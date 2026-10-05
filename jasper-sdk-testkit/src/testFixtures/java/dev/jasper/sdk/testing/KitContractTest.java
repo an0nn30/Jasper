@@ -67,7 +67,7 @@ public abstract class KitContractTest {
             List.of(new Nodes.Text(id+".title",ControlState.READY,id+" tab",Nodes.TextRole.BODY)),List.of(new Nodes.Text(id+".detail",ControlState.READY,"Tabs",Nodes.TextRole.DESCRIPTION)),
             List.of(new Nodes.Text(id+".tag",ControlState.READY,"Cmd+T",Nodes.TextRole.CAPTION))));
         return new ViewSpec(new Nodes.Stack("palette",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
-            new Nodes.Field("query",ControlState.READY,Nodes.FieldKind.SEARCH,"tab","Search everything","Search all",""),
+            new Nodes.Field("query",ControlState.READY,Nodes.FieldKind.SEARCH,"tab","Search everything","Search all","",Optional.empty(),Nodes.FieldPresentation.TRANSPARENT),
             new Nodes.ItemList("results",ControlState.READY,Nodes.ListKind.RESULTS,items,Set.of(selected),"run",List.of(),Nodes.SelectionMode.SINGLE,Optional.empty(),OptionalInt.of(visibleRows)))));
     }
     @Test void resultListsMountUpdateAndReportPressesAndComposition() throws Exception { edt(() -> {

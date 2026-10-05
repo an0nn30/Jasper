@@ -127,7 +127,10 @@ final class TextFields {
         @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(labelShown()); }
         @Override void hero(boolean value) { surface.hero=value; label.setVisible(labelShown()); }
         /** A search field is labelled by its glyph and hint; its label stays its accessible name only. */
-        boolean labelShown() { return !embedded && !surface.hero && ((Nodes.Field)node).kind() != Nodes.FieldKind.SEARCH; }
+        boolean labelShown() {
+            var field = (Nodes.Field)node;
+            return !embedded && !surface.hero && field.kind() != Nodes.FieldKind.SEARCH && field.presentation() == Nodes.FieldPresentation.STANDARD;
+        }
         static int uncommitted(java.awt.event.InputMethodEvent event) {
             var text = event.getText();
             if (text == null) return 0;
@@ -158,6 +161,7 @@ final class TextFields {
             input.getAccessibleContext().setAccessibleDescription(bounds.isEmpty() ? described : described.isEmpty() ? bounds : described + ". " + bounds);
             label.setText(field.label()); label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
             label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY)); label.setEnabled(component.isEnabled());
+            surface.transparent = field.presentation() == Nodes.FieldPresentation.TRANSPARENT;
             error.setText(field.state().error()); error.setVisible(!field.state().error().isEmpty());
             error.setEnabled(component.isEnabled());
             error.setFont(ThemePainting.font(context(), Typography.Role.CAPTION)); error.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ERROR));
@@ -236,6 +240,8 @@ final class TextFields {
         boolean hero;
         final KitContext context; final JTextComponent input; final boolean multiline;
         Typography.Role role = Typography.Role.BODY; String hint = ""; boolean error;
+        /** The parent surface is the field's backdrop: no input fill, the outline kept. */
+        boolean transparent;
         ThemePainting.Focus focus;
         FieldSurface(KitContext context, JTextComponent input, boolean multiline) {
             super(new BorderLayout()); this.context = context; this.input = input; this.multiline = multiline; setOpaque(false);
@@ -269,7 +275,7 @@ final class TextFields {
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create();
             try {
-                ThemePainting.rounded(g, this, context, ThemePainting.color(context, SemanticColor.SURFACE_INPUT),
+                ThemePainting.rounded(g, this, context, transparent ? null : ThemePainting.color(context, SemanticColor.SURFACE_INPUT),
                     ThemePainting.color(context, error ? SemanticColor.BORDER_ERROR : focus.visible() ? SemanticColor.BORDER_FOCUS : SemanticColor.BORDER_INPUT),
                     focus.visible(), error);
             } finally { g.dispose(); }

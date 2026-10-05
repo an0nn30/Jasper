@@ -275,6 +275,40 @@ class ResultsKitTest {
         });
     }
 
+    /** Fields a host composition labels (and, transparent, backs): no visible label, the name kept, the outline kept. */
+    @Test void embeddedFieldsLeaveTheLabelToTheHostAndTransparentOnesShowTheParentSurface() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            Node standard = new Field("standard", READY, FieldKind.TEXT, "", "", "Standard", "");
+            Node embedded = new Field("embedded", READY, FieldKind.TEXT, "", "", "Embedded", "", Optional.empty(), FieldPresentation.EMBEDDED);
+            Node transparent = new Field("transparent", READY, FieldKind.SEARCH, "", "", "Transparent", "", Optional.empty(), FieldPresentation.TRANSPARENT);
+            assertThat(((Field) standard).presentation()).as("the prior constructors stay standard").isEqualTo(FieldPresentation.STANDARD);
+            try (var view = new KitView(context, stack(standard, embedded, transparent), e -> { })) {
+                view.setSize(UIScale.scale(300), view.getPreferredSize().height); InteractiveRowsTest.layout(view);
+                assertThat(find(view, "standard.label", JLabel.class).isVisible()).isTrue();
+                assertThat(find(view, "embedded.label", JLabel.class).isVisible()).as("the host lays out the label").isFalse();
+                assertThat(editor(view, "embedded").getAccessibleContext().getAccessibleName()).isEqualTo("Embedded");
+                assertThat(find(view, "embedded.label", JLabel.class).getLabelFor()).isSameAs(editor(view, "embedded"));
+                assertThat(find(view, "transparent.label", JLabel.class).isVisible()).isFalse();
+                var semantic = context.theme().semantic();
+                var image = new java.awt.image.BufferedImage(view.getWidth(), view.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                var g = image.createGraphics(); try { view.paint(g); } finally { g.dispose(); }
+                java.util.function.BiFunction<String, Point, Color> at = (id, p) -> {
+                    var surface = SwingUtilities.getAncestorOfClass(TextFields.FieldSurface.class, editor(view, id));
+                    var point = SwingUtilities.convertPoint(surface, p, view); return new Color(image.getRGB(point.x, point.y), true);
+                };
+                var embeddedSurface = SwingUtilities.getAncestorOfClass(TextFields.FieldSurface.class, editor(view, "embedded"));
+                var transparentSurface = SwingUtilities.getAncestorOfClass(TextFields.FieldSurface.class, editor(view, "transparent"));
+                assertThat(at.apply("embedded", new Point(embeddedSurface.getWidth() - UIScale.scale(4), embeddedSurface.getHeight() / 2)))
+                    .as("an embedded field keeps the input fill").isEqualTo(semantic.color(SemanticColor.SURFACE_INPUT));
+                assertThat(at.apply("transparent", new Point(transparentSurface.getWidth() - UIScale.scale(4), transparentSurface.getHeight() / 2)).getAlpha())
+                    .as("a transparent field shows its parent surface").isZero();
+                assertThat(at.apply("transparent", new Point(transparentSurface.getWidth() / 2, 0)))
+                    .as("and keeps its outline").isEqualTo(semantic.color(SemanticColor.BORDER_INPUT));
+            } finally { release(context); }
+        });
+    }
+
     @Test void fieldsReportWhileAnInputMethodComposesAndSearchFieldsKeepTheirLabelOnlyAsAName() {
         Edt.run(() -> {
             var context = KitFixtures.context();

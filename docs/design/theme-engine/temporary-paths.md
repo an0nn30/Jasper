@@ -269,7 +269,8 @@ FlatLaf style: the former readers of `List.foreground`/`List.background`/`List.s
 (the JList renderer, the `JTextField` with its `DocumentFilter`, the chip, hint and step `JLabel`s) were rewritten as kit
 descriptors. Remaining raw Swing in the family is layout only: the card shell (rounded clip and hairline outline painted
 from `border.menu` over `surface.card`, `PALETTE_*`/`RESULTS_*` named metrics with the former values), the fixed-height
-query row and hint bar (a `border.subtle` rule), the CardLayout centre and the query-only focus traversal policy. The
+query row and hint bar (a `border.subtle` rule), the step form's rows (fixed heights, 140 px label column, 10 px gap;
+`PALETTE_STEP_*`), the CardLayout centre and the query-only focus traversal policy. The
 keys stay published for their other consumers (6c pluginmanager/notifications, Tasks 7–10 plugins) until Task 11.
 
 Task 11 dependency (ruling P5): SDK `PaletteRow.icon`/`ScopeSpec.icon` are still raw `Optional<Icon>`. The kit palette

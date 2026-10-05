@@ -141,6 +141,40 @@ class CommandPaletteTest {
         });
     }
 
+    /**
+     * A key typed before the field shows the normalized query still carries the consumed prefix; the palette strips it,
+     * as the old synchronous prefix filter did, so the chip's query is only what was typed after it.
+     */
+    @Test void aKeyQueuedBeforeTheChipSettlesStillLeavesThePrefixOut() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var chips = new ArrayList<String>();
+            CommandPalette[] holder = new CommandPalette[1];
+            // As the controller: a prefix makes a chip only while none is set.
+            holder[0] = new CommandPalette(KitTestSupport.context(), true, query -> { }, (entry, verb) -> { },
+                text -> holder[0].chipText() != null ? java.util.Optional.empty() : ScopePrefix.parse(text, List.of(COMMANDS, HISTORY)),
+                scope -> { chips.add(scope.id()); holder[0].setChip(scope.label(), null); });
+            var palette = holder[0];
+            var query = PaletteTestSupport.query(palette);
+            query.setText("hist > ");
+            assertThat(chips).containsExactly("test.history");
+            assertThat(palette.queryText()).isEmpty();
+            try { query.getDocument().insertString(query.getDocument().getLength(), "l", null); }
+            catch (javax.swing.text.BadLocationException failure) { throw new AssertionError(failure); }
+            assertThat(palette.queryText()).as("the queued key's text without the consumed prefix").isEqualTo("l");
+            PaletteTestSupport.settle();
+            assertThat(palette.chipText()).isEqualTo("History");
+            assertThat(chips).as("one chip").containsExactly("test.history");
+            assertThat(palette.queryText()).isEqualTo("l");
+            assertThat(query.getText()).isEqualTo("l");
+            assertThat(query.getCaretPosition()).as("the caret after the typed text").isEqualTo(1);
+            query.replaceSelection("s");
+            assertThat(palette.queryText()).isEqualTo("ls");
+            query.setText("hist > x");
+            assertThat(palette.queryText()).as("once settled, text that looks like the prefix is ordinary text").isEqualTo("hist > x");
+            palette.close();
+        });
+    }
+
     @Test void allGroupsRowsUnderHeadersAndSelectionSkipsThem() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var palette = palette(new ArrayList<>());
@@ -323,6 +357,13 @@ class CommandPaletteTest {
                     assertThat(palette.contains(palette.getWidth() / 2, 1)).isTrue();
                     var fieldRow = PaletteTestSupport.fieldRow(palette);
                     assertPixel(image, at(fieldRow, fieldRow.getWidth() - UIScale.scale(3), fieldRow.getHeight() / 2, palette), semantic.color(SemanticColor.SURFACE_CARD), name + " field row");
+                    // One surface throughout: the query field is the card's colour inside its input outline.
+                    assertThat(((Nodes.Field) palette.queryView().spec().root()).presentation()).isEqualTo(Nodes.FieldPresentation.TRANSPARENT);
+                    var input = PaletteTestSupport.query(palette);
+                    var surface = (JComponent) input.getParent();
+                    assertPixel(image, at(surface, surface.getWidth() - UIScale.scale(4), surface.getHeight() / 2, palette),
+                        semantic.color(SemanticColor.SURFACE_CARD), name + " the field is the card's colour");
+                    assertPixel(image, at(surface, surface.getWidth() / 2, 0, palette), semantic.color(SemanticColor.BORDER_INPUT), name + " field outline");
                     Component selected = row(palette, 1), plain = row(palette, 2), rule = row(palette, 3);
                     assertPixel(image, at(selected, selected.getWidth() - 12, 3, palette), semantic.color(SemanticColor.SELECTION_BG), name + " selection");
                     assertPixel(image, at(plain, plain.getWidth() - 3, 3, palette), semantic.color(SemanticColor.SURFACE_CARD), name + " row");
@@ -495,10 +536,35 @@ class CommandPaletteTest {
             assertThat(fields.getFirst().getAccessibleContext().getAccessibleName()).isEqualTo("branch");
             assertThat(palette.stepFocusIndex()).isZero();
             assertThat(palette.stepTitleText()).isEqualTo("Rebase");
-            assertThat(KitTestSupport.require(palette.stepView(), CommandPalette.STEP + ".title", JLabel.class).getText()).isEqualTo("Rebase");
+            assertThat(KitTestSupport.require(palette.stepPanel(), CommandPalette.STEP + ".title", JLabel.class).getText()).isEqualTo("Rebase");
             assertThat(palette.hintBar().isVisible()).isFalse();
             Insets insets = palette.getInsets();
             assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(44 + 22 + 2 * 40) + insets.top + insets.bottom);
+            // The laid-out form keeps the former geometry: a 22 px title row, 40 px field rows padded 4/12, a 140 px
+            // label column and a 10 px gap before the field.
+            palette.setSize(palette.getPreferredSize());
+            layoutTree(palette);
+            var panel = palette.stepPanel();
+            var titleRow = palette.stepTitleRow();
+            assertThat(titleRow.getHeight()).isEqualTo(UIScale.scale(22));
+            assertThat(SwingUtilities.convertPoint(KitTestSupport.require(panel, CommandPalette.STEP + ".title", JLabel.class), 0, 0, titleRow).x)
+                .as("the title is inset like the rows").isEqualTo(UIScale.scale(12));
+            for (int i = 0; i < 2; i++) {
+                var row = palette.stepRow(i);
+                assertThat(row.getHeight()).as("row %d", i).isEqualTo(UIScale.scale(40));
+                assertThat(SwingUtilities.convertPoint(row, 0, 0, panel).y).isEqualTo(UIScale.scale(22) + i * UIScale.scale(40));
+                var label = palette.stepLabelView(i);
+                assertThat(label.getX()).isEqualTo(UIScale.scale(12));
+                assertThat(label.getWidth()).as("the label column").isEqualTo(UIScale.scale(140));
+                assertThat(KitTestSupport.require(label, CommandPalette.STEP + ".label." + i, JLabel.class).getText()).isEqualTo(i == 0 ? "branch" : "remote");
+                var field = palette.stepFieldView(i);
+                assertThat(field.getX()).as("a 10 px gap").isEqualTo(UIScale.scale(12 + 140 + 10));
+                assertThat(field.getY()).isEqualTo(UIScale.scale(4));
+                assertThat(field.getHeight()).isEqualTo(UIScale.scale(40 - 2 * 4));
+                assertThat(row.getWidth() - field.getX() - field.getWidth()).isEqualTo(UIScale.scale(12));
+                assertThat(KitTestSupport.find(field, CommandPalette.STEP + ".field." + i + ".label", JLabel.class).isVisible())
+                    .as("the row's label column labels the field").isFalse();
+            }
             palette.focusStepField(1);
             assertThat(palette.stepFocusIndex()).isEqualTo(1);
             palette.focusStepField(1);
@@ -509,13 +575,17 @@ class CommandPaletteTest {
             assertThat(palette.stepValues()).hasSize(2).containsEntry("branch", "main").containsEntry("remote", "origin");
             palette.setStepError("Nope");
             assertThat(palette.stepErrorText()).isEqualTo("Nope");
-            assertThat(KitTestSupport.require(palette.stepView(), CommandPalette.STEP + ".error", JComponent.class).isVisible()).isTrue();
-            assertThat(KitTestSupport.require(palette.stepView(), CommandPalette.STEP + ".error.text", JLabel.class).getText()).isEqualTo("Nope");
+            assertThat(KitTestSupport.require(palette.stepPanel(), CommandPalette.STEP + ".error", JComponent.class).isVisible()).isTrue();
+            assertThat(KitTestSupport.require(palette.stepPanel(), CommandPalette.STEP + ".error.text", JLabel.class).getText()).isEqualTo("Nope");
             assertThat(fields.get(1).getText()).as("an error keeps what was typed").isEqualTo("origin");
             assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(44 + 22 + 2 * 40 + 22) + insets.top + insets.bottom);
+            palette.setSize(palette.getPreferredSize());
+            layoutTree(palette);
+            assertThat(palette.stepErrorRow().getHeight()).as("the error row").isEqualTo(UIScale.scale(22));
+            assertThat(SwingUtilities.convertPoint(palette.stepErrorRow(), 0, 0, palette.stepPanel()).y).isEqualTo(UIScale.scale(22 + 2 * 40));
             palette.setStepError(null);
             assertThat(palette.stepErrorText()).isNull();
-            assertThat(KitTestSupport.require(palette.stepView(), CommandPalette.STEP + ".error", JComponent.class).isVisible()).isFalse();
+            assertThat(KitTestSupport.require(palette.stepPanel(), CommandPalette.STEP + ".error", JComponent.class).isVisible()).isFalse();
             palette.hideStep();
             assertThat(palette.stepShowing()).isFalse();
             assertThat(PaletteTestSupport.stepFields(palette)).isEmpty();

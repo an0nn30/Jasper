@@ -132,6 +132,32 @@ class PaletteScopesTest {
         });
     }
 
+    /** Review I1: a key queued before the field shows the chip's query must not bring the consumed prefix back. */
+    @Test void aKeyQueuedBeforeTheChipSettlesKeepsThePrefixOutOfTheQuery() throws Exception {
+        edt(() -> {
+            try (var owner = owner(true)) {
+                install(owner);
+                var fake = new FakeScope();
+                fake.rows = List.of(PaletteRow.of("alpha", "Alpha"), PaletteRow.of("lima", "lima"));
+                owner.scopes().register(fake);
+                var palette = owner.commandPalette(); var card = palette.component();
+                palette.toggle();
+                var query = PaletteTestSupport.query(card);
+                query.setText("fake > ");
+                assertThat(palette.activeScopeId()).isEqualTo("test.fake");
+                try { query.getDocument().insertString(query.getDocument().getLength(), "l", null); }
+                catch (javax.swing.text.BadLocationException failure) { throw new AssertionError(failure); }
+                PaletteTestSupport.settle();
+                assertThat(palette.activeScopeId()).isEqualTo("test.fake");
+                assertThat(PaletteTestSupport.chipText(card)).isEqualTo("Fake");
+                assertThat(PaletteTestSupport.queryText(card)).isEqualTo("l");
+                assertThat(query.getText()).isEqualTo("l");
+                assertThat(query.getCaretPosition()).isEqualTo(1);
+                assertThat(PaletteTestSupport.entries(card)).as("the chip's query searches").contains("test.fake/alpha", "test.fake/lima");
+            }
+        });
+    }
+
     @Test void typedPrefixesSetTheChipAndBackspaceRemovesIt() throws Exception {
         edt(() -> {
             try (var owner = owner(true)) {

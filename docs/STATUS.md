@@ -2,7 +2,7 @@
 
 ## Current state — 2026-10-05
 
-- **Theme engine Plan 2 Task 6b-2 implemented (command palette); review pending** (2026-10-05). Carried preliminary
+- **Theme engine Plan 2 Task 6b-2 implemented (command palette); review fix round 1 done, re-review pending** (2026-10-05). Carried preliminary
   fix first: Settings' `okSettings` and the chooser's `chooser.approve` window Enter bindings are disabled while OK/the
   primary is (spec §6), so Enter is then not consumed, like a disabled default button. Kit additions next (spec §6,
   mirrored in SDK, host `KitValues`/`HostedKitView`, testkit fake and `KitContractTest`, SDK version unchanged):
@@ -12,13 +12,19 @@
   (fake `setComposing`); SEARCH fields no longer show a label (accessible name only), which also restores the
   pre-Plan-2 look of the Settings and chooser search fields. The palette card is a layout-only shell on the chrome
   context (`PALETTE_*` metrics, exact geometry tests kept) hosting kit views for the chip, query, results, empty line,
-  hint bar and step form; no UIManager/FlatLaf reads remain. Scopes, recents, verbs and keys, selection persistence,
-  IME suppression and focus are unchanged; a typed scope prefix becomes the chip through host normalization of
-  `Edited`. `WindowCommandPalette` passes the context and uses `focusQuery()`. Query, caret, selection and scroll
+  hint bar and step form; no UIManager/FlatLaf reads remain. Scopes, recents, verbs and keys, selection persistence
+  and IME suppression are unchanged, and the query keeps focus for keys and row presses; the hint verbs are now
+  focusable kit LINK buttons that act on release (a click moves focus off the query until the palette closes or a step
+  takes it). A typed scope prefix becomes the chip through host normalization of `Edited`. `WindowCommandPalette` passes the context and uses `focusQuery()`. Query, caret, selection and scroll
   survive a theme switch (tested). Until Task 11: plugin palette row icons are omitted (raw SDK icons) and the chip has
-  no icon. GUI checks for the user: palette look, click-to-run, IME composition, Tab in steps.
+  no icon. Fix round 1: a key queued before the field shows the chip's query no longer brings the consumed prefix back;
+  the step form keeps its former geometry (140 px label column, 40 px rows padded 4/12, 10 px gap; named
+  `PALETTE_STEP_*` metrics on shell rows); the query is again the card's colour inside its outline through the new
+  `Field.presentation` (STANDARD/EMBEDDED/TRANSPARENT, mirrored in SDK, host and fake). GUI checks for the user: palette
+  look, click-to-run, IME composition, Tab in steps, hint-verb clicks, and TEXT_SECONDARY on SELECTION_BG contrast in
+  palette rows.
 
-- **Theme engine Plan 2 Task 6b-1 implemented (files chooser, shortcuthelp/Keymap); review pending** (2026-10-05).
+- **Theme engine Plan 2 Task 6b-1 complete (files chooser, shortcuthelp/Keymap); review clean after fix round 3** (2026-10-05).
   Controller split 6b into 6b-1 and 6b-2 (palette). Kit additions first (`b5b5597b`, spec §6), mirrored in SDK, host
   `KitValues`, testkit fake and `KitContractTest`, SDK version unchanged (Task 11): `Column` weight/sort with
   `UiEvent.Sorted`, `TableRow.muted`, per-row context menus on `TableRow`/`TreeItem` (trees gain menus), `TreeItem`

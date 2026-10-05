@@ -38,6 +38,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.ObjIntConsumer;
 import javax.swing.Icon;
+import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.border.AbstractBorder;
 import javax.swing.border.EmptyBorder;
@@ -62,8 +63,10 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
     private final Function<String, Optional<ScopePrefix>> prefixes;
     private final Consumer<PaletteScope> chipTyped;
     private final List<KitView> views = new ArrayList<>();
-    private final KitView chipView, queryView, resultsView, emptyView, hintView, stepView;
-    private final JPanel fieldRow, hintBar, cards;
+    private final KitView chipView, queryView, resultsView, emptyView, hintView, stepTitleView, stepErrorView;
+    private final JPanel fieldRow, hintBar, cards, stepPanel, stepTitleRow, stepErrorRow;
+    /** One shell row per step field: a fixed label column and the field, each its own kit view. */
+    private final List<StepRow> stepRows = new ArrayList<>();
     private final CardLayout cardLayout = new CardLayout();
     private final AutoCloseable themeSubscription;
     private int visibleRows = dev.jasper.app.config.PaletteSettings.DEFAULT_VISIBLE_ROWS;
@@ -121,12 +124,25 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         var empty = new JPanel(new GridBagLayout());
         empty.setOpaque(false);
         empty.add(emptyView);
-        stepView = view(stepSpec());
+        stepTitleView = view(stepTitleSpec());
+        stepErrorView = view(stepErrorSpec());
+        stepTitleRow = new FixedHeightPanel(DesignMetrics.Role.PALETTE_STEP_TITLE_HEIGHT);
+        stepTitleRow.setLayout(new BorderLayout());
+        stepTitleRow.setOpaque(false);
+        stepTitleRow.add(stepTitleView, BorderLayout.CENTER);
+        stepErrorRow = new FixedHeightPanel(DesignMetrics.Role.PALETTE_STEP_TITLE_HEIGHT);
+        stepErrorRow.setLayout(new BorderLayout());
+        stepErrorRow.setOpaque(false);
+        stepErrorRow.add(stepErrorView, BorderLayout.CENTER);
+        stepErrorRow.setVisible(false);
+        stepPanel = new JPanel();
+        stepPanel.setLayout(new javax.swing.BoxLayout(stepPanel, javax.swing.BoxLayout.Y_AXIS));
+        stepPanel.setOpaque(false);
         cards = new JPanel(cardLayout);
         cards.setOpaque(false);
         cards.add(resultsView, RESULTS);
         cards.add(empty, EMPTY);
-        cards.add(stepView, STEP);
+        cards.add(stepPanel, STEP);
         cardLayout.show(cards, listCard);
         add(cards, BorderLayout.CENTER);
 
@@ -160,8 +176,9 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
 
     private ViewSpec querySpec() {
         String name = chip == null ? "All" : chip;
+        // One surface throughout: the query shows the card inside its input outline, as before.
         return new ViewSpec(new Nodes.Field(QUERY, ControlState.READY, Nodes.FieldKind.SEARCH, query, placeholder,
-            "Search " + name.toLowerCase(Locale.ROOT), ""));
+            "Search " + name.toLowerCase(Locale.ROOT), "", Optional.empty(), Nodes.FieldPresentation.TRANSPARENT));
     }
 
     private ViewSpec resultsSpec() {
@@ -216,20 +233,58 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         return new ViewSpec(new Nodes.Stack(HINT, ControlState.READY, Nodes.LayoutRole.NAVIGATION, children));
     }
 
-    private ViewSpec stepSpec() {
-        var children = new ArrayList<Nodes.Node>();
-        children.add(text(STEP + ".title", stepTitle == null ? "" : stepTitle, Nodes.TextRole.CAPTION));
-        for (int i = 0; i < stepFields.size(); i++) {
-            PaletteStep.Field field = stepFields.get(i);
-            String label = field.label().isBlank() ? field.name() : field.label();
-            children.add(new Nodes.FormRow(STEP + ".row." + i, ControlState.READY, label, "",
-                new Nodes.Field(STEP_FIELD + i, ControlState.READY, Nodes.FieldKind.TEXT, stepTexts.get(i), "", label, ""), Optional.empty()));
-        }
+    private ViewSpec stepTitleSpec() {
+        return new ViewSpec(text(STEP + ".title", stepTitle == null ? "" : stepTitle, Nodes.TextRole.CAPTION));
+    }
+
+    private ViewSpec stepErrorSpec() {
         var shown = new ControlState(stepError != null, true, false, "");
-        children.add(new Nodes.Stack(STEP + ".error", shown, Nodes.LayoutRole.INLINE, List.of(
+        return new ViewSpec(new Nodes.Stack(STEP + ".error", shown, Nodes.LayoutRole.INLINE, List.of(
             new Nodes.StatusDot(STEP + ".error.status", ControlState.READY, Nodes.StatusKind.DANGER),
             text(STEP + ".error.text", stepError == null ? "" : stepError, Nodes.TextRole.BODY))));
-        return new ViewSpec(new Nodes.Stack(STEP, ControlState.READY, Nodes.LayoutRole.VERTICAL, children));
+    }
+
+    private static String stepLabel(PaletteStep.Field field) { return field.label().isBlank() ? field.name() : field.label(); }
+
+    /** The row's own label column names the field, so the field is EMBEDDED: its label stays its accessible name. */
+    private ViewSpec stepFieldSpec(int index) {
+        return new ViewSpec(new Nodes.Field(STEP_FIELD + index, ControlState.READY, Nodes.FieldKind.TEXT, stepTexts.get(index), "",
+            stepLabel(stepFields.get(index)), "", Optional.empty(), Nodes.FieldPresentation.EMBEDDED));
+    }
+
+    /** Rebuilds the step's rows: the title row, one row per field and the (hidden) error row. */
+    private void buildStepRows() {
+        clearStepRows();
+        stepPanel.add(stepTitleRow);
+        for (int i = 0; i < stepFields.size(); i++) {
+            var row = new StepRow(view(new ViewSpec(text(STEP + ".label." + i, stepLabel(stepFields.get(i)), Nodes.TextRole.CAPTION))), view(stepFieldSpec(i)));
+            stepRows.add(row);
+            stepPanel.add(row);
+        }
+        stepPanel.add(stepErrorRow);
+        stepPanel.add(javax.swing.Box.createVerticalGlue());
+        applyStepGeometry();
+    }
+
+    private void clearStepRows() {
+        for (StepRow row : stepRows) {
+            row.label.close(); row.field.close();
+            views.remove(row.label); views.remove(row.field);
+        }
+        stepRows.clear();
+        stepPanel.removeAll();
+    }
+
+    /** The former step geometry: 4/12 row padding, a fixed label column and a gap before the field. */
+    private void applyStepGeometry() {
+        int side = scaled(DesignMetrics.Role.PALETTE_STEP_SIDE_PADDING), vertical = scaled(DesignMetrics.Role.PALETTE_STEP_ROW_PADDING);
+        stepTitleRow.setBorder(new EmptyBorder(0, side, 0, side));
+        stepErrorRow.setBorder(new EmptyBorder(0, side, 0, side));
+        for (StepRow row : stepRows) {
+            row.setBorder(new EmptyBorder(vertical, side, vertical, side));
+            ((BorderLayout) row.getLayout()).setHgap(scaled(DesignMetrics.Role.PALETTE_STEP_LABEL_GAP));
+        }
+        stepPanel.revalidate();
     }
 
     private void render(KitView view, ViewSpec spec) { if (!view.isClosed()) view.update(spec); }
@@ -239,7 +294,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
     private void event(UiEvent event) {
         if (closed) return;
         switch (event) {
-            case UiEvent.Edited edited when edited.id().equals(QUERY) -> edited(edited.text());
+            case UiEvent.Edited edited when edited.id().equals(QUERY) -> edited(edited.text(), true);
             case UiEvent.Edited edited when edited.id().startsWith(STEP_FIELD) -> {
                 int index = Integer.parseInt(edited.id().substring(STEP_FIELD.length()));
                 if (index < stepTexts.size()) stepTexts.set(index, edited.text());
@@ -253,16 +308,38 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
     }
 
     /**
-     * The query changed, typed or set by the host. A scope prefix typed with no chip ("history > ls") leaves the query
-     * and becomes the chip, as the field's prefix filter did; deleting text never makes a chip.
+     * The scope prefix text a chip consumed while the field may still show it. The kit applies the shortened query one
+     * event-loop turn after the edit (Swing forbids document writes while it notifies), so a key queued before then
+     * reports text that still begins with the prefix; that text is stripped, as the old synchronous filter never let
+     * it into the field. Cleared once the field shows the query, or by any edit without the prefix.
      */
-    private void edited(String text) {
+    private String consumedPrefix;
+
+    /**
+     * The query changed, typed ({@code typed}) or set by the host. A scope prefix typed with no chip ("history > ls")
+     * leaves the query and becomes the chip, as the field's prefix filter did; deleting text never makes a chip.
+     */
+    private void edited(String text, boolean typed) {
+        if (consumedPrefix != null) {
+            if (typed && text.startsWith(consumedPrefix)) text = text.substring(consumedPrefix.length());
+            else consumedPrefix = null;
+        }
         String previous = query;
         Optional<ScopePrefix> prefix = text.equals(previous) || removal(previous, text) ? Optional.empty() : prefixes.apply(text);
+        if (prefix.isPresent()) consumedPrefix = text.substring(0, text.length() - prefix.get().rest().length());
         query = prefix.map(ScopePrefix::rest).orElse(text);
         render(queryView, querySpec());
+        if (consumedPrefix != null) settleConsumedPrefix();
         queryChanged.accept(query);
         prefix.ifPresent(found -> chipTyped.accept(found.scope()));
+    }
+
+    /** After the kit's own deferred update (queued first), forgets the consumed prefix once the field shows the query. */
+    private void settleConsumedPrefix() {
+        java.awt.EventQueue.invokeLater(() -> {
+            if (closed || consumedPrefix == null) return;
+            if (queryInput() instanceof JTextComponent input && input.getText().equals(query)) consumedPrefix = null;
+        });
     }
 
     /** Whether {@code next} is {@code previous} with one stretch of it deleted. */
@@ -293,7 +370,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
     }
 
     /** Replaces the query as if typed (a typed scope prefix still becomes the chip); the same text changes nothing. */
-    void setQueryText(String text) { if (!Objects.requireNonNull(text).equals(query)) edited(text); }
+    void setQueryText(String text) { if (!Objects.requireNonNull(text).equals(query)) edited(text, false); }
 
     /** Shows {@code label}'s chip, or none for null; the field and list are named after it. The icon stays off the chip. */
     void setChip(String label, Icon ignoredIcon) {
@@ -434,7 +511,10 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         stepTexts.clear();
         for (PaletteStep.Field field : stepFields) stepTexts.add(field.prefill());
         stepError = null;
-        render(stepView, stepSpec());
+        render(stepTitleView, stepTitleSpec());
+        render(stepErrorView, stepErrorSpec());
+        stepErrorRow.setVisible(false);
+        buildStepRows();
         cardLayout.show(cards, STEP);
         hintBar.setVisible(false);
         stepFocus = -1;
@@ -448,7 +528,10 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         stepTexts.clear();
         stepError = null;
         stepFocus = -1;
-        render(stepView, stepSpec());
+        clearStepRows();
+        render(stepTitleView, stepTitleSpec());
+        render(stepErrorView, stepErrorSpec());
+        stepErrorRow.setVisible(false);
         hintBar.setVisible(true);
         cardLayout.show(cards, listCard);
         revalidate(); repaint();
@@ -465,14 +548,15 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
     void focusStepField(int delta) {
         if (stepFields.isEmpty()) return;
         stepFocus = Math.floorMod(stepFocus + delta, stepFields.size());
-        if (stepView.isClosed()) return;
-        stepView.focus(STEP_FIELD + stepFocus);
+        var view = stepRows.get(stepFocus).field;
+        if (view.isClosed()) return;
+        view.focus(STEP_FIELD + stepFocus);
         var input = stepInput(stepFocus);
         if (input != null) input.selectAll();
     }
 
     /** The mounted kit input of the {@code index}th step field (kit components are named after their node). */
-    JTextComponent stepInput(int index) { return find(stepView, STEP_FIELD + index + ".input", JTextComponent.class); }
+    JTextComponent stepInput(int index) { return find(stepRows.get(index).field, STEP_FIELD + index + ".input", JTextComponent.class); }
 
     Map<String, String> stepValues() {
         var values = new LinkedHashMap<String, String>();
@@ -482,7 +566,8 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
 
     void setStepError(String message) {
         stepError = message;
-        render(stepView, stepSpec());
+        render(stepErrorView, stepErrorSpec());
+        stepErrorRow.setVisible(message != null);
         revalidate(); repaint();
     }
 
@@ -495,8 +580,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         int vertical = scaled(DesignMetrics.Role.PALETTE_FIELD_VERTICAL_PADDING), side = scaled(DesignMetrics.Role.PALETTE_FIELD_SIDE_PADDING);
         fieldRow.setBorder(new EmptyBorder(vertical, side, vertical, side));
         ((BorderLayout) fieldRow.getLayout()).setHgap(scaled(DesignMetrics.Role.PALETTE_CHIP_GAP));
-        int step = scaled(DesignMetrics.Role.PALETTE_STEP_SIDE_PADDING), stepRow = scaled(DesignMetrics.Role.PALETTE_STEP_ROW_PADDING);
-        stepView.setBorder(new EmptyBorder(stepRow, step, stepRow, step));
+        applyStepGeometry();
         revalidate();
         repaint();
     }
@@ -565,7 +649,12 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
     KitView chipView() { return chipView; }
     KitView resultsView() { return resultsView; }
     KitView hintView() { return hintView; }
-    KitView stepView() { return stepView; }
+    JPanel stepPanel() { return stepPanel; }
+    JPanel stepTitleRow() { return stepTitleRow; }
+    JPanel stepErrorRow() { return stepErrorRow; }
+    JPanel stepRow(int index) { return stepRows.get(index); }
+    JComponent stepLabelView(int index) { return stepRows.get(index).labelColumn; }
+    KitView stepFieldView(int index) { return stepRows.get(index).field; }
     KitView emptyView() { return emptyView; }
     JPanel fieldRow() { return fieldRow; }
     JPanel hintBar() { return hintBar; }
@@ -585,7 +674,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
     }
 
     /** A panel whose height is fixed in logical pixels, so the query row and hint bar stay put under any font. */
-    private final class FixedHeightPanel extends JPanel {
+    private class FixedHeightPanel extends JPanel {
         private final DesignMetrics.Role height;
 
         FixedHeightPanel(DesignMetrics.Role height) { this.height = height; }
@@ -593,6 +682,27 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         @Override public Dimension getMinimumSize() { return new Dimension(0, scaled(height)); }
         @Override public Dimension getPreferredSize() { return new Dimension(super.getPreferredSize().width, scaled(height)); }
         @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, scaled(height)); }
+    }
+
+    /** A step field's row: fixed height, the label column at a fixed width, the field filling the rest. */
+    private final class StepRow extends FixedHeightPanel {
+        final KitView label, field;
+        final JPanel labelColumn = new JPanel(new BorderLayout()) {
+            @Override public Dimension getPreferredSize() {
+                return new Dimension(scaled(DesignMetrics.Role.PALETTE_STEP_LABEL_WIDTH), super.getPreferredSize().height);
+            }
+        };
+
+        StepRow(KitView label, KitView field) {
+            super(DesignMetrics.Role.PALETTE_STEP_ROW_HEIGHT);
+            this.label = label; this.field = field;
+            setLayout(new BorderLayout());
+            setOpaque(false);
+            labelColumn.setOpaque(false);
+            labelColumn.add(label, BorderLayout.CENTER);
+            add(labelColumn, BorderLayout.LINE_START);
+            add(field, BorderLayout.CENTER);
+        }
     }
 
     /** The hint bar: a hairline rule in {@code border.subtle} above the detail and verb links. */

@@ -170,7 +170,7 @@ unique within their owning control; references resolve only in that control. Do 
 | Button | `String label, String icon, ButtonKind kind, String action, String tooltip` |
 | MenuButton | `String label, String icon, ButtonKind kind, String action, List<MenuItem> items, String tooltip` |
 | StatusDot | `StatusKind kind` |
-| Field | `FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric` (present exactly for NUMBER) |
+| Field | `FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation` (numeric present exactly for NUMBER) |
 | Secret | `String hint, String label, String revealGroup, SecretKind kind, String copyAction` (no string value) |
 | Choice | `ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon, Optional<ChoiceSearch> search` (present exactly for SEARCHABLE) |
 | Toggle | `String label, boolean checked, String action, boolean compact` |
@@ -208,7 +208,7 @@ BODY_STRONG/LABEL/DESCRIPTION/CAPTION/SECTION_LABEL/COUNT/CHIP/MONO/MONO_SMALL; 
 BLUE/GREEN/AMBER/PURPLE/NEUTRAL/NONE; IconSize is CAPTION/CONTROL/RAIL/EMPTY/HERO;
 ButtonKind is PRIMARY/SECONDARY/GHOST/DESTRUCTIVE_GHOST/LINK;
 StatusKind is SUCCESS/WARNING/DANGER/IDLE;
-FieldKind is TEXT/SEARCH/PORT/PATH/TEXTAREA/NUMBER; ChoiceKind is DROPDOWN/PICKER/SEGMENTED/SEARCHABLE;
+FieldKind is TEXT/SEARCH/PORT/PATH/TEXTAREA/NUMBER; FieldPresentation is STANDARD/EMBEDDED/TRANSPARENT; ChoiceKind is DROPDOWN/PICKER/SEGMENTED/SEARCHABLE;
 CardKind is FORM/SETTINGS/MIXED; ListKind is SINGLE/DOUBLE/COMPACT/ORDERED/RESULTS; SelectionMode is SINGLE/MULTIPLE;
 FormKind is HERO/SHEET/FULL/SETTINGS; LayoutRole is VERTICAL/INLINE/ACTIONS/HERO/DETAIL/FOOTER/NAVIGATION;
 SplitKind is SIDEBAR_DETAIL/THREE_COLUMN/DOCUMENT; CustomKind is EDITOR/TERMINAL/CHART/PREVIEW; ScrollPolicy is STANDARD/OVERLAY.
@@ -328,6 +328,14 @@ and default to the old meaning (not a heading, no visible-row count):
   text in a field (a non-field id is rejected); the testkit fake simulates it with `FakeKitView.setComposing`.
 - A SEARCH field never shows its label (kit behaviour, no API): the label stays its accessible name and `labelFor`,
   and the search glyph and hint label it visually. Other field kinds are unchanged.
+- `Field.presentation` (review fix round 1; prior constructors give STANDARD): STANDARD shows the kit label (never for
+  SEARCH) over the `surface.input` fill; EMBEDDED leaves the visible label to the host's own arrangement (no kit label,
+  accessible name and `labelFor` kept, fill kept), for a host row with its own label column; TRANSPARENT is EMBEDDED with
+  no input fill, so the host surface behind it shows, keeping the `border.input`/focus outline and halo (the palette
+  query on its card).
+- Host normalization of `Edited` text applies to the field one event-loop turn later (the 6a rule). A host that
+  shortens typed text must expect a further `Edited` queued before that turn to still carry the removed part; the
+  palette strips a consumed scope prefix from such edits until the field shows the query.
 
 `ViewSpec(Node root)` validates the tree and references. `UiEvent` is sealed with nested records
 `Action(String id)`, `Edited(String id,String text)`, `Selected(String id,Set<String> ids)`,

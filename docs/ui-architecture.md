@@ -139,7 +139,8 @@ list that follows an external field: it never takes focus, a left press runs a r
 (`RESULTS_ROW_HEIGHT`/`RESULTS_HEADING_HEIGHT`), the trailing tag drops first, and every host update keeps the
 selection and the heading above it in view while a theme change keeps the scroll; `ItemList.visibleRows` sizes the
 viewport in selectable rows; `KitView.composing(fieldId)` reports uncommitted input-method text; and a SEARCH field's
-label is its accessible name only (the glyph and hint label it visually).
+label is its accessible name only (the glyph and hint label it visually). `Field.presentation` lets a host composition
+supply a field's visible label (EMBEDDED) and, on a surface that backs the field, drop the input fill (TRANSPARENT).
 
 See [maintenance](ui-maintenance.md), [calibration evidence](design/theme-engine/calibration.md),
 [module entry point](../jasper-ui/README.md) and [SDK architecture](sdk-architecture.md).

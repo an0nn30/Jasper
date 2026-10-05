@@ -93,8 +93,15 @@ public final class Nodes {
         }
     }
 
+    /**
+     * How a field sits in its composition. STANDARD shows the kit label (a SEARCH field never does) over a filled input.
+     * EMBEDDED leaves the visible label to the host's own arrangement (the label stays the accessible name). TRANSPARENT
+     * is EMBEDDED on a host surface that is the field's backdrop: no input fill, the outline and focus ring kept.
+     */
+    public enum FieldPresentation { STANDARD, EMBEDDED, TRANSPARENT }
+
     /** A NUMBER field states its {@link Numeric} shape; other kinds have none. */
-    public record Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric) implements Node {
+    public record Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation) implements Node {
         public Field {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -103,7 +110,11 @@ public final class Nodes {
             ModelChecks.label(label, "label");
             Objects.requireNonNull(trailingAction);
             Objects.requireNonNull(numeric);
+            Objects.requireNonNull(presentation);
             if ((kind == FieldKind.NUMBER) != numeric.isPresent()) throw new IllegalArgumentException("Numeric bounds belong to NUMBER fields only, which require them");
+        }
+        public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric) {
+            this(id, state, kind, value, hint, label, trailingAction, numeric, FieldPresentation.STANDARD);
         }
         public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction) {
             this(id, state, kind, value, hint, label, trailingAction, Optional.empty());

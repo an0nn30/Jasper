@@ -31,6 +31,8 @@ public final class StateFixtures {
             "", "Font family", "", "", Optional.of(new ChoiceSearch(0, "No installed font matches", Optional.of("Iosevka")))));
         controls.add(new Toggle("switch", READY, "Switch", true, "switch", false));
         controls.add(new Chip("chip", READY, "HTTP", Hue.BLUE));
+        for (FieldPresentation presentation : FieldPresentation.values())
+            controls.add(new Field("field-" + presentation, READY, FieldKind.TEXT, presentation.name(), "", "Presentation " + presentation, "", Optional.empty(), presentation));
         controls.add(new Progress("progress", READY, .65, "Progress"));
         controls.add(new Progress("indeterminate", READY, -1, "Working"));
         controls.add(new Strength("strength", READY, 3, "Strong"));
