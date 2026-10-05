@@ -314,14 +314,14 @@ public class RemotePlugin implements Plugin {
 
     // ---- sessions
 
-    private void connect(PendingSession pending, UUID hostId) {
+    private void connect(PendingSession pending, UUID hostId, Optional<String> folder) {
         var host = store.host(hostId);
         if (host.isEmpty()) { pending.fail("Host not found"); return; }
         if (pending.isCancelled() || stopped) return;
         WindowHandle window = pending.pane().tab().window();
         if (focusExistingAttempt(window)) { pending.fail("Another connection is already in progress"); return; }
         final ConnectAttempt attempt;
-        try { attempt = new ConnectAttempt(window, host.get(), shell -> attach(pending, shell)); }
+        try { attempt = new ConnectAttempt(window, host.get(), folder, shell -> attach(pending, shell)); }
         catch (RuntimeException failure) { pending.fail(message(failure)); return; }
         attempt.cancelled = () -> { if (!stopped) pending.fail("Cancelled"); };
         var cancellation = pending.onCancelled(() -> ui.execute(attempt::close));
@@ -330,10 +330,14 @@ public class RemotePlugin implements Plugin {
     }
 
     void openHost(WindowHandle window, RemoteHost host) {
-        prepare(window, host, request -> context.terminals().openTab(window, request));
+        prepare(window, host, Optional.empty(), request -> context.terminals().openTab(window, request));
+    }
+    /** Opens a new tab on a saved host whose login shell starts in {@code folder}; Reconnect returns there. */
+    void openHostIn(WindowHandle window, RemoteHost host, String folder) {
+        prepare(window, host, Optional.of(folder), request -> context.terminals().openTab(window, request));
     }
     void splitHost(PaneHandle pane, RemoteHost host) {
-        prepare(pane.tab().window(), host, request -> context.terminals().split(pane, Direction.RIGHT, request));
+        prepare(pane.tab().window(), host, Optional.empty(), request -> context.terminals().split(pane, Direction.RIGHT, request));
     }
 
     void activateHost(WindowHandle window, RemoteHost host) {
@@ -389,14 +393,14 @@ public class RemotePlugin implements Plugin {
         return false;
     }
 
-    private void prepare(WindowHandle window, RemoteHost host, Function<OpenRequest, Optional<PaneHandle>> open) {
+    private void prepare(WindowHandle window, RemoteHost host, Optional<String> folder, Function<OpenRequest, Optional<PaneHandle>> open) {
         if (!window.isOpen() || stopped || focusExistingAttempt(window)) return;
         final ConnectAttempt attempt;
-        try { attempt = new ConnectAttempt(window, host, shell -> {
+        try { attempt = new ConnectAttempt(window, host, folder, shell -> {
             var ready = new java.util.concurrent.atomic.AtomicReference<>(shell);
             SessionSpec spec = new SessionSpec(host.name(), java.util.Optional.of(serverIcon), dev.jasper.sdk.terminal.ExitPolicy.KEEP_OPEN, pending -> {
                 Connections.Shell first = ready.getAndSet(null);
-                if (first == null) connect(pending, host.id());
+                if (first == null) connect(pending, host.id(), folder);
                 else ui.execute(() -> attach(pending, first));
             });
             try {
@@ -443,14 +447,15 @@ public class RemotePlugin implements Plugin {
     private final class ConnectAttempt {
         final WindowHandle window;
         final RemoteHost host;
+        final Optional<String> folder;
         final java.util.function.Consumer<Connections.Shell> success;
         final PluginDialog dialog;
         final ConnectionPanel panel;
         CompletableFuture<Connections.Shell> future;
         boolean closed, delivered;
         Runnable cancelled = () -> {}, finished = () -> {};
-        ConnectAttempt(WindowHandle window, RemoteHost host, java.util.function.Consumer<Connections.Shell> success) {
-            this.window = window; this.host = host; this.success = success;
+        ConnectAttempt(WindowHandle window, RemoteHost host, Optional<String> folder, java.util.function.Consumer<Connections.Shell> success) {
+            this.window = window; this.host = host; this.folder = folder; this.success = success;
             dialog = context.windows().overlay(new OverlaySpec("Connecting to " + host.name(), window));
             panel = new ConnectionPanel(host.name(), host.label(), this::start, this::close);
             currentConnectionPanel = panel;
@@ -471,7 +476,7 @@ public class RemotePlugin implements Plugin {
             int rows = dimensions.map(info -> Math.max(1, info.rows())).orElse(24);
             // Followed panes get their own connection so the probe can tell their shell apart (see the directory probe spec).
             boolean dedicated = host.followDirectory() && !"Windows".equals(hostInfo.get(host).os());
-            future = connections.shell(host.id(), window, cols, rows, panel::status, dedicated);
+            future = connections.shell(host.id(), window, cols, rows, panel::status, dedicated, folder);
             future.whenComplete((shell, failure) -> ui.execute(() -> {
                 if (closed || stopped || !window.isOpen()) { if (shell != null) shell.connection().close().run(); close(); return; }
                 if (failure != null) { panel.failed(message(failure)); return; }

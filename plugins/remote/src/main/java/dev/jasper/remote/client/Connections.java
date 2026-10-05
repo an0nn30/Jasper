@@ -317,6 +317,12 @@ public final class Connections {
     }
     /** A {@code dedicated} shell gets its own connection, never shared and closed with the shell, and a {@link ShellFolder}. */
     public CompletableFuture<Shell> shell(UUID id, WindowHandle owner, int columns, int rows, Consumer<String> status, boolean dedicated) {
+        return shell(id, owner, columns, rows, status, dedicated, Optional.empty());
+    }
+
+    /** As above; a {@code startFolder} starts the login shell there (see {@link StartFolder}). */
+    public CompletableFuture<Shell> shell(UUID id, WindowHandle owner, int columns, int rows, Consumer<String> status, boolean dedicated,
+                                          Optional<String> startFolder) {
         var result = new CompletableFuture<Shell>();
         CompletableFuture<SessionLease> requested;
         try { requested = lease(identity(id), owner, status, dedicated); }
@@ -336,7 +342,7 @@ public final class Connections {
             status.accept("Opening shell…");
             ShellFolder folder = dedicated ? new ShellFolder(lease.session()) : null;
             Runnable entered = folder == null ? () -> { } : folder::entered;
-            onBackground(() -> ShellChannels.open(lease.session(), columns, rows, settings.get().connectTimeout(), entered, release))
+            onBackground(() -> ShellChannels.open(lease.session(), columns, rows, settings.get().connectTimeout(), entered, release, startFolder))
                 .whenComplete((connection, problem) -> ui.execute(() -> {
                     if (problem != null) { release.run(); result.completeExceptionally(problem); return; }
                     if (result.isDone()) { connection.close().run(); return; }
