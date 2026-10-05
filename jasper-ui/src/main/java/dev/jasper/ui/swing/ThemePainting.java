@@ -61,23 +61,45 @@ final class ThemePainting {
     /** Per-control focus cause; mouse presses hide keyboard rings until keyboard focus returns. */
     static final class Focus implements AutoCloseable {
         private final JComponent target;
+        private final JComponent paintOwner;
+        private final KitView view;
+        private Rectangle priorHaloBounds;
         private boolean keyboard;
         private final MouseListener mouse = new MouseAdapter() {
-            @Override public void mousePressed(MouseEvent e) { keyboard = false; target.repaint(); repaintParent(); }
+            @Override public void mousePressed(MouseEvent e) { keyboard = false; target.repaint(); repaintHalo(); }
         };
         private final KeyListener key = new KeyAdapter() {
-            @Override public void keyPressed(KeyEvent e) { keyboard = true; target.repaint(); repaintParent(); }
+            @Override public void keyPressed(KeyEvent e) { keyboard = true; target.repaint(); repaintHalo(); }
         };
         private final FocusListener focus = new FocusAdapter() {
             @Override public void focusGained(FocusEvent e) {
                 keyboard = switch (e.getCause()) { case MOUSE_EVENT -> false; default -> true; };
-                target.repaint(); repaintParent();
+                target.repaint(); repaintHalo();
             }
-            @Override public void focusLost(FocusEvent e) { target.repaint(); repaintParent(); }
+            @Override public void focusLost(FocusEvent e) { target.repaint(); repaintHalo(); }
         };
-        Focus(JComponent target) { this.target = target; target.addMouseListener(mouse); target.addKeyListener(key); target.addFocusListener(focus); }
+        Focus(JComponent target, JComponent paintOwner, KitView view) {
+            this.target = target; this.paintOwner = paintOwner; this.view = view;
+            target.addMouseListener(mouse); target.addKeyListener(key); target.addFocusListener(focus);
+        }
         boolean visible() { return target.isEnabled() && target.isFocusOwner() && keyboard; }
-        private void repaintParent() { if (target.getParent() != null) target.getParent().repaint(); }
-        @Override public void close() { target.removeMouseListener(mouse); target.removeKeyListener(key); target.removeFocusListener(focus); }
+        private void repaintHalo() {
+            if (target.getParent() != null) target.getParent().repaint();
+            Rectangle dirty = priorHaloBounds == null ? null : new Rectangle(priorHaloBounds);
+            if (SwingUtilities.isDescendingFrom(paintOwner, view)) {
+                var bounds = SwingUtilities.convertRectangle(paintOwner, new Rectangle(0, 0, paintOwner.getWidth(), paintOwner.getHeight()), view);
+                int ring = metric(view.context(), DesignMetrics.Role.FOCUS_RING);
+                bounds.grow(ring, ring);
+                priorHaloBounds = bounds;
+                dirty = dirty == null ? bounds : dirty.union(bounds);
+            }
+            // The view paints the external ring, so its dirty region must include the exterior.
+            // Retain the previous rectangle until teardown to erase rings after detachment/moves.
+            if (dirty != null) view.repaint(dirty.x, dirty.y, dirty.width, dirty.height);
+        }
+        @Override public void close() {
+            paintOwner.putClientProperty("Jasper.kit.halo", null); repaintHalo();
+            target.removeMouseListener(mouse); target.removeKeyListener(key); target.removeFocusListener(focus);
+        }
     }
 }

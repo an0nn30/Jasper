@@ -37,12 +37,12 @@ final class Choices {
             } else if (node.kind() == Nodes.ChoiceKind.PICKER) {
                 var picker = new PickerButton(context()); input = picker;
                 picker.kind = Nodes.ButtonKind.SECONDARY; picker.setContentAreaFilled(false); picker.setBorderPainted(false); picker.setFocusPainted(false); picker.setOpaque(false);
-                picker.focus = new ThemePainting.Focus(picker); own(picker.focus);
+                picker.focus = new ThemePainting.Focus(picker, picker, view); own(picker.focus);
                 ActionListener listener = event -> { String action = ((Nodes.Choice)this.node).action(); if (!action.isBlank()) emit(new UiEvent.Action(action)); };
                 picker.addActionListener(listener); own(() -> picker.removeActionListener(listener));
             } else { input = new SegmentTrack(context()); own(this::closeOptions); }
             input.putClientProperty("html.disable", true); KitOwnership.mark(input, node.id() + ".input");
-            if (input instanceof ChoiceCombo combo) { combo.focus = new ThemePainting.Focus(combo); own(combo.focus); }
+            if (input instanceof ChoiceCombo combo) { combo.focus = new ThemePainting.Focus(combo, combo, view); own(combo.focus); }
             var container = (JPanel)component; container.setOpaque(false); container.add(label, BorderLayout.NORTH); container.add(input, BorderLayout.CENTER); container.add(error, BorderLayout.SOUTH);
             label.setLabelFor(input); refresh();
         }
@@ -91,7 +91,7 @@ final class Choices {
                             Option option = options.get(i); var button = new SegmentButton(context()); button.setText(option.label());
                             KitOwnership.mark(button, choice.id() + ".option." + option.id()); button.setOpaque(false); button.setContentAreaFilled(false); button.setBorderPainted(false); button.setFocusPainted(false);
                             button.setRolloverEnabled(true); button.putClientProperty("html.disable", true);
-                            button.focus = new ThemePainting.Focus(button); optionLifetimes.add(button.focus);
+                            button.focus = new ThemePainting.Focus(button, button, view); optionLifetimes.add(button.focus);
                             ActionListener listener = event -> select(option.id()); button.addActionListener(listener); optionLifetimes.add(() -> button.removeActionListener(listener));
                             int index = i;
                             bind(button, "LEFT", () -> navigate(index - 1)); bind(button, "RIGHT", () -> navigate(index + 1));

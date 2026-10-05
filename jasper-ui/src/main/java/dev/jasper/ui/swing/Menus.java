@@ -117,7 +117,7 @@ final class Menus {
             button.setFocusPainted(false);
             button.setRolloverEnabled(true);
             button.putClientProperty("html.disable", true);
-            button.focus = new ThemePainting.Focus(button);
+            button.focus = new ThemePainting.Focus(button, button, view);
             own(button.focus);
         }
 

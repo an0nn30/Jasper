@@ -22,7 +22,7 @@ final class Switches {
             super(view, node, new SwitchButton(view.context())); button = (SwitchButton)component;
             button.position = node.checked() ? 1 : 0; target = button.position;
             button.setContentAreaFilled(false); button.setBorderPainted(false); button.setFocusPainted(false); button.setOpaque(false);
-            button.focus = new ThemePainting.Focus(button); own(button.focus);
+            button.focus = new ThemePainting.Focus(button, button, view); own(button.focus);
             animation = new Timer(16, event -> frame()); own(this::settle);
             ActionListener action = event -> emit(new UiEvent.Toggled(this.node.id(), !((Nodes.Toggle)this.node).checked()));
             button.addActionListener(action); own(() -> button.removeActionListener(action)); refresh();

@@ -32,7 +32,7 @@ final class TextFields {
             input.setOpaque(false); input.setBorder(new EmptyBorder(0, 0, 0, 0)); KitOwnership.mark(input, node.id() + ".input");
             if (node.kind() == Nodes.FieldKind.PORT) ((AbstractDocument)input.getDocument()).setDocumentFilter(new NumericFilter());
             surface = new FieldSurface(context(), input, node.kind() == Nodes.FieldKind.TEXTAREA);
-            var focus = new ThemePainting.Focus(input); surface.focus = focus; own(focus);
+            var focus = new ThemePainting.Focus(input, surface, view); surface.focus = focus; own(focus);
             if (node.kind() == Nodes.FieldKind.TEXTAREA) {
                 scroll = new JScrollPane(input); scroll.setBorder(new EmptyBorder(0, 0, 0, 0));
                 scroll.setOpaque(false); scroll.getViewport().setOpaque(false); surface.add(scroll, BorderLayout.CENTER);

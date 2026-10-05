@@ -230,4 +230,27 @@ class KitViewTest {
             } finally {if(holder[0]!=null)holder[0].close();release(context);}
         });
     }
+    @Test void movingStableTextRecomputesContextualWrappingForItsCurrentParentAndRole() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            String content = "A long helper that wraps over more than one line in the control column";
+            var caption = new Text("text", ControlState.READY, content, TextRole.CAPTION);
+            try (var view = new KitView(context, stack(new FormRow("row", ControlState.READY, "Label", "", caption, java.util.Optional.empty())), e -> {})) {
+                KitFixtures.render(view, com.formdev.flatlaf.util.UIScale.scale(260), com.formdev.flatlaf.util.UIScale.scale(150), 1);
+                var label = (Labels.LiteralLabel)view.control("text").component;
+                assertThat(label.wrap).isTrue();
+                view.update(stack(new Text("text", ControlState.READY, content, TextRole.BODY)));
+                KitFixtures.render(view, com.formdev.flatlaf.util.UIScale.scale(260), com.formdev.flatlaf.util.UIScale.scale(150), 1);
+                assertThat(view.control("text").component).isSameAs(label);
+                assertThat(label.wrap).as("standalone BODY must not inherit old helper wrapping").isFalse();
+                assertThat(label.getHeight()).isEqualTo(label.getPreferredSize().height);
+                view.update(stack(new FormRow("row", ControlState.READY, "Label", "", caption, java.util.Optional.empty())));
+                KitFixtures.render(view, com.formdev.flatlaf.util.UIScale.scale(260), com.formdev.flatlaf.util.UIScale.scale(150), 1);
+                assertThat(label.wrap).isTrue();
+                view.update(stack(new FormRow("row", ControlState.READY, "Label", "", new Text("text", ControlState.READY, content, TextRole.BODY), java.util.Optional.empty())));
+                KitFixtures.render(view, com.formdev.flatlaf.util.UIScale.scale(260), com.formdev.flatlaf.util.UIScale.scale(150), 1);
+                assertThat(label.wrap).isFalse();
+            } finally { context.icons().close(); context.binding().close(); }
+        });
+    }
 }

@@ -27,12 +27,12 @@ final class SecretFields {
             input.setOpaque(false); input.setBorder(new EmptyBorder(0, 0, 0, 0)); KitOwnership.mark(input, node.id() + ".input");
             input.putClientProperty("JPasswordField.cutCopyAllowed", false);
             surface = new TextFields.FieldSurface(context(), input, false);
-            surface.focus = new ThemePainting.Focus(input); own(surface.focus);
+            surface.focus = new ThemePainting.Focus(input, surface, view); own(surface.focus);
             surface.add(input, BorderLayout.CENTER); surface.add(lock, BorderLayout.WEST);
             reveal = new Buttons.KitButton(context()); reveal.kind = Nodes.ButtonKind.GHOST;
             KitOwnership.mark(reveal, node.id() + ".reveal"); reveal.setOpaque(false); reveal.setContentAreaFilled(false);
             reveal.setBorderPainted(false); reveal.setFocusPainted(false); reveal.setRolloverEnabled(true);
-            reveal.focus = new ThemePainting.Focus(reveal); own(reveal.focus);
+            reveal.focus = new ThemePainting.Focus(reveal, reveal, view); own(reveal.focus);
             ActionListener action = event -> { if (interactive()) view.revealSecrets(this, !revealed); };
             reveal.addActionListener(action); own(() -> reveal.removeActionListener(action)); surface.add(reveal, BorderLayout.EAST);
             var container = (JPanel)component; container.setOpaque(false);

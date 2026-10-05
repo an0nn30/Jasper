@@ -930,4 +930,20 @@ class FormsTest {
                     }
                 });
     }
+    @Test void threeColumnMeasurementUsesTheSameWidthsAsLayoutAfterResize() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var side = new SettingRow("sidebar", ControlState.READY, "Connection", "A sufficiently long description that wraps differently in the narrow semantic sidebar column", new Toggle("toggle", ControlState.READY, "Enabled", false, "toggle", true), false);
+            var split = new Split("split", ControlState.READY, SplitKind.THREE_COLUMN, List.of(side, new Text("middle", ControlState.READY, "List", TextRole.BODY), new Text("detail", ControlState.READY, "Detail", TextRole.BODY)));
+            try (var view = new KitView(context, stack(split, new Text("following", ControlState.READY, "Following", TextRole.BODY)), e -> {})) {
+                for (int width : new int[]{900, 500, 700, 900}) {
+                    KitFixtures.render(view, com.formdev.flatlaf.util.UIScale.scale(width), com.formdev.flatlaf.util.UIScale.scale(300), 1);
+                    var sidebar = view.control("sidebar").component; var columns = view.control("split").component;
+                    int needed = Composition.height(sidebar, sidebar.getWidth());
+                    assertThat(columns.getHeight()).as("semantic sidebar width=%s at host=%s", sidebar.getWidth(), width).isGreaterThanOrEqualTo(needed);
+                    assertThat(view.control("following").component.getY()).isGreaterThanOrEqualTo(columns.getY() + needed);
+                }
+            } finally { context.icons().close(); context.binding().close(); }
+        });
+    }
 }

@@ -23,7 +23,7 @@ final class Buttons {
             button.putClientProperty("html.disable", true);
             button.setOpaque(false); button.setContentAreaFilled(false); button.setBorderPainted(false); button.setFocusPainted(false);
             button.setRolloverEnabled(true); button.setHorizontalAlignment(SwingConstants.CENTER);
-            button.focus = new ThemePainting.Focus(button); own(button.focus);
+            button.focus = new ThemePainting.Focus(button, button, view); own(button.focus);
             ActionListener listener = event -> {
                 if (interactive()) try { events.accept(new UiEvent.Action(((Nodes.Button)this.node).action())); }
                 catch (Throwable failure) { view.report(failure); }

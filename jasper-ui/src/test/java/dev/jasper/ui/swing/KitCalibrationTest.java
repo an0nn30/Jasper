@@ -192,5 +192,59 @@ class KitCalibrationTest {
             } finally { context.icons().close(); base.icons().close(); base.binding().close(); }
         });
     }
+    @Test void actualDirtyRegionRepaintsExternalHaloOnFocusMouseLossAndRemoval() {
+        Edt.run(() -> {
+            var old = UIManager.getLookAndFeel(); var oldFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            var oldRepaint = RepaintManager.currentManager(null); var repaint = new DirtyRegions();
+            var manager = new FocusManager(); var context = KitFixtures.context();
+            try {
+                FlatLafInstaller.install(context.theme()); KeyboardFocusManager.setCurrentKeyboardFocusManager(manager);
+                RepaintManager.setCurrentManager(repaint);
+                var field = new Field("field", ControlState.READY, FieldKind.TEXT, "", "Value", "Label", "");
+                var form = new Form("form", ControlState.READY, FormKind.FULL, "Form", Optional.empty(), List.of(new FormRow("row", ControlState.READY, "Label", "", field, Optional.empty())), Optional.empty(), List.of(), "cancel");
+                try (var view = new KitView(context, new ViewSpec(form), e -> {})) {
+                    view.setOpaque(true); view.setBackground(context.theme().semantic().color(SemanticColor.SURFACE_PANEL));
+                    var image = KitFixtures.render(view, UIScale.scale(540), UIScale.scale(180), 1);
+                    var control = (TextFields.FieldControl)view.control("field");
+                    var bounds = SwingUtilities.convertRectangle(control.surface.getParent(), control.surface.getBounds(), view);
+                    var probe = new Point(bounds.x + bounds.width / 2, bounds.y - UIScale.scale(2));
+                    repaint.clear(); manager.target = control.input;
+                    fireFocus(control.input, FocusEvent.FOCUS_GAINED);
+                    incremental(view, image, repaint, probe);
+                    repaint.clear();
+                    var mouse = new java.awt.event.MouseEvent(control.input, java.awt.event.MouseEvent.MOUSE_PRESSED, 0, 0, 2, 2, 1, false);
+                    for (var listener : control.input.getMouseListeners()) listener.mousePressed(mouse);
+                    incremental(view, image, repaint, probe);
+                    repaint.clear(); fireFocus(control.input, FocusEvent.FOCUS_GAINED);
+                    incremental(view, image, repaint, probe);
+                    repaint.clear(); manager.target = null; fireFocus(control.input, FocusEvent.FOCUS_LOST);
+                    incremental(view, image, repaint, probe);
+                    repaint.clear(); manager.target = control.input; fireFocus(control.input, FocusEvent.FOCUS_GAINED);
+                    incremental(view, image, repaint, probe);
+                    repaint.clear(); view.update(new ViewSpec(new Nodes.Stack("replacement", ControlState.READY, LayoutRole.VERTICAL, List.of())));
+                    incremental(view, image, repaint, probe);
+                    manager.target = null; fireFocus(control.input, FocusEvent.FOCUS_LOST);
+                }
+            } finally { RepaintManager.setCurrentManager(oldRepaint); KeyboardFocusManager.setCurrentKeyboardFocusManager(oldFocus); context.icons().close(); context.binding().close(); restore(old); }
+        });
+    }
+    private static void fireFocus(JComponent target, int id) {
+        var event = new FocusEvent(target, id, false, null, FocusEvent.Cause.TRAVERSAL_FORWARD);
+        for (var listener : target.getFocusListeners()) { if (id == FocusEvent.FOCUS_GAINED) listener.focusGained(event); else listener.focusLost(event); }
+    }
+    private static void incremental(KitView view, java.awt.image.BufferedImage image, DirtyRegions repaint, Point probe) {
+        var dirty = repaint.getDirtyRegion(view);
+        assertThat(dirty.contains(probe)).as("actual owning-view dirty region %s must include halo pixel %s", dirty, probe).isTrue();
+        var g = image.createGraphics(); try { g.setClip(dirty); view.paint(g); } finally { g.dispose(); }
+        var full = KitFixtures.render(view, view.getWidth(), view.getHeight(), 1);
+        assertThat(image.getRGB(probe.x, probe.y)).as("incremental halo equals full paint").isEqualTo(full.getRGB(probe.x, probe.y));
+    }
+    /** Instrument actual JComponent.repaint traffic; headless undisplayable roots do not enqueue native paints. */
+    private static final class DirtyRegions extends RepaintManager {
+        final java.util.Map<JComponent, Rectangle> dirty = new java.util.IdentityHashMap<>();
+        @Override public void addDirtyRegion(JComponent c, int x, int y, int w, int h) { if (w > 0 && h > 0) dirty.merge(c, new Rectangle(x,y,w,h), Rectangle::union); super.addDirtyRegion(c,x,y,w,h); }
+        @Override public Rectangle getDirtyRegion(JComponent c) { return new Rectangle(dirty.getOrDefault(c, new Rectangle())); }
+        void clear() { dirty.clear(); }
+    }
     private static void restore(LookAndFeel laf) { try { UIManager.setLookAndFeel(laf); } catch (UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); } }
 }
