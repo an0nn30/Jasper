@@ -234,7 +234,7 @@ class WindowCommandPaletteTest {
             }
         });
     }
-    @Test void overlayShadowTintsTowardThePopupDropShadowColour() throws Exception {
+    @Test void overlayShadowTintsTowardTheModuleScrimRole() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
                 var root = install(owner);
@@ -242,7 +242,14 @@ class WindowCommandPaletteTest {
                 var overlay = (JComponent) owner.commandPalette().component().getParent();
                 var card = owner.commandPalette().component().getBounds();
                 try {
-                    UIManager.put("Popup.dropShadowColor", Color.RED);
+                    var base = dev.jasper.app.appearance.Theme.DARK.source().document();
+                    var document = new dev.jasper.ui.theme.ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), base.parentLine(),
+                        base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), base.tokens(), base.syntax(), base.ui(), base.icons(), base.workspace(),
+                        java.util.Map.of(dev.jasper.ui.theme.SemanticColor.SURFACE_SCRIM, Color.RED));
+                    var generated = dev.jasper.ui.theme.ThemeGenerator.generate(document);
+                    owner.selectTheme(new dev.jasper.app.appearance.Theme("shadow-test", "Shadow test", true,
+                        dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(generated.terminal()),
+                        new dev.jasper.app.appearance.Theme.UserFile(java.nio.file.Path.of("shadow.toml"), document)));
                     var image = new BufferedImage(overlay.getWidth(), overlay.getHeight(), BufferedImage.TYPE_INT_ARGB);
                     var graphics = image.createGraphics();
                     try {
@@ -251,7 +258,7 @@ class WindowCommandPaletteTest {
                         overlay.paint(graphics);
                     } finally { graphics.dispose(); }
                     var pixel = new Color(image.getRGB(card.x - 2, card.y - 2), true);
-                    assertThat(pixel.getRed()).as("the shadow is tinted toward the configured drop-shadow colour")
+                    assertThat(pixel.getRed()).as("the shadow is tinted toward the configured module scrim role")
                         .isGreaterThan(pixel.getGreen());
                 } finally {
                     // Putting the saved value back would pin it in the developer defaults, ahead of

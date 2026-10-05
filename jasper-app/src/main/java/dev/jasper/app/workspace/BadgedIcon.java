@@ -1,5 +1,10 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.swing.NativeControlStyles;
+
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.contributions.PanelBadge;
 import java.awt.Color;
@@ -35,14 +40,14 @@ final class BadgedIcon implements Icon {
         var g = (Graphics2D) graphics.create();
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            int dot = UIScale.scale(6), ring = UIScale.scale(1);
+            int dot = NativeControlStyles.metric(DesignMetrics.Role.STATUS_DOT), ring = NativeControlStyles.metric(DesignMetrics.Role.HAIRLINE);
             int left = x + getIconWidth() - dot;
-            Color rail = UIManager.getColor("Jasper.titleBackground");
+            Color rail = ThemeZone.color(null, SemanticColor.SURFACE_APP);
             if (rail != null) {
                 g.setColor(rail);
                 g.fillOval(left - ring, y - ring, dot + 2 * ring, dot + 2 * ring);
             }
-            Color color = UIManager.getColor(tone == PanelBadge.Tone.ERROR ? "Jasper.railBadgeError" : "Jasper.railBadgeAccent");
+            Color color = ThemeZone.color(null, tone == PanelBadge.Tone.ERROR ? SemanticColor.STATUS_DANGER : SemanticColor.ACCENT);
             g.setColor(color != null ? color : Color.RED);
             g.fillOval(left, y, dot, dot);
         } finally { g.dispose(); }

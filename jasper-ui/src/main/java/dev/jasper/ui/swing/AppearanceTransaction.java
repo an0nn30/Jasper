@@ -53,7 +53,13 @@ public final class AppearanceTransaction {
             try { UIManager.setLookAndFeel(laf); }
             catch (javax.swing.UnsupportedLookAndFeelException failure) { throw new IllegalStateException("Cannot restore appearance", failure); }
             var defaults = UIManager.getLookAndFeelDefaults();
-            defaults.clear(); defaults.putAll(lafDefaults);
+            defaults.clear();
+            // putAll dispatches a property event per entry. A Label.font callback can resolve
+            // ActiveFont before defaultFont is restored and recurse through FlatLaf. Publish one batch.
+            var entries = new Object[lafDefaults.size() * 2];
+            int index = 0;
+            for (var entry : lafDefaults.entrySet()) { entries[index++] = entry.getKey(); entries[index++] = entry.getValue(); }
+            defaults.putDefaults(entries);
             overrides.forEach(UIManager::put);
         }
     }

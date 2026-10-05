@@ -29,17 +29,17 @@ class JasperLightTest {
 
     @Test void itsTextAndStatusColoursMeetJaspersFloors() {
         for (Token background : List.of(Token.SURFACE, Token.TITLE_BAR, Token.SIDEBAR, Token.INPUT_BACKGROUND)) {
-            assertThat(ChromeKeys.contrast(token(Token.TEXT), token(background))).as("text on " + background.key()).isGreaterThanOrEqualTo(4.5);
-            assertThat(ChromeKeys.contrast(token(Token.TEXT_MUTED), token(background))).as("muted on " + background.key()).isGreaterThanOrEqualTo(3);
+            assertThat(dev.jasper.ui.theme.ColorMath.contrast(token(Token.TEXT), token(background))).as("text on " + background.key()).isGreaterThanOrEqualTo(4.5);
+            assertThat(dev.jasper.ui.theme.ColorMath.contrast(token(Token.TEXT_MUTED), token(background))).as("muted on " + background.key()).isGreaterThanOrEqualTo(3);
         }
-        assertThat(ChromeKeys.contrast(token(Token.LINK), token(Token.SURFACE))).isGreaterThanOrEqualTo(4.5);
+        assertThat(dev.jasper.ui.theme.ColorMath.contrast(token(Token.LINK), token(Token.SURFACE))).isGreaterThanOrEqualTo(4.5);
         for (Token status : List.of(Token.SUCCESS, Token.WARNING, Token.ERROR)) {
-            assertThat(ChromeKeys.contrast(token(status), token(Token.STATUS_BAR))).as(status.key()).isGreaterThanOrEqualTo(4.5);
-            assertThat(ChromeKeys.contrast(token(status), token(Token.SURFACE))).as(status.key()).isGreaterThanOrEqualTo(4.5);
+            assertThat(dev.jasper.ui.theme.ColorMath.contrast(token(status), token(Token.STATUS_BAR))).as(status.key()).isGreaterThanOrEqualTo(4.5);
+            assertThat(dev.jasper.ui.theme.ColorMath.contrast(token(status), token(Token.SURFACE))).as(status.key()).isGreaterThanOrEqualTo(4.5);
         }
-        assertThat(ChromeKeys.contrast(token(Token.SELECTION_TEXT), token(Token.SELECTION))).isGreaterThanOrEqualTo(4.5);
-        assertThat(ChromeKeys.contrast(token(Token.TEXT_ON_ACCENT), token(Token.BUTTON_DEFAULT))).isGreaterThanOrEqualTo(4.5);
-        assertThat(ChromeKeys.contrast(token(Token.DIVIDER), Palette.jasperLight().background())).isGreaterThanOrEqualTo(3);
+        assertThat(dev.jasper.ui.theme.ColorMath.contrast(token(Token.SELECTION_TEXT), token(Token.SELECTION))).isGreaterThanOrEqualTo(4.5);
+        assertThat(dev.jasper.ui.theme.ColorMath.contrast(token(Token.TEXT_ON_ACCENT), token(Token.BUTTON_DEFAULT))).isGreaterThanOrEqualTo(4.5);
+        assertThat(dev.jasper.ui.theme.ColorMath.contrast(token(Token.DIVIDER), Palette.jasperLight().background())).isGreaterThanOrEqualTo(3);
     }
 
     @Test void itInstallsAsALightLookAndFeel() throws Exception {

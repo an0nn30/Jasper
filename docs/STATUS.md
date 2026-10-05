@@ -2,6 +2,21 @@
 
 ## Current state — 2026-10-05
 
+- **Theme engine Plan 2 Task 5 implemented; independent review pending** (2026-10-05).
+  Native workspace/chrome presentation consumes module roles, named fixed metrics and semantic icons;
+  identity-sensitive controls use module-owned native styling entrypoints. Folder tab geometry/motion,
+  native actions, glass/corners and menu focus ownership remain. ToolWindowArea borrows the kit panel's
+  one header and releases host actions/drag listeners across hide/re-show, replacement and disposal.
+  ChromeKeys derivation is removed. Approved sequencing retains only exact raw consumers in the
+  [temporary ledger](design/theme-engine/temporary-paths.md): app Task 6, plugins Tasks 7–10, removal Task 11.
+  The preliminary WorkspaceDefaults zero-reader conclusion was incorrect: SDK palette readers build
+  keys dynamically, so existing module-value publication remains until those consumers migrate.
+  Module transaction restoration now batches defaults, avoiding incomplete-font recursion during rollback.
+  Default gate: app811/module283; final affected gate105/module283; all four architecture checks pass.
+  Verified 2×: app6/module8; direct scale2.0 assertion. App tests now forward explicit jasper.uiScale
+  (previously preview-only), making the scale-aware geometry/rollback gate reproducible. Native layout composition remains Plan 3 Task 10; no pixel matching
+  or before-asset recapture. Full repository gate remains Task 12. No GUI/AOT/push/merge.
+
 - **Theme engine Plan 2 Task 4 review fixes implemented; fix review pending** (2026-10-05).
   Owned SDK views mount in panels, windows/dialogs/overlays, content tabs and custom settings pages.
   Real/fake adapters retain guards, chooser pinning, draft Apply/Cancel and exactly-once disposal;

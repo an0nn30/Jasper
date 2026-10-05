@@ -67,6 +67,8 @@ tasks.named<JavaExec>("run") {
 }
 
 tasks.test {
+    // Explicit opt-in scaled geometry tests; use the same property as headless previews.
+    providers.gradleProperty("jasper.uiScale").orNull?.let { systemProperty("flatlaf.uiScale", it) }
     systemProperty("jasper.repoRoot", rootProject.projectDir.absolutePath)
     // Tests start the staged plugins and install the zips, so their contents are inputs (which also brings
     // the task dependency); a path property alone left this task UP-TO-DATE after a plugin's code changed.

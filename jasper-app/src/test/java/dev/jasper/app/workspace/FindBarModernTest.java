@@ -98,6 +98,7 @@ class FindBarModernTest {
                 assertThat(query.getClientProperty(FlatClientProperties.OUTLINE)).isEqualTo(FlatClientProperties.OUTLINE_ERROR);
                 assertThat(query.getBackground()).isEqualTo(UIManager.getColor("Jasper.findErrorBackground"));
                 assertThat(bar[0].countLabel().getText()).isEqualTo("0 results");
+                assertThat(bar[0].countLabel().getFont()).isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.LABEL));
                 SwingUtilities.updateComponentTreeUI(bar[0]);
                 assertThat(query.getBackground()).as("a theme switch keeps the no-match tint")
                     .isEqualTo(UIManager.getColor("Jasper.findErrorBackground"));
@@ -108,15 +109,15 @@ class FindBarModernTest {
                 var tokens = themes.current().workspace().tokens();
                 assertThat(query.getBackground()).isEqualTo(tokens.get(dev.jasper.ui.theme.Token.ERROR_BACKGROUND));
                 assertThat(query.getForeground()).isEqualTo(tokens.get(dev.jasper.ui.theme.Token.TEXT));
-                assertThat(query.getSelectionColor()).isEqualTo(tokens.get(dev.jasper.ui.theme.Token.TEXT_SELECTION));
+                assertThat(query.getSelectionColor()).isEqualTo(themes.current().workspace().semantic().color(dev.jasper.ui.theme.SemanticColor.SELECTION_BG));
                 assertThat(bar[0].getBackground()).isEqualTo(tokens.get(dev.jasper.ui.theme.Token.SURFACE));
                 assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.STYLE)).isInstanceOf(java.util.Map.class);
                 themes.configureTerminal(dev.jasper.app.config.TerminalColors.MATCH);
                 WorkspaceTheme.apply(bar[0], themes.current()); bar[0].refreshTheme();
                 assertThat(query.getBackground()).isEqualTo(UIManager.getColor("Jasper.findErrorBackground"));
                 assertThat(query.getForeground()).isEqualTo(UIManager.getColor("TextField.foreground"));
-                assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.STYLE)).isNull();
-                assertThat(query.getClientProperty(FlatClientProperties.STYLE)).isEqualTo("borderWidth: 0; focusWidth: 0; innerFocusWidth: 0");
+                assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.STYLE)).isInstanceOf(java.util.Map.class);
+                assertThat(query.getClientProperty(FlatClientProperties.STYLE)).isInstanceOf(java.util.Map.class);
                 bar[0].caseButton().doClick();
             });
             until(() -> bar[0].result().count() == 2);

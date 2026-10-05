@@ -12,7 +12,7 @@ class AppIconsTest {
     private static final String[] ICONS = {"square-plus", "app-window", "columns-2", "maximize", "search", "settings",
         "refresh", "command", "history", "bookmark", "close", "exit"};
 
-    @Test void modernApplicationIconsAreUntintedIntellijArtwork() throws Exception {
+    @Test void modernApplicationIconsUseModuleNamedTinting() throws Exception {
         edt(() -> {
             new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             try {
@@ -22,7 +22,7 @@ class AppIconsTest {
                     assertThat(icon.getIconHeight()).isEqualTo(16);
                     assertThat(Arrays.stream(IntellijIconsTest.pixels(icon)).anyMatch(pixel -> (pixel >>> 24) != 0)).isTrue();
                 }
-                var expected = new FlatSVGIcon("dev/jasper/app/icons/intellij/general/search.svg", 16, 16);
+                var expected = new dev.jasper.ui.icons.IconRegistry().icon("search", dev.jasper.ui.swing.FlatLafInstaller.installedTheme().semantic(), dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY, 16);
                 assertThat(IntellijIconsTest.pixels(AppIcons.icon("search")))
                     .isEqualTo(IntellijIconsTest.pixels(expected));
             } finally { new ThemeController(); }
@@ -50,7 +50,7 @@ class AppIconsTest {
         edt(() -> {
             var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             try {
-                var original = AppIcons.named("TERMINAL");
+                var original = AppIcons.bundled("terminal/toolwindow/terminal");
                 int[] light = IntellijIconsTest.pixels(original);
                 themes.configure(Theme.DARK);
                 int[] dark = IntellijIconsTest.pixels(original);

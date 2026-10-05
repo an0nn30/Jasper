@@ -47,7 +47,10 @@ public final class KitView extends JPanel implements AutoCloseable {
     /** Reconcile by stable id/kind; unchanged descriptor values preserve pending input. */
     public void update(ViewSpec spec) { requireOpen(); Objects.requireNonNull(spec);
         if (updating) throw new IllegalStateException("Reentrant view update");
+        ViewSpec previous = this.spec;
         updating = true; try { reconciler.update(spec); this.spec = spec; } finally { updating = false; }
+        // Native panel hosts reborrow a replacement header after reconciliation, never during it.
+        try { firePropertyChange("viewSpec", previous, spec); } catch (Throwable failure) { report(failure); }
     }
     /** Current immutable descriptor; it never contains mutable input or secret content. */
     public ViewSpec spec() { requireOpen(); return spec; }
@@ -113,6 +116,8 @@ public final class KitView extends JPanel implements AutoCloseable {
     }
     private static void requireEdt() { if (!EventQueue.isDispatchThread()) throw new IllegalStateException("KitView requires EDT"); }
     private void requireOpen() { requireEdt(); if (closeRequested.get()) throw new IllegalStateException("KitView is closed"); }
+    /** Whether close has been requested; host teardown may outlive plugin disposal. */
+    public boolean isClosed() { return closeRequested.get(); }
     /** Idempotent; callers outside EDT enqueue the owned teardown. */
     @Override public void close() {
         if (!closeRequested.compareAndSet(false, true)) return;

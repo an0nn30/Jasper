@@ -157,7 +157,8 @@ public final class WorkspaceStyler implements AutoCloseable {
 
     private void collect(Component c, IdentityHashMap<Component, Boolean> wanted,
                          IdentityHashMap<Component, Boolean> associated) {
-        if (c == null || wanted.containsKey(c) || transientBoundary(c)) return;
+        if (c == null || wanted.containsKey(c) || transientBoundary(c)
+            || c instanceof JComponent kit && dev.jasper.ui.swing.KitOwnership.owns(kit)) return;
         boolean full = true;
         if (c instanceof JComponent jc) {
             full = !Boolean.TRUE.equals(jc.getClientProperty(EXEMPT))

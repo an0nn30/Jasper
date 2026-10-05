@@ -70,9 +70,9 @@ class TitleSearchFieldTest {
     @Test void paintsTheThemesFillAndAHoverFill() {
         var field = new TitleSearchField(() -> { }, () -> "⌘K");
         field.setSize(400, 22);
-        assertThat(pixel(field, 200, 11)).isEqualTo(UIManager.getColor("Jasper.titleSearch.background"));
+        assertThat(pixel(field, 200, 11)).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT));
         field.dispatchEvent(mouse(field, MouseEvent.MOUSE_ENTERED, 10));
-        assertThat(pixel(field, 390, 3)).isEqualTo(UIManager.getColor("Jasper.titleSearch.hoverBackground"));
+        assertThat(pixel(field, 390, 3)).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL_HOVER));
         field.setCollapsed(true);
         assertThat(field.collapsed()).isTrue();
     }

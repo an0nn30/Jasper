@@ -1,5 +1,11 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.swing.NativeControlStyles;
+
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.contributions.ProgressState;
 import java.awt.Dimension;
@@ -37,8 +43,7 @@ final class StatusProgressView extends JPanel {
     private static JButton button() {
         var result = new JButton();
         result.putClientProperty("html.disable", true);
-        result.setBorder(BorderFactory.createEmptyBorder());
-        result.setOpaque(false); result.setContentAreaFilled(false);
+        NativeControlStyles.unframed(result);
         return result;
     }
 
@@ -65,27 +70,29 @@ final class StatusProgressView extends JPanel {
     }
 
     void refreshTheme() {
+        bar.setForeground(ThemeZone.color(this, SemanticColor.ACCENT));
+        bar.setBackground(ThemeZone.color(this, SemanticColor.SURFACE_CONTROL));
         for (var button : new JButton[]{main, secondary}) {
-            button.setFont(UIManager.getFont("Label.font"));
-            button.setForeground(UIManager.getColor("Jasper.mutedForeground"));
+            button.setFont(ThemeZone.font(Typography.Role.LABEL));
+            button.setForeground(ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
         }
     }
 
     @Override public Dimension getPreferredSize() {
-        return new Dimension(Math.min(UIScale.scale(420), main.getPreferredSize().width + UIScale.scale(90)
-            + (secondary.isVisible() ? secondary.getPreferredSize().width + UIScale.scale(8) : 0)),
-            Math.max(UIScale.scale(24), Math.max(main.getPreferredSize().height, secondary.getPreferredSize().height)));
+        return new Dimension(Math.min(NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_MAX_WIDTH), main.getPreferredSize().width + NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_RESERVE)
+            + (secondary.isVisible() ? secondary.getPreferredSize().width + NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_GAP) : 0)),
+            Math.max(NativeControlStyles.metric(DesignMetrics.Role.PANEL_ACTION), Math.max(main.getPreferredSize().height, secondary.getPreferredSize().height)));
     }
     @Override public Dimension getMinimumSize() { return new Dimension(0, getPreferredSize().height); }
     @Override public void doLayout() {
         int width = Math.max(0, getWidth()), height = Math.max(0, getHeight());
         int cancel = secondary.isVisible() ? Math.min(width, secondary.getPreferredSize().width) : 0;
         secondary.setBounds(width - cancel, 0, cancel, height);
-        int remaining = Math.max(0, width - cancel - (cancel > 0 ? UIScale.scale(8) : 0));
-        int progress = Math.min(UIScale.scale(72), remaining / 3);
-        int gap = progress > 0 ? Math.min(UIScale.scale(8), remaining - progress) : 0;
+        int remaining = Math.max(0, width - cancel - (cancel > 0 ? NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_GAP) : 0));
+        int progress = Math.min(NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_WIDTH), remaining / 3);
+        int gap = progress > 0 ? Math.min(NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_GAP), remaining - progress) : 0;
         main.setBounds(0, 0, Math.max(0, remaining - progress - gap), height);
-        int barHeight = Math.min(height, UIScale.scale(8));
+        int barHeight = Math.min(height, NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_GAP));
         bar.setBounds(remaining - progress, (height - barHeight) / 2, progress, barHeight);
     }
 }

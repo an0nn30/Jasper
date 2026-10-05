@@ -47,6 +47,7 @@ class DockDragTest {
 
     @BeforeEach void recordKeyDispatchers() throws Exception {
         edt(() -> {
+            dev.jasper.app.appearance.ThemeManager.install(dev.jasper.app.appearance.Theme.DARK);
             previousKeys = KeyboardFocusManager.getCurrentKeyboardFocusManager();
             keys = new CommandPaletteShortcutsTest.RecordingFocusManager();
             KeyboardFocusManager.setCurrentKeyboardFocusManager(keys);

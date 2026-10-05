@@ -32,6 +32,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(EdtTestExtension.class)
 class ToolWindowAreaTest {
+    @org.junit.jupiter.api.BeforeEach void installModuleTheme() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> dev.jasper.app.appearance.ThemeManager.install(dev.jasper.app.appearance.Theme.DARK));
+    }
+
     private static Rectangle in(ToolWindowArea area, Component component) {
         return SwingUtilities.convertRectangle(component.getParent(), component.getBounds(), area);
     }

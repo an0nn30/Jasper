@@ -8,7 +8,7 @@ import javax.swing.UIManager;
 import javax.swing.plaf.ColorUIResource;
 import javax.swing.plaf.InsetsUIResource;
 
-/** Temporary raw-Swing defaults adapter. Plan 2 Task 5 removes this after chrome consumers migrate. */
+/** Temporary raw-control publication for Plan 2 Tasks 6–10. Task 11 removes it; no theme derivation lives here. */
 final class LegacyAppearanceDefaults {
     private LegacyAppearanceDefaults() {}
     static void install(GeneratedTheme theme) {
@@ -25,7 +25,18 @@ final class LegacyAppearanceDefaults {
             defaults.put(key, new ColorUIResource(color));
             extra.put(key, ColorMath.hex(color));
         });
-        ChromeKeys.derive(defaults, theme.terminal().background()).forEach((key, color) -> extra.put(key, ColorMath.hex(color)));
+        // Exact residual notification keys: Task 6 removes these readers. Editor keys already come from module uiKeys.
+        java.util.Map.of(
+            "Jasper.notification.background", SemanticColor.SURFACE_CARD,
+            "Jasper.notification.borderColor", SemanticColor.BORDER_SUBTLE,
+            "Jasper.notification.foreground", SemanticColor.TEXT_PRIMARY,
+            "Jasper.notification.mutedForeground", SemanticColor.TEXT_SECONDARY,
+            "Jasper.notification.linkForeground", SemanticColor.TEXT_LINK).forEach((key, role) -> {
+                var color = dev.jasper.ui.themeimport.FlatLafThemeData.explicitColors(theme.uiKeys()).get(key);
+                if (color == null) color = theme.semantic().color(role);
+                defaults.put(key, new ColorUIResource(color));
+                extra.put(key, ColorMath.hex(color));
+            });
         // Persist module-installed colors, including semantic values, through reinstallation.
         defaults.forEach((key, value) -> { if (value instanceof java.awt.Color color) extra.put(key.toString(), ColorMath.hex(color)); });
         defaults.put("ListUI", "dev.jasper.app.appearance.AppListUI");

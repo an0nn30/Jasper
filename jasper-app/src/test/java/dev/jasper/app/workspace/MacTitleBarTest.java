@@ -203,9 +203,9 @@ class MacTitleBarTest {
                 owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
                 assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameAqua");
                 assertThat(pixel(bar)).isEqualTo(new Color(0xf2f2f2));
-                assertThat(label(bar).getForeground()).isEqualTo(new Color(0x8a8a8a));
+                assertThat(label(bar).getForeground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
                 bar.setActive(true);
-                assertThat(label(bar).getForeground()).isEqualTo(new Color(0x6e6e6e));
+                assertThat(label(bar).getForeground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
                 owner.setToolbarMode(ToolbarMode.HIDDEN);
                 assertThat(bar.isVisible()).isTrue();
                 assertThat(root.getMinimumSize().height).isGreaterThanOrEqualTo(owner.getMinimumSize().height + 30);

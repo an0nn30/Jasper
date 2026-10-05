@@ -1,5 +1,13 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.swing.NativeControlStyles;
+
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.swing.NativeChromePainting;
+
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.contributions.MenuEntry;
@@ -81,7 +89,7 @@ final class WindowChrome {
         standardMenus.put(MenuTarget.Slot.FILE, file); standardMenus.put(MenuTarget.Slot.EDIT, edit);
         standardMenus.put(MenuTarget.Slot.VIEW, view); standardMenus.put(MenuTarget.Slot.PANE, pane);
         standardMenus.put(MenuTarget.Slot.TAB, tab);
-        JMenu modes = new JMenu("Toolbar");
+        JMenu modes = menu("Toolbar");
         for (ToolbarMode mode : ToolbarMode.values()) {
             JRadioButtonMenuItem item = new MenuBarItems.Radio(owner.windowCommands().view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)));
             item.setActionCommand(mode.name());
@@ -144,8 +152,8 @@ final class WindowChrome {
         button.putClientProperty("label", label);
         button.setIcon(icon != null ? icon : AppIcons.icon("command"));
         button.setFocusable(false);
-        button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
-        button.setIconTextGap(UIScale.scale(4));
+        NativeControlStyles.unframed(button);
+        button.setIconTextGap(NativeControlStyles.metric(DesignMetrics.Role.NATIVE_ACTION_PADDING));
         button.getAccessibleContext().setAccessibleName(label);
         button.setToolTipText(label);
         button.setFont(button.chromeFont());
@@ -210,6 +218,7 @@ final class WindowChrome {
                     if (children.stream().noneMatch(child -> child instanceof JMenuItem)) break;
                     JMenu menu = new JMenu(submenu.title());
                     children.forEach(menu::add);
+                    NativeControlStyles.menu(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
                     built.add(menu);
                 }
             }
@@ -271,6 +280,7 @@ final class WindowChrome {
     }
 
     private JMenu observe(JMenu menu) {
+        NativeControlStyles.menu(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
         menu.addMenuListener(new MenuListener() {
             @Override public void menuSelected(MenuEvent event) { owner.updateActions(); }
             @Override public void menuDeselected(MenuEvent event) {}
@@ -288,8 +298,8 @@ final class WindowChrome {
         ReferenceButton button = new ReferenceButton(owner.action(id), id);
         button.setText(label); button.putClientProperty("label", label);
         button.setIcon(AppIcons.icon(icon)); button.setFocusable(false);
-        button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
-        button.setIconTextGap(UIScale.scale(4));
+        NativeControlStyles.unframed(button);
+        button.setIconTextGap(NativeControlStyles.metric(DesignMetrics.Role.NATIVE_ACTION_PADDING));
         button.getAccessibleContext().setAccessibleName(id.label());
         button.setToolTipText(id.label());
         boolean labelled = id == ActionId.SPLIT_RIGHT;
@@ -340,8 +350,7 @@ final class WindowChrome {
         }
 
         private Font chromeFont() {
-            Font font = UIManager.getFont("Label.font");
-            return font.deriveFont(Font.PLAIN, font.getSize2D() - UIScale.scale(.5f));
+            return ThemeZone.font(Typography.Role.LABEL);
         }
 
         /** The toolbar's button height; icon-only buttons are square. */
@@ -358,44 +367,14 @@ final class WindowChrome {
         }
 
         @Override protected void paintComponent(Graphics graphics) {
-            var g = (Graphics2D) graphics.create();
-            try {
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-                ButtonModel model = getModel();
-                if (isEnabled() && (model.isRollover() || model.isPressed() || model.isSelected())) {
-                    g.setColor(UIManager.getColor(model.isPressed() || model.isSelected()
-                        ? "Button.toolbar.pressedBackground" : "Button.toolbar.hoverBackground"));
-                    int arc = UIScale.scale(6);
-                    g.fillRoundRect(0, 0, getWidth(), getHeight(), arc, arc);
-                }
-                if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.38f));
-                Icon icon = getIcon();
-                int x = labels() ? UIScale.scale(4)
-                    : menu() ? Math.max(UIScale.scale(4), (getWidth() - UIScale.scale(10) - icon.getIconWidth()) / 2)
-                    : (getWidth() - icon.getIconWidth()) / 2;
-                icon.paintIcon(this, g, x, (getHeight() - icon.getIconHeight()) / 2);
-                x += icon.getIconWidth();
-                if (labels()) {
-                    x += UIScale.scale(4);
-                    g.setFont(chromeFont()); g.setColor(UIManager.getColor("Jasper.chromeForeground"));
-                    FontMetrics fm = g.getFontMetrics();
-                    g.drawString(getText(), x, (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
-                    x += fm.stringWidth(getText());
-                }
-                if (menu()) {
-                    x += UIScale.scale(3);
-                    Icon arrow = AppIcons.dropdown();
-                    arrow.paintIcon(this, g, x, (getHeight() - arrow.getIconHeight()) / 2);
-                }
-            } finally { g.dispose(); }
+            NativeChromePainting.action(this, graphics, ThemeZone.theme(this), labels(), menu() ? AppIcons.dropdown() : null);
         }
     }
 
     private static final class ToolbarSeparator extends JSeparator {
         ToolbarSeparator() { super(SwingConstants.VERTICAL); }
         @Override protected void paintComponent(Graphics g) {
-            g.setColor(UIManager.getColor("Separator.foreground"));
+            g.setColor(ThemeZone.color(null, SemanticColor.BORDER_SUBTLE));
             g.fillRect(0, 0, getWidth(), getHeight());
         }
     }
@@ -414,6 +393,7 @@ final class WindowChrome {
                 built.forEach(menu::add);
             }
         }
+        NativeControlStyles.menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
         return menu;
     }
 
@@ -423,9 +403,9 @@ final class WindowChrome {
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }
     void refreshTheme() {
-        header.setBackground(UIManager.getColor("Jasper.titleBackground"));
+        header.setBackground(ThemeZone.color(null, SemanticColor.SURFACE_APP));
         search.repaint();
-        toolbar.setBackground(UIManager.getColor("Jasper.titleBackground"));
+        toolbar.setBackground(ThemeZone.color(null, SemanticColor.SURFACE_APP));
         for (Component child : toolbar.getComponents())
             if (child instanceof ReferenceButton button) button.setFont(button.chromeFont());
         status.refreshTheme();

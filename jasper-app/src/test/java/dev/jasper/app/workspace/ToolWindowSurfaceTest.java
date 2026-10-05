@@ -121,7 +121,7 @@ class ToolWindowSurfaceTest {
         var bg = buttonImage.createGraphics(); selectedButton.paint(bg); bg.dispose();
         assertThat(new Color(buttonImage.getRGB(4, selectedButton.getHeight() / 2)))
             .as("the stripe uses the active theme's neutral toolbar selection")
-            .isEqualTo(UIManager.getColor("ToggleButton.toolbar.selectedBackground"));
+            .isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SEGMENT_SELECTED_BG));
         var image = new java.awt.image.BufferedImage(1640, 960, 2); var g = image.createGraphics();
         try { g.scale(2, 2); root.printAll(g); } finally { g.dispose(); }
         var output = java.nio.file.Path.of("build/render-preview"); java.nio.file.Files.createDirectories(output);

@@ -81,7 +81,7 @@ class WorkspaceValuesTest {
         var values = ThemeGenerator.generate(document);
         assertThat(values.tokens()).containsEntry(Token.SURFACE, explicit).containsEntry(Token.EDITOR_BACKGROUND, Color.WHITE);
         assertThat(values.syntax()).containsEntry(SyntaxRole.COMMENT, style);
-        assertThat(ChromeKeys.contrast(values.syntax().get(SyntaxRole.KEYWORD).color(), Color.WHITE)).isGreaterThanOrEqualTo(4.5);
+        assertThat(dev.jasper.ui.theme.ColorMath.contrast(values.syntax().get(SyntaxRole.KEYWORD).color(), Color.WHITE)).isGreaterThanOrEqualTo(4.5);
     }
 
     @Test void missingEffectiveKeysKeepGeneratedValuesAndPresentColorsKeepAlpha() {

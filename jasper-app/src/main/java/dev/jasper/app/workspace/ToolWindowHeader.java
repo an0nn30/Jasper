@@ -1,5 +1,10 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.swing.NativeControlStyles;
+
 import com.formdev.flatlaf.ui.FlatEmptyBorder;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.platform.AppIcons;
@@ -23,17 +28,17 @@ import javax.swing.UIManager;
  */
 final class ToolWindowHeader extends JPanel {
     /** Height in logical pixels. */
-    static final int HEIGHT = 32;
+    static final int HEIGHT = DesignMetrics.DEFAULT.value(DesignMetrics.Role.NATIVE_TOOL_HEADER_HEIGHT);
 
     private final JLabel title = new JLabel() {
         @Override public void updateUI() {
             super.updateUI();
-            Font font = UIManager.getFont("Label.font");
-            if (font != null) setFont(font.deriveFont(Font.BOLD));
+            Font font = ThemeZone.font(Typography.Role.LABEL);
+            if (font != null) setFont(ThemeZone.font(Typography.Role.PANEL_TITLE));
         }
     };
-    private final JButton options = button("general/moreVertical", "Options");
-    private final JButton hide = button("general/hide", "Hide");
+    private final JButton options = button("more", "Options");
+    private final JButton hide = button("collapse", "Hide");
     private final Supplier<JPopupMenu> menu;
 
     /**
@@ -57,14 +62,14 @@ final class ToolWindowHeader extends JPanel {
         buttons.add(Box.createHorizontalStrut(2));
         buttons.add(hide);
         // An app-owned compound border keeps the padding through look-and-feel switches: the same pattern ToolWindowArea.Host.gutters uses.
-        setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(0, 10, 0, 6), null));
+        setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(0, DesignMetrics.DEFAULT.value(DesignMetrics.Role.FIELD_HORIZONTAL_PADDING), 0, DesignMetrics.DEFAULT.value(DesignMetrics.Role.ICON_GAP)), null));
         add(title, BorderLayout.CENTER);
         add(buttons, BorderLayout.EAST);
     }
 
     private static JButton button(String icon, String name) {
-        var button = new JButton(AppIcons.bundled(icon));
-        button.putClientProperty("JButton.buttonType", "toolBarButton");
+        var button = new JButton(AppIcons.semantic(icon));
+        NativeControlStyles.button(button, () -> ThemeZone.theme(button));
         button.setFocusable(false);
         button.setToolTipText(name);
         button.getAccessibleContext().setAccessibleName(name);

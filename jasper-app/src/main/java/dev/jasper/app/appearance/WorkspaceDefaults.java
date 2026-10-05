@@ -4,7 +4,7 @@ import dev.jasper.ui.theme.GeneratedTheme;
 
 import javax.swing.UIManager;
 
-/** Native semantic defaults consumed by workspace-aware Swing clients. EDT only. */
+/** Temporary module-value publication for SDK palette current() readers. Tasks 7–10 migrate callers; Task 11 removes this adapter. EDT only. */
 final class WorkspaceDefaults {
     private WorkspaceDefaults() {}
     static void publish(GeneratedTheme theme) {

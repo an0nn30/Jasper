@@ -194,7 +194,7 @@ class PluginPaneAppearanceTest {
             var contributions = new Contributions(); owner.connectContributions(contributions);
             var panel = new JPanel(); var list = new JList<>(new String[] {"entry"}); panel.add(list);
             contributions.content().open("fixture", "pane", "Pane", owner.id(), panel);
-            assertThat(UIManager.getColor("ToolWindow.background")).isNull();
+            assertThat(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR)).isNotNull();
             assertThat(list.getBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SURFACE_SUNKEN));
             assertThat(list.getSelectionBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SELECTION_INACTIVE));
         });

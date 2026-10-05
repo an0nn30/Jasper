@@ -81,7 +81,7 @@ class BarHeightTest {
             try {
                 UIManager.put("Label.font", font.deriveFont(40f));
                 status.refreshTheme();
-                int text = status.getFontMetrics(UIManager.getFont("Label.font").deriveFont(40f - UIScale.scale(2f))).getHeight();
+                int text = status.getFontMetrics(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.CAPTION)).getHeight();
                 assertThat(status.getPreferredSize().height).as("a large UI font grows the bar").isGreaterThanOrEqualTo(text)
                     .isGreaterThan(UIScale.scale(20));
             } finally {

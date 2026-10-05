@@ -1,152 +1,39 @@
 package dev.jasper.app.appearance;
 
+import dev.jasper.app.testsupport.EdtTestExtension;
+import dev.jasper.ui.theme.*;
 import java.awt.Color;
-import java.util.List;
-import javax.swing.UIDefaults;
-import javax.swing.plaf.ColorUIResource;
+import java.util.Map;
+import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
-import static org.assertj.core.api.Assertions.*;
+import org.junit.jupiter.api.extension.ExtendWith;
+import static org.assertj.core.api.Assertions.assertThat;
 
+/** Transitional alias publication, not a second color derivation engine. Task 6 removes notification aliases. */
+@ExtendWith(EdtTestExtension.class)
 class ChromeKeysTest {
-    private static final Color TERMINAL = new Color(0xfafafa);
-
-    /** Only keys FlatLaf itself always defines, with light values. */
-    private static UIDefaults flatLafOnly() {
-        var d = new UIDefaults();
-        put(d, "Label.foreground", 0x000000); put(d, "Label.disabledForeground", 0x8c8c8c);
-        put(d, "TitlePane.background", 0xf2f2f2); put(d, "TitlePane.foreground", 0x6e6e6e);
-        put(d, "TitlePane.inactiveForeground", 0x999999); put(d, "Separator.foreground", 0xd1d1d1);
-        put(d, "Panel.background", 0xf2f2f2); put(d, "TabbedPane.hoverColor", 0xd9d9d9);
-        put(d, "TabbedPane.underlineColor", 0x4083c9); put(d, "TabbedPane.inactiveUnderlineColor", 0x9ca7b8);
-        put(d, "TextField.background", 0xffffff); put(d, "Actions.Red", 0xdb5860);
-        put(d, "Actions.Green", 0x59a869); put(d, "Actions.Yellow", 0xeda200);
-        put(d, "Component.borderColor", 0xc4c4c4); put(d, "Component.focusedBorderColor", 0x87afda);
-        put(d, "List.selectionBackground", 0x2675bf); put(d, "List.selectionForeground", 0xffffff);
-        return d;
+    @Test void residualNotificationAliasesComeFromTheInstalledModuleSnapshotAndNeverStayStale() {
+        for (var theme : java.util.List.of(Theme.DARK, Theme.JASPER_LIGHT, Theme.DARK)) {
+            ThemeManager.install(theme);
+            var palette = ThemeManager.generated(theme).semantic();
+            Map.of("Jasper.notification.background", SemanticColor.SURFACE_CARD,
+                "Jasper.notification.borderColor", SemanticColor.BORDER_SUBTLE,
+                "Jasper.notification.foreground", SemanticColor.TEXT_PRIMARY,
+                "Jasper.notification.mutedForeground", SemanticColor.TEXT_SECONDARY,
+                "Jasper.notification.linkForeground", SemanticColor.TEXT_LINK).forEach((key, role) ->
+                    assertThat(UIManager.getColor(key)).as(key).isEqualTo(palette.color(role)));
+        }
     }
-
-    private static void put(UIDefaults d, String key, int rgb) { d.put(key, new ColorUIResource(rgb)); }
-
-    @Test void flatLafsOwnKeysAreEnoughForEveryChromeKey() {
-        var defaults = flatLafOnly();
-        var added = ChromeKeys.derive(defaults, TERMINAL);
-        assertThat(added).containsOnlyKeys(ChromeKeys.KEYS);
-        for (String key : ChromeKeys.KEYS) assertThat(defaults.getColor(key)).as(key).isNotNull();
-        assertThat(defaults.getColor("Jasper.titleBackground")).isEqualTo(new Color(0xf2f2f2));
-        assertThat(defaults.getColor("Jasper.titleSeparator")).isEqualTo(new Color(0xd1d1d1));
-        assertThat(defaults.getColor("Jasper.chromeForeground")).isEqualTo(new Color(0x000000));
-        assertThat(defaults.getColor("Jasper.tabSelectedBackground")).isEqualTo(new Color(0xf2f2f2));
-        assertThat(defaults.getColor("Jasper.tabHoverBackground")).isEqualTo(new Color(0xd9d9d9));
-        assertThat(defaults.getColor("Jasper.tabUnderline")).isEqualTo(new Color(0x4083c9));
-        assertThat(defaults.getColor("Jasper.tabSelectedBorder")).isEqualTo(new Color(0x4083c9));
-        assertThat(defaults.getColor("Jasper.tabSelectedBorderInactive")).isEqualTo(new Color(0x9ca7b8));
-        assertThat(defaults.getColor("Jasper.findErrorBackground")).isEqualTo(ChromeKeys.mix(new Color(0xdb5860), Color.WHITE, .12));
-        assertThat(ChromeKeys.KEYS).noneMatch(key -> key.startsWith("Jasper.palette"));
-        assertThat(defaults.getColor("Jasper.paletteSelectionBackground")).as("the palette reads the theme's own keys").isNull();
-    }
-
-    @Test void intellijKeysWinOverFlatLafFallbacks() {
-        var defaults = flatLafOnly();
-        put(defaults, "MainToolbar.background", 0xeeeeee); put(defaults, "MainToolbar.foreground", 0x111111);
-        put(defaults, "Borders.color", 0xcccccc); put(defaults, "Label.infoForeground", 0x707070);
-        put(defaults, "EditorTabs.underlinedTabBackground", 0xffffff); put(defaults, "EditorTabs.underlinedTabForeground", 0x222222);
-        defaults.put("EditorTabs.hoverBackground", new ColorUIResource(new Color(0, 0, 0, 0x19)));
-        put(defaults, "EditorTabs.underlineColor", 0x3574f0); put(defaults, "EditorTabs.inactiveUnderlineColor", 0xa0a0a0);
-        put(defaults, "SearchField.errorBackground", 0xffcccc); put(defaults, "StatusBar.background", 0xf7f7f7);
-        ChromeKeys.derive(defaults, TERMINAL);
-        assertThat(defaults.getColor("Jasper.titleBackground")).isEqualTo(new Color(0xeeeeee));
-        assertThat(defaults.getColor("Jasper.chromeForeground")).isEqualTo(new Color(0x111111));
-        assertThat(defaults.getColor("Jasper.titleSeparator")).isEqualTo(new Color(0xcccccc));
-        assertThat(defaults.getColor("Jasper.mutedForeground")).isEqualTo(new Color(0x707070));
-        assertThat(defaults.getColor("Jasper.tabSelectedBackground")).isEqualTo(Color.WHITE);
-        assertThat(defaults.getColor("Jasper.tabSelectedForeground")).isEqualTo(new Color(0x222222));
-        assertThat(defaults.getColor("Jasper.tabHoverBackground")).isEqualTo(new Color(0, 0, 0, 0x19));
-        assertThat(defaults.getColor("Jasper.tabUnderline")).isEqualTo(new Color(0x3574f0));
-        assertThat(defaults.getColor("Jasper.tabUnderlineInactive")).isEqualTo(new Color(0xa0a0a0));
-        assertThat(defaults.getColor("Jasper.findErrorBackground")).isEqualTo(new Color(0xffcccc));
-    }
-
-    @Test void aKeyTheThemeSetsIsNeverReplaced() {
-        var defaults = flatLafOnly();
-        put(defaults, "Jasper.titleBackground", 0x123456);
-        put(defaults, "Jasper.configErrorForeground", 0xffeeee);
-        var added = ChromeKeys.derive(defaults, TERMINAL);
-        assertThat(defaults.getColor("Jasper.titleBackground")).isEqualTo(new Color(0x123456));
-        // A theme-set colour is not adjusted, even below the floor.
-        assertThat(defaults.getColor("Jasper.configErrorForeground")).isEqualTo(new Color(0xffeeee));
-        assertThat(added).doesNotContainKeys("Jasper.titleBackground", "Jasper.configErrorForeground");
-    }
-
-    @Test void derivedTextAndStrokesMeetJaspersContrastFloor() {
-        var defaults = flatLafOnly();
-        ChromeKeys.derive(defaults, TERMINAL);
-        Color title = defaults.getColor("Jasper.titleBackground");
-        Color status = defaults.getColor("Panel.background");
-        assertThat(defaults.getColor("Jasper.titleInactiveForeground")).isNotEqualTo(new Color(0x999999));
-        assertThat(ChromeKeys.contrast(defaults.getColor("Jasper.titleInactiveForeground"), title)).isGreaterThanOrEqualTo(3);
-        assertThat(ChromeKeys.contrast(defaults.getColor("Jasper.mutedForeground"), title)).isGreaterThanOrEqualTo(3);
-        assertThat(ChromeKeys.contrast(defaults.getColor("Jasper.splitDivider"), TERMINAL)).isGreaterThanOrEqualTo(3);
-        assertThat(ChromeKeys.contrast(defaults.getColor("Jasper.runningForeground"), status)).isGreaterThanOrEqualTo(3);
-        for (String key : List.of("Jasper.configSuccessForeground", "Jasper.configWarningForeground", "Jasper.configErrorForeground"))
-            assertThat(ChromeKeys.contrast(defaults.getColor(key), status)).as(key).isGreaterThanOrEqualTo(4.5);
-    }
-
-    @Test void aColourThatAlreadyMeetsTheFloorIsKept() {
-        assertThat(ChromeKeys.readable(new Color(0x333333), Color.WHITE, 4.5, Color.BLACK)).isEqualTo(new Color(0x333333));
-        Color moved = ChromeKeys.readable(new Color(0xdddddd), Color.WHITE, 3, Color.BLACK);
-        assertThat(ChromeKeys.contrast(moved, Color.WHITE)).isGreaterThanOrEqualTo(3);
-    }
-
-    @Test void aThemeMissingAFlatLafKeyFailsNamingIt() {
-        var defaults = flatLafOnly();
-        defaults.remove("TitlePane.background");
-        assertThatIllegalStateException().isThrownBy(() -> ChromeKeys.derive(defaults, TERMINAL))
-            .withMessageContaining("TitlePane.background");
-    }
-
-    @Test void titleSearchKeysDeriveFromTheTitleBarUnlessTheThemeNamesThem() {
-        var defaults = flatLafOnly();
-        ChromeKeys.derive(defaults, TERMINAL);
-        Color title = defaults.getColor("Jasper.titleBackground");
-        Color background = defaults.getColor("Jasper.titleSearch.background");
-        assertThat(background).isEqualTo(ChromeKeys.mix(Color.BLACK, title, .07));
-        assertThat(defaults.getColor("Jasper.titleSearch.hoverBackground")).isEqualTo(ChromeKeys.mix(Color.BLACK, background, .06));
-        assertThat(defaults.getColor("Jasper.titleSearch.border")).isEqualTo(ChromeKeys.mix(Color.BLACK, title, .16));
-        assertThat(defaults.getColor("Jasper.titleSearch.foreground")).isEqualTo(defaults.getColor("Jasper.titleForeground"));
-        assertThat(ChromeKeys.contrast(defaults.getColor("Jasper.titleSearch.hintForeground"), background)).isGreaterThanOrEqualTo(3);
-
-        var themed = flatLafOnly();
-        put(themed, "SearchEverywhere.SearchField.background", 0x101010);
-        put(themed, "SearchEverywhere.SearchField.borderColor", 0x202020);
-        put(themed, "MainToolbar.searchField.hoverBackground", 0x303030);
-        ChromeKeys.derive(themed, TERMINAL);
-        assertThat(themed.getColor("Jasper.titleSearch.background")).isEqualTo(new Color(0x101010));
-        assertThat(themed.getColor("Jasper.titleSearch.border")).isEqualTo(new Color(0x202020));
-        assertThat(themed.getColor("Jasper.titleSearch.hoverBackground")).isEqualTo(new Color(0x303030));
-    }
-
-    @Test void railBadgesReadAgainstTheRail() {
-        var defaults = flatLafOnly();
-        ChromeKeys.derive(defaults, TERMINAL);
-        Color rail = defaults.getColor("Jasper.titleBackground");
-        assertThat(ChromeKeys.contrast(defaults.getColor("Jasper.railBadgeError"), rail)).isGreaterThanOrEqualTo(3);
-        assertThat(ChromeKeys.contrast(defaults.getColor("Jasper.railBadgeAccent"), rail)).isGreaterThanOrEqualTo(3);
-    }
-
-    @Test void notificationCardsFollowIntellijNotificationKeysOrDeriveThem() {
-        var derived = flatLafOnly();
-        ChromeKeys.derive(derived, TERMINAL);
-        assertThat(derived.getColor("Jasper.notification.background")).isEqualTo(new Color(0xf2f2f2));
-        assertThat(derived.getColor("Jasper.notification.borderColor")).isEqualTo(new Color(0xc4c4c4));
-        assertThat(derived.getColor("Jasper.notification.foreground")).isEqualTo(new Color(0x000000));
-        assertThat(ChromeKeys.contrast(derived.getColor("Jasper.notification.linkForeground"), new Color(0xf2f2f2))).isGreaterThanOrEqualTo(4.5);
-        assertThat(ChromeKeys.contrast(derived.getColor("Jasper.notification.mutedForeground"), new Color(0xf2f2f2))).isGreaterThanOrEqualTo(4.5);
-        var authored = flatLafOnly();
-        put(authored, "Notification.background", 0xfff8e0); put(authored, "Notification.borderColor", 0xd0b060);
-        put(authored, "Notification.foreground", 0x222222); put(authored, "PopupMenu.background", 0xffffff);
-        ChromeKeys.derive(authored, TERMINAL);
-        assertThat(authored.getColor("Jasper.notification.background")).isEqualTo(new Color(0xfff8e0));
-        assertThat(authored.getColor("Jasper.notification.borderColor")).isEqualTo(new Color(0xd0b060));
-        assertThat(authored.getColor("Jasper.notification.foreground")).isEqualTo(new Color(0x222222));
+    @Test void explicitNativeResidualAliasWinsOnlyOnItsOwnInstall() {
+        var base = Theme.DARK.source().document();
+        var ui = new java.util.LinkedHashMap<>(base.ui());
+        ui.put("Jasper.notification.background", "#123456");
+        var document = new ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), base.parentLine(),
+            base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), base.tokens(), base.syntax(), ui, base.icons(), base.workspace());
+        ThemeManager.install(ThemeGenerator.generate(document));
+        assertThat(UIManager.getColor("Jasper.notification.background")).isEqualTo(new Color(0x123456));
+        ThemeManager.install(Theme.JASPER_LIGHT);
+        assertThat(UIManager.getColor("Jasper.notification.background"))
+            .isEqualTo(ThemeManager.generated(Theme.JASPER_LIGHT).semantic().color(SemanticColor.SURFACE_CARD));
     }
 }

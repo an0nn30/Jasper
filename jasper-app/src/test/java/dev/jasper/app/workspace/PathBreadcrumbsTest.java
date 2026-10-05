@@ -65,7 +65,7 @@ class PathBreadcrumbsTest {
             }
             UIManager.put("Label.font", UIManager.getFont("Label.font").deriveFont(40f));
             status.refreshTheme();
-            assertThat(status.getPreferredSize().height).isGreaterThanOrEqualTo(status.getFontMetrics(UIManager.getFont("Label.font")).getHeight());
+            assertThat(status.getPreferredSize().height).isGreaterThanOrEqualTo(status.getFontMetrics(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.CAPTION)).getHeight());
         } finally { UIManager.put("Label.font", null); UIManager.setLookAndFeel(original); }
     }
     private static void layout(Container container) {

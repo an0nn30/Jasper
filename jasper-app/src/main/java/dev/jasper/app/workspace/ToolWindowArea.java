@@ -1,5 +1,9 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.metrics.DesignMetrics;
+
 import com.formdev.flatlaf.ui.FlatEmptyBorder;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.dock.DockGeometry;
@@ -46,9 +50,9 @@ import javax.swing.UIManager;
  * calls {@link #sync} afterwards. EDT only.
  */
 final class ToolWindowArea extends JPanel {
-    private static final int GUTTER = 6;
+    private static final int GUTTER = DesignMetrics.DEFAULT.value(DesignMetrics.Role.WORKSPACE_GUTTER);
     /** Shared with the folder tabs so their upper corners meet the workspace frame exactly. */
-    static final int SURFACE_ARC = 16;
+    static final int SURFACE_ARC = DesignMetrics.DEFAULT.value(DesignMetrics.Role.WORKSPACE_SURFACE_ARC);
 
     /** A shared frame around plugin-owned content; gutters belong to the workspace chrome. */
     private static final class Host extends JPanel {
@@ -57,6 +61,8 @@ final class ToolWindowArea extends JPanel {
         /** The opacity in effect for the surface, 1 being opaque; only the centre host follows the window's glass. */
         private float opacity = 1f;
         private JComponent content;
+        private Runnable releaseHeader = () -> {};
+        private JComponent borrowedHeader;
 
         Host(boolean toolWindow) {
             super(new BorderLayout());
@@ -84,7 +90,7 @@ final class ToolWindowArea extends JPanel {
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D) graphics.create();
             try {
-                Color chrome = UIManager.getColor("Jasper.titleBackground");
+                Color chrome = ThemeZone.color(null, SemanticColor.SURFACE_APP);
                 g.setColor(chrome);
                 g.fillRect(0, 0, getWidth(), getHeight());
                 if (opacity < 1f) {
@@ -218,6 +224,7 @@ final class ToolWindowArea extends JPanel {
     Consumer<String> onHide = id -> { };
     /** Hears of each header a sync creates (and its title label), so that a drag can start from it. */
     BiConsumer<JComponent, String> dragSource = (component, id) -> { };
+    Consumer<JComponent> releaseDragSource = component -> { };
 
     ToolWindowArea(JComponent terminalColumn, DockState state) {
         super(null);
@@ -239,7 +246,7 @@ final class ToolWindowArea extends JPanel {
     @Override public void updateUI() {
         super.updateUI();
         // The gaps between frames show the workspace chrome.
-        setBackground(UIManager.getColor("Jasper.titleBackground"));
+        setBackground(ThemeZone.color(null, SemanticColor.SURFACE_APP));
     }
 
     DockState state() { return state; }
@@ -250,6 +257,12 @@ final class ToolWindowArea extends JPanel {
     }
 
     void removeContent(String id) { contents.remove(id); }
+
+    /** Window disposal releases borrowed kit headers even when the plugin closed its view first. */
+    void close() {
+        for (var host : hosts.values()) { host.releaseHeader.run(); host.removeAll(); remove(host); }
+        hosts.clear(); contents.clear();
+    }
 
     /** The content showing in the slot, or null. */
     JComponent content(Slot slot) {
@@ -274,9 +287,12 @@ final class ToolWindowArea extends JPanel {
         for (Slot slot : Slot.values()) {
             String id = toolsSuppressed ? null : state.active(slot).orElse(null);
             Content wanted = id == null ? null : contents.get(id);
+            if (wanted != null && wanted.component() instanceof dev.jasper.ui.swing.KitView view && view.isClosed()) wanted = null;
             Host host = hosts.get(slot);
-            if (host != null && (wanted == null || host.content != wanted.component())) {
+            if (host != null && (wanted == null || host.content != wanted.component()
+                    || host.borrowedHeader != kitHeader(wanted.component()))) {
                 remove(host);
+                host.releaseHeader.run();
                 host.removeAll();
                 hosts.remove(slot);
                 host = null;
@@ -284,10 +300,23 @@ final class ToolWindowArea extends JPanel {
             if (wanted != null && host == null) {
                 host = new Host(true);
                 host.content = wanted.component();
-                ToolWindowHeader header = header(id, wanted.title());
-                host.add(header, BorderLayout.NORTH);
-                dragSource.accept(header, id);
-                dragSource.accept(header.titleLabel(), id);
+                host.borrowedHeader = kitHeader(wanted.component());
+                if (wanted.component() instanceof dev.jasper.ui.swing.KitView view
+                        && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Panel panel) {
+                    host.releaseHeader = mountHeader(view, panel.id(), id);
+                } else {
+                    ToolWindowHeader header = header(id, wanted.title());
+                    host.add(header, BorderLayout.NORTH);
+                    dragSource.accept(header, id);
+                    dragSource.accept(header.titleLabel(), id);
+                    host.releaseHeader = () -> { releaseDragSource.accept(header); releaseDragSource.accept(header.titleLabel()); };
+                }
+                if (wanted.component() instanceof dev.jasper.ui.swing.KitView view) {
+                    var release = host.releaseHeader;
+                    java.beans.PropertyChangeListener changed = event -> sync();
+                    view.addPropertyChangeListener("viewSpec", changed);
+                    host.releaseHeader = () -> { view.removePropertyChangeListener("viewSpec", changed); release.run(); };
+                }
                 host.add(wanted.component(), BorderLayout.CENTER);
                 ToolWindowSurface.apply(host);
                 hosts.put(slot, host);
@@ -297,6 +326,45 @@ final class ToolWindowArea extends JPanel {
         refreshGutters();
         revalidate(); repaint();
         onMinimumSizeChanged.run();
+    }
+
+    private static JComponent kitHeader(JComponent component) {
+        return component instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()
+            && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Panel panel ? view.panelHeader(panel.id()) : null;
+    }
+
+    /** Borrow only the kit header; the panel and its footer remain owned by the view. */
+    private Runnable mountHeader(dev.jasper.ui.swing.KitView view, String panel, String id) {
+        var header = view.panelHeader(panel);
+        var sources = new java.util.ArrayList<JComponent>();
+        collectHeaderSources(header, sources);
+        sources.forEach(component -> dragSource.accept(component, id));
+        var ready = dev.jasper.ui.model.ControlState.READY;
+        var ghost = dev.jasper.ui.model.Nodes.ButtonKind.GHOST;
+        view.setPanelHostActions(panel, List.of(
+            new dev.jasper.ui.model.Nodes.Button("host.options", ready, "", "more", ghost, "host.options", "Options"),
+            new dev.jasper.ui.model.Nodes.Button("host.hide", ready, "", "collapse", ghost, "host.hide", "Hide")), event -> {
+                if (event instanceof dev.jasper.ui.model.UiEvent.Action action) {
+                    if (action.id().equals("host.hide")) onHide.accept(id);
+                    else if (action.id().equals("host.options") && header.isShowing())
+                        ToolWindowMenu.create(state.slot(id).orElse(Slot.LEFT_TOP), state.visible(id),
+                            slot -> onMove.accept(id, slot), () -> onHide.accept(id)).show(header, header.getWidth(), header.getHeight());
+                }
+            });
+        return () -> {
+            sources.forEach(releaseDragSource);
+            // Plugin disposal can precede removing the dock frame. A closed view has already released its controls.
+            if (!view.isClosed() && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Panel current
+                    && current.id().equals(panel) && view.panelHeader(panel) == header)
+                view.setPanelHostActions(panel, List.of(), event -> {});
+        };
+    }
+
+    private static void collectHeaderSources(JComponent component, java.util.List<JComponent> sources) {
+        if (component instanceof javax.swing.AbstractButton) return;
+        sources.add(component);
+        for (var child : component.getComponents())
+            if (child instanceof JComponent next) collectHeaderSources(next, sources);
     }
 
     /** Zen changes the presentation only: no dock mutation, persistence or disposal of plugin content. */
@@ -332,7 +400,7 @@ final class ToolWindowArea extends JPanel {
 
     /** Reapplies the tool window colour after a theme change reset the frame backgrounds. */
     void refreshTheme() {
-        setBackground(UIManager.getColor("Jasper.titleBackground"));
+        setBackground(ThemeZone.color(null, SemanticColor.SURFACE_APP));
         hosts.values().forEach(ToolWindowSurface::apply);
     }
 

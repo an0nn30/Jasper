@@ -20,6 +20,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(EdtTestExtension.class)
 class ToolWindowHeaderTest {
+    @org.junit.jupiter.api.BeforeEach void installModuleTheme() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> dev.jasper.app.appearance.ThemeManager.install(dev.jasper.app.appearance.Theme.DARK));
+    }
+
     private final List<String> events = new ArrayList<>();
 
     private JPopupMenu menu(Slot current, boolean visible) {
@@ -37,6 +41,7 @@ class ToolWindowHeaderTest {
 
     @Test void theMenuMovesToAnyOfTheSixSlotsAndHides() {
         JPopupMenu menu = menu(Slot.LEFT_BOTTOM, true);
+        assertThat(item(menu, "Hide").getFont()).isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.LABEL));
         var moveTo = (JMenu) menu.getComponent(0);
         assertThat(moveTo.getText()).isEqualTo("Move to");
         assertThat(Arrays.stream(moveTo.getMenuComponents()).map(item -> ((JMenuItem) item).getText()))
@@ -55,11 +60,11 @@ class ToolWindowHeaderTest {
         var header = new ToolWindowHeader("<html><b>Sessions</b>", () -> menu(Slot.LEFT_TOP, true), () -> events.add("hidden"));
         assertThat(header.titleLabel().getText()).isEqualTo("<html><b>Sessions</b>");
         assertThat(header.titleLabel().getClientProperty("html.disable")).as("a plugin title is never HTML").isEqualTo(Boolean.TRUE);
-        assertThat(header.titleLabel().getFont().getStyle() & Font.BOLD).isEqualTo(Font.BOLD);
+        assertThat(header.titleLabel().getFont()).isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.PANEL_TITLE));
         header.updateUI();
         SwingUtilities.updateComponentTreeUI(header);
         assertThat(header.getInsets()).as("padding survives a look-and-feel update").isEqualTo(new Insets(0, UIScale.scale(10), 0, UIScale.scale(6)));
-        assertThat(header.titleLabel().getFont().isBold()).as("bold after a look-and-feel change").isTrue();
+        assertThat(header.titleLabel().getFont()).as("module title role survives a look-and-feel change").isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.PANEL_TITLE));
         assertThat(header.optionsButton().getAccessibleContext().getAccessibleName()).isEqualTo("Options");
         assertThat(header.optionsButton().getToolTipText()).isEqualTo("Options");
         assertThat(header.hideButton().getAccessibleContext().getAccessibleName()).isEqualTo("Hide");

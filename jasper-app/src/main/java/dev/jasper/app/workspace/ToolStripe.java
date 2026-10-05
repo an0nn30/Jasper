@@ -1,5 +1,10 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.swing.NativeControlStyles;
+
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -99,8 +104,7 @@ final class ToolStripe extends JPanel {
     private static void style(AbstractButton button) {
         button.setHideActionText(true);
         button.setText(null);
-        button.putClientProperty("JButton.buttonType", "toolBarButton");
-        button.putClientProperty("FlatLaf.style", "arc: 10");
+        NativeControlStyles.button(button, () -> ThemeZone.theme(button));
         button.setMargin(new Insets(0, 0, 0, 0));
         button.setFocusable(false);
     }
@@ -284,7 +288,7 @@ final class ToolStripe extends JPanel {
         return result;
     }
 
-    @Override public Dimension getMinimumSize() { return new Dimension(UIScale.scale(railWidth), UIScale.scale(80)); }
+    @Override public Dimension getMinimumSize() { return new Dimension(UIScale.scale(railWidth), NativeControlStyles.metric(DesignMetrics.Role.RAIL_MIN_HEIGHT)); }
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }
 
     @Override public void doLayout() {
@@ -301,26 +305,26 @@ final class ToolStripe extends JPanel {
      */
     private Placement place(boolean withGap) {
         var placement = new Placement();
-        int x = UIScale.scale(3), square = UIScale.scale(railWidth - 6), step = square + UIScale.scale(4);
-        int y = column(Slot.Group.TOP, UIScale.scale(4), x, square, step, withGap, placement);
+        int x = NativeControlStyles.metric(DesignMetrics.Role.RAIL_EDGE), square = UIScale.scale(railWidth - 6), step = square + NativeControlStyles.metric(DesignMetrics.Role.RAIL_GAP);
+        int y = column(Slot.Group.TOP, NativeControlStyles.metric(DesignMetrics.Role.RAIL_GAP), x, square, step, withGap, placement);
         int split = y;
         if (secondSeparator != null && (dragging || !groups.get(Slot.Group.SECOND).isEmpty())) {
             placement.bounds.put(secondSeparator, separator(y));
-            split = y + UIScale.scale(4);
-            y += UIScale.scale(8);
+            split = y + NativeControlStyles.metric(DesignMetrics.Role.RAIL_GAP);
+            y += NativeControlStyles.metric(DesignMetrics.Role.RAIL_SECTION_GAP);
         }
         y = column(Slot.Group.SECOND, y, x, square, step, withGap, placement);
         if (actionsSeparator != null) {
             placement.bounds.put(actionsSeparator, separator(y));
-            y += UIScale.scale(8);
+            y += NativeControlStyles.metric(DesignMetrics.Role.RAIL_SECTION_GAP);
         }
         for (AbstractButton action : actions) {
             placement.bounds.put(action, new Rectangle(x, y, square, square));
             y += step;
         }
         int count = footCount(withGap);
-        int footHeight = count == 0 ? 0 : count * step - UIScale.scale(4);
-        int footY = Math.max(y, getHeight() - UIScale.scale(4) - footHeight);
+        int footHeight = count == 0 ? 0 : count * step - NativeControlStyles.metric(DesignMetrics.Role.RAIL_GAP);
+        int footY = Math.max(y, getHeight() - NativeControlStyles.metric(DesignMetrics.Role.RAIL_GAP) - footHeight);
         column(Slot.Group.FOOT, footY, x, square, step, withGap, placement);
         int boundary = (y + footY) / 2;
         placement.groups.put(Slot.Group.TOP, new Rectangle(0, 0, getWidth(), split));
@@ -330,7 +334,7 @@ final class ToolStripe extends JPanel {
     }
 
     private Rectangle separator(int y) {
-        return new Rectangle(UIScale.scale(7), y + UIScale.scale(3), UIScale.scale(railWidth - 14), UIScale.scale(1));
+        return new Rectangle(NativeControlStyles.metric(DesignMetrics.Role.RAIL_SEPARATOR_INSET), y + NativeControlStyles.metric(DesignMetrics.Role.RAIL_EDGE), UIScale.scale(railWidth - 14), NativeControlStyles.metric(DesignMetrics.Role.HAIRLINE));
     }
 
     /** The group's shown buttons, the lifted one left out. */
@@ -374,7 +378,7 @@ final class ToolStripe extends JPanel {
     }
 
     void refreshTheme() {
-        setBackground(UIManager.getColor("Jasper.titleBackground"));
+        setBackground(ThemeZone.color(null, SemanticColor.SURFACE_APP));
         repaint();
     }
 }

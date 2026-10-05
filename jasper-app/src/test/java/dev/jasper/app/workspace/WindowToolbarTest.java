@@ -88,7 +88,7 @@ class WindowToolbarTest {
         }
         bar.setSize(bar.fullWidth(), 30); bar.doLayout();
         assertThat(bar.overflowButton().isVisible()).as("the full width shows everything").isFalse();
-        assertThat(bar.overflowButton().getIcon()).isSameAs(dev.jasper.app.platform.AppIcons.bundled("general/moreVertical"));
+        assertThat(bar.overflowButton().getIcon()).isSameAs(dev.jasper.app.platform.AppIcons.named("MORE"));
     }
 
     @Test void labelsGiveWayBeforeAnyControlOverflowsAndComeBackWithRoom() {

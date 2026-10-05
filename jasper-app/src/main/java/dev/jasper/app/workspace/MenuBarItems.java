@@ -17,11 +17,15 @@ import javax.swing.KeyStroke;
 final class MenuBarItems {
     private MenuBarItems() {}
 
+    private static void style(JMenuItem item) {
+        dev.jasper.ui.swing.NativeControlStyles.menu(item, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+    }
+
     /** Swing offers a declined window key to the menu bar's items under {@code WHEN_IN_FOCUSED_WINDOW}; they refuse it. */
     private static boolean accelerator(int condition) { return condition == JComponent.WHEN_IN_FOCUSED_WINDOW; }
 
     static final class Item extends JMenuItem {
-        Item(Action action) { super(action); }
+        Item(Action action) { super(action); style(this); }
 
         @Override protected boolean processKeyBinding(KeyStroke stroke, KeyEvent event, int condition, boolean pressed) {
             return !accelerator(condition) && super.processKeyBinding(stroke, event, condition, pressed);
@@ -29,7 +33,7 @@ final class MenuBarItems {
     }
 
     static final class CheckBox extends JCheckBoxMenuItem {
-        CheckBox(String text, boolean selected) { super(text, selected); }
+        CheckBox(String text, boolean selected) { super(text, selected); style(this); }
 
         @Override protected boolean processKeyBinding(KeyStroke stroke, KeyEvent event, int condition, boolean pressed) {
             return !accelerator(condition) && super.processKeyBinding(stroke, event, condition, pressed);
@@ -37,7 +41,7 @@ final class MenuBarItems {
     }
 
     static final class Radio extends JRadioButtonMenuItem {
-        Radio(Action action) { super(action); }
+        Radio(Action action) { super(action); style(this); }
 
         @Override protected boolean processKeyBinding(KeyStroke stroke, KeyEvent event, int condition, boolean pressed) {
             return !accelerator(condition) && super.processKeyBinding(stroke, event, condition, pressed);

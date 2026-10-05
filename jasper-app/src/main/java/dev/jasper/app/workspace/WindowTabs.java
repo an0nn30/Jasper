@@ -1,6 +1,12 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.swing.NativeControlStyles;
+
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.app.config.AnimationSettings;
 import java.awt.image.BufferedImage;
 import java.awt.geom.Rectangle2D;
@@ -21,7 +27,9 @@ import javax.swing.*;
  * surface; the recessed strip and fixed controls frame it independently of the surrounding chrome.
  */
 final class WindowTabs extends JPanel implements AutoCloseable {
-    private static final int MIN_TAB = 160, MAX_TAB = 240, LIST_WIDTH = 24, EDGE = 8, GAP = 6;
+    private static final int MIN_TAB = metric(DesignMetrics.Role.TAB_MIN_WIDTH), MAX_TAB = metric(DesignMetrics.Role.TAB_MAX_WIDTH),
+        LIST_WIDTH = metric(DesignMetrics.Role.TAB_LIST_WIDTH), EDGE = metric(DesignMetrics.Role.TAB_EDGE), GAP = metric(DesignMetrics.Role.TAB_GAP);
+    private static int metric(DesignMetrics.Role role) { return DesignMetrics.DEFAULT.value(role); }
     /** Titles come from remote programs; tooltips and the tab list show at most this many characters. */
     private static final int TITLE_LIMIT = 200;
     private final WindowContent owner;
@@ -159,7 +167,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         if (disposed) return;
         settle(); doLayout();
         double distance = event.getPreciseWheelRotation() * (event.getScrollType() == MouseWheelEvent.WHEEL_BLOCK_SCROLL
-            ? viewport.getWidth() : UIScale.scale(16) * event.getScrollAmount());
+            ? viewport.getWidth() : NativeControlStyles.metric(DesignMetrics.Role.ICON_RAIL) * event.getScrollAmount());
         scrollOffset = Math.max(0, Math.min(Math.max(0, contentWidth - viewport.getWidth()), scrollOffset + distance));
         revealSelection = false;
         doLayout(); repaint();
@@ -175,7 +183,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             item.addActionListener(event -> { if (!disposed) { revealSelection = true; owner.selectTab(tab); revalidate(); repaint(); } });
             menu.add(item);
         }
-        return menu;
+        dev.jasper.ui.swing.NativeControlStyles.menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
     }
 
     @Override public Dimension getMinimumSize() { return new Dimension(UIScale.scale(MIN_TAB), UIScale.scale(owner.tabHeight())); }
@@ -197,7 +205,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         }
         contentWidth = (int) Math.ceil(total);
         if (revealSelection && selectedWidth > 0) {
-            double margin = selectedWidth + UIScale.scale(32) <= space ? UIScale.scale(16) : 0;
+            double margin = selectedWidth + NativeControlStyles.metric(DesignMetrics.Role.TAB_REVEAL_SPACE) <= space ? NativeControlStyles.metric(DesignMetrics.Role.ICON_RAIL) : 0;
             if (selectedStart - margin < scrollOffset || selectedWidth > space) scrollOffset = selectedStart - margin;
             else if (selectedStart + selectedWidth + margin > scrollOffset + space) scrollOffset = selectedStart + selectedWidth + margin - space;
             // Continue revealing an expanding selected tab until its width has settled.
@@ -250,15 +258,15 @@ final class WindowTabs extends JPanel implements AutoCloseable {
                 g.fill(fading);
             }
             // A slim accent pill travels with the folder, staying inside the scrolling tab viewport.
-            double indicatorWidth = Math.min(UIScale.scale(64), Math.max(0, folderWidth.current - UIScale.scale(16)));
+            double indicatorWidth = Math.min(UIScale.scale(metric(DesignMetrics.Role.TAB_ACCENT_WIDTH)), Math.max(0, folderWidth.current - UIScale.scale(metric(DesignMetrics.Role.TAB_ACCENT_MARGIN))));
             if (indicatorWidth > 0 && folderAlpha.current > 0) {
                 g.clip(viewport.getBounds());
                 g.setComposite(AlphaComposite.SrcOver.derive((float) folderAlpha.current));
-                g.setColor(owner.theme().workspace().tokens().get(Token.ACCENT));
-                double thickness = UIScale.scale(2f);
+                g.setColor(owner.theme().workspace().semantic().color(SemanticColor.ACCENT));
+                double thickness = UIScale.scale((float) metric(DesignMetrics.Role.TAB_ACCENT_HEIGHT));
                 g.fill(new java.awt.geom.RoundRectangle2D.Double(
                     folderX.current - scrollOffset + (folderWidth.current - indicatorWidth) / 2,
-                    getHeight() - UIScale.scale(3), indicatorWidth, thickness, thickness, thickness));
+                    getHeight() - UIScale.scale(metric(DesignMetrics.Role.TAB_ACCENT_BOTTOM)), indicatorWidth, thickness, thickness, thickness));
             }
         } finally { g.dispose(); }
     }
@@ -289,7 +297,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     /** Fade clipped tabs into the recessed strip; the tab-list button stays outside the viewport. */
     private void paintOverflow(Graphics2D graphics) {
         int width = viewport.getWidth(), height = viewport.getHeight();
-        int fade = Math.min(UIScale.scale(16), width / 2);
+        int fade = Math.min(NativeControlStyles.metric(DesignMetrics.Role.ICON_RAIL), width / 2);
         if (fade < 2) return;
         Color surface = getBackground();
         Color clear = new Color(surface.getRed(), surface.getGreen(), surface.getBlue(), 0);
@@ -437,7 +445,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
 
     private static void flat(JButton button) {
         button.putClientProperty("html.disable", true);
-        button.setBorder(BorderFactory.createEmptyBorder());
+        NativeControlStyles.unframed(button);
         button.setContentAreaFilled(false); button.setFocusable(false);
     }
 
@@ -492,7 +500,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
                     Point start = origin; origin = null;
                     if (disposed || start == null || !SwingUtilities.isLeftMouseButton(event)) return;
                     Point end = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), WindowTabs.this);
-                    if (start.distance(end) <= UIScale.scale(5) || !viewport.getBounds().contains(end)) return;
+                    if (start.distance(end) <= NativeControlStyles.metric(DesignMetrics.Role.DOCK_DRAG_THRESHOLD) || !viewport.getBounds().contains(end)) return;
                     settle(); doLayout();
                     for (int i = 0; i < order.size(); i++) {
                         Entry target = entries.get(order.get(i));
@@ -537,9 +545,9 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             close.setIcon(AppIcons.forBackground(AppIcons.named("CLOSE"), surface));
             close.setRolloverIcon(AppIcons.forBackground(AppIcons.named("CLOSE_HOVERED"), surface));
             select.setSelected(tab == selected);
-            select.setFont(SystemFonts.ui(Font.PLAIN, 13f));
+            select.setFont(ThemeZone.font(Typography.Role.BODY));
             select.setForeground(tab == selected ? owner.theme().palette().foreground()
-                : WorkspaceTheme.color(this, Token.TEXT_MUTED, !active ? "Jasper.titleInactiveForeground" : "Jasper.titleForeground"));
+                : ThemeZone.color(this, !active ? SemanticColor.TEXT_TERTIARY : SemanticColor.TEXT_SECONDARY));
             close.setVisible(tab == selected || hovered);
             return retitled;
         }
@@ -555,7 +563,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         }
 
         @Override public void doLayout() {
-            int edge = UIScale.scale(EDGE), closeWidth = Math.min(UIScale.scale(16), getWidth());
+            int edge = UIScale.scale(EDGE), closeWidth = Math.min(NativeControlStyles.metric(DesignMetrics.Role.ICON_RAIL), getWidth());
             int closeX = Math.max(0, getWidth() - edge - closeWidth);
             close.setBounds(closeX, 0, closeWidth, getHeight());
             // Reserve the icon's space even on plain inactive labels, so selecting never changes the tab width.

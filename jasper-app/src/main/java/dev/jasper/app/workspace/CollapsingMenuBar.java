@@ -32,12 +32,13 @@ final class CollapsingMenuBar extends JMenuBar {
     CollapsingMenuBar() {
         setLayout(new Layout());
         control(more, "menuOverflow", "More menus", AppIcons.named("MORE"));
-        control(hamburger, "menuHamburger", "Application menu", AppIcons.bundled("general/menu"));
+        control(hamburger, "menuHamburger", "Application menu", AppIcons.semantic("menu"));
         super.addImpl(more, null, -1);
         super.addImpl(hamburger, null, -1);
     }
 
     private void control(JMenu control, String name, String description, Icon icon) {
+        dev.jasper.ui.swing.NativeControlStyles.menu(control, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
         control.setName(name);
         control.setIcon(icon);
         control.setToolTipText(description);
@@ -73,6 +74,8 @@ final class CollapsingMenuBar extends JMenuBar {
             super.addImpl(component, constraints, index);
             return;
         }
+        dev.jasper.ui.swing.NativeControlStyles.menu(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+        dev.jasper.ui.swing.NativeControlStyles.menuTree(menu.getPopupMenu(), dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
         menus.add(menu);
         super.addImpl(menu, constraints, getComponentIndex(more));
     }

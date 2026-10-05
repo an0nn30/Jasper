@@ -568,3 +568,39 @@ Reopening an existing typed content key still enters ContentRegistry.open, so an
 failed move and failed recovery can reattach. It uses the original component/view; the unused incoming
 view remains caller-owned. Generic custom-content document/caret/opacity tests are not evidence of
 actual Editor-plugin applied syntax palette; the latter remains an Editor migration obligation (Task 9).
+
+
+## Plan 2 Task 5 native consumer integration
+
+`ui.swing.NativeControlStyles` supplies native adapter `font(Typography.Role)`, scaled `metric(Role)`,
+`padding`, `unframed`, `button`, `field`, `label`, `textArea`, `menu`, `menuTree`, and `refresh`. These retain existing
+Actions/documents/models/focus routing; local UI listeners reapply module styling after delegate changes.
+No global component registry or feature-owned FlatLaf recipe is introduced. Raw user defaultFont/Label
+font overrides feed module typography once; role geometry comes from DesignMetrics. NativeChromePainting
+owns search-field and compact command painting for identity-sensitive native adapters. Plan 3 Task 10
+owns final composition/replacement. App named semantic icons use the module IconRegistry and live
+ThemeZone roles; catalog/native identity assets keep authored variants.
+
+DesignMetrics names the preserved native folder-tab range160–240, accent64×2, motion80/100/130ms,
+workspace surface arc16 and native header/rail/breadcrumb/status/search/dock dimensions. These are fixed
+module values, not theme options. Dock model packages stay JDK-only.
+
+`FlatLafInstaller.installedTheme()` returns the immutable GeneratedTheme installed in LAF defaults.
+The private snapshot ThemeLaf preserves it when the same LAF instance is reinstalled. There is no public
+vendor signature or static palette cache. App ThemeZone resolves explicit workspace route properties
+before this snapshot and stops at chrome/popup/window boundaries. Failed AppearanceTransaction installation
+restores both raw defaults layers, the exact LAF and snapshot; LAF restoration batches UIDefaults entries
+before firing the defaults change event. Per-entry restoration previously exposed an incomplete font table
+to FlatLaf UIScale and could fail recursively; the integration regression verifies no suppressed restoration
+failure and live existing controls after rollback.
+
+`KitView.isClosed()` exposes existing atomic close-request state to module/native hosts. Successful update
+publishes property `viewSpec` after reconciliation and after clearing the reentrancy guard, with listener
+failure containment. ToolWindowArea (the actual outer-header owner) borrows `panelHeader`, attaches drag
+sources to non-button descendants, and installs placement/hide through `setPanelHostActions`. Hide, move,
+replacement, re-show and host close release listeners/actions; plugin close before host teardown is safe.
+The app never closes the plugin-owned view merely to hide it. No new SDK method is needed.
+
+Temporary raw defaults and plugin styling retain only the exact consumers/removal owners in
+[temporary-paths](../../design/theme-engine/temporary-paths.md). Dynamic SDK current() readers require
+WorkspaceDefaults publication until Tasks 7–10/11, correcting the early literal-key audit.

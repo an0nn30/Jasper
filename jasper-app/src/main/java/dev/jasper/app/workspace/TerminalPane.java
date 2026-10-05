@@ -1,5 +1,10 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.swing.NativeControlStyles;
+
 import dev.jasper.app.config.ShellExitBehavior;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.terminal.config.Palette;
@@ -190,13 +195,18 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         if (requestOrNull != null) reportedTitle = requestOrNull.title();
         setPreferredSize(new Dimension(958, 821));
         setFocusable(true);
-        add(new JLabel("Starting terminal…", SwingConstants.CENTER));
-        setBackground(UIManager.getColor("Panel.background"));
+        var starting = new JLabel("Starting terminal…", SwingConstants.CENTER);
+        NativeControlStyles.label(starting, dev.jasper.ui.metrics.Typography.Role.LABEL, SemanticColor.TEXT_PRIMARY, () -> ThemeZone.theme(this));
+        add(starting);
+        setBackground(ThemeZone.color(null, SemanticColor.SURFACE_PANEL));
         noticeLabel.putClientProperty("html.disable", Boolean.TRUE);
-        var buttons = new JPanel(new FlowLayout(FlowLayout.TRAILING, 8, 0));
+        NativeControlStyles.label(noticeLabel, dev.jasper.ui.metrics.Typography.Role.LABEL, SemanticColor.TEXT_PRIMARY, () -> ThemeZone.theme(this));
+        var buttons = new JPanel(new FlowLayout(FlowLayout.TRAILING, NativeControlStyles.metric(DesignMetrics.Role.BUTTON_GAP), 0));
         buttons.setOpaque(false);
         buttons.add(noticeSecondary); buttons.add(noticePrimary);
-        notice.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
+        notice.setBorder(NativeControlStyles.padding(DesignMetrics.Role.BUTTON_GAP, DesignMetrics.Role.COLUMN_GAP));
+        NativeControlStyles.button(noticePrimary, () -> ThemeZone.theme(this));
+        NativeControlStyles.button(noticeSecondary, () -> ThemeZone.theme(this));
         notice.add(noticeLabel, BorderLayout.CENTER);
         notice.add(buttons, BorderLayout.EAST);
         noticePrimary.addActionListener(event -> primaryAction.run());
@@ -233,6 +243,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
                 while (cause.getCause() != null) cause = cause.getCause();
                 removeAll();
                 var message = new JLabel("Could not start terminal: " + cause.getMessage());
+                NativeControlStyles.label(message, dev.jasper.ui.metrics.Typography.Role.LABEL, SemanticColor.TEXT_PRIMARY, () -> ThemeZone.theme(this));
                 message.setForeground(getForeground()); add(message);
                 revalidate(); repaint();
                 onFailure.accept("Could not start terminal in " + launchDirectory + ":\n" + cause.getMessage(), failure);

@@ -1,0 +1,90 @@
+package dev.jasper.app.workspace;
+
+import dev.jasper.app.appearance.*;
+import dev.jasper.app.testsupport.EdtTestExtension;
+import dev.jasper.ui.theme.*;
+import java.awt.Color;
+import java.util.Map;
+import javax.swing.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import static org.assertj.core.api.Assertions.assertThat;
+
+@ExtendWith(EdtTestExtension.class)
+class WorkspaceRolesTest {
+    @Test void nativeSearchKeepsItsDocumentCaretAndSelectionAcrossAnAppearanceRefresh() {
+        ThemeManager.install(Theme.DARK);
+        var field = new JTextField("pending query");
+        dev.jasper.ui.swing.NativeControlStyles.field(field, () -> dev.jasper.app.platform.ThemeZone.theme(field));
+        var document = field.getDocument(); field.select(2, 7);
+        ThemeManager.install(Theme.JASPER_LIGHT);
+        SwingUtilities.updateComponentTreeUI(field);
+        assertThat(field.getDocument()).isSameAs(document);
+        assertThat(field.getText()).isEqualTo("pending query");
+        assertThat(field.getSelectionStart()).isEqualTo(2); assertThat(field.getSelectionEnd()).isEqualTo(7);
+        assertThat(field.getBackground()).isEqualTo(ThemeManager.generated(Theme.JASPER_LIGHT).semantic().color(SemanticColor.SURFACE_INPUT));
+    }
+
+    @Test void liveModuleSnapshotSurvivesReinstallAndTransactionalRollback() throws Exception {
+        ThemeManager.install(Theme.DARK);
+        var dark = ThemeManager.generated(Theme.DARK); var light = ThemeManager.generated(Theme.JASPER_LIGHT);
+        var laf = UIManager.getLookAndFeel();
+        ThemeManager.install(Theme.JASPER_LIGHT);
+        UIManager.setLookAndFeel(laf);
+        assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(dark);
+        try (var binding = new ThemeBinding(new ThemePair(dark, dark), failure -> { throw new AssertionError(failure); });
+             var icons = new dev.jasper.ui.icons.IconRegistry();
+             var view = new dev.jasper.ui.swing.KitView(new dev.jasper.ui.swing.KitContext(binding, ThemeRoute.CHROME,
+                 dev.jasper.ui.metrics.DesignMetrics.DEFAULT, icons, () -> false),
+                 new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Text("label", dev.jasper.ui.model.ControlState.READY,
+                     "Existing view", dev.jasper.ui.model.Nodes.TextRole.BODY)), event -> {})) {
+            var label = (JLabel) view.getComponent(0);
+            var beforeLaf = raw(UIManager.getLookAndFeelDefaults());
+            var beforeOverrides = raw(UIManager.getDefaults());
+            var transaction = new dev.jasper.ui.swing.AppearanceTransaction(binding, next -> {
+                dev.jasper.ui.swing.FlatLafInstaller.install(next); throw new IllegalStateException("after install");
+            }, previous -> {});
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> transaction.apply(new ThemePair(light, light)))
+                .hasMessage("after install").satisfies(failure -> assertThat(failure.getSuppressed()).isEmpty());
+            assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(dark);
+            assertThat(binding.current().chrome()).isSameAs(dark);
+            assertThat(raw(UIManager.getLookAndFeelDefaults())).isEqualTo(beforeLaf);
+            assertThat(raw(UIManager.getDefaults())).isEqualTo(beforeOverrides);
+            assertThat(label.getForeground()).isEqualTo(dark.semantic().color(SemanticColor.TEXT_PRIMARY));
+            try {
+                UIManager.put("defaultFont", new java.awt.Font("Dialog", java.awt.Font.PLAIN, 21));
+                UIManager.put("Label.font", new java.awt.Font("Dialog", java.awt.Font.PLAIN, 21));
+                assertThat(label.getFont().getSize2D()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(21f));
+            } finally {
+                UIManager.put("Label.font", beforeOverrides.get("Label.font"));
+                UIManager.put("defaultFont", beforeOverrides.get("defaultFont"));
+            }
+            new dev.jasper.ui.swing.AppearanceTransaction(binding, dev.jasper.ui.swing.FlatLafInstaller::install, previous -> {})
+                .apply(new ThemePair(light, light));
+            assertThat(view.getComponent(0)).isSameAs(label);
+            assertThat(label.getForeground()).isEqualTo(light.semantic().color(SemanticColor.TEXT_PRIMARY));
+        }
+    }
+
+    @Test void canonicalChromeRolesWinWithoutChangingSearchContextOnThemeSwitch() {
+        var source = Theme.DARK.source().document();
+        var document = new ThemeDocument(source.origin(), source.name(), source.dark(), source.parent(), source.parentLine(),
+            source.uiComplete(), source.metadata(), source.seeds(), source.ansi(), source.tokens(), source.syntax(), source.ui(), source.icons(), source.workspace(),
+            Map.of(SemanticColor.SURFACE_APP, new Color(0x123456)));
+        var generated = ThemeGenerator.generate(document);
+        var theme = new Theme("role-test", "Role test", true, TerminalPaletteAdapter.toTerminal(generated.terminal()),
+            new Theme.UserFile(java.nio.file.Path.of("role-test.toml"), document));
+        var search = new TitleSearchField(() -> {}, () -> "shortcut");
+        search.setContext("pending context", "tooltip", null);
+        ThemeManager.install(theme);
+        var area = new ToolWindowArea(new JPanel(), new dev.jasper.app.dock.DockState());
+        assertThat(area.getBackground()).isEqualTo(new Color(0x123456));
+        ThemeManager.install(Theme.JASPER_LIGHT);
+        SwingUtilities.updateComponentTreeUI(search);
+        assertThat(search.contextText()).isEqualTo("pending context");
+    }
+    private static Map<Object, Object> raw(javax.swing.UIDefaults defaults) {
+        var values = new java.util.HashMap<Object, Object>(); defaults.forEach(values::put); return values;
+    }
+
+}

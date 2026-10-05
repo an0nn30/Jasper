@@ -189,8 +189,7 @@ class DockDropOverlayTest {
     }
 
     @Test void thePlaceholdersBorderDoesNotStackOnItsFill() {
-        noThemeColours();
-        UIManager.put("Component.accentColor", new Color(0x2f, 0x80, 0xed));
+        installDragTheme(new Color(0x2f, 0x80, 0xed), Map.of());
         var overlay = new DockDropOverlay();
         overlay.show(null, new Rectangle(10, 160, 40, 40), null, null);
         BufferedImage image = paint(overlay);
@@ -204,8 +203,7 @@ class DockDropOverlayTest {
     }
 
     @Test void theHighlightAndThePlaceholderLandExactlyInTheirRectangles() {
-        noThemeColours();
-        UIManager.put("Component.accentColor", new Color(0x2f, 0x80, 0xed));
+        installDragTheme(new Color(0x2f, 0x80, 0xed), Map.of());
         var overlay = new DockDropOverlay();
         overlay.show(new Rectangle(50, 40, 200, 100), new Rectangle(10, 160, 22, 22), null, null);
         BufferedImage image = paint(overlay);
@@ -222,14 +220,24 @@ class DockDropOverlayTest {
     }
 
     @Test void theThemesOwnDragColoursWin() {
-        originalLookAndFeel = UIManager.getLookAndFeel();
-        ThemeTestSupport.install(Theme.DARK);
-        UIManager.put("DragAndDrop.areaBackground", new Color(10, 20, 30, 40));
-        UIManager.put("DragAndDrop.borderColor", new Color(200, 100, 50, 255));
+        installDragTheme(new Color(0x3574f0), Map.of("DragAndDrop.areaBackground", "#0a141e28", "DragAndDrop.borderColor", "#c86432"));
         assertThat(DockDropOverlay.fill()).isEqualTo(new Color(10, 20, 30, 40));
         assertThat(DockDropOverlay.border()).isEqualTo(new Color(200, 100, 50, 255));
-        noThemeColours();
-        assertThat(DockDropOverlay.fill()).as("no accent either: IntelliJ's blue").isEqualTo(new Color(0x35, 0x74, 0xf0, 64));
+        installDragTheme(new Color(0x3574f0), Map.of());
+        assertThat(DockDropOverlay.fill()).as("module accent supplies the missing drag color").isEqualTo(new Color(0x35, 0x74, 0xf0, 64));
+    }
+
+    private void installDragTheme(Color accent, Map<String, Object> colors) {
+        if (originalLookAndFeel == null) originalLookAndFeel = UIManager.getLookAndFeel();
+        var base = Theme.DARK.source().document();
+        var ui = new java.util.LinkedHashMap<>(base.ui());
+        ui.remove("DragAndDrop.areaBackground"); ui.remove("DragAndDrop.borderColor"); ui.putAll(colors);
+        var document = new dev.jasper.ui.theme.ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), base.parentLine(),
+            base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), base.tokens(), base.syntax(), ui, base.icons(), base.workspace(),
+            Map.of(dev.jasper.ui.theme.SemanticColor.ACCENT, accent));
+        var generated = dev.jasper.ui.theme.ThemeGenerator.generate(document);
+        ThemeTestSupport.install(new Theme("drag-test", "Drag test", true, dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(generated.terminal()),
+            new Theme.UserFile(java.nio.file.Path.of("drag.toml"), document)));
     }
 
     @Test void theGhostFollowsTheCursorAndClearRemovesEverything() {

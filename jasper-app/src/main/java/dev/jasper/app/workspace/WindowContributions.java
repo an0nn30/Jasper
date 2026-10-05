@@ -265,6 +265,8 @@ final class WindowContributions implements AutoCloseable {
             LOG.log(System.Logger.Level.WARNING, "The panel " + id + " could not be built; showing a placeholder.", failure);
         }
         panel.component = built != null ? built : new JLabel("This panel could not be loaded.", SwingConstants.CENTER);
+        if (built == null) dev.jasper.ui.swing.NativeControlStyles.label((JLabel) panel.component, dev.jasper.ui.metrics.Typography.Role.LABEL,
+            dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY, () -> dev.jasper.app.platform.ThemeZone.theme(panel.component));
         owner.area().setContent(id, panel.entry.title(), panel.component);
     }
 

@@ -56,6 +56,25 @@ final class NamedIcons {
     static final Set<String> NAMES = ARTWORK.keySet();
     private NamedIcons() { }
 
+    /** Named module glyphs; catalog ids below remain only for native assets and explicit catalog choices. */
+    static String kitName(String name) {
+        if (name == null || !NAMES.contains(name)) throw new IllegalArgumentException("Unknown icon name: " + name);
+        return switch (name) {
+            case "CLOSE_HOVERED" -> "close";
+            case "CONNECT", "EXECUTE", "RESUME" -> "play";
+            case "DISCONNECT", "EXIT" -> "logout";
+            case "DROPDOWN", "NEXT_MATCH" -> "chevron.down";
+            case "PREVIOUS_MATCH", "UP" -> "chevron.up";
+            case "NEXT" -> "forward";
+            case "PREVIOUS" -> "back";
+            case "NETWORK" -> "server";
+            case "NEW_FOLDER" -> "folder.add";
+            case "NEW_WINDOW" -> "window.add";
+            case "SEARCH_HISTORY" -> "history";
+            default -> name.toLowerCase(java.util.Locale.ROOT).replace('_', '.');
+        };
+    }
+
     static String id(String name) {
         if (name == null || !NAMES.contains(name)) throw new IllegalArgumentException("Unknown icon name: " + name);
         return ARTWORK.get(name);

@@ -18,11 +18,26 @@ import javax.swing.plaf.ColorUIResource;
 /** Real FlatLaf installation. Authored colors are retained; geometry is owned by the kit. EDT only. */
 public final class FlatLafInstaller {
     private FlatLafInstaller() {}
+    /** Installed immutable snapshot; stored with the LAF so appearance rollback restores it atomically. */
+    public static GeneratedTheme installedTheme() {
+        Object value = UIManager.getLookAndFeelDefaults().get("Jasper.installedTheme");
+        if (value instanceof GeneratedTheme theme) return theme;
+        throw new IllegalStateException("No Jasper theme installed");
+    }
+    private static final class SnapshotLaf extends IntelliJTheme.ThemeLaf {
+        private final GeneratedTheme snapshot;
+        SnapshotLaf(IntelliJTheme source, GeneratedTheme snapshot) { super(source); this.snapshot = snapshot; }
+        @Override public javax.swing.UIDefaults getDefaults() {
+            var defaults = super.getDefaults();
+            defaults.put("Jasper.installedTheme", snapshot);
+            return defaults;
+        }
+    }
     public static void install(GeneratedTheme theme) {
         if (!EventQueue.isDispatchThread()) throw new IllegalStateException("Appearance requires EDT");
         String json = FlatLafThemeData.json(theme.name(), theme.dark(), theme.author(), theme.uiKeys(), theme.icons());
         FlatLaf laf;
-        try { laf = IntelliJTheme.createLaf(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8))); }
+        try { laf = new SnapshotLaf(new IntelliJTheme(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8))), theme); }
         catch (IOException failure) { throw new UncheckedIOException(failure); }
         var fixed = new LinkedHashMap<String, String>();
         var metrics = DesignMetrics.DEFAULT;
@@ -35,6 +50,7 @@ public final class FlatLafInstaller {
         try { UIManager.setLookAndFeel(laf); }
         catch (javax.swing.UnsupportedLookAndFeelException failure) { throw new IllegalStateException("Cannot install generated appearance", failure); }
         var defaults = UIManager.getLookAndFeelDefaults();
+        defaults.put("Jasper.installedTheme", theme);
         FlatLafThemeData.explicitColors(theme.uiKeys()).forEach((key, color) -> defaults.put(key, new ColorUIResource(color)));
         for (var role : SemanticColor.values()) defaults.put("Jasper.semantic." + role.key(), new ColorUIResource(theme.semantic().color(role)));
         var palette = theme.semantic();

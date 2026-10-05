@@ -21,7 +21,7 @@ class ZoneIconsTest {
             var root = new JPanel();
             root.putClientProperty("Jasper.zone", "workspace");
             root.putClientProperty("Jasper.workspace.dark", true);
-            var icon = AppIcons.named("SEARCH");
+            var icon = AppIcons.bundled("general/search");
             var light = fixed(false);
             var dark = fixed(true);
             assertThat(pixels(icon, label)).isEqualTo(pixels(light, label));

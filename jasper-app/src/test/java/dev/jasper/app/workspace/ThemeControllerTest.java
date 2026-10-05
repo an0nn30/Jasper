@@ -357,8 +357,8 @@ class ThemeControllerTest {
                     assertThat(contrast(UIManager.getColor(prefix + ".foreground"), UIManager.getColor(prefix + ".background")))
                         .as(prefix + " normal text in " + theme).isGreaterThanOrEqualTo(4.5);
                 }
-                assertThat(contrast(UIManager.getColor("Jasper.titleInactiveForeground"), owner.toolbar().getBackground())).isGreaterThanOrEqualTo(3);
-                assertThat(contrast(UIManager.getColor("Button.disabledText"), owner.toolbar().getBackground())).isGreaterThanOrEqualTo(3);
+                assertThat(contrast(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY), owner.toolbar().getBackground())).isGreaterThanOrEqualTo(3);
+                assertThat(contrast(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY), owner.toolbar().getBackground())).isGreaterThanOrEqualTo(3);
                 assertThat(contrast(UIManager.getColor("MenuItem.selectionForeground"), UIManager.getColor("MenuItem.selectionBackground"))).isGreaterThanOrEqualTo(4.5);
             }
         });

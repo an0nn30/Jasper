@@ -98,9 +98,8 @@ class ThemeManagerTest {
                 Map.entry("SearchEverywhere.List.separatorColor", "#d9d9d9"), Map.entry("SearchEverywhere.List.separatorForeground", "#999999"),
                 Map.entry("SearchEverywhere.Advertiser.background", "#f2f2f2"), Map.entry("SearchEverywhere.Advertiser.foreground", "#808080"),
                 Map.entry("Popup.borderColor", "#ababab")));
-            assertColours(Map.of("Jasper.titleBackground", "#f2f2f2", "Jasper.titleForeground", "#6e6e6e",
-                "Jasper.titleInactiveForeground", "#8a8a8a", "Jasper.titleSeparator", "#d1d1d1",
-                "Jasper.tabSelectedBackground", "#ffffff", "Jasper.tabUnderline", "#4083c9", "Jasper.findErrorBackground", "#ffcccc"));
+            assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme())
+                .isSameAs(ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT));
             // IntelliJ's border classes are dropped, so FlatLaf keeps its own.
             assertThat(UIManager.getBorder("ScrollPane.border")).isInstanceOf(com.formdev.flatlaf.ui.FlatScrollPaneBorder.class);
             assertThat(UIManager.getFont("Label.font").getSize2D()).isEqualTo(12f);
@@ -139,13 +138,20 @@ class ThemeManagerTest {
     @Test void keysFlatLafSkipsAreRestoredWithoutReplacingItsOwn() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            var resolved = dev.jasper.ui.themeimport.LegacyThemeTestSupport.load("fixture.json", """
-                {"name": "Fixture", "ui": {"SearchEverywhere.Header.background": "#123456",
-                  "EditorTabs.hoverBackground": "#00000019", "ComboBox.background": "#010101"}}""");
-            assertThat(LegacyInstallFixture.install(resolved.json(), resolved.colors(), Color.WHITE)).isTrue();
-            assertColours(Map.of("SearchEverywhere.Header.background", "#123456", "EditorTabs.hoverBackground", "#00000019"));
-            // FlatLaf reads IntelliJ's combo keys its own way; its value stands.
-            assertThat(hex(UIManager.getColor("ComboBox.background"))).isNotEqualTo("#010101");
+            var base = Theme.DARK.source().document();
+            var ui = new LinkedHashMap<>(base.ui());
+            ui.put("SearchEverywhere.Header.background", "#123456");
+            ui.put("EditorTabs.hoverBackground", "#00000019");
+            ui.put("ComboBox.background", "#010101");
+            var document = new dev.jasper.ui.theme.ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), base.parentLine(),
+                base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), base.tokens(), base.syntax(), ui, base.icons(), base.workspace());
+            assertThat(ThemeManager.install(dev.jasper.ui.theme.ThemeGenerator.generate(document))).isTrue();
+            assertColours(Map.of("SearchEverywhere.Header.background", "#123456", "EditorTabs.hoverBackground", "#00000019",
+                "ComboBox.background", "#010101"));
+            // Native authored raw colors now win consistently, including alpha and same-instance reinstall.
+            UIManager.setLookAndFeel(UIManager.getLookAndFeel());
+            assertColours(Map.of("SearchEverywhere.Header.background", "#123456", "EditorTabs.hoverBackground", "#00000019",
+                "ComboBox.background", "#010101"));
         } finally { UIManager.setLookAndFeel(original); }
     }
 
@@ -229,7 +235,8 @@ class ThemeManagerTest {
             assertThat(UIManager.getColor("Jasper.tabSelectedBackground")).isEqualTo(theme.tokens().get(Token.TAB_ACTIVE));
             assertThat(UIManager.getColor("EditorTabs.underlineColor")).as("a key FlatLaf skips is put back")
                 .isEqualTo(theme.tokens().get(Token.TAB_UNDERLINE));
-            assertThat(UIManager.getColor("Jasper.titleSearch.background")).as("ChromeKeys fills keys without a token").isNotNull();
+            assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT))
+                .as("native search reads its canonical role directly").isEqualTo(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT));
             assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(2 * dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.CONTROL_RADIUS));
             assertThat(UIManager.getFont("Label.font").getSize2D()).as("app defaults still apply").isEqualTo(12f);
         } finally { UIManager.setLookAndFeel(original); }

@@ -1,5 +1,11 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.swing.NativeControlStyles;
+
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -26,7 +32,7 @@ final class WindowStatusBar extends JPanel {
     private final Box rightItems = Box.createHorizontalBox();
     Runnable onConfigurationDetails = () -> {};
     private String configText = "Built-in defaults";
-    private String configColor = "Jasper.configSuccessForeground";
+    private SemanticColor configColor = SemanticColor.STATUS_SUCCESS;
     private String shell = "", directory = "", dimensions = "";
     private boolean running;
     private boolean integration;
@@ -72,7 +78,7 @@ final class WindowStatusBar extends JPanel {
             contentStatus = items; contentItems.removeAll();
             for (var item : items) {
                 var button = new JButton(item.text()); button.putClientProperty("html.disable", true);
-                button.setToolTipText(item.tooltip()); button.setBorder(BorderFactory.createEmptyBorder(0, 5, 0, 5));
+                button.setToolTipText(item.tooltip()); button.setBorder(BorderFactory.createEmptyBorder(0, NativeControlStyles.metric(DesignMetrics.Role.STATUS_ITEM_GAP), 0, NativeControlStyles.metric(DesignMetrics.Role.STATUS_ITEM_GAP)));
                 button.setContentAreaFilled(false); button.setFocusable(false); button.setFont(statusFont());
                 button.setForeground(muted()); if (item.run() != null) button.addActionListener(event -> item.run().run());
                 contentItems.add(button);
@@ -102,7 +108,7 @@ final class WindowStatusBar extends JPanel {
         configText = error ? "Config error" : warning ? "Config warnings" : state.present() ? "Config loaded" : "Built-in defaults";
         if (warning) state.diagnostics().stream().filter(d -> d.line() > 0).findFirst()
             .ifPresent(d -> configText += " (line " + d.line() + ")");
-        configColor = error ? "Jasper.configErrorForeground" : warning ? "Jasper.configWarningForeground" : "Jasper.configSuccessForeground";
+        configColor = error ? SemanticColor.STATUS_DANGER : warning ? SemanticColor.STATUS_WARNING : SemanticColor.STATUS_SUCCESS;
         configButton.setToolTipText(state.file().toString());
         configButton.setEnabled(true);
         updateText(); refreshTheme();
@@ -142,7 +148,7 @@ final class WindowStatusBar extends JPanel {
                     var item = new JButton();
                     item.setBorder(BorderFactory.createEmptyBorder()); item.setContentAreaFilled(false); item.setOpaque(false);
                     item.setFocusable(false); item.putClientProperty("html.disable", true);
-                    item.setIconTextGap(UIScale.scale(5));
+                    item.setIconTextGap(NativeControlStyles.metric(DesignMetrics.Role.STATUS_ITEM_GAP));
                     view = item;
                 }
                 var item = (JButton) view;
@@ -169,7 +175,7 @@ final class WindowStatusBar extends JPanel {
         if (current.equals(views)) return;
         row.removeAll();
         for (var view : views) {
-            if (row.getComponentCount() > 0) row.add(Box.createHorizontalStrut(UIScale.scale(14)));
+            if (row.getComponentCount() > 0) row.add(Box.createHorizontalStrut(NativeControlStyles.metric(DesignMetrics.Role.STATUS_GAP)));
             row.add(view);
         }
     }
@@ -184,14 +190,13 @@ final class WindowStatusBar extends JPanel {
     String getText() { return text; }
     void applyPalette(Palette next) { palette = java.util.Objects.requireNonNull(next); refreshTheme(); }
     private static java.awt.Font statusFont() {
-        var font = UIManager.getFont("Label.font");
-        return font.deriveFont(font.getSize2D() - UIScale.scale(2f));
+        return ThemeZone.font(Typography.Role.CAPTION);
     }
 
-    private Color muted() { return UIManager.getColor("Jasper.mutedForeground"); }
+    private Color muted() { return ThemeZone.color(null, SemanticColor.TEXT_SECONDARY); }
     private static Color surface() {
-        Color colour = UIManager.getColor("StatusBar.background");
-        return colour != null ? colour : UIManager.getColor("Panel.background");
+        Color colour = ThemeZone.color(null, SemanticColor.SURFACE_APP);
+        return colour != null ? colour : ThemeZone.color(null, SemanticColor.SURFACE_PANEL);
     }
     void refreshTheme() {
         setBackground(surface());
@@ -201,7 +206,7 @@ final class WindowStatusBar extends JPanel {
                 item.setForeground(muted());
                 item.setFont(statusFont());
             } else if (child instanceof StatusProgressView progress) progress.refreshTheme();
-        configButton.setForeground(UIManager.getColor(configColor));
+        configButton.setForeground(ThemeZone.color(null, configColor));
     }
 
     private final class Segment extends JPanel {
@@ -221,17 +226,17 @@ final class WindowStatusBar extends JPanel {
         void setFirstToolTip(String tip) { first.setToolTipText(tip); }
         void refreshTheme() {
             for (JComponent label : new JComponent[]{first, slash, last}) {
-                label.setForeground(label == slash ? UIManager.getColor("Separator.foreground") : muted());
+                label.setForeground(label == slash ? ThemeZone.color(null, SemanticColor.BORDER_SUBTLE) : muted());
                 label.setFont(statusFont());
             }
         }
         @Override public Dimension getPreferredSize() {
-            return new Dimension(first.getPreferredSize().width + (slash.isVisible() ? UIScale.scale(28) : 0)
+            return new Dimension(first.getPreferredSize().width + (slash.isVisible() ? NativeControlStyles.metric(DesignMetrics.Role.STATUS_SEPARATOR) : 0)
                 + last.getPreferredSize().width, Math.max(first.getPreferredSize().height, last.getPreferredSize().height));
         }
         @Override public void doLayout() {
             int firstWidth = Math.min(last instanceof PathBreadcrumbs ? getWidth() / 3 : getWidth(), first.getPreferredSize().width);
-            int separatorWidth = Math.min(Math.max(0, getWidth() - firstWidth), slash.isVisible() ? UIScale.scale(28) : 0);
+            int separatorWidth = Math.min(Math.max(0, getWidth() - firstWidth), slash.isVisible() ? NativeControlStyles.metric(DesignMetrics.Role.STATUS_SEPARATOR) : 0);
             first.setBounds(0, 0, firstWidth, getHeight());
             slash.setBounds(firstWidth, 0, separatorWidth, getHeight());
             last.setBounds(firstWidth + separatorWidth, 0, Math.max(0, getWidth() - firstWidth - separatorWidth), getHeight());
@@ -243,8 +248,8 @@ final class WindowStatusBar extends JPanel {
         return new Dimension(0, Math.max(UIScale.scale(barHeight), Math.max(left.getPreferredSize().height, getFontMetrics(statusFont()).getHeight())));
     }
     @Override public void doLayout() {
-        int edge = Math.min(UIScale.scale(14), getWidth() / 2), leftInset = Math.min(getWidth(), UIScale.scale(26));
-        int gap = UIScale.scale(14);
+        int edge = Math.min(NativeControlStyles.metric(DesignMetrics.Role.STATUS_GAP), getWidth() / 2), leftInset = Math.min(getWidth(), NativeControlStyles.metric(DesignMetrics.Role.STATUS_LEADING));
+        int gap = NativeControlStyles.metric(DesignMetrics.Role.STATUS_GAP);
         int available = Math.max(0, getWidth() - edge * 2);
         int rightWidth = Math.min(available, right.getPreferredSize().width);
         right.setBounds(Math.max(edge, getWidth() - edge - rightWidth), 0, rightWidth, getHeight());
@@ -270,12 +275,12 @@ final class WindowStatusBar extends JPanel {
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         if (showingContent) return;
-        g.setColor(running ? UIManager.getColor("Jasper.runningForeground") : muted());
+        g.setColor(running ? ThemeZone.color(null, SemanticColor.STATUS_SUCCESS) : muted());
         var copy = (Graphics2D) g.create();
         try {
             copy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            int size = UIScale.scale(5);
-            copy.fillOval(UIScale.scale(14), (getHeight() - size) / 2, size, size);
+            int size = NativeControlStyles.metric(DesignMetrics.Role.STATUS_ITEM_GAP);
+            copy.fillOval(NativeControlStyles.metric(DesignMetrics.Role.STATUS_GAP), (getHeight() - size) / 2, size, size);
         } finally { copy.dispose(); }
     }
 }

@@ -1,5 +1,8 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.swing.NativeControlStyles;
+
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.Dimension;
 import java.awt.Insets;
@@ -18,7 +21,7 @@ import javax.swing.SwingUtilities;
  * Space the field and toolbar do not use drags the window.
  */
 final class WindowHeader extends JPanel {
-    private static final int GAP = 12;
+    private static final int GAP = DesignMetrics.DEFAULT.value(DesignMetrics.Role.NATIVE_HEADER_GAP);
     private final TitleSearchField field;
     private final WindowToolbar toolbar;
 
@@ -58,7 +61,7 @@ final class WindowHeader extends JPanel {
     WindowToolbar toolbar() { return toolbar; }
 
     private int height() { return toolbar.getPreferredSize().height; }
-    private int fieldHeight(int height) { return Math.max(0, height - UIScale.scale(8)); }
+    private int fieldHeight(int height) { return Math.max(0, height - NativeControlStyles.metric(DesignMetrics.Role.TITLE_SEARCH_VERTICAL_SPACE)); }
 
     /** The header adapts to the window's width, so it never asks for more than its minimum; the terminal sizes new windows. */
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }

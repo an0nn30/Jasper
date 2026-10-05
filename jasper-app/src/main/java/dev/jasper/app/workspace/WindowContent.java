@@ -1,5 +1,8 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+
 import dev.jasper.ui.theme.GlassLevels;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ResolvedTheme;
@@ -253,6 +256,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         leftStripe.dragSource = dockDrag::install;
         rightStripe.dragSource = dockDrag::install;
         area.dragSource = dockDrag::install;
+        area.releaseDragSource = dockDrag::uninstall;
         // A dock change moves the window's minimum size; read the hook when it fires, as the frame sets it later.
         area.onMinimumSizeChanged = () -> onMinimumSizeChanged.run();
         add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
@@ -338,8 +342,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         header.addPropertyChangeListener("barHeight",
             event -> root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_HEIGHT, event.getNewValue()));
         Runnable colors = () -> {
-            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_BACKGROUND, UIManager.getColor("Jasper.titleBackground"));
-            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_FOREGROUND, UIManager.getColor("Jasper.titleForeground"));
+            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_BACKGROUND, ThemeZone.color(null, SemanticColor.SURFACE_APP));
+            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_FOREGROUND, ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
         };
         colors.run();
         content.onThemeChanged = theme -> colors.run();
@@ -611,12 +615,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 ? (state.present() ? "Configuration loaded successfully." : "Using built-in defaults. Open Settings to create this file.")
                 : String.join("\n", state.diagnostics().stream().map(ConfigDiagnostic::formatted).toList()));
             JTextArea text = new JTextArea(details, 12, 64);
+            dev.jasper.ui.swing.NativeControlStyles.textArea(text, () -> ThemeZone.theme(text));
             text.setEditable(false); text.setLineWrap(true); text.setWrapStyleWord(true); text.setCaretPosition(0);
             text.getAccessibleContext().setAccessibleName("Configuration details");
             JScrollPane scroll = new JScrollPane(text);
             Runnable migrate = migrateConfiguration;
             if (!state.migratable() || migrate == null) { showConfigDiagnostics.accept(scroll); return; }
             var button = new JButton("Migrate Config\u2026");
+            dev.jasper.ui.swing.NativeControlStyles.button(button, () -> ThemeZone.theme(button));
             button.setName("configuration.migrate");
             button.setToolTipText("Rewrite old keys in this file to the current layout; the original is backed up first.");
             button.addActionListener(event -> {
@@ -823,7 +829,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             for (var command : entry.commands()) { var item = new JMenuItem(command.title()); item.putClientProperty("html.disable", true);
                 item.setEnabled(command.enabled()); item.setAccelerator(command.shortcut()); item.addActionListener(event -> command.run().run()); menu.add(item); }
         }
-        var close = new JMenuItem("Close Tab"); close.addActionListener(event -> closeTab(component)); menu.add(close); return menu;
+        var close = new JMenuItem("Close Tab"); close.addActionListener(event -> closeTab(component)); menu.add(close); dev.jasper.ui.swing.NativeControlStyles.menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
     }
     public void focusSelected() { var entry = selectedContent(); if (entry != null) entry.focus(); else if (currentTab() != null) currentTab().focusTerminal(); }
     public boolean mayClose() { return contentRegistry == null || contentRegistry.mayClose(() -> contentRegistry.inWindow(id)); }
@@ -1384,6 +1390,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         dockDrag.cancel();
         paletteKeys.close();
         if (contributed != null) { contributed.close(rememberLayout); contributed = null; }
+        area.close();
         commandPalette.close(); windowCommands.close(); commands.close();
         scopes.close();
         closed = true;

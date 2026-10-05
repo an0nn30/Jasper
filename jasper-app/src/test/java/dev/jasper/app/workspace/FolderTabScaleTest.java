@@ -18,6 +18,9 @@ class FolderTabScaleTest {
     @Test void scaledFoldersKeepTheirShouldersFlushAndFixedControlsReachable() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            String requestedScale = System.getProperty("flatlaf.uiScale");
+            if (requestedScale != null) assertThat(UIScale.getUserScaleFactor()).as("actual test JVM scale").isEqualTo(Float.parseFloat(requestedScale));
+            System.out.println("FolderTabScaleTest observed scale=" + UIScale.getUserScaleFactor());
             owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
             var strip = owner.windowTabs();
             for (int height : new int[]{20, 30, 72}) {

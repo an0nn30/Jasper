@@ -49,9 +49,9 @@ owners remain app code, but lose any copied color derivation/generation when the
 | Exact app path | Module authority or responsibility | Plan 2 owner | Disposition |
 |---|---|---|---|
 | `jasper-app/src/main/java/dev/jasper/app/plugins/KitThemeBridge.java` | `theme.ThemePair`, module generator/semantic values | Task 2, adapter cleanup verified in Task 4 | Removed in integrated Plan 2 Tasks 2–3; module authority retained; existing source/resource bytes preserved. |
-| `jasper-app/src/main/java/dev/jasper/app/appearance/ChromeKeys.java` | `theme.UiColorKeys.chromeAliases()`, `theme.SemanticDefaults`, `theme.ColorMath`, kit installer | Tasks 2/5 | Remove legacy UIDefaults color derivation after workspace/chrome consumers use canonical semantics; preserve existing alias behavior during cutover. |
+| `jasper-app/src/main/java/dev/jasper/app/appearance/ChromeKeys.java` | `theme.UiColorKeys.chromeAliases()`, `theme.SemanticDefaults`, `theme.ColorMath`, kit installer | Task 5 | Removed; notification-only module-value publication has the exact Task 6/11 ownership below. |
 | `jasper-app/src/main/java/dev/jasper/app/appearance/WorkspaceValues.java` | module generation/semantic values and `swing.FlatLafInstaller` | Task 2 | Removed in integrated Plan 2 Tasks 2–3; module authority retained; existing source/resource bytes preserved. |
-| `jasper-app/src/main/java/dev/jasper/app/appearance/WorkspaceDefaults.java` | module semantic publication and app adapters | Tasks 2/5 | Remove legacy `Jasper.workspace.*` token publication after remaining consumers migrate; any compatibility alias publication is app adapter policy only. |
+| `jasper-app/src/main/java/dev/jasper/app/appearance/WorkspaceDefaults.java` | module semantic publication and app adapters | Tasks 7–10 / 11 | Retained exact module-value publication for dynamically constructed SDK reader keys; superseding Task 5 audit below. |
 | `jasper-app/src/main/java/dev/jasper/app/appearance/BuiltInThemes.java` | `themeimport.NativeThemeParents` owns independent pure import-parent loading | Tasks 2/3 | Retain/adapt app catalog entries and lazy discovery; remove parser/generator copies and redirect bundled pure parent inputs. |
 | `jasper-app/src/main/java/dev/jasper/app/appearance/ThemeCatalog.java` | app native-file discovery/caching/selection policy | Tasks 2/3 | Retain owner and size/fingerprint boundaries; use module documents/resolution. |
 | `jasper-app/src/main/java/dev/jasper/app/appearance/ThemeManager.java` | app installation/routing lifecycle; module installer/metrics | Tasks 2/5 | Retain application policy; replace legacy generation, token/geometry installation and global appearance derivation with module contracts. |
@@ -122,29 +122,103 @@ startup; `PluginHost` passes it to `HostedKit`. Existing switch effects settle o
 future effects stay disabled, and enabling resumes motion without view replacement. Owner-package
 headless probes cover native and hosted contexts; configuration reload is covered end to end.
 
-## Integrated Tasks 2–3 adapter removal contract
+## Task 5 superseding adapter ownership
 
-- `jasper-app/src/main/java/dev/jasper/app/appearance/LegacyAppearanceDefaults.java`: **Task 5** removes
-  token-to-UIDefaults publication and the legacy selection arcs/insets, list/table cell margins,
-  AppListUI, 12-point form defaults, split divider border/size and centered platform titles as consumers
-  acquire module contexts. It never parses or generates a theme; module kit geometry remains installed.
-  Authored native `[ui]` colors retain their raw-control precedence over legacy tokens; canonical kit
-  colors come directly from ThemePair. The adapter persists installed colors into the LAF's extra defaults
-  to preserve reinstall and transactional rollback. Do not retain it as a second appearance engine.
-- `jasper-app/src/main/java/dev/jasper/app/appearance/ChromeKeys.java`: **Task 5** removes the remaining
-  extra legacy aliases. They run after module values and never resolve workspace/editor snapshots.
-- `jasper-app/src/main/java/dev/jasper/app/appearance/WorkspaceDefaults.java`: **Task 5** removes or
-  replaces every `Jasper.workspace.*` consumer before retiring publication; no stale palette cache.
-- `AppearanceBindings`, `TerminalPaletteAdapter`, app selection wrappers and file publication remain
-  genuine app policy/boundaries. `KitThemeBridge` and `WorkspaceValues` are removed.
-- Pure importer tests that require package-private module internals moved to `jasper-app/src/test/java/dev/jasper/ui/`;
-  they remain in the app integration test source set. No parser internals were made public for tests.
-- Native parents/index and IntelliJ parents live only in the module. Native theme licenses/notices moved
-  byte-for-byte beside those resources. App `themes/legacy-aliases.json` remains app migration policy.
-  Former bundled Darcula/IntelliJ Light test resources moved byte-for-byte to the corresponding module resource namespace.
-- `migration.csv` retains removed/moved historical rows and adds destinations/new boundaries. Integrity
-  tests verify absence plus extant replacement authority/destination, and still enforce discovery and
-  the unchanged 572-file before-capture checksum manifest.
+The original Tasks 2–3 Task 5 removal estimate is superseded by the controller-approved sequencing below.
+Task 5 removes production `appearance/ChromeKeys.java` and its derivation. The only former derived
+aliases still published are the five notification colors below, copied from the installed module snapshot.
+No production ChromeKeys/derive calls or native Task 5 `WorkspaceTheme.color` callers remain.
+`workspace/WorkspaceTheme` still publishes explicit route properties; its unused raw `color/resolvedColor`
+compatibility lookup is removed with the legacy bridge in Task 11, not used as a native-role bypass.
+
+| Exact retained path / keys | Actual remaining consumers | Migration / final removal owner |
+|---|---|---|
+| `appearance/LegacyAppearanceDefaults.java`: module `UiTokenKeys.KEYS` publication (48 exact keys in the module map), authored native `[ui]` last-word raw colors | Task 6 app dialogs/settings/notifications and raw controls in bundled Tasks 7–10 plugins | Migrate controls in Tasks 6–10; remove adapter and legacy publication in Task 11. No generation, parsing or app color derivation. |
+| Same adapter: `Jasper.notification.{background,borderColor,foreground,mutedForeground,linkForeground}` → `SURFACE_CARD,BORDER_SUBTLE,TEXT_PRIMARY,TEXT_SECONDARY,TEXT_LINK` | App notification rendering | Task 6 migrates; Task 11 removes adapter. Explicit authored key wins for that install only. |
+| Same adapter: `Jasper.editor{Background,Foreground,Caret,Selection,CurrentLine,Gutter,LineNumbers}` in module UiTokenKeys | SDK EditorPalette fallback / Editor | Task 9 migrates Editor; Task 11 removes aliases/legacy current(). |
+| Same adapter: `ListUI=AppListUI`; `{List,Tree,Table,ComboBox,MenuItem}.selection{Arc,Insets}`; `{Label,List,TextField,PasswordField,FormattedTextField,TextArea,ComboBox,Button}.font`; `List.cellMargins`, `Table.cellMargins`, `SplitPane.dividerSize`, `SplitPaneDivider.border`, `TitlePane.centerTitle` | Legacy raw controls until their assigned migration, plus native window delegate plumbing | Tasks 6–10 remove raw readers; Task 11 removes adapter and verifies module/native delegate defaults. Kit controls and native adapters take explicit module roles. |
+| `appearance/WorkspaceDefaults.java`: `Jasper.workspace.{background,surfaceRaised,surfaceSunken,text,textMuted,border,selection,selectionText,hover,accent,success,warning,error}`; `editor{Background,Foreground,Caret,Selection,CurrentLine,Gutter,LineNumbers}`; `dark`; `syntax.<role>.{color,bold,italic}` for every module SyntaxRole | SDK `ui/WorkspacePalette.current`, `EditorPalette.current`, `SyntaxPalette.current`, default `Appearance` methods, app `plugins/HostedUi` absent-snapshot fallback | Tasks 7–10 migrate dynamic consumers; Task 11 removes current() compatibility and publication together. Existing publisher only copies current GeneratedTheme values, with no resolver or cache. |
+| `workspace/{WorkspaceStyler,WorkspaceStyles,WorkspaceStyleLayer,WorkspaceComboPopup}.java`, `ToolWindowSurface` raw recursion | `WindowContent.hostedStylers` for raw contributed components only | Tasks 7–10 migrate contributions; Task 11 deletes raw adapter machinery. Traversal stops at KitOwnership roots, including mixed trees. |
+
+Exact UiTokenKeys residual publication (no derivation):
+
+| Keys | Consumer migration / publication removal |
+|---|---|
+| `Panel.background` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Label.foreground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Jasper.mutedForeground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Label.disabledForeground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Jasper.titleBackground` | No Task 5 native reader remains; remove compatibility publication in Task 11. |
+| `StatusBar.background` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `ToolWindow.background` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `PopupMenu.background` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `List.background` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `TextField.background` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Component.borderColor` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Separator.foreground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Jasper.splitDivider` | No Task 5 native reader remains; remove compatibility publication in Task 11. |
+| `Component.focusColor` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `List.selectionBackground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `List.selectionForeground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `List.selectionInactiveBackground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `TextField.selectionBackground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `TextField.selectionForeground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `TabbedPane.background` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Jasper.tabSelectedBackground` | No Task 5 native reader remains; remove compatibility publication in Task 11. |
+| `Jasper.tabSelectedForeground` | No Task 5 native reader remains; remove compatibility publication in Task 11. |
+| `Jasper.tabSelectedBorder` | No Task 5 native reader remains; remove compatibility publication in Task 11. |
+| `Jasper.tabHoverBackground` | No Task 5 native reader remains; remove compatibility publication in Task 11. |
+| `Jasper.tabUnderline` | No Task 5 native reader remains; remove compatibility publication in Task 11. |
+| `Jasper.tabUnderlineInactive` | No Task 5 native reader remains; remove compatibility publication in Task 11. |
+| `Button.background` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Button.borderColor` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Button.foreground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Button.default.background` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Button.default.foreground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Button.hoverBackground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Button.pressedBackground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `ScrollBar.thumb` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `ScrollBar.track` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Component.accentColor` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Component.linkColor` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Jasper.configSuccessForeground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Jasper.configWarningForeground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Jasper.configErrorForeground` | App Task 6 / plugin Tasks 7–10 raw controls; Task 11 publication removal. |
+| `Jasper.findErrorBackground` | No Task 5 native reader remains; remove compatibility publication in Task 11. |
+| `Jasper.editorBackground` | Editor Task 9; Task 11 removal. |
+| `Jasper.editorForeground` | Editor Task 9; Task 11 removal. |
+| `Jasper.editorCaret` | Editor Task 9; Task 11 removal. |
+| `Jasper.editorSelection` | Editor Task 9; Task 11 removal. |
+| `Jasper.editorCurrentLine` | Editor Task 9; Task 11 removal. |
+| `Jasper.editorGutter` | Editor Task 9; Task 11 removal. |
+| `Jasper.editorLineNumbers` | Editor Task 9; Task 11 removal. |
+
+The dynamic WorkspacePalette callers are exactly:
+- Task 7: `plugins/vault/.../ui/ManagerPanel.java`.
+- Task 8: `plugins/remote/.../ui/HostsPanel.java`, `ui/tunnels/TunnelsPanel.java`, `ui/transfers/TransferStrip.java`.
+- Task 9: `plugins/editor/.../ui/EditorTab.java`, `vim/ui/VimBar.java`; editor/syntax snapshots also serve Editor through Appearance.
+- Task 10: `plugins/fileserver/.../ui/FileServersPanel.java`.
+
+Correction to the initial Task 5 audit: a literal-key search appeared to show zero WorkspaceDefaults readers;
+the SDK constructs these keys dynamically. Independent chrome/workspace selection tests through each
+actual SDK reader demonstrated the dependency. Publication is retained until its consumers migrate.
+No new SDK snapshot bridge is introduced. `LegacyInstallFixture` was a Task 2 test helper, not a frozen
+Task 1 artifact. Its only caller now tests the real module install path (skipped authored keys, alpha,
+explicit precedence and same-LAF reinstall), so the unused fixture and obsolete derivation are removed.
+The 572-file before checksum manifest and all 408 before renders remain unchanged.
+
+Native standard-control/layout adapters retained for **Plan 3 Task 10** composition are the exact Task 5
+standard-ui rows in `migration.csv`: WindowChrome/WindowHeader/WindowContent/WindowToolbar/WindowStatusBar,
+WindowTabs and menu items, ToolStripe/ToolWindowHeader/ToolWindowMenu, FindBar, TitleSearchField,
+PathBreadcrumbs, StatusProgressView and TerminalPane notice actions. `NativeControlStyles` owns their
+button/field/menu recipes, fonts and padding; `NativeChromePainting` owns native search/command painting.
+Native folder tabs, terminal surfaces, docking overlays and glass keep host geometry/input ownership,
+using module roles and named metrics. This is implemented Plan 2 styling consumption; it does not
+claim Plan 3 composition or screenshot matching. Unchanged coordination-only owners are marked as such.
+
+`AppearanceBindings`, `TerminalPaletteAdapter`, selection/file policy remain app boundaries. Native parents,
+licenses and import algorithms stay in jasper-ui. Inventory removed/moved rows retain their authority paths;
+checksum and discovery assertions are unchanged apart from recognizing Task 5 removal dispositions.
 
 ## Task 4 typed-mount transition — exact Task 11 removal owners
 

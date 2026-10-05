@@ -1,5 +1,7 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.ui.metrics.DesignMetrics;
+
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.DockGeometry;
@@ -44,7 +46,7 @@ import javax.swing.SwingUtilities;
  */
 final class DockDrag {
     /** How far, in logical pixels, a press must move before it becomes a drag. */
-    static final int THRESHOLD = 5;
+    static final int THRESHOLD = DesignMetrics.DEFAULT.value(DesignMetrics.Role.DOCK_DRAG_THRESHOLD);
 
     private final JComponent root;
     private final DockState state;
@@ -89,12 +91,26 @@ final class DockDrag {
     }
 
     /** Lets a drag start from the component for the window with that id: a stripe button, a header or its title. */
+    private static final String LISTENER = "Jasper.dock.dragListener";
+
+    private record Registration(DockDrag owner, MouseAdapter listener) {}
+
+    void uninstall(JComponent component) {
+        if (!(component.getClientProperty(LISTENER) instanceof Registration registration) || registration.owner() != this) return;
+        var listener = registration.listener();
+        component.putClientProperty(LISTENER, null);
+        if (listener != null) { component.removeMouseListener(listener); component.removeMouseMotionListener(listener); }
+        if (source == component) cancel();
+    }
+
     void install(JComponent component, String id) {
+        if (component.getClientProperty(LISTENER) instanceof Registration previous) previous.owner().uninstall(component);
         var mouse = new MouseAdapter() {
             @Override public void mousePressed(MouseEvent event) { pressed(component, id, event); }
             @Override public void mouseDragged(MouseEvent event) { dragged(component, event); }
             @Override public void mouseReleased(MouseEvent event) { released(component, event); }
         };
+        component.putClientProperty(LISTENER, new Registration(this, mouse));
         component.addMouseListener(mouse);
         component.addMouseMotionListener(mouse);
     }

@@ -1,5 +1,8 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+
 import dev.jasper.app.config.ViewMode;
 import dev.jasper.app.palette.CommandPalette;
 import dev.jasper.app.palette.PaletteController;
@@ -210,8 +213,7 @@ final class WindowCommandPalette implements AutoCloseable {
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 Rectangle card = palette.getBounds();
-                Color shadow = UIManager.getColor("Popup.dropShadowColor");
-                if (shadow == null) shadow = Color.BLACK;
+                Color shadow = ThemeZone.color(null, SemanticColor.SURFACE_SCRIM);
                 g.setColor(new Color(shadow.getRed(), shadow.getGreen(), shadow.getBlue(), owner.theme().chrome().dark() ? 4 : 2));
                 for (int i = 12; i >= 1; i--) {
                     int expansion = UIScale.scale(i);

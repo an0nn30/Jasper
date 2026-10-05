@@ -30,7 +30,7 @@ class BadgedIconTest {
                 var g = image.createGraphics();
                 try { icon.paintIcon(new JLabel(), g, 0, 0); } finally { g.dispose(); }
                 int dot = UIScale.scale(6);
-                Color expected = UIManager.getColor(tone == PanelBadge.Tone.ERROR ? "Jasper.railBadgeError" : "Jasper.railBadgeAccent");
+                Color expected = dev.jasper.app.platform.ThemeZone.color(null, tone == PanelBadge.Tone.ERROR ? dev.jasper.ui.theme.SemanticColor.STATUS_DANGER : dev.jasper.ui.theme.SemanticColor.ACCENT);
                 assertThat(new Color(image.getRGB(icon.getIconWidth() - dot / 2 - 1, dot / 2), true)).as("%s %s", theme, tone)
                     .isEqualTo(new Color(expected.getRGB()));
             }

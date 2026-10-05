@@ -1,5 +1,8 @@
 package dev.jasper.app.platform;
 
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.metrics.DesignMetrics;
+
 import com.formdev.flatlaf.extras.FlatSVGIcon;
 import com.formdev.flatlaf.FlatLaf;
 import com.formdev.flatlaf.FlatLaf.DisabledIconProvider;
@@ -33,8 +36,8 @@ public final class AppIcons {
         Map.entry("search", "SEARCH"), Map.entry("settings", "SETTINGS"), Map.entry("refresh", "REFRESH"),
         Map.entry("command", "EXECUTE"), Map.entry("history", "HISTORY"), Map.entry("bookmark", "BOOKMARK"),
         Map.entry("close", "CLOSE"), Map.entry("exit", "EXIT"));
-    private static final Icon KEY = new KeyIcon(false);
-    private static final Icon DROPDOWN = dynamic(NamedIcons.id("DROPDOWN"), 8, false);
+    private static final dev.jasper.ui.icons.IconRegistry NAMED = new dev.jasper.ui.icons.IconRegistry();
+    private static final Icon DROPDOWN = new SemanticIcon("chevron.down", 8, false);
     private AppIcons() { }
 
     /** Compact dropdown affordance for existing toolbar spacing. */
@@ -49,8 +52,15 @@ public final class AppIcons {
 
     /** Host-owned semantic artwork, independent of any plugin's resource loader. */
     public static Icon named(String name) {
-        String id = NamedIcons.id(name);
-        return id.equals("standard/KEY") ? KEY : bundled(id);
+        return CACHE.computeIfAbsent("named:" + name, ignored -> new SemanticIcon(NamedIcons.kitName(name),
+            DesignMetrics.DEFAULT.value(DesignMetrics.Role.ICON_RAIL), false));
+    }
+
+    /** A module glyph for an app-native affordance outside the SDK named-icon vocabulary. */
+    public static Icon semantic(String name) {
+        if (!NAMED.names().contains(name)) throw new IllegalArgumentException("Unknown module icon: " + name);
+        return CACHE.computeIfAbsent("semantic:" + name, ignored -> new SemanticIcon(name,
+            DesignMetrics.DEFAULT.value(DesignMetrics.Role.ICON_RAIL), false));
     }
 
     /** The authored light SVG behind a semantic name, for a surface that renders it itself (the macOS menu bar glyph). */
@@ -105,22 +115,18 @@ public final class AppIcons {
         }
     }
 
-    /** Only the semantic key is tinted; catalog and plugin artwork keep their authored colours. */
-    private static final class KeyIcon implements Icon, DisabledIconProvider {
-        private final boolean disabled;
-        private final FlatSVGIcon source;
-        KeyIcon(boolean disabled) {
-            this.disabled = disabled;
-            source = new FlatSVGIcon("dev/jasper/app/icons/standard/KEY.svg", 16, 16);
-        }
-        @Override public Icon getDisabledIcon() { return new KeyIcon(true); }
-        @Override public int getIconWidth() { return source.getIconWidth(); }
-        @Override public int getIconHeight() { return source.getIconHeight(); }
+    /** Paint-time module tint follows live chrome/workspace routing; only immutable glyph paths are cached. */
+    private record SemanticIcon(String name, int size, boolean disabled) implements Icon, DisabledIconProvider {
+        @Override public Icon getDisabledIcon() { return new SemanticIcon(name, size, true); }
+        @Override public int getIconWidth() { return UIScale.scale(size); }
+        @Override public int getIconHeight() { return UIScale.scale(size); }
         @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
-            Color color = ThemeZone.foreground(component, UIManager.getColor("Jasper.chromeForeground"));
-            source.setColorFilter(new FlatSVGIcon.ColorFilter(authored -> color == null ? authored
-                : new Color(color.getRed(), color.getGreen(), color.getBlue(), authored.getAlpha())));
-            (disabled ? source.getDisabledIcon() : source).paintIcon(component, graphics, x, y);
+            var g = (Graphics2D) graphics.create();
+            try {
+                if (disabled) g.setComposite(java.awt.AlphaComposite.SrcOver.derive(.42f));
+                NAMED.icon(name, ThemeZone.theme(component).semantic(), SemanticColor.TEXT_PRIMARY,
+                    getIconWidth()).paintIcon(component, g, x, y);
+            } finally { g.dispose(); }
         }
     }
 

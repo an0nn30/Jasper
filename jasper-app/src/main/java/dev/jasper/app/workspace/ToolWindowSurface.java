@@ -1,5 +1,8 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
@@ -38,11 +41,12 @@ final class ToolWindowSurface {
     static void apply(Component root) { paint(root, colour()); }
 
     private static ColorUIResource colour() {
-        Color colour = UIManager.getColor("ToolWindow.background");
-        return new ColorUIResource(colour != null ? colour : UIManager.getColor("Panel.background"));
+        Color colour = ThemeZone.color(null, SemanticColor.SURFACE_SIDEBAR);
+        return new ColorUIResource(colour != null ? colour : ThemeZone.color(null, SemanticColor.SURFACE_PANEL));
     }
 
     private static void paint(Component component, ColorUIResource colour) {
+        if (component instanceof javax.swing.JComponent jc && dev.jasper.ui.swing.KitOwnership.owns(jc)) return;
         if (cells(component)) return;
         if (surface(component) && (component.getBackground() == null || component.getBackground() instanceof UIResource))
             component.setBackground(colour);

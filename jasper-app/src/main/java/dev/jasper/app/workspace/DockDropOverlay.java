@@ -1,5 +1,9 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.metrics.DesignMetrics;
+
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.Color;
 import java.awt.Graphics;
@@ -23,14 +27,15 @@ import javax.swing.UIManager;
  * only the regions of the guides that changed, never the whole window under this transparent component. EDT only.
  */
 final class DockDropOverlay extends JComponent {
-    private static final int FILL_ALPHA = 64, BORDER_ALPHA = 153, ARC = 10;
+    private static final int FILL_ALPHA = metric(DesignMetrics.Role.DOCK_DROP_FILL_ALPHA),
+        BORDER_ALPHA = metric(DesignMetrics.Role.DOCK_DROP_BORDER_ALPHA), ARC = metric(DesignMetrics.Role.DOCK_DROP_ARC);
+    private static int metric(DesignMetrics.Role role) { return DesignMetrics.DEFAULT.value(role); }
     /**
      * A margin, in pixels, for pipeline rounding when repainting the placeholder and the ghost. The antialiased stroke
      * stays inside its rectangle in the software pipeline.
      */
     private static final int BLEED = 1;
     /** IntelliJ's accent, for a theme without an accent colour. */
-    private static final Color FALLBACK_ACCENT = new Color(0x3574f0);
 
     private Rectangle highlight;
     private Rectangle placeholder;
@@ -83,19 +88,14 @@ final class DockDropOverlay extends JComponent {
     @Override public boolean contains(int x, int y) { return false; }
 
     static Color fill() {
-        Color theme = UIManager.getColor("DragAndDrop.areaBackground");
-        return theme != null ? theme : withAlpha(accent(), FILL_ALPHA);
+        Color authored = dev.jasper.ui.themeimport.FlatLafThemeData.explicitColors(ThemeZone.theme(null).uiKeys()).get("DragAndDrop.areaBackground");
+        return authored == null ? withAlpha(accent(), FILL_ALPHA) : authored;
     }
-
     static Color border() {
-        Color theme = UIManager.getColor("DragAndDrop.borderColor");
-        return theme != null ? theme : withAlpha(accent(), BORDER_ALPHA);
+        Color authored = dev.jasper.ui.themeimport.FlatLafThemeData.explicitColors(ThemeZone.theme(null).uiKeys()).get("DragAndDrop.borderColor");
+        return authored == null ? withAlpha(accent(), BORDER_ALPHA) : authored;
     }
-
-    private static Color accent() {
-        Color accent = UIManager.getColor("Component.accentColor");
-        return accent != null ? accent : FALLBACK_ACCENT;
-    }
+    private static Color accent() { return ThemeZone.color(null, SemanticColor.ACCENT); }
 
     private static Color withAlpha(Color color, int alpha) { return new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha); }
 

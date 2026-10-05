@@ -1,5 +1,7 @@
 package dev.jasper.app.platform;
 
+import dev.jasper.ui.theme.SemanticColor;
+
 import com.formdev.flatlaf.FlatClientProperties;
 import com.formdev.flatlaf.util.UIScale;
 import com.formdev.flatlaf.util.SystemInfo;
@@ -198,20 +200,20 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     public void setActive(boolean active) { this.active = active; refreshColors(); }
 
     private void refreshColors() {
-        setBackground(UIManager.getColor("Jasper.titleBackground"));
+        setBackground(ThemeZone.color(null, SemanticColor.SURFACE_APP));
         title.setFont(SystemFonts.ui(header == null ? Font.BOLD : Font.PLAIN, 13f));
-        title.setForeground(UIManager.getColor(active ? "Jasper.titleForeground" : "Jasper.titleInactiveForeground"));
+        title.setForeground(ThemeZone.color(this, active ? SemanticColor.TEXT_SECONDARY : SemanticColor.TEXT_TERTIARY));
         repaint();
     }
 
     @Override protected void paintChildren(Graphics g) {
         super.paintChildren(g);
         if (header != null) {
-            Color highlight = UIManager.getColor("Jasper.headerHighlight");
+            Color highlight = dev.jasper.ui.theme.ColorMath.opacity(ThemeZone.color(this, SemanticColor.HOVER_OVERLAY), .08);
             if (highlight != null) { g.setColor(highlight); g.fillRect(0, 0, getWidth(), UIScale.scale(1)); }
         }
         if (header == null) {
-            g.setColor(UIManager.getColor("Jasper.titleSeparator"));
+            g.setColor(ThemeZone.color(null, SemanticColor.BORDER_SUBTLE));
             g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
         }
     }
