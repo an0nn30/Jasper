@@ -7,6 +7,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -30,9 +31,11 @@ import java.util.Set;
 
 /**
  * One shared folder; every engine reaches the disk only through it. Client paths are {@code /}-separated (a
- * backslash separates too) and relative to the share. They never leave it, through {@code ..} or a symbolic link,
- * and every write is refused when the share is read-only. Reads follow links that stay inside; writes, deletes and
- * renames act on the named entry itself and never through a final link. Holds no mutable state.
+ * backslash separates too) and relative to the share. They never climb above it through {@code ..}, and every write
+ * is refused when the share is read-only. Links in a path are followed, and the real location the path reaches must
+ * be inside the share. Only that final location is checked: a path through a link that leads out and another that
+ * leads back in is accepted. Writes, deletes and renames act on the named entry itself and never through a final
+ * link. Holds no mutable state.
  *
  * <p>Out of scope: a local user who can already write inside the share swapping a checked folder for a link between
  * the check and the open.
@@ -90,7 +93,7 @@ public final class ShareRoot {
         if (RESERVED.contains(stem)) throw new PathRefusedException(name + " is a reserved device name");
     }
 
-    /** The real path a client path names, following links that stay inside; a missing target's parent must exist inside. */
+    /** The real path a client path names, following links; it must be inside the share. A missing target's real parent must be. */
     public Path resolve(String clientPath) throws IOException {
         List<String> segments = segments(clientPath);
         if (segments.isEmpty()) return root;
@@ -129,7 +132,8 @@ public final class ShareRoot {
     }
 
     /**
-     * The entry a client path names: its folder resolved through links that stay inside, its own name not followed.
+     * The entry a client path names: its folder resolved through links to a real folder inside the share, its own
+     * name not followed.
      * The root for an empty path. SFTP works on these paths, and every content operation still comes back here.
      */
     public Path locate(String clientPath) throws IOException { return entry(clientPath); }
@@ -220,8 +224,13 @@ public final class ShareRoot {
         try { return FileChannel.open(path, all); }
         catch (FileSystemException refused) { throw refused; }
         catch (IOException failure) {
-            // FileChannel.open reports a refused final link as a plain IOException on some platforms.
-            if (Files.isSymbolicLink(path)) throw new FileSystemException(path.toString(), null, failure.getMessage());
+            // FileChannel.open reports a refused final link as a plain IOException on every Unix JDK
+            // (NOFOLLOW_LINKS on a final link).
+            if (Files.isSymbolicLink(path)) {
+                var refused = new FileSystemException(path.toString(), null, failure.getMessage());
+                refused.initCause(failure);
+                throw refused;
+            }
             throw failure;
         }
     }
@@ -262,18 +271,47 @@ public final class ShareRoot {
         public FileChannel channel() { return channel; }
 
         /** Closes the file and moves it onto the target, replacing it. */
-        public void commit() throws IOException {
+        public void commit() throws IOException { commit(true); }
+
+        /**
+         * Closes the file and moves it onto the target. Without {@code replace}, a target that exists by now fails the
+         * commit with {@link FileAlreadyExistsException}, as an exclusive create must. A failed commit removes the
+         * temporary file.
+         */
+        public void commit(boolean replace) throws IOException {
             if (finished) throw new IllegalStateException("The upload is finished");
             finished = true;
             try {
                 channel.close();
-                keepPermissions();
-                try { Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
-                catch (AtomicMoveNotSupportedException unsupported) { Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING); }
+                if (replace) {
+                    keepPermissions();
+                    try { Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
+                    catch (AtomicMoveNotSupportedException unsupported) { Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING); }
+                } else {
+                    moveExclusively();
+                }
             } catch (IOException | RuntimeException failure) {
                 discard();
                 throw failure;
             }
+        }
+
+        /**
+         * Moves the file onto a target that must not exist. An atomic move cannot do this: on Unix it renames over an
+         * existing file whatever the options say. A hard link fails in one step if the target exists. Where links are
+         * not available, a plain move checks the target first.
+         */
+        private void moveExclusively() throws IOException {
+            try {
+                Files.createLink(target, temp);
+            } catch (FileAlreadyExistsException taken) {
+                throw taken;
+            } catch (UnsupportedOperationException | IOException noLinks) {
+                Files.move(temp, target);
+                return;
+            }
+            try { Files.delete(temp); }
+            catch (IOException leftover) { /* the target is in place; a hidden temporary file is never listed */ }
         }
 
         /** A replaced file keeps its permissions; the temporary file was created with the process's defaults. Best effort. */

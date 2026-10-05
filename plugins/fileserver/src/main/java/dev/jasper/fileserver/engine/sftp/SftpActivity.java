@@ -23,7 +23,8 @@ import org.apache.sshd.sftp.server.SftpEventListener;
  * <li>Only harmless extensions run. The others (copy-file, md5-hash, space-available, …) would reach the disk
  *     without the jail's checks.</li>
  * <li>Each file handle is one transfer. A normal CLOSE marks an upload for commit; a dropped connection never
- *     does.</li>
+ *     does. A failed write fails the upload, so the CLOSE that follows commits nothing and the transfer is
+ *     incomplete.</li>
  * <li>Changes are reported as FTP reports them.</li>
  * </ul>
  */
@@ -63,6 +64,7 @@ final class SftpActivity implements SftpEventListener {
 
     @Override public void written(ServerSession session, String remoteHandle, FileHandle localHandle, long offset, byte[] data, int dataOffset,
                                   int dataLen, Throwable thrown) {
+        if (thrown != null && localHandle.getFileChannel() instanceof UploadChannel upload) upload.fail(); // sshd keeps the handle open
         Track track = transfers.get(localHandle);
         if (track != null && thrown == null) track.transfer().add(dataLen);
     }
@@ -71,10 +73,16 @@ final class SftpActivity implements SftpEventListener {
         if (localHandle instanceof FileHandle file && file.getFileChannel() instanceof UploadChannel upload) upload.complete();
     }
 
-    /** After a normal CLOSE, whose close committed any upload. */
+    /** After a normal CLOSE, whose close committed any upload whose writes all succeeded. */
     @Override public void closed(ServerSession session, String remoteHandle, Handle localHandle, Throwable thrown) {
         Track track = transfers.remove(localHandle);
-        if (track != null) track.transfer().finish(thrown == null && (track.upload() || track.transfer().bytes() >= track.total()));
+        if (track == null) return;
+        boolean complete = track.upload() ? !failedUpload(localHandle) : track.transfer().bytes() >= track.total();
+        track.transfer().finish(thrown == null && complete);
+    }
+
+    private static boolean failedUpload(Handle handle) {
+        return handle instanceof FileHandle file && file.getFileChannel() instanceof UploadChannel upload && upload.failed();
     }
 
     /** A handle the client left open when its connection ended: the transfer did not finish. */

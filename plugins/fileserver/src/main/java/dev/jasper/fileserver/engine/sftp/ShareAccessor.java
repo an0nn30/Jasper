@@ -44,8 +44,9 @@ import org.apache.sshd.sftp.server.SftpSubsystemProxy;
  *
  * <p>sshd resolves every remote path through {@link #resolveLocalFilePath} and then calls {@code Files} on the
  * result directly. So the result is always inside the share: the client path with {@code ..} stopped at the root,
- * located through {@link ShareRoot#locate}, which follows the folder's links only while they stay inside and never
- * follows the entry's own name.
+ * located through {@link ShareRoot#locate}. That follows the folder's links, requires the real folder they reach to be
+ * inside the share, and never follows the entry's own name. Only the final real location is checked, so a path
+ * through a link that leads out and another that leads back in is accepted.
  *
  * <p>Two paths reach sshd's own {@code Files} calls without that method. REALPATH's version 6 extra parts are joined
  * with {@code Path.resolve}, and its existence checks follow the entry's own name. Both pass through
@@ -60,7 +61,8 @@ import org.apache.sshd.sftp.server.SftpSubsystemProxy;
  * may.
  *
  * <p>A truncating, exclusive or creating open of a missing file uploads to a temporary file
- * ({@link UploadChannel}). Other write opens write in place. Refusals reach the client as "permission denied".
+ * ({@link UploadChannel}); an exclusive one fails at CLOSE if the file appeared meanwhile. Other write opens write in
+ * place. Refusals reach the client as "permission denied".
  */
 final class ShareAccessor implements SftpFileSystemAccessor {
     private static final Set<String> TIMES = Set.of("lastModifiedTime", "lastAccessTime", "creationTime");
@@ -100,7 +102,8 @@ final class ShareAccessor implements SftpFileSystemAccessor {
             boolean creates = options.contains(StandardOpenOption.CREATE) || options.contains(StandardOpenOption.CREATE_NEW);
             if (options.contains(StandardOpenOption.CREATE_NEW) && exists) throw new FileAlreadyExistsException("/" + path);
             if (!exists && !creates) throw new NoSuchFileException("/" + path);
-            if (options.contains(StandardOpenOption.TRUNCATE_EXISTING) || !exists) return new UploadChannel(share.upload(path));
+            if (options.contains(StandardOpenOption.TRUNCATE_EXISTING) || !exists)
+                return new UploadChannel(share.upload(path), !options.contains(StandardOpenOption.CREATE_NEW));
             return share.openWriteChannel(path, options);
         } catch (PathRefusedException | ReadOnlyShareException refused) {
             throw denied(refused);

@@ -37,6 +37,16 @@ class AuthorizedKeysTest {
         assertThatThrownBy(() -> AuthorizedKeys.parse("  ")).hasMessage("Not an OpenSSH public key (for example ssh-ed25519 AAAA…)");
     }
 
+    @Test void tabsSeparateLikeSpaces() {
+        String tabbed = ED25519.replace(' ', '\t');
+        var key = AuthorizedKeys.parse(tabbed + '\t');
+        assertThat(key.type()).isEqualTo("ssh-ed25519");
+        assertThat(key.comment()).isEqualTo("alice@laptop");
+        assertThat(key.line()).as("stored with single spaces").isEqualTo(ED25519);
+        assertThat(AuthorizedKeys.parseAll("# keys\n" + tabbed + "\n")).extracting(AuthorizedKeys.Key::line).containsExactly(ED25519);
+        assertThatThrownBy(() -> AuthorizedKeys.parse(tabbed + (char) 0x1b)).hasMessage("The line contains control characters");
+    }
+
     @Test void parsesAWholeFileAndNamesTheBadLine() {
         String file = "# my keys\n\n" + ED25519 + "\r\n" + ECDSA + "\n";
         assertThat(AuthorizedKeys.parseAll(file)).extracting(AuthorizedKeys.Key::type).containsExactly("ssh-ed25519", "ecdsa-sha2-nistp256");

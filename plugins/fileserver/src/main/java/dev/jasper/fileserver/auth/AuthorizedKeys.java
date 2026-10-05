@@ -42,7 +42,7 @@ public final class AuthorizedKeys {
 
     public static Key parse(String line) {
         String text = line == null ? "" : line.strip();
-        if (text.chars().anyMatch(Character::isISOControl)) throw new IllegalArgumentException("The line contains control characters");
+        if (text.chars().anyMatch(c -> c != '\t' && Character.isISOControl(c))) throw new IllegalArgumentException("The line contains control characters");
         String[] parts = text.split("\\s+", 3);
         if (!TYPES.contains(parts[0])) {
             for (String part : text.split("\\s+"))

@@ -47,8 +47,8 @@ keeps it.
 **Serve Current Folder over FTP** does the same with a temporary read-only FTP server on this computer only. It uses a
 session password; copy it with **Copy Password** in the server's menu.
 
-**Serve Current Folder over SFTP** does the same with a temporary read-only SFTP server on this computer only, with
-a session password.
+**Serve Current Folder over SFTP** does the same with a temporary read-only SFTP server on this computer only. It
+uses a session password; copy it with **Copy Password** in the server's menu.
 
 ## FTP and FTPS
 
@@ -92,12 +92,13 @@ WinSCP). It serves file transfer only: no shell, no commands and no port forward
   `data/hostkey` (owner-only). Clients ask you to trust it on first connection; compare the fingerprint with the
   server card's "SSH host key SHA256:…" or Show Fingerprints…. If the key file becomes unreadable, a new key replaces
   it and clients warn about the change.
-- **The shared folder is a jail.** `..` stops at the top; links that lead outside are invisible and cannot be
-  followed, and links can't be created or read. A link inside the shared folder that leads outside is refused
-  ("permission denied"), however deep the path behind it. Server-side copy, checksum and disk-space requests are not
-  supported.
-- **Uploads** replace a file only when the client closes it normally; a dropped connection leaves the old file.
-  Resuming, appending and writing part of a file happen in place.
+- **The shared folder is a jail.** `..` stops at the top; links that lead outside are invisible, and links can't be
+  created or read. A path whose real location is outside the shared folder is refused ("permission denied"), however
+  deep it goes behind an outward link. Only the real location counts: a path that leaves through one link and comes
+  back through another is allowed. Server-side copy, checksum and disk-space requests are not supported.
+- **Uploads** replace a file only when the client closes it normally and every write succeeded; a dropped connection
+  or a failed write (a full disk, say) leaves the old file. An exclusive create fails if the file appeared during the
+  upload. Resuming, appending and writing part of a file happen in place.
 - On a writable server, a client may change a file's times and permissions. SFTP clients can't set owners or groups.
 
 ## Quitting

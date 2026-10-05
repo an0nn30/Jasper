@@ -155,6 +155,25 @@ class FileServerPluginTest {
         }
     }
 
+    @Test void keyFilesSkipsLargeFilesAndFolders() throws Exception {
+        Path keys = Files.createDirectories(home.resolve(".ssh"));
+        Path good = Files.writeString(keys.resolve("id_ed25519.pub"), "ssh-ed25519 AAAA alice");
+        Path huge = Files.writeString(keys.resolve("huge.pub"), "x".repeat(64 * 1024 + 1));
+        Path exact = Files.writeString(keys.resolve("exact.pub"), "y".repeat(64 * 1024));
+        Path folder = Files.createDirectories(keys.resolve("folder.pub"));
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            var owner = plugin.windowHandle(host.addTerminalWindow());
+            host.queuePathSelection(List.of(good, huge, folder, exact));
+            assertThat(plugin.keyFiles(owner)).contains("ssh-ed25519 AAAA alice\n" + "y".repeat(64 * 1024) + "\n");
+            String reason = ": not a public key file (too large or not a regular file)";
+            assertThat(host.notifications().lines()).containsExactly(
+                "dev.jasper.fileserver|ERROR|Could not read a public key file|" + huge + reason,
+                "dev.jasper.fileserver|ERROR|Could not read a public key file|" + folder + reason);
+        }
+    }
+
     @Test void addsStartsServesAndStopsAServer() throws Exception {
         try (var host = new FakePluginHost(root)) {
             var plugin = plugin();

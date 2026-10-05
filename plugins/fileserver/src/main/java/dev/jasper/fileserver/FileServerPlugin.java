@@ -89,6 +89,8 @@ public final class FileServerPlugin implements Plugin {
     public static final String SERVE_HTTP = ID + ".serve-http";
     public static final String SERVE_FTP = ID + ".serve-ftp";
     public static final String SERVE_SFTP = ID + ".serve-sftp";
+    /** The largest public key file read; a real one is well under 16 KiB. */
+    private static final long MAX_KEY_FILE = 64 * 1024;
 
     /** What the plugin takes from the machine; tests replace each part. */
     record Environment(Executor ui, Supplier<List<ServerAddresses.Nic>> nics, IntPredicate portFree, Consumer<String> clipboard,
@@ -281,12 +283,22 @@ public final class FileServerPlugin implements Plugin {
         dialog.show();
     }
 
-    /** The text of public key files the user picks; a file that can't be read is reported and skipped. */
-    private Optional<String> keyFiles(WindowHandle window) {
+    /**
+     * The text of public key files the user picks. A file that can't be read is reported and skipped, and so is one
+     * that is not a regular file or is larger than 64 KiB: this runs on the UI thread.
+     */
+    Optional<String> keyFiles(WindowHandle window) {
         List<Path> chosen = context.windows().chooseFiles(window, "Public keys to allow", Optional.of(environment.home().resolve(".ssh")));
         var text = new StringBuilder();
         for (Path file : chosen) {
-            try { text.append(Files.readString(file)).append('\n'); }
+            try {
+                if (!Files.isRegularFile(file) || Files.size(file) > MAX_KEY_FILE) {
+                    context.notifications().group().error("Could not read a public key file",
+                        file + ": not a public key file (too large or not a regular file)");
+                    continue;
+                }
+                text.append(Files.readString(file)).append('\n');
+            }
             catch (IOException | RuntimeException failure) {
                 context.notifications().group().error("Could not read a public key file", file + ": " + message(failure), failure);
             }

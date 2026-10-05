@@ -186,6 +186,22 @@ class ShareRootTest {
         assertThat(names(shared.resolve("docs"))).containsExactly("a.txt");
     }
 
+    @Test void anExclusiveCommitRefusesAFileCreatedMeanwhile() throws IOException {
+        var share = new ShareRoot(shared, false);
+        try (var upload = share.upload("docs/new.txt")) {
+            upload.stream().write("mine".getBytes(StandardCharsets.UTF_8));
+            Files.writeString(shared.resolve("docs/new.txt"), "theirs");
+            assertThatThrownBy(() -> upload.commit(false)).isInstanceOf(FileAlreadyExistsException.class);
+        }
+        assertThat(shared.resolve("docs/new.txt")).hasContent("theirs");
+        assertThat(names(shared.resolve("docs"))).as("no temporary file remains").containsExactly("a.txt", "new.txt");
+        try (var upload = share.upload("docs/fresh.txt")) {
+            upload.stream().write('x');
+            upload.commit(false);
+        }
+        assertThat(shared.resolve("docs/fresh.txt")).as("a free name still commits").hasContent("x");
+    }
+
     @Test void anUploadKeepsTheSamePathRules() throws IOException {
         var share = new ShareRoot(shared, false);
         assertThatThrownBy(() -> share.upload("docs")).isInstanceOf(IsFolderException.class);

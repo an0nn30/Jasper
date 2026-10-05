@@ -309,6 +309,43 @@ class SftpEngineTest {
         assertThat(shared.resolve("docs/a.txt")).hasContent("hello");
     }
 
+    /** A write the disk refuses (here: past the largest file size) fails the upload; the client's CLOSE then commits nothing. */
+    @Test void aFailedWriteLeavesTheTargetAndIsIncomplete() throws Exception {
+        var sftp = start(true);
+        var handle = sftp.open("/docs/a.txt", OpenMode.Write, OpenMode.Create, OpenMode.Truncate);
+        sftp.write(handle, 0, "trunc".getBytes(StandardCharsets.UTF_8));
+        assertThatThrownBy(() -> sftp.write(handle, Long.MAX_VALUE - 1, "ated".getBytes(StandardCharsets.UTF_8)))
+            .isInstanceOf(SftpException.class);
+        sftp.close(handle);
+        await(() -> transferred().size() == 1, "the upload ends");
+        assertThat(shared.resolve("docs/a.txt")).as("the good file stays").hasContent("hello");
+        assertThat(docs()).as("no temporary file remains").containsExactly("a.txt");
+        assertThat(transferred().getFirst().complete()).isFalse();
+    }
+
+    /**
+     * A write that fails before it reaches the upload's channel (a negative offset, which sshd's client cannot send)
+     * is seen only by the activity listener; it must fail the upload too.
+     */
+    @Test void aWriteThatFailsBeforeTheChannelAlsoFailsTheUpload() throws Exception {
+        var sftp = start(true);
+        var handle = sftp.open("/docs/a.txt", OpenMode.Write, OpenMode.Create, OpenMode.Truncate);
+        sftp.write(handle, 0, "trunc".getBytes(StandardCharsets.UTF_8));
+        var buffer = new ByteArrayBuffer();
+        buffer.putBytes(handle.getIdentifier());
+        buffer.putLong(-1L);
+        buffer.putBytes("ated".getBytes(StandardCharsets.UTF_8));
+        var raw = (RawSftpClient) sftp;
+        int id = raw.send(SftpConstants.SSH_FXP_WRITE, buffer);
+        assertThat(status(SftpResponse.parse(SftpConstants.SSH_FXP_WRITE, raw.receive(id, Duration.ofSeconds(5)))))
+            .isNotEqualTo(SftpConstants.SSH_FX_OK);
+        sftp.close(handle);
+        await(() -> transferred().size() == 1, "the upload ends");
+        assertThat(shared.resolve("docs/a.txt")).hasContent("hello");
+        assertThat(docs()).containsExactly("a.txt");
+        assertThat(transferred().getFirst().complete()).isFalse();
+    }
+
     @Test void otherWritesHappenInPlace() throws Exception {
         var sftp = start(true);
         try (var handle = sftp.open("/docs/a.txt", OpenMode.Write)) { sftp.write(handle, 0, "J".getBytes(StandardCharsets.UTF_8)); }
