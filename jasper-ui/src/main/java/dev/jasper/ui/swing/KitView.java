@@ -69,9 +69,14 @@ public final class KitView extends JPanel implements AutoCloseable {
     /** Register only explicit Custom content; ordinary Swing trees cannot enter through this method. */
     public void registerContent(String id, JComponent component, AutoCloseable lifetime) { requireOpen(); throw new UnsupportedOperationException("Custom content is not implemented yet"); }
     /** Borrow the mounted kit header; ownership remains with the view. */
-    public JComponent panelHeader(String panelId) { requireOpen(); throw new UnsupportedOperationException("Panels are not implemented yet"); }
+    public JComponent panelHeader(String panelId) { requireOpen(); return panel(panelId).header.component; }
     /** Host integration slot, separate from the descriptor event callback. */
-    public void setPanelHostActions(String panelId, List<Nodes.Button> actions, Consumer<UiEvent> events) { requireOpen(); throw new UnsupportedOperationException("Panels are not implemented yet"); }
+    public void setPanelHostActions(String panelId, List<Nodes.Button> actions, Consumer<UiEvent> events) { requireOpen(); panel(panelId).header.hostActions(actions, events); revalidate(); repaint(); }
+    private Panels.PanelControl panel(String id) {
+        var control = reconciler.control(Objects.requireNonNull(id));
+        if (control instanceof Panels.PanelControl panel) return panel;
+        throw new IllegalArgumentException("Node is not a panel: " + id);
+    }
     /** App-only available content height excluding native chrome, in logical pixels; EDT confined. */
     public void setAvailableHeight(int logicalPixels) {
         requireOpen(); if (logicalPixels <= 0) throw new IllegalArgumentException("Available height must be positive");

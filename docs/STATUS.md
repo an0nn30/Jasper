@@ -141,6 +141,20 @@
   landed on its doubled border. Per controller ruling, that fixture now scales logical bounds and
   sample coordinates consistently; exact expected colors remain unchanged. Earlier module counts
   are pre-fix evidence; no broad repository/module rerun was requested for this bounded fix.
+  Task 10 panel implementation/self-review complete (independent review pending): a single inline
+  title/count/context/primary/overflow/header with app-only borrowed-header and owned host-action slots,
+  separate host/descriptor callbacks, persistent footer and scrollable navigation/body. ItemList data
+  remains viewport-owned; 10,000-row/offscreen-focus/popup tests retain bounded live controls.
+  Approved count semantics use Header.count as total collection size: zero hides count/navigation,
+  positive retains search for filtered-empty, and absent leaves declared navigation visible as unknown.
+  Query/component/document and header/footer identity survive body/collapse/appearance transitions.
+  Four real local gallery controllers perform filter/add/chooser/switch pending/failure/confirmation;
+  all four render at 320×480 and 240×180 with logical 13/24 fonts. Inspection reproduced/fixed stretched
+  empty tiles/actions, and scoped checks fixed hidden-query refresh, optional-slot teardown, short
+  navigation scrolling and header action metrics. Dense SettingRow footers wrap while controls remain
+  reachable. Final default/2x focused: **13 tests each**; module check/architecture: **234 tests,
+  0 failures/errors/skips**. Original panel screenshot remains unchanged; full gallery calibration and
+  native focus checks remain Task 13/user-run. No GUI, benchmark, AOT, push or merge.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
   application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`

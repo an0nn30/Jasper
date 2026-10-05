@@ -47,8 +47,7 @@ final class EmptyStates {
                     Typography.Role.DESCRIPTION,
                     SemanticColor.TEXT_SECONDARY);
             content.setLayout(
-                    new Composition.Vertical(
-                            ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP)));
+                    new ContentLayout(this));
             actions.setLayout(new Stacks.StackLayout(context(), Nodes.LayoutRole.ACTIONS));
             int size = ThemePainting.metric(context(), DesignMetrics.Role.EMPTY_TILE);
             tile.setPreferredSize(new Dimension(size, size));
@@ -71,7 +70,19 @@ final class EmptyStates {
         }
     }
 
-    static final class Layout implements LayoutManager {
+    static final class ContentLayout extends Composition.Vertical {
+        final EmptyControl owner;
+        ContentLayout(EmptyControl owner) { super(ThemePainting.metric(owner.context(), DesignMetrics.Role.ICON_GAP)); this.owner=owner; }
+        @Override public void layoutContainer(Container parent) {
+            super.layoutContainer(parent);
+            int size=owner.tile.getPreferredSize().width;
+            owner.tile.setBounds(Math.max(0,(parent.getWidth()-size)/2),owner.tile.getY(),size,size);
+            int width=Math.min(parent.getWidth(),owner.actions.getPreferredSize().width);
+            owner.actions.setBounds(Math.max(0,(parent.getWidth()-width)/2),owner.actions.getY(),width,owner.actions.getHeight());
+        }
+    }
+
+    static final class Layout implements Composition.WidthLayout {
         final EmptyControl owner;
 
         Layout(EmptyControl owner) {
@@ -85,8 +96,16 @@ final class EmptyStates {
         public void removeLayoutComponent(Component c) {}
 
         @Override
+        public int height(Container p, int width) {
+            width = Math.max(1, Math.min(width, ThemePainting.metric(owner.context(), DesignMetrics.Role.EMPTY_TEXT_WIDTH)));
+            return owner.tile.getPreferredSize().height + owner.title.height(width)
+                + owner.description.height(width) + Composition.height(owner.actions, width)
+                + 3 * ThemePainting.metric(owner.context(), DesignMetrics.Role.ICON_GAP);
+        }
+        @Override
         public Dimension preferredLayoutSize(Container p) {
-            return owner.content.getPreferredSize();
+            int width = p.getWidth() > 0 ? p.getWidth() : owner.content.getPreferredSize().width;
+            return new Dimension(width, height(p, width));
         }
 
         @Override

@@ -307,6 +307,16 @@ initial value is unconstrained. Forms cap their preferred height at 85% of the s
 scroll the body independently of the reachable action/preview footer. Native screen queries and
 plugin-provided geometry are forbidden. Native title bars/windows/scrims stay app-owned; sheet
 content has an in-content title and bottom-only rounded corners.
+Panel Header.count is an explicit **total collection count**, not the number of filtered results.
+A present zero hides count and search/navigation while keeping the latter mounted. A positive total
+retains both through filtered-empty body changes. An absent count hides the count only: the size is
+unknown, so search/navigation retains its declared visibility. Callers must supply zero to request
+automatic collection-empty hiding; the renderer never infers emptiness from body kind or text.
+Header/footer/query identity survives body transitions and appearance refreshes. A short panel scrolls
+navigation and the body (data owners retain a bounded viewport), keeping the footer attached and reachable.
+A SettingRow used directly as a panel footer receives the dense footer treatment with wrapped text;
+its ordinary settings/card treatment is restored when moved elsewhere.
+
 The two panel-header methods are module/app integration only and are not projected into UiView.
 `panelHeader` returns the existing kit-owned header so the host can attach drag/focus handling; it
 does not transfer ownership. Host actions occupy reserved header slots and use their separate callback.

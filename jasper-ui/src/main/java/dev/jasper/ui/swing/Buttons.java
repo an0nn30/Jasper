@@ -16,12 +16,18 @@ final class Buttons {
     static final class ButtonControl extends ControlRegistry.Control {
         final KitButton button;
         ButtonControl(KitView view, Nodes.Button node) {
+            this(view, node, view::dispatch);
+        }
+        ButtonControl(KitView view, Nodes.Button node, java.util.function.Consumer<UiEvent> events) {
             super(view, node, new KitButton(view.context())); button = (KitButton)component;
             button.putClientProperty("html.disable", true);
             button.setOpaque(false); button.setContentAreaFilled(false); button.setBorderPainted(false); button.setFocusPainted(false);
             button.setRolloverEnabled(true); button.setHorizontalAlignment(SwingConstants.CENTER);
             button.focus = new ThemePainting.Focus(button); own(button.focus);
-            ActionListener listener = event -> emit(new UiEvent.Action(((Nodes.Button)this.node).action()));
+            ActionListener listener = event -> {
+                if (interactive()) try { events.accept(new UiEvent.Action(((Nodes.Button)this.node).action())); }
+                catch (Throwable failure) { view.report(failure); }
+            };
             button.addActionListener(listener); own(() -> button.removeActionListener(listener)); refresh();
         }
         @Override void hero(boolean value) { button.hero=value; }
@@ -46,7 +52,7 @@ final class Buttons {
     static class KitButton extends JButton {
         private final KitContext context;
         Nodes.ButtonKind kind;
-        boolean hero;
+        boolean hero, panel;
         float disabledOpacity=.42f;
         ThemePainting.Focus focus;
         KitButton(KitContext context) { this.context = context; }
@@ -61,7 +67,7 @@ final class Buttons {
         }
         @Override public Dimension getPreferredSize() {
             Dimension size = super.getPreferredSize();
-            int height = ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_BUTTON_HEIGHT : DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.LABEL);
+            int height = ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_BUTTON_HEIGHT : panel ? DesignMetrics.Role.PANEL_ACTION : DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.LABEL);
             return new Dimension(getText() == null || getText().isEmpty() ? height : size.width, Math.max(height, size.height));
         }
         /** Shared painter permits a real specialized owner to select its semantic surface. */

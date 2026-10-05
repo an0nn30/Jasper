@@ -28,7 +28,7 @@ final class ViewReconciler implements AutoCloseable {
             String group = ((Nodes.Secret)secret.node).revealGroup();
             if (!group.isEmpty()) revealGroups.put(group, secret.revealed);
         }
-        next.values().forEach(control -> { control.embeddedLabel(false); control.hero(false); });
+        next.values().forEach(control -> { if(control instanceof SettingRows.RowControl row)row.panelFooter=false; if(control instanceof Buttons.ButtonControl button)button.button.panel=false; if(control instanceof Menus.MenuControl menu){menu.main.panel=false;menu.arrow.panel=false;} control.embeddedLabel(false); control.hero(false); });
         inherit(spec.root(), next, true);
         for (var node : nodes.values()) next.get(node.id()).update(node);
         applyHero(spec.root(), next, false);
@@ -72,12 +72,14 @@ final class ViewReconciler implements AutoCloseable {
     }
     boolean dismissPopup() {
         boolean dismissed = false;
+        for(var owner:mounted.values()) if(owner instanceof PanelHeaders.HeaderControl header) dismissed |= header.dismiss();
         for(var owner:mounted.values()) if(owner instanceof InteractiveRows.RowsControl rows) dismissed |= rows.dismiss();
         for (var owner : mounted.values()) if (owner instanceof Menus.MenuControl menu) dismissed |= menu.dismiss();
         for (var owner : mounted.values()) if (owner instanceof Choices.ChoiceControl choice && choice.input instanceof javax.swing.JComboBox<?> combo && combo.isPopupVisible()) { combo.hidePopup(); dismissed = true; }
         return dismissed;
     }
     boolean popupOpen() {
+        if(mounted.values().stream().anyMatch(owner -> owner instanceof PanelHeaders.HeaderControl header && header.popupOpen()))return true;
         if(mounted.values().stream().anyMatch(owner -> owner instanceof InteractiveRows.RowsControl rows && rows.popupOpen()))return true;
         return mounted.values().stream().anyMatch(owner -> owner instanceof Menus.MenuControl menu && menu.popup.isVisible()
             || owner instanceof Choices.ChoiceControl choice && choice.input instanceof javax.swing.JComboBox<?> combo && combo.isPopupVisible());
@@ -92,6 +94,6 @@ final class ViewReconciler implements AutoCloseable {
         for (var control : mounted.values()) if (control instanceof SecretFields.SecretControl secret
                 && (secret == source || !group.isEmpty() && group.equals(((Nodes.Secret)secret.node).revealGroup()))) secret.reveal(revealed);
     }
-    void refresh() { mounted.values().forEach(ControlRegistry.Control::refresh); view.revalidate(); view.repaint(); }
+    void refresh() { mounted.values().forEach(ControlRegistry.Control::refresh); mounted.values().forEach(c -> {if(c instanceof Panels.PanelControl panel)panel.presentation();}); view.revalidate(); view.repaint(); }
     @Override public void close() { mounted.values().forEach(ControlRegistry.Control::close); mounted.clear(); view.removeAll(); }
 }

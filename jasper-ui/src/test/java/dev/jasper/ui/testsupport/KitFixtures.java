@@ -110,6 +110,26 @@ public final class KitFixtures {
                         "cancel"));
     }
 
+    /** One of the four canonical module-only panel compositions. */
+    public static dev.jasper.ui.model.ViewSpec panel(String name) {
+        return dev.jasper.ui.gallery.PanelFixtures.create(name);
+    }
+
+    /** Headless paint with layout settling; the view and context remain owned by the caller. */
+    public static java.awt.image.BufferedImage render(dev.jasper.ui.swing.KitView view, int width, int height, double deviceScale) {
+        if (width <= 0 || height <= 0 || !Double.isFinite(deviceScale) || deviceScale <= 0) throw new IllegalArgumentException("Invalid render size/scale");
+        view.setSize(width, height);
+        for (int i = 0; i < 3; i++) layout(view);
+        var image = new java.awt.image.BufferedImage((int)Math.ceil(width*deviceScale), (int)Math.ceil(height*deviceScale), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { graphics.scale(deviceScale, deviceScale); view.paint(graphics); } finally { graphics.dispose(); }
+        return image;
+    }
+    private static void layout(java.awt.Container container) {
+        container.doLayout();
+        for (var child : container.getComponents()) if (child instanceof java.awt.Container nested) layout(nested);
+    }
+
     /** Caller owns and closes the binding and icon registry; creation requires EDT. */
     public static KitContext context() {
         return new KitContext(

@@ -210,6 +210,7 @@ public final class Nodes {
         }
     }
 
+    /** Optional total collection count: zero hides the panel count/navigation, absent leaves navigation declared visibility intact. */
     public record Header(String id, ControlState state, String title, OptionalInt count, Optional<Node> context, Optional<Node> primary, List<MenuItem> overflow) implements Node {
         public Header {
             ModelChecks.id(id); Objects.requireNonNull(state);

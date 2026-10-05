@@ -16,6 +16,7 @@ final class SettingRows {
 
     static final class RowControl extends ControlRegistry.Control {
         final Composition.WrappedText title, description;
+        boolean panelFooter;
 
         RowControl(KitView view, Nodes.SettingRow node) {
             super(view, node, new JPanel());
@@ -43,7 +44,7 @@ final class SettingRows {
                     vertical =
                             ThemePainting.metric(
                                     context(), DesignMetrics.Role.SETTING_VERTICAL_PADDING);
-            component.setBorder(new EmptyBorder(vertical, side, vertical, side));
+            component.setBorder(panelFooter ? new EmptyBorder(0,0,0,0) : new EmptyBorder(vertical, side, vertical, side));
             component.setLayout(new RowLayout(this));
         }
 
@@ -84,7 +85,7 @@ final class SettingRows {
                             + (owner.description.isVisible() ? owner.description.height(w) : 0);
             int control = p.getComponentCount() > 2 ? Composition.height(p.getComponent(2), tw) : 0;
             return Math.max(
-                    ThemePainting.metric(
+                    owner.panelFooter ? 0 : ThemePainting.metric(
                             owner.context(),
                             owner.description.isVisible()
                                     ? DesignMetrics.Role.SETTING_DESCRIPTION_HEIGHT

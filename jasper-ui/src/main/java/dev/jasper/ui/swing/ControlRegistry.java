@@ -18,12 +18,14 @@ final class ControlRegistry {
             case Nodes.MenuButton ignored -> {}
             case Nodes.ItemList n -> { for(var item:n.items()) { item.leading().ifPresent(ControlRegistry::validate); item.title().forEach(ControlRegistry::validate); item.subtitle().forEach(ControlRegistry::validate); item.trailing().forEach(ControlRegistry::validate); } n.addAction().ifPresent(ControlRegistry::validate); }
             case Nodes.Table _, Nodes.Tree _ -> {}
-            case Nodes.Stack _, Nodes.FormRow _, Nodes.SettingRow _, Nodes.Card _, Nodes.Section _, Nodes.Empty _, Nodes.Form _, Nodes.Split _ -> children(node).forEach(ControlRegistry::validate);
+            case Nodes.Panel _, Nodes.Header _, Nodes.Stack _, Nodes.FormRow _, Nodes.SettingRow _, Nodes.Card _, Nodes.Section _, Nodes.Empty _, Nodes.Form _, Nodes.Split _ -> children(node).forEach(ControlRegistry::validate);
             default -> throw new UnsupportedOperationException("Renderer not implemented yet: " + node.getClass().getSimpleName());
         }
     }
     static Control create(KitView view, Nodes.Node node) {
         return switch (node) {
+            case Nodes.Panel panel -> new Panels.PanelControl(view, panel);
+            case Nodes.Header header -> new PanelHeaders.HeaderControl(view, header);
             case Nodes.Text text -> new Labels.TextControl(view, text);
             case Nodes.Icon icon -> new Labels.IconControl(view, icon);
             case Nodes.Button button -> new Buttons.ButtonControl(view, button);
@@ -53,6 +55,8 @@ final class ControlRegistry {
     static List<Nodes.Node> children(Nodes.Node node) {
         var result = new ArrayList<Nodes.Node>();
         switch (node) {
+            case Nodes.Panel n -> { result.add(n.header()); n.searchOrNavigation().ifPresent(result::add); result.add(n.body()); n.footer().ifPresent(result::add); }
+            case Nodes.Header n -> { n.context().ifPresent(result::add); n.primary().ifPresent(result::add); }
             case Nodes.Stack n -> result.addAll(n.children());
             case Nodes.ItemList n -> n.addAction().ifPresent(result::add);
             case Nodes.Card n -> result.addAll(n.children());
