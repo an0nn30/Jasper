@@ -234,6 +234,26 @@ claim Plan 3 composition or screenshot matching. Unchanged coordination-only own
 licenses and import algorithms stay in jasper-ui. Inventory removed/moved rows retain their authority paths;
 checksum and discovery assertions are unchanged apart from recognizing Task 5 removal dispositions.
 
+## Task 6b-1 consumer removal (files chooser, shortcuthelp)
+
+Plan 2 Task 6b-1 moved the file chooser (`files/FileChooserPanel`) and the Keymap settings page
+(`shortcuthelp/ShortcutPanel`, `ShortcutTree`, `ShortcutEditPanel`, `KeymapPage`) to module kit views on the chrome
+`KitContext` (the chooser's from `NativeShells` via `ThemeController.appearance().context(ThemeRoute.CHROME)`, the
+Keymap page's from `PageContext.kit`). These families no longer read any `LegacyAppearanceDefaults` key or FlatLaf
+style: the former readers of `TableHeader.font`/`TableHeader.foreground`, `Label.disabledForeground`,
+`Label.foreground`, `TextField.background`, `Component.borderColor`, `TextComponent.arc`, `ScrollBar.thumb`,
+`Panel.background`, `Tree.selectionForeground` and `Component.linkColor`, the `JButton.buttonType`/`JTextField.*`/
+`FlatClientProperties` client properties and `AppIcons.bundled` artwork were rewritten or deleted
+(`FileListScrollPane` → kit `ScrollPolicy.OVERLAY`; `WrapLayout` → wrapping kit ACTIONS stacks). Remaining raw Swing in
+these families is layout only (BorderLayout/CardLayout shells, the chooser's `JSplitPane` with its unpainted gutter
+and `RoundedPane` clipping on `WORKSPACE_SURFACE_ARC`) plus the preview's read-only `JTextArea`, registered as kit
+`Custom` EDITOR content and painted from module roles. The keys stay published for their other consumers (6b-2
+palette, 6c pluginmanager/notifications, Tasks 7–10 plugins) until Task 11 removes the adapter.
+
+Out-of-family integration: `windows/NativeShells` now passes the chrome context and calls
+`FileChooserPanel.installDefaultAction` instead of `setDefaultButton`; its `JOptionPane` replace and new-folder
+prompts are Task 6c. `workspace/WindowCommandPalette` (palette focus traversal) is untouched until 6b-2.
+
 ## Task 5 review fix round 1 — native geometry, vendor roles and open status-surface item
 
 **Preserved native geometry (no visual change in Plan 2).** Native adapters keep their pre-migration values

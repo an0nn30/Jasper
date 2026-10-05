@@ -360,8 +360,8 @@ public final class Nodes {
 
     /**
      * A path of crumbs that can turn into a typed path. Clicking a crumb reports {@link UiEvent.Selected} with its id;
-     * a crumb's context action reports Selected then {@link UiEvent.Action}. Clicking the free area, or the host's
-     * {@code focus(id)}, reports {@code editAction}; while {@code editing} the kit shows a text field holding
+     * a crumb's context action reports only its {@link UiEvent.Action} (it does not navigate). Clicking the free area
+     * reports {@code editAction}; {@code focus(id)} focuses the field while editing. While {@code editing} the kit shows a text field holding
      * {@code value}, reports typing as {@link UiEvent.Edited}, Enter as {@code submitAction} and Escape or leaving the
      * field as {@code cancelAction}. When the crumbs do not fit, the leading ones slide out so the last stays visible.
      */

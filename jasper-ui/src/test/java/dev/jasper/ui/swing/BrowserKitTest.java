@@ -353,7 +353,7 @@ class BrowserKitTest {
                 events.clear();
                 control.context("c2", crumb, 0, 0);
                 ((JMenuItem) control.popup.getComponent(0)).doClick(0);
-                assertThat(events).containsExactly(new UiEvent.Selected("path", Set.of("c2")), new UiEvent.Action("pin"));
+                assertThat(events).as("a crumb's menu acts without navigating").containsExactly(new UiEvent.Action("pin"));
                 control.context("c0", crumb, 0, 0);
                 assertThat(control.popup.getComponentCount()).as("a crumb without actions has no menu").isZero();
                 events.clear();

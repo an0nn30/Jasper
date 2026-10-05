@@ -16,12 +16,13 @@ class ThemeMigrationEvidenceTest {
         Files.createDirectory(directory.resolve("examples"));
         Files.writeString(directory.resolve("example.txt"), "Fixture data\n");
         ThemeMigrationCapture.themes(theme -> {
-            new dev.jasper.app.appearance.ThemeController().configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+            var themes = new dev.jasper.app.appearance.ThemeController();
+            themes.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT);
             var request = new ChooserRequest("Choose fixture file", ChooserRequest.Mode.OPEN, false, Location.local(directory),
                 Optional.of(Location.local(directory)), Optional.empty(), Optional.empty(), Optional.empty());
             var prefs = new ChooserPrefs(UiState.inMemory());
             var model = new ChooserModel(request, List.of(new LocalSource(new LocalBrowser(directory))), Runnable::run, Runnable::run, false);
-            var panel = new FileChooserPanel(model, prefs, directory, files -> { }, file -> false, Optional::<String>empty);
+            var panel = new FileChooserPanel(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), model, prefs, directory, files -> { }, file -> false, Optional::<String>empty);
             try {
                 model.start();
                 save("file-chooser", theme, "populated", panel, 920, 560);

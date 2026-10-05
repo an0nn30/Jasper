@@ -279,7 +279,8 @@ remain and default to the old meaning (weight 1, no sort, not muted, no row menu
   hides after `OVERLAY_SCROLLBAR_IDLE_MILLIS` and when the table leaves the screen.
 - `Breadcrumbs` is a field-shaped path: crumbs are literal, unfocusable GHOST buttons as wide as their labels with
   `›` separators; when they do not fit the leading crumbs slide out so the last stays visible. A crumb click reports
-  `Selected(id,{crumbId})`; a crumb's menu reports Selected then Action; a click on the free area reports `editAction`.
+  `Selected(id,{crumbId})`; a crumb's menu item reports only its Action (it does not navigate; the host names the crumb in
+  the item's action); a click on the free area reports `editAction`.
   While `editing` it shows a MONO text field holding `value` (selected for replacement when editing starts), reports
   typing as `Edited`, Enter as `submitAction`, Escape or leaving the field as `cancelAction`; `focus(id)` focuses the
   field while editing.

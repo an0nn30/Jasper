@@ -2,6 +2,18 @@
 
 ## Current state — 2026-10-05
 
+- **Theme engine Plan 2 Task 6b-1 implemented (files chooser, shortcuthelp/Keymap); review pending** (2026-10-05).
+  Controller split 6b into 6b-1 and 6b-2 (palette). Kit additions first (`b5b5597b`, spec §6), mirrored in SDK, host
+  `KitValues`, testkit fake and `KitContractTest`, SDK version unchanged (Task 11): `Column` weight/sort with
+  `UiEvent.Sorted`, `TableRow.muted`, per-row context menus on `TableRow`/`TreeItem` (trees gain menus), `TreeItem`
+  tooltip/status/trailing columns, `ScrollPolicy.OVERLAY` (the chooser's overlay thumb, opt-in) and the `Breadcrumbs`
+  path control (tail overflow, crumb menus, typed-path mode); no-API type-ahead, Shift ranges, host-selection reveal and
+  wrapping ACTIONS stacks; glyphs `home`/`desktop`/`preview`. The Keymap page and the file chooser are layout-only
+  shells (named `KEYMAP_*`/`CHOOSER_*` metrics, rounded panes on `WORKSPACE_SURFACE_ARC`) hosting chrome kit views;
+  `WrapLayout` and `FileListScrollPane` are gone. Behaviour kept: single-click edit/toggle in the Keymap tree, click
+  on the value to record, Save-mode dimming, crumb pin menus, free-area/Cmd+L typed path, Enter as the default action
+  (`FileChooserPanel.installDefaultAction`, wired in `NativeShells`). Visual-only until Plan 3: multi-select
+  checkboxes, preview switch, field labels above search fields. `NativeShells`' `JOptionPane` prompts go to 6c.
 - **Theme engine Plan 2 Task 6a implemented (settingsui, restart, themesui); review pending** (2026-10-05).
   Controller ruling (spec §6: extend the kit for missing standard controls) added module kit capabilities first
   (`0008eb49`): `TreeItem` count/emphasized, `SettingRow`/`FormRow` `highlighted` with `KitView.reveal` (no focus move),

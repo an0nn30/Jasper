@@ -1,95 +1,92 @@
 package dev.jasper.app.files;
 
-import com.formdev.flatlaf.ui.FlatEmptyBorder;
 import com.formdev.flatlaf.util.SystemInfo;
 import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.app.platform.AppIcons;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.model.Column;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.Crumb;
+import dev.jasper.ui.model.MenuItem;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.Option;
+import dev.jasper.ui.model.TableRow;
+import dev.jasper.ui.model.TreeItem;
+import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.model.ViewSpec;
+import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.swing.KitView;
+import dev.jasper.ui.theme.SemanticColor;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
-import java.awt.Component;
-import java.awt.Container;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Font;
+import java.awt.EventQueue;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
-import java.awt.LayoutManager;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Shape;
+import java.awt.event.ActionEvent;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
 import java.awt.geom.Area;
 import java.awt.geom.RoundRectangle2D;
-import java.awt.event.ActionEvent;
-import java.awt.event.FocusAdapter;
-import java.awt.event.FocusEvent;
-import java.awt.event.InputEvent;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.DefaultListCellRenderer;
-import javax.swing.DefaultListModel;
-import javax.swing.Icon;
-import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JMenuItem;
 import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
+import javax.swing.JRootPane;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTable;
 import javax.swing.JTextArea;
-import javax.swing.JTextField;
-import javax.swing.JToggleButton;
 import javax.swing.KeyStroke;
-import javax.swing.ListSelectionModel;
-import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
-import javax.swing.UIManager;
 import javax.swing.plaf.basic.BasicSplitPaneDivider;
 import javax.swing.plaf.basic.BasicSplitPaneUI;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import javax.swing.table.AbstractTableModel;
-import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.text.JTextComponent;
 
 /**
- * The chooser's Swing view over a {@link ChooserModel}: toolbar and path bar, navigation pane (places, pinned, recent
- * and each source's roots), file table with its connecting and error states, optional preview pane, and the name field
- * with Cancel and the primary button. It never waits for I/O. Whoever shows it starts the model, closes the dialog when
- * {@code finish} runs (an empty list means cancelled) and then calls {@link #close()}. File names are shown as plain
- * text. UI thread.
+ * The chooser's view over a {@link ChooserModel}: a layout-only shell (toolbar row, a draggable split between the
+ * places tree and the file table or its message, an optional preview and the bottom row) hosting kit views on the
+ * chrome {@link KitContext}: navigation buttons, kit breadcrumbs, search, the places tree, a file table with the
+ * overlay scroll policy, connecting/error/empty states, the preview and the name field with Cancel and the primary
+ * button. It never waits for I/O. Whoever shows it starts the model, closes the dialog when {@code finish} runs (an
+ * empty list means cancelled) and then calls {@link #close()}. File names are shown as plain text. UI thread.
  */
 public final class FileChooserPanel extends JPanel {
+    static final String FILES = "files";
+    static final String PLACES = "places";
+    static final String PATH = "path";
+    static final String SEARCH = "search";
+    static final String NAME = "name";
+    static final String PREVIEW_TOGGLE = "previewToggle";
+    private static final String PREVIEW_CONTENT = "chooser.preview";
+    private static final String PIN = "pin:";
     private static final DateTimeFormatter MODIFIED = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final int MENU = SystemInfo.isMacOS ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
-    private static final Color CONNECTED = new Color(0x5B, 0xD1, 0x8B);
 
+    private final KitContext kit;
     private final ChooserModel model;
     private final ChooserPrefs prefs;
     private final Path home;
@@ -97,48 +94,46 @@ public final class FileChooserPanel extends JPanel {
     private final Predicate<Location> confirmReplace;
     private final Supplier<Optional<String>> askFolderName;
     private final List<Runnable> sourceRemovals = new ArrayList<>();
-    private final JButton backButton = tool("general/chevronLeft", "Back");
-    private final JButton forwardButton = tool("general/chevronRight", "Forward");
-    private final JButton upButton = tool("nodes/upFolder", "Up");
-    private final JButton refreshButton = tool("general/refresh", "Refresh");
-    private final JButton newFolderButton = new JButton("New folder", AppIcons.bundled("actions/newFolder"));
-    private final JToggleButton previewToggle = new JToggleButton(AppIcons.bundled("actions/preview"));
-    private final PathBar pathBar = new PathBar();
-    private final JTextField search = new JTextField(14);
-    private final DefaultListModel<Object> navigationItems = new DefaultListModel<>();
-    private final JList<Object> navigation = new JList<>(navigationItems);
-    private final EntryTable tableModel = new EntryTable();
-    private final JTable table = new JTable(tableModel);
-    private final FileListScrollPane tableScroll = new FileListScrollPane(table);
+    private final List<KitView> views = new ArrayList<>();
+    private final KitView navigationView, pathView, toolsView, headingView, placesView, filesView, messageView, previewHeaderView,
+        previewContentView, statusView, buttonsView;
+    private final KitView nameView;
     private final CardLayout centerCards = new CardLayout();
     private final JPanel center = new JPanel(centerCards);
-    private final JLabel message = plain(new JLabel("", SwingConstants.CENTER));
-    private final JButton centerButton = new JButton();
-    private final JPanel previewPane = new JPanel(new BorderLayout(0, 6));
-    private final JLabel previewTitle = plain(new JLabel());
-    private final JLabel previewDetails = plain(new JLabel());
+    private final JPanel previewPane = new JPanel(new BorderLayout());
     private final JTextArea previewText = new JTextArea();
-    private final JTextField nameField = new JTextField();
-    private final JLabel status = plain(new JLabel());
-    private final JButton cancelButton = new JButton("Cancel");
-    private final JButton primaryButton;
-    private final Timer loadingDelay = new Timer(150, event -> showCenter());
+    private final JSplitPane split;
+    private final List<RoundedPane> panes = new ArrayList<>();
+    private final AutoCloseable themeSubscription;
+    private final Timer loadingDelay;
+    private final Map<String, Places.Place> placeIds = new LinkedHashMap<>();
+    private final List<Object> navigationItems = new ArrayList<>();
+    private final Map<String, Location> crumbTargets = new LinkedHashMap<>();
+    private final List<String> crumbLabels = new ArrayList<>();
+    private String placeSelection;
+    private String name = "";
+    private String status = "";
+    private boolean editingPath;
+    private String pathValue = "";
+    private boolean previewVisible;
     private Optional<String> centerMessage = Optional.empty();
+    private Optional<String> centerActionLabel = Optional.empty();
     private Runnable centerAction = () -> { };
     private boolean updating;
     private boolean finished;
-    private String typed = "";
-    private long typedAt;
+    private boolean closed;
 
     /**
+     * @param kit the chrome kit context the views use
      * @param home the local home folder, for the Places list
      * @param finish receives the chosen locations, or an empty list on cancel; runs at most once
      * @param confirmReplace asks whether to replace an existing file in Save
      * @param askFolderName asks for a new folder's name; empty when the user cancelled
      */
-    public FileChooserPanel(ChooserModel model, ChooserPrefs prefs, Path home, Consumer<List<Location>> finish,
+    public FileChooserPanel(KitContext kit, ChooserModel model, ChooserPrefs prefs, Path home, Consumer<List<Location>> finish,
                             Predicate<Location> confirmReplace, Supplier<Optional<String>> askFolderName) {
         super(new BorderLayout());
+        this.kit = Objects.requireNonNull(kit);
         this.model = Objects.requireNonNull(model);
         this.prefs = Objects.requireNonNull(prefs);
         this.home = Objects.requireNonNull(home);
@@ -146,188 +141,147 @@ public final class FileChooserPanel extends JPanel {
         this.confirmReplace = Objects.requireNonNull(confirmReplace);
         this.askFolderName = Objects.requireNonNull(askFolderName);
         ChooserRequest request = model.request();
-        primaryButton = new JButton(switch (request.mode()) {
-            case OPEN -> "Open";
-            case SAVE -> "Save";
-            case DIRECTORY -> "Choose";
-        });
+        loadingDelay = new Timer(kit.metrics().value(DesignMetrics.Role.CHOOSER_LOADING_DELAY_MILLIS), event -> showCenter());
         loadingDelay.setRepeats(false);
+        if (request.mode() == ChooserRequest.Mode.SAVE) name = request.suggestedName().orElse("");
+        previewVisible = prefs.preview();
+        rebuildNavigationItems();
+        navigationView = view(navigationSpec());
+        pathView = view(pathSpec());
+        toolsView = view(toolsSpec());
+        headingView = view(new ViewSpec(new Nodes.Text("places.heading", ControlState.READY, "Places", Nodes.TextRole.CAPTION)));
+        placesView = view(placesSpec());
+        filesView = view(filesSpec());
+        messageView = view(messageSpec());
+        previewHeaderView = view(previewHeaderSpec());
+        previewContentView = view(new ViewSpec(new Nodes.Custom("preview.content", ControlState.READY, PREVIEW_CONTENT, Nodes.CustomKind.EDITOR, "File preview")));
+        previewText.setEditable(false);
+        previewText.setOpaque(false);
+        previewText.setBorder(BorderFactory.createEmptyBorder());
+        // The preview is specialized read-only text content: selectable and scrollable, painted from module roles.
+        var previewScroll = new JScrollPane(previewText);
+        previewScroll.setBorder(BorderFactory.createEmptyBorder());
+        previewScroll.setOpaque(false);
+        previewScroll.getViewport().setOpaque(false);
+        previewContentView.registerContent(PREVIEW_CONTENT, previewScroll, () -> { });
+        statusView = view(statusSpec());
+        buttonsView = view(buttonsSpec());
+        nameView = request.mode() == ChooserRequest.Mode.OPEN ? null : view(nameSpec());
+
         add(toolbar(), BorderLayout.NORTH);
-        add(body(), BorderLayout.CENTER);
+        split = body();
+        add(split, BorderLayout.CENTER);
         add(bottom(), BorderLayout.SOUTH);
         bindKeys();
         if (request.mode() == ChooserRequest.Mode.SAVE)
-            request.suggestedName().ifPresent(name -> {
-                nameField.setText(name);
-                int dot = name.lastIndexOf('.');
-                nameField.select(0, dot > 0 ? dot : name.length());
+            request.suggestedName().ifPresent(suggested -> {
+                int dot = suggested.lastIndexOf('.');
+                // The kit field holds the host's value; select the name part so typing replaces it, as before.
+                nameInput().ifPresent(input -> input.select(0, dot > 0 ? dot : suggested.length()));
             });
-        previewToggle.setSelected(prefs.preview());
-        previewPane.setVisible(prefs.preview());
+        previewPane.setVisible(previewVisible);
         for (ChooserSource source : model.sources()) {
             try { sourceRemovals.add(source.onChanged(this::rebuildNavigation)); }
             catch (RuntimeException failed) { /* a failing source just does not update the pane */ }
         }
-        rebuildNavigation();
+        themeSubscription = kit.binding().subscribe(pair -> applySurfaces());
+        applySurfaces();
         model.addListener(this::sync);
         sync();
     }
 
-    /** The dialog's default button. */
-    public JButton primaryButton() { return primaryButton; }
+    private KitView view(ViewSpec spec) {
+        var view = new KitView(kit, spec, this::event);
+        views.add(view);
+        return view;
+    }
 
-    /** Stops listening to the sources; call once the dialog has closed. */
+    private int metric(DesignMetrics.Role role) { return UIScale.scale(kit.metrics().value(role)); }
+
+    private Color color(SemanticColor role) { return kit.theme().semantic().color(role); }
+
+    /** Lets Enter anywhere in the dialog press the primary button, as a default button did; controls owning Enter keep it. */
+    public void installDefaultAction(JRootPane root) {
+        var stroke = KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0);
+        root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(stroke, "chooser.approve");
+        root.getActionMap().put("chooser.approve", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent event) { if (!closed) approve(); }
+        });
+    }
+
+    /** Stops listening to the sources and the theme; call once the dialog has closed. */
     public void close() {
+        if (closed) return;
+        closed = true;
         loadingDelay.stop();
-        tableScroll.stop();
         sourceRemovals.forEach(Runnable::run);
         sourceRemovals.clear();
+        try { themeSubscription.close(); } catch (Exception ignored) { /* closing a subscription has nothing to report */ }
+        views.forEach(KitView::close);
     }
 
     // Package-private accessors for headless tests.
-    JTable table() { return table; }
-    JTextField nameField() { return nameField; }
-    JList<Object> navigation() { return navigation; }
-    JToggleButton previewToggle() { return previewToggle; }
-    String statusText() { return status.getText(); }
+    /** The name the primary button acts on: the field's text in Save and Directory, the selection's names in Open. */
+    String nameText() { return name; }
+    /** The mounted name field; Open has none. */
+    Optional<JTextComponent> nameInput() {
+        return nameView == null ? Optional.empty() : Optional.ofNullable(find(nameView, NAME + ".input", JTextComponent.class));
+    }
+    List<Object> navigationItems() { return List.copyOf(navigationItems); }
+    Optional<Places.Place> selectedPlace() { return Optional.ofNullable(placeIds.get(placeSelection)); }
+    String placeId(Places.Place place) {
+        return placeIds.entrySet().stream().filter(entry -> entry.getValue().equals(place)).map(Map.Entry::getKey).findFirst().orElseThrow();
+    }
+    String statusText() { return status; }
     Optional<String> centerMessage() { return centerMessage; }
-    Optional<String> centerAction() { return centerButton.isVisible() ? Optional.of(centerButton.getText()) : Optional.empty(); }
+    Optional<String> centerAction() { return centerActionLabel; }
     void pressCenterAction() { centerAction.run(); }
     String previewText() { return previewText.getText(); }
-    String pathText() { return pathBar.text(); }
-    JComponent pathBox() { return pathBar.crumbs; }
-    void editPath(String text) { pathBar.edit(); pathBar.field.setText(text); pathBar.submit(); }
+    String pathText() { return String.join(" › ", crumbLabels); }
+    List<RoundedPane> roundedPanes() { return List.copyOf(panes); }
+    /** Delivers a menu item's action as the kit reports it; context menus cannot open headlessly. */
+    void act(String actionId) { event(new UiEvent.Action(actionId)); }
+    JSplitPane split() { return split; }
 
     private JComponent toolbar() {
-        var bar = new JPanel(new BorderLayout(8, 0));
-        bar.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
-        var buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
-        buttons.add(backButton);
-        buttons.add(forwardButton);
-        buttons.add(upButton);
-        buttons.add(refreshButton);
-        backButton.addActionListener(event -> model.goBack());
-        forwardButton.addActionListener(event -> model.goForward());
-        upButton.addActionListener(event -> model.goUp());
-        refreshButton.addActionListener(event -> model.refresh());
-        var trailing = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
-        search.putClientProperty("JTextField.leadingIcon", AppIcons.bundled("general/search"));
-        search.putClientProperty("JTextField.showClearButton", Boolean.TRUE);
-        search.getDocument().addDocumentListener(new DocumentListener() {
-            @Override public void insertUpdate(DocumentEvent event) { searched(); }
-            @Override public void removeUpdate(DocumentEvent event) { searched(); }
-            @Override public void changedUpdate(DocumentEvent event) { searched(); }
-        });
-        trailing.add(search);
-        if (model.request().mode() == ChooserRequest.Mode.SAVE) {
-            newFolderButton.addActionListener(event -> newFolder());
-            trailing.add(newFolderButton);
-        }
-        previewToggle.setToolTipText("Preview pane");
-        previewToggle.putClientProperty("JButton.buttonType", "toolBarButton");
-        previewToggle.setFocusable(false);
-        previewToggle.addActionListener(event -> setPreviewVisible(previewToggle.isSelected()));
-        trailing.add(previewToggle);
-        bar.add(buttons, BorderLayout.WEST);
-        bar.add(pathBar, BorderLayout.CENTER);
-        bar.add(trailing, BorderLayout.EAST);
+        var bar = new JPanel(new BorderLayout(metric(DesignMetrics.Role.CHOOSER_TOOLBAR_GAP), 0));
+        bar.setOpaque(false);
+        int vertical = metric(DesignMetrics.Role.CHOOSER_TOOLBAR_VERTICAL_PADDING), side = metric(DesignMetrics.Role.CHOOSER_TOOLBAR_SIDE_PADDING);
+        bar.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
+        bar.add(navigationView, BorderLayout.WEST);
+        bar.add(pathView, BorderLayout.CENTER);
+        bar.add(toolsView, BorderLayout.EAST);
         return bar;
     }
 
-    private void searched() { if (!updating) model.setFilter(search.getText()); }
+    private JSplitPane body() {
+        var navigation = new JPanel(new BorderLayout());
+        navigation.setOpaque(false);
+        int pad = metric(DesignMetrics.Role.ICON_GAP);
+        headingView.setBorder(BorderFactory.createEmptyBorder(pad, metric(DesignMetrics.Role.CHOOSER_SIDE_PADDING), pad, pad));
+        navigation.add(headingView, BorderLayout.NORTH);
+        navigation.add(placesView, BorderLayout.CENTER);
+        var navigationPane = rounded(navigation, () -> headingView.getHeight());
+        navigationPane.setMinimumSize(new java.awt.Dimension(metric(DesignMetrics.Role.CHOOSER_NAVIGATION_MIN_WIDTH), 0));
+        center.setOpaque(false);
+        center.add(rounded(filesView, this::filesHeaderHeight), "table");
+        center.add(rounded(messageView, () -> 0), "message");
 
-    private JComponent body() {
-        navigation.setCellRenderer(new NavigationRenderer());
-        navigation.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        navigation.addListSelectionListener(event -> {
-            if (event.getValueIsAdjusting() || updating) return;
-            if (navigation.getSelectedValue() instanceof Places.Place place) model.navigate(place.location());
-            else syncNavigationSelection();
-        });
-        navigation.addMouseListener(new MouseAdapter() {
-            @Override public void mousePressed(MouseEvent event) { navigationPopup(event); }
-            @Override public void mouseReleased(MouseEvent event) { navigationPopup(event); }
-        });
-        var navigationScroll = new JScrollPane(navigation);
-        navigationScroll.setBorder(BorderFactory.createEmptyBorder());
-        navigationScroll.setMinimumSize(new Dimension(140, 0));
-        var placesHeading = new JLabel("Places") {
-            @Override public void updateUI() {
-                super.updateUI();
-                setFont(UIManager.getFont("TableHeader.font"));
-                setForeground(UIManager.getColor("TableHeader.foreground"));
-            }
-            @Override public Dimension getPreferredSize() {
-                return new Dimension(super.getPreferredSize().width, table.getTableHeader().getPreferredSize().height);
-            }
-        };
-        placesHeading.setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(0, 10, 0, 6), null));
-        navigationScroll.setColumnHeaderView(placesHeading);
-
-        table.setAutoCreateRowSorter(false);
-        table.setShowGrid(false);
-        table.setFillsViewportHeight(true);
-        table.setSelectionMode(model.request().multiple()
-            ? ListSelectionModel.MULTIPLE_INTERVAL_SELECTION : ListSelectionModel.SINGLE_SELECTION);
-        table.setDefaultRenderer(Object.class, new EntryRenderer());
-        table.getTableHeader().setReorderingAllowed(false);
-        table.getColumnModel().getColumn(0).setPreferredWidth(360);
-        table.getColumnModel().getColumn(1).setPreferredWidth(140);
-        table.getColumnModel().getColumn(2).setPreferredWidth(80);
-        table.getTableHeader().addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent event) {
-                int column = table.columnAtPoint(event.getPoint());
-                if (column >= 0 && SwingUtilities.isLeftMouseButton(event)) model.sortBy(ChooserModel.Column.values()[column]);
-            }
-        });
-        table.getSelectionModel().addListSelectionListener(event -> { if (!event.getValueIsAdjusting() && !updating) selectionChanged(); });
-        table.addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent event) {
-                if (event.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(event)) activateSelection();
-            }
-            @Override public void mousePressed(MouseEvent event) { tablePopup(event); }
-            @Override public void mouseReleased(MouseEvent event) { tablePopup(event); }
-        });
-        table.addKeyListener(new KeyAdapter() {
-            @Override public void keyTyped(KeyEvent event) {
-                if ((event.getModifiersEx() & (MENU | InputEvent.ALT_DOWN_MASK)) == 0) typeToSelect(event.getKeyChar());
-            }
-        });
-        tableScroll.setBorder(BorderFactory.createEmptyBorder());
-        message.setForeground(UIManager.getColor("Label.disabledForeground"));
-        message.setAlignmentX(Component.CENTER_ALIGNMENT);
-        centerButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        centerButton.addActionListener(event -> centerAction.run());
-        var messageBox = new JPanel();
-        messageBox.setLayout(new BoxLayout(messageBox, BoxLayout.Y_AXIS));
-        messageBox.setOpaque(false);
-        messageBox.add(message);
-        messageBox.add(Box.createVerticalStrut(10));
-        messageBox.add(centerButton);
-        var messageArea = new JPanel(new GridBagLayout());
-        messageArea.add(messageBox);
-        center.add(new RoundedPane(tableScroll), "table");
-        center.add(new RoundedPane(messageArea), "message");
-
-        previewText.setEditable(false);
-        previewText.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        previewTitle.setFont(previewTitle.getFont().deriveFont(Font.BOLD));
-        var previewHeader = new JPanel(new BorderLayout(0, 2));
-        previewHeader.add(previewTitle, BorderLayout.NORTH);
-        previewHeader.add(previewDetails, BorderLayout.SOUTH);
-        previewPane.add(previewHeader, BorderLayout.NORTH);
-        var previewScroll = new JScrollPane(previewText);
-        previewScroll.setBorder(BorderFactory.createEmptyBorder());
-        previewPane.add(previewScroll, BorderLayout.CENTER);
-        previewPane.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
-        previewPane.setPreferredSize(new Dimension(230, 0));
+        int vertical = metric(DesignMetrics.Role.CHOOSER_PREVIEW_VERTICAL_PADDING), side = metric(DesignMetrics.Role.CHOOSER_PREVIEW_SIDE_PADDING);
+        previewPane.setOpaque(false);
+        ((BorderLayout) previewPane.getLayout()).setVgap(metric(DesignMetrics.Role.CHOOSER_PREVIEW_GAP));
+        previewPane.add(previewHeaderView, BorderLayout.NORTH);
+        previewPane.add(previewContentView, BorderLayout.CENTER);
+        previewPane.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
+        previewPane.setPreferredSize(new java.awt.Dimension(metric(DesignMetrics.Role.CHOOSER_PREVIEW_WIDTH), 0));
 
         var main = new JPanel(new BorderLayout());
+        main.setOpaque(false);
         main.add(center, BorderLayout.CENTER);
         main.add(previewPane, BorderLayout.EAST);
-        var split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new RoundedPane(navigationScroll), main) {
+        var pane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, navigationPane, main) {
             @Override public void updateUI() {
-                // The rail dividers are unpainted resize gutters. Keep Swing's keyboard and drag handling.
+                // The divider is an unpainted resize gutter. Keep Swing's keyboard and drag handling.
                 setUI(new BasicSplitPaneUI() {
                     @Override public BasicSplitPaneDivider createDefaultDivider() {
                         return new BasicSplitPaneDivider(this) {
@@ -338,97 +292,69 @@ public final class FileChooserPanel extends JPanel {
                         };
                     }
                 });
-                setDividerSize(UIScale.scale(6));
+                setDividerSize(UIScale.scale(kit.metrics().value(DesignMetrics.Role.WORKSPACE_GUTTER)));
+                int gutter = UIScale.scale(kit.metrics().value(DesignMetrics.Role.CHOOSER_SIDE_PADDING));
+                setBorder(BorderFactory.createEmptyBorder(0, gutter, 0, gutter));
+                setBackground(kit.theme().semantic().color(SemanticColor.SURFACE_DIALOG));
             }
         };
-        split.setContinuousLayout(true);
-        split.setDividerLocation(190);
-        split.setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(0, 10, 0, 10), null));
-        return split;
+        pane.setContinuousLayout(true);
+        pane.setDividerLocation(metric(DesignMetrics.Role.CHOOSER_NAVIGATION_WIDTH));
+        return pane;
     }
 
-    /** The same scaled 16px arc as the workspace hosts, including opaque scroll panes. */
-    private static final class RoundedPane extends JPanel {
-        private final JComponent content;
-
-        RoundedPane(JComponent content) {
-            super(new BorderLayout());
-            this.content = content;
-            add(content, BorderLayout.CENTER);
-        }
-
-        private int surfaceTop() {
-            // Keep the column headings on the chrome, rounding the listing below them.
-            return content instanceof JScrollPane scroll ? scroll.getViewport().getY() : 0;
-        }
-
-        private Shape surface() {
-            int arc = UIScale.scale(16);
-            int top = surfaceTop();
-            return new RoundRectangle2D.Double(0, top, getWidth(), Math.max(0, getHeight() - top), arc, arc);
-        }
-
-        @Override protected boolean isPaintingOrigin() { return true; }
-        @Override public boolean contains(int x, int y) {
-            return y < surfaceTop() ? super.contains(x, y) : surface().contains(x, y);
-        }
-
-        @Override protected void paintChildren(Graphics graphics) {
-            super.paintChildren(graphics);
-            var g = (Graphics2D) graphics.create();
-            try {
-                // Mask after the children: Swing can skip paintComponent during an opaque child's repaint.
-                int top = surfaceTop();
-                var corners = new Area(new Rectangle(0, top, getWidth(), Math.max(0, getHeight() - top)));
-                corners.subtract(new Area(surface()));
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setColor(getBackground());
-                g.fill(corners);
-            } finally { g.dispose(); }
-        }
+    /** The file table's column header height: the listing's rounded surface starts below it, on the chrome. */
+    private int filesHeaderHeight() {
+        var scroll = find(filesView, FILES, JScrollPane.class);
+        if (scroll == null || scroll.getColumnHeader() == null) return 0;
+        return SwingUtilities.convertPoint(scroll.getViewport(), 0, 0, filesView).y;
     }
 
-    /**
-     * The name row and the buttons. Open has no name row: the selection is what opens, so a type filter, when the
-     * caller set one, sits beside the buttons instead. Save and Directory keep the field for a typed name or path.
-     */
+    private RoundedPane rounded(JComponent content, IntSupplier top) {
+        var pane = new RoundedPane(content, top);
+        panes.add(pane);
+        return pane;
+    }
+
+    /** The name row (Save and Directory) and the buttons. Open has no name row: the selection is what opens. */
     private JComponent bottom() {
-        ChooserRequest request = model.request();
-        boolean open = request.mode() == ChooserRequest.Mode.OPEN;
-        var types = new JComboBox<>(new String[] { request.suffix().map(suffix -> "*" + suffix).orElse("All files") });
-        types.setPrototypeDisplayValue("All files      ");
-        nameField.addActionListener(event -> approve());
-        cancelButton.addActionListener(event -> cancel());
-        primaryButton.addActionListener(event -> approve());
-        var buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        if (open && request.suffix().isPresent()) buttons.add(types);
-        buttons.add(cancelButton);
-        buttons.add(primaryButton);
         var actions = new JPanel(new BorderLayout());
-        actions.add(status, BorderLayout.CENTER);
-        actions.add(buttons, BorderLayout.EAST);
-        var bottom = new JPanel(new BorderLayout(0, 8));
-        bottom.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
-        if (!open) {
-            var name = new JPanel(new BorderLayout(8, 0));
-            name.add(plain(new JLabel(request.mode() == ChooserRequest.Mode.DIRECTORY ? "Folder" : "File name")), BorderLayout.WEST);
-            name.add(nameField, BorderLayout.CENTER);
-            name.add(types, BorderLayout.EAST);
-            bottom.add(name, BorderLayout.NORTH);
-        }
+        actions.setOpaque(false);
+        actions.add(statusView, BorderLayout.CENTER);
+        actions.add(buttonsView, BorderLayout.EAST);
+        var bottom = new JPanel(new BorderLayout(0, metric(DesignMetrics.Role.CHOOSER_BOTTOM_GAP)));
+        bottom.setOpaque(false);
+        int vertical = metric(DesignMetrics.Role.CHOOSER_BOTTOM_VERTICAL_PADDING), side = metric(DesignMetrics.Role.CHOOSER_BOTTOM_SIDE_PADDING);
+        bottom.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
+        if (nameView != null) bottom.add(nameView, BorderLayout.NORTH);
         bottom.add(actions, BorderLayout.SOUTH);
         return bottom;
+    }
+
+    /** Surfaces come from the theme: the dialog behind, the gutter, the panes' corners and the preview text. */
+    private void applySurfaces() {
+        if (closed) return;
+        setBackground(color(SemanticColor.SURFACE_DIALOG));
+        if (split != null) split.setBackground(getBackground());
+        for (var pane : panes) pane.setBackground(getBackground());
+        var mono = kit.typography().font(Typography.Role.MONO);
+        previewText.setFont(mono.deriveFont(UIScale.scale(mono.getSize2D())));
+        previewText.setForeground(color(SemanticColor.TEXT_PRIMARY));
+        previewText.setCaretColor(previewText.getForeground());
+        previewText.setSelectionColor(color(SemanticColor.SELECTION_BG));
+        previewText.setSelectedTextColor(color(SemanticColor.TEXT_PRIMARY));
+        repaint();
     }
 
     private void bindKeys() {
         bind(this, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, InputEvent.ALT_DOWN_MASK), "back", model::goBack);
         bind(this, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, InputEvent.ALT_DOWN_MASK), "forward", model::goForward);
         bind(this, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke(KeyEvent.VK_UP, InputEvent.ALT_DOWN_MASK), "up", model::goUp);
-        bind(this, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke(KeyEvent.VK_L, MENU), "path", pathBar::edit);
+        bind(this, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke(KeyEvent.VK_L, MENU), "path", this::editPath);
         bind(this, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke(KeyEvent.VK_PERIOD, MENU | InputEvent.SHIFT_DOWN_MASK), "hidden", this::toggleHidden);
         bind(this, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "cancel", this::cancel);
-        bind(table, JComponent.WHEN_FOCUSED, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "activate", this::activateSelection);
-        bind(table, JComponent.WHEN_FOCUSED, KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0), "up", model::goUp);
+        // Backspace in the file listing goes up, as before; text fields keep their own Backspace.
+        bind(filesView, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0), "up", model::goUp);
     }
 
     private static void bind(JComponent component, int condition, KeyStroke stroke, String name, Runnable action) {
@@ -438,27 +364,91 @@ public final class FileChooserPanel extends JPanel {
         });
     }
 
-    /** Brings every component up to date with the model. */
+    // ---- Kit events -------------------------------------------------------------------------------------------------
+
+    private void event(UiEvent event) {
+        if (closed) return;
+        switch (event) {
+            case UiEvent.Action action -> action(action.id());
+            case UiEvent.Edited edited -> {
+                switch (edited.id()) {
+                    case SEARCH -> { if (!updating) model.setFilter(edited.text()); }
+                    case NAME -> name = edited.text();
+                    case PATH -> pathValue = edited.text();
+                    default -> { }
+                }
+            }
+            case UiEvent.Selected selected -> {
+                switch (selected.id()) {
+                    case FILES -> { if (!updating) selectionChanged(selected.ids()); }
+                    case PLACES -> placeSelected(selected.ids().stream().findFirst().orElse(null));
+                    case PATH -> selected.ids().stream().findFirst().map(crumbTargets::get).ifPresent(model::navigate);
+                    default -> { }
+                }
+            }
+            case UiEvent.Sorted sorted -> {
+                switch (sorted.columnId()) {
+                    case "name" -> model.sortBy(ChooserModel.Column.NAME);
+                    case "modified" -> model.sortBy(ChooserModel.Column.MODIFIED);
+                    case "size" -> model.sortBy(ChooserModel.Column.SIZE);
+                    default -> { }
+                }
+            }
+            case UiEvent.Toggled toggled when toggled.id().equals(PREVIEW_TOGGLE) -> setPreviewVisible(toggled.checked());
+            // Section headings stay open; their disclosure arrow changes nothing.
+            case UiEvent.Expanded expanded -> render(placesView, placesSpec());
+            default -> { }
+        }
+    }
+
+    private void action(String id) {
+        if (id.startsWith(PIN)) { pinTarget(id.substring(PIN.length())).ifPresent(this::togglePin); return; }
+        switch (id) {
+            case "back" -> model.goBack();
+            case "forward" -> model.goForward();
+            case "up" -> model.goUp();
+            case "refresh" -> model.refresh();
+            case "newFolder" -> newFolder();
+            case "open" -> activateSelection();
+            case "approve" -> approve();
+            case "cancel" -> cancel();
+            case "center" -> centerAction.run();
+            case "path.edit" -> editPath();
+            case "path.go" -> submitPath();
+            case "path.done" -> finishEditingPath();
+            default -> { }
+        }
+    }
+
+    /** A pin menu names its folder: {@code row:<path>}, {@code place:<id>} or {@code crumb:<id>}. */
+    private Optional<Location> pinTarget(String key) {
+        if (key.startsWith("row:")) return Optional.of(model.location().at(key.substring(4)));
+        if (key.startsWith("place:")) return Optional.ofNullable(placeIds.get(key.substring(6))).map(Places.Place::location);
+        if (key.startsWith("crumb:")) return Optional.ofNullable(crumbTargets.get(key.substring(6)));
+        return Optional.empty();
+    }
+
+    private void placeSelected(String id) {
+        // The kit selects a row before showing its menu; a right click names the place without going there.
+        boolean menu = EventQueue.getCurrentEvent() instanceof MouseEvent mouse && mouse.isPopupTrigger();
+        Places.Place place = placeIds.get(id);
+        if (place != null && !menu && !updating) model.navigate(place.location());
+        else syncNavigationSelection();
+    }
+
+    // ---- Model to views ---------------------------------------------------------------------------------------------
+
+    /** Brings every view up to date with the model. */
     private void sync() {
+        if (closed) return;
         updating = true;
         try {
-            backButton.setEnabled(model.canGoBack());
-            forwardButton.setEnabled(model.canGoForward());
-            upButton.setEnabled(model.canGoUp());
-            pathBar.display();
-            if (!search.getText().equals(model.filter())) search.setText(model.filter());
-            search.putClientProperty("JTextField.placeholderText", "Search " + safe(model.name(model.location())));
-            tableModel.set(model.entries());
-            for (int column = 0; column < 3; column++)
-                table.getColumnModel().getColumn(column).setHeaderValue(header(ChooserModel.Column.values()[column]));
-            table.getTableHeader().repaint();
-            syncTableSelection();
-            syncNavigationSelection();
-            status.setText(statusLine());
+            status = statusLine();
             if (model.loading() && model.error().isEmpty()) {
                 if (!loadingDelay.isRunning()) loadingDelay.restart();
                 if (model.entries().isEmpty()) {
                     centerMessage = Optional.empty();
+                    centerActionLabel = Optional.empty();
                     centerCards.show(center, "table");
                 } else {
                     showCenter();
@@ -467,42 +457,50 @@ public final class FileChooserPanel extends JPanel {
                 loadingDelay.stop();
                 showCenter();
             }
-            syncPreview();
+            selectNavigationPlace();
+            renderAll();
         } finally {
             updating = false;
         }
     }
 
-    private void syncTableSelection() {
-        List<ChooserEntry> entries = model.entries();
-        int[] wanted = model.selection().stream().mapToInt(entries::indexOf).filter(row -> row >= 0).sorted().toArray();
-        if (Arrays.equals(wanted, table.getSelectedRows())) return;
-        var selection = table.getSelectionModel();
-        selection.clearSelection();
-        for (int row : wanted) selection.addSelectionInterval(row, row);
-        if (wanted.length > 0) table.scrollRectToVisible(table.getCellRect(wanted[0], 0, true));
+    private void renderAll() {
+        render(navigationView, navigationSpec());
+        render(pathView, pathSpec());
+        render(toolsView, toolsSpec());
+        render(placesView, placesSpec());
+        render(filesView, filesSpec());
+        render(messageView, messageSpec());
+        render(previewHeaderView, previewHeaderSpec());
+        syncPreviewText();
+        render(statusView, statusSpec());
+        render(buttonsView, buttonsSpec());
+        if (nameView != null) render(nameView, nameSpec());
+    }
+
+    private void render(KitView view, ViewSpec spec) {
+        if (view == null || closed) return;
+        boolean was = updating;
+        updating = true;
+        try { view.update(spec); } finally { updating = was; }
     }
 
     private void syncNavigationSelection() {
-        boolean was = updating;
-        updating = true;
-        try {
-            Location shown = model.location();
-            int sameRoot = -1;
-            for (int index = 0; index < navigationItems.size(); index++) {
-                if (!(navigationItems.get(index) instanceof Places.Place place)) continue;
-                if (place.location().equals(shown)) {
-                    navigation.setSelectedIndex(index);
-                    return;
-                }
-                if (sameRoot < 0 && place.section() == Places.Section.SOURCE && place.location().source().equals(shown.source())
-                        && place.location().root().equals(shown.root())) sameRoot = index;
-            }
-            if (sameRoot >= 0) navigation.setSelectedIndex(sameRoot);
-            else navigation.clearSelection();
-        } finally {
-            updating = was;
+        selectNavigationPlace();
+        render(placesView, placesSpec());
+    }
+
+    /** The place shown is highlighted: the exact place, or else its source root. */
+    private void selectNavigationPlace() {
+        Location shown = model.location();
+        String exact = null, sameRoot = null;
+        for (var entry : placeIds.entrySet()) {
+            Places.Place place = entry.getValue();
+            if (place.location().equals(shown)) { exact = entry.getKey(); break; }
+            if (sameRoot == null && place.section() == Places.Section.SOURCE && place.location().source().equals(shown.source())
+                    && place.location().root().equals(shown.root())) sameRoot = entry.getKey();
         }
+        placeSelection = exact != null ? exact : sameRoot;
     }
 
     /** The message area: connecting, loading, an error with Retry, or an empty folder; otherwise the table. */
@@ -510,7 +508,7 @@ public final class FileChooserPanel extends JPanel {
         Optional<String> text;
         Optional<String> action = Optional.empty();
         if (model.connectingTo().isPresent()) {
-            text = Optional.of("Connecting to " + safe(model.connectingTo().get()) + "\u2026");
+            text = Optional.of("Connecting to " + safe(model.connectingTo().get()) + "…");
             action = Optional.of("Cancel connection");
             centerAction = model::cancelConnection;
         } else if (model.error().isPresent()) {
@@ -520,17 +518,189 @@ public final class FileChooserPanel extends JPanel {
                 centerAction = model::retry;
             }
         } else if (model.loading()) {
-            text = model.entries().isEmpty() ? Optional.of("Loading\u2026") : Optional.empty();
+            text = model.entries().isEmpty() ? Optional.of("Loading…") : Optional.empty();
         } else if (model.entries().isEmpty()) {
             text = Optional.of(model.filter().isBlank() ? "This folder is empty." : "No items match your search.");
         } else {
             text = Optional.empty();
         }
         centerMessage = text;
-        message.setText(text.orElse(""));
-        centerButton.setText(action.orElse(""));
-        centerButton.setVisible(action.isPresent());
+        centerActionLabel = action;
+        render(messageView, messageSpec());
         centerCards.show(center, text.isPresent() ? "message" : "table");
+    }
+
+    private ViewSpec navigationSpec() {
+        return new ViewSpec(new Nodes.Stack("navigation", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            tool("back", "back", "Back", model.canGoBack()),
+            tool("forward", "forward", "Forward", model.canGoForward()),
+            tool("up", "chevron.up", "Up", model.canGoUp()),
+            tool("refresh", "refresh", "Refresh", true))));
+    }
+
+    private static Nodes.Button tool(String id, String icon, String tip, boolean enabled) {
+        return new Nodes.Button(id, new ControlState(true, enabled, false, ""), "", icon, Nodes.ButtonKind.GHOST, id, tip);
+    }
+
+    /** The crumbs for the place shown: a source's root label first, then its folders; while connecting, the root alone. */
+    private ViewSpec pathSpec() {
+        crumbTargets.clear();
+        crumbLabels.clear();
+        var crumbs = new ArrayList<Crumb>();
+        Location shown = model.location();
+        if (!shown.isLocal()) crumb(crumbs, model.rootLabel(shown), Location.home(shown.source(), shown.root()));
+        if (!shown.path().equals(Location.HOME))
+            for (Location step : model.chain()) crumb(crumbs, model.name(step), step);
+        return new ViewSpec(new Nodes.Breadcrumbs(PATH, ControlState.READY, crumbs, "Location", editingPath, pathValue,
+            "path.edit", "path.go", "path.done"));
+    }
+
+    private void crumb(List<Crumb> crumbs, String text, Location target) {
+        String id = "c" + crumbs.size();
+        String label = safe(text);
+        crumbTargets.put(id, target);
+        crumbLabels.add(label);
+        crumbs.add(new Crumb(id, label, target.path().equals(Location.HOME) ? List.of() : List.of(pinItem(target, "crumb:" + id))));
+    }
+
+    private MenuItem pinItem(Location folder, String key) {
+        return new MenuItem("pin", prefs.isPinned(folder) ? "Unpin" : "Pin", "bookmark", PIN + key, true, false);
+    }
+
+    private ViewSpec toolsSpec() {
+        var children = new ArrayList<Nodes.Node>();
+        children.add(new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, model.filter(),
+            "Search " + safe(model.name(model.location())), "Search", ""));
+        if (model.request().mode() == ChooserRequest.Mode.SAVE)
+            children.add(new Nodes.Button("newFolder", ControlState.READY, "New folder", "folder.add", Nodes.ButtonKind.SECONDARY, "newFolder", ""));
+        children.add(new Nodes.Icon("preview.icon", ControlState.READY, "preview", Nodes.Hue.NONE, Nodes.IconSize.CONTROL, "Preview pane"));
+        children.add(new Nodes.Toggle(PREVIEW_TOGGLE, ControlState.READY, "Preview pane", previewVisible, PREVIEW_TOGGLE, true));
+        return new ViewSpec(new Nodes.Stack("tools", ControlState.READY, Nodes.LayoutRole.INLINE, children));
+    }
+
+    private ViewSpec placesSpec() {
+        var roots = new ArrayList<TreeItem>();
+        var open = new HashSet<String>();
+        String section = null, headingId = null, heading = null;
+        List<TreeItem> children = null;
+        for (var entry : placeIds.entrySet()) {
+            Places.Place place = entry.getValue();
+            var item = new TreeItem(entry.getKey(), safe(place.label()), Optional.of(place.icon()), true, List.of(), OptionalInt.empty(), false,
+                place.tooltip().isEmpty() ? "" : safe(place.tooltip()), place.connected() ? Optional.of(Nodes.StatusKind.SUCCESS) : Optional.empty(),
+                List.of(), Optional.of(place.location().path().equals(Location.HOME) ? List.of() : List.of(pinItem(place.location(), "place:" + entry.getKey()))));
+            if (place.section() == Places.Section.PLACES) { roots.add(item); continue; }
+            String key = place.section() + "|" + place.heading();
+            if (!key.equals(section)) {
+                if (children != null) roots.add(branch(headingId, heading, children));
+                section = key; heading = place.heading(); headingId = "section/" + roots.size(); children = new ArrayList<>();
+                open.add(headingId);
+            }
+            children.add(item);
+        }
+        if (children != null) roots.add(branch(headingId, heading, children));
+        return new ViewSpec(new Nodes.Tree(PLACES, ControlState.READY, roots, open,
+            placeSelection == null ? Set.of() : Set.of(placeSelection), ""));
+    }
+
+    private static TreeItem branch(String id, String heading, List<TreeItem> children) {
+        return new TreeItem(id, safe(heading), Optional.empty(), false, children);
+    }
+
+    private ViewSpec filesSpec() {
+        boolean save = model.request().mode() == ChooserRequest.Mode.SAVE;
+        var rows = new ArrayList<TableRow>();
+        for (ChooserEntry entry : model.entries()) {
+            var cells = Map.of(
+                "name", safe(entry.name()),
+                "modified", entry.modified() < 0 ? "" : modifiedText(entry.modified()),
+                "size", entry.directory() ? "" : sizeText(entry.size()));
+            rows.add(new TableRow(entry.path(), cells, Optional.of(entry.directory() ? "folder" : "file"), save && !entry.directory(),
+                Optional.of(entry.directory() ? List.of(pinItem(model.location().at(entry.path()), "row:" + entry.path())) : List.of())));
+        }
+        var selected = new HashSet<String>();
+        for (ChooserEntry entry : model.selection()) if (model.entries().contains(entry)) selected.add(entry.path());
+        return new ViewSpec(new Nodes.Table(FILES, ControlState.READY, List.of(
+                column("name", "Name", Nodes.TextRole.BODY, false, DesignMetrics.Role.CHOOSER_NAME_COLUMN, ChooserModel.Column.NAME),
+                column("modified", "Modified", Nodes.TextRole.DESCRIPTION, false, DesignMetrics.Role.CHOOSER_MODIFIED_COLUMN, ChooserModel.Column.MODIFIED),
+                column("size", "Size", Nodes.TextRole.DESCRIPTION, true, DesignMetrics.Role.CHOOSER_SIZE_COLUMN, ChooserModel.Column.SIZE)),
+            rows, selected, "open", List.of(),
+            model.request().multiple() ? Nodes.SelectionMode.MULTIPLE : Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.OVERLAY));
+    }
+
+    private Column column(String id, String title, Nodes.TextRole role, boolean numeric, DesignMetrics.Role width, ChooserModel.Column column) {
+        return new Column(id, title, role, numeric, kit.metrics().value(width),
+            model.sortColumn() == column ? Optional.of(model.ascending()) : Optional.empty());
+    }
+
+    private ViewSpec messageSpec() {
+        String text = centerMessage.orElse("Loading…");
+        String icon = model.connectingTo().isPresent() ? "server" : model.error().isPresent() ? "warning" : "folder";
+        var actions = centerActionLabel.<List<Nodes.Node>>map(label -> List.of(new Nodes.Button("center", ControlState.READY, label, "",
+            Nodes.ButtonKind.SECONDARY, "center", ""))).orElse(List.of());
+        return new ViewSpec(new Nodes.Empty("message", ControlState.READY,
+            new Nodes.Icon("message.icon", ControlState.READY, icon, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, text), text, "", actions));
+    }
+
+    private ViewSpec previewHeaderSpec() {
+        String title, details;
+        List<ChooserEntry> selected = model.selection();
+        if (selected.size() != 1) {
+            title = selected.isEmpty() ? "No selection" : selected.size() + " items selected";
+            details = "";
+        } else {
+            ChooserEntry entry = selected.getFirst();
+            Optional<PreviewInfo> loaded = model.preview();
+            title = safe(entry.name());
+            details = entry.directory()
+                ? loaded.map(preview -> preview.items() == 1 ? "1 item" : preview.items() + " items").orElse("Folder")
+                : sizeText(entry.size()) + (entry.modified() >= 0 ? " · " + modifiedText(entry.modified()) : "");
+        }
+        return new ViewSpec(new Nodes.Stack("preview.header", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Text("preview.title", ControlState.READY, title, Nodes.TextRole.BODY_STRONG),
+            new Nodes.Text("preview.details", ControlState.READY, details, Nodes.TextRole.DESCRIPTION))));
+    }
+
+    private void syncPreviewText() {
+        if (!previewVisible) return;
+        List<ChooserEntry> selected = model.selection();
+        String text = "";
+        if (selected.size() == 1) {
+            Optional<PreviewInfo> loaded = model.preview();
+            text = loaded.flatMap(PreviewInfo::text).orElse(loaded.filter(PreviewInfo::binary).isPresent() ? "Binary file" : "");
+        }
+        if (!previewText.getText().equals(text)) {
+            previewText.setText(text);
+            previewText.setCaretPosition(0);
+        }
+    }
+
+    private ViewSpec statusSpec() {
+        return new ViewSpec(new Nodes.Text("status", ControlState.READY, status, Nodes.TextRole.DESCRIPTION));
+    }
+
+    private ViewSpec buttonsSpec() {
+        ChooserRequest request = model.request();
+        var children = new ArrayList<Nodes.Node>();
+        if (request.mode() == ChooserRequest.Mode.OPEN && request.suffix().isPresent()) children.add(types());
+        children.add(new Nodes.Button("cancel", ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, "cancel", ""));
+        children.add(new Nodes.Button("primary", ControlState.READY, switch (request.mode()) {
+            case OPEN -> "Open";
+            case SAVE -> "Save";
+            case DIRECTORY -> "Choose";
+        }, "", Nodes.ButtonKind.PRIMARY, "approve", ""));
+        return new ViewSpec(new Nodes.Stack("buttons", ControlState.READY, Nodes.LayoutRole.ACTIONS, children));
+    }
+
+    private Nodes.Choice types() {
+        String label = model.request().suffix().map(suffix -> "*" + suffix).orElse("All files");
+        return new Nodes.Choice("types", ControlState.READY, Nodes.ChoiceKind.DROPDOWN, List.of(new Option("type", label, Optional.empty())),
+            "type", "File type", "types");
+    }
+
+    private ViewSpec nameSpec() {
+        boolean directory = model.request().mode() == ChooserRequest.Mode.DIRECTORY;
+        var field = new Nodes.Field(NAME, ControlState.READY, Nodes.FieldKind.TEXT, name, "", directory ? "Folder" : "File name", "approve");
+        return new ViewSpec(new Nodes.FormRow("name.row", ControlState.READY, directory ? "Folder" : "File name", "", field, Optional.of(types())));
     }
 
     private String statusLine() {
@@ -543,17 +713,18 @@ public final class FileChooserPanel extends JPanel {
         return line + " · Choose: " + safe(target);
     }
 
-    private String header(ChooserModel.Column column) {
-        String name = switch (column) { case NAME -> "Name"; case MODIFIED -> "Modified"; case SIZE -> "Size"; };
-        return column == model.sortColumn() ? name + (model.ascending() ? " \u25B4" : " \u25BE") : name;
+    // ---- Behaviour --------------------------------------------------------------------------------------------------
+
+    private void selectionChanged(Set<String> ids) {
+        List<ChooserEntry> chosen = model.entries().stream().filter(entry -> ids.contains(entry.path())).toList();
+        model.select(chosen);
+        model.nameForSelection().ifPresent(this::showName);
+        if (previewVisible) model.requestPreview();
     }
 
-    private void selectionChanged() {
-        List<ChooserEntry> entries = model.entries();
-        List<ChooserEntry> chosen = Arrays.stream(table.getSelectedRows()).filter(row -> row < entries.size()).mapToObj(entries::get).toList();
-        model.select(chosen);
-        model.nameForSelection().ifPresent(nameField::setText);
-        if (previewPane.isVisible()) model.requestPreview();
+    private void showName(String text) {
+        name = text;
+        if (nameView != null) render(nameView, nameSpec());
     }
 
     private void activateSelection() {
@@ -563,7 +734,7 @@ public final class FileChooserPanel extends JPanel {
         else approve();
     }
 
-    void approve() { model.accept(nameField.getText(), this::handle); }
+    void approve() { model.accept(name, this::handle); }
 
     void cancel() { done(List.of()); }
 
@@ -573,10 +744,15 @@ public final class FileChooserPanel extends JPanel {
             case ChooserModel.Outcome.ConfirmReplace replace -> {
                 if (confirmReplace.test(replace.file())) done(List.of(replace.file()));
             }
-            case ChooserModel.Outcome.Invalid invalid -> status.setText(safe(invalid.message()));
-            case ChooserModel.Outcome.Navigated navigated -> nameField.setText(model.request().mode() == ChooserRequest.Mode.SAVE
+            case ChooserModel.Outcome.Invalid invalid -> setStatus(safe(invalid.message()));
+            case ChooserModel.Outcome.Navigated navigated -> showName(model.request().mode() == ChooserRequest.Mode.SAVE
                 ? model.request().suggestedName().orElse("") : "");
         }
+    }
+
+    private void setStatus(String text) {
+        status = text;
+        render(statusView, statusSpec());
     }
 
     private void done(List<Location> chosen) {
@@ -591,7 +767,7 @@ public final class FileChooserPanel extends JPanel {
     }
 
     void newFolder() {
-        askFolderName.get().ifPresent(name -> model.createFolder(name, problem -> problem.ifPresent(text -> status.setText(safe(text)))));
+        askFolderName.get().ifPresent(folder -> model.createFolder(folder, problem -> problem.ifPresent(text -> setStatus(safe(text)))));
     }
 
     void toggleHidden() {
@@ -606,105 +782,72 @@ public final class FileChooserPanel extends JPanel {
         rebuildNavigation();
     }
 
-    /** Selects the first entry whose name starts with what was typed in the last second. */
-    void typeToSelect(char c) {
-        if (Character.isISOControl(c)) return;
-        long now = System.currentTimeMillis();
-        typed = now - typedAt > 1000 ? String.valueOf(c) : typed + c;
-        typedAt = now;
-        String prefix = typed.toLowerCase(Locale.ROOT);
-        List<ChooserEntry> entries = model.entries();
-        for (int row = 0; row < entries.size(); row++)
-            if (entries.get(row).name().toLowerCase(Locale.ROOT).startsWith(prefix)) {
-                table.setRowSelectionInterval(row, row);
-                table.scrollRectToVisible(table.getCellRect(row, 0, true));
-                return;
-            }
+    /** Cmd/Ctrl+L or a click beside the crumbs: the path becomes a text field holding the folder shown. */
+    void editPath() {
+        editingPath = true;
+        pathValue = model.location().path().equals(Location.HOME) ? "" : model.location().path();
+        render(pathView, pathSpec());
+    }
+
+    private void submitPath() {
+        model.goTo(pathValue, problem -> {
+            if (problem.isPresent()) setStatus(safe(problem.get()));
+            else finishEditingPath();
+        });
+    }
+
+    private void finishEditingPath() {
+        if (!editingPath) return;
+        editingPath = false;
+        pathValue = "";
+        render(pathView, pathSpec());
     }
 
     private void setPreviewVisible(boolean visible) {
         prefs.setPreview(visible);
-        previewToggle.setSelected(visible);
+        previewVisible = visible;
         previewPane.setVisible(visible);
         if (visible) model.requestPreview();
-        syncPreview();
+        render(toolsView, toolsSpec());
+        render(previewHeaderView, previewHeaderSpec());
+        syncPreviewText();
         revalidate();
         repaint();
     }
 
-    private void syncPreview() {
-        if (!previewPane.isVisible()) return;
-        List<ChooserEntry> selected = model.selection();
-        if (selected.size() != 1) {
-            previewTitle.setText(selected.isEmpty() ? "No selection" : selected.size() + " items selected");
-            previewDetails.setText("");
-            previewText.setText("");
-            return;
-        }
-        ChooserEntry entry = selected.getFirst();
-        Optional<PreviewInfo> loaded = model.preview();
-        previewTitle.setText(safe(entry.name()));
-        previewDetails.setText(entry.directory()
-            ? loaded.map(preview -> preview.items() == 1 ? "1 item" : preview.items() + " items").orElse("Folder")
-            : sizeText(entry.size()) + (entry.modified() >= 0 ? " \u00B7 " + modifiedText(entry.modified()) : ""));
-        previewText.setText(loaded.flatMap(PreviewInfo::text).orElse(loaded.filter(PreviewInfo::binary).isPresent() ? "Binary file" : ""));
-        previewText.setCaretPosition(0);
-    }
-
     private void rebuildNavigation() {
-        boolean was = updating;
-        updating = true;
-        try {
-            navigationItems.clear();
-            String heading = null;
-            Places.Section section = null;
-            for (Places.Place place : Places.build(model.request().terminalFolder(), home, prefs.pinned(), prefs.recent(), model.sources(), Files::isDirectory)) {
-                if (place.section() != section || !place.heading().equals(heading)) {
-                    section = place.section();
-                    heading = place.heading();
-                    if (section != Places.Section.PLACES) navigationItems.addElement(heading);
-                }
-                navigationItems.addElement(place);
-            }
-        } finally {
-            updating = was;
-        }
+        rebuildNavigationItems();
+        if (placesView == null) return;
         syncNavigationSelection();
+        render(filesView, filesSpec());
+        render(pathView, pathSpec());
     }
 
-    private void navigationPopup(MouseEvent event) {
-        if (!event.isPopupTrigger()) return;
-        int index = navigation.locationToIndex(event.getPoint());
-        if (index >= 0 && navigationItems.get(index) instanceof Places.Place place && !place.location().path().equals(Location.HOME))
-            pinMenu(event, place.location());
+    private void rebuildNavigationItems() {
+        placeIds.clear();
+        navigationItems.clear();
+        String heading = null;
+        Places.Section section = null;
+        for (Places.Place place : Places.build(model.request().terminalFolder(), home, prefs.pinned(), prefs.recent(), model.sources(), Files::isDirectory)) {
+            if (place.section() != section || !place.heading().equals(heading)) {
+                section = place.section();
+                heading = place.heading();
+                if (section != Places.Section.PLACES) navigationItems.add(heading);
+            }
+            navigationItems.add(place);
+            String id = place.section() + "|" + place.location().stored();
+            while (placeIds.containsKey(id)) id = id + "'";
+            placeIds.put(id, place);
+        }
     }
 
-    private void tablePopup(MouseEvent event) {
-        if (!event.isPopupTrigger()) return;
-        int row = table.rowAtPoint(event.getPoint());
-        if (row >= 0 && row < model.entries().size() && model.entries().get(row).directory())
-            pinMenu(event, model.location().at(model.entries().get(row).path()));
-    }
-
-    private void pinMenu(MouseEvent event, Location folder) {
-        var menu = new JPopupMenu();
-        var item = new JMenuItem(prefs.isPinned(folder) ? "Unpin" : "Pin");
-        item.addActionListener(action -> togglePin(folder));
-        menu.add(item);
-        menu.show(event.getComponent(), event.getX(), event.getY());
-    }
-
-    private static JButton tool(String icon, String tip) {
-        var button = new JButton(AppIcons.bundled(icon));
-        button.setToolTipText(tip);
-        button.putClientProperty("JButton.buttonType", "toolBarButton");
-        button.setFocusable(false);
-        return button;
-    }
-
-    private static <T extends JComponent> T plain(T component) {
-        component.putClientProperty("html.disable", Boolean.TRUE);
-        return component;
+    private static <T extends java.awt.Component> T find(java.awt.Component root, String name, Class<T> type) {
+        if (type.isInstance(root) && name.equals(root.getName())) return type.cast(root);
+        if (root instanceof java.awt.Container container) for (var child : container.getComponents()) {
+            T found = find(child, name, type);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     /** Untrusted text for display: control characters become U+FFFD. */
@@ -726,247 +869,57 @@ public final class FileChooserPanel extends JPanel {
 
     static String modifiedText(long millis) { return MODIFIED.format(Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())); }
 
-    private final class EntryTable extends AbstractTableModel {
-        private List<ChooserEntry> rows = List.of();
-
-        void set(List<ChooserEntry> entries) {
-            if (entries.equals(rows)) return;
-            rows = entries;
-            fireTableDataChanged();
-        }
-
-        @Override public int getRowCount() { return rows.size(); }
-        @Override public int getColumnCount() { return 3; }
-        /** Plain names: JTable asks while the panel's fields are still being built; {@code sync} adds the sort arrow. */
-        @Override public String getColumnName(int column) { return switch (column) { case 0 -> "Name"; case 1 -> "Modified"; default -> "Size"; }; }
-        @Override public Object getValueAt(int row, int column) { return rows.get(row); }
-    }
-
-    private final class EntryRenderer extends DefaultTableCellRenderer {
-        EntryRenderer() { putClientProperty("html.disable", Boolean.TRUE); }
-
-        @Override public Component getTableCellRendererComponent(JTable owner, Object value, boolean selected, boolean focused, int row, int column) {
-            super.getTableCellRendererComponent(owner, "", selected, false, row, column);
-            ChooserEntry entry = (ChooserEntry) value;
-            setIcon(null);
-            setHorizontalAlignment(SwingConstants.LEADING);
-            switch (column) {
-                case 0 -> {
-                    setText(safe(entry.name()));
-                    setIcon(AppIcons.bundled(entry.directory() ? "nodes/folder"
-                        : entry.kind() == ChooserEntry.Kind.FILE ? "fileTypes/text" : "fileTypes/unknown"));
-                }
-                case 1 -> setText(entry.modified() < 0 ? "" : modifiedText(entry.modified()));
-                default -> {
-                    setText(entry.directory() ? "" : sizeText(entry.size()));
-                    setHorizontalAlignment(SwingConstants.TRAILING);
-                }
-            }
-            boolean dimmed = column > 0 || model.request().mode() == ChooserRequest.Mode.SAVE && !entry.directory();
-            if (!selected) setForeground(dimmed ? UIManager.getColor("Label.disabledForeground") : owner.getForeground());
-            return this;
-        }
-    }
-
-    private static final class NavigationRenderer extends DefaultListCellRenderer {
-        NavigationRenderer() { putClientProperty("html.disable", Boolean.TRUE); }
-
-        @Override public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focused) {
-            if (value instanceof Places.Place place) {
-                super.getListCellRendererComponent(list, safe(place.label()), index, selected, false);
-                Icon icon = AppIcons.bundled(place.icon());
-                setIcon(place.connected() ? new ConnectedIcon(icon) : icon);
-                setToolTipText(place.tooltip().isEmpty() ? null : safe(place.tooltip()));
-                setBorder(BorderFactory.createEmptyBorder(3, 10, 3, 6));
-            } else {
-                super.getListCellRendererComponent(list, safe(String.valueOf(value)).toUpperCase(Locale.ROOT), index, false, false);
-                setIcon(null);
-                setToolTipText(null);
-                setFont(getFont().deriveFont(Font.BOLD, getFont().getSize2D() - 2));
-                setForeground(UIManager.getColor("Label.disabledForeground"));
-                setBorder(BorderFactory.createEmptyBorder(index == 0 ? 4 : 10, 8, 2, 6));
-            }
-            return this;
-        }
-    }
-
-    /** A root's icon with a small green dot at its lower right: connected. */
-    private record ConnectedIcon(Icon base) implements Icon {
-        @Override public int getIconWidth() { return base.getIconWidth(); }
-        @Override public int getIconHeight() { return base.getIconHeight(); }
-        @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
-            base.paintIcon(component, graphics, x, y);
-            Graphics2D copy = (Graphics2D) graphics.create();
-            try {
-                copy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                int size = Math.max(5, getIconWidth() / 3);
-                copy.setColor(CONNECTED);
-                copy.fillOval(x + getIconWidth() - size, y + getIconHeight() - size, size, size);
-            } finally {
-                copy.dispose();
-            }
-        }
-    }
-
-    /** Clickable breadcrumbs; clicking the empty area or Cmd/Ctrl+L turns it into a text field for a typed path. */
-    private final class PathBar extends JPanel {
-        private final CardLayout cards = new CardLayout();
-        private final JPanel crumbs = new FieldBox(new TailLayout());
-        private final JTextField field = new JTextField();
-        private final List<String> labels = new ArrayList<>();
-
-        PathBar() {
-            setLayout(cards);
-            crumbs.addMouseListener(new MouseAdapter() {
-                @Override public void mouseClicked(MouseEvent event) { if (SwingUtilities.isLeftMouseButton(event)) edit(); }
-            });
-            add(crumbs, "crumbs");
-            add(field, "field");
-            field.addActionListener(event -> submit());
-            bind(field, JComponent.WHEN_FOCUSED, KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "done", this::finishEditing);
-            field.addFocusListener(new FocusAdapter() {
-                @Override public void focusLost(FocusEvent event) { finishEditing(); }
-            });
-        }
-
-        /** The crumbs for the place shown: a source's root label first, then its folders; while connecting, the root alone. */
-        void display() {
-            crumbs.removeAll();
-            labels.clear();
-            Location shown = model.location();
-            if (!shown.isLocal()) crumb(model.rootLabel(shown), Location.home(shown.source(), shown.root()));
-            if (!shown.path().equals(Location.HOME)) {
-                List<Location> chain = model.chain();
-                for (Location step : chain) crumb(model.name(step), step);
-            }
-            crumbs.revalidate();
-            crumbs.repaint();
-        }
-
-        private void crumb(String text, Location target) {
-            if (!labels.isEmpty()) {
-                var separator = new JLabel("\u203A");
-                separator.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
-                crumbs.add(separator);
-            }
-            String label = safe(text);
-            labels.add(label);
-            var crumb = plain(new JButton(label));
-            crumb.putClientProperty("JButton.buttonType", "borderless");
-            // As wide as the name: FlatLaf buttons otherwise pad short names out to a minimum width.
-            crumb.putClientProperty(com.formdev.flatlaf.FlatClientProperties.MINIMUM_WIDTH, 0);
-            crumb.setMargin(new Insets(1, 4, 1, 4));
-            crumb.setFocusable(false);
-            crumb.addActionListener(event -> model.navigate(target));
-            if (!target.path().equals(Location.HOME))
-                crumb.addMouseListener(new MouseAdapter() {
-                    @Override public void mousePressed(MouseEvent event) { if (event.isPopupTrigger()) pinMenu(event, target); }
-                    @Override public void mouseReleased(MouseEvent event) { if (event.isPopupTrigger()) pinMenu(event, target); }
-                });
-            crumbs.add(crumb);
-        }
-
-        String text() { return String.join(" \u203A ", labels); }
-
-        void edit() {
-            field.setText(model.location().path().equals(Location.HOME) ? "" : model.location().path());
-            cards.show(this, "field");
-            field.requestFocusInWindow();
-            field.selectAll();
-        }
-
-        void submit() {
-            model.goTo(field.getText(), problem -> {
-                if (problem.isPresent()) status.setText(safe(problem.get()));
-                else finishEditing();
-            });
-        }
-
-        void finishEditing() { cards.show(this, "crumbs"); }
-    }
-
     /**
-     * The path bar's breadcrumbs inside a box drawn like a text field, so it matches the search box: the theme's field
-     * background, border colour and corner radius, at least a text field's height. Crumbs that slide out on the left are
-     * clipped to the box's padding.
+     * Layout-only rounding with the workspace's surface arc: the listing below its headings is filled with the theme's
+     * card surface and its corners are masked to the dialog surface, including during an opaque child's repaint.
      */
-    private static final class FieldBox extends JPanel {
-        FieldBox(LayoutManager layout) {
-            super(layout);
+    final class RoundedPane extends JPanel {
+        private final IntSupplier top;
+
+        RoundedPane(JComponent content, IntSupplier top) {
+            super(new BorderLayout());
+            this.top = top;
             setOpaque(false);
-            setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+            add(content, BorderLayout.CENTER);
         }
 
-        @Override public Dimension getPreferredSize() {
-            Dimension size = super.getPreferredSize();
-            return new Dimension(size.width, Math.max(size.height, new JTextField().getPreferredSize().height));
+        /** Where the rounded surface starts; the headings above it sit on the chrome. */
+        int surfaceTop() { return Math.max(0, Math.min(getHeight(), top.getAsInt())); }
+
+        private Shape surface() {
+            int arc = metric(DesignMetrics.Role.WORKSPACE_SURFACE_ARC);
+            int surfaceTop = surfaceTop();
+            return new RoundRectangle2D.Double(0, surfaceTop, getWidth(), Math.max(0, getHeight() - surfaceTop), arc, arc);
+        }
+
+        @Override protected boolean isPaintingOrigin() { return true; }
+        @Override public boolean contains(int x, int y) {
+            return y < surfaceTop() ? super.contains(x, y) : surface().contains(x, y);
         }
 
         @Override protected void paintComponent(Graphics graphics) {
-            Graphics2D copy = (Graphics2D) graphics.create();
+            var g = (Graphics2D) graphics.create();
             try {
-                copy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                float arc = com.formdev.flatlaf.util.UIScale.scale((float) UIManager.getInt("TextComponent.arc"));
-                var shape = new RoundRectangle2D.Float(0.5f, 0.5f, getWidth() - 1f, getHeight() - 1f, arc, arc);
-                copy.setColor(color("TextField.background", getBackground()));
-                copy.fill(shape);
-                copy.setColor(color("Component.borderColor", getForeground()));
-                copy.draw(shape);
-            } finally {
-                copy.dispose();
-            }
+                g.setColor(getBackground());
+                g.fillRect(0, 0, getWidth(), getHeight());
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(color(SemanticColor.SURFACE_CARD));
+                g.fill(surface());
+            } finally { g.dispose(); }
         }
 
         @Override protected void paintChildren(Graphics graphics) {
-            Insets insets = getInsets();
-            Graphics clipped = graphics.create();
+            super.paintChildren(graphics);
+            var g = (Graphics2D) graphics.create();
             try {
-                clipped.clipRect(insets.left, 0, getWidth() - insets.left - insets.right, getHeight());
-                super.paintChildren(clipped);
-            } finally {
-                clipped.dispose();
-            }
-        }
-
-        private static Color color(String key, Color fallback) {
-            Color value = UIManager.getColor(key);
-            return value == null ? fallback : value;
-        }
-    }
-
-    /** Lays crumbs out left to right; when they do not fit, the leftmost slide out of view so the current folder stays visible. */
-    private static final class TailLayout implements LayoutManager {
-        @Override public void addLayoutComponent(String name, Component component) { }
-        @Override public void removeLayoutComponent(Component component) { }
-
-        @Override public Dimension preferredLayoutSize(Container parent) {
-            int width = 0;
-            int height = 0;
-            for (Component component : parent.getComponents()) {
-                Dimension size = component.getPreferredSize();
-                width += size.width;
-                height = Math.max(height, size.height);
-            }
-            Insets insets = parent.getInsets();
-            return new Dimension(width + insets.left + insets.right, height + insets.top + insets.bottom);
-        }
-
-        @Override public Dimension minimumLayoutSize(Container parent) {
-            Insets insets = parent.getInsets();
-            return new Dimension(insets.left + insets.right, preferredLayoutSize(parent).height);
-        }
-
-        @Override public void layoutContainer(Container parent) {
-            Insets insets = parent.getInsets();
-            int available = parent.getWidth() - insets.left - insets.right;
-            int needed = preferredLayoutSize(parent).width - insets.left - insets.right;
-            int x = insets.left + Math.min(0, available - needed);
-            int height = parent.getHeight() - insets.top - insets.bottom;
-            for (Component component : parent.getComponents()) {
-                int width = component.getPreferredSize().width;
-                component.setBounds(x, insets.top, width, height);
-                x += width;
-            }
+                // Mask after the children: Swing can skip paintComponent during an opaque child's repaint.
+                int surfaceTop = surfaceTop();
+                var corners = new Area(new Rectangle(0, surfaceTop, getWidth(), Math.max(0, getHeight() - surfaceTop)));
+                corners.subtract(new Area(surface()));
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(getBackground());
+                g.fill(corners);
+            } finally { g.dispose(); }
         }
     }
 }

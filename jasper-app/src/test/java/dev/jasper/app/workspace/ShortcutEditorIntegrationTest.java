@@ -45,7 +45,7 @@ class ShortcutEditorIntegrationTest {
                     var contributions = new Contributions();
                     page[0] = new KeymapPage(new KeymapPage.Hooks(contributions, () -> config[0].snapshot().keybindings(), Map::of, true,
                         changes -> config[0].saveKeybindings(changes, List.of())),
-                        new PageContext(null, id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { }));
+                        new PageContext(null, id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { }, () -> null, dev.jasper.app.testsupport.KitTestSupport::context));
                     page[0].component();
                     config[0].onSnapshot(snapshot -> page[0].refresh());
                     contributions.addAction("app.shortcuts", "Keyboard Shortcuts…", null, List.of("keymap"), Optional.empty(),

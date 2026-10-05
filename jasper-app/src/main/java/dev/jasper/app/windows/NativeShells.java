@@ -244,7 +244,7 @@ public final class NativeShells {
         var prefs = new ChooserPrefs(state);
         var model = new ChooserModel(request, sources, worker, SwingUtilities::invokeLater, prefs.showHidden());
         var result = new AtomicReference<List<Location>>(List.of());
-        var panel = new FileChooserPanel(model, prefs, local.homePath(), chosen -> { result.set(chosen); dialog.dispose(); },
+        var panel = new FileChooserPanel(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), model, prefs, local.homePath(), chosen -> { result.set(chosen); dialog.dispose(); },
             file -> JOptionPane.showConfirmDialog(dialog, model.name(file) + " already exists. Do you want to replace it?",
                 "Confirm Save As", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) == JOptionPane.YES_OPTION,
             () -> Optional.ofNullable(JOptionPane.showInputDialog(dialog, "Folder name:", "New Folder", JOptionPane.PLAIN_MESSAGE))
@@ -266,7 +266,7 @@ public final class NativeShells {
                 });
                 bar.attach(dialog);
             }
-            dialog.getRootPane().setDefaultButton(panel.primaryButton());
+            panel.installDefaultAction(dialog.getRootPane());
             var size = state.window(CHOOSER_BOUNDS).map(saved -> new java.awt.Dimension(saved.width(), saved.height()))
                 .orElse(new java.awt.Dimension(820, 520));
             dialog.setSize(size);

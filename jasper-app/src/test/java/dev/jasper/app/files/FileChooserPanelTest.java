@@ -1,10 +1,16 @@
 package dev.jasper.app.files;
 
+import static dev.jasper.app.files.ChooserKit.*;
 import static dev.jasper.app.files.ChooserRequest.Mode.*;
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.testsupport.EdtTestExtension;
-import java.awt.event.ActionEvent;
-import java.awt.event.KeyEvent;
+import dev.jasper.app.testsupport.KitTestSupport;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.TreeItem;
+import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.ThemeRoute;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,9 +19,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.IntStream;
+import java.util.stream.Stream;
+import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,58 +67,56 @@ class FileChooserPanelTest {
         };
     }
 
-    private FileChooserPanel panel(ChooserRequest.Mode mode, Optional<String> name, List<ChooserSource> extra) {
+    private FileChooserPanel panel(KitContext kit, ChooserRequest.Mode mode, Optional<String> name, List<ChooserSource> extra) {
         var request = new ChooserRequest("Choose", mode, false, Location.local(dir), Optional.of(Location.local(dir)), name,
             Optional.empty(), Optional.empty());
         var sources = new ArrayList<ChooserSource>();
         sources.add(new LocalSource(new LocalBrowser(dir)));
         sources.addAll(extra);
         var model = new ChooserModel(request, sources, Runnable::run, Runnable::run, prefs.showHidden());
-        var panel = new FileChooserPanel(model, prefs, dir, finished::add, file -> replace, () -> folderName);
+        var panel = new FileChooserPanel(kit, model, prefs, dir, finished::add, file -> replace, () -> folderName);
         model.start();
+        layout(panel);
         return panel;
+    }
+
+    private FileChooserPanel panel(ChooserRequest.Mode mode, Optional<String> name, List<ChooserSource> extra) {
+        return panel(KitTestSupport.context(), mode, name, extra);
     }
 
     private FileChooserPanel panel(ChooserRequest.Mode mode, Optional<String> name) { return panel(mode, name, List.of()); }
 
-    private static List<String> rows(FileChooserPanel panel) {
-        var table = panel.table();
-        return IntStream.range(0, table.getRowCount()).mapToObj(row -> ((ChooserEntry) table.getValueAt(row, 0)).name()).toList();
-    }
-
-    private static void press(JComponent component, int key) {
-        Object name = component.getInputMap(JComponent.WHEN_FOCUSED).get(KeyStroke.getKeyStroke(key, 0));
-        component.getActionMap().get(name).actionPerformed(new ActionEvent(component, ActionEvent.ACTION_PERFORMED, ""));
-    }
-
     private static Places.Place place(FileChooserPanel panel, String label) {
-        var items = panel.navigation().getModel();
-        return IntStream.range(0, items.getSize()).mapToObj(items::getElementAt)
+        return panel.navigationItems().stream()
             .filter(item -> item instanceof Places.Place place && place.label().equals(label)).map(Places.Place.class::cast)
             .findFirst().orElseThrow();
+    }
+
+    private static void enterIn(JTextField field) {
+        field.getActionMap().get(field.getInputMap().get(KeyStroke.getKeyStroke("ENTER"))).actionPerformed(null);
     }
 
     @Test void enterOnAFolderEntersItAndEnterOnAFileOpensIt() {
         var panel = panel(OPEN, Optional.empty());
         assertThat(rows(panel)).containsExactly("docs", "notes.txt", "todo.md");
-        panel.table().setRowSelectionInterval(0, 0);
-        press(panel.table(), KeyEvent.VK_ENTER);
+        selectRow(panel, 0);
+        enter(panel);
         assertThat(rows(panel)).isEmpty();
         assertThat(panel.centerMessage()).contains("This folder is empty.");
-        press(panel.table(), KeyEvent.VK_BACK_SPACE);
-        panel.table().setRowSelectionInterval(1, 1);
-        assertThat(panel.nameField().getText()).isEqualTo("notes.txt");
-        press(panel.table(), KeyEvent.VK_ENTER);
+        backspace(panel);
+        selectRow(panel, 1);
+        assertThat(panel.nameText()).isEqualTo("notes.txt");
+        enter(panel);
         assertThat(finished).containsExactly(List.of(here("notes.txt")));
         assertThat(prefs.recent()).containsExactly(Location.local(dir));
     }
 
     @Test void openHasNoNameFieldAndOpensTheSelection() {
         var panel = panel(OPEN, Optional.empty());
-        assertThat(javax.swing.SwingUtilities.isDescendingFrom(panel.nameField(), panel)).as("Open picks rows; nothing is typed").isFalse();
+        assertThat(panel.nameInput()).as("Open picks rows; nothing is typed").isEmpty();
         panel.approve();
         assertThat(panel.statusText()).isEqualTo("Select a file.");
-        panel.table().setRowSelectionInterval(2, 2);
+        selectRow(panel, 2);
         panel.approve();
         assertThat(finished).containsExactly(List.of(here("todo.md")));
     }
@@ -118,60 +124,96 @@ class FileChooserPanelTest {
     @Test void saveAndDirectoryKeepTheNameField() {
         var save = panel(SAVE, Optional.empty());
         var directory = panel(DIRECTORY, Optional.empty());
-        assertThat(javax.swing.SwingUtilities.isDescendingFrom(save.nameField(), save)).isTrue();
-        assertThat(javax.swing.SwingUtilities.isDescendingFrom(directory.nameField(), directory)).isTrue();
+        assertThat(javax.swing.SwingUtilities.isDescendingFrom(save.nameInput().orElseThrow(), save)).isTrue();
+        assertThat(javax.swing.SwingUtilities.isDescendingFrom(directory.nameInput().orElseThrow(), directory)).isTrue();
     }
 
     @Test void theSaveNameFieldAcceptsPathsAndReportsProblems() {
         var panel = panel(SAVE, Optional.empty());
-        panel.nameField().setText("docs");
+        var name = (JTextField) panel.nameInput().orElseThrow();
+        name.setText("docs");
         panel.approve();
         assertThat(panel.pathText()).endsWith("docs");
-        panel.nameField().setText("../nowhere/x.txt");
+        name.setText("../nowhere/x.txt");
         panel.approve();
         assertThat(panel.statusText()).isEqualTo("The folder for \"../nowhere/x.txt\" doesn't exist.");
         replace = true;
-        panel.nameField().setText("../todo.md");
-        panel.approve();
-        assertThat(finished).containsExactly(List.of(here("todo.md")));
+        name.setText("../todo.md");
+        enterIn(name);
+        assertThat(finished).as("Enter in the name field approves").containsExactly(List.of(here("todo.md")));
     }
 
     @Test void saveSelectsTheNamePartAndAsksBeforeReplacing() {
         var panel = panel(SAVE, Optional.of("notes.txt"));
-        assertThat(panel.nameField().getSelectedText()).isEqualTo("notes");
-        assertThat(panel.primaryButton().getText()).isEqualTo("Save");
+        assertThat(panel.nameInput().orElseThrow().getSelectedText()).isEqualTo("notes");
+        assertThat(kit(panel, "primary", JButton.class).getText()).isEqualTo("Save");
         replace = false;
         panel.approve();
         assertThat(finished).isEmpty();
         replace = true;
-        panel.approve();
+        kit(panel, "primary", JButton.class).doClick(0);
+        assertThat(finished).containsExactly(List.of(here("notes.txt")));
+    }
+
+    @Test void enterAnywhereInTheDialogApprovesLikeTheDefaultButton() {
+        var panel = panel(SAVE, Optional.of("notes.txt"));
+        var root = new javax.swing.JRootPane();
+        panel.installDefaultAction(root);
+        replace = true;
+        var name = root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(KeyStroke.getKeyStroke("ENTER"));
+        root.getActionMap().get(name).actionPerformed(null);
         assertThat(finished).containsExactly(List.of(here("notes.txt")));
     }
 
     @Test void newFolderCreatesAndSelectsIt() {
         folderName = Optional.of("reports");
         var panel = panel(SAVE, Optional.empty());
-        panel.newFolder();
+        kit(panel, "newFolder", JButton.class).doClick(0);
         assertThat(dir.resolve("reports")).isDirectory();
-        assertThat(panel.table().getSelectedRow()).isEqualTo(rows(panel).indexOf("reports"));
+        assertThat(table(panel).selectedIds()).containsExactly(table(panel).rows().get(rows(panel).indexOf("reports")).id());
     }
 
     @Test void cancelFinishesOnceWithNothing() {
         var panel = panel(OPEN, Optional.empty());
-        panel.cancel();
+        kit(panel, "cancel", JButton.class).doClick(0);
         panel.cancel();
         assertThat(finished).containsExactly(List.of());
     }
 
     @Test void theNavigationPaneListsPlacesAndPinnedFolders() {
         var panel = panel(OPEN, Optional.empty());
-        var items = panel.navigation().getModel();
-        assertThat(((Places.Place) items.getElementAt(0)).label()).isEqualTo("Terminal folder");
-        assertThat(panel.navigation().getSelectedValue()).as("the folder shown is highlighted").isEqualTo(items.getElementAt(0));
+        var items = panel.navigationItems();
+        assertThat(((Places.Place) items.getFirst()).label()).isEqualTo("Terminal folder");
+        assertThat(panel.selectedPlace()).as("the folder shown is highlighted").contains((Places.Place) items.getFirst());
+        var places = (Nodes.Tree) view(panel, FileChooserPanel.PLACES).spec().root();
+        assertThat(places.selectedIds()).containsExactly(panel.placeId((Places.Place) items.getFirst()));
         panel.togglePin(here("docs"));
         assertThat(prefs.pinned()).containsExactly(here("docs"));
-        panel.navigation().setSelectedValue(place(panel, "docs"), false);
+        choosePlace(panel, place(panel, "docs"));
         assertThat(panel.pathText()).endsWith("docs");
+    }
+
+    @Test void pinMenusNameTheirFolderAndPinWithoutNavigating() {
+        var panel = panel(OPEN, Optional.empty());
+        var docs = table(panel).rows().get(rows(panel).indexOf("docs"));
+        assertThat(table(panel).rows().get(rows(panel).indexOf("notes.txt")).contextActions()).as("files have no pin menu").contains(List.of());
+        var pin = docs.contextActions().orElseThrow().getFirst();
+        assertThat(pin.label()).isEqualTo("Pin");
+        String shown = panel.pathText();
+        panel.act(pin.action());
+        assertThat(prefs.pinned()).containsExactly(here("docs"));
+        assertThat(panel.pathText()).as("pinning does not navigate").isEqualTo(shown);
+        assertThat(table(panel).rows().get(rows(panel).indexOf("docs")).contextActions().orElseThrow().getFirst().label()).isEqualTo("Unpin");
+        var tree = (Nodes.Tree) view(panel, FileChooserPanel.PLACES).spec().root();
+        TreeItem pinned = tree.roots().stream().flatMap(root -> Stream.concat(Stream.of(root), root.children().stream()))
+            .filter(item -> item.id().equals(panel.placeId(place(panel, "docs")))).findFirst().orElseThrow();
+        assertThat(pinned.tooltip()).isEqualTo(dir.resolve("docs").toString());
+        panel.act(pinned.contextActions().orElseThrow().getFirst().action());
+        assertThat(prefs.pinned()).isEmpty();
+        var crumbs = ((Nodes.Breadcrumbs) view(panel, FileChooserPanel.PATH).spec().root()).crumbs();
+        panel.act(crumbs.getLast().contextActions().getFirst().action());
+        assertThat(prefs.pinned()).as("a crumb's menu pins the folder it names").containsExactly(Location.local(dir));
+        assertThat(panel.pathText()).isEqualTo(shown);
     }
 
     @Test void theHiddenFilesToggleIsRememberedAndTypingSelects() throws IOException {
@@ -181,47 +223,62 @@ class FileChooserPanelTest {
         panel.toggleHidden();
         assertThat(rows(panel)).doesNotContain(".env");
         assertThat(prefs.showHidden()).isFalse();
-        panel.typeToSelect('t');
-        assertThat(panel.nameField().getText()).isEqualTo("todo.md");
+        type(panel, 't');
+        assertThat(panel.nameText()).isEqualTo("todo.md");
     }
 
     @Test void thePreviewPaneShowsTheStartOfTheSelectedFile() {
         var panel = panel(OPEN, Optional.empty());
-        panel.previewToggle().doClick(0);
+        previewToggle(panel).doClick(0);
         assertThat(prefs.preview()).isTrue();
-        panel.table().setRowSelectionInterval(1, 1);
+        selectRow(panel, 1);
         assertThat(panel.previewText()).isEqualTo("hello\n");
     }
 
     @Test void thePathBarAcceptsATypedFolder() {
         var panel = panel(OPEN, Optional.empty());
-        panel.editPath(dir.resolve("docs").toString());
+        editPath(panel, dir.resolve("docs").toString());
         assertThat(panel.pathText()).endsWith("docs");
-        panel.editPath(dir.resolve("nowhere").toString());
+        editPath(panel, dir.resolve("nowhere").toString());
         assertThat(panel.statusText()).startsWith("There is no folder at ");
+    }
+
+    @Test void theFreeAreaOpensTheTypedPathAndEscapeClosesItWithoutCancelling() {
+        var panel = panel(OPEN, Optional.empty());
+        var area = crumbs(panel);
+        for (var listener : area.getMouseListeners())
+            listener.mouseClicked(new java.awt.event.MouseEvent(area, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 2, 2, 1, false, java.awt.event.MouseEvent.BUTTON1));
+        var field = kit(panel, "@crumbs/path/field", JTextField.class);
+        assertThat(field.getText()).as("the field holds the folder shown").isEqualTo(dir.toAbsolutePath().normalize().toString());
+        field.getActionMap().get(field.getInputMap().get(KeyStroke.getKeyStroke("ESCAPE"))).actionPerformed(null);
+        assertThat(((Nodes.Breadcrumbs) view(panel, FileChooserPanel.PATH).spec().root()).editing()).isFalse();
+        assertThat(finished).as("Escape in the path field does not cancel the dialog").isEmpty();
     }
 
     @Test void aSourceRootConnectsWhenOpenedAndOffersRetryWhenItFails() throws IOException {
         Path remote = Files.createDirectory(dir.resolve("remote-home"));
         Files.writeString(remote.resolve("r.txt"), "r");
         var panel = panel(OPEN, Optional.empty(), List.of(hosts()));
-        var items = panel.navigation().getModel();
-        assertThat(IntStream.range(0, items.getSize()).mapToObj(items::getElementAt)).contains("Remote");
+        assertThat(panel.navigationItems()).contains("Remote");
         assertThat(place(panel, "Box").connected()).isFalse();
         hostConnected = true;
         sourceListeners.forEach(Runnable::run);
         assertThat(place(panel, "Box").connected()).as("the pane follows the source").isTrue();
-        panel.navigation().setSelectedValue(place(panel, "Box"), false);
-        assertThat(panel.centerMessage()).contains("Connecting to Box\u2026");
+        layout(panel);
+        assertThat(KitTestSupport.find(panel, "@tree/places/" + panel.placeId(place(panel, "Box")) + "/status", JComponent.class))
+            .as("a connected root shows its status dot").isNotNull();
+        choosePlace(panel, place(panel, "Box"));
+        assertThat(panel.centerMessage()).contains("Connecting to Box…");
         assertThat(panel.centerAction()).contains("Cancel connection");
         connects.getLast().completeExceptionally(new IOException("offline"));
         assertThat(panel.centerMessage()).contains("Couldn't connect to Box: offline");
         assertThat(panel.centerAction()).contains("Retry");
-        panel.pressCenterAction();
+        layout(panel);
+        kit(panel, "center", JButton.class).doClick(0);
         connects.getLast().complete(new LocalBrowser(remote));
         assertThat(rows(panel)).containsExactly("r.txt");
         assertThat(panel.pathText()).startsWith("Box");
-        panel.table().setRowSelectionInterval(0, 0);
+        selectRow(panel, 0);
         panel.approve();
         assertThat(finished).containsExactly(List.of(new Location("dev.x.hosts", "box", remote.resolve("r.txt").toString())));
         panel.close();
@@ -232,54 +289,98 @@ class FileChooserPanelTest {
     @Test void fileNamesAreShownAsPlainText() throws IOException {
         Files.writeString(dir.resolve("<html><b>x"), "");
         var panel = panel(OPEN, Optional.empty());
-        int row = rows(panel).indexOf("<html><b>x");
-        var cell = (JLabel) panel.table().prepareRenderer(panel.table().getCellRenderer(row, 0), row, 0);
+        layout(panel);
+        var id = table(panel).rows().get(rows(panel).indexOf("<html><b>x")).id();
+        var cell = KitTestSupport.require(panel, "@table/files/" + id + "/name", JLabel.class);
         assertThat(cell.getClientProperty("html.disable")).isEqualTo(Boolean.TRUE);
         assertThat(cell.getText()).isEqualTo("<html><b>x");
     }
 
     @Test void directoryModeSaysWhichFolderChooseWillPick() {
         var panel = panel(DIRECTORY, Optional.empty());
-        assertThat(panel.primaryButton().getText()).isEqualTo("Choose");
+        assertThat(kit(panel, "primary", JButton.class).getText()).isEqualTo("Choose");
         assertThat(rows(panel)).containsExactly("docs");
         assertThat(panel.statusText()).endsWith("Choose: " + dir.getFileName());
-        panel.table().setRowSelectionInterval(0, 0);
+        selectRow(panel, 0);
         assertThat(panel.statusText()).endsWith("Choose: docs");
         panel.approve();
         assertThat(finished).containsExactly(List.of(here("docs")));
     }
 
+    @Test void saveModeMutesFilesAndTheHeaderSorts() {
+        var panel = panel(SAVE, Optional.empty());
+        var rows = table(panel).rows();
+        assertThat(rows.get(rows(panel).indexOf("notes.txt")).muted()).as("files are dimmed in Save, as before").isTrue();
+        assertThat(rows.get(rows(panel).indexOf("docs")).muted()).isFalse();
+        assertThat(table(panel).columns().getFirst().sorted()).contains(true);
+        var header = kit(panel, "@table/files/header/name", JLabel.class);
+        for (var listener : header.getMouseListeners())
+            listener.mouseClicked(new java.awt.event.MouseEvent(header, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 2, 2, 1, false, java.awt.event.MouseEvent.BUTTON1));
+        assertThat(table(panel).columns().getFirst().sorted()).as("clicking the sorted column reverses it").contains(false);
+        assertThat(rows(panel)).containsExactly("docs", "todo.md", "notes.txt");
+        assertThat(table(panel).scroll()).as("the listing keeps its overlay scroll bar").isEqualTo(Nodes.ScrollPolicy.OVERLAY);
+    }
+
+    @Test void selectionScrollAndPreviewSurviveAThemeSwitch() throws IOException {
+        for (int i = 0; i < 80; i++) Files.writeString(dir.resolve(String.format("file-%02d.txt", i)), "line " + i + "\n");
+        var bindings = KitTestSupport.bindings(true);
+        try {
+            var panel = panel(bindings.context(ThemeRoute.CHROME), OPEN, Optional.empty(), List.of());
+            previewToggle(panel).doClick(0);
+            panel.setSize(900, 400);
+            layout(panel);
+            int row = rows(panel).indexOf("file-60.txt");
+            var viewport = scroll(panel).getViewport();
+            int rowHeight = viewport.getViewSize().height / rows(panel).size();
+            viewport.setViewPosition(new java.awt.Point(0, row * rowHeight - viewport.getExtentSize().height / 2));
+            layout(panel);
+            selectRow(panel, row);
+            int scrolled = viewport.getViewPosition().y;
+            assertThat(scrolled).isPositive();
+            assertThat(panel.previewText()).isEqualTo("line 60\n");
+            var search = KitTestSupport.require(panel, FileChooserPanel.SEARCH + ".input", javax.swing.text.JTextComponent.class);
+            var light = ThemeTestSupport.pair(false);
+            bindings.binding().publish(light);
+            layout(panel);
+            assertThat(table(panel).selectedIds()).as("selection survives").containsExactly(table(panel).rows().get(row).id());
+            assertThat(panel.nameText()).isEqualTo("file-60.txt");
+            assertThat(viewport.getViewPosition().y).as("scroll position survives").isEqualTo(scrolled);
+            assertThat(panel.previewText()).as("preview survives").isEqualTo("line 60\n");
+            assertThat(previewToggle(panel).isSelected()).isTrue();
+            assertThat(search.getText()).isEmpty();
+            assertThat(panel.getBackground()).as("the dialog surface follows the theme").isEqualTo(light.chrome().semantic().color(SemanticColor.SURFACE_DIALOG));
+            assertThat(KitTestSupport.require(panel, "@table/files/" + table(panel).rows().get(row).id() + "/name", JLabel.class).getForeground())
+                .isEqualTo(light.chrome().semantic().color(SemanticColor.TEXT_PRIMARY));
+            panel.close();
+        } finally { bindings.close(); }
+    }
+
     @Test void thePathBarIsDrawnAsATextFieldLikeTheSearchBox() {
         var panel = panel(OPEN, Optional.empty());
-        JComponent box = panel.pathBox();
+        JComponent box = pathBox(panel);
         assertThat(box.isOpaque()).as("it paints its own rounded field").isFalse();
         int height = box.getPreferredSize().height;
-        assertThat(height).isGreaterThanOrEqualTo(new javax.swing.JTextField().getPreferredSize().height);
+        assertThat(height).isGreaterThanOrEqualTo(new JTextField().getPreferredSize().height);
         box.setSize(300, height);
-        box.doLayout();
+        KitTestSupport.layout(box);
         var image = new java.awt.image.BufferedImage(300, height, java.awt.image.BufferedImage.TYPE_INT_ARGB);
         var graphics = image.createGraphics();
         box.paint(graphics);
         graphics.dispose();
         assertThat(image.getRGB(299, height / 2) >>> 24).as("an outline at the right edge").isNotZero();
-        java.awt.Color fill = javax.swing.UIManager.getColor("TextField.background");
-        assertThat(new java.awt.Color(image.getRGB(296, height / 2), true)).as("the field's background inside").isEqualTo(fill);
+        java.awt.Color fill = KitTestSupport.context().theme().semantic().color(SemanticColor.SURFACE_INPUT);
+        assertThat(new java.awt.Color(image.getRGB(296, height / 2), true)).as("the field's background inside, as the search box's").isEqualTo(fill);
     }
 
     @Test void placesAndFilesKeepRoundedCornersWithOpaqueContents() {
         var panel = panel(OPEN, Optional.empty());
         try {
             for (boolean preview : new boolean[] {false, true}) {
-                if (panel.previewToggle().isSelected() != preview) panel.previewToggle().doClick();
-                for (var view : List.of(panel.navigation(), panel.table())) {
-                    var scroll = (javax.swing.JScrollPane) javax.swing.SwingUtilities
-                        .getAncestorOfClass(javax.swing.JScrollPane.class, view);
-                    // JTable installs this on addNotify in a displayed dialog.
-                    if (view == panel.table()) scroll.setColumnHeaderView(panel.table().getTableHeader());
-                    var pane = (JComponent) scroll.getParent();
+                if (previewToggle(panel).isSelected() != preview) previewToggle(panel).doClick(0);
+                for (var pane : panel.roundedPanes().subList(0, 2)) {
                     pane.setSize(320, 240);
-                    dev.jasper.app.testsupport.LayoutTestSupport.layoutTree((java.awt.Container) pane);
-                    int top = scroll.getViewport().getY();
+                    dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(pane);
+                    int top = pane.surfaceTop();
                     for (int scale : new int[] {1, 2}) {
                         var image = new java.awt.image.BufferedImage(320 * scale, 240 * scale,
                             java.awt.image.BufferedImage.TYPE_INT_RGB);
@@ -316,18 +417,14 @@ class FileChooserPanelTest {
         var panel = panel(OPEN, Optional.empty());
         try {
             panel.setSize(900, 560);
-            var navigationScroll = (javax.swing.JScrollPane) javax.swing.SwingUtilities
-                .getAncestorOfClass(javax.swing.JScrollPane.class, panel.navigation());
-            var files = (javax.swing.JScrollPane) javax.swing.SwingUtilities
-                .getAncestorOfClass(javax.swing.JScrollPane.class, panel.table());
-            files.setColumnHeaderView(panel.table().getTableHeader());
             dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(panel);
-            assertThat(panel.navigation().getModel().getElementAt(0)).isInstanceOf(Places.Place.class);
-            assertThat(navigationScroll.getColumnHeader()).isNotNull();
-            assertThat(((JLabel) navigationScroll.getColumnHeader().getView()).getText()).isEqualTo("Places");
-            assertThat(navigationScroll.getViewport().getY()).isEqualTo(files.getViewport().getY());
-            var split = (javax.swing.JSplitPane) ((java.awt.BorderLayout) panel.getLayout())
-                .getLayoutComponent(java.awt.BorderLayout.CENTER);
+            assertThat(panel.navigationItems().getFirst()).isInstanceOf(Places.Place.class);
+            assertThat(KitTestSupport.require(panel, "places.heading", JLabel.class).getText()).isEqualTo("Places");
+            var placesViewport = KitTestSupport.require(panel, FileChooserPanel.PLACES, javax.swing.JScrollPane.class).getViewport();
+            var filesViewport = scroll(panel).getViewport();
+            assertThat(javax.swing.SwingUtilities.convertPoint(placesViewport, 0, 0, panel).y)
+                .as("places start level with the file rows").isEqualTo(javax.swing.SwingUtilities.convertPoint(filesViewport, 0, 0, panel).y);
+            var split = panel.split();
             var gutter = split.getInsets();
             javax.swing.SwingUtilities.updateComponentTreeUI(panel);
             dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(panel);
@@ -344,9 +441,9 @@ class FileChooserPanelTest {
 
     @Test void crumbsSitCloseToTheirSeparators() {
         var panel = panel(OPEN, Optional.empty());
-        var separators = new java.util.ArrayList<String>();
-        for (var child : panel.pathBox().getComponents()) {
-            if (child instanceof javax.swing.JButton crumb) {
+        var separators = new ArrayList<String>();
+        for (var child : crumbs(panel).getComponents()) {
+            if (child instanceof JButton crumb) {
                 assertThat(crumb.getClientProperty(com.formdev.flatlaf.FlatClientProperties.MINIMUM_WIDTH)).as("no minimum width").isEqualTo(0);
                 assertThat(crumb.getMargin().left + crumb.getMargin().right).as("tight side margins").isLessThanOrEqualTo(8);
             } else if (child instanceof JLabel separator) {
@@ -355,6 +452,6 @@ class FileChooserPanelTest {
                 assertThat(insets.left + insets.right).isLessThanOrEqualTo(4);
             }
         }
-        assertThat(separators).isNotEmpty().allMatch("\u203A"::equals);
+        assertThat(separators).isNotEmpty().allMatch("›"::equals);
     }
 }

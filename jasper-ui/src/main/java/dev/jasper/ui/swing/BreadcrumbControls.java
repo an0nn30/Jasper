@@ -208,7 +208,7 @@ final class BreadcrumbControls {
             crumbs.repaint();
         }
 
-        /** A crumb's own menu; choosing an item reports the crumb then the item's action. */
+        /** A crumb's own menu; choosing an item reports only the item's action (the host names the crumb in it). */
         void context(String crumbId, JComponent invoker, int x, int y) {
             if (!interactive()) return;
             clearPopup();
@@ -226,8 +226,8 @@ final class BreadcrumbControls {
                 entry.setBorder(BorderFactory.createEmptyBorder(0, inset, 0, inset));
                 entry.setIcon(item.icon().isBlank() ? null : context().icons().tile(item.icon(), context().theme().semantic(), item.hue(),
                     ThemePainting.metric(context(), DesignMetrics.Role.MENU_TILE), false));
+                // A crumb's menu acts on that crumb without navigating to it, so it reports only the item's action.
                 ActionListener chosen = event -> {
-                    emit(new UiEvent.Selected(node.id(), Set.of(crumbId)));
                     if (value().crumbs().stream().anyMatch(candidate -> candidate.id().equals(crumbId) && candidate.contextActions().contains(item)))
                         emit(new UiEvent.Action(item.action()));
                 };
