@@ -75,4 +75,18 @@ public abstract class KitContractTest {
         assertThatThrownBy(() -> b.registerContent(new CustomContent("node",Nodes.CustomKind.EDITOR,new javax.swing.JTextArea(),() -> {}))).isInstanceOf(IllegalArgumentException.class);
         a.update(new ViewSpec(new Nodes.Custom("replacement",ControlState.READY,"content",Nodes.CustomKind.EDITOR,"Editor")));assertThat(disposed.get()).isEqualTo(1);stop(first);stop(second);assertThat(disposed.get()).isEqualTo(1);
     }); }
+    @Test void reentrantCloseDuringRemovalDisposesEachContentExactlyOnce() throws Exception { edt(() -> {
+        var kit=kit("owner");
+        var tree=new ViewSpec(new Nodes.Stack("root",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
+            new Nodes.Custom("first",ControlState.READY,"first-content",Nodes.CustomKind.EDITOR,"First"),
+            new Nodes.Custom("second",ControlState.READY,"second-content",Nodes.CustomKind.EDITOR,"Second"))));
+        var view=kit.create(tree,e -> {});var first=new java.util.concurrent.atomic.AtomicInteger();var second=new java.util.concurrent.atomic.AtomicInteger();
+        try {
+            view.registerContent(new CustomContent("first-content",Nodes.CustomKind.EDITOR,new javax.swing.JTextArea(),() -> {first.incrementAndGet();view.close();}));
+            view.registerContent(new CustomContent("second-content",Nodes.CustomKind.EDITOR,new javax.swing.JTextArea(),() -> {second.incrementAndGet();view.close();}));
+            view.update(spec("Removed"));
+            assertThat(first.get()).isEqualTo(1);assertThat(second.get()).isEqualTo(1);
+            view.close();assertThat(first.get()).isEqualTo(1);assertThat(second.get()).isEqualTo(1);
+        } finally {view.close();stop(kit);}
+    }); }
 }

@@ -68,4 +68,37 @@ class HostedKitTest {
   // Stop requested inside an event turn from a worker: disposal cannot run until this turn ends.
   SwingUtilities.invokeAndWait(() -> {var worker=new Thread(kit[0]::close);worker.start();try{worker.join();}catch(InterruptedException e){throw new AssertionError(e);}view[0].dispatch(new UiEvent.Action("stale"));assertThat(delivered.get()).isZero();});
  }
+ @Test void chromeOnlyChangesRefreshContentAndDisposeBothAppearanceSubscriptions() throws Exception {SwingUtilities.invokeAndWait(() -> {
+  var current=new java.util.concurrent.atomic.AtomicReference<>(new dev.jasper.app.appearance.ThemeController().current());
+  var workspace=current.get().workspace();var updates=new java.util.ArrayList<java.util.function.Consumer<dev.jasper.app.appearance.ResolvedTheme>>();
+  var glass=new java.util.ArrayList<Runnable>();double[] opacity={1};var themeSubscriptions=new AtomicInteger();var workspaceSubscriptions=new AtomicInteger();
+  var containment=new Containment(java.awt.EventQueue::isDispatchThread);
+  var ui=new HostedUi("editor",new dev.jasper.app.contributions.Contributions(),containment,Runnable::run,java.awt.EventQueue::isDispatchThread,() -> true,getClass().getClassLoader(),() -> dev.jasper.sdk.Variant.DARK,h -> () -> {},null,null,current::get,h -> {updates.add(h);return new dev.jasper.app.lifecycle.Subscription(() -> updates.remove(h));},new GlassSource(c -> opacity[0],h -> {glass.add(h);return new dev.jasper.app.lifecycle.Subscription(() -> glass.remove(h));}));
+  var source=ui.appearance();
+  var appearance=new Appearance() {
+   public java.awt.Color color(SemanticColor role){return source.color(role);}
+   public dev.jasper.sdk.Variant variant(){return source.variant();}
+   public double workspaceOpacity(java.awt.Component component){return source.workspaceOpacity(component);}
+   public javax.swing.Icon icon(String path){return source.icon(path);}
+   public dev.jasper.sdk.Subscription onChanged(java.util.function.Consumer<dev.jasper.sdk.Variant> handler){var subscription=source.onChanged(handler);themeSubscriptions.incrementAndGet();return () -> {subscription.close();themeSubscriptions.decrementAndGet();};}
+   public dev.jasper.sdk.Subscription onWorkspaceChanged(java.util.function.Consumer<dev.jasper.sdk.Variant> handler){var subscription=source.onWorkspaceChanged(handler);workspaceSubscriptions.incrementAndGet();return () -> {subscription.close();workspaceSubscriptions.decrementAndGet();};}
+  };
+  var kit=new HostedKit("editor",() -> true,ui::kitThemes,appearance,containment);
+  var editor=new JTextArea("stable document");editor.setCaretPosition(4);var document=editor.getDocument();var scroll=new JScrollPane(editor);
+  var view=kit.create(custom(Nodes.CustomKind.EDITOR,"doc"),e -> {});
+  try {
+   view.registerContent(new CustomContent("doc",Nodes.CustomKind.EDITOR,scroll,() -> {}));
+   var previous=current.get().chrome();var tokens=new java.util.EnumMap<dev.jasper.app.appearance.Token,java.awt.Color>(dev.jasper.app.appearance.Token.class);tokens.putAll(previous.tokens());
+   tokens.put(dev.jasper.app.appearance.Token.INPUT_BACKGROUND,java.awt.Color.MAGENTA);tokens.put(dev.jasper.app.appearance.Token.TEXT,java.awt.Color.GREEN);
+   var changed=new dev.jasper.app.appearance.GeneratedTheme(previous.name(),previous.dark(),previous.author(),tokens,previous.syntax(),previous.terminal(),previous.uiKeys(),previous.icons());
+   current.set(new dev.jasper.app.appearance.ResolvedTheme(changed,workspace));for(var update:java.util.List.copyOf(updates))update.accept(current.get());
+   assertThat(current.get().workspace()).isSameAs(workspace);assertThat(source.editorPalette()).isEqualTo(HostedPalettes.editor(workspace));assertThat(source.syntaxPalette()).isEqualTo(HostedPalettes.syntax(workspace));
+   assertThat(scroll.getBackground()).isEqualTo(source.color(SemanticColor.SURFACE_INPUT));assertThat(scroll.getForeground()).isEqualTo(source.color(SemanticColor.TEXT_PRIMARY));
+   assertThat(editor.getDocument()).isSameAs(document);assertThat(editor.getCaretPosition()).isEqualTo(4);
+   assertThat(themeSubscriptions.get()).isEqualTo(2);assertThat(workspaceSubscriptions.get()).isEqualTo(1);
+   view.close();assertThat(themeSubscriptions.get()).isEqualTo(1);assertThat(workspaceSubscriptions.get()).isZero();
+   var retainedColor=scroll.getBackground();opacity[0]=.5;for(var listener:java.util.List.copyOf(glass))listener.run();assertThat(scroll.getBackground()).isEqualTo(retainedColor);
+  } finally {view.close();kit.close();ui.closeAll();}
+  assertThat(themeSubscriptions.get()).isZero();assertThat(workspaceSubscriptions.get()).isZero();assertThat(updates).isEmpty();assertThat(glass).isEmpty();
+ });}
 }

@@ -19,7 +19,7 @@ public final class FakeKitView implements UiView {
  @Override public ViewSpec spec(){guard();return spec;}
  @Override public void update(ViewSpec next){guard();Objects.requireNonNull(next);var nodes=index(next.root());
   secrets.entrySet().removeIf(e -> {if(nodes.get(e.getKey()) instanceof Nodes.Secret)return false;Arrays.fill(e.getValue(),(char)0);return true;});
-  for(var content:List.copyOf(contents.values()))if(nodes.values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id()) && c.kind()==content.kind() && index(spec.root()).get(c.id()) instanceof Nodes.Custom previous && previous.contentId().equals(content.id()) && previous.kind()==content.kind())){contents.remove(content.id());dispose(content);}
+  for(var content:List.copyOf(contents.values()))if(nodes.values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id()) && c.kind()==content.kind() && index(spec.root()).get(c.id()) instanceof Nodes.Custom previous && previous.contentId().equals(content.id()) && previous.kind()==content.kind())){dispose(content);}
   spec=next;if(focused!=null&&!nodes.containsKey(focused))focused=null;
  }
  private static Map<String,Nodes.Node> index(Nodes.Node root){var result=new HashMap<String,Nodes.Node>();walk(root,result);return result;}
@@ -39,7 +39,9 @@ public final class FakeKitView implements UiView {
   if(contents.containsKey(content.id()))throw new IllegalArgumentException("Content already registered");
   FakeKitContent.validate(content);if(CONTENT_OWNERS.containsKey(content.component())||content.component().getParent()!=null)throw new IllegalArgumentException("Content is already owned or mounted");CONTENT_OWNERS.put(content.component(),this);contents.put(content.id(),content);
  }
- private void dispose(CustomContent content){CONTENT_OWNERS.remove(content.component(),this);try{content.lifetime().close();}catch(Throwable failure){owner.failed();}}
+ private void dispose(CustomContent content){
+  // Claim removal before invoking plugin code; reentrant close may consume the remaining snapshot.
+  if(contents.get(content.id())!=content)return;contents.remove(content.id());CONTENT_OWNERS.remove(content.component(),this);try{content.lifetime().close();}catch(Throwable failure){owner.failed();}}
  @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {for(var value:secrets.values())Arrays.fill(value,(char)0);secrets.clear();for(var content:List.copyOf(contents.values()))dispose(content);contents.clear();events=e -> {};owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
     static List<Nodes.Node> children(Nodes.Node node) {
         var result = new ArrayList<Nodes.Node>();
