@@ -83,6 +83,7 @@ public class RemotePlugin implements Plugin {
     private dev.jasper.sdk.Subscription reopener;
     private dev.jasper.remote.chooser.RemoteHosts remoteHosts;
     private dev.jasper.sdk.Subscription locations;
+    private java.util.function.BiConsumer<dev.jasper.remote.api.RemoteFolder, WindowHandle> remoteOpener;
     private final Map<UUID, PendingSession> attachedPanes = new java.util.HashMap<>();
     public static final String SFTP="dev.jasper.remote.sftp", SFTP_TOGGLE=dev.jasper.remote.ui.sftp.SftpUi.TOGGLE;
     private final Function<PluginContext, Optional<AgentClient>> agentFactory;
@@ -177,6 +178,8 @@ public class RemotePlugin implements Plugin {
             paneId->context.terminals().pane(paneId).flatMap(this::sftpPane).map(target->new dev.jasper.remote.chooser.RemoteHosts.Located(target.identity(),target.directory())),
             connections::resolveIdentity,(identity,window)->endpoints.open(Optional.of(identity),window,status->{}),()->context.terminals().activeWindow());
         context.fileSources().register(remoteHosts);
+        remoteOpener = (file, window) -> context.notifications().group().error("Could not open a remote file",
+            "Install the Editor plugin to open " + file.path() + ".");
         try {
             var editor=context.services().find(dev.jasper.editor.api.Editor.class);
             if(editor.isPresent()) {
@@ -184,11 +187,17 @@ public class RemotePlugin implements Plugin {
                 var editing=new dev.jasper.remote.edit.RemoteEditing(editor.orElseThrow(),editChannels,()->context.terminals().activeWindow(),context.notifications().group(),
                     id->store.hosts().stream().filter(host->host.id().equals(id)).findFirst());
                 sftpUi.editing(editing);
+                remoteOpener = (file, window) -> remoteIdentity(file.hostId()).ifPresentOrElse(
+                    identity -> editing.open(identity, file.path(), window),
+                    () -> context.notifications().group().error("Could not open a remote file", file.hostName() + " is no longer saved."));
                 try { reopener=editing.registerReopener(); } catch(NoSuchMethodError older) { /* an Editor before 0.4 keeps no recent files */ }
                 try { locations=editing.registerLocations(dev.jasper.remote.chooser.RemoteHosts.ID,root->remoteHosts.identity(root).or(()->configuredIdentity(root))); }
                 catch(NoSuchMethodError older) { /* an Editor before 0.6 opens only local files from its chooser */ }
             }
         } catch(NoClassDefFoundError absent) { /* the Editor is not installed: files in the SFTP panel do not open */ }
+        context.services().publish(dev.jasper.remote.api.RemoteProjects.class, new dev.jasper.remote.projects.ProjectsService(connections,
+            store::host, this::paneFolder, (file, window) -> remoteOpener.accept(file, window),
+            (folder, window) -> store.host(folder.hostId()).ifPresent(saved -> openHostIn(window, saved, folder.path())), context.background()));
         follower=new dev.jasper.remote.ui.sftp.DirectoryFollower(ui,schedule,id->sftpUi.following(id)||context.terminals().activePane().map(pane->pane.id().equals(id)).orElse(false),this::probedDirectory,sftpUi::notice);
         sftpUi.onFollowRequested(follower::request);
         context.actions().register(ActionSpec.of(SFTP,"Open SFTP here").withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp","files","browse","remote"))
@@ -279,6 +288,18 @@ public class RemotePlugin implements Plugin {
     private Optional<dev.jasper.remote.client.ConnectionIdentity> configuredIdentity(String root) {
         try { return Optional.of(connections.identity(UUID.fromString(root))); }
         catch (RuntimeException unknown) { return Optional.empty(); }
+    }
+    /** The identity last used for a host, else its configured route; empty when it is no longer saved. */
+    private Optional<dev.jasper.remote.client.ConnectionIdentity> remoteIdentity(UUID hostId) {
+        String root = hostId.toString();
+        return remoteHosts.identity(root).or(() -> configuredIdentity(root));
+    }
+
+    /** Where an SSH pane Remote opened is, for {@code RemoteProjects.locate}; empty until its folder is known. */
+    private Optional<dev.jasper.remote.api.RemoteFolder> paneFolder(UUID paneId) {
+        return context.terminals().pane(paneId).flatMap(this::sftpPane).filter(target -> target.directory().startsWith("/"))
+            .flatMap(target -> store.host(target.identity().host().id())
+                .map(saved -> new dev.jasper.remote.api.RemoteFolder(saved.id(), saved.name(), target.directory())));
     }
     private void sftpFocused(UUID id) {
         context.terminals().pane(id).ifPresent(pane->sftpPane(pane).ifPresent(target->sftpUi.pane(pane.tab().window(),target)));
