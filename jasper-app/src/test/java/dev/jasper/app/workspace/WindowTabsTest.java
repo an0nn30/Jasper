@@ -67,7 +67,7 @@ class WindowTabsTest {
             var strip = owner.windowTabs(); layout(strip, 800, 38);
             var first = (AbstractButton) named(strip, "select:first");
             var second = (AbstractButton) named(strip, "select:second");
-            assertThat(first.getIcon()).as("inactive tabs are plain labels").isNull();
+            assertThat(first.getIcon()).as("inactive tabs retain their identifying icons").isNotNull();
             assertThat(second.getIcon()).isNotNull();
             assertThat(second.getIcon().getIconWidth()).isEqualTo(16);
             assertThat(first.getHorizontalAlignment()).isEqualTo(SwingConstants.LEADING);
@@ -89,6 +89,24 @@ class WindowTabsTest {
         });
     }
 
+    @Test void hostedTabsKeepAnIconWhenPluginArtworkIsAbsentOrCleared() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var terminal = owner.currentTab();
+            var model = new dev.jasper.app.contributions.Contributions(); owner.connectContributions(model);
+            var document = model.content().open("preview.editor", "file", "config.yml", owner.id(), new JPanel());
+            var button = (AbstractButton) named(owner.windowTabs(), "select:config.yml");
+            assertThat(button.getIcon()).as("new documents start with a generic icon").isNotNull();
+            var custom = new ImageIcon(new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB));
+            document.presentation("config.yml", "", custom, false, "config.yml", "");
+            assertThat(button.getIcon()).as("plugin artwork takes precedence").isSameAs(custom);
+            document.presentation("config.yml", "", null, false, "config.yml", "");
+            owner.selectTab(terminal);
+            assertThat(button.getIcon()).as("clearing artwork retains an icon on inactive tabs").isNotNull();
+            assertThat(button.getIcon()).isNotSameAs(custom);
+        });
+    }
+
     @Test void tooltipsCarryTheTitleAndTheLiveSelectShortcut() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()), true);
@@ -103,87 +121,78 @@ class WindowTabsTest {
         });
     }
 
-    @Test void selectedFolderJoinsTheWorkspaceWithConcaveShouldersAndNoOutline() throws Exception {
+    @Test void flatStripSharesItsSurfaceAndSeparatesContentWithAnUnderline() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
-            for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                owner.selectTheme(theme);
-                var strip = owner.windowTabs(); layout(strip, 800, 30);
-                Container selected = named(strip, "select:second").getParent();
-                int x = selected.getX(), right = x + selected.getWidth(), middle = x + selected.getWidth() / 2;
-                Color surface = owner.theme().palette().background();
-                Color recessed = pixel(strip, 650, 15);
-                assertThat(recessed).as("a recessed strip separates inactive titles from the workspace").isNotEqualTo(surface);
-                assertThat(pixel(strip, middle, 5)).as("top body has workspace fill, with no accent outline").isEqualTo(surface);
-                assertThat(pixel(strip, middle, 29)).as("folder bottom joins the terminal without a gap").isEqualTo(surface);
-                assertThat(pixel(strip, x - 5, 29)).as("left shoulder spreads outward at the bottom").isEqualTo(surface);
-                assertThat(pixel(strip, right + 4, 29)).as("right shoulder spreads outward at the bottom").isEqualTo(surface);
-                assertThat(pixel(strip, x - 5, 20)).as("left shoulder is concave above the bottom").isEqualTo(recessed);
-                assertThat(pixel(strip, right + 4, 20)).as("right shoulder is concave above the bottom").isEqualTo(recessed);
-                assertThat(pixel(strip, x, 0)).as("soft top corner exposes the recess").isEqualTo(recessed);
-                owner.setActive(false);
-                assertThat(pixel(strip, middle, 5)).as("window activation adds no outline").isEqualTo(surface);
-                owner.setActive(true);
-            }
-        });
-    }
-
-    @Test void hiddenRailsSquareOnlyTheFolderCornerAtTheWorkspaceEdge() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            var contributions = new dev.jasper.app.contributions.Contributions();
-            owner.connectContributions(contributions);
-            contributions.addPanel("test.panel", "Panel", new ImageIcon(), dev.jasper.app.dock.Slot.LEFT_TOP,
-                site -> new JLabel("panel"));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 80, 100, 130));
-            owner.currentTab().rename("first");
-            var first = owner.currentTab();
-            owner.newTab(HOME); owner.currentTab().rename("second");
-            var strip = owner.windowTabs();
-            for (boolean zen : new boolean[]{false, true}) {
-                owner.selectTab(first); owner.update(); layout(strip, 800, 30);
-                assertThat(owner.leftStripe().isVisible()).isTrue();
-                assertThat(pixel(strip, 0, 0)).isEqualTo(strip.getBackground());
-                if (zen) owner.toggleZenMode(); else owner.setRailVisible(false);
-                layout(strip, 800, 30);
-                assertThat(owner.leftStripe().isVisible()).isFalse();
-                assertThat(pixel(strip, 0, 0)).as("hidden rails join the folder to the workspace edge, Zen=%s", zen)
-                    .isEqualTo(owner.workspaceSurface());
-                var entry = named(strip, "select:first").getParent();
-                assertThat(pixel(strip, entry.getWidth() - 1, 0)).as("the inner right corner stays rounded")
-                    .isEqualTo(strip.getBackground());
-                owner.selectTab(owner.terminalTabs().get(1)); owner.update(); layout(strip, 800, 30);
-                var second = named(strip, "select:second").getParent();
-                assertThat(pixel(strip, second.getX(), 0)).as("interior tabs retain their rounded left corner")
-                    .isEqualTo(strip.getBackground());
-                owner.selectTab(first);
-                if (zen) owner.toggleZenMode(); else owner.setRailVisible(true);
-                layout(strip, 800, 30);
-                assertThat(owner.leftStripe().isVisible()).isTrue();
-                assertThat(pixel(strip, 0, 0)).as("showing rails restores the rounded outer corner")
-                    .isEqualTo(strip.getBackground());
-            }
-        });
-    }
-
-    @Test void activeFolderHasAThinPillInTheWorkspaceAccent() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
             owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
             for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                 owner.selectTheme(theme);
                 var strip = owner.windowTabs(); layout(strip, 800, 30);
                 var selected = named(strip, "select:second").getParent();
-                int middle = selected.getX() + selected.getWidth() / 2;
+                int x = selected.getX(), right = x + selected.getWidth();
+                Color surface = owner.theme().palette().background();
                 Color accent = owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.ACCENT);
-                assertThat(pixel(strip, middle, 28)).as("active indicator uses the current workspace accent").isEqualTo(accent);
-                assertThat(pixel(strip, middle, 26)).as("indicator remains only two pixels tall").isEqualTo(owner.workspaceSurface());
-                assertThat(pixel(strip, middle, 29)).as("the folder still joins the terminal below the indicator").isEqualTo(owner.workspaceSurface());
-                assertThat(pixel(strip, 40, 28)).as("inactive tabs have no accent indicator").isEqualTo(strip.getBackground());
+                Color divider = owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.BORDER);
+                for (int at : new int[]{0, x, x + 40, right, 650})
+                    assertThat(pixel(strip, at, 4)).as("one flat surface across every tab").isEqualTo(surface);
+                for (int at : new int[]{x + 4, x + 40, right - 4}) {
+                    assertThat(pixel(strip, at, 28)).as("underline spans the selected tab").isEqualTo(accent);
+                    assertThat(pixel(strip, at, 29)).as("underline meets the content edge").isEqualTo(accent);
+                    assertThat(pixel(strip, at, 26)).as("underline stays thin").isEqualTo(surface);
+                }
+                assertThat(pixel(strip, x - 4, 29)).as("no folder shoulders beside the underline").isEqualTo(divider);
+                assertThat(pixel(strip, right + 4, 29)).isEqualTo(divider);
+                assertThat(pixel(strip, 790, 29)).as("divider continues beneath the fixed controls").isEqualTo(divider);
             }
         });
+    }
+
+    @Test void liveDotAppearsOnlyAfterLaunchAndDisappearsWhenTheSessionExits() throws Exception {
+        var pending = new ArrayDeque<Runnable>();
+        WindowContent[] owners = new WindowContent[1];
+        edt(() -> {
+            var owner = content(launcher(pending)); owners[0] = owner;
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 80, 100, 130));
+            owner.currentTab().rename("zsh"); owner.update(); layout(owner.windowTabs(), 800, 30);
+            assertThat(successPixels(owner)).as("pending launch is not a live session").isZero();
+        });
+        while (!pending.isEmpty()) pending.remove().run();
+        until(() -> owners[0].currentPane().running());
+        edt(() -> {
+            var owner = owners[0]; layout(owner.windowTabs(), 800, 30);
+            assertThat(successPixels(owner)).as("running session shows a green dot").isGreaterThan(4);
+            assertThat(named(owner.windowTabs(), "select:zsh").getAccessibleContext().getAccessibleDescription())
+                .isEqualTo("Session running");
+            var terminal = owner.currentTab();
+            var model = new dev.jasper.app.contributions.Contributions(); owner.connectContributions(model);
+            var document = model.content().open("preview.editor", "config", "config.yml", owner.id(), new JPanel());
+            document.presentation("config.yml", "", dev.jasper.app.platform.AppIcons.named("FILE"), false, "config.yml", "");
+            layout(owner.windowTabs(), 800, 30);
+            assertThat(successPixels(owner, "config.yml")).as("document tabs have no session status").isZero();
+            assertThat(successPixels(owner)).as("an inactive running terminal retains its status").isGreaterThan(4);
+            owner.selectTab(terminal);
+            terminal.rename("very long terminal title ".repeat(20)); layout(owner.windowTabs(), 800, 30);
+            assertThat(successPixels(owner, terminal.title())).as("truncated titles leave room for the dot").isGreaterThan(4);
+            terminal.rename("zsh"); layout(owner.windowTabs(), 800, 30);
+            owner.currentPane().write(new byte[]{'\n'});
+        });
+        until(() -> !owners[0].currentPane().running());
+        until(() -> successPixels(owners[0]) == 0);
+    }
+
+    private static int successPixels(WindowContent owner) { return successPixels(owner, "zsh"); }
+
+    private static int successPixels(WindowContent owner, String title) {
+        var label = named(owner.windowTabs(), "select:" + title);
+        var image = new BufferedImage(label.getWidth(), label.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { label.paint(graphics); } finally { graphics.dispose(); }
+        int success = owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.SUCCESS).getRGB();
+        int count = 0;
+        for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++)
+            if (image.getRGB(x, y) == success) count++;
+        return count;
     }
 
     @Test void newTabAtTheFarRightOpensAndSelectsATabAndStopsAfterClosure() throws Exception {
@@ -208,7 +217,7 @@ class WindowTabsTest {
         });
     }
 
-    @Test void foldersRemainFlushAndControlsFitAtTheMinimumConfiguredHeight() throws Exception {
+    @Test void underlineAndControlsFitAtTheMinimumConfiguredHeight() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
@@ -219,8 +228,8 @@ class WindowTabsTest {
                 var label = named(strip, "select:second");
                 var close = named(strip, "close:second");
                 int middle = label.getParent().getX() + label.getParent().getWidth() / 2;
-                assertThat(pixel(strip, middle, height - 1)).as("no seam at height %s", height)
-                    .isEqualTo(owner.theme().palette().background());
+                assertThat(pixel(strip, middle, height - 1)).as("underline meets content at height %s", height)
+                    .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.ACCENT));
                 assertThat(close.getHeight()).isGreaterThanOrEqualTo(16);
                 assertThat(label.getY() + label.getHeight()).isEqualTo(height);
                 assertThat(close.getY() + close.getHeight()).isEqualTo(height);
@@ -249,7 +258,7 @@ class WindowTabsTest {
         });
     }
 
-    @Test void recessedStripKeepsReadableTitlesWhateverTheUiTheme() throws Exception {
+    @Test void flatStripKeepsReadableTitlesWhateverTheUiTheme() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
@@ -259,7 +268,7 @@ class WindowTabsTest {
                 for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
                     owner.selectTerminalColors(colors);
                     var strip = owner.windowTabs(); layout(strip, 800, 38);
-                    assertThat(strip.getBackground()).as("%s UI, %s terminal", chrome, colors).isNotEqualTo(owner.theme().palette().background());
+                    assertThat(strip.getBackground()).as("%s UI, %s terminal", chrome, colors).isEqualTo(owner.theme().palette().background());
                     for (boolean active : new boolean[]{true, false}) {
                         owner.setActive(active);
                         Color text = named(strip, "select:other").getForeground();
@@ -457,7 +466,7 @@ class WindowTabsTest {
                 wheel(first, 0.5); layout(strip, 380, 38);
                 var viewport = first.getParent().getParent();
                 Color surface = strip.getBackground();
-                assertThat(pixel(viewport, 0, 6)).as("left edge fades into the recessed strip").isEqualTo(surface);
+                assertThat(pixel(viewport, 0, 6)).as("left edge fades into the tab surface").isEqualTo(surface);
                 assertThat(pixel(viewport, 24, 6)).as("selection beyond the fade is unchanged")
                     .isEqualTo(owner.theme().palette().background());
                 var output = java.nio.file.Path.of("build/render-preview");
@@ -561,7 +570,7 @@ class WindowTabsTest {
     }
     private static Color pixel(Container entry, int x, int y) { return new Color(render(entry).getRGB(x, y)); }
     private static BufferedImage render(Container entry) {
-        // Folder shoulders are painted by the strip across entry boundaries; crop the real whole strip.
+        // Background and underline are painted by the strip; crop the real whole strip.
         var ancestor = SwingUtilities.getAncestorOfClass(WindowTabs.class, entry);
         if (ancestor instanceof WindowTabs strip) {
             Point at = SwingUtilities.convertPoint(entry, 0, 0, strip);

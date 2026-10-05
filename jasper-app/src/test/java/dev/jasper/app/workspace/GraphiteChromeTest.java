@@ -156,8 +156,8 @@ class GraphiteChromeTest {
                     var corner = javax.swing.SwingUtilities.convertPoint(strip, 0, 0, root);
                     assertThat(image.getRGB(corner.x, corner.y)).as("rounded tab-strip shoulder").isEqualTo(chrome);
                     var quiet = javax.swing.SwingUtilities.convertPoint(strip, strip.getWidth() - 50, strip.getHeight() - 1, root);
-                    assertThat(image.getRGB(quiet.x, quiet.y)).as("the recessed strip has no baseline rule")
-                        .isEqualTo(strip.getBackground().getRGB());
+                    assertThat(image.getRGB(quiet.x, quiet.y)).as("the flat strip has a subtle baseline separator")
+                        .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.BORDER).getRGB());
                     var output = java.nio.file.Path.of("build/render-preview"); java.nio.file.Files.createDirectories(output);
                     javax.imageio.ImageIO.write(image, "png", output.resolve("fluid-workspace-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
                 }
