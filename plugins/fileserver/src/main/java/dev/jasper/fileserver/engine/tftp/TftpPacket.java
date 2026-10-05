@@ -93,13 +93,6 @@ sealed interface TftpPacket {
         };
     }
 
-    /**
-     * Whether the first {@code length} bytes of {@code buffer} carry the ERROR opcode, read from the raw bytes so a
-     * malformed error counts too. An error is never answered (RFC 1350): answering one lets a single forged packet
-     * start an endless exchange between two servers (CVE-2024-2169).
-     */
-    static boolean isError(byte[] buffer, int length) { return length >= 2 && buffer[0] == 0 && buffer[1] == ERROR; }
-
     private static int u16(byte[] buffer, int at) { return ((buffer[at] & 0xFF) << 8) | (buffer[at + 1] & 0xFF); }
 
     /** The NUL-terminated strings from {@code from} to {@code length}; the last must be terminated. */

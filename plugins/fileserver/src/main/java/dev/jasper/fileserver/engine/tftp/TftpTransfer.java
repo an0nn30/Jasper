@@ -30,10 +30,11 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * One TFTP read or write, on its own socket. Every packet is resent after the timeout, up to the retry count, and a
- * packet from anyone but the client gets error 5, unless it is itself an error, which is never answered. A duplicate
- * acknowledgement is ignored, never answered with a resend. Refusals are error packets with fixed texts, never host
- * paths.
+ * One TFTP read or write, on its own socket. Every packet is resent after the timeout, up to the retry count. A
+ * well-formed DATA, ACK or OACK from anyone but the client gets error 5; anything else from a stranger (an ERROR, a
+ * request, or a datagram that does not parse) gets no reply, because it may be another service's reply (CVE-2024-2169).
+ * A duplicate acknowledgement is ignored, never answered with a resend. Refusals are error packets with fixed texts,
+ * never host paths.
  */
 final class TftpTransfer {
     static final TftpPacket.Error BUSY = new TftpPacket.Error(0, "Server busy");
@@ -243,7 +244,10 @@ final class TftpTransfer {
         return false;
     }
 
-    /** The client's next packet before the deadline, or null; anyone else gets error 5, and malformed packets are dropped. */
+    /**
+     * The client's next packet before the deadline, or null; malformed packets are dropped. A stranger's DATA, ACK or
+     * OACK gets error 5, and anything else from a stranger is dropped.
+     */
     TftpPacket receive(long deadline) throws IOException {
         while (true) {
             long left = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
@@ -253,11 +257,21 @@ final class TftpTransfer {
             try { socket.receive(packet); }
             catch (SocketTimeoutException timedOut) { return null; }
             if (!client.equals(packet.getSocketAddress())) {
-                if (!TftpPacket.isError(packet.getData(), packet.getLength())) reply(packet.getSocketAddress(), UNKNOWN_ID);
+                if (isTransferPacket(packet)) reply(packet.getSocketAddress(), UNKNOWN_ID);
                 continue;
             }
             try { return TftpPacket.parse(packet.getData(), packet.getLength()); }
             catch (IllegalArgumentException malformed) { /* dropped; a resend may follow */ }
+        }
+    }
+
+    /** Whether a datagram parses as DATA, ACK or OACK: the only packets a stranger is told "Unknown transfer ID" about. */
+    private static boolean isTransferPacket(DatagramPacket packet) {
+        try {
+            TftpPacket parsed = TftpPacket.parse(packet.getData(), packet.getLength());
+            return parsed instanceof TftpPacket.Data || parsed instanceof TftpPacket.Ack || parsed instanceof TftpPacket.OptionAck;
+        } catch (IllegalArgumentException notTftp) {
+            return false;
         }
     }
 

@@ -27,8 +27,13 @@ import java.util.function.Supplier;
 /**
  * A TFTP server for one share, on the JDK: the server's port takes requests, and each transfer runs on its own
  * ephemeral socket. At most 16 run at once; another request gets error 0 "Server busy". A lost packet is resent after
- * one second, up to five times. TFTP has no login: anyone who can reach the port can use it. An error packet is never
- * answered, so a forged one cannot start an endless exchange (CVE-2024-2169).
+ * one second, up to five times. TFTP has no login: anyone who can reach the port can use it.
+ *
+ * <p>The server port answers only what parses as TFTP: a request is served, and a well-formed DATA, ACK or OACK gets
+ * error 4. An ERROR packet, and anything that does not parse (an unknown opcode, a malformed request, a datagram larger
+ * than the largest packet), gets no reply at all, because it may be another service's reply. A forged datagram
+ * therefore cannot start an endless exchange with another TFTP server, or with a chargen- or echo-style service
+ * (Loop DoS, CVE-2024-2169).
  */
 public final class TftpEngine implements ServerEngine {
     static final Duration TIMEOUT = Duration.ofSeconds(1);
@@ -79,11 +84,11 @@ public final class TftpEngine implements ServerEngine {
     }
 
     /**
-     * Takes requests until the socket closes; each gets a slot and its own socket, or an error packet. An error packet
-     * gets nothing, even a malformed one.
+     * Takes requests until the socket closes; each gets a slot and its own socket, or an error packet. A stray DATA, ACK
+     * or OACK gets error 4; an ERROR packet and anything unparseable or oversized get nothing.
      */
     private void listen(DatagramSocket server, Semaphore slots, ExecutorService pool) {
-        byte[] buffer = new byte[TftpPacket.MAX_PACKET];
+        byte[] buffer = new byte[TftpPacket.MAX_PACKET + 1]; // one byte more, so an oversized datagram is seen, not truncated
         while (running) {
             var received = new DatagramPacket(buffer, buffer.length);
             try { server.receive(received); }
@@ -93,11 +98,12 @@ public final class TftpEngine implements ServerEngine {
                 catch (InterruptedException interrupted) { return; }
                 continue;
             }
-            if (TftpPacket.isError(received.getData(), received.getLength())) continue;
+            if (received.getLength() > TftpPacket.MAX_PACKET) continue; // oversized: not TFTP
             var client = (InetSocketAddress) received.getSocketAddress();
             TftpPacket packet;
             try { packet = TftpPacket.parse(received.getData(), received.getLength()); }
-            catch (IllegalArgumentException malformed) { reply(server, client, TftpTransfer.ILLEGAL); continue; }
+            catch (IllegalArgumentException notTftp) { continue; } // never answered: it may be another service's reply
+            if (packet instanceof TftpPacket.Error) continue; // never answered (RFC 1350)
             if (!(packet instanceof TftpPacket.Request request)) { reply(server, client, TftpTransfer.ILLEGAL); continue; }
             if (!slots.tryAcquire()) { reply(server, client, TftpTransfer.BUSY); continue; }
             try { pool.execute(() -> serve(client, request, slots)); }

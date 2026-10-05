@@ -258,6 +258,56 @@ class TftpReadTest {
         }
     }
 
+    /** Datagrams that are not TFTP, or not well-formed TFTP: another service's reply must never be answered (CVE-2024-2169). */
+    static final List<byte[]> GARBAGE = List.of(
+        "abc".getBytes(StandardCharsets.US_ASCII),
+        new byte[]{0, 9, 0, 1, 'x', 0},
+        "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ\r\n".getBytes(StandardCharsets.US_ASCII),
+        new byte[]{0, 1, 'a', '.', 't', 'x', 't'},
+        new byte[]{0, 2, 'x', 0},
+        new byte[]{0, 3, 0});
+
+    static void sendRaw(RawClient client, int to, byte[] bytes) throws IOException {
+        client.socket.send(new DatagramPacket(bytes, bytes.length, InetAddress.getLoopbackAddress(), to));
+    }
+
+    @Test void unparseableDatagramsOnTheServerPortGetNoReply() throws Exception {
+        start();
+        try (var client = new RawClient()) {
+            for (byte[] stray : GARBAGE) {
+                sendRaw(client, port, stray);
+                assertThat(client.receive(QUIET)).as("no reply to %s", java.util.Arrays.toString(stray)).isEmpty();
+            }
+            client.send(port, new TftpPacket.Data(1, new byte[]{1}));
+            assertThat(client.next()).as("a stray DATA still gets error 4").isEqualTo(new RawClient.Reply(port, TftpTransfer.ILLEGAL));
+            client.send(port, new TftpPacket.OptionAck(Map.of("blksize", "512")));
+            assertThat(client.next()).as("a stray OACK still gets error 4").isEqualTo(new RawClient.Reply(port, TftpTransfer.ILLEGAL));
+            client.send(port, RawClient.read("docs/a.txt", "octet"));
+            assertThat(client.next().packet()).as("requests are still served").isInstanceOf(TftpPacket.Data.class);
+        }
+    }
+
+    @Test void aStrangersGarbageOnATransferPortIsNotAnswered() throws Exception {
+        engine(Duration.ofSeconds(2), 5, 16).start();
+        try (var holder = new RawClient(); var stranger = new RawClient()) {
+            holder.send(port, RawClient.read("docs/a.txt", "octet"));
+            var held = holder.next();
+            for (byte[] stray : GARBAGE) {
+                sendRaw(stranger, held.port(), stray);
+                assertThat(stranger.receive(QUIET)).as("no reply to %s", java.util.Arrays.toString(stray)).isEmpty();
+            }
+            stranger.send(held.port(), RawClient.read("docs/a.txt", "octet"));
+            assertThat(stranger.receive(QUIET)).as("a request is not a transfer packet").isEmpty();
+            stranger.send(held.port(), new TftpPacket.OptionAck(Map.of("blksize", "512")));
+            assertThat(stranger.next()).isEqualTo(new RawClient.Reply(held.port(), TftpTransfer.UNKNOWN_ID));
+            stranger.send(held.port(), new TftpPacket.Data(1, new byte[]{1}));
+            assertThat(stranger.next()).isEqualTo(new RawClient.Reply(held.port(), TftpTransfer.UNKNOWN_ID));
+            holder.send(held.port(), new TftpPacket.Ack(1));
+            await(() -> transferred().size() == 1, "the held transfer ends");
+            assertThat(transferred().getFirst().complete()).as("the transfer carries on").isTrue();
+        }
+    }
+
     @Test void aStrangersErrorOnATransferPortIsNotAnswered() throws Exception {
         engine(Duration.ofSeconds(2), 5, 16).start();
         try (var holder = new RawClient(); var stranger = new RawClient()) {
