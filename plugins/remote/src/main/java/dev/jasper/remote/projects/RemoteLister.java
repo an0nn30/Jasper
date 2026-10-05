@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
+import org.apache.sshd.sftp.common.SftpConstants;
+import org.apache.sshd.sftp.common.SftpException;
 
 /** Lists a remote project: Git, else {@code find}, else an SFTP walk. Blocking: call it off the UI thread. */
 final class RemoteLister {
@@ -61,7 +63,10 @@ final class RemoteLister {
         try (var endpoint = new SftpEndpoint(lease, remaining(deadline))) {
             String start;
             try { start = endpoint.resolveDirectory(root); }
-            catch (IOException missing) { throw new NoSuchFileException(root); }
+            catch (SftpException failure) {
+                if (missing(failure)) throw new NoSuchFileException(root);
+                throw failure;
+            }
             var files = new ArrayList<String>();
             var pending = new ArrayDeque<String>();
             pending.add("");
@@ -88,6 +93,11 @@ final class RemoteLister {
             }
             return listing(files, RemoteListing.Strategy.SFTP, truncated);
         }
+    }
+
+    /** Whether SFTP said the path does not exist; any other failure (a dropped session, no permission) is not that. */
+    private static boolean missing(SftpException failure) {
+        return failure.getStatus() == SftpConstants.SSH_FX_NO_SUCH_FILE || failure.getStatus() == SftpConstants.SSH_FX_NO_SUCH_PATH;
     }
 
     private static RemoteListing listing(List<String> files, RemoteListing.Strategy strategy, boolean truncated) {

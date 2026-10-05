@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CancellationException;
@@ -80,6 +81,26 @@ class RemoteListerTest {
             assertThat(walked.strategy()).isEqualTo(RemoteListing.Strategy.SFTP);
             assertThat(walked.files()).hasSize(1);
             assertThat(walked.truncated()).isTrue();
+        }
+    }
+
+    @Test void aWalkWhoseRootCannotBeReachedFailsWithoutCallingItMissing() throws Exception {
+        posix();
+        assumeTrue(!"root".equals(System.getProperty("user.name")));
+        try (var fixture = new ProjectsFixture(dir)) {
+            Path locked = Files.createDirectories(fixture.home.resolve("locked"));
+            Path root = Files.createDirectories(locked.resolve("app"));
+            Files.writeString(root.resolve("a.txt"), "");
+            fixture.server.server.setCommandFactory((channel, command) -> new RealExec("exit 4", fixture.home));
+            Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("---------"));
+            try {
+                assertThatThrownBy(() -> RemoteLister.list(fixture.lease(), root.toString(), OPTIONS))
+                    .isInstanceOf(IOException.class).isNotInstanceOf(NoSuchFileException.class);
+            } finally {
+                Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rwx------"));
+            }
+            assertThatThrownBy(() -> RemoteLister.list(fixture.lease(), fixture.home.resolve("gone").toString(), OPTIONS))
+                .as("a root that does not exist is still missing").isInstanceOf(NoSuchFileException.class);
         }
     }
 
