@@ -132,6 +132,7 @@ class GraphiteChromeTest {
         for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
             try (var owner = content(launcher(new ArrayDeque<>()))) {
                 owner.selectTheme(theme);
+                owner.newTab(HOME);
                 var root = new javax.swing.JRootPane();
                 try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                     var panel = new javax.swing.JPanel(new java.awt.BorderLayout(0, 12));

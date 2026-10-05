@@ -1,5 +1,7 @@
 # Jasper — Phase 1: The Terminal — Design Spec
 
+> Approved tab redesign, 2026-10-05: [Alacritty-style workspace tabs](../../design/alacritty-tabs.md) supersede previous tab layout and motion: equal-width centered cells, hidden single-tab bar and recorded open/close timing.
+
 > Final tab polish, 2026-10-04: after native testing the user selected permanent 80/100/130 ms open/close/switch timings and requested a slim theme-accent pill below the active tab. The [folder-tab design](../../design/folder-tabs.md) records the indicator geometry and retirement of temporary duration settings; the global animation toggle remains.
 
 > Folder-motion amendment, 2026-10-04: the user approved [opening, closing and selection transitions](../../design/folder-tabs.md#tab-motion-and-shared-animation-setting), with immediate content/focus changes and a saved, live app-wide Appearance → Animations switch. Temporary duration controls support native tuning before permanent values are chosen. This extends the current folder strip; historical underline animation is not reinstated.

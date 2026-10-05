@@ -11,7 +11,7 @@ package dev.jasper.app.config;
  */
 public record AnimationSettings(boolean enabled, int tabOpenMillis, int tabCloseMillis, int tabSwitchMillis) {
     /** User-approved tab motion durations in milliseconds. */
-    public static final int DEFAULT_OPEN_MILLIS = 80, DEFAULT_CLOSE_MILLIS = 100, DEFAULT_SWITCH_MILLIS = 130;
+    public static final int DEFAULT_OPEN_MILLIS = 475, DEFAULT_CLOSE_MILLIS = 425, DEFAULT_SWITCH_MILLIS = 0;
 
     public AnimationSettings {
         if (tabOpenMillis < 0 || tabOpenMillis > 2000 || tabCloseMillis < 0 || tabCloseMillis > 2000
