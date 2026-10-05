@@ -123,6 +123,13 @@ keys (no spinner); `ChoiceKind.SEARCHABLE` is the one type-to-filter dropdown, w
 options are suggestions. The [contracts appendix](superpowers/plans/2026-10-04-theme-engine-contracts.md) states
 the exact semantics.
 
+Browser capabilities (Plan 2 Task 6b-1): table columns share the width by weight, show the host's sort and report
+header clicks as `Sorted`; rows can be muted and carry their own context menu; tree items carry a tooltip, a status
+dot and aligned trailing columns; every row collection has type-ahead, Shift ranges for multiple selection and
+scrolls a host-set selection into view; tables can opt into the OVERLAY scroll policy; and `Breadcrumbs` is the kit
+path control with tail overflow and a typed-path mode. The named glyph vocabulary gains `home`, `desktop` and
+`preview`.
+
 See [maintenance](ui-maintenance.md), [calibration evidence](design/theme-engine/calibration.md),
 [module entry point](../jasper-ui/README.md) and [SDK architecture](sdk-architecture.md).
 

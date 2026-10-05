@@ -29,6 +29,25 @@ class ViewSpecTest {
             List.of(new ListItem("a", Optional.empty(), List.of(text("title")), List.of(), List.of())), Set.of("missing"), "", List.of())))
             .isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void browserDescriptorsValidateWeightsCrumbsMenusAndEditingActions() {
+        assertThatThrownBy(() -> new Column("name", "Name", TextRole.BODY, false, 0, Optional.empty())).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Column("name", "Name", TextRole.BODY, false, Double.NaN, Optional.empty())).isInstanceOf(IllegalArgumentException.class);
+        assertThat(new Column("name", "Name", TextRole.BODY, false).weight()).isEqualTo(1);
+        var pin = new MenuItem("pin", "Pin", "", "pin", true, false);
+        assertThatThrownBy(() -> new TableRow("r", Map.of(), Optional.empty(), false, Optional.of(List.of(pin, pin)))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new TreeItem("t", "T", Optional.empty(), true, List.of(), OptionalInt.empty(), false, "", Optional.empty(), List.of(), Optional.of(List.of(pin, pin))))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThat(new TreeItem("t", "T", Optional.empty(), true, List.of()).trailing()).isEmpty();
+        var crumb = new Crumb("c", "Users", List.of());
+        assertThatThrownBy(() -> new Breadcrumbs("path", ControlState.READY, List.of(crumb, crumb), "Location", false, "", "", "", ""))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Breadcrumbs("path", ControlState.READY, List.of(crumb), "Location", true, "/", "edit", "", "done"))
+            .as("editing needs submit and cancel").isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Crumb("c", " ", List.of())).isInstanceOf(IllegalArgumentException.class);
+        assertThatCode(() -> new ViewSpec(new Breadcrumbs("path", ControlState.READY, List.of(crumb), "Location", true, "/", "edit", "go", "done")))
+            .doesNotThrowAnyException();
+        assertThat(new Table("t", ControlState.READY, List.of(), List.of(), Set.of(), "", List.of()).scroll()).isEqualTo(ScrollPolicy.STANDARD);
+    }
     @Test void optionIdsAreScopedToTheirOwningControls() {
         var options = List.of(new Option("same", "Same", Optional.empty()));
         assertThatCode(() -> new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL, List.of(

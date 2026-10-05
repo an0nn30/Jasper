@@ -30,10 +30,21 @@ final class InteractiveRows {
         JComponent footer;
         final Menus.Popup popup;
         final List<Runnable> popupCleanup = new ArrayList<>();
+        /** The Shift-range origin; the last row chosen without Shift. */
+        String anchor;
+        /** A row the host selected, scrolled into view once the viewport has a size. */
+        String pendingReveal;
+        String typed = "";
+        long typedAt = Long.MIN_VALUE;
 
         RowsControl(KitView view, Nodes.Node node) {
-            super(view, node, new JScrollPane());
+            this(view, node, new JScrollPane());
+        }
+
+        RowsControl(KitView view, Nodes.Node node, JScrollPane pane) {
+            super(view, node, pane);
             scroll = (JScrollPane) component;
+            if (pane instanceof OverlayScrollPane overlay) own(overlay::stop);
             canvas = new Canvas(this);
             scroll.setViewportView(canvas);
             scroll.setBorder(BorderFactory.createEmptyBorder());
@@ -51,6 +62,16 @@ final class InteractiveRows {
                     });
             bind(canvas, "DOWN", () -> move(1));
             bind(canvas, "UP", () -> move(-1));
+            bind(canvas, "shift DOWN", () -> extend(1));
+            bind(canvas, "shift UP", () -> extend(-1));
+            java.awt.event.KeyListener typing = new KeyAdapter() {
+                @Override public void keyTyped(KeyEvent event) {
+                    int menu = InputEvent.CTRL_DOWN_MASK | InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK;
+                    if ((event.getModifiersEx() & menu) == 0) typeAhead(event.getKeyChar(), event.getWhen());
+                }
+            };
+            canvas.addKeyListener(typing);
+            own(() -> canvas.removeKeyListener(typing));
             bind(
                     canvas,
                     "ENTER",
@@ -83,6 +104,16 @@ final class InteractiveRows {
 
         abstract List<MenuItem> contextActions();
 
+        /** The context menu for one item; the control's own menu unless the item declares its own. */
+        List<MenuItem> contextActions(String id) {
+            return contextActions();
+        }
+
+        /** The text type-ahead matches for one item: its first column or title. */
+        String itemText(int index) {
+            return "";
+        }
+
         abstract void populate(Row row, int index);
 
         abstract void data();
@@ -110,6 +141,9 @@ final class InteractiveRows {
             data();
             if (!Objects.equals(declaredSelection, specifiedSelection())
                     || declaredMultiple != multiple()) {
+                // A selection the host made (not the echo of the user's own) is scrolled into view.
+                if (!selected.equals(specifiedSelection()) && !specifiedSelection().isEmpty())
+                    pendingReveal = specifiedSelection().stream().min(Comparator.comparingInt(this::indexOf)).orElse(null);
                 selected.clear();
                 selected.addAll(specifiedSelection());
                 declaredSelection = specifiedSelection();
@@ -151,6 +185,11 @@ final class InteractiveRows {
 
         void sync() {
             if (closed || syncing || rowHeight <= 0) return;
+            if (pendingReveal != null && scroll.getViewport().getExtentSize().height > 0) {
+                int index = indexOf(pendingReveal);
+                pendingReveal = null;
+                if (index >= 0) position(index);
+            }
             syncing = true;
             try {
                 int extent = scroll.getViewport().getExtentSize().height;
@@ -202,6 +241,7 @@ final class InteractiveRows {
             if (!interactive() || indexOf(id) < 0) return;
             focusItem = id;
             focusControl = null;
+            anchor = id;
             if (toggle && multiple()) {
                 if (!selected.remove(id)) selected.add(id);
             } else {
@@ -211,6 +251,45 @@ final class InteractiveRows {
             sync();
             canvas.repaint();
             emit(new UiEvent.Selected(node.id(), selected));
+        }
+
+        /** Shift-click: with multiple selection, every row from the anchor through {@code id}; otherwise a plain select. */
+        void range(String id) {
+            if (!multiple() || anchor == null || indexOf(anchor) < 0) { select(id, false); return; }
+            if (!interactive() || indexOf(id) < 0) return;
+            int from = indexOf(anchor), to = indexOf(id);
+            selected.clear();
+            for (int i = Math.min(from, to); i <= Math.max(from, to); i++) selected.add(itemId(i));
+            focusItem = id;
+            focusControl = null;
+            sync();
+            canvas.repaint();
+            emit(new UiEvent.Selected(node.id(), selected));
+        }
+
+        void extend(int delta) {
+            if (!multiple()) { move(delta); return; }
+            if (size() == 0 || !interactive()) return;
+            int i = Math.max(0, Math.min(size() - 1, (focusItem == null ? -1 : indexOf(focusItem)) + delta));
+            if (anchor == null) anchor = itemId(i);
+            range(itemId(i));
+            ensure(i);
+            canvas.requestFocusInWindow();
+        }
+
+        /** Selects the first item whose text starts with what was typed within the type-ahead window. */
+        void typeAhead(char c, long when) {
+            if (Character.isISOControl(c) || size() == 0 || !interactive()) return;
+            long window = context().metrics().value(DesignMetrics.Role.TYPE_AHEAD_MILLIS);
+            typed = typedAt != Long.MIN_VALUE && when - typedAt <= window ? typed + c : String.valueOf(c);
+            typedAt = when;
+            String prefix = typed.toLowerCase(Locale.ROOT);
+            for (int i = 0; i < size(); i++)
+                if (itemText(i).toLowerCase(Locale.ROOT).startsWith(prefix)) {
+                    select(itemId(i), false);
+                    ensure(i);
+                    return;
+                }
         }
 
         void activate(String id) {
@@ -235,6 +314,11 @@ final class InteractiveRows {
         }
 
         void ensure(int index) {
+            position(index);
+            sync();
+        }
+
+        void position(int index) {
             int y = index * rowHeight,
                     top = scroll.getViewport().getViewPosition().y,
                     h = scroll.getViewport().getExtentSize().height;
@@ -242,7 +326,6 @@ final class InteractiveRows {
                 scroll.getViewport()
                         .setViewPosition(
                                 new Point(0, Math.max(0, y - Math.max(0, h - rowHeight) / 2)));
-            sync();
         }
 
         ControlRegistry.Control inline(String id) {
@@ -250,12 +333,12 @@ final class InteractiveRows {
         }
 
         void context(String id, JComponent invoker, int x, int y) {
-            var actions = contextActions();
+            var actions = contextActions(id);
             if (!interactive()) return;
             if (!selected.contains(id)) select(id, false);
-            if (!stillCurrent(id) || !actions.equals(contextActions())) return;
+            if (!stillCurrent(id) || !actions.equals(contextActions(id))) return;
             clearPopup();
-            for (var item : contextActions()) {
+            for (var item : actions) {
                 if (item.separator()) {
                     popup.add(new Menus.Separator(context()));
                     continue;
@@ -284,7 +367,7 @@ final class InteractiveRows {
                 ActionListener listener =
                         e -> {
                             emit(new UiEvent.Selected(node.id(), selected));
-                            if (stillCurrent(id) && contextActions().contains(item))
+                            if (stillCurrent(id) && contextActions(id).contains(item))
                                 emit(new UiEvent.Action(item.action()));
                         };
                 entry.addActionListener(listener);
@@ -461,6 +544,7 @@ final class InteractiveRows {
                         public void mouseClicked(MouseEvent e) {
                             if (!SwingUtilities.isLeftMouseButton(e)) return;
                             if (e.getClickCount() == 2) owner.activate(id);
+                            else if (e.isShiftDown()) owner.range(id);
                             else owner.select(id, e.isControlDown() || e.isMetaDown());
                             owner.canvas.requestFocusInWindow();
                         }
@@ -469,6 +553,13 @@ final class InteractiveRows {
             leading.addMouseListener(mouse);
             title.addMouseListener(mouse);
             subtitle.addMouseListener(mouse);
+        }
+
+        @Override
+        public JToolTip createToolTip() {
+            var tip = super.createToolTip();
+            tip.putClientProperty("html.disable", true);
+            return tip;
         }
 
         static JPanel part() {
@@ -523,6 +614,7 @@ final class InteractiveRows {
                                 public void mouseClicked(MouseEvent e) {
                                     if (SwingUtilities.isLeftMouseButton(e)) {
                                         if (e.getClickCount() == 2) owner.activate(id);
+                                        else if (e.isShiftDown()) owner.range(id);
                                         else owner.select(id, e.isControlDown() || e.isMetaDown());
                                         owner.canvas.requestFocusInWindow();
                                     }
@@ -610,6 +702,8 @@ final class InteractiveRows {
             controls.clear();
             used.clear();
             cells.clear();
+            setToolTipText(null);
+            getAccessibleContext().setAccessibleDescription(null);
             leading.removeAll();
             title.removeAll();
             subtitle.removeAll();

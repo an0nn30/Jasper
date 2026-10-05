@@ -188,16 +188,18 @@ unique within their owning control; references resolve only in that control. Do 
 | Panel | `Header header, Optional<Node> searchOrNavigation, Node body, Optional<Node> footer` |
 | Form | `FormKind kind, String title, Optional<Node> hero, List<Node> sections, Optional<Node> preview, List<Button> actions, String cancelAction` |
 | Split | `SplitKind kind, List<Node> children` (semantic manager/sidebar/document divisions) |
-| Table | `List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode` |
+| Table | `List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, ScrollPolicy scroll` |
 | Tree | `List<TreeItem> roots, Set<String> expandedIds, Set<String> selectedIds, String activateAction` |
+| Breadcrumbs | `List<Crumb> crumbs, String label, boolean editing, String value, String editAction, String submitAction, String cancelAction` (editing requires submit and cancel) |
 | Custom | `String contentId, CustomKind kind, String accessibleName` |
 
 Support records, each in its own model file: `Option(String id,String label,Optional<Hue> hue)`,
 `MenuItem(String id,String label,String icon,String action,boolean enabled,boolean separator,Nodes.Hue hue)`,
 `ListItem(String id,Optional<Node> leading,List<Node> title,List<Node> subtitle,List<Node> trailing)`,
-`Column(String id,String title,TextRole role,boolean numeric)`,
-`TableRow(String id,Map<String,String> cells,Optional<String> icon)`,
-`TreeItem(String id,String title,Optional<String> icon,boolean leaf,List<TreeItem> children,OptionalInt count,boolean emphasized)`.
+`Column(String id,String title,TextRole role,boolean numeric,double weight,Optional<Boolean> sorted)`,
+`TableRow(String id,Map<String,String> cells,Optional<String> icon,boolean muted,Optional<List<MenuItem>> contextActions)`,
+`TreeItem(String id,String title,Optional<String> icon,boolean leaf,List<TreeItem> children,OptionalInt count,boolean emphasized,String tooltip,Optional<StatusKind> status,List<String> trailing,Optional<List<MenuItem>> contextActions)`,
+`Crumb(String id,String label,List<MenuItem> contextActions)`.
 Nested in `Nodes`: `Numeric(double min,double max,double step,int decimals)` and
 `ChoiceSearch(int pinned,String noMatches,Optional<String> entry)`.
 
@@ -209,7 +211,7 @@ StatusKind is SUCCESS/WARNING/DANGER/IDLE;
 FieldKind is TEXT/SEARCH/PORT/PATH/TEXTAREA/NUMBER; ChoiceKind is DROPDOWN/PICKER/SEGMENTED/SEARCHABLE;
 CardKind is FORM/SETTINGS/MIXED; ListKind is SINGLE/DOUBLE/COMPACT/ORDERED; SelectionMode is SINGLE/MULTIPLE;
 FormKind is HERO/SHEET/FULL/SETTINGS; LayoutRole is VERTICAL/INLINE/ACTIONS/HERO/DETAIL/FOOTER/NAVIGATION;
-SplitKind is SIDEBAR_DETAIL/THREE_COLUMN/DOCUMENT; CustomKind is EDITOR/TERMINAL/CHART/PREVIEW.
+SplitKind is SIDEBAR_DETAIL/THREE_COLUMN/DOCUMENT; CustomKind is EDITOR/TERMINAL/CHART/PREVIEW; ScrollPolicy is STANDARD/OVERLAY.
 Header primary nodes are restricted to Button or MenuButton. MenuButton's `action` is blank for a
 menu-only button; nonblank gives the main side of a split button. Its arrow opens the listed menu
 without firing the main action; item actions dispatch their own ids. StatusDot uses status tokens,
@@ -257,10 +259,36 @@ SDK version unchanged until Task 11). Prior constructors remain and default to t
 - `SettingRow` preferred width gives a trailing control its preferred width despite the half-row cap
   (`max(title + gap + control, 2 * control + gap)`), so a host laying out at preferred width never squashes it.
 
+Plan 2 Task 6b-1 browser additions (file chooser and Keymap; same mirroring and SDK version rule). Prior constructors
+remain and default to the old meaning (weight 1, no sort, not muted, no row menu, no tooltip/status/trailing, STANDARD):
+- `Column.weight` is the column's positive share of the row width (header and cells use the same split);
+  a present `Column.sorted` shows the kit sort indicator (true ascending) and the header's accessible name says so.
+  A left click on any header reports `Sorted(tableId,columnId)`; the host owns the order.
+- `TableRow.muted` paints every cell in `text.placeholder` (the theme's disabled text). A present
+  `TableRow.contextActions`/`TreeItem.contextActions` is that row's context menu, replacing the table's; an empty
+  list means none. Trees gain context menus this way. A menu item reports `Selected` for the row, then `Action`.
+- `TreeItem.tooltip` is the row's literal tooltip (no HTML) and accessible description; `status` adds a status dot
+  after the icon; `trailing` texts are CAPTION columns at the row end, right-aligned, each as wide as its widest
+  value across the tree, before any count.
+- Every row collection (no API): typing selects the first row whose first cell/title starts with the case-insensitive
+  text typed within 1 s (`TYPE_AHEAD_MILLIS`); with MULTIPLE selection Shift-click and Shift+Up/Down select the range
+  from the last row chosen without Shift; a selection the host sets (not the echo of the user's own) is scrolled into
+  view once the viewport has a size. A theme change keeps selection and scroll position.
+- `ScrollPolicy.OVERLAY` (opt-in per table; a policy change remounts the control) draws a transient
+  `text.tertiary` thumb over the rows only while they scroll, taking no width; a held drag stays visible, and the thumb
+  hides after `OVERLAY_SCROLLBAR_IDLE_MILLIS` and when the table leaves the screen.
+- `Breadcrumbs` is a field-shaped path: crumbs are literal, unfocusable GHOST buttons as wide as their labels with
+  `›` separators; when they do not fit the leading crumbs slide out so the last stays visible. A crumb click reports
+  `Selected(id,{crumbId})`; a crumb's menu reports Selected then Action; a click on the free area reports `editAction`.
+  While `editing` it shows a MONO text field holding `value` (selected for replacement when editing starts), reports
+  typing as `Edited`, Enter as `submitAction`, Escape or leaving the field as `cancelAction`; `focus(id)` focuses the
+  field while editing.
+
 `ViewSpec(Node root)` validates the tree and references. `UiEvent` is sealed with nested records
 `Action(String id)`, `Edited(String id,String text)`, `Selected(String id,Set<String> ids)`,
 `Toggled(String id,boolean checked)`, `Expanded(String id,String itemId,boolean expanded)`,
-`Reordered(String id,String itemId,int destination)`, `Removed(String id,String itemId)`, `SecretChanged(String id)`.
+`Reordered(String id,String itemId,int destination)`, `Removed(String id,String itemId)`, `SecretChanged(String id)`,
+`Sorted(String id,String columnId)`.
 Event identifier mapping (approved Task 7 ruling): `Action.id` is the configured action key
 (Button/MenuButton/menu item, Browse, or Choice PICKER opening). Every payload-bearing event
 (`Edited`, `Selected`, `Toggled`, `Expanded`, `Reordered`, `Removed`, `SecretChanged`) identifies its owning

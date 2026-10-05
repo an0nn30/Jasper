@@ -97,6 +97,9 @@ public final class IconRegistry implements AutoCloseable {
     private static Map<String, String> builtIns() {
         return Map.ofEntries(
             Map.entry("bookmark", "M 4 2 H 12 V 14 L 8 11 L 4 14 Z"),
+            Map.entry("home", "M 2 8 L 8 2 L 14 8 M 4 6.5 V 14 H 12 V 6.5 M 7 14 V 10 H 9 V 14"),
+            Map.entry("desktop", "M 2 3 H 14 V 11 H 2 Z M 6 14 H 10 M 8 11 V 14"),
+            Map.entry("preview", "M 1 8 Q 8 1 15 8 Q 8 15 1 8 Z M 10 8 A 2 2 0 1 1 6 8 A 2 2 0 1 1 10 8"),
             Map.entry("logout", "M 6 2 H 2 V 14 H 6 M 6 8 H 14 M 11 5 L 14 8 L 11 11"),
             Map.entry("download", "M 8 2 V 11 M 4 7 L 8 11 L 12 7 M 2 10 V 14 H 14 V 10"),
             Map.entry("help", "M 14 8 A 6 6 0 1 1 2 8 A 6 6 0 1 1 14 8 M 6 5 Q 10 3 10 6 L 8 8 V 9 M 8 12 H 8.1"),

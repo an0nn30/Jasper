@@ -120,4 +120,22 @@ class KitValuesTest {
         assertThatThrownBy(() -> new Numeric(0, 1, 1, -1)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new Numeric(Double.NaN, 1, 1, 0)).isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void browserDescriptorsValidateWeightsCrumbsMenusAndEditingActions() {
+        assertThatThrownBy(() -> new Column("name", "Name", TextRole.BODY, false, 0, Optional.empty())).isInstanceOf(IllegalArgumentException.class);
+        assertThat(new Column("name", "Name", TextRole.BODY, false).weight()).isEqualTo(1);
+        assertThat(new Column("name", "Name", TextRole.BODY, false).sorted()).isEmpty();
+        var pin = new MenuItem("pin", "Pin", "", "pin", true, false);
+        assertThatThrownBy(() -> new TableRow("r", Map.of(), Optional.empty(), false, Optional.of(List.of(pin, pin)))).isInstanceOf(IllegalArgumentException.class);
+        assertThat(new TableRow("r", Map.of(), Optional.empty()).muted()).isFalse();
+        var item = new TreeItem("t", "T", Optional.empty(), true, List.of());
+        assertThat(item.tooltip()).isEmpty(); assertThat(item.trailing()).isEmpty(); assertThat(item.status()).isEmpty(); assertThat(item.contextActions()).isEmpty();
+        var trailing = new java.util.ArrayList<>(List.of("Global"));
+        var copied = new TreeItem("t", "T", Optional.empty(), true, List.of(), OptionalInt.empty(), false, "", Optional.empty(), trailing, Optional.empty());
+        trailing.clear(); assertThat(copied.trailing()).containsExactly("Global");
+        var crumb = new Crumb("c", "Users", List.of());
+        assertThatThrownBy(() -> new Breadcrumbs("path", ControlState.READY, List.of(crumb, crumb), "Location", false, "", "", "", "")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Breadcrumbs("path", ControlState.READY, List.of(crumb), "Location", true, "/", "edit", "go", "")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(new Table("t", ControlState.READY, List.of(), List.of(), Set.of(), "", List.of()).scroll()).isEqualTo(ScrollPolicy.STANDARD);
+        assertThatThrownBy(() -> new UiEvent.Sorted("files", " ")).isInstanceOf(IllegalArgumentException.class);
+    }
 }

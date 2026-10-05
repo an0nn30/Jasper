@@ -1,13 +1,22 @@
 package dev.jasper.sdk.ui;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Map;
 import java.util.Objects;
 
-/** Immutable tablerow descriptor. */
-public record TableRow(String id, Map<String,String> cells, Optional<String> icon) {
+/**
+ * Immutable tablerow descriptor. A {@code muted} row shows every cell in the de-emphasized text color (for example
+ * entries that cannot be chosen); a present {@code contextActions} replaces the table's context menu for this row, and
+ * an empty list means the row has none.
+ */
+public record TableRow(String id, Map<String,String> cells, Optional<String> icon, boolean muted, Optional<List<MenuItem>> contextActions) {
     public TableRow {
         ModelChecks.id(id);
         cells = Map.copyOf(cells); cells.keySet().forEach(ModelChecks::id); Objects.requireNonNull(icon); icon.ifPresent(name -> ModelChecks.label(name, "icon"));
+        Objects.requireNonNull(contextActions); contextActions = contextActions.map(List::copyOf); contextActions.ifPresent(items -> ModelChecks.unique(items, MenuItem::id));
+    }
+    public TableRow(String id, Map<String,String> cells, Optional<String> icon) {
+        this(id, cells, icon, false, Optional.empty());
     }
 }

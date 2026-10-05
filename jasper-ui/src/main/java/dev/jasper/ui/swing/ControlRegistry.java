@@ -17,7 +17,7 @@ final class ControlRegistry {
             case Nodes.Chip ignored -> {} case Nodes.StatusDot ignored -> {} case Nodes.Progress ignored -> {} case Nodes.Strength ignored -> {}
             case Nodes.MenuButton ignored -> {}
             case Nodes.ItemList n -> { for(var item:n.items()) { item.leading().ifPresent(ControlRegistry::validate); item.title().forEach(ControlRegistry::validate); item.subtitle().forEach(ControlRegistry::validate); item.trailing().forEach(ControlRegistry::validate); } n.addAction().ifPresent(ControlRegistry::validate); }
-            case Nodes.Table _, Nodes.Tree _ -> {}
+            case Nodes.Table _, Nodes.Tree _, Nodes.Breadcrumbs _ -> {}
             case Nodes.Panel _, Nodes.Header _, Nodes.Stack _, Nodes.FormRow _, Nodes.SettingRow _, Nodes.Card _, Nodes.Section _, Nodes.Empty _, Nodes.Form _, Nodes.Split _ -> children(node).forEach(ControlRegistry::validate);
         }
     }
@@ -49,6 +49,7 @@ final class ControlRegistry {
             case Nodes.ItemList list -> new ItemLists.ListControl(view,list);
             case Nodes.Table table -> new Tables.TableControl(view,table);
             case Nodes.Tree tree -> new Trees.TreeControl(view,tree);
+            case Nodes.Breadcrumbs crumbs -> new BreadcrumbControls.BreadcrumbsControl(view, crumbs);
         };
     }
     static List<Nodes.Node> children(Nodes.Node node) {
@@ -76,6 +77,7 @@ final class ControlRegistry {
             case Nodes.Secret secret -> secret.kind();
             case Nodes.Button button -> button.kind();
             case Nodes.Choice choice -> choice.kind();
+            case Nodes.Table table -> java.util.List.of(Nodes.Table.class, table.scroll());
             default -> node.getClass();
         };
     }

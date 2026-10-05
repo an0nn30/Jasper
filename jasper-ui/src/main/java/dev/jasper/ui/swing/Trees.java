@@ -15,6 +15,9 @@ final class Trees {
     static final class TreeControl extends InteractiveRows.RowsControl {
         final List<Visible> visible = new ArrayList<>();
         final Set<String> itemIds = new HashSet<>();
+        final Map<String, TreeItem> items = new HashMap<>();
+        /** Each trailing column's width, measured over every item so the columns line up from row to row. */
+        int[] trailingWidths = new int[0];
 
         TreeControl(KitView view, Nodes.Tree node) {
             super(view, node);
@@ -58,10 +61,28 @@ final class Trees {
         }
 
         @Override
+        List<MenuItem> contextActions(String id) {
+            var item = items.get(id);
+            return item == null ? List.of() : item.contextActions().orElse(List.of());
+        }
+
+        @Override
+        String itemText(int i) {
+            return visible.get(i).item().title();
+        }
+
+        @Override
         void data() {
             visible.clear();
             itemIds.clear();
+            items.clear();
             value().roots().forEach(root -> flatten(root, 0, true));
+            var metrics = canvas.getFontMetrics(ThemePainting.font(context(), dev.jasper.ui.metrics.Typography.Role.CAPTION));
+            int columns = items.values().stream().mapToInt(item -> item.trailing().size()).max().orElse(0);
+            trailingWidths = new int[columns];
+            for (var item : items.values())
+                for (int i = 0; i < item.trailing().size(); i++)
+                    trailingWidths[i] = Math.max(trailingWidths[i], metrics.stringWidth(item.trailing().get(i)));
         }
 
         @Override
@@ -71,6 +92,7 @@ final class Trees {
 
         void flatten(TreeItem item, int depth, boolean shown) {
             itemIds.add(item.id());
+            items.put(item.id(), item);
             if (shown) visible.add(new Visible(item, depth));
             boolean childrenShown = shown && value().expandedIds().contains(item.id());
             item.children().forEach(child -> flatten(child, depth + 1, childrenShown));
@@ -113,6 +135,8 @@ final class Trees {
                                                     Nodes.Hue.NONE,
                                                     Nodes.IconSize.CONTROL,
                                                     item.title())));
+            item.status().ifPresent(status -> leading.add(new Nodes.StatusDot(
+                    "@tree/" + node.id() + "/" + item.id() + "/status", ControlState.READY, status)));
             row.slot(row.leading, leading);
             String titleId = "@tree/" + node.id() + "/" + item.id() + "/title";
             row.slot(
@@ -127,16 +151,25 @@ final class Trees {
             if (item.emphasized())
                 row.controls.get(titleId).component.setForeground(ThemePainting.color(context(), dev.jasper.ui.theme.SemanticColor.TEXT_LINK));
             row.slot(row.subtitle, List.of());
-            row.slot(
-                    row.trailing,
-                    item.count().isPresent()
-                            ? List.of(
-                                    new Nodes.Text(
-                                            "@tree/" + node.id() + "/" + item.id() + "/count",
-                                            ControlState.READY,
-                                            Integer.toString(item.count().getAsInt()),
-                                            Nodes.TextRole.COUNT))
-                            : List.of());
+            var trailing = new ArrayList<Nodes.Node>();
+            for (int i = 0; i < item.trailing().size(); i++)
+                trailing.add(new Nodes.Text("@tree/" + node.id() + "/" + item.id() + "/trailing/" + i,
+                        ControlState.READY, item.trailing().get(i), Nodes.TextRole.CAPTION));
+            item.count().ifPresent(count -> trailing.add(new Nodes.Text(
+                    "@tree/" + node.id() + "/" + item.id() + "/count", ControlState.READY, Integer.toString(count), Nodes.TextRole.COUNT)));
+            row.slot(row.trailing, trailing);
+            for (int i = 0; i < item.trailing().size(); i++) {
+                var label = (javax.swing.JLabel) row.controls.get(trailing.get(i).id()).component;
+                label.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
+                label.setPreferredSize(null);
+                int width = i < trailingWidths.length ? trailingWidths[i] : label.getPreferredSize().width;
+                label.setPreferredSize(new java.awt.Dimension(width + label.getInsets().left + label.getInsets().right, label.getPreferredSize().height));
+            }
+            String tooltip = item.tooltip().isBlank() ? null : item.tooltip();
+            row.setToolTipText(tooltip);
+            row.getAccessibleContext().setAccessibleDescription(tooltip);
+            ((javax.swing.JComponent) row.controls.get(titleId).component).setToolTipText(tooltip);
+            for (var part : trailing) ((javax.swing.JComponent) row.controls.get(part.id()).component).setToolTipText(tooltip);
             if (!item.leaf()) {
                 var c = (Buttons.ButtonControl) row.controls.get(leading.getFirst().id());
                 if (c.button.getClientProperty("Jasper.treeCommand") == null) {

@@ -9,7 +9,7 @@ import java.util.Objects;
 /** Immutable, semantic view vocabulary; no pixel dimensions, delegates or secret values. */
 public final class Nodes {
     private Nodes() {}
-    public sealed interface Node permits Text, Icon, Button, MenuButton, StatusDot, Field, Secret, Choice, Toggle, Chip, Progress, Strength, Stack, FormRow, SettingRow, Card, Section, Empty, ItemList, Header, Panel, Form, Split, Table, Tree, Custom {
+    public sealed interface Node permits Text, Icon, Button, MenuButton, StatusDot, Field, Secret, Choice, Toggle, Chip, Progress, Strength, Stack, FormRow, SettingRow, Card, Section, Empty, ItemList, Header, Panel, Form, Split, Table, Tree, Breadcrumbs, Custom {
         String id();
         ControlState state();
     }
@@ -27,6 +27,8 @@ public final class Nodes {
     public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION }
     public enum SplitKind { SIDEBAR_DETAIL, THREE_COLUMN, DOCUMENT }
     public enum CustomKind { EDITOR, TERMINAL, CHART, PREVIEW }
+    /** STANDARD reserves the scroll bar's width; OVERLAY shows a transient thumb over the rows only while scrolling. */
+    public enum ScrollPolicy { STANDARD, OVERLAY }
 
     public record Text(String id, ControlState state, String text, TextRole role) implements Node {
         public Text {
@@ -323,8 +325,8 @@ public final class Nodes {
         }
     }
 
-    /** Column collection with explicit single or checkbox-based multiple selection. */
-    public record Table(String id, ControlState state, List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode) implements Node {
+    /** Column collection with explicit single or checkbox-based multiple selection and an explicit scroll policy. */
+    public record Table(String id, ControlState state, List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, ScrollPolicy scroll) implements Node {
         public Table {
             ModelChecks.id(id); Objects.requireNonNull(state);
             columns = List.copyOf(columns);
@@ -332,11 +334,14 @@ public final class Nodes {
             selectedIds = Set.copyOf(selectedIds);
             Objects.requireNonNull(activateAction);
             contextActions = List.copyOf(contextActions);
-            Objects.requireNonNull(selectionMode);
+            Objects.requireNonNull(selectionMode); Objects.requireNonNull(scroll);
             if (selectionMode == SelectionMode.SINGLE && selectedIds.size() > 1) throw new IllegalArgumentException("Single selection accepts at most one item");
             ModelChecks.unique(columns, Column::id);
             ModelChecks.unique(rows, TableRow::id);
             ModelChecks.unique(contextActions, MenuItem::id);
+        }
+        public Table(String id, ControlState state, List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode) {
+            this(id, state, columns, rows, selectedIds, activateAction, contextActions, selectionMode, ScrollPolicy.STANDARD);
         }
         public Table(String id, ControlState state, List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions) {
             this(id, state, columns, rows, selectedIds, activateAction, contextActions, SelectionMode.SINGLE);
@@ -350,6 +355,24 @@ public final class Nodes {
             expandedIds = Set.copyOf(expandedIds);
             selectedIds = Set.copyOf(selectedIds);
             Objects.requireNonNull(activateAction);
+        }
+    }
+
+    /**
+     * A path of crumbs that can turn into a typed path. Clicking a crumb reports {@link UiEvent.Selected} with its id;
+     * a crumb's context action reports Selected then {@link UiEvent.Action}. Clicking the free area, or the host's
+     * {@code focus(id)}, reports {@code editAction}; while {@code editing} the kit shows a text field holding
+     * {@code value}, reports typing as {@link UiEvent.Edited}, Enter as {@code submitAction} and Escape or leaving the
+     * field as {@code cancelAction}. When the crumbs do not fit, the leading ones slide out so the last stays visible.
+     */
+    public record Breadcrumbs(String id, ControlState state, List<Crumb> crumbs, String label, boolean editing, String value, String editAction, String submitAction, String cancelAction) implements Node {
+        public Breadcrumbs {
+            ModelChecks.id(id); Objects.requireNonNull(state);
+            crumbs = List.copyOf(crumbs); ModelChecks.unique(crumbs, Crumb::id);
+            ModelChecks.label(label, "label");
+            Objects.requireNonNull(value);
+            Objects.requireNonNull(editAction); Objects.requireNonNull(submitAction); Objects.requireNonNull(cancelAction);
+            if (editing && (submitAction.isBlank() || cancelAction.isBlank())) throw new IllegalArgumentException("Editing needs submit and cancel actions");
         }
     }
 

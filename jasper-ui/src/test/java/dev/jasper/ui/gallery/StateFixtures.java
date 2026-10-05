@@ -46,6 +46,22 @@ public final class StateFixtures {
         data.add(new Tree("tree", READY, List.of(new TreeItem("root", "Home", Optional.of("folder"), false, List.of(new TreeItem("child", "Documents", Optional.of("folder"), true, List.of()),
             new TreeItem("matched", "Downloads", Optional.of("folder"), true, List.of(), OptionalInt.of(3), true)))), Set.of("root"), Set.of("child"), "open"));
         result.add(sheet("data", new Stack("data", READY, LayoutRole.VERTICAL, data), 600, 760));
+        var pin = new dev.jasper.ui.model.MenuItem("pin", "Pin", "bookmark", "pin", true, false);
+        var browser = new ArrayList<Node>();
+        browser.add(new Breadcrumbs("browser-path", READY, List.of(new Crumb("home", "Home", List.of()), new Crumb("projects", "projects", List.of(pin)),
+            new Crumb("jasper", "jasper", List.of(pin))), "Location", false, "", "edit-path", "go", "done"));
+        browser.add(new Tree("browser-places", READY, List.of(new TreeItem("home", "Home", Optional.of("home"), true, List.of(), OptionalInt.empty(), false, "/Users/me", Optional.empty(), List.of(), Optional.empty()),
+            new TreeItem("remote", "Remote", Optional.empty(), false, List.of(new TreeItem("box", "Box", Optional.of("server"), true, List.of(), OptionalInt.empty(), false,
+                "me@box:22", Optional.of(StatusKind.SUCCESS), List.of("SSH", "connected"), Optional.of(List.of(pin)))), OptionalInt.of(1), false, "", Optional.empty(), List.of(), Optional.empty())),
+            Set.of("remote"), Set.of("home"), "open"));
+        browser.add(new Table("browser-files", READY, List.of(new Column("name", "Name", TextRole.BODY, false, 4.5, Optional.of(true)),
+                new Column("modified", "Modified", TextRole.DESCRIPTION, false, 1.75, Optional.empty()), new Column("size", "Size", TextRole.DESCRIPTION, true, 1, Optional.empty())),
+            List.of(new TableRow("docs", Map.of("name", "docs", "modified", "2026-10-05 09:12", "size", ""), Optional.of("folder"), false, Optional.of(List.of(pin))),
+                new TableRow("notes", Map.of("name", "notes.txt", "modified", "2026-10-04 17:40", "size", "6 B"), Optional.of("file"), true, Optional.of(List.of()))),
+            Set.of("docs"), "open", List.of(), SelectionMode.SINGLE, ScrollPolicy.OVERLAY));
+        browser.add(new Table("browser-standard", READY, List.of(new Column("name", "Name", TextRole.BODY, false)),
+            List.of(new TableRow("one", Map.of("name", "Standard scroll"), Optional.empty())), Set.of(), "", List.of(), SelectionMode.SINGLE, ScrollPolicy.STANDARD));
+        result.add(sheet("browser", new Stack("browser", READY, LayoutRole.VERTICAL, browser), 640, 560));
         for (SplitKind kind : SplitKind.values()) result.add(sheet("split-" + kind, new Split("split", READY, kind, List.of(text("left", "Sidebar", TextRole.BODY), text("right", "Detail", TextRole.BODY))), 600, 100));
         for (FormKind kind : FormKind.values()) result.add(sheet("form-" + kind, new Form("form", READY, kind, kind.name(), Optional.empty(), List.of(row("row", "Label", field("input", "", "Value", FieldKind.TEXT))), Optional.empty(), List.of(button("save", "Save", ButtonKind.PRIMARY)), "cancel"), 480, 200));
         for (CustomKind kind : CustomKind.values()) result.add(sheet("custom-" + kind, new Custom("custom", READY, "preview", kind, kind.name()), 480, 180));

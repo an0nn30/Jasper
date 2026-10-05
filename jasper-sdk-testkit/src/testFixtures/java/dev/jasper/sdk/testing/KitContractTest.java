@@ -38,6 +38,26 @@ public abstract class KitContractTest {
         assertThat(events).containsExactly(new UiEvent.Selected("theme",Set.of("same")),new UiEvent.Edited("font","SF Mono"),new UiEvent.Edited("size","14.5"));
         stop(kit);assertThatThrownBy(() -> view.reveal("row")).isInstanceOf(IllegalStateException.class);
     }); }
+    static ViewSpec browser(boolean editing, Optional<Boolean> sorted) {
+        var pin=List.of(new MenuItem("pin","Pin","bookmark","pin",true,false));
+        return new ViewSpec(new Nodes.Stack("browser",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
+            new Nodes.Breadcrumbs("path",ControlState.READY,List.of(new Crumb("home","Home",List.of()),new Crumb("docs","docs",pin)),"Location",editing,editing?"/docs":"","edit","go","done"),
+            new Nodes.Tree("places",ControlState.READY,List.of(new TreeItem("box","Box",Optional.of("server"),true,List.of(),java.util.OptionalInt.empty(),false,"me@box",Optional.of(Nodes.StatusKind.SUCCESS),List.of("SSH"),Optional.of(pin))),Set.of(),Set.of(),""),
+            new Nodes.Table("files",ControlState.READY,List.of(new Column("name","Name",Nodes.TextRole.BODY,false,4.5,sorted),new Column("size","Size",Nodes.TextRole.DESCRIPTION,true,1,Optional.empty())),
+                List.of(new TableRow("docs",Map.of("name","docs"),Optional.of("folder"),false,Optional.of(pin)),new TableRow("notes",Map.of("name","notes.txt"),Optional.of("file"),true,Optional.of(List.of()))),
+                Set.of("docs"),"open",List.of(),Nodes.SelectionMode.MULTIPLE,Nodes.ScrollPolicy.OVERLAY))));
+    }
+    @Test void browserDescriptorsMountUpdateAndReportSortsCrumbsAndMenus() throws Exception { edt(() -> {
+        var kit=kit("owner");var events=new ArrayList<UiEvent>();var view=kit.create(browser(false,Optional.of(true)),events::add);
+        assertThat(view.spec()).isEqualTo(browser(false,Optional.of(true)));
+        view.update(browser(true,Optional.of(false)));assertThat(view.spec()).isEqualTo(browser(true,Optional.of(false)));
+        view.focus("path");
+        emit(view,new UiEvent.Sorted("files","size"));emit(view,new UiEvent.Selected("path",Set.of("docs")));emit(view,new UiEvent.Action("pin"));
+        emit(view,new UiEvent.Edited("path","/tmp"));emit(view,new UiEvent.Action("go"));
+        assertThat(events).containsExactly(new UiEvent.Sorted("files","size"),new UiEvent.Selected("path",Set.of("docs")),new UiEvent.Action("pin"),
+            new UiEvent.Edited("path","/tmp"),new UiEvent.Action("go"));
+        stop(kit);
+    }); }
     @Test void disposalCannotReenterUpdate() throws Exception { edt(() -> {
         var kit=kit("owner"); var before=new ViewSpec(new Nodes.Custom("custom",ControlState.READY,"content",Nodes.CustomKind.EDITOR,"Editor"));
         var view=kit.create(before,e -> {}); var calls=new java.util.concurrent.atomic.AtomicInteger(); var rejected=new java.util.concurrent.atomic.AtomicBoolean();

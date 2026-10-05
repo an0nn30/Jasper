@@ -28,6 +28,7 @@ class KitValuesTest {
    new Split("split",READY,SplitKind.SIDEBAR_DETAIL,List.of(text("side"),text("body"))),
    new Table("table",READY,List.of(new Column("column","Title",TextRole.MONO,true)),List.of(new TableRow("row",Map.of("column","42"),Optional.of("add"))),Set.of("row"),"activate",menu,SelectionMode.MULTIPLE),
    new Tree("tree",READY,List.of(new TreeItem("branch","Title",Optional.of("folder"),false,List.of(new TreeItem("leaf","Leaf",Optional.empty(),true,List.of())))),Set.of("branch"),Set.of("leaf"),"activate"),
+   new Breadcrumbs("path",READY,List.of(new Crumb("home","Home",List.of()),new Crumb("docs","docs",menu)),"Location",true,"/tmp","edit","go","done"),
    new Custom("custom",READY,"document",CustomKind.EDITOR,"Document"));
   assertThat(nodes.stream().map(Object::getClass).distinct()).hasSize(Node.class.getPermittedSubclasses().length);
   for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}
@@ -50,7 +51,7 @@ class KitValuesTest {
   assertThat(new MenuItem("old","Old","key","open",true,false).hue()).isEqualTo(Hue.NEUTRAL);
  }
  @Test void everyEventProjectsItsOwnerItemAndPayload(){
-  List<dev.jasper.ui.model.UiEvent> events=List.of(new dev.jasper.ui.model.UiEvent.Action("act"),new dev.jasper.ui.model.UiEvent.Edited("field","text"),new dev.jasper.ui.model.UiEvent.Selected("list",Set.of("a")),new dev.jasper.ui.model.UiEvent.Toggled("toggle",true),new dev.jasper.ui.model.UiEvent.Expanded("tree","branch",true),new dev.jasper.ui.model.UiEvent.Reordered("list","a",2),new dev.jasper.ui.model.UiEvent.Removed("list","a"),new dev.jasper.ui.model.UiEvent.SecretChanged("secret"));
+  List<dev.jasper.ui.model.UiEvent> events=List.of(new dev.jasper.ui.model.UiEvent.Action("act"),new dev.jasper.ui.model.UiEvent.Edited("field","text"),new dev.jasper.ui.model.UiEvent.Selected("list",Set.of("a")),new dev.jasper.ui.model.UiEvent.Toggled("toggle",true),new dev.jasper.ui.model.UiEvent.Expanded("tree","branch",true),new dev.jasper.ui.model.UiEvent.Reordered("list","a",2),new dev.jasper.ui.model.UiEvent.Removed("list","a"),new dev.jasper.ui.model.UiEvent.SecretChanged("secret"),new dev.jasper.ui.model.UiEvent.Sorted("table","name"));
   assertThat(events).hasSize(UiEvent.class.getPermittedSubclasses().length);for(var event:events)assertThat(KitValues.toSdk(event).toString()).isEqualTo(event.toString());
   assertThat(Arrays.stream(SemanticColor.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.theme.SemanticColor.values()).map(Enum::name).toArray(String[]::new));
  }
@@ -65,7 +66,20 @@ class KitValuesTest {
    new FormRow("row",READY,"Label","",new Text("c",READY,"x",TextRole.BODY),Optional.empty(),true),
    new Tree("tree",READY,List.of(new TreeItem("a","A",Optional.empty(),false,List.of(new TreeItem("b","B",Optional.empty(),true,List.of(),OptionalInt.of(4),true)),OptionalInt.of(0),false)),Set.of("a"),Set.of("b"),""));
   for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}
+  assertThat(Arrays.stream(ChoiceKind.values()).map(Enum::name)).hasSize(dev.jasper.ui.model.Nodes.ChoiceKind.values().length);
   assertThat(Arrays.stream(FieldKind.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.FieldKind.values()).map(Enum::name).toArray(String[]::new));
   assertThat(Arrays.stream(ChoiceKind.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.ChoiceKind.values()).map(Enum::name).toArray(String[]::new));
+ }
+ @Test void browserCapabilitiesProjectWithoutLoss(){
+  var pin=List.of(new MenuItem("pin","Pin","bookmark","pin",true,false));
+  List<Node> nodes=List.of(
+   new Table("files",READY,List.of(new Column("name","Name",TextRole.BODY,false,4.5,Optional.of(true)),new Column("size","Size",TextRole.DESCRIPTION,true,1,Optional.of(false)),new Column("plain","Plain",TextRole.DESCRIPTION,false)),
+    List.of(new TableRow("docs",Map.of("name","docs"),Optional.of("folder"),false,Optional.of(pin)),new TableRow("notes",Map.of("name","notes"),Optional.empty(),true,Optional.of(List.of())),new TableRow("plain",Map.of(),Optional.empty())),
+    Set.of("docs","notes"),"open",pin,SelectionMode.MULTIPLE,ScrollPolicy.OVERLAY),
+   new Tree("keys",READY,List.of(new TreeItem("tabs","Tabs",Optional.of("folder"),false,List.of(new TreeItem("new","New tab",Optional.empty(),true,List.of(),OptionalInt.empty(),true,"Context",Optional.of(StatusKind.SUCCESS),List.of("Global","Cmd+T"),Optional.of(pin))),OptionalInt.of(1),false)),Set.of("tabs"),Set.of("new"),"edit"),
+   new Breadcrumbs("path",READY,List.of(new Crumb("home","Home",List.of()),new Crumb("docs","docs",pin)),"Location",false,"","edit","go","done"));
+  for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}
+  assertThat(Arrays.stream(ScrollPolicy.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.ScrollPolicy.values()).map(Enum::name).toArray(String[]::new));
+  assertThat(KitValues.toSdk(new dev.jasper.ui.model.UiEvent.Sorted("files","size"))).isEqualTo(new UiEvent.Sorted("files","size"));
  }
 }

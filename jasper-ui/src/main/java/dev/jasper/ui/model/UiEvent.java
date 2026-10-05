@@ -26,4 +26,6 @@ public sealed interface UiEvent {
         public Reordered { ModelChecks.id(id); ModelChecks.id(itemId); if (destination < 0) throw new IllegalArgumentException("Negative destination"); }
     }
     record SecretChanged(String id) implements UiEvent { public SecretChanged { ModelChecks.id(id); } }
+    /** Sort intent: id is the table owner, columnId the clicked column header; the host owns the order. */
+    record Sorted(String id, String columnId) implements UiEvent { public Sorted { ModelChecks.id(id); ModelChecks.id(columnId); } }
 }
