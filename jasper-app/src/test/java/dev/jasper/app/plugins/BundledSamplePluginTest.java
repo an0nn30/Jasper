@@ -59,14 +59,15 @@ class BundledSamplePluginTest {
                 .anySatisfy(item -> assertThat(item.text()).startsWith("Sample:"))
                 .anySatisfy(item -> assertThat(item.text()).isEqualTo("Vault"));
         });
-        assertThat(runtime.get().statusLines()).as("the sample and the six bundled feature plugins").hasSize(7)
+        assertThat(runtime.get().statusLines()).as("the sample and the seven bundled feature plugins").hasSize(8)
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.2.1", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.history", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.snippets", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.vault", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.remote", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.editor", "BUNDLED", "ACTIVE"))
-            .anySatisfy(line -> assertThat(line).contains("dev.jasper.fileserver", "BUNDLED", "ACTIVE"));
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.fileserver", "BUNDLED", "ACTIVE"))
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.indexer", "BUNDLED", "ACTIVE"));
         String outcome = "dev.jasper.sample.activities|INFO|Sample plugin|Ready";
         var lines = new AtomicReference<List<String>>(List.of());
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
@@ -96,7 +97,7 @@ class BundledSamplePluginTest {
             var outcome = new CompletableFuture<PluginRuntime.Outcome>();
             onEdt(() -> runtime.get().snapshot(outcome::complete));
             var rows = outcome.get(10, TimeUnit.SECONDS).snapshot().rows();
-            assertThat(rows).hasSize(7).allSatisfy(row -> assertThat(row.icon()).as(row.id()).isPresent());
+            assertThat(rows).hasSize(8).allSatisfy(row -> assertThat(row.icon()).as(row.id()).isPresent());
             assertThat(rows).filteredOn(row -> row.id().equals("dev.jasper.remote")).singleElement()
                 .satisfies(row -> assertThat(row.homepage()).isEqualTo("https://github.com/an0nn30/Jasper"));
         } finally {

@@ -1,0 +1,11 @@
+id = "dev.jasper.indexer"
+name = "Project Index"
+version = "0.1.0"
+entry = "dev.jasper.indexer.IndexerPlugin"
+sdk = ">=0.14.2, <0.15"
+description = "Offers to index the project a terminal enters and finds its files from the command palette's Files tab, opening them in the Editor; folders can also be indexed by hand."
+vendor = "Jasper"
+icon = "icons/indexer.svg"
+homepage = "https://github.com/an0nn30/Jasper"
+capabilities = ["terminal.observe", "terminal.open", "palette.contribute"]
+requires = [{ id = "dev.jasper.editor", version = ">=0.7", optional = true }]
