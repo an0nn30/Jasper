@@ -20,8 +20,10 @@
   including architecture, documentation and native headless gates. Source hygiene and whitespace checks
   passed. Reproduce previews with `./gradlew -I tools/previews/flat-tabs.gradle :jasper-app:flatTabsPreview`.
   No GUI, benchmark or AOT training. User approved local main integration on 2026-10-05;
-  the unrelated inherited Markdown-preview design stays on its own branch. Merge verification is pending.
-  No push is authorized.
+  the unrelated inherited Markdown-preview design stays on its own branch. Integrated as `e27dba15`;
+  `./gradlew check --continue` on main passed **8,771 tests, 0 failures, 0 errors, 6 existing skips**.
+  Previews are preserved in the main checkout under `jasper-app/build/flat-tabs-preview/`.
+  The managed worktree is archived after verification. No push performed.
 
 - **Populated plugin panel reference follow-up** (2026-10-04; `codex/plugin-panel-redesign`): implements the
   second user-supplied mock for connected SFTP, listed Tunnels/File Servers, and the Sessions header correction.
