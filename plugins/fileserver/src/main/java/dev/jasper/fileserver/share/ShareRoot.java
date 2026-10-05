@@ -2,14 +2,18 @@ package dev.jasper.fileserver.share;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.NotDirectoryException;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
@@ -18,6 +22,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
@@ -103,6 +108,22 @@ public final class ShareRoot {
         return child(inside(parent), segments.getLast());
     }
 
+    /**
+     * The entry a client path names: its folder resolved through links that stay inside, its own name not followed.
+     * The root for an empty path. SFTP works on these paths, and every content operation still comes back here.
+     */
+    public Path locate(String clientPath) throws IOException { return entry(clientPath); }
+
+    /** The client path ({@code "a/b"}, empty for the root) of a path inside the share; refuses any other path. */
+    public String clientPath(Path path) throws PathRefusedException {
+        Path normal = path.toAbsolutePath().normalize();
+        if (!normal.startsWith(root)) throw new PathRefusedException("The path leaves the shared folder");
+        if (normal.equals(root)) return "";
+        var names = new ArrayList<String>();
+        for (Path name : root.relativize(normal)) names.add(name.toString());
+        return String.join("/", names);
+    }
+
     /** The entry itself: its parent resolved, its own name not followed. The root for an empty path. */
     private Path entry(String clientPath) throws IOException {
         List<String> segments = segments(clientPath);
@@ -165,6 +186,27 @@ public final class ShareRoot {
     }
 
     /**
+     * Opens a file for writing in place at any offset, for SFTP's resumed, appended and read-write opens. The same
+     * refusals as {@link #openWrite}; a final link is never written through. {@code options} must contain WRITE; READ,
+     * CREATE, CREATE_NEW and TRUNCATE_EXISTING are honoured.
+     */
+    public FileChannel openWriteChannel(String clientPath, Set<? extends OpenOption> options) throws IOException {
+        if (!options.contains(StandardOpenOption.WRITE)) throw new IllegalArgumentException("A write channel needs WRITE");
+        requireWritable();
+        Path path = entry(clientPath);
+        if (path.equals(root) || Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) throw new IsFolderException(clientPath);
+        var all = new HashSet<OpenOption>(options);
+        all.add(LinkOption.NOFOLLOW_LINKS);
+        try { return FileChannel.open(path, all); }
+        catch (FileSystemException refused) { throw refused; }
+        catch (IOException failure) {
+            // FileChannel.open reports a refused final link as a plain IOException on some platforms.
+            if (Files.isSymbolicLink(path)) throw new FileSystemException(path.toString(), null, failure.getMessage());
+            throw failure;
+        }
+    }
+
+    /**
      * Starts replacing or creating a file without touching the target until {@link Upload#commit()}: the bytes go to
      * a hidden temporary file in the target's folder, which then moves onto the target in one step. Closing the
      * upload without a commit removes the temporary file and leaves the target as it was. The same refusals as
@@ -177,27 +219,34 @@ public final class ShareRoot {
         byte[] random = new byte[8];
         UPLOAD_NAMES.nextBytes(random);
         Path temp = target.resolveSibling(UPLOAD_PREFIX + HexFormat.of().formatHex(random) + ".part");
-        OutputStream out = Files.newOutputStream(temp, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
-        return new Upload(temp, target, out);
+        FileChannel channel = FileChannel.open(temp, StandardOpenOption.CREATE_NEW, StandardOpenOption.READ, StandardOpenOption.WRITE,
+            LinkOption.NOFOLLOW_LINKS);
+        return new Upload(temp, target, channel);
     }
 
     /** A file being received; see {@link ShareRoot#upload}. */
     public static final class Upload implements AutoCloseable {
         private final Path temp, target;
+        private final FileChannel channel;
         private final OutputStream out;
         private boolean finished;
 
-        private Upload(Path temp, Path target, OutputStream out) { this.temp = temp; this.target = target; this.out = out; }
+        private Upload(Path temp, Path target, FileChannel channel) {
+            this.temp = temp; this.target = target; this.channel = channel; this.out = Channels.newOutputStream(channel);
+        }
 
-        /** The stream to write the new content to. */
+        /** The stream to write the new content to, in order. */
         public OutputStream stream() { return out; }
 
-        /** Closes the stream and moves the temporary file onto the target, replacing it. */
+        /** The temporary file's channel (readable and writable), for writes at any offset; use commit or close, not channel().close(). */
+        public FileChannel channel() { return channel; }
+
+        /** Closes the file and moves it onto the target, replacing it. */
         public void commit() throws IOException {
             if (finished) throw new IllegalStateException("The upload is finished");
             finished = true;
             try {
-                out.close();
+                channel.close();
                 keepPermissions();
                 try { Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
                 catch (AtomicMoveNotSupportedException unsupported) { Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING); }
@@ -225,7 +274,7 @@ public final class ShareRoot {
         }
 
         private void discard() {
-            try { out.close(); } catch (IOException ignored) { /* the file is removed next */ }
+            try { channel.close(); } catch (IOException ignored) { /* the file is removed next */ }
             try { Files.deleteIfExists(temp); } catch (IOException ignored) { /* nothing more to do */ }
         }
     }
@@ -242,11 +291,15 @@ public final class ShareRoot {
         Files.delete(path);
     }
 
-    public void rename(String from, String to) throws IOException {
+    public void rename(String from, String to) throws IOException { rename(from, to, false); }
+
+    /** Renames an entry; {@code replace} replaces an existing target, as SFTP's posix-rename asks. */
+    public void rename(String from, String to, boolean replace) throws IOException {
         requireWritable();
         Path source = entry(from), target = entry(to);
         if (source.equals(root) || target.equals(root)) throw new PathRefusedException("The shared folder itself cannot be renamed");
-        Files.move(source, target);
+        if (replace) Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+        else Files.move(source, target);
     }
 
     private void requireWritable() throws ReadOnlyShareException {

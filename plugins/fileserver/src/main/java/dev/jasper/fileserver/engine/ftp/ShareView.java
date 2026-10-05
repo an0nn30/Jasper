@@ -1,5 +1,6 @@
 package dev.jasper.fileserver.engine.ftp;
 
+import dev.jasper.fileserver.engine.ClientPaths;
 import dev.jasper.fileserver.engine.ServerEvents;
 import dev.jasper.fileserver.share.PathRefusedException;
 import dev.jasper.fileserver.share.ShareRoot;
@@ -36,8 +37,8 @@ final class ShareView implements FileSystemView {
 
     @Override public synchronized boolean changeWorkingDirectory(String directory) {
         try {
-            String target = FtpPaths.absolute(workingDirectory, directory);
-            if (!share.attributes(FtpPaths.relative(target)).directory()) return false;
+            String target = ClientPaths.absolute(workingDirectory, directory);
+            if (!share.attributes(ClientPaths.relative(target)).directory()) return false;
             workingDirectory = target;
             return true;
         } catch (IOException missingOrRefused) {
@@ -46,7 +47,7 @@ final class ShareView implements FileSystemView {
     }
 
     @Override public synchronized FtpFile getFile(String file) throws FtpException {
-        try { return new ShareFile(this, FtpPaths.absolute(workingDirectory, file), null); }
+        try { return new ShareFile(this, ClientPaths.absolute(workingDirectory, file), null); }
         catch (PathRefusedException refused) { throw new FtpException(refused.getMessage(), refused); }
     }
 

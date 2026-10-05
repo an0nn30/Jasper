@@ -3,14 +3,19 @@ package dev.jasper.fileserver.share;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryNotEmptyException;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -191,5 +196,75 @@ class ShareRootTest {
         }
         assertThat(target).hasContent("new");
         assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(target))).isEqualTo("rwxr-x---");
+    }
+
+    @Test void locateResolvesTheFolderButNotTheEntryItself() throws IOException {
+        var share = new ShareRoot(shared, true);
+        Path real = shared.toRealPath();
+        assertThat(share.locate("")).isEqualTo(real);
+        assertThat(share.locate("/docs/a.txt")).isEqualTo(real.resolve("docs/a.txt"));
+        assertThat(share.locate("docs/new.txt")).as("a missing entry in an existing folder").isEqualTo(real.resolve("docs/new.txt"));
+        link(shared.resolve("inside"), shared.resolve("docs"));
+        link(shared.resolve("out"), outside);
+        link(shared.resolve("docs/to-secret"), outside.resolve("secret.txt"));
+        assertThat(share.locate("inside/a.txt")).as("an inside link in the folder is followed").isEqualTo(real.resolve("docs/a.txt"));
+        assertThat(share.locate("docs/to-secret")).as("the entry itself is not followed").isEqualTo(real.resolve("docs/to-secret"));
+        assertThatThrownBy(() -> share.locate("out/secret.txt")).isInstanceOf(PathRefusedException.class);
+        assertThatThrownBy(() -> share.locate("../outside")).isInstanceOf(PathRefusedException.class);
+        assertThatThrownBy(() -> share.locate("CON")).isInstanceOf(PathRefusedException.class);
+    }
+
+    @Test void clientPathIsTheInverseInsideTheShare() throws IOException {
+        var share = new ShareRoot(shared, true);
+        Path real = shared.toRealPath();
+        assertThat(share.clientPath(real)).isEmpty();
+        assertThat(share.clientPath(real.resolve("docs/a.txt"))).isEqualTo("docs/a.txt");
+        assertThat(share.clientPath(real.resolve("docs/../docs/a.txt"))).isEqualTo("docs/a.txt");
+        assertThatThrownBy(() -> share.clientPath(real.getParent())).isInstanceOf(PathRefusedException.class);
+        assertThatThrownBy(() -> share.clientPath(outside.toRealPath().resolve("secret.txt"))).isInstanceOf(PathRefusedException.class);
+    }
+
+    @Test void anUploadAcceptsWritesAtAnyOffset() throws IOException {
+        var share = new ShareRoot(shared, false);
+        try (var upload = share.upload("docs/a.txt")) {
+            FileChannel channel = upload.channel();
+            channel.write(ByteBuffer.wrap("world".getBytes(StandardCharsets.UTF_8)), 6);
+            channel.write(ByteBuffer.wrap("hello ".getBytes(StandardCharsets.UTF_8)), 0);
+            assertThat(shared.resolve("docs/a.txt")).as("untouched until the commit").hasContent("hello");
+            upload.commit();
+        }
+        assertThat(shared.resolve("docs/a.txt")).hasContent("hello world");
+    }
+
+    @Test void aWriteChannelWritesInPlace() throws IOException {
+        var share = new ShareRoot(shared, false);
+        try (FileChannel channel = share.openWriteChannel("docs/a.txt", Set.of(StandardOpenOption.WRITE))) {
+            channel.write(ByteBuffer.wrap("J".getBytes(StandardCharsets.UTF_8)), 0);
+            channel.write(ByteBuffer.wrap("!".getBytes(StandardCharsets.UTF_8)), channel.size());
+        }
+        assertThat(shared.resolve("docs/a.txt")).hasContent("Jello!");
+        try (FileChannel channel = share.openWriteChannel("docs/b.txt", Set.of(StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW))) {
+            channel.write(ByteBuffer.wrap("new".getBytes(StandardCharsets.UTF_8)));
+        }
+        assertThat(shared.resolve("docs/b.txt")).hasContent("new");
+        assertThatThrownBy(() -> share.openWriteChannel("docs/b.txt", Set.of(StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)))
+            .isInstanceOf(FileAlreadyExistsException.class);
+        assertThatThrownBy(() -> share.openWriteChannel("docs", Set.of(StandardOpenOption.WRITE))).isInstanceOf(IsFolderException.class);
+        assertThatThrownBy(() -> share.openWriteChannel("docs/a.txt", Set.of(StandardOpenOption.READ))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ShareRoot(shared, true).openWriteChannel("docs/a.txt", Set.of(StandardOpenOption.WRITE)))
+            .isInstanceOf(ReadOnlyShareException.class);
+        link(shared.resolve("docs/to-secret"), outside.resolve("secret.txt"));
+        assertThatThrownBy(() -> share.openWriteChannel("docs/to-secret", Set.of(StandardOpenOption.WRITE)))
+            .as("a final link is never written through").isInstanceOf(FileSystemException.class);
+        assertThat(outside.resolve("secret.txt")).hasContent("secret");
+    }
+
+    @Test void renameCanReplaceWhenAsked() throws IOException {
+        Files.writeString(shared.resolve("docs/b.txt"), "bee");
+        var share = new ShareRoot(shared, false);
+        assertThatThrownBy(() -> share.rename("docs/a.txt", "docs/b.txt")).isInstanceOf(FileAlreadyExistsException.class);
+        share.rename("docs/a.txt", "docs/b.txt", true);
+        assertThat(shared.resolve("docs/b.txt")).hasContent("hello");
+        assertThat(shared.resolve("docs/a.txt")).doesNotExist();
     }
 }
