@@ -43,10 +43,12 @@ final class ShortcutKit {
         return (JComponent) scroll.getViewport().getView();
     }
 
-    /** Presses a key bound on the tree, as the focused tree receives it. */
+    /** Presses a key on the tree as the focused tree receives it: its own bindings first, then its ancestors'. */
     static void key(ShortcutPanel panel, String stroke) {
         var canvas = canvas(panel);
-        canvas.getActionMap().get(canvas.getInputMap().get(javax.swing.KeyStroke.getKeyStroke(stroke))).actionPerformed(null);
+        var key = javax.swing.KeyStroke.getKeyStroke(stroke);
+        javax.swing.SwingUtilities.processKeyBindings(new java.awt.event.KeyEvent(canvas, java.awt.event.KeyEvent.KEY_PRESSED,
+            System.currentTimeMillis(), key.getModifiers(), key.getKeyCode(), java.awt.event.KeyEvent.CHAR_UNDEFINED));
     }
 
     /** Selects the row on screen with the keyboard, which never starts an edit. */

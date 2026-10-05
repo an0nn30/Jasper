@@ -21,7 +21,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
+import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JRootPane;
 import javax.swing.KeyStroke;
@@ -64,6 +66,11 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         list = new KitView(context, new ViewSpec(tree.descriptor()), this::event);
         footer = new KitView(context, statusSpec(), this::event);
         list.getAccessibleContext().setAccessibleName("Keyboard shortcuts grouped by section or plugin");
+        // The tree has no activate action, so Enter passes on to this binding: it edits or toggles the selected row.
+        list.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "keymap.activate");
+        list.getActionMap().put("keymap.activate", new AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent event) { if (!closed) activate(tree.selected()); }
+        });
         footer.getAccessibleContext().setAccessibleName("Shortcut search status");
         add(top, BorderLayout.NORTH);
         var sections = new JPanel(new BorderLayout(0, scaled(context, DesignMetrics.Role.KEYMAP_TOOLS_GAP)));
@@ -106,12 +113,11 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
                     case "clear" -> { captured = null; query = ""; filter(); top.focus(SEARCH); }
                     case "expand" -> { tree.expandSections(true); render(); }
                     case "collapse" -> { tree.expandSections(false); render(); }
-                    case "edit" -> activate(tree.selected());
                     default -> { }
                 }
             }
-            // Keys and right clicks only select; a left click, Enter or a double click edits a shortcut or opens or
-            // closes a section, as the old tree did.
+            // Keys only select; a plain left click (once, even in a double click) or Enter edits a shortcut or opens or
+            // closes a section, as the old tree did. A right click never reaches here.
             case UiEvent.Selected selected when selected.id().equals(ShortcutTree.ID) -> {
                 tree.select(selected.ids().stream().findFirst().orElse(null));
                 render();

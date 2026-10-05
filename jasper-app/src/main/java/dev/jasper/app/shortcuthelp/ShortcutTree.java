@@ -107,6 +107,7 @@ final class ShortcutTree {
             roots.add(new TreeItem(groupId(group), group, Optional.of("folder"), false, children, OptionalInt.of(rows.size()),
                 customized, shown ? "Collapse section" : "Expand section", Optional.empty(), List.of(), Optional.empty()));
         });
-        return new Nodes.Tree(ID, ControlState.READY, roots, open, selected == null ? Set.of() : Set.of(selected), "edit");
+        // No activate action: a click reports Clicked, so a double click acts once; the panel owns Enter.
+        return new Nodes.Tree(ID, ControlState.READY, roots, open, selected == null ? Set.of() : Set.of(selected), "");
     }
 }

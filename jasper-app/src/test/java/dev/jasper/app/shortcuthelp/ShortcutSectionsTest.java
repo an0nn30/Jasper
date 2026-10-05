@@ -210,6 +210,34 @@ class ShortcutSectionsTest {
         });
     }
 
+    @Test void aDoubleClickTogglesASectionOnceAndStartsOneEditOnAShortcut() throws Exception {
+        edt(() -> {
+            var panel = panel(changes -> { throw new AssertionError("Unexpected save"); });
+            try {
+                panel.setRows(List.of(new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"), "Terminal window", "", true, "cmd+c")));
+                layout(panel);
+                int closed = panel.tree.rowCount();
+                var section = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/group/Clipboard/title", JLabel.class);
+                post(new java.awt.event.MouseEvent(section, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 3, 3, 1, false, java.awt.event.MouseEvent.BUTTON1));
+                post(new java.awt.event.MouseEvent(section, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 3, 3, 2, false, java.awt.event.MouseEvent.BUTTON1));
+                assertThat(panel.tree.rowCount()).as("a double click opens the section once").isEqualTo(closed + 1);
+                layout(panel);
+                var row = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/action/copy/title", JLabel.class);
+                post(new java.awt.event.MouseEvent(row, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 3, 3, 1, false, java.awt.event.MouseEvent.BUTTON1));
+                button(panel, "editor.record").doClick(0);
+                assertThat(message(panel)).as("recording stopped after the first click's edit").contains("Apply or OK");
+                post(new java.awt.event.MouseEvent(row, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 3, 3, 2, false, java.awt.event.MouseEvent.BUTTON1));
+                assertThat(panel.editor.isVisible()).isTrue();
+                assertThat(message(panel)).as("the second click does not start a second edit").contains("Apply or OK");
+                key(panel, "ENTER");
+                assertThat(message(panel)).as("Enter edits the selected shortcut").contains("Press the new shortcut");
+                key(panel, "UP");
+                key(panel, "ENTER");
+                assertThat(panel.tree.rowCount()).as("Enter on the section closes it").isEqualTo(closed);
+            } finally { panel.close(); }
+        });
+    }
+
     @Test void theKeymapKeepsItsAccessibleNames() throws Exception {
         edt(() -> {
             var panel = panel(changes -> { throw new AssertionError("Unexpected save"); });

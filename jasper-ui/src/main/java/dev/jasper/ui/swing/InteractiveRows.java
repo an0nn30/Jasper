@@ -73,12 +73,13 @@ final class InteractiveRows {
             };
             canvas.addKeyListener(typing);
             own(() -> canvas.removeKeyListener(typing));
-            bind(
-                    canvas,
-                    "ENTER",
-                    () -> {
-                        if (focusItem != null) activate(focusItem);
-                    });
+            // Enter activates the focused row; with no activate action it is not the rows' key and passes on to the host,
+            // as a single-line field's Enter does without a trailing action.
+            canvas.getInputMap().put(KeyStroke.getKeyStroke("ENTER"), "ENTER");
+            canvas.getActionMap().put("ENTER", new AbstractAction() {
+                @Override public boolean isEnabled() { return !closed && !activation().isBlank(); }
+                @Override public void actionPerformed(ActionEvent event) { if (focusItem != null) activate(focusItem); }
+            });
             bind(
                     canvas,
                     "SPACE",
@@ -259,10 +260,38 @@ final class InteractiveRows {
             return false;
         }
 
-        /** A plain left single click: selects the row, then, for tables and trees, reports the click. */
-        void click(String id, boolean toggle) {
+        /**
+         * A left single click: selects the row (Ctrl/Meta toggles it); only a plain click, with no modifier, also
+         * reports {@link UiEvent.Clicked} for tables and trees.
+         */
+        void click(String id, boolean toggle, boolean plain) {
             select(id, toggle);
-            if (reportsClicks() && stillCurrent(id)) emit(new UiEvent.Clicked(node.id(), id));
+            if (plain && reportsClicks() && stillCurrent(id)) emit(new UiEvent.Clicked(node.id(), id));
+        }
+
+        /** Pointer input shared by a row and its passive content; a click whose press opened the context menu is ignored. */
+        void pressed(Row row, MouseEvent e) {
+            row.contextPress = e.isPopupTrigger();
+            if (row.contextPress) context(row.id, (JComponent) e.getComponent(), e.getX(), e.getY());
+        }
+
+        void released(Row row, MouseEvent e) {
+            if (!e.isPopupTrigger()) return;
+            row.contextPress = true;
+            context(row.id, (JComponent) e.getComponent(), e.getX(), e.getY());
+        }
+
+        void clicked(Row row, MouseEvent e) {
+            boolean context = row.contextPress;
+            row.contextPress = false;
+            // macOS Ctrl+click is the popup trigger on press yet arrives as a BUTTON1 click: never a selection.
+            if (context || !SwingUtilities.isLeftMouseButton(e)) return;
+            int modifiers = InputEvent.CTRL_DOWN_MASK | InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK
+                    | InputEvent.ALT_GRAPH_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK;
+            if (e.getClickCount() == 2) activate(row.id);
+            else if (e.isShiftDown()) range(row.id);
+            else click(row.id, e.isControlDown() || e.isMetaDown(), (e.getModifiersEx() & modifiers) == 0);
+            canvas.requestFocusInWindow();
         }
 
         /** Shift-click: with multiple selection, every row from the anchor through {@code id}; otherwise a plain select. */
@@ -518,6 +547,8 @@ final class InteractiveRows {
         final JPanel leading = part(), title = part(), subtitle = part(), trailing = part();
         final JCheckBox check = new JCheckBox();
         String id;
+        /** The last press or release opened the context menu, so its click is not a selection. */
+        boolean contextPress;
         int index, indent;
         boolean hover;
         final java.util.List<JComponent> cells = new ArrayList<>();
@@ -549,25 +580,17 @@ final class InteractiveRows {
 
                         @Override
                         public void mousePressed(MouseEvent e) {
-                            if (e.isPopupTrigger()) popup(e);
+                            owner.pressed(Row.this, e);
                         }
 
                         @Override
                         public void mouseReleased(MouseEvent e) {
-                            if (e.isPopupTrigger()) popup(e);
-                        }
-
-                        void popup(MouseEvent e) {
-                            owner.context(id, Row.this, e.getX(), e.getY());
+                            owner.released(Row.this, e);
                         }
 
                         @Override
                         public void mouseClicked(MouseEvent e) {
-                            if (!SwingUtilities.isLeftMouseButton(e)) return;
-                            if (e.getClickCount() == 2) owner.activate(id);
-                            else if (e.isShiftDown()) owner.range(id);
-                            else owner.click(id, e.isControlDown() || e.isMetaDown());
-                            owner.canvas.requestFocusInWindow();
+                            owner.clicked(Row.this, e);
                         }
                     };
             addMouseListener(mouse);
@@ -633,32 +656,17 @@ final class InteractiveRows {
                             new MouseAdapter() {
                                 @Override
                                 public void mouseClicked(MouseEvent e) {
-                                    if (SwingUtilities.isLeftMouseButton(e)) {
-                                        if (e.getClickCount() == 2) owner.activate(id);
-                                        else if (e.isShiftDown()) owner.range(id);
-                                        else owner.click(id, e.isControlDown() || e.isMetaDown());
-                                        owner.canvas.requestFocusInWindow();
-                                    }
+                                    owner.clicked(Row.this, e);
                                 }
 
                                 @Override
                                 public void mousePressed(MouseEvent e) {
-                                    if (e.isPopupTrigger())
-                                        owner.context(
-                                                id,
-                                                (JComponent) e.getComponent(),
-                                                e.getX(),
-                                                e.getY());
+                                    owner.pressed(Row.this, e);
                                 }
 
                                 @Override
                                 public void mouseReleased(MouseEvent e) {
-                                    if (e.isPopupTrigger())
-                                        owner.context(
-                                                id,
-                                                (JComponent) e.getComponent(),
-                                                e.getX(),
-                                                e.getY());
+                                    owner.released(Row.this, e);
                                 }
                             };
                     c.component.addMouseListener(mouse);
@@ -730,6 +738,7 @@ final class InteractiveRows {
             subtitle.removeAll();
             trailing.removeAll();
             hover = false;
+            contextPress = false;
         }
 
         @Override

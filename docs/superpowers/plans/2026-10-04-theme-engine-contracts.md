@@ -280,10 +280,14 @@ remain and default to the old meaning (weight 1, no sort, not muted, no row menu
   text typed within 1 s (`TYPE_AHEAD_MILLIS`); with MULTIPLE selection Shift-click and Shift+Up/Down select the range
   from the last row chosen without Shift; a selection the host sets (not the echo of the user's own) is scrolled into
   view once the viewport has a size. A theme change keeps selection and scroll position.
-- Tables and trees report a plain left single click on a row as `Clicked(id,itemId)` after its `Selected`; keys, right
-  clicks (which do not select either), right-button clicks and the second click of a double click never report it (Enter and double clicks report
-  the owner's activate action). Hosts that open or edit on a single click use `Clicked`, never the event being
-  dispatched. Item lists keep their contract (no `Clicked`).
+- Tables and trees report a plain left single click on a row (no Ctrl, Meta, Alt, AltGraph or Shift) as
+  `Clicked(id,itemId)` after its `Selected`. Keys, Ctrl/Meta toggle clicks (selecting or deselecting), Shift ranges,
+  non-left buttons, any click whose press or release was the popup trigger (macOS Ctrl+click, which then neither
+  selects nor clicks) and the second click of a double click never report it; that second click reports the owner's
+  activate action when it has one, otherwise only `Selected`. Enter activates the focused row when the control has an
+  activate action; without one Enter is not the rows' key and passes on to the host. So a host that acts on a single
+  click leaves the activate action blank, uses `Clicked`, and binds Enter itself: a double click then acts exactly
+  once. Hosts never inspect the event being dispatched. Item lists keep their contract (no `Clicked`).
 - Kit `ACTIONS` stacks too wide for one row wrap onto further rows at their natural widths instead of squeezing their
   buttons (Form footers, Empty-state actions and app action rows); at normal widths they stay one row as before.
 - A single-line field never clips its text: when the designed height leaves less than the input's preferred height
@@ -328,7 +332,8 @@ Task 9 approved corrections (mirror exactly in the later SDK projection):
   rows; selection membership still uses the complete tree descriptor. Tree flattening is bounded
   in mounted components, including large expanded branches.
 - Row pointer selection (single click), keyboard navigation and multi-checkbox selection emit
-  Selected(owner,ids). Double click/Enter activation first emits Selected for the activated item,
+  Selected(owner,ids). Double click/Enter activation (Enter only with a nonblank activate action, Plan 2 Task 6b-1)
+  first emits Selected for the activated item,
   then Action(activateAction), when nonblank. Context opening never changes the selection (Plan 2 Task 6b-1:
   a shared menu opens only on a selected row; a row's own menu on any row) and invocation emits only
   Action(menuItem.action). A synchronous

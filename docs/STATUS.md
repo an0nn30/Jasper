@@ -22,6 +22,9 @@
   (tests press the real kit menu items via `KitOwnership.CONTEXT_MENU`). A context press no longer changes the
   selection (controller ruling, reversing Plan 1), so places again open as the highlight moves (click or arrow keys)
   and a right click neither selects, highlights nor navigates.
+  Fix round 2: only a plain left click reports `Clicked` (never after a popup-trigger press such as macOS Ctrl+click,
+  never for toggle clicks); Enter passes on when a row collection has no activate action, so the Keymap tree (no
+  activate action, Enter bound by the panel) acts exactly once on a double click.
 - **Theme engine Plan 2 Task 6a implemented (settingsui, restart, themesui); review pending** (2026-10-05).
   Controller ruling (spec §6: extend the kit for missing standard controls) added module kit capabilities first
   (`0008eb49`): `TreeItem` count/emphasized, `SettingRow`/`FormRow` `highlighted` with `KitView.reveal` (no focus move),

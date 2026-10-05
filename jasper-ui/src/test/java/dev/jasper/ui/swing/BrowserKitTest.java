@@ -556,6 +556,83 @@ class BrowserKitTest {
         });
     }
 
+    static Tree clickTree() {
+        var keys = keymap(false);
+        return new Tree(keys.id(), keys.state(), keys.roots(), keys.expandedIds(), keys.selectedIds(), "");
+    }
+
+    static MouseEvent clicked(Component on, int count, int modifiers) {
+        return new MouseEvent(on, MouseEvent.MOUSE_CLICKED, 0, modifiers, 2, 2, count, false, MouseEvent.BUTTON1);
+    }
+
+    @Test void aDoubleClickWithoutAnActivateActionClicksOnceAndEnterPassesOnToTheHost() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, new ViewSpec(clickTree()), events::add)) {
+                view.setSize(500, 300); InteractiveRowsTest.layout(view);
+                var owner = (Trees.TreeControl) view.control("keys");
+                var title = find(view, "@tree/keys/tabs/title", JLabel.class);
+                for (var listener : title.getMouseListeners()) listener.mouseClicked(clicked(title, 1, 0));
+                for (var listener : title.getMouseListeners()) listener.mouseClicked(clicked(title, 2, 0));
+                assertThat(events).as("the double click's second click only selects").containsExactly(
+                    new UiEvent.Selected("keys", Set.of("tabs")), new UiEvent.Clicked("keys", "tabs"), new UiEvent.Selected("keys", Set.of("tabs")));
+                var enter = owner.canvas.getActionMap().get(owner.canvas.getInputMap().get(KeyStroke.getKeyStroke("ENTER")));
+                assertThat(enter.isEnabled()).as("with no activate action Enter is not the rows' to consume").isFalse();
+                var host = new java.util.concurrent.atomic.AtomicInteger();
+                view.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke("ENTER"), "host");
+                view.getActionMap().put("host", new AbstractAction() {
+                    @Override public void actionPerformed(java.awt.event.ActionEvent e) { host.incrementAndGet(); }
+                });
+                SwingUtilities.processKeyBindings(new java.awt.event.KeyEvent(owner.canvas, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, java.awt.event.KeyEvent.VK_ENTER, '\n'));
+                assertThat(host.get()).as("Enter reaches the host's binding").isEqualTo(1);
+            } finally { release(context); }
+        });
+    }
+
+    @Test void aClickWhosePressOpenedTheContextMenuNeitherSelectsNorClicks() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, new ViewSpec(keymap(false)), events::add)) {
+                view.setSize(500, 300); InteractiveRowsTest.layout(view);
+                var owner = (Trees.TreeControl) view.control("keys");
+                for (Component target : List.of(find(view, "@tree/keys/scrollback/title", JLabel.class), owner.mounted.get("scrollback"))) {
+                    // macOS: Ctrl+click is the popup trigger on press, then arrives as a BUTTON1 click.
+                    var press = new MouseEvent(target, MouseEvent.MOUSE_PRESSED, 0, InputEvent.CTRL_DOWN_MASK | InputEvent.BUTTON1_DOWN_MASK, 2, 2, 1, true, MouseEvent.BUTTON1);
+                    for (var listener : target.getMouseListeners()) listener.mousePressed(press);
+                    for (var listener : target.getMouseListeners()) listener.mouseClicked(clicked(target, 1, InputEvent.CTRL_DOWN_MASK));
+                    assertThat(events).as("no selection and no click after a context press").isEmpty();
+                    assertThat(owner.selected).isEmpty();
+                }
+                var title = find(view, "@tree/keys/scrollback/title", JLabel.class);
+                for (var listener : title.getMouseListeners()) listener.mouseClicked(clicked(title, 1, 0));
+                assertThat(events).as("the next plain click works").containsExactly(new UiEvent.Selected("keys", Set.of("scrollback")), new UiEvent.Clicked("keys", "scrollback"));
+            } finally { release(context); }
+        });
+    }
+
+    @Test void onlyAPlainLeftClickReportsClicked() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, new ViewSpec(files(10, Set.of(), SelectionMode.MULTIPLE, ScrollPolicy.STANDARD, Optional.empty())), events::add)) {
+                view.setSize(600, 400); InteractiveRowsTest.layout(view);
+                var owner = (Tables.TableControl) view.control("files");
+                var row = owner.mounted.get("r2");
+                int menu = InputEvent.META_DOWN_MASK;
+                for (int modifiers : new int[] {InputEvent.CTRL_DOWN_MASK, menu, InputEvent.ALT_DOWN_MASK}) {
+                    events.clear();
+                    for (var listener : row.getMouseListeners()) listener.mouseClicked(clicked(row, 1, modifiers));
+                    assertThat(events).as("modifiers %s", modifiers).noneMatch(event -> event instanceof UiEvent.Clicked).isNotEmpty();
+                }
+                events.clear();
+                for (var listener : row.getMouseListeners()) listener.mouseClicked(clicked(row, 1, InputEvent.CTRL_DOWN_MASK));
+                assertThat(events).as("a deselecting toggle click").noneMatch(event -> event instanceof UiEvent.Clicked);
+                events.clear();
+                for (var listener : row.getMouseListeners()) listener.mouseClicked(clicked(row, 1, 0));
+                assertThat(events).containsExactly(new UiEvent.Selected("files", Set.of("r2")), new UiEvent.Clicked("files", "r2"));
+            } finally { release(context); }
+        });
+    }
+
     @Test void newPlaceGlyphsAreNamedKitArtwork() {
         try (var icons = new dev.jasper.ui.icons.IconRegistry()) {
             assertThat(icons.names()).contains("home", "desktop", "preview");
