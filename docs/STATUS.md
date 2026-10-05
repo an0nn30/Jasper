@@ -2,6 +2,23 @@
 
 ## Current state — 2026-10-05
 
+- **Bundled default terminal font** (2026-10-05; `codex/bundled-terminal-font`, isolated worktree
+  `/Users/dustin/.codex/worktrees/bundled-terminal-font/moray`): implements the approved bounded design:
+  the app bundles the supplied Cousine Nerd Font Mono regular/bold/italic/bold-italic faces with upstream
+  license notices and defaults terminal text to **12 pt**. Process-local font registration precedes app
+  startup, pane/window metrics and font-picker enumeration; no system installation. Explicit saved
+  family/size settings keep precedence. App panes without configuration use the same defaults; the
+  independent terminal library retains its own options. Native inline implementation with independent
+  final review; no new plan document. Regressions reproduced missing JAR fonts and old family/size
+  defaults before implementation. Focused config, font-picker, packaged-resource and pane/reset tests
+  pass. Independent final review found no actionable issues. Full `./gradlew check --continue
+  :jasper-app:verifyPackage -Pjasper.aot=false` passed: **8,785 tests, 0 failures, 0 errors, 6 existing
+  skips**, including architecture/documentation gates and the macOS native image. A final headless
+  package rebuild after license whitespace normalization passed; all four fonts and four notices in
+  the image match source bytes. Changed-source hygiene and whitespace checks passed. A 2x headless
+  12 pt style/symbol render was inspected (`jasper-app/build/font-preview/cousine-12pt-2x.png`).
+  No GUI, benchmark or AOT training. User approved local main integration on 2026-10-05; no push requested.
+
 - **Alacritty-style workspace tabs** (2026-10-05; `codex/alacritty-tabs`, isolated worktree
   `/Users/dustin/.codex/worktrees/alacritty-tabs/moray`): implements the user-approved
   [equal-width layout and measured motion](design/alacritty-tabs.md), superseding the flat-tab pass.

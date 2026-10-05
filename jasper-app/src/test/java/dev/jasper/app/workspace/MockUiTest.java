@@ -55,10 +55,11 @@ class MockUiTest {
             assertThat(pane.getInsets()).isEqualTo(new Insets(4, 4, 4, 4));
             assertThat(pane.view().getBounds()).isEqualTo(new Rectangle(4, 4,
                 pane.getWidth() - 8, pane.getHeight() - 8));
-            assertThat(pane.view().fontSize()).isEqualTo(16);
+            assertThat(pane.view().fontSize()).isEqualTo(12);
+            assertThat(pane.view().options().fontFamily()).isEqualTo("Cousine Nerd Font Mono");
             owner.action(ActionId.FONT_BIGGER).actionPerformed(null);
             owner.action(ActionId.FONT_RESET).actionPerformed(null);
-            assertThat(pane.view().fontSize()).isEqualTo(16);
+            assertThat(pane.view().fontSize()).isEqualTo(12);
             owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             layoutTree(owner);
             assertThat(pane.getBackground()).isEqualTo(pane.view().palette().background());

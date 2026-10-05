@@ -48,7 +48,7 @@ class ConfigAliasTest {
 
     @Test void anOldKeyWithABadValueReportsBoth() {
         var result = parse("[font]\nsize = 100\n");
-        assertThat(result.snapshot().fontSize()).isEqualTo(16f);
+        assertThat(result.snapshot().fontSize()).isEqualTo(12f);
         assertThat(result.diagnostics()).extracting(ConfigDiagnostic::message).containsExactlyInAnyOrder(
             "Use a finite number from 6–72; using the default.",
             "Moved to terminal.font.size. Use Migrate Config to update the file.");

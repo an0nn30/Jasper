@@ -6,7 +6,7 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Installed font families, read once; the monospaced subset draws 'i' and 'W' at the same width. */
+/** Installed and bundled font families, read once; the monospaced subset draws 'i' and 'W' at the same width. */
 final class Fonts {
     private static List<String> all;
     private static List<String> monospaced;
@@ -15,6 +15,7 @@ final class Fonts {
 
     static synchronized List<String> families(boolean monospacedOnly) {
         if (all == null) {
+            dev.jasper.app.platform.BundledFonts.register();
             all = List.of(GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames());
             var graphics = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB).createGraphics();
             try {

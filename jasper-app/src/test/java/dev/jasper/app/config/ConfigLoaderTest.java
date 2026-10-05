@@ -18,6 +18,17 @@ class ConfigLoaderTest {
     private static final Path FILE = Path.of("/fixture/config.toml");
     private ConfigLoader.Result parse(String text) { return ConfigLoader.parse(FILE, text, true); }
 
+    @Test void missingFontSettingsUseBundledCousineAtTwelvePointsWhileSavedChoicesWin() {
+        var defaults = parse("").snapshot();
+        assertThat(defaults.font().family()).isEqualTo("Cousine Nerd Font Mono");
+        assertThat(defaults.fontSize()).isEqualTo(12f);
+        var saved = parse("terminal.font.family='JetBrains Mono'\nterminal.font.size=16").snapshot();
+        assertThat(saved.font().family()).isEqualTo("JetBrains Mono");
+        assertThat(saved.fontSize()).isEqualTo(16f);
+        assertThat(parse("terminal.font.size=19").snapshot().font().family()).isEqualTo("Cousine Nerd Font Mono");
+        assertThat(parse("terminal.font.family='Monospaced'").snapshot().fontSize()).isEqualTo(12f);
+    }
+
     @Test void uiTypographyIsIndependentOfTerminalFontAndSurvivesBuilderCopies() {
         var result = parse("ui.font.family='Serif'\nui.font.size=18.5\nterminal.font.size=23");
         assertThat(result.diagnostics()).isEmpty();
@@ -226,7 +237,7 @@ class ConfigLoaderTest {
         var result = parse("[window]\ntab_height = 44\n[terminal.font]\n  size = 900");
         assertThat(result.rejected()).isFalse();
         assertThat(result.snapshot().tabHeight()).isEqualTo(44);
-        assertThat(result.snapshot().fontSize()).isEqualTo(16f);
+        assertThat(result.snapshot().fontSize()).isEqualTo(12f);
         assertDiagnostic(result, "terminal.font.size", 4, 3, ConfigDiagnostic.Severity.ERROR);
         for (String text : new String[]{"terminal.font.size=5.9",
                 "terminal.font.size=72.1", "terminal.font.size=nan", "terminal.font.size=inf", "terminal.font.size=-inf",

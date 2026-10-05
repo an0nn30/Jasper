@@ -39,6 +39,12 @@ a GUI or native benchmark without the user's request. Building the distribution 
 - [Current handoff](../docs/STATUS.md) and [verification](../docs/app-refactor-verification.md):
   actual checkpoints, decisions, independent review and pending native acceptance.
 
+Terminal typography defaults to bundled **Cousine Nerd Font Mono, 12 pt**. The four unmodified faces and their
+notices live in `src/main/resources/dev/jasper/app/fonts/cousine/`; `platform/BundledFonts` registers them once
+per JVM before startup, pane/window metrics and Settings font enumeration. Explicit configuration still wins.
+The independent terminal library keeps its own default font options. `PackagedResourcesTest` loads every face
+from the built app JAR and checks its family, style and symbol coverage.
+
 For a command begin with `workspace/WorkspaceActions`, `commands/ActionId` and
 `workspace/WindowCommands`; for live font defaults begin with `config/ConfigSnapshot`
 and `workspace/WorkspaceConfiguration`; for Buddy producers begin with
