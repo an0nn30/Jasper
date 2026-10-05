@@ -11,6 +11,8 @@ import java.util.Set;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.plaf.basic.BasicComboBoxUI;
+import javax.swing.plaf.basic.BasicComboPopup;
+import javax.swing.plaf.basic.ComboPopup;
 
 /** Semantic exclusive choices. Selection events identify the node; picker actions identify the action. */
 final class Choices {
@@ -27,7 +29,7 @@ final class Choices {
             super(view, node, new JPanel(new BorderLayout()));
             if (node.kind() == Nodes.ChoiceKind.DROPDOWN) {
                 var combo = new ChoiceCombo(context()); input = combo;
-                combo.setRenderer((list, value, index, selected, focus) -> optionLabel(value, selected));
+                combo.setRenderer((list, value, index, selected, focus) -> optionLabel(value, selected && index >= 0));
                 ActionListener listener = event -> {
                     if (applying) return;
                     if (!interactive()) { refresh(); return; }
@@ -47,7 +49,19 @@ final class Choices {
             label.setLabelFor(input); refresh();
         }
         private JLabel optionLabel(Option option, boolean selected) {
-            var renderer = Labels.literal(); renderer.setOpaque(selected);
+            var renderer = new Labels.LiteralLabel() {
+                @Override protected void paintComponent(Graphics graphics) {
+                    if (selected) {
+                        var g=(Graphics2D)graphics.create();
+                        try { ThemePainting.antialias(g);g.setColor(ThemePainting.color(context(),SemanticColor.ACCENT));
+                            int r=ThemePainting.metric(context(),DesignMetrics.Role.MENU_ITEM_RADIUS);
+                            g.fillRoundRect(0,0,getWidth(),getHeight(),r*2,r*2);
+                        } finally {g.dispose();}
+                    }
+                    super.paintComponent(graphics);
+                }
+            };
+            renderer.putClientProperty("html.disable",true); renderer.setOpaque(false);
             renderer.setText(option == null ? "Choose…" : option.label());
             renderer.setFont(ThemePainting.font(context(), Typography.Role.BODY));
             renderer.setForeground(ThemePainting.color(context(), selected ? SemanticColor.TEXT_ONACCENT : option == null ? SemanticColor.TEXT_TERTIARY : SemanticColor.TEXT_PRIMARY));
@@ -70,6 +84,7 @@ final class Choices {
                 input.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY)); input.setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_CONTROL));
                 if (input instanceof JComboBox<?> raw) {
                     var combo = (JComboBox<Option>)raw;
+                    ((ChoiceCombo)combo).refreshPopup();
                     if (!options.equals(choice.options())) {
                         combo.setModel(new DefaultComboBoxModel<>(choice.options().toArray(Option[]::new))); options = choice.options();
                     }
@@ -102,7 +117,8 @@ final class Choices {
                     for (int i = 0; i < input.getComponentCount(); i++) {
                         var button = (SegmentButton)input.getComponent(i); Option option = options.get(i);
                         button.setEnabled(input.isEnabled()); button.setSelected(option.id().equals(choice.selectedId()));
-                        button.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
+                        var font = context().typography().font(Typography.Role.LABEL, button.isSelected());
+                        button.setFont(font.deriveFont(com.formdev.flatlaf.util.UIScale.scale(font.getSize2D())));
                         button.setForeground(ThemePainting.color(context(), button.isSelected() ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_SECONDARY));
                         button.setIcon(option.hue().map(h -> (javax.swing.Icon)new HueDot(context(), h)).orElse(null)); button.setDisabledIcon(button.getIcon());
                         int pad = ThemePainting.metric(context(), DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
@@ -162,11 +178,18 @@ final class Choices {
         }
     }
     static final class ChoiceCombo extends JComboBox<Option> {
-        final KitContext context; ThemePainting.Focus focus;
+        final KitContext context; ThemePainting.Focus focus; BasicComboPopup popup;
         ChoiceCombo(KitContext context) {
             this.context = context; setOpaque(false);
             setBorder(new EmptyBorder(ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0, ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0));
             setUI(new BasicComboBoxUI() {
+                @Override protected ComboPopup createPopup() {
+                    ChoiceCombo.this.popup = new BasicComboPopup(comboBox) {
+                        @Override protected void paintComponent(Graphics graphics) { Menus.paintSurface(this, graphics, context); }
+                    };
+                    ChoiceCombo.this.popup.setOpaque(false);
+                    return ChoiceCombo.this.popup;
+                }
                 @Override protected JButton createArrowButton() { return new JButton() {
                     { setBorder(new EmptyBorder(0, 0, 0, 0)); setContentAreaFilled(false); setOpaque(false); setFocusable(false); }
                     @Override protected void paintComponent(Graphics graphics) {
@@ -177,6 +200,19 @@ final class Choices {
                 }; }
                 @Override public void paintCurrentValueBackground(Graphics graphics, Rectangle bounds, boolean hasFocus) {}
             });
+        }
+        void refreshPopup() {
+            if (popup == null) return;
+            int pad = ThemePainting.metric(context, DesignMetrics.Role.MENU_SEPARATOR_MARGIN);
+            popup.setBorder(new EmptyBorder(pad,pad,pad,pad));
+            var list = popup.getList();
+            list.setBackground(ThemePainting.color(context, SemanticColor.SURFACE_MENU));
+            list.setForeground(ThemePainting.color(context, SemanticColor.TEXT_PRIMARY));
+            list.setSelectionBackground(ThemePainting.color(context, SemanticColor.ACCENT));
+            list.setSelectionForeground(ThemePainting.color(context, SemanticColor.TEXT_ONACCENT));
+            list.setFixedCellHeight(ThemePainting.height(context, DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.BODY));
+            list.setFont(ThemePainting.font(context, Typography.Role.BODY));
+            popup.revalidate(); popup.repaint(); list.repaint();
         }
         @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); return new Dimension(size.width, Math.max(size.height, ThemePainting.height(context, DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY))); }
         @Override public void paint(Graphics graphics) {

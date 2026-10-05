@@ -18,6 +18,26 @@ public abstract class KitContractTest {
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
         new Nodes.Secret("secret",ControlState.READY,"","Password","")))); }
+    @Test void disposalCannotReenterUpdate() throws Exception { edt(() -> {
+        var kit=kit("owner"); var before=new ViewSpec(new Nodes.Custom("custom",ControlState.READY,"content",Nodes.CustomKind.EDITOR,"Editor"));
+        var view=kit.create(before,e -> {}); var calls=new java.util.concurrent.atomic.AtomicInteger(); var rejected=new java.util.concurrent.atomic.AtomicBoolean();
+        view.registerContent(new CustomContent("content",Nodes.CustomKind.EDITOR,new javax.swing.JTextArea(),() -> {
+            calls.incrementAndGet(); try {view.update(spec("Nested"));} catch(IllegalStateException expected){rejected.set(true);}
+        }));
+        view.update(spec("Outer")); assertThat(rejected.get()).isTrue(); assertThat(view.spec()).isEqualTo(spec("Outer"));
+        view.close(); stop(kit); assertThat(calls.get()).isEqualTo(1);
+    }); }
+    @Test void storedSecretDetailsOwnDefensiveTransfersAndWipeTemporaryCopies() throws Exception { edt(() -> {
+        var kit=kit("owner");var events=new ArrayList<UiEvent>();
+        var descriptor=new Nodes.Secret("detail",ControlState.READY,"","Passphrase","",Nodes.SecretKind.DETAIL,"copy-detail");
+        var view=kit.create(new ViewSpec(descriptor),events::add);char[] source={'x','y'};view.replaceSecret("detail",source);source[0]='z';
+        assertThat(events).isEmpty();char[][] held={null};
+        assertThatThrownBy(() -> view.withSecret("detail",chars -> {held[0]=chars;assertThat(chars).containsExactly('x','y');throw new IllegalStateException();})).isInstanceOf(IllegalStateException.class);
+        assertThat(held[0]).containsOnly((char)0);view.replaceSecret("detail",new char[]{'n'});view.withSecret("detail",chars -> assertThat(chars).containsExactly('n'));
+        view.clearSecret("detail");view.withSecret("detail",chars -> assertThat(chars).isEmpty());
+        view.replaceSecret("detail",new char[]{'q'});view.update(spec("Input"));view.update(new ViewSpec(descriptor));view.withSecret("detail",chars -> assertThat(chars).isEmpty());
+        stop(kit);assertThatThrownBy(() -> view.replaceSecret("detail",new char[]{'s'})).isInstanceOf(IllegalStateException.class);
+    }); }
     @Test void createUpdateActionAndClose() throws Exception { edt(() -> {
         var kit=kit("owner"); var events=new ArrayList<UiEvent>(); var view=kit.create(spec("Before"),events::add);
         view.update(spec("After")); assertThat(view.spec()).isEqualTo(spec("After"));
@@ -55,6 +75,7 @@ public abstract class KitContractTest {
     }
     @Test void scopedIconsAndMalformedDescriptorsAreRejected() throws Exception { edt(() -> {
         var kit=kit("owner");
+        assertThatThrownBy(() -> new IconAsset("owner:empty","M 1 1 Z M 15 15 Z")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> kit.registerIcon(new IconAsset("foreign:logo","M 1 1 L 15 15"))).isInstanceOf(IllegalArgumentException.class);
         var icon=kit.registerIcon(new IconAsset("owner:logo","M 1 1 L 15 15"));
         assertThatThrownBy(() -> kit.registerIcon(new IconAsset("owner:logo","M 1 1 L 15 15"))).isInstanceOf(IllegalArgumentException.class);

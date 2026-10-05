@@ -53,6 +53,9 @@ public final class KitGallery {
         result.add(panelState("fileservers-confirmed", "fileservers", "selected", demo -> { demo.dispatch(new UiEvent.Toggled("server-toggle", true)); demo.completePending(true); }));
         result.add(panelState("fileservers-added-pending", "fileservers", "busy", demo -> { demo.dispatch(new UiEvent.Action("fileservers-add")); demo.dispatch(new UiEvent.Toggled("server-1-toggle", true)); }));
         result.addAll(StateFixtures.create());
+        result.add(new Fixture("stored-secret-masked","","stored-secret-masked",320,88,new ViewSpec(new Secret("stored-secret",ControlState.READY,"","Passphrase","",SecretKind.DETAIL,"copy-secret"))));
+        result.add(new Fixture("stored-secret-revealed","","stored-secret-revealed",320,88,new ViewSpec(new Secret("stored-secret",ControlState.READY,"","Passphrase","",SecretKind.DETAIL,"copy-secret"))));
+        result.add(new Fixture("dropdown-open","","dropdown-open",240,130,new ViewSpec(new Nodes.Choice("dropdown",ControlState.READY,ChoiceKind.DROPDOWN,List.of(new Option("ssh","SSH",Optional.of(Hue.GREEN)),new Option("local","Local",Optional.of(Hue.BLUE)),new Option("sftp","SFTP",Optional.of(Hue.PURPLE))),"ssh","Protocol","protocol"))));
         return List.copyOf(result);
     }
     private static Fixture panelState(String name, String panel, String state, java.util.function.Consumer<PanelFixtures.Demo> transition) {
@@ -122,6 +125,12 @@ public final class KitGallery {
                             applyState(view, fixture, focus);
                             JComponent paintedRoot = view;
                             BufferedImage rendered = onSurface(KitFixtures.render(view, width, height, 1), context);
+                            if (fixture.name().equals("dropdown-open")) {
+                                var combo=(JComboBox<?>)find(view,"dropdown.input");
+                                var popup=(javax.swing.plaf.basic.BasicComboPopup)combo.getUI().getAccessibleChild(combo,0);
+                                popup.getList().setSelectedIndex(0);paintedRoot=popup;
+                                rendered=paint(popup,UIScale.scale(240),UIScale.scale(100));
+                            }
                             if (fixture.name().equals("vault-add-menu")) {
                                 var anchor = find(view, "add-menu");
                                 var popup = anchor.getComponentPopupMenu();
@@ -159,6 +168,12 @@ public final class KitGallery {
         @Override public Component getPermanentFocusOwner() { return target; }
     }
     private static void applyState(KitView view, Fixture fixture, GalleryFocus focus) {
+        if(fixture.name().equals("credential-vault") || fixture.name().startsWith("stored-secret")) {
+            String id=fixture.name().equals("credential-vault")?"passphrase":"stored-secret";
+            char[] value={'e','x','a','m','p','l','e','-','o','n','l','y'};
+            try{view.replaceSecret(id,value);}finally{java.util.Arrays.fill(value,(char)0);}
+            if(fixture.state().equals("stored-secret-revealed"))((JButton)find(view,id+".reveal")).doClick(0);
+        }
         if (fixture.state().equals("focus")) {
             JComponent root = find(view, fixture.name().equals("unlock-vault") ? "password" : "state-field");
             Component target = descendants(root).stream().filter(c -> c instanceof JTextField).findFirst().orElse(root);
@@ -254,8 +269,11 @@ public final class KitGallery {
             ImageIO.write(sheet, "png", output.resolve("sheet-" + (start / 8 + 1) + ".png").toFile());
         }
     }
-    private static BufferedImage paint(JComponent component, int width, int height) {
-        component.setSize(width, height); component.doLayout();
+    private static void layout(Container component) {
+        component.doLayout();for(var child:component.getComponents())if(child instanceof Container nested)layout(nested);
+    }
+    static BufferedImage paint(JComponent component, int width, int height) {
+        component.setSize(width, height); layout(component);
         var image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB); var g = image.createGraphics();
         try { component.paint(g); } finally { g.dispose(); } return image;
     }

@@ -16,6 +16,11 @@ public interface UiView extends Subscription {
  /** Erase live secret storage.
  * @param fieldId secret node */
  void clearSecret(String fieldId);
+ /** Replace secret storage with a synchronous defensive copy, without emitting an edit.
+  * The caller retains ownership of value and must erase it when finished.
+  * @param fieldId input or detail secret node
+  * @param value caller-owned characters */
+ void replaceSecret(String fieldId, char[] value);
  /** Focus a node.
  * @param id node id */
  void focus(String id);

@@ -149,6 +149,28 @@ class KitCalibrationTest {
             } finally { context.icons().close(); context.binding().close(); }
         });
     }
+    @Test void panelAndPopupAndMenuItemUseFullNamedRadii() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try {
+                for (JComponent component : List.of(new Panels.Surface(context), new Menus.Popup(context))) {
+                    component.setBorder(javax.swing.BorderFactory.createEmptyBorder()); component.setSize(UIScale.scale(180), UIScale.scale(80));
+                    assertThat((ButtonsTest.paint(component).getRGB(0, UIScale.scale(5)) >>> 24) & 255).isLessThan(200);
+                }
+                var item = new Menus.Item(context); item.setText(""); item.setSize(UIScale.scale(180), UIScale.scale(28)); item.getModel().setArmed(true);
+                assertThat((ButtonsTest.paint(item).getRGB(0, UIScale.scale(2)) >>> 24) & 255).isLessThan(200);
+            } finally { context.icons().close(); context.binding().close(); }
+        });
+    }
+    @Test void sheetBottomCornersUseFullWindowRadius() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, new ViewSpec(new Form("sheet", ControlState.READY, FormKind.SHEET, "Sheet", Optional.empty(), List.of(), Optional.empty(), List.of())), e -> {})) {
+                var surface = view.control("sheet").component; surface.setSize(UIScale.scale(180), UIScale.scale(80));
+                assertThat((ButtonsTest.paint(surface).getRGB(0, UIScale.scale(80-7)) >>> 24) & 255).isLessThan(200);
+            } finally { context.icons().close(); context.binding().close(); }
+        });
+    }
     private static final class FocusManager extends DefaultKeyboardFocusManager { Component target; @Override public Component getFocusOwner() { return target; } }
     @Test void formRowHelperWrapsAndDetailHasSourceInsets() {
         Edt.run(() -> {

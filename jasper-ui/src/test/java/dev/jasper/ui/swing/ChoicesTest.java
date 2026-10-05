@@ -14,6 +14,30 @@ class ChoicesTest {
     static Choice choice(ChoiceKind kind, String selected, ControlState state) {
         return new Choice("choice", state, kind, List.of(new Option("a", "<html>Alpha", Optional.of(Hue.BLUE)), new Option("b", "Beta", Optional.empty())), selected, "Protocol", "choose-protocol");
     }
+    @Test void existingDropdownPopupTracksSemanticMenuColorsAndRows() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();
+            try(var view=new KitView(context,stack(choice(ChoiceKind.DROPDOWN,"a",ControlState.READY)),e -> {})) {
+                var combo=find(view,"choice.input",JComboBox.class);
+                var popup=(javax.swing.plaf.basic.BasicComboPopup)combo.getUI().getAccessibleChild(combo,0);
+                var list=popup.getList();
+                for(var color:List.of(java.awt.Color.RED,java.awt.Color.GREEN)) {
+                    var base=KitFixtures.dark();var colors=new EnumMap<dev.jasper.ui.theme.SemanticColor,java.awt.Color>(dev.jasper.ui.theme.SemanticColor.class);
+                    for(var role:dev.jasper.ui.theme.SemanticColor.values())colors.put(role,base.semantic().color(role));
+                    colors.put(dev.jasper.ui.theme.SemanticColor.SURFACE_MENU,color);
+                    var theme=new dev.jasper.ui.theme.GeneratedTheme(base.name(),base.dark(),base.author(),base.tokens(),base.syntax(),base.terminal(),base.uiKeys(),base.icons(),base.glass(),new dev.jasper.ui.theme.SemanticPalette(colors));
+                    context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme,theme));
+                    assertThat(popup.getList()).isSameAs(list);assertThat(list.getBackground()).isEqualTo(color);
+                    assertThat(list.getFixedCellHeight()).isGreaterThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(28));
+                    var row=(JComponent)combo.getRenderer().getListCellRendererComponent(list,combo.getItemAt(0),0,true,false);
+                    row.setSize(com.formdev.flatlaf.util.UIScale.scale(220),list.getFixedCellHeight());
+                    assertThat(ButtonsTest.paint(row).getRGB(com.formdev.flatlaf.util.UIScale.scale(200),list.getFixedCellHeight()/2)).isEqualTo(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT).getRGB());
+                    popup.setSize(com.formdev.flatlaf.util.UIScale.scale(180),com.formdev.flatlaf.util.UIScale.scale(80));
+                    assertThat(ButtonsTest.paint(popup).getRGB(com.formdev.flatlaf.util.UIScale.scale(90),com.formdev.flatlaf.util.UIScale.scale(2))).isEqualTo(color.getRGB());
+                }
+            }finally{release(context);}
+        });
+    }
     @Test void pickerUsesChoiceSurfaceWhileSecondaryButtonsRetainTheirIndependentColors() {
         Edt.run(() -> {
             int width = com.formdev.flatlaf.util.UIScale.scale(240), height = com.formdev.flatlaf.util.UIScale.scale(40);
@@ -63,6 +87,7 @@ class ChoicesTest {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
             try (var view = new KitView(context, stack(choice(ChoiceKind.SEGMENTED, "a", ControlState.READY)), events::add)) {
                 var a = find(view, "choice.option.a", JButton.class);
+                assertThat(a.getFont().getAttributes().get(java.awt.font.TextAttribute.WEIGHT)).isEqualTo(java.awt.font.TextAttribute.WEIGHT_MEDIUM);
                 var key = a.getInputMap(JComponent.WHEN_FOCUSED).get(KeyStroke.getKeyStroke("RIGHT")); assertThat(key).isNotNull();
                 a.getActionMap().get(key).actionPerformed(new java.awt.event.ActionEvent(a, 0, ""));
                 assertThat(events).containsExactly(new UiEvent.Selected("choice", Set.of("b")));

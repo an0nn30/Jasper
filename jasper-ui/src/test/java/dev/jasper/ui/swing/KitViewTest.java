@@ -219,6 +219,18 @@ class KitViewTest {
             } finally { release(context); }
         });
     }
+    @Test void disposalCannotReenterUpdateAndOuterTreeMatchesSpec() {
+        Edt.run(() -> {
+            var context=KitFixtures.context(); var holder=new KitView[1]; var count=new java.util.concurrent.atomic.AtomicInteger();
+            try {
+                holder[0]=new KitView(context,new ViewSpec(new Custom("custom",ControlState.READY,"content",CustomKind.EDITOR,"Editor")),e -> {});
+                holder[0].registerContent("content",new JTextArea(),() -> {count.incrementAndGet(); assertThatThrownBy(() -> holder[0].update(new ViewSpec(new Text("nested",ControlState.READY,"Nested",TextRole.BODY)))).isInstanceOf(IllegalStateException.class).hasMessageContaining("update");});
+                var outer=new ViewSpec(new Text("outer",ControlState.READY,"Outer",TextRole.BODY)); holder[0].update(outer);
+                assertThat(holder[0].spec()).isEqualTo(outer); assertThat(find(holder[0],"outer",JLabel.class).getText()).isEqualTo("Outer");
+                holder[0].close(); assertThat(count.get()).isEqualTo(1);
+            } finally {if(holder[0]!=null)holder[0].close();release(context);}
+        });
+    }
     @Test void disposalCallbackClosingViewDisposesTheNewlyMountedControls() {
         Edt.run(() -> {
             var context=KitFixtures.context();var button=new JButton[1];var holder=new KitView[1];

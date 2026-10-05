@@ -73,6 +73,7 @@ final class ControlRegistry {
         return switch (node) {
             case Nodes.Custom custom -> java.util.List.of(custom.kind(),custom.contentId());
             case Nodes.Field field -> field.kind();
+            case Nodes.Secret secret -> secret.kind();
             case Nodes.Button button -> button.kind();
             case Nodes.Choice choice -> choice.kind();
             default -> node.getClass();

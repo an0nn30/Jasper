@@ -30,6 +30,12 @@ class ThemeGeneratorTest {
         return ThemeGenerator.generate(ThemeResolver.resolve(ThemeToml.parse(toml, "test.toml")));
     }
 
+    @Test void authoredUiColorsReachSemanticSnapshotWithCanonicalAndNativePrecedence() {
+        String source=SEEDS+"\n[ui]\n\"Panel.background\" = \"#123456\"\n";
+        assertThat(generate(source).semantic().color(SemanticColor.SURFACE_PANEL)).isEqualTo(new Color(0x123456));
+        assertThat(generate(source+"\n[tokens]\nsurface=\"#abcdef\"\n").semantic().color(SemanticColor.SURFACE_PANEL)).isEqualTo(new Color(0xabcdef));
+        assertThat(generate(source+"\n[semantic]\n\"surface.panel\"=\"#fedcba\"\n").semantic().color(SemanticColor.SURFACE_PANEL)).isEqualTo(new Color(0xfedcba));
+    }
     @Test void seedsAloneMakeACompleteTheme() {
         GeneratedTheme theme = generate(SEEDS);
         assertThat(theme.name()).isEqualTo("Mocha");
@@ -313,6 +319,7 @@ class ThemeGeneratorTest {
             "Probe.background" = { "os.mac" = "true", "os.default" = "#123456" }
             "Probe.borderColor" = "mix(false, #fff, 25%)"
             "Probe.caretColor" = "if(true, true, #123456)"
+            "ColorPalette.Gray2" = "#223344"
             "Label.foreground" = "Gray2"
             "Button.background" = "if(true, #123456, #abcdef)"
             "Button.foreground" = "if(false, Gray2, #abcdef)"

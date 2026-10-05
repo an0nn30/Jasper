@@ -19,7 +19,7 @@ final class IconPaths {
         }
         if (!text.substring(end).matches("[\\s]*") || tokens.isEmpty() || !tokens.getFirst().matches("[Mm]"))
             throw new IllegalArgumentException("Path must start with a move");
-        int at = 0, count = 0; char command = 0;
+        int at = 0, count = 0; char command = 0; boolean drawable = false;
         while (at < tokens.size()) {
             String token = tokens.get(at);
             if (Character.isLetter(token.charAt(0))) { command = token.charAt(0); at++; }
@@ -33,6 +33,7 @@ final class IconPaths {
                 case 'Z' -> 0;
                 default -> throw new IllegalArgumentException("Unknown path command");
             };
+            if (Character.toUpperCase(command) != 'M' && Character.toUpperCase(command) != 'Z') drawable = true;
             if (++count > 2048) throw new IllegalArgumentException("Too many path commands");
             for (int i = 0; i < args; i++) {
                 if (at >= tokens.size() || Character.isLetter(tokens.get(at).charAt(0))) throw new IllegalArgumentException("Missing path parameter");
@@ -54,6 +55,8 @@ final class IconPaths {
             if (command == 'M') command = 'L'; else if (command == 'm') command = 'l';
             if (args == 0) command = 0;
         }
+
+        if (!drawable) throw new IllegalArgumentException("Path must contain drawable segments");
         return count;
     }
 }

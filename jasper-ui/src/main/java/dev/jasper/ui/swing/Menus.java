@@ -426,18 +426,22 @@ final class Menus {
 
         @Override
         protected void paintComponent(Graphics graphics) {
+            paintSurface(this, graphics, context);
+        }
+    }
+
+    static void paintSurface(JComponent component, Graphics graphics, KitContext context) {
             var g = (Graphics2D) graphics.create();
             try {
                 ThemePainting.antialias(g);
                 int r = ThemePainting.metric(context, DesignMetrics.Role.CARD_RADIUS);
                 g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_MENU));
-                g.fillRoundRect(0, 0, getWidth(), getHeight(), r, r);
+                g.fillRoundRect(0, 0, component.getWidth(), component.getHeight(), r * 2, r * 2);
                 g.setColor(ThemePainting.color(context, SemanticColor.BORDER_MENU));
-                g.draw(new RoundRectangle2D.Double(.5, .5, getWidth() - 1, getHeight() - 1, r, r));
+                g.draw(new RoundRectangle2D.Double(.5, .5, component.getWidth() - 1, component.getHeight() - 1, r * 2, r * 2));
             } finally {
                 g.dispose();
             }
-        }
     }
 
     static final class Item extends JMenuItem {
@@ -472,7 +476,7 @@ final class Menus {
                 if (hover) {
                     g.setColor(ThemePainting.color(context, SemanticColor.ACCENT));
                     int r = ThemePainting.metric(context, DesignMetrics.Role.MENU_ITEM_RADIUS);
-                    g.fillRoundRect(0, 0, getWidth(), getHeight(), r, r);
+                    g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2);
                 }
                 g.setColor(
                         ThemePainting.color(

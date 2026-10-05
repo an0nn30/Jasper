@@ -85,6 +85,17 @@ try (var binding = new ThemeBinding(new ThemePair(generated, generated), failure
 Asynchronous consumers must transfer a clone to an owner that erases it. Secrets never enter nodes,
 events, metadata or diagnostics. Reveal state and wipeable documents belong to the view.
 
+Stored credentials use `SecretKind.DETAIL` plus a value-free copy action; the legacy constructor
+continues to create INPUT. `replaceSecret(id, char[])` defensively copies without an edit event and
+leaves the original caller-owned. DETAIL uses character-array painting, never a text-component value.
+Replacement/removal/kind change/close wipe owned values; `clearSecret` and replacement remask details.
+Copy emits only `Action(copyAction)`; the domain callback uses `withSecret` and its credential clipboard
+service. No secret-bearing immutable string or general clipboard write is added by the kit.
+
+Updates invoked from an in-progress update are rejected before mutation at module/SDK/fake boundaries.
+Disposal still contains callback diagnostics and permits reentrant close; normal event handlers can
+continue updating synchronously outside reconciliation.
+
 Containers own semantic layout. Forms consume a host-supplied logical available-content-height;
 the host owns window chrome, sheet/scrim lifetime and cancellation cleanup. Panels own header,
 context/navigation, virtual body and persistent footer. Hidden headers consume zero space.
@@ -107,3 +118,9 @@ single/double-list roles; ordinary CONTROL folder icons remain plain glyphs.
 
 See [maintenance](ui-maintenance.md), [calibration evidence](design/theme-engine/calibration.md),
 [module entry point](../jasper-ui/README.md) and [SDK architecture](sdk-architecture.md).
+
+
+Pure generation can take `RuntimePlatform` explicitly. Ordered authored UI literals, OS choices,
+references, aliases and supported deterministic functions reach the semantic snapshot before the
+explicit native-token and canonical override layers. `systemColor` requires a resolvable fallback;
+missing required references/cycles diagnose the source origin/key. Optional references may be null.

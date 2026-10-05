@@ -246,7 +246,7 @@ final class Panels {
                 ThemePainting.antialias(g);
                 g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_PANEL));
                 int r = ThemePainting.metric(context, DesignMetrics.Role.CARD_RADIUS);
-                g.fillRoundRect(0, 0, getWidth(), getHeight(), r, r);
+                g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2);
             } finally {
                 g.dispose();
             }

@@ -45,6 +45,17 @@ final class SecretBuffer extends PlainDocument implements AutoCloseable {
     }
     boolean clearing() { return clearing || clearPending; }
     char[] snapshot() { return Arrays.copyOf(storage.data, getLength()); }
+    void replace(char[] value) {
+        if (closed) throw new IllegalStateException("Secret buffer is closed");
+        if (notifying != 0) throw new IllegalStateException("Cannot replace during secret notification");
+        clear(); clearing = true; writeLock();
+        try {
+            storage.insertChars(0,value);
+            var event = new DefaultDocumentEvent(0,value.length,javax.swing.event.DocumentEvent.EventType.INSERT);
+            insertUpdate(event,null); event.end(); fireInsertUpdate(event);
+        } catch (BadLocationException impossible) { throw new IllegalStateException(impossible); }
+        finally { writeUnlock(); clearing=false; }
+    }
     void clear() {
         if (clearing) return;
         // Callback teardown may occur while Swing prohibits document writes. Wipe immediately,

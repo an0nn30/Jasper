@@ -51,7 +51,7 @@ class IconRegistryTest {
         }
     }
     @Test void strictPathGrammarMetadataAndBaseAlphaAreValidated() {
-        for (String bad : java.util.List.of("M 1 1 Z 2 3", "M 1 1 L 4 4 junk", "M 1 1 A 2 2 0 2 0 3 3", "M 1 1 L 1e999 2", "M 1 1 L NaN 3", "M 1 1 L 2 3 #red", "M,1,1 L 2 2", "M 1,,1 L 2 2", "M 1 1 L 2 2,"))
+        for (String bad : java.util.List.of("M 1 1 Z M 15 15 Z", "M 1 1 Z 2 3", "M 1 1 L 4 4 junk", "M 1 1 A 2 2 0 2 0 3 3", "M 1 1 L 1e999 2", "M 1 1 L NaN 3", "M 1 1 L 2 3 #red", "M,1,1 L 2 2", "M 1,,1 L 2 2", "M 1 1 L 2 2,"))
             assertThatThrownBy(() -> new IconArtwork(bad)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new IconArtwork("M 1 1 L 15 15", 24, 1.5f)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new IconArtwork("M 1 1 L 15 15", 16, 2)).isInstanceOf(IllegalArgumentException.class);

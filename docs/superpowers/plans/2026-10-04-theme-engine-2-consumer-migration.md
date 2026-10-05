@@ -10,6 +10,11 @@
 
 **Spec:** [Approved design](../specs/2026-10-04-jasper-theme-engine-design.md).
 **Prerequisite:** [Plan 1](2026-10-04-theme-engine-1-engine-and-kit.md) implemented, reviewed and verified.
+
+**Mandatory Task 4 policy wiring:** replace HostedKit's temporary `() -> true` animation supplier
+with the live `ui.animations.enabled` application setting before mounting migrated production surfaces.
+Test disabled motion and setting changes on an existing hosted view. This is also recorded in the
+[temporary-path ledger](../../design/theme-engine/temporary-paths.md).
 **Shared contracts:** [Exact paths and APIs](2026-10-04-theme-engine-contracts.md).
 **Status:** Written for review; not executed. No deviations. Do not interpret task checkboxes or expected outcomes as completed verification.
 

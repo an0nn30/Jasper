@@ -136,6 +136,13 @@ final class InteractiveRows {
             canvas.revalidate();
             sync();
             canvas.repaint();
+            for (var child : popup.getComponents()) if (child instanceof Menus.Item entry
+                    && entry.getClientProperty("Jasper.menu.item") instanceof MenuItem item) {
+                Composition.style(entry, context(), Typography.Role.BODY, SemanticColor.TEXT_PRIMARY);
+                entry.setIcon(item.icon().isBlank() ? null : context().icons().tile(item.icon(),
+                        context().theme().semantic(), item.hue(), ThemePainting.metric(context(), DesignMetrics.Role.MENU_TILE), false));
+            }
+            popup.revalidate(); popup.repaint();
         }
 
         int footerHeight() {
@@ -255,6 +262,7 @@ final class InteractiveRows {
                 }
                 var entry = new Menus.Item(context());
                 entry.setText(item.label());
+                entry.putClientProperty("Jasper.menu.item", item);
                 entry.putClientProperty("html.disable", true);
                 entry.setEnabled(item.enabled());
                 Composition.style(
@@ -269,7 +277,7 @@ final class InteractiveRows {
                                         .tile(
                                                 item.icon(),
                                                 context().theme().semantic(),
-                                                Nodes.Hue.NEUTRAL,
+                                                item.hue(),
                                                 ThemePainting.metric(
                                                         context(), DesignMetrics.Role.MENU_TILE),
                                                 false));

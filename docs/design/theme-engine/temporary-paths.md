@@ -111,3 +111,12 @@ preserved. License/provenance files travel with their assets. No resource is del
 | `jasper-app/src/main/resources/dev/jasper/app/themes/THIRD-PARTY-THEMES.md` | App provenance/legacy-name policy (not a module copy) | Tasks 2/3 | Retain or relocate with catalog assets; preserve licensing and migration alias semantics. |
 | `jasper-app/src/main/resources/dev/jasper/app/themes/legacy-aliases.json` | App provenance/legacy-name policy (not a module copy) | Tasks 2/3 | Retain or relocate with catalog assets; preserve licensing and migration alias semantics. |
 | `jasper-app/src/main/resources/dev/jasper/app/themes/licenses/nord/license` | App provenance/legacy-name policy (not a module copy) | Tasks 2/3 | Retain or relocate with catalog assets; preserve licensing and migration alias semantics. |
+
+
+## Required host-policy wiring before production cutover
+
+`jasper-app/src/main/java/dev/jasper/app/plugins/HostedKit.java` temporarily passes `() -> true`
+as the kit animation supplier. **Plan 2 Task 4 owns replacing it with the live application
+`ui.animations.enabled` setting before any migrated production surface mounts.** Verify disabled
+motion and a setting change on an existing hosted view. The standalone kit's supplier/motion behavior
+is already implemented; this is remaining app integration, not permission to ship a hardcoded policy.

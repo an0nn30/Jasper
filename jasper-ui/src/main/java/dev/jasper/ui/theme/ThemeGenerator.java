@@ -69,16 +69,21 @@ public final class ThemeGenerator {
      * @param resolved a resolved document with background, foreground, accent and all eight normal ANSI colors
      * @return the complete generated tokens, syntax, terminal palette and UI data
      */
-    public static GeneratedTheme generate(ThemeDocument resolved) { return new Generation(resolved).result(); }
+    public static GeneratedTheme generate(ThemeDocument resolved) { return generate(resolved, RuntimePlatform.current()); }
+
+    /** Generate deterministically for an explicit runtime platform, without consulting Swing. */
+    public static GeneratedTheme generate(ThemeDocument resolved, RuntimePlatform platform) { return new Generation(resolved, platform).result(); }
 
     private static final class Generation {
         private final ThemeDocument document;
+        private final RuntimePlatform platform;
         private final Color background, foreground, accent, cursor, selection;
         private final boolean dark;
         private final List<Color> ansi;
         private final Map<Token, Color> tokens = new EnumMap<>(Token.class);
 
-        Generation(ThemeDocument document) {
+        Generation(ThemeDocument document, RuntimePlatform platform) {
+            this.platform = java.util.Objects.requireNonNull(platform);
             this.document = document;
             background = seed(Seed.BACKGROUND);
             foreground = seed(Seed.FOREGROUND);
@@ -110,7 +115,18 @@ public final class ThemeGenerator {
             for (SyntaxRole role : SyntaxRole.values()) syntax.put(role, syntax(role));
             return new GeneratedTheme(document.name(), dark, document.metadata().getOrDefault("author", "Jasper"), tokens, syntax,
                 new TerminalColors(background, foreground, cursor, selection, ansi), uiKeys(), document.icons(), document.workspace().levels(),
-                SemanticDefaults.resolve(document.semanticOverrides(), tokens, new TerminalColors(background, foreground, cursor, selection, ansi)));
+                semanticPalette());
+        }
+
+        private SemanticPalette semanticPalette() {
+            var legacy = new EnumMap<Token,Color>(Token.class); legacy.putAll(tokens);
+            var authored = new AuthoredUiColors(document, platform, uiKeys()).tokens(); legacy.putAll(authored);
+            var overrides = new EnumMap<SemanticColor,Color>(SemanticColor.class);
+            // Focus is a dependent default only when no legacy focus color was authored.
+            if (authored.containsKey(FOCUS_RING) || document.tokens().containsKey(FOCUS_RING))
+                overrides.put(SemanticColor.BORDER_FOCUS, legacy.get(FOCUS_RING));
+            overrides.putAll(document.semanticOverrides());
+            return SemanticDefaults.resolve(overrides, legacy, new TerminalColors(background, foreground, cursor, selection, ansi));
         }
 
         private Color token(Token token) {

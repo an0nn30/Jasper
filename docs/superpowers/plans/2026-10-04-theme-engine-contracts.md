@@ -1,7 +1,7 @@
 # Shared contracts for the three theme-engine plans
 
-Status: Plan 1 engine/kit and SDK 0.14.1 projection are implemented through Task 13;
-Task 14 final whole-branch verification/review remains pending. Plans 2–3 consumers remain unexecuted.
+Status: Plan 1 implementation and the combined final-review fix wave are implemented;
+scoped independent rereview remains pending. Plans 2–3 consumers remain unexecuted.
 Authority: [approved spec](../specs/2026-10-04-jasper-theme-engine-design.md).
 This is a shared contract appendix, not a fourth implementation plan.
 
@@ -169,7 +169,7 @@ unique within their owning control; references resolve only in that control. Do 
 | MenuButton | `String label, String icon, ButtonKind kind, String action, List<MenuItem> items, String tooltip` |
 | StatusDot | `StatusKind kind` |
 | Field | `FieldKind kind, String value, String hint, String label, String trailingAction` |
-| Secret | `String hint, String label, String revealGroup` (no string value) |
+| Secret | `String hint, String label, String revealGroup, SecretKind kind, String copyAction` (no string value) |
 | Choice | `ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon` |
 | Toggle | `String label, boolean checked, String action, boolean compact` |
 | Chip | `String label, Hue hue` |
@@ -287,6 +287,7 @@ public void update(ViewSpec spec);
 public ViewSpec spec();
 public void withSecret(String fieldId, Consumer<char[]> use);
 public void clearSecret(String fieldId);
+public void replaceSecret(String fieldId, char[] value);
 public void focus(String id);
 public void setAvailableHeight(int logicalPixels);
 public void registerContent(String id, JComponent component, AutoCloseable lifetime);
@@ -327,7 +328,7 @@ For a mounted kit Panel, app ToolWindowSurface suppresses its old outer header a
 placement/collapse/drag behavior to this header. Exactly one title/count/action row is visible.
 
 The SDK mirrors Nodes/support records/ViewSpec/UiEvent in `dev.jasper.sdk.ui`, without module imports.
-`UiView extends Subscription` exposes update/spec/withSecret/clearSecret/focus and typed content
+`UiView extends Subscription` exposes update/spec/withSecret/clearSecret/replaceSecret/focus and typed content
 registration via `void registerContent(CustomContent content)`, but never `component()`. `UiKit.create(ViewSpec,Consumer<UiEvent>): UiView` is implemented
 by `HostedKit` and `FakeKit`. `PluginContext.kit(): UiKit` supplies the factory. `KitValues` exhaustively
 maps the two sealed vocabularies and events. Host-owned views cannot be passed to another plugin.
@@ -407,3 +408,60 @@ hidden panel headers consume zero height. Category tile roles use 20 single/rail
 CONTROL icons remain glyphs. Ordered rows use bounded input chrome, separators and leading add;
 settings choices use the 160 trailing-width role. FormRow helper CAPTION/DESCRIPTION text wraps.
 Gallery evidence and scale/crop anchors are in [calibration](../../design/theme-engine/calibration.md).
+
+
+## Combined final-review contract rulings — 2026-10-04
+
+`ThemeGenerator.generate(document, RuntimePlatform)` resolves a deterministic MAC/WINDOWS/LINUX/OTHER
+snapshot; the original overload selects `RuntimePlatform.current()` from the JDK OS property. The
+model never reads Swing defaults. Shared `UiTokenKeys` supplies representative inverse keys and
+legacy aliases. Ordered authored UI colors (including platform branch/default, references, aliases,
+button gradient-start pairs and wildcard order) populate semantic legacy bases. Explicit native
+`[tokens]` override that inverse input; explicit `[semantic]` values apply last. Authored focus colors
+supply border.focus when present; otherwise it still derives from final accent. Component.borderColor
+installs the matching border.input role. Imported token provenance and post-JSON exclusions remain
+owned by the existing importer; no import goldens or source assets were regenerated.
+
+The pure bounded evaluator supports admitted deterministic color functions, references and alpha;
+its function behavior is checked against pinned FlatLaf 3.7. `systemColor` uses its explicit fallback
+because the pure model has no native color source. Missing/unresolvable fallback, missing required
+references and cycles yield origin/key-aware actionable diagnostics; optional `$?` references may
+resolve to null. Function `derived`/`lazy` inputs become colors in the immutable snapshot, with
+no live UI lookup. New publications recompute from current authored inputs.
+
+`SecretKind` is INPUT or DETAIL. The five-argument constructor remains INPUT with no copy action.
+DETAIL is read-only, uses mutable owned character storage and char-array painting, and keeps reveal
+and optional copy controls enabled independently of editability. No stored value enters a text
+component, descriptor, event, metadata or diagnostic. `replaceSecret(id, char[])` synchronously copies
+caller-owned data without an edit event, and works for INPUT and DETAIL. The caller retains and erases
+its original. Replacement, kind change, removal and close erase owned data; detail replacement and
+clear also remask. `withSecret` always erases its callback copy in finally. A detail copy control emits
+only `Action(copyAction)`; the domain handler calls `withSecret` and transfers to its existing credential
+clipboard/async owner, which remains responsible for that independent lifetime. The kit never silently
+writes the system clipboard. Fake input simulation rejects DETAIL; the fake/host mirror transfers.
+
+A nested `update` during reconciliation is rejected before mutation by KitView, HostedKitView and
+FakeKitView. Disposal callbacks retain existing contained-diagnostic behavior, outer reconciliation
+commits its matching descriptor/tree, and each lifetime closes exactly once. Reentrant close remains
+allowed. Ordinary event callbacks outside reconciliation may still update synchronously.
+
+Dropdown popup list/background/border/row height use the menu treatment and refresh on the existing
+popup/list during same-variant changes. Selected segment labels use central medium weight, scaled once.
+All named radii are full radii (Java arcs receive twice the metric). Row context items retain their
+explicit hue and refresh retained icons on appearance publication. Icon paths with only moves/closes
+are rejected by both the SDK grammar and module artwork validation.
+
+Plan 2 must replace HostedKit's temporary always-enabled animation supplier with the real live
+`ui.animations.enabled` source before exposing migrated production surfaces. This obligation remains
+in Plan 2 and the temporary-path ledger. Full app composition, font/native gesture acceptance and
+user review of gallery artifacts remain Plan 3/user-run; the secure detail capability is completed
+in Plan 1 rather than deferred.
+
+
+Final-review compatibility ruling: canonical roles honor authored supported UI colors ahead of
+FlatLaf theme-name/author-specific post-JSON heuristics. For example, Carbon's authored Panel
+`#202020` and TextField `#112233` resolve/install `surface.input=#112233`; the foreign heuristic
+`lighten($Panel.background,4%)` does not replace that role. The model has no vendor-name logic or
+new provenance mechanism. Existing importer exclusions/provenance and ancillary legacy UI behavior
+remain; this is not full vendor visual parity. Themes relying on those heuristics may need explicit
+semantic adjustment during Plan 2 visual acceptance. A concrete Carbon regression preserves this ruling.

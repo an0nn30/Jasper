@@ -85,12 +85,17 @@ public final class Nodes {
         }
     }
 
-    public record Secret(String id, ControlState state, String hint, String label, String revealGroup) implements Node {
+    public enum SecretKind { INPUT, DETAIL }
+
+    public record Secret(String id, ControlState state, String hint, String label, String revealGroup, SecretKind kind, String copyAction) implements Node {
         public Secret {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(hint);
             ModelChecks.label(label, "label");
-            Objects.requireNonNull(revealGroup);
+            Objects.requireNonNull(revealGroup); Objects.requireNonNull(kind); Objects.requireNonNull(copyAction);
+        }
+        public Secret(String id, ControlState state, String hint, String label, String revealGroup) {
+            this(id,state,hint,label,revealGroup,SecretKind.INPUT,"");
         }
     }
 

@@ -26,9 +26,21 @@ class GalleryCoverageTest {
         assertThat(KitGallery.fixtures().stream().map(KitGallery.Fixture::name))
             .contains("sessions", "tunnels", "sftp", "fileservers", "sftp-connected", "sessions-filtered-empty", "fileservers-pending", "fileservers-failed", "fileservers-confirmed");
         assertThat(KitGallery.fixtures().stream().map(KitGallery.Fixture::state))
-            .contains("normal", "hover", "focus", "pressed", "selected", "disabled", "error", "busy", "conditional", "empty", "filtered-empty", "motion-disabled");
+            .contains("normal", "hover", "focus", "pressed", "selected", "disabled", "error", "busy", "conditional", "empty", "filtered-empty", "motion-disabled", "stored-secret-masked", "stored-secret-revealed", "dropdown-open");
     }
 
+    @Test void openedDropdownCaptureLaysOutRealListRows() {
+        dev.jasper.ui.testsupport.Edt.run(() -> {
+            var context=dev.jasper.ui.testsupport.KitFixtures.context();
+            var fixture=KitGallery.fixtures().stream().filter(f -> f.name().equals("dropdown-open")).findFirst().orElseThrow();
+            try(var view=new dev.jasper.ui.swing.KitView(context,fixture.spec(),e -> {})) {
+                var pending=new java.util.ArrayDeque<java.awt.Component>();pending.add(view);javax.swing.JComboBox<?> combo=null;
+                while(!pending.isEmpty()){var c=pending.removeFirst();if(c instanceof javax.swing.JComboBox<?> found){combo=found;break;}if(c instanceof java.awt.Container parent)Collections.addAll(pending,parent.getComponents());}
+                assertThat(combo).isNotNull();var popup=(javax.swing.plaf.basic.BasicComboPopup)combo.getUI().getAccessibleChild(combo,0);
+                KitGallery.paint(popup,240,100);assertThat(popup.getList().getWidth()).isPositive();assertThat(popup.getList().getHeight()).isGreaterThanOrEqualTo(84);
+            }finally{context.icons().close();context.binding().close();}
+        });
+    }
     @Test void missingCoverageDiagnosticNamesTheNode() {
         var values = new HashSet<String>();
         KitGallery.fixtures().forEach(f -> collect(f.spec().root(), values));

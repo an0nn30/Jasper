@@ -9,6 +9,7 @@ public final class FakeKitView implements UiView {
  private static final Map<javax.swing.JComponent,FakeKitView> CONTENT_OWNERS=new IdentityHashMap<>();
  final FakeKit owner;
  private ViewSpec spec;
+ private boolean updating;
  private Consumer<UiEvent> events;
  private final Map<String,char[]> secrets=new HashMap<>();
  private final Map<String,CustomContent> contents=new HashMap<>();
@@ -17,16 +18,17 @@ public final class FakeKitView implements UiView {
  FakeKitView(FakeKit owner, ViewSpec spec, Consumer<UiEvent> events) {this.owner=owner;this.events=Objects.requireNonNull(events);update(spec);}
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
  @Override public ViewSpec spec(){guard();return spec;}
- @Override public void update(ViewSpec next){guard();Objects.requireNonNull(next);var nodes=index(next.root());
-  secrets.entrySet().removeIf(e -> {if(nodes.get(e.getKey()) instanceof Nodes.Secret)return false;Arrays.fill(e.getValue(),(char)0);return true;});
+ @Override public void update(ViewSpec next){guard();Objects.requireNonNull(next);if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{var nodes=index(next.root());
+  secrets.entrySet().removeIf(e -> {if(nodes.get(e.getKey()) instanceof Nodes.Secret nextSecret && index(spec.root()).get(e.getKey()) instanceof Nodes.Secret oldSecret && nextSecret.kind()==oldSecret.kind())return false;Arrays.fill(e.getValue(),(char)0);return true;});
   for(var content:List.copyOf(contents.values()))if(nodes.values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id()) && c.kind()==content.kind() && index(spec.root()).get(c.id()) instanceof Nodes.Custom previous && previous.contentId().equals(content.id()) && previous.kind()==content.kind())){dispose(content);}
-  spec=next;if(focused!=null&&!nodes.containsKey(focused))focused=null;
+  spec=next;if(focused!=null&&!nodes.containsKey(focused))focused=null;}finally{updating=false;}
  }
  private static Map<String,Nodes.Node> index(Nodes.Node root){var result=new HashMap<String,Nodes.Node>();walk(root,result);return result;}
  private static void walk(Nodes.Node node,Map<String,Nodes.Node> result){result.put(node.id(),node);for(var child:children(node))walk(child,result);}
  private void requireSecret(String id){guard();if(!(index(spec.root()).get(id) instanceof Nodes.Secret))throw new IllegalArgumentException("Not a secret node");}
  /** Simulate input; the fake owns a copy and never includes it in diagnostics. */
- public void setSecret(String id,char[] value){requireSecret(id);clearSecret(id);secrets.put(id,value.clone());emit(new UiEvent.SecretChanged(id));}
+ public void setSecret(String id,char[] value){requireSecret(id);if(((Nodes.Secret)index(spec.root()).get(id)).kind()!=Nodes.SecretKind.INPUT)throw new IllegalArgumentException("Secret detail is read-only");replaceSecret(id,value);emit(new UiEvent.SecretChanged(id));}
+ @Override public void replaceSecret(String id,char[] value){requireSecret(id);Objects.requireNonNull(value);char[] next=value.clone();clearSecret(id);secrets.put(id,next);}
  @Override public void withSecret(String id,Consumer<char[]> use){requireSecret(id);Objects.requireNonNull(use);char[] copy=secrets.getOrDefault(id,new char[0]).clone();try{use.accept(copy);}finally{Arrays.fill(copy,(char)0);}}
  @Override public void clearSecret(String id){requireSecret(id);var old=secrets.remove(id);if(old!=null)Arrays.fill(old,(char)0);}
  @Override public void focus(String id){guard();if(!index(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");focused=id;}

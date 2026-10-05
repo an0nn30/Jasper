@@ -14,6 +14,35 @@ import static dev.jasper.ui.swing.KitViewTest.*;
 @SuppressWarnings("try")
 class SecretFieldsTest {
     static Secret secret(String id, String group) { return new Secret(id, ControlState.READY, "Password", "Password", group); }
+    @Test void storedDetailTransfersCopiesRevealsAndCopiesWithoutImmutableValues() {
+        Edt.run(() -> {
+            var context=KitFixtures.context(); var events=new ArrayList<UiEvent>(); char[][] copied={null}; var holder=new KitView[1];
+            var descriptor=new Secret("detail",ControlState.READY,"","Passphrase","",SecretKind.DETAIL,"copy-detail");
+            try(var view=new KitView(context,stack(descriptor),event -> {events.add(event); if(event.equals(new UiEvent.Action("copy-detail")))holder[0].withSecret("detail",chars -> {copied[0]=chars; assertThat(chars).containsExactly('x','y');});})) {
+                holder[0]=view;char[] source={'x','y'}; view.replaceSecret("detail",source); source[0]='z';
+                assertThat(events).isEmpty(); assertThat(descriptor.toString()).doesNotContain("xy");
+                var control=(SecretFields.SecretControl)view.control("detail");
+                assertThat(control.input.getParent()).isNull(); assertThat(control.input.isEditable()).isFalse();
+                var masked=KitFixtures.render(view,240,70,1);
+                find(view,"detail.reveal",JButton.class).doClick(0); assertThat(control.revealed).isTrue();
+                var revealed=KitFixtures.render(view,240,70,1); assertThat(masked.getRGB(0,0,240,70,null,0,240)).isNotEqualTo(revealed.getRGB(0,0,240,70,null,0,240));
+                find(view,"detail.copy",JButton.class).doClick(0);assertThat(events).containsExactly(new UiEvent.Action("copy-detail"));assertThat(copied[0]).containsOnly((char)0);
+                char[] owned=control.detailValue;view.replaceSecret("detail",new char[]{'n'});assertThat(owned).containsOnly((char)0); assertThat(control.revealed).isFalse();
+                owned=control.detailValue; view.update(stack());assertThat(owned).containsOnly((char)0);
+                view.update(stack(descriptor));view.withSecret("detail",chars -> assertThat(chars).isEmpty());view.replaceSecret("detail",new char[]{'a'});
+                owned=((SecretFields.SecretControl)view.control("detail")).detailValue;view.close();assertThat(owned).containsOnly((char)0);
+            }finally{release(context);}
+        });
+    }
+    @Test void programmaticInputTransferPreservesCallerOwnershipAndEmitsNoEdit() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();var events=new ArrayList<UiEvent>();
+            try(var view=new KitView(context,stack(secret("a","")),events::add)) {
+                char[] value={'a','b'};view.replaceSecret("a",value);assertThat(value).containsExactly('a','b');assertThat(events).isEmpty();
+                view.withSecret("a",chars -> assertThat(chars).containsExactly('a','b'));
+            }finally{release(context);}
+        });
+    }
     @Test void temporarySecretCopyIsErasedAfterCallbackFailure() {
         Edt.run(() -> {
             var context = KitFixtures.context();

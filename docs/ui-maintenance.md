@@ -91,3 +91,51 @@ non-fatal; no tests or assertions were weakened for this verification.
 
 See [architecture](ui-architecture.md), [module README](../jasper-ui/README.md) and
 [plugin authoring](plugin-authoring.md).
+
+
+## Combined final-review fix verification
+
+The single combined fix wave addresses all four Important and four Minor findings: runtime authored
+UI-to-semantic colors, secure stored secret details, live dropdown popup theming, nested-update
+coherence, no-artwork icon rejection, selected segment medium weight, full named radii and retained
+row-context hue. `AuthoredUiColorsTest` includes native/import → semantic → FlatLaf → painted output,
+platform and precedence cases, bounded origin-aware failures, and differential checks against pinned
+FlatLaf functions. Existing import parity fixtures/goldens are unchanged. Secret module/shared host/fake
+contracts check defensive transfers, callback erasure, value-free copy actions and lifetime wiping.
+
+Focused checks include `:jasper-ui:check :jasper-sdk:check :jasper-sdk-testkit:check`, hosted `*Kit*Test`,
+UI/app/SDK architecture and `:jasper-ui:verifyUiDistribution`. Geometry/choice/secret/row regressions
+also run with `-Dflatlaf.uiScale=2`. Final repository counts and gallery verification follow below.
+Scoped rereview remains pending; this does not claim native/user acceptance or Plans 2–3 completion.
+
+
+Final-review compatibility ruling: canonical roles honor authored supported UI colors ahead of
+FlatLaf theme-name/author-specific post-JSON heuristics. For example, Carbon's authored Panel
+`#202020` and TextField `#112233` resolve/install `surface.input=#112233`; the foreign heuristic
+`lighten($Panel.background,4%)` does not replace that role. The model has no vendor-name logic or
+new provenance mechanism. Existing importer exclusions/provenance and ancillary legacy UI behavior
+remain; this is not full vendor visual parity. Themes relying on those heuristics may need explicit
+semantic adjustment during Plan 2 visual acceptance. A concrete Carbon regression preserves this ruling.
+
+Final stabilized `./gradlew check` passed in 1m 56s (99 tasks: 15 executed, 84 up-to-date).
+The following counts replace the historical pre-review baseline above; they were read from 682
+XML files after the full run, not from the focused test output. 9,057 tests passed and the same six
+environment-dependent cases were skipped. All architecture/doclint/compiled-documentation gates
+passed. The focused 2x geometry/choice/secret/row run passed all 42 tests.
+
+| Module | Tests | Failures | Errors | Skipped |
+| --- | ---: | ---: | ---: | ---: |
+| jasper-app | 2522 | 0 | 0 | 1 |
+| jasper-buddy | 150 | 0 | 0 | 0 |
+| jasper-sdk | 59 | 0 | 0 | 0 |
+| jasper-sdk-testkit | 108 | 0 | 0 | 0 |
+| jasper-terminal | 397 | 0 | 0 | 4 |
+| jasper-ui | 277 | 0 | 0 | 0 |
+| plugins/editor | 4791 | 0 | 0 | 0 |
+| plugins/fileserver | 161 | 0 | 0 | 0 |
+| plugins/history | 41 | 0 | 0 | 0 |
+| plugins/remote | 391 | 0 | 0 | 0 |
+| plugins/sample | 12 | 0 | 0 | 0 |
+| plugins/snippets | 11 | 0 | 0 | 0 |
+| plugins/vault | 143 | 0 | 0 | 1 |
+| **Total** | **9063** | **0** | **0** | **6** |

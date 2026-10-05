@@ -11,16 +11,18 @@ final class HostedKitView implements UiView {
  final HostedKit owner;
  private final KitView view;
  private ViewSpec spec;
+ private boolean updating;
  private Consumer<UiEvent> events;
  private final AtomicBoolean closed=new AtomicBoolean();
  HostedKitView(HostedKit owner,KitContext context,ViewSpec spec,Consumer<UiEvent> events){this.owner=owner;this.events=Objects.requireNonNull(events);view=new KitView(context,KitValues.toModule(spec),e -> dispatch(KitValues.toSdk(e)));this.spec=spec;}
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
  KitView component(){guard();return view;}
  void dispatch(UiEvent event){if(closed.get()||!owner.live())return;try{events.accept(event);}catch(Throwable failure){owner.failed();}}
- @Override public void update(ViewSpec next){guard();view.update(KitValues.toModule(next));spec=next;}
+ @Override public void update(ViewSpec next){guard();if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{view.update(KitValues.toModule(next));spec=next;}finally{updating=false;}}
  @Override public ViewSpec spec(){guard();return spec;}
  @Override public void withSecret(String id,Consumer<char[]> use){guard();view.withSecret(id,use);}
  @Override public void clearSecret(String id){guard();view.clearSecret(id);}
+ @Override public void replaceSecret(String id,char[] value){guard();view.replaceSecret(id,value);}
  @Override public void focus(String id){guard();view.focus(id);}
  @Override public void registerContent(CustomContent content){guard();Objects.requireNonNull(content);KitDiagnostics.validate(content);
   var expected=KitContent.find(spec.root(),content.id());if(expected==null||expected.kind()!=content.kind())throw new IllegalArgumentException("No matching Custom content id/kind");

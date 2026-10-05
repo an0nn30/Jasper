@@ -296,14 +296,14 @@ final class Forms {
                 g.setColor(ThemePainting.color(view.context(), SemanticColor.SURFACE_DIALOG));
                 if (!sheet) g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2);
                 else {
-                    double half = r / 2.0;
+                    double radius = r;
                     var path = new Path2D.Double();
                     path.moveTo(0, 0);
                     path.lineTo(getWidth(), 0);
-                    path.lineTo(getWidth(), getHeight() - half);
-                    path.quadTo(getWidth(), getHeight(), getWidth() - half, getHeight());
-                    path.lineTo(half, getHeight());
-                    path.quadTo(0, getHeight(), 0, getHeight() - half);
+                    path.lineTo(getWidth(), getHeight() - radius);
+                    path.quadTo(getWidth(), getHeight(), getWidth() - radius, getHeight());
+                    path.lineTo(radius, getHeight());
+                    path.quadTo(0, getHeight(), 0, getHeight() - radius);
                     path.closePath();
                     g.fill(path);
                 }

@@ -25,6 +25,13 @@ public final class IconArtwork {
         path = new Path2D.Float();
         var history = new BuildHistory();
         for (var command : commands) command.appendPath(path, history);
+        var segments = path.getPathIterator(null); boolean drawable = false;
+        while (!segments.isDone()) {
+            int segment = segments.currentSegment(new double[6]);
+            if (segment != java.awt.geom.PathIterator.SEG_MOVETO && segment != java.awt.geom.PathIterator.SEG_CLOSE) drawable = true;
+            segments.next();
+        }
+        if (!drawable) throw new IllegalArgumentException("Path must contain drawable segments");
         var bounds = path.getBounds2D();
         if (bounds.getMinX() < 0 || bounds.getMinY() < 0 || bounds.getMaxX() > 16 || bounds.getMaxY() > 16
             || (bounds.getWidth() == 0 && bounds.getHeight() == 0)) throw new IllegalArgumentException("Path must fit the 16-grid and contain artwork");

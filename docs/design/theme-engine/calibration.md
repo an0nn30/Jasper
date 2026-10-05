@@ -87,3 +87,24 @@ application surface composition and screenshot matching after Plan 2 consumer mi
 single final whole-branch review remains Task 14; this gallery is headless kit evidence.
 
 See [architecture](../../ui-architecture.md) and [maintenance](../../ui-maintenance.md).
+
+
+## Combined final-review fixture extension
+
+The catalog now contains 49 fixtures: stored-secret masked/revealed states and the actual dropdown
+popup/list join the existing 46. Credential Vault transfers harmless local characters into its
+read-only detail, with trailing reveal/copy, rather than depicting an empty editable password input.
+Neither descriptors nor metadata contain the transferred value. Popup capture recursively lays out
+the scroll viewport/list; zero-size popup lists are rejected by a regression. The six-run matrix is
+regenerated after shared theme/radius fixes; new geometry uses full named radii at both scales.
+Scoped rereview and user/native artifact acceptance remain pending.
+
+Final fix matrix: dark 1x/2x, light 1x, custom 1x and calibration 1x/2x each produced
+49 fixture PNGs, 49 fixture JSON files, seven contact sheets and one manifest (106 files/run;
+636 total). Metadata audit confirms 26 node kinds, requested scales, device scale 1, actual
+FlatLaf, motion disabled, nonzero dropdown list bounds and no transferred sample secret in JSON.
+Representative changed surfaces inspected at native resolution include calibration/light sheet 6,
+calibration 2x and dark/light/custom 1x open dropdowns, calibration Credential Vault, Add SSH Key
+and context menu, and dark 2x revealed stored secret. These checks cover selected popup fill,
+read-only secret masking/reveal and inset, semantic colors, radii and context hue. They do not
+claim fresh visual inspection of all 42 contact sheets or native application acceptance.

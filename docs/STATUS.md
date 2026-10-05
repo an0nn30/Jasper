@@ -203,8 +203,17 @@
   27 byte-identical resource pairs to removal/adaptation owners; app config.TerminalColors is retained
   as a saved-choice record. Module algorithms are the designated authority; app consumers remain until
   Plan 2. Branch diff whitespace and the 178 changed Java sources passed hygiene against `192443b3`.
-  Task 14's independent whole-branch review and three deferred minor findings remain pending; no final
-  review completion is claimed. Plans 2–3 consumer/surface migration remain unexecuted. Native acceptance
+  Task 14's independent whole-branch review found four Important and four Minor findings. The single
+  combined fix wave is implemented; scoped independent rereview remains pending. The wave adds pure
+  runtime platform/authored color resolution, secure stored Secret details and defensive char-array
+  transfer, coherent nested-update rejection, menu-owned live dropdown styling, and all four minor
+  icon/weight/radius/context-hue corrections. These are recorded deviations/additions to Plan 1's
+  contracts, not a fourth delivery plan. New regression and six-run gallery evidence is recorded in
+  UI maintenance/calibration. HostedKit's live animation-setting wiring remains mandatory Plan 2
+  work before migrated production surfaces mount. Canonical roles deliberately preserve authored UI
+  intent over FlatLaf theme-name/author-specific heuristics (Carbon input regression); affected imports
+  may need explicit semantic adjustment during Plan 2 visual acceptance, so full vendor visual parity
+  is not claimed. Plans 2–3 consumer/surface migration remain unexecuted. Native acceptance
   and user review of gallery/calibration artifacts remain user-run before Plan 2. No GUI/benchmark/AOT/push/merge.
 
 - **Tab width correction** (2026-10-04): clarified that only the starting size should double. Tabs now
@@ -5002,3 +5011,9 @@ copying avoids Windows symlink privileges. Inspected a headless retro Sessions t
 preview. Full check and installDist passed: 1,711 tests, 1,708 passed, three expected skips,
 zero failures/errors. Installed Remote jar has the >=0.7.4 manifest and no old server.svg.
 Independent review and rollback re-review are complete. No GUI launch or push.
+
+Theme-engine Plan 1 final fix evidence (2026-10-04): stabilized headless `./gradlew check` passed
+9,063 tests (9,057 passed; zero failures/errors; six existing environment skips). Six regenerated
+gallery runs contain 49 fixtures each / 636 files total; details and exact per-module totals are in
+[UI maintenance](ui-maintenance.md) and [calibration](design/theme-engine/calibration.md).
+Fixes are implemented; scoped rereview and user/native acceptance remain pending.

@@ -21,6 +21,7 @@ public final class KitView extends JPanel implements AutoCloseable {
     private final MotionPolicy motion;
     private final AtomicBoolean closeRequested = new AtomicBoolean();
     private ViewSpec spec;
+    private boolean updating;
     private int availableHeight = Integer.MAX_VALUE;
     private AutoCloseable appearance;
     private final UIDefaults defaults;
@@ -44,7 +45,10 @@ public final class KitView extends JPanel implements AutoCloseable {
         }
     }
     /** Reconcile by stable id/kind; unchanged descriptor values preserve pending input. */
-    public void update(ViewSpec spec) { requireOpen(); Objects.requireNonNull(spec); reconciler.update(spec); this.spec = spec; }
+    public void update(ViewSpec spec) { requireOpen(); Objects.requireNonNull(spec);
+        if (updating) throw new IllegalStateException("Reentrant view update");
+        updating = true; try { reconciler.update(spec); this.spec = spec; } finally { updating = false; }
+    }
     /** Current immutable descriptor; it never contains mutable input or secret content. */
     public ViewSpec spec() { requireOpen(); return spec; }
     /**
@@ -53,11 +57,13 @@ public final class KitView extends JPanel implements AutoCloseable {
      */
     public void withSecret(String fieldId, Consumer<char[]> use) {
         requireOpen(); Objects.requireNonNull(use);
-        char[] copy = secret(fieldId).buffer.snapshot();
+        char[] copy = secret(fieldId).snapshot();
         try { use.accept(copy); } finally { java.util.Arrays.fill(copy, (char)0); }
     }
     /** Erase live mutable storage; callbacks may request erasure while an edit is being delivered. */
-    public void clearSecret(String fieldId) { requireOpen(); secret(fieldId).buffer.clear(); }
+    public void clearSecret(String fieldId) { requireOpen(); secret(fieldId).clear(); }
+    /** Copy a caller-owned value into live storage without emitting an edit. Caller remains responsible for its array. */
+    public void replaceSecret(String fieldId, char[] value) { requireOpen(); secret(fieldId).replace(Objects.requireNonNull(value)); }
     private SecretFields.SecretControl secret(String id) {
         var control = reconciler.control(Objects.requireNonNull(id));
         if (control instanceof SecretFields.SecretControl secret) return secret;

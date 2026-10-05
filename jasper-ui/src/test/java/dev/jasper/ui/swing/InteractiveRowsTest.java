@@ -587,7 +587,7 @@ class InteractiveRowsTest {
                     var context = KitFixtures.context();
                     var action =
                             new dev.jasper.ui.model.MenuItem(
-                                    "delete", "Delete", "delete", "delete", true, false);
+                                    "delete", "Delete", "delete", "delete", true, false, Hue.PURPLE);
                     try (var view =
                             new KitView(
                                     context,
@@ -606,6 +606,19 @@ class InteractiveRowsTest {
                         var old = (JMenuItem) owner.popup.getComponent(0);
                         assertThat(old).isInstanceOf(Menus.Item.class);
                         assertThat(old.getIcon()).isNotNull();
+                        var baseTheme=context.theme();var colors=new java.util.EnumMap<dev.jasper.ui.theme.SemanticColor,java.awt.Color>(dev.jasper.ui.theme.SemanticColor.class);
+                        for(var role:dev.jasper.ui.theme.SemanticColor.values())colors.put(role,baseTheme.semantic().color(role));
+                        colors.put(dev.jasper.ui.theme.SemanticColor.HUE_PURPLE,java.awt.Color.RED);
+                        var contrasting=new dev.jasper.ui.theme.GeneratedTheme(baseTheme.name(),baseTheme.dark(),baseTheme.author(),baseTheme.tokens(),baseTheme.syntax(),baseTheme.terminal(),baseTheme.uiKeys(),baseTheme.icons(),baseTheme.glass(),new dev.jasper.ui.theme.SemanticPalette(colors));
+                        for(var theme : List.of(baseTheme, contrasting)) {
+                        context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme,theme));
+                        var expectedIcon = context.icons().tile("delete", context.theme().semantic(), Hue.PURPLE, com.formdev.flatlaf.util.UIScale.scale(18), false);
+                        var actualPixels = new java.awt.image.BufferedImage(expectedIcon.getIconWidth(), expectedIcon.getIconHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                        var expectedPixels = new java.awt.image.BufferedImage(expectedIcon.getIconWidth(), expectedIcon.getIconHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                        var ag = actualPixels.createGraphics(); var eg = expectedPixels.createGraphics();
+                        old.getIcon().paintIcon(old, ag, 0, 0); expectedIcon.paintIcon(old, eg, 0, 0); ag.dispose(); eg.dispose();
+                        assertThat(actualPixels.getRGB(0,0,actualPixels.getWidth(),actualPixels.getHeight(),null,0,actualPixels.getWidth())).isEqualTo(expectedPixels.getRGB(0,0,expectedPixels.getWidth(),expectedPixels.getHeight(),null,0,expectedPixels.getWidth()));
+                        }
                         owner.context("item0", owner.canvas, 0, 0);
                         assertThat(old.getActionListeners()).isEmpty();
                         var current = (JMenuItem) owner.popup.getComponent(0);
