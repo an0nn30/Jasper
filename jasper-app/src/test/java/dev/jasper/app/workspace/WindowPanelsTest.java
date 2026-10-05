@@ -421,6 +421,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
+            owner.newTab(DesktopTestSupport.HOME);
             owner.connectContributions(model, UiState.inMemory());
             var left = new JLabel("left"); var right = new JLabel("right"); var bottom = new JLabel("bottom");
             model.addPanel("dev.x.left", "Left", new ImageIcon(), Slot.LEFT_TOP, site -> left);

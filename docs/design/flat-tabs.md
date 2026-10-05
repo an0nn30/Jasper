@@ -1,5 +1,7 @@
 # Flat workspace tabs
 
+> Superseded on 2026-10-05 by [Alacritty-style tabs](alacritty-tabs.md).
+
 Approved in chat on 2026-10-04 from the user's supplied mock. This bounded visual follow-up supersedes
 [folder tabs](folder-tabs.md): one flat workspace-colored strip, a subtle bottom separator, icons on
 all tabs, muted inactive labels, and a full-width two-pixel accent underline with rounded upper corners.
