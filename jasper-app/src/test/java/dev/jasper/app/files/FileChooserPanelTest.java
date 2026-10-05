@@ -163,6 +163,28 @@ class FileChooserPanelTest {
         assertThat(finished).containsExactly(List.of(here("notes.txt")));
     }
 
+    /**
+     * The default action is the primary button's: while the primary is disabled, Enter is not consumed and does
+     * nothing, exactly as a disabled default button (spec §6). The primary is disabled once the chooser has closed.
+     */
+    @Test void enterFollowsThePrimaryButtonAndDoesNothingWhileItIsDisabled() {
+        var panel = panel(SAVE, Optional.of("notes.txt"));
+        var root = new javax.swing.JRootPane();
+        panel.installDefaultAction(root);
+        var stroke = KeyStroke.getKeyStroke("ENTER");
+        var approve = root.getActionMap().get(root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(stroke));
+        java.util.function.BooleanSupplier enter = () -> javax.swing.SwingUtilities.notifyAction(approve, stroke,
+            new java.awt.event.KeyEvent(root, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, java.awt.event.KeyEvent.VK_ENTER, '\n'), root, 0);
+        var primary = kit(panel, "primary", JButton.class);
+        assertThat(primary.isEnabled()).isTrue();
+        assertThat(approve.isEnabled()).as("the primary is enabled, so Enter is too").isTrue();
+        panel.close();
+        assertThat(approve.isEnabled()).as("closed: Enter follows the disabled primary").isFalse();
+        replace = true;
+        assertThat(enter.getAsBoolean()).as("and the key is not consumed").isFalse();
+        assertThat(finished).isEmpty();
+    }
+
     @Test void newFolderCreatesAndSelectsIt() {
         folderName = Optional.of("reports");
         var panel = panel(SAVE, Optional.empty());

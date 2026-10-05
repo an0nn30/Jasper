@@ -84,7 +84,8 @@ final class SettingsView extends JPanel implements AutoCloseable {
 
     /**
      * Enter outside a control that takes it presses OK, as the dialog's default button did. The binding lives on the
-     * root pane, where a closed dropdown forwards Enter just as it would to a default button.
+     * root pane, where a closed dropdown forwards Enter just as it would to a default button. Like a disabled default
+     * button, the binding is disabled while OK is, so Enter is then not consumed and does nothing.
      */
     void onEnter(Runnable ok) { enter = ok; }
 
@@ -94,7 +95,8 @@ final class SettingsView extends JPanel implements AutoCloseable {
         if (root == null) return;
         root.getInputMap(WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "okSettings");
         root.getActionMap().put("okSettings", new AbstractAction() {
-            @Override public void actionPerformed(java.awt.event.ActionEvent event) { enter.run(); }
+            @Override public boolean isEnabled() { return ok; }
+            @Override public void actionPerformed(java.awt.event.ActionEvent event) { if (ok) enter.run(); }
         });
     }
 

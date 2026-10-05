@@ -198,14 +198,24 @@ public final class FileChooserPanel extends JPanel {
 
     private Color color(SemanticColor role) { return kit.theme().semantic().color(role); }
 
-    /** Lets Enter anywhere in the dialog press the primary button, as a default button did; controls owning Enter keep it. */
+    /**
+     * Lets Enter anywhere in the dialog press the primary button, as a default button did; controls owning Enter keep it.
+     * Like a disabled default button, the binding is disabled while the primary is, so Enter is then not consumed.
+     */
     public void installDefaultAction(JRootPane root) {
         var stroke = KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0);
         root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(stroke, "chooser.approve");
         root.getActionMap().put("chooser.approve", new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent event) { if (!closed) approve(); }
+            @Override public boolean isEnabled() { return primaryEnabled(); }
+            @Override public void actionPerformed(ActionEvent event) { if (primaryEnabled()) approve(); }
         });
     }
+
+    /**
+     * Whether the primary button (and so Enter) acts. Invalid input is reported in the status line when the primary is
+     * pressed, as before Plan 2, so the primary is disabled only once the chooser has closed.
+     */
+    private boolean primaryEnabled() { return !closed; }
 
     /** Stops listening to the sources and the theme; call once the dialog has closed. */
     public void close() {
@@ -686,7 +696,7 @@ public final class FileChooserPanel extends JPanel {
         var children = new ArrayList<Nodes.Node>();
         if (request.mode() == ChooserRequest.Mode.OPEN && request.suffix().isPresent()) children.add(types());
         children.add(new Nodes.Button("cancel", ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, "cancel", ""));
-        children.add(new Nodes.Button("primary", ControlState.READY, switch (request.mode()) {
+        children.add(new Nodes.Button("primary", new ControlState(true, primaryEnabled(), false, ""), switch (request.mode()) {
             case OPEN -> "Open";
             case SAVE -> "Save";
             case DIRECTORY -> "Choose";

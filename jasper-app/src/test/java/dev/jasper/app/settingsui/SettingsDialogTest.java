@@ -423,6 +423,44 @@ class SettingsDialogTest {
         until(() -> !dialog.isOpen());
     }
 
+    /**
+     * A disabled default button takes no Enter: the root pane's press action is disabled, so the key is not consumed.
+     * Enter's window binding follows OK the same way while the page is invalid or a save is in flight (spec §6).
+     */
+    @Test void enterDoesNothingWhileOkIsDisabledAsADisabledDefaultButton() throws Exception {
+        saveResult = new CompletableFuture<>();
+        var dialog = dialog();
+        edt(() -> {
+            dialog.open(null, "window");
+            var view = dialog.view();
+            var root = new javax.swing.JRootPane();
+            root.getContentPane().add(view);
+            view.addNotify();
+            var stroke = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0);
+            var okSettings = root.getActionMap().get(root.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW).get(stroke));
+            java.util.function.BooleanSupplier enter = () -> javax.swing.SwingUtilities.notifyAction(okSettings, stroke,
+                new java.awt.event.KeyEvent(root, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, java.awt.event.KeyEvent.VK_ENTER, '\n'), root, 0);
+            assertThat(okSettings.isEnabled()).as("OK is enabled, so Enter is too").isTrue();
+
+            var field = KitTestSupport.require(view, "window.tab_height.input", javax.swing.JTextField.class);
+            field.setText("99");
+            assertThat(button(dialog, "ok").isEnabled()).isFalse();
+            assertThat(okSettings.isEnabled()).as("invalid: Enter follows the disabled OK").isFalse();
+            assertThat(enter.getAsBoolean()).as("and the key is not consumed").isFalse();
+            assertThat(dialog.isOpen()).isTrue();
+
+            field.setText("50");
+            assertThat(okSettings.isEnabled()).as("valid again").isTrue();
+            assertThat(enter.getAsBoolean()).as("Enter presses OK, which starts the save").isTrue();
+            assertThat(saved).hasSize(1);
+            assertThat(button(dialog, "ok").isEnabled()).as("busy while the save is in flight").isFalse();
+            assertThat(okSettings.isEnabled()).as("busy: Enter follows the disabled OK").isFalse();
+            assertThat(enter.getAsBoolean()).isFalse();
+            assertThat(saved).as("a second Enter starts no second save").hasSize(1);
+            assertThat(dialog.isOpen()).isTrue();
+        });
+    }
+
     @Test void theTreeNavigatesAndRemembersClosedGroupsThroughKitEvents() throws Exception {
         var dialog = dialog();
         edt(() -> {
