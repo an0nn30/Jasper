@@ -46,4 +46,11 @@ class ProjectDetectorTest {
         assertThat(ProjectDetector.localAncestors(Path.of("/Users/me/src/../src/app"), home))
             .as("normalized first").containsExactly(Path.of("/Users/me/src/app"), Path.of("/Users/me/src"));
     }
+
+    @Test void remoteAncestorsStopBeforeTheRoot() {
+        assertThat(ProjectDetector.remoteAncestors("/srv/app/src")).containsExactly("/srv/app/src", "/srv/app", "/srv");
+        assertThat(ProjectDetector.remoteAncestors("/srv/app/")).containsExactly("/srv/app", "/srv");
+        assertThat(ProjectDetector.remoteAncestors("/")).isEmpty();
+        assertThat(ProjectDetector.remoteAncestors("relative")).isEmpty();
+    }
 }

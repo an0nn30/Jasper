@@ -39,6 +39,24 @@ public final class ProjectDetector {
     }
 
     /**
+     * A remote folder and its ancestors, nearest first, without {@code /}. Remote reports nothing for the login's home
+     * and its ancestors, so they never become roots.
+     *
+     * @param folder an absolute {@code /}-separated folder
+     * @return the candidates; empty for {@code /} and for a relative path
+     */
+    public static List<String> remoteAncestors(String folder) {
+        var result = new ArrayList<String>();
+        String at = folder.length() > 1 && folder.endsWith("/") ? folder.substring(0, folder.length() - 1) : folder;
+        while (at.startsWith("/") && !at.equals("/")) {
+            result.add(at);
+            int slash = at.lastIndexOf('/');
+            at = slash == 0 ? "/" : at.substring(0, slash);
+        }
+        return result;
+    }
+
+    /**
      * A local folder and its ancestors, nearest first, stopping before the home folder and the file-system root.
      *
      * @param folder an absolute folder
