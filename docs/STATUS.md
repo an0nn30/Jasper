@@ -2,6 +2,15 @@
 
 ## Current state — 2026-10-04
 
+- **Editor Markdown preview design** (2026-10-04; `codex/editor-markdown-preview`): conversational design approved;
+  [written spec](superpowers/specs/2026-10-04-editor-markdown-preview-design.md) awaits user review before the
+  implementation plan. CommonMark plus native Swing, Source/Split/Preview controls, remembered default mode,
+  live unsaved preview and bidirectional linked scrolling; local/SFTP-relative images load automatically and web
+  images load on demand per document. Scope includes tables, task lists, strikethrough, highlighted code and raster
+  images; excludes browser runtime, embedded HTML layouts, SVG, diagrams and math. A small EditorDocument hook
+  preserves the original SFTP route/login for relative resources. The spec defines focus/find behavior, worker
+  lifetimes, bounds and verification. No implementation or tests run; no GUI, AOT training, merge or push.
+
 - **Populated plugin panel reference follow-up** (2026-10-04; `codex/plugin-panel-redesign`): implements the
   second user-supplied mock for connected SFTP, listed Tunnels/File Servers, and the Sessions header correction.
   Sessions has header-only Add/Import icons and count, flat alphabetical ungrouped hosts, a pencil-only edit action,
