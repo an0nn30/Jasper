@@ -24,8 +24,15 @@ page.
 
 ## Projects on remote hosts
 
-With the Remote plugin, SSH panes work the same way. When an SSH pane's folder is known (Remote follows the shell's
-folder, or the shell reports it) and its host is connected, Jasper looks for markers on the host with one command and
+With the Remote plugin, SSH panes on Remote's saved hosts are offered projects too, but only when the shell on the host
+reports its folder with OSC 7. Jasper does not load its [shell integration](configuration.md#shell-integration) on
+remote hosts: copy the script for your shell to the host and source it there, or have your own prompt send OSC 7.
+Remote's own folder following (the read-only check after Enter that its file browser uses) does not count. The same
+reports refresh a project when a pane enters it again; refreshing after a command finishes also needs command marks
+(OSC 133), which Jasper's script sends as well. Without either, the **Files** tab still puts the project you are in
+first, and **Reindex Current Project** still works, because both use the folder Remote follows.
+
+When a pane reports a folder and its host is connected, Jasper looks for markers on the host with one command and
 offers the project with its host name. Indexing uses Git on the host when the project is a work tree, then `find`,
 then an SFTP walk. Opening a file edits it over SFTP in the Editor; **⇧Enter** opens a new SSH tab on the host in the
 file's folder. Remote projects refresh only while their host is connected; otherwise their saved index is still

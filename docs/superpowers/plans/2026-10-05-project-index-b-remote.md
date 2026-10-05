@@ -6,6 +6,7 @@
 - Task 4: a dropped session (marker seen, no exit status) is never accepted as a complete Git/find listing.
 - Task 5: ProjectsService closes borrowed leases when the background executor rejects work.
 - Task 8: terminal events received before the saved project list loads are held and replayed (no prompt for already-indexed projects at startup); local detection completes even if the probe throws an Error.
+- Final review fixes: deviation 4 below is reworded to what the code does (only a host that is not connected when a background job starts is dropped quietly); the SFTP walk reports a root as missing only on SFTP's no-such-file status. Project Index also gained fixes from the same review (unreadable or linked local roots, polynomial initials matching, nested repositories in Git listings, `projects.toml.bad`, snapshots kept on read errors, remote detection that throws); see [docs/STATUS.md](../../STATUS.md).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -48,8 +49,9 @@ Jupiter 6, AssertJ.
    ancestors, so remote detection stops below home as the spec asks without the indexer knowing the home path.
 3. **Ignored remote entries show as `<host id>:<path>`** in the standard list row; the SDK row cannot relabel
    entries with host names.
-4. **A background remote job whose host disconnects mid-run is dropped silently** (treated as cancelled) instead of
-   posting a failure card; the saved snapshot stays and shows as Stale.
+4. **A background remote job whose host is not connected when it starts is dropped quietly** (treated as cancelled)
+   instead of posting a failure card; the saved snapshot stays and shows as Stale. A connection that drops mid-run
+   fails the job like any other failure: a "Couldn't index" card, and the saved snapshot stays, shown as Stale.
 
 ## File structure
 

@@ -355,6 +355,7 @@ Remote 0.12 exports `dev.jasper.remote.api`. Its `RemoteProjects` service (publi
 folders with one command (`exists`), list a project's files (`list`: Git, then `find`, then an SFTP walk), and open a
 file in the Editor or an SSH tab in a folder. Calls without a window use only an already authenticated connection and
 fail with `NotConnectedException` otherwise; `list` with a window may connect and ask the user to sign in. Remote runs
-fixed scripts as `sh -s` with every path single-quoted and never types into the user's shell. `exists` and `list` need
-a POSIX `sh` on the host, so Windows OpenSSH hosts are not supported for project indexing. Project Index is the
-bundled consumer.
+fixed scripts as `sh -s` with every path single-quoted and never types into the user's shell. `exists` needs a POSIX
+`sh` on the host, so marker detection does not work on Windows OpenSSH hosts; `list` falls back to an SFTP walk where
+`sh`, Git or `find` is missing. `locate` attributes a pane's folder to the pane's saved host: after a nested `ssh`
+inside an SSH pane, the folder reported is still read as one on the saved host. Project Index is the bundled consumer.

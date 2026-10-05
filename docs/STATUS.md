@@ -12,7 +12,9 @@
   them through Remote, copies `host:path`, opens SSH tabs in a file's folder, adds remote folders from Index Folder…,
   and shows Unavailable/Stale remote projects in Settings. Deviations from the spec: start folder via exec channel
   (Remote had no such path); the marker script, not the indexer, enforces the remote home boundary; ignored remote
-  entries show as `<host id>:<path>`; a background remote job whose host disconnected is dropped silently.
+  entries show as `<host id>:<path>`; a background remote job whose host is not connected when it starts is dropped
+  quietly (a connection that drops mid-run fails the job with a "Couldn't index" card; the saved snapshot stays, shown
+  as Stale).
   Deviations and hardening made during execution: Task 2: the PTY test asserts COLUMNS/LINES, the start-folder
   round-trip test also runs ksh/tcsh/dash/fish when present, and the exec path skips MOTD/lastlog. Task 3: Exec
   catches a throwing field filter so it fails the run, not the shared SSH session; `/` and trailing-slash folders
@@ -20,10 +22,21 @@
   no exit status) is never accepted as a complete Git/find listing. Task 5: ProjectsService closes borrowed leases
   when the background executor rejects work. Task 8: terminal events received before the saved project list loads
   are held and replayed (no prompt for already-indexed projects at startup), and local detection completes even if
-  the probe throws an Error. `exists` and `list` need a POSIX `sh` on the host (Windows OpenSSH hosts are not
-  supported for project indexing). Full `./gradlew check --continue`: **8875 tests, 0 failures, 0 errors, 6 skips**.
-  No GUI, benchmark or AOT training; GUI checks (an SSH pane's card, remote Files rows and their three verbs, Index
-  Folder… on a saved host, an SSH tab opened in a folder) are for the user. Not merged, not pushed.
+  the probe throws an Error. Marker detection (`exists`) needs a POSIX `sh` on the host, so Windows OpenSSH hosts get
+  no cards; `list` falls back to an SFTP walk where `sh`, Git or `find` is missing. Remote cards and
+  refresh-on-entry need the remote shell to report its folder with OSC 7 (Remote's probe-based following raises no
+  `CWD_CHANGED`), and after-command refreshes also need OSC 133 marks; current-project ranking and Reindex Current
+  Project work from Remote's followed folder. Known gap: opening a remote file that no longer exists does not queue a
+  refresh of its project (spec §7; local only). Final review fixes: an unreadable local root fails the job (the old
+  snapshot stays) and a root that is a link is walked; initials matching is memoized (no exponential backtracking);
+  Git listings skip nested repositories and gitlinks; an unloadable `projects.toml` is renamed `projects.toml.bad`
+  before the next save; snapshots are deleted only when corrupt, not on read errors; remote detection that throws
+  finds nothing; Remote's SFTP walk reports a root missing only on SFTP's no-such-file status; the guide, `remote.md`
+  and deviation 4 now say what the code does. Focused checks after the fixes: Project Index 95 and Remote 431 tests,
+  0 failures. Full `./gradlew check --continue` before them: **8875 tests, 0 failures, 0 errors, 6 skips**.
+  No GUI, benchmark or AOT training; GUI checks (an SSH pane's card, which needs a host shell that sends OSC 7, remote
+  Files rows and their three verbs, Index Folder… on a saved host, an SSH tab opened in a folder) are for the user.
+  Not merged, not pushed.
 - **Project Index, plan A (local)** (2026-10-05; `claude/file-indexer`, worktree `.worktrees/file-indexer`): new bundled
   plugin Project Index (`plugins/indexer`, `dev.jasper.indexer` 0.1.0) per the
   [design](superpowers/specs/2026-10-05-jasper-project-index-design.md) and
