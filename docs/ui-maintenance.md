@@ -106,7 +106,8 @@ contracts check defensive transfers, callback erasure, value-free copy actions a
 Focused checks include `:jasper-ui:check :jasper-sdk:check :jasper-sdk-testkit:check`, hosted `*Kit*Test`,
 UI/app/SDK architecture and `:jasper-ui:verifyUiDistribution`. Geometry/choice/secret/row regressions
 also run with `-Dflatlaf.uiScale=2`. Final repository counts and gallery verification follow below.
-Scoped rereview remains pending; this does not claim native/user acceptance or Plans 2–3 completion.
+Scoped rereview is complete: all eight original findings addressed, no new Critical/Important findings.
+The known Minor below remains; native/user acceptance and Plans 2–3 completion are not claimed.
 
 
 Final-review compatibility ruling: canonical roles honor authored supported UI colors ahead of
@@ -139,3 +140,26 @@ passed. The focused 2x geometry/choice/secret/row run passed all 42 tests.
 | plugins/snippets | 11 | 0 | 0 | 0 |
 | plugins/vault | 143 | 0 | 0 | 1 |
 | **Total** | **9063** | **0** | **0** | **6** |
+
+## Known Minor expression-parity gap
+
+Final scoped review of `a4e78995..771fd1a1` found a narrow admitted-expression mismatch with
+pinned FlatLaf 3.7. The reviewer ran a bounded JBR 25 headless source-launcher probe against
+compiled `jasper-ui` and the pinned jar (`java -Djava.awt.headless=true --class-path <ui classes>:<flatlaf 3.7 jar> --source 25 /dev/stdin`). Exact ARGB results:
+
+| Expression | Pure generated | FlatLaf 3.7 |
+| --- | --- | --- |
+| `spin(#00ff00,30,relative)` | `ff00ff00` | `ff00ff7f` |
+| `spin(#00ff00,30)` | `ff00ff80` | `ff00ff7f` |
+| `rgba(#123456,50%)` | `80123456` | `7f123456` |
+
+`AuthoredUiColors` applies relative adjustment to hue, whereas the pinned spin parser ignores that
+option and rotates by an absolute angle. Spin/rgba channel materialization also differs by one unit.
+This is a real known Minor, distinct from the approved authored-color-over-vendor-heuristic policy.
+The existing differential sample is bounded evidence, not a promise of complete expression parity.
+Controller parked this after the single final fix wave. **Owner: Plan 2 Task 2 theme integration**,
+before Task 3 imported-theme visual acceptance: add these differential regressions, keep hue rotation
+absolute and match pinned channel materialization (or obtain an explicit documented rounding-policy
+ruling). Affected themes must not receive exact parity acceptance until corrected. No architecture/API
+task depends on this edge; native/user acceptance is still pending. See the
+[final verification handoff](design/theme-engine/verification.md).

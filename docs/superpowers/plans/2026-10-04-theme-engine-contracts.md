@@ -1,7 +1,9 @@
 # Shared contracts for the three theme-engine plans
 
 Status: Plan 1 implementation and the combined final-review fix wave are implemented;
-scoped independent rereview remains pending. Plans 2–3 consumers remain unexecuted.
+scoped independent rereview is complete with one known Minor expression-parity gap assigned to
+Plan 2 Task 2 before imported-theme visual acceptance. Native/user acceptance is pending;
+Plans 2–3 consumers remain unexecuted. See the [review record](../../design/theme-engine/verification.md).
 Authority: [approved spec](../specs/2026-10-04-jasper-theme-engine-design.md).
 This is a shared contract appendix, not a fourth implementation plan.
 
@@ -387,7 +389,8 @@ No GUI, benchmarks, AOT training, packageDist, or `-Pjasper.aot=true`.
 For each plan finish, record real command results and XML counts in the plan banner and STATUS;
 perform independent whole-branch review, resolve findings, and repeat only affected verification.
 Plan 1 tests and gallery now have recorded task evidence; remaining consumer/surface tests are
-future Plans 2–3 work. The final whole-branch gate and independent review remain Task 14.
+future Plans 2–3 work. The final whole-branch gate and independent review were completed in Task 14; the known Minor
+expression-parity gap is carried to Plan 2 as recorded below.
 
 
 ### Task 13 calibration clarifications
@@ -423,7 +426,10 @@ installs the matching border.input role. Imported token provenance and post-JSON
 owned by the existing importer; no import goldens or source assets were regenerated.
 
 The pure bounded evaluator supports admitted deterministic color functions, references and alpha;
-its function behavior is checked against pinned FlatLaf 3.7. `systemColor` uses its explicit fallback
+selected function cases are differentially checked against pinned FlatLaf 3.7, not a complete parity
+guarantee. Known Minor: spin(relative) hue handling and one-channel spin/rgba rounding drift remain
+for Plan 2 Task 2 correction before imported-theme visual acceptance; exact reproductions are in
+[UI maintenance](../../ui-maintenance.md#known-minor-expression-parity-gap). `systemColor` uses its explicit fallback
 because the pure model has no native color source. Missing/unresolvable fallback, missing required
 references and cycles yield origin/key-aware actionable diagnostics; optional `$?` references may
 resolve to null. Function `derived`/`lazy` inputs become colors in the immutable snapshot, with

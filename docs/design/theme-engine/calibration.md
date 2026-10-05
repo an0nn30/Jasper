@@ -97,7 +97,8 @@ read-only detail, with trailing reveal/copy, rather than depicting an empty edit
 Neither descriptors nor metadata contain the transferred value. Popup capture recursively lays out
 the scroll viewport/list; zero-size popup lists are rejected by a regression. The six-run matrix is
 regenerated after shared theme/radius fixes; new geometry uses full named radii at both scales.
-Scoped rereview and user/native artifact acceptance remain pending.
+Scoped rereview is complete with one known Minor expression-parity gap; user/native artifact acceptance
+remains pending. See the [final review record](verification.md).
 
 Final fix matrix: dark 1x/2x, light 1x, custom 1x and calibration 1x/2x each produced
 49 fixture PNGs, 49 fixture JSON files, seven contact sheets and one manifest (106 files/run;

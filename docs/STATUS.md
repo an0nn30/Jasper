@@ -2,7 +2,7 @@
 
 ## Current state — 2026-10-04
 
-- **Theme engine/UI kit overhaul: Plan 1 execution approved and in progress** (2026-10-04), on
+- **Theme engine/UI kit overhaul: Plan 1 implemented and reviewed** (2026-10-04), on
   `codex/theme-engine` in `/Users/dustin/.codex/worktrees/theme-engine/moray`, based on `192443b3`.
   [Approved specification](superpowers/specs/2026-10-04-jasper-theme-engine-design.md);
   [preserved source and nine visual references](design/theme-engine/reference/README.md).
@@ -15,14 +15,14 @@
   protocol chips and interactive switches, persistent detail/settings footers, and full-body empty
   states with centered button/dropdown actions are required kit and SDK capabilities. Plan 1 must prove
   all four panel compositions in its gallery; Plan 3 matches the depicted panel areas. The user approved
-  the written spec with “alrighty, lets get started”. Three delivery plans are written; Plan 1 is executing:
+  the written spec with “alrighty, lets get started”. Three delivery plans are written; Plan 1 implementation/review is complete:
   [1: engine and kit](superpowers/plans/2026-10-04-theme-engine-1-engine-and-kit.md),
   [2: consumer/SDK migration](superpowers/plans/2026-10-04-theme-engine-2-consumer-migration.md),
   [3: surface composition](superpowers/plans/2026-10-04-theme-engine-3-surface-refactor.md), with
   [shared API contracts](superpowers/plans/2026-10-04-theme-engine-contracts.md). The plans cover 14/12/11
   task groups, preserve the per-task implementer/reviewer workflow, and propose the coordinated SDK
   0.15.0 boundary. Planning self-review checked source paths, cross-plan signatures, spec coverage,
-  and panel capability gaps (including status dots and menu buttons). The user requested “execute plan 1”. Plan 1 is now in progress; Plans 2–3 remain unexecuted.
+  and panel capability gaps (including status dots and menu buttons). The user requested “execute plan 1”. Plan 1 Task 14 is complete with one known Minor expression-parity gap assigned to Plan 2 Task 2. Native/user acceptance is pending; Plans 2–3 remain unexecuted. See the [final handoff and decisions](design/theme-engine/verification.md).
   Sequencing adjustments: Tasks 4–5 (context/icons/metrics) and 11–12 (SDK/host) are each integrated
   implementation/review units to keep commits runnable; Task 14 supplies the single final branch review.
   Task 1 pulls forward base ThemeToml parsing into `themeio` so the resolver tests retain real TOML
@@ -192,8 +192,7 @@
   include compile-checked public examples. UI **258**, SDK **59**, testkit **106**, KitValues **4** pass,
   zero failures/errors/skips, with UI/SDK doclint and four architecture gates. Headless installDist and
   verifyUiDistribution confirm the application engine jar and isolate all seven plugin runtimes.
-  Task 14 headless repository verification and audit are complete (single final whole-branch review
-  pending): fresh `./gradlew check --rerun-tasks` passed in **5m 6s**, **99/99 tasks executed**.
+  Task 14 initial headless repository verification and audit completed before review: fresh `./gradlew check --rerun-tasks` passed in **5m 6s**, **99/99 tasks executed**.
   Across **681 XML files**: **9,043 tests, 9,037 passed, 0 failures, 0 errors, 6 skipped**; per-module
   counts in [UI maintenance](ui-maintenance.md). All five architecture gates and UI/SDK doclint passed.
   All 26 module/SDK nodes have real renderer/exhaustive host branches; eight events and 14 node enum
@@ -204,7 +203,9 @@
   as a saved-choice record. Module algorithms are the designated authority; app consumers remain until
   Plan 2. Branch diff whitespace and the 178 changed Java sources passed hygiene against `192443b3`.
   Task 14's independent whole-branch review found four Important and four Minor findings. The single
-  combined fix wave is implemented; scoped independent rereview remains pending. The wave adds pure
+  combined fix wave and scoped independent rereview are complete: all eight original findings addressed,
+  no new Critical/Important findings. One new Minor spin/rgba expression-parity gap is assigned to
+  Plan 2 Task 2 before imported-theme visual acceptance; [final review record](design/theme-engine/verification.md). The wave adds pure
   runtime platform/authored color resolution, secure stored Secret details and defensive char-array
   transfer, coherent nested-update rejection, menu-owned live dropdown styling, and all four minor
   icon/weight/radius/context-hue corrections. These are recorded deviations/additions to Plan 1's
@@ -5016,4 +5017,6 @@ Theme-engine Plan 1 final fix evidence (2026-10-04): stabilized headless `./grad
 9,063 tests (9,057 passed; zero failures/errors; six existing environment skips). Six regenerated
 gallery runs contain 49 fixtures each / 636 files total; details and exact per-module totals are in
 [UI maintenance](ui-maintenance.md) and [calibration](design/theme-engine/calibration.md).
-Fixes are implemented; scoped rereview and user/native acceptance remain pending.
+Task 14 verification and independent review are complete; one known Minor expression-parity gap
+is assigned to Plan 2 Task 2 before imported-theme visual acceptance. User/native acceptance remains
+pending; Plans 2–3 remain unexecuted. See the [review handoff](design/theme-engine/verification.md).
