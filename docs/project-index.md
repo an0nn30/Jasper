@@ -22,6 +22,16 @@ folder, which Jasper's shell integration does for zsh, bash and fish.
 To index a folder that is not a project, choose **File › Index Folder…**, or **Add Folder…** on the plugin's Settings
 page.
 
+## Projects on remote hosts
+
+With the Remote plugin, SSH panes work the same way. When an SSH pane's folder is known (Remote follows the shell's
+folder, or the shell reports it) and its host is connected, Jasper looks for markers on the host with one command and
+offers the project with its host name. Indexing uses Git on the host when the project is a work tree, then `find`,
+then an SFTP walk. Opening a file edits it over SFTP in the Editor; **⇧Enter** opens a new SSH tab on the host in the
+file's folder. Remote projects refresh only while their host is connected; otherwise their saved index is still
+searched and shows as Stale in Settings. Background refreshes never ask you to sign in. **File › Index Folder…**
+offers Remote's saved hosts too. Ignoring a remote folder adds `<host id>:<path>` to **Ignored paths**.
+
 ## Finding files
 
 Press **⌘P** (**Ctrl+Alt+Shift+P** on Linux and Windows), or open the palette and choose the **Files** tab. Files

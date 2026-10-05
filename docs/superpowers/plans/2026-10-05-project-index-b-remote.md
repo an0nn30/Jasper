@@ -1,5 +1,12 @@
 # Project Index, Plan B (remote projects) Implementation Plan
 
+**Status:** executed on `claude/file-indexer` (2026-10-05); see [docs/STATUS.md](../../STATUS.md). Deviations from the plan text made during execution:
+- Task 2: the PTY test asserts COLUMNS/LINES; the start-folder round-trip test also runs ksh/tcsh/dash/fish when present; the exec path skips MOTD/lastlog.
+- Task 3: Exec catches a throwing field filter so it fails the run, not the shared SSH session; `/` and trailing-slash folders count as ancestors of home; the git script guards against HOME being unset.
+- Task 4: a dropped session (marker seen, no exit status) is never accepted as a complete Git/find listing.
+- Task 5: ProjectsService closes borrowed leases when the background executor rejects work.
+- Task 8: terminal events received before the saved project list loads are held and replayed (no prompt for already-indexed projects at startup); local detection completes even if the probe throws an Error.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Remote 0.12.0 exports `dev.jasper.remote.api` (service `RemoteProjects`) so Project Index 0.2.0 can detect,

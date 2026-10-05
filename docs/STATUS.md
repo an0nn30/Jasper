@@ -2,6 +2,28 @@
 
 ## Current state — 2026-10-05
 
+- **Project Index, plan B (remote)** (2026-10-05; `claude/file-indexer`, worktree `.worktrees/file-indexer`):
+  [plan B](superpowers/plans/2026-10-05-project-index-b-remote.md). Remote 0.12.0 exports `dev.jasper.remote.api`
+  (`RemoteProjects`: `locate`, `connected`, `hostName`, `folder`, `exists`, `list`, `open`, `openTerminal`) backed by
+  `dev.jasper.remote.projects` (fixed `sh -s` scripts for markers, `git ls-files` and `find`, an SFTP walk fallback),
+  `Connections.existingLease(UUID)` for prompt-free background work, and a start-folder PTY exec channel for SSH tabs
+  opened in a folder (Reconnect returns there). Project Index 0.2.0 confines Remote types to
+  `dev.jasper.indexer.remote.RemoteBridge`, offers and indexes projects in connected SSH panes, searches and opens
+  them through Remote, copies `host:path`, opens SSH tabs in a file's folder, adds remote folders from Index Folder…,
+  and shows Unavailable/Stale remote projects in Settings. Deviations from the spec: start folder via exec channel
+  (Remote had no such path); the marker script, not the indexer, enforces the remote home boundary; ignored remote
+  entries show as `<host id>:<path>`; a background remote job whose host disconnected is dropped silently.
+  Deviations and hardening made during execution: Task 2: the PTY test asserts COLUMNS/LINES, the start-folder
+  round-trip test also runs ksh/tcsh/dash/fish when present, and the exec path skips MOTD/lastlog. Task 3: Exec
+  catches a throwing field filter so it fails the run, not the shared SSH session; `/` and trailing-slash folders
+  count as ancestors of home; the git script guards against HOME being unset. Task 4: a dropped session (marker seen,
+  no exit status) is never accepted as a complete Git/find listing. Task 5: ProjectsService closes borrowed leases
+  when the background executor rejects work. Task 8: terminal events received before the saved project list loads
+  are held and replayed (no prompt for already-indexed projects at startup), and local detection completes even if
+  the probe throws an Error. `exists` and `list` need a POSIX `sh` on the host (Windows OpenSSH hosts are not
+  supported for project indexing). Full `./gradlew check --continue`: **8875 tests, 0 failures, 0 errors, 6 skips**.
+  No GUI, benchmark or AOT training; GUI checks (an SSH pane's card, remote Files rows and their three verbs, Index
+  Folder… on a saved host, an SSH tab opened in a folder) are for the user. Not merged, not pushed.
 - **Project Index, plan A (local)** (2026-10-05; `claude/file-indexer`, worktree `.worktrees/file-indexer`): new bundled
   plugin Project Index (`plugins/indexer`, `dev.jasper.indexer` 0.1.0) per the
   [design](superpowers/specs/2026-10-05-jasper-project-index-design.md) and
