@@ -32,6 +32,8 @@ public final class FakeRemote implements RemoteProjects {
     public final Map<String, Set<String>> markers = new HashMap<>();
     /** Listings per root. */
     public final Map<String, RemoteListing> listings = new HashMap<>();
+    /** Thrown from {@link #exists} before it returns a stage, when set. */
+    public RuntimeException existsThrows;
     /** What was asked, in order. */
     public final List<String> calls = new CopyOnWriteArrayList<>();
 
@@ -48,6 +50,7 @@ public final class FakeRemote implements RemoteProjects {
 
     @Override public CompletionStage<Map<String, Set<String>>> exists(UUID hostId, List<String> folders, Set<String> wanted) {
         calls.add("exists " + folders);
+        if (existsThrows != null) throw existsThrows;
         if (!connected(hostId)) return CompletableFuture.failedFuture(new NotConnectedException(names.getOrDefault(hostId, "?")));
         var found = new LinkedHashMap<String, Set<String>>();
         for (String folder : folders) if (markers.containsKey(folder)) found.put(folder, markers.get(folder));

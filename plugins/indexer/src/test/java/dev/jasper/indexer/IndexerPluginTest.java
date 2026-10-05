@@ -220,6 +220,27 @@ class IndexerPluginTest {
         }
     }
 
+    @Test void remoteDetectionThatThrowsFindsNothing() throws IOException {
+        UUID buildHost = UUID.fromString("0b6f2b5e-8c1a-4c55-9d43-2f3a4b5c6d7e");
+        var fake = new FakeRemote();
+        fake.names.put(buildHost, "build-01");
+        fake.connectedHosts.add(buildHost);
+        fake.existsThrows = new IllegalStateException("Remote broke");
+        try (var host = host()) {
+            host.start(FakeRemotePlugin.INFO, Set.of(), Set.of(), new FakeRemotePlugin(fake));
+            UUID window = window(host);
+            UUID tab = host.addTerminalTab(window, "build-01");
+            UUID pane = host.addTerminalPane(tab, IndexerTesting.pane(null));
+            fake.panes.put(pane, new RemoteFolder(buildHost, "build-01", "/srv/app"));
+            host.start(IndexerTesting.INFO, Set.of(), Set.of("dev.jasper.remote"), plugin());
+            host.remoteCwdChanged(pane, "build-01", "/srv/app");
+            settle(host);
+            assertThat(fake.calls).anyMatch(call -> call.startsWith("exists "));
+            assertThat(host.notifications().posts()).noneMatch(post -> post.spec().title().equals("Index project?"));
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
     @Test void terminalEventsBeforeSavedProjectsLoadWaitForThem() throws IOException {
         Path workspace = Files.createDirectories(home.resolve("ws"));
         Files.writeString(workspace.resolve("Cargo.toml"), "");

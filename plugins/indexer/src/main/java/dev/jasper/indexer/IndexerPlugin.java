@@ -48,6 +48,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.Set;
@@ -288,11 +289,15 @@ public final class IndexerPlugin implements Plugin {
         return result;
     }
 
+    /** Like {@link #probe}: a detection that fails, even by throwing before it starts, finds nothing. */
     private CompletionStage<Optional<Detection<String>>> detectRemote(RemotePlace place) {
-        var result = new CompletableFuture<Optional<Detection<String>>>();
         if (remote.isEmpty()) return CompletableFuture.completedFuture(Optional.empty());
-        remote.get().detect(place, settings.markers()).whenComplete((found, failure) ->
-            environment.ui().execute(() -> result.complete(failure == null ? found : Optional.empty())));
+        var result = new CompletableFuture<Optional<Detection<String>>>();
+        CompletionStage<Optional<Detection<String>>> started;
+        try { started = Objects.requireNonNull(remote.get().detect(place, settings.markers())); }
+        catch (Throwable failure) { started = CompletableFuture.failedFuture(failure); }
+        started.whenComplete((found, failure) ->
+            environment.ui().execute(() -> result.complete(failure == null && found != null ? found : Optional.empty())));
         return result;
     }
 
