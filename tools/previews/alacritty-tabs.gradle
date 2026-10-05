@@ -1,0 +1,27 @@
+// Headless Swing renders; controlled /bin/sh fixtures only, no native window or login shell.
+// ./gradlew -I tools/previews/alacritty-tabs.gradle :jasper-app:alacrittyTabsPreview
+// ./gradlew -I tools/previews/alacritty-tabs.gradle :jasper-app:test -Pjasper.tabTestScale=2 --tests '*FolderTabScaleTest'
+gradle.projectsEvaluated {
+    def app = rootProject.project(':jasper-app')
+    app.tasks.register('alacrittyTabsPreview', JavaExec) {
+        dependsOn app.tasks.named('testClasses')
+        classpath = app.sourceSets.test.runtimeClasspath
+        mainClass = 'dev.jasper.app.workspace.AlacrittyTabsPreview'
+        javaLauncher = app.javaToolchains.launcherFor(app.java.toolchain)
+        jvmArgs '-Djava.awt.headless=true', '--enable-native-access=ALL-UNNAMED'
+        args app.layout.buildDirectory.dir('alacritty-tabs-preview').get().asFile.absolutePath
+    }
+    app.tasks.register('alacrittyTabMotionPreview', JavaExec) {
+        dependsOn app.tasks.named('testClasses')
+        classpath = app.sourceSets.test.runtimeClasspath
+        mainClass = 'dev.jasper.app.workspace.WindowTabMotionPreview'
+        javaLauncher = app.javaToolchains.launcherFor(app.java.toolchain)
+        jvmArgs '-Djava.awt.headless=true', '--enable-native-access=ALL-UNNAMED'
+        args app.layout.buildDirectory.dir('alacritty-tabs-preview/motion').get().asFile.absolutePath
+    }
+    if (rootProject.hasProperty('jasper.tabTestScale')) {
+        app.tasks.named('test', Test) {
+            systemProperty 'flatlaf.uiScale', rootProject.property('jasper.tabTestScale')
+        }
+    }
+}

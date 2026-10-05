@@ -581,8 +581,8 @@ The palette uses the same geometry for selections, hover and scope highlights.
 
 
 Workspace boundaries use continuous chrome instead of painted rules: rail, toolbar,
-workspace title bar, tab strip and status bar have no edge strokes. The selected tab
-uses an inset rounded selection instead of an underline. Dock dividers paint nothing, so no UI
+workspace title bar and status bar have no edge strokes. The equal-width tab strip uses
+vertical separators and a subtle bottom rule. Dock dividers paint nothing, so no UI
 update can give them a border or grip; terminal-internal splits keep their existing visible indicators. The standalone
 dialog title bar retains its separator. `GraphiteChromeTest` writes headless full-window
 previews to `build/render-preview/fluid-workspace-{dark,light}.png`.
@@ -606,20 +606,14 @@ dedicated connections, OS support and failure limits still apply. `PathBreadcrum
 saves light/dark local/remote/narrow previews under `build/render-preview`.
 
 
-Selected workspace tabs read `Jasper.tabSelectedBackground` and
-`Jasper.tabSelectedForeground` from the active UI theme; host icons choose their variant
-against that fill. `Jasper.tabSelectedBorder` and `Jasper.tabSelectedBorderInactive`
-derive from the theme's active/inactive underline colors unless explicitly supplied.
-Jasper Dark defines its fill and outline in the scheme JSON. `WindowTabs` paints a 4px
-radius and 1px outline, with 2px horizontal and up to 4px vertical insets; short tabs
-reduce the vertical inset to preserve space for labels/icons. Hover uses the same
-rounded shape. Geometry scales with UI scale. Overflow uses a clipped viewport with
-full-width tabs and a fixed tab-list button; precise wheel/trackpad input over any tab
-control scrolls by distance without changing selection. Selection, resize and growing
-visible titles reveal the active tab. The viewport paints a 16px fade from the active
-`ToolWindow.background` at each overflowing edge and owns child repaint origins so
-hover/close repaints preserve that overlay. `WindowTabsTest` saves dark/light selection
-and overflow previews under `build/render-preview`.
+Workspace tabs use centered text and equal-width cells, hiding the rail when only one tab
+remains. `WindowTabs` derives selected/inactive surfaces from the workspace palette while
+preserving glass alpha. Child repaints start at the strip to reconstruct translucent pixels
+once. Width animations interpolate the sampled Alacritty reference; resize/reorder/animation
+disable settle, and closed content is released before its empty gap contracts. See the
+[approved layout and motion](design/alacritty-tabs.md), including reproducible headless previews.
+The toolbar and shortcuts own new-tab actions; close is hover-only and titles retain literal,
+bounded tooltips. The fixed list/add controls and scrolling/underline motion are retired.
 
 
 Startup keyboard focus belongs to the active terminal. `WindowContent` provides the

@@ -2,6 +2,28 @@
 
 ## Current state — 2026-10-05
 
+- **Alacritty-style workspace tabs** (2026-10-05; `codex/alacritty-tabs`, isolated worktree
+  `/Users/dustin/.codex/worktrees/alacritty-tabs/moray`): implements the user-approved
+  [equal-width layout and measured motion](design/alacritty-tabs.md), superseding the flat-tab pass.
+  A single tab hides the rail and reclaims its height. Multiple centered text tabs divide the full
+  terminal column, with theme-derived selected/inactive surfaces, separators and hover-only close.
+  New-tab remains in the toolbar/palette/shortcuts. First reveal is 490 ms, additions 475 ms,
+  removals 425 ms; selection and hiding the rail are immediate. Curves interpolate boundaries from
+  the third supplied recording using ffmpeg frames and their actual timestamps; no source easing
+  constants are claimed. Closed tabs release resources immediately. This bounded follow-up uses
+  regression-first native inline implementation and independent final review, not historical plans.
+  Initial behavior regressions failed before implementation; a real hidden-parent reveal regression
+  also reproduced before its fix. Workspace/config checks and dark/light/glass headless previews pass.
+  Independent review found narrow cells reserving all title space for a hidden close affordance; a
+  16-tab/800px regression reproduced it, and narrow cells now reclaim those gutters. Follow-up review
+  has no remaining findings. Final `./gradlew -I tools/previews/alacritty-tabs.gradle
+  :jasper-app:alacrittyTabsPreview :jasper-app:alacrittyTabMotionPreview check --continue` passed:
+  **8,753 tests, 0 failures, 0 errors, 6 existing skips**, including architecture, docs and native
+  headless gates. The explicit 2× scale check, source hygiene and whitespace checks passed. Replaced
+  superseded underline/scroll/natural-width tests with equal-width/visibility/measured-motion coverage.
+  Previews remain in `jasper-app/build/alacritty-tabs-preview/`, including `tab-motion.mp4`.
+  No GUI, benchmark, AOT training, merge or push. Native GUI acceptance remains user-run.
+
 - **Flat workspace tabs** (2026-10-04; `codex/flat-tabs`, isolated worktree
   `/Users/dustin/.codex/worktrees/flat-tabs/moray`): implements the approved screenshot-directed
   [flat-tab design](design/flat-tabs.md). One workspace-colored strip, persistent icons, muted inactive
