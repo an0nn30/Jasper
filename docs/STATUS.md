@@ -10,12 +10,19 @@
   (controller rulings 1, 6, 7): `SecretKind.MULTILINE` secure-note secret (mirrored module/SDK/host/fake, contract case),
   PATH browse buttons accessibly named "Browse for <label>", testkit `FakePluginHost.windowView` (Task 11 testkit
   surface). Vault's `SecretDocument` and `ZoneColors` are deleted (partial-deletion wipe assertion ported to
-  `SecretFieldsTest`); its only `WorkspacePalette.current` reader is gone. Enter/Escape follow baseline `f16ae32f`
-  per dialog: Save/Create/Unlock/Choose/Okay stay the default (primary); Grant has no primary (Enter never grants);
-  import's "Unlock key" is primary only while a passphrase is wanted and "Import and use" stays secondary; Escape runs
-  each dialog's existing Cancel/Deny (manager: close). Field-attributable validation shows on the field until the next
-  edit (primary disabled meanwhile); operation status/failures stay in a message line with retry. Deviation: after an
-  inline manager unlock, Okay is the default again (the baseline left no default button, a removeNotify bug).
+  `SecretFieldsTest`); its only `WorkspacePalette.current` reader is gone. Enter follows baseline `f16ae32f` per
+  dialog: Save/Create/Unlock/Choose/Okay stay the default (primary); password fields submit on Enter through the new
+  kit `Secret.submitAction` (review fix round 1, as their action listeners did); Grant has no primary (Enter never
+  grants); key import has no primary: Enter unlocks only from the passphrase field and never commits; while the
+  manager's inline unlock shows, Unlock is the window's default, so Enter on a footer button unlocks. Field-attributable
+  validation shows on the field until the next edit (primary disabled meanwhile); operation status/failures stay in a
+  message line with retry. Enter/Escape deviations from baseline, all accepted by the controller: (1) Escape now runs
+  each dialog's existing Cancel/Deny (none at baseline): Grant denies, import cancels (not while committing), the
+  generator has none while it runs; (2) Escape on the manager closes it, or cancels the inline unlock prompt while it
+  shows; (3) after an inline unlock Okay is the default again (baseline left no default, a `removeNotify` bug);
+  (4) Enter on a disabled-primary form (a field error showing) does nothing, where baseline re-ran validation; a
+  password field's own Enter still re-validates. Staged-Vault app tests start unbound through the shared
+  `UnboundVault` test guard (settings file plus an asserted-off bind switch), so no test reaches the keychain.
   Visual-only changes (ledgered in `migration.csv`): inputs carry kit labels above them (the fixed kit label column
   truncated the former labels), checkboxes became switches in setting rows, Grant text is no longer bold, import key
   lines are a list with new/reuse chips, every secret input has the kit reveal (paired per form), the manager toolbar
@@ -25,8 +32,10 @@
   `jasper-app` `VaultRenderEvidenceTest` (`build/theme-migration-evidence/vault-hosted`). Report:
   `.superpowers/sdd/2026-10-04-theme-engine-2-consumer-migration/task-7-report.md`.
   GUI checks for the user (Task 7): Vault create/unlock dialogs (Enter submits, Escape cancels, reveal shows both
-  password fields), the manager (Enter in the list edits, elsewhere closes; inline unlock; type filter), a secure note
-  (multiline editing, wrapping), the generator and delete forms, grant prompt (Enter does nothing), key import.
+  password fields), the unlock password field disabled while "Unlocking…" (baseline left it enabled), the manager
+  (Enter in the list edits, elsewhere closes; inline unlock with Enter on Okay unlocking; type filter), a secure note
+  (multiline editing, wrapping), the generator and delete forms, grant prompt (Enter does nothing), key import (Enter
+  only in the passphrase field unlocks; Enter never imports).
 - **Theme engine Plan 2 Task 6d (post-merge) implemented: SDK `PanelHeader` on borrowed kit panel headers; review
   pending** (2026-10-05). A plugin that mounts a kit `Panel` view and calls `PanelHost.setHeader` now gets main's
   native-header result in the panel's one header row: the detail after the title and count (count role), the connected

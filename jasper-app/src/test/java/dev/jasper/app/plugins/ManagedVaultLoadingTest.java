@@ -37,14 +37,16 @@ class ManagedVaultLoadingTest {
             var api = new AtomicReference<Object>(); var owner = new AtomicReference<WindowHandle>();
             onEdt(() -> {
                 new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+                UnboundVault.settings(host); // the staged no-arg plugin uses the platform keychain for bound vaults only
                 host.start(new PluginInfo("dev.jasper.vault", "Credential Vault", "0.2.0", Set.of(dev.jasper.sdk.Capabilities.PALETTE_CONTRIBUTE)), Set.of(), Set.of(), plugin);
                 var consumer = host.start(new PluginInfo("dev.jasper.remote", "Remote", "0.2.0", Set.of()), Set.of("dev.jasper.vault"), Set.of(), context -> api.set(context.services().require(apiType)));
                 UUID id = host.addTerminalWindow(); host.activateTerminalWindow(id); owner.set(consumer.terminals().window(id).orElseThrow());
                 host.invoke("dev.jasper.vault.open", id, null);
                 var create = host.windowView("dev.jasper.vault", "Create Vault").orElseThrow();
                 assertThat(node(create.spec().root(), "password")).isInstanceOf(dev.jasper.sdk.ui.Nodes.Secret.class);
+                UnboundVault.assertUnbound(create);
                 create.setSecret("password", "fixture-password".toCharArray()); create.setSecret("confirm", "fixture-password".toCharArray());
-                create.emit(new dev.jasper.sdk.ui.UiEvent.Toggled("bind", false));
+                UnboundVault.assertUnbound(create);
                 create.emit(new dev.jasper.sdk.ui.UiEvent.Action("submit"));
                 assertThat(create.spec().toString()).doesNotContain("fixture-password");
             });

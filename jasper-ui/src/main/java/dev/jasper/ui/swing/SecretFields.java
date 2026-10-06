@@ -180,6 +180,7 @@ final class SecretFields {
                 surface.remove(input);
             } else container.add(surface, BorderLayout.CENTER);
             label.setLabelFor(detail ? detailDisplay : multiline ? area : input);
+            bindSubmit();
             DocumentListener listener =
                     new DocumentListener() {
                         @Override
@@ -205,6 +206,39 @@ final class SecretFields {
             buffer.addDocumentListener(listener);
             own(() -> buffer.removeDocumentListener(listener));
             refresh();
+        }
+
+        /**
+         * Enter in an input secret with a submit action runs it and keeps the key (the containing form's primary is not
+         * pressed); without one the binding is disabled and Enter passes on to the form or dialog.
+         */
+        private void bindSubmit() {
+            KeyStroke key = KeyStroke.getKeyStroke("ENTER");
+            String name = "secret.submit";
+            input.getInputMap(JComponent.WHEN_FOCUSED).put(key, name);
+            input.getActionMap()
+                    .put(
+                            name,
+                            new AbstractAction() {
+                                @Override
+                                public boolean isEnabled() {
+                                    var secret = (Nodes.Secret) node;
+                                    return !closed
+                                            && secret.kind() == Nodes.SecretKind.INPUT
+                                            && !secret.submitAction().isBlank();
+                                }
+
+                                @Override
+                                public void actionPerformed(java.awt.event.ActionEvent event) {
+                                    if (isEnabled() && interactive())
+                                        emit(new UiEvent.Action(((Nodes.Secret) node).submitAction()));
+                                }
+                            });
+            own(
+                    () -> {
+                        input.getInputMap(JComponent.WHEN_FOCUSED).remove(key);
+                        input.getActionMap().remove(name);
+                    });
         }
 
         char[] snapshot() {

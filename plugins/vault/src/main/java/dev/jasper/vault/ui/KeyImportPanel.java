@@ -16,8 +16,8 @@ import java.util.Set;
 
 /**
  * Passive import review and passphrase controls; metadata is literal text, never markup. Enter keeps the former
- * dialog's meaning: while a passphrase is wanted, "Unlock key" is the form's primary (Enter in the passphrase field
- * unlocked before); "Import and use" is never the primary, since Enter never committed an import. Escape cancels.
+ * dialog's meaning exactly: the form has no primary (the dialog had no default button), Enter in the passphrase field
+ * unlocks the key (its action listener did) and Enter anywhere else does nothing, so it never commits. Escape cancels.
  */
 public final class KeyImportPanel implements AutoCloseable {
     static final String FORM = "import", STATUS = "status", KEYS = "keys", PASSPHRASE = "passphrase", UNLOCK = "unlock-key",
@@ -76,13 +76,13 @@ public final class KeyImportPanel implements AutoCloseable {
         var sections = List.<Nodes.Node>of(
             new Nodes.Text(STATUS, ControlState.READY, prompt.status(), Nodes.TextRole.BODY),
             new Nodes.ItemList(KEYS, ControlState.READY, Nodes.ListKind.DOUBLE, items, Set.of(), "", List.of()),
-            new Nodes.Secret(PASSPHRASE, new ControlState(wanted, true, false, ""), "", "Key passphrase", ""));
+            new Nodes.Secret(PASSPHRASE, new ControlState(wanted, true, false, ""), "", "Key passphrase", "", Nodes.SecretKind.INPUT, "", UNLOCK));
         var actions = new ArrayList<Nodes.Button>();
         actions.add(new Nodes.Button(CANCEL, new ControlState(true, phase != KeyImportPrompt.Phase.COMMITTING, false, ""), "Cancel", "",
             Nodes.ButtonKind.SECONDARY, CANCEL, ""));
         actions.add(new Nodes.Button(COMMIT, new ControlState(true, phase == KeyImportPrompt.Phase.REVIEW, phase == KeyImportPrompt.Phase.COMMITTING, ""),
             "Import and use", "", Nodes.ButtonKind.SECONDARY, COMMIT, ""));
-        if (wanted) actions.add(new Nodes.Button(UNLOCK, ControlState.READY, "Unlock key", "", Nodes.ButtonKind.PRIMARY, UNLOCK, ""));
+        if (wanted) actions.add(new Nodes.Button(UNLOCK, ControlState.READY, "Unlock key", "", Nodes.ButtonKind.SECONDARY, UNLOCK, ""));
         return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, "Import SSH keys", Optional.empty(), sections, Optional.empty(), actions,
             phase == KeyImportPrompt.Phase.COMMITTING ? "" : CANCEL);
     }

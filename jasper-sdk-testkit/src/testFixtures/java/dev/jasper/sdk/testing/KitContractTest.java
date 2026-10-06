@@ -145,6 +145,19 @@ public abstract class KitContractTest {
         secret(view,"note","x".toCharArray());view.clearSecret("note");view.withSecret("note",chars -> assertThat(chars).isEmpty());
         view.close();assertThatThrownBy(() -> view.withSecret("note",chars -> {})).isInstanceOf(IllegalStateException.class);stop(kit);
     }); }
+    @Test void inputSecretsCarryASubmitActionThroughUpdatesAndOnlyInputsTakeOne() throws Exception { edt(() -> {
+        assertThatThrownBy(() -> new Nodes.Secret("n",ControlState.READY,"","Note","",Nodes.SecretKind.MULTILINE,"","go")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Nodes.Secret("n",ControlState.READY,"","Stored","",Nodes.SecretKind.DETAIL,"copy","go")).isInstanceOf(IllegalArgumentException.class);
+        var kit=kit("owner");var events=new ArrayList<UiEvent>();
+        var withSubmit=new ViewSpec(new Nodes.Secret("secret",ControlState.READY,"","Passphrase","",Nodes.SecretKind.INPUT,"","unlock"));
+        var view=kit.create(withSubmit,events::add);
+        assertThat(((Nodes.Secret)view.spec().root()).submitAction()).isEqualTo("unlock");
+        secret(view,"secret","typed".toCharArray());
+        view.update(new ViewSpec(new Nodes.Secret("secret",ControlState.READY,"","Passphrase","")));
+        view.withSecret("secret",chars -> assertThat(chars).as("changing the submit action keeps the typed value").containsExactly('t','y','p','e','d'));
+        emit(view,new UiEvent.Action("unlock"));assertThat(events).contains(new UiEvent.Action("unlock"));
+        stop(kit);
+    }); }
     @Test void createUpdateActionAndClose() throws Exception { edt(() -> {
         var kit=kit("owner"); var events=new ArrayList<UiEvent>(); var view=kit.create(spec("Before"),events::add);
         view.update(spec("After")); assertThat(view.spec()).isEqualTo(spec("After"));

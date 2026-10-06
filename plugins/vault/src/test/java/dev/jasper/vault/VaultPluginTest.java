@@ -274,6 +274,8 @@ class VaultPluginTest {
 
     @Test void defaultPluginStartsWithoutTouchingTheDesktopClipboard() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         try (var host = new FakePluginHost()) {
+            // The default plugin uses the platform keychain for bound vaults only; this test creates none, and binding is off.
+            host.setSetting(INFO.id(), "bind_new_vaults_to_device", false);
             host.start(INFO, Set.of(), Set.of(), new VaultPlugin());
             assertThat(host.failures()).isEmpty();
             assertThat(host.scopes()).hasSize(1);

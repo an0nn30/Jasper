@@ -232,7 +232,7 @@ final class ManagerPanel implements AutoCloseable {
     }
 
     private List<Nodes.Node> lockedCard() {
-        if (unlock != null) return List.of(unlock.node());
+        if (unlock != null) return List.of(unlock.embedded());
         return List.of(new Nodes.Empty(LOCKED, ControlState.READY,
             new Nodes.Icon(LOCKED + ".icon", ControlState.READY, "lock", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Vault locked"), "Vault locked", "",
             List.of(new Nodes.Button(UNLOCK, ControlState.READY, "Unlock", "unlock", Nodes.ButtonKind.SECONDARY, UNLOCK, ""))));
@@ -240,12 +240,15 @@ final class ManagerPanel implements AutoCloseable {
 
     private Nodes.Form node() {
         List<Nodes.Node> sections = !unlocked ? lockedCard() : card == Card.GRANTS ? grantsCard() : entries();
-        var actions = List.of(
+        boolean prompting = unlock != null && !unlocked;
+        var actions = new ArrayList<Nodes.Button>(List.of(
             new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CLOSE, ""),
-            // While the unlock form shows, its Unlock is the one primary of the window, as its default button was.
-            new Nodes.Button(OKAY, ControlState.READY, "Okay", "", unlock != null ? Nodes.ButtonKind.SECONDARY : Nodes.ButtonKind.PRIMARY, CLOSE, ""));
+            new Nodes.Button(OKAY, ControlState.READY, "Okay", "", prompting ? Nodes.ButtonKind.SECONDARY : Nodes.ButtonKind.PRIMARY, CLOSE, "")));
+        // While the unlock form shows, its Unlock is the window's one primary, as it was the default button: Enter
+        // anywhere in the window (a footer button included) unlocks, and Escape cancels the prompt first.
+        if (prompting) actions.add(unlock.submitButton());
         return new Nodes.Form(ROOT, ControlState.READY, Nodes.FormKind.FULL, "Credential Vault", Optional.empty(), sections,
-            Optional.of(new Nodes.Text(STATUS, ControlState.READY, status, Nodes.TextRole.CAPTION)), actions, CLOSE);
+            Optional.of(new Nodes.Text(STATUS, ControlState.READY, status, Nodes.TextRole.CAPTION)), actions, prompting ? unlock.cancel : CLOSE);
     }
 
     /** The window closed (its surface already disposed the view and erased its storage) or is closing. */

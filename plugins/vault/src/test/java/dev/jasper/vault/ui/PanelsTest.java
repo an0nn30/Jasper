@@ -29,6 +29,9 @@ class PanelsTest {
             assertThat(node(view, panel.bind, Nodes.Toggle.class).checked()).isTrue();
             assertThat(node(view, panel.password, Nodes.Secret.class).revealGroup())
                 .as("password and confirmation reveal together").isEqualTo(node(view, panel.confirm, Nodes.Secret.class).revealGroup()).isNotBlank();
+            assertThat(node(view, panel.password, Nodes.Secret.class).submitAction()).as("Enter in either field submits, as their action listeners did")
+                .isEqualTo(panel.submit);
+            assertThat(node(view, panel.confirm, Nodes.Secret.class).submitAction()).isEqualTo(panel.submit);
             press(view, panel.submit);
             assertThat(error(view, panel.password)).contains("at least 8");
             assertThat(button(view, panel.submit).kind()).isEqualTo(Nodes.ButtonKind.PRIMARY);

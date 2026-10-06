@@ -33,6 +33,7 @@ class RemoteShortcutConfigTest {
     private Contributions contributions;
 
     private void start() throws Exception {
+        UnboundVault.settings(root.resolve("plugins")); // the runtime starts the staged Vault, whose keychain stays unused
         onEdt(() -> {
             contributions = new Contributions();
             var buddy = new BuddyTestSupport();

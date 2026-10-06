@@ -171,7 +171,7 @@ unique within their owning control; references resolve only in that control. Do 
 | MenuButton | `String label, String icon, ButtonKind kind, String action, List<MenuItem> items, String tooltip, ButtonPresentation presentation` |
 | StatusDot | `StatusKind kind` |
 | Field | `FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation` (numeric present exactly for NUMBER) |
-| Secret | `String hint, String label, String revealGroup, SecretKind kind, String copyAction` (no string value; MULTILINE takes no reveal group or copy action) |
+| Secret | `String hint, String label, String revealGroup, SecretKind kind, String copyAction, String submitAction` (no string value; MULTILINE takes no reveal group or copy action; only INPUT takes a submit action) |
 | Choice | `ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon, Optional<ChoiceSearch> search` (present exactly for SEARCHABLE) |
 | Toggle | `String label, boolean checked, String action, boolean compact, String tooltip` |
 | Chip | `String label, Hue hue` |
@@ -346,6 +346,10 @@ Plan 2 Task 7 Vault additions (secure notes; same mirroring and SDK version rule
   inserts a newline (the form's Enter submit already skips text areas); `withSecret`, `replaceSecret` and
   `clearSecret` behave exactly as for INPUT, and kind change, removal and close erase the buffer. The fake's
   `setSecret` accepts INPUT and MULTILINE (DETAIL stays read-only).
+- `Secret.submitAction` (Task 7 review fix round 1; the seven- and five-argument constructors give blank): Enter in an
+  INPUT secret with a nonblank submit action runs it as `Action(submitAction)` and keeps the key, so the containing form's
+  primary is not pressed (the Task 6a single-line field rule); blank passes Enter on. DETAIL and MULTILINE reject one.
+  This lets a dialog keep Enter scoped to its password field, as a Swing field action listener did.
 - A PATH field's Browse button keeps its visible "Browse…" label and is accessibly named "Browse for <field label>"
   (no API), restoring the per-field names the Vault editors had.
 - Testkit: `FakePluginHost.windowView(pluginId, title)` returns the `FakeKitView` mounted on an open plugin window or

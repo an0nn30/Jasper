@@ -93,7 +93,8 @@ Copy emits only `Action(copyAction)`; the domain callback uses `withSecret` and 
 service. No secret-bearing immutable string or general clipboard write is added by the kit.
 `SecretKind.MULTILINE` (Plan 2 Task 7) is an editable secure note: a wrapping text area over the same wipeable
 buffer, shown in clear, with no reveal group, copy action or reveal control; its storage, transfer and wipe rules
-are those of INPUT.
+are those of INPUT. An INPUT secret's optional `submitAction` (Task 7 review fix round 1) is what Enter in that
+field runs; the field keeps the key, so a dialog can scope Enter to its password field.
 
 Updates invoked from an in-progress update are rejected before mutation at module/SDK/fake boundaries.
 Disposal still contains callback diagnostics and permits reentrant close; normal event handlers can

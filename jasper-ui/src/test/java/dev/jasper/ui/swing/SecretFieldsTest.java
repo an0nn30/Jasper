@@ -189,6 +189,54 @@ class SecretFieldsTest {
         assertThatThrownBy(() -> new Secret("n", ControlState.READY, "", "Note", "pair", SecretKind.MULTILINE, "")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new Secret("n", ControlState.READY, "", "Note", "", SecretKind.MULTILINE, "copy")).isInstanceOf(IllegalArgumentException.class);
     }
+    static void enter(java.awt.Component source) {
+        SwingUtilities.processKeyBindings(new java.awt.event.KeyEvent(source, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, java.awt.event.KeyEvent.VK_ENTER, '\n'));
+    }
+    static ViewSpec unlockForm(String submitAction, ButtonKind unlockKind) {
+        return new ViewSpec(new Form("form", ControlState.READY, FormKind.FULL, "Unlock", java.util.Optional.empty(),
+            java.util.List.of(new Secret("p", ControlState.READY, "", "Passphrase", "", SecretKind.INPUT, "", submitAction)), java.util.Optional.empty(),
+            java.util.List.of(new Button("cancel", ControlState.READY, "Cancel", "", ButtonKind.SECONDARY, "cancel", ""),
+                new Button("unlock", ControlState.READY, "Unlock", "", unlockKind, "unlock", "")), "cancel"));
+    }
+    @Test void enterInASecretWithASubmitActionRunsItThereAndOnlyThere() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, unlockForm("unlock", ButtonKind.SECONDARY), events::add)) {
+                var input = find(view, "p.input", JPasswordField.class);
+                input.setText("synthetic-secret"); events.clear();
+                enter(input);
+                assertThat(events).as("the field owns Enter for its action").containsExactly(new UiEvent.Action("unlock"));
+                events.clear();
+                enter(find(view, "cancel", JButton.class));
+                assertThat(events).as("a form without a primary does nothing on Enter elsewhere").isEmpty();
+                view.update(unlockForm("", ButtonKind.SECONDARY)); enter(input);
+                assertThat(events).as("without a submit action Enter passes on").isEmpty();
+                view.update(new ViewSpec(new Form("form", ControlState.READY, FormKind.FULL, "Unlock", java.util.Optional.empty(),
+                    java.util.List.of(new Secret("p", new ControlState(true, false, false, ""), "", "Passphrase", "", SecretKind.INPUT, "", "unlock")),
+                    java.util.Optional.empty(), java.util.List.of(), "")));
+                enter(input);
+                assertThat(events).as("a disabled field runs nothing").isEmpty();
+            } finally { release(context); }
+        });
+    }
+    @Test void enterInASecretWithoutASubmitActionReachesTheFormPrimary() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, unlockForm("", ButtonKind.PRIMARY), events::add)) {
+                enter(find(view, "p.input", JPasswordField.class));
+                assertThat(events).containsExactly(new UiEvent.Action("unlock"));
+                events.clear();
+                view.update(unlockForm("submit-field", ButtonKind.PRIMARY));
+                enter(find(view, "p.input", JPasswordField.class));
+                assertThat(events).as("the field's action, not also the primary").containsExactly(new UiEvent.Action("submit-field"));
+            } finally { release(context); }
+        });
+    }
+    @Test void onlyAnInputSecretTakesASubmitAction() {
+        assertThatThrownBy(() -> new Secret("n", ControlState.READY, "", "Note", "", SecretKind.MULTILINE, "", "go")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Secret("n", ControlState.READY, "", "Stored", "", SecretKind.DETAIL, "copy", "go")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(new Secret("n", ControlState.READY, "", "Password", "", SecretKind.INPUT, "").submitAction()).isEmpty();
+    }
     static char[] storage(javax.swing.text.JTextComponent input) {
         var segment = new Segment();
         try { input.getDocument().getText(0, input.getDocument().getLength(), segment); return segment.array; }

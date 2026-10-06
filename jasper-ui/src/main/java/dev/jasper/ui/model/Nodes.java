@@ -153,14 +153,23 @@ public final class Nodes {
      */
     public enum SecretKind { INPUT, DETAIL, MULTILINE }
 
-    public record Secret(String id, ControlState state, String hint, String label, String revealGroup, SecretKind kind, String copyAction) implements Node {
+    /**
+     * A present {@code submitAction} (INPUT only) is what Enter in the field runs: the field keeps the key, as a single-line
+     * field with a trailing action does, so the containing form's primary is not pressed. Blank passes Enter on.
+     */
+    public record Secret(String id, ControlState state, String hint, String label, String revealGroup, SecretKind kind, String copyAction, String submitAction) implements Node {
         public Secret {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(hint);
             ModelChecks.label(label, "label");
-            Objects.requireNonNull(revealGroup); Objects.requireNonNull(kind); Objects.requireNonNull(copyAction);
+            Objects.requireNonNull(revealGroup); Objects.requireNonNull(kind); Objects.requireNonNull(copyAction); Objects.requireNonNull(submitAction);
             if (kind == SecretKind.MULTILINE && (!revealGroup.isEmpty() || !copyAction.isEmpty()))
                 throw new IllegalArgumentException("A multiline secret has no reveal group or copy action");
+            if (kind != SecretKind.INPUT && !submitAction.isEmpty())
+                throw new IllegalArgumentException("Only an input secret takes a submit action");
+        }
+        public Secret(String id, ControlState state, String hint, String label, String revealGroup, SecretKind kind, String copyAction) {
+            this(id, state, hint, label, revealGroup, kind, copyAction, "");
         }
         public Secret(String id, ControlState state, String hint, String label, String revealGroup) {
             this(id,state,hint,label,revealGroup,SecretKind.INPUT,"");

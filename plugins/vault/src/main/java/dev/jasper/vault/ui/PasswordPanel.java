@@ -136,21 +136,43 @@ public final class PasswordPanel implements AutoCloseable {
 
     private ControlState state(String id) { return new ControlState(true, !busy, false, errors.getOrDefault(id, "")); }
 
-    /** The form node: intro, password rows, the bind switch when creating, the status line and Cancel / primary. */
+    /** The form node: intro, password fields, the bind switch when creating, the status line and Cancel / primary. */
     Nodes.Form node() {
         var sections = new ArrayList<Nodes.Node>();
         sections.add(new Nodes.Text(intro, ControlState.READY, introText, Nodes.TextRole.BODY));
-        sections.add(new Nodes.Secret(password, state(password), "", "Master password:", REVEAL_GROUP));
+        sections.add(secret(password, "Master password:"));
         if (creating) {
-            sections.add(new Nodes.Secret(confirm, state(confirm), "", "Confirm:", REVEAL_GROUP));
+            sections.add(secret(confirm, "Confirm:"));
             sections.add(new Nodes.SettingRow(bind + ".row", ControlState.READY, "Bind to this device (recommended)", "",
                 new Nodes.Toggle(bind, new ControlState(true, !busy, false, ""), "Bind to this device (recommended)", bound, bind, false), false));
         }
-        sections.add(new Nodes.Text(message, new ControlState(!status.isEmpty(), true, false, ""), status, Nodes.TextRole.BODY));
-        var actions = List.of(
-            new Nodes.Button(cancel, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, cancel, ""),
-            new Nodes.Button(submit, new ControlState(true, true, busy, ""), primaryTitle, "", Nodes.ButtonKind.PRIMARY, submit, ""));
-        return new Nodes.Form(form, ControlState.READY, Nodes.FormKind.FULL, primaryTitle, Optional.empty(), sections, Optional.empty(), actions, cancel);
+        sections.add(statusLine());
+        return new Nodes.Form(form, ControlState.READY, Nodes.FormKind.FULL, primaryTitle, Optional.empty(), sections, Optional.empty(),
+            List.of(cancelButton(), submitButton()), cancel);
+    }
+
+    /**
+     * The unlock form inside a larger view: its fields and Cancel. The host puts {@link #submitButton()} among its own
+     * actions as the one primary, as the former form was its window's default button.
+     */
+    Nodes.Node embedded() {
+        return new Nodes.Stack(form, ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Text(intro, ControlState.READY, introText, Nodes.TextRole.BODY), secret(password, "Master password:"), statusLine(),
+            new Nodes.Stack(form + ".actions", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(cancelButton()))));
+    }
+
+    /** Enter in a password field submits, as the former fields' action listeners did. */
+    private Nodes.Secret secret(String id, String label) {
+        return new Nodes.Secret(id, state(id), "", label, REVEAL_GROUP, Nodes.SecretKind.INPUT, "", submit);
+    }
+
+    private Nodes.Text statusLine() { return new Nodes.Text(message, new ControlState(!status.isEmpty(), true, false, ""), status, Nodes.TextRole.BODY); }
+
+    private Nodes.Button cancelButton() { return new Nodes.Button(cancel, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, cancel, ""); }
+
+    /** The primary submit button (Unlock or Create Vault). */
+    Nodes.Button submitButton() {
+        return new Nodes.Button(submit, new ControlState(true, true, busy, ""), primaryTitle, "", Nodes.ButtonKind.PRIMARY, submit, "");
     }
 
     boolean busy() { return busy; }

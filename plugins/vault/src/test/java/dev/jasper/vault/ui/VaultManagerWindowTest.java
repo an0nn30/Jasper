@@ -109,10 +109,13 @@ class VaultManagerWindowTest {
                 press(view, ManagerPanel.UNLOCK);
                 assertThat(prompts[0]).isEqualTo(1);
                 assertThat(window.passwordPanel).isNotNull();
-                var form = node(view, window.passwordPanel.form, Nodes.Form.class);
-                assertThat(form.actions()).filteredOn(b -> b.kind() == Nodes.ButtonKind.PRIMARY).singleElement()
-                    .satisfies(b -> assertThat(b.label()).isEqualTo("Unlock"));
-                assertThat(button(view, ManagerPanel.OKAY).kind()).as("the unlock form owns the window's primary").isEqualTo(Nodes.ButtonKind.SECONDARY);
+                var root = node(view, ManagerPanel.ROOT, Nodes.Form.class);
+                assertThat(root.actions()).as("Unlock is the window's default, so Enter on a footer button unlocks as at baseline")
+                    .filteredOn(b -> b.kind() == Nodes.ButtonKind.PRIMARY).singleElement()
+                    .satisfies(b -> { assertThat(b.label()).isEqualTo("Unlock"); assertThat(b.action()).isEqualTo(window.passwordPanel.submit); });
+                assertThat(button(view, ManagerPanel.OKAY).kind()).isEqualTo(Nodes.ButtonKind.SECONDARY);
+                assertThat(node(view, window.passwordPanel.password, Nodes.Secret.class).submitAction()).isEqualTo(window.passwordPanel.submit);
+                assertThat(root.cancelAction()).as("Escape cancels the prompt first").isEqualTo(window.passwordPanel.cancel);
                 type(view, window.passwordPanel.password, "test-password");
                 assertThat(view.spec().toString()).doesNotContain("test-password");
                 press(view, window.passwordPanel.submit); f.drain();
