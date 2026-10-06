@@ -30,6 +30,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -78,7 +79,11 @@ public final class ErrorsView extends JPanel {
     private final Incidents incidents;
     private final Hooks hooks;
     private final DateTimeFormatter time;
-    private final KitView listView, headingView, traceView, emptyView, leadingButtons, trailingButtons;
+    private final KitView listView, headerView, sightingsView, messageView, traceView, emptyView, copyView, disableView, logView, clearView;
+    /** The former heading column: header, a 2 px gap, sightings, an 8 px gap, the message. */
+    private final JPanel heading = new JPanel();
+    private final JPanel leadingButtons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING, 0, 0));
+    private final JPanel trailingButtons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.TRAILING, 0, 0));
     private final CardLayout cards = new CardLayout();
     private final JPanel detail = new JPanel(cards), details = new JPanel(new BorderLayout()), buttons = new JPanel(new BorderLayout());
     private final JSplitPane split;
@@ -109,17 +114,30 @@ public final class ErrorsView extends JPanel {
         message.getAccessibleContext().setAccessibleName("Message");
         trace.getAccessibleContext().setAccessibleName("Stack trace");
         for (var area : List.of(message, trace)) { area.setEditable(false); area.setOpaque(false); }
-        headingView = new KitView(kit, headingSpec(null), this::event);
-        headingView.registerContent(MESSAGE, scroll(message), () -> { });
+        headerView = new KitView(kit, textSpec(HEADER, " ", Nodes.TextRole.BODY_STRONG), this::event);
+        sightingsView = new KitView(kit, textSpec(SIGHTINGS, " ", Nodes.TextRole.DESCRIPTION), this::event);
+        messageView = new KitView(kit, new ViewSpec(new Nodes.Custom("message", ControlState.READY, MESSAGE, Nodes.CustomKind.EDITOR, "Message")), this::event);
+        messageView.registerContent(MESSAGE, scroll(message), () -> { });
+        heading.setLayout(new javax.swing.BoxLayout(heading, javax.swing.BoxLayout.Y_AXIS));
+        heading.setOpaque(false);
         traceView = new KitView(kit, new ViewSpec(new Nodes.Custom("trace", ControlState.READY, TRACE, Nodes.CustomKind.EDITOR, "Stack trace")), this::event);
         traceView.registerContent(TRACE, scroll(trace), () -> { });
         emptyView = new KitView(kit, new ViewSpec(new Nodes.Empty("no-errors", ControlState.READY,
             new Nodes.Icon("no-errors-icon", ControlState.READY, "check", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "No errors"), "No errors", "", List.of())), this::event);
-        leadingButtons = new KitView(kit, leadingSpec(null), this::event);
-        trailingButtons = new KitView(kit, trailingSpec(false), this::event);
+        copyView = new KitView(kit, buttonSpec(COPY, "Copy", new ControlState(true, false, false, "")), this::event);
+        disableView = new KitView(kit, buttonSpec(DISABLE, "Disable Plugin", new ControlState(false, true, false, "")), this::event);
+        logView = new KitView(kit, buttonSpec(LOG_FOLDER, "Open Log Folder", ControlState.READY), this::event);
+        clearView = new KitView(kit, buttonSpec(CLEAR, "Clear", new ControlState(true, false, false, "")), this::event);
+        disableView.setVisible(false);
+        leadingButtons.setOpaque(false);
+        leadingButtons.add(copyView);
+        leadingButtons.add(disableView);
+        trailingButtons.setOpaque(false);
+        trailingButtons.add(logView);
+        trailingButtons.add(clearView);
 
         details.setOpaque(false);
-        details.add(headingView, BorderLayout.NORTH);
+        details.add(heading, BorderLayout.NORTH);
         details.add(traceView, BorderLayout.CENTER);
         detail.setOpaque(false);
         detail.add(emptyView, EMPTY);
@@ -167,6 +185,17 @@ public final class ErrorsView extends JPanel {
         ((BorderLayout) details.getLayout()).setVgap(metric(DesignMetrics.Role.ERRORS_DETAIL_GAP));
         int buttonsVertical = metric(DesignMetrics.Role.ERRORS_BUTTONS_VERTICAL_PADDING), buttonsSide = metric(DesignMetrics.Role.ERRORS_BUTTONS_SIDE_PADDING);
         buttons.setBorder(BorderFactory.createEmptyBorder(buttonsVertical, buttonsSide, buttonsVertical, buttonsSide));
+        // The former FlowLayout gap between the buttons of each group.
+        int buttonGap = metric(DesignMetrics.Role.ERRORS_BUTTON_GAP);
+        ((java.awt.FlowLayout) leadingButtons.getLayout()).setHgap(buttonGap);
+        ((java.awt.FlowLayout) trailingButtons.getLayout()).setHgap(buttonGap);
+        // The former heading struts: 2 px under the header, 8 px above the message.
+        heading.removeAll();
+        for (java.awt.Component part : List.of(headerView, javax.swing.Box.createVerticalStrut(metric(DesignMetrics.Role.ERRORS_SIGHTINGS_GAP)), sightingsView,
+                javax.swing.Box.createVerticalStrut(metric(DesignMetrics.Role.ERRORS_MESSAGE_GAP)), messageView)) {
+            if (part instanceof JComponent component) component.setAlignmentX(LEFT_ALIGNMENT);
+            heading.add(part);
+        }
         split.setDividerSize(metric(DesignMetrics.Role.WORKSPACE_GUTTER));
         message.setFont(NotificationStyle.font(kit, Typography.Role.BODY));
         trace.setFont(NotificationStyle.font(kit, Typography.Role.MONO));
@@ -222,7 +251,7 @@ public final class ErrorsView extends JPanel {
         closed = true;
         listening.close();
         try { theme.close(); } catch (Exception ignored) { /* the binding outlives the view */ }
-        for (var view : List.of(listView, headingView, traceView, emptyView, leadingButtons, trailingButtons)) view.close();
+        for (var view : List.of(listView, headerView, sightingsView, messageView, traceView, emptyView, copyView, disableView, logView, clearView)) view.close();
     }
 
     Optional<Incident> selected() {
@@ -247,8 +276,11 @@ public final class ErrorsView extends JPanel {
 
     private void showSelected() {
         Optional<Incident> chosen = selected();
-        leadingButtons.update(leadingSpec(chosen.orElse(null)));
-        trailingButtons.update(trailingSpec(!listed.isEmpty()));
+        boolean plugin = chosen.map(Incident::fromPlugin).orElse(false);
+        copyView.update(buttonSpec(COPY, "Copy", new ControlState(true, chosen.isPresent(), false, "")));
+        disableView.update(buttonSpec(DISABLE, "Disable Plugin", new ControlState(plugin, true, false, "")));
+        disableView.setVisible(plugin);
+        clearView.update(buttonSpec(CLEAR, "Clear", new ControlState(true, !listed.isEmpty(), false, "")));
         if (chosen.isEmpty()) {
             shown = null;
             showingEmpty = true;
@@ -256,7 +288,8 @@ public final class ErrorsView extends JPanel {
             return;
         }
         Incident incident = chosen.get();
-        headingView.update(headingSpec(incident));
+        headerView.update(textSpec(HEADER, sourceName(incident) + " · " + incident.operation(), Nodes.TextRole.BODY_STRONG));
+        sightingsView.update(textSpec(SIGHTINGS, sightingsOf(incident), Nodes.TextRole.DESCRIPTION));
         if (!incident.id().equals(shown)) {
             // The first sighting's text never changes, so a long trace is set once per selection.
             message.setText(incident.message().isEmpty() ? "No message" : incident.message());
@@ -283,24 +316,12 @@ public final class ErrorsView extends JPanel {
             selectedId == null ? Set.of() : Set.of(selectedId.toString()), "", List.of()));
     }
 
-    private ViewSpec headingSpec(Incident incident) {
-        return new ViewSpec(new Nodes.Stack("heading", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
-            new Nodes.Text(HEADER, ControlState.READY, incident == null ? " " : sourceName(incident) + " · " + incident.operation(), Nodes.TextRole.BODY_STRONG),
-            new Nodes.Text(SIGHTINGS, ControlState.READY, incident == null ? " " : sightingsOf(incident), Nodes.TextRole.DESCRIPTION),
-            new Nodes.Custom("message", ControlState.READY, MESSAGE, Nodes.CustomKind.EDITOR, "Message"))));
+    private static ViewSpec textSpec(String id, String text, Nodes.TextRole role) {
+        return new ViewSpec(new Nodes.Text(id, ControlState.READY, text, role));
     }
 
-    private ViewSpec leadingSpec(Incident incident) {
-        boolean plugin = incident != null && incident.fromPlugin();
-        return new ViewSpec(new Nodes.Stack("leading-buttons", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
-            new Nodes.Button(COPY, new ControlState(true, incident != null, false, ""), "Copy", "", Nodes.ButtonKind.SECONDARY, COPY, ""),
-            new Nodes.Button(DISABLE, new ControlState(plugin, true, false, ""), "Disable Plugin", "", Nodes.ButtonKind.SECONDARY, DISABLE, ""))));
-    }
-
-    private ViewSpec trailingSpec(boolean any) {
-        return new ViewSpec(new Nodes.Stack("trailing-buttons", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
-            new Nodes.Button(LOG_FOLDER, ControlState.READY, "Open Log Folder", "", Nodes.ButtonKind.SECONDARY, LOG_FOLDER, ""),
-            new Nodes.Button(CLEAR, new ControlState(true, any, false, ""), "Clear", "", Nodes.ButtonKind.SECONDARY, CLEAR, ""))));
+    private static ViewSpec buttonSpec(String id, String label, ControlState state) {
+        return new ViewSpec(new Nodes.Button(id, state, label, "", Nodes.ButtonKind.SECONDARY, id, ""));
     }
 
     private String sourceName(Incident incident) {
@@ -325,22 +346,26 @@ public final class ErrorsView extends JPanel {
 
     List<Incident> listed() { return listed; }
     String headerText() { return showingEmpty ? "" : headingText(0); }
-    JLabel headerLabel() { return (JLabel) NotificationCard.find(headingView, HEADER); }
+    JLabel headerLabel() { return (JLabel) NotificationCard.find(headerView, HEADER); }
+    JLabel sightingsLabel() { return (JLabel) NotificationCard.find(sightingsView, SIGHTINGS); }
+    KitView messageView() { return messageView; }
+    JPanel headingColumn() { return heading; }
     String sightingsText() { return showingEmpty ? "" : headingText(1); }
     String messageText() { return message.getText(); }
     String traceText() { return trace.getText(); }
     Font traceFont() { return trace.getFont(); }
     boolean showingEmpty() { return showingEmpty; }
-    AbstractButton copyButton() { return (AbstractButton) NotificationCard.find(leadingButtons, COPY); }
-    AbstractButton disableButton() { return (AbstractButton) NotificationCard.find(leadingButtons, DISABLE); }
-    AbstractButton logFolderButton() { return (AbstractButton) NotificationCard.find(trailingButtons, LOG_FOLDER); }
-    AbstractButton clearButton() { return (AbstractButton) NotificationCard.find(trailingButtons, CLEAR); }
+    AbstractButton copyButton() { return (AbstractButton) NotificationCard.find(copyView, COPY); }
+    AbstractButton disableButton() { return (AbstractButton) NotificationCard.find(disableView, DISABLE); }
+    AbstractButton logFolderButton() { return (AbstractButton) NotificationCard.find(logView, LOG_FOLDER); }
+    AbstractButton clearButton() { return (AbstractButton) NotificationCard.find(clearView, CLEAR); }
+    List<KitView> buttonViews() { return List.of(copyView, disableView, logView, clearView); }
     KitView listView() { return listView; }
     JTextArea messageArea() { return message; }
     JTextArea traceArea() { return trace; }
 
     private String headingText(int index) {
-        return ((Nodes.Text) ((Nodes.Stack) headingView.spec().root()).children().get(index)).text();
+        return ((Nodes.Text) (index == 0 ? headerView : sightingsView).spec().root()).text();
     }
 
     private ListItem item(int index) { return ((Nodes.ItemList) listView.spec().root()).items().get(index); }

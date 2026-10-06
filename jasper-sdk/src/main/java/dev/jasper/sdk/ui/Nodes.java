@@ -63,7 +63,8 @@ public final class Nodes {
     /**
      * How a button sits in its composition. STANDARD is the kit's padded, minimum-height button. EMBEDDED is content-sized
      * for a host arrangement that supplies the spacing (for example a row of inline links): no padding, focus-ring inset,
-     * minimum height or resting fill, and an icon-only embedded button draws its glyph at the row-glyph size.
+     * minimum height or resting fill, and an icon-only embedded button draws its glyph at the row-glyph size. Keyboard
+     * focus still shows, as a hairline in the focus colour inside the button's bounds.
      */
     public enum ButtonPresentation { STANDARD, EMBEDDED }
 

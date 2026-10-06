@@ -329,7 +329,8 @@ rule; prior constructors remain and default to the old meaning):
 - `Button.presentation`/`MenuButton.presentation` (`ButtonPresentation` STANDARD/EMBEDDED, default STANDARD): EMBEDDED
   is content-sized for a host arrangement that supplies the spacing (inline links): no padding, focus-ring inset,
   minimum height or resting/hover fill; an icon-only embedded button draws its glyph at `ICON_RAIL`; an embedded
-  menu-only button draws no chevron of its own.
+  menu-only button draws no chevron of its own. Keyboard focus still shows: a `border.focus` hairline inside the bounds
+  (no inset change).
 - Host-only (not projected into the SDK): `KitView(context, spec, events, pointerOnly)`. A pointer-only view's controls
   never take keyboard focus, including controls mounted later and after theme changes, while they stay operable by
   pointer and keep their accessible names and actions (notification cards over a terminal keep the shell's focus).

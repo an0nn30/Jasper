@@ -264,6 +264,58 @@ class NoticeKitTest {
         });
     }
 
+    /** Review round 2: a keyboard-focused EMBEDDED button shows a focus hairline inside its bounds, in both themes. */
+    @Test void aFocusedEmbeddedButtonShowsAFocusCueInsideItsBounds() {
+        Edt.run(() -> {
+            var prior = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            var manager = new DefaultKeyboardFocusManager() {
+                Component target;
+                @Override public Component getFocusOwner() { return target; }
+            };
+            KeyboardFocusManager.setCurrentKeyboardFocusManager(manager);
+            for (var theme : List.of(KitFixtures.dark(), KitFixtures.light())) {
+                var context = KitFixtures.context();
+                context.binding().publish(new ThemePair(theme, theme));
+                try (var view = new KitView(context, stack(new Nodes.Button("link", READY, "Open in Editor", "", ButtonKind.LINK, "open", "",
+                        ButtonPresentation.EMBEDDED)), e -> {})) {
+                    var button = find(view, "link", JButton.class);
+                    button.setSize(button.getPreferredSize());
+                    var insets = button.getInsets();
+                    var resting = paint(button);
+                    assertThat(colourAt(resting, 0, button.getHeight() / 2)).as("no cue while unfocused").isNotEqualTo(focus(theme));
+                    manager.target = button;
+                    var event = new java.awt.event.FocusEvent(button, java.awt.event.FocusEvent.FOCUS_GAINED, false, null, java.awt.event.FocusEvent.Cause.TRAVERSAL_FORWARD);
+                    for (var listener : button.getFocusListeners()) listener.focusGained(event);
+                    var focused = paint(button);
+                    assertThat(colourAt(focused, 0, button.getHeight() / 2)).as("left edge cue in %s", theme.name()).isEqualTo(focus(theme));
+                    assertThat(colourAt(focused, button.getWidth() / 2, button.getHeight() - 1)).as("bottom edge cue in %s", theme.name()).isEqualTo(focus(theme));
+                    assertThat(button.getInsets()).as("no inset change").isEqualTo(insets);
+                    assertThat(button.getSize()).isEqualTo(button.getPreferredSize());
+                    manager.target = null;
+                    var lost = new java.awt.event.FocusEvent(button, java.awt.event.FocusEvent.FOCUS_LOST, false, null, java.awt.event.FocusEvent.Cause.TRAVERSAL_FORWARD);
+                    for (var listener : button.getFocusListeners()) listener.focusLost(lost);
+                    assertThat(colourAt(paint(button), 0, button.getHeight() / 2)).as("gone once focus leaves").isNotEqualTo(focus(theme));
+                } finally { release(context); }
+            }
+            KeyboardFocusManager.setCurrentKeyboardFocusManager(prior);
+        });
+    }
+
+    private static int focus(dev.jasper.ui.theme.GeneratedTheme theme) { return theme.semantic().color(SemanticColor.BORDER_FOCUS).getRGB() & 0xffffff; }
+
+    private static BufferedImage paint(JComponent component) {
+        var image = new BufferedImage(component.getWidth(), component.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { component.paint(g); } finally { g.dispose(); }
+        return image;
+    }
+
+    /** The opaque colour at a pixel, or -1 where nothing fully covers it. */
+    private static int colourAt(BufferedImage image, int x, int y) {
+        int argb = image.getRGB(x, y);
+        return (argb >>> 24) == 255 ? argb & 0xffffff : -1;
+    }
+
     /** Kit menu items (menu buttons and row menus) never render plugin-supplied markup, whatever look and feel installed them. */
     @Test void menuItemsNeverRenderMarkup() {
         Edt.run(() -> {

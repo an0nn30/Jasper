@@ -165,6 +165,34 @@ class ErrorsViewTest {
         return null;
     }
 
+    /** Review round 2: the former 2 px header/sightings gap, 8 px above the message and 6 px between buttons, as named metrics. */
+    @Test void theHeadingAndButtonsKeepTheFormerGaps() {
+        var view = view();
+        record("dev.jasper.remote", "panel remote.sftp", new IllegalStateException("broke"));
+        view.setSize(900, 560);
+        for (int pass = 0; pass < 3; pass++) dev.jasper.app.testsupport.KitTestSupport.layout(view);
+        assertThat(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.ERRORS_SIGHTINGS_GAP)).isEqualTo(2);
+        assertThat(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.ERRORS_MESSAGE_GAP)).isEqualTo(8);
+        assertThat(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.ERRORS_BUTTON_GAP)).isEqualTo(6);
+        var header = bounds(view.headerLabel(), view);
+        var sightings = bounds(view.sightingsLabel(), view);
+        var message = bounds(view.messageView(), view);
+        assertThat(sightings.y - (header.y + header.height)).as("header to sightings").isEqualTo(com.formdev.flatlaf.util.UIScale.scale(2));
+        assertThat(message.y - (sightings.y + sightings.height)).as("sightings to message").isEqualTo(com.formdev.flatlaf.util.UIScale.scale(8));
+        var copy = bounds(view.copyButton(), view);
+        var disable = bounds(view.disableButton(), view);
+        var folder = bounds(view.logFolderButton(), view);
+        var clear = bounds(view.clearButton(), view);
+        assertThat(view.disableButton().isShowing() || view.disableButton().getWidth() > 0).isTrue();
+        assertThat(disable.x - (copy.x + copy.width)).as("Copy to Disable Plugin").isEqualTo(com.formdev.flatlaf.util.UIScale.scale(6));
+        assertThat(clear.x - (folder.x + folder.width)).as("Open Log Folder to Clear").isEqualTo(com.formdev.flatlaf.util.UIScale.scale(6));
+        assertThat(copy.y).isEqualTo(clear.y);
+    }
+
+    private static java.awt.Rectangle bounds(java.awt.Component component, java.awt.Component root) {
+        return javax.swing.SwingUtilities.convertRectangle(component.getParent(), component.getBounds(), root);
+    }
+
     @Test void selectIgnoresAnIncidentThatIsNotListed() {
         var view = view();
         Incident listed = record("jasper", "a", new IllegalStateException("listed"));

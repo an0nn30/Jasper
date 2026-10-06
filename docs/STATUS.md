@@ -39,8 +39,9 @@
   Task 11 diagnostic); Buddy facade-only assertion. Chooser replace/new-folder prompts are kit sheets (`ec7b8c2b`).
   Behaviour preserved (install/uninstall/enable, drop-in zips, consent, restart conversation, actions once,
   deduplication, hover/countdown); theme switches keep manager search/selection/choice/text selection/scroll and open
-  cards. Visual-only until Plan 3: list plugin tile, switch for checkbox, kit link padding (fewer wide links beside
-  More), kit stack gaps in history rows. Until Task 11: poster notification icons omitted. GUI checks for the user:
+  cards. Visual-only until Plan 3: list plugin tile, switch for checkbox; history entries use the kit stack gap (10 px
+  instead of the former 4 px between content, meta and actions) and their links lost the former 2 px vertical padding
+  (controller ruling, Plan 3 Task 9 recomposes the history row). Until Task 11: poster notification icons omitted. GUI checks for the user:
   Plugins page look and row menus, card hover/close and link clicks keeping terminal focus, history wrapping, Errors
   window, chooser sheets. Gate: module 355, SDK 63, testkit 122, app 2600 (1 pre-existing skip), four architecture
   checks green.
@@ -50,6 +51,9 @@
   plugin list and Errors list echo the user's selection so a later host selection applies; a page-gone consent
   refuses and discards the staged install; kit menu items set html.disable before their text; history empty text is
   centred again. Gate: module 357, SDK 64, testkit 123, app 2629.
+  Review fix round 2: the Errors window keeps its former 2 px header/sightings gap, 8 px above the message and 6 px
+  between buttons (`ERRORS_SIGHTINGS_GAP`/`ERRORS_MESSAGE_GAP`/`ERRORS_BUTTON_GAP` in the shell); a keyboard-focused
+  EMBEDDED button shows a `border.focus` hairline inside its bounds.
 - **Theme engine Plan 2 Task 6b-2 implemented (command palette); review fix round 1 done, re-review pending** (2026-10-05). Carried preliminary
   fix first: Settings' `okSettings` and the chooser's `chooser.approve` window Enter bindings are disabled while OK/the
   primary is (spec §6), so Enter is then not consumed, like a disabled default button. Kit additions next (spec §6,

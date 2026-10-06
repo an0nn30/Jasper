@@ -112,6 +112,14 @@ final class Buttons {
                     artwork.paintIcon(this, g, icon.x, icon.y);
                 }
                 if (clipped != null) g.drawString(clipped, text.x, text.y + g.getFontMetrics().getAscent());
+                if (embedded && isEnabled() && focus != null && focus.visible()) {
+                    // An embedded button has no outer ring room: its keyboard focus cue is a hairline inside its bounds.
+                    int radius = ThemePainting.metric(context, DesignMetrics.Role.CONTROL_RADIUS);
+                    g.setComposite(AlphaComposite.SrcOver);
+                    g.setColor(ThemePainting.color(context, SemanticColor.BORDER_FOCUS));
+                    g.setStroke(new BasicStroke(ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE)));
+                    g.draw(new java.awt.geom.RoundRectangle2D.Double(.5, .5, getWidth() - 1, getHeight() - 1, radius * 2.0, radius * 2.0));
+                }
             } finally { g.dispose(); }
         }
     }
