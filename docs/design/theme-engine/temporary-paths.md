@@ -209,7 +209,7 @@ fix round 1 replaced `SettingsDialog.askDiscard`'s `JOptionPane` with a modal ki
 
 The dynamic WorkspacePalette callers are exactly:
 - Task 7: `plugins/vault/.../ui/ManagerPanel.java` — **removed by Task 7** (2026-10-05): the manager is an owned kit view and reads no `WorkspacePalette`.
-- Task 8: `plugins/remote/.../ui/HostsPanel.java` — **removed by Task 8a** (2026-10-06): the Sessions panel is an owned kit view and reads no `WorkspacePalette`; `ui/tunnels/TunnelsPanel.java` — **removed by Task 8b** (2026-10-06): the Tunnels panel is an owned kit view; `ui/transfers/TransferStrip.java` (8c) remains.
+- Task 8: `plugins/remote/.../ui/HostsPanel.java` — **removed by Task 8a** (2026-10-06): the Sessions panel is an owned kit view and reads no `WorkspacePalette`; `ui/tunnels/TunnelsPanel.java` — **removed by Task 8b** (2026-10-06): the Tunnels panel is an owned kit view; `ui/transfers/TransferStrip.java` — **removed by Task 8c** (2026-10-06): the transfer rows are kit descriptors rendered in the SFTP kit panel. No Remote file reads `WorkspacePalette` any more.
 - Task 9: `plugins/editor/.../ui/EditorTab.java`, `vim/ui/VimBar.java`; editor/syntax snapshots also serve Editor through Appearance.
 - Task 10: `plugins/fileserver/.../ui/FileServersPanel.java`.
 
@@ -434,6 +434,20 @@ no duplicate new adapter outside app.plugins.
 
 ## Main merge (2026-10-05, main `d3455d47`) — new raw consumers and owners
 
+## Task 8c consumer removal (Remote SFTP explorer, transfer rows and their dialogs)
+
+Plan 2 Task 8c moved the SFTP explorer (`SftpPanel`, registered with `registerView`), its dialogs (`HostChooser`,
+`FolderNamePanel`, `DestinationPanel`, the delete `ConfirmPanel`), the transfer rows (`TransferStrip`, now kit descriptors
+rendered in the SFTP panel footer) and the transfer dialogs (`ResolvePanel`, `RenamePanel`, `ExistingItemsPanel`) to owned
+SDK `UiView`s from `context.kit()`. None of these files reads `WorkspacePalette.current`, `UIManager` fonts, `PanelStyle`
+or a fixed colour (`0x5e9bed`, `0x397ac4`, `0x3274f6`, `0x2467de`) or paints anything: the blue folder, document and
+refresh glyphs, the painted path crumbs, the segmented back/forward border, the follow switch and the strip separator are
+gone in favour of kit glyphs, kit `Breadcrumbs`, GHOST buttons, a kit switch and the kit panel footer. `PanelStyle` and
+`FlatToolBar` are deleted (no caller left), with the test-only `ZoneColors`. No Remote file reads Task 5 compatibility
+values or `WorkspaceDefaults`. Remaining raw Remote paths are Task 11's only: the `PanelSpec`/`PanelHeader.Action`, status
+item and action icons from `context.appearance().icon(...)` (`SftpUi`, `TransferUi`, `TunnelsUi`, `RemotePlugin`,
+`SessionsToolbar`); `javax.swing.Timer` and the AWT clipboard are nonvisual.
+
 Merging main brought new UI. Consumers in already-migrated families were re-bound in the merge commit; the rest stay
 raw (they need real design work) with these exact owners. Every path below has a `migration.csv` row.
 
@@ -442,7 +456,7 @@ raw (they need real design work) with these exact owners. Every path below has a
 | `jasper-sdk/src/main/java/dev/jasper/sdk/ui/PanelHeader.java` (SDK 0.14.2, main's bump kept) | `Action.icon` is a raw `javax.swing.Icon` | Task 11 (0.15 cutover) replaces raw SDK icons |
 | `jasper-app/src/main/java/dev/jasper/app/contributions/PanelHeaderState.java` | carries the raw action icons to the native header | Task 11 with `PanelHeader` |
 | `jasper-app/src/main/java/dev/jasper/app/workspace/WindowTabs.java` (`surface(boolean)`) | the tab surface blend toward white/black: selected `.035` dark / `.12` light, unselected `.3` dark / `.06` light (main's values, following the branch's former `shade` precedent) | Plan 3 Task 10 (tab surface composition becomes module roles) |
-| `plugins/remote/src/main/java/dev/jasper/remote/ui/PanelStyle.java` and the redesigned `SftpPanel` (`HostsPanel` and `ConnectionDots` done by Task 8a; `TunnelsPanel` and `TunnelSwitch` by Task 8b) | `UIManager.getFont("Label.font")`, fixed accent colours `0x3274f6`/`0x2467de`, custom-painted controls | Task 8c (SFTP; deletes `PanelStyle`) |
+| ~~`plugins/remote/src/main/java/dev/jasper/remote/ui/PanelStyle.java` and the redesigned `SftpPanel`~~ | **resolved by Task 8c (2026-10-06)**: `SftpPanel` is a kit view and `PanelStyle` is deleted (`HostsPanel`/`ConnectionDots` by 8a, `TunnelsPanel`/`TunnelSwitch` by 8b) | done |
 | `plugins/fileserver/src/main/java/dev/jasper/fileserver/ui/PanelStyle.java`, `ui/RowArtwork.java`, `ui/ProtocolChip.java` and FS-3/FS-4 `ServerEditor` additions | the same raw font/accent reads and painted chips/artwork | Task 10 |
 | `plugins/indexer/src/main/java/dev/jasper/indexer/ui/IndexerSettingsPanel.java`, `ui/FilesScope.java`, `IndexerPlugin.java` (Project Index, eighth bundled plugin) | raw Swing settings page; palette rows with raw SDK icons | Task 10 (Task 11 for the SDK icon path) |
 

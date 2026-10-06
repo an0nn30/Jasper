@@ -2,6 +2,48 @@
 
 ## Current state — 2026-10-06
 
+- **Theme engine Plan 2 Task 8c implemented: Remote SFTP explorer, transfer rows and their dialogs on kit views; Task 8
+  complete pending review** (2026-10-06). The SFTP explorer (`SftpPanel`, now registered with `registerView`) is an owned
+  kit Panel: Back/Forward/Refresh GHOST icon buttons and an Upload split MenuButton (its menu is the old right-click menu)
+  over the path as kit `Breadcrumbs`; the folder as a two-column kit Table keyed by entry name (folder/file/link glyphs,
+  MULTIPLE checkboxes, size column numeric) or the kit Empty "Not Connected" with Choose Session; a footer with paging, the
+  status line and Cancel, the last operation's result, the Follow terminal folder switch and the window's transfer rows.
+  The transfer strip is no longer a component (ruling G8): `TransferStrip` publishes kit descriptors (heading, DOUBLE rows
+  keyed by job id, three visible, hidden when empty; arrow and title, progress (indeterminate while scanning) and status,
+  an optional link action and an embedded close: Cancel transfer / Dismiss, disabled while cancelling) that the SFTP panel
+  renders. The host chooser, New folder, delete, Copy to host (`DestinationPanel`, embedding the folders-only browser),
+  Items already exist, Resolve transfer and Rename destination are kit forms from `context.kit()`. `FlatToolBar`,
+  `PanelStyle`, its test and the test-only `ZoneColors` are deleted; no Remote file reads `WorkspacePalette`, `UIManager`
+  fonts or fixed colours or paints anything (raw `appearance().icon` artwork stays for Task 11). Behaviour kept: a new
+  listing or page selects its first row; Enter or a double click opens a folder, navigates a link without the Editor or
+  hands files and links to the Editor; Open in Editor only with the Editor; the old enable rules for every menu item;
+  follow-folder provenance, uploads/downloads through the Windows chooser APIs, existing-item checks and conflict
+  resolution unchanged; late listings, statuses and connections after close are ignored; row tooltips are "name — size —
+  modified" (ruling G1) and the row's accessible description; the header's connection name and connected dot travel
+  through `PanelHost.setHeader` (Task 6d acceptance, asserted in a real window by `StagedRemoteSftpTest` and through the
+  testkit `panelHeader` in `SftpPluginTest`). Rulings applied: G6 — Back, Forward and Parent are panel shortcuts
+  (`dev.jasper.remote.sftp.back/forward/parent`, `ShortcutContext.panel`, default Alt+Left/Alt+Right/Alt+Up, listed in the
+  Keymap and palette) with the old guards; G9 — table checkboxes, crumb click opens that folder (addition), free-area click
+  edits, Enter goes, Escape or leaving cancels; controller carry — row-owned menus act on the selection when their row is
+  selected and on that row alone otherwise; a context press never selects. Enter/Escape (ruling Task8 Enter): no dialog
+  has a primary; New folder creates from its name field only (`trailingAction`); Rename destination's field applies
+  nothing on Enter (as before); Escape closes the chooser, New folder and Rename and cancels the others. Behaviour
+  deviations: a right-clicked row is not selected (its menu acts on it alone unless it is selected); right-click on the
+  table's empty area offers no menu (the Upload button's menu has the same items); Alt+Left/Right/Up do not apply inside
+  the Copy to host dialog (its buttons and crumbs do); status messages wrap instead of truncating with a tooltip.
+  Visual-only (ledgered in `migration.csv`): GHOST icon row instead of the segmented back/forward border, the path on its
+  own row below the icons, kit table header/rows/selection, kit glyphs instead of the blue folder and painted
+  document/refresh glyphs, size column sized by weight (whole at 220 px, wider in wide rails), checkboxes, the Upload split
+  button, Follow as a SettingRow switch, kit Empty with a chevron Choose Session; transfer titles truncate at the end
+  (middle elision removed; the tooltip has the full title, both paths and the status), embedded ghost/link row buttons;
+  dialogs with kit labels and a switch for "Apply to the rest of this transfer". Evidence (ruling G10): descriptor
+  scenarios (`ui/sftp/` and `ui/transfers/ThemeMigrationEvidenceTest`) plus real-host dark and light captures
+  (`RemoteRenderEvidenceTest`: SFTP not connected, a listing with a transfer row, New folder, Items already exist).
+  Tests: plugin tests drive the SFTP kit view through `SftpTestAccess` on the EDT and deliver host events that reach it on
+  the EDT; the kit primary focus-ring assertion of the deleted `PanelStyleTest` moved to jasper-ui `RemoteKitTest`. GUI
+  checks for the user: the SFTP panel in a narrow rail (icons row, crumbs, editing the path, size column, checkboxes, row
+  menus and the Upload menu, Alt+Left/Right/Up in the panel and the Keymap entries), the transfer rows (progress, link
+  action, close, title truncation), the Copy to host dialog (browser inside the form), New folder, Resolve and Rename.
 - **Theme engine Plan 2 Task 8b implemented: Remote Tunnels panel and tunnel dialogs on kit views; review pending**
   (2026-10-06). The Tunnels panel (`TunnelsPanel`, now registered with `registerView`) and the New/Edit/Save as Tunnel
   editor and Forward a Port dialogs are owned SDK `UiView`s from `context.kit()`; they read no `WorkspacePalette`,
