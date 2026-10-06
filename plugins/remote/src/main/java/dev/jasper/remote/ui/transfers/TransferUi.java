@@ -4,14 +4,12 @@ import dev.jasper.remote.transfer.*;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.*;
-import java.awt.*;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.*;
-import javax.swing.*;
 
-/** The aggregate status item and every window's transfer strip over the plugin-owned queue. */
+/** The aggregate status item and every window's transfer rows (shown by its SFTP sidebar) over the plugin-owned queue. */
 public final class TransferUi implements AutoCloseable {
     public static final String SHOW = "dev.jasper.remote.transfers", CANCEL = SHOW + ".cancel";
     private static final int PAGE = 50;
@@ -53,8 +51,8 @@ public final class TransferUi implements AutoCloseable {
         refresh();
     }
 
-    /** A strip for {@code window}'s SFTP sidebar; the same queue in every window. */
-    public JComponent strip(WindowHandle window) {
+    /** The transfer rows for {@code window}'s SFTP sidebar, which renders them; the same queue in every window. */
+    public TransferStrip strip(WindowHandle window) {
         var strip = new TransferStrip(new TransferStrip.Actions((id, action) -> act(window, id, action), coordinator::cancel, id -> dismiss(window, id)));
         strips.put(window.id(), strip);
         refresh();
@@ -163,25 +161,22 @@ public final class TransferUi implements AutoCloseable {
             if (entry.isEmpty()) { report("Could not resume the transfer", coordinator.resume(id, window)); return; }
             var target = entry.get();
             var dialog = context.windows().dialog(new DialogSpec("Resolve transfer", window, false));
-            dialog.setContent(new ResolvePanel(target, choice -> {
+            var panel = new ResolvePanel(context.kit(), target, choice -> {
                 dialog.close();
                 if (choice.decision() == ConflictDecision.RENAME) rename(window, target);
                 else resolved(window, target, choice.decision(), null, choice.remaining());
-            }, () -> { dialog.close(); report("Could not restart the transfer", coordinator.restart(target.id(), window)); }, dialog::close));
+            }, () -> { dialog.close(); report("Could not restart the transfer", coordinator.restart(target.id(), window)); }, dialog::close);
+            dialog.setContent(panel.view());
+            dialog.onClosed(panel::close);
             dialog.show();
         }));
     }
 
     private void rename(WindowHandle window, TransferEntry entry) {
         var dialog = context.windows().dialog(new DialogSpec("Rename destination", window, false));
-        var body = new JPanel(new BorderLayout(6, 6));
-        body.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-        var name = new JTextField(entry.sourceInfo().name(), 24);
-        var apply = new JButton("Use name");
-        body.add(name, BorderLayout.CENTER);
-        body.add(apply, BorderLayout.SOUTH);
-        apply.addActionListener(event -> { dialog.close(); resolved(window, entry, ConflictDecision.RENAME, name.getText(), false); });
-        dialog.setContent(body);
+        var panel = new RenamePanel(context.kit(), entry.sourceInfo().name(), name -> { dialog.close(); resolved(window, entry, ConflictDecision.RENAME, name, false); }, dialog::close);
+        dialog.setContent(panel.view());
+        dialog.onClosed(panel::close);
         dialog.show();
     }
 

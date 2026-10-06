@@ -1,178 +1,130 @@
 package dev.jasper.remote.ui.transfers;
 
-import dev.jasper.sdk.ui.WorkspacePalette;
-import java.awt.*;
-import java.util.*;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.ListItem;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.function.*;
-import javax.swing.*;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
-/** The SFTP sidebar's transfers: two-line rows, at most three visible before scrolling, hidden when empty. */
-public final class TransferStrip extends JPanel {
+/**
+ * One window's transfers as kit descriptors for the SFTP sidebar (Plan 2 Task 8c, ruling G8): a "Transfers" heading over
+ * two-line rows keyed by the job's id, at most three visible before the list scrolls, and nothing at all while there is
+ * no transfer. A row shows the direction arrow and title, a progress bar (indeterminate while scanning) with the status
+ * text, the one action that applies as a link and a close button that cancels a running transfer or dismisses a finished
+ * one (disabled while cancelling). Long titles truncate at the end; the row tooltip carries the full title, both paths
+ * and the status. The strip owns no view: the SFTP panel renders {@link #node()} in its footer and hands its events to
+ * {@link #handle}. UI thread only.
+ */
+public final class TransferStrip {
     static final int VISIBLE_ROWS = 3;
+    public static final String ROOT = "transfers", HEADING = "transfers.heading", ROWS = "transfers.rows", UNAVAILABLE = "transfers.unavailable";
+    static final String ACTION = "transfer.action:", CLOSE = "transfer.close:";
     public record Actions(BiConsumer<UUID, TransferRows.Action> action, Consumer<UUID> cancel, Consumer<UUID> dismiss) { }
     private final Actions actions;
-    private final JPanel list = new JPanel();
-    private final JScrollPane scroll = new JScrollPane(list, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-    private final JLabel unavailable = label("");
-    private final Map<UUID, RowView> views = new LinkedHashMap<>();
+    private List<TransferRows.Row> rows = List.of();
+    private String unavailable = "", selected;
+    private Runnable changed = () -> { };
 
-    public TransferStrip(Actions actions) {
-        super(new BorderLayout(0, 4));
-        this.actions = actions;
-        setBorder(new javax.swing.border.AbstractBorder() {
-            @Override public java.awt.Insets getBorderInsets(java.awt.Component component, java.awt.Insets insets) {
-                insets.set(7, 0, 0, 0); return insets;
-            }
-            @Override public void paintBorder(java.awt.Component component, java.awt.Graphics graphics, int x, int y, int width, int height) {
-                graphics.setColor(WorkspacePalette.current(component).border());
-                graphics.fillRect(x, y, width, 1);
-            }
-        });
-        list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
-        scroll.setBorder(BorderFactory.createEmptyBorder());
-        add(label("Transfers"), BorderLayout.NORTH);
-        add(scroll, BorderLayout.CENTER);
-        add(unavailable, BorderLayout.SOUTH);
-        unavailable.setVisible(false);
-        setVisible(false);
+    public TransferStrip(Actions actions) { this.actions = Objects.requireNonNull(actions); }
+
+    /** Runs after every change of what the strip shows, so its owner can render it again. */
+    public void onChanged(Runnable listener) { changed = Objects.requireNonNull(listener); }
+
+    /** Shows these transfers, in this order; an unchanged list changes nothing, so a refresh tick never re-renders. */
+    public void rows(List<TransferRows.Row> next) {
+        var copy = List.copyOf(next);
+        if (copy.equals(rows) && unavailable.isEmpty()) return;
+        rows = copy;
+        unavailable = "";
+        if (selected != null && rows.stream().noneMatch(row -> rowId(row.id()).equals(selected))) selected = null;
+        changed.run();
     }
 
-    /** Updates rows in place; components are only detached when the set or order of transfers changes, so focus and presses survive a refresh. */
-    public void rows(List<TransferRows.Row> rows) {
-        boolean relayout = unavailable.isVisible();
-        unavailable.setVisible(false);
-        int height = visibleHeight();
-        if (!rows.stream().map(TransferRows.Row::id).toList().equals(List.copyOf(views.keySet()))) {
-            relayout = true;
-            list.removeAll();
-            var oldViews = new HashMap<>(views);
-            views.clear();
-            for (var row : rows) {
-                var view = oldViews.computeIfAbsent(row.id(), id -> new RowView(id, actions));
-                views.put(row.id(), view);
-                list.add(view);
-            }
-        }
-        for (var row : rows) views.get(row.id()).show(row);
-        if (relayout || visibleHeight() != height) resize();
-        setVisible(!rows.isEmpty());
-    }
-
+    /** One line in place of the rows: the queue cannot be read (another instance owns it). */
     public void unavailable(String message) {
-        views.clear();
-        list.removeAll();
-        unavailable.setText(message);
-        unavailable.setToolTipText(message);
-        unavailable.setVisible(true);
-        resize();
-        setVisible(true);
+        if (message.equals(unavailable) && rows.isEmpty()) return;
+        rows = List.of();
+        selected = null;
+        unavailable = message;
+        changed.run();
     }
 
-    private int visibleHeight() {
-        int height = 0, shown = 0;
-        for (var view : views.values()) { if (shown++ == VISIBLE_ROWS) break; height += view.getPreferredSize().height; }
-        return height;
+    /** Whether the strip shows anything: rows or the unavailable line. */
+    public boolean visible() { return !rows.isEmpty() || !unavailable.isEmpty(); }
+
+    /** The strip's descriptors, empty while there is nothing to show. */
+    public Optional<Nodes.Node> node() {
+        if (!visible()) return Optional.empty();
+        var children = new ArrayList<Nodes.Node>();
+        children.add(new Nodes.Text(HEADING, ControlState.READY, "Transfers", Nodes.TextRole.SECTION_LABEL));
+        if (!unavailable.isEmpty()) children.add(new Nodes.Text(UNAVAILABLE, ControlState.READY, unavailable, Nodes.TextRole.DESCRIPTION));
+        else children.add(new Nodes.ItemList(ROWS, ControlState.READY, Nodes.ListKind.DOUBLE, rows.stream().map(TransferStrip::item).toList(),
+            selected == null ? Set.of() : Set.of(selected), "", List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(VISIBLE_ROWS)));
+        return Optional.of(new Nodes.Stack(ROOT, ControlState.READY, Nodes.LayoutRole.VERTICAL, children));
     }
 
-    private void resize() {
-        scroll.setPreferredSize(new Dimension(10, visibleHeight()));
-        scroll.setVisible(!views.isEmpty());
-        revalidate();
-        repaint();
-    }
-
-    int visibleRows() { return Math.min(views.size(), VISIBLE_ROWS); }
-    Optional<RowView> view(UUID id) { return Optional.ofNullable(views.get(id)); }
-    String unavailableText() { return unavailable.isVisible() ? unavailable.getText() : ""; }
-    List<UUID> order() { return List.copyOf(views.keySet()); }
-
-    static JLabel label(String text) {
-        var label = new JLabel(text);
-        label.putClientProperty("html.disable", true);
-        return label;
-    }
-
-    static String elideMiddle(String text, FontMetrics metrics, int width) {
-        if (metrics.stringWidth(text) <= width) return text;
-        for (int keep = text.length() - 1; keep > 1; keep--) {
-            String candidate = text.substring(0, (keep + 1) / 2) + "…" + text.substring(text.length() - keep / 2);
-            if (metrics.stringWidth(candidate) <= width) return candidate;
+    /** Acts on one of the strip's events and says whether it was one. */
+    public boolean handle(UiEvent event) {
+        switch (event) {
+            case UiEvent.Selected chosen when chosen.id().equals(ROWS) -> {
+                selected = chosen.ids().stream().findFirst().orElse(null);
+                return true;
+            }
+            case UiEvent.Action action when action.id().startsWith(ACTION) -> {
+                job(action.id().substring(ACTION.length())).ifPresent(row -> row.action().ifPresent(chosen -> actions.action().accept(row.id(), chosen)));
+                return true;
+            }
+            case UiEvent.Action action when action.id().startsWith(CLOSE) -> {
+                job(action.id().substring(CLOSE.length())).filter(row -> !row.cancelling())
+                    .ifPresent(row -> { if (row.finished()) actions.dismiss().accept(row.id()); else actions.cancel().accept(row.id()); });
+                return true;
+            }
+            default -> { return false; }
         }
-        return "…";
     }
 
-    static final class RowView extends JPanel {
-        private final JLabel title = label(""), status = label("");
-        private final JProgressBar progress = new JProgressBar(0, 1000);
-        private final JButton action = new JButton(), close = new JButton("×");
-        private String fullTitle = "", tooltip = "";
-        private TransferRows.Row row;
+    private Optional<TransferRows.Row> job(String id) { return rows.stream().filter(row -> row.id().toString().equals(id)).findFirst(); }
 
-        RowView(UUID id, Actions actions) {
-            super(new BorderLayout(4, 2));
-            setBorder(BorderFactory.createEmptyBorder(3, 0, 3, 0));
-            progress.setPreferredSize(new Dimension(60, 6));
-            progress.setBorderPainted(false);
-            close.setMargin(new Insets(0, 4, 0, 4));
-            close.getAccessibleContext().setAccessibleName("Cancel or dismiss transfer");
-            action.setMargin(new Insets(0, 6, 0, 6));
-            var top = new JPanel(new BorderLayout(4, 0));
-            top.setOpaque(false);
-            top.add(title, BorderLayout.CENTER);
-            var closeBar = new dev.jasper.remote.ui.FlatToolBar();
-            closeBar.add(close);
-            top.add(closeBar, BorderLayout.EAST);
-            var middle = new JPanel(new BorderLayout(0, 2));
-            middle.setOpaque(false);
-            middle.add(progress, BorderLayout.NORTH);
-            middle.add(status, BorderLayout.CENTER);
-            var bottom = new JPanel(new BorderLayout(4, 0));
-            bottom.setOpaque(false);
-            bottom.add(middle, BorderLayout.CENTER);
-            var actionBar = new dev.jasper.remote.ui.FlatToolBar();
-            actionBar.add(action);
-            bottom.add(actionBar, BorderLayout.EAST);
-            add(top, BorderLayout.NORTH);
-            add(bottom, BorderLayout.CENTER);
-            action.addActionListener(event -> { if (row != null) row.action().ifPresent(chosen -> actions.action().accept(id, chosen)); });
-            close.addActionListener(event -> {
-                if (row == null) return;
-                if (row.finished()) actions.dismiss().accept(id); else actions.cancel().accept(id);
-            });
-        }
+    Optional<TransferRows.Row> row(UUID id) { return rows.stream().filter(row -> row.id().equals(id)).findFirst(); }
+    List<UUID> order() { return rows.stream().map(TransferRows.Row::id).toList(); }
+    String unavailableText() { return unavailable; }
 
-        void show(TransferRows.Row next) {
-            row = next;
-            fullTitle = next.arrow() + " " + next.title();
-            tooltip = next.tooltip();
-            title.setToolTipText(tooltip);
-            title.getAccessibleContext().setAccessibleDescription(tooltip);
-            fitTitle();
-            status.setText(next.status());
-            status.setToolTipText(next.status());
-            progress.setIndeterminate(next.indeterminate());
-            progress.setValue((int) Math.round(next.fraction().orElse(0) * 1000));
-            progress.setVisible(next.indeterminate() || next.fraction().isPresent());
-            action.setVisible(next.action().isPresent());
-            next.action().ifPresent(chosen -> action.setText(chosen.label()));
-            close.setEnabled(!next.cancelling());
-            close.setToolTipText(next.finished() ? "Dismiss" : "Cancel transfer");
-        }
+    static String rowId(UUID id) { return id.toString(); }
+    static String titleId(UUID id) { return "transfer." + id + ".title"; }
+    static String progressId(UUID id) { return "transfer." + id + ".progress"; }
+    static String statusId(UUID id) { return "transfer." + id + ".status"; }
+    static String actionId(UUID id) { return "transfer." + id + ".action"; }
+    static String closeId(UUID id) { return "transfer." + id + ".close"; }
 
-        @Override public void doLayout() { fitTitle(); super.doLayout(); }
+    /** The visible title: the direction arrow and what goes where. */
+    static String fullTitle(TransferRows.Row row) { return row.arrow() + " " + row.title(); }
 
-        private void fitTitle() {
-            int width = getWidth() - close.getPreferredSize().width - 8;
-            title.setText(width <= 0 ? fullTitle : elideMiddle(fullTitle, title.getFontMetrics(title.getFont()), width));
-        }
+    /** The row's literal tooltip: the full title (which may truncate), both endpoints with their paths, and the status. */
+    static String tooltip(TransferRows.Row row) {
+        return fullTitle(row) + " — " + row.tooltip() + (row.status().isEmpty() ? "" : " — " + row.status());
+    }
 
-        String fullTitle() { return fullTitle; }
-        String titleText() { return title.getText(); }
-        String tooltip() { return tooltip; }
-        String statusText() { return status.getText(); }
-        JButton actionButton() { return action; }
-        JButton closeButton() { return close; }
-        JProgressBar progress() { return progress; }
+    private static ListItem item(TransferRows.Row row) {
+        UUID id = row.id();
+        boolean progressShown = row.indeterminate() || row.fraction().isPresent();
+        var subtitle = List.<Nodes.Node>of(
+            new Nodes.Progress(progressId(id), new ControlState(progressShown, true, false, ""), row.indeterminate() ? -1 : row.fraction().orElse(0), ""),
+            new Nodes.Text(statusId(id), ControlState.READY, row.status(), Nodes.TextRole.DESCRIPTION));
+        var trailing = new ArrayList<Nodes.Node>();
+        row.action().ifPresent(action -> trailing.add(new Nodes.Button(actionId(id), ControlState.READY, action.label(), "", Nodes.ButtonKind.LINK,
+            ACTION + id, "", Nodes.ButtonPresentation.EMBEDDED)));
+        trailing.add(new Nodes.Button(closeId(id), new ControlState(true, !row.cancelling(), false, ""), "", "close", Nodes.ButtonKind.GHOST,
+            CLOSE + id, row.finished() ? "Dismiss" : "Cancel transfer", Nodes.ButtonPresentation.EMBEDDED));
+        return new ListItem(rowId(id), Optional.empty(),
+            List.of(new Nodes.Text(titleId(id), ControlState.READY, fullTitle(row), Nodes.TextRole.BODY)),
+            subtitle, trailing, false, Optional.empty(), tooltip(row));
     }
 }

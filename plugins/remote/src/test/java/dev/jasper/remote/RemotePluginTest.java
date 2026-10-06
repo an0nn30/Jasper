@@ -23,7 +23,10 @@ import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import dev.jasper.remote.ui.sftp.SftpPanel;
+import dev.jasper.remote.ui.sftp.SftpTestAccess;
 import dev.jasper.remote.ui.sftp.SftpUi;
+import dev.jasper.remote.ui.transfers.ExistingItemsPanel;
 import dev.jasper.remote.testsupport.Kits;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -94,6 +97,12 @@ class RemotePluginTest {
             assertThat(defaults(host, dev.jasper.remote.ui.transfers.TransferUi.SHOW)).isEqualTo("cmd+alt+3|alt+3|GLOBAL");
             assertThat(defaults(host, RemotePlugin.SFTP)).as("Alt rule off macOS").isEqualTo("cmd+shift+o|derived|TERMINAL");
             assertThat(defaults(host, RemotePlugin.SPLIT)).isEqualTo("none|derived|TERMINAL");
+            // Ruling G6: the SFTP panel's Alt+Left/Alt+Right/Alt+Up are panel shortcuts with those defaults.
+            assertThat(defaults(host, SftpUi.BACK)).isEqualTo("alt+left|derived|PANEL");
+            assertThat(defaults(host, SftpUi.FORWARD)).isEqualTo("alt+right|derived|PANEL");
+            assertThat(defaults(host, SftpUi.PARENT)).isEqualTo("alt+up|derived|PANEL");
+            for (String id : List.of(SftpUi.BACK, SftpUi.FORWARD, SftpUi.PARENT))
+                assertThat(host.actionSpec(id).orElseThrow().context().id()).as("in the SFTP panel only").contains(SftpUi.PANEL);
             assertThat(host.settingsReports("dev.jasper.remote")).containsExactly("shortcuts.toggle_panel: Unknown setting or table; ignored.");
         }
     }
@@ -124,31 +133,33 @@ class RemotePluginTest {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
             var handle = context.terminals().window(window).orElseThrow();
-            var panel = (dev.jasper.remote.ui.sftp.SftpPanel) host.openPanel(SftpUi.PANEL, window);
+            Kits.edt(() -> host.openPanel(SftpUi.PANEL, window));
+            var panel = SftpTestAccess.panel(plugin.sftp(), window);
             Kits.edt(() -> plugin.openHost(handle, prod)); settle(host);
             Kits.edt(() -> plugin.openHost(handle, prod)); settle(host);
             UUID first = host.terminalPanes().getFirst(), second = host.terminalPanes().getLast();
 
-            host.focusTerminalPane(first); host.flush();
+            // The SFTP panel is a kit view: host events that reach it are delivered on the EDT, as the app delivers them.
+            Kits.edt(() -> { host.focusTerminalPane(first); host.flush(); });
             awaitRowCount(host, panel, 1);
-            host.typeIntoSession(first, "q");
+            Kits.edt(() -> host.typeIntoSession(first, "q"));
             awaitRowCount(host, panel, 0);
-            assertThat(panel.directory()).as("the shell exited").isEmpty();
+            assertThat(SftpTestAccess.directory(panel)).as("the shell exited").isEmpty();
 
-            host.focusTerminalPane(second); host.flush();
+            Kits.edt(() -> { host.focusTerminalPane(second); host.flush(); });
             awaitRowCount(host, panel, 1);
-            host.closeTerminalPane(second); host.flush();
+            Kits.edt(() -> { host.closeTerminalPane(second); host.flush(); });
             awaitRowCount(host, panel, 0);
-            assertThat(panel.directory()).as("the pane closed").isEmpty();
+            assertThat(SftpTestAccess.directory(panel)).as("the pane closed").isEmpty();
             host.stopAll();
             assertThat(host.failures()).isEmpty();
         }
     }
 
-    static void awaitRowCount(FakePluginHost host, dev.jasper.remote.ui.sftp.SftpPanel panel, int count) throws Exception {
+    static void awaitRowCount(FakePluginHost host, SftpPanel panel, int count) throws Exception {
         long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
-        while (panel.table().getRowCount() != count && System.nanoTime() < deadline) { settle(host); Thread.sleep(20); }
-        assertThat(panel.table().getRowCount()).isEqualTo(count);
+        while (SftpTestAccess.rows(panel).size() != count && System.nanoTime() < deadline) { settle(host); Thread.sleep(20); }
+        assertThat(SftpTestAccess.rows(panel)).hasSize(count);
     }
 
     /**
@@ -182,38 +193,43 @@ class RemotePluginTest {
             new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
-            var panel = (dev.jasper.remote.ui.sftp.SftpPanel) host.openPanel(SftpUi.PANEL, window);
+            Kits.edt(() -> host.openPanel(SftpUi.PANEL, window));
+            var panel = SftpTestAccess.panel(plugin.sftp(), window);
             Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), prod)); settle(host);
-            host.focusTerminalPane(host.terminalPanes().getFirst()); host.flush();
+            Kits.edt(() -> { host.focusTerminalPane(host.terminalPanes().getFirst()); host.flush(); });
             awaitRowCount(host, panel, 1);
 
             host.queuePathSelection(List.of(fresh));
-            button(panel, "Upload files").doClick();
+            SftpTestAccess.upload(panel);
             awaitRemote(host, files.resolve("fresh.txt"), "fresh");
             assertThat(host.windowContent("dev.jasper.remote", "Items already exist")).as("nothing existed, nothing asked").isEmpty();
 
             java.nio.file.Files.writeString(fresh, "fresher");
             var before = jobs(plugin);
             host.queuePathSelection(List.of(readme, fresh));
-            button(panel, "Upload files").doClick();
+            SftpTestAccess.upload(panel);
             var ask = awaitAsk(host);
-            assertThat(find(ask, javax.swing.JLabel.class).orElseThrow().getText()).isEqualTo("2 of 2 items already exist in prod:" + panel.directory() + ".");
-            button(ask, "Cancel").doClick();
+            String where = SftpTestAccess.directory(panel);
+            assertThat(Kits.<String>value(() -> Kits.node(ask, ExistingItemsPanel.TEXT, dev.jasper.sdk.ui.Nodes.Text.class).text())).isEqualTo("2 of 2 items already exist in prod:" + where + ".");
+            assertThat(Kits.<List<dev.jasper.sdk.ui.Nodes.Button>>value(() -> Kits.primaries(ask))).as("Enter copies nothing").isEmpty();
+            Kits.edt(() -> Kits.click(ask, ExistingItemsPanel.CANCEL));
             settle(host);
             assertThat(host.windowContent("dev.jasper.remote", "Items already exist")).isEmpty();
             assertThat(jobs(plugin)).as("Cancel queues nothing").isSubsetOf(before);
 
             host.queuePathSelection(List.of(readme, fresh));
-            button(panel, "Upload files").doClick();
-            button(awaitAsk(host), "Skip existing").doClick();
+            SftpTestAccess.upload(panel);
+            var skip = awaitAsk(host);
+            Kits.edt(() -> Kits.click(skip, ExistingItemsPanel.SKIP));
             var skipped = awaitNewJob(host, plugin, before);
             assertThat(skipped.skippedEntries()).isEqualTo(2);
             assertThat(java.nio.file.Files.readString(files.resolve("readme.txt"))).as("Skip existing keeps the old file").isEqualTo("old");
             assertThat(java.nio.file.Files.readString(files.resolve("fresh.txt"))).isEqualTo("fresh");
 
             host.queuePathSelection(List.of(readme, fresh));
-            button(panel, "Upload files").doClick();
-            button(awaitAsk(host), "Replace").doClick();
+            SftpTestAccess.upload(panel);
+            var replace = awaitAsk(host);
+            Kits.edt(() -> Kits.click(replace, ExistingItemsPanel.REPLACE));
             awaitRemote(host, files.resolve("readme.txt"), "new");
             awaitRemote(host, files.resolve("fresh.txt"), "fresher");
             host.stopAll();
@@ -221,10 +237,11 @@ class RemotePluginTest {
         }
     }
 
-    static dev.jasper.remote.ui.transfers.ExistingItemsPanel awaitAsk(FakePluginHost host) throws Exception {
+    /** The open "Items already exist" question's kit view, once it shows. */
+    static dev.jasper.sdk.testing.FakeKitView awaitAsk(FakePluginHost host) throws Exception {
         long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
-        while (host.windowContent("dev.jasper.remote", "Items already exist").isEmpty() && System.nanoTime() < deadline) { settle(host); Thread.sleep(20); }
-        return (dev.jasper.remote.ui.transfers.ExistingItemsPanel) host.windowContent("dev.jasper.remote", "Items already exist").orElseThrow();
+        while (Kits.value(() -> host.windowView("dev.jasper.remote", "Items already exist")).isEmpty() && System.nanoTime() < deadline) { settle(host); Thread.sleep(20); }
+        return Kits.value(() -> host.windowView("dev.jasper.remote", "Items already exist").orElseThrow());
     }
 
     static Set<UUID> jobs(RemotePlugin plugin) throws Exception {

@@ -726,5 +726,7 @@ public class RemotePlugin implements Plugin {
     /** The Sessions panel open in a window, for tests. */
     HostsPanel hostsPanel(UUID windowId) { return panels.get(windowId); }
     dev.jasper.remote.ui.tunnels.TunnelsUi tunnels() { return tunnelsUi; }
+    /** The SFTP explorers, for tests. */
+    dev.jasper.remote.ui.sftp.SftpUi sftp() { return sftpUi; }
     dev.jasper.remote.tunnels.TunnelStore tunnelStore() { return tunnelStore; }
 }

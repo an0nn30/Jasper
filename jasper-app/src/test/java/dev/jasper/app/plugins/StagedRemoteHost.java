@@ -47,7 +47,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 final class StagedRemoteHost implements AutoCloseable {
     static final PluginInfo REMOTE = new PluginInfo("dev.jasper.remote", "Remote", "0.12.0", Set.of(Capabilities.TERMINAL_OPEN,
         Capabilities.SESSION_PROVIDE, Capabilities.TERMINAL_OBSERVE, Capabilities.PALETTE_CONTRIBUTE, Capabilities.FILES_SOURCE));
-    static final String PANEL = "dev.jasper.remote.panel", SESSIONS = "sessions", TUNNELS_PANEL = "dev.jasper.remote.tunnels.panel", TUNNELS = "tunnels";
+    static final String PANEL = "dev.jasper.remote.panel", SESSIONS = "sessions", TUNNELS_PANEL = "dev.jasper.remote.tunnels.panel", TUNNELS = "tunnels",
+        SFTP_PANEL = "dev.jasper.remote.sftp.panel", SFTP = "sftp";
 
     final Contributions contributions;
     final AuxiliaryWindows auxiliary;
@@ -218,6 +219,95 @@ final class StagedRemoteHost implements AutoCloseable {
     void openTunnels() throws InterruptedException {
         onEdt(() -> contributions.requestPanel(new Contributions.PanelRequest(window.id(), TUNNELS_PANEL, Contributions.PanelRequest.Op.TOGGLE)));
         StagedVaultHost.await(() -> tunnels() != null, "the Tunnels panel is mounted in the window");
+    }
+
+    /** Opens the SFTP panel in the window and waits until its kit view is mounted (Task 8c). */
+    void openSftp() throws InterruptedException {
+        onEdt(() -> contributions.requestPanel(new Contributions.PanelRequest(window.id(), SFTP_PANEL, Contributions.PanelRequest.Op.TOGGLE)));
+        StagedVaultHost.await(() -> sftp() != null, "the SFTP panel is mounted in the window");
+    }
+
+    /** The SFTP kit view mounted in the window; UI thread. */
+    KitView sftp() { return find(window, SFTP); }
+
+    /** The window's borrowed kit header of the SFTP panel; UI thread. */
+    Container sftpHeader() { return sftp().panelHeader(SFTP); }
+
+    /** The window's live SFTP explorer (the plugin's {@code SftpPanel}); UI thread. */
+    Object sftpPanel() {
+        try {
+            Object sftpUi = field(plugin, "sftpUi");
+            var panel = sftpUi.getClass().getDeclaredMethod("panel", java.util.UUID.class); panel.setAccessible(true);
+            return panel.invoke(sftpUi, window.id());
+        } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+    }
+
+    /** A Remote {@code FileEntry}: {@code kind} is FILE, DIRECTORY or LINK. */
+    Object fileEntry(String name, String kind, long size, long modifiedMillis) {
+        try {
+            Class<?> entry = loader.loadClass("dev.jasper.remote.sftp.FileEntry");
+            @SuppressWarnings({"unchecked", "rawtypes"}) Object value = Enum.valueOf((Class) loader.loadClass("dev.jasper.remote.sftp.FileEntry$Kind"), kind);
+            return entry.getConstructor(String.class, value.getClass(), long.class, long.class, int.class, String.class)
+                .newInstance(name, value, size, modifiedMillis, kind.equals("DIRECTORY") ? 0755 : 0644, "");
+        } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+    }
+
+    /**
+     * Shows a listing in the live SFTP explorer as its controller does after a successful list (no connection): the host
+     * name, the folder and its entries; UI thread.
+     */
+    void sftpListing(String host, String directory, List<Object> entries) {
+        try {
+            Object panel = sftpPanel();
+            panel.getClass().getMethod("showPage", String.class, String.class, List.class, long.class, long.class, boolean.class)
+                .invoke(panel, host, directory, entries, 0L, (long) entries.size(), false);
+        } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+    }
+
+    /** Sends files to {@code activated} on Enter or a double click, as the Editor integration would; UI thread. */
+    void sftpEditing(java.util.function.Consumer<Object> activated, Runnable open) {
+        try {
+            Object panel = sftpPanel();
+            Class<?> editing = loader.loadClass("dev.jasper.remote.ui.sftp.SftpPanel$Editing");
+            Object value = editing.getConstructor(java.util.function.Consumer.class, Runnable.class).newInstance(activated, open);
+            panel.getClass().getMethod("editing", editing).invoke(panel, value);
+        } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+    }
+
+    /** Stops the transfer UI's own refresh and waits for one in flight, so only rows handed in by {@link #transferRows} show. */
+    void quietTransfers() throws InterruptedException {
+        onEdt(() -> {
+            try {
+                Object timer = field(field(plugin, "transferUi"), "timer");
+                if (timer != null) timer.getClass().getMethod("stop").invoke(timer);
+            } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+        });
+        StagedVaultHost.await(() -> {
+            try { return !(boolean) field(field(plugin, "transferUi"), "pending"); }
+            catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+        }, "no transfer refresh in flight");
+        StagedVaultHost.settle();
+    }
+
+    /**
+     * Hands the window's transfer rows to its SFTP sidebar as the transfer UI does after a refresh, with the queue's own
+     * refresh stopped first ({@link #quietTransfers}) so only these rows show; each row is {@code {id, title, status, fraction or -1, finished}}.
+     */
+    void transferRows(List<Object[]> rows) {
+        try {
+            Object transferUi = field(plugin, "transferUi");
+            Object strip = ((Map<?, ?>) field(transferUi, "strips")).get(window.id());
+            Class<?> row = loader.loadClass("dev.jasper.remote.ui.transfers.TransferRows$Row");
+            var constructor = row.getConstructor(java.util.UUID.class, String.class, String.class, String.class, String.class, java.util.OptionalDouble.class,
+                boolean.class, Optional.class, boolean.class, boolean.class);
+            var values = new ArrayList<Object>();
+            for (Object[] r : rows) {
+                double fraction = (double) r[3];
+                values.add(constructor.newInstance(r[0], "↑", r[1], "Local: /fixture/" + r[1] + " → prod: /srv", r[2],
+                    fraction < 0 ? java.util.OptionalDouble.empty() : java.util.OptionalDouble.of(fraction), false, Optional.empty(), r[4], false));
+            }
+            strip.getClass().getMethod("rows", List.class).invoke(strip, values);
+        } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 
     /** The plugin's data directory under the test's {@code root} (the contract host resolves it by id), where tunnels.toml lives. */

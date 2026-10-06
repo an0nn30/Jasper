@@ -1,6 +1,7 @@
 package dev.jasper.remote.ui.transfers;
 
 import static org.assertj.core.api.Assertions.*;
+import static dev.jasper.remote.testsupport.Kits.find;
 
 import dev.jasper.remote.sftp.LocalEndpoint;
 import dev.jasper.remote.transfer.*;
@@ -33,13 +34,14 @@ class TransferUiTest {
             try {
                 transfers = new TransferUi(context, coordinator, Runnable::run, window -> shown.add(window.id()), () -> now[0], false);
                 UUID window = host.addTerminalWindow();
-                var strip = (TransferStrip) transfers.strip(context.terminals().window(window).orElseThrow());
+                var strip = transfers.strip(context.terminals().window(window).orElseThrow());
                 var id = coordinator.enqueue(new TransferRequest(EndpointRef.local(), List.of(source.toString()), EndpointRef.local(), dest.toString()), null).get(5, TimeUnit.SECONDS);
-                awaitView(transfers, strip, id, view -> view.statusText().equals("Done") && view.fullTitle().equals("↑ report.txt → " + dest));
-                assertThat(strip.isVisible()).isTrue();
+                awaitView(transfers, strip, id, row -> row.status().equals("Done") && TransferStrip.fullTitle(row).equals("↑ report.txt → " + dest));
+                assertThat(strip.visible()).isTrue();
+                assertThat(find(strip.node().orElseThrow(), TransferStrip.closeId(id))).as("the row shows in the sidebar").isPresent();
                 now[0] += FinishedJobs.FADE_NANOS;
                 awaitGone(transfers, strip, id);
-                assertThat(strip.isVisible()).isFalse();
+                assertThat(strip.visible()).isFalse();
                 assertThat(coordinator.snapshot(0, 50).get(5, TimeUnit.SECONDS).jobs()).as("history cleared").isEmpty();
                 assertThat(Files.readString(dest.resolve("report.txt"))).as("destination kept").isEqualTo("payload");
                 host.invoke(TransferUi.SHOW, window, null);
@@ -70,25 +72,25 @@ class TransferUiTest {
             try {
                 transfers = new TransferUi(context, coordinator, Runnable::run, window -> { }, () -> 0L, false);
                 UUID window = host.addTerminalWindow();
-                var strip = (TransferStrip) transfers.strip(context.terminals().window(window).orElseThrow());
+                var strip = transfers.strip(context.terminals().window(window).orElseThrow());
                 var clean = coordinator.enqueue(new TransferRequest(EndpointRef.local(), List.of(source.toString()), EndpointRef.local(), dest.toString()), null).get(5, TimeUnit.SECONDS);
-                awaitView(transfers, strip, clean, view -> view.statusText().equals("Done"));
+                awaitView(transfers, strip, clean, row -> row.status().equals("Done"));
                 coordinator.clear(clean, false).get(5, TimeUnit.SECONDS); // the fade gets there first
-                strip.view(clean).orElseThrow().closeButton().doClick();
+                click(strip, TransferStrip.closeId(clean));
                 awaitGone(transfers, strip, clean);
                 assertThat(host.notifications().lines()).as("an already cleared job is not an error").isEmpty();
                 var again = coordinator.enqueue(new TransferRequest(EndpointRef.local(), List.of(source.toString()), EndpointRef.local(), root.resolve("dest").toString()).withExisting(ConflictDecision.REPLACE), null).get(5, TimeUnit.SECONDS);
-                awaitView(transfers, strip, again, view -> view.statusText().equals("Done"));
-                strip.view(again).orElseThrow().closeButton().doClick();
+                awaitView(transfers, strip, again, row -> row.status().equals("Done"));
+                click(strip, TransferStrip.closeId(again));
                 awaitGone(transfers, strip, again);
                 assertThat(coordinator.snapshot(0, 50).get(5, TimeUnit.SECONDS).jobs()).as("dismiss cleared it").extracting(TransferJob::id).containsExactly(dirty);
                 assertThat(Files.readString(dest.resolve("report.txt"))).as("destination kept").isEqualTo("payload");
 
-                awaitView(transfers, strip, dirty, view -> view.statusText().equals("Cancelled") && view.actionButton().getText().equals("Retry cleanup"));
-                var close = strip.view(dirty).orElseThrow().closeButton();
-                assertThat(close.isEnabled()).as("a cancelled transfer can be dismissed").isTrue();
+                awaitView(transfers, strip, dirty, row -> row.status().equals("Cancelled") && row.action().map(TransferRows.Action::label).orElse("").equals("Retry cleanup"));
+                assertThat(button(strip, TransferStrip.actionId(dirty)).label()).isEqualTo("Retry cleanup");
+                assertThat(button(strip, TransferStrip.closeId(dirty)).state().enabled()).as("a cancelled transfer can be dismissed").isTrue();
                 // The confirmation is a kit view (Task 8a), which lives on the EDT.
-                dev.jasper.remote.testsupport.Kits.edt(close::doClick);
+                dev.jasper.remote.testsupport.Kits.edt(() -> click(strip, TransferStrip.closeId(dirty)));
                 var confirm = dev.jasper.remote.testsupport.Kits.value(() -> host.windowView("dev.jasper.remote", "Clear transfer history").orElseThrow());
                 assertThat(dev.jasper.remote.testsupport.Kits.<java.util.List<dev.jasper.sdk.ui.Nodes.Button>>value(() -> dev.jasper.remote.testsupport.Kits.primaries(confirm)))
                     .as("Enter clears nothing").isEmpty();
@@ -121,23 +123,23 @@ class TransferUiTest {
             try {
                 transfers = new TransferUi(context, coordinator, Runnable::run, window -> { }, () -> 0L, false);
                 UUID window = host.addTerminalWindow();
-                var strip = (TransferStrip) transfers.strip(context.terminals().window(window).orElseThrow());
+                var strip = transfers.strip(context.terminals().window(window).orElseThrow());
                 var paused = coordinator.enqueue(new TransferRequest(EndpointRef.local(), List.of(source.toString()), EndpointRef.local(), dest.toString()), null).get(5, TimeUnit.SECONDS);
                 coordinator.pause(paused);
-                awaitView(transfers, strip, paused, view -> view.statusText().equals("Paused") && view.actionButton().isVisible());
+                awaitView(transfers, strip, paused, row -> row.status().equals("Paused") && row.action().isPresent());
                 hold.set(false);
-                assertThat(strip.view(paused).orElseThrow().actionButton().getText()).isEqualTo("Resume");
-                strip.view(paused).orElseThrow().actionButton().doClick();
-                awaitView(transfers, strip, paused, view -> view.statusText().equals("Done"));
+                assertThat(button(strip, TransferStrip.actionId(paused)).label()).isEqualTo("Resume");
+                click(strip, TransferStrip.actionId(paused));
+                awaitView(transfers, strip, paused, row -> row.status().equals("Done"));
                 assertThat(Files.readString(dest.resolve("report.txt"))).isEqualTo("payload");
 
                 var failed = coordinator.enqueue(new TransferRequest(EndpointRef.local(), List.of(pipe.toString()), EndpointRef.local(), dest.toString()), null).get(5, TimeUnit.SECONDS);
-                awaitView(transfers, strip, failed, view -> view.statusText().equals("Done · 1 failed") && view.actionButton().isVisible());
-                assertThat(strip.view(failed).orElseThrow().actionButton().getText()).isEqualTo("Retry failed");
+                awaitView(transfers, strip, failed, row -> row.status().equals("Done · 1 failed") && row.action().isPresent());
+                assertThat(button(strip, TransferStrip.actionId(failed)).label()).isEqualTo("Retry failed");
                 Files.delete(pipe);
                 Files.writeString(pipe, "fixed");
-                strip.view(failed).orElseThrow().actionButton().doClick();
-                awaitView(transfers, strip, failed, view -> view.statusText().equals("Done"));
+                click(strip, TransferStrip.actionId(failed));
+                awaitView(transfers, strip, failed, row -> row.status().equals("Done"));
                 assertThat(Files.readString(dest.resolve("pipe"))).isEqualTo("fixed");
                 assertThat(host.failures()).isEmpty();
                 assertThat(host.notifications().lines()).isEmpty();
@@ -149,22 +151,34 @@ class TransferUiTest {
         }
     }
 
-    static void awaitView(TransferUi transfers, TransferStrip strip, UUID id, Predicate<TransferStrip.RowView> done) throws Exception {
+    /** The row's button as the kit shows it. */
+    static dev.jasper.sdk.ui.Nodes.Button button(TransferStrip strip, String id) {
+        return (dev.jasper.sdk.ui.Nodes.Button) find(strip.node().orElseThrow(), id).orElseThrow(() -> new AssertionError("no " + id));
+    }
+
+    /** A click on the row's enabled button: the event the kit reports. */
+    static void click(TransferStrip strip, String id) {
+        var button = button(strip, id);
+        if (!button.state().enabled()) throw new AssertionError(id + " is disabled");
+        strip.handle(new dev.jasper.sdk.ui.UiEvent.Action(button.action()));
+    }
+
+    static void awaitView(TransferUi transfers, TransferStrip strip, UUID id, Predicate<TransferRows.Row> done) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime() < deadline) {
             transfers.refresh();
-            var view = strip.view(id);
-            if (view.isPresent() && done.test(view.get())) return;
+            var row = strip.row(id);
+            if (row.isPresent() && done.test(row.get())) return;
             Thread.sleep(20);
         }
-        throw new AssertionError("Row not reached: " + strip.view(id).map(v -> v.fullTitle() + " | " + v.statusText()).orElse("absent"));
+        throw new AssertionError("Row not reached: " + strip.row(id).map(r -> TransferStrip.fullTitle(r) + " | " + r.status()).orElse("absent"));
     }
 
     static void awaitGone(TransferUi transfers, TransferStrip strip, UUID id) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime() < deadline) {
             transfers.refresh();
-            if (strip.view(id).isEmpty()) return;
+            if (strip.row(id).isEmpty()) return;
             Thread.sleep(20);
         }
         throw new AssertionError("Row did not fade");

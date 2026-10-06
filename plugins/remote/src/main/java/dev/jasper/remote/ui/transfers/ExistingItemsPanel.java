@@ -1,29 +1,55 @@
 package dev.jasper.remote.ui.transfers;
 
 import dev.jasper.remote.transfer.ConflictDecision;
-import java.awt.*;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
-import javax.swing.*;
 
-/** Asked once before copying when selected items already exist at the destination. */
-public final class ExistingItemsPanel extends JPanel {
-    final JButton replace = new JButton("Replace"), skip = new JButton("Skip existing"), cancel = new JButton("Cancel");
+/**
+ * Asked once before copying when selected items already exist at the destination, on a host-rendered kit form: Replace,
+ * Skip existing or Cancel. No button is the form's primary, so Enter copies nothing (the former dialog had no default
+ * button); Escape cancels. The message is literal text. UI thread only; {@link #close()} makes late callbacks inert.
+ */
+public final class ExistingItemsPanel implements AutoCloseable {
+    public static final String FORM = "existing", TEXT = "existing.text", REPLACE = "existing.replace", SKIP = "existing.skip", CANCEL = "existing.cancel";
+    private final String message;
+    private final UiView view;
+    private boolean closed;
 
-    public ExistingItemsPanel(String message, Consumer<ConflictDecision> choose, Runnable close) {
-        super(new BorderLayout(8, 12));
-        setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-        add(TransferStrip.label(message), BorderLayout.CENTER);
-        var buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
-        for (var button : List.of(replace, skip, cancel)) buttons.add(button);
-        add(buttons, BorderLayout.SOUTH);
-        replace.addActionListener(event -> choose.accept(ConflictDecision.REPLACE));
-        skip.addActionListener(event -> choose.accept(ConflictDecision.SKIP));
-        cancel.addActionListener(event -> close.run());
+    public ExistingItemsPanel(UiKit kit, String message, Consumer<ConflictDecision> choose, Runnable close) {
+        this.message = message;
+        var actions = List.of(
+            new Nodes.Button(REPLACE, ControlState.READY, "Replace", "", Nodes.ButtonKind.SECONDARY, REPLACE, ""),
+            new Nodes.Button(SKIP, ControlState.READY, "Skip existing", "", Nodes.ButtonKind.SECONDARY, SKIP, ""),
+            new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""));
+        var form = new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, "Items already exist", Optional.empty(),
+            List.of(new Nodes.Text(TEXT, ControlState.READY, message, Nodes.TextRole.BODY)), Optional.empty(), actions, CANCEL);
+        view = kit.create(new ViewSpec(form), event -> {
+            if (closed || !(event instanceof UiEvent.Action action)) return;
+            switch (action.id()) {
+                case REPLACE -> choose.accept(ConflictDecision.REPLACE);
+                case SKIP -> choose.accept(ConflictDecision.SKIP);
+                case CANCEL -> close.run();
+                default -> { }
+            }
+        });
     }
+
+    public UiView view() { return view; }
+
+    /** The question as shown. */
+    public String message() { return message; }
 
     public static String message(List<String> existing, int selected, String destination) {
         if (selected == 1) return "\"" + existing.getFirst() + "\" already exists in " + destination + ".";
         return existing.size() + " of " + selected + " items already " + (existing.size() == 1 ? "exists" : "exist") + " in " + destination + ".";
     }
+
+    @Override public void close() { if (closed) return; closed = true; view.close(); }
 }

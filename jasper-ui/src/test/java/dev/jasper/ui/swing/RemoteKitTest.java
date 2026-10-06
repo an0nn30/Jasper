@@ -277,6 +277,47 @@ class RemoteKitTest {
         });
     }
 
+    /**
+     * Plan 2 Task 8c (port of the deleted Remote PanelStyleTest): a PRIMARY action, as the Sessions card's Connect,
+     * shows a visible keyboard focus ring without depending on the look and feel's border, and losing focus removes it.
+     */
+    @Test void aPrimaryActionShowsAVisibleKeyboardFocusRingAndLosesItWithFocus() {
+        Edt.run(() -> {
+            var priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            var manager = new DefaultKeyboardFocusManager() { Component target; @Override public Component getFocusOwner() { return target; } };
+            var context = KitFixtures.context();
+            try {
+                KeyboardFocusManager.setCurrentKeyboardFocusManager(manager);
+                var connect = new Nodes.Button("connect", READY, "Connect", "terminal", ButtonKind.PRIMARY, "connect", "");
+                try (var view = new KitView(context, new ViewSpec(new Stack("card", READY, LayoutRole.VERTICAL, List.of(connect))), e -> {})) {
+                    int width = 240, height = 80;
+                    var idle = KitFixtures.render(view, width, height, 1);
+                    var button = find(view, "connect", Buttons.KitButton.class);
+                    var bounds = SwingUtilities.convertRectangle(button.getParent(), button.getBounds(), view);
+                    manager.target = button;
+                    var gained = new java.awt.event.FocusEvent(button, java.awt.event.FocusEvent.FOCUS_GAINED, false, null, java.awt.event.FocusEvent.Cause.TRAVERSAL_FORWARD);
+                    for (var listener : button.getFocusListeners()) listener.focusGained(gained);
+                    assertThat(button.focus.visible()).as("keyboard focus shows").isTrue();
+                    var focused = KitFixtures.render(view, width, height, 1);
+                    int ring = Math.max(2, ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.FOCUS_RING));
+                    var area = new Rectangle(bounds); area.grow(ring, ring);
+                    assertThat(differing(idle, focused, area)).as("a visible focus ring around the primary action").isGreaterThan(0);
+                    manager.target = null;
+                    var lost = new java.awt.event.FocusEvent(button, java.awt.event.FocusEvent.FOCUS_LOST, false, null, java.awt.event.FocusEvent.Cause.TRAVERSAL_FORWARD);
+                    for (var listener : button.getFocusListeners()) listener.focusLost(lost);
+                    assertThat(differing(idle, KitFixtures.render(view, width, height, 1), area)).as("no ring without focus").isZero();
+                }
+            } finally { KeyboardFocusManager.setCurrentKeyboardFocusManager(priorFocus); release(context); }
+        });
+    }
+
+    static int differing(java.awt.image.BufferedImage a, java.awt.image.BufferedImage b, Rectangle area) {
+        int count = 0;
+        for (int x = Math.max(0, area.x); x < Math.min(a.getWidth(), area.x + area.width); x++)
+            for (int y = Math.max(0, area.y); y < Math.min(a.getHeight(), area.y + area.height); y++) if (a.getRGB(x, y) != b.getRGB(x, y)) count++;
+        return count;
+    }
+
     static final String HOSTILE = "<html><img src='http://127.0.0.1:9/x.png'>web";
 
     /** Every component under {@code root} (itself included) that shows a tooltip. */

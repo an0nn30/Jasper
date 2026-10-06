@@ -7,6 +7,7 @@ import dev.jasper.remote.hosts.Auth;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.trust.KnownHosts;
 import dev.jasper.remote.ui.sftp.SftpPanel;
+import dev.jasper.remote.ui.sftp.SftpTestAccess;
 import dev.jasper.remote.ui.sftp.SftpUi;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.Plugin;
@@ -15,7 +16,6 @@ import dev.jasper.sdk.testing.FakePluginHost;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -92,34 +92,29 @@ class RemoteEditingPluginTest {
         new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
         UUID window = host.addTerminalWindow();
         host.activateTerminalWindow(window);
-        var panel = (SftpPanel) host.openPanel(SftpUi.PANEL, window);
+        dev.jasper.remote.testsupport.Kits.edt(() -> host.openPanel(SftpUi.PANEL, window));
+        var panel = SftpTestAccess.panel(plugin.sftp(), window);
         dev.jasper.remote.testsupport.Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), prod)); RemotePluginTest.settle(host);
         UUID pane = host.terminalPanes().getFirst();
-        host.focusTerminalPane(pane); host.flush();
+        dev.jasper.remote.testsupport.Kits.edt(() -> { host.focusTerminalPane(pane); host.flush(); });
         RemotePluginTest.awaitRowCount(host, panel, rows);
         return new Browsed(panel, window, pane, context);
     }
 
-    static void select(SftpPanel panel, String name) {
-        for (int row = 0; row < panel.table().getRowCount(); row++)
-            if (name.equals(panel.table().getValueAt(row, 0))) { panel.table().setRowSelectionInterval(row, row); return; }
-        throw new AssertionError("no row " + name);
+    static void enter(SftpPanel panel, String name) throws Exception { SftpTestAccess.enter(panel, name); }
+    static String directory(SftpPanel panel) {
+        try { return SftpTestAccess.directory(panel); } catch (Exception failure) { throw new AssertionError(failure); }
     }
-    static void enter(SftpPanel panel, String name) { select(panel, name); panel.table().getActionMap().get("browse").actionPerformed(null); }
+    /** The visible texts of the panel (status, results), read on the EDT. */
+    static List<String> labels(SftpPanel panel) {
+        try { return SftpTestAccess.texts(panel); } catch (Exception failure) { throw new AssertionError(failure); }
+    }
     static void await(FakePluginHost host, BooleanSupplier condition, String what) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (!condition.getAsBoolean() && System.nanoTime() < deadline) { RemotePluginTest.settle(host); Thread.sleep(20); }
         assertThat(condition.getAsBoolean()).as(what).isTrue();
     }
     static <T> T done(FakePluginHost host, CompletableFuture<T> future) throws Exception { await(host, future::isDone, "the operation finishes"); return future.get(); }
-    static List<String> labels(java.awt.Container root) {
-        var texts = new ArrayList<String>();
-        for (var child : root.getComponents()) {
-            if (child instanceof javax.swing.JLabel label && label.getText() != null) texts.add(label.getText());
-            if (child instanceof java.awt.Container container) texts.addAll(labels(container));
-        }
-        return texts;
-    }
     /** Counts down {@code blocked} and waits on {@code release} the first time {@code path} itself is (l)stat-ed, then serves it normally. */
     static SftpSubsystemFactory blockingLstat(String path, CountDownLatch blocked, CountDownLatch release) {
         return new SftpSubsystemFactory() {
@@ -164,7 +159,7 @@ class RemoteEditingPluginTest {
             assertThat(Files.isSymbolicLink(files.resolve("alias.toml"))).isTrue();
 
             enter(panel, "conf-link");
-            await(host, () -> panel.directory().equals("/conf"), "the link to a folder navigates");
+            await(host, () -> directory(panel).equals("/conf"), "the link to a folder navigates");
             assertThat(editor.documents).hasSize(2);
             host.stopAll();
             assertThat(host.failures()).isEmpty();
@@ -180,8 +175,8 @@ class RemoteEditingPluginTest {
         var editor = new FakeEditor();
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
             var panel = browse(host, server, files, dir, Optional.of(editor), 28);
-            panel.table().selectAll();
-            RemotePluginTest.menuItem(panel.table().getComponentPopupMenu(), "Open in Editor").doClick();
+            SftpTestAccess.selectAll(panel);
+            SftpTestAccess.menu(panel, "Open in Editor");
             await(host, () -> labels(panel).contains("Opened 20 of 26 files."), "the cap is reported");
             assertThat(editor.documents).hasSize(20).extracting(EditorDocument::name).doesNotContain("conf", "conf-link");
             host.stopAll();
@@ -194,10 +189,10 @@ class RemoteEditingPluginTest {
         Files.writeString(files.resolve("notes.toml"), "a = 1\n");
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
             var panel = browse(host, server, files, dir, Optional.empty(), 1);
-            assertThat(RemotePluginTest.menuItem(panel.table().getComponentPopupMenu(), "Open in Editor").isVisible()).isFalse();
+            assertThat(SftpTestAccess.menuLabels(panel)).doesNotContain("Open in Editor");
             enter(panel, "notes.toml");
             RemotePluginTest.settle(host);
-            assertThat(panel.directory()).isEqualTo("/");
+            assertThat(directory(panel)).isEqualTo("/");
             host.stopAll();
             assertThat(host.failures()).isEmpty();
         }
@@ -231,8 +226,8 @@ class RemoteEditingPluginTest {
         var editor = new FakeEditor();
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
             var panel = browse(host, server, files, dir, Optional.of(editor), 4);
-            panel.table().selectAll();
-            RemotePluginTest.menuItem(panel.table().getComponentPopupMenu(), "Open in Editor").doClick();
+            SftpTestAccess.selectAll(panel);
+            SftpTestAccess.menu(panel, "Open in Editor");
             await(host, () -> editor.documents.size() == 2, "the regular files open despite the link loop");
             assertThat(editor.documents).extracting(EditorDocument::name).containsExactlyInAnyOrder("one.txt", "two.txt");
             await(host, () -> labels(panel).stream().anyMatch(text -> text.contains("Too many levels of symbolic links")), "the link loop failure is reported");
@@ -256,12 +251,12 @@ class RemoteEditingPluginTest {
                 enter(panel, "conf-link");
                 await(host, () -> blocked.getCount() == 0, "the link lookup reached the server and is now blocked there");
                 enter(panel, "other");
-                await(host, () -> panel.directory().equals("/other"), "navigating elsewhere while the lookup is still in flight");
+                await(host, () -> directory(panel).equals("/other"), "navigating elsewhere while the lookup is still in flight");
                 release.countDown();
                 long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
                 while (System.nanoTime() < deadline) {
                     RemotePluginTest.settle(host);
-                    assertThat(panel.directory()).as("a late link result must not pull a view that moved on").isEqualTo("/other");
+                    assertThat(directory(panel)).as("a late link result must not pull a view that moved on").isEqualTo("/other");
                     Thread.sleep(20);
                 }
                 host.stopAll();

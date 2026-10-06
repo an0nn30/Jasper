@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * host translation. Each capture waits for its named content to mount and must not be a uniform frame. The host-key
  * question is asked through the plugin's own entry with a synthetic key; the connecting overlay is mounted on an
  * overlay as a connection attempt does, with synthetic text and no connection. Task 8b adds the Tunnels panel and its
- * dialogs. Output goes to
+ * dialogs; Task 8c the SFTP explorer, a transfer row and the SFTP/transfer dialogs. Output goes to
  * build/theme-migration-evidence/remote-hosted; the frozen before images are untouched.
  */
 class RemoteRenderEvidenceTest {
@@ -174,6 +174,54 @@ class RemoteRenderEvidenceTest {
             awaitNamed(surface, "forward.more");
             save(theme, "forward-port", surface.holder(), 560, 520);
             onEdt(() -> forward.get().close());
+            assertThat(remote.problems).isEmpty();
+        } finally {
+            onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); });
+        }
+    }
+
+    /**
+     * Plan 2 Task 8c: the SFTP explorer (not connected; a listing with a transfer row) and the New folder and Items already
+     * exist dialogs, dark and light. The listing and the transfer row are handed to the live explorer as its controller and
+     * the transfer UI would, with no connection and no transfer running.
+     */
+    @Test @Timeout(value = 150, unit = TimeUnit.SECONDS)
+    void capturesTheStagedSftpPanelAndDialogsInTheRealHostDarkAndLight() throws Exception {
+        for (String theme : List.of("dark", "light")) captureSftp(theme, root.resolve("sftp-" + theme));
+    }
+
+    private void captureSftp(String theme, Path data) throws Exception {
+        var controller = onEdtValue(dev.jasper.app.appearance.ThemeController::new);
+        onEdt(() -> controller.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT));
+        try (var remote = new StagedRemoteHost(data, theme.equals("dark"))) {
+            remote.openSftp();
+            save(theme, "sftp-disconnected", remote.window, 900, 560);
+            remote.quietTransfers();
+            onEdt(() -> {
+                remote.sftpListing("Example host", "/fixture/app", List.of(remote.fileEntry("logs", "DIRECTORY", 0, 1_000),
+                    remote.fileEntry("example.txt", "FILE", 42, 1_000), remote.fileEntry("current", "LINK", 10, 1_000)));
+                remote.transferRows(List.<Object[]>of(new Object[] {java.util.UUID.fromString("00000000-0000-4000-8000-0000000000c2"),
+                    "example.txt → Example host:/fixture/app", "50% · 1.0 MiB/s · 3 s left", 0.5, false}));
+            });
+            StagedVaultHost.settle();
+            onEdt(() -> assertThat(StagedRemoteHost.labels(remote.sftp())).contains("example.txt", "Transfers"));
+            save(theme, "sftp-connected", remote.window, 900, 560);
+            var folder = new AtomicReference<PluginDialog>();
+            onEdt(() -> folder.set(StagedRemoteSftpTest.mount(remote, "New folder", "dev.jasper.remote.ui.sftp.FolderNamePanel",
+                new Class<?>[] {UiKit.class, java.util.function.Function.class, Runnable.class},
+                (java.util.function.Function<String, java.util.Optional<String>>) name -> java.util.Optional.empty(), (Runnable) () -> { })));
+            var surface = remote.awaitSurface("New folder");
+            awaitNamed(surface, "new-folder.name.input");
+            save(theme, "sftp-new-folder", surface.holder(), 460, 220);
+            onEdt(() -> folder.get().close());
+            var existing = new AtomicReference<PluginDialog>();
+            onEdt(() -> existing.set(StagedRemoteSftpTest.mount(remote, "Items already exist", "dev.jasper.remote.ui.transfers.ExistingItemsPanel",
+                new Class<?>[] {UiKit.class, String.class, java.util.function.Consumer.class, Runnable.class},
+                "2 of 3 items already exist in Example host:/fixture/app.", (java.util.function.Consumer<Object>) choice -> { }, (Runnable) () -> { })));
+            var ask = remote.awaitSurface("Items already exist");
+            awaitNamed(ask, "existing.replace");
+            save(theme, "transfers-existing-items", ask.holder(), 520, 200);
+            onEdt(() -> existing.get().close());
             assertThat(remote.problems).isEmpty();
         } finally {
             onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); });
