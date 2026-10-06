@@ -40,7 +40,7 @@ class ThemeMigrationEvidenceTest {
             emit(hosts.view(), new UiEvent.Edited(HostsPanel.SEARCH, "")); hosts.setDistros(List.of(), profile -> 0); hosts.setHosts(List.of(), Optional.empty());
             save("sessions-empty", hosts.view());
             assertThat(node(hosts.view(), HostsPanel.HINT, Nodes.Text.class).text()).startsWith("No hosts yet");
-            var editor = new HostEditor(kit, List.of(), Optional.empty(), true, id -> Optional.empty(),
+            var editor = new HostEditor(kit, UI, List.of(), Optional.empty(), true, id -> Optional.empty(),
                 () -> CompletableFuture.completedFuture(Optional.empty()), host -> { }, () -> { });
             save("add-host-vault", editor.view());
             emit(editor.view(), new UiEvent.Selected(HostEditor.AUTH, Set.of(HostEditor.AGENT)));
@@ -65,7 +65,7 @@ class ThemeMigrationEvidenceTest {
             save("rename-default-group", group.view());
             var confirm = new ConfirmPanel(kit, "Delete the saved host fixture? Open sessions stay connected.", "Delete", () -> { }, () -> { });
             save("delete-host", confirm.view());
-            assertThat(Files.list(Path.of("build/theme-migration-evidence/remote-descriptors")).count()).isGreaterThanOrEqualTo(14);
+            try (var saved = Files.list(Path.of("build/theme-migration-evidence/remote-descriptors"))) { assertThat(saved.count()).isGreaterThanOrEqualTo(14); }
         });
     }
 }

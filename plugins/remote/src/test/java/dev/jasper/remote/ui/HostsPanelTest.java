@@ -170,6 +170,23 @@ class HostsPanelTest {
         });
     }
 
+    /** Review fix round 1 (M3): a double click on a star toggles once, as the old list acted only on a single click. */
+    @Test void aDoubleClickOnTheStarTogglesTheFavouriteOnce() throws Exception {
+        edt(() -> {
+            long[] now = {0};
+            var panel = new HostsPanel(new FakeKit("dev.jasper.remote"), actions, dev.jasper.sdk.testing.FakeBundledIcon::new, () -> now[0]);
+            panel.setHosts(List.of(prod, nas), Optional.empty());
+            String nasStar = star(panel, indexOf(panel, nas)).action(), prodStar = star(panel, indexOf(panel, prod)).action();
+            press(panel.view(), nasStar);
+            now[0] += 120_000_000L; press(panel.view(), nasStar);
+            assertThat(events).as("the second click of a double click").containsExactly("favorite nas true");
+            now[0] += 50_000_000L; press(panel.view(), prodStar);
+            assertThat(events).as("another host's star is its own click").containsExactly("favorite nas true", "favorite prod true");
+            now[0] += 2_000_000_000L; press(panel.view(), nasStar);
+            assertThat(events).as("a later click toggles again").hasSize(3);
+        });
+    }
+
     @Test void theCardsEditAndConnectControlsAreNamedAndReachable() throws Exception {
         edt(() -> {
             var panel = panel();

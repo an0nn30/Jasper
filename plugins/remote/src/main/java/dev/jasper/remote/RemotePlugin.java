@@ -566,7 +566,7 @@ public class RemotePlugin implements Plugin {
         PluginDialog dialog = context.windows().dialog(new DialogSpec(editing.isPresent() ? "Edit " + editing.get().name() : "Add Host", window, true));
         HostEditor[] editor = new HostEditor[1];
         boolean[] closed = {false};
-        editor[0] = new HostEditor(context.kit(), store.hosts(), editing, vault.isPresent(), this::credentialName,
+        editor[0] = new HostEditor(context.kit(), ui, store.hosts(), editing, vault.isPresent(), this::credentialName,
             () -> vault.isPresent() ? vault.get().pick(window) : CompletableFuture.completedFuture(Optional.empty()),
             host -> store.put(host).whenComplete((ignored, failure) -> ui.execute(() -> {
                 if (stopped) return;

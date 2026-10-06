@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -48,7 +49,8 @@ public final class HostEditor implements AutoCloseable {
     private UUID credentialId;
     private final List<UUID> managedIds = new ArrayList<>();
 
-    public HostEditor(UiKit kit, List<RemoteHost> others, Optional<RemoteHost> editing, boolean vaultPresent, Function<UUID, Optional<String>> credentialName,
+    /** {@code ui} runs the Vault pick's continuation on the UI thread: a pick may complete on any thread. */
+    public HostEditor(UiKit kit, Executor ui, List<RemoteHost> others, Optional<RemoteHost> editing, boolean vaultPresent, Function<UUID, Optional<String>> credentialName,
                       Supplier<CompletableFuture<Optional<CredentialDescriptor>>> pick, Consumer<RemoteHost> onSave, Runnable onCancel) {
         this.others = List.copyOf(others); this.editing = editing; this.vaultPresent = vaultPresent; this.credentialName = credentialName;
         jumps = others.stream().filter(other -> editing.map(host -> !host.id().equals(other.id())).orElse(true)).toList();
@@ -78,8 +80,8 @@ public final class HostEditor implements AutoCloseable {
                 case UiEvent.Selected selected when selected.id().equals(JUMP) && !selected.ids().isEmpty() -> { jump = selected.ids().iterator().next(); render(); }
                 case UiEvent.Reordered moved when moved.id().equals(KEYS) -> move(UUID.fromString(moved.itemId()), moved.destination());
                 case UiEvent.Removed removed when removed.id().equals(KEYS) -> remove(UUID.fromString(removed.itemId()));
-                case UiEvent.Action action when action.id().equals(CHOOSE) -> { if (vaultAuth) pick.get().thenAccept(chosen -> chosen.ifPresent(this::chose)); }
-                case UiEvent.Action action when action.id().equals(ADD_KEY) -> { if (vaultAuth && vaultPresent) pick.get().thenAccept(chosen -> chosen.ifPresent(this::addKey)); }
+                case UiEvent.Action action when action.id().equals(CHOOSE) -> { if (vaultAuth) pick.get().thenAccept(chosen -> ui.execute(() -> chosen.ifPresent(this::chose))); }
+                case UiEvent.Action action when action.id().equals(ADD_KEY) -> { if (vaultAuth && vaultPresent) pick.get().thenAccept(chosen -> ui.execute(() -> chosen.ifPresent(this::addKey))); }
                 case UiEvent.Action action when action.id().equals(SAVE) -> save(onSave);
                 case UiEvent.Action action when action.id().equals(CANCEL) -> onCancel.run();
                 default -> { }

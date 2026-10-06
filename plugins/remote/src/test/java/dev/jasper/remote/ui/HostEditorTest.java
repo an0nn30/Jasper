@@ -27,7 +27,7 @@ class HostEditorTest {
 
     HostEditor editor(List<RemoteHost> others, Optional<RemoteHost> editing, boolean vault, java.util.function.Function<UUID, Optional<String>> names,
                       Supplier<CompletableFuture<Optional<CredentialDescriptor>>> pick, Runnable cancel) {
-        return new HostEditor(kit, others, editing, vault, names, pick, saved::add, cancel);
+        return new HostEditor(kit, UI, others, editing, vault, names, pick, saved::add, cancel);
     }
 
     static String value(HostEditor editor, String id) { return node(editor.view(), id, Nodes.Field.class).value(); }
@@ -180,7 +180,7 @@ class HostEditorTest {
         edt(() -> {
             var recording = new RecordingKit("dev.jasper.remote");
             var pending = new CompletableFuture<Optional<CredentialDescriptor>>();
-            var editor = new HostEditor(recording, List.of(), Optional.empty(), true, id -> Optional.empty(), () -> pending, saved::add, () -> { });
+            var editor = new HostEditor(recording, UI, List.of(), Optional.empty(), true, id -> Optional.empty(), () -> pending, saved::add, () -> { });
             click(editor.view(), HostEditor.CHOOSE);
             editor.close();
             pending.complete(Optional.of(login));
@@ -188,5 +188,28 @@ class HostEditorTest {
             assertThat(recording.lateCalls).isEmpty();
             assertThat(saved).isEmpty();
         });
+    }
+
+    /**
+     * Review fix round 1 (M1): Vault may complete a pick on a worker thread (after an unlock). The choice still reaches the
+     * EDT-confined view, through the plugin's UI executor, instead of failing silently inside the future.
+     */
+    @Test void aPickCompletedOffTheEdtStillShowsTheChoice() throws Exception {
+        var pending = new CompletableFuture<Optional<CredentialDescriptor>>();
+        var editor = dev.jasper.remote.testsupport.Kits.value(() -> new HostEditor(kit, UI, List.of(), Optional.empty(), true, id -> id.equals(login.id()) ? Optional.of(login.name()) : Optional.empty(),
+            () -> pending, saved::add, () -> { }));
+        edt(() -> click(editor.view(), HostEditor.CHOOSE));
+        var worker = Thread.ofPlatform().start(() -> pending.complete(Optional.of(login)));
+        worker.join(5_000);
+        assertThat(pending).isCompleted();
+        edt(() -> { });
+        assertThat(dev.jasper.remote.testsupport.Kits.value(editor::credentialLabel)).isEqualTo("Work login");
+        assertThat(dev.jasper.remote.testsupport.Kits.value(() -> node(editor.view(), HostEditor.CREDENTIAL, Nodes.Text.class).text()))
+            .as("the view shows the choice: the render ran on the EDT, not on the completing thread").isEqualTo("Work login");
+        edt(() -> {
+            type(editor.view(), HostEditor.NAME, "prod"); type(editor.view(), HostEditor.HOSTNAME, "api.example");
+            save(editor);
+        });
+        assertThat(saved).singleElement().satisfies(host -> assertThat(host.auth()).isEqualTo(new Auth.Vault(login.id())));
     }
 }
