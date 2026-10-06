@@ -1,6 +1,8 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.config.AnimationSettings;
 import dev.jasper.app.config.ViewMode;
+import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.palette.CommandPalette;
 import dev.jasper.app.palette.PaletteController;
 import dev.jasper.app.palette.PaletteTarget;
@@ -8,21 +10,33 @@ import dev.jasper.app.palette.ScopeRegistry;
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.function.LongSupplier;
 import javax.swing.*;
 
 /** Workspace adapter for palette overlay, captured terminal capabilities and focus restoration. */
 final class WindowCommandPalette implements AutoCloseable {
     private static final int TOP_ANCHOR_DIVISOR = 5;
+    /** How long an opening card takes to drop to its full height. */
+    static final int REVEAL_MILLIS = 300;
+    /** The snap guides, as fractions of the window: its vertical centre line and the default top. */
+    static final double GUIDE_CENTER = 0.5, GUIDE_TOP = 1.0 / TOP_ANCHOR_DIVISOR;
+    /** Logical pixels a press must travel before it drags, and how near a guide a dragged card snaps to it. */
+    static final int DRAG_THRESHOLD = 4, SNAP_DISTANCE = 8;
     private final WindowContent owner;
     private final String defaultScopeId;
     private final PaletteController controller;
     private final CommandPalette palette;
     private final Overlay overlay = new Overlay();
+    private final Drag drag = new Drag();
     private JRootPane root;
     private TerminalTab originTab;
     private TerminalPane originPane;
     private Component priorFocus;
     private boolean closed;
+    private AnimationSettings animations = AnimationSettings.defaults();
+    private LongSupplier clock = System::nanoTime;
+    private Timer reveal;
+    private long revealStart;
     private final ComponentAdapter resize = new ComponentAdapter() {
         @Override public void componentResized(ComponentEvent event) { layoutOverlay(); }
         @Override public void componentMoved(ComponentEvent event) { layoutOverlay(); }
@@ -47,6 +61,8 @@ final class WindowCommandPalette implements AutoCloseable {
             @Override public Component getDefaultComponent(Container root) { return palette.queryField(); }
         });
         overlay.setLayout(null); overlay.setOpaque(false); overlay.add(palette); overlay.setVisible(false);
+        // Presses that no row, field or link takes reach the card itself: those empty areas move it.
+        palette.addMouseListener(drag); palette.addMouseMotionListener(drag);
     }
 
     void install(JRootPane replacement) {
@@ -78,6 +94,7 @@ final class WindowCommandPalette implements AutoCloseable {
             if (controller.open(id, originPane == null ? PaletteTarget.window(owner.id()) : target(originPane), this::validOrigin, queryOrNull, rowIdOrNull)) {
                 if (!wasOpen) overlay.swallowing = false;
                 overlay.setVisible(true); layoutOverlay();
+                if (!wasOpen) startReveal();
                 palette.queryField().requestFocusInWindow();
             }
         }
@@ -98,12 +115,52 @@ final class WindowCommandPalette implements AutoCloseable {
     }
 
     private void restoreAndHide() {
+        stopReveal(); drag.cancel();
         boolean restorePriorFocus = validOrigin();
         overlay.setVisible(overlay.swallowing);
         if (restorePriorFocus && priorFocus != null && priorFocus.isShowing()
                 && SwingUtilities.isDescendingFrom(priorFocus, owner)) priorFocus.requestFocusInWindow();
         else owner.focusSelected();
         priorFocus = null; originTab = null; originPane = null;
+    }
+
+    void setAnimations(AnimationSettings settings) {
+        animations = settings;
+        if (!settings.enabled()) stopReveal();
+    }
+
+    /** Tests drive the reveal with the same monotonic clock it starts from. */
+    void useClock(LongSupplier replacement) { clock = replacement; }
+
+    /** The card drops open vertically: its bottom edge leaves the field fast and settles slowly. */
+    private void startReveal() {
+        stopReveal();
+        if (!animations.enabled()) return;
+        revealStart = clock.getAsLong();
+        palette.setReveal(0); overlay.repaint();
+        reveal = new Timer(8, event -> animate(clock.getAsLong()));
+        reveal.start();
+    }
+
+    /** One elapsed-time frame of the reveal. */
+    void animate(long now) {
+        if (reveal == null) return;
+        double elapsed = Math.max(0, Math.min(1, (now - revealStart) / (REVEAL_MILLIS * 1_000_000.0)));
+        palette.setReveal(drip(elapsed)); overlay.repaint();
+        if (elapsed >= 1) stopReveal();
+    }
+
+    /** Quartic ease-out: most of the height in the first third, then a slow settle. */
+    static double drip(double elapsed) {
+        double rest = 1 - elapsed;
+        return 1 - rest * rest * rest * rest;
+    }
+
+    boolean revealRunning() { return reveal != null; }
+
+    private void stopReveal() {
+        if (reveal != null) { reveal.stop(); reveal = null; }
+        palette.setReveal(1); overlay.repaint();
     }
 
     void setVisibleRows(int value) { controller.setVisibleRows(value); }
@@ -143,6 +200,29 @@ final class WindowCommandPalette implements AutoCloseable {
         return new Rectangle(x, field.y, width, height);
     }
 
+    /** A dragged card: its saved centre and top in {@code available}, at most the preferred size, inside the margin. */
+    static Rectangle placed(Rectangle available, Dimension preferred, UiState.PalettePosition position, int margin) {
+        Dimension size = fitted(available, preferred, margin);
+        int x = available.x + (int) Math.round(available.width * position.centerX()) - size.width / 2;
+        int y = available.y + (int) Math.round(available.height * position.top());
+        return inside(new Rectangle(x, y, size.width, size.height), available, margin);
+    }
+
+    private static Dimension fitted(Rectangle available, Dimension preferred, int margin) {
+        int insetX = Math.min(margin, Math.max(0, available.width / 2));
+        int insetY = Math.min(margin, Math.max(0, available.height / 2));
+        return new Dimension(Math.min(preferred.width, Math.max(0, available.width - 2 * insetX)),
+            Math.min(preferred.height, Math.max(0, available.height - 2 * insetY)));
+    }
+
+    private static Rectangle inside(Rectangle card, Rectangle available, int margin) {
+        int insetX = Math.min(margin, Math.max(0, available.width / 2));
+        int insetY = Math.min(margin, Math.max(0, available.height / 2));
+        card.x = Math.max(available.x + insetX, Math.min(card.x, available.x + available.width - insetX - card.width));
+        card.y = Math.max(available.y + insetY, Math.min(card.y, available.y + available.height - insetY - card.height));
+        return card;
+    }
+
     static Rectangle positioned(Rectangle available, Dimension preferred, int margin) {
         int insetX = Math.min(margin, Math.max(0, available.width / 2));
         int insetY = Math.min(margin, Math.max(0, available.height / 2));
@@ -165,9 +245,87 @@ final class WindowCommandPalette implements AutoCloseable {
         root.getLayeredPane().remove(overlay); root.repaint(); root = null;
     }
 
+    boolean dragging() { return drag.location != null; }
+    boolean snappedToCenter() { return drag.location != null && drag.snappedX; }
+    boolean snappedToTop() { return drag.location != null && drag.snappedY; }
+
+    /** The card's size once dragged: the activated width in either view mode, inside the window. */
+    private Dimension detachedSize(Rectangle window) {
+        Dimension preferred = palette.getPreferredSize();
+        preferred.width = UIScale.scale(ANCHORED_MINIMUM_WIDTH);
+        return fitted(window, preferred, UIScale.scale(16));
+    }
+
+    /**
+     * Moves the card by its empty areas. Near the window's vertical centre line or its default top the card snaps to
+     * that guide; the guides are felt, never drawn. Releasing saves the place for every window; a double click forgets it.
+     */
+    private final class Drag extends MouseAdapter {
+        private Point press, origin, location;
+        private boolean snappedX, snappedY;
+
+        @Override public void mousePressed(MouseEvent event) {
+            cancel();
+            if (!SwingUtilities.isLeftMouseButton(event) || !controller.isOpen()) return;
+            press = SwingUtilities.convertPoint(palette, event.getPoint(), overlay);
+            origin = palette.getLocation();
+        }
+
+        @Override public void mouseDragged(MouseEvent event) {
+            if (press == null || !controller.isOpen()) return;
+            Point at = SwingUtilities.convertPoint(palette, event.getPoint(), overlay);
+            int dx = at.x - press.x, dy = at.y - press.y;
+            if (location == null && Math.hypot(dx, dy) < UIScale.scale(DRAG_THRESHOLD)) return;
+            Rectangle window = overlay.workspace();
+            if (window.width <= 0 || window.height <= 0) return;
+            if (location == null) { stopReveal(); palette.setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR)); }
+            Dimension size = detachedSize(window);
+            int x = origin.x + dx, y = origin.y + dy, snap = UIScale.scale(SNAP_DISTANCE);
+            int guideX = guideX(window), guideY = guideY(window);
+            snappedX = Math.abs(x + size.width / 2 - guideX) <= snap;
+            if (snappedX) x = guideX - size.width / 2;
+            snappedY = Math.abs(y - guideY) <= snap;
+            if (snappedY) y = guideY;
+            Rectangle card = inside(new Rectangle(x, y, size.width, size.height), window, UIScale.scale(16));
+            snappedX &= card.x == x; snappedY &= card.y == y;
+            location = card.getLocation();
+            overlay.doLayout(); overlay.repaint();
+        }
+
+        @Override public void mouseReleased(MouseEvent event) {
+            if (location != null) {
+                Rectangle window = overlay.workspace();
+                Dimension size = detachedSize(window);
+                double centerX = snappedX ? GUIDE_CENTER : fraction((location.x + size.width / 2.0 - window.x) / window.width);
+                double top = snappedY ? GUIDE_TOP : fraction((location.y - window.y) / (double) window.height);
+                owner.uiState().setPalettePosition(new UiState.PalettePosition(centerX, top));
+                owner.uiState().save();
+            }
+            cancel();
+        }
+
+        @Override public void mouseClicked(MouseEvent event) {
+            if (!SwingUtilities.isLeftMouseButton(event) || event.getClickCount() != 2 || !controller.isOpen()) return;
+            owner.uiState().setPalettePosition(null);
+            owner.uiState().save();
+            layoutOverlay();
+        }
+
+        void cancel() {
+            boolean moved = location != null;
+            press = null; origin = null; location = null; snappedX = false; snappedY = false;
+            if (moved) { palette.setCursor(null); layoutOverlay(); }
+        }
+
+        private static double fraction(double value) { return Math.max(0, Math.min(1, value)); }
+    }
+
+    private static int guideX(Rectangle window) { return window.x + (int) Math.round(window.width * GUIDE_CENTER); }
+    private static int guideY(Rectangle window) { return window.y + (int) Math.round(window.height * GUIDE_TOP); }
+
     @Override public void close() {
         if (closed) return;
-        controller.close(); closed = true; uninstall();
+        stopReveal(); controller.close(); closed = true; uninstall();
     }
 
     private final class Overlay extends JComponent {
@@ -188,8 +346,21 @@ final class WindowCommandPalette implements AutoCloseable {
             addMouseListener(mouse); addMouseMotionListener(mouse);
             addMouseWheelListener(MouseEvent::consume);
         }
+        /** The workspace, which spans the window including its rail and tool panels. */
+        Rectangle workspace() { return SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), this); }
+
         @Override public void doLayout() {
             if (root == null || !SwingUtilities.isDescendingFrom(owner, root.getLayeredPane())) return;
+            if (drag.location != null) {
+                palette.setBounds(new Rectangle(drag.location, detachedSize(workspace())));
+                return;
+            }
+            var saved = owner.uiState().palettePosition();
+            if (saved.isPresent()) {
+                Rectangle window = workspace();
+                palette.setBounds(placed(window, detachedSize(window), saved.get(), UIScale.scale(16)));
+                return;
+            }
             Rectangle field = owner.paletteAnchor(this);
             if (field != null) {
                 palette.setBounds(anchored(field, new Rectangle(0, 0, getWidth(), getHeight()), palette.getPreferredSize(),
@@ -198,7 +369,7 @@ final class WindowCommandPalette implements AutoCloseable {
             }
             // No usable field: centre across the workspace, which spans the window including its rail and
             // tool panels. Panel dividers must not move or narrow the palette.
-            Rectangle window = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), this);
+            Rectangle window = workspace();
             Dimension preferred = palette.getPreferredSize();
             // Compact changes placement while retaining the title-anchored card's activated width.
             if (owner.viewMode() == ViewMode.COMPACT) preferred.width = UIScale.scale(ANCHORED_MINIMUM_WIDTH);
@@ -210,6 +381,8 @@ final class WindowCommandPalette implements AutoCloseable {
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 Rectangle card = palette.getBounds();
+                card.height = palette.revealedHeight();
+                if (card.height <= 0) return;
                 Color shadow = UIManager.getColor("Popup.dropShadowColor");
                 if (shadow == null) shadow = Color.BLACK;
                 g.setColor(new Color(shadow.getRed(), shadow.getGreen(), shadow.getBlue(), owner.theme().chrome().dark() ? 4 : 2));

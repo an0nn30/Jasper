@@ -400,4 +400,29 @@ class UiStateTest {
         Files.writeString(file, "version = 2\n\n[dock]\n" + String.join("\n", dockLines) + "\n");
         return UiState.load(file).dock();
     }
+
+    @Test void roundTripsTheDraggedPalettePositionAndFallsBackAloneWhenItIsBad() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        UiState state = UiState.load(file);
+        assertThat(state.palettePosition()).isEmpty();
+        state.setPalettePosition(new UiState.PalettePosition(0.5, 0.2));
+        state.save();
+        assertThat(Files.readString(file)).contains("\n[palette]\ncenter_x = 0.5\ntop = 0.2\n");
+        assertThat(UiState.load(file).palettePosition()).hasValue(new UiState.PalettePosition(0.5, 0.2));
+
+        state.setPalettePosition(null);
+        state.save();
+        assertThat(Files.readString(file)).doesNotContain("[palette]");
+        assertThat(UiState.load(file).palettePosition()).isEmpty();
+
+        for (String bad : List.of("center_x = 1.5\ntop = 0.2", "center_x = 0.5", "center_x = 0.5\ntop = 2", "center_x = \"a\"\ntop = 0.2")) {
+            Files.writeString(file, "version = 2\nrail_visible = false\n\n[palette]\n" + bad + "\n");
+            UiState loaded = UiState.load(file);
+            assertThat(loaded.palettePosition()).as(bad).isEmpty();
+            assertThat(loaded.railVisible()).as("%s leaves the rest alone", bad).isFalse();
+        }
+        Files.writeString(file, "version = 2\n\n[palette]\ncenter_x = 0\ntop = 1\n");
+        assertThat(UiState.load(file).palettePosition()).as("whole numbers are fractions too").hasValue(new UiState.PalettePosition(0, 1));
+        assertThatIllegalArgumentException().isThrownBy(() -> new UiState.PalettePosition(-0.1, 0.5));
+    }
 }

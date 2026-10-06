@@ -96,6 +96,7 @@ public final class CommandPalette extends JPanel {
     private long resultCount;
     private int stepFocus = -1;
     private int hover = -1;
+    private double reveal = 1;
     private boolean composing;
     private Color chipBackground, foreground, infoForeground, separatorColor,
         separatorForeground, selectionBackground, selectionForeground, hoverBackground, advertiserForeground, linkColor;
@@ -181,15 +182,45 @@ public final class CommandPalette extends JPanel {
             int inset = UIScale.scale(1);
             int arc = UIScale.scale(CORNER_ARC - 2);
             clipped.clip(new RoundRectangle2D.Double(inset, inset,
-                Math.max(0, getWidth() - 2 * inset), Math.max(0, getHeight() - 2 * inset), arc, arc));
+                Math.max(0, getWidth() - 2 * inset), Math.max(0, revealedHeight() - 2 * inset), arc, arc));
             super.paintChildren(clipped);
         } finally { clipped.dispose(); }
     }
 
+    // FlatLaf fills the rounded background from the border's arc; while revealing, only the shown part.
+    @Override protected void paintComponent(Graphics graphics) {
+        if (reveal >= 1) { super.paintComponent(graphics); return; }
+        var clipped = (Graphics2D) graphics.create();
+        try {
+            int arc = UIScale.scale(CORNER_ARC);
+            clipped.clip(new RoundRectangle2D.Double(0, 0, getWidth(), revealedHeight(), arc, arc));
+            super.paintComponent(clipped);
+        } finally { clipped.dispose(); }
+    }
+
+    @Override protected void paintBorder(Graphics graphics) {
+        int height = revealedHeight();
+        if (getBorder() != null && height > 0) getBorder().paintBorder(this, graphics, 0, 0, getWidth(), height);
+    }
+
     @Override public boolean contains(int x, int y) {
         int arc = UIScale.scale(CORNER_ARC);
-        return new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), arc, arc).contains(x, y);
+        return new RoundRectangle2D.Double(0, 0, getWidth(), revealedHeight(), arc, arc).contains(x, y);
     }
+
+    /**
+     * Shows only the top {@code fraction} of the card, 0-1: its border, corners and hit area follow that edge while
+     * the content stays laid out at full height, so an opening reveal uncovers the card without moving its rows.
+     */
+    public void setReveal(double fraction) {
+        double clamped = Math.max(0, Math.min(1, fraction));
+        if (clamped == reveal) return;
+        reveal = clamped;
+        repaint();
+    }
+
+    /** The height currently shown; the full height unless a reveal is under way. */
+    public int revealedHeight() { return reveal >= 1 ? getHeight() : (int) Math.ceil(getHeight() * reveal); }
 
     public JTextField queryField() { return query; }
     JList<PaletteEntry> entryList() { return list; }
