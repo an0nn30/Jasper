@@ -527,6 +527,31 @@ class RemoteKitTest {
         });
     }
 
+    /**
+     * Task 8b fix round 1 (M2): a real double click on a row's switch is two operations of that switch and nothing else:
+     * exactly two {@code Toggled} reports (the Tunnels panel ignores the second as the second click of a double click),
+     * never the row's selection, {@code Clicked} or its double-click activation.
+     */
+    @Test void aRealDoubleClickOnARowSwitchReportsTwoToggledAndNeverActivatesTheRow() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, new ViewSpec(tunnels(List.of(tunnel("a", "row a", false), tunnel("b", "row b", false)), Set.of("b"), "toggle", "delete")), events::add)) {
+                view.setSize(420, 240); InteractiveRowsTest.layout(view);
+                var owner = (ItemLists.ListControl) view.control("tunnels");
+                var button = (AbstractButton) owner.mounted.get("a").controls.get("a.run").component;
+                assertThat(button.getWidth()).as("laid out").isPositive();
+                int x = button.getWidth() / 2, y = button.getHeight() / 2;
+                for (int count = 1; count <= 2; count++) {
+                    for (int id : new int[] {MouseEvent.MOUSE_PRESSED, MouseEvent.MOUSE_RELEASED, MouseEvent.MOUSE_CLICKED})
+                        button.dispatchEvent(new MouseEvent(button, id, System.currentTimeMillis(), id == MouseEvent.MOUSE_RELEASED || id == MouseEvent.MOUSE_CLICKED ? 0
+                            : InputEvent.BUTTON1_DOWN_MASK, x, y, count, false, MouseEvent.BUTTON1));
+                }
+                assertThat(events).as("two operations of the switch, nothing on the row")
+                    .containsExactly(new UiEvent.Toggled("a.run", true), new UiEvent.Toggled("a.run", true));
+            } finally { release(context); }
+        });
+    }
+
     // ---- earlier consumers keep their behaviour
 
     @Test void paletteResultsReportNoClickedAndKeepTheirEnter() {
