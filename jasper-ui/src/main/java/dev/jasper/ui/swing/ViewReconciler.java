@@ -80,15 +80,15 @@ final class ViewReconciler implements AutoCloseable {
         ControlRegistry.children(node).forEach(child -> applyTiles(child, next, size));
     }
     /**
-     * Body text flows (wraps, keeping its line breaks) where its parent stacks content vertically: VERTICAL and DETAIL
-     * stacks, form bodies, cards and sections. Inline stacks and list rows keep one truncated line.
+     * Body, description and caption text flows (wraps, keeping its line breaks) where its parent stacks content vertically: VERTICAL and DETAIL
+     * stacks, form bodies, cards and sections. Inline stacks, list rows and titles (BODY_STRONG included) keep one truncated line.
      */
     private void applyFlow(Nodes.Node node, Map<String, ControlRegistry.Control> next) {
         boolean vertical = node instanceof Nodes.Form || node instanceof Nodes.Card || node instanceof Nodes.Section
                 || node instanceof Nodes.Stack stack && (stack.role() == Nodes.LayoutRole.VERTICAL || stack.role() == Nodes.LayoutRole.DETAIL);
         for (var child : ControlRegistry.children(node)) {
             if (vertical && child instanceof Nodes.Text text && switch (text.role()) {
-                        case BODY, BODY_STRONG, DESCRIPTION, CAPTION -> true;
+                        case BODY, DESCRIPTION, CAPTION -> true;
                         default -> false;
                     } && next.get(child.id()).component instanceof Labels.LiteralLabel label) {
                 label.flow = true;

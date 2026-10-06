@@ -43,7 +43,9 @@ final class PluginCardList {
         this.selectionChanged = selectionChanged;
         view = new KitView(kit, spec(), event -> {
             if (event instanceof UiEvent.Selected chosen && chosen.id().equals(LIST)) {
-                chosen.ids().stream().findFirst().filter(id -> row(id) != null).ifPresent(id -> { selected = id; selectionChanged.run(); });
+                // The user's choice becomes the declared selection too, so a later host selection (for example of the
+                // previously declared row) is never mistaken for an unchanged one and the list agrees with the details.
+                chosen.ids().stream().findFirst().filter(id -> row(id) != null).ifPresent(id -> { selected = id; render(); selectionChanged.run(); });
                 return;
             }
             events.accept(event);

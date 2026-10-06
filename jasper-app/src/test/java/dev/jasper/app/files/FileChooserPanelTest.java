@@ -309,6 +309,27 @@ class FileChooserPanelTest {
         assertThat(panel.previewText()).isEqualTo("hello\n");
     }
 
+    /**
+     * Plan 2 Task 6c (review I2): the preview title is a one-line strong title, as the former JLabel was; a long name
+     * without spaces is cut, never broken character by character over several lines in the narrow preview column.
+     */
+    @Test void thePreviewTitleStaysOneLineForALongName() throws IOException {
+        String name = "a" + "verylongfilenamewithoutanyspaces".repeat(4) + ".txt";
+        Files.writeString(dir.resolve(name), "x\n");
+        var panel = panel(OPEN, Optional.empty());
+        previewToggle(panel).doClick(0);
+        selectRow(panel, rows(panel).indexOf(name));
+        panel.setSize(820, 520);
+        for (int pass = 0; pass < 3; pass++) dev.jasper.app.testsupport.KitTestSupport.layout(panel);
+        var title = dev.jasper.app.testsupport.KitTestSupport.require(panel, "preview.title", javax.swing.JLabel.class);
+        var details = dev.jasper.app.testsupport.KitTestSupport.require(panel, "preview.details", javax.swing.JLabel.class);
+        assertThat(title.getText()).isEqualTo(name);
+        int line = title.getFontMetrics(title.getFont()).getHeight();
+        assertThat(title.getHeight()).as("one line").isEqualTo(line);
+        assertThat(title.getWidth()).as("inside the preview column").isLessThan(title.getFontMetrics(title.getFont()).stringWidth(name));
+        assertThat(details.getY()).as("the details follow one title line").isLessThanOrEqualTo(title.getY() + line + 2 * line);
+    }
+
     @Test void thePathBarAcceptsATypedFolder() {
         var panel = panel(OPEN, Optional.empty());
         editPath(panel, dir.resolve("docs").toString());

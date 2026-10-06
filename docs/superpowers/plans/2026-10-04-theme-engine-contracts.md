@@ -167,8 +167,8 @@ unique within their owning control; references resolve only in that control. Do 
 |---|---|
 | Text | `String text, TextRole role` |
 | Icon | `String name, Hue hue, IconSize size, String accessibleName, Optional<Severity> severity` |
-| Button | `String label, String icon, ButtonKind kind, String action, String tooltip` |
-| MenuButton | `String label, String icon, ButtonKind kind, String action, List<MenuItem> items, String tooltip` |
+| Button | `String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation` |
+| MenuButton | `String label, String icon, ButtonKind kind, String action, List<MenuItem> items, String tooltip, ButtonPresentation presentation` |
 | StatusDot | `StatusKind kind` |
 | Field | `FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation` (numeric present exactly for NUMBER) |
 | Secret | `String hint, String label, String revealGroup, SecretKind kind, String copyAction` (no string value) |
@@ -206,7 +206,7 @@ Nested in `Nodes`: `Numeric(double min,double max,double step,int decimals)` and
 Enums are nested in `Nodes`: TextRole is HERO_TITLE/DETAIL_TITLE/WINDOW_TITLE/PANEL_TITLE/BODY/
 BODY_STRONG/LABEL/DESCRIPTION/CAPTION/SECTION_LABEL/COUNT/CHIP/MONO/MONO_SMALL; Hue is
 BLUE/GREEN/AMBER/PURPLE/NEUTRAL/NONE; IconSize is CAPTION/CONTROL/RAIL/EMPTY/HERO;
-ButtonKind is PRIMARY/SECONDARY/GHOST/DESTRUCTIVE_GHOST/LINK;
+ButtonKind is PRIMARY/SECONDARY/GHOST/DESTRUCTIVE_GHOST/LINK; ButtonPresentation is STANDARD/EMBEDDED;
 StatusKind is SUCCESS/WARNING/DANGER/IDLE; Severity is INFO/WARNING/DANGER;
 FieldKind is TEXT/SEARCH/PORT/PATH/TEXTAREA/NUMBER; FieldPresentation is STANDARD/EMBEDDED/TRANSPARENT; ChoiceKind is DROPDOWN/PICKER/SEGMENTED/SEARCHABLE;
 CardKind is FORM/SETTINGS/MIXED; ListKind is SINGLE/DOUBLE/COMPACT/ORDERED/RESULTS; SelectionMode is SINGLE/MULTIPLE;
@@ -321,10 +321,15 @@ rule; prior constructors remain and default to the old meaning):
   error still takes precedence.
 - `Icon.severity` (INFO, WARNING, DANGER) tints the glyph with `accent`, `status.warning` or `status.danger` instead of
   its hue. New named glyphs `error` and `plugin`.
-- BODY, BODY_STRONG, DESCRIPTION and CAPTION text whose parent stacks content vertically (VERTICAL and DETAIL stacks,
+- BODY, DESCRIPTION and CAPTION text whose parent stacks content vertically (VERTICAL and DETAIL stacks,
   form bodies, cards and sections) flows: it wraps to the width it is given, keeps explicit line breaks, and asks for no
   more than `TEXT_FLOW_COLUMNS` (44) widths of 'm', the former text areas' column rule. INLINE stacks, list rows and
-  FormRow controls keep one truncated line; FormRow helper text keeps its own wrapping (no API).
+  FormRow controls keep one truncated line, as do titles (BODY_STRONG and the title roles); FormRow helper text keeps its
+  own wrapping (no API).
+- `Button.presentation`/`MenuButton.presentation` (`ButtonPresentation` STANDARD/EMBEDDED, default STANDARD): EMBEDDED
+  is content-sized for a host arrangement that supplies the spacing (inline links): no padding, focus-ring inset,
+  minimum height or resting/hover fill; an icon-only embedded button draws its glyph at `ICON_RAIL`; an embedded
+  menu-only button draws no chevron of its own.
 - Host-only (not projected into the SDK): `KitView(context, spec, events, pointerOnly)`. A pointer-only view's controls
   never take keyboard focus, including controls mounted later and after theme changes, while they stay operable by
   pointer and keep their accessible names and actions (notification cards over a terminal keep the shell's focus).

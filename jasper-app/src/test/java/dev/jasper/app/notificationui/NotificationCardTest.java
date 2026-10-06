@@ -61,7 +61,7 @@ class NotificationCardTest {
 
     /** The More menu's mounted items: the kit builds them headless without showing the popup. */
     static List<AbstractButton> moreItems(NotificationCard card) {
-        var more = KitTestSupport.find(card.actionsView(), NotificationCard.MORE, JComponent.class);
+        var more = KitTestSupport.find(card.moreView(), NotificationCard.MORE, JComponent.class);
         if (more == null) return List.of();
         return Arrays.stream(more.getComponentPopupMenu().getComponents()).filter(AbstractButton.class::isInstance)
             .map(AbstractButton.class::cast).toList();
@@ -105,7 +105,7 @@ class NotificationCardTest {
         assertThat(center.find(card.notification().id()).orElseThrow().expired()).isTrue();
         card.close();
         var fresh = card(posted(titled("Once").withAction(NotificationAction.of("Go", () -> ran.add("go")))), false);
-        find(fresh.actionsView(), NotificationCard.ACTION + 0, AbstractButton.class).doClick(0);
+        link(fresh, 0).doClick(0);
         assertThat(ran).as("a link runs its action exactly once").containsExactly("Five", "go");
         fresh.close();
     }
@@ -149,8 +149,9 @@ class NotificationCardTest {
         for (String label : List.of("One", "Two", "Three", "Four")) request = request.withAction(NotificationAction.of(label, () -> {}));
         var card = card(posted(request), true);
         assertThat(focusable(card)).isEmpty();
-        assertThat(card.actionsView().pointerOnly() && card.closeView().pointerOnly() && card.iconView().pointerOnly()).isTrue();
-        assertThat(find(card.actionsView(), NotificationCard.ACTION + 0, AbstractButton.class).getText()).isEqualTo("One");
+        assertThat(card.linkViews()).allSatisfy(view -> assertThat(view.pointerOnly()).isTrue());
+        assertThat(card.moreView().pointerOnly() && card.closeView().pointerOnly() && card.iconView().pointerOnly()).isTrue();
+        assertThat(link(card, 0).getText()).isEqualTo("One");
         assertThat(card.getAccessibleContext().getAccessibleName()).isEqualTo("Information: Focus");
         card.close();
     }
@@ -189,6 +190,68 @@ class NotificationCardTest {
         } finally { bindings.close(); }
     }
 
+    /**
+     * The former link row: each link exactly as wide as its label (no padding), as tall as the text line plus the former
+     * 2 px above and below, 12 px before every link but the first, starting at the text column. Close keeps its 16 px
+     * glyph in the 16 px slot at the top right.
+     */
+    @Test void linksAndCloseKeepTheFormerGeometry() {
+        var card = card(posted(withActions(titled("Geometry"), List.of("Open", "Show in Finder", "Copy", "Four"))), true);
+        layOut(card);
+        assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_LINK_GAP)).isEqualTo(12);
+        assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_LINK_VERTICAL_PADDING)).isEqualTo(2);
+        int textX = UIScale.scale(12 + 16 + 8), gap = UIScale.scale(12), padding = UIScale.scale(2);
+        var views = new ArrayList<JComponent>();
+        for (var view : card.linkViews()) if (view.isVisible()) views.add(view);
+        if (card.moreView().isVisible()) views.add(card.moreView());
+        assertThat(views).hasSizeGreaterThanOrEqualTo(2);
+        int x = textX;
+        for (int i = 0; i < views.size(); i++) {
+            var view = views.get(i);
+            var button = firstButton(view);
+            var metrics = button.getFontMetrics(button.getFont());
+            if (i > 0) x += gap;
+            assertThat(view.getX()).as("link %d starts after the former gap", i).isEqualTo(x);
+            assertThat(view.getWidth()).as("link %d is as wide as its label", i).isEqualTo(metrics.stringWidth(button.getText()));
+            assertThat(view.getHeight()).as("link %d is a text line plus the padding", i).isEqualTo(metrics.getHeight() + 2 * padding);
+            assertThat(button.getInsets().left + button.getInsets().right).isZero();
+            x += view.getWidth();
+        }
+        var close = card.closeView();
+        assertThat(close.getBounds()).isEqualTo(new java.awt.Rectangle(UIScale.scale(360 - 12 - 16), UIScale.scale(12), UIScale.scale(16), UIScale.scale(16)));
+        var closeButton = find(close, NotificationCard.CLOSE, AbstractButton.class);
+        assertThat(closeButton.getIcon().getIconWidth()).as("the whole 16 px glyph").isEqualTo(UIScale.scale(16));
+        assertThat(closeButton.getInsets()).isEqualTo(new java.awt.Insets(0, 0, 0, 0));
+        assertThat(closeButton.getSize()).isEqualTo(new java.awt.Dimension(UIScale.scale(16), UIScale.scale(16)));
+        card.close();
+    }
+
+    /** Links that a theme or font change shows anew still count the pointer over them as hovering the card. */
+    @Test void linksShownAfterARestyleKeepTheCardHovered() {
+        var bindings = KitTestSupport.bindings(true);
+        Object font = javax.swing.UIManager.get("defaultFont");
+        try {
+            javax.swing.UIManager.put("defaultFont", new java.awt.Font(java.awt.Font.DIALOG, java.awt.Font.PLAIN, 40));
+            var card = card(bindings.context(ThemeRoute.CHROME), posted(withActions(titled("Restyle"), List.of("One", "Two", "Three", "Four"))), false);
+            int before = card.actionLabels().size();
+            javax.swing.UIManager.put("defaultFont", font);
+            bindings.binding().publish(ThemeTestSupport.pair(false));
+            assertThat(card.actionLabels()).as("more links fit after the change").hasSizeGreaterThan(before);
+            layOut(card);
+            for (int i = 0; i < card.actionLabels().size() - 1; i++) {
+                var button = link(card, i);
+                for (var listener : button.getMouseListeners())
+                    listener.mouseEntered(new MouseEvent(button, MouseEvent.MOUSE_ENTERED, 0, 0, 1, 1, 0, false));
+                assertThat(card.hovered()).as("hover from link %d", i).isTrue();
+                card.setHovered(false);
+            }
+            card.close();
+        } finally {
+            javax.swing.UIManager.put("defaultFont", font);
+            bindings.close();
+        }
+    }
+
     private static NotificationRequest withActions(NotificationRequest request, List<String> labels) {
         for (String label : labels) request = request.withAction(NotificationAction.of(label, () -> {}));
         return request;
@@ -207,33 +270,44 @@ class NotificationCardTest {
         KitTestSupport.layout(card);
     }
 
-    /** Every link and More sit on the one row, at their natural widths, inside the action column. */
+    static AbstractButton firstButton(Component root) {
+        if (root instanceof AbstractButton button) return button;
+        if (root instanceof Container container) for (var child : container.getComponents()) {
+            var found = firstButton(child);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    /** The mounted link button at {@code index}. */
+    static AbstractButton link(NotificationCard card, int index) {
+        return find(card.linkViews().get(index), NotificationCard.ACTION + index, AbstractButton.class);
+    }
+
+    /** Every visible link and More: on one row, at their natural widths, inside the card's text column. */
     private static void assertSingleRowInsideThePanel(NotificationCard card) {
-        var parts = ((Container) card.actionsView().getComponent(0)).getComponents();
-        assertThat(parts).isNotEmpty();
-        for (var part : parts) {
-            if (!part.isVisible()) continue;
-            assertThat(part.getY()).as(part.getName() + " is on the first and only row").isZero();
-            assertThat(part.getX() + part.getWidth()).as(part.getName() + " fits the panel").isLessThanOrEqualTo(card.actionsView().getWidth());
-            assertThat(part.getWidth()).as(part.getName() + " keeps its natural width").isEqualTo(part.getPreferredSize().width);
+        var row = new ArrayList<JComponent>();
+        for (var view : card.linkViews()) if (view.isVisible()) row.add(view);
+        if (card.moreView().isVisible()) row.add(card.moreView());
+        assertThat(row).isNotEmpty();
+        int right = card.getWidth() - UIScale.scale(12);
+        for (var part : row) {
+            assertThat(part.getY()).as("one row").isEqualTo(row.getFirst().getY());
+            assertThat(part.getX() + part.getWidth()).as("fits the text column").isLessThanOrEqualTo(right);
+            assertThat(part.getWidth()).as("natural width").isEqualTo(part.getPreferredSize().width);
         }
     }
 
     @Test void actionLabelsNeverRenderMarkup() {
         var labels = List.of("<html>One", "<html>Two", "<html>Three", "<html>Four", "<html>Five");
         var card = card(posted(withActions(titled("Markup"), labels)), false);
-        // Kit links carry the kit's button padding, so fewer of these wide labels fit beside More than the former
-        // unpadded links did (a visual-only change until Plan 3); every one stays reachable, in order, never as markup.
-        var shown = card.actionLabels();
-        assertThat(shown.getLast()).isEqualTo(NotificationCard.MORE_LABEL);
-        assertThat(shown.size() - 1).isBetween(1, NotificationCard.VISIBLE_ACTIONS);
-        assertThat(shown.subList(0, shown.size() - 1)).isEqualTo(labels.subList(0, shown.size() - 1));
-        for (int i = 0; i < shown.size() - 1; i++) {
-            var link = find(card.actionsView(), NotificationCard.ACTION + i, AbstractButton.class);
+        assertThat(card.actionLabels()).containsExactly("<html>One", "<html>Two", "<html>Three", NotificationCard.MORE_LABEL);
+        for (int i = 0; i < 3; i++) {
+            var link = link(card, i);
             assertThat(link.getText()).isEqualTo(labels.get(i));
             assertThat(link.getClientProperty("html")).as(link.getText()).isNull();
         }
-        assertThat(reachableLabels(card)).containsExactlyElementsOf(labels);
+        assertThat(moreItems(card)).extracting(AbstractButton::getText).containsExactly("<html>Four", "<html>Five");
         assertThat(moreItems(card)).allSatisfy(item -> assertThat(item.getClientProperty("html")).as(item.getText()).isNull());
         card.close();
     }

@@ -166,6 +166,36 @@ class SchemaPageTest {
         assertThat(runs[0]).isEqualTo(1);
     }
 
+    /** Plan 2 Task 6c (ruling G4): a long action description flows over lines above its buttons in a narrow page. */
+    @Test void aLongActionDescriptionFlowsAboveItsButtons() {
+        String text = "Rewrite every option that an older Jasper wrote under a former name, keeping the file's comments and order. ".repeat(3).strip();
+        var page = SchemaPage.page("system", "System Settings")
+            .action(() -> text, new SchemaPage.Button("Migrate Config…", () -> { }, () -> true))
+            .build(context);
+        var body = page.component();
+        body.setSize(420, 600);
+        for (int pass = 0; pass < 3; pass++) KitTestSupport.layout(body);
+        var label = labelWithText(body, text);
+        assertThat(label).as("the description is shown whole").isNotNull();
+        int line = label.getFontMetrics(label.getFont()).getHeight();
+        assertThat(label.getHeight()).as("several lines").isGreaterThanOrEqualTo(3 * line);
+        assertThat(label.getHeight() % line).isZero();
+        JButton migrate = kit(page, page.actionButtons().getFirst(), JButton.class);
+        var labelBounds = javax.swing.SwingUtilities.convertRectangle(label.getParent(), label.getBounds(), body);
+        var buttonBounds = javax.swing.SwingUtilities.convertRectangle(migrate.getParent(), migrate.getBounds(), body);
+        assertThat(buttonBounds.y).as("the buttons sit below the text, not over it").isGreaterThanOrEqualTo(labelBounds.y + labelBounds.height);
+        assertThat(labelBounds.x + labelBounds.width).as("the text stays inside the page").isLessThanOrEqualTo(body.getWidth());
+    }
+
+    private static javax.swing.JLabel labelWithText(java.awt.Component root, String text) {
+        if (root instanceof javax.swing.JLabel label && text.equals(label.getText())) return label;
+        if (root instanceof java.awt.Container container) for (var child : container.getComponents()) {
+            var found = labelWithText(child, text);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     @Test void groupPagesLinkToTheirChildren() {
         var child = page();
         var group = new GroupPage("appearance-behavior", "Appearance & Behavior", Optional.empty(), false, () -> List.of(child), context);

@@ -50,6 +50,8 @@ public final class HistoryPanel extends JPanel {
     private final Set<UUID> fresh = new LinkedHashSet<>();
     private final Rows rows = new Rows();
     private final KitView header, empty, newHeading, earlierHeading;
+    /** Centres the empty text across the panel, as before. */
+    private final JPanel emptyHolder = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 0, 0));
     private final DateTimeFormatter time;
     private final Map<UUID, HistoryRow> shown = new LinkedHashMap<>();
     private final Subscription subscription;
@@ -82,6 +84,8 @@ public final class HistoryPanel extends JPanel {
         top.add(header, BorderLayout.EAST);
         add(top, BorderLayout.NORTH);
         empty = new KitView(kit, new ViewSpec(new Nodes.Text("empty", ControlState.READY, "No notifications", Nodes.TextRole.DESCRIPTION)), event -> { }, true);
+        emptyHolder.setOpaque(false);
+        emptyHolder.add(empty);
         newHeading = heading(NEW);
         earlierHeading = heading(EARLIER);
         var scroll = new JScrollPane(rows, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -118,7 +122,7 @@ public final class HistoryPanel extends JPanel {
         header.setBorder(BorderFactory.createEmptyBorder(vertical, metric(DesignMetrics.Role.HISTORY_HEADER_LEADING_PADDING), vertical,
             metric(DesignMetrics.Role.HISTORY_HEADER_TRAILING_PADDING)));
         int emptyPadding = metric(DesignMetrics.Role.HISTORY_EMPTY_VERTICAL_PADDING);
-        empty.setBorder(BorderFactory.createEmptyBorder(emptyPadding, side, emptyPadding, side));
+        emptyHolder.setBorder(BorderFactory.createEmptyBorder(emptyPadding, side, emptyPadding, side));
         for (var view : List.of(newHeading, earlierHeading))
             view.setBorder(BorderFactory.createEmptyBorder(metric(DesignMetrics.Role.HISTORY_HEADING_TOP_PADDING), side,
                 metric(DesignMetrics.Role.HISTORY_HEADING_BOTTOM_PADDING), side));
@@ -162,7 +166,10 @@ public final class HistoryPanel extends JPanel {
         return ids;
     }
 
-    boolean showingEmpty() { return empty.getParent() == rows; }
+    boolean showingEmpty() { return emptyHolder.getParent() == rows; }
+
+    /** The empty text's view, for its placement. */
+    KitView emptyView() { return empty; }
 
     HistoryRow row(UUID id) { return shown.get(id); }
 
@@ -225,7 +232,7 @@ public final class HistoryPanel extends JPanel {
         var previous = new HashMap<>(shown);
         shown.clear();
         rows.removeAll();
-        if (all.isEmpty()) rows.add(empty);
+        if (all.isEmpty()) rows.add(emptyHolder);
         section(newHeading, all.stream().filter(this::isNew).toList(), previous);
         section(earlierHeading, all.stream().filter(entry -> !isNew(entry)).toList(), previous);
         previous.values().forEach(HistoryRow::close);

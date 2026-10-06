@@ -88,6 +88,7 @@ public abstract class KitContractTest {
         return new ViewSpec(new Nodes.Stack("root",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
             new Nodes.Icon("severity",ControlState.READY,"error",Nodes.Hue.NONE,Nodes.IconSize.RAIL,"Error",Optional.of(Nodes.Severity.DANGER)),
             new Nodes.Text("body",ControlState.READY,"A plugin is unrestricted code.\nAllow only plugins you trust.",Nodes.TextRole.BODY),
+            new Nodes.Button("open",ControlState.READY,"Open","",Nodes.ButtonKind.LINK,"open","",Nodes.ButtonPresentation.EMBEDDED),
             new Nodes.ItemList("plugins",ControlState.READY,Nodes.ListKind.DOUBLE,List.of(
                 new ListItem("group",Optional.empty(),List.of(new Nodes.Text("group.title",ControlState.READY,"Bundled",Nodes.TextRole.CAPTION)),List.of(),List.of(),true),
                 new ListItem("a",Optional.of(new Nodes.Icon("a.icon",ControlState.READY,"plugin",Nodes.Hue.NEUTRAL,Nodes.IconSize.RAIL,"Plugin")),

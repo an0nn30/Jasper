@@ -63,6 +63,12 @@ class KitValuesTest {
         assertThat(new Icon("i", ControlState.READY, "info", Hue.NONE, IconSize.RAIL, "Info").severity()).isEmpty();
         assertThatThrownBy(() -> new Icon("i", ControlState.READY, "info", Hue.NONE, IconSize.RAIL, "Info", null)).isInstanceOf(NullPointerException.class);
     }
+    @Test void buttonsDefaultToTheStandardPresentationAndRejectNone() {
+        assertThat(new Button("b", ControlState.READY, "Open", "", ButtonKind.LINK, "open", "").presentation()).isEqualTo(ButtonPresentation.STANDARD);
+        assertThat(new MenuButton("m", ControlState.READY, "More", "", ButtonKind.LINK, "", List.of(new MenuItem("i", "I", "", "i", true, false)), "").presentation())
+            .isEqualTo(ButtonPresentation.STANDARD);
+        assertThatThrownBy(() -> new Button("b", ControlState.READY, "Open", "", ButtonKind.LINK, "open", "", null)).isInstanceOf(NullPointerException.class);
+    }
     @Test void nestedCollectionsAreImmutableSnapshots() {
         var children = new ArrayList<Node>(); children.add(text("text"));
         var root = new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL, children);

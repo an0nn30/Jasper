@@ -44,4 +44,25 @@ class ThemeImportViewTest {
         none.doClick();
         view.view.close(); empty.view.close();
     }
+    /** Plan 2 Task 6c (ruling G4): the warning and failure details flow over lines inside the sheet, keeping their line breaks. */
+    @Test void longDetailsFlowInsideTheSheetAboveTheActions() {
+        var warnings=new ArrayList<String>();
+        for (int i=0;i<6;i++) warnings.add("The provider color "+i+" has no counterpart in this theme and falls back to the console default");
+        var conversion=new ConversionResult(Theme.DARK.source().document(),warnings,"provider");
+        var item=new ThemeImporter.Item("fresh",conversion,Optional.empty(),Optional.empty(),true);
+        var view=new ThemeImportView(KitTestSupport.context(),new ThemeImporter.ImportPlan(List.of(item),List.of()),m->{},()->{});
+        view.view.setSize(view.view.getPreferredSize());
+        for (int pass=0;pass<3;pass++) KitTestSupport.layout(view.view);
+        var details=KitTestSupport.require(view.view,"details",JLabel.class);
+        int line=details.getFontMetrics(details.getFont()).getHeight();
+        int columns=details.getFontMetrics(details.getFont()).charWidth('m')*dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.TEXT_FLOW_COLUMNS);
+        assertThat(details.getPreferredSize().width).as("no wider than the flow cap").isLessThanOrEqualTo(columns);
+        assertThat(details.getHeight()).as("at least one line per warning").isGreaterThanOrEqualTo(warnings.size()*line);
+        assertThat(details.getHeight()%line).isZero();
+        var commit=KitTestSupport.require(view.view,"import",JButton.class);
+        var detailsBottom=javax.swing.SwingUtilities.convertRectangle(details.getParent(),details.getBounds(),view.view);
+        var commitTop=javax.swing.SwingUtilities.convertRectangle(commit.getParent(),commit.getBounds(),view.view);
+        assertThat(commitTop.y).as("the actions sit below the details").isGreaterThanOrEqualTo(detailsBottom.y+detailsBottom.height);
+        view.view.close();
+    }
 }

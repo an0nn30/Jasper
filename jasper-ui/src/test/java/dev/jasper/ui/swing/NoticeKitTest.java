@@ -172,12 +172,14 @@ class NoticeKitTest {
             var spec = new ViewSpec(new Stack("root", READY, LayoutRole.VERTICAL, List.of(
                 new Text("body", READY, "Fixture 1.0\nFrom Vendor\n\n" + LONG, TextRole.BODY),
                 new Text("title", READY, "Title", TextRole.DETAIL_TITLE),
+                new Text("strong", READY, LONG.replace(' ', '_'), TextRole.BODY_STRONG),
                 new Stack("row", READY, LayoutRole.INLINE, List.of(new Text("inline", READY, LONG, TextRole.BODY))),
                 new FormRow("form-row", READY, "Name", "", new Text("caption", READY, LONG, TextRole.CAPTION), Optional.empty()))));
             try (var view = new KitView(context, spec, e -> {})) {
                 var body = find(view, "body", Labels.LiteralLabel.class);
                 var inline = find(view, "inline", Labels.LiteralLabel.class);
                 var title = find(view, "title", Labels.LiteralLabel.class);
+                var strong = find(view, "strong", Labels.LiteralLabel.class);
                 var caption = find(view, "caption", Labels.LiteralLabel.class);
                 var metrics = body.getFontMetrics(body.getFont());
                 int columns = DesignMetrics.DEFAULT.value(DesignMetrics.Role.TEXT_FLOW_COLUMNS);
@@ -191,6 +193,8 @@ class NoticeKitTest {
                 assertThat(inline.flow).as("inline stacks keep one truncated line").isFalse();
                 assertThat(inline.getHeight()).isLessThanOrEqualTo(inline.getPreferredSize().height);
                 assertThat(title.flow).as("titles are not body text").isFalse();
+                assertThat(strong.flow).as("strong text keeps one line (review I2)").isFalse();
+                assertThat(strong.getHeight()).isEqualTo(strong.getPreferredSize().height);
                 assertThat(caption.wrap).as("FormRow captions keep their own wrapping").isTrue();
                 assertThat(caption.flow).isFalse();
                 // A theme change keeps the flow and the measured height.
@@ -220,6 +224,70 @@ class NoticeKitTest {
                 var button = find(view, "close", JButton.class);
                 assertThat(button.isShowing() || button.getWidth() > 0).isTrue();
             } finally { release(context); }
+        });
+    }
+
+    /** Review I1/M4: an EMBEDDED button is content-sized for a host arrangement; STANDARD buttons are unchanged. */
+    @Test void anEmbeddedButtonIsSizedToItsContentWithoutPaddingRingOrFill() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            var spec = stack(
+                new Nodes.Button("embedded", READY, "Open in Editor", "", ButtonKind.LINK, "open", "", ButtonPresentation.EMBEDDED),
+                new Nodes.Button("standard", READY, "Open in Editor", "", ButtonKind.LINK, "open", ""),
+                new Nodes.Button("close", READY, "", "close", ButtonKind.GHOST, "close", "Close", ButtonPresentation.EMBEDDED),
+                new MenuButton("more", READY, "More ▾", "", ButtonKind.LINK, "", List.of(new MenuItem("four", "Four", "", "four", true, false)), "", ButtonPresentation.EMBEDDED));
+            try (var view = new KitView(context, spec, events::add)) {
+                var embedded = find(view, "embedded", JButton.class);
+                var standard = find(view, "standard", JButton.class);
+                var metrics = embedded.getFontMetrics(embedded.getFont());
+                assertThat(embedded.getInsets()).isEqualTo(new Insets(0, 0, 0, 0));
+                assertThat(embedded.getPreferredSize()).isEqualTo(new Dimension(metrics.stringWidth("Open in Editor"), metrics.getHeight()));
+                assertThat(standard.getPreferredSize().width).as("standard keeps its padding").isGreaterThan(embedded.getPreferredSize().width);
+                assertThat(standard.getPreferredSize().height).as("and its minimum height").isGreaterThan(embedded.getPreferredSize().height);
+                var close = find(view, "close", JButton.class);
+                int glyph = com.formdev.flatlaf.util.UIScale.scale(context.metrics().value(DesignMetrics.Role.ICON_RAIL));
+                assertThat(close.getIcon().getIconWidth()).isEqualTo(glyph);
+                assertThat(close.getPreferredSize()).isEqualTo(new Dimension(glyph, glyph));
+                var main = find(view, "more.main", JButton.class);
+                var menuMetrics = main.getFontMetrics(main.getFont());
+                assertThat(main.getInsets()).as("no chevron inset: the label carries its own").isEqualTo(new Insets(0, 0, 0, 0));
+                assertThat(main.getPreferredSize().width).isEqualTo(menuMetrics.stringWidth("More ▾"));
+                // No resting or hover fill: an embedded link paints only its text.
+                embedded.setSize(embedded.getPreferredSize());
+                embedded.getModel().setRollover(true);
+                var image = new BufferedImage(embedded.getWidth(), embedded.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                var g = image.createGraphics(); embedded.paint(g); g.dispose();
+                assertThat(image.getRGB(0, 0) >>> 24).as("corner untouched").isZero();
+                embedded.doClick(0);
+                assertThat(events).containsExactly(new UiEvent.Action("open"));
+            } finally { release(context); }
+        });
+    }
+
+    /** Kit menu items (menu buttons and row menus) never render plugin-supplied markup, whatever look and feel installed them. */
+    @Test void menuItemsNeverRenderMarkup() {
+        Edt.run(() -> {
+            // FlatLaf's menu item delegate parses markup as soon as text is set (the order dependence the app suite hit).
+            var prior = UIManager.getLookAndFeel();
+            FlatLafInstaller.install(KitFixtures.dark());
+            var context = KitFixtures.context();
+            var menu = List.of(new MenuItem("evil", "<html><b>Evil</b>", "", "evil", true, false));
+            var spec = new ViewSpec(new Stack("root", READY, LayoutRole.VERTICAL, List.of(
+                new MenuButton("more", READY, "More", "", ButtonKind.LINK, "", menu, ""),
+                plugins(List.of(plugin("a", true, READY, Optional.of(menu))), Set.of()))));
+            try (var view = new KitView(context, spec, e -> {})) {
+                view.setSize(420, 240); InteractiveRowsTest.layout(view);
+                var item = (JMenuItem) find(view, "more", JComponent.class).getComponentPopupMenu().getComponent(0);
+                assertThat(item.getText()).isEqualTo("<html><b>Evil</b>");
+                assertThat(item.getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey)).isNull();
+                var owner = (ItemLists.ListControl) view.control("plugins");
+                owner.context("a", owner.canvas, 0, 0);
+                var row = (JMenuItem) owner.popup.getComponent(0);
+                assertThat(row.getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey)).isNull();
+            } finally {
+                release(context);
+                try { UIManager.setLookAndFeel(prior); } catch (UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
+            }
         });
     }
 

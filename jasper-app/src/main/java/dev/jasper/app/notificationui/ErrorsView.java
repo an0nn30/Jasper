@@ -184,7 +184,7 @@ public final class ErrorsView extends JPanel {
         if (closed) return;
         switch (event) {
             case UiEvent.Selected chosen when chosen.id().equals(LIST) -> chosen.ids().stream().findFirst().map(UUID::fromString)
-                .ifPresent(id -> { selectedId = id; showSelected(); });
+                .ifPresent(id -> { selectedId = id; listView.update(listSpec()); showSelected(); });
             case UiEvent.Action action -> {
                 switch (action.id()) {
                     case COPY -> selected().ifPresent(incident -> hooks.copy().accept(report(incident)));

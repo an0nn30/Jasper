@@ -47,7 +47,11 @@ final class NotificationCard extends JPanel implements AutoCloseable {
     private final NotificationCenter center;
     private final boolean sticky;
     private Notification notification;
-    private final KitView icon, actions, close;
+    private final KitView icon, more, close;
+    /** One pointer-only view per leading link, reused by position; hidden when not shown. */
+    private final List<KitView> links = new ArrayList<>();
+    private int shownLinks;
+    private boolean moreShown;
     private final TextBlock title, count, content;
     private final MouseAdapter hover;
     private final AutoCloseable theme;
@@ -67,7 +71,13 @@ final class NotificationCard extends JPanel implements AutoCloseable {
         count = new TextBlock(kit, Typography.Role.BODY, SemanticColor.TEXT_SECONDARY, 1);
         content = new TextBlock(kit, Typography.Role.BODY, SemanticColor.TEXT_PRIMARY, CONTENT_LINES);
         icon = new KitView(kit, new ViewSpec(NotificationStyle.icon(ICON, notification)), event -> { }, true);
-        actions = new KitView(kit, actionsSpec(List.of(), 0, false), this::event, true);
+        for (int i = 0; i < VISIBLE_ACTIONS; i++) {
+            var link = new KitView(kit, linkSpec(i, "Action"), this::event, true);
+            link.setVisible(false);
+            links.add(link);
+        }
+        more = new KitView(kit, moreSpec(List.of(), 0), this::event, true);
+        more.setVisible(false);
         close = new KitView(kit, closeSpec(), this::event, true);
         hover = new MouseAdapter() {
             @Override public void mouseEntered(MouseEvent event) { setHovered(true); }
@@ -78,7 +88,7 @@ final class NotificationCard extends JPanel implements AutoCloseable {
             }
         };
         addMouseListener(hover);
-        add(icon); add(title); add(count); add(content); add(actions); add(close);
+        add(icon); add(title); add(count); add(content); links.forEach(this::add); add(more); add(close);
         theme = kit.binding().subscribe(pair -> restyle());
         update(notification);
     }
@@ -99,12 +109,10 @@ final class NotificationCard extends JPanel implements AutoCloseable {
         content.setText(request.content());
         content.setVisible(!request.content().isEmpty());
         fillActions(request.actions());
-        actions.setVisible(!request.actions().isEmpty());
         setCursor(request.activate().isPresent() ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) : Cursor.getDefaultCursor());
         close.update(closeSpec());
         getAccessibleContext().setAccessibleName(NotificationStyle.severityName(request.severity()) + ": " + request.title());
         getAccessibleContext().setAccessibleDescription(request.content());
-        track(this);
         arrange(true);
         revalidate();
         repaint();
@@ -128,51 +136,57 @@ final class NotificationCard extends JPanel implements AutoCloseable {
 
     private ViewSpec closeSpec() {
         return new ViewSpec(new Nodes.Button(CLOSE, new ControlState(sticky || hovered, true, false, ""), "", "close", Nodes.ButtonKind.GHOST,
-            CLOSE, "Close notification"));
+            CLOSE, "Close notification", Nodes.ButtonPresentation.EMBEDDED));
     }
 
-    /** {@code shown} leading links, then More holding the rest when {@code more}. */
-    private ViewSpec actionsSpec(List<NotificationAction> all, int shown, boolean more) {
-        var nodes = new ArrayList<Nodes.Node>();
-        for (int i = 0; i < shown; i++)
-            nodes.add(new Nodes.Button(ACTION + i, ControlState.READY, all.get(i).label(), "", Nodes.ButtonKind.LINK, ACTION + i, ""));
-        if (more) {
-            var items = new ArrayList<MenuItem>();
-            for (int i = shown; i < all.size(); i++) items.add(new MenuItem("item:" + i, all.get(i).label(), "", ACTION + i, true, false));
-            if (items.isEmpty()) items.add(new MenuItem("item:none", MORE_LABEL, "", "none", false, false));
-            nodes.add(new Nodes.MenuButton(MORE, ControlState.READY, MORE_LABEL, "", Nodes.ButtonKind.LINK, "", items, ""));
-        }
-        return new ViewSpec(new Nodes.Stack("actions", ControlState.READY, Nodes.LayoutRole.INLINE, nodes));
+    /** A leading link: an EMBEDDED LINK, sized to its label, placed by the card with the former gap and padding. */
+    private static ViewSpec linkSpec(int index, String label) {
+        return new ViewSpec(new Nodes.Button(ACTION + index, ControlState.READY, label, "", Nodes.ButtonKind.LINK, ACTION + index, "",
+            Nodes.ButtonPresentation.EMBEDDED));
+    }
+
+    /** More, holding every action from {@code first} on, as an EMBEDDED LINK menu. */
+    private static ViewSpec moreSpec(List<NotificationAction> all, int first) {
+        var items = new ArrayList<MenuItem>();
+        for (int i = first; i < all.size(); i++) items.add(new MenuItem("item:" + i, all.get(i).label(), "", ACTION + i, true, false));
+        if (items.isEmpty()) items.add(new MenuItem("item:none", MORE_LABEL, "", "none", false, false));
+        return new ViewSpec(new Nodes.MenuButton(MORE, ControlState.READY, MORE_LABEL, "", Nodes.ButtonKind.LINK, "", items, "",
+            Nodes.ButtonPresentation.EMBEDDED));
     }
 
     /**
      * At most {@link #VISIBLE_ACTIONS} leading links, all of them when they fit one row; otherwise as many as fit beside
      * More (possibly none), with every other action under More. Wrapping onto a second row would hide More. Widths are the
-     * mounted kit links' own.
+     * mounted kit links' own plus the former {@code NOTIFICATION_LINK_GAP} before every link but the first, as the old
+     * link borders had; More is measured with its gap, as before.
      */
     private void fillActions(List<NotificationAction> all) {
-        int candidates = Math.min(all.size(), VISIBLE_ACTIONS);
-        actions.update(actionsSpec(all, candidates, true));
+        int candidates = Math.min(all.size(), VISIBLE_ACTIONS), gap = metric(DesignMetrics.Role.NOTIFICATION_LINK_GAP);
         var widths = new int[candidates];
-        for (int i = 0; i < candidates; i++) widths[i] = width(ACTION + i);
-        int moreWidth = width(MORE), gap = metric(DesignMetrics.Role.COLUMN_GAP), available = textWidth();
-        int shown = candidates;
-        if (all.size() > candidates || widthOf(widths, candidates, gap) > available) {
-            shown = Math.min(candidates, all.size() - 1);
-            while (shown > 0 && widthOf(widths, shown, gap) + gap + moreWidth > available) shown--;
+        for (int i = 0; i < candidates; i++) {
+            links.get(i).update(linkSpec(i, all.get(i).label()));
+            widths[i] = links.get(i).getPreferredSize().width + (i > 0 ? gap : 0);
         }
-        actions.update(actionsSpec(all, shown, shown < all.size()));
+        more.update(moreSpec(all, candidates));
+        int moreWidth = more.getPreferredSize().width + gap, available = textWidth();
+        int shown = candidates;
+        if (all.size() > candidates || widthOf(widths, candidates) > available) {
+            shown = Math.min(candidates, all.size() - 1);
+            while (shown > 0 && widthOf(widths, shown) + moreWidth > available) shown--;
+        }
+        shownLinks = shown;
+        moreShown = shown < all.size();
+        if (moreShown) more.update(moreSpec(all, shown));
+        for (int i = 0; i < links.size(); i++) links.get(i).setVisible(i < shown);
+        more.setVisible(moreShown);
+        // Links mounted or remounted now (an update, a theme switch) keep the pointer over the card counted as hover.
+        track(this);
     }
 
-    private static int widthOf(int[] widths, int count, int gap) {
+    private static int widthOf(int[] widths, int count) {
         int width = 0;
-        for (int i = 0; i < count; i++) width += widths[i] + (i > 0 ? gap : 0);
+        for (int i = 0; i < count; i++) width += widths[i];
         return width;
-    }
-
-    private int width(String name) {
-        var component = find(actions, name);
-        return component == null ? 0 : component.getPreferredSize().width;
     }
 
     static JComponent find(Component root, String name) {
@@ -197,7 +211,9 @@ final class NotificationCard extends JPanel implements AutoCloseable {
     List<String> contentLines() { return content.lines(); }
     String countText() { return count.text(); }
     java.awt.Color titleColor() { return title.getForeground(); }
-    KitView actionsView() { return actions; }
+    /** The leading links' views, shown or not. */
+    List<KitView> linkViews() { return links; }
+    KitView moreView() { return more; }
     KitView closeView() { return close; }
     KitView iconView() { return icon; }
     boolean closeShown() { return close.spec().root().state().visible(); }
@@ -205,16 +221,14 @@ final class NotificationCard extends JPanel implements AutoCloseable {
     /** The visible links' labels, then More when it shows. */
     List<String> actionLabels() {
         var labels = new ArrayList<String>();
-        for (var node : ((Nodes.Stack) actions.spec().root()).children())
-            labels.add(node instanceof Nodes.Button button ? button.label() : MORE_LABEL);
+        for (int i = 0; i < shownLinks; i++) labels.add(((Nodes.Button) links.get(i).spec().root()).label());
+        if (moreShown) labels.add(MORE_LABEL);
         return labels;
     }
 
     /** The More menu's item labels, or none. */
     List<String> moreLabels() {
-        for (var node : ((Nodes.Stack) actions.spec().root()).children())
-            if (node instanceof Nodes.MenuButton more) return more.items().stream().map(MenuItem::label).toList();
-        return List.of();
+        return moreShown ? ((Nodes.MenuButton) more.spec().root()).items().stream().map(MenuItem::label).toList() : List.of();
     }
 
     private boolean pointerInside() {
@@ -269,11 +283,24 @@ final class NotificationCard extends JPanel implements AutoCloseable {
             if (apply) content.setBounds(textX, y, contentSize.width, contentSize.height);
             y += contentSize.height;
         }
-        if (actions.isVisible()) {
+        if (shownLinks > 0 || moreShown) {
+            // The former link row: each link as tall as its text plus NOTIFICATION_LINK_VERTICAL_PADDING above and below,
+            // NOTIFICATION_LINK_GAP before every link but the first.
             y += gap;
-            Dimension actionSize = actions.getPreferredSize();
-            if (apply) actions.setBounds(textX, y, textWidth, actionSize.height);
-            y += actionSize.height;
+            int padding = metric(DesignMetrics.Role.NOTIFICATION_LINK_VERTICAL_PADDING), linkGap = metric(DesignMetrics.Role.NOTIFICATION_LINK_GAP);
+            var row = new ArrayList<KitView>(links.subList(0, shownLinks));
+            if (moreShown) row.add(more);
+            int rowHeight = 0;
+            for (var view : row) rowHeight = Math.max(rowHeight, view.getPreferredSize().height + 2 * padding);
+            int x = textX;
+            for (int i = 0; i < row.size(); i++) {
+                var view = row.get(i);
+                if (i > 0) x += linkGap;
+                int linkWidth = view.getPreferredSize().width;
+                if (apply) view.setBounds(x, y, linkWidth, rowHeight);
+                x += linkWidth;
+            }
+            y += rowHeight;
         }
         return y + pad;
     }
@@ -309,7 +336,7 @@ final class NotificationCard extends JPanel implements AutoCloseable {
         if (closed) return;
         closed = true;
         try { theme.close(); } catch (Exception ignored) { /* the binding outlives the card */ }
-        icon.close(); actions.close(); close.close();
+        icon.close(); links.forEach(KitView::close); more.close(); close.close();
     }
 
     boolean closed() { return closed; }

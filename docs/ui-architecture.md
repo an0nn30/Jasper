@@ -146,7 +146,8 @@ Manager and notification capabilities (Plan 2 Task 6c): item-list rows can carry
 any row, never selecting it; the menu key and Shift+F10 open the focused row's menu); Space on a row whose trailing slot
 holds exactly one switch operates that switch, keeping a list of switch rows one focus stop; switches take a literal
 tooltip; glyphs can carry a severity (INFO, WARNING, DANGER) that tints them with the accent or status colour, and the
-vocabulary gains `error` and `plugin`; body, strong, description and caption text flows (wraps, keeping line breaks,
+vocabulary gains `error` and `plugin`; buttons and menu buttons can be EMBEDDED (content-sized inline links and
+glyph buttons for a host arrangement); body, description and caption text flows (wraps, keeping line breaks,
 no wider than `TEXT_FLOW_COLUMNS`) in vertical stacks, form bodies, cards and sections; and an app host can mount a
 pointer-only `KitView` whose controls never take keyboard focus (not part of the plugin SDK).
 

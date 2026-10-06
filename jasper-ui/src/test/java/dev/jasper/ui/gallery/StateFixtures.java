@@ -91,6 +91,9 @@ public final class StateFixtures {
                 List.of(text("notice-plugin-name", "Fixture plugin", TextRole.BODY_STRONG)), List.of(text("notice-plugin-meta", "1.0  Fixture vendor", TextRole.CAPTION)),
                 List.of(new Toggle("notice-plugin-enabled", READY, "Enable Fixture plugin", true, "toggle", true, "Restart to apply")), false, Optional.of(menu))),
             Set.of("notice-plugin"), "", List.of(), SelectionMode.SINGLE, Optional.empty()));
+        notices.add(new Nodes.Stack("notice-links", READY, LayoutRole.INLINE, List.of(
+            new Nodes.Button("notice-open", READY, "Open", "", ButtonKind.LINK, "open", "", ButtonPresentation.EMBEDDED),
+            new MenuButton("notice-more", READY, "More ▾", "", ButtonKind.LINK, "", List.of(new MenuItem("notice-four", "Four", "", "four", true, false)), "", ButtonPresentation.EMBEDDED))));
         result.add(sheet("notices", new Stack("notices", READY, LayoutRole.VERTICAL, notices), 420, 320));
         for (SplitKind kind : SplitKind.values()) result.add(sheet("split-" + kind, new Split("split", READY, kind, List.of(text("left", "Sidebar", TextRole.BODY), text("right", "Detail", TextRole.BODY))), 600, 100));
         for (FormKind kind : FormKind.values()) result.add(sheet("form-" + kind, new Form("form", READY, kind, kind.name(), Optional.empty(), List.of(row("row", "Label", field("input", "", "Value", FieldKind.TEXT))), Optional.empty(), List.of(button("save", "Save", ButtonKind.PRIMARY)), "cancel"), 480, 200));

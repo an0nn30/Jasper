@@ -187,16 +187,19 @@ final class Menus {
         void refresh() {
             state();
             var menu = (Nodes.MenuButton) node;
+            boolean embedded = menu.presentation() == Nodes.ButtonPresentation.EMBEDDED;
             for (var button : java.util.List.of(main, arrow)) {
                 button.kind = menu.kind();
                 button.setEnabled(component.isEnabled());
                 Composition.style(button, context(), Typography.Role.LABEL, button.textRole(false));
                 int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING),
                         pad = ThemePainting.metric(context(), DesignMetrics.Role.MENU_ITEM_PADDING);
-                button.setBorder(new EmptyBorder(ring, pad, ring, pad));
+                button.embedded = embedded;
+                button.setBorder(embedded ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(ring, pad, ring, pad));
             }
+            ((MenuSurface) component).background.embedded = embedded;
             main.setText(menu.label());
-            if (menu.action().isBlank()) {
+            if (menu.action().isBlank() && !embedded) {
                 Insets insets = main.getInsets();
                 main.setBorder(
                         new EmptyBorder(
@@ -228,7 +231,7 @@ final class Menus {
             arrow.setToolTipText("Open menu");
             arrow.getAccessibleContext().setAccessibleName("Open menu");
             arrow.setVisible(!menu.action().isBlank());
-            ((Main) main).menuOnly = menu.action().isBlank();
+            ((Main) main).menuOnly = menu.action().isBlank() && !embedded;
             ((MenuSurface) component).background.kind = menu.kind();
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.MENU_PADDING);
             popup.setBorder(new EmptyBorder(pad, pad, pad, pad));
@@ -449,6 +452,8 @@ final class Menus {
 
         Item(KitContext context) {
             this.context = context;
+            // Before any text: Swing parses markup when the text is set, so the property must already be there.
+            putClientProperty("html.disable", true);
             setOpaque(false);
             setBorderPainted(false);
         }

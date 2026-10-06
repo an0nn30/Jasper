@@ -245,7 +245,14 @@ public final class PluginManager {
         AuxiliarySurface dialog = windows.dialog(title, true, host.get());
         boolean[] decided = {false};
         var view = new ConsentView(kit.get(), name, version, vendor, capabilities, update, allowLabel,
-            () -> { if (decided[0]) return; decided[0] = true; dialog.close(); if (panel != null) allowed.run(); }, dialog::close);
+            () -> {
+                if (decided[0] || dialog.closed()) return;
+                // With the page gone nothing can carry the allowed operation on: the answer becomes a refusal, so a
+                // staged install is discarded rather than left behind.
+                decided[0] = panel != null;
+                dialog.close();
+                if (decided[0]) allowed.run();
+            }, dialog::close);
         dialog.onClosed(() -> {
             view.close();
             if (consentDialog == dialog) { consentDialog = null; consent = null; }

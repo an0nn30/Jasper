@@ -129,6 +129,42 @@ class ErrorsViewTest {
         assertThat(view.listed()).hasSize(3);
     }
 
+    /** Review I3: after the user clicks a row, Show more… on another incident moves the list's row too, not only the details. */
+    @Test void aHostSelectionAfterTheUsersClickMovesTheListRow() {
+        var view = view();
+        Incident oldest = record("jasper", "a", new IllegalStateException("oldest"));
+        clock.advance(Duration.ofSeconds(1));
+        Incident middle = record("jasper", "b", new IllegalArgumentException("middle"));
+        clock.advance(Duration.ofSeconds(1));
+        Incident newest = record("jasper", "c", new UnsupportedOperationException("newest"));
+        assertThat(view.selected()).map(Incident::id).as("the first incident stays selected").contains(oldest.id());
+        view.listView().setSize(320, 400);
+        dev.jasper.app.testsupport.KitTestSupport.layout(view.listView());
+        dev.jasper.app.testsupport.KitTestSupport.layout(view.listView());
+        var label = dev.jasper.app.testsupport.KitTestSupport.require(view.listView(), "summary:" + newest.id(), javax.swing.JComponent.class);
+        for (var listener : label.getMouseListeners())
+            listener.mousePressed(new java.awt.event.MouseEvent(label, java.awt.event.MouseEvent.MOUSE_PRESSED, 0, java.awt.event.InputEvent.BUTTON1_DOWN_MASK, 2, 2, 1, false, java.awt.event.MouseEvent.BUTTON1));
+        for (var listener : label.getMouseListeners())
+            listener.mouseClicked(new java.awt.event.MouseEvent(label, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 2, 2, 1, false, java.awt.event.MouseEvent.BUTTON1));
+        assertThat(view.selected()).map(Incident::id).as("the user's click").contains(newest.id());
+        view.select(oldest.id());
+        var list = (dev.jasper.ui.model.Nodes.ItemList) view.listView().spec().root();
+        assertThat(list.selectedIds()).containsExactly(oldest.id().toString());
+        var canvas = canvas(view.listView());
+        canvas.getActionMap().get(canvas.getInputMap().get(javax.swing.KeyStroke.getKeyStroke("UP"))).actionPerformed(null);
+        assertThat(view.selected()).map(Incident::id).as("Up moves on from the host's row").contains(middle.id());
+        assertThat(view.headerText()).isEqualTo("Jasper · b");
+    }
+
+    private static javax.swing.JComponent canvas(java.awt.Component root) {
+        if (root instanceof javax.swing.JComponent c && c.isFocusable() && c.getInputMap().get(javax.swing.KeyStroke.getKeyStroke("DOWN")) != null) return c;
+        if (root instanceof java.awt.Container container) for (var child : container.getComponents()) {
+            var found = canvas(child);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     @Test void selectIgnoresAnIncidentThatIsNotListed() {
         var view = view();
         Incident listed = record("jasper", "a", new IllegalStateException("listed"));

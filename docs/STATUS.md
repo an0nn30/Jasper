@@ -44,6 +44,12 @@
   Plugins page look and row menus, card hover/close and link clicks keeping terminal focus, history wrapping, Errors
   window, chooser sheets. Gate: module 355, SDK 63, testkit 122, app 2600 (1 pre-existing skip), four architecture
   checks green.
+  Review fix round 1: new `Button`/`MenuButton.presentation` EMBEDDED (mirrored) gives card and history links and the
+  close/remove glyphs their former geometry (exact three-links-plus-More assertion restored; dead metrics removed);
+  BODY_STRONG no longer flows (the chooser preview title stays one line; history titles wrap as TextBlocks); the
+  plugin list and Errors list echo the user's selection so a later host selection applies; a page-gone consent
+  refuses and discards the staged install; kit menu items set html.disable before their text; history empty text is
+  centred again. Gate: module 357, SDK 64, testkit 123, app 2629.
 - **Theme engine Plan 2 Task 6b-2 implemented (command palette); review fix round 1 done, re-review pending** (2026-10-05). Carried preliminary
   fix first: Settings' `okSettings` and the chooser's `chooser.approve` window Enter bindings are disabled while OK/the
   primary is (spec §6), so Enter is then not consumed, like a disabled default button. Kit additions next (spec §6,

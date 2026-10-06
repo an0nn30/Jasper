@@ -91,6 +91,15 @@ final class PluginKit {
             .map(AbstractButton.class::cast).orElseThrow(() -> new AssertionError("no menu item " + label)).doClick(0);
     }
 
+    /** A plain left single click on the row whose title is named {@code titleName}, as the user selects a row. */
+    static void click(Component root, String titleName) {
+        var target = KitTestSupport.require(laidOut(root), titleName, JComponent.class);
+        var press = new MouseEvent(target, MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(), InputEvent.BUTTON1_DOWN_MASK, 2, 2, 1, false, MouseEvent.BUTTON1);
+        var click = new MouseEvent(target, MouseEvent.MOUSE_CLICKED, System.currentTimeMillis(), 0, 2, 2, 1, false, MouseEvent.BUTTON1);
+        for (var listener : target.getMouseListeners()) listener.mousePressed(press);
+        for (var listener : target.getMouseListeners()) listener.mouseClicked(click);
+    }
+
     /** Runs the list's key binding for {@code stroke} on its focused row. */
     static void key(PluginManagerPanel panel, String stroke) { key(panel.listView(), stroke); }
 

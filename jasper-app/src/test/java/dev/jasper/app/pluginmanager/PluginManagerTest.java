@@ -139,6 +139,27 @@ class PluginManagerTest {
         assertThat(user().resolve(".pending").resolve("dev.example.zipped").resolve("main.jar")).exists();
     }
 
+    /** Allowing after the Plugins page went away cannot install: it is a refusal, so the staged plugin is discarded. */
+    @Test void allowingAfterThePageWentAwayDiscardsTheStagedPlugin() throws Exception {
+        start(false, false);
+        chosenZip = zipOf("dev.example.orphan", "1.0.0", "");
+        open();
+        until(() -> manager.panel().details().contains("No plugins"));
+        edt(() -> PluginKit.clickGear(manager.panel(), "Install from Zip\u2026"));
+        until(() -> manager.consent() != null);
+        try (var all = Files.list(user())) {
+            assertThat(all.anyMatch(path -> path.getFileName().toString().startsWith(".staging-"))).as("staged while asking").isTrue();
+        }
+        edt(() -> { page.dispose(); page = null; });
+        edt(() -> PluginKit.press(manager.consent().view(), ConsentView.ALLOW));
+        until(() -> {
+            try (var all = Files.list(user())) { return all.noneMatch(path -> path.getFileName().toString().startsWith(".staging-")); }
+            catch (java.io.IOException failure) { return false; }
+        });
+        assertThat(user().resolve(".pending").resolve("dev.example.orphan")).doesNotExist();
+        edt(() -> assertThat(manager.consent()).isNull());
+    }
+
     @Test void decliningConsentDiscardsTheStagedPluginAndABadZipIsExplained() throws Exception {
         start(false, false);
         chosenZip = zipOf("dev.example.zipped", "1.0.0", "");

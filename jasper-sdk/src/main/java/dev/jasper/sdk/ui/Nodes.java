@@ -60,16 +60,28 @@ public final class Nodes {
         }
     }
 
-    public record Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip) implements Node {
+    /**
+     * How a button sits in its composition. STANDARD is the kit's padded, minimum-height button. EMBEDDED is content-sized
+     * for a host arrangement that supplies the spacing (for example a row of inline links): no padding, focus-ring inset,
+     * minimum height or resting fill, and an icon-only embedded button draws its glyph at the row-glyph size.
+     */
+    public enum ButtonPresentation { STANDARD, EMBEDDED }
+
+    public record Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation) implements Node {
         public Button {
             ModelChecks.id(id); Objects.requireNonNull(state);
             ModelChecks.button(label, icon, tooltip);
             Objects.requireNonNull(kind);
             ModelChecks.label(action, "action");
+            Objects.requireNonNull(presentation);
+        }
+        public Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip) {
+            this(id, state, label, icon, kind, action, tooltip, ButtonPresentation.STANDARD);
         }
     }
 
-    public record MenuButton(String id, ControlState state, String label, String icon, ButtonKind kind, String action, List<MenuItem> items, String tooltip) implements Node {
+    /** {@code presentation} as for {@link Button}; an EMBEDDED menu-only button draws no chevron of its own. */
+    public record MenuButton(String id, ControlState state, String label, String icon, ButtonKind kind, String action, List<MenuItem> items, String tooltip, ButtonPresentation presentation) implements Node {
         public MenuButton {
             ModelChecks.id(id); Objects.requireNonNull(state);
             ModelChecks.button(label, icon, tooltip);
@@ -78,6 +90,10 @@ public final class Nodes {
             items = List.copyOf(items);
             ModelChecks.unique(items, MenuItem::id);
             if (items.isEmpty()) throw new IllegalArgumentException("Menu must have items");
+            Objects.requireNonNull(presentation);
+        }
+        public MenuButton(String id, ControlState state, String label, String icon, ButtonKind kind, String action, List<MenuItem> items, String tooltip) {
+            this(id, state, label, icon, kind, action, items, tooltip, ButtonPresentation.STANDARD);
         }
     }
 

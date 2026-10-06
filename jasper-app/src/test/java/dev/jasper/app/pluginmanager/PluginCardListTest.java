@@ -147,6 +147,22 @@ class PluginCardListTest {
         assertThat(selections).isZero();
     }
 
+    /**
+     * Review I3: the user's click becomes the declared selection, so a later host selection of the previously declared
+     * row is applied, and the keys continue from it.
+     */
+    @Test void aHostSelectionAfterTheUsersClickIsApplied() {
+        list.show(List.of(TestRows.plugin("a.a", "A").row(), TestRows.plugin("a.b", "B").row(), TestRows.plugin("a.c", "C").row()));
+        assertThat(list.selected()).isEqualTo("a.a");
+        PluginKit.click(list.view(), "name:a.b");
+        assertThat(list.selected()).as("the user's click").isEqualTo("a.b");
+        assertThat(((dev.jasper.ui.model.Nodes.ItemList) list.view().spec().root()).selectedIds()).as("declared too").containsExactly("a.b");
+        list.select("a.a");
+        assertThat(((dev.jasper.ui.model.Nodes.ItemList) list.view().spec().root()).selectedIds()).containsExactly("a.a");
+        PluginKit.key(list.view(), "DOWN");
+        assertThat(list.selected()).as("the kit row is the host's: Down moves on from A").isEqualTo("a.b");
+    }
+
     @Test void pluginTextIsNeverMarkup() {
         list.show(List.of(TestRows.plugin("a.h", "<html><b>Bold").vendor("<html><i>Acme").row()));
         assertThat(list.listed()).containsExactly("<html><b>Bold  1.0.0");

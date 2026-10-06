@@ -55,6 +55,37 @@ class HistoryPanelTest {
         assertThat(panel.clearAllButton().isEnabled()).isFalse();
     }
 
+    /** Review M9: "No notifications" is centred across the panel, as before. */
+    @Test void theEmptyTextIsCentred() {
+        var panel = panel(true);
+        show();
+        panel.setSize(400, 300);
+        for (int pass = 0; pass < 3; pass++) LayoutTestSupport.layoutTree(panel);
+        var empty = panel.emptyView();
+        var bounds = SwingUtilities.convertRectangle(empty.getParent(), empty.getBounds(), panel);
+        assertThat(bounds.width).as("as wide as its text").isLessThan(panel.getWidth() / 2);
+        assertThat(Math.abs(bounds.x + bounds.width / 2 - panel.getWidth() / 2)).as("centred").isLessThanOrEqualTo(1);
+    }
+
+    /** The title wraps to the row (as the former wrapping title did), strong while unread, with its count beside it. */
+    @Test void aLongTitleWrapsWithItsCountBesideIt() {
+        String title = "The background job that refreshes every remote listing finished with warnings on several hosts";
+        UUID id = post(title);
+        post(title);
+        var panel = panel(false);
+        show();
+        panel.setSize(300, 800);
+        for (int pass = 0; pass < 3; pass++) LayoutTestSupport.layoutTree(panel);
+        var row = panel.row(id);
+        assertThat(row.titleBold()).isTrue();
+        assertThat(row.titleLines()).as("wrapped").hasSizeGreaterThan(1);
+        assertThat(String.join(" ", row.titleLines())).isEqualTo(title);
+        assertThat(row.countText()).isEqualTo("×2");
+        var block = row.titleBlock();
+        assertThat(block.getWidth() + block.getX()).as("inside the row").isLessThanOrEqualTo(row.getWidth());
+        assertThat(block.getHeight()).isEqualTo(row.titleLines().size() * block.lineHeight());
+    }
+
     @Test void showingInAFocusedWindowReadsEverythingAndKeepsItUnderNewUntilHidden() {
         UUID a = post("a");
         UUID b = post("b");

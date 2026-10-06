@@ -95,6 +95,13 @@ class KitValuesTest {
   assertThat(module.items().getFirst().contextActions()).hasValueSatisfying(items -> assertThat(items).hasSize(2));
   assertThat(module.items().get(1).contextActions()).hasValue(List.of());
   assertThat(Arrays.stream(Severity.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.Severity.values()).map(Enum::name).toArray(String[]::new));
+  for(var presentation:ButtonPresentation.values()){
+   var link=new ViewSpec(new Button("b",READY,"Open","",ButtonKind.LINK,"open","",presentation));
+   assertThat(KitValues.toModule(link).toString()).isEqualTo(link.toString());
+   var more=new ViewSpec(new MenuButton("m",READY,"More","",ButtonKind.LINK,"",List.of(new MenuItem("i","I","","i",true,false)),"",presentation));
+   assertThat(KitValues.toModule(more).toString()).isEqualTo(more.toString());
+  }
+  assertThat(Arrays.stream(ButtonPresentation.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.ButtonPresentation.values()).map(Enum::name).toArray(String[]::new));
  }
  /** Plan 2 Task 6b-2: RESULTS lists, headings and visible rows cross the projection unchanged. */
  @Test void resultListsProjectWithoutLoss(){

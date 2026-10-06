@@ -24,7 +24,7 @@ import javax.swing.plaf.basic.BasicGraphicsUtils;
 final class TextBlock extends JComponent {
     static final String ELLIPSIS = "…";
     private final KitContext kit;
-    private final Typography.Role role;
+    private Typography.Role role;
     private final SemanticColor color;
     private final int maxLines;
     private String text = "";
@@ -79,6 +79,13 @@ final class TextBlock extends JComponent {
     }
 
     Typography.Role role() { return role; }
+
+    /** Takes another role (a history title turns plain once read) and restyles. */
+    void setRole(Typography.Role value) {
+        if (value == role) return;
+        role = value;
+        restyle();
+    }
 
     private int measure(String value) {
         return (int) Math.ceil(BasicGraphicsUtils.getStringWidth(this, getFontMetrics(getFont()), value));

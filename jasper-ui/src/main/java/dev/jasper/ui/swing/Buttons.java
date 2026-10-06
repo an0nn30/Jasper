@@ -35,15 +35,18 @@ final class Buttons {
             var value = (Nodes.Button)node; state(); button.kind = value.kind();
             button.setText(value.label()); button.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
             button.setForeground(ThemePainting.color(context(), button.textRole(false)));
+            boolean embedded = value.presentation() == Nodes.ButtonPresentation.EMBEDDED;
+            button.embedded = embedded;
             button.setIcon(value.icon().isEmpty() ? null : context().icons().icon(value.icon(), context().theme().semantic(), button.textRole(false),
-                UIScale.scale(context().icons().size(Nodes.IconSize.CONTROL))));
+                UIScale.scale(context().icons().size(embedded && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL))));
             button.setDisabledIcon(button.getIcon()); button.putClientProperty("Jasper.button.icon", value.icon().isEmpty() ? null : value.icon());
             button.setToolTipText(value.tooltip().isEmpty() ? null : value.tooltip());
             button.getAccessibleContext().setAccessibleName(value.label().isEmpty() ? value.tooltip() : value.label());
             button.getAccessibleContext().setAccessibleDescription(value.state().error());
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
             int horizontal = ThemePainting.metric(context(), value.kind() == Nodes.ButtonKind.PRIMARY ? DesignMetrics.Role.PRIMARY_BUTTON_HORIZONTAL_PADDING : DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
-            button.setBorder(new EmptyBorder(ring, value.label().isEmpty() ? ring : horizontal, ring, value.label().isEmpty() ? ring : horizontal));
+            button.setBorder(embedded ? new EmptyBorder(0, 0, 0, 0)
+                : new EmptyBorder(ring, value.label().isEmpty() ? ring : horizontal, ring, value.label().isEmpty() ? ring : horizontal));
             button.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
             button.setCursor(Cursor.getPredefinedCursor(button.isEnabled() ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
             button.revalidate(); button.repaint();
@@ -53,6 +56,8 @@ final class Buttons {
         private final KitContext context;
         Nodes.ButtonKind kind;
         boolean hero, panel;
+        /** Content-sized for a host arrangement (ButtonPresentation.EMBEDDED): no minimum height and no resting or hover fill. */
+        boolean embedded;
         float disabledOpacity=.42f;
         ThemePainting.Focus focus;
         KitButton(KitContext context) { this.context = context; }
@@ -67,6 +72,7 @@ final class Buttons {
         }
         @Override public Dimension getPreferredSize() {
             Dimension size = super.getPreferredSize();
+            if (embedded) return size;
             int height = ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_BUTTON_HEIGHT : panel ? DesignMetrics.Role.PANEL_ACTION : DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.LABEL);
             return new Dimension(getText() == null || getText().isEmpty() ? height : size.width, Math.max(height, size.height));
         }
@@ -87,13 +93,13 @@ final class Buttons {
             try {
                 if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(disabledOpacity));
                 boolean hover = isEnabled() && getModel().isRollover();
-                Color fill = fill(hover);
+                Color fill = embedded ? null : fill(hover);
                 if (isEnabled() && getModel().isPressed() && fill != null) {
                     Color darkened = ColorMath.mix(ThemePainting.color(context, SemanticColor.SURFACE_APP), fill, .08);
                     fill = new Color(darkened.getRed(), darkened.getGreen(), darkened.getBlue(), fill.getAlpha());
                 }
-                Color border = border();
-                ThemePainting.rounded(g, this, context, fill, border, focus != null && focus.visible(), false);
+                Color border = embedded ? null : border();
+                ThemePainting.rounded(g, this, context, fill, border, !embedded && focus != null && focus.visible(), false);
                 g.setFont(getFont()); g.setColor(ThemePainting.color(context, textRole(hover)));
                 Insets insets = getInsets(); Rectangle icon = new Rectangle(), text = new Rectangle();
                 String clipped = SwingUtilities.layoutCompoundLabel(this, g.getFontMetrics(), getText(), getIcon(), CENTER, getHorizontalAlignment(), CENTER, RIGHT,
