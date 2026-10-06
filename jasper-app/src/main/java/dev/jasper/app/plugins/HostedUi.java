@@ -443,7 +443,7 @@ final class HostedUi {
         final AuxiliarySurface surface;
         HostedKitView mounted;
         Surface(AuxiliarySurface surface) { this.surface = surface; surface.onClosed(() -> { if(mounted!=null){mounted.close();mounted=null;} }); }
-        @Override public void setContent(JComponent content) { requireUi("setContent"); if(surface.closed())return; surface.setContent(content); if(mounted!=null){mounted.close();mounted=null;} }
+        @Override public void setContent(JComponent content) { requireUi("setContent"); if(surface.closed())return; surface.fitContent(false); surface.setContent(content); if(mounted!=null){mounted.close();mounted=null;} }
         @Override public void setContent(dev.jasper.sdk.ui.UiView content) {
             guard("setContent");
             var next = kit.requireOwned(content);
@@ -451,7 +451,8 @@ final class HostedUi {
             next.mount(surface);
             if(mounted==next)return;
             var previous=mounted;
-            surface.setContent(next.component());mounted=next;
+            // A host-packed dialog follows its kit view's size (DialogFit), as plugin dialogs did with pack().
+            surface.setContent(next.component());mounted=next;next.updated=surface::contentChanged;surface.fitContent(true);
             if(previous!=null)previous.close();
         }
         @Override public void show() { requireUi("show"); surface.show(); }

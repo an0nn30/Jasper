@@ -38,7 +38,13 @@ public final class AuxiliarySurface {
     private final UUID ownerWindow;
     private final AuxiliarySurface ownerSurface;
     private final Function<AuxiliarySurface, Shell> shells;
-    private final JPanel holder = new JPanel(new BorderLayout());
+    /** Its invalidation (any content revalidating) is how a fitted dialog notices its kit view's size changing. */
+    private final JPanel holder = new JPanel(new BorderLayout()) {
+        @Override public void invalidate() {
+            super.invalidate();
+            contentChanged();
+        }
+    };
     private final List<BooleanSupplier> guards = new ArrayList<>();
     private final List<BooleanSupplier> closeCommands = new ArrayList<>();
     private final List<Runnable> closedListeners = new ArrayList<>();
@@ -48,6 +54,8 @@ public final class AuxiliarySurface {
     private boolean shown;
     private boolean closed;
     private Rectangle lastBounds;
+    private boolean fitContent;
+    private DialogFit fit;
 
     AuxiliarySurface(String id, String title, Kind kind, boolean modal, Dimension preferredSize, UUID ownerWindow,
                      AuxiliarySurface ownerSurface, Function<AuxiliarySurface, Shell> shells) {
@@ -78,6 +86,30 @@ public final class AuxiliarySurface {
         holder.removeAll();
         if (content != null) holder.add(content, BorderLayout.CENTER);
         holder.revalidate(); holder.repaint();
+    }
+
+    /**
+     * Whether the content is a mounted kit view, whose preferred-size changes a host-packed dialog follows ({@link
+     * DialogFit}); raw Swing content keeps its own sizing.
+     */
+    public void fitContent(boolean value) {
+        fitContent = value;
+        contentChanged();
+    }
+
+    /**
+     * The mounted kit view changed (its descriptor was updated, or its layout was invalidated); a fitted dialog re-packs
+     * when the preferred size changed.
+     */
+    public void contentChanged() { if (fitContent && fit != null && !closed) fit.contentChanged(); }
+
+    /** Whether the content is a mounted kit view (see {@link #fitContent}). */
+    public boolean fitsContent() { return fitContent; }
+
+    /** The native shell's fitting rule for a dialog it packs itself; none for remembered bounds. Closed with the surface. */
+    public void fitWith(DialogFit value) {
+        fit = Objects.requireNonNull(value);
+        if (closed) value.close();
     }
 
     public void setTitle(String value) {
@@ -155,6 +187,7 @@ public final class AuxiliarySurface {
     public void close() {
         if (closed) return;
         closed = true;
+        if (fit != null) fit.close();
         if (shell != null) {
             try { lastBounds = shell.bounds().get(); } catch (RuntimeException ignored) { lastBounds = null; }
             shell.dispose().run();

@@ -171,8 +171,23 @@ public final class NativeShells {
         });
         FloatWhileActive floating = surface.modal() ? FloatWhileActive.attach(dialog) : null;
         natives.put(surface, dialog);
+        // A dialog the host packs itself follows its kit content's size, as plugin dialogs did with pack(), until the
+        // user resizes it; remembered bounds are the user's and stay.
+        DialogFit fit = remembered ? null : new DialogFit(surface.holder(), fitTarget(dialog));
+        if (fit != null) surface.fitWith(fit);
+        boolean[] watching = {false};
         return new AuxiliarySurface.Shell(() -> {
-                if (!remembered) { dialog.pack(); dialog.setLocationRelativeTo(owner); }
+                if (!remembered) {
+                    dialog.pack(); dialog.setLocationRelativeTo(owner);
+                    fit.packed();
+                    // Added after the show-time pack, so only later resizes are reported.
+                    if (!watching[0]) {
+                        watching[0] = true;
+                        dialog.addComponentListener(new java.awt.event.ComponentAdapter() {
+                            @Override public void componentResized(java.awt.event.ComponentEvent event) { fit.resized(dialog.getSize()); }
+                        });
+                    }
+                }
                 if (floating != null) floating.update();
                 dialog.setVisible(true);
             },
@@ -182,6 +197,23 @@ public final class NativeShells {
                 if (bar != null) bar.close();
                 natives.remove(surface); dialog.dispose();
             }, title -> { dialog.setTitle(title); if (bar != null) bar.setTitle(title); }, dialog::getBounds, (title, initial) -> chooseFile(dialog, title, initial, Optional.empty()));
+    }
+
+    /** The native side of {@link DialogFit}: the dialog's own size, pack size and its screen's usable bounds. */
+    private static DialogFit.Target fitTarget(JDialog dialog) {
+        return new DialogFit.Target() {
+            @Override public java.awt.Dimension size() { return dialog.getSize(); }
+            @Override public java.awt.Dimension packedSize() { return dialog.getPreferredSize(); }
+            @Override public Rectangle usableBounds() {
+                var configuration = dialog.getGraphicsConfiguration();
+                Rectangle screen = configuration.getBounds();
+                var insets = Toolkit.getDefaultToolkit().getScreenInsets(configuration);
+                return new Rectangle(screen.x + insets.left, screen.y + insets.top,
+                    screen.width - insets.left - insets.right, screen.height - insets.top - insets.bottom);
+            }
+            @Override public java.awt.Point location() { return dialog.getLocation(); }
+            @Override public void setBounds(Rectangle bounds) { dialog.setBounds(bounds); }
+        };
     }
 
     /** Shared, headless-testable title setup for both kinds of SDK/application auxiliary surface. */

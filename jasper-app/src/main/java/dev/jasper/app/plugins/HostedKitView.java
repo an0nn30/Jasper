@@ -19,13 +19,15 @@ final class HostedKitView implements UiView {
  private Consumer<UiEvent> events;
  java.util.function.Predicate<UiEvent> hostEvents = event -> false;
  java.util.function.UnaryOperator<ViewSpec> hostSpec = value -> value;
+ /** Runs after each descriptor update; a host-packed dialog uses it to follow the view's size (DialogFit). */
+ Runnable updated = () -> { };
 
  private final AtomicBoolean closed=new AtomicBoolean();
  HostedKitView(HostedKit owner,KitContext context,ViewSpec spec,Consumer<UiEvent> events){this.owner=owner;this.events=Objects.requireNonNull(events);view=new KitView(context,KitValues.toModule(spec),e -> dispatch(KitValues.toSdk(e)));this.spec=spec;}
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
  KitView component(){guard();return view;}
  void dispatch(UiEvent event){if(closed.get()||!owner.live())return;try{if(hostEvents.test(event))return;events.accept(event);}catch(Throwable failure){owner.failed();}}
- @Override public void update(ViewSpec next){guard();if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{next=hostSpec.apply(next);view.update(KitValues.toModule(next));spec=next;}finally{updating=false;}}
+ @Override public void update(ViewSpec next){guard();if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{next=hostSpec.apply(next);view.update(KitValues.toModule(next));spec=next;}finally{updating=false;}updated.run();}
  @Override public ViewSpec spec(){guard();return spec;}
  @Override public void withSecret(String id,Consumer<char[]> use){guard();view.withSecret(id,use);}
  @Override public void clearSecret(String id){guard();view.clearSecret(id);}
@@ -37,5 +39,5 @@ final class HostedKitView implements UiView {
   var expected=KitContent.find(spec.root(),content.id());if(expected==null||expected.kind()!=content.kind())throw new IllegalArgumentException("No matching Custom content id/kind");
   var owned=new KitContent(owner,content);try{view.registerContent(content.id(),content.component(),owned);}catch(Throwable failure){owned.abort();throw failure;}
  }
- @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {view.close();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
+ @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {view.close();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;updated=() -> { };mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
 }

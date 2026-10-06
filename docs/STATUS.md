@@ -20,9 +20,11 @@
   Enter): neither dialog has a primary or a submitting field, so Enter saves or forwards nothing (baseline `f16ae32f`
   had no default button); Escape runs Cancel. A closed panel or editor ignores later state changes, ticks and save
   errors. Behaviour deviations: a right-click no longer selects the row (each row's menu acts on that row, 6c rule); a
-  quick double Space on a focused switch operates it once (the double-click guard is time-based, as the 8a star);
-  More in Forward a Port grows the form but no longer re-packs the dialog window (the SDK dialog has no pack; the
-  revealed field is in the form's scroll area; GUI check). Visual-only changes (ledgered in `migration.csv`): kit
+  quick double Space on a focused switch operates it once (the double-click guard is time-based, as the 8a star).
+  Fix round 1 (I1): a plugin dialog the host packed itself now re-packs when its kit view's preferred size changes
+  (host `DialogFit`, no SDK member), so More/Less in Forward a Port grows and shrinks the window as the old `pack()`
+  did, clamped to the screen; once the user resizes a dialog it keeps its size, and other kit dialogs follow their
+  content the same way (for example a message line appearing). Visual-only changes (ledgered in `migration.csv`): kit
   DOUBLE rows with a StatusDot (Up SUCCESS, Up with a warning or Starting WARNING, Failed DANGER, Stopped IDLE) and the
   kit selection colour; the stage or problem (formerly a third line) follows the MONO_SMALL mapping on the subtitle
   line, failures and warnings with a severity icon instead of red/amber text, so in a narrow rail the mapping

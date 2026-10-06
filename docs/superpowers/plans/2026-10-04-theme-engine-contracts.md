@@ -356,6 +356,17 @@ Plan 2 Task 7 Vault additions (secure notes; same mirroring and SDK version rule
 - Testkit: `FakePluginHost.windowView(pluginId, title)` returns the `FakeKitView` mounted on an open plugin window or
   dialog (empty after close or for raw content); it joins the Task 11 0.15 testkit surface with `closePanel`.
 
+Plan 2 Task 8b fix round 1 host rule (no SDK member; controller ruling I1 option b): a plugin dialog the host packed
+itself (`WindowSurface.setContent(UiView)` on a dialog without remembered bounds) follows its mounted kit view's
+preferred size as the former plugin `getWindowAncestor(this).pack()` did. After each descriptor update (and, in a real
+window, each invalidation of the content holder) the host re-packs on the next event-loop turn when the preferred size
+changed, growing or shrinking, clamped to the screen's usable bounds and moved only as far as needed to stay on it
+(`dev.jasper.app.windows.DialogFit`, wired by `NativeShells`). The first size the host did not set (a user resize) ends
+the rule for that dialog; raw `JComponent` content, windows, overlays and remembered-bounds dialogs are never re-packed.
+Other kit dialogs gain the same fit when their content grows or shrinks (for example a validation message line
+appearing). The testkit fake models no window geometry, so it has no counterpart; plugins need not and cannot observe
+it.
+
 Plan 2 Task 8-kit Remote additions (Sessions, Tunnels, SFTP and transfer rows; controller rulings G1–G5; same
 mirroring module ↔ SDK ↔ host `KitValues` ↔ fake and SDK version rule — the SDK stays 0.14.2 and Task 11 versions these
 record components; prior constructors remain and default to the old meaning):

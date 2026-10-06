@@ -3,6 +3,7 @@ package dev.jasper.app.plugins;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.app.windows.AuxiliaryWindows;
+import dev.jasper.app.windows.DialogFit;
 import dev.jasper.app.workspace.DesktopTestSupport;
 import dev.jasper.app.workspace.WindowContent;
 import dev.jasper.sdk.Capabilities;
@@ -62,7 +63,7 @@ final class StagedRemoteHost implements AutoCloseable {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins")).resolve(REMOTE.id());
         ssh = Files.createDirectories(data.resolve("ssh"));
         contributions = onEdtValue(Contributions::new);
-        auxiliary = onEdtValue(AppContractTest::headlessWindows);
+        auxiliary = onEdtValue(() -> new AuxiliaryWindows(dev.jasper.app.persistence.UiState.inMemory(), this::shell));
         terminals = onEdtValue(TerminalFixture::new);
         host = AppContractTest.host(data.resolve("home"), Duration.ofMillis(200), contributions, new AtomicBoolean(dark), auxiliary,
             terminals.registry, problems, new CopyOnWriteArrayList<>());
@@ -80,6 +81,48 @@ final class StagedRemoteHost implements AutoCloseable {
             content.connectContributions(contributions);
             return content;
         });
+    }
+
+    /**
+     * A headless stand-in for a native dialog the host packs itself: it takes its content's preferred size when shown
+     * (as {@code pack()} does) and then follows the production {@link DialogFit} rule, as {@code NativeShells} wires it.
+     */
+    static final class PackedDialog implements DialogFit.Target {
+        final javax.swing.JComponent holder;
+        java.awt.Rectangle bounds = new java.awt.Rectangle(100, 100, 0, 0);
+        DialogFit fit;
+        PackedDialog(javax.swing.JComponent holder) { this.holder = holder; }
+        @Override public java.awt.Dimension size() { return bounds.getSize(); }
+        @Override public java.awt.Dimension packedSize() { return holder.getPreferredSize(); }
+        @Override public java.awt.Rectangle usableBounds() { return new java.awt.Rectangle(0, 0, 1440, 900); }
+        @Override public java.awt.Point location() { return bounds.getLocation(); }
+        @Override public void setBounds(java.awt.Rectangle value) { bounds = new java.awt.Rectangle(value); }
+    }
+
+    final Map<AuxiliarySurface, PackedDialog> dialogs = new java.util.HashMap<>();
+
+    /** Plugin dialogs get a packed stand-in; every other surface touches no native window. */
+    private AuxiliarySurface.Shell shell(AuxiliarySurface surface) {
+        if (surface.kind() == AuxiliarySurface.Kind.DIALOG && surface.id().isEmpty()) {
+            var dialog = new PackedDialog(surface.holder());
+            dialog.fit = new DialogFit(surface.holder(), dialog);
+            surface.fitWith(dialog.fit);
+            dialogs.put(surface, dialog);
+            return new AuxiliarySurface.Shell(() -> { dialog.bounds.setSize(dialog.packedSize()); dialog.fit.packed(); }, () -> { }, () -> { },
+                title -> { }, () -> dialog.bounds, (title, initial) -> Optional.empty());
+        }
+        return new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { },
+            () -> new java.awt.Rectangle(0, 0, 10, 10), (title, initial) -> Optional.empty());
+    }
+
+    /** The size of a shown plugin dialog's stand-in window; UI thread. */
+    java.awt.Dimension dialogSize(AuxiliarySurface surface) { return dialogs.get(surface).size(); }
+
+    /** The user drags the dialog to {@code size}; UI thread. */
+    void userResize(AuxiliarySurface surface, java.awt.Dimension size) {
+        var dialog = dialogs.get(surface);
+        dialog.bounds.setSize(size);
+        dialog.fit.resized(size);
     }
 
     /** Opens the Sessions panel in the window and waits until its kit view is mounted. */

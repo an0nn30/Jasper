@@ -141,7 +141,8 @@ class StagedRemoteTunnelsTest {
     /**
      * The baseline's empty-state wrap and literal-text tests in the real host: in a rail-wide panel the empty message
      * wraps over several lines and New Tunnel stays inside; the broken-file note shows above it. Tunnel text that looks
-     * like HTML is shown as text. More grows Forward a Port's form and Less shrinks it back.
+     * like HTML is shown as text. More grows Forward a Port's form and its host-packed window, Less shrinks both back,
+     * and a dialog the user resized keeps its size.
      */
     @Test @Timeout(value = 90, unit = TimeUnit.SECONDS)
     void theEmptyStateWrapsTextStaysLiteralAndMoreGrowsTheForwardForm() throws Exception {
@@ -177,19 +178,32 @@ class StagedRemoteTunnelsTest {
             var surface = remote.awaitSurface("Forward a Port");
             awaitNamed(surface, "forward.more");
             int[] heights = new int[3];
+            var windows = new java.awt.Dimension[4];
             onEdt(() -> {
                 heights[0] = form(surface.holder()).getPreferredSize().height;
+                windows[0] = remote.dialogSize(surface);
                 ((AbstractButton) require(surface, "forward.more")).doClick(0);
             });
             StagedVaultHost.settle();
             onEdt(() -> {
                 heights[1] = form(surface.holder()).getPreferredSize().height;
+                windows[1] = remote.dialogSize(surface);
                 ((AbstractButton) require(surface, "forward.more")).doClick(0);
             });
             StagedVaultHost.settle();
-            onEdt(() -> heights[2] = form(surface.holder()).getPreferredSize().height);
+            onEdt(() -> { heights[2] = form(surface.holder()).getPreferredSize().height; windows[2] = remote.dialogSize(surface); });
             assertThat(heights[1]).as("More reveals the target host and grows the form").isGreaterThan(heights[0]);
             assertThat(heights[2]).as("Less returns it to its size").isEqualTo(heights[0]);
+            // Fix round 1 (I1): the host-packed dialog re-packs as the old panel's pack() did.
+            assertThat(windows[1].height).as("More grows the dialog window").isGreaterThan(windows[0].height);
+            assertThat(windows[2]).as("Less returns the window to its original size").isEqualTo(windows[0]);
+            onEdt(() -> {
+                remote.userResize(surface, new java.awt.Dimension(700, 520));
+                ((AbstractButton) require(surface, "forward.more")).doClick(0);
+            });
+            StagedVaultHost.settle();
+            onEdt(() -> windows[3] = remote.dialogSize(surface));
+            assertThat(windows[3]).as("a dialog the user resized is never re-packed").isEqualTo(new java.awt.Dimension(700, 520));
             onEdt(() -> forward.get().close());
         }
         Path html = root.resolve("html");
