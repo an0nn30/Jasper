@@ -31,6 +31,7 @@ public final class ImportPanel implements AutoCloseable {
 
     public static String check(int row) { return "import.check." + row; }
     public static String detail(int row) { return "import.detail." + row; }
+    public static String name(int row) { return "import.name." + row; }
     public static String choose(int row) { return "import.choose." + row; }
 
     public ImportPanel(UiKit kit, List<ConfigImport.Candidate> candidates, List<String> skippedEntries,
@@ -92,6 +93,9 @@ public final class ImportPanel implements AutoCloseable {
             sections.add(new Nodes.Stack("import.row." + i, ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
                 new Nodes.Stack("import.line." + i, ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
                     new Nodes.Toggle(check(i), state(true, choosable), label, checked.get(i), check(i), false),
+                    // A switch shows its label only to assistive technology; the row reads it beside the switch, as the
+                    // former checkbox's own text did.
+                    new Nodes.Text(name(i), ControlState.READY, label, Nodes.TextRole.BODY),
                     new Nodes.Button(choose(i), state(c.identities().isEmpty(), choosable), "Choose credential…", "", Nodes.ButtonKind.SECONDARY, choose(i), ""))),
                 new Nodes.Text(detail(i), ControlState.READY, details.get(i), Nodes.TextRole.DESCRIPTION))));
         }

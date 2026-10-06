@@ -103,6 +103,35 @@ final class StagedRemoteHost implements AutoCloseable {
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 
+    /** The plugin's own context (its kit, windows and terminals), for mounting its views as the plugin does. */
+    dev.jasper.sdk.plugin.PluginContext context() {
+        try {
+            var field = plugin.getClass().getDeclaredField("context"); field.setAccessible(true);
+            return (dev.jasper.sdk.plugin.PluginContext) field.get(plugin);
+        } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+    }
+
+    /**
+     * Asks the plugin's host-key question for a synthetic key, as a connection would, through its package-private entry.
+     * A method handle resolves just that method; plain reflection would load every signature, and Vault types are absent.
+     */
+    CompletableFuture<?> askHostKey(String host, int port, String type, String fingerprint) {
+        try {
+            Class<?> question = loader.loadClass("dev.jasper.remote.client.HostKeyVerifier$Question");
+            Object asked = question.getConstructor(String.class, int.class, String.class, String.class).newInstance(host, port, type, fingerprint);
+            var lookup = java.lang.invoke.MethodHandles.privateLookupIn(plugin.getClass(), java.lang.invoke.MethodHandles.lookup());
+            var ask = lookup.findVirtual(plugin.getClass(), "askHostKey",
+                java.lang.invoke.MethodType.methodType(CompletableFuture.class, dev.jasper.sdk.terminal.WindowHandle.class, question));
+            var owner = onEdtValue(() -> context().terminals().window(window.id()).orElseThrow());
+            return (CompletableFuture<?>) ask.invoke(plugin, owner, asked);
+        } catch (Throwable failure) { throw new AssertionError(failure); }
+    }
+
+    /** Waits until the surface's content holds a component with this kit name (a mounted, laid-out view). */
+    static void awaitNamed(AuxiliarySurface surface, String name) throws InterruptedException {
+        StagedVaultHost.await(() -> StagedVaultHost.named(surface.holder(), name) != null, name + " in " + surface.title());
+    }
+
     /** The Sessions kit view mounted in the window, found by its root Panel's id; UI thread. */
     KitView sessions() { return find(window); }
 

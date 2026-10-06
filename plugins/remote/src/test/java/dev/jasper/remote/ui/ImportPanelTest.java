@@ -21,6 +21,9 @@ class ImportPanelTest {
             assertThat(check(panel, 0).checked()).isTrue();
             assertThat(check(panel, 1).checked()).isFalse();
             assertThat(check(panel, 1).label()).contains("Update");
+            assertThat(node(view, ImportPanel.name(1), Nodes.Text.class).text()).as("the row's text shows beside its switch, as the checkbox's did")
+                .isEqualTo(check(panel, 1).label()).startsWith("Update: old");
+            assertThat(texts(view)).anyMatch(text -> text.startsWith("New: fresh"));
             assertThat(check(panel, 2).state().enabled()).isFalse();
             emit(view, new UiEvent.Toggled(ImportPanel.check(1), true));
             click(view, ImportPanel.IMPORT);

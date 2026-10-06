@@ -22,8 +22,9 @@
   description rather than its name) also names the jump host. Visual-only changes (ledgered in `migration.csv`): kit
   rows with a StatusDot instead of the ● glyph and the kit selection colour instead of `0x304e77`; chevrons and a COUNT
   text on group rows instead of folder icons; the outline star always visible; the card is a kit Card (server tile,
-  name, MONO address, credential caption with a StatusDot or lock glyph, Edit ghost icon, Connect with the `terminal`
-  glyph); the empty hint is DESCRIPTION text; the search field is the kit SEARCH field; dialogs carry kit labels above
+  name, MONO address that truncates at the start under the kit MONO rule and no longer has its own tooltip (address,
+  facts and jump host are in the row tooltip), credential caption with a StatusDot or lock glyph, Edit ghost icon,
+  Connect with the `terminal` glyph; its controls wrap at full width in a narrow panel); the empty hint is DESCRIPTION text; the search field is the kit SEARCH field; dialogs carry kit labels above
   inputs, switches instead of checkboxes (Favorite, Track shell folder, import rows), a SEGMENTED auth choice, a
   SEARCHABLE free-entry group choice with a "Blank: <default> (default)" caption instead of the placeholder, an ORDERED
   key list with kit move/remove instead of four buttons; host-key text is BODY with a MONO fingerprint instead of HTML
@@ -33,7 +34,13 @@
   hops, waiting for the loopback banner off the EDT under a JUnit timeout. The editor's validation message and the import status sit in the form footer beside the buttons (where the former south line sat), so a long form never scrolls them away. Evidence (ruling G10): descriptor scenarios (`ThemeMigrationEvidenceTest`) plus real-host dark and light captures of the staged plugin (`RemoteRenderEvidenceTest`, build/theme-migration-evidence/remote-hosted) through the reusable `StagedRemoteHost`. GUI checks for the user: Sessions panel rows
   (star tint and hover, group click/Enter, row menus, distro badges), the card in dark and light, the Add/Edit Host,
   Verify host key, Import and Rename default group dialogs (Enter/Escape), and the connecting overlay's progress and
-  Escape.
+  Escape, and the dark theme's PRIMARY Connect button contrast on the card (white on pale blue in the capture).
+  Review fix round 1: the kit progress animates only while showing (as ConnectionDots did); kit list, table and tree
+  rows are named by their title text for assistive technology (description = tooltip; also 6c plugin rows and Task 7
+  Vault rows); the card's controls are an ACTIONS stack that wraps instead of squeezing; Vault picks reach the editor
+  on the UI thread; a double click on a star toggles once; import candidates show their text beside each switch (the
+  kit switch label is accessible-only); real-host captures now include the host-key question and the connecting overlay
+  and fail on a blank frame.
 - **Theme engine Plan 2 Task 8-kit implemented: kit capabilities for the Remote migration; review pending** (2026-10-05).
   Task 8 is split (controller ruling) into 8-kit, 8a (Sessions and dialogs), 8b (Tunnels) and 8c (SFTP and transfers).
   8-kit adds, mirrored module ↔ SDK ↔ host `KitValues` ↔ testkit fake with a shared contract case (SDK version unchanged;
