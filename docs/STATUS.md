@@ -24,7 +24,11 @@
   Fix round 1 (I1): a plugin dialog the host packed itself now re-packs when its kit view's preferred size changes
   (host `DialogFit`, no SDK member), so More/Less in Forward a Port grows and shrinks the window as the old `pack()`
   did, clamped to the screen; once the user resizes a dialog it keeps its size, and other kit dialogs follow their
-  content the same way (for example a message line appearing). Visual-only changes (ledgered in `migration.csv`): kit
+  content the same way (for example a message line appearing). Further deviations (fix round 1, M4): clicking a row's
+  switch no longer selects its row; the broken-file row can no longer be selected; hovering the switch shows Start
+  tunnel/Stop tunnel or the failure rather than the row's live-counter tooltip; the dialogs' kit PORT fields admit
+  digits only (the baseline accepted any text and explained the error on Save/Forward; range messages unchanged).
+  Visual-only changes (ledgered in `migration.csv`): kit
   DOUBLE rows with a StatusDot (Up SUCCESS, Up with a warning or Starting WARNING, Failed DANGER, Stopped IDLE) and the
   kit selection colour; the stage or problem (formerly a third line) follows the MONO_SMALL mapping on the subtitle
   line, failures and warnings with a severity icon instead of red/amber text, so in a narrow rail the mapping
