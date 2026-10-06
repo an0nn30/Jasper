@@ -32,7 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * ({@link StagedRemoteHost}: no Vault, no network, no shell, an isolated ~/.ssh) and its kit views render through the
  * host translation. Each capture waits for its named content to mount and must not be a uniform frame. The host-key
  * question is asked through the plugin's own entry with a synthetic key; the connecting overlay is mounted on an
- * overlay as a connection attempt does, with synthetic text and no connection. Output goes to
+ * overlay as a connection attempt does, with synthetic text and no connection. Task 8b adds the Tunnels panel and its
+ * dialogs. Output goes to
  * build/theme-migration-evidence/remote-hosted; the frozen before images are untouched.
  */
 class RemoteRenderEvidenceTest {
@@ -108,6 +109,71 @@ class RemoteRenderEvidenceTest {
             });
             save(theme, "connection-error", connecting.holder(), 460, 260);
             onEdt(() -> overlay.get().close());
+            assertThat(remote.problems).isEmpty();
+        } finally {
+            onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); });
+        }
+    }
+
+    /**
+     * Plan 2 Task 8b: the Tunnels panel (empty; a failed and a stopped row; a starting row with its pending switch and an
+     * up row) and the New Tunnel and Forward a Port dialogs, dark and light. Every tunnel goes through a missing host, so
+     * nothing connects; the starting and up states are handed to the live panel as the plugin would after the manager
+     * confirmed them, with no tunnel running.
+     */
+    @Test @Timeout(value = 150, unit = TimeUnit.SECONDS)
+    void capturesTheStagedTunnelsPanelAndDialogsInTheRealHostDarkAndLight() throws Exception {
+        for (String theme : List.of("dark", "light")) captureTunnels(theme, root.resolve("tunnels-" + theme));
+    }
+
+    private void captureTunnels(String theme, Path data) throws Exception {
+        var controller = onEdtValue(dev.jasper.app.appearance.ThemeController::new);
+        onEdt(() -> controller.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT));
+        try (var remote = new StagedRemoteHost(data, theme.equals("dark"))) {
+            remote.openTunnels();
+            save(theme, "tunnels-empty", remote.window, 900, 560);
+            onEdt(() -> button(remote.tunnelsHeader(), "New Tunnel…").doClick(0));
+            var editor = remote.awaitSurface("New Tunnel");
+            awaitNamed(editor, "tunnel.save");
+            save(theme, "tunnel-new", editor.holder(), 620, 640);
+            onEdt(() -> ((AbstractButton) require(editor, "tunnel.save")).doClick(0));
+            save(theme, "tunnel-new-invalid", editor.holder(), 620, 640);
+            onEdt(editor::requestClose);
+            StagedRemoteTunnelsTest.tunnels(data, "db", "web");
+            remote.pollTunnels();
+            StagedVaultHost.await(() -> StagedRemoteHost.labels(remote.tunnelsHeader()).contains("2"), "the tunnels are listed");
+            onEdt(() -> {
+                var view = remote.tunnels();
+                view.setSize(300, 480);
+                StagedRemoteTunnelsTest.layout(view);
+                var db = StagedRemoteTunnelsTest.row(view, "db");
+                StagedRemoteTunnelsTest.click(db, 1);
+                StagedRemoteHost.press(StagedRemoteTunnelsTest.canvas(db), java.awt.event.KeyEvent.VK_ENTER, '\n');
+            });
+            StagedVaultHost.await(() -> StagedRemoteTunnelsTest.problems(remote.tunnels()) == 1, "db failed: its host is missing");
+            StagedVaultHost.settle();
+            save(theme, "tunnels-failed-stopped", remote.window, 900, 560);
+            onEdt(() -> remote.tunnelStates("Connecting…"));
+            StagedVaultHost.settle(); // the switches' knobs finish moving
+            save(theme, "tunnels-starting-up", remote.window, 900, 560);
+            var forward = new AtomicReference<PluginDialog>();
+            onEdt(() -> {
+                try {
+                    var context = remote.context();
+                    var handle = context.terminals().window(remote.window.id()).orElseThrow();
+                    forward.set(context.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Forward a Port", handle, true)));
+                    Object panel = remote.loader.loadClass("dev.jasper.remote.ui.tunnels.ForwardPanel")
+                        .getConstructor(UiKit.class, List.class, java.util.Optional.class, java.util.function.IntPredicate.class, java.util.function.Consumer.class, Runnable.class)
+                        .newInstance(context.kit(), List.of(), java.util.Optional.empty(), (java.util.function.IntPredicate) port -> true,
+                            (java.util.function.Consumer<Object>) tunnel -> { }, (Runnable) () -> { });
+                    forward.get().setContent((UiView) panel.getClass().getMethod("view").invoke(panel));
+                    forward.get().show();
+                } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+            });
+            var surface = remote.awaitSurface("Forward a Port");
+            awaitNamed(surface, "forward.more");
+            save(theme, "forward-port", surface.holder(), 560, 520);
+            onEdt(() -> forward.get().close());
             assertThat(remote.problems).isEmpty();
         } finally {
             onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); });

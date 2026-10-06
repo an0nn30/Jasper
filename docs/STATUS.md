@@ -2,6 +2,40 @@
 
 ## Current state — 2026-10-06
 
+- **Theme engine Plan 2 Task 8b implemented: Remote Tunnels panel and tunnel dialogs on kit views; review pending**
+  (2026-10-06). The Tunnels panel (`TunnelsPanel`, now registered with `registerView`) and the New/Edit/Save as Tunnel
+  editor and Forward a Port dialogs are owned SDK `UiView`s from `context.kit()`; they read no `WorkspacePalette`,
+  `UIManager` font, `PanelStyle` or fixed colour and paint nothing, and `TunnelSwitch` is deleted (the kit compact `Toggle`
+  with `Toggle.pending`, ruling G5). Behaviour kept: rows keyed by tunnel id, saved tunnels by name then quick forwards
+  under their heading, the filter and "No tunnels match", the broken-file row (no switch, no menu) and note, the menu
+  per state (Start/Stop, Open in Browser, Copy Address, Edit/Duplicate/Delete or Save as Tunnel), selection surviving
+  refreshes; the switch shows only confirmed `TunnelManager` state (on while Up, pending and still operable while
+  Starting so a click stops it, the failure as its error and accessible description; never flipped optimistically) and
+  a double click on it operates once, as the old switch did; Enter toggles (`ItemList.enterAction`), a double click edits
+  a saved tunnel or offers Save as Tunnel for a quick forward, Delete/Backspace delete only saved tunnels
+  (`deleteAction`), Space operates the row's switch and Shift+F10 opens its menu (ruling G3); the live counters, uptime
+  and bytes stay in the row tooltip, now also the row's accessible description (ruling G1); the header count and New
+  Tunnel… travel through `PanelHost.setHeader` (Task 6d acceptance, asserted in a real window by
+  `StagedRemoteTunnelsTest` and through the testkit `panelHeader` in `TunnelsPluginTest`). Enter/Escape (ruling Task8
+  Enter): neither dialog has a primary or a submitting field, so Enter saves or forwards nothing (baseline `f16ae32f`
+  had no default button); Escape runs Cancel. A closed panel or editor ignores later state changes, ticks and save
+  errors. Behaviour deviations: a right-click no longer selects the row (each row's menu acts on that row, 6c rule); a
+  quick double Space on a focused switch operates it once (the double-click guard is time-based, as the 8a star);
+  More in Forward a Port grows the form but no longer re-packs the dialog window (the SDK dialog has no pack; the
+  revealed field is in the form's scroll area; GUI check). Visual-only changes (ledgered in `migration.csv`): kit
+  DOUBLE rows with a StatusDot (Up SUCCESS, Up with a warning or Starting WARNING, Failed DANGER, Stopped IDLE) and the
+  kit selection colour; the stage or problem (formerly a third line) follows the MONO_SMALL mapping on the subtitle
+  line, failures and warnings with a severity icon instead of red/amber text, so in a narrow rail the mapping
+  truncates at the start under the kit MONO rule (the full mapping is in the tooltip); the kit Quick forwards heading;
+  a kit Empty (tunnel glyph) with New Tunnel and the broken-file note as wrapping body text with an error icon; the
+  kit SEARCH filter; dialogs with kit labels above inputs, a SEGMENTED type choice, switches for Allow other computers
+  and Keep as a saved tunnel, labelled address/port pairs, the shared-port warning with a warning icon and the message
+  beside the buttons. Evidence (ruling G10): descriptor scenarios (`ui/tunnels/ThemeMigrationEvidenceTest`) plus
+  real-host dark and light captures (`RemoteRenderEvidenceTest`: empty, failed/stopped, starting/up with the pending
+  switch, New Tunnel, Forward a Port). GUI checks for the user: Tunnels rows (dots, pending knob, failure tooltip,
+  menus, Enter/Space/double click/Delete), the mapping truncation in a narrow rail, the empty state, the New/Edit
+  Tunnel and Forward a Port dialogs (Enter/Escape, More inside the unchanged window size), the light theme's
+  off-switch contrast.
 - **Theme engine Plan 2 Task 8a implemented: Remote Sessions panel and host dialogs on kit views; review pending**
   (2026-10-06). The Sessions panel (`HostsPanel`, now registered with `registerView`) and the host editor, connecting
   overlay, host-key question, config import, default-group rename and delete confirmations are owned SDK `UiView`s from

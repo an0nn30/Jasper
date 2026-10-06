@@ -46,7 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 final class StagedRemoteHost implements AutoCloseable {
     static final PluginInfo REMOTE = new PluginInfo("dev.jasper.remote", "Remote", "0.12.0", Set.of(Capabilities.TERMINAL_OPEN,
         Capabilities.SESSION_PROVIDE, Capabilities.TERMINAL_OBSERVE, Capabilities.PALETTE_CONTRIBUTE, Capabilities.FILES_SOURCE));
-    static final String PANEL = "dev.jasper.remote.panel", SESSIONS = "sessions";
+    static final String PANEL = "dev.jasper.remote.panel", SESSIONS = "sessions", TUNNELS_PANEL = "dev.jasper.remote.tunnels.panel", TUNNELS = "tunnels";
 
     final Contributions contributions;
     final AuxiliaryWindows auxiliary;
@@ -103,6 +103,45 @@ final class StagedRemoteHost implements AutoCloseable {
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 
+    /** Has the tunnel store re-read tunnels.toml, as its file watch would (the test constructor runs no timers); UI thread. */
+    void pollTunnels() throws InterruptedException {
+        onEdt(() -> {
+            try {
+                var store = field(plugin, "tunnelStore");
+                store.getClass().getMethod("poll").invoke(store);
+            } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+        });
+        StagedVaultHost.settle();
+    }
+
+    /**
+     * Hands the live Tunnels panel the states the manager would confirm for a connection in progress (the first saved
+     * tunnel Starting at {@code stage}) and an established one (the second Up), as the plugin does on a state change,
+     * without running either; UI thread. The panel's switches and dots then show those confirmed states.
+     */
+    void tunnelStates(String stage) {
+        try {
+            Object tunnelsUi = field(plugin, "tunnelsUi");
+            Object panel = ((Map<?, ?>) field(tunnelsUi, "panels")).get(window.id());
+            Object store = field(tunnelsUi, "store");
+            var tunnels = (List<?>) store.getClass().getMethod("tunnels").invoke(store);
+            Object starting = loader.loadClass("dev.jasper.remote.tunnels.TunnelState$Starting").getConstructor(String.class).newInstance(stage);
+            Object counters = loader.loadClass("dev.jasper.remote.tunnels.Counters").getConstructor().newInstance();
+            Object up = loader.loadClass("dev.jasper.remote.tunnels.TunnelState$Up").getConstructor(java.time.Instant.class, int.class, counters.getClass())
+                .newInstance(java.time.Instant.now(), 5433, counters);
+            var first = tunnels.getFirst().getClass().getMethod("id").invoke(tunnels.getFirst());
+            Function<Object, Object> states = id -> id.equals(first) ? starting : up;
+            Function<Object, Optional<String>> hosts = id -> Optional.empty();
+            panel.getClass().getMethod("setTunnels", List.class, List.class, Optional.class, Function.class, Function.class)
+                .invoke(panel, tunnels, List.of(), Optional.empty(), states, hosts);
+        } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+    }
+
+    private static Object field(Object owner, String name) throws ReflectiveOperationException {
+        var field = owner.getClass().getDeclaredField(name); field.setAccessible(true);
+        return field.get(owner);
+    }
+
     /** The plugin's own context (its kit, windows and terminals), for mounting its views as the plugin does. */
     dev.jasper.sdk.plugin.PluginContext context() {
         try {
@@ -132,8 +171,23 @@ final class StagedRemoteHost implements AutoCloseable {
         StagedVaultHost.await(() -> StagedVaultHost.named(surface.holder(), name) != null, name + " in " + surface.title());
     }
 
+    /** Opens the Tunnels panel in the window and waits until its kit view is mounted (Task 8b). */
+    void openTunnels() throws InterruptedException {
+        onEdt(() -> contributions.requestPanel(new Contributions.PanelRequest(window.id(), TUNNELS_PANEL, Contributions.PanelRequest.Op.TOGGLE)));
+        StagedVaultHost.await(() -> tunnels() != null, "the Tunnels panel is mounted in the window");
+    }
+
+    /** The plugin's data directory under the test's {@code root} (the contract host resolves it by id), where tunnels.toml lives. */
+    static Path data(Path root) { return root.resolve("home").resolve(REMOTE.id()); }
+
     /** The Sessions kit view mounted in the window, found by its root Panel's id; UI thread. */
-    KitView sessions() { return find(window); }
+    KitView sessions() { return find(window, SESSIONS); }
+
+    /** The Tunnels kit view mounted in the window; UI thread. */
+    KitView tunnels() { return find(window, TUNNELS); }
+
+    /** The window's borrowed kit header of the Tunnels panel; UI thread. */
+    Container tunnelsHeader() { return tunnels().panelHeader(TUNNELS); }
 
     /** The window's borrowed kit header of the Sessions panel; UI thread. */
     Container header() { return sessions().panelHeader(SESSIONS); }
@@ -155,10 +209,10 @@ final class StagedRemoteHost implements AutoCloseable {
         StagedVaultHost.await(() -> editor.closed() && !String.join("|", labels(header())).equals(before), "Add Host saved " + name);
     }
 
-    private static KitView find(Container root) {
+    private static KitView find(Container root, String id) {
         for (var child : root.getComponents()) {
-            if (child instanceof KitView view && !view.isClosed() && view.spec().root().id().equals(SESSIONS)) return view;
-            if (child instanceof Container nested) { var found = find(nested); if (found != null) return found; }
+            if (child instanceof KitView view && !view.isClosed() && view.spec().root().id().equals(id)) return view;
+            if (child instanceof Container nested) { var found = find(nested, id); if (found != null) return found; }
         }
         return null;
     }

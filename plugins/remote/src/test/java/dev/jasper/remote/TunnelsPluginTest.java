@@ -90,6 +90,61 @@ class TunnelsPluginTest {
         }
     }
 
+    /**
+     * Plan 2 Task 8b (Task 6d acceptance through the testkit): the Tunnels kit panel keeps its count and New Tunnel action
+     * on the window's header through PanelHost.setHeader; the action opens the editor, which Escape (its cancel action)
+     * closes. A tunnel through a missing host fails at once, so its switch shows the failure without any network; a
+     * closed panel ignores later state changes.
+     */
+    @Test void theTunnelsHeaderKeepsItsCountAndNewActionAndTheSwitchShowsConfirmedState(@TempDir Path dir) throws Exception {
+        try (var host = new FakePluginHost()) {
+            RemotePlugin plugin = plugin(dir.resolve("ssh"));
+            host.start(RemotePluginTest.INFO, Set.of(), Set.of(), plugin);
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            var tunnels = plugin.tunnels();
+            Kits.edt(() -> host.openPanel(TunnelsUi.PANEL, window));
+            assertThat(host.panelHeader(TunnelsUi.PANEL, window).detail()).as("no count while empty").isEmpty();
+            Tunnel db = Tunnel.create("db", UUID.randomUUID(), TunnelKind.LOCAL, Tunnel.LOCALHOST, 5432, "db.internal", 5432);
+            plugin.tunnelStore().put(db);
+            RemotePluginTest.settle(host);
+            var header = host.panelHeader(TunnelsUi.PANEL, window);
+            assertThat(header.detail()).isEqualTo("1");
+            assertThat(header.actions()).extracting(dev.jasper.sdk.ui.PanelHeader.Action::label).containsExactly("New Tunnel…");
+            Kits.edt(() -> header.actions().getFirst().invoke().run());
+            assertThat(host.windows()).containsExactly("dialog|New Tunnel|true");
+            Kits.edt(() -> {
+                var editor = tunnels.currentEditor();
+                assertThat(Kits.primaries(editor.view())).as("Enter saves nothing").isEmpty();
+                Kits.press(editor.view(), Kits.form(editor.view()).cancelAction());
+            });
+            assertThat(host.windows()).as("Escape cancelled").isEmpty();
+            var panel = Kits.value(() -> TunnelsTestAccess.panel(tunnels, window));
+            String row = "tunnel:" + db.id();
+            Kits.edt(() -> {
+                var item = Kits.item(Kits.node(panel.view(), dev.jasper.remote.ui.tunnels.TunnelsPanel.ROWS, dev.jasper.sdk.ui.Nodes.ItemList.class), row);
+                var toggle = (dev.jasper.sdk.ui.Nodes.Toggle) item.trailing().getFirst();
+                assertThat(toggle.checked()).isFalse();
+                Kits.emit(panel.view(), new dev.jasper.sdk.ui.UiEvent.Toggled(toggle.id(), true));
+            });
+            RemotePluginTest.settle(host);
+            assertThat(tunnels.manager().state(db.id())).as("the host is missing, so it fails without a connection").isEqualTo(new TunnelState.Failed("Host missing"));
+            Kits.edt(() -> {
+                var item = Kits.item(Kits.node(panel.view(), dev.jasper.remote.ui.tunnels.TunnelsPanel.ROWS, dev.jasper.sdk.ui.Nodes.ItemList.class), row);
+                var toggle = (dev.jasper.sdk.ui.Nodes.Toggle) item.trailing().getFirst();
+                assertThat(toggle.checked()).as("the confirmed state, never the requested one").isFalse();
+                assertThat(toggle.state().error()).isEqualTo("Host missing");
+                assertThat(((dev.jasper.sdk.ui.Nodes.StatusDot) item.leading().orElseThrow()).kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.StatusKind.DANGER);
+            });
+            Kits.edt(() -> host.closePanel(TunnelsUi.PANEL, window));
+            assertThat(Kits.closed(panel.view())).as("the host disposed the view").isTrue();
+            Kits.edt(() -> tunnels.manager().stop(db.id()));
+            RemotePluginTest.settle(host);
+            assertThat(Kits.value(() -> TunnelsTestAccess.panel(tunnels, window))).as("the closed panel left the plugin's map").isNull();
+            assertThat(host.failures()).as("no late update reached the closed view").isEmpty();
+        }
+    }
+
     @Test void aSavedTunnelStartsFromThePaletteForwardsAndOpensInTheBrowser(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var echo = new EchoServer(); var host = new FakePluginHost()) {
             Started started = start(host, server, dir);
