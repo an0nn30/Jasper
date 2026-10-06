@@ -75,15 +75,23 @@ public final class HostsPanel implements AutoCloseable {
     private int headerCount = -1;
     private boolean closed;
     private final LongSupplier clock;
+    private final long multiClickNanos;
     private String lastStar;
     private long lastStarAt;
 
     /** {@code icons} supplies the header actions' artwork, which the window draws. */
-    public HostsPanel(UiKit kit, Actions actions, Function<BundledIcon, javax.swing.Icon> icons) { this(kit, actions, icons, System::nanoTime); }
+    public HostsPanel(UiKit kit, Actions actions, Function<BundledIcon, javax.swing.Icon> icons) {
+        this(kit, actions, icons, System::nanoTime, multiClickNanos());
+    }
 
-    /** {@code clock} (nanoseconds) tells a double click on a star from two separate clicks. */
-    HostsPanel(UiKit kit, Actions actions, Function<BundledIcon, javax.swing.Icon> icons, LongSupplier clock) {
+    /**
+     * {@code clock} (nanoseconds) and {@code multiClickNanos} (the desktop's double-click interval) tell a double click on a
+     * star from two separate clicks.
+     */
+    HostsPanel(UiKit kit, Actions actions, Function<BundledIcon, javax.swing.Icon> icons, LongSupplier clock, long multiClickNanos) {
         this.clock = Objects.requireNonNull(clock);
+        if (multiClickNanos < 0) throw new IllegalArgumentException("multiClickNanos must not be negative");
+        this.multiClickNanos = multiClickNanos;
         this.actions = Objects.requireNonNull(actions); this.icons = Objects.requireNonNull(icons);
         this.activate = actions.connect();
         rebuildRows();
@@ -183,6 +191,7 @@ public final class HostsPanel implements AutoCloseable {
         }
     }
 
+    /** The desktop's double-click interval, 500 ms where it has none. */
     private static long multiClickNanos() {
         Object interval = null;
         try { interval = java.awt.Toolkit.getDefaultToolkit().getDesktopProperty("awt.multiClickInterval"); } catch (RuntimeException | java.awt.AWTError headless) { }
@@ -204,7 +213,7 @@ public final class HostsPanel implements AutoCloseable {
             // The star reports each click; the second click of a double click is not a second toggle, as the old list
             // acted only on a single click.
             long now = clock.getAsLong();
-            boolean second = hostId.equals(lastStar) && now - lastStarAt < multiClickNanos();
+            boolean second = hostId.equals(lastStar) && now - lastStarAt < multiClickNanos;
             lastStar = hostId; lastStarAt = now;
             if (second) return;
             hosts.stream().filter(host -> host.id().toString().equals(hostId)).findFirst().ifPresent(host -> actions.favorite().accept(host, !host.favorite()));

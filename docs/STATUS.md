@@ -40,7 +40,10 @@
   Vault rows); the card's controls are an ACTIONS stack that wraps instead of squeezing; Vault picks reach the editor
   on the UI thread; a double click on a star toggles once; import candidates show their text beside each switch (the
   kit switch label is accessible-only); real-host captures now include the host-key question and the connecting overlay
-  and fail on a blank frame.
+  and fail on a blank frame. Carried 8a review minors (closed in 8b): the star's double-click interval is injected (tests no
+  longer depend on the machine's double-click setting); recorded deviations: a quick double Space on a focused star
+  toggles the favourite once (the time-based guard cannot tell keys from clicks), and an import candidate's
+  "New:/Update: …" text is not clickable and may be read twice by assistive technology (switch name plus visible text).
 - **Theme engine Plan 2 Task 8-kit implemented: kit capabilities for the Remote migration; review pending** (2026-10-05).
   Task 8 is split (controller ruling) into 8-kit, 8a (Sessions and dialogs), 8b (Tunnels) and 8c (SFTP and transfers).
   8-kit adds, mirrored module ↔ SDK ↔ host `KitValues` ↔ testkit fake with a shared contract case (SDK version unchanged;
