@@ -27,6 +27,8 @@ class ImportPanelTest {
             assertThat(selected).extracting(ConfigImport.Candidate::name).containsExactly("fresh", "old");
             assertThat(texts(view)).contains("Not importable: skipped");
             panel.busy(); assertThat(button(view, ImportPanel.REFRESH).state().enabled()).isFalse();
+            assertThat(form(view).preview()).as("the status sits beside the buttons, as it sat above them at baseline")
+                .hasValueSatisfying(line -> assertThat(line.id()).isEqualTo(ImportPanel.STATUS));
             assertThat(check(panel, 0).state().enabled()).isFalse();
             assertThat(panel.status()).isEqualTo("Reviewing credentials in Vault…");
             panel.failed("retry"); assertThat(button(view, ImportPanel.REFRESH).state().enabled()).isTrue();

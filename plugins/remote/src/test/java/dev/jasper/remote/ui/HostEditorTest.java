@@ -45,6 +45,9 @@ class HostEditorTest {
             assertThat(choice(editor, HostEditor.JUMP).options()).as("none + bastion").hasSize(2);
             save(editor);
             assertThat(editor.message()).contains("name");
+            assertThat(form(editor.view()).preview()).as("the message sits beside the buttons, as it sat above them at baseline")
+                .hasValueSatisfying(line -> assertThat(line).isInstanceOfSatisfying(Nodes.Text.class, text -> {
+                    assertThat(text.id()).isEqualTo(HostEditor.MESSAGE); assertThat(text.state().visible()).isTrue(); assertThat(text.text()).contains("name"); }));
             type(editor.view(), HostEditor.NAME, "prod"); type(editor.view(), HostEditor.HOSTNAME, "api.example"); type(editor.view(), HostEditor.PORT, "2222");
             save(editor);
             assertThat(editor.message()).contains("credential");

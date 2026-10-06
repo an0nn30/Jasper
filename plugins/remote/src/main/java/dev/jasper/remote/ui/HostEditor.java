@@ -196,11 +196,12 @@ public final class HostEditor implements AutoCloseable {
         jumpOptions.add(new Option(NO_JUMP, "none", Optional.empty()));
         for (var other : jumps) jumpOptions.add(new Option(other.id().toString(), other.name(), Optional.empty()));
         sections.add(new Nodes.Choice(JUMP, ControlState.READY, Nodes.ChoiceKind.DROPDOWN, jumpOptions, jump, "Jump host", ""));
-        sections.add(new Nodes.Text(MESSAGE, state(!message.isEmpty(), true), message, Nodes.TextRole.BODY));
         var actions = List.of(
             new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
             new Nodes.Button(SAVE, ControlState.READY, editing.isPresent() ? "Save" : "Add Host", "", Nodes.ButtonKind.SECONDARY, SAVE, ""));
-        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, editing.isPresent() ? "Edit host" : "Add Host", Optional.empty(), sections, Optional.empty(), actions, CANCEL);
+        // The message sits beside the buttons, as the former one sat above them, so a long form never scrolls it away.
+        var messageLine = new Nodes.Text(MESSAGE, state(!message.isEmpty(), true), message, Nodes.TextRole.BODY);
+        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, editing.isPresent() ? "Edit host" : "Add Host", Optional.empty(), sections, Optional.of(messageLine), actions, CANCEL);
     }
 
     @Override public void close() { if (closed) return; closed = true; view.close(); }

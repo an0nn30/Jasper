@@ -30,7 +30,7 @@
   bold/code; the connecting overlay's progress bar hides once finished and the overlay/import/group dialogs lose their
   fixed minimum sizes. Tests: Remote plugin tests drive the EDT-confined kit views on the EDT (new `testsupport/Kits`,
   plugin completions marshal through `Kits.UI`); `ManagedImportIntegrationTest` now runs on the test thread with EDT
-  hops, waiting for the loopback banner off the EDT under a JUnit timeout. GUI checks for the user: Sessions panel rows
+  hops, waiting for the loopback banner off the EDT under a JUnit timeout. The editor's validation message and the import status sit in the form footer beside the buttons (where the former south line sat), so a long form never scrolls them away. Evidence (ruling G10): descriptor scenarios (`ThemeMigrationEvidenceTest`) plus real-host dark and light captures of the staged plugin (`RemoteRenderEvidenceTest`, build/theme-migration-evidence/remote-hosted) through the reusable `StagedRemoteHost`. GUI checks for the user: Sessions panel rows
   (star tint and hover, group click/Enter, row menus, distro badges), the card in dark and light, the Add/Edit Host,
   Verify host key, Import and Rename default group dialogs (Enter/Escape), and the connecting overlay's progress and
   Escape.

@@ -96,12 +96,13 @@ public final class ImportPanel implements AutoCloseable {
                 new Nodes.Text(detail(i), ControlState.READY, details.get(i), Nodes.TextRole.DESCRIPTION))));
         }
         sections.add(new Nodes.Text(SKIPPED, state(!skipped.isEmpty(), true), skipped, Nodes.TextRole.DESCRIPTION));
-        sections.add(new Nodes.Text(STATUS, state(!status.isEmpty(), true), status, Nodes.TextRole.BODY));
         var actions = List.of(
             new Nodes.Button(REFRESH, state(true, enabled), "Refresh", "", Nodes.ButtonKind.SECONDARY, REFRESH, ""),
             new Nodes.Button(CANCEL, ControlState.READY, cancelLabel, "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
             new Nodes.Button(IMPORT, state(true, enabled && !candidates.isEmpty()), "Import", "", Nodes.ButtonKind.SECONDARY, IMPORT, ""));
-        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, "Import from ~/.ssh/config", Optional.empty(), sections, Optional.empty(), actions, CANCEL);
+        // The status sits beside the buttons, as it sat above them, so a long preview never scrolls it away.
+        var statusLine = new Nodes.Text(STATUS, state(!status.isEmpty(), true), status, Nodes.TextRole.BODY);
+        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, "Import from ~/.ssh/config", Optional.empty(), sections, Optional.of(statusLine), actions, CANCEL);
     }
 
     @Override public void close() { if (closed) return; closed = true; view.close(); }
