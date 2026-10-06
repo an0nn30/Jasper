@@ -273,8 +273,10 @@ The palette can be dragged by its empty areas: the padding around the search box
 empty result list. Near the window's vertical centre line or one fifth down from its top, it snaps to that
 line; the lines are never drawn, only felt. Releasing saves the place, as fractions of the window, in `ui-state.toml`'s
 `[palette]` table (`center_x`, `top`), and every window opens the palette there; a dragged palette keeps the
-560-pixel activated width in both view modes. Double-click a draggable area to forget the place: Normal mode
-hangs the palette from the title-bar field again and Compact mode centres it.
+560-pixel activated width in both view modes. In Normal mode, dragging the palette back to the title-bar field
+(near its usual place across, at or above its usual height) snaps it home, and releasing there re-attaches it.
+Double-clicking a draggable area also forgets the place: Normal mode hangs the palette from the title-bar field
+again and Compact mode centres it.
 
 ### Finished-command notifications
 
