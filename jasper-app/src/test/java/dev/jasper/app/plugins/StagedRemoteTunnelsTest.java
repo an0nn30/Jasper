@@ -101,6 +101,8 @@ class StagedRemoteTunnelsTest {
             StagedVaultHost.settle();
             onEdt(() -> {
                 assertThat(editor.closed()).as("Enter saves nothing: the old dialog had no default button").isFalse();
+                // Any save attempt here would show "Choose a host to go through" (the host is missing): none was made.
+                assertSaveNotAttempted(editor);
                 press(require(editor, "tunnel.name.input"), KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED);
             });
             StagedVaultHost.await(editor::closed, "Escape cancels the tunnel editor");
@@ -131,9 +133,11 @@ class StagedRemoteTunnelsTest {
             StagedVaultHost.settle();
             onEdt(() -> {
                 assertThat(created.closed()).as("Enter adds nothing").isFalse();
+                assertSaveNotAttempted(created);
                 press(require(created, "tunnel.name.input"), KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED);
             });
             StagedVaultHost.await(created::closed, "Escape cancels New Tunnel");
+            assertThat(Files.readString(data(root).resolve("tunnels.toml"))).as("nothing was saved").doesNotContain("\"api\"");
             assertThat(remote.problems).isEmpty();
         }
     }
@@ -224,6 +228,14 @@ class StagedRemoteTunnelsTest {
             });
             assertThat(remote.problems).isEmpty();
         }
+    }
+
+    /** The editor shows no validation or save message: Save never ran (it would at least ask for a host here). */
+    static void assertSaveNotAttempted(dev.jasper.app.windows.AuxiliarySurface editor) {
+        var message = StagedVaultHost.named(editor.holder(), "tunnel.message");
+        assertThat(message == null || !message.isVisible()).as("no message line: Save never ran").isTrue();
+        assertThat(labels(editor.holder())).as("no validation text").noneMatch(text -> text.startsWith("Choose a host")
+            || text.startsWith("A tunnel") || text.startsWith("The listen port") || text.startsWith("The target port"));
     }
 
     /** Rows asking for a host: the subtitle "Edit to choose a host" a stopped tunnel through a missing host shows. */
