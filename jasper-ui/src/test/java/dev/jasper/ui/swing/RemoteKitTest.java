@@ -423,47 +423,66 @@ class RemoteKitTest {
     }
 
     /**
-     * Task 8a (ruling G7): the connecting overlay's indeterminate progress replaces Remote's custom ConnectionDots, whose
-     * lifecycle assertions are ported here: the animation runs only while the progress is indeterminate, visible and
-     * enabled; hiding it, making it determinate, removing it or closing the view stops it, and with motion off it never
-     * starts.
+     * Task 8a (ruling G7, review fix round 1): the connecting overlay's indeterminate progress replaces Remote's custom
+     * ConnectionDots, and keeps its lifecycle: no animation before the view is displayable, none under a hidden ancestor
+     * or once removed from the hierarchy, again when re-added; none while hidden, determinate or removed by the
+     * descriptor, with motion off or after the view closes.
      */
-    @Test void anIndeterminateProgressAnimatesOnlyWhileShownAndStopsWhenHiddenDeterminateRemovedOrClosed() {
+    @Test void anIndeterminateProgressAnimatesOnlyWhileShowingAndStopsWhenHiddenDeterminateRemovedOrClosed() {
         Edt.run(() -> {
             var enabled = new java.util.concurrent.atomic.AtomicBoolean(true); var base = KitFixtures.context();
             var context = new KitContext(base.binding(), base.route(), base.metrics(), base.icons(), enabled::get);
             java.util.function.Function<ControlState, ViewSpec> working = state -> stack(new Progress("progress", state, -1, "Connecting"),
                 new Text("status", READY, "Opening shell…", TextRole.BODY));
+            var host = new javax.swing.JPanel(new java.awt.BorderLayout());
             try (var view = new KitView(context, working.apply(READY), e -> {})) {
                 var bar = find(view, "progress", Indicators.ProgressBar.class);
-                assertThat(bar.animation.isRunning()).as("working").isTrue();
-                view.update(working.apply(new ControlState(false, true, false, "")));
-                assertThat(bar.animation.isRunning()).as("hidden after a failure").isFalse();
-                view.update(working.apply(READY));
-                assertThat(bar.animation.isRunning()).as("shown again by Retry").isTrue();
-                view.update(stack(new Progress("progress", READY, .5, "Connecting")));
-                assertThat(bar.animation.isRunning()).as("determinate").isFalse();
-                view.update(working.apply(READY));
-                assertThat(bar.animation.isRunning()).isTrue();
-                view.update(stack(new Text("status", READY, "Done", TextRole.BODY)));
-                assertThat(bar.animation.isRunning()).as("removed").isFalse();
-                view.update(working.apply(READY));
-                var again = find(view, "progress", Indicators.ProgressBar.class);
-                assertThat(again.animation.isRunning()).isTrue();
-                enabled.set(false);
-                view.update(working.apply(READY));
-                assertThat(again.animation.isRunning()).as("motion off").isFalse();
-                assertThat(again.phase).isZero();
-                enabled.set(true);
-                view.update(working.apply(READY));
-                assertThat(again.animation.isRunning()).isTrue();
-                view.close();
-                assertThat(again.animation.isRunning()).as("closed").isFalse();
+                host.add(view);
+                assertThat(bar.animation.isRunning()).as("not displayable yet: no timer").isFalse();
+                host.addNotify();
+                try {
+                    assertThat(bar.animation.isRunning()).as("showing").isTrue();
+                    host.setVisible(false);
+                    assertThat(bar.animation.isRunning()).as("an ancestor hidden").isFalse();
+                    host.setVisible(true);
+                    assertThat(bar.animation.isRunning()).as("the ancestor shown again").isTrue();
+                    host.remove(view);
+                    assertThat(bar.animation.isRunning()).as("removed from the hierarchy").isFalse();
+                    host.add(view);
+                    assertThat(bar.animation.isRunning()).as("re-added").isTrue();
+                    view.update(working.apply(new ControlState(false, true, false, "")));
+                    assertThat(bar.animation.isRunning()).as("hidden after a failure").isFalse();
+                    view.update(working.apply(READY));
+                    assertThat(bar.animation.isRunning()).as("shown again by Retry").isTrue();
+                    view.update(stack(new Progress("progress", READY, .5, "Connecting")));
+                    assertThat(bar.animation.isRunning()).as("determinate").isFalse();
+                    view.update(working.apply(READY));
+                    assertThat(bar.animation.isRunning()).isTrue();
+                    view.update(stack(new Text("status", READY, "Done", TextRole.BODY)));
+                    assertThat(bar.animation.isRunning()).as("removed by the descriptor").isFalse();
+                    view.update(working.apply(READY));
+                    var again = find(view, "progress", Indicators.ProgressBar.class);
+                    assertThat(again.animation.isRunning()).isTrue();
+                    enabled.set(false);
+                    view.update(working.apply(READY));
+                    assertThat(again.animation.isRunning()).as("motion off").isFalse();
+                    assertThat(again.phase).isZero();
+                    enabled.set(true);
+                    view.update(working.apply(READY));
+                    assertThat(again.animation.isRunning()).isTrue();
+                    view.close();
+                    assertThat(again.animation.isRunning()).as("closed").isFalse();
+                    host.remove(view); host.add(view);
+                    assertThat(again.animation.isRunning()).as("a closed view never restarts").isFalse();
+                } finally { host.removeNotify(); }
             } finally { release(context); }
             var fresh = KitFixtures.context();
             var off = new KitContext(fresh.binding(), fresh.route(), fresh.metrics(), fresh.icons(), () -> false);
+            var shown = new javax.swing.JPanel(new java.awt.BorderLayout());
             try (var view = new KitView(off, working.apply(READY), e -> {})) {
-                assertThat(find(view, "progress", Indicators.ProgressBar.class).animation.isRunning()).as("never starts with motion off").isFalse();
+                shown.add(view); shown.addNotify();
+                try { assertThat(find(view, "progress", Indicators.ProgressBar.class).animation.isRunning()).as("never starts with motion off").isFalse(); }
+                finally { shown.removeNotify(); }
             } finally { release(off); }
         });
     }

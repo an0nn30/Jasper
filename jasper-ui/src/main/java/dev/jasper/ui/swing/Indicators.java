@@ -66,7 +66,18 @@ final class Indicators {
             animation = new Timer(32, event -> {
                 if (!view.motion().enabled()) { settle(); return; }
                 progress.phase = (progress.phase + .035) % 1; progress.repaint();
-            }); progress.animation = animation; own(this::settle); refresh();
+            }); progress.animation = animation;
+            // Animate only while actually showing: not before the view is mounted, under a hidden ancestor or once removed.
+            java.awt.event.HierarchyListener showing = event -> {
+                if ((event.getChangeFlags() & (java.awt.event.HierarchyEvent.SHOWING_CHANGED | java.awt.event.HierarchyEvent.DISPLAYABILITY_CHANGED)) != 0) animate();
+            };
+            progress.addHierarchyListener(showing);
+            own(() -> progress.removeHierarchyListener(showing)); own(this::settle); refresh();
+        }
+        private void animate() {
+            if (progress.isIndeterminate() && view.motion().enabled() && component.isEnabled() && component.isShowing()) {
+                if (!animation.isRunning()) { effect = view.motion().register(this::settle); animation.start(); }
+            } else settle();
         }
         private void settle() {
             animation.stop(); progress.phase = 0;
@@ -78,9 +89,7 @@ final class Indicators {
             progress.setString(value.label()); progress.setFont(ThemePainting.font(context(), Typography.Role.CAPTION));
             progress.setForeground(ThemePainting.color(context(), SemanticColor.ACCENT)); progress.setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_CONTROL));
             progress.getAccessibleContext().setAccessibleName(value.label()); progress.getAccessibleContext().setAccessibleDescription(value.fraction() == -1 ? "In progress" : (int)Math.round(value.fraction()*100) + "%");
-            if (progress.isIndeterminate() && view.motion().enabled() && component.isEnabled() && component.isVisible()) {
-                if (!animation.isRunning()) { effect = view.motion().register(this::settle); animation.start(); }
-            } else settle();
+            animate();
             progress.revalidate(); progress.repaint();
         }
     }
