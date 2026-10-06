@@ -149,8 +149,10 @@ public final class TransferUi implements AutoCloseable {
         if (job.isEmpty()) return;
         if (job.get().cleanupPending() == 0) { clear(id, false); return; }
         var dialog = context.windows().dialog(new DialogSpec("Clear transfer history", window, false));
-        dialog.setContent(new dev.jasper.remote.ui.ConfirmPanel("Unfinished cleanup will be forgotten. Partial files may remain. Clear this history?", "Clear history",
-            () -> { dialog.close(); clear(id, true); }, dialog::close));
+        var confirm = new dev.jasper.remote.ui.ConfirmPanel(context.kit(), "Unfinished cleanup will be forgotten. Partial files may remain. Clear this history?", "Clear history",
+            () -> { dialog.close(); clear(id, true); }, dialog::close);
+        dialog.setContent(confirm.view());
+        dialog.onClosed(confirm::close);
         dialog.show();
     }
 

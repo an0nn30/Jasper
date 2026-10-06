@@ -33,19 +33,16 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
-import javax.swing.JLabel;
-import javax.swing.JMenuItem;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import static dev.jasper.remote.ui.UiTestAccess.list;
-import static dev.jasper.remote.ui.UiTestAccess.menuFor;
+import dev.jasper.remote.ui.UiTestAccess;
 import static org.assertj.core.api.Assertions.*;
 
 class TunnelsPluginTest {
     final List<Runnable> scheduled = new ArrayList<>();
 
     RemotePlugin plugin(Path sshDir) {
-        return new TestRemotePlugin(Runnable::run, context -> Optional.empty(), (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
+        return new TestRemotePlugin(dev.jasper.remote.testsupport.Kits.UI, context -> Optional.empty(), (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
     }
 
     /** Drains background work until the condition holds; sockets and MINA run on their own threads meanwhile. */
@@ -171,16 +168,18 @@ class TunnelsPluginTest {
             Started started = start(host, server, dir);
             started.plugin().tunnelStore().put(Tunnel.create("db", started.prod().id(), TunnelKind.LOCAL, Tunnel.LOCALHOST, 5432, "db", 5432));
             RemotePluginTest.settle(host);
-            var hosts = (HostsPanel) host.openPanel(RemotePlugin.PANEL, started.window());
-            int row = -1;
-            for (int i = 0; i < list(hosts).getModel().getSize(); i++)
-                if (list(hosts).getModel().getElementAt(i) instanceof HostRows.Host entry && entry.host().id().equals(started.prod().id())) row = i;
-            JMenuItem delete = null;
-            for (var item : menuFor(hosts, row).getComponents()) if (item instanceof JMenuItem entry && entry.getText().equals("Delete…")) delete = entry;
-            assertThat(delete).isNotNull();
-            delete.doClick();
-            var confirm = started.plugin().currentConfirm();
-            assertThat(((JLabel) confirm.getComponent(0)).getText())
+            // The Sessions panel and the confirmation are kit views (Task 8a): drive them on the EDT.
+            var text = dev.jasper.remote.testsupport.Kits.value(() -> {
+                host.openPanel(RemotePlugin.PANEL, started.window());
+                HostsPanel hosts = started.plugin().hostsPanel(started.window());
+                int row = -1;
+                for (int i = 0; i < UiTestAccess.rows(hosts).size(); i++)
+                    if (UiTestAccess.rows(hosts).get(i) instanceof HostRows.Host entry && entry.host().id().equals(started.prod().id())) row = i;
+                assertThat(UiTestAccess.menu(hosts, row)).contains("Delete…");
+                UiTestAccess.menu(hosts, row, "Delete…");
+                return started.plugin().currentConfirm().text();
+            });
+            assertThat(text)
                 .isEqualTo("Delete the saved host prod? Open sessions stay connected. 1 tunnel uses this host (db); they stay, marked Host missing.");
         }
     }
@@ -284,8 +283,10 @@ class TunnelsPluginTest {
             manager.start(db, null);
             await(host, () -> manager.state(db.id()) instanceof TunnelState.Up, "the tunnel to come up");
             int port = ((TunnelState.Up) manager.state(db.id())).boundPort();
-            TunnelsTestAccess.delete(panel, db.id());
-            tunnels.currentConfirm().confirm.doClick();
+            dev.jasper.remote.testsupport.Kits.edt(() -> {
+                TunnelsTestAccess.delete(panel, db.id());
+                dev.jasper.remote.testsupport.Kits.click(tunnels.currentConfirm().view(), dev.jasper.remote.ui.ConfirmPanel.CONFIRM);
+            });
             RemotePluginTest.settle(host);
             assertThat(started.plugin().tunnelStore().tunnels()).isEmpty();
             assertThat(manager.state(db.id())).isEqualTo(TunnelState.STOPPED);
@@ -312,8 +313,10 @@ class TunnelsPluginTest {
             Files.setLastModifiedTime(store.file(), FileTime.from(Instant.now().plusSeconds(5)));
             store.poll();
             await(host, () -> store.error().isPresent(), "the broken file to be noticed");
-            TunnelsTestAccess.delete(panel, db.id());
-            tunnels.currentConfirm().confirm.doClick();
+            dev.jasper.remote.testsupport.Kits.edt(() -> {
+                TunnelsTestAccess.delete(panel, db.id());
+                dev.jasper.remote.testsupport.Kits.click(tunnels.currentConfirm().view(), dev.jasper.remote.ui.ConfirmPanel.CONFIRM);
+            });
             RemotePluginTest.settle(host);
             assertThat(store.tunnels()).as("the removal was refused").containsExactly(db);
             assertThat(manager.state(db.id())).as("so the tunnel was not stopped").isInstanceOf(TunnelState.Up.class);

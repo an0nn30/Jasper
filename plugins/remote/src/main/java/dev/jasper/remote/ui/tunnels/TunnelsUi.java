@@ -299,15 +299,15 @@ public final class TunnelsUi implements AutoCloseable {
         PluginDialog dialog = dialog(window, "Delete " + tunnel.name() + "?");
         boolean running = manager.state(tunnel.id()).running();
         // The tunnel stops when the store reports its entry gone (storeChanged), so a refused removal leaves it running.
-        var confirm = new ConfirmPanel("Delete the tunnel " + tunnel.name() + "?" + (running ? " It is running; deleting it stops it." : ""), "Delete", () -> {
+        var confirm = new ConfirmPanel(context.kit(), "Delete the tunnel " + tunnel.name() + "?" + (running ? " It is running; deleting it stops it." : ""), "Delete", () -> {
             store.remove(tunnel.id()).whenComplete((ignored, failure) -> ui.execute(() -> {
                 if (failure != null && !closed) notifications.error("Could not delete the tunnel", message(failure), failure);
                 dialog.close();
             }));
         }, dialog::close);
         currentConfirm = confirm;
-        dialog.setContent(confirm);
-        dialog.onClosed(() -> { if (currentConfirm == confirm) currentConfirm = null; });
+        dialog.setContent(confirm.view());
+        dialog.onClosed(() -> { confirm.close(); if (currentConfirm == confirm) currentConfirm = null; });
         dialog.show();
     }
 

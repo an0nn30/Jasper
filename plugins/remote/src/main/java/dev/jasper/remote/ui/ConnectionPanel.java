@@ -1,44 +1,60 @@
 package dev.jasper.remote.ui;
 
-import java.awt.BorderLayout;
-import java.awt.Dimension;
-import java.awt.Font;
-import javax.swing.*;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
+import java.util.List;
+import java.util.Optional;
 
-/** Compact connection progress, with retry after failure. Contains no network work. */
-public final class ConnectionPanel extends JPanel {
-    final JLabel message = new JLabel("Preparing connection…");
-    final ConnectionDots progress = new ConnectionDots();
-    final JButton retry = new JButton("Retry"), cancel = new JButton("Cancel");
+/**
+ * Compact connection progress, with retry after failure, on a host-rendered kit form; contains no network work. The
+ * motion is the kit's indeterminate progress, which follows the motion setting and stops with the view. Escape runs
+ * Cancel (Close after a failure); nothing is Enter's default. Updates after {@link #close()} (a stale completion) are
+ * ignored. UI thread only.
+ */
+public final class ConnectionPanel implements AutoCloseable {
+    public static final String FORM = "connection", TITLE = "connection.title", ADDRESS = "connection.address", MESSAGE = "connection.message",
+        PROGRESS = "connection.progress", RETRY = "connection.retry", CANCEL = "connection.cancel";
+    private final UiView view;
+    private final String name, address;
+    private String message = "Preparing connection…";
+    private boolean working = true, failed, closed;
 
-    public ConnectionPanel(String name, String address, Runnable retryAction, Runnable cancelAction) {
-        super(new BorderLayout(0, 16));
-        setBorder(BorderFactory.createEmptyBorder(20, 24, 16, 24));
-        var heading = new JPanel(new java.awt.GridLayout(0, 1, 0, 5));
-        var title = new JLabel(name) {
-            @Override public void updateUI() {
-                super.updateUI();
-                var base = UIManager.getFont("Label.font");
-                setFont(base.deriveFont(Font.BOLD, base.getSize2D() + 3));
-            }
-        };
-        title.putClientProperty("html.disable", true);
-        var target = new JLabel(address); target.putClientProperty("html.disable", true);
-        heading.add(title); heading.add(target); add(heading, BorderLayout.NORTH);
-        var body = new JPanel(new BorderLayout(0, 8));
-        message.putClientProperty("html.disable", true);
-        body.add(message, BorderLayout.NORTH); body.add(progress, BorderLayout.SOUTH); add(body, BorderLayout.CENTER);
-        var buttons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
-        buttons.add(retry); buttons.add(cancel); add(buttons, BorderLayout.SOUTH);
-        retry.addActionListener(event -> retryAction.run()); cancel.addActionListener(event -> cancelAction.run());
-        working();
+    public ConnectionPanel(UiKit kit, String name, String address, Runnable retryAction, Runnable cancelAction) {
+        this.name = name; this.address = address;
+        view = kit.create(new ViewSpec(form()), event -> {
+            if (closed || !(event instanceof UiEvent.Action action)) return;
+            if (action.id().equals(RETRY)) retryAction.run();
+            else if (action.id().equals(CANCEL)) cancelAction.run();
+        });
     }
-    @Override public Dimension getPreferredSize() {
-        Dimension size = super.getPreferredSize();
-        return new Dimension(Math.max(400, size.width), Math.max(190, size.height));
+
+    public UiView view() { return view; }
+
+    /** The status line as shown. */
+    public String message() { return message; }
+
+    public void working() { failed = false; working = true; message = "Preparing connection…"; render(); }
+    public void status(String text) { message = text; render(); }
+    public void failed(String text) { message = text; failed = true; working = false; render(); }
+    public void finished() { working = false; render(); }
+
+    private void render() { if (!closed) view.update(new ViewSpec(form())); }
+
+    private Nodes.Form form() {
+        var sections = List.<Nodes.Node>of(
+            new Nodes.Text(TITLE, ControlState.READY, name, Nodes.TextRole.DETAIL_TITLE),
+            new Nodes.Text(ADDRESS, ControlState.READY, address, Nodes.TextRole.DESCRIPTION),
+            new Nodes.Text(MESSAGE, ControlState.READY, message, Nodes.TextRole.BODY),
+            new Nodes.Progress(PROGRESS, new ControlState(working, true, false, ""), -1, "Connecting"));
+        var actions = List.of(
+            new Nodes.Button(RETRY, new ControlState(failed, true, false, ""), "Retry", "", Nodes.ButtonKind.SECONDARY, RETRY, ""),
+            new Nodes.Button(CANCEL, ControlState.READY, failed ? "Close" : "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""));
+        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, "Connecting to " + name, Optional.empty(), sections, Optional.empty(), actions, CANCEL);
     }
-    public void working() { progress.setVisible(true); progress.setWorking(true); retry.setVisible(false); cancel.setText("Cancel"); status("Preparing connection…"); }
-    public void status(String text) { message.setText(text); message.setToolTipText(text); }
-    public void failed(String text) { status(text); progress.setWorking(false); progress.setVisible(false); retry.setVisible(true); cancel.setText("Close"); }
-    public void finished() { progress.setWorking(false); }
+
+    @Override public void close() { if (closed) return; closed = true; working = false; view.close(); }
 }

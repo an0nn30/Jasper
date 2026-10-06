@@ -159,7 +159,7 @@ public final class SftpUi implements AutoCloseable {
     }
     private void delete(View view) {
         var selected=view.controller().capture();if(selected.isEmpty() || selected.orElseThrow().selection().isEmpty() || view.operations().busy()) return;var captured=selected.orElseThrow();
-        var dialog=dialog(view.host().window(),"Delete selected files");var panel=new dev.jasper.remote.ui.ConfirmPanel("Delete "+captured.selection().size()+" selected items from "+captured.identity().host().name()+":"+captured.directory()+"?", "Delete",()-> { dialog.close();if(!closed) view.operations().delete(captured); },dialog::close);dialog.setContent(panel);dialog.show();
+        var dialog=dialog(view.host().window(),"Delete selected files");var panel=new dev.jasper.remote.ui.ConfirmPanel(context.kit(),"Delete "+captured.selection().size()+" selected items from "+captured.identity().host().name()+":"+captured.directory()+"?", "Delete",()-> { dialog.close();if(!closed) view.operations().delete(captured); },dialog::close);dialog.setContent(panel.view());dialog.onClosed(panel::close);dialog.show();
     }
     private void copyHost(View view) {
         var selected=view.controller().capture();if(selected.isEmpty() || selected.orElseThrow().selection().isEmpty()) return;var source=selected.orElseThrow();var owner=view.host().window();var dialog=dialog(owner,"Copy to host");

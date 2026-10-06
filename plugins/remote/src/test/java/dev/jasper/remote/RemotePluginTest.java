@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import dev.jasper.remote.ui.sftp.SftpUi;
+import dev.jasper.remote.testsupport.Kits;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static dev.jasper.remote.ui.UiTestAccess.*;
@@ -36,7 +37,8 @@ class RemotePluginTest {
     final List<Runnable> scheduled = new ArrayList<>();
 
     RemotePlugin plugin(Path sshDir) {
-        return new TestRemotePlugin(Runnable::run, context -> Optional.empty(), (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
+        // Completions reach the plugin's kit views on the EDT (Task 8a): inline there, queued from MINA and worker threads.
+        return new TestRemotePlugin(Kits.UI, context -> Optional.empty(), (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
     }
 
     @Test void hostRequestsNetworkAndServerIcons(@TempDir Path dir) {
@@ -123,8 +125,8 @@ class RemotePluginTest {
             host.activateTerminalWindow(window);
             var handle = context.terminals().window(window).orElseThrow();
             var panel = (dev.jasper.remote.ui.sftp.SftpPanel) host.openPanel(SftpUi.PANEL, window);
-            plugin.openHost(handle, prod); settle(host);
-            plugin.openHost(handle, prod); settle(host);
+            Kits.edt(() -> plugin.openHost(handle, prod)); settle(host);
+            Kits.edt(() -> plugin.openHost(handle, prod)); settle(host);
             UUID first = host.terminalPanes().getFirst(), second = host.terminalPanes().getLast();
 
             host.focusTerminalPane(first); host.flush();
@@ -149,7 +151,17 @@ class RemotePluginTest {
         assertThat(panel.table().getRowCount()).isEqualTo(count);
     }
 
-    static void settle(FakePluginHost host) { for (int i = 0; i < 20; i++) { host.runBackground(); host.flush(); } }
+    /**
+     * Drains the fake host's background work and events. The plugin's views are kit views, which live on the EDT: on the
+     * EDT this runs inline; from the test thread each round hops to the EDT (running queued completions first), so the
+     * caller can wait off the EDT between rounds and no worker/EDT hand-off can deadlock.
+     */
+    static void settle(FakePluginHost host) {
+        if (java.awt.EventQueue.isDispatchThread()) { for (int i = 0; i < 20; i++) { host.runBackground(); host.flush(); } return; }
+        try { Kits.settle(host); }
+        catch (RuntimeException | Error failure) { throw failure; }
+        catch (Exception failure) { throw new AssertionError(failure); }
+    }
 
     @Test void uploadingOntoExistingFilesAsksOnceAndReplaceCopies(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
@@ -171,7 +183,7 @@ class RemotePluginTest {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
             var panel = (dev.jasper.remote.ui.sftp.SftpPanel) host.openPanel(SftpUi.PANEL, window);
-            plugin.openHost(context.terminals().window(window).orElseThrow(), prod); settle(host);
+            Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), prod)); settle(host);
             host.focusTerminalPane(host.terminalPanes().getFirst()); host.flush();
             awaitRowCount(host, panel, 1);
 
@@ -284,10 +296,11 @@ class RemotePluginTest {
             host.activateTerminalWindow(window);
             List<String> rows = host.searchScope(RemoteScope.ID, "", window, null);
             assertThat(rows).containsExactly("host." + prod.id() + "|prod|true");
-            assertThat(host.invoke("dev.jasper.remote.session.h" + prod.id(), window, null)).isTrue();
+            // The connecting overlay is a kit view (Task 8a): actions that open it run on the EDT.
+            assertThat(Kits.value(() -> host.invoke("dev.jasper.remote.session.h" + prod.id(), window, null))).isTrue();
             assertThat(host.openRequests()).isEmpty();
             assertThat(host.windows()).containsExactly("overlay|Connecting to prod|true");
-            plugin.openHost(context.terminals().window(window).orElseThrow(), prod);
+            Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), prod));
             assertThat(host.windows()).hasSize(1);
             settle(host);
             assertThat(host.openRequests()).containsExactly("session-tab|" + window + "|prod");
@@ -301,17 +314,17 @@ class RemotePluginTest {
             host.focusTerminalPane(pane);
             host.flush();
             assertThat(host.actions()).contains("dev.jasper.remote.split|Split with Same Host|true");
-            assertThat(host.invoke(RemotePlugin.SPLIT, window, pane)).isTrue();
+            assertThat(Kits.value(() -> host.invoke(RemotePlugin.SPLIT, window, pane))).isTrue();
             settle(host);
             assertThat(host.openRequests()).hasSize(2).last().asString().startsWith("session-split");
             assertThat(host.terminalPanes()).hasSize(2);
             assertThat(host.status().getFirst()).contains("2 SSH sessions");
             UUID second = host.terminalPanes().stream().filter(id -> !id.equals(pane)).findFirst().orElseThrow();
             host.focusTerminalPane(pane); host.flush();
-            assertThat(host.invoke("dev.jasper.remote.session.h" + prod.id(), window, null)).isTrue();
+            assertThat(Kits.value(() -> host.invoke("dev.jasper.remote.session.h" + prod.id(), window, null))).isTrue();
             assertThat(context.terminals().activePane()).get().extracting(dev.jasper.sdk.terminal.PaneHandle::id).isEqualTo(pane);
             host.focusTerminalPane(second); host.flush();
-            assertThat(host.invoke("dev.jasper.remote.session.h" + prod.id(), window, null)).isTrue();
+            assertThat(Kits.value(() -> host.invoke("dev.jasper.remote.session.h" + prod.id(), window, null))).isTrue();
             assertThat(context.terminals().activePane()).get().extracting(dev.jasper.sdk.terminal.PaneHandle::id).isEqualTo(second);
             assertThat(host.openRequests()).hasSize(2);
             host.closeTerminalPane(pane);
@@ -321,12 +334,12 @@ class RemotePluginTest {
             long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(3);
             while (!host.sessionState(second).startsWith("EXITED") && System.nanoTime() < deadline) { Thread.sleep(10); host.flush(); }
             assertThat(host.sessionState(second)).startsWith("EXITED");
-            host.reconnectSession(second);
+            Kits.edt(() -> host.reconnectSession(second));
             assertThat(host.windows()).containsExactly("overlay|Connecting to prod|true");
-            cancel(plugin.currentConnectionPanel()).doClick(); settle(host);
+            Kits.edt(() -> cancel(plugin.currentConnectionPanel())); settle(host);
             assertThat(host.sessionState(second)).startsWith("EXITED");
             assertThat(plugin.connections().channelCount()).isZero();
-            host.reconnectSession(second); settle(host);
+            Kits.edt(() -> host.reconnectSession(second)); settle(host);
             assertThat(host.sessionState(second)).isEqualTo("RUNNING|");
             assertThat(host.openRequests()).hasSize(2);
             host.stopAll();
@@ -350,11 +363,11 @@ class RemotePluginTest {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
             var handle = context.terminals().window(window).orElseThrow();
-            plugin.openHost(handle, shared); settle(host);
-            plugin.openHost(handle, shared); settle(host);
+            Kits.edt(() -> plugin.openHost(handle, shared)); settle(host);
+            Kits.edt(() -> plugin.openHost(handle, shared)); settle(host);
             assertThat(server.server.getActiveSessions()).as("unfollowed panes share a connection").hasSize(1);
-            plugin.openHost(handle, followed); settle(host);
-            plugin.openHost(handle, followed); settle(host);
+            Kits.edt(() -> plugin.openHost(handle, followed)); settle(host);
+            Kits.edt(() -> plugin.openHost(handle, followed)); settle(host);
             assertThat(server.server.getActiveSessions()).as("each followed pane has its own").hasSize(3);
 
             UUID followedPane = host.terminalPanes().getLast();
@@ -393,162 +406,182 @@ class RemotePluginTest {
         }
     }
 
-    @Test void sessionsToolbarTracksSavedHostsAndCleansUp(@TempDir Path dir) {
-        try (var host = new FakePluginHost()) {
-            RemotePlugin plugin = plugin(dir);
-            host.start(INFO, Set.of(), Set.of(), plugin);
-            settle(host);
-            String manage = "dev.jasper.remote.sessions.manage";
-            assertThat(host.toolbar()).containsExactly("menu:Sessions:" + manage);
-            assertThat(host.actions()).contains(manage + "|Manage Sessions...|true");
-            UUID window = host.addTerminalWindow();
-            assertThat(host.invoke(manage, window, null)).isTrue();
-            assertThat(host.openPanel(RemotePlugin.PANEL, window)).isInstanceOf(HostsPanel.class);
+    @Test void sessionsToolbarTracksSavedHostsAndCleansUp(@TempDir Path dir) throws Exception {
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                RemotePlugin plugin = plugin(dir);
+                host.start(INFO, Set.of(), Set.of(), plugin);
+                settle(host);
+                String manage = "dev.jasper.remote.sessions.manage";
+                assertThat(host.toolbar()).containsExactly("menu:Sessions:" + manage);
+                assertThat(host.actions()).contains(manage + "|Manage Sessions...|true");
+                UUID window = host.addTerminalWindow();
+                assertThat(host.invoke(manage, window, null)).isTrue();
+                assertThat(host.openPanel(RemotePlugin.PANEL, window)).as("a kit view, no raw component").isNotNull();
+                assertThat(plugin.hostsPanel(window)).isNotNull();
 
-            var zebra = RemoteHost.create("Zebra", "z.example", 22, "me", new Auth.Agent(), "", Optional.empty());
-            var alpha = RemoteHost.create("alpha", "a.example", 2222, "root", new Auth.Agent(), "", Optional.empty());
-            plugin.store().put(zebra); plugin.store().put(alpha); settle(host);
-            String zebraAction = "dev.jasper.remote.session.h" + zebra.id();
-            String alphaAction = "dev.jasper.remote.session.h" + alpha.id();
-            assertThat(host.toolbar()).containsExactly("menu:Sessions:" + alphaAction + "," + zebraAction + "," + manage);
-            assertThat(host.actions()).contains(alphaAction + "|alpha (root@a.example:2222)|true");
+                var zebra = RemoteHost.create("Zebra", "z.example", 22, "me", new Auth.Agent(), "", Optional.empty());
+                var alpha = RemoteHost.create("alpha", "a.example", 2222, "root", new Auth.Agent(), "", Optional.empty());
+                plugin.store().put(zebra); plugin.store().put(alpha); settle(host);
+                String zebraAction = "dev.jasper.remote.session.h" + zebra.id();
+                String alphaAction = "dev.jasper.remote.session.h" + alpha.id();
+                assertThat(host.toolbar()).containsExactly("menu:Sessions:" + alphaAction + "," + zebraAction + "," + manage);
+                assertThat(host.actions()).contains(alphaAction + "|alpha (root@a.example:2222)|true");
 
-            var renamed = zebra.withEdited("Aardvark", "new.example", 2200, "deploy", zebra.auth(), "", Optional.empty());
-            plugin.store().put(renamed); settle(host);
-            assertThat(host.toolbar()).containsExactly("menu:Sessions:" + zebraAction + "," + alphaAction + "," + manage);
-            assertThat(host.actions()).contains(zebraAction + "|Aardvark (deploy@new.example:2200)|true");
-            assertThat(host.invoke(zebraAction, window, null)).isTrue();
-            assertThat(host.windows()).containsExactly("overlay|Connecting to Aardvark|true");
-            cancel(plugin.currentConnectionPanel()).doClick(); settle(host);
+                var renamed = zebra.withEdited("Aardvark", "new.example", 2200, "deploy", zebra.auth(), "", Optional.empty());
+                plugin.store().put(renamed); settle(host);
+                assertThat(host.toolbar()).containsExactly("menu:Sessions:" + zebraAction + "," + alphaAction + "," + manage);
+                assertThat(host.actions()).contains(zebraAction + "|Aardvark (deploy@new.example:2200)|true");
+                assertThat(host.invoke(zebraAction, window, null)).isTrue();
+                assertThat(host.windows()).containsExactly("overlay|Connecting to Aardvark|true");
+                cancel(plugin.currentConnectionPanel()); settle(host);
 
-            plugin.store().remove(zebra.id()); settle(host);
-            assertThat(host.toolbar()).containsExactly("menu:Sessions:" + alphaAction + "," + manage);
-            assertThat(host.invoke(zebraAction, window, null)).isFalse();
-            plugin.store().remove(alpha.id()); settle(host);
-            assertThat(host.toolbar()).containsExactly("menu:Sessions:" + manage);
-            host.stopAll();
-            assertThat(host.toolbar()).isEmpty();
-            assertThat(host.actions()).isEmpty();
-            assertThat(host.failures()).isEmpty();
-        }
+                plugin.store().remove(zebra.id()); settle(host);
+                assertThat(host.toolbar()).containsExactly("menu:Sessions:" + alphaAction + "," + manage);
+                assertThat(host.invoke(zebraAction, window, null)).isFalse();
+                plugin.store().remove(alpha.id()); settle(host);
+                assertThat(host.toolbar()).containsExactly("menu:Sessions:" + manage);
+                host.stopAll();
+                assertThat(host.toolbar()).isEmpty();
+                assertThat(host.actions()).isEmpty();
+                assertThat(host.failures()).isEmpty();
+            }
+        });
     }
 
-    @Test void hostKeyPromptIsAWindowModalDialog(@TempDir Path dir) {
-        try (var host = new FakePluginHost()) {
-            RemotePlugin plugin = plugin(dir);
-            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
-            host.addTerminalWindow();
-            CompletableFuture<HostKeyVerifier.Decision> decision = plugin.askHostKey(new HostKeyVerifier.Question("h", 22, "ssh-ed25519", "SHA256:x"));
-            assertThat(host.windows()).containsExactly("dialog|Verify host key h|true");
-            trust(plugin.currentHostKeyPanel()).doClick();
-            assertThat(decision).isCompletedWithValue(HostKeyVerifier.Decision.TRUST);
-            assertThat(host.windows()).isEmpty();
-            CompletableFuture<HostKeyVerifier.Decision> closed = plugin.askHostKey(new HostKeyVerifier.Question("h", 22, "ssh-ed25519", "SHA256:x"));
-            host.requestClose("dialog");
-            assertThat(closed).isCompletedWithValue(HostKeyVerifier.Decision.CANCEL);
-        }
+    @Test void hostKeyPromptIsAWindowModalDialog(@TempDir Path dir) throws Exception {
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                RemotePlugin plugin = plugin(dir);
+                var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+                host.addTerminalWindow();
+                CompletableFuture<HostKeyVerifier.Decision> decision = plugin.askHostKey(new HostKeyVerifier.Question("h", 22, "ssh-ed25519", "SHA256:x"));
+                assertThat(host.windows()).containsExactly("dialog|Verify host key h|true");
+                trust(plugin.currentHostKeyPanel());
+                assertThat(decision).isCompletedWithValue(HostKeyVerifier.Decision.TRUST);
+                assertThat(host.windows()).isEmpty();
+                CompletableFuture<HostKeyVerifier.Decision> closed = plugin.askHostKey(new HostKeyVerifier.Question("h", 22, "ssh-ed25519", "SHA256:x"));
+                host.requestClose("dialog");
+                assertThat(closed).isCompletedWithValue(HostKeyVerifier.Decision.CANCEL);
+            }
+        });
     }
 
     @Test void thePanelAddsEditsDeletesAndImports(@TempDir Path dir) throws Exception {
-        Path sshDir = Files.createDirectories(dir.resolve("ssh"));
-        Files.writeString(sshDir.resolve("config"), "Host imported\n  HostName imported.example\n  User me\n");
-        try (var host = new FakePluginHost()) {
-            var vault = new FakeVault(); vault.password("Imported login", "me", "secret");
-            host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
-            RemotePlugin plugin = plugin(sshDir);
-            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
-            UUID window = host.addTerminalWindow();
-            host.activateTerminalWindow(window);
-            var panel = (HostsPanel) host.openPanel(RemotePlugin.PANEL, window);
-            assertThat(panel).isNotNull();
-            add(panel).doClick();
-            assertThat(host.windows()).containsExactly("dialog|Add Host|true");
-            name(plugin.currentEditor()).setText("new"); hostname(plugin.currentEditor()).setText("new.example"); agentAuth(plugin.currentEditor()).doClick();
-            username(plugin.currentEditor()).setText("root");
-            save(plugin.currentEditor()).doClick();
-            settle(host);
-            assertThat(host.windows()).isEmpty();
-            assertThat(plugin.store().hosts()).extracting(RemoteHost::name).containsExactly("new");
-            assertThat(list(panel).getModel().getSize()).as("ungrouped host without a redundant header").isEqualTo(1);
-            assertThat(host.panelHeader(RemotePlugin.PANEL, window).detail()).isEqualTo("1");
-            panel.select(plugin.store().hosts().getFirst().id());
-            assertThat(cardCredential(panel).getText()).isEqualTo("SSH agent");
-            assertThat(host.invoke(RemotePlugin.IMPORT, window, null)).isTrue();
-            settle(host);
-            assertThat(host.windows()).containsExactly("dialog|Import from ~/.ssh/config|true");
-            chooseCredential(plugin.currentImport(), 0).doClick();
-            importButton(plugin.currentImport()).doClick();
-            settle(host);
-            assertThat(plugin.store().hosts()).extracting(RemoteHost::name).containsExactly("new", "imported");
-            RemoteHost imported = plugin.store().hosts().get(1);
-            cancelImport(plugin.currentImport()).doClick();
-            javax.swing.JPopupMenu menu = menuFor(panel, indexOf(panel, imported));
-            menuItem(menu,"Delete…").doClick();
-            assertThat(host.windows()).containsExactly("dialog|Delete imported?|true");
-            plugin.currentConfirm().confirm.doClick();
-            settle(host);
-            assertThat(plugin.store().hosts()).extracting(RemoteHost::name).containsExactly("new");
-            menuItem(menuFor(panel, 0), "Rename group\u2026").doClick();
-            groupName(plugin.currentGroupEditor()).setText("Servers");
-            saveGroup(plugin.currentGroupEditor()).doClick(); settle(host);
-            toggle(panel, 0);
-            settle(host);
-            var savedPanelState = new PanelState(context.dataDirectory().resolve("panel-state.toml"));
-            assertThat(savedPanelState.defaultGroup()).isEqualTo("Servers");
-            assertThat(savedPanelState.collapsed()).containsExactly("Servers");
-        }
+        Kits.edt(() -> {
+            Path sshDir = Files.createDirectories(dir.resolve("ssh"));
+            Files.writeString(sshDir.resolve("config"), "Host imported\n  HostName imported.example\n  User me\n");
+            try (var host = new FakePluginHost()) {
+                var vault = new FakeVault(); vault.password("Imported login", "me", "secret");
+                host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+                RemotePlugin plugin = plugin(sshDir);
+                var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+                UUID window = host.addTerminalWindow();
+                host.activateTerminalWindow(window);
+                host.openPanel(RemotePlugin.PANEL, window);
+                var panel = plugin.hostsPanel(window);
+                assertThat(panel).isNotNull();
+                headerAction(host, window, "New session");
+                assertThat(host.windows()).containsExactly("dialog|Add Host|true");
+                name(plugin.currentEditor(), "new"); hostname(plugin.currentEditor(), "new.example"); agentAuth(plugin.currentEditor());
+                username(plugin.currentEditor(), "root");
+                save(plugin.currentEditor());
+                settle(host);
+                assertThat(host.windows()).isEmpty();
+                assertThat(plugin.store().hosts()).extracting(RemoteHost::name).containsExactly("new");
+                assertThat(rows(panel)).as("ungrouped host without a redundant header").hasSize(1);
+                assertThat(host.panelHeader(RemotePlugin.PANEL, window).detail()).isEqualTo("1");
+                panel.select(plugin.store().hosts().getFirst().id());
+                assertThat(cardCredential(panel)).isEqualTo("SSH agent");
+                assertThat(host.invoke(RemotePlugin.IMPORT, window, null)).isTrue();
+                settle(host);
+                assertThat(host.windows()).containsExactly("dialog|Import from ~/.ssh/config|true");
+                chooseCredential(plugin.currentImport(), 0);
+                importButton(plugin.currentImport());
+                settle(host);
+                assertThat(plugin.store().hosts()).extracting(RemoteHost::name).containsExactly("new", "imported");
+                RemoteHost imported = plugin.store().hosts().get(1);
+                cancelImport(plugin.currentImport());
+                menu(panel, indexOf(panel, imported), "Delete…");
+                assertThat(host.windows()).containsExactly("dialog|Delete imported?|true");
+                Kits.click(plugin.currentConfirm().view(), dev.jasper.remote.ui.ConfirmPanel.CONFIRM);
+                settle(host);
+                assertThat(plugin.store().hosts()).extracting(RemoteHost::name).containsExactly("new");
+                menu(panel, 0, "Rename group\u2026");
+                groupName(plugin.currentGroupEditor(), "Servers");
+                saveGroup(plugin.currentGroupEditor()); settle(host);
+                toggle(panel, 0);
+                settle(host);
+                var savedPanelState = new PanelState(context.dataDirectory().resolve("panel-state.toml"));
+                assertThat(savedPanelState.defaultGroup()).isEqualTo("Servers");
+                assertThat(savedPanelState.collapsed()).containsExactly("Servers");
+            }
+        });
+    }
+
+    /** Runs a Sessions header action through the testkit's published header, as the window's header button would. */
+    static void headerAction(FakePluginHost host, UUID window, String label) {
+        host.panelHeader(RemotePlugin.PANEL, window).actions().stream().filter(action -> action.label().equals(label)).findFirst()
+            .orElseThrow(() -> new AssertionError("No header action " + label)).invoke().run();
     }
 
     static int indexOf(HostsPanel panel, RemoteHost host) {
-        for (int i = 0; i < list(panel).getModel().getSize(); i++)
-            if (list(panel).getModel().getElementAt(i) instanceof dev.jasper.remote.ui.HostRows.Host row && row.host().id().equals(host.id())) return i;
+        for (int i = 0; i < rows(panel).size(); i++)
+            if (rows(panel).get(i) instanceof dev.jasper.remote.ui.HostRows.Host row && row.host().id().equals(host.id())) return i;
         throw new AssertionError("host row not shown");
     }
-    @Test void cancellationClosesTheHostKeyDialog(@TempDir Path dir) {
-        try (var host = new FakePluginHost()) {
-            RemotePlugin plugin = plugin(dir);
-            host.start(INFO, Set.of(), Set.of(), plugin);
-            host.addTerminalWindow();
-            var pending = plugin.askHostKey(new HostKeyVerifier.Question("h", 22, "ssh-rsa", "SHA256:x"));
-            pending.cancel(true);
-            assertThat(host.windows()).isEmpty();
-        }
+    @Test void cancellationClosesTheHostKeyDialog(@TempDir Path dir) throws Exception {
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                RemotePlugin plugin = plugin(dir);
+                host.start(INFO, Set.of(), Set.of(), plugin);
+                host.addTerminalWindow();
+                var pending = plugin.askHostKey(new HostKeyVerifier.Question("h", 22, "ssh-rsa", "SHA256:x"));
+                pending.cancel(true);
+                assertThat(host.windows()).isEmpty();
+            }
+        });
     }
 
-    @Test void hostsActionCreatesThePanelWithoutOpeningThePalette(@TempDir Path dir) {
-        try (var host = new FakePluginHost()) {
-            var plugin = plugin(dir);
-            host.start(INFO, Set.of(), Set.of(), plugin);
-            UUID window = host.addTerminalWindow();
-            host.invoke(RemotePlugin.HOSTS, window, null);
-            assertThat(host.paletteOpens()).isEmpty();
-            assertThat(host.openPanel(RemotePlugin.PANEL, window)).isNotNull();
-        }
+    @Test void hostsActionCreatesThePanelWithoutOpeningThePalette(@TempDir Path dir) throws Exception {
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                var plugin = plugin(dir);
+                host.start(INFO, Set.of(), Set.of(), plugin);
+                UUID window = host.addTerminalWindow();
+                host.invoke(RemotePlugin.HOSTS, window, null);
+                assertThat(host.paletteOpens()).isEmpty();
+                assertThat(host.openPanel(RemotePlugin.PANEL, window)).isNotNull();
+            }
+        });
     }
 
     @Test void failedMutationsReportAfterTheEditorCloses(@TempDir Path dir) throws Exception {
-        try (var host = new FakePluginHost()) {
-            var plugin = plugin(dir);
-            var context = host.start(INFO, Set.of(), Set.of(), plugin);
-            UUID window = host.addTerminalWindow();
-            var panel = (HostsPanel) host.openPanel(RemotePlugin.PANEL, window);
-            var saved = RemoteHost.create("saved", "example", 22, "me", Auth.AGENT, "", Optional.empty());
-            plugin.store().put(saved); settle(host);
-            Files.writeString(context.dataDirectory().resolve("hosts.toml"), "broken = [");
-            var menu = menuFor(panel, indexOf(panel, saved));
-            menuItem(menu,"Duplicate").doClick();
-            menuItem(menu,"Add to favorites").doClick();
-            add(panel).doClick();
-            name(plugin.currentEditor()).setText("new"); hostname(plugin.currentEditor()).setText("example");
-            agentAuth(plugin.currentEditor()).doClick(); username(plugin.currentEditor()).setText("me");
-            save(plugin.currentEditor()).doClick();
-            host.requestClose("dialog");
-            settle(host);
-            assertThat(host.notifications().posts()).extracting(post -> post.spec().title())
-                .containsExactlyInAnyOrder("Could not duplicate the host", "Could not update favorites", "Could not save the host");
-            assertThat(host.notifications().posts()).allSatisfy(post -> assertThat(post.spec().cause()).isPresent());
-            assertThat(host.failures()).isEmpty();
-        }
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                var plugin = plugin(dir);
+                var context = host.start(INFO, Set.of(), Set.of(), plugin);
+                UUID window = host.addTerminalWindow();
+                host.openPanel(RemotePlugin.PANEL, window);
+                var panel = plugin.hostsPanel(window);
+                var saved = RemoteHost.create("saved", "example", 22, "me", Auth.AGENT, "", Optional.empty());
+                plugin.store().put(saved); settle(host);
+                Files.writeString(context.dataDirectory().resolve("hosts.toml"), "broken = [");
+                int row = indexOf(panel, saved);
+                menu(panel, row, "Duplicate");
+                menu(panel, row, "Add to favorites");
+                headerAction(host, window, "New session");
+                name(plugin.currentEditor(), "new"); hostname(plugin.currentEditor(), "example");
+                agentAuth(plugin.currentEditor()); username(plugin.currentEditor(), "me");
+                save(plugin.currentEditor());
+                host.requestClose("dialog");
+                settle(host);
+                assertThat(host.notifications().posts()).extracting(post -> post.spec().title())
+                    .containsExactlyInAnyOrder("Could not duplicate the host", "Could not update favorites", "Could not save the host");
+                assertThat(host.notifications().posts()).allSatisfy(post -> assertThat(post.spec().cause()).isPresent());
+                assertThat(host.failures()).isEmpty();
+            }
+        });
     }
 
     @Test void cancelledConnectCreatesNoTabOrRetainedChannel(@TempDir Path dir) throws Exception {
@@ -560,9 +593,9 @@ class RemotePluginTest {
             plugin.store().put(saved); settle(host);
             new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
             UUID window = host.addTerminalWindow();
-            plugin.openHost(context.terminals().window(window).orElseThrow(), saved);
+            Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), saved));
             assertThat(host.requestClose("overlay")).isFalse();
-            cancel(plugin.currentConnectionPanel()).doClick();
+            Kits.edt(() -> cancel(plugin.currentConnectionPanel()));
             settle(host);
             assertThat(host.openRequests()).isEmpty();
             assertThat(plugin.connections().channelCount()).isZero();
@@ -580,12 +613,12 @@ class RemotePluginTest {
             plugin.store().put(saved); settle(host);
             new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
             UUID window = host.addTerminalWindow();
-            plugin.openHost(context.terminals().window(window).orElseThrow(), saved); settle(host);
+            Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), saved)); settle(host);
             assertThat(host.openRequests()).isEmpty();
             assertThat(host.windows()).hasSize(1);
             assertThat(connectionStatus(plugin.currentConnectionPanel())).contains("Authentication failed");
             vault.secrets.put(credential, () -> new dev.jasper.vault.api.Credential(credential, "p", dev.jasper.vault.api.Kind.ACCOUNT_PASSWORD, "deploy", "s3cret".toCharArray(), null, null));
-            retry(plugin.currentConnectionPanel()).doClick(); settle(host);
+            Kits.edt(() -> retry(plugin.currentConnectionPanel())); settle(host);
             assertThat(host.openRequests()).hasSize(1);
             assertThat(host.windows()).isEmpty();
             assertThat(host.failures()).isEmpty();
@@ -593,101 +626,107 @@ class RemotePluginTest {
     }
 
     @Test void renamesDefaultGroupThroughThePanel(@TempDir Path dir) throws Exception {
-        try (var host = new FakePluginHost()) {
-            var plugin = plugin(dir);
-            var context = host.start(INFO, Set.of(), Set.of(), plugin);
-            UUID window = host.addTerminalWindow();
-            var saved = RemoteHost.create("home", "example", 22, "me", Auth.AGENT, "", Optional.empty());
-            plugin.store().put(saved); settle(host);
-            var panel = (HostsPanel) host.openPanel(RemotePlugin.PANEL, window);
-            var menu = menuFor(panel, 0);
-            java.util.Arrays.stream(menu.getComponents()).filter(javax.swing.JMenuItem.class::isInstance)
-                .map(javax.swing.JMenuItem.class::cast).filter(item -> item.getText().equals("Rename group\u2026")).findFirst().orElseThrow().doClick();
-            groupName(plugin.currentGroupEditor()).setText("My machines");
-            saveGroup(plugin.currentGroupEditor()).doClick(); settle(host);
-            assertThat(host.windows()).isEmpty();
-            assertThat(list(panel).getModel().getElementAt(0)).isInstanceOfSatisfying(dev.jasper.remote.ui.HostRows.Group.class,
-                group -> assertThat(group.name()).isEqualTo("My machines"));
-            assertThat(new PanelState(context.dataDirectory().resolve("panel-state.toml")).defaultGroup()).isEqualTo("My machines");
-            assertThat(plugin.store().hosts().getFirst().group()).isEmpty();
-        }
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                var plugin = plugin(dir);
+                var context = host.start(INFO, Set.of(), Set.of(), plugin);
+                UUID window = host.addTerminalWindow();
+                var saved = RemoteHost.create("home", "example", 22, "me", Auth.AGENT, "", Optional.empty());
+                plugin.store().put(saved); settle(host);
+                host.openPanel(RemotePlugin.PANEL, window);
+                var panel = plugin.hostsPanel(window);
+                menu(panel, 0, "Rename group\u2026");
+                groupName(plugin.currentGroupEditor(), "My machines");
+                saveGroup(plugin.currentGroupEditor()); settle(host);
+                assertThat(host.windows()).isEmpty();
+                assertThat(rows(panel).get(0)).isInstanceOfSatisfying(dev.jasper.remote.ui.HostRows.Group.class,
+                    group -> assertThat(group.name()).isEqualTo("My machines"));
+                assertThat(new PanelState(context.dataDirectory().resolve("panel-state.toml")).defaultGroup()).isEqualTo("My machines");
+                assertThat(plugin.store().hosts().getFirst().group()).isEmpty();
+            }
+        });
     }
 
     static final ShellProfileInfo UBUNTU = new ShellProfileInfo("wsl:Ubuntu", "Ubuntu", ShellProfileInfo.Kind.WSL, Optional.of("WSL 2"));
 
     @Test void wslDistributionsOpenLocalPanesFromThePanelAndCountTheirSessions(@TempDir Path dir) throws Exception {
-        try (var host = new FakePluginHost()) {
-            host.setShellProfiles(List.of(new ShellProfileInfo("pwsh", "PowerShell 7", ShellProfileInfo.Kind.LOCAL_SHELL, Optional.empty())));
-            RemotePlugin plugin = plugin(dir);
-            var context = host.start(INFO, Set.of(), Set.of(), plugin);
-            UUID window = host.addTerminalWindow();
-            host.activateTerminalWindow(window);
-            var panel = (HostsPanel) host.openPanel(RemotePlugin.PANEL, window);
-            assertThat(list(panel).getModel().getSize()).as("no WSL group without distributions").isZero();
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                host.setShellProfiles(List.of(new ShellProfileInfo("pwsh", "PowerShell 7", ShellProfileInfo.Kind.LOCAL_SHELL, Optional.empty())));
+                RemotePlugin plugin = plugin(dir);
+                var context = host.start(INFO, Set.of(), Set.of(), plugin);
+                UUID window = host.addTerminalWindow();
+                host.activateTerminalWindow(window);
+                host.openPanel(RemotePlugin.PANEL, window);
+                var panel = plugin.hostsPanel(window);
+                assertThat(rows(panel)).as("no WSL group without distributions").isEmpty();
 
-            host.setShellProfiles(List.of(UBUNTU));
-            settle(host);
-            assertThat(list(panel).getModel().getElementAt(0)).isEqualTo(new HostRows.Group(HostRows.WSL, 1, false, true));
-            assertThat(list(panel).getModel().getElementAt(1)).isEqualTo(new HostRows.Distro(UBUNTU, 0));
-            activate(panel, 1);
-            settle(host);
-            assertThat(host.openRequests()).containsExactly("tab|" + window + "|-|wsl:Ubuntu");
-            UUID first = host.terminalPanes().getLast();
-            assertThat(list(panel).getModel().getElementAt(1)).isEqualTo(new HostRows.Distro(UBUNTU, 1));
+                host.setShellProfiles(List.of(UBUNTU));
+                settle(host);
+                assertThat(rows(panel).get(0)).isEqualTo(new HostRows.Group(HostRows.WSL, 1, false, true));
+                assertThat(rows(panel).get(1)).isEqualTo(new HostRows.Distro(UBUNTU, 0));
+                activate(panel, 1);
+                settle(host);
+                assertThat(host.openRequests()).containsExactly("tab|" + window + "|-|wsl:Ubuntu");
+                UUID first = host.terminalPanes().getLast();
+                assertThat(rows(panel).get(1)).isEqualTo(new HostRows.Distro(UBUNTU, 1));
 
-            host.focusTerminalPane(first); host.flush();
-            menuItem(menuFor(panel, 1), "Open in split").doClick();
-            settle(host);
-            assertThat(host.openRequests()).last().isEqualTo("split|" + first + "|RIGHT|-|wsl:Ubuntu");
-            assertThat(list(panel).getModel().getElementAt(1)).isEqualTo(new HostRows.Distro(UBUNTU, 2));
-            UUID second = host.terminalPanes().getLast();
-            host.sessionExited(second, OptionalInt.of(0)); settle(host);
-            assertThat(list(panel).getModel().getElementAt(1)).as("an exited shell is not a session").isEqualTo(new HostRows.Distro(UBUNTU, 1));
-            host.closeTerminalPane(first); settle(host);
-            assertThat(list(panel).getModel().getElementAt(1)).isEqualTo(new HostRows.Distro(UBUNTU, 0));
-            assertThat(host.status()).as("the status item counts SSH sessions only").isEmpty();
+                host.focusTerminalPane(first); host.flush();
+                menu(panel, 1, "Open in split");
+                settle(host);
+                assertThat(host.openRequests()).last().isEqualTo("split|" + first + "|RIGHT|-|wsl:Ubuntu");
+                assertThat(rows(panel).get(1)).isEqualTo(new HostRows.Distro(UBUNTU, 2));
+                UUID second = host.terminalPanes().getLast();
+                host.sessionExited(second, OptionalInt.of(0)); settle(host);
+                assertThat(rows(panel).get(1)).as("an exited shell is not a session").isEqualTo(new HostRows.Distro(UBUNTU, 1));
+                host.closeTerminalPane(first); settle(host);
+                assertThat(rows(panel).get(1)).isEqualTo(new HostRows.Distro(UBUNTU, 0));
+                assertThat(host.status()).as("the status item counts SSH sessions only").isEmpty();
 
-            toggle(panel, 0); settle(host);
-            assertThat(Files.readString(context.dataDirectory().resolve("panel-state.toml")))
-                .as("the WSL group's own flag, not a host group name").contains("wsl_collapsed = true").doesNotContain("\"wsl\"");
-            assertThat(new PanelState(context.dataDirectory().resolve("panel-state.toml")).collapsed()).isEmpty();
-            host.setShellProfiles(List.of()); settle(host);
-            assertThat(list(panel).getModel().getSize()).as("the group leaves with the last distribution").isZero();
-            host.stopAll();
-            assertThat(host.failures()).isEmpty();
-        }
+                toggle(panel, 0); settle(host);
+                assertThat(Files.readString(context.dataDirectory().resolve("panel-state.toml")))
+                    .as("the WSL group's own flag, not a host group name").contains("wsl_collapsed = true").doesNotContain("\"wsl\"");
+                assertThat(new PanelState(context.dataDirectory().resolve("panel-state.toml")).collapsed()).isEmpty();
+                host.setShellProfiles(List.of()); settle(host);
+                assertThat(rows(panel)).as("the group leaves with the last distribution").isEmpty();
+                host.stopAll();
+                assertThat(host.failures()).isEmpty();
+            }
+        });
     }
 
-    @Test void sessionsToolbarAndPaletteListWslDistributionsFirst(@TempDir Path dir) {
-        try (var host = new FakePluginHost()) {
-            host.setShellProfiles(List.of(UBUNTU));
-            RemotePlugin plugin = plugin(dir);
-            host.start(INFO, Set.of(), Set.of(), plugin);
-            settle(host);
-            String manage = "dev.jasper.remote.sessions.manage";
-            String ubuntu = "dev.jasper.remote.session.w" + UUID.nameUUIDFromBytes("wsl:Ubuntu".getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            var alpha = RemoteHost.create("alpha", "a.example", 22, "root", new Auth.Agent(), "", Optional.empty());
-            plugin.store().put(alpha); settle(host);
-            String alphaAction = "dev.jasper.remote.session.h" + alpha.id();
-            assertThat(host.toolbar()).containsExactly("menu:Sessions:" + ubuntu + "," + alphaAction + "," + manage);
-            assertThat(host.actions()).contains(ubuntu + "|Ubuntu (WSL 2)|true");
-            UUID window = host.addTerminalWindow();
-            host.activateTerminalWindow(window);
-            assertThat(host.invoke(ubuntu, window, null)).isTrue();
-            assertThat(host.openRequests()).containsExactly("tab|" + window + "|-|wsl:Ubuntu");
+    @Test void sessionsToolbarAndPaletteListWslDistributionsFirst(@TempDir Path dir) throws Exception {
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                host.setShellProfiles(List.of(UBUNTU));
+                RemotePlugin plugin = plugin(dir);
+                host.start(INFO, Set.of(), Set.of(), plugin);
+                settle(host);
+                String manage = "dev.jasper.remote.sessions.manage";
+                String ubuntu = "dev.jasper.remote.session.w" + UUID.nameUUIDFromBytes("wsl:Ubuntu".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                var alpha = RemoteHost.create("alpha", "a.example", 22, "root", new Auth.Agent(), "", Optional.empty());
+                plugin.store().put(alpha); settle(host);
+                String alphaAction = "dev.jasper.remote.session.h" + alpha.id();
+                assertThat(host.toolbar()).containsExactly("menu:Sessions:" + ubuntu + "," + alphaAction + "," + manage);
+                assertThat(host.actions()).contains(ubuntu + "|Ubuntu (WSL 2)|true");
+                UUID window = host.addTerminalWindow();
+                host.activateTerminalWindow(window);
+                assertThat(host.invoke(ubuntu, window, null)).isTrue();
+                assertThat(host.openRequests()).containsExactly("tab|" + window + "|-|wsl:Ubuntu");
 
-            assertThat(host.searchScope(RemoteScope.ID, "", window, null)).containsExactly("wsl.Ubuntu|Ubuntu|true", "host." + alpha.id() + "|alpha|true");
-            assertThat(host.availableInScope(RemoteScope.ID, "wsl.Ubuntu", "edit", window, null)).isFalse();
-            host.executeInScope(RemoteScope.ID, "wsl.Ubuntu", "connect", window, null);
-            assertThat(host.openRequests()).hasSize(2).last().isEqualTo("tab|" + window + "|-|wsl:Ubuntu");
+                assertThat(host.searchScope(RemoteScope.ID, "", window, null)).containsExactly("wsl.Ubuntu|Ubuntu|true", "host." + alpha.id() + "|alpha|true");
+                assertThat(host.availableInScope(RemoteScope.ID, "wsl.Ubuntu", "edit", window, null)).isFalse();
+                host.executeInScope(RemoteScope.ID, "wsl.Ubuntu", "connect", window, null);
+                assertThat(host.openRequests()).hasSize(2).last().isEqualTo("tab|" + window + "|-|wsl:Ubuntu");
 
-            host.setShellProfiles(List.of()); settle(host);
-            assertThat(host.toolbar()).containsExactly("menu:Sessions:" + alphaAction + "," + manage);
-            assertThat(host.invoke(ubuntu, window, null)).isFalse();
-            assertThat(host.searchScope(RemoteScope.ID, "", window, null)).containsExactly("host." + alpha.id() + "|alpha|true");
-            host.stopAll();
-            assertThat(host.failures()).isEmpty();
-        }
+                host.setShellProfiles(List.of()); settle(host);
+                assertThat(host.toolbar()).containsExactly("menu:Sessions:" + alphaAction + "," + manage);
+                assertThat(host.invoke(ubuntu, window, null)).isFalse();
+                assertThat(host.searchScope(RemoteScope.ID, "", window, null)).containsExactly("host." + alpha.id() + "|alpha|true");
+                host.stopAll();
+                assertThat(host.failures()).isEmpty();
+            }
+        });
     }
 
 }

@@ -221,7 +221,7 @@ public class RemotePlugin implements Plugin {
         context.palette().register(scope);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 60));
         status.setIcon(icon); status.setAction(HOSTS); status.setVisible(false);
-        context.panels().register(new PanelSpec(PANEL, "Sessions", icon, Anchor.LEFT).withToggleActionId(HOSTS), this::createPanel);
+        context.panels().registerView(new PanelSpec(PANEL, "Sessions", icon, Anchor.LEFT).withToggleActionId(HOSTS), this::createPanel);
         sessionsToolbar = new SessionsToolbar(context, store, icon, this::activateHost, window -> {
             PanelHost panel = panelHosts.get(window.id());
             if (panel == null) showPanel(window); else panel.show();
@@ -478,9 +478,9 @@ public class RemotePlugin implements Plugin {
         ConnectAttempt(WindowHandle window, RemoteHost host, Optional<String> folder, java.util.function.Consumer<Connections.Shell> success) {
             this.window = window; this.host = host; this.folder = folder; this.success = success;
             dialog = context.windows().overlay(new OverlaySpec("Connecting to " + host.name(), window));
-            panel = new ConnectionPanel(host.name(), host.label(), this::start, this::close);
+            panel = new ConnectionPanel(context.kit(), host.name(), host.label(), this::start, this::close);
             currentConnectionPanel = panel;
-            dialog.setContent(panel); dialog.onClosed(this::close);
+            dialog.setContent(panel.view()); dialog.onClosed(this::close);
         }
         void start() {
             if (closed || stopped || !window.isOpen()) { close(); return; }
@@ -509,7 +509,8 @@ public class RemotePlugin implements Plugin {
             if (closed) return;
             closed = true; attempts.remove(this);
             if (future != null && !future.isDone()) future.cancel(true);
-            panel.finished(); finished.run();
+            // The overlay may already have disposed the view; the panel ignores any later status (a stale completion).
+            panel.close(); finished.run();
             if (!delivered) cancelled.run();
             dialog.close();
             if (currentConnectionPanel == panel) currentConnectionPanel = null;
@@ -548,10 +549,12 @@ public class RemotePlugin implements Plugin {
             questions.add(decision);
             if (owner == null || !owner.isOpen()) { decision.complete(HostKeyVerifier.Decision.CANCEL); return; }
             PluginDialog dialog = context.windows().dialog(new DialogSpec("Verify host key " + question.host(), owner, true));
-            currentHostKeyPanel = new HostKeyPanel(question, answer -> { decision.complete(answer); dialog.close(); });
-            dialog.setContent(currentHostKeyPanel);
+            var panel = new HostKeyPanel(context.kit(), question, answer -> { decision.complete(answer); dialog.close(); });
+            currentHostKeyPanel = panel;
+            dialog.setContent(panel.view());
             decision.whenComplete((answer, failure) -> ui.execute(() -> { questions.remove(decision); dialog.close(); }));
-            dialog.onClosed(() -> { currentHostKeyPanel = null; decision.complete(HostKeyVerifier.Decision.CANCEL); });
+            // The surface disposed the view first; closing never trusts: it answers Cancel, as before.
+            dialog.onClosed(() -> { panel.close(); if (currentHostKeyPanel == panel) currentHostKeyPanel = null; decision.complete(HostKeyVerifier.Decision.CANCEL); });
             dialog.show();
         });
         return decision;
@@ -563,7 +566,7 @@ public class RemotePlugin implements Plugin {
         PluginDialog dialog = context.windows().dialog(new DialogSpec(editing.isPresent() ? "Edit " + editing.get().name() : "Add Host", window, true));
         HostEditor[] editor = new HostEditor[1];
         boolean[] closed = {false};
-        editor[0] = new HostEditor(store.hosts(), editing, vault.isPresent(), this::credentialName,
+        editor[0] = new HostEditor(context.kit(), store.hosts(), editing, vault.isPresent(), this::credentialName,
             () -> vault.isPresent() ? vault.get().pick(window) : CompletableFuture.completedFuture(Optional.empty()),
             host -> store.put(host).whenComplete((ignored, failure) -> ui.execute(() -> {
                 if (stopped) return;
@@ -576,20 +579,21 @@ public class RemotePlugin implements Plugin {
             dialog::close);
         editor[0].setDefaultGroupName(panelState.defaultGroup());
         currentEditor = editor[0];
-        dialog.setContent(editor[0]);
-        dialog.onClosed(() -> { closed[0] = true; if (currentEditor == editor[0]) currentEditor = null; });
+        dialog.setContent(editor[0].view());
+        dialog.onClosed(() -> { closed[0] = true; editor[0].close(); if (currentEditor == editor[0]) currentEditor = null; });
         dialog.show();
     }
 
     private void deleteHost(WindowHandle window, RemoteHost host) {
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Delete " + host.name() + "?", window, true));
-        currentConfirm = new ConfirmPanel(deleteHostText(host), "Delete",
+        var confirm = new ConfirmPanel(context.kit(), deleteHostText(host), "Delete",
             () -> store.remove(host.id()).whenComplete((ignored, failure) -> ui.execute(() -> {
                 if (failure != null) context.notifications().group().error("Could not delete the host", message(failure), failure);
                 dialog.close();
             })), dialog::close);
-        dialog.setContent(currentConfirm);
-        dialog.onClosed(() -> currentConfirm = null);
+        currentConfirm = confirm;
+        dialog.setContent(confirm.view());
+        dialog.onClosed(() -> { confirm.close(); if (currentConfirm == confirm) currentConfirm = null; });
         dialog.show();
     }
 
@@ -609,9 +613,9 @@ public class RemotePlugin implements Plugin {
 
     // ---- panel and status
 
-    private javax.swing.JComponent createPanel(PanelHost host) {
+    private dev.jasper.sdk.ui.UiView createPanel(PanelHost host) {
         WindowHandle window = host.window();
-        var panel = new HostsPanel(new HostsPanel.Actions(h -> openHost(window, h), h -> window.activeTab().flatMap(tab -> tab.activePane()).ifPresent(pane -> splitHost(pane, h)),
+        var panel = new HostsPanel(context.kit(), new HostsPanel.Actions(h -> openHost(window, h), h -> window.activeTab().flatMap(tab -> tab.activePane()).ifPresent(pane -> splitHost(pane, h)),
             editing -> editHost(window, editing), h -> reportMutation("Could not duplicate the host", store.put(duplicate(h))), h -> deleteHost(window, h),
             (h, favorite) -> reportMutation("Could not update favorites", store.put(h.withFavorite(favorite))), () -> importConfig(window)), context.appearance()::icon);
         panel.onHeaderChanged(host::setHeader);
@@ -629,9 +633,12 @@ public class RemotePlugin implements Plugin {
         panel.onCollapsedChanged(() -> { try { panelState.save(panel.collapsed(), panel.wslCollapsed()); } catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "panel state: {0}", failure.getMessage()); } });
         panel.setHosts(store.hosts(), store.error());
         panels.put(window.id(), panel); panelHosts.put(window.id(), host);
-        host.onVisibility(visible -> { if (visible) panel.focusWhenOpened(); });
-        host.onClosed(() -> { panels.remove(window.id()); panelHosts.remove(window.id()); });
-        return panel;
+        // Shown again, the first host is selected as when the old list was shown; focus follows an explicit opening only
+        // (a restored panel's window is not showing yet, so the kit's focus request does nothing).
+        host.onVisibility(visible -> { if (visible) { panel.shown(); panel.focusWhenOpened(); } });
+        // The host disposed the view; the panel goes inert so no later refresh touches it.
+        host.onClosed(() -> { panel.close(); if (panels.get(window.id()) == panel) { panels.remove(window.id()); panelHosts.remove(window.id()); } });
+        return panel.view();
     }
 
     private void reportMutation(String title, CompletableFuture<Void> mutation) {
@@ -674,7 +681,7 @@ public class RemotePlugin implements Plugin {
     private void renameDefaultGroup(WindowHandle window) {
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Rename default group", window, true));
         GroupNamePanel[] editor = new GroupNamePanel[1];
-        editor[0] = new GroupNamePanel(panelState.defaultGroup(), name -> {
+        editor[0] = new GroupNamePanel(context.kit(), panelState.defaultGroup(), name -> {
             try {
                 String value = name.strip();
                 if (store.hosts().stream().anyMatch(host -> !host.group().isEmpty() && host.group().equalsIgnoreCase(value)))
@@ -684,8 +691,8 @@ public class RemotePlugin implements Plugin {
                 refreshPanels(); dialog.close();
             } catch (IOException | IllegalArgumentException failure) { editor[0].showError(message(failure)); }
         }, dialog::close);
-        currentGroupEditor = editor[0]; dialog.setContent(editor[0]);
-        dialog.onClosed(() -> { if (currentGroupEditor == editor[0]) currentGroupEditor = null; }); dialog.show();
+        currentGroupEditor = editor[0]; dialog.setContent(editor[0].view());
+        dialog.onClosed(() -> { editor[0].close(); if (currentGroupEditor == editor[0]) currentGroupEditor = null; }); dialog.show();
     }
 
     private String credentialLabel(RemoteHost host) {
@@ -716,6 +723,8 @@ public class RemotePlugin implements Plugin {
     GroupNamePanel currentGroupEditor() { return currentGroupEditor; }
     ConnectionPanel currentConnectionPanel() { return currentConnectionPanel; }
     ConfirmPanel currentConfirm() { return currentConfirm; }
+    /** The Sessions panel open in a window, for tests. */
+    HostsPanel hostsPanel(UUID windowId) { return panels.get(windowId); }
     dev.jasper.remote.ui.tunnels.TunnelsUi tunnels() { return tunnelsUi; }
     dev.jasper.remote.tunnels.TunnelStore tunnelStore() { return tunnelStore; }
 }

@@ -422,6 +422,52 @@ class RemoteKitTest {
         });
     }
 
+    /**
+     * Task 8a (ruling G7): the connecting overlay's indeterminate progress replaces Remote's custom ConnectionDots, whose
+     * lifecycle assertions are ported here: the animation runs only while the progress is indeterminate, visible and
+     * enabled; hiding it, making it determinate, removing it or closing the view stops it, and with motion off it never
+     * starts.
+     */
+    @Test void anIndeterminateProgressAnimatesOnlyWhileShownAndStopsWhenHiddenDeterminateRemovedOrClosed() {
+        Edt.run(() -> {
+            var enabled = new java.util.concurrent.atomic.AtomicBoolean(true); var base = KitFixtures.context();
+            var context = new KitContext(base.binding(), base.route(), base.metrics(), base.icons(), enabled::get);
+            java.util.function.Function<ControlState, ViewSpec> working = state -> stack(new Progress("progress", state, -1, "Connecting"),
+                new Text("status", READY, "Opening shell…", TextRole.BODY));
+            try (var view = new KitView(context, working.apply(READY), e -> {})) {
+                var bar = find(view, "progress", Indicators.ProgressBar.class);
+                assertThat(bar.animation.isRunning()).as("working").isTrue();
+                view.update(working.apply(new ControlState(false, true, false, "")));
+                assertThat(bar.animation.isRunning()).as("hidden after a failure").isFalse();
+                view.update(working.apply(READY));
+                assertThat(bar.animation.isRunning()).as("shown again by Retry").isTrue();
+                view.update(stack(new Progress("progress", READY, .5, "Connecting")));
+                assertThat(bar.animation.isRunning()).as("determinate").isFalse();
+                view.update(working.apply(READY));
+                assertThat(bar.animation.isRunning()).isTrue();
+                view.update(stack(new Text("status", READY, "Done", TextRole.BODY)));
+                assertThat(bar.animation.isRunning()).as("removed").isFalse();
+                view.update(working.apply(READY));
+                var again = find(view, "progress", Indicators.ProgressBar.class);
+                assertThat(again.animation.isRunning()).isTrue();
+                enabled.set(false);
+                view.update(working.apply(READY));
+                assertThat(again.animation.isRunning()).as("motion off").isFalse();
+                assertThat(again.phase).isZero();
+                enabled.set(true);
+                view.update(working.apply(READY));
+                assertThat(again.animation.isRunning()).isTrue();
+                view.close();
+                assertThat(again.animation.isRunning()).as("closed").isFalse();
+            } finally { release(context); }
+            var fresh = KitFixtures.context();
+            var off = new KitContext(fresh.binding(), fresh.route(), fresh.metrics(), fresh.icons(), () -> false);
+            try (var view = new KitView(off, working.apply(READY), e -> {})) {
+                assertThat(find(view, "progress", Indicators.ProgressBar.class).animation.isRunning()).as("never starts with motion off").isFalse();
+            } finally { release(off); }
+        });
+    }
+
     // ---- earlier consumers keep their behaviour
 
     @Test void paletteResultsReportNoClickedAndKeepTheirEnter() {

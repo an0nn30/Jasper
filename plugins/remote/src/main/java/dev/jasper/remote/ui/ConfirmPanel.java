@@ -1,26 +1,43 @@
 package dev.jasper.remote.ui;
 
-import java.awt.BorderLayout;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
+import java.util.List;
+import java.util.Optional;
 
-/** "Delete prod?" with one verb button and Cancel. */
-public final class ConfirmPanel extends JPanel {
-    public final JButton confirm, cancel = new JButton("Cancel");
+/**
+ * "Delete prod?" with one verb button and Cancel, on a host-rendered kit form. Neither button is the form's primary,
+ * so Enter confirms nothing (the former dialog had no default button); Escape cancels. The question is literal text.
+ * UI thread only; the surface that mounts {@link #view()} disposes it, and {@link #close()} makes late callbacks inert.
+ */
+public final class ConfirmPanel implements AutoCloseable {
+    public static final String FORM = "confirm", TEXT = "confirm.text", CONFIRM = "confirm.verb", CANCEL = "confirm.cancel";
+    private final UiView view;
+    private final String text;
+    private boolean closed;
 
-    public ConfirmPanel(String text, String verb, Runnable onConfirm, Runnable onCancel) {
-        super(new BorderLayout(0, 12));
-        setBorder(BorderFactory.createEmptyBorder(16, 16, 12, 16));
-        confirm = new JButton(verb);
-        add(new JLabel(text), BorderLayout.CENTER);
-        var buttons = new JPanel(); buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
-        buttons.add(Box.createHorizontalGlue()); buttons.add(cancel); buttons.add(Box.createHorizontalStrut(8)); buttons.add(confirm);
-        add(buttons, BorderLayout.SOUTH);
-        confirm.addActionListener(event -> onConfirm.run());
-        cancel.addActionListener(event -> onCancel.run());
+    public ConfirmPanel(UiKit kit, String text, String verb, Runnable onConfirm, Runnable onCancel) {
+        this.text = text;
+        var actions = List.of(
+            new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
+            new Nodes.Button(CONFIRM, ControlState.READY, verb, "", Nodes.ButtonKind.SECONDARY, CONFIRM, ""));
+        var form = new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, verb, Optional.empty(),
+            List.of(new Nodes.Text(TEXT, ControlState.READY, text, Nodes.TextRole.BODY)), Optional.empty(), actions, CANCEL);
+        view = kit.create(new ViewSpec(form), event -> {
+            if (closed || !(event instanceof UiEvent.Action action)) return;
+            if (action.id().equals(CONFIRM)) onConfirm.run();
+            else if (action.id().equals(CANCEL)) onCancel.run();
+        });
     }
+
+    public UiView view() { return view; }
+
+    /** The question as shown. */
+    public String text() { return text; }
+
+    @Override public void close() { if (closed) return; closed = true; view.close(); }
 }

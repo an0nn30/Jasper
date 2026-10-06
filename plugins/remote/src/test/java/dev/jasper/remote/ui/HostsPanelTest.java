@@ -1,141 +1,27 @@
 package dev.jasper.remote.ui;
 
-import dev.jasper.remote.testsupport.ZoneColors;
-import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.remote.hosts.Auth;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
+import dev.jasper.sdk.testing.FakeKit;
+import dev.jasper.sdk.ui.ListItem;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import static dev.jasper.remote.testsupport.Kits.*;
 import static org.assertj.core.api.Assertions.*;
 
+/**
+ * The Sessions panel as a host-rendered kit view (Plan 2 Task 8a). Each baseline (f16ae32f) behaviour is driven
+ * through the kit's events and asserted on the descriptor; colours, fonts and geometry are kit roles now, and the
+ * app's real-host Remote tests cover the mounted panel and its borrowed header.
+ */
 class HostsPanelTest {
-    @Test void connectedFooterActivatesExistingShellAndUpdatesWhenSessionsEnd() {
-        var panel = new HostsPanel(actions);
-        panel.onActivate(host -> events.add("activate " + host.name()));
-        panel.setCredentialLabels(host -> "Vault locked");
-        panel.setHosts(List.of(prod), Optional.empty());
-        panel.setHostDetails(host -> "Ubuntu", host -> 1);
-        assertThat(panel.connect.getText()).isEqualTo("Open Shell");
-        assertThat(panel.cardCredential.getText()).isEqualTo("Connected");
-        assertThat(panel.cardInfo.isVisible()).as("OS metadata is retained in the tooltip").isFalse();
-        panel.connect.doClick();
-        panel.setHostDetails(host -> "Ubuntu", host -> 0);
-        assertThat(panel.connect.getText()).isEqualTo("Connect");
-        assertThat(panel.cardCredential.getText()).isEqualTo("Vault locked");
-        panel.connect.doClick();
-        assertThat(events).containsExactly("activate prod", "connect prod");
-    }
-
-    @Test void searchOccupiesTheOnlyTopRowAndUsesTheReferencePlaceholder() {
-        var panel = new HostsPanel(actions);
-        assertThat(panel.search.getClientProperty("JTextField.placeholderText")).isEqualTo("Search sessions");
-        assertThat(panel.add.getParent()).as("new/import actions belong in the app header").isNull();
-        assertThat(panel.importButton.getParent()).isNull();
-    }
-
-    @Test void appHeaderPublishesTotalSessionsAndAccessibleAddAndImportActions() {
-        var panel = new HostsPanel(actions, dev.jasper.sdk.testing.FakeBundledIcon::new);
-        var headers = new ArrayList<dev.jasper.sdk.ui.PanelHeader>();
-        panel.onHeaderChanged(headers::add);
-        assertThat(headers.getLast().detail()).isEqualTo("0");
-        panel.setHosts(List.of(nas, prod), Optional.empty());
-        panel.setDistros(List.of(ubuntu, pwsh), profile -> 0);
-        panel.search.setText("no match");
-        var header = headers.getLast();
-        assertThat(header.detail()).as("filtering doesn't change the saved-session count").isEqualTo("3");
-        assertThat(header.active()).isFalse();
-        assertThat(header.actions()).extracting(dev.jasper.sdk.ui.PanelHeader.Action::label).containsExactly("New session", "Import sessions");
-        header.actions().forEach(action -> action.invoke().run());
-        assertThat(events).containsExactly("edit new", "import");
-        panel.setHosts(List.of(nas), Optional.empty());
-        assertThat(headers.getLast().detail()).isEqualTo("2");
-    }
-
-    @Test void compactRowsRevealNonfavoriteStarsOnHoverAndKeyboardFocus() {
-        var panel = new HostsPanel(actions);
-        panel.setHosts(List.of(nas), Optional.empty());
-        panel.list.setSize(300, 100);
-        assertThat(render(panel, 0).getPreferredSize().height).isEqualTo(PanelStyle.scale(panel, 30));
-        assertThat(labels(render(panel, 0))).doesNotContain("\u2606");
-        var bounds = panel.list.getCellBounds(0, 0);
-        var move = new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_MOVED, 0, 0,
-            288, bounds.y + bounds.height / 2, 0, false);
-        for (var listener : panel.list.getMouseMotionListeners()) listener.mouseMoved(move);
-        assertThat(labels(render(panel, 0))).contains("\u2606");
-        var exit = new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_EXITED, 0, 0, -1, -1, 0, false);
-        for (var listener : panel.list.getMouseListeners()) listener.mouseExited(exit);
-        assertThat(labels(render(panel, 0))).doesNotContain("\u2606");
-        assertThat(labels(panel.list.getCellRenderer().getListCellRendererComponent(panel.list,
-            panel.list.getModel().getElementAt(0), 0, true, true))).contains("\u2606");
-    }
-
-    @Test void selectedFooterKeepsTheShellAndEditControlsReachableInANarrowPanel() {
-        var panel = new HostsPanel(actions, name -> new dev.jasper.sdk.testing.FakeBundledIcon(name));
-        panel.setHostDetails(host -> "Ubuntu", host -> 1);
-        panel.setHosts(List.of(prod), Optional.empty());
-        panel.setSize(220, 400); layout(panel);
-        assertThat(panel.edit.getText()).isEmpty();
-        assertThat(panel.edit.getAccessibleContext().getAccessibleName()).isEqualTo("Edit session");
-        for (var button : List.of(panel.edit, panel.connect)) {
-            var bounds = javax.swing.SwingUtilities.convertRectangle(button.getParent(), button.getBounds(), panel);
-            assertThat(bounds.width).isPositive();
-            assertThat(bounds.x).isGreaterThanOrEqualTo(0);
-            assertThat(bounds.x + bounds.width).isLessThanOrEqualTo(panel.getWidth());
-        }
-    }
-    @Test void mountedHostRowsUseReferenceStateColorsAndDistrosUseSemanticColors() throws Exception {
-        javax.swing.SwingUtilities.invokeAndWait(() -> {
-            try (var colors = new ZoneColors()) {
-                var panel = withDistros(icon -> null);
-                panel.setHostDetails(host -> "detail", host -> 1);
-                for (var parent : List.of(colors.workspace, colors.chrome, colors.workspace)) {
-                    parent.add(panel);
-                    var palette = WorkspacePalette.current(panel.list);
-                    for (int i = 0; i < panel.list.getModel().getSize(); i++) {
-                        var row = panel.list.getModel().getElementAt(i);
-                        var labels = ZoneColors.labels(render(panel, i));
-                        if (row instanceof HostRows.Host)
-                            assertThat(labels.stream().filter(l -> "\u25CF".equals(l.getText())).findFirst().orElseThrow().getForeground()).isEqualTo(new java.awt.Color(0x38ba54));
-                        if (row instanceof HostRows.Distro distro && distro.sessions() > 0)
-                            assertThat(labels.stream().filter(l -> "\u25CF".equals(l.getText())).findFirst().orElseThrow().getForeground()).isEqualTo(palette.success());
-                        if (row instanceof HostRows.Distro) {
-                            assertThat(labels.stream().filter(l -> l.getText() != null && l.getText().startsWith("WSL ")).findFirst().orElseThrow().getForeground()).isEqualTo(palette.textMuted());
-                            var selected = ZoneColors.labels(panel.list.getCellRenderer().getListCellRendererComponent(panel.list, row, i, true, false));
-                            assertThat(selected.stream().filter(l -> l.getText() != null && l.getText().startsWith("WSL ")).findFirst().orElseThrow().getForeground()).isEqualTo(panel.list.getSelectionForeground());
-                        }
-                    }
-                    colors.put("Jasper.workspace.success", new java.awt.Color(0x123456));
-                }
-            }
-        });
-    }
-
-    @Test void groupRowsUseFolderIconsWhenExpandedCollapsedAndRevealedBySearch() {
-        var folderIcons = new java.util.EnumMap<dev.jasper.sdk.ui.BundledIcon, javax.swing.Icon>(dev.jasper.sdk.ui.BundledIcon.class);
-        folderIcons.put(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER, new dev.jasper.sdk.testing.FakeBundledIcon(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER));
-        folderIcons.put(dev.jasper.sdk.ui.BundledIcon.GENERAL_OPEN, new dev.jasper.sdk.testing.FakeBundledIcon(dev.jasper.sdk.ui.BundledIcon.GENERAL_OPEN));
-        var panel = new HostsPanel(actions, folderIcons::get);
-        panel.setHosts(List.of(prod), Optional.empty());
-        java.util.function.Supplier<javax.swing.JLabel> group = () -> (javax.swing.JLabel) panel.list.getCellRenderer()
-            .getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(0), 0, true, false);
-        var open = group.get().getIcon();
-        assertThat(open).isSameAs(folderIcons.get(dev.jasper.sdk.ui.BundledIcon.GENERAL_OPEN));
-        assertThat(group.get().getText()).isEqualTo("Production   1");
-        panel.toggle(0);
-        var closed = group.get().getIcon();
-        assertThat(closed).isSameAs(folderIcons.get(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER));
-        panel.search.setText("prod");
-        assertThat(group.get().getIcon()).isSameAs(open);
-        assertThat(panel.collapsed()).containsExactly("Production");
-        panel.search.setText("");
-        assertThat(group.get().getIcon()).isSameAs(closed);
-    }
-
     final List<String> events = new ArrayList<>();
     final HostsPanel.Actions actions = new HostsPanel.Actions(h -> events.add("connect " + h.name()), h -> events.add("split " + h.name()),
         h -> events.add("edit " + h.map(RemoteHost::name).orElse("new")), h -> events.add("duplicate " + h.name()), h -> events.add("delete " + h.name()),
@@ -147,356 +33,567 @@ class HostsPanelTest {
     final ShellProfileInfo debian = new ShellProfileInfo("wsl:Debian", "Debian", ShellProfileInfo.Kind.WSL, Optional.of("WSL 2"));
     final ShellProfileInfo pwsh = new ShellProfileInfo("pwsh", "PowerShell 7", ShellProfileInfo.Kind.LOCAL_SHELL, Optional.empty());
 
-    HostsPanel withDistros(java.util.function.Function<dev.jasper.sdk.ui.BundledIcon, javax.swing.Icon> icons) {
-        var panel = new HostsPanel(actions, icons);
+    HostsPanel panel() { return new HostsPanel(new FakeKit("dev.jasper.remote"), actions, dev.jasper.sdk.testing.FakeBundledIcon::new); }
+
+    HostsPanel withDistros() {
+        var panel = panel();
         panel.onDistros(profile -> events.add("open " + profile.name()), profile -> events.add("split " + profile.name()));
         panel.setDistros(List.of(ubuntu, pwsh, debian), profile -> profile.equals(debian) ? 2 : 0);
         panel.setHosts(List.of(prod), Optional.empty());
         return panel;
     }
 
-    static List<HostRows.Row> rows(HostsPanel panel) {
-        var out = new ArrayList<HostRows.Row>();
-        for (int i = 0; i < panel.list.getModel().getSize(); i++) out.add(panel.list.getModel().getElementAt(i));
+    static List<HostRows.Row> rows(HostsPanel panel) { return panel.rows(); }
+    static Nodes.ItemList list(HostsPanel panel) { return node(panel.view(), HostsPanel.ROWS, Nodes.ItemList.class); }
+    static ListItem row(HostsPanel panel, int index) { return list(panel).items().get(index); }
+    static void search(HostsPanel panel, String text) { type(panel.view(), HostsPanel.SEARCH, text); }
+    static void select(HostsPanel panel, int index) { emit(panel.view(), new UiEvent.Selected(HostsPanel.ROWS, Set.of(row(panel, index).id()))); }
+    /** A plain left click: the kit reports the selection, then the click. */
+    static void clickRow(HostsPanel panel, int index) { select(panel, index); emit(panel.view(), new UiEvent.Clicked(HostsPanel.ROWS, row(panel, index).id())); }
+    /** Enter or a double click on the selected row. */
+    static void activate(HostsPanel panel) { press(panel.view(), list(panel).activateAction()); }
+    static void menu(HostsPanel panel, int index, String label) { press(panel.view(), menuItem(row(panel, index), label).action()); }
+    static Optional<Nodes.Node> card(HostsPanel panel) { return find(panel.view(), HostsPanel.CARD); }
+    static String cardText(HostsPanel panel, String id) { return node(panel.view(), id, Nodes.Text.class).text(); }
+    static boolean shown(HostsPanel panel, String id) { return find(panel.view(), id).map(n -> n.state().visible()).orElse(false); }
+    static Nodes.Button star(HostsPanel panel, int index) {
+        return row(panel, index).trailing().stream().filter(n -> n instanceof Nodes.Button b && b.action().startsWith(HostsPanel.FAVORITE))
+            .map(Nodes.Button.class::cast).findFirst().orElseThrow();
+    }
+    static List<String> rowTexts(ListItem item) {
+        var out = new ArrayList<String>();
+        for (var part : List.of(item.title(), item.subtitle(), item.trailing()))
+            for (var node : part) if (node instanceof Nodes.Text text) out.add(text.text()); else if (node instanceof Nodes.Chip chip) out.add(chip.label());
         return out;
     }
-
-    static java.awt.Component render(HostsPanel panel, int index) {
-        return panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(index), index, false, false);
+    static Optional<Nodes.StatusKind> dot(ListItem item) {
+        var all = new ArrayList<Nodes.Node>(); item.leading().ifPresent(all::add); all.addAll(item.trailing());
+        return all.stream().filter(n -> n instanceof Nodes.StatusDot).map(n -> ((Nodes.StatusDot) n).kind()).findFirst();
     }
 
-    @Test void theToolWindowHeaderCarriesTheTitleAndThereIsNoWslGroupWithoutDistributions() {
-        var panel = new HostsPanel(actions);
-        assertThat(texts(panel)).as("Jasper's header shows Sessions").doesNotContain("Sessions");
-        panel.setDistros(List.of(pwsh), profile -> 0);
-        assertThat(rows(panel)).isEmpty();
-        assertThat(panel.empty.isVisible()).isTrue();
-        assertThat(panel.empty.getText()).as("without WSL the panel holds only hosts")
-            .isEqualTo("No hosts yet \u2014 Add or Import from ~/.ssh/config");
-        assertThat(panel.search.getClientProperty("JTextField.placeholderText")).isEqualTo("Search sessions");
-        panel.setHosts(List.of(prod), Optional.empty());
-        assertThat(rows(panel)).containsExactly(new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
+    @Test void connectedFooterActivatesExistingShellAndUpdatesWhenSessionsEnd() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.onActivate(host -> events.add("activate " + host.name()));
+            panel.setCredentialLabels(host -> "Vault locked");
+            panel.setHosts(List.of(prod), Optional.empty());
+            panel.setHostDetails(host -> "Ubuntu", host -> 1);
+            assertThat(button(panel.view(), HostsPanel.CONNECT).label()).isEqualTo("Open Shell");
+            assertThat(button(panel.view(), HostsPanel.CONNECT).icon()).isEqualTo("terminal");
+            assertThat(cardText(panel, HostsPanel.CARD_CREDENTIAL)).isEqualTo("Connected");
+            assertThat(node(panel.view(), HostsPanel.CARD_CONNECTED, Nodes.StatusDot.class).kind()).isEqualTo(Nodes.StatusKind.SUCCESS);
+            assertThat(shown(panel, HostsPanel.CARD_INFO)).as("OS metadata is retained in the tooltip").isFalse();
+            dev.jasper.remote.testsupport.Kits.click(panel.view(), HostsPanel.CONNECT);
+            panel.setHostDetails(host -> "Ubuntu", host -> 0);
+            assertThat(button(panel.view(), HostsPanel.CONNECT).label()).isEqualTo("Connect");
+            assertThat(button(panel.view(), HostsPanel.CONNECT).kind()).as("the card's Connect keeps its primary styling").isEqualTo(Nodes.ButtonKind.PRIMARY);
+            assertThat(cardText(panel, HostsPanel.CARD_CREDENTIAL)).isEqualTo("Vault locked");
+            assertThat(node(panel.view(), HostsPanel.CARD_LOCKED, Nodes.Icon.class).name()).isEqualTo("lock");
+            assertThat(find(panel.view(), HostsPanel.CARD_CONNECTED)).isEmpty();
+            dev.jasper.remote.testsupport.Kits.click(panel.view(), HostsPanel.CONNECT);
+            assertThat(events).containsExactly("activate prod", "connect prod");
+        });
     }
 
-    @Test void theEmptyHintSpeaksOfSshHostsWhenTheWslGroupIsShown() {
-        var panel = new HostsPanel(actions);
-        panel.setDistros(List.of(ubuntu), profile -> 0);
-        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(ubuntu, 0));
-        assertThat(panel.empty.isVisible()).isTrue();
-        assertThat(panel.empty.getText()).isEqualTo("No SSH hosts yet \u2014 Add or Import from ~/.ssh/config");
-        panel.setHosts(List.of(prod), Optional.empty());
-        panel.search.setText("zzz");
-        assertThat(rows(panel)).isEmpty();
-        assertThat(panel.empty.getText()).isEqualTo("No sessions match");
-        panel.setDistros(List.of(), profile -> 0);
-        assertThat(panel.empty.getText()).isEqualTo("No hosts match");
+    @Test void searchOccupiesTheOnlyTopRowAndUsesTheReferencePlaceholder() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            var root = (Nodes.Panel) panel.view().spec().root();
+            assertThat(root.searchOrNavigation()).get().isInstanceOfSatisfying(Nodes.Field.class, field -> {
+                assertThat(field.kind()).isEqualTo(Nodes.FieldKind.SEARCH);
+                assertThat(field.hint()).isEqualTo("Search sessions");
+                assertThat(field.label()).isEqualTo("Search sessions");
+            });
+            assertThat(all(panel.view())).as("new/import actions belong in the app header")
+                .noneMatch(n -> n instanceof Nodes.Button b && (b.tooltip().equals("New session") || b.label().equals("Import")));
+            assertThat(root.header().primary()).isEmpty();
+        });
     }
 
-    @Test void wslDistributionsComeFirstWithBadgesSessionsAndTheirOwnCard() {
-        var panel = withDistros(name -> null);
-        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 2, false, true),
-            new HostRows.Distro(ubuntu, 0), new HostRows.Distro(debian, 2), new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
-        var header = (javax.swing.JLabel) render(panel, 0);
-        assertThat(header.getText()).isEqualTo("WSL   2");
-        assertThat(header.getToolTipText()).as("only the default host group can be renamed").isNull();
-        var busy = render(panel, 2);
-        assertThat(labels(busy)).contains("Debian", "WSL 2", "\u25CF", "2");
-        assertThat(busy.getAccessibleContext().getAccessibleName()).isEqualTo("Debian, WSL 2, 2 sessions");
-        assertThat(labels(render(panel, 1))).contains("Ubuntu", "WSL 1").doesNotContain("\u25CF");
-        assertThat(panel.selectedDistro()).as("the first selectable row").contains(ubuntu);
-        assertThat(panel.card.isVisible()).isTrue();
-        assertThat(panel.cardName.getText()).isEqualTo("Ubuntu");
-        assertThat(panel.cardAddress.getText()).isEqualTo("WSL 1");
-        assertThat(panel.cardInfo.getText()).isEqualTo("wsl.exe -d Ubuntu");
-        assertThat(panel.cardCredential.isVisible()).isFalse();
-        assertThat(panel.edit.isVisible()).isFalse();
-        assertThat(panel.connect.getText()).isEqualTo("Open");
-        panel.connect.doClick();
-        panel.activate(2);
-        assertThat(events).containsExactly("open Ubuntu", "open Debian");
-        panel.selectDistro("wsl:Debian");
-        panel.setDistros(List.of(ubuntu, debian), profile -> 1);
-        assertThat(panel.selectedDistro()).as("a refresh keeps the selection").contains(debian);
-        panel.select(prod.id());
-        assertThat(panel.selectedDistro()).isEmpty();
-        assertThat(panel.connect.getText()).isEqualTo("Connect");
-        assertThat(panel.edit.isVisible()).isTrue();
-        assertThat(panel.cardCredential.isVisible()).isTrue();
+    /** Task 6d acceptance: the count and New/Import actions travel through PanelHost.setHeader. */
+    @Test void appHeaderPublishesTotalSessionsAndAccessibleAddAndImportActions() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            var headers = new ArrayList<dev.jasper.sdk.ui.PanelHeader>();
+            panel.onHeaderChanged(headers::add);
+            assertThat(headers.getLast().detail()).isEqualTo("0");
+            panel.setHosts(List.of(nas, prod), Optional.empty());
+            panel.setDistros(List.of(ubuntu, pwsh), profile -> 0);
+            search(panel, "no match");
+            var header = headers.getLast();
+            assertThat(header.detail()).as("filtering doesn't change the saved-session count").isEqualTo("3");
+            assertThat(header.active()).isFalse();
+            assertThat(header.actions()).extracting(dev.jasper.sdk.ui.PanelHeader.Action::label).containsExactly("New session", "Import sessions");
+            header.actions().forEach(action -> action.invoke().run());
+            assertThat(events).containsExactly("edit new", "import");
+            panel.setHosts(List.of(nas), Optional.empty());
+            assertThat(headers.getLast().detail()).isEqualTo("2");
+            int published = headers.size();
+            panel.setHosts(List.of(nas), Optional.empty());
+            assertThat(headers).as("an unchanged count publishes nothing").hasSize(published);
+        });
     }
 
-    @Test void aHostGroupNamedWslCollapsesApartFromTheWslGroup() {
-        var box = RemoteHost.create("box", "box.example", 22, "me", Auth.AGENT, "wsl", Optional.empty());
-        var panel = new HostsPanel(actions);
-        panel.setDistros(List.of(ubuntu), profile -> 0);
-        panel.setHosts(List.of(box), Optional.empty());
-        panel.setCollapsed(Set.of("wsl"));
-        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(ubuntu, 0),
-            new HostRows.Group("wsl", 1, true));
-        panel.toggle(0);
-        assertThat(panel.wslCollapsed()).isTrue();
-        assertThat(panel.collapsed()).containsExactly("wsl");
-        panel.toggle(1);
-        assertThat(panel.collapsed()).isEmpty();
-        assertThat(panel.wslCollapsed()).isTrue();
-        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, true, true), new HostRows.Group("wsl", 1, false), new HostRows.Host(box));
-        panel.setWslCollapsed(false);
-        assertThat(rows(panel)).startsWith(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(ubuntu, 0));
+    /** G4 (controller ruling): the outline star is always shown (visual-only); a favourite's is filled and amber. */
+    @Test void rowsShowAnOutlineStarAndFavouritesAFilledWarningStar() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.setHosts(List.of(nas, prod.withFavorite(true)), Optional.empty());
+            int nasRow = indexOf(panel, nas), prodRow = indexOf(panel, prod);
+            var plain = star(panel, nasRow);
+            assertThat(plain.icon()).isEqualTo("star");
+            assertThat(plain.iconSeverity()).isEmpty();
+            assertThat(plain.tooltip()).isEqualTo("Add to favorites");
+            assertThat(plain.kind()).isEqualTo(Nodes.ButtonKind.GHOST);
+            assertThat(plain.presentation()).isEqualTo(Nodes.ButtonPresentation.EMBEDDED);
+            assertThat(plain.label()).isEmpty();
+            var favourite = star(panel, prodRow);
+            assertThat(favourite.icon()).isEqualTo("star.filled");
+            assertThat(favourite.iconSeverity()).contains(Nodes.Severity.WARNING);
+            assertThat(favourite.tooltip()).isEqualTo("Remove from favorites");
+            assertThat(row(panel, nasRow).trailing().getLast()).as("the star sits at the trailing edge").isSameAs(plain);
+        });
     }
 
-    @Test void distroMenusOfferOnlyOpeningAndTheWslGroupCollapsesOnItsOwn() {
-        var icons = new java.util.EnumMap<dev.jasper.sdk.ui.BundledIcon, javax.swing.Icon>(dev.jasper.sdk.ui.BundledIcon.class);
-        for (var name : List.of(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER, dev.jasper.sdk.ui.BundledIcon.GENERAL_OPEN,
-                dev.jasper.sdk.ui.BundledIcon.TERMINAL_TOOLWINDOW_TERMINAL))
-            icons.put(name, new dev.jasper.sdk.testing.FakeBundledIcon(name));
-        var panel = withDistros(icons::get);
-        var row = (java.awt.Container) render(panel, 1);
-        assertThat(((javax.swing.JLabel) row.getComponent(0)).getIcon()).isSameAs(icons.get(dev.jasper.sdk.ui.BundledIcon.TERMINAL_TOOLWINDOW_TERMINAL));
-        javax.swing.JPopupMenu menu = panel.menuFor(1);
-        assertThat(menu.getComponentCount()).isEqualTo(2);
-        assertThat(((javax.swing.JMenuItem) menu.getComponent(0)).getText()).isEqualTo("Open in new tab");
-        assertThat(((javax.swing.JMenuItem) menu.getComponent(1)).getText()).isEqualTo("Open in split");
-        ((javax.swing.JMenuItem) menu.getComponent(0)).doClick();
-        ((javax.swing.JMenuItem) menu.getComponent(1)).doClick();
-        assertThat(events).containsExactly("open Ubuntu", "split Ubuntu");
-        assertThat(panel.menuFor(0)).as("the WSL header offers no rename").isNull();
-        int[] changes = {0};
-        panel.onCollapsedChanged(() -> changes[0]++);
-        panel.toggle(0);
-        assertThat(changes[0]).isEqualTo(1);
-        assertThat(panel.wslCollapsed()).isTrue();
-        assertThat(panel.collapsed()).as("the WSL group is not in the host groups' collapsed set").isEmpty();
-        assertThat(rows(panel)).startsWith(new HostRows.Group(HostRows.WSL, 2, true, true), new HostRows.Group("Production", 1, false));
-        assertThat(((javax.swing.JLabel) render(panel, 0)).getIcon()).isSameAs(icons.get(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER));
-        panel.search.setText("deb");
-        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(debian, 2));
-        panel.search.setText("");
-        panel.setDistros(List.of(), profile -> 0);
-        assertThat(rows(panel)).containsExactly(new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
+    /** A star click reports only its action: it toggles the favourite without selecting or activating the row. */
+    @Test void theStarTogglesTheFavouriteWithoutSelectingOrActivating() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.onActivate(host -> events.add("activate " + host.name()));
+            panel.setHosts(List.of(prod, nas), Optional.empty());
+            panel.select(prod.id());
+            int nasRow = indexOf(panel, nas);
+            press(panel.view(), star(panel, nasRow).action());
+            assertThat(events).containsExactly("favorite nas true");
+            assertThat(panel.selectedHost()).as("selection unchanged").contains(prod);
+            assertThat(list(panel).selectedIds()).containsExactly(HostsPanel.rowId(new HostRows.Host(prod)));
+        });
     }
 
-    @Test void showingSelectsFirstHostAndArrowKeysNavigateImmediately() throws Exception {
-        javax.swing.SwingUtilities.invokeAndWait(() -> {
-            var panel = new HostsPanel(actions);
+    @Test void theCardsEditAndConnectControlsAreNamedAndReachable() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.setHostDetails(host -> "Ubuntu", host -> 1);
+            panel.setHosts(List.of(prod), Optional.empty());
+            var edit = button(panel.view(), HostsPanel.EDIT);
+            assertThat(edit.label()).isEmpty();
+            assertThat(edit.icon()).isEqualTo("edit");
+            assertThat(edit.tooltip()).as("its accessible name").isEqualTo("Edit session");
+            assertThat(edit.kind()).isEqualTo(Nodes.ButtonKind.GHOST);
+            assertThat(edit.state().visible() && edit.state().enabled()).isTrue();
+            assertThat(button(panel.view(), HostsPanel.CONNECT).state().visible()).isTrue();
+        });
+    }
+
+    @Test void hostRowsShowTheirSessionStateAndDistrosTheirBadgeAndSessions() throws Exception {
+        edt(() -> {
+            var panel = withDistros();
+            panel.setHostDetails(host -> "detail", host -> 1);
+            for (int i = 0; i < rows(panel).size(); i++) {
+                var model = rows(panel).get(i);
+                var item = row(panel, i);
+                if (model instanceof HostRows.Host) assertThat(dot(item)).contains(Nodes.StatusKind.SUCCESS);
+                if (model instanceof HostRows.Distro distro && distro.sessions() > 0) assertThat(dot(item)).contains(Nodes.StatusKind.SUCCESS);
+                if (model instanceof HostRows.Distro distro && distro.sessions() == 0) assertThat(dot(item)).isEmpty();
+                if (model instanceof HostRows.Distro distro) assertThat(item.trailing()).anySatisfy(n -> assertThat(n).isInstanceOfSatisfying(Nodes.Chip.class,
+                    chip -> { assertThat(chip.label()).isEqualTo(distro.profile().detail().orElseThrow()); assertThat(chip.hue()).isEqualTo(Nodes.Hue.NEUTRAL); }));
+            }
+            panel.setHostDetails(host -> "detail", host -> 0);
+            assertThat(dot(row(panel, indexOf(panel, prod)))).as("no session: an idle dot").contains(Nodes.StatusKind.IDLE);
+        });
+    }
+
+    @Test void groupRowsShowTheirStateWhenExpandedCollapsedAndRevealedBySearch() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.setHosts(List.of(prod), Optional.empty());
+            java.util.function.Supplier<Nodes.Icon> glyph = () -> (Nodes.Icon) row(panel, 0).leading().orElseThrow();
+            assertThat(glyph.get().name()).isEqualTo("chevron.down");
+            assertThat(glyph.get().accessibleName()).isEqualTo("Expanded group");
+            assertThat(rowTexts(row(panel, 0))).containsExactly("Production", "1");
+            assertThat(row(panel, 0).title().getLast()).isInstanceOfSatisfying(Nodes.Text.class, count -> assertThat(count.role()).isEqualTo(Nodes.TextRole.COUNT));
+            clickRow(panel, 0);
+            assertThat(glyph.get().name()).isEqualTo("chevron.right");
+            assertThat(glyph.get().accessibleName()).isEqualTo("Collapsed group");
+            search(panel, "prod");
+            assertThat(glyph.get().name()).as("a search shows the group open").isEqualTo("chevron.down");
+            assertThat(panel.collapsed()).containsExactly("Production");
+            search(panel, "");
+            assertThat(glyph.get().name()).isEqualTo("chevron.right");
+        });
+    }
+
+    @Test void theKitHeaderCarriesTheTitleAndThereIsNoWslGroupWithoutDistributions() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            var root = (Nodes.Panel) panel.view().spec().root();
+            assertThat(root.header().title()).as("the window borrows this header").isEqualTo("Sessions");
+            assertThat(texts(panel.view())).doesNotContain("Sessions");
+            panel.setDistros(List.of(pwsh), profile -> 0);
+            assertThat(rows(panel)).isEmpty();
+            assertThat(shown(panel, HostsPanel.HINT)).isTrue();
+            assertThat(cardText(panel, HostsPanel.HINT)).as("without WSL the panel holds only hosts")
+                .isEqualTo("No hosts yet — Add or Import from ~/.ssh/config");
+            panel.setHosts(List.of(prod), Optional.empty());
+            assertThat(rows(panel)).containsExactly(new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
+            assertThat(find(panel.view(), HostsPanel.HINT)).isEmpty();
+        });
+    }
+
+    @Test void theEmptyHintSpeaksOfSshHostsWhenTheWslGroupIsShown() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.setDistros(List.of(ubuntu), profile -> 0);
+            assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(ubuntu, 0));
+            assertThat(cardText(panel, HostsPanel.HINT)).isEqualTo("No SSH hosts yet — Add or Import from ~/.ssh/config");
+            panel.setHosts(List.of(prod), Optional.empty());
+            search(panel, "zzz");
+            assertThat(rows(panel)).isEmpty();
+            assertThat(cardText(panel, HostsPanel.HINT)).isEqualTo("No sessions match");
+            panel.setDistros(List.of(), profile -> 0);
+            assertThat(cardText(panel, HostsPanel.HINT)).isEqualTo("No hosts match");
+        });
+    }
+
+    @Test void wslDistributionsComeFirstWithBadgesSessionsAndTheirOwnCard() throws Exception {
+        edt(() -> {
+            var panel = withDistros();
+            assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 2, false, true),
+                new HostRows.Distro(ubuntu, 0), new HostRows.Distro(debian, 2), new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
+            assertThat(rowTexts(row(panel, 0))).containsExactly("WSL", "2");
+            assertThat(row(panel, 0).tooltip()).as("only the default host group can be renamed").isEmpty();
+            var busy = row(panel, 2);
+            assertThat(rowTexts(busy)).contains("Debian", "WSL 2", "2");
+            assertThat(dot(busy)).contains(Nodes.StatusKind.SUCCESS);
+            assertThat(busy.tooltip()).isEqualTo("Debian, WSL 2, 2 sessions");
+            assertThat(rowTexts(row(panel, 1))).contains("Ubuntu", "WSL 1");
+            assertThat(dot(row(panel, 1))).isEmpty();
+            assertThat(panel.selectedDistro()).as("the first selectable row").contains(ubuntu);
+            assertThat(card(panel)).isPresent();
+            assertThat(cardText(panel, HostsPanel.CARD_NAME)).isEqualTo("Ubuntu");
+            assertThat(cardText(panel, HostsPanel.CARD_ADDRESS)).isEqualTo("WSL 1");
+            assertThat(cardText(panel, HostsPanel.CARD_INFO)).isEqualTo("wsl.exe -d Ubuntu");
+            assertThat(shown(panel, HostsPanel.CARD_INFO)).isTrue();
+            assertThat(shown(panel, HostsPanel.CARD_CREDENTIAL)).isFalse();
+            assertThat(shown(panel, HostsPanel.EDIT)).isFalse();
+            assertThat(button(panel.view(), HostsPanel.CONNECT).label()).isEqualTo("Open");
+            dev.jasper.remote.testsupport.Kits.click(panel.view(), HostsPanel.CONNECT);
+            select(panel, 2); activate(panel);
+            assertThat(events).containsExactly("open Ubuntu", "open Debian");
+            panel.selectDistro("wsl:Debian");
+            panel.setDistros(List.of(ubuntu, debian), profile -> 1);
+            assertThat(panel.selectedDistro()).as("a refresh keeps the selection").contains(debian);
+            panel.select(prod.id());
+            assertThat(panel.selectedDistro()).isEmpty();
+            assertThat(button(panel.view(), HostsPanel.CONNECT).label()).isEqualTo("Connect");
+            assertThat(shown(panel, HostsPanel.EDIT)).isTrue();
+            assertThat(shown(panel, HostsPanel.CARD_CREDENTIAL)).isTrue();
+        });
+    }
+
+    @Test void aHostGroupNamedWslCollapsesApartFromTheWslGroup() throws Exception {
+        edt(() -> {
+            var box = RemoteHost.create("box", "box.example", 22, "me", Auth.AGENT, "wsl", Optional.empty());
+            var panel = panel();
+            panel.setDistros(List.of(ubuntu), profile -> 0);
+            panel.setHosts(List.of(box), Optional.empty());
+            panel.setCollapsed(Set.of("wsl"));
+            assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(ubuntu, 0),
+                new HostRows.Group("wsl", 1, true));
+            assertThat(row(panel, 0).id()).isNotEqualTo(row(panel, 2).id());
+            clickRow(panel, 0);
+            assertThat(panel.wslCollapsed()).isTrue();
+            assertThat(panel.collapsed()).containsExactly("wsl");
+            clickRow(panel, 1);
+            assertThat(panel.collapsed()).isEmpty();
+            assertThat(panel.wslCollapsed()).isTrue();
+            assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, true, true), new HostRows.Group("wsl", 1, false), new HostRows.Host(box));
+            panel.setWslCollapsed(false);
+            assertThat(rows(panel)).startsWith(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(ubuntu, 0));
+        });
+    }
+
+    @Test void distroMenusOfferOnlyOpeningAndTheWslGroupCollapsesOnItsOwn() throws Exception {
+        edt(() -> {
+            var panel = withDistros();
+            assertThat(row(panel, 1).leading()).get().isInstanceOfSatisfying(Nodes.Icon.class, icon -> assertThat(icon.name()).isEqualTo("terminal"));
+            assertThat(menuLabels(row(panel, 1))).containsExactly("Open in new tab", "Open in split");
+            menu(panel, 1, "Open in new tab");
+            menu(panel, 1, "Open in split");
+            assertThat(events).containsExactly("open Ubuntu", "split Ubuntu");
+            assertThat(row(panel, 0).contextActions()).as("the WSL header offers no rename").isEmpty();
+            int[] changes = {0};
+            panel.onCollapsedChanged(() -> changes[0]++);
+            clickRow(panel, 0);
+            assertThat(changes[0]).isEqualTo(1);
+            assertThat(panel.wslCollapsed()).isTrue();
+            assertThat(panel.collapsed()).as("the WSL group is not in the host groups' collapsed set").isEmpty();
+            assertThat(rows(panel)).startsWith(new HostRows.Group(HostRows.WSL, 2, true, true), new HostRows.Group("Production", 1, false));
+            assertThat(((Nodes.Icon) row(panel, 0).leading().orElseThrow()).name()).isEqualTo("chevron.right");
+            search(panel, "deb");
+            assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(debian, 2));
+            search(panel, "");
+            panel.setDistros(List.of(), profile -> 0);
+            assertThat(rows(panel)).containsExactly(new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
+        });
+    }
+
+    @Test void showingSelectsFirstHostAndKeyboardSelectionActivates() throws Exception {
+        edt(() -> {
+            var panel = panel();
             var second = RemoteHost.create("staging", "staging.example", 22, "me", Auth.AGENT, "Production", Optional.empty());
             panel.setHosts(List.of(second, prod, nas), Optional.of("A host file warning"));
             panel.select(nas.id());
-            panel.addNotify();
-            try {
-                assertThat(panel.selectedHost()).contains(prod);
-                assertThat(panel.list.getSelectedValue()).isInstanceOf(HostRows.Host.class);
-                panel.list.getActionMap().get("selectNextRow").actionPerformed(
-                    new java.awt.event.ActionEvent(panel.list, 0, "Down"));
-                assertThat(panel.selectedHost()).contains(second);
-                panel.list.getActionMap().get("activateHost").actionPerformed(
-                    new java.awt.event.ActionEvent(panel.list, 0, "Enter"));
-                assertThat(events).containsExactly("connect staging");
-                panel.removeNotify();
-                panel.addNotify();
-                assertThat(panel.selectedHost()).contains(prod);
-            } finally { panel.removeNotify(); }
+            panel.shown();
+            assertThat(panel.selectedHost()).contains(prod);
+            assertThat(row(panel, 0).heading()).as("the error row is never selected").isTrue();
+            assertThat(list(panel).selectedIds()).containsExactly(HostsPanel.rowId(new HostRows.Host(prod)));
+            select(panel, indexOf(panel, second));
+            assertThat(panel.selectedHost()).contains(second);
+            activate(panel);
+            assertThat(events).containsExactly("connect staging");
+            panel.shown();
+            assertThat(panel.selectedHost()).contains(prod);
         });
     }
 
-    @Test void selectedGroupSurvivesCollapseExpandAndHostRefresh() {
-        var panel = new HostsPanel(actions);
-        panel.setHosts(List.of(prod, nas), Optional.empty());
-        panel.list.setSelectedIndex(0);
-        var enter = panel.list.getActionMap().get("activateHost");
-        var event = new java.awt.event.ActionEvent(panel.list, 0, "Enter");
-        enter.actionPerformed(event);
-        assertThat(panel.list.getSelectedValue()).isEqualTo(new HostRows.Group("Production", 1, true));
-        panel.setHosts(List.of(prod, nas), Optional.empty());
-        assertThat(panel.list.getSelectedValue()).isEqualTo(new HostRows.Group("Production", 1, true));
-        enter.actionPerformed(event);
-        assertThat(panel.list.getSelectedValue()).isEqualTo(new HostRows.Group("Production", 1, false));
-        assertThat(events).isEmpty();
+    @Test void selectedGroupSurvivesCollapseExpandAndHostRefresh() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.setHosts(List.of(prod, nas), Optional.empty());
+            select(panel, 0);
+            activate(panel);
+            assertThat(panel.selectedRow()).contains(new HostRows.Group("Production", 1, true));
+            panel.setHosts(List.of(prod, nas), Optional.empty());
+            assertThat(panel.selectedRow()).contains(new HostRows.Group("Production", 1, true));
+            activate(panel);
+            assertThat(panel.selectedRow()).contains(new HostRows.Group("Production", 1, false));
+            assertThat(events).isEmpty();
+        });
+    }
+
+    /** G2: a group toggles on a single click, as the old list did; a host's single click only selects it. */
+    @Test void aSingleClickTogglesAGroupButOnlySelectsAHost() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.onActivate(host -> events.add("activate " + host.name()));
+            panel.setHosts(List.of(prod, nas), Optional.empty());
+            clickRow(panel, indexOf(panel, nas));
+            assertThat(panel.selectedHost()).contains(nas);
+            assertThat(events).as("a single click never connects").isEmpty();
+            clickRow(panel, 0);
+            assertThat(panel.collapsed()).containsExactly("Production");
+            assertThat(list(panel).selectedIds()).as("the clicked group stays selected").containsExactly(row(panel, 0).id());
+            select(panel, 0);
+            assertThat(panel.collapsed()).as("keyboard selection never toggles").containsExactly("Production");
+        });
     }
 
     @Test void lateHostsSelectFirstButRefreshKeepsKeyboardSelection() throws Exception {
-        javax.swing.SwingUtilities.invokeAndWait(() -> {
-            var panel = new HostsPanel(actions);
-            panel.addNotify();
-            try {
-                panel.setHosts(List.of(prod, nas), Optional.empty());
-                assertThat(panel.selectedHost()).contains(prod);
-                panel.select(nas.id());
-                panel.setHosts(List.of(prod, nas), Optional.empty());
-                assertThat(panel.selectedHost()).contains(nas);
-                panel.search.setText("no match");
-                assertThat(panel.selectedHost()).isEmpty();
-                panel.search.setText("prod");
-                assertThat(panel.selectedHost()).contains(prod);
-            } finally { panel.removeNotify(); }
+        edt(() -> {
+            var panel = panel();
+            panel.shown();
+            panel.setHosts(List.of(prod, nas), Optional.empty());
+            assertThat(panel.selectedHost()).contains(prod);
+            panel.select(nas.id());
+            panel.setHosts(List.of(prod, nas), Optional.empty());
+            assertThat(panel.selectedHost()).contains(nas);
+            search(panel, "no match");
+            assertThat(panel.selectedHost()).isEmpty();
+            search(panel, "prod");
+            assertThat(panel.selectedHost()).contains(prod);
         });
     }
 
-    @Test void openHostDetailsAndConnectionHeadingFollowUiFontChanges() throws Exception {
-        javax.swing.SwingUtilities.invokeAndWait(() -> {
-            var panel = new HostsPanel(actions);
+    /** Typography is the kit's (it follows the UI font live): the card asks for roles, never fonts. */
+    @Test void theCardUsesKitTextRoles() throws Exception {
+        edt(() -> {
+            var panel = panel();
             panel.setHosts(List.of(prod), Optional.empty()); panel.select(prod.id());
-            var progress = new ConnectionPanel("prod", "user@host", () -> {}, () -> {});
-            var emptyState = PanelStyle.emptyState(null, "Empty", "No items", new javax.swing.JButton("Add"));
-            Object previous = javax.swing.UIManager.get("Label.font");
-            try {
-                javax.swing.UIManager.put("Label.font", new javax.swing.plaf.FontUIResource("Serif", java.awt.Font.PLAIN, 20));
-                javax.swing.SwingUtilities.updateComponentTreeUI(panel);
-                javax.swing.SwingUtilities.updateComponentTreeUI(progress);
-                javax.swing.SwingUtilities.updateComponentTreeUI(emptyState);
-                assertThat(panel.cardAddress.getFont().getSize2D()).isEqualTo(20);
-                var emptyHeading = ZoneColors.labels(emptyState).stream().filter(label -> "Empty".equals(label.getText())).findFirst().orElseThrow();
-                assertThat(emptyHeading.getFont().getSize2D()).isEqualTo(20);
-                assertThat(panel.cardName.getFont().getFamily()).isEqualTo(java.awt.Font.SERIF);
-                assertThat(panel.cardName.getFont().getSize2D()).isEqualTo(20);
-                assertThat(panel.cardName.getFont().isBold()).isTrue();
-                var heading = (javax.swing.JPanel) progress.getComponent(0);
-                var title = (javax.swing.JLabel) heading.getComponent(0);
-                assertThat(title.getFont().getFamily()).isEqualTo(java.awt.Font.SERIF);
-                assertThat(title.getFont().getSize2D()).isEqualTo(23);
-            } finally { javax.swing.UIManager.put("Label.font", previous); }
+            assertThat(node(panel.view(), HostsPanel.CARD_NAME, Nodes.Text.class).role()).isEqualTo(Nodes.TextRole.BODY_STRONG);
+            assertThat(node(panel.view(), HostsPanel.CARD_ADDRESS, Nodes.Text.class).role()).isEqualTo(Nodes.TextRole.MONO);
+            assertThat(node(panel.view(), HostsPanel.CARD_TILE, Nodes.Icon.class).name()).isEqualTo("server");
         });
     }
 
-    @Test void showsRowsCardAndRunsActions() {
-        var panel = new HostsPanel(actions);
-        assertThat(panel.empty.isVisible()).isTrue();
-        panel.setCredentialLabels(host -> host.auth() instanceof Auth.Agent ? "SSH agent" : "Work key");
-        panel.setHosts(List.of(prod, nas), Optional.empty());
-        assertThat(panel.empty.isVisible()).isFalse();
-        assertThat(panel.list.getModel().getSize()).as("two groups, two hosts").isEqualTo(4);
-        panel.select(nas.id());
-        assertThat(panel.card.isVisible()).isTrue();
-        assertThat(panel.cardName.getText()).isEqualTo("nas");
-        assertThat(panel.cardAddress.getText()).isEqualTo("me@nas.local:2222");
-        assertThat(panel.cardCredential.getText()).isEqualTo("SSH agent");
-        assertThat(panel.cardJump.getText()).isEqualTo("via prod");
-        panel.connect.doClick();
-        panel.edit.doClick();
-        panel.activate(panel.list.getSelectedIndex());
-        panel.add.doClick();
-        panel.importButton.doClick();
-        assertThat(events).containsExactly("connect nas", "edit nas", "connect nas", "edit new", "import");
-        events.clear();
-        javax.swing.JPopupMenu menu = panel.menuFor(panel.list.getSelectedIndex());
-        assertThat(menu.getComponentCount()).isEqualTo(6);
-        ((javax.swing.JMenuItem) menu.getComponent(1)).doClick();
-        ((javax.swing.JMenuItem) menu.getComponent(5)).doClick();
-        assertThat(events).containsExactly("split nas", "favorite nas true");
-        panel.select(prod.id());
-        assertThat(panel.cardCredential.getText()).isEqualTo("Work key");
-        assertThat(panel.cardJump.isVisible()).isFalse();
+    @Test void showsRowsCardAndRunsActions() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            assertThat(shown(panel, HostsPanel.HINT)).isTrue();
+            panel.setCredentialLabels(host -> host.auth() instanceof Auth.Agent ? "SSH agent" : "Work key");
+            panel.setHosts(List.of(prod, nas), Optional.empty());
+            assertThat(find(panel.view(), HostsPanel.HINT)).isEmpty();
+            assertThat(list(panel).items()).as("two groups, two hosts").hasSize(4);
+            panel.select(nas.id());
+            assertThat(card(panel)).isPresent();
+            assertThat(cardText(panel, HostsPanel.CARD_NAME)).isEqualTo("nas");
+            assertThat(cardText(panel, HostsPanel.CARD_ADDRESS)).isEqualTo("me@nas.local:2222");
+            assertThat(cardText(panel, HostsPanel.CARD_CREDENTIAL)).isEqualTo("SSH agent");
+            assertThat(cardText(panel, HostsPanel.CARD_JUMP)).isEqualTo("via prod");
+            dev.jasper.remote.testsupport.Kits.click(panel.view(), HostsPanel.CONNECT);
+            dev.jasper.remote.testsupport.Kits.click(panel.view(), HostsPanel.EDIT);
+            activate(panel);
+            assertThat(events).containsExactly("connect nas", "edit nas", "connect nas");
+            events.clear();
+            int nasRow = indexOf(panel, nas);
+            assertThat(menuLabels(row(panel, nasRow))).containsExactly("Connect in new tab", "Connect in split", "Edit…", "Duplicate", "Delete…", "Add to favorites");
+            menu(panel, nasRow, "Connect in split");
+            menu(panel, nasRow, "Add to favorites");
+            assertThat(events).containsExactly("split nas", "favorite nas true");
+            panel.select(prod.id());
+            assertThat(cardText(panel, HostsPanel.CARD_CREDENTIAL)).isEqualTo("Work key");
+            assertThat(shown(panel, HostsPanel.CARD_JUMP)).isFalse();
+        });
     }
 
-    @Test void searchFiltersAndCollapseIsRemembered() {
-        var panel = new HostsPanel(actions);
-        panel.setHosts(List.of(prod, nas), Optional.empty());
-        int[] collapsedChanges = {0};
-        panel.onCollapsedChanged(() -> collapsedChanges[0]++);
-        panel.toggle(0);
-        assertThat(panel.collapsed()).containsExactly("Production");
-        assertThat(panel.list.getModel().getSize()).isEqualTo(3);
-        assertThat(collapsedChanges[0]).isEqualTo(1);
-        panel.search.setText("prod");
-        assertThat(panel.list.getModel().getSize()).as("search reveals the collapsed group").isEqualTo(2);
-        assertThat(panel.collapsed()).as("without changing the saved state").containsExactly("Production");
-        panel.search.setText("zzz");
-        assertThat(panel.list.getModel().getSize()).isZero();
-        assertThat(panel.empty.getText()).contains("No hosts match");
-        panel.search.setText("");
-        panel.setCollapsed(Set.of());
-        assertThat(panel.list.getModel().getSize()).isEqualTo(4);
-        panel.setHosts(List.of(prod, nas), Optional.of("hosts.toml has TOML errors"));
-        assertThat(panel.list.getModel().getSize()).as("an error row leads").isEqualTo(5);
-        assertThat(panel.list.getModel().getElementAt(0)).isInstanceOf(HostRows.Error.class);
-    }
-    @Test void clearsRemovedSelectionAndBindsEnterAndFavoriteClick() {
-        var panel = new HostsPanel(actions);
-        panel.setHosts(List.of(nas), Optional.empty());
-        panel.select(nas.id());
-        Object action = panel.list.getInputMap().get(javax.swing.KeyStroke.getKeyStroke("ENTER"));
-        assertThat(action).isNotNull();
-        panel.list.getActionMap().get(action).actionPerformed(new java.awt.event.ActionEvent(panel.list, 0, ""));
-        panel.list.setSize(300, 100);
-        var bounds = panel.list.getCellBounds(0, 0);
-        var click = new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 288, bounds.y + bounds.height / 2, 1, false, java.awt.event.MouseEvent.BUTTON1);
-        for (var listener : panel.list.getMouseListeners()) listener.mouseClicked(click);
-        assertThat(events).containsExactly("connect nas", "favorite nas true");
-        panel.setHosts(List.of(), Optional.empty());
-        assertThat(panel.card.isVisible()).isFalse();
+    /** Row menus act on the row they belong to, whatever is selected (a context press never selects). */
+    @Test void rowMenusNameTheirRowAndNeverNeedTheSelection() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.onBrowseFiles(host -> events.add("browse " + host.name()));
+            panel.setHosts(List.of(prod, nas), Optional.empty());
+            panel.select(prod.id());
+            int nasRow = indexOf(panel, nas);
+            assertThat(menuLabels(row(panel, nasRow))).contains("Browse files");
+            menu(panel, nasRow, "Delete…");
+            menu(panel, nasRow, "Browse files");
+            menu(panel, nasRow, "Duplicate");
+            menu(panel, nasRow, "Edit…");
+            assertThat(events).containsExactly("delete nas", "browse nas", "duplicate nas", "edit nas");
+            assertThat(panel.selectedHost()).contains(prod);
+            assertThat(row(panel, nasRow).contextActions().orElseThrow()).extracting(dev.jasper.sdk.ui.MenuItem::action)
+                .allSatisfy(action -> assertThat(action).endsWith(HostsPanel.rowId(new HostRows.Host(nas))));
+            assertThat(list(panel).contextActions()).as("no shared menu acting on the selection").isEmpty();
+        });
     }
 
-    @Test void rowsKeepSessionCountsAndSearchableDetails() {
-        var panel = new HostsPanel(actions);
-        panel.setHostDetails(host -> host.id().equals(nas.id()) ? "Ubuntu \u00B7 10.0.0.2" : "macOS", host -> host.id().equals(nas.id()) ? 2 : 0);
-        panel.setHosts(List.of(nas, prod), Optional.empty());
-        panel.search.setText("ubuntu");
-        assertThat(panel.list.getModel().getSize()).isEqualTo(1);
-        var component = panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(0), 0, false, false);
-        assertThat(labels(component)).contains("nas");
-        assertThat(component.getAccessibleContext().getAccessibleName()).contains("2 sessions");
-        assertThat(((javax.swing.JComponent) component).getToolTipText()).contains("me@nas.local:2222", "Ubuntu \u00B7 10.0.0.2");
-        panel.select(nas.id());
-        assertThat(panel.cardAddress.getText()).isEqualTo("me@nas.local:2222");
-        assertThat(panel.cardInfo.getText()).isEqualTo("Ubuntu \u00B7 10.0.0.2");
+    @Test void theDefaultGroupRenamesFromItsRowOrAFlatList() throws Exception {
+        edt(() -> {
+            int[] renames = {0};
+            var panel = panel();
+            panel.onRenameDefaultGroup(() -> renames[0]++);
+            panel.setHosts(List.of(nas), Optional.empty());
+            assertThat(rows(panel)).as("a flat list has no group row").containsExactly(new HostRows.Host(nas));
+            menu(panel, 0, "Rename group…");
+            panel.setHosts(List.of(prod, nas), Optional.empty());
+            int other = rows(panel).indexOf(new HostRows.Group(HostRows.OTHER, 1, false));
+            assertThat(row(panel, other).tooltip()).isEqualTo("Right-click to rename this group");
+            assertThat(menuLabels(row(panel, other))).containsExactly("Rename group…");
+            menu(panel, other, "Rename group…");
+            assertThat(menuLabels(row(panel, indexOf(panel, nas)))).as("grouped hosts rename through the group row").doesNotContain("Rename group…");
+            assertThat(row(panel, 0).contextActions()).as("a named group has no menu").isEmpty();
+            assertThat(renames[0]).isEqualTo(2);
+        });
     }
+
+    @Test void searchFiltersAndCollapseIsRemembered() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.setHosts(List.of(prod, nas), Optional.empty());
+            int[] collapsedChanges = {0};
+            panel.onCollapsedChanged(() -> collapsedChanges[0]++);
+            clickRow(panel, 0);
+            assertThat(panel.collapsed()).containsExactly("Production");
+            assertThat(rows(panel)).hasSize(3);
+            assertThat(collapsedChanges[0]).isEqualTo(1);
+            search(panel, "prod");
+            assertThat(rows(panel)).as("search reveals the collapsed group").hasSize(2);
+            assertThat(panel.collapsed()).as("without changing the saved state").containsExactly("Production");
+            search(panel, "zzz");
+            assertThat(rows(panel)).isEmpty();
+            assertThat(cardText(panel, HostsPanel.HINT)).contains("No hosts match");
+            search(panel, "");
+            panel.setCollapsed(Set.of());
+            assertThat(rows(panel)).hasSize(4);
+            panel.setHosts(List.of(prod, nas), Optional.of("hosts.toml has TOML errors"));
+            assertThat(rows(panel)).as("an error row leads").hasSize(5);
+            assertThat(rows(panel).getFirst()).isInstanceOf(HostRows.Error.class);
+            assertThat(rowTexts(row(panel, 0))).containsExactly("hosts.toml has TOML errors");
+            assertThat(node(panel.view(), HostsPanel.SEARCH, Nodes.Field.class).value()).isEmpty();
+        });
+    }
+
+    @Test void clearsRemovedSelectionAndBindsEnterAndFavoriteClick() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.setHosts(List.of(nas), Optional.empty());
+            panel.select(nas.id());
+            assertThat(list(panel).activateAction()).as("Enter and double click").isNotBlank();
+            assertThat(list(panel).enterAction()).as("Enter is the activate action").isEmpty();
+            activate(panel);
+            press(panel.view(), star(panel, 0).action());
+            assertThat(events).containsExactly("connect nas", "favorite nas true");
+            panel.setHosts(List.of(), Optional.empty());
+            assertThat(card(panel)).isEmpty();
+        });
+    }
+
+    @Test void rowsKeepSessionCountsAndSearchableDetails() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.setHostDetails(host -> host.id().equals(nas.id()) ? "Ubuntu · 10.0.0.2" : "macOS", host -> host.id().equals(nas.id()) ? 2 : 0);
+            panel.setHosts(List.of(nas, prod), Optional.empty());
+            search(panel, "ubuntu");
+            assertThat(rows(panel)).hasSize(1);
+            var item = row(panel, 0);
+            assertThat(rowTexts(item)).contains("nas");
+            assertThat(item.tooltip()).contains("2 sessions");
+            assertThat(item.tooltip()).contains("me@nas.local:2222", "Ubuntu · 10.0.0.2");
+            panel.select(nas.id());
+            assertThat(cardText(panel, HostsPanel.CARD_ADDRESS)).isEqualTo("me@nas.local:2222");
+            assertThat(cardText(panel, HostsPanel.CARD_INFO)).isEqualTo("Ubuntu · 10.0.0.2");
+        });
+    }
+
     @Test void sessionRowsShowAddressAndFavoriteAtTheTrailingEdge() throws Exception {
-        javax.swing.SwingUtilities.invokeAndWait(() -> {
-            var panel = new HostsPanel(actions);
+        edt(() -> {
+            var panel = panel();
             panel.setHosts(List.of(prod), Optional.empty());
-            panel.list.setSize(300, 100);
-            var row = (javax.swing.JPanel) panel.list.getCellRenderer().getListCellRendererComponent(panel.list,
-                panel.list.getModel().getElementAt(1), 1, true, true);
-            row.setSize(300, row.getPreferredSize().height);
-            layout(row);
-            var address = ZoneColors.labels(row).stream().filter(label -> prod.hostname().equals(label.getText())).findFirst();
-            assertThat(address).as("the host address is visible alongside its name").isPresent();
-            row.setSize(180, row.getPreferredSize().height); layout(row);
-            var at = javax.swing.SwingUtilities.convertRectangle(address.orElseThrow().getParent(), address.orElseThrow().getBounds(), row);
-            assertThat(at.width).isPositive();
-            assertThat(at.y + at.height).as("narrow rows keep address on the visible baseline").isLessThanOrEqualTo(row.getHeight());
-            row.setSize(300, row.getPreferredSize().height); layout(row);
-            var star = ZoneColors.labels(row).stream().filter(label -> "\u2606".equals(label.getText())).findFirst().orElseThrow();
-            assertThat(javax.swing.SwingUtilities.convertPoint(star, 0, 0, row).x).isGreaterThan(260);
-            var bounds = panel.list.getCellBounds(1, 1);
-            var click = new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0,
-                8, bounds.y + bounds.height / 2, 1, false, java.awt.event.MouseEvent.BUTTON1);
-            for (var listener : panel.list.getMouseListeners()) listener.mouseClicked(click);
-            assertThat(events).as("the leading status dot is not a favorite toggle").isEmpty();
+            var item = row(panel, 1);
+            assertThat(item.title()).extracting(n -> ((Nodes.Text) n).text()).as("the host address is visible alongside its name")
+                .containsExactly("prod", "api.example");
+            assertThat(((Nodes.Text) item.title().getLast()).role()).isEqualTo(Nodes.TextRole.DESCRIPTION);
+            assertThat(item.trailing().getLast()).isInstanceOf(Nodes.Button.class);
+            assertThat(item.leading()).get().as("the leading status dot is not a favorite toggle").isInstanceOf(Nodes.StatusDot.class);
         });
     }
 
-    private static void layout(java.awt.Container container) {
-        container.doLayout();
-        for (var child : container.getComponents()) if (child instanceof java.awt.Container nested) layout(nested);
+    @Test void rowsExposeTheirIdentityToAssistiveTechnology() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.setHostDetails(host -> "Ubuntu", host -> 1);
+            panel.setHosts(List.of(nas), Optional.empty());
+            assertThat(row(panel, 0).tooltip()).as("the row's accessible description").contains("nas", "me@nas.local:2222", "Ubuntu", "1 session")
+                .doesNotContain("via");
+            panel.setHosts(List.of(nas, prod), Optional.empty());
+            assertThat(row(panel, indexOf(panel, nas)).tooltip()).as("a jump host the old card's tooltip named").contains("nas", "me@nas.local:2222", "via prod");
+        });
     }
 
-    private static List<String> labels(java.awt.Component component) {
-        var out = new ArrayList<String>();
-        if (component instanceof javax.swing.JLabel label) out.add(label.getText());
-        if (component instanceof java.awt.Container container) for (var child : container.getComponents()) out.addAll(labels(child));
-        return out;
+    @Test void keyboardSelectionIsVisibleOnGroupHeaders() throws Exception {
+        edt(() -> {
+            var panel = panel(); panel.setHosts(List.of(nas), Optional.empty()); panel.setCollapsed(Set.of(HostRows.OTHER));
+            assertThat(row(panel, 0).heading()).as("a group row is a selectable row, not a heading").isFalse();
+            assertThat(list(panel).selectedIds()).containsExactly(row(panel, 0).id());
+        });
     }
 
-    @Test void rowsExposeTheirIdentityToAssistiveTechnology() {
-        var panel = new HostsPanel(actions);
-        panel.setHostDetails(host -> "Ubuntu", host -> 1);
-        panel.setHosts(List.of(nas), Optional.empty());
-        var row = panel.list.getAccessibleContext().getAccessibleChild(0).getAccessibleContext();
-        assertThat(row.getAccessibleName()).contains("nas", "me@nas.local:2222", "Ubuntu", "1 session");
+    /** No raw Swing reaches the host: the panel is a kit view the plugin owns, and closing it makes callbacks inert. */
+    @Test void closingThePanelMakesLateUpdatesInert() throws Exception {
+        edt(() -> {
+            var kit = new RecordingKit("dev.jasper.remote");
+            var panel = new HostsPanel(kit, actions, dev.jasper.sdk.testing.FakeBundledIcon::new);
+            panel.setHosts(List.of(prod), Optional.empty());
+            panel.close();
+            panel.setHosts(List.of(prod, nas), Optional.empty()); panel.setDistros(List.of(ubuntu), p -> 0); panel.shown(); panel.focusWhenOpened();
+            panel.setCredentialLabels(h -> "x"); panel.select(prod.id());
+            assertThat(kit.lateCalls).isEmpty();
+            assertThat(closed(panel.view())).isTrue();
+        });
     }
 
-    @Test void keyboardSelectionIsVisibleOnGroupHeaders() {
-        var panel = new HostsPanel(actions); panel.setHosts(List.of(nas), Optional.empty()); panel.setCollapsed(Set.of(HostRows.OTHER));
-        var renderer = panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(0), 0, true, true);
-        assertThat(((javax.swing.JComponent) renderer).isOpaque()).isTrue();
-        assertThat(renderer.getBackground()).isEqualTo(panel.list.getSelectionBackground());
-    }
-
-    private static List<String> texts(java.awt.Container root) {
-        List<String> found = new ArrayList<>();
-        for (java.awt.Component child : root.getComponents()) {
-            if (child instanceof javax.swing.JLabel label) found.add(label.getText());
-            if (child instanceof java.awt.Container nested) found.addAll(texts(nested));
-        }
-        return found;
+    static int indexOf(HostsPanel panel, RemoteHost host) {
+        for (int i = 0; i < rows(panel).size(); i++) if (rows(panel).get(i) instanceof HostRows.Host row && row.host().id().equals(host.id())) return i;
+        throw new AssertionError("host row not shown");
     }
 }

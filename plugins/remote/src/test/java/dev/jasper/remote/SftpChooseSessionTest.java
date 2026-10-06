@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.*;
 class SftpChooseSessionTest {
     @Test void choosingSessionFromDisconnectedSidebarOpensTheExistingHostChooser(@TempDir Path root) throws Exception {
         try(var host=new FakePluginHost(root.resolve("home"))) {
-            var plugin=new TestRemotePlugin(Runnable::run,context->Optional.empty(),(delay,work)->()->{},root.resolve("ssh"));
+            var plugin=new TestRemotePlugin(dev.jasper.remote.testsupport.Kits.UI,context->Optional.empty(),(delay,work)->()->{},root.resolve("ssh"));
             host.start(RemotePluginTest.INFO,Set.of(),Set.of(),plugin);
             var window=host.addTerminalWindow();
             var sidebar=host.openPanel(SftpUi.PANEL,window);

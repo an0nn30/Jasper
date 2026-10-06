@@ -87,10 +87,13 @@ class TransferUiTest {
                 awaitView(transfers, strip, dirty, view -> view.statusText().equals("Cancelled") && view.actionButton().getText().equals("Retry cleanup"));
                 var close = strip.view(dirty).orElseThrow().closeButton();
                 assertThat(close.isEnabled()).as("a cancelled transfer can be dismissed").isTrue();
-                close.doClick();
-                var confirm = (dev.jasper.remote.ui.ConfirmPanel) host.windowContent("dev.jasper.remote", "Clear transfer history").orElseThrow();
+                // The confirmation is a kit view (Task 8a), which lives on the EDT.
+                dev.jasper.remote.testsupport.Kits.edt(close::doClick);
+                var confirm = dev.jasper.remote.testsupport.Kits.value(() -> host.windowView("dev.jasper.remote", "Clear transfer history").orElseThrow());
+                assertThat(dev.jasper.remote.testsupport.Kits.<java.util.List<dev.jasper.sdk.ui.Nodes.Button>>value(() -> dev.jasper.remote.testsupport.Kits.primaries(confirm)))
+                    .as("Enter clears nothing").isEmpty();
                 assertThat(coordinator.job(dirty).get(5, TimeUnit.SECONDS).cleanupPending()).as("nothing cleared before confirming").isEqualTo(1);
-                confirm.confirm.doClick();
+                dev.jasper.remote.testsupport.Kits.edt(() -> dev.jasper.remote.testsupport.Kits.click(confirm, dev.jasper.remote.ui.ConfirmPanel.CONFIRM));
                 awaitGone(transfers, strip, dirty);
                 assertThat(host.windowContent("dev.jasper.remote", "Clear transfer history")).isEmpty();
                 assertThat(coordinator.snapshot(0, 50).get(5, TimeUnit.SECONDS).jobs()).isEmpty();

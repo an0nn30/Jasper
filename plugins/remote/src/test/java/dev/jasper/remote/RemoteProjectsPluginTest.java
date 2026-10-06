@@ -31,10 +31,11 @@ class RemoteProjectsPluginTest {
     final List<Runnable> scheduled = new ArrayList<>();
 
     RemotePlugin plugin(Path sshDir) {
-        return new TestRemotePlugin(Runnable::run, context -> Optional.empty(), (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
+        return new TestRemotePlugin(dev.jasper.remote.testsupport.Kits.UI, context -> Optional.empty(), (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
     }
 
-    static void settle(FakePluginHost host) { for (int i = 0; i < 20; i++) { host.runBackground(); host.flush(); } }
+    /** On the EDT, where the plugin's kit views live (Task 8a); see {@link RemotePluginTest#settle}. */
+    static void settle(FakePluginHost host) { RemotePluginTest.settle(host); }
 
     @Test void openHostInStartsTheShellInTheFolder(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
@@ -52,7 +53,7 @@ class RemoteProjectsPluginTest {
             new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
-            plugin.openHostIn(context.terminals().window(window).orElseThrow(), saved, "/srv/app");
+            dev.jasper.remote.testsupport.Kits.edt(() -> plugin.openHostIn(context.terminals().window(window).orElseThrow(), saved, "/srv/app"));
             long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
             while (!server.execCommands.contains(start) && System.nanoTime() < deadline) { settle(host); Thread.sleep(20); }
             assertThat(server.execCommands).contains(start);

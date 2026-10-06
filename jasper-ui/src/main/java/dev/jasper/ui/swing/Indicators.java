@@ -66,7 +66,7 @@ final class Indicators {
             animation = new Timer(32, event -> {
                 if (!view.motion().enabled()) { settle(); return; }
                 progress.phase = (progress.phase + .035) % 1; progress.repaint();
-            }); own(this::settle); refresh();
+            }); progress.animation = animation; own(this::settle); refresh();
         }
         private void settle() {
             animation.stop(); progress.phase = 0;
@@ -86,6 +86,8 @@ final class Indicators {
     }
     static final class ProgressBar extends JProgressBar {
         final KitContext context; double phase;
+        /** The owning control's indeterminate animation (package-private for lifecycle tests). */
+        Timer animation;
         ProgressBar(KitContext context) {
             super(0, 1000); this.context = context; setOpaque(false); setBorderPainted(false);
             setUI(new BasicProgressBarUI() { @Override protected void startAnimationTimer() {} @Override protected void stopAnimationTimer() {} });

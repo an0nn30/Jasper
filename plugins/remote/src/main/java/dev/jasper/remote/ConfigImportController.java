@@ -67,8 +67,12 @@ final class ConfigImportController implements AutoCloseable {
                 var rows = ConfigImport.plan(parsed, existing, Path.of(System.getProperty("user.home")), System.getProperty("user.name", ""));
                 ui.execute(() -> {
                     if (!live(version)) return;
-                    panel = new ImportPanel(rows, parsed.skipped(), this::importSelected, this::choose, this::refresh, this::close);
-                    dialog.setContent(panel); dialog.show();
+                    // A refresh replaces the preview: the dialog disposes the old view, and the old panel goes inert.
+                    var previous = panel;
+                    panel = new ImportPanel(context.kit(), rows, parsed.skipped(), this::importSelected, this::choose, this::refresh, this::close);
+                    dialog.setContent(panel.view());
+                    if (previous != null) previous.close();
+                    dialog.show();
                 });
             } catch (Exception unreadable) {
                 ui.execute(() -> {
@@ -187,6 +191,7 @@ final class ConfigImportController implements AutoCloseable {
         if (closed) return; closed = true; revision++;
         if (pending != null) pending.cancel(false);
         if (lifetime != null) lifetime.close();
+        if (panel != null) panel.close();
         if (dialog != null) dialog.close();
     }
 }

@@ -83,7 +83,7 @@ class RemoteEditingPluginTest {
         var vault = new FakeVault();
         host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
         editor.ifPresent(fake -> host.start(EDITOR, Set.of(), Set.of(), fake));
-        RemotePlugin plugin = new TestRemotePlugin(Runnable::run, context -> Optional.empty(), (delay, task) -> () -> {}, dir.resolve("ssh"));
+        RemotePlugin plugin = new TestRemotePlugin(dev.jasper.remote.testsupport.Kits.UI, context -> Optional.empty(), (delay, task) -> () -> {}, dir.resolve("ssh"));
         var context = host.start(RemotePluginTest.INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), plugin);
         UUID credential = vault.password("deploy login", "deploy", "s3cret");
         RemoteHost prod = RemoteHost.create("prod", "127.0.0.1", server.port(), "", new Auth.Vault(credential), "", Optional.empty()).withFollowDirectory(false);
@@ -93,7 +93,7 @@ class RemoteEditingPluginTest {
         UUID window = host.addTerminalWindow();
         host.activateTerminalWindow(window);
         var panel = (SftpPanel) host.openPanel(SftpUi.PANEL, window);
-        plugin.openHost(context.terminals().window(window).orElseThrow(), prod); RemotePluginTest.settle(host);
+        dev.jasper.remote.testsupport.Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), prod)); RemotePluginTest.settle(host);
         UUID pane = host.terminalPanes().getFirst();
         host.focusTerminalPane(pane); host.flush();
         RemotePluginTest.awaitRowCount(host, panel, rows);
