@@ -489,7 +489,9 @@ class BrowserKitTest {
                 view.setSize(400, 200); InteractiveRowsTest.layout(view);
                 var row = ((ItemLists.ListControl) view.control("servers")).mounted.get("item0");
                 for (var listener : row.getMouseListeners()) listener.mouseClicked(click(row, 0));
-                assertThat(listEvents).as("item lists keep their contract").containsExactly(new UiEvent.Selected("servers", Set.of("item0")));
+                // Plan 2 Task 8-kit (ruling G2): item-list rows report a plain left click too, after the selection.
+                assertThat(listEvents).as("item lists report Clicked like tables and trees")
+                    .containsExactly(new UiEvent.Selected("servers", Set.of("item0")), new UiEvent.Clicked("servers", "item0"));
             } finally { release(lists); }
         });
     }

@@ -123,4 +123,20 @@ class KitValuesTest {
   }
   assertThat(Arrays.stream(FieldPresentation.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.FieldPresentation.values()).map(Enum::name).toArray(String[]::new));
  }
+ /** Plan 2 Task 8-kit: row tooltips, list Enter and Delete actions and pending switches cross the projection unchanged. */
+ @Test void remoteRowCapabilitiesProjectWithoutLoss(){
+  var row=new ListItem("a",Optional.of(new StatusDot("a.dot",READY,StatusKind.WARNING)),List.of(new Text("a.name",READY,"web",TextRole.BODY)),List.of(),
+   List.of(new Button("a.star",READY,"","star.filled",ButtonKind.GHOST,"favorite:a","Remove from favorites",ButtonPresentation.EMBEDDED),
+    new Toggle("a.run",READY,"Stop tunnel",true,"toggle:a",true,"",true)),false,Optional.empty(),"web, up 3 min");
+  var list=new ItemList("tunnels",READY,ListKind.DOUBLE,List.of(row),Set.of("a"),"edit",List.of(),SelectionMode.SINGLE,Optional.empty(),OptionalInt.empty(),"toggle","delete");
+  var table=new Table("files",READY,List.of(new Column("name","Name",TextRole.BODY,false)),List.of(new TableRow("n",Map.of("name","notes"),Optional.of("file"),false,Optional.empty(),"notes — 6 B")),Set.of(),"open",List.of());
+  for(Node node:List.<Node>of(list,table)){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}
+  var module=(dev.jasper.ui.model.Nodes.ItemList)KitValues.toModule(new ViewSpec(list)).root();
+  assertThat(module.enterAction()).isEqualTo("toggle");assertThat(module.deleteAction()).isEqualTo("delete");
+  assertThat(module.items().getFirst().tooltip()).isEqualTo("web, up 3 min");
+  assertThat(((dev.jasper.ui.model.Nodes.Toggle)module.items().getFirst().trailing().get(1)).pending()).isTrue();
+  var rows=(dev.jasper.ui.model.Nodes.Table)KitValues.toModule(new ViewSpec(table)).root();
+  assertThat(rows.rows().getFirst().tooltip()).isEqualTo("notes — 6 B");
+  assertThat(KitValues.toSdk(new dev.jasper.ui.model.UiEvent.Clicked("tunnels","a"))).isEqualTo(new UiEvent.Clicked("tunnels","a"));
+ }
 }

@@ -69,6 +69,28 @@ class KitValuesTest {
             .isEqualTo(ButtonPresentation.STANDARD);
         assertThatThrownBy(() -> new Button("b", ControlState.READY, "Open", "", ButtonKind.LINK, "open", "", null)).isInstanceOf(NullPointerException.class);
     }
+    /** Plan 2 Task 8-kit: row tooltips, list Enter and Delete actions and pending switches, with their defaults. */
+    @Test void remoteRowCapabilitiesAreValidatedAndDefaultToNone() {
+        var title = List.<Node>of(text("t"));
+        assertThat(new ListItem("r", Optional.empty(), title, List.of(), List.of()).tooltip()).isEmpty();
+        assertThat(new ListItem("r", Optional.empty(), title, List.of(), List.of(), false, Optional.empty(), "Up 3 min").tooltip()).isEqualTo("Up 3 min");
+        assertThatThrownBy(() -> new ListItem("h", Optional.empty(), title, List.of(), List.of(), true, Optional.empty(), "tip")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ListItem("r", Optional.empty(), title, List.of(), List.of(), false, Optional.empty(), null)).isInstanceOf(NullPointerException.class);
+        assertThat(new TableRow("r", Map.of(), Optional.empty()).tooltip()).isEmpty();
+        assertThat(new TableRow("r", Map.of(), Optional.empty(), false, Optional.empty(), "notes.txt").tooltip()).isEqualTo("notes.txt");
+        assertThatThrownBy(() -> new TableRow("r", Map.of(), Optional.empty(), false, Optional.empty(), null)).isInstanceOf(NullPointerException.class);
+        var item = new ListItem("a", Optional.empty(), title, List.of(), List.of());
+        var list = new ItemList("l", ControlState.READY, ListKind.DOUBLE, List.of(item), Set.of(), "edit", List.of());
+        assertThat(list.enterAction()).isEmpty(); assertThat(list.deleteAction()).isEmpty();
+        var keyed = new ItemList("l", ControlState.READY, ListKind.DOUBLE, List.of(item), Set.of(), "edit", List.of(), SelectionMode.SINGLE, Optional.empty(), OptionalInt.empty(), "toggle", "delete");
+        assertThat(keyed.enterAction()).isEqualTo("toggle"); assertThat(keyed.deleteAction()).isEqualTo("delete");
+        for (var keys : List.of(List.of("go", ""), List.of("", "delete")))
+            assertThatThrownBy(() -> new ItemList("l", ControlState.READY, ListKind.RESULTS, List.of(item), Set.of(), "run", List.of(), SelectionMode.SINGLE, Optional.empty(), OptionalInt.empty(), keys.get(0), keys.get(1)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ItemList("l", ControlState.READY, ListKind.DOUBLE, List.of(item), Set.of(), "edit", List.of(), SelectionMode.SINGLE, Optional.empty(), OptionalInt.empty(), null, "")).isInstanceOf(NullPointerException.class);
+        assertThat(new Toggle("t", ControlState.READY, "On", true, "on", true, "").pending()).isFalse();
+        assertThat(new Toggle("t", ControlState.READY, "On", true, "on", true, "", true).pending()).isTrue();
+    }
     @Test void nestedCollectionsAreImmutableSnapshots() {
         var children = new ArrayList<Node>(); children.add(text("text"));
         var root = new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL, children);

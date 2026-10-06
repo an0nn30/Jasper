@@ -27,9 +27,10 @@ public sealed interface UiEvent {
     }
     record SecretChanged(String id) implements UiEvent { public SecretChanged { ModelChecks.id(id); } }
     /**
-     * A plain left single click on a table or tree row, reported after its {@link Selected}: id is the owner, itemId
-     * the row. Keys, right clicks and the second click of a double click never report it; Enter and double clicks
-     * report the owner's activate action instead.
+     * A plain left single click on a table, tree or item-list row (not a RESULTS list or a heading), reported after its
+     * {@link Selected}: id is the owner, itemId the row. Keys, right clicks, clicks on a row's own buttons or switches and
+     * the second click of a double click never report it; Enter and double clicks report the owner's activate (or a
+     * list's Enter) action instead.
      */
     record Clicked(String id, String itemId) implements UiEvent { public Clicked { ModelChecks.id(id); ModelChecks.id(itemId); } }
     /** Sort intent: id is the table owner, columnId the clicked column header; the host owns the order. */

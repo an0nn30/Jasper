@@ -104,6 +104,27 @@ public abstract class KitContractTest {
         assertThat(events).containsExactly(new UiEvent.Toggled("a.on",true),new UiEvent.Action("a:remove"));
         stop(kit);
     }); }
+    /** Remote rows (Plan 2 Task 8-kit): tooltips, a star button, a pending switch, list Enter and Delete actions and list clicks. */
+    static ViewSpec tunnels(String tooltip, boolean pending) {
+        var row=new ListItem("web",Optional.of(new Nodes.StatusDot("web.dot",ControlState.READY,Nodes.StatusKind.WARNING)),
+            List.of(new Nodes.Text("web.name",ControlState.READY,"web",Nodes.TextRole.BODY)),List.of(new Nodes.Text("web.map",ControlState.READY,"8080 → :80",Nodes.TextRole.MONO_SMALL)),
+            List.of(new Nodes.Button("web.star",ControlState.READY,"","star",Nodes.ButtonKind.GHOST,"favorite:web","Add to favorites",Nodes.ButtonPresentation.EMBEDDED),
+                new Nodes.Toggle("web.run",ControlState.READY,"Stop tunnel",true,"toggle:web",true,"",pending)),false,Optional.empty(),tooltip);
+        return new ViewSpec(new Nodes.Stack("root",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
+            new Nodes.ItemList("tunnels",ControlState.READY,Nodes.ListKind.DOUBLE,List.of(row),Set.of("web"),"edit",List.of(),Nodes.SelectionMode.SINGLE,Optional.empty(),OptionalInt.empty(),"toggle","delete"),
+            new Nodes.Table("files",ControlState.READY,List.of(new Column("name","Name",Nodes.TextRole.BODY,false)),
+                List.of(new TableRow("notes",Map.of("name","notes.txt"),Optional.of("file"),false,Optional.empty(),tooltip)),Set.of(),"open",List.of()))));
+    }
+    @Test void remoteRowsMountUpdateAndReportClicksKeysStarsAndPendingSwitches() throws Exception { edt(() -> {
+        var kit=kit("owner");var events=new ArrayList<UiEvent>();var view=kit.create(tunnels("up 3 min",true),events::add);
+        assertThat(view.spec()).isEqualTo(tunnels("up 3 min",true));
+        view.update(tunnels("up 4 min",false));assertThat(view.spec()).isEqualTo(tunnels("up 4 min",false));
+        emit(view,new UiEvent.Selected("tunnels",Set.of("web")));emit(view,new UiEvent.Clicked("tunnels","web"));
+        emit(view,new UiEvent.Action("toggle"));emit(view,new UiEvent.Action("delete"));emit(view,new UiEvent.Action("favorite:web"));emit(view,new UiEvent.Toggled("web.run",false));
+        assertThat(events).containsExactly(new UiEvent.Selected("tunnels",Set.of("web")),new UiEvent.Clicked("tunnels","web"),new UiEvent.Action("toggle"),
+            new UiEvent.Action("delete"),new UiEvent.Action("favorite:web"),new UiEvent.Toggled("web.run",false));
+        stop(kit);
+    }); }
     @Test void disposalCannotReenterUpdate() throws Exception { edt(() -> {
         var kit=kit("owner"); var before=new ViewSpec(new Nodes.Custom("custom",ControlState.READY,"content",Nodes.CustomKind.EDITOR,"Editor"));
         var view=kit.create(before,e -> {}); var calls=new java.util.concurrent.atomic.AtomicInteger(); var rejected=new java.util.concurrent.atomic.AtomicBoolean();

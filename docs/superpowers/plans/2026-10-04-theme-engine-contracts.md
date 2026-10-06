@@ -173,7 +173,7 @@ unique within their owning control; references resolve only in that control. Do 
 | Field | `FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation` (numeric present exactly for NUMBER) |
 | Secret | `String hint, String label, String revealGroup, SecretKind kind, String copyAction, String submitAction` (no string value; MULTILINE takes no reveal group or copy action; only INPUT takes a submit action) |
 | Choice | `ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon, Optional<ChoiceSearch> search` (present exactly for SEARCHABLE) |
-| Toggle | `String label, boolean checked, String action, boolean compact, String tooltip` |
+| Toggle | `String label, boolean checked, String action, boolean compact, String tooltip, boolean pending` |
 | Chip | `String label, Hue hue` |
 | Progress | `double fraction, String label` (-1 means indeterminate) |
 | Strength | `int filled, String label` (0–4) |
@@ -183,7 +183,7 @@ unique within their owning control; references resolve only in that control. Do 
 | Card | `CardKind kind, List<Node> children` |
 | Section | `String title, Node body` |
 | Empty | `Node icon, String title, String description, List<Node> actions` |
-| ItemList | `ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows` |
+| ItemList | `ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows, String enterAction, String deleteAction` (RESULTS takes neither key action) |
 | Header | `String title, OptionalInt count, Optional<Node> context, Optional<Node> primary, List<MenuItem> overflow` |
 | Panel | `Header header, Optional<Node> searchOrNavigation, Node body, Optional<Node> footer` |
 | Form | `FormKind kind, String title, Optional<Node> hero, List<Node> sections, Optional<Node> preview, List<Button> actions, String cancelAction` |
@@ -195,9 +195,9 @@ unique within their owning control; references resolve only in that control. Do 
 
 Support records, each in its own model file: `Option(String id,String label,Optional<Hue> hue)`,
 `MenuItem(String id,String label,String icon,String action,boolean enabled,boolean separator,Nodes.Hue hue)`,
-`ListItem(String id,Optional<Node> leading,List<Node> title,List<Node> subtitle,List<Node> trailing,boolean heading,Optional<List<MenuItem>> contextActions)`,
+`ListItem(String id,Optional<Node> leading,List<Node> title,List<Node> subtitle,List<Node> trailing,boolean heading,Optional<List<MenuItem>> contextActions,String tooltip)`,
 `Column(String id,String title,TextRole role,boolean numeric,double weight,Optional<Boolean> sorted)`,
-`TableRow(String id,Map<String,String> cells,Optional<String> icon,boolean muted,Optional<List<MenuItem>> contextActions)`,
+`TableRow(String id,Map<String,String> cells,Optional<String> icon,boolean muted,Optional<List<MenuItem>> contextActions,String tooltip)`,
 `TreeItem(String id,String title,Optional<String> icon,boolean leaf,List<TreeItem> children,OptionalInt count,boolean emphasized,String tooltip,Optional<StatusKind> status,List<String> trailing,Optional<List<MenuItem>> contextActions)`,
 `Crumb(String id,String label,List<MenuItem> contextActions)`.
 Nested in `Nodes`: `Numeric(double min,double max,double step,int decimals)` and
@@ -290,7 +290,8 @@ remain and default to the old meaning (weight 1, no sort, not muted, no row menu
   Enter on the chooser's places presses its default action, as the pre-Plan-2 JTree/JList with a default button did
   (evidence in the Task 6b-1 report, fix round 3); the Keymap binds Enter itself and the chooser's files keep `open`. So a host that acts on a single
   click leaves the activate action blank, uses `Clicked`, and binds Enter itself: a double click then acts exactly
-  once. Hosts never inspect the event being dispatched. Item lists keep their contract (no `Clicked`).
+  once. Hosts never inspect the event being dispatched. Since Plan 2 Task 8-kit item lists (not RESULTS lists or
+  headings) report `Clicked` under the same rules.
 - Kit `ACTIONS` stacks too wide for one row wrap onto further rows at their natural widths instead of squeezing their
   buttons (Form footers, Empty-state actions and app action rows); at normal widths they stay one row as before.
 - A single-line field never clips its text: when the designed height leaves less than the input's preferred height
@@ -354,6 +355,28 @@ Plan 2 Task 7 Vault additions (secure notes; same mirroring and SDK version rule
   (no API), restoring the per-field names the Vault editors had.
 - Testkit: `FakePluginHost.windowView(pluginId, title)` returns the `FakeKitView` mounted on an open plugin window or
   dialog (empty after close or for raw content); it joins the Task 11 0.15 testkit surface with `closePanel`.
+
+Plan 2 Task 8-kit Remote additions (Sessions, Tunnels, SFTP and transfer rows; controller rulings G1–G5; same
+mirroring module ↔ SDK ↔ host `KitValues` ↔ fake and SDK version rule — the SDK stays 0.14.2 and Task 11 versions these
+record components; prior constructors remain and default to the old meaning):
+- `ListItem.tooltip` and `TableRow.tooltip` (blank = none): the row's literal tooltip (html disabled) and accessible
+  description, shown over the row and its passive content (Text, Icon, Chip, StatusDot; a table's cells); a row's
+  buttons, switches and choices keep their own tooltips. A heading rejects a tooltip. Live text (tunnel counters)
+  follows the descriptor on every update.
+- Item lists report a plain left single click as `Clicked(id,itemId)` after its `Selected`, under exactly the table and
+  tree rules (no keys, modifiers, non-left buttons, popup-trigger presses or second clicks); RESULTS lists and headings
+  never report it. A click on a row's own Button, MenuButton or Toggle is that control's intent only: it reports the
+  control's `Action`/`Toggled` and never `Selected`, `Clicked` or the activate action.
+- `ItemList.enterAction` (blank = Enter reports `activateAction` as before): Enter on the focused row selects it and
+  reports `Action(enterAction)`, so Enter and a double click can differ (Tunnels: Enter toggles, a double click edits).
+- `ItemList.deleteAction` (blank = Delete and Backspace are not the rows' keys and pass on to the host): Delete or
+  Backspace on the focused row reports `Action(deleteAction)`; an unselected focused row is selected first (reporting
+  `Selected`). Inline controls never receive these keys from the list, and Backspace never feeds type-ahead. RESULTS
+  lists reject both key actions (their rows never take focus).
+- `Toggle.pending` (default false): the knob rests midway on `status.warning` while the domain confirms a change; the
+  switch stays operable and reports `Toggled(id, !checked)`, where `checked` is always the confirmed state; its
+  accessible description is "Pending" unless an error or tooltip says more.
+- Named glyphs `star` (outline) and `star.filled` (solid) for favourites.
 
 Plan 2 Task 6b-2 palette additions (command palette; same mirroring and SDK version rule). Prior constructors remain
 and default to the old meaning (not a heading, no visible-row count):

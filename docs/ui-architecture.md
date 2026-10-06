@@ -137,6 +137,12 @@ on to the host when a row collection has no activate action; a context press nev
 menu items report only their action (a shared menu opens only on a selected row); ACTIONS stacks wrap instead of squeezing their buttons; trailing tree columns keep minimum
 widths; single-line fields never clip an enlarged font.
 
+Remote row capabilities (Plan 2 Task 8-kit): item-list rows and table rows carry a literal tooltip shown over their
+passive content; item lists report a plain left click as `Clicked` (not RESULTS lists or headings) and can give Enter
+and Delete/Backspace their own actions (`enterAction`, `deleteAction`), so Enter and a double click can differ; a row's
+own buttons and switches report only their intent; `Toggle.pending` shows an operable midway switch on the warning
+colour while the domain confirms a change; and the glyph vocabulary gains `star` and `star.filled`.
+
 Palette capabilities (Plan 2 Task 6b-2): `ListItem.heading` is a title-only section row (never selected, activated,
 hovered or given a menu; a hairline opens every heading after the first); `ListKind.RESULTS` is the one-line result
 list that follows an external field: it never takes focus, a left press runs a row, rows and headings keep fixed heights

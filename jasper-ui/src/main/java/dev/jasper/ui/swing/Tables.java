@@ -174,6 +174,7 @@ final class Tables {
                 if (muted != null) label.setForeground(muted);
                 row.cells.add(label);
             }
+            row.tooltip(data.tooltip());
         }
     }
 

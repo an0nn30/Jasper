@@ -95,6 +95,19 @@ public final class StateFixtures {
             new Nodes.Button("notice-open", READY, "Open", "", ButtonKind.LINK, "open", "", ButtonPresentation.EMBEDDED),
             new MenuButton("notice-more", READY, "More ▾", "", ButtonKind.LINK, "", List.of(new MenuItem("notice-four", "Four", "", "four", true, false)), "", ButtonPresentation.EMBEDDED))));
         result.add(sheet("notices", new Stack("notices", READY, LayoutRole.VERTICAL, notices), 420, 320));
+        // Plan 2 Task 8-kit: Remote rows with tooltips, star buttons (plain and favourite) and a pending switch.
+        var remote = new ArrayList<ListItem>();
+        for (String id : List.of("web", "db", "socks")) {
+            boolean favourite = id.equals("db"), pending = id.equals("socks");
+            remote.add(new ListItem("remote-" + id, Optional.of(new StatusDot("remote-" + id + "-dot", READY, pending ? StatusKind.WARNING : favourite ? StatusKind.SUCCESS : StatusKind.IDLE)),
+                List.of(text("remote-" + id + "-name", id, TextRole.BODY), text("remote-" + id + "-via", "via build-box", TextRole.DESCRIPTION)),
+                List.of(text("remote-" + id + "-map", "8080 → localhost:80", TextRole.MONO_SMALL)),
+                List.of(new Nodes.Button("remote-" + id + "-star", READY, "", favourite ? "star.filled" : "star", ButtonKind.GHOST, "favorite", favourite ? "Remove from favorites" : "Add to favorites", ButtonPresentation.EMBEDDED),
+                    new Toggle("remote-" + id + "-run", READY, pending ? "Stop tunnel" : "Start tunnel", favourite || pending, "toggle", true, "", pending)),
+                false, Optional.empty(), id + ", 8080 → localhost:80, via build-box"));
+        }
+        result.add(sheet("remote-rows", new ItemList("remote-tunnels", READY, ListKind.DOUBLE, remote, Set.of("remote-web"), "edit", List.of(), SelectionMode.SINGLE,
+            Optional.empty(), OptionalInt.empty(), "toggle", "delete"), 360, 200));
         for (SplitKind kind : SplitKind.values()) result.add(sheet("split-" + kind, new Split("split", READY, kind, List.of(text("left", "Sidebar", TextRole.BODY), text("right", "Detail", TextRole.BODY))), 600, 100));
         for (FormKind kind : FormKind.values()) result.add(sheet("form-" + kind, new Form("form", READY, kind, kind.name(), Optional.empty(), List.of(row("row", "Label", field("input", "", "Value", FieldKind.TEXT))), Optional.empty(), List.of(button("save", "Save", ButtonKind.PRIMARY)), "cancel"), 480, 200));
         for (CustomKind kind : CustomKind.values()) result.add(sheet("custom-" + kind, new Custom("custom", READY, "preview", kind, kind.name()), 480, 180));

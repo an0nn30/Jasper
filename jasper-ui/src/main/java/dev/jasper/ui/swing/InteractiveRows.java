@@ -75,12 +75,20 @@ final class InteractiveRows {
             };
             canvas.addKeyListener(typing);
             own(() -> canvas.removeKeyListener(typing));
-            // Enter activates the focused row; with no activate action it is not the rows' key and passes on to the host,
-            // as a single-line field's Enter does without a trailing action.
+            // Enter activates the focused row (or runs a list's own Enter action); with neither it is not the rows' key and
+            // passes on to the host, as a single-line field's Enter does without a trailing action.
             canvas.getInputMap().put(KeyStroke.getKeyStroke("ENTER"), "ENTER");
             canvas.getActionMap().put("ENTER", new AbstractAction() {
-                @Override public boolean isEnabled() { return !closed && !activation().isBlank(); }
-                @Override public void actionPerformed(ActionEvent event) { if (focusItem != null) activate(focusItem); }
+                @Override public boolean isEnabled() { return !closed && !enterKey().isBlank(); }
+                @Override public void actionPerformed(ActionEvent event) { if (focusItem != null) enter(focusItem); }
+            });
+            // Delete and Backspace report a collection's delete action for the focused row; without one they pass on.
+            for (String stroke : List.of("DELETE", "BACK_SPACE")) {
+                canvas.getInputMap().put(KeyStroke.getKeyStroke(stroke), "delete");
+            }
+            canvas.getActionMap().put("delete", new AbstractAction() {
+                @Override public boolean isEnabled() { return !closed && !deletion().isBlank(); }
+                @Override public void actionPerformed(ActionEvent event) { if (focusItem != null) delete(focusItem); }
             });
             bind(
                     canvas,
@@ -114,6 +122,29 @@ final class InteractiveRows {
         abstract String activation();
 
         abstract List<MenuItem> contextActions();
+
+        /** What Enter on the focused row reports; the activate action unless a collection gives Enter its own. */
+        String enterKey() {
+            return activation();
+        }
+
+        /** Enter on the focused row. */
+        void enter(String id) {
+            activate(id);
+        }
+
+        /** What Delete and Backspace on the focused row report; blank leaves the keys to the host. */
+        String deletion() {
+            return "";
+        }
+
+        /** Delete or Backspace on the focused row: an unselected row is selected first, then the delete action runs. */
+        void delete(String id) {
+            if (indexOf(id) < 0 || !selectable(indexOf(id)) || !interactive()) return;
+            String action = deletion();
+            if (!selected.contains(id)) select(id, false);
+            if (!action.isBlank() && stillCurrent(id) && action.equals(deletion())) emit(new UiEvent.Action(action));
+        }
 
         /** The context menu for one item; the control's own menu unless the item declares its own. */
         List<MenuItem> contextActions(String id) {
@@ -368,7 +399,7 @@ final class InteractiveRows {
          */
         void click(String id, boolean toggle, boolean plain) {
             select(id, toggle);
-            if (plain && reportsClicks() && stillCurrent(id)) emit(new UiEvent.Clicked(node.id(), id));
+            if (plain && reportsClicks() && stillCurrent(id) && selectable(indexOf(id))) emit(new UiEvent.Clicked(node.id(), id));
         }
 
         /** Pointer input shared by a row and its passive content; a click whose press opened the context menu is ignored. */
@@ -791,6 +822,24 @@ final class InteractiveRows {
                         text.role() == Nodes.TextRole.MONO
                                 || text.role() == Nodes.TextRole.MONO_SMALL);
             return c;
+        }
+
+        /**
+         * The row's literal tooltip and accessible description over the row and its passive content; interactive controls
+         * keep their own tooltips, and an icon without a row tooltip shows its accessible name again.
+         */
+        void tooltip(String text) {
+            String tooltip = text == null || text.isBlank() ? null : text;
+            setToolTipText(tooltip);
+            getAccessibleContext().setAccessibleDescription(tooltip);
+            for (var c : controls.values()) {
+                if (!(c.component instanceof JComponent component)) continue;
+                switch (c.node) {
+                    case Nodes.Text _, Nodes.Chip _, Nodes.StatusDot _ -> component.setToolTipText(tooltip);
+                    case Nodes.Icon icon -> component.setToolTipText(tooltip == null ? icon.accessibleName() : tooltip);
+                    default -> { }
+                }
+            }
         }
 
         void slot(JPanel panel, List<Nodes.Node> nodes) {

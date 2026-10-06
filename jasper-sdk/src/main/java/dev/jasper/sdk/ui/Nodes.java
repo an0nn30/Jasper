@@ -215,13 +215,22 @@ public final class Nodes {
         }
     }
 
-    /** {@code tooltip} is the switch's literal tooltip (blank shows the label); a validation error still takes precedence. */
-    public record Toggle(String id, ControlState state, String label, boolean checked, String action, boolean compact, String tooltip) implements Node {
+    /**
+     * {@code tooltip} is the switch's literal tooltip (blank shows the label); a validation error still takes precedence.
+     * A {@code pending} switch shows its knob midway on the warning colour while the domain confirms a change (for
+     * example a tunnel starting); it stays operable and reports the opposite of {@code checked}, which is always the
+     * confirmed state.
+     */
+    public record Toggle(String id, ControlState state, String label, boolean checked, String action, boolean compact, String tooltip, boolean pending) implements Node {
         public Toggle {
             ModelChecks.id(id); Objects.requireNonNull(state);
             ModelChecks.label(label, "label");
             ModelChecks.label(action, "action");
             Objects.requireNonNull(tooltip);
+        }
+        /** A switch that is not pending. */
+        public Toggle(String id, ControlState state, String label, boolean checked, String action, boolean compact, String tooltip) {
+            this(id, state, label, checked, action, compact, tooltip, false);
         }
         public Toggle(String id, ControlState state, String label, boolean checked, String action, boolean compact) {
             this(id, state, label, checked, action, compact, "");
@@ -317,8 +326,13 @@ public final class Nodes {
      * Virtual row collection. MULTIPLE shows checkboxes; addAction is a footer, never a data item. A present
      * {@code visibleRows} is how many selectable rows the viewport shows before it scrolls (headings above them add their
      * own height); absent keeps the kit default. Headings are never selected and ORDERED lists have none.
+     * A present {@code enterAction} is what Enter on the focused row reports (after selecting it), so a double click and
+     * Enter can differ; blank keeps Enter as {@code activateAction}. A present {@code deleteAction} is what Delete and
+     * Backspace on the focused row report (an unselected row is selected first); blank leaves those keys to the host.
+     * A plain left single click on a row also reports {@link UiEvent.Clicked} after its selection. RESULTS lists take
+     * neither action.
      */
-    public record ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows) implements Node {
+    public record ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows, String enterAction, String deleteAction) implements Node {
         public ItemList {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -329,12 +343,19 @@ public final class Nodes {
             Objects.requireNonNull(selectionMode); Objects.requireNonNull(addAction); Objects.requireNonNull(visibleRows);
             if (selectionMode == SelectionMode.SINGLE && selectedIds.size() > 1) throw new IllegalArgumentException("Single selection accepts at most one item");
             if (visibleRows.isPresent() && visibleRows.getAsInt() < 1) throw new IllegalArgumentException("Visible rows must be positive");
+            Objects.requireNonNull(enterAction); Objects.requireNonNull(deleteAction);
+            if (kind == ListKind.RESULTS && (!enterAction.isEmpty() || !deleteAction.isEmpty()))
+                throw new IllegalArgumentException("RESULTS rows never take focus, so they have no Enter or Delete action");
             ModelChecks.unique(items, ListItem::id);
             ModelChecks.unique(contextActions, MenuItem::id);
             for (var item : items) if (item.heading()) {
                 if (kind == ListKind.ORDERED) throw new IllegalArgumentException("Ordered lists have no headings");
                 if (selectedIds.contains(item.id())) throw new IllegalArgumentException("A heading is never selected");
             }
+        }
+        /** A list whose Enter reports its activate action and which has no Delete action. */
+        public ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows) {
+            this(id, state, kind, items, selectedIds, activateAction, contextActions, selectionMode, addAction, visibleRows, "", "");
         }
         public ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction) {
             this(id, state, kind, items, selectedIds, activateAction, contextActions, selectionMode, addAction, OptionalInt.empty());

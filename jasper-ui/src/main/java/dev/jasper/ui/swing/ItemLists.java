@@ -94,6 +94,32 @@ final class ItemLists {
                 emit(new UiEvent.Toggled(toggle.id(), !toggle.checked()));
         }
 
+        /** List rows report a plain left click as {@link UiEvent.Clicked}, as tables and trees do; RESULTS rows do not. */
+        @Override
+        boolean reportsClicks() {
+            return !results();
+        }
+
+        @Override
+        String enterKey() {
+            return value().enterAction().isBlank() ? activation() : value().enterAction();
+        }
+
+        /** A list's own Enter action selects the focused row and reports it; otherwise Enter activates as usual. */
+        @Override
+        void enter(String id) {
+            String action = value().enterAction();
+            if (action.isBlank()) { activate(id); return; }
+            if (indexOf(id) < 0 || !selectable(indexOf(id))) return;
+            select(id, false);
+            if (stillCurrent(id) && action.equals(value().enterAction())) emit(new UiEvent.Action(action));
+        }
+
+        @Override
+        String deletion() {
+            return value().deleteAction();
+        }
+
         @Override
         int lines() {
             return value().kind() == Nodes.ListKind.DOUBLE ? 2 : 1;
@@ -326,6 +352,7 @@ final class ItemLists {
             row.slot(row.title, item.title());
             row.slot(row.subtitle, item.subtitle());
             row.slot(row.trailing, trailing);
+            row.tooltip(item.tooltip());
             if (value().kind() == Nodes.ListKind.ORDERED) {
                 command(
                         row,

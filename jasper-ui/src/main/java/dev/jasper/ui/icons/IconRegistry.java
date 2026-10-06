@@ -149,7 +149,12 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("plugin", "M 6 2 V 5 M 10 2 V 5 M 4 5 H 12 V 8 A 4 4 0 0 1 4 8 Z M 8 12 V 14"),
             Map.entry("check", "M 3 8 L 6 11 L 13 4"),
             Map.entry("close", "M 4 4 L 12 12 M 12 4 L 4 12"),
-            Map.entry("sparkle", "M 8 1 L 10 6 L 15 8 L 10 10 L 8 15 L 6 10 L 1 8 L 6 6 Z")
+            Map.entry("sparkle", "M 8 1 L 10 6 L 15 8 L 10 10 L 8 15 L 6 10 L 1 8 L 6 6 Z"),
+            // A favourite: the outline star, and the filled star (outline, an inner star and spokes to the tips) for a chosen one.
+            Map.entry("star", "M 8 2 L 9.6 6.3 L 14.3 6.6 L 10.7 9.5 L 11.9 13.9 L 8 11.4 L 4.1 13.9 L 5.3 9.5 L 1.7 6.6 L 6.4 6.3 Z"),
+            Map.entry("star.filled", "M 8 2 L 9.6 6.3 L 14.3 6.6 L 10.7 9.5 L 11.9 13.9 L 8 11.4 L 4.1 13.9 L 5.3 9.5 L 1.7 6.6 L 6.4 6.3 Z "
+                + "M 8 5 L 8.9 7.4 L 11.4 7.5 L 9.4 9.1 L 10.1 11.5 L 8 10.1 L 5.9 11.5 L 6.6 9.1 L 4.6 7.5 L 7.1 7.4 Z "
+                + "M 8 8.6 L 8 3.6 M 8 8.6 L 12.8 7 M 8 8.6 L 11 12.6 M 8 8.6 L 5 12.6 M 8 8.6 L 3.2 7")
         );
     }
 }
