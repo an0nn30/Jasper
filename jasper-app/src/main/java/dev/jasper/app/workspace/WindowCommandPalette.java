@@ -22,6 +22,8 @@ final class WindowCommandPalette implements AutoCloseable {
     static final double GUIDE_CENTER = 0.5, GUIDE_TOP = 1.0 / TOP_ANCHOR_DIVISOR;
     /** Logical pixels a press must travel before it drags, and how near a guide a dragged card snaps to it. */
     static final int DRAG_THRESHOLD = 4, SNAP_DISTANCE = 8;
+    /** How near its home under the title field, across, a dragged card re-attaches there; anywhere above that height counts. */
+    static final int HOME_DISTANCE = 24;
     private final WindowContent owner;
     private final String defaultScopeId;
     private final PaletteController controller;
@@ -248,6 +250,7 @@ final class WindowCommandPalette implements AutoCloseable {
     boolean dragging() { return drag.location != null; }
     boolean snappedToCenter() { return drag.location != null && drag.snappedX; }
     boolean snappedToTop() { return drag.location != null && drag.snappedY; }
+    boolean snappedHome() { return drag.location != null && drag.snappedHome; }
 
     /** The card's size once dragged: the activated width in either view mode, inside the window. */
     private Dimension detachedSize(Rectangle window) {
@@ -258,11 +261,12 @@ final class WindowCommandPalette implements AutoCloseable {
 
     /**
      * Moves the card by its empty areas. Near the window's vertical centre line or its default top the card snaps to
-     * that guide; the guides are felt, never drawn. Releasing saves the place for every window; a double click forgets it.
+     * that guide; the guides are felt, never drawn. Releasing saves the place for every window. Dragged back to its home
+     * under the title field the card re-attaches there, and releasing forgets the place, as a double click does.
      */
     private final class Drag extends MouseAdapter {
         private Point press, origin, location;
-        private boolean snappedX, snappedY;
+        private boolean snappedX, snappedY, snappedHome;
 
         @Override public void mousePressed(MouseEvent event) {
             cancel();
@@ -279,8 +283,18 @@ final class WindowCommandPalette implements AutoCloseable {
             Rectangle window = overlay.workspace();
             if (window.width <= 0 || window.height <= 0) return;
             if (location == null) { stopReveal(); palette.setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR)); }
-            Dimension size = detachedSize(window);
             int x = origin.x + dx, y = origin.y + dy, snap = UIScale.scale(SNAP_DISTANCE);
+            // Back at (or above) its home under the title field, the card re-attaches there.
+            Rectangle home = overlay.home();
+            int reach = UIScale.scale(HOME_DISTANCE);
+            snappedHome = home != null && Math.abs(x - home.x) <= reach && y <= home.y + reach;
+            if (snappedHome) {
+                snappedX = false; snappedY = false;
+                location = home.getLocation();
+                overlay.doLayout(); overlay.repaint();
+                return;
+            }
+            Dimension size = detachedSize(window);
             int guideX = guideX(window), guideY = guideY(window);
             snappedX = Math.abs(x + size.width / 2 - guideX) <= snap;
             if (snappedX) x = guideX - size.width / 2;
@@ -293,7 +307,10 @@ final class WindowCommandPalette implements AutoCloseable {
         }
 
         @Override public void mouseReleased(MouseEvent event) {
-            if (location != null) {
+            if (location != null && snappedHome) {
+                owner.uiState().setPalettePosition(null);
+                owner.uiState().save();
+            } else if (location != null) {
                 Rectangle window = overlay.workspace();
                 Dimension size = detachedSize(window);
                 double centerX = snappedX ? GUIDE_CENTER : fraction((location.x + size.width / 2.0 - window.x) / window.width);
@@ -313,7 +330,7 @@ final class WindowCommandPalette implements AutoCloseable {
 
         void cancel() {
             boolean moved = location != null;
-            press = null; origin = null; location = null; snappedX = false; snappedY = false;
+            press = null; origin = null; location = null; snappedX = false; snappedY = false; snappedHome = false;
             if (moved) { palette.setCursor(null); layoutOverlay(); }
         }
 
@@ -349,10 +366,18 @@ final class WindowCommandPalette implements AutoCloseable {
         /** The workspace, which spans the window including its rail and tool panels. */
         Rectangle workspace() { return SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), this); }
 
+        /** The card's default place, dropped from the title field; null in Compact mode or without a usable field. */
+        Rectangle home() {
+            Rectangle field = owner.paletteAnchor(this);
+            return field == null ? null : anchored(field, new Rectangle(0, 0, getWidth(), getHeight()), palette.getPreferredSize(),
+                UIScale.scale(ANCHORED_MINIMUM_WIDTH), UIScale.scale(16));
+        }
+
         @Override public void doLayout() {
             if (root == null || !SwingUtilities.isDescendingFrom(owner, root.getLayeredPane())) return;
             if (drag.location != null) {
-                palette.setBounds(new Rectangle(drag.location, detachedSize(workspace())));
+                Rectangle home = drag.snappedHome ? home() : null;
+                palette.setBounds(home != null ? home : new Rectangle(drag.location, detachedSize(workspace())));
                 return;
             }
             var saved = owner.uiState().palettePosition();
@@ -361,10 +386,9 @@ final class WindowCommandPalette implements AutoCloseable {
                 palette.setBounds(placed(window, detachedSize(window), saved.get(), UIScale.scale(16)));
                 return;
             }
-            Rectangle field = owner.paletteAnchor(this);
-            if (field != null) {
-                palette.setBounds(anchored(field, new Rectangle(0, 0, getWidth(), getHeight()), palette.getPreferredSize(),
-                    UIScale.scale(ANCHORED_MINIMUM_WIDTH), UIScale.scale(16)));
+            Rectangle home = home();
+            if (home != null) {
+                palette.setBounds(home);
                 return;
             }
             // No usable field: centre across the workspace, which spans the window including its rail and

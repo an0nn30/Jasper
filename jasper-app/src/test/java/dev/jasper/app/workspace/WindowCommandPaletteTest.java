@@ -339,6 +339,59 @@ class WindowCommandPaletteTest {
             }
         });
     }
+    @Test void draggingTheCardBackToTheTitleFieldReattachesIt() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            var state = dev.jasper.app.persistence.UiState.inMemory();
+            try (var owner = owner(new CommandHistory())) {
+                owner.connectContributions(new dev.jasper.app.contributions.Contributions(), state);
+                var root = install(owner); root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
+                var palette = owner.commandPalette();
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                var card = palette.component();
+                Rectangle home = card.getBounds();
+                Point press = grab(card);
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x - 300, press.y + 250), 1);
+                mouse(card, MouseEvent.MOUSE_RELEASED, new Point(press.x - 300, press.y + 250), 1);
+                assertThat(state.palettePosition()).isPresent();
+                palette.dismiss(); palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(card.getBounds()).isNotEqualTo(home);
+
+                press = grab(card);
+                int dx = home.x - card.getX(), dy = home.y - card.getY();
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x + dx + 30, press.y + dy + 60), 1);
+                assertThat(palette.snappedHome()).as("still too far below its home").isFalse();
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x + dx + 12, press.y + dy - 80), 1);
+                assertThat(palette.snappedHome()).as("near it across and above it").isTrue();
+                assertThat(card.getBounds()).isEqualTo(home);
+                mouse(card, MouseEvent.MOUSE_RELEASED, new Point(press.x + dx + 12, press.y + dy - 80), 1);
+                assertThat(state.palettePosition()).as("re-attached: the dragged place is forgotten").isEmpty();
+                assertThat(card.getBounds()).isEqualTo(home);
+                palette.dismiss(); palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(card.getBounds()).isEqualTo(home);
+            }
+        });
+    }
+    @Test void compactModeHasNoHomeToSnapTo() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                owner.applyConfiguration(dev.jasper.app.config.ConfigSnapshot.defaults().toBuilder()
+                    .viewMode(dev.jasper.app.config.ViewMode.COMPACT).build(), true);
+                var root = install(owner); root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
+                var palette = owner.commandPalette();
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                var card = palette.component();
+                Point press = grab(card);
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x, press.y - 400), 1);
+                assertThat(palette.dragging()).isTrue();
+                assertThat(palette.snappedHome()).isFalse();
+                mouse(card, MouseEvent.MOUSE_RELEASED, new Point(press.x, press.y - 400), 1);
+                assertThat(owner.uiState().palettePosition()).isPresent();
+            }
+        });
+    }
     @Test void aSavedPlaceKeepsTheCardInsideTheWindow() {
         var window = new Rectangle(0, 40, 1000, 600);
         var size = new Dimension(560, 300);
