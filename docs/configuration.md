@@ -271,7 +271,7 @@ an open palette.
 
 The palette can be dragged by its empty areas: the padding around the search box, the hint bar and an
 empty result list. Near the window's vertical centre line or one fifth down from its top, it snaps to that
-line, which shows while it holds. Releasing saves the place, as fractions of the window, in `ui-state.toml`'s
+line; the lines are never drawn, only felt. Releasing saves the place, as fractions of the window, in `ui-state.toml`'s
 `[palette]` table (`center_x`, `top`), and every window opens the palette there; a dragged palette keeps the
 560-pixel activated width in both view modes. Double-click a draggable area to forget the place: Normal mode
 hangs the palette from the title-bar field again and Compact mode centres it.

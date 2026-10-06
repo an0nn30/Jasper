@@ -258,7 +258,7 @@ final class WindowCommandPalette implements AutoCloseable {
 
     /**
      * Moves the card by its empty areas. Near the window's vertical centre line or its default top the card snaps to
-     * that guide, which shows while it holds. Releasing saves the place for every window; a double click forgets it.
+     * that guide; the guides are felt, never drawn. Releasing saves the place for every window; a double click forgets it.
      */
     private final class Drag extends MouseAdapter {
         private Point press, origin, location;
@@ -389,14 +389,6 @@ final class WindowCommandPalette implements AutoCloseable {
                 for (int i = 12; i >= 1; i--) {
                     int expansion = UIScale.scale(i);
                     g.fillRect(card.x - expansion, card.y - expansion, card.width + expansion * 2, card.height + expansion * 2);
-                }
-                if (drag.location != null && (drag.snappedX || drag.snappedY)) {
-                    Color guide = UIManager.getColor("Component.focusColor");
-                    g.setColor(guide != null ? guide : UIManager.getColor("Component.linkColor"));
-                    Rectangle window = workspace();
-                    int line = UIScale.scale(1);
-                    if (drag.snappedX) g.fillRect(guideX(window), window.y, line, window.height);
-                    if (drag.snappedY) g.fillRect(window.x, guideY(window), window.width, line);
                 }
             } finally { g.dispose(); }
         }

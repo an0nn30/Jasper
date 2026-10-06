@@ -325,9 +325,8 @@ class WindowCommandPaletteTest {
                 var image = new java.awt.image.BufferedImage(overlay.getWidth(), overlay.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
                 var graphics = image.createGraphics();
                 try { overlay.paint(graphics); } finally { graphics.dispose(); }
-                var guide = UIManager.getColor("Component.focusColor");
-                assertThat(new Color(image.getRGB(guideX, window.y + window.height - 5), true)).as("the centre guide shows").isEqualTo(guide);
-                assertThat(new Color(image.getRGB(window.x + 5, guideY), true)).as("the top guide shows").isEqualTo(guide);
+                assertThat(image.getRGB(guideX, window.y + window.height - 5) >>> 24).as("the centre guide is felt, not drawn").isZero();
+                assertThat(image.getRGB(window.x + 5, guideY) >>> 24).as("the top guide is felt, not drawn").isZero();
                 mouse(card, MouseEvent.MOUSE_RELEASED, new Point(press.x + dx, press.y + dy), 1);
                 assertThat(state.palettePosition()).hasValue(new dev.jasper.app.persistence.UiState.PalettePosition(0.5, 0.2));
 
