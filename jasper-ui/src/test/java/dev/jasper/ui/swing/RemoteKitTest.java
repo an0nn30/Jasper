@@ -317,6 +317,46 @@ class RemoteKitTest {
         });
     }
 
+    /**
+     * Task 8a fix round 1 (controller ruling I4): every kit row has an accessible name from its title text, as a list
+     * cell's name was its text, and keeps its tooltip as the accessible description.
+     */
+    @Test void everyRowIsNamedByItsTitleAndDescribedByItsTooltip() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var table = new Table("files", READY, List.of(new Column("name", "Name", TextRole.BODY, false), new Column("size", "Size", TextRole.DESCRIPTION, true)),
+                List.of(new TableRow("notes", Map.of("name", "notes.txt", "size", "6 B"), Optional.of("file"), false, Optional.empty(), "notes.txt — 6 B")), Set.of(), "open", List.of());
+            var host = new ListItem("h", Optional.of(new StatusDot("h.dot", READY, StatusKind.SUCCESS)),
+                List.of(new Text("h.name", READY, "prod", TextRole.BODY), new Text("h.address", READY, "api.example", TextRole.DESCRIPTION)),
+                List.of(), List.of(), false, Optional.empty(), "prod, deploy@api.example:22, 1 session");
+            var plain = new ListItem("p", Optional.empty(), List.of(new Text("p.name", READY, "staging", TextRole.BODY), new Chip("p.chip", READY, "WSL 2", Hue.NEUTRAL)),
+                List.of(), List.of(), false, Optional.empty(), "");
+            var tree = new Tree("places", READY, List.of(new TreeItem("home", "Home", Optional.of("home"), true, List.of(), OptionalInt.empty(), false,
+                "/Users/me", Optional.empty(), List.of(), Optional.empty())), Set.of(), Set.of(), "");
+            var spec = new ViewSpec(new Stack("root", READY, LayoutRole.VERTICAL, List.of(tunnels(List.of(host, plain), Set.of(), "", ""), table, tree)));
+            try (var view = new KitView(context, spec, e -> {})) {
+                view.setSize(480, 500); InteractiveRowsTest.layout(view);
+                var rows = ((ItemLists.ListControl) view.control("tunnels")).mounted;
+                var named = rows.get("h").getAccessibleContext();
+                assertThat(named.getAccessibleName()).isEqualTo("prod, api.example");
+                assertThat(named.getAccessibleDescription()).isEqualTo("prod, deploy@api.example:22, 1 session");
+                assertThat(rows.get("p").getAccessibleContext().getAccessibleName()).as("chips count as title text").isEqualTo("staging, WSL 2");
+                assertThat(rows.get("p").getAccessibleContext().getAccessibleDescription()).as("no tooltip, no description").isNull();
+                var file = ((Tables.TableControl) view.control("files")).mounted.get("notes").getAccessibleContext();
+                assertThat(file.getAccessibleName()).as("a table row is named by its first column").isEqualTo("notes.txt");
+                assertThat(file.getAccessibleDescription()).isEqualTo("notes.txt — 6 B");
+                var place = ((Trees.TreeControl) view.control("places")).mounted.get("home").getAccessibleContext();
+                assertThat(place.getAccessibleName()).isEqualTo("Home");
+                assertThat(place.getAccessibleDescription()).isEqualTo("/Users/me");
+                view.update(new ViewSpec(new Stack("root", READY, LayoutRole.VERTICAL, List.of(tunnels(List.of(
+                    new ListItem("h", Optional.empty(), List.of(new Text("h.name", READY, "prod-2", TextRole.BODY)), List.of(), List.of(), false, Optional.empty(), "")),
+                    Set.of(), "", ""), table, tree))));
+                InteractiveRowsTest.layout(view);
+                assertThat(((ItemLists.ListControl) view.control("tunnels")).mounted.get("h").getAccessibleContext().getAccessibleName()).as("follows the descriptor").isEqualTo("prod-2");
+            } finally { release(context); }
+        });
+    }
+
     /** The component a pointer at {@code point} (row coordinates) reaches: the deepest one listening for the mouse. */
     static JComponent receiver(JComponent row, Point point) {
         Component c = SwingUtilities.getDeepestComponentAt(row, point.x, point.y);

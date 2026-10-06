@@ -844,6 +844,19 @@ final class InteractiveRows {
         }
 
         /**
+         * The row's accessible name: its title text (Text and Chip labels, joined), as a list cell's name was its text.
+         * Assistive technology reads the name first and the tooltip as the description.
+         */
+        void name(List<Nodes.Node> titleNodes) {
+            var parts = new ArrayList<String>();
+            for (var n : titleNodes) {
+                if (n instanceof Nodes.Text text && !text.text().isBlank()) parts.add(text.text());
+                else if (n instanceof Nodes.Chip chip && !chip.label().isBlank()) parts.add(chip.label());
+            }
+            getAccessibleContext().setAccessibleName(parts.isEmpty() ? null : String.join(", ", parts));
+        }
+
+        /**
          * The row's literal tooltip and accessible description over the row and its passive content; interactive controls
          * keep their own tooltips, and an icon without a row tooltip shows its accessible name again.
          */
@@ -904,6 +917,7 @@ final class InteractiveRows {
             used.clear();
             cells.clear();
             setToolTipText(null);
+            getAccessibleContext().setAccessibleName(null);
             getAccessibleContext().setAccessibleDescription(null);
             for (var part : List.of(leading, title, subtitle, trailing)) part.setToolTipText(null);
             leading.removeAll();

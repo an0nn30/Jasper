@@ -182,6 +182,8 @@ class HostsPanelTest {
             assertThat(edit.kind()).isEqualTo(Nodes.ButtonKind.GHOST);
             assertThat(edit.state().visible() && edit.state().enabled()).isTrue();
             assertThat(button(panel.view(), HostsPanel.CONNECT).state().visible()).isTrue();
+            assertThat(node(panel.view(), "card.actions", Nodes.Stack.class).role())
+                .as("a narrow panel wraps the card's controls at full width (real-host geometry: StagedRemoteSessionsTest)").isEqualTo(Nodes.LayoutRole.ACTIONS);
         });
     }
 

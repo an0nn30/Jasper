@@ -181,6 +181,8 @@ final class Tables {
                 row.cells.add(label);
             }
             row.tooltip(data.tooltip());
+            // A table row is named by its first column, as its identity (a file's name, an entry's title).
+            row.name(nodes.isEmpty() ? List.of() : List.of(nodes.getFirst()));
         }
     }
 

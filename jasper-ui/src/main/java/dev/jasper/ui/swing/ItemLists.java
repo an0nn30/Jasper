@@ -353,6 +353,7 @@ final class ItemLists {
             row.slot(row.subtitle, item.subtitle());
             row.slot(row.trailing, trailing);
             row.tooltip(item.tooltip());
+            row.name(item.title());
             if (value().kind() == Nodes.ListKind.ORDERED) {
                 command(
                         row,

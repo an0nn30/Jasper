@@ -56,6 +56,7 @@ final class StagedRemoteHost implements AutoCloseable {
     final List<String> problems = new CopyOnWriteArrayList<>();
     final Path ssh;
     final WindowContent window;
+    final Plugin plugin;
 
     StagedRemoteHost(Path data, boolean dark) throws Exception {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins")).resolve(REMOTE.id());
@@ -68,7 +69,7 @@ final class StagedRemoteHost implements AutoCloseable {
         loader = new PluginClassLoader(REMOTE.id(), ManagedVaultLoadingTest.jars(staged), getClass().getClassLoader(), Map.of());
         var constructor = loader.loadClass("dev.jasper.remote.RemotePlugin").getDeclaredConstructor(Executor.class, Function.class, BiFunction.class, Path.class);
         constructor.setAccessible(true);
-        Plugin plugin = (Plugin) constructor.newInstance((Executor) SwingUtilities::invokeLater, (Function<Object, Optional<Object>>) context -> Optional.empty(),
+        plugin = (Plugin) constructor.newInstance((Executor) SwingUtilities::invokeLater, (Function<Object, Optional<Object>>) context -> Optional.empty(),
             (BiFunction<Duration, Runnable, Runnable>) (delay, task) -> () -> { }, ssh);
         onEdt(() -> host.start(new HostedPlugin(REMOTE, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), Set.of("dev.jasper.remote.api"),
             loader, () -> plugin)));
@@ -85,6 +86,21 @@ final class StagedRemoteHost implements AutoCloseable {
     void openSessions() throws InterruptedException {
         onEdt(() -> contributions.requestPanel(new Contributions.PanelRequest(window.id(), PANEL, Contributions.PanelRequest.Op.TOGGLE)));
         StagedVaultHost.await(() -> sessions() != null, "the Sessions panel is mounted in the window");
+    }
+
+    /**
+     * Drives the live Sessions panel's session counts and credential captions directly (its test accessor), as the
+     * plugin does when sessions open or the Vault locks, without a connection or a Vault; UI thread.
+     */
+    void sessionsState(java.util.function.ToIntFunction<Object> sessions, String credential) {
+        try {
+            // The plugin's per-window panel map: its method table names optional Vault types, which are absent here.
+            var panels = plugin.getClass().getDeclaredField("panels"); panels.setAccessible(true);
+            Object panel = ((Map<?, ?>) panels.get(plugin)).get(window.id());
+            panel.getClass().getMethod("setCredentialLabels", Function.class).invoke(panel, (Function<Object, String>) host -> credential);
+            panel.getClass().getMethod("setHostDetails", Function.class, java.util.function.ToIntFunction.class)
+                .invoke(panel, (Function<Object, String>) host -> "Ubuntu 24.04", sessions);
+        } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 
     /** The Sessions kit view mounted in the window, found by its root Panel's id; UI thread. */

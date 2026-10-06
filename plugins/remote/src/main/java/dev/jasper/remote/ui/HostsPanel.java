@@ -389,7 +389,9 @@ public final class HostsPanel implements AutoCloseable {
         status.add(new Nodes.Text(CARD_CREDENTIAL, state(isHost), credential, Nodes.TextRole.CAPTION));
         status.add(new Nodes.Button(EDIT, state(isHost), "", "edit", Nodes.ButtonKind.GHOST, EDIT, "Edit session"));
         status.add(new Nodes.Button(CONNECT, ControlState.READY, button, terminal ? "terminal" : "", Nodes.ButtonKind.PRIMARY, CONNECT, ""));
-        var actionsRow = new Nodes.Stack("card.actions", ControlState.READY, Nodes.LayoutRole.INLINE, status);
+        // ACTIONS wraps at natural widths instead of cutting controls short, so a narrow panel keeps Edit and Connect whole
+        // (the former footer kept its buttons at full size and let the caption shrink).
+        var actionsRow = new Nodes.Stack("card.actions", ControlState.READY, Nodes.LayoutRole.ACTIONS, status);
         return Optional.of(new Nodes.Card(CARD, ControlState.READY, Nodes.CardKind.MIXED, List.of(identity, actionsRow)));
     }
 

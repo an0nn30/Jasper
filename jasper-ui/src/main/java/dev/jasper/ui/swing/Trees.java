@@ -183,6 +183,7 @@ final class Trees {
             }
             // The row, its slots and its passive texts (title, trailing columns, count) show the item's literal tooltip.
             row.tooltip(item.tooltip());
+            row.name(List.of(new Nodes.Text("@tree/" + node.id() + "/" + item.id() + "/name", ControlState.READY, item.title(), Nodes.TextRole.BODY)));
             if (!item.leaf()) {
                 var c = (Buttons.ButtonControl) row.controls.get(leading.getFirst().id());
                 if (c.button.getClientProperty("Jasper.treeCommand") == null) {
