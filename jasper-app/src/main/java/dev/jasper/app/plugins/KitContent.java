@@ -13,7 +13,8 @@ final class KitContent implements AutoCloseable {
  KitContent(HostedKit owner,CustomContent content,java.util.function.Supplier<dev.jasper.ui.theme.ThemeRoute> route){this.owner=owner;this.content=content;this.route=java.util.Objects.requireNonNull(route);if(OWNERS.containsKey(content.component())||content.component().getParent()!=null)throw new IllegalArgumentException("Content is already owned or mounted");OWNERS.put(content.component(),this);
   try{content.component().addHierarchyListener(hierarchy);refresh();if(owner.appearance!=null){themeChanges=owner.appearance.onChanged(v -> refresh());workspaceChanges=owner.appearance.onWorkspaceChanged(v -> refresh());}}catch(Throwable failure){abort();throw failure;}
  }
- private void refresh(){if(closed)return;var appearance=owner.appearance;if(appearance==null)return;
+ boolean closed(){return closed;}
+ void refresh(){if(closed)return;var appearance=owner.appearance;if(appearance==null)return;
   var component=content.component();var background=owner.color(route.get(),dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT);var foreground=owner.color(route.get(),dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY);double opacity=appearance.workspaceOpacity(component);
   component.setForeground(foreground);component.setBackground(new Color(background.getRed(),background.getGreen(),background.getBlue(),(int)Math.round(background.getAlpha()*opacity)));component.setOpaque(opacity==1);component.repaint();
  }

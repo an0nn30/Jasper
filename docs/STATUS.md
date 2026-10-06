@@ -19,7 +19,12 @@
   `EditorKitTest` (keys, list driving, toggle accessibility and paint, caret and severity, DOCUMENT layout, re-routing),
   app `WorkspaceContentRouteTest` (light chrome/dark workspace content tab, move, window stays chrome, failed
   publication), SDK and host projection/validation cases, gallery `editor-document`/`editor-language` fixtures.
-  No existing assertion changed.
+  No existing assertion changed. Review fix round 1: the field's list keys are installed only while `listId` is set
+  (a disabled own-map entry had hidden FlatLaf's macOS Up/Down caret moves in every kit field), proven with FlatLaf
+  installed by `KitKeyBindingAuditTest` (behaviour against plain Swing controls, and a structural audit of every field
+  kind, secret and gallery fixture that no dead kit key shadows a look and feel binding); a disabled, busy or hidden
+  stack (and a non-interactive field) passes Escape on to the enclosing form; a route change refreshes registered content
+  at once (publication failure included); `ViewSpec` collects field lists in its single validation traversal.
 - **Theme engine Plan 2 Task 8c implemented: Remote SFTP explorer, transfer rows and their dialogs on kit views; Task 8
   complete pending review** (2026-10-06). The SFTP explorer (`SftpPanel`, now registered with `registerView`) is an owned
   kit Panel: Back/Forward/Refresh GHOST icon buttons and an Upload split MenuButton (its menu is the old right-click menu)

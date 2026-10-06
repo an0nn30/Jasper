@@ -38,9 +38,10 @@ final class Stacks {
             KeyStroke key = KeyStroke.getKeyStroke("ESCAPE"); String name = "stack.cancel";
             input.put(key, name);
             component.getActionMap().put(name, new AbstractAction() {
-                @Override public boolean isEnabled() { return !closed && !((Nodes.Stack) node).cancelAction().isBlank(); }
+                // A disabled, busy or hidden stack leaves Escape to its ancestors (a dialog's or form's Cancel).
+                @Override public boolean isEnabled() { return !closed && interactive() && !((Nodes.Stack) node).cancelAction().isBlank(); }
                 @Override public void actionPerformed(java.awt.event.ActionEvent event) {
-                    if (!isEnabled() || view.dismissPopup() || !interactive()) return;
+                    if (!isEnabled() || view.dismissPopup()) return;
                     emit(new UiEvent.Action(((Nodes.Stack) node).cancelAction()));
                 }
             });

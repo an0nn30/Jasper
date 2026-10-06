@@ -38,6 +38,12 @@ final class HostedKitView implements UiView {
  @Override public void registerContent(CustomContent content){guard();Objects.requireNonNull(content);KitDiagnostics.validate(content);
   var expected=KitContent.find(spec.root(),content.id());if(expected==null||expected.kind()!=content.kind())throw new IllegalArgumentException("No matching Custom content id/kind");
   var owned=new KitContent(owner,content,view::route);try{view.registerContent(content.id(),content.component(),owned);}catch(Throwable failure){owned.abort();throw failure;}
+  contents.removeIf(KitContent::closed);contents.add(owned);
  }
+ /** This view's registered specialized content, refreshed when the view changes theme slot. */
+ private final List<KitContent> contents=new ArrayList<>();
+ /** Host-only: moves the view to a theme slot (a workspace content tab, or back to chrome) with or without the opaque
+  * surface, and refreshes its registered specialized content at once rather than at its next reparent. */
+ void route(dev.jasper.ui.theme.ThemeRoute route,boolean surface){guard();view.route(route);view.paintsSurface(surface);contents.removeIf(KitContent::closed);for(var content:List.copyOf(contents))content.refresh();}
  @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {view.close();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;updated=() -> { };mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
 }

@@ -94,22 +94,51 @@ class WorkspaceContentRouteTest {
         });
     }
 
-    @Test void aFailedPublicationReturnsTheViewToChromeAndTheCaller() throws Exception {
+    /** A mixed light-chrome, dark-workspace host whose main content host adds the component and then fails. */
+    @Test void aFailedPublicationReturnsTheViewAndItsContentToChromeAndTheCaller() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
+            var chrome = ThemeManager.generated(Theme.JASPER_LIGHT); var workspace = ThemeManager.generated(Theme.DARK);
+            var mixed = new ResolvedTheme(chrome, workspace);
             var containment = new Containment(() -> true); var model = new dev.jasper.app.contributions.Contributions();
-            var main = java.util.UUID.randomUUID();
-            model.content().addHost(new dev.jasper.app.contributions.ContentHost(main, false, e -> { throw new IllegalStateException("mount failed"); }, e -> {}, e -> {}, () -> {}));
+            var main = java.util.UUID.randomUUID(); var holder = new JPanel();
+            model.content().addHost(new dev.jasper.app.contributions.ContentHost(main, false,
+                e -> { holder.add(e.component()); holder.remove(e.component()); throw new IllegalStateException("mount failed"); }, e -> {}, e -> {}, () -> {}));
             model.content().setFactory(detached -> main);
-            var ui = new HostedUi("test.kit", model, containment, Runnable::run, () -> true, () -> true, getClass().getClassLoader(), () -> dev.jasper.sdk.Variant.DARK,
-                h -> () -> {}, AppContractTest.headlessWindows(), null);
+            var ui = new HostedUi("test.kit", model, containment, Runnable::run, () -> true, () -> true, getClass().getClassLoader(), () -> dev.jasper.sdk.Variant.LIGHT,
+                h -> () -> {}, AppContractTest.headlessWindows(), null, () -> mixed, h -> new dev.jasper.app.lifecycle.Subscription(() -> {}), GlassSource.NONE);
             var kit = new HostedKit("test.kit", () -> true, ui::kitThemes, ui.appearance(), containment); ui.kit(kit);
             var view = kit.create(document(), e -> {});
+            var scroll = new JScrollPane(new JTextArea("kept"));
+            view.registerContent(new CustomContent("text", Nodes.CustomKind.EDITOR, scroll, () -> {}));
+            var chromeInput = chrome.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT).getRGB();
             assertThatThrownBy(() -> ui.windows().openTab(new ContentSpec("doc", "Document"), null, view)).isInstanceOf(IllegalStateException.class);
             KitView component = ((HostedKitView) view).component();
             assertThat(component.route()).isEqualTo(ThemeRoute.CHROME); assertThat(component.isOpaque()).isFalse();
+            assertThat(scroll.getBackground().getRGB()).as("its content is back on chrome without waiting for a reparent").isEqualTo(chromeInput);
             var window = ui.windows().create(new WindowSpec("test.kit.form", "Form", new Dimension(400, 300), false));
             window.setContent(view);
             window.close(); ui.closeAll(); kit.close();
+        });
+    }
+
+    @Test void aRouteChangeAloneRefreshesRegisteredContent() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var chrome = ThemeManager.generated(Theme.JASPER_LIGHT); var workspace = ThemeManager.generated(Theme.DARK);
+            var mixed = new ResolvedTheme(chrome, workspace);
+            var containment = new Containment(() -> true);
+            var ui = new HostedUi("test.kit", new dev.jasper.app.contributions.Contributions(), containment, Runnable::run, () -> true, () -> true, getClass().getClassLoader(),
+                () -> dev.jasper.sdk.Variant.LIGHT, h -> () -> {}, AppContractTest.headlessWindows(), null, () -> mixed, h -> new dev.jasper.app.lifecycle.Subscription(() -> {}), GlassSource.NONE);
+            var kit = new HostedKit("test.kit", () -> true, ui::kitThemes, ui.appearance(), containment); ui.kit(kit);
+            var view = (HostedKitView) kit.create(document(), e -> {});
+            var scroll = new JScrollPane(new JTextArea("kept"));
+            view.registerContent(new CustomContent("text", Nodes.CustomKind.EDITOR, scroll, () -> {}));
+            var parent = new JPanel(); parent.add(view.component());
+            view.route(ThemeRoute.WORKSPACE, true);
+            assertThat(scroll.getBackground().getRGB()).isEqualTo(workspace.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT).getRGB());
+            assertThat(scroll.getForeground()).isEqualTo(workspace.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
+            view.route(ThemeRoute.CHROME, false);
+            assertThat(scroll.getBackground().getRGB()).isEqualTo(chrome.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT).getRGB());
+            view.close(); ui.closeAll(); kit.close();
         });
     }
 }

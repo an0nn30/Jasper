@@ -598,14 +598,13 @@ final class HostedUi {
                 view.mount(spec);
                 // Workspace content takes the workspace theme slot, as terminals and editors do, on an opaque workspace
                 // surface; its specialized content paints its own background or glass above that. Moves keep both.
-                var component = view.component();
-                component.route(dev.jasper.ui.theme.ThemeRoute.WORKSPACE); component.paintsSurface(true);
+                view.route(dev.jasper.ui.theme.ThemeRoute.WORKSPACE, true);
                 try {
-                    var tab = openTab(spec, owner, component);
+                    var tab = openTab(spec, owner, view.component());
                     tab.onClosed(view::close);
                     return tab;
                 } catch(RuntimeException | Error failure) {
-                    component.route(dev.jasper.ui.theme.ThemeRoute.CHROME); component.paintsSurface(false);
+                    view.route(dev.jasper.ui.theme.ThemeRoute.CHROME, false);
                     view.unmount(spec);throw failure;
                 }
             }

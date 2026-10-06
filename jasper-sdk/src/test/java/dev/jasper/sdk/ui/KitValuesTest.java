@@ -231,4 +231,22 @@ class KitValuesTest {
             .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new Button("b", ControlState.READY, "Go", "", ButtonKind.GHOST, "go", "", ButtonPresentation.STANDARD, Optional.empty(), null)).isInstanceOf(NullPointerException.class);
     }
+
+    /** Plan 2 Task 9-kit fix round 1 (M4): a field's list is checked wherever either sits, in the same one traversal. */
+    @Test void aFieldsListIsResolvedAcrossEveryContainer() {
+        var filter = new Field("filter", ControlState.READY, FieldKind.SEARCH, "", "Filter", "Filter", "choose", Optional.empty(), FieldPresentation.STANDARD, "", "", "languages");
+        var languages = new ItemList("languages", ControlState.READY, ListKind.SINGLE, List.of(new ListItem("java", Optional.empty(), List.of(text("java.name")), List.of(), List.of())), Set.of(), "choose", List.of());
+        var header = new Header("header", ControlState.READY, "Languages", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
+        var inForm = new Form("form", ControlState.READY, FormKind.SHEET, "Language", Optional.empty(),
+            List.of(new Section("section", ControlState.READY, "Filter", new Card("card", ControlState.READY, CardKind.FORM, List.of(new FormRow("row", ControlState.READY, "Filter", "", filter, Optional.empty()))))),
+            Optional.of(new Panel("panel", ControlState.READY, header, Optional.empty(), new Split("split", ControlState.READY, SplitKind.DOCUMENT, List.of(text("a"), languages)), Optional.empty())),
+            List.of(), "cancel");
+        assertThat(new ViewSpec(inForm).root()).isSameAs(inForm);
+        var dangling = new Form("form", ControlState.READY, FormKind.SHEET, "Language", Optional.empty(),
+            List.of(new Section("section", ControlState.READY, "Filter", new SettingRow("row", ControlState.READY, "Filter", "", filter, false))), Optional.empty(), List.of(), "cancel");
+        assertThatThrownBy(() -> new ViewSpec(dangling)).as("no list anywhere").isInstanceOf(IllegalArgumentException.class);
+        var inEmpty = new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL, List.of(
+            new Empty("empty", ControlState.READY, text("icon"), "Nothing", "", List.of(new Panel("p", ControlState.READY, header, Optional.of(filter), languages, Optional.empty())))));
+        assertThat(new ViewSpec(inEmpty).root()).isSameAs(inEmpty);
+    }
 }

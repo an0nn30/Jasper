@@ -10,32 +10,10 @@ import static dev.jasper.ui.model.Nodes.*;
 public record ViewSpec(Node root) {
     public ViewSpec {
         Objects.requireNonNull(root);
-        var ids = new HashSet<String>();
-        validate(root, ids, new HashSet<>(), 0, new int[]{0});
+        // One traversal validates ids and collects the ItemLists that fields name with their arrow keys.
         var lists = new HashSet<String>(); var listRefs = new HashSet<String>();
-        lists(root, lists, listRefs);
+        validate(root, new HashSet<>(), new HashSet<>(), lists, listRefs, 0, new int[]{0});
         if (!lists.containsAll(listRefs)) throw new IllegalArgumentException("A field's list must be an ItemList in the same view");
-    }
-    /** ItemList ids, and the lists fields move with their arrow keys. */
-    private static void lists(Node node, Set<String> lists, Set<String> refs) {
-        if (node instanceof ItemList list) lists.add(list.id());
-        if (node instanceof Field field && !field.listId().isBlank()) refs.add(field.listId());
-        var children = new ArrayList<Node>();
-        switch (node) {
-            case Stack n -> children.addAll(n.children());
-            case Card n -> children.addAll(n.children());
-            case Split n -> children.addAll(n.children());
-            case FormRow n -> { children.add(n.control()); n.trailing().ifPresent(children::add); }
-            case SettingRow n -> children.add(n.control());
-            case Section n -> children.add(n.body());
-            case Empty n -> { children.add(n.icon()); children.addAll(n.actions()); }
-            case Header n -> { n.context().ifPresent(children::add); n.primary().ifPresent(children::add); }
-            case Panel n -> { children.add(n.header()); n.searchOrNavigation().ifPresent(children::add); children.add(n.body()); n.footer().ifPresent(children::add); }
-            case Form n -> { n.hero().ifPresent(children::add); children.addAll(n.sections()); n.preview().ifPresent(children::add); children.addAll(n.actions()); }
-            case ItemList n -> { n.addAction().ifPresent(children::add); for (var item : n.items()) { item.leading().ifPresent(children::add); children.addAll(item.title()); children.addAll(item.subtitle()); children.addAll(item.trailing()); } }
-            default -> { }
-        }
-        for (var child : children) lists(child, lists, refs);
     }
     private static void references(Set<String> selected, Set<String> ids) {
         if (!ids.containsAll(selected)) throw new IllegalArgumentException("Unknown item reference");
@@ -46,10 +24,12 @@ public record ViewSpec(Node root) {
         if (!item.leaf()) branches.add(item.id());
         for (var child : item.children()) tree(child, ids, branches, depth + 1);
     }
-    private static void validate(Node node, Set<String> ids, Set<String> contentIds, int depth, int[] count) {
+    private static void validate(Node node, Set<String> ids, Set<String> contentIds, Set<String> lists, Set<String> listRefs, int depth, int[] count) {
         if (depth > 128 || ++count[0] > 100_000) throw new IllegalArgumentException("View too deep or large");
         if (!ids.add(node.id())) throw new IllegalArgumentException("Duplicate node: " + node.id());
         if (node instanceof Custom custom && !contentIds.add(custom.contentId())) throw new IllegalArgumentException("Duplicate custom content id");
+        if (node instanceof ItemList list) lists.add(list.id());
+        if (node instanceof Field field && !field.listId().isBlank()) listRefs.add(field.listId());
         var children = new ArrayList<Node>();
         switch (node) {
             case Stack n -> children.addAll(n.children());
@@ -82,6 +62,6 @@ public record ViewSpec(Node root) {
             }
             case Text _, Icon _, Button _, MenuButton _, StatusDot _, Field _, Secret _, Toggle _, Chip _, Progress _, Strength _, Breadcrumbs _, Custom _ -> { }
         }
-        for (var child : children) validate(child, ids, contentIds, depth + 1, count);
+        for (var child : children) validate(child, ids, contentIds, lists, listRefs, depth + 1, count);
     }
 }

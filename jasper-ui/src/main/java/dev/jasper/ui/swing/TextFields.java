@@ -37,13 +37,8 @@ final class TextFields {
             if (node.kind() != Nodes.FieldKind.TEXTAREA) {
                 bindKey("shift ENTER", "field.alternate", () -> !((Nodes.Field)this.node).alternateAction().isBlank(),
                     () -> emit(new UiEvent.Action(((Nodes.Field)this.node).alternateAction())));
-                if (node.kind() != Nodes.FieldKind.NUMBER) for (var move : java.util.Map.of("UP", -1, "KP_UP", -1, "DOWN", 1, "KP_DOWN", 1, "PAGE_UP", -2, "PAGE_DOWN", 2).entrySet())
-                    bindKey(move.getKey(), "field.list." + move.getKey(), () -> list() != null, () -> {
-                        var rows = list(); if (rows == null) return;
-                        int delta = move.getValue();
-                        rows.follow(Math.abs(delta) == 2 ? Integer.signum(delta) * rows.page() : delta);
-                    });
             }
+            own(() -> listKeys(false));
             bindKey("ESCAPE", "field.cancel", () -> !((Nodes.Field)this.node).cancelAction().isBlank(),
                 () -> emit(new UiEvent.Action(((Nodes.Field)this.node).cancelAction())));
             if (node.kind() == Nodes.FieldKind.NUMBER) {
@@ -107,10 +102,35 @@ final class TextFields {
             KeyStroke key = KeyStroke.getKeyStroke(stroke);
             input.getInputMap(JComponent.WHEN_FOCUSED).put(key, name);
             input.getActionMap().put(name, new AbstractAction() {
-                @Override public boolean isEnabled() { return !closed && when.getAsBoolean(); }
-                @Override public void actionPerformed(java.awt.event.ActionEvent event) { if (isEnabled() && interactive()) run.run(); }
+                @Override public boolean isEnabled() { return !closed && interactive() && when.getAsBoolean(); }
+                @Override public void actionPerformed(java.awt.event.ActionEvent event) { if (isEnabled()) run.run(); }
             });
             own(() -> { input.getInputMap(JComponent.WHEN_FOCUSED).remove(key); input.getActionMap().remove(name); });
+        }
+        /** Arrow and page keys this field owns while it names a list (Field.listId); delta 2 means a page. */
+        private static final java.util.Map<String, Integer> LIST_KEYS = java.util.Map.of("UP", -1, "KP_UP", -1, "DOWN", 1, "KP_DOWN", 1, "PAGE_UP", -2, "PAGE_DOWN", 2);
+        private boolean listKeys;
+        /**
+         * Installs the list keys only while the field names a list, and removes them otherwise: an entry in the field's own
+         * map, even a disabled one, would hide the look and feel's binding for the same key (FlatLaf's macOS Up/Down caret
+         * moves to the line's start and end) and let the key reach an ancestor instead.
+         */
+        private void listKeys(boolean wanted) {
+            if (wanted == listKeys) return;
+            listKeys = wanted;
+            for (var move : LIST_KEYS.entrySet()) {
+                KeyStroke key = KeyStroke.getKeyStroke(move.getKey()); String name = "field.list." + move.getKey();
+                if (!wanted) { input.getInputMap(JComponent.WHEN_FOCUSED).remove(key); input.getActionMap().remove(name); continue; }
+                input.getInputMap(JComponent.WHEN_FOCUSED).put(key, name);
+                input.getActionMap().put(name, new AbstractAction() {
+                    @Override public boolean isEnabled() { return !closed && interactive() && list() != null; }
+                    @Override public void actionPerformed(java.awt.event.ActionEvent event) {
+                        var rows = list(); if (!isEnabled() || rows == null) return;
+                        int delta = move.getValue();
+                        rows.follow(Math.abs(delta) == 2 ? Integer.signum(delta) * rows.page() : delta);
+                    }
+                });
+            }
         }
         /** The interactive item list this field's arrow keys move, or null. */
         private InteractiveRows.RowsControl list() {
@@ -171,6 +191,7 @@ final class TextFields {
         @Override JComponent focusTarget() { return input; }
         @Override void refresh() {
             var field = (Nodes.Field)node; state(); label.setVisible(labelShown()); input.setEnabled(component.isEnabled());
+            listKeys(!field.listId().isBlank() && field.kind() != Nodes.FieldKind.TEXTAREA && field.kind() != Nodes.FieldKind.NUMBER);
             input.setEditable(component.isEnabled()); surface.setEnabled(component.isEnabled());
             input.setCursor(Cursor.getPredefinedCursor(component.isEnabled() ? Cursor.TEXT_CURSOR : Cursor.DEFAULT_CURSOR));
             if (scroll != null) {

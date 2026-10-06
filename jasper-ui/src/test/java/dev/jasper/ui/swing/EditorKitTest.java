@@ -86,13 +86,25 @@ class EditorKitTest {
         });
     }
 
-    @Test void aDisabledStackDoesNotCloseOnEscape() {
+    /** A form around the bar: Escape the bar does not take reaches the form's Cancel. */
+    static ViewSpec barInForm(ControlState barState) {
+        var bar = new Stack("bar", barState, LayoutRole.INLINE, List.of(findField("", ""), option("next-button", "Next", Optional.empty())), "bar-close");
+        return new ViewSpec(new Form("form", READY, FormKind.SHEET, "Find", Optional.empty(), List.of(bar), Optional.empty(), List.of(), "form-cancel"));
+    }
+
+    @Test void aDisabledBusyOrHiddenStackLeavesEscapeToTheEnclosingFormsCancel() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
-            var disabled = new ViewSpec(new Stack("bar", new ControlState(true, false, false, ""), LayoutRole.INLINE, List.of(findField("", "")), "bar-close"));
-            try (var view = new KitView(context, disabled, events::add)) {
-                SwingUtilities.processKeyBindings(key(editor(view, "find"), KeyEvent.VK_ESCAPE, 0));
-                assertThat(events).isEmpty();
+            try (var view = new KitView(context, barInForm(READY), events::add)) {
+                var next = find(view, "next-button", Buttons.KitButton.class);
+                assertThat(SwingUtilities.processKeyBindings(key(next, KeyEvent.VK_ESCAPE, 0))).isTrue();
+                assertThat(events).as("an interactive bar takes Escape").containsExactly(new UiEvent.Action("bar-close"));
+                for (var state : List.of(new ControlState(true, false, false, ""), new ControlState(true, true, true, ""), HIDDEN)) {
+                    events.clear();
+                    view.update(barInForm(state));
+                    assertThat(SwingUtilities.processKeyBindings(key(next, KeyEvent.VK_ESCAPE, 0))).as("%s", state).isTrue();
+                    assertThat(events).as("%s passes Escape to the form", state).containsExactly(new UiEvent.Action("form-cancel"));
+                }
             } finally { release(context); }
         });
     }
@@ -131,17 +143,6 @@ class EditorKitTest {
                 assertThat(events.getLast()).as("clamped at the first row").isEqualTo(new UiEvent.Selected("languages", Set.of("l0")));
                 assertThat(SwingUtilities.processKeyBindings(key(input, KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(events.getLast()).as("Enter stays the field's own action").isEqualTo(new UiEvent.Action("choose"));
-            } finally { release(context); }
-        });
-    }
-
-    @Test void withoutAListTheFieldLeavesArrowKeysAlone() {
-        Edt.run(() -> {
-            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
-            try (var view = new KitView(context, picker(Set.of("l0"), ""), events::add)) {
-                var input = editor(view, "filter");
-                assertThat(SwingUtilities.processKeyBindings(key(input, KeyEvent.VK_DOWN, 0))).isFalse();
-                assertThat(events).isEmpty();
             } finally { release(context); }
         });
     }

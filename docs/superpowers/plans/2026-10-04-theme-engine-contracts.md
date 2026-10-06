@@ -417,11 +417,16 @@ version unchanged, Task 11 freezes it). Each record change keeps every prior con
   is what Escape runs in the field. Blank passes either key on. `Field.listId` names an `ItemList` in the same view
   (validated by `ViewSpec`): Up/Down (and the keypad arrows) move its keyboard row one selectable row, Page Up/Page Down
   by the rows its viewport shows, clamped at the ends, selecting it (`Selected`) and keeping it in view while the
-  focus stays in the field; Enter stays `trailingAction`. Without a mounted, interactive list the keys pass on. A
+  focus stays in the field; Enter stays `trailingAction`. Without a mounted, interactive list the keys pass on. The
+  list keys sit in the field's own input map only while `listId` is set (fix round 1): an entry there, even a disabled
+  one, would hide the look and feel's binding for the key (FlatLaf's macOS Up/Down caret moves). No kit key with a
+  blank action may shadow a look and feel binding (`KitKeyBindingAuditTest`, FlatLaf installed, every field kind,
+  secrets and every gallery fixture); a NUMBER field's live arrow keys are the one intended override. A
   TEXTAREA takes neither `alternateAction` nor `listId`; a NUMBER field (whose arrows step it) takes no `listId`.
 - `Stack.cancelAction` is what Escape runs from any focused control inside the stack that does not take Escape itself
   (a field's own `cancelAction` runs first; an open kit popup is dismissed first), as an inline find bar closes from
-  its field or its buttons. A disabled, busy or hidden stack reports nothing.
+  its field or its buttons. A disabled, busy or hidden stack neither reports nor takes Escape, which then reaches an
+  enclosing form's or dialog's Cancel; a field's Shift+Enter and Escape likewise pass on unless it is interactive.
 - `Button.selected` (GHOST and SECONDARY only) makes a toggle button, such as a find option (match case, whole word,
   regular expression): while true it paints the segmented control's selected fill (`segment.selected.bg`, a
   `border.control` hairline, `text.primary` label and glyph), embedded or not; assistive technology reads it as a
@@ -437,7 +442,8 @@ version unchanged, Task 11 freezes it). Each record change keeps every prior con
   sharing it keep their slot. `KitView.paintsSurface(boolean)` makes a view paint its route's `surface.panel` opaque
   behind its controls. `HostedUi.openTab(…, UiView)` mounts the view with `WORKSPACE` and the opaque surface (as the
   former raw editor panels showed the workspace surface), restoring `CHROME` and transparency if publication fails;
-  windows, dialogs, overlays and panels keep `CHROME`. Registered specialized content refreshes its background and
+  windows, dialogs, overlays and panels keep `CHROME`. A route change (`HostedKitView.route`) refreshes the view's
+  registered content at once, the failure path included. Registered specialized content refreshes its background and
   foreground from the owning view's slot (`KitContent`), so an editor in a content tab takes workspace `surface.input`
   at the workspace opacity it sits on, and a move between windows keeps the slot and resamples the opacity. The
   testkit fake records the slot a content tab would take (`FakeKitView.route`, package-private), and the shared
