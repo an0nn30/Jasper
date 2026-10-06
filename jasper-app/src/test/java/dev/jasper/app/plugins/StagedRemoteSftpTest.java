@@ -127,6 +127,57 @@ class StagedRemoteSftpTest {
         }
     }
 
+    /**
+     * Review fix round 1. I1: as the old table's component popup did, a right click in an empty folder (outside every row)
+     * opens the folder's menu on the selection (Up, New folder…, Upload folder… enabled) and selects nothing. M4: the old
+     * 24 pt table test, in the real host: with the application's font enlarged, rows grow to fit their text.
+     */
+    @Test @Timeout(value = 90, unit = TimeUnit.SECONDS)
+    void anEmptyFolderOffersItsMenuAndRowsGrowWithAnEnlargedFont() throws Exception {
+        try (var remote = new StagedRemoteHost(root, true)) {
+            remote.openSftp();
+            onEdt(() -> remote.sftpListing("prod", "/srv/empty", List.of()));
+            StagedVaultHost.settle();
+            onEdt(() -> {
+                var view = remote.sftp();
+                view.setSize(260, 520);
+                StagedRemoteTunnelsTest.layout(view);
+                var files = (javax.swing.JScrollPane) StagedVaultHost.named(view, "sftp.files");
+                var viewport = files.getViewport();
+                viewport.dispatchEvent(new MouseEvent(viewport, MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(), InputEvent.BUTTON3_DOWN_MASK,
+                    20, Math.max(1, viewport.getHeight() / 2), 1, true, MouseEvent.BUTTON3));
+                var popup = (javax.swing.JPopupMenu) files.getClientProperty(dev.jasper.ui.swing.KitOwnership.CONTEXT_MENU);
+                var enabled = new ArrayList<String>();
+                for (var item : popup.getComponents()) if (item instanceof javax.swing.JMenuItem entry && entry.isEnabled()) enabled.add(entry.getText());
+                assertThat(enabled).as("the empty folder's menu").containsExactly("Up", "New folder…", "Upload folder…");
+                assertThat(selection(remote)).as("a context press selects nothing").isEmpty();
+            });
+            // The application's font setting is a defaultFont/Label.font override, which kit views follow live.
+            Object previous = AppContractTest.onEdtValue(() -> javax.swing.UIManager.get("Label.font"));
+            Object previousDefault = AppContractTest.onEdtValue(() -> javax.swing.UIManager.get("defaultFont"));
+            try {
+                onEdt(() -> {
+                    remote.sftpListing("prod", "/srv/app", List.of(remote.fileEntry("readme.txt", "FILE", 3_700, 1_000)));
+                    var large = new javax.swing.plaf.FontUIResource(new java.awt.Font(java.awt.Font.DIALOG, java.awt.Font.PLAIN, 24));
+                    javax.swing.UIManager.put("defaultFont", large);
+                    javax.swing.UIManager.put("Label.font", large);
+                });
+                StagedVaultHost.settle();
+                onEdt(() -> {
+                    var view = remote.sftp();
+                    view.setSize(260, 520);
+                    StagedRemoteTunnelsTest.layout(view);
+                    var readme = row(view, "readme.txt");
+                    var name = label((Container) readme, "readme.txt");
+                    assertThat(name.getFont().getSize2D()).as("the body text follows the enlarged font").isGreaterThanOrEqualTo(20f);
+                    assertThat(readme.getHeight()).as("the row grows to fit it with room")
+                        .isGreaterThanOrEqualTo(name.getFontMetrics(name.getFont()).getHeight() + 8);
+                });
+            } finally { onEdt(() -> { javax.swing.UIManager.put("Label.font", previous); javax.swing.UIManager.put("defaultFont", previousDefault); }); }
+            assertThat(remote.problems).isEmpty();
+        }
+    }
+
     /** New folder and Items already exist keep baseline f16ae32f keys through the real kit components. */
     @Test @Timeout(value = 90, unit = TimeUnit.SECONDS)
     void theSftpDialogsKeepTheirKeys() throws Exception {

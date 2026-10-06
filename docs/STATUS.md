@@ -28,9 +28,18 @@
   selected and on that row alone otherwise; a context press never selects. Enter/Escape (ruling Task8 Enter): no dialog
   has a primary; New folder creates from its name field only (`trailingAction`); Rename destination's field applies
   nothing on Enter (as before); Escape closes the chooser, New folder and Rename and cancels the others. Behaviour
-  deviations: a right-clicked row is not selected (its menu acts on it alone unless it is selected); right-click on the
-  table's empty area offers no menu (the Upload button's menu has the same items); Alt+Left/Right/Up do not apply inside
-  the Copy to host dialog (its buttons and crumbs do); status messages wrap instead of truncating with a tooltip.
+  deviations: a right-clicked row is not selected (its menu acts on it alone unless it is selected); Alt+Left/Right/Up do
+  not apply inside the Copy to host dialog (its Back/Forward buttons and crumbs do) — accepted by controller ruling
+  (review I2) and **owned by Keymap K4**: when plugin dialogs get WINDOW-context shortcuts, register the same three
+  actions for the Copy to host dialog to restore them; status messages wrap instead of truncating with a tooltip.
+  Review fix round 1: right-click anywhere outside the table's rows (an empty folder included) opens the folder's menu on
+  the selection again, through a new Table-only kit rule (no SDK record change; contracts appendix "Plan 2 Task 8c fix
+  round 1 kit rule"; the file chooser's table, whose shared menu is empty, is unaffected); choosing the same Copy to host
+  destination again retries after "Cannot connect" (or restarts the listing), as the old combo box did; the real-host
+  test also checks row height under an enlarged application font. Perf note for Task 12 (review M3): each transfer
+  progress change (up to 5 Hz while transfers run) re-renders the whole SFTP panel descriptor (table rows with their
+  menus included) and the kit diffs it; correct, but unmeasured — measure in the Task 12 performance pass and cache the
+  table node if it shows.
   Visual-only (ledgered in `migration.csv`): GHOST icon row instead of the segmented back/forward border, the path on its
   own row below the icons, kit table header/rows/selection, kit glyphs instead of the blue folder and painted
   document/refresh glyphs, size column sized by weight (whole at 220 px, wider in wide rails), checkboxes, the Upload split

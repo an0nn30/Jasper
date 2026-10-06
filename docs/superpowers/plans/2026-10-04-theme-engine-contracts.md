@@ -367,6 +367,15 @@ Other kit dialogs gain the same fit when their content grows or shrinks (for exa
 appearing). The testkit fake models no window geometry, so it has no counterpart; plugins need not and cannot observe
 it.
 
+Plan 2 Task 8c fix round 1 kit rule (no SDK record change; controller ruling I1): in a `Table` only, a context press
+(the popup trigger on press or release) outside every row — the free area below the rows, or anywhere in an empty
+table — opens the table's shared `contextActions` at the pointer. As on a selected row, that menu acts on the current
+selection; the press never changes the selection or reports `Selected`, and a chosen item reports only its `Action`.
+Rows keep their own menus (a present `TableRow.contextActions` still takes precedence on its row), item lists and trees
+still offer nothing outside their rows, and a table whose shared menu is empty (the file chooser) shows none. This
+restores the old `JTable` component popup (Remote SFTP: Up, New folder…, Upload folder… in an empty folder). The
+testkit fake has no pointer geometry, so it has no counterpart; consumers state the shared menu in the descriptor.
+
 Plan 2 Task 8-kit Remote additions (Sessions, Tunnels, SFTP and transfer rows; controller rulings G1–G5; same
 mirroring module ↔ SDK ↔ host `KitValues` ↔ fake and SDK version rule — the SDK stays 0.14.2 and Task 11 versions these
 record components; prior constructors remain and default to the old meaning):

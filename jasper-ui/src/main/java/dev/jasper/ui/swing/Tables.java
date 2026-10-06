@@ -67,6 +67,12 @@ final class Tables {
             return true;
         }
 
+        /** A context press outside every row opens the table's shared menu, as the JTable's component popup did. */
+        @Override
+        boolean sharedMenuOutsideRows() {
+            return true;
+        }
+
         @Override
         Set<String> specifiedSelection() {
             return value().selectedIds();

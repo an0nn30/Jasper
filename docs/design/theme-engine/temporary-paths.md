@@ -350,6 +350,20 @@ No `ui/tunnels` file reads Task 5 compatibility values or `WorkspaceDefaults`. R
 `PanelHeader.Action` and status-item icons from `context.appearance().icon(BundledIcon)` in `TunnelsPanel`/`TunnelsUi`
 (Task 11 with `PanelHeader`).
 
+## Task 8c consumer removal (Remote SFTP explorer, transfer rows and their dialogs)
+
+Plan 2 Task 8c moved the SFTP explorer (`SftpPanel`, registered with `registerView`), its dialogs (`HostChooser`,
+`FolderNamePanel`, `DestinationPanel`, the delete `ConfirmPanel`), the transfer rows (`TransferStrip`, now kit descriptors
+rendered in the SFTP panel footer) and the transfer dialogs (`ResolvePanel`, `RenamePanel`, `ExistingItemsPanel`) to owned
+SDK `UiView`s from `context.kit()`. None of these files reads `WorkspacePalette.current`, `UIManager` fonts, `PanelStyle`
+or a fixed colour (`0x5e9bed`, `0x397ac4`, `0x3274f6`, `0x2467de`) or paints anything: the blue folder, document and
+refresh glyphs, the painted path crumbs, the segmented back/forward border, the follow switch and the strip separator are
+gone in favour of kit glyphs, kit `Breadcrumbs`, GHOST buttons, a kit switch and the kit panel footer. `PanelStyle` and
+`FlatToolBar` are deleted (no caller left), with the test-only `ZoneColors`. No Remote file reads Task 5 compatibility
+values or `WorkspaceDefaults`. Remaining raw Remote paths are Task 11's only: the `PanelSpec`/`PanelHeader.Action`, status
+item and action icons from `context.appearance().icon(...)` (`SftpUi`, `TransferUi`, `TunnelsUi`, `RemotePlugin`,
+`SessionsToolbar`); `javax.swing.Timer` and the AWT clipboard are nonvisual.
+
 ## Task 5 review fix round 1 — native geometry, vendor roles and open status-surface item
 
 **Preserved native geometry (no visual change in Plan 2).** Native adapters keep their pre-migration values
@@ -433,20 +447,6 @@ not expose raw Swing through the final SDK. Existing auxiliary/panel/content lif
 no duplicate new adapter outside app.plugins.
 
 ## Main merge (2026-10-05, main `d3455d47`) — new raw consumers and owners
-
-## Task 8c consumer removal (Remote SFTP explorer, transfer rows and their dialogs)
-
-Plan 2 Task 8c moved the SFTP explorer (`SftpPanel`, registered with `registerView`), its dialogs (`HostChooser`,
-`FolderNamePanel`, `DestinationPanel`, the delete `ConfirmPanel`), the transfer rows (`TransferStrip`, now kit descriptors
-rendered in the SFTP panel footer) and the transfer dialogs (`ResolvePanel`, `RenamePanel`, `ExistingItemsPanel`) to owned
-SDK `UiView`s from `context.kit()`. None of these files reads `WorkspacePalette.current`, `UIManager` fonts, `PanelStyle`
-or a fixed colour (`0x5e9bed`, `0x397ac4`, `0x3274f6`, `0x2467de`) or paints anything: the blue folder, document and
-refresh glyphs, the painted path crumbs, the segmented back/forward border, the follow switch and the strip separator are
-gone in favour of kit glyphs, kit `Breadcrumbs`, GHOST buttons, a kit switch and the kit panel footer. `PanelStyle` and
-`FlatToolBar` are deleted (no caller left), with the test-only `ZoneColors`. No Remote file reads Task 5 compatibility
-values or `WorkspaceDefaults`. Remaining raw Remote paths are Task 11's only: the `PanelSpec`/`PanelHeader.Action`, status
-item and action icons from `context.appearance().icon(...)` (`SftpUi`, `TransferUi`, `TunnelsUi`, `RemotePlugin`,
-`SessionsToolbar`); `javax.swing.Timer` and the AWT clipboard are nonvisual.
 
 Merging main brought new UI. Consumers in already-migrated families were re-bound in the merge commit; the rest stay
 raw (they need real design work) with these exact owners. Every path below has a `migration.csv` row.

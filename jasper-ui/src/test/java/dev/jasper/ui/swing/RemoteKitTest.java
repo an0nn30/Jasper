@@ -318,6 +318,64 @@ class RemoteKitTest {
         return count;
     }
 
+    /**
+     * Plan 2 Task 8c fix round 1 (I1, controller ruling): as the JTable's component popup did, a context press outside
+     * every table row (below the rows, or in an empty table) opens the table's shared menu, which acts on the selection;
+     * it never changes the selection, and a chosen item reports only its action. Rows keep their own menus; lists keep
+     * offering nothing outside their rows; a table without a shared menu (the file chooser) shows none.
+     */
+    @Test void aContextPressOutsideTheRowsOpensTheTablesSharedMenuWithoutChangingTheSelection() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            var shared = List.of(new MenuItem("up", "Up", "", "menu:up", true, false), new MenuItem("delete", "Delete selected…", "", "menu:delete", false, false));
+            java.util.function.BiFunction<Integer, List<MenuItem>, Table> table = (count, menu) -> new Table("files", READY,
+                List.of(new Column("name", "Name", TextRole.BODY, false), new Column("size", "Size", TextRole.DESCRIPTION, true)),
+                java.util.stream.IntStream.range(0, count).mapToObj(i -> new TableRow("r" + i, Map.of("name", "f" + i, "size", i + " B"), Optional.of("file"), false,
+                    Optional.of(List.of(new MenuItem("own", "Own", "", "row:" + i, true, false))))).toList(),
+                count > 0 ? Set.of("r0") : Set.of(), "open", menu, SelectionMode.MULTIPLE, ScrollPolicy.STANDARD);
+            try (var view = new KitView(context, new ViewSpec(table.apply(2, shared)), events::add)) {
+                view.setSize(400, 300); InteractiveRowsTest.layout(view);
+                var owner = (Tables.TableControl) view.control("files");
+                var viewport = owner.scroll.getViewport();
+                assertThat(owner.canvas.getHeight()).as("the rows leave free area below").isLessThan(viewport.getHeight());
+                events.clear();
+                viewport.dispatchEvent(new MouseEvent(viewport, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON3_DOWN_MASK, 20, viewport.getHeight() - 5, 1, true, MouseEvent.BUTTON3));
+                assertThat(owner.popup.getComponentCount()).as("the shared menu below the rows").isEqualTo(2);
+                assertThat(((JMenuItem) owner.popup.getComponent(0)).getText()).isEqualTo("Up");
+                assertThat(owner.popup.getComponent(1).isEnabled()).as("items keep their enabled state").isFalse();
+                assertThat(events).as("a context press never selects").isEmpty();
+                assertThat(owner.selected).containsExactly("r0");
+                ((JMenuItem) owner.popup.getComponent(0)).doClick(0);
+                assertThat(events).as("the item reports only its action").containsExactly(new UiEvent.Action("menu:up"));
+                events.clear();
+                var row = owner.mounted.get("r1");
+                row.dispatchEvent(new MouseEvent(row, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON3_DOWN_MASK, 4, 4, 1, true, MouseEvent.BUTTON3));
+                assertThat(((JMenuItem) owner.popup.getComponent(0)).getText()).as("a row keeps its own menu").isEqualTo("Own");
+                view.update(new ViewSpec(table.apply(0, shared)));
+                InteractiveRowsTest.layout(view);
+                owner.canvas.dispatchEvent(new MouseEvent(owner.canvas, MouseEvent.MOUSE_RELEASED, 0, 0, 2, 2, 1, true, MouseEvent.BUTTON3));
+                viewport.dispatchEvent(new MouseEvent(viewport, MouseEvent.MOUSE_RELEASED, 0, 0, 20, 20, 1, true, MouseEvent.BUTTON3));
+                assertThat(owner.popup.getComponentCount()).as("an empty table still offers its shared menu").isEqualTo(2);
+                assertThat(events).isEmpty();
+                view.update(new ViewSpec(table.apply(2, List.of())));
+                InteractiveRowsTest.layout(view);
+                viewport.dispatchEvent(new MouseEvent(viewport, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON3_DOWN_MASK, 20, viewport.getHeight() - 5, 1, true, MouseEvent.BUTTON3));
+                assertThat(owner.popup.getComponentCount()).as("no shared menu, no menu (the file chooser)").isZero();
+                viewport.dispatchEvent(new MouseEvent(viewport, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON1_DOWN_MASK, 20, viewport.getHeight() - 5, 1, false, MouseEvent.BUTTON1));
+                assertThat(events).isEmpty();
+            } finally { release(context); }
+            var lists = KitFixtures.context();
+            try (var view = new KitView(lists, new ViewSpec(new ItemList("rows", READY, ListKind.SINGLE, List.of(new ListItem("a", Optional.empty(),
+                    List.of(new Text("a.t", READY, "A", TextRole.BODY)), List.of(), List.of())), Set.of("a"), "", shared)), e -> {})) {
+                view.setSize(400, 300); InteractiveRowsTest.layout(view);
+                var owner = (ItemLists.ListControl) view.control("rows");
+                var viewport = owner.scroll.getViewport();
+                viewport.dispatchEvent(new MouseEvent(viewport, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON3_DOWN_MASK, 20, viewport.getHeight() - 5, 1, true, MouseEvent.BUTTON3));
+                assertThat(owner.popup.getComponentCount()).as("lists offer nothing outside their rows").isZero();
+            } finally { release(lists); }
+        });
+    }
+
     static final String HOSTILE = "<html><img src='http://127.0.0.1:9/x.png'>web";
 
     /** Every component under {@code root} (itself included) that shows a tooltip. */

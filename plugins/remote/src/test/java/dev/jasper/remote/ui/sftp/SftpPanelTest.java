@@ -108,6 +108,10 @@ class SftpPanelTest {
             assertThat(SftpTestAccess.menuLabels(panel)).containsExactlyElementsOf(labels);
             assertThat(SftpTestAccess.row(panel.view(),"a").contextActions().orElseThrow()).filteredOn(item->!item.separator())
                 .extracting(MenuItem::label).containsExactlyElementsOf(labels);
+            assertThat(SftpTestAccess.table(panel.view()).contextActions()).as("outside every row: the same menu on the selection (fix round 1, I1)")
+                .filteredOn(item->!item.separator()).extracting(MenuItem::label).containsExactlyElementsOf(labels);
+            assertThat(SftpTestAccess.table(panel.view()).contextActions()).filteredOn(item->!item.separator())
+                .extracting(MenuItem::action).allMatch(action->action.startsWith(SftpPanel.MENU));
         });
     }
 
@@ -256,6 +260,20 @@ class SftpPanelTest {
             panel.busy(true,"Loading folder…");
             pressRowItem(panel.view(),"alias","Delete selected…");
             assertThat(seen).as("a stale menu acts on nothing while loading").hasSize(3);
+        });
+    }
+
+    /** Fix round 1 (I1): in an empty folder the table's shared menu still offers the folder's actions. */
+    @Test void anEmptyFolderStillOffersTheFoldersMenuOnTheTable() throws Exception {
+        edt(()-> {
+            var panel=panel();panel.actions(actions());
+            panel.showPage("host","/srv/empty",List.of(),0,0,false);
+            var menu=SftpTestAccess.table(panel.view()).contextActions();
+            assertThat(menu).filteredOn(item->!item.separator()&&item.enabled()).extracting(MenuItem::label).containsExactly("Up","New folder…","Upload folder…");
+            press(panel.view(),SftpTestAccess.item(menu,"New folder…").action());
+            press(panel.view(),SftpTestAccess.item(menu,"Up").action());
+            press(panel.view(),SftpTestAccess.item(menu,"Delete selected…").action());
+            assertThat(commands).as("disabled items do nothing even if pressed").containsExactly("new folder","up");
         });
     }
 

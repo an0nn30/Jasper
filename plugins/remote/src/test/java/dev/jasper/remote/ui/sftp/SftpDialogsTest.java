@@ -115,6 +115,28 @@ class SftpDialogsTest {
         }
     }
 
+    /** Fix round 1 (M1): choosing the same host again after "Cannot connect" retries, as the old combo box did. */
+    @Test void choosingTheSameHostAgainRetriesAFailedConnection(@TempDir Path root) throws Exception {
+        var attempts = new java.util.concurrent.CopyOnWriteArrayList<CompletableFuture<ConnectionIdentity>>();
+        try (var workers = Executors.newVirtualThreadPerTaskExecutor()) {
+            var panel = value(() -> new DestinationPanel(new FakeKit("dev.jasper.remote"), "1 items from prod:/srv", List.of(PROD), root.resolve("cache"), workers, UI,
+                id -> { var attempt = new CompletableFuture<ConnectionIdentity>(); attempts.add(attempt); return attempt; },
+                connection -> new CompletableFuture<FileEndpoint>(), capture -> { }, capture -> { }, () -> { }, () -> { }));
+            try {
+                edt(() -> emit(panel.view(), new UiEvent.Selected(DestinationPanel.HOST, Set.of(PROD.id().toString()))));
+                attempts.getFirst().completeExceptionally(new java.io.IOException("refused"));
+                await(() -> texts(panel.view()).stream().anyMatch(text -> text.startsWith("Cannot connect")));
+                edt(() -> {
+                    emit(panel.view(), new UiEvent.Selected(DestinationPanel.HOST, Set.of(PROD.id().toString())));
+                    assertThat(attempts).as("re-picking the host connects again").hasSize(2);
+                    assertThat(texts(panel.view())).contains("Connecting…");
+                });
+                attempts.getFirst().completeExceptionally(new java.io.IOException("late")); // already done: ignored
+                assertThat(attempts.get(1)).isNotDone();
+            } finally { edt(panel::close); }
+        }
+    }
+
     @Test void aClosedCopyToHostIgnoresALateConnection(@TempDir Path root) throws Exception {
         var identity = new CompletableFuture<ConnectionIdentity>();
         var kit = value(() -> new RecordingKit("dev.jasper.remote"));

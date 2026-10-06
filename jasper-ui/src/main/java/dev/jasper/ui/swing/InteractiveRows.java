@@ -63,6 +63,16 @@ final class InteractiveRows {
                         popup.setVisible(false);
                         clearPopup();
                     });
+            // Tables only: a context press outside every row (below the rows, or anywhere in an empty table) opens the
+            // control's shared menu, which acts on the selection; it never changes the selection, as the JTable's
+            // component popup did.
+            MouseAdapter outside = new MouseAdapter() {
+                @Override public void mousePressed(MouseEvent e) { if (e.isPopupTrigger()) outsideContext((JComponent) e.getComponent(), e.getX(), e.getY()); }
+                @Override public void mouseReleased(MouseEvent e) { if (e.isPopupTrigger()) outsideContext((JComponent) e.getComponent(), e.getX(), e.getY()); }
+            };
+            canvas.addMouseListener(outside);
+            scroll.getViewport().addMouseListener(outside);
+            own(() -> { canvas.removeMouseListener(outside); scroll.getViewport().removeMouseListener(outside); });
             bind(canvas, "DOWN", () -> move(1));
             bind(canvas, "UP", () -> move(-1));
             bind(canvas, "shift DOWN", () -> extend(1));
@@ -521,6 +531,18 @@ final class InteractiveRows {
             return false;
         }
 
+        /** Whether a context press outside every row opens the control's shared menu (tables only). */
+        boolean sharedMenuOutsideRows() {
+            return false;
+        }
+
+        /** A context press outside every row: the shared menu, acting on the selection, which it never changes. */
+        void outsideContext(JComponent invoker, int x, int y) {
+            if (!sharedMenuOutsideRows() || !interactive()) return;
+            clearPopup();
+            showMenu(contextActions(), item -> contextActions().contains(item), invoker, x, y);
+        }
+
         /**
          * A context press targets the row under the pointer and never changes the selection. A row's own menu is
          * offered on any row; the control's shared menu acts on the selection, so it is offered only on a selected row.
@@ -529,7 +551,13 @@ final class InteractiveRows {
             if (!interactive()) return;
             clearPopup();
             if (!stillCurrent(id) || !selectable(indexOf(id)) || !selected.contains(id) && !ownsContextActions(id)) return;
-            var actions = contextActions(id);
+            // A row's menu acts on that row (its action names it); it never re-reports the selection, so choosing an
+            // item cannot also open or navigate to the row.
+            showMenu(contextActions(id), item -> stillCurrent(id) && contextActions(id).contains(item), invoker, x, y);
+        }
+
+        /** Fills and shows the popup; a chosen item reports only its action, and only while {@code current} still holds. */
+        void showMenu(List<MenuItem> actions, java.util.function.Predicate<MenuItem> current, JComponent invoker, int x, int y) {
             for (var item : actions) {
                 if (item.separator()) {
                     popup.add(new Menus.Separator(context()));
@@ -558,10 +586,7 @@ final class InteractiveRows {
                                                 false));
                 ActionListener listener =
                         e -> {
-                            // A row's menu acts on that row (its action names it); it never re-reports the
-                            // selection, so choosing an item cannot also open or navigate to the row.
-                            if (stillCurrent(id) && contextActions(id).contains(item))
-                                emit(new UiEvent.Action(item.action()));
+                            if (current.test(item)) emit(new UiEvent.Action(item.action()));
                         };
                 entry.addActionListener(listener);
                 popupCleanup.add(() -> entry.removeActionListener(listener));

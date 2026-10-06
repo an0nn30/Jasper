@@ -76,8 +76,8 @@ public final class DestinationPanel implements AutoCloseable {
         }
     }
 
+    /** Choosing a host (again) connects and lists it afresh, as the old combo box's action did: a retry after a failure. */
     private void chooseHost(String id) {
-        if(id.equals(host)) return;
         long token=++generation;host=id;copyable=false;controller.cancel();if(resolving!=null) resolving.cancel(true);
         var chosen=saved.stream().filter(candidate->candidate.id().toString().equals(id)).findFirst();
         render();

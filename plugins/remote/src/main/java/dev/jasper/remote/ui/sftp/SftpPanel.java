@@ -38,7 +38,8 @@ import java.util.function.Consumer;
  *
  * <p>Rows are keyed by entry name. A new listing or page selects its first row. Enter or a double click on one entry
  * opens a folder (or a link, without the Editor) or hands a file or link to the Editor. Each row's own context menu acts
- * on the selection when the row is selected and on that row alone otherwise; a context press never selects. Clicking a
+ * on the selection when the row is selected and on that row alone otherwise; outside every row (an empty folder too) a
+ * context press opens the folder's menu on the selection. A context press never selects. Clicking a
  * crumb opens that folder; clicking beside the crumbs edits the path (Enter goes, Escape or leaving cancels). UI thread
  * only; after {@link #close()} nothing touches the view.
  */
@@ -346,7 +347,9 @@ public final class SftpPanel implements AutoCloseable {
         return new Nodes.Table(FILES,state(true,!working),List.of(
                 new Column("name","Name",Nodes.TextRole.BODY,false,2.4,Optional.empty()),
                 new Column("size","Size",Nodes.TextRole.DESCRIPTION,true,1,Optional.empty())),
-            rows,selected,OPEN,List.of(),destination?Nodes.SelectionMode.SINGLE:Nodes.SelectionMode.MULTIPLE,Nodes.ScrollPolicy.STANDARD);
+            // The shared menu (on the selection) opens on a context press outside every row, empty folders included, as the
+            // old table's component popup did; each row's own menu takes precedence on the row.
+            rows,selected,OPEN,destination?List.of():menu(MENU,"",selection()),destination?Nodes.SelectionMode.SINGLE:Nodes.SelectionMode.MULTIPLE,Nodes.ScrollPolicy.STANDARD);
     }
 
     private static String glyph(FileEntry entry) {
