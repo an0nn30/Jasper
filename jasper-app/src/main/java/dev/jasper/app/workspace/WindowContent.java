@@ -681,6 +681,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return SwingUtilities.convertRectangle(field.getParent(), field.getBounds(), target);
     }
     WindowChrome chrome() { return chrome; }
+    UiState uiState() { return uiState; }
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }
     boolean statusVisible() { return statusVisible; }
