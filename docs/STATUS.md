@@ -2,6 +2,24 @@
 
 ## Current state — 2026-10-06
 
+- **Theme engine Plan 2 Task 9-kit implemented: kit capabilities for the Editor migration; review pending** (2026-10-06).
+  Task 9 is split (controller ruling) into 9-kit, 9a (Editor dialogs), 9b (document tab and find bar) and 9c (Vim bar).
+  9-kit adds, mirrored module ↔ SDK ↔ host `KitValues`/settings-row rewriters ↔ testkit fake with a shared contract case
+  (SDK version unchanged; Task 11 versions the new record components; every prior constructor kept):
+  `SplitKind.DOCUMENT` fill layout (the first visible Custom/Empty takes the height the bars leave; hidden children take
+  none; a hidden document stays registered); `Field.alternateAction` (Shift+Enter), `Field.cancelAction` (Escape) and
+  `Field.listId` (arrow and page keys move a named ItemList while focus stays in the field; validated by `ViewSpec`);
+  `Stack.cancelAction` (Escape from anything inside the stack); `Button.selected` (ghost/secondary toggle buttons:
+  segmented selected fill, TOGGLE_BUTTON role and CHECKED state, confirmed by the owner); `Text.severity` (severity
+  colour) and `Text.caret` (MONO insertion bar). Host-only (rulings G1/G1b; no SDK member): `KitView.route(ThemeRoute)`
+  and `KitView.paintsSurface`; each view now owns a copy of its caller's `KitContext`; `HostedUi.openTab(…, UiView)`
+  mounts plugin content tabs on the workspace slot over an opaque workspace `surface.panel` (CHROME restored if
+  publication fails); registered specialized content refreshes from its view's slot (`KitContent`); the fake records
+  the route (package-private) and `ContractHarness.viewRoute` asserts it on both runtimes. New tests: module
+  `EditorKitTest` (keys, list driving, toggle accessibility and paint, caret and severity, DOCUMENT layout, re-routing),
+  app `WorkspaceContentRouteTest` (light chrome/dark workspace content tab, move, window stays chrome, failed
+  publication), SDK and host projection/validation cases, gallery `editor-document`/`editor-language` fixtures.
+  No existing assertion changed.
 - **Theme engine Plan 2 Task 8c implemented: Remote SFTP explorer, transfer rows and their dialogs on kit views; Task 8
   complete pending review** (2026-10-06). The SFTP explorer (`SftpPanel`, now registered with `registerView`) is an owned
   kit Panel: Back/Forward/Refresh GHOST icon buttons and an Upload split MenuButton (its menu is the old right-click menu)

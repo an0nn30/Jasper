@@ -165,19 +165,19 @@ unique within their owning control; references resolve only in that control. Do 
 
 | Record | Additional fields |
 |---|---|
-| Text | `String text, TextRole role` |
+| Text | `String text, TextRole role, Optional<Severity> severity, OptionalInt caret` (caret only on MONO/MONO_SMALL, 0..length) |
 | Icon | `String name, Hue hue, IconSize size, String accessibleName, Optional<Severity> severity` |
-| Button | `String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation, Optional<Severity> iconSeverity` |
+| Button | `String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation, Optional<Severity> iconSeverity, Optional<Boolean> selected` (selected only on GHOST/SECONDARY) |
 | MenuButton | `String label, String icon, ButtonKind kind, String action, List<MenuItem> items, String tooltip, ButtonPresentation presentation` |
 | StatusDot | `StatusKind kind` |
-| Field | `FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation` (numeric present exactly for NUMBER) |
+| Field | `FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation, String alternateAction, String cancelAction, String listId` (numeric present exactly for NUMBER; TEXTAREA takes no alternate action or list, NUMBER no list; a list id names an ItemList in the view) |
 | Secret | `String hint, String label, String revealGroup, SecretKind kind, String copyAction, String submitAction` (no string value; MULTILINE takes no reveal group or copy action; only INPUT takes a submit action) |
 | Choice | `ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon, Optional<ChoiceSearch> search` (present exactly for SEARCHABLE) |
 | Toggle | `String label, boolean checked, String action, boolean compact, String tooltip, boolean pending` |
 | Chip | `String label, Hue hue` |
 | Progress | `double fraction, String label` (-1 means indeterminate) |
 | Strength | `int filled, String label` (0–4) |
-| Stack | `LayoutRole role, List<Node> children` |
+| Stack | `LayoutRole role, List<Node> children, String cancelAction` |
 | FormRow | `String label, String caption, Node control, Optional<Node> trailing, boolean highlighted` |
 | SettingRow | `String title, String description, Node control, boolean dependent, boolean highlighted` |
 | Card | `CardKind kind, List<Node> children` |
@@ -187,7 +187,7 @@ unique within their owning control; references resolve only in that control. Do 
 | Header | `String title, OptionalInt count, Optional<Node> context, Optional<Node> primary, List<MenuItem> overflow` |
 | Panel | `Header header, Optional<Node> searchOrNavigation, Node body, Optional<Node> footer` |
 | Form | `FormKind kind, String title, Optional<Node> hero, List<Node> sections, Optional<Node> preview, List<Button> actions, String cancelAction` |
-| Split | `SplitKind kind, List<Node> children` (semantic manager/sidebar/document divisions) |
+| Split | `SplitKind kind, List<Node> children` (semantic manager/sidebar/document divisions; DOCUMENT stacks vertically and its first visible Custom/Empty fills) |
 | Table | `List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, ScrollPolicy scroll` |
 | Tree | `List<TreeItem> roots, Set<String> expandedIds, Set<String> selectedIds, String activateAction` |
 | Breadcrumbs | `List<Crumb> crumbs, String label, boolean editing, String value, String editAction, String submitAction, String cancelAction` (editing requires submit and cancel) |
@@ -405,6 +405,45 @@ record components; prior constructors remain and default to the old meaning):
   glyph, at rest and on hover, with the colour `Icon.severity` uses (`accent`, `status.warning`, `status.danger`), in
   place of the kind's text colour; the label keeps the kind's colour. A favourite's star is `star.filled` with WARNING
   (the baseline warning-coloured ★); a non-favourite's outline `star` is untinted.
+
+Plan 2 Task 9-kit Editor additions (editor chrome; controller rulings G1–G6; same mirroring and SDK version rule: SDK
+version unchanged, Task 11 freezes it). Each record change keeps every prior constructor, defaulting to the old meaning
+(no severity or caret, no Shift+Enter/Escape action or list, no stack Escape, no pressed state):
+- `SplitKind.DOCUMENT` gains its layout: children stack top to bottom at their preferred heights; the first visible
+  `Custom` or `Empty` child fills the height left over (the document, or its loading/failed state in its place); hidden
+  children take no space. A document kept hidden (`ControlState.visible=false`) stays registered. SIDEBAR_DETAIL and
+  THREE_COLUMN are unchanged.
+- `Field.alternateAction` is what Shift+Enter runs in a single-line field (a find field's Previous); `Field.cancelAction`
+  is what Escape runs in the field. Blank passes either key on. `Field.listId` names an `ItemList` in the same view
+  (validated by `ViewSpec`): Up/Down (and the keypad arrows) move its keyboard row one selectable row, Page Up/Page Down
+  by the rows its viewport shows, clamped at the ends, selecting it (`Selected`) and keeping it in view while the
+  focus stays in the field; Enter stays `trailingAction`. Without a mounted, interactive list the keys pass on. A
+  TEXTAREA takes neither `alternateAction` nor `listId`; a NUMBER field (whose arrows step it) takes no `listId`.
+- `Stack.cancelAction` is what Escape runs from any focused control inside the stack that does not take Escape itself
+  (a field's own `cancelAction` runs first; an open kit popup is dismissed first), as an inline find bar closes from
+  its field or its buttons. A disabled, busy or hidden stack reports nothing.
+- `Button.selected` (GHOST and SECONDARY only) makes a toggle button, such as a find option (match case, whole word,
+  regular expression): while true it paints the segmented control's selected fill (`segment.selected.bg`, a
+  `border.control` hairline, `text.primary` label and glyph), embedded or not; assistive technology reads it as a
+  toggle button, CHECKED (and PRESSED) while selected. A click reports only its `Action`; the button never flips by
+  itself: the owner confirms the state in its next update. Reusable by the terminal find bar (Plan 3 Task 10).
+- `Text.severity` draws the text in the severity's colour (`accent`, `status.warning`, `status.danger`, as
+  `Icon.severity` tints a glyph) instead of its role's; `Text.caret` (MONO and MONO_SMALL only, from 0 to the text's
+  length) draws a one-pixel insertion bar in the text colour after that many characters (kept from the visible end
+  when a leading ellipsis shortens the text), as a Vim command line shows its cursor.
+- Host-only (module `KitView`, not projected into the SDK; controller ruling G1/G1b): `KitView.route(ThemeRoute)`
+  re-routes one view to the other theme slot in place (every control re-applies its appearance; controls, input,
+  focus and registered content are kept); each view keeps a private copy of the caller's `KitContext`, so other views
+  sharing it keep their slot. `KitView.paintsSurface(boolean)` makes a view paint its route's `surface.panel` opaque
+  behind its controls. `HostedUi.openTab(…, UiView)` mounts the view with `WORKSPACE` and the opaque surface (as the
+  former raw editor panels showed the workspace surface), restoring `CHROME` and transparency if publication fails;
+  windows, dialogs, overlays and panels keep `CHROME`. Registered specialized content refreshes its background and
+  foreground from the owning view's slot (`KitContent`), so an editor in a content tab takes workspace `surface.input`
+  at the workspace opacity it sits on, and a move between windows keeps the slot and resamples the opacity. The
+  testkit fake records the slot a content tab would take (`FakeKitView.route`, package-private), and the shared
+  `ContractHarness.viewRoute` case asserts CHROME for window content and WORKSPACE for a content tab across moves on
+  both runtimes. The fake does not lay out, paint or route keys: the new key and layout behaviour is module/host only
+  and is asserted in `EditorKitTest` (module) and the descriptor round trip in `KitContractTest.editor`.
 
 Plan 2 Task 6b-2 palette additions (command palette; same mirroring and SDK version rule). Prior constructors remain
 and default to the old meaning (not a heading, no visible-row count):

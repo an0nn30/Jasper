@@ -144,6 +144,16 @@ own buttons and switches report only their intent; `Toggle.pending` shows an ope
 colour while the domain confirms a change; `Button.iconSeverity` tints a button's glyph with a severity colour (a
 favourite's warning star); and the glyph vocabulary gains `star` and `star.filled`.
 
+Editor capabilities (Plan 2 Task 9-kit): a `SplitKind.DOCUMENT` split stacks its children and lets its first visible
+`Custom` (or `Empty`, a loading or failed state) fill the height the bars leave, so a document keeps its own scrolling;
+fields take Shift+Enter (`alternateAction`) and Escape (`cancelAction`) actions and can drive an item list with their
+arrow and page keys (`listId`) while keeping the focus; a stack's `cancelAction` answers Escape from anything inside it
+(an inline find bar); `Button.selected` makes a ghost or secondary button a toggle (pressed fill, CHECKED for assistive
+technology, confirmed by the owner); `Text.severity` tints text and `Text.caret` draws a command line's insertion bar.
+Host-only: `KitView.route(ThemeRoute)` re-routes one view in place (each view owns a copy of its context) and
+`KitView.paintsSurface(true)` paints its slot's `surface.panel` opaque; the app mounts plugin content tabs on the
+workspace slot over that surface, and their registered specialized content follows the view's slot.
+
 Palette capabilities (Plan 2 Task 6b-2): `ListItem.heading` is a title-only section row (never selected, activated,
 hovered or given a menu; a hairline opens every heading after the first); `ListKind.RESULTS` is the one-line result
 list that follows an external field: it never takes focus, a left press runs a row, rows and headings keep fixed heights
