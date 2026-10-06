@@ -1,69 +1,73 @@
 package dev.jasper.vault.ui;
 
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.ListItem;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
 import dev.jasper.vault.api.CredentialDescriptor;
 import dev.jasper.vault.service.PickPrompt;
-import java.awt.BorderLayout;
-import java.awt.Dimension;
 import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.DefaultListModel;
-import javax.swing.JButton;
-import javax.swing.JList;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.ListSelectionModel;
 
-/** The account picker: a list of descriptors, Choose and Cancel. */
-public final class PickerPanel extends JPanel {
-    final JList<CredentialDescriptor> list;
-    final JButton primary = new JButton("Choose");
-    final JButton cancel = new JButton("Cancel");
+/** The account picker: a list of descriptors (rows keyed by credential id), Choose and Cancel. UI thread only. */
+public final class PickerPanel implements AutoCloseable {
+    static final String FORM = "picker", LIST = "choices", CHOOSE = "choose", CANCEL = "cancel";
+    /** Full rows the former 240-pixel list showed (10.8 at its 22-pixel rows), measured at baseline f16ae32f. */
+    static final int VISIBLE_ROWS = 10;
+    private final List<CredentialDescriptor> choices;
+    private final Consumer<UUID> onChoose;
+    private final Runnable onCancel;
+    private final UiView view;
+    private String selected = "";
+    private boolean closed;
 
-    public PickerPanel(PickPrompt prompt) { this(prompt.choices(), prompt::choose, prompt::cancel); }
+    public PickerPanel(UiKit kit, PickPrompt prompt) { this(kit, prompt.choices(), prompt::choose, prompt::cancel); }
 
-    PickerPanel(List<CredentialDescriptor> choices, Consumer<UUID> onChoose, Runnable onCancel) {
-        super(new BorderLayout(0, 8));
-        setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-        var model = new DefaultListModel<CredentialDescriptor>();
-        choices.forEach(model::addElement);
-        list = new JList<>(model);
-        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        list.setCellRenderer((view, value, index, selected, focused) -> {
-            var label = new javax.swing.JLabel(label(value));
-            label.setOpaque(true);
-            label.setBackground(selected ? view.getSelectionBackground() : view.getBackground());
-            label.setForeground(selected ? view.getSelectionForeground() : view.getForeground());
-            label.setBorder(BorderFactory.createEmptyBorder(3, 6, 3, 6));
-            return label;
-        });
-        var scroll = new JScrollPane(list);
-        scroll.setPreferredSize(new Dimension(360, 240));
-        add(scroll, BorderLayout.CENTER);
-        var buttons = new JPanel();
-        buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
-        buttons.add(Box.createHorizontalGlue()); buttons.add(cancel); buttons.add(Box.createHorizontalStrut(8)); buttons.add(primary);
-        add(buttons, BorderLayout.SOUTH);
-        primary.setEnabled(false);
-        list.addListSelectionListener(event -> primary.setEnabled(list.getSelectedValue() != null));
-        primary.addActionListener(event -> { CredentialDescriptor chosen = list.getSelectedValue(); if (chosen != null) onChoose.accept(chosen.id()); });
-        cancel.addActionListener(event -> onCancel.run());
+    PickerPanel(UiKit kit, List<CredentialDescriptor> choices, Consumer<UUID> onChoose, Runnable onCancel) {
+        this.choices = List.copyOf(choices); this.onChoose = onChoose; this.onCancel = onCancel;
+        view = kit.create(new ViewSpec(node()), this::handle);
     }
+
+    public UiView view() { return view; }
 
     static String label(CredentialDescriptor descriptor) {
         return descriptor.subtitle().isBlank() ? descriptor.name() : descriptor.name() + "  —  " + descriptor.subtitle();
     }
-    @Override public void removeNotify() {
-        if (getRootPane() != null && getRootPane().getDefaultButton() == primary)
-            getRootPane().setDefaultButton(null);
-        super.removeNotify();
-    }
-    @Override public void addNotify() {
-        super.addNotify();
-        if (getRootPane() != null) getRootPane().setDefaultButton(primary);
+
+    private void handle(UiEvent event) {
+        if (closed) return;
+        switch (event) {
+            case UiEvent.Selected chosen when chosen.id().equals(LIST) -> {
+                selected = chosen.ids().stream().findFirst().orElse(""); view.update(new ViewSpec(node()));
+            }
+            case UiEvent.Action action when action.id().equals(CHOOSE) -> { if (!selected.isEmpty()) onChoose.accept(UUID.fromString(selected)); }
+            case UiEvent.Action action when action.id().equals(CANCEL) -> onCancel.run();
+            default -> { }
+        }
     }
 
+    /**
+     * No activate action: as with the former list, a double click selects only and Enter reaches the form, which
+     * presses Choose (the default button) once a row is selected.
+     */
+    private Nodes.Form node() {
+        var items = choices.stream().map(d -> new ListItem(d.id().toString(), Optional.empty(),
+            List.<Nodes.Node>of(new Nodes.Text("title." + d.id(), ControlState.READY, label(d), Nodes.TextRole.BODY)), List.of(), List.of())).toList();
+        var list = new Nodes.ItemList(LIST, ControlState.READY, Nodes.ListKind.SINGLE, items, selected.isEmpty() ? Set.of() : Set.of(selected), "",
+            List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(VISIBLE_ROWS));
+        var actions = List.of(new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
+            new Nodes.Button(CHOOSE, new ControlState(true, !selected.isEmpty(), false, ""), "Choose", "", Nodes.ButtonKind.PRIMARY, CHOOSE, ""));
+        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, "Choose a credential", Optional.empty(), List.of(list), Optional.empty(), actions, CANCEL);
+    }
+
+    String selected() { return selected; }
+
+    @Override public void close() { if (closed) return; closed = true; view.close(); }
 }

@@ -9,19 +9,41 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import dev.jasper.sdk.testing.FakeKit;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import static dev.jasper.vault.testsupport.KitViews.*;
 import static org.assertj.core.api.Assertions.*;
 
 class KeyGeneratorFormTest {
     @TempDir Path directory;
-    @Test void formDefaultsToEd25519AndRequiresAUsernameOnlyWhenAddingAnAccount() {
-        var request = new AtomicReference<KeyGeneratorForm.Request>();
-        var form = new KeyGeneratorForm(value -> { request.set(value); return CompletableFuture.completedFuture(null); }, () -> { });
-        form.name.setText("Laptop"); form.alsoAccount.setSelected(true); form.save.doClick();
-        assertThat(request.get()).isNull(); assertThat(form.error.getText()).contains("username");
-        form.username.setText("deploy"); form.save.doClick();
-        assertThat(request.get().algorithm()).isEqualTo(KeyAlgorithm.ED25519);
-        assertThat(request.get().username()).contains("deploy");
-        assertThat(form.description.getText()).contains("unencrypted");
+    @Test void formDefaultsToEd25519AndRequiresAUsernameOnlyWhenAddingAnAccount() throws Exception {
+        edt(() -> {
+            var request = new AtomicReference<KeyGeneratorForm.Request>();
+            var form = new KeyGeneratorForm(new FakeKit("dev.jasper.vault"), value -> { request.set(value); return CompletableFuture.completedFuture(null); }, () -> { });
+            var view = form.view();
+            assertThat(button(view, EditorForm.SAVE).label()).isEqualTo("Generate Key");
+            emit(view, new UiEvent.Edited(KeyGeneratorForm.NAME, "Laptop")); emit(view, new UiEvent.Toggled(KeyGeneratorForm.ACCOUNT, true));
+            press(view, EditorForm.SAVE);
+            assertThat(request.get()).isNull(); assertThat(error(view, KeyGeneratorForm.USERNAME)).contains("username");
+            emit(view, new UiEvent.Edited(KeyGeneratorForm.USERNAME, "deploy")); press(view, EditorForm.SAVE);
+            assertThat(request.get().algorithm()).isEqualTo(KeyAlgorithm.ED25519);
+            assertThat(request.get().username()).contains("deploy");
+            assertThat(closed(view)).as("a successful generation closes the form").isTrue();
+        });
+    }
+
+    @Test void theKeyFilesNoteAndPairedPassphraseFieldsAreDescribed() throws Exception {
+        edt(() -> {
+            var form = new KeyGeneratorForm(new FakeKit("dev.jasper.vault"), value -> CompletableFuture.completedFuture(null), () -> { });
+            var view = form.view();
+            var description = node(view, KeyGeneratorForm.KEY_FILES, Nodes.Text.class);
+            assertThat(description.text()).contains("unencrypted"); assertThat(description.role()).isEqualTo(Nodes.TextRole.DESCRIPTION);
+            assertThat(node(view, KeyGeneratorForm.PASSPHRASE, Nodes.Secret.class).revealGroup())
+                .isEqualTo(node(view, KeyGeneratorForm.CONFIRM, Nodes.Secret.class).revealGroup()).isNotBlank();
+            assertThat(node(view, KeyGeneratorForm.ACCOUNT, Nodes.Toggle.class).checked()).isFalse();
+            form.close();
+        });
     }
 
     @Test void generationAddsKeyAndOptionalAccountInOnePersistedEdit() {
@@ -67,22 +89,27 @@ class KeyGeneratorFormTest {
             try (var files = Files.list(keys)) { assertThat(files.toList()).isEmpty(); }
         }
     }
-    @Test void passphraseConfirmationAndRequestBuffersAreWiped() {
-        var held = new AtomicReference<char[]>();
-        var completion = new CompletableFuture<Void>();
-        var form = new KeyGeneratorForm(request -> {
-            assertThat(request.passphrase()).isEqualTo(" phrase ".toCharArray());
-            held.set(request.passphrase()); return completion;
-        }, () -> { });
-        form.name.setText("Encrypted");
-        form.passphrase.replace(" phrase ".toCharArray()); form.confirm.replace("different".toCharArray());
-        form.save.doClick();
-        assertThat(held.get()).isNull(); assertThat(form.error.getText()).contains("do not match");
-        form.confirm.replace(" phrase ".toCharArray()); form.save.doClick();
-        assertThat(held.get()).containsOnly((char) 0);
-        form.close();
-        assertThat(form.passphrase.snapshot()).isEmpty(); assertThat(form.confirm.snapshot()).isEmpty();
-        completion.complete(null);
+    @Test void passphraseConfirmationAndRequestBuffersAreWiped() throws Exception {
+        edt(() -> {
+            var held = new AtomicReference<char[]>();
+            var completion = new CompletableFuture<Void>();
+            var form = new KeyGeneratorForm(new FakeKit("dev.jasper.vault"), request -> {
+                assertThat(request.passphrase()).isEqualTo(" phrase ".toCharArray());
+                held.set(request.passphrase()); return completion;
+            }, () -> { });
+            var view = form.view();
+            emit(view, new UiEvent.Edited(KeyGeneratorForm.NAME, "Encrypted"));
+            type(view, KeyGeneratorForm.PASSPHRASE, " phrase "); type(view, KeyGeneratorForm.CONFIRM, "different");
+            press(view, EditorForm.SAVE);
+            assertThat(held.get()).isNull(); assertThat(error(view, KeyGeneratorForm.CONFIRM)).contains("do not match");
+            type(view, KeyGeneratorForm.CONFIRM, " phrase "); press(view, EditorForm.SAVE);
+            assertThat(held.get()).containsOnly((char) 0);
+            assertThat(button(view, EditorForm.CANCEL).state().enabled()).as("generation cannot be cancelled midway").isFalse();
+            assertThat(node(view, EditorForm.FORM, Nodes.Form.class).cancelAction()).as("nor escaped").isEmpty();
+            form.close();
+            assertThat(closed(view)).isTrue();
+            completion.complete(null);
+        });
     }
 
     @Test void encryptedGenerationStoresThePassphraseOnlyInTheOptionalVaultAccount() throws Exception {

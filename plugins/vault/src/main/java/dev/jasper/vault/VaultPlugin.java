@@ -210,7 +210,7 @@ public class VaultPlugin implements Plugin {
         creating = result; createDialog = dialog;
         boolean[] success = {false}, submitted = {false};
         PasswordPanel[] form = new PasswordPanel[1];
-        form[0] = PasswordPanel.create(settings.bindByDefault(), (password, bind) -> {
+        form[0] = PasswordPanel.create(context.kit(), settings.bindByDefault(), (password, bind) -> {
             submitted[0] = true; form[0].setBusy(true);
             lock.create(password, bind).whenComplete((ignored, failure) -> {
                 if (createDialog != dialog || stopped) return;
@@ -222,9 +222,9 @@ public class VaultPlugin implements Plugin {
                 }
             });
         }, dialog::close);
-        dialog.setContent(form[0]);
+        dialog.setContent(form[0].view());
         dialog.onClosed(() -> {
-            form[0].clear();
+            form[0].close();
             if (createDialog == dialog) { createDialog = null; creating = null; }
             if (!success[0]) {
                 if (submitted[0]) lock.lock();
@@ -254,26 +254,28 @@ public class VaultPlugin implements Plugin {
         prompt.onDismiss(() -> { if (currentUnlock == prompt) currentUnlock = null; });
         if (managerWindow != null && managerWindow.showUnlock(prompt)) return;
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Unlock Vault", owner(prompt.owner()), true));
-        PasswordPanel panel = PasswordPanel.unlock(prompt);
-        dialog.setContent(panel);
+        PasswordPanel panel = PasswordPanel.unlock(context.kit(), prompt);
+        dialog.setContent(panel.view());
         prompt.onDismiss(() -> { panel.clear(); dialog.close(); });
-        dialog.onClosed(() -> { panel.clear(); prompt.cancel(); });
+        // The surface disposed the view first; close the form before the prompt can report to it.
+        dialog.onClosed(() -> { panel.close(); prompt.cancel(); });
         dialog.show();
     }
 
     private void showGrant(GrantPrompt prompt) {
         currentGrant = prompt;
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Allow " + prompt.consumerName() + " to use " + prompt.descriptor().name() + "?", owner(prompt.owner()), true));
-        dialog.setContent(new GrantPanel(prompt));
+        var panel = new GrantPanel(context.kit(), prompt);
+        dialog.setContent(panel.view());
         prompt.onDismiss(() -> { currentGrant = null; dialog.close(); vaultChanged(); });
-        dialog.onClosed(prompt::cancel);
+        dialog.onClosed(() -> { panel.close(); prompt.cancel(); });
         dialog.show();
     }
 
     private void showImport(dev.jasper.vault.service.KeyImportPrompt prompt) {
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Import SSH keys", owner(prompt.owner()), true));
-        var panel = new dev.jasper.vault.ui.KeyImportPanel(prompt);
-        dialog.setContent(panel);
+        var panel = new dev.jasper.vault.ui.KeyImportPanel(context.kit(), prompt);
+        dialog.setContent(panel.view());
         prompt.result().whenComplete((value, failure) -> ui.execute(dialog::close));
         boolean[] shown = {false};
         // Setup/unlock owns its modal loop first. Never cover it with a waiting import dialog.
@@ -288,9 +290,10 @@ public class VaultPlugin implements Plugin {
 
     private void showPick(PickPrompt prompt) {
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Choose a credential", owner(prompt.owner()), true));
-        dialog.setContent(new PickerPanel(prompt));
+        var panel = new PickerPanel(context.kit(), prompt);
+        dialog.setContent(panel.view());
         prompt.onDismiss(dialog::close);
-        dialog.onClosed(prompt::cancel);
+        dialog.onClosed(() -> { panel.close(); prompt.cancel(); });
         dialog.show();
     }
 
@@ -337,7 +340,7 @@ public class VaultPlugin implements Plugin {
     }
 
     private void showGenerator() {
-        managerWindow.dialog("Generate SSH Key", close -> new KeyGeneratorForm(request ->
+        managerWindow.dialog("Generate SSH Key", close -> new KeyGeneratorForm(context.kit(), request ->
             manager.generate(settings.keysDirectory(), request.algorithm(), request.name(), request.comment(), request.username(), request.passphrase()), close));
     }
 

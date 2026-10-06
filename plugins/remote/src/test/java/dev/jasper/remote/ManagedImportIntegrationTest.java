@@ -24,9 +24,16 @@ class ManagedImportIntegrationTest {
     static final PluginInfo VAULT = new PluginInfo("dev.jasper.vault", "Credential Vault", "0.2.0", Set.of(dev.jasper.sdk.Capabilities.PALETTE_CONTRIBUTE));
     static RemotePlugin remote(Path sshDir) { return new TestRemotePlugin(Runnable::run, ignored -> Optional.empty(), (delay, action) -> () -> {}, sshDir); }
     static void settle(FakePluginHost host) throws Exception {
-        for (int i = 0; i < 6; i++) { host.runBackground(); host.flush(); SwingUtilities.invokeAndWait(() -> {}); }
+        for (int i = 0; i < 6; i++) { host.runBackground(); host.flush(); if (!SwingUtilities.isEventDispatchThread()) SwingUtilities.invokeAndWait(() -> {}); }
     }
+    /** Vault's surfaces are owned kit views (Plan 2 Task 7), which the kit drives on the EDT. */
     @Test void realImportSurvivesRestartAndSourceDeletion(@TempDir Path dir) throws Exception {
+        Throwable[] failure = {null};
+        SwingUtilities.invokeAndWait(() -> { try { importSurvivesRestart(dir); } catch (Throwable t) { failure[0] = t; } });
+        if (failure[0] instanceof Exception e) throw e;
+        if (failure[0] instanceof Error e) throw e;
+    }
+    private void importSurvivesRestart(Path dir) throws Exception {
         var key = new KeyGenerator(dir.resolve("keys")).generate(KeyAlgorithm.ED25519, "shared", "fixture", "key-passphrase".toCharArray());
         var sshDir = Files.createDirectories(dir.resolve("ssh")); var persistedRoot = dir.resolve("plugins");
         UUID savedId;
@@ -42,14 +49,15 @@ class ManagedImportIntegrationTest {
                 host.invoke(RemotePlugin.IMPORT, window, null); settle(host);
                 importCheck(remote.currentImport(), 0).setSelected(true); importButton(remote.currentImport()).doClick(); settle(host);
                 assertThat(host.windows()).contains("dialog|Create Vault|true").doesNotContain("dialog|Import SSH keys|true");
-                JComponent create = host.windowContent("dev.jasper.vault", "Create Vault").orElseThrow();
-                fields(create, JPasswordField.class).forEach(f -> f.setText("test-password"));
-                fields(create, JCheckBox.class).forEach(c -> c.setSelected(false)); button(create, "Create Vault").doClick(); settle(host);
-                JComponent prompt = host.windowContent("dev.jasper.vault", "Import SSH keys").orElseThrow();
-                fields(prompt, JPasswordField.class).getFirst().setText("wrong"); button(prompt, "Unlock key").doClick(); settle(host);
-                assertThat(button(prompt, "Import and use").isEnabled()).isFalse();
-                fields(prompt, JPasswordField.class).getFirst().setText("key-passphrase"); button(prompt, "Unlock key").doClick(); settle(host);
-                button(prompt, "Import and use").doClick(); settle(host);
+                var create = host.windowView("dev.jasper.vault", "Create Vault").orElseThrow();
+                create.setSecret("password", "test-password".toCharArray()); create.setSecret("confirm", "test-password".toCharArray());
+                create.emit(new dev.jasper.sdk.ui.UiEvent.Toggled("bind", false)); create.emit(new dev.jasper.sdk.ui.UiEvent.Action("submit")); settle(host);
+                var prompt = host.windowView("dev.jasper.vault", "Import SSH keys").orElseThrow();
+                prompt.setSecret("passphrase", "wrong".toCharArray()); prompt.emit(new dev.jasper.sdk.ui.UiEvent.Action("unlock-key")); settle(host);
+                assertThat(((dev.jasper.sdk.ui.Nodes.Form) prompt.spec().root()).actions().stream()
+                    .filter(b -> b.id().equals("commit")).findFirst().orElseThrow().state().enabled()).isFalse();
+                prompt.setSecret("passphrase", "key-passphrase".toCharArray()); prompt.emit(new dev.jasper.sdk.ui.UiEvent.Action("unlock-key")); settle(host);
+                prompt.emit(new dev.jasper.sdk.ui.UiEvent.Action("commit")); settle(host);
                 assertThat(VaultTestAccess.managedCount(vault)).isEqualTo(1);
                 assertThat(VaultTestAccess.grantedConsumers(vault)).containsExactly("dev.jasper.remote");
                 assertThat(remote.store().hosts()).hasSize(2);
@@ -65,8 +73,8 @@ class ManagedImportIntegrationTest {
                 var remote = remote(sshDir); var context = restarted.start(RemotePluginTest.INFO, Set.of(), Set.of("dev.jasper.vault"), remote);
                 settle(restarted); UUID window = restarted.addTerminalWindow(); restarted.activateTerminalWindow(window);
                 restarted.invoke(VaultPlugin.OPEN, window, null);
-                var unlock = restarted.windowContent("dev.jasper.vault", "Unlock Vault").orElseThrow();
-                fields(unlock, JPasswordField.class).getFirst().setText("test-password"); button(unlock, "Unlock").doClick(); settle(restarted);
+                var unlock = restarted.windowView("dev.jasper.vault", "Unlock Vault").orElseThrow();
+                unlock.setSecret("password", "test-password".toCharArray()); unlock.emit(new dev.jasper.sdk.ui.UiEvent.Action("submit")); settle(restarted);
                 var saved = remote.store().host(savedId).orElseThrow();
                 remote.openHost(context.terminals().window(window).orElseThrow(), saved); settle(restarted);
                 assertThat(restarted.terminalPanes()).hasSize(1);

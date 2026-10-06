@@ -36,7 +36,7 @@ class VaultPluginTest {
             new FileStore(context.dataDirectory().resolve("device.secret"))), Runnable::run);
     }
 
-    @Test void openAndLockHaveTheirDefaultShortcuts() {
+    @Test void openAndLockHaveTheirDefaultShortcuts() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             var open = host.actionSpec(VaultPlugin.OPEN).orElseThrow();
@@ -46,9 +46,9 @@ class VaultPluginTest {
             assertThat(lock.defaultBinding()).as("the Alt rule makes it Ctrl+Alt+Shift+L off macOS").contains("cmd+shift+l");
             assertThat(lock.otherDefaultBinding()).isEmpty();
         }
-    }
+    }); }
 
-    @Test void cancellingOneImportDoesNotCancelSharedVaultSetup() {
+    @Test void cancellingOneImportDoesNotCancelSharedVaultSetup() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         var plugin = plugin();
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin);
@@ -60,10 +60,10 @@ class VaultPluginTest {
             second.cancel(false);
             assertThat(host.windows()).doesNotContain("dialog|Create Vault|true");
         }
-    }
+    }); }
     static final PluginInfo OTHER_SETUP = new PluginInfo("dev.jasper.other", "Other", "0.2.0", Set.of());
 
-    @Test void stopLocksTheVaultEvenWhenClipboardCleanupFails() {
+    @Test void stopLocksTheVaultEvenWhenClipboardCleanupFails() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         String[] contents = {""};
         SecretClipboard clipboard = new SecretClipboard(text -> {
             if (text.isEmpty()) throw new IllegalStateException("clipboard busy");
@@ -82,9 +82,9 @@ class VaultPluginTest {
             assertThatCode(plugin::stop).doesNotThrowAnyException();
             assertThat(plugin.lockManager().state()).isEqualTo(LockState.LOCKED);
         }
-    }
+    }); }
 
-    @Test void publishesTheServiceActionsAndLockStateEvents() {
+    @Test void publishesTheServiceActionsAndLockStateEvents() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), plugin);
@@ -114,9 +114,9 @@ class VaultPluginTest {
             assertThat(host.invoke(VaultPlugin.OPEN, window, null)).isTrue();
             assertThat(host.windows()).as("locked: the unlock dialog").contains("dialog|Unlock Vault|true");
         }
-    }
+    }); }
 
-    @Test void aConsumerFetchesThroughUnlockAndGrantDialogs() {
+    @Test void aConsumerFetchesThroughUnlockAndGrantDialogs() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), plugin);
@@ -145,9 +145,9 @@ class VaultPluginTest {
             cancelled.cancel(false);
             assertThat(host.windows()).as("the last waiter left: dialog closed").isEmpty();
         }
-    }
+    }); }
 
-    @Test void autoLockFollowsTheSettingsAndStopLocks() {
+    @Test void autoLockFollowsTheSettingsAndStopLocks() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.vault", "auto_lock_minutes", 1L);
@@ -171,9 +171,9 @@ class VaultPluginTest {
             host.stopAll();
             assertThat(plugin.lockManager().state()).isEqualTo(LockState.LOCKED);
         }
-    }
+    }); }
 
-    @Test void settingsResolveTheKeysDirectoryAndDefaults() {
+    @Test void settingsResolveTheKeysDirectoryAndDefaults() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.vault", "keys_directory", "/elsewhere/keys");
             host.setSetting("dev.jasper.vault", "bind_new_vaults_to_device", false);
@@ -192,8 +192,8 @@ class VaultPluginTest {
             assertThat(plugin.settings().autoLock()).as("out of range: the default").isEqualTo(Duration.ofMinutes(15));
             assertThat(host.settingsReports("dev.jasper.vault")).singleElement().asString().startsWith("auto_lock_minutes: ");
         }
-    }
-    @Test void thePadlockFollowsTheLockStateAndTheFileMenuOpensTheVault() {
+    }); }
+    @Test void thePadlockFollowsTheLockStateAndTheFileMenuOpensTheVault() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), plugin);
@@ -214,9 +214,9 @@ class VaultPluginTest {
             assertThat(VaultPlugin.tooltip(LockState.UNLOCKED, Duration.ZERO)).isEqualTo("Vault unlocked");
             assertThat(VaultPlugin.tooltip(LockState.UNLOCKED, Duration.ofSeconds(30))).isEqualTo("Vault unlocked · locks in 1 min");
         }
-    }
+    }); }
 
-    @Test void openingTheVaultAndGeneratorUsesOneManagerAndInlineUnlock() {
+    @Test void openingTheVaultAndGeneratorUsesOneManagerAndInlineUnlock() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), plugin);
@@ -239,9 +239,9 @@ class VaultPluginTest {
             assertThat(host.windows()).hasSize(1);
             assertThat(host.failures()).isEmpty();
         }
-    }
+    }); }
 
-    @Test void stoppingDuringUnlockClosesThePromptAndRejectsLateOpen() {
+    @Test void stoppingDuringUnlockClosesThePromptAndRejectsLateOpen() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), plugin);
@@ -256,9 +256,9 @@ class VaultPluginTest {
             assertThat(plugin.lockManager().state()).isEqualTo(LockState.LOCKED);
             assertThat(host.windows()).isEmpty();
         }
-    }
+    }); }
 
-    @Test void createPromptIsSingletonAndCanBeCancelled() {
+    @Test void createPromptIsSingletonAndCanBeCancelled() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), plugin);
@@ -270,17 +270,17 @@ class VaultPluginTest {
             assertThat(plugin.lockManager().state()).isEqualTo(LockState.NO_VAULT);
             assertThat(host.windows()).isEmpty();
         }
-    }
+    }); }
 
-    @Test void defaultPluginStartsWithoutTouchingTheDesktopClipboard() {
+    @Test void defaultPluginStartsWithoutTouchingTheDesktopClipboard() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), new VaultPlugin());
             assertThat(host.failures()).isEmpty();
             assertThat(host.scopes()).hasSize(1);
         }
-    }
+    }); }
 
-    @Test void requestsLockAndUnlockIcons() {
+    @Test void requestsLockAndUnlockIcons() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         try (var host = new FakePluginHost()) {
             var delegate = plugin();
             var icons = new java.util.ArrayList<dev.jasper.sdk.testing.FakeNamedIcon>();
@@ -307,5 +307,80 @@ class VaultPluginTest {
             assertThat(host.failures()).isEmpty();
             assertThat(icons).extracting(dev.jasper.sdk.testing.FakeNamedIcon::name).containsExactly(dev.jasper.sdk.ui.IconName.LOCK, dev.jasper.sdk.ui.IconName.UNLOCK);
         }
-    }
+    }); }
+
+    @Test void failedCreationReportsWithoutThePasswordAndLeavesTheFormUsable() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
+        VaultPlugin plugin = plugin();
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            UUID window = host.addTerminalWindow();
+            host.invoke(VaultPlugin.OPEN, window, null);
+            var view = host.windowView(INFO.id(), "Create Vault").orElseThrow();
+            // An obstructed vault file makes the write fail.
+            java.nio.file.Files.createDirectories(context.dataDirectory().resolve("vault.jv.tmp"));
+            dev.jasper.vault.testsupport.KitViews.type(view, "password", "synthetic-create-1");
+            dev.jasper.vault.testsupport.KitViews.type(view, "confirm", "synthetic-create-1");
+            dev.jasper.vault.testsupport.KitViews.press(view, "submit");
+            host.runBackground(); host.flush();
+            assertThat(host.notifications().lines()).anyMatch(line -> line.contains("Could not create the vault"));
+            assertThat(String.join("\n", host.notifications().lines()) + view.spec()).doesNotContain("synthetic-create-1");
+            assertThat(host.windows()).containsExactly("dialog|Create Vault|true");
+            assertThat(dev.jasper.vault.testsupport.KitViews.button(view, "submit").state().busy()).as("the form is usable again").isFalse();
+            assertThat(dev.jasper.vault.testsupport.KitViews.secret(view, "password")).as("no password stays behind").isEmpty();
+            host.requestClose("dialog");
+            assertThat(dev.jasper.vault.testsupport.KitViews.closed(view)).isTrue();
+            assertThat(host.windows()).isEmpty();
+            assertThat(plugin.lockManager().state()).as("an abandoned failed create leaves nothing unlocked").isNotEqualTo(LockState.UNLOCKED);
+            assertThat(context.kit().failures()).isEmpty();
+        }
+    }); }
+
+    @Test void closingTheUnlockDialogWhileTheAttemptRunsCancelsAndIgnoresItsResult() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
+        VaultPlugin plugin = plugin();
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            UUID window = host.addTerminalWindow();
+            plugin.lockManager().create("test-password".toCharArray(), false);
+            host.runBackground();
+            plugin.lockManager().lock();
+            host.invoke(VaultPlugin.OPEN, window, null);
+            var view = host.windowView(INFO.id(), "Unlock Vault").orElseThrow();
+            dev.jasper.vault.testsupport.KitViews.type(view, "password", "test-password");
+            dev.jasper.vault.testsupport.KitViews.press(view, "submit");
+            assertThat(dev.jasper.vault.testsupport.KitViews.secret(view, "password")).isEmpty();
+            assertThat(host.requestClose("dialog")).isTrue();
+            assertThat(dev.jasper.vault.testsupport.KitViews.closed(view)).isTrue();
+            host.runBackground(); host.flush();
+            assertThat(plugin.lockManager().state()).as("closing during the attempt keeps the vault locked").isEqualTo(LockState.LOCKED);
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+            assertThat(context.kit().failures()).isEmpty();
+        }
+    }); }
+
+    @Test void grantAndPickerDialogsAnswerThroughTheirViewsAndEscapeDenies() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
+        VaultPlugin plugin = plugin();
+        try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            AtomicReference<VaultApi> api = new AtomicReference<>();
+            host.start(SSH, Set.of("dev.jasper.vault"), Set.of(), context -> api.set(context.services().require(VaultApi.class)));
+            host.addTerminalWindow();
+            plugin.lockManager().create("hunter2!".toCharArray(), false);
+            host.runBackground();
+            UUID id = UUID.randomUUID();
+            plugin.lockManager().vault().accounts().add(new Account(id, "prod", "deploy", new Auth.Password("s3cret".toCharArray()), Instant.EPOCH, Instant.EPOCH));
+            plugin.lockManager().save(); host.runBackground();
+            CompletableFuture<Optional<Credential>> denied = api.get().credential(id);
+            var grant = host.windowView(INFO.id(), "Allow SSH to use prod?").orElseThrow();
+            var form = dev.jasper.vault.testsupport.KitViews.node(grant, "grant", dev.jasper.sdk.ui.Nodes.Form.class);
+            dev.jasper.vault.testsupport.KitViews.press(grant, form.cancelAction());
+            assertThat(denied.join()).isEmpty();
+            assertThat(host.windows()).isEmpty();
+            assertThat(dev.jasper.vault.testsupport.KitViews.closed(grant)).isTrue();
+            CompletableFuture<Optional<Credential>> allowed = api.get().credential(id);
+            dev.jasper.vault.testsupport.KitViews.press(host.windowView(INFO.id(), "Allow SSH to use prod?").orElseThrow(), "allow-once");
+            try (Credential credential = allowed.join().orElseThrow()) { assertThat(credential.password()).isEqualTo("s3cret".toCharArray()); }
+            assertThat(host.windows()).isEmpty();
+        }
+    }); }
 }

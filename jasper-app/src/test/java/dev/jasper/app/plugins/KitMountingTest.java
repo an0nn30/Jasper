@@ -187,6 +187,52 @@ class KitMountingTest {
             assertThat(kit.viewCount()).isZero();
         });
     }
+    /** Plan 2 Task 7 host contract: closing a dialog that holds a Vault-style password prompt. */
+    @Test void closingAVaultPromptDialogDisposesItsViewAndErasesTheTypedSecretBeforeOwnerCleanup() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var containment = new Containment(java.awt.EventQueue::isDispatchThread);
+            var windows = AppContractTest.headlessWindows();
+            var ui = new HostedUi("test.kit", new dev.jasper.app.contributions.Contributions(), containment,
+                Runnable::run, java.awt.EventQueue::isDispatchThread, () -> true, getClass().getClassLoader(),
+                () -> dev.jasper.sdk.Variant.DARK, h -> () -> {}, windows, null);
+            var kit = new HostedKit("test.kit", () -> true, ui::kitThemes, ui.appearance(), containment);
+            ui.kit(kit);
+            var owner = ui.windows().create(new WindowSpec("test.kit.owner", "Owner", new Dimension(400, 300), true));
+            owner.show();
+            var dialog = ui.windows().dialog(new DialogSpec("Unlock Vault", owner, true));
+            var events = new java.util.ArrayList<UiEvent>();
+            var prompt = new ViewSpec(new Nodes.Form("form", ControlState.READY, Nodes.FormKind.FULL, "Unlock", java.util.Optional.empty(),
+                java.util.List.of(new Nodes.FormRow("password.row", ControlState.READY, "Master password:", "",
+                    new Nodes.Secret("password", ControlState.READY, "", "Master password", "master"), java.util.Optional.empty())),
+                java.util.Optional.empty(), java.util.List.of(
+                    new Nodes.Button("cancel", ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, "cancel", ""),
+                    new Nodes.Button("submit", ControlState.READY, "Unlock", "", Nodes.ButtonKind.PRIMARY, "submit", "")), "cancel"));
+            var view = kit.create(prompt, events::add);
+            dialog.setContent(view);
+            dialog.show();
+            var field = HostedKitContractTest.input(((HostedKitView) view).component(), "password.input");
+            field.setText("synthetic-prompt-secret");
+            var segment = new javax.swing.text.Segment();
+            try { field.getDocument().getText(0, field.getDocument().getLength(), segment); }
+            catch (javax.swing.text.BadLocationException impossible) { throw new AssertionError(impossible); }
+            char[] storage = segment.array;
+            assertThat(events).containsExactly(new UiEvent.SecretChanged("password"));
+            assertThat(view.spec().toString() + events).doesNotContain("synthetic-prompt-secret");
+            boolean[] disposedFirst = {false};
+            dialog.onClosed(() -> {
+                // The owner's cleanup runs after the surface disposed the view: nothing secret is left to reach.
+                try { view.spec(); } catch (IllegalStateException closed) { disposedFirst[0] = true; }
+            });
+            var surface = windows.open().stream().filter(s -> s.title().equals("Unlock Vault")).findFirst().orElseThrow();
+            assertThat(surface.requestClose()).isTrue();
+            assertThat(disposedFirst[0]).as("the view is disposed before owner close handlers run").isTrue();
+            assertThat(storage).as("the typed secret is erased with the view").containsOnly((char) 0);
+            assertThat(field.getDocument().getLength()).isZero();
+            assertThatThrownBy(() -> view.withSecret("password", chars -> {})).isInstanceOf(IllegalStateException.class);
+            assertThat(kit.viewCount()).isZero();
+            owner.close(); ui.closeAll(); kit.close();
+        });
+    }
     @Test void nativeAndHostedContextsUseLiveMotionPolicy() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try (var themes = new dev.jasper.app.appearance.ThemeController()) {

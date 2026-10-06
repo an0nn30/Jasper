@@ -208,7 +208,7 @@ Remaining raw Swing in these families is layout only (`SettingsView` split/scrol
 fix round 1 replaced `SettingsDialog.askDiscard`'s `JOptionPane` with a modal kit SHEET over Settings.
 
 The dynamic WorkspacePalette callers are exactly:
-- Task 7: `plugins/vault/.../ui/ManagerPanel.java`.
+- Task 7: `plugins/vault/.../ui/ManagerPanel.java` — **removed by Task 7** (2026-10-05): the manager is an owned kit view and reads no `WorkspacePalette`.
 - Task 8: `plugins/remote/.../ui/HostsPanel.java`, `ui/tunnels/TunnelsPanel.java`, `ui/transfers/TransferStrip.java`.
 - Task 9: `plugins/editor/.../ui/EditorTab.java`, `vim/ui/VimBar.java`; editor/syntax snapshots also serve Editor through Appearance.
 - Task 10: `plugins/fileserver/.../ui/FileServersPanel.java`.
@@ -314,6 +314,17 @@ Task 11 removes the adapter. `WorkspaceDefaults` is unchanged (SDK palette reade
 Remaining `JOptionPane` owners outside Task 6 families: `workspace/WindowContent` (configuration diagnostics message)
 and `workspace/WorkspaceActions` (tab rename input) are Task 5 family items, recorded in `migration.csv` for the
 Task 12 audit sweep. `workspace/WindowCommandPalette` has none.
+
+## Task 7 consumer removal (Vault)
+
+Plan 2 Task 7 moved every Vault surface (create/unlock/change-password/editor/generator/delete/managed-key forms, the
+grant, import and picker prompts and the manager window) to owned SDK `UiView`s built from `context.kit()` and mounted
+with `WindowSurface.setContent(UiView)`. Vault no longer reads `WorkspacePalette.current` (the former `ManagerPanel`
+muted-label/border painter was the only dynamic `Jasper.workspace.*` reader), any `LegacyAppearanceDefaults` key, the
+`WorkspaceStyler` raw-contribution path or `UIManager`. The plugin's former `SecretDocument` is deleted: the kit
+`SecretBuffer` owns all secret storage (`SecretKind.MULTILINE` added for the secure note). Remaining raw Vault paths are
+Task 11's: `context.appearance().icon(IconName)` artwork for the Open action and the status item. The `WorkspaceDefaults`
+publication stays for the Task 8–10 callers listed above until Task 11.
 
 ## Task 5 review fix round 1 — native geometry, vendor roles and open status-surface item
 

@@ -2,6 +2,31 @@
 
 ## Current state — 2026-10-05
 
+- **Theme engine Plan 2 Task 7 implemented: Vault on secure host-rendered kit views; review pending** (2026-10-05).
+  Every Vault surface (create/unlock/change-password/login/key/note/generator/delete/stored-key forms, the grant,
+  import and picker prompts, the manager window) is an owned SDK `UiView` of kit descriptors mounted with
+  `setContent(UiView)`; secrets live only in kit `SecretBuffer` storage (`withSecret` copies handed to LockManager/
+  VaultManager/prompt owners, `replaceSecret` for stored values, `clearSecret`/view close wipe). Kit/SDK additions
+  (controller rulings 1, 6, 7): `SecretKind.MULTILINE` secure-note secret (mirrored module/SDK/host/fake, contract case),
+  PATH browse buttons accessibly named "Browse for <label>", testkit `FakePluginHost.windowView` (Task 11 testkit
+  surface). Vault's `SecretDocument` and `ZoneColors` are deleted (partial-deletion wipe assertion ported to
+  `SecretFieldsTest`); its only `WorkspacePalette.current` reader is gone. Enter/Escape follow baseline `f16ae32f`
+  per dialog: Save/Create/Unlock/Choose/Okay stay the default (primary); Grant has no primary (Enter never grants);
+  import's "Unlock key" is primary only while a passphrase is wanted and "Import and use" stays secondary; Escape runs
+  each dialog's existing Cancel/Deny (manager: close). Field-attributable validation shows on the field until the next
+  edit (primary disabled meanwhile); operation status/failures stay in a message line with retry. Deviation: after an
+  inline manager unlock, Okay is the default again (the baseline left no default button, a removeNotify bug).
+  Visual-only changes (ledgered in `migration.csv`): inputs carry kit labels above them (the fixed kit label column
+  truncated the former labels), checkboxes became switches in setting rows, Grant text is no longer bold, import key
+  lines are a list with new/reuse chips, every secret input has the kit reveal (paired per form), the manager toolbar
+  is a kit inline row (no divider; the type filter shows its kit label; status tooltip gone), empty and locked states
+  are kit Empty states, list rows keep the baseline visible counts (manager 11, picker 10). Evidence: descriptor
+  scenarios in the Vault `ThemeMigrationEvidenceTest`; real-host dark/light pixels from the staged Vault in
+  `jasper-app` `VaultRenderEvidenceTest` (`build/theme-migration-evidence/vault-hosted`). Report:
+  `.superpowers/sdd/2026-10-04-theme-engine-2-consumer-migration/task-7-report.md`.
+  GUI checks for the user (Task 7): Vault create/unlock dialogs (Enter submits, Escape cancels, reveal shows both
+  password fields), the manager (Enter in the list edits, elsewhere closes; inline unlock; type filter), a secure note
+  (multiline editing, wrapping), the generator and delete forms, grant prompt (Enter does nothing), key import.
 - **Theme engine Plan 2 Task 6d (post-merge) implemented: SDK `PanelHeader` on borrowed kit panel headers; review
   pending** (2026-10-05). A plugin that mounts a kit `Panel` view and calls `PanelHost.setHeader` now gets main's
   native-header result in the panel's one header row: the detail after the title and count (count role), the connected
