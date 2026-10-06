@@ -104,11 +104,12 @@ public abstract class KitContractTest {
         assertThat(events).containsExactly(new UiEvent.Toggled("a.on",true),new UiEvent.Action("a:remove"));
         stop(kit);
     }); }
-    /** Remote rows (Plan 2 Task 8-kit): tooltips, a star button, a pending switch, list Enter and Delete actions and list clicks. */
+    /** Remote rows (Plan 2 Task 8-kit): tooltips, a star button (warning-tinted when a favourite), a pending switch, list Enter and Delete actions and list clicks. */
     static ViewSpec tunnels(String tooltip, boolean pending) {
         var row=new ListItem("web",Optional.of(new Nodes.StatusDot("web.dot",ControlState.READY,Nodes.StatusKind.WARNING)),
             List.of(new Nodes.Text("web.name",ControlState.READY,"web",Nodes.TextRole.BODY)),List.of(new Nodes.Text("web.map",ControlState.READY,"8080 → :80",Nodes.TextRole.MONO_SMALL)),
-            List.of(new Nodes.Button("web.star",ControlState.READY,"","star",Nodes.ButtonKind.GHOST,"favorite:web","Add to favorites",Nodes.ButtonPresentation.EMBEDDED),
+            List.of(pending ? new Nodes.Button("web.star",ControlState.READY,"","star",Nodes.ButtonKind.GHOST,"favorite:web","Add to favorites",Nodes.ButtonPresentation.EMBEDDED)
+                    : new Nodes.Button("web.star",ControlState.READY,"","star.filled",Nodes.ButtonKind.GHOST,"favorite:web","Remove from favorites",Nodes.ButtonPresentation.EMBEDDED,Optional.of(Nodes.Severity.WARNING)),
                 new Nodes.Toggle("web.run",ControlState.READY,"Stop tunnel",true,"toggle:web",true,"",pending)),false,Optional.empty(),tooltip);
         return new ViewSpec(new Nodes.Stack("root",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
             new Nodes.ItemList("tunnels",ControlState.READY,Nodes.ListKind.DOUBLE,List.of(row),Set.of("web"),"edit",List.of(),Nodes.SelectionMode.SINGLE,Optional.empty(),OptionalInt.empty(),"toggle","delete"),

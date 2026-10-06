@@ -167,7 +167,7 @@ unique within their owning control; references resolve only in that control. Do 
 |---|---|
 | Text | `String text, TextRole role` |
 | Icon | `String name, Hue hue, IconSize size, String accessibleName, Optional<Severity> severity` |
-| Button | `String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation` |
+| Button | `String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation, Optional<Severity> iconSeverity` |
 | MenuButton | `String label, String icon, ButtonKind kind, String action, List<MenuItem> items, String tooltip, ButtonPresentation presentation` |
 | StatusDot | `StatusKind kind` |
 | Field | `FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation` (numeric present exactly for NUMBER) |
@@ -377,6 +377,10 @@ record components; prior constructors remain and default to the old meaning):
   switch stays operable and reports `Toggled(id, !checked)`, where `checked` is always the confirmed state; its
   accessible description is "Pending" unless an error or tooltip says more.
 - Named glyphs `star` (outline) and `star.filled` (solid) for favourites.
+- `Button.iconSeverity` (8-kit addition by controller ruling; default empty): a present severity tints the button's
+  glyph, at rest and on hover, with the colour `Icon.severity` uses (`accent`, `status.warning`, `status.danger`), in
+  place of the kind's text colour; the label keeps the kind's colour. A favourite's star is `star.filled` with WARNING
+  (the baseline warning-coloured ★); a non-favourite's outline `star` is untinted.
 
 Plan 2 Task 6b-2 palette additions (command palette; same mirroring and SDK version rule). Prior constructors remain
 and default to the old meaning (not a heading, no visible-row count):

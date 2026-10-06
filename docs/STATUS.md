@@ -12,8 +12,9 @@
   `Toggle.pending` (operable midway switch on `status.warning`; `checked` stays the confirmed state); glyphs `star` and
   `star.filled`. Kit tests prove the palette RESULTS list, plugin rows, ordered settings lists and Vault manager rows keep
   their Enter/Space/Delete behaviour; the one changed assertion is `BrowserKitTest`'s "item lists report no Clicked",
-  now the ruled contract. Deviation: the favourite star is not amber — kit buttons tint their glyph by button kind and
-  no button hue was ruled; favourites use the solid `star.filled` glyph and their accessible name instead.
+  now the ruled contract. By a follow-up ruling, `Button.iconSeverity` (mirrored the same way) tints a button's glyph
+  with the `Icon.severity` colour at rest and on hover, so a favourite's `star.filled` keeps the baseline warning
+  colour in both themes; a non-favourite's outline `star` is untinted.
 - **Theme engine Plan 2 Task 7 implemented: Vault on secure host-rendered kit views; review pending** (2026-10-05).
   Every Vault surface (create/unlock/change-password/login/key/note/generator/delete/stored-key forms, the grant,
   import and picker prompts, the manager window) is an owned SDK `UiView` of kit descriptors mounted with

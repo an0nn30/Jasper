@@ -233,6 +233,50 @@ class RemoteKitTest {
         return (image.getRGB(16, 18) >>> 24) > 128;
     }
 
+    /** A context on one theme for both routes, as {@link KitFixtures#context()} does for dark. */
+    static KitContext context(dev.jasper.ui.theme.GeneratedTheme theme) {
+        return new KitContext(new dev.jasper.ui.theme.ThemeBinding(new dev.jasper.ui.theme.ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }),
+            dev.jasper.ui.theme.ThemeRoute.WORKSPACE, dev.jasper.ui.metrics.DesignMetrics.DEFAULT, new dev.jasper.ui.icons.IconRegistry(), () -> false);
+    }
+
+    /** Opaque glyph pixels within a small distance of {@code colour}. */
+    static int near(java.awt.image.BufferedImage image, Color colour) {
+        int count = 0;
+        for (int x = 0; x < image.getWidth(); x++) for (int y = 0; y < image.getHeight(); y++) {
+            var c = new Color(image.getRGB(x, y), true);
+            if (c.getAlpha() > 200 && Math.abs(c.getRed() - colour.getRed()) + Math.abs(c.getGreen() - colour.getGreen()) + Math.abs(c.getBlue() - colour.getBlue()) < 30) count++;
+        }
+        return count;
+    }
+
+    static Nodes.Button star(String id, boolean favourite) {
+        return favourite
+            ? new Nodes.Button(id, READY, "", "star.filled", ButtonKind.GHOST, "favorite", "Remove from favorites", ButtonPresentation.EMBEDDED, Optional.of(Severity.WARNING))
+            : new Nodes.Button(id, READY, "", "star", ButtonKind.GHOST, "favorite", "Add to favorites", ButtonPresentation.EMBEDDED);
+    }
+
+    @Test void aFavouriteStarKeepsTheWarningColourAtRestAndOnHoverInBothThemes() {
+        Edt.run(() -> {
+            for (var theme : List.of(KitFixtures.dark(), KitFixtures.light())) {
+                var context = context(theme);
+                try (var view = new KitView(context, new ViewSpec(new Stack("root", READY, LayoutRole.INLINE, List.of(star("fav", true), star("plain", false)))), e -> {})) {
+                    var warning = ThemePainting.color(context, SemanticColor.STATUS_WARNING);
+                    var favourite = find(view, "fav", Buttons.KitButton.class);
+                    var plain = find(view, "plain", Buttons.KitButton.class);
+                    favourite.setSize(favourite.getPreferredSize()); plain.setSize(plain.getPreferredSize());
+                    assertThat(near(ButtonsTest.paint(favourite), warning)).as("%s favourite at rest", theme.dark() ? "dark" : "light").isGreaterThan(20);
+                    assertThat(near(ButtonsTest.paint(plain), warning)).as("%s plain star is untinted", theme.dark() ? "dark" : "light").isZero();
+                    favourite.getModel().setRollover(true);
+                    assertThat(near(ButtonsTest.paint(favourite), warning)).as("%s favourite on hover", theme.dark() ? "dark" : "light").isGreaterThan(20);
+                    favourite.getModel().setRollover(false);
+                    view.update(new ViewSpec(new Stack("root", READY, LayoutRole.INLINE, List.of(star("fav", false), star("plain", false)))));
+                    assertThat(near(ButtonsTest.paint(favourite), warning)).as("%s no longer a favourite", theme.dark() ? "dark" : "light").isZero();
+                } finally { release(context); }
+            }
+            assertThat(star("plain", false).iconSeverity()).isEmpty();
+        });
+    }
+
     @Test void aPendingSwitchShowsAMidWarningTrackAndStaysOperable() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();

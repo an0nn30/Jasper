@@ -35,14 +35,14 @@ final class Buttons {
         }
         @Override void hero(boolean value) { button.hero=value; }
         @Override void refresh() {
-            var value = (Nodes.Button)node; state(); button.kind = value.kind();
+            var value = (Nodes.Button)node; state(); button.kind = value.kind(); button.iconSeverity = value.iconSeverity().orElse(null);
             button.setText(value.label()); button.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
             button.setForeground(ThemePainting.color(context(), button.textRole(false)));
             boolean embedded = value.presentation() == Nodes.ButtonPresentation.EMBEDDED;
             button.embedded = embedded;
             if (artwork != null) { button.setIcon(artwork); button.putClientProperty("Jasper.button.icon", null); }
             else {
-                button.setIcon(value.icon().isEmpty() ? null : context().icons().icon(value.icon(), context().theme().semantic(), button.textRole(false),
+                button.setIcon(value.icon().isEmpty() ? null : context().icons().icon(value.icon(), context().theme().semantic(), button.iconRole(false),
                     UIScale.scale(context().icons().size(embedded && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL))));
                 button.putClientProperty("Jasper.button.icon", value.icon().isEmpty() ? null : value.icon());
             }
@@ -66,6 +66,8 @@ final class Buttons {
         /** Content-sized for a host arrangement (ButtonPresentation.EMBEDDED): no minimum height and no resting or hover fill. */
         boolean embedded;
         float disabledOpacity=.42f;
+        /** A severity tinting the glyph at rest and on hover (a favourite's warning star); null takes the kind's text colour. */
+        Nodes.Severity iconSeverity;
         ThemePainting.Focus focus;
         KitButton(KitContext context) { this.context = context; }
         @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
@@ -76,6 +78,10 @@ final class Buttons {
                 case DESTRUCTIVE_GHOST -> hover ? SemanticColor.STATUS_DANGER : SemanticColor.TEXT_SECONDARY;
                 case LINK -> hover ? SemanticColor.TEXT_LINK_HOVER : SemanticColor.TEXT_LINK;
             };
+        }
+        /** The glyph's colour: the severity's (as on a kit Icon) when present, otherwise the text colour. */
+        SemanticColor iconRole(boolean hover) {
+            return iconSeverity == null ? textRole(hover) : Labels.tint(iconSeverity);
         }
         @Override public Dimension getPreferredSize() {
             Dimension size = super.getPreferredSize();
@@ -115,7 +121,7 @@ final class Buttons {
                     // Re-tint the same named icon for hover without altering component identity.
                     String name = null;
                     if (getClientProperty("Jasper.button.icon") instanceof String value) name = value;
-                    javax.swing.Icon artwork = name == null ? getIcon() : context.icons().icon(name, context.theme().semantic(), textRole(hover), getIcon().getIconWidth());
+                    javax.swing.Icon artwork = name == null ? getIcon() : context.icons().icon(name, context.theme().semantic(), iconRole(hover), getIcon().getIconWidth());
                     artwork.paintIcon(this, g, icon.x, icon.y);
                 }
                 if (clipped != null) g.drawString(clipped, text.x, text.y + g.getFontMetrics().getAscent());

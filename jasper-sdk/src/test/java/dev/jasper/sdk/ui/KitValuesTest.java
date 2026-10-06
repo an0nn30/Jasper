@@ -68,6 +68,10 @@ class KitValuesTest {
         assertThat(new MenuButton("m", ControlState.READY, "More", "", ButtonKind.LINK, "", List.of(new MenuItem("i", "I", "", "i", true, false)), "").presentation())
             .isEqualTo(ButtonPresentation.STANDARD);
         assertThatThrownBy(() -> new Button("b", ControlState.READY, "Open", "", ButtonKind.LINK, "open", "", null)).isInstanceOf(NullPointerException.class);
+        assertThat(new Button("b", ControlState.READY, "", "star", ButtonKind.GHOST, "fav", "Favourite", ButtonPresentation.EMBEDDED).iconSeverity()).isEmpty();
+        assertThat(new Button("b", ControlState.READY, "", "star.filled", ButtonKind.GHOST, "fav", "Favourite", ButtonPresentation.EMBEDDED, Optional.of(Severity.WARNING)).iconSeverity())
+            .hasValue(Severity.WARNING);
+        assertThatThrownBy(() -> new Button("b", ControlState.READY, "", "star", ButtonKind.GHOST, "fav", "Favourite", ButtonPresentation.EMBEDDED, null)).isInstanceOf(NullPointerException.class);
     }
     /** Plan 2 Task 8-kit: row tooltips, list Enter and Delete actions and pending switches, with their defaults. */
     @Test void remoteRowCapabilitiesAreValidatedAndDefaultToNone() {

@@ -68,13 +68,24 @@ public final class Nodes {
      */
     public enum ButtonPresentation { STANDARD, EMBEDDED }
 
-    public record Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation) implements Node {
+    /**
+     * A present {@code iconSeverity} tints the button's glyph with that severity's colour (as {@link Icon#severity()}
+     * does) at rest and on hover, instead of the kind's text colour; for example a favourite's warning star. The label
+     * keeps the kind's colour.
+     */
+    public record Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation,
+                         Optional<Severity> iconSeverity) implements Node {
         public Button {
             ModelChecks.id(id); Objects.requireNonNull(state);
             ModelChecks.button(label, icon, tooltip);
             Objects.requireNonNull(kind);
             ModelChecks.label(action, "action");
             Objects.requireNonNull(presentation);
+            Objects.requireNonNull(iconSeverity);
+        }
+        /** A button whose glyph takes its kind's colour. */
+        public Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation) {
+            this(id, state, label, icon, kind, action, tooltip, presentation, Optional.empty());
         }
         public Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip) {
             this(id, state, label, icon, kind, action, tooltip, ButtonPresentation.STANDARD);

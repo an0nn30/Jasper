@@ -141,7 +141,8 @@ Remote row capabilities (Plan 2 Task 8-kit): item-list rows and table rows carry
 passive content; item lists report a plain left click as `Clicked` (not RESULTS lists or headings) and can give Enter
 and Delete/Backspace their own actions (`enterAction`, `deleteAction`), so Enter and a double click can differ; a row's
 own buttons and switches report only their intent; `Toggle.pending` shows an operable midway switch on the warning
-colour while the domain confirms a change; and the glyph vocabulary gains `star` and `star.filled`.
+colour while the domain confirms a change; `Button.iconSeverity` tints a button's glyph with a severity colour (a
+favourite's warning star); and the glyph vocabulary gains `star` and `star.filled`.
 
 Palette capabilities (Plan 2 Task 6b-2): `ListItem.heading` is a title-only section row (never selected, activated,
 hovered or given a menu; a hairline opens every heading after the first); `ListKind.RESULTS` is the one-line result
