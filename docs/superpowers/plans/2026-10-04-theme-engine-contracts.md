@@ -417,9 +417,10 @@ version unchanged, Task 11 freezes it). Each record change keeps every prior con
   is what Escape runs in the field. Blank passes either key on. `Field.listId` names an `ItemList` in the same view
   (validated by `ViewSpec`): Up/Down (and the keypad arrows) move its keyboard row one selectable row, Page Up/Page Down
   by the rows its viewport shows, clamped at the ends, selecting it (`Selected`) and keeping it in view while the
-  focus stays in the field; Enter stays `trailingAction`. Without a mounted, interactive list the keys pass on. The
-  list keys sit in the field's own input map only while `listId` is set (fix round 1): an entry there, even a disabled
-  one, would hide the look and feel's binding for the key (FlatLaf's macOS Up/Down caret moves). No kit key with a
+  focus stays in the field; Enter stays `trailingAction`. The list keys sit in the field's own input map only while
+  `listId` is set (fix round 1): an entry there, even a disabled one, would hide the look and feel's binding for the key
+  (FlatLaf's macOS Up/Down caret moves). While the named list is hidden, disabled, busy or inside a hidden container, or
+  the field is inactive, each list key runs the look and feel's own binding for it, as in a plain field (Task 9a). No kit key with a
   blank action may shadow a look and feel binding (`KitKeyBindingAuditTest`, FlatLaf installed, every field kind,
   secrets and every gallery fixture); a NUMBER field's live arrow keys are the one intended override. A
   TEXTAREA takes neither `alternateAction` nor `listId`; a NUMBER field (whose arrows step it) takes no `listId`.

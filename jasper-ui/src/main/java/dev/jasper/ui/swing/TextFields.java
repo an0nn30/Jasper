@@ -113,7 +113,9 @@ final class TextFields {
         /**
          * Installs the list keys only while the field names a list, and removes them otherwise: an entry in the field's own
          * map, even a disabled one, would hide the look and feel's binding for the same key (FlatLaf's macOS Up/Down caret
-         * moves to the line's start and end) and let the key reach an ancestor instead.
+         * moves to the line's start and end) and let the key reach an ancestor instead. While the named list is hidden,
+         * disabled, busy or inside a hidden container (or the field itself is inactive), each key runs the look and feel's
+         * own binding for it, so the field behaves exactly as a plain one.
          */
         private void listKeys(boolean wanted) {
             if (wanted == listKeys) return;
@@ -123,21 +125,47 @@ final class TextFields {
                 if (!wanted) { input.getInputMap(JComponent.WHEN_FOCUSED).remove(key); input.getActionMap().remove(name); continue; }
                 input.getInputMap(JComponent.WHEN_FOCUSED).put(key, name);
                 input.getActionMap().put(name, new AbstractAction() {
-                    @Override public boolean isEnabled() { return !closed && interactive() && list() != null; }
+                    @Override public boolean isEnabled() {
+                        if (closed) return false;
+                        if (moving() != null) return true;
+                        var fallback = lookAndFeel(key); return fallback != null && fallback.isEnabled();
+                    }
                     @Override public void actionPerformed(java.awt.event.ActionEvent event) {
-                        var rows = list(); if (!isEnabled() || rows == null) return;
-                        int delta = move.getValue();
-                        rows.follow(Math.abs(delta) == 2 ? Integer.signum(delta) * rows.page() : delta);
+                        if (closed) return;
+                        var rows = moving();
+                        if (rows != null) {
+                            int delta = move.getValue();
+                            rows.follow(Math.abs(delta) == 2 ? Integer.signum(delta) * rows.page() : delta);
+                            return;
+                        }
+                        var fallback = lookAndFeel(key);
+                        if (fallback != null && fallback.isEnabled()) fallback.actionPerformed(event);
                     }
                 });
             }
         }
-        /** The interactive item list this field's arrow keys move, or null. */
+        /** The list this field's keys move now: the field is active and its list resolves; otherwise null. */
+        private InteractiveRows.RowsControl moving() { return interactive() ? list() : null; }
+        /** The look and feel's own action for {@code key} on this input (from its parent maps), or null when it binds none. */
+        private javax.swing.Action lookAndFeel(KeyStroke key) {
+            var parent = input.getInputMap(JComponent.WHEN_FOCUSED).getParent();
+            Object name = parent == null ? null : parent.get(key);
+            return name == null ? null : input.getActionMap().get(name);
+        }
+        /** The interactive, mounted item list this field's arrow keys move, or null. */
         private InteractiveRows.RowsControl list() {
             String id = ((Nodes.Field)node).listId();
             if (id.isBlank()) return null;
             var control = view.controlOrNull(id);
-            return control instanceof ItemLists.ListControl rows && rows.interactive() ? rows : null;
+            return control instanceof ItemLists.ListControl rows && rows.interactive() && mounted(rows.component) ? rows : null;
+        }
+        /** Whether the component and every container above it, up to this view, is visible: no hidden ancestor holds it. */
+        private boolean mounted(java.awt.Component component) {
+            for (var at = component; at != null; at = at.getParent()) {
+                if (!at.isVisible()) return false;
+                if (at == view) return true;
+            }
+            return false;
         }
         /** Arrow keys step a NUMBER field by its step, clamped to its bounds; the edit reaches the host like typing. */
         private void bindStep(String stroke, int direction) {

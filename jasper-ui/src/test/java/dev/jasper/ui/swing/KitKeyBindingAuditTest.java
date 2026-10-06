@@ -107,6 +107,54 @@ class KitKeyBindingAuditTest {
         });
     }
 
+    static ViewSpec picker(ControlState listState, ControlState holderState) {
+        var items = new ArrayList<ListItem>();
+        for (int i = 0; i < 5; i++) items.add(new ListItem("l" + i, Optional.empty(), List.of(new Text("l" + i + ".name", READY, "Language " + i, TextRole.BODY)), List.of(), List.of()));
+        var filter = new Field("filter", READY, FieldKind.SEARCH, "", "Filter", "Filter", "choose", Optional.empty(), FieldPresentation.STANDARD, "", "", "languages");
+        var list = new ItemList("languages", listState, ListKind.SINGLE, items, Set.of("l0"), "choose", List.of());
+        return new ViewSpec(new Stack("root", READY, LayoutRole.VERTICAL, List.of(filter, new Stack("holder", holderState, LayoutRole.VERTICAL, List.of(list)))));
+    }
+
+    /**
+     * Plan 2 Task 9a carried fix: a field that names a list which is hidden, disabled, busy or inside a hidden container
+     * gives every list key to the look and feel, exactly as a plain field does, and takes them back when the list returns.
+     */
+    @Test void aFieldWhoseListIsHiddenDisabledOrUnmountedLeavesEveryListKeyToTheLookAndFeel() {
+        withFlatLaf(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            var hidden = new ControlState(false, true, false, ""); var disabled = new ControlState(true, false, false, ""); var busy = new ControlState(true, true, true, "");
+            try (var view = new KitView(context, picker(READY, READY), events::add)) {
+                view.setSize(300, 300); InteractiveRowsTest.layout(view);
+                var input = editor(view, "filter");
+                var states = new LinkedHashMap<String, ViewSpec>();
+                states.put("hidden list", picker(hidden, READY));
+                states.put("disabled list", picker(disabled, READY));
+                states.put("busy list", picker(busy, READY));
+                states.put("list in a hidden container", picker(READY, hidden));
+                for (var state : states.entrySet()) {
+                    view.update(state.getValue()); InteractiveRowsTest.layout(view); events.clear();
+                    for (int code : new int[] {KeyEvent.VK_UP, KeyEvent.VK_DOWN, KeyEvent.VK_KP_UP, KeyEvent.VK_KP_DOWN, KeyEvent.VK_PAGE_UP, KeyEvent.VK_PAGE_DOWN}) {
+                        var plain = new JTextField();
+                        assertThat(outcome(input, code, 0)).as("%s: %s as a plain field", state.getKey(), KeyEvent.getKeyText(code))
+                            .isEqualTo(outcome(plain, code, 0));
+                    }
+                    assertThat(events).as("%s: the list never moved", state.getKey()).noneMatch(UiEvent.Selected.class::isInstance);
+                    var own = input.getInputMap(JComponent.WHEN_FOCUSED);
+                    for (KeyStroke stroke : own.keys()) {
+                        if (own.getParent().get(stroke) == null) continue;
+                        if ("notify-field-accept".equals(own.getParent().get(stroke))) continue;
+                        var action = input.getActionMap().get(own.get(stroke));
+                        assertThat(action != null && action.isEnabled()).as("%s: %s is live, not a dead shadow", state.getKey(), stroke).isTrue();
+                    }
+                }
+                view.update(picker(READY, READY)); InteractiveRowsTest.layout(view); events.clear();
+                input.setCaretPosition(0);
+                assertThat(SwingUtilities.processKeyBindings(key(input, KeyEvent.VK_DOWN, 0))).isTrue();
+                assertThat(events).as("the list keys come back with the list").containsExactly(new UiEvent.Selected("languages", Set.of("l1")));
+            } finally { release(context); }
+        });
+    }
+
     @Test void noBlankKitKeyHidesALookAndFeelBindingOnAnyFieldKindOrSecret() {
         withFlatLaf(() -> {
             var context = KitFixtures.context();
