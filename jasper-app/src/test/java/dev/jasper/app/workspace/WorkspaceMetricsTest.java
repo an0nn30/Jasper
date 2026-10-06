@@ -26,7 +26,8 @@ class WorkspaceMetricsTest {
             DesignMetrics.Role.TAB_CLOSE_TRAILING, 6, DesignMetrics.Role.TAB_DIVIDER, 1, DesignMetrics.Role.TAB_REORDER_THRESHOLD, 5));
         expected.putAll(Map.of(DesignMetrics.Role.STATUS_RUNNING_DOT, 5, DesignMetrics.Role.STATUS_PROGRESS_BAR_HEIGHT, 8,
             DesignMetrics.Role.STATUS_PROGRESS_MIN_HEIGHT, 24, DesignMetrics.Role.TOOL_HEADER_LEADING_PADDING, 10,
-            DesignMetrics.Role.TOOL_HEADER_TRAILING_PADDING, 6));
+            DesignMetrics.Role.TOOL_HEADER_TRAILING_PADDING, 6, DesignMetrics.Role.TOOL_HEADER_DETAIL_GAP, 6,
+            DesignMetrics.Role.TOOL_HEADER_ACTIVE_DOT, 6));
         expected.putAll(Map.of(DesignMetrics.Role.RAIL_BUTTON_ARC, 10, DesignMetrics.Role.NATIVE_TOOLBAR_HOVER_ARC, 6,
             DesignMetrics.Role.NATIVE_TOOLBAR_DISABLED_PERCENT, 38, DesignMetrics.Role.RAIL_BADGE_DOT, 6,
             DesignMetrics.Role.FIND_GAP, 6, DesignMetrics.Role.FIND_SIDE_PADDING, 6, DesignMetrics.Role.FIND_CONTROL_GAP, 4,
@@ -61,7 +62,8 @@ class WorkspaceMetricsTest {
             "StatusProgressView.java", List.of("STATUS_PROGRESS_BAR_HEIGHT", "STATUS_PROGRESS_MIN_HEIGHT"),
             "WindowTabs.java", List.of("TAB_REVEAL_INSET", "TAB_CLOSE_FIT_WIDTH", "TAB_CLOSE_GUTTER", "TAB_COMPACT_GUTTER",
                 "TAB_CLOSE_WIDTH", "TAB_CLOSE_TRAILING", "TAB_DIVIDER", "TAB_REORDER_THRESHOLD"),
-            "ToolWindowHeader.java", List.of("TOOL_HEADER_LEADING_PADDING", "TOOL_HEADER_TRAILING_PADDING"));
+            "ToolWindowHeader.java", List.of("TOOL_HEADER_LEADING_PADDING", "TOOL_HEADER_TRAILING_PADDING",
+                "TOOL_HEADER_DETAIL_GAP", "TOOL_HEADER_ACTIVE_DOT"));
         for (var entry : required.entrySet())
             assertThat(Files.readString(workspace.resolve(entry.getKey()))).as(entry.getKey()).contains(entry.getValue());
     }

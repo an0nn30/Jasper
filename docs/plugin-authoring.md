@@ -180,7 +180,8 @@ Since SDK 0.14.2, call `host.setHeader(new PanelHeader(detail, active, actions))
 factory or when its model changes. `detail` is a count or connection name; `active` adds a status dot.
 Each `PanelHeader.Action(label, icon, callback)` is an icon-only header button with an accessible name
 and tooltip. Keep callbacks scoped to that factory's window. Header state survives hiding and moving
-the panel, and callbacks become inert when the instance closes. Use `PanelHeader.EMPTY` to clear it;
+the panel, and callbacks become inert when the instance closes. It works the same for a kit `Panel` view
+registered with `registerView`: the detail, dot and actions join that panel's own header row. Use `PanelHeader.EMPTY` to clear it;
 do not add a duplicate action row inside the panel. Declare `sdk = ">=0.14.2, <0.15"` when using it.
 
 A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window

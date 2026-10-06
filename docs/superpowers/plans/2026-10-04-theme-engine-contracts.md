@@ -439,6 +439,7 @@ public void setAvailableHeight(int logicalPixels);
 public void registerContent(String id, JComponent component, AutoCloseable lifetime);
 public JComponent panelHeader(String panelId);
 public void setPanelHostActions(String panelId, List<Nodes.Button> actions, Consumer<UiEvent> events);
+public void setPanelHostHeader(String panelId, PanelHostHeader header); // Task 6d (post-merge)
 public void close();
 ```
 
@@ -472,6 +473,20 @@ The two panel-header methods are module/app integration only and are not project
 does not transfer ownership. Host actions occupy reserved header slots and use their separate callback.
 For a mounted kit Panel, app ToolWindowSurface suppresses its old outer header and attaches host
 placement/collapse/drag behavior to this header. Exactly one title/count/action row is visible.
+
+Task 6d (post-merge, 2026-10-05): `setPanelHostHeader` is the third module/app panel-header method, also not
+projected into UiView. `UI/swing/PanelHostHeader.java` is
+`public record PanelHostHeader(String detail, boolean active, List<Action> actions)` with `EMPTY` and
+`record Action(String label, javax.swing.Icon icon, Runnable invoke)` (nonblank label, non-null icon and callback;
+the list is copied). The header shows the detail after the title and count (COUNT typography, TEXT_SECONDARY), a
+`STATUS_DOT`-sized dot before it when active (`SurfaceContrast.on(STATUS_SUCCESS, SURFACE_PANEL, INDICATOR)`), and
+icon-only GHOST panel-action buttons with the host's artwork first in the host slot, before the `setPanelHostActions`
+buttons (native order: contributed, Options, Hide). Controls are kept by position; each activation runs the current
+description's action once; failures go to the view's failure reporter. `EMPTY` clears; a replacement header starts
+empty; view close releases. ToolWindowArea translates app `PanelHeaderState` (itself translated from SDK
+`PanelHeader` in `app.plugins.HostedUi`) into it, keeps it while hidden, applies it when it borrows a header and
+clears it with the host actions on hide/replace/remove/close. `ContractHarness` gains `panelHeader`,
+`runPanelHeaderAction` and `closePanel` (fake: `FakePluginHost.closePanel`) for the shared contract test; no SDK change.
 
 The SDK mirrors Nodes/support records/ViewSpec/UiEvent in `dev.jasper.sdk.ui`, without module imports.
 `UiView extends Subscription` exposes update/spec/withSecret/clearSecret/replaceSecret/focus and typed content

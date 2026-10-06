@@ -151,6 +151,15 @@ glyph buttons for a host arrangement); body, description and caption text flows 
 no wider than `TEXT_FLOW_COLUMNS`) in vertical stacks, form bodies, cards and sections; and an app host can mount a
 pointer-only `KitView` whose controls never take keyboard focus (not part of the plugin SDK).
 
+Borrowed panel headers (Plan 2 Task 6d): a native host that borrows a kit Panel's header (`panelHeader`) adds its
+placement/collapse buttons with `setPanelHostActions` and its own header metadata with `setPanelHostHeader`
+(`PanelHostHeader`: a detail after the title and count in the count role, an optional connected dot (the success
+status held to the indicator floor on the panel surface), and icon-only actions with host-supplied artwork). The row
+order mirrors a native tool window header: title, count, detail; the panel's own header actions; the host's
+contributed actions; the host's placement/collapse actions. Metadata controls are kept by position across refreshes
+and descriptor updates; `PanelHostHeader.EMPTY` clears them; a replacement header starts empty; closing the view
+releases them. Host integration only, not part of the plugin SDK (plugins reach it through `PanelHost.setHeader`).
+
 See [maintenance](ui-maintenance.md), [calibration evidence](design/theme-engine/calibration.md),
 [module entry point](../jasper-ui/README.md) and [SDK architecture](sdk-architecture.md).
 

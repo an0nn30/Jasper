@@ -406,10 +406,14 @@ raw (they need real design work) with these exact owners. Every path below has a
 |---|---|---|
 | `jasper-sdk/src/main/java/dev/jasper/sdk/ui/PanelHeader.java` (SDK 0.14.2, main's bump kept) | `Action.icon` is a raw `javax.swing.Icon` | Task 11 (0.15 cutover) replaces raw SDK icons |
 | `jasper-app/src/main/java/dev/jasper/app/contributions/PanelHeaderState.java` | carries the raw action icons to the native header | Task 11 with `PanelHeader` |
-| `jasper-app/src/main/java/dev/jasper/app/workspace/ToolWindowArea.java` (`setHeader`) | a borrowed kit panel header does not show `PanelHeader` detail, connected dot or actions (the native `ToolWindowHeader` does, on module roles) | Task 6d (post-merge): project `PanelHeader` onto kit headers or rule that kit panels use their `Panel` node |
+| `jasper-app/src/main/java/dev/jasper/app/workspace/WindowTabs.java` (`surface(boolean)`) | the tab surface blend toward white/black: selected `.035` dark / `.12` light, unselected `.3` dark / `.06` light (main's values, following the branch's former `shade` precedent) | Plan 3 Task 10 (tab surface composition becomes module roles) |
 | `plugins/remote/src/main/java/dev/jasper/remote/ui/PanelStyle.java`, `ui/tunnels/TunnelSwitch.java` and the redesigned `HostsPanel`/`SftpPanel`/`TunnelsPanel` | `UIManager.getFont("Label.font")`, fixed accent colours `0x3274f6`/`0x2467de`, custom-painted switch | Task 8 |
 | `plugins/fileserver/src/main/java/dev/jasper/fileserver/ui/PanelStyle.java`, `ui/RowArtwork.java`, `ui/ProtocolChip.java` and FS-3/FS-4 `ServerEditor` additions | the same raw font/accent reads and painted chips/artwork | Task 10 |
 | `plugins/indexer/src/main/java/dev/jasper/indexer/ui/IndexerSettingsPanel.java`, `ui/FilesScope.java`, `IndexerPlugin.java` (Project Index, eighth bundled plugin) | raw Swing settings page; palette rows with raw SDK icons | Task 10 (Task 11 for the SDK icon path) |
+
+Resolved by Task 6d (post-merge), 2026-10-05: `ToolWindowArea.setHeader` now shows `PanelHeader` detail, connected
+dot and actions on a borrowed kit panel header through the module's host-only `KitView.setPanelHostHeader`
+(`PanelHostHeader`); the former row for that gap is closed. The raw action icons remain Task 11's (rows above).
 
 Re-bound in the merge (no temporary path): `WindowTabs` (main's equal-width tabs on module roles and named `TAB_*`
 metrics), `ToolWindowHeader` (main's detail/dot/actions on module roles), `NotificationGroupsEditor` (main's

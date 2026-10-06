@@ -65,6 +65,19 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: invokes the panel's factory as a window showing it would; null when there is no such panel or the factory failed. */
     javax.swing.JComponent openPanel(String panelId, java.util.UUID windowId);
 
+    /**
+     * UI thread: the header metadata an open panel instance published through {@code PanelHost.setHeader}, as
+     * {@code detail|active|label;label} with {@code -} for no actions; {@code |false|-} when it published none or no
+     * instance is open.
+     */
+    String panelHeader(String panelId, java.util.UUID windowId);
+
+    /** UI thread: activates the labelled header action of an open panel instance as its header would; false when there is none. */
+    boolean runPanelHeaderAction(String panelId, java.util.UUID windowId, String label);
+
+    /** UI thread: discards an open panel instance as its window would when the window or registration goes away. */
+    void closePanel(String panelId, java.util.UUID windowId);
+
     /** Rail buttons as action ids in placement order; buttons of closed actions omitted. */
     List<String> rail();
 

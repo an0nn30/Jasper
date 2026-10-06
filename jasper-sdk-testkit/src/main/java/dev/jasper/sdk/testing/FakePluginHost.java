@@ -827,6 +827,21 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
+     * Discards an open panel instance as its window would when the window closes: its header clears, retained header
+     * callbacks become inert and its close handlers run. Nothing happens when no such instance is open.
+     *
+     * @param panelId panel identifier
+     * @param windowId owning window
+     */
+    public void closePanel(String panelId, UUID windowId) {
+        for (var context : contexts.values()) for (var panel : context.ui.panels) {
+            if (!panel.spec.id().equals(panelId)) continue;
+            var instance = panel.instances.remove(windowId);
+            if (instance != null) instance.close();
+        }
+    }
+
+    /**
      * Invokes a panel's factory as a window showing it would. A factory failure is recorded.
      *
      * @param panelId the panel to build

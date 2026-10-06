@@ -103,6 +103,168 @@ class ToolWindowKitPanelTest {
         }
     }
 
+    private static final Icon ARTWORK = new Icon() {
+        @Override public int getIconWidth() { return 16; }
+        @Override public int getIconHeight() { return 16; }
+        @Override public void paintIcon(java.awt.Component c, java.awt.Graphics g, int x, int y) { g.fillRect(x, y, 16, 16); }
+    };
+
+    private static dev.jasper.app.contributions.PanelHeaderState metadata(String detail, boolean active, List<String> calls, String... labels) {
+        var actions = new ArrayList<dev.jasper.app.contributions.PanelHeaderState.Action>();
+        for (String label : labels) actions.add(new dev.jasper.app.contributions.PanelHeaderState.Action(label, ARTWORK, () -> calls.add(label + ":" + detail)));
+        return new dev.jasper.app.contributions.PanelHeaderState(detail, active, actions);
+    }
+
+    private static AbstractButton button(java.awt.Container root, String name) {
+        return buttons(root).stream().filter(b -> name.equals(b.getAccessibleContext().getAccessibleName())).findFirst().orElse(null);
+    }
+
+    private static JLabel detail(java.awt.Container root) {
+        for (var child : root.getComponents()) {
+            if (child instanceof JLabel label && label.getName() != null && label.getName().endsWith(".host-detail")) return label;
+            if (child instanceof java.awt.Container nested) { var found = detail(nested); if (found != null) return found; }
+        }
+        return null;
+    }
+
+    private static java.awt.Color dot(JLabel detail) {
+        var icon = detail.getIcon();
+        var image = new java.awt.image.BufferedImage(icon.getIconWidth() + 2, icon.getIconHeight() + 2, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { icon.paintIcon(detail, g, 0, 0); } finally { g.dispose(); }
+        return new java.awt.Color(image.getRGB(icon.getIconWidth() / 2, icon.getIconHeight() / 2), true);
+    }
+
+    /** SDK 0.14.2 PanelHost.setHeader on a kit panel: main's native header detail, dot and actions in the one borrowed row. */
+    @Test void panelHeaderMetadataShowsInTheBorrowedKitHeaderBeforeTheHostActions() {
+        ThemeManager.install(Theme.DARK);
+        var theme = ThemeManager.generated(Theme.DARK);
+        try (var bindings = new AppearanceBindings(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }, () -> false);
+             var view = new KitView(bindings.context(ThemeRoute.CHROME), spec(), event -> { throw new AssertionError("Header action leaked"); })) {
+            var area = new ToolWindowArea(new JPanel(), new DockState());
+            var calls = new ArrayList<String>();
+            String id = DockTestSupport.id(Slot.LEFT_TOP);
+            area.setHeader(id, metadata("prod", true, calls, "New session", "Import sessions"));
+            DockTestSupport.show(area, Slot.LEFT_TOP, view, 250);
+            var header = view.panelHeader("panel");
+            assertThat(area.headerOf(Slot.LEFT_TOP)).as("no native header beside the borrowed one").isNull();
+            assertThat(texts(area, "Hosts")).as("one title row").hasSize(1);
+            assertThat(texts(area, "prod")).as("one detail").hasSize(1);
+            assertThat(texts(header, "prod")).as("the detail is in the borrowed header").hasSize(1);
+            var palette = bindings.context(ThemeRoute.CHROME).theme().semantic();
+            var detail = detail(header);
+            assertThat(detail.getForeground()).isEqualTo(palette.color(SemanticColor.TEXT_SECONDARY));
+            assertThat(dot(detail)).isEqualTo(SurfaceContrast.on(palette, SemanticColor.STATUS_SUCCESS, SemanticColor.SURFACE_PANEL, SurfaceContrast.INDICATOR));
+            assertThat(buttons(header)).extracting(b -> b.getAccessibleContext().getAccessibleName())
+                .containsExactly("New session", "Import sessions", "Options", "Hide");
+            var created = button(header, "New session");
+            assertThat(created.isFocusable()).isTrue();
+            assertThat(created.getIcon()).isSameAs(ARTWORK);
+            created.doClick();
+            assertThat(calls).as("invoked once").containsExactly("New session:prod");
+
+            area.setHeader(id, metadata("staging", false, calls, "New session", "Import sessions"));
+            assertThat(button(header, "New session")).as("a refresh keeps the control").isSameAs(created);
+            assertThat(detail.getText()).isEqualTo("staging");
+            assertThat(detail.getIcon()).isNull();
+            created.doClick();
+            assertThat(calls).containsExactly("New session:prod", "New session:staging");
+
+            area.setHeader(id, dev.jasper.app.contributions.PanelHeaderState.EMPTY);
+            assertThat(buttons(header)).extracting(AbstractButton::getToolTipText).containsExactly("Options", "Hide");
+            assertThat(detail.isVisible()).isFalse();
+            assertThat(created.getActionListeners()).isEmpty();
+            created.doClick();
+            assertThat(calls).hasSize(2);
+            area.close();
+        }
+    }
+
+    @Test void panelHeaderMetadataIsReleasedOnHideReappliedOnReshowAndReplacementAndClearedOnClose() {
+        ThemeManager.install(Theme.DARK);
+        var theme = ThemeManager.generated(Theme.DARK);
+        try (var bindings = new AppearanceBindings(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }, () -> false);
+             var view = new KitView(bindings.context(ThemeRoute.CHROME), spec(), event -> {})) {
+            var area = new ToolWindowArea(new JPanel(), new DockState());
+            var calls = new ArrayList<String>();
+            String id = DockTestSupport.id(Slot.LEFT_TOP);
+            DockTestSupport.show(area, Slot.LEFT_TOP, view, 250);
+            area.setHeader(id, metadata("3", false, calls, "New session"));
+            var header = view.panelHeader("panel");
+            var first = button(header, "New session");
+            assertThat(first).as("metadata set while showing reaches the borrowed header").isNotNull();
+
+            DockTestSupport.hide(area, Slot.LEFT_TOP);
+            assertThat(buttons(header)).as("hiding releases host and header actions").isEmpty();
+            assertThat(first.getActionListeners()).isEmpty();
+            assertThat(detail(header).isVisible()).isFalse();
+            area.setHeader(id, metadata("4", true, calls, "New session"));
+            assertThat(buttons(header)).as("metadata is retained, not shown, while hidden").isEmpty();
+
+            DockTestSupport.show(area, Slot.LEFT_TOP, view, 250);
+            area.sync(); area.sync();
+            assertThat(buttons(header)).extracting(b -> b.getAccessibleContext().getAccessibleName())
+                .containsExactly("New session", "Options", "Hide");
+            assertThat(detail(header).getText()).isEqualTo("4");
+            button(header, "New session").doClick();
+            assertThat(calls).containsExactly("New session:4");
+
+            view.update(spec("replacement", "replacement-header"));
+            var replacement = view.panelHeader("replacement");
+            assertThat(buttons(replacement)).extracting(b -> b.getAccessibleContext().getAccessibleName())
+                .as("a replacement header is borrowed with the metadata").containsExactly("New session", "Options", "Hide");
+            assertThat(texts(area, "4")).hasSize(1);
+            var current = button(replacement, "New session");
+            current.doClick();
+            assertThat(calls).hasSize(2);
+
+            area.removeContent(id);
+            area.sync();
+            assertThat(buttons(replacement)).isEmpty();
+            assertThat(current.getActionListeners()).isEmpty();
+            area.setContent(id, "Hosts", view);
+            area.sync();
+            assertThat(buttons(replacement)).as("removed content forgets its metadata").extracting(AbstractButton::getToolTipText)
+                .containsExactly("Options", "Hide");
+
+            area.setHeader(id, metadata("5", false, calls, "New session"));
+            var last = button(replacement, "New session");
+            view.close();
+            area.setHeader(id, metadata("6", false, calls, "New session"));
+            area.sync();
+            area.close();
+            assertThat(last.getActionListeners()).isEmpty();
+            last.doClick();
+            assertThat(calls).hasSize(2);
+        }
+    }
+
+    @Test void aThemeChangeRestylesTheBorrowedHeaderDetailAndKeepsItsActions() {
+        ThemeManager.install(Theme.DARK);
+        var dark = ThemeManager.generated(Theme.DARK);
+        var light = ThemeManager.generated(Theme.JASPER_LIGHT);
+        try (var bindings = new AppearanceBindings(new ThemePair(dark, dark), failure -> { throw new AssertionError(failure); }, () -> false);
+             var view = new KitView(bindings.context(ThemeRoute.CHROME), spec(), event -> {})) {
+            var area = new ToolWindowArea(new JPanel(), new DockState());
+            var calls = new ArrayList<String>();
+            String id = DockTestSupport.id(Slot.LEFT_TOP);
+            area.setHeader(id, metadata("prod", true, calls, "New session"));
+            DockTestSupport.show(area, Slot.LEFT_TOP, view, 250);
+            var header = view.panelHeader("panel");
+            var created = button(header, "New session");
+            bindings.binding().publish(new ThemePair(light, light));
+            area.refreshTheme();
+            var palette = light.semantic();
+            var detail = detail(header);
+            assertThat(detail.getForeground()).isEqualTo(palette.color(SemanticColor.TEXT_SECONDARY));
+            assertThat(dot(detail)).isEqualTo(SurfaceContrast.on(palette, SemanticColor.STATUS_SUCCESS, SemanticColor.SURFACE_PANEL, SurfaceContrast.INDICATOR));
+            assertThat(button(header, "New session")).isSameAs(created);
+            created.doClick();
+            assertThat(calls).containsExactly("New session:prod");
+            area.close();
+        }
+    }
+
     private static List<JComponent> texts(java.awt.Container root, String text) {
         var result = new ArrayList<JComponent>();
         for (var child : root.getComponents()) {

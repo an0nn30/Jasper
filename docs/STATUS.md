@@ -2,6 +2,29 @@
 
 ## Current state — 2026-10-05
 
+- **Theme engine Plan 2 Task 6d (post-merge) implemented: SDK `PanelHeader` on borrowed kit panel headers; review
+  pending** (2026-10-05). A plugin that mounts a kit `Panel` view and calls `PanelHost.setHeader` now gets main's
+  native-header result in the panel's one header row: the detail after the title and count (count role), the connected
+  dot before it (success status floored to 3:1 on the panel surface), and its icon actions (focusable, run once, kept
+  across refreshes) after the panel's own header actions and before Options/Hide, as the native header orders them.
+  Module host-only `KitView.setPanelHostHeader` / `PanelHostHeader` (not in the SDK); `ToolWindowArea` translates the
+  app's `PanelHeaderState`, keeps it while hidden, re-applies it on re-show and on a replacement header, and clears it
+  with the host actions on hide, replace, remove and close (once). Shared contract test on host and fake (new harness
+  `panelHeader`/`runPanelHeaderAction`/`closePanel`, fake `FakePluginHost.closePanel`); SDK version unchanged. Tasks 8
+  and 10 now carry the acceptance item that converted Hosts/SFTP/Tunnels/File Servers panels keep their count,
+  connected dot and New/Import actions through `setHeader`. Merge-review minors: `PanelHeaderState` CSV owner `6;11`,
+  `WorkspaceMetricsTest` pins `TOOL_HEADER_DETAIL_GAP`/`TOOL_HEADER_ACTIVE_DOT`, `WindowTabs.surface()` blend constants
+  in the temporary ledger (Plan 3 Task 10). Gate in `.superpowers/sdd/2026-10-04-theme-engine-2-consumer-migration/task-6d-report.md`.
+  GUI checks for the user (theme engine branch, from the main merge and Task 6d):
+  - connected dot hue in an SSH SFTP panel header: the theme's success colour, not main's fixed green `0x38ba54`;
+  - folder-tab close icons tinted with the terminal palette foreground (differs from main when the terminal palette
+    differs from the UI theme); the hovered close glyph is the same artwork;
+  - tool window header detail (session count, connection name) in the secondary text colour, not
+    `Label.disabledForeground`;
+  - Settings › Notifications groups editor: kit form rows (id in the caption, no Group/From/Shows column headings);
+  - once Tasks 8/10 convert the panels: a kit panel's header shows the count/connection, dot and New/Import actions in
+    one row before Options and Hide, with the dot-to-text gap the kit's 6 px icon gap (native header: 4 px).
+
 - **Merged main (`d3455d47`) into the theme engine branch** (2026-10-05). Main's Project Index plugin (eighth bundled
   plugin, `plugins/indexer`), File Server FS-3/FS-4 (SFTP/TFTP), Alacritty-style equal-width workspace tabs, SDK
   `PanelHeader`/`PanelHost.setHeader` (SDK 0.14.2, main's bump kept), notification-groups settings, bundled Cousine

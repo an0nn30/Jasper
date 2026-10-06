@@ -63,6 +63,10 @@ final class ToolWindowArea extends JPanel {
         private JComponent content;
         private Runnable releaseHeader = () -> {};
         private JComponent borrowedHeader;
+        /** The tool window this frame shows. */
+        private String id;
+        /** Shows per-window header metadata on this frame's header, native or borrowed; inert once released. */
+        private Consumer<dev.jasper.app.contributions.PanelHeaderState> header = state -> { };
 
         Host(boolean toolWindow) {
             super(new BorderLayout());
@@ -261,14 +265,13 @@ final class ToolWindowArea extends JPanel {
         contents.put(Objects.requireNonNull(id), new Content(Objects.requireNonNull(title), Objects.requireNonNull(component)));
     }
 
+    /**
+     * Per-window header metadata (SDK {@code PanelHeader}, translated at the plugin boundary). It is kept while the window
+     * is hidden and shown on whichever header the frame has: the native header, or a kit panel's borrowed header.
+     */
     void setHeader(String id, dev.jasper.app.contributions.PanelHeaderState header) {
         headers.put(id, Objects.requireNonNull(header));
-        for (Slot slot : Slot.values()) {
-            if (state.active(slot).filter(id::equals).isPresent()) {
-                ToolWindowHeader shown = headerOf(slot);
-                if (shown != null) shown.presentation(header);
-            }
-        }
+        for (Host host : hosts.values()) if (id.equals(host.id)) host.header.accept(header);
     }
 
     void removeContent(String id) { contents.remove(id); headers.remove(id); }
@@ -314,17 +317,20 @@ final class ToolWindowArea extends JPanel {
             }
             if (wanted != null && host == null) {
                 host = new Host(true);
+                host.id = id;
                 host.content = wanted.component();
                 host.borrowedHeader = kitHeader(wanted.component());
                 if (wanted.component() instanceof dev.jasper.ui.swing.KitView view
                         && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Panel panel) {
-                    host.releaseHeader = mountHeader(view, panel.id(), id);
+                    host.releaseHeader = mountHeader(host, view, panel.id(), id);
                 } else {
                     ToolWindowHeader header = header(id, wanted.title());
                     host.add(header, BorderLayout.NORTH);
                     var surfaces = header.dragSurfaces();
                     for (JComponent surface : surfaces) dragSource.accept(surface, id);
-                    host.releaseHeader = () -> surfaces.forEach(releaseDragSource);
+                    host.header = header::presentation;
+                    Host mounted = host;
+                    host.releaseHeader = () -> { mounted.header = state -> { }; surfaces.forEach(releaseDragSource); };
                 }
                 if (wanted.component() instanceof dev.jasper.ui.swing.KitView view) {
                     var release = host.releaseHeader;
@@ -351,8 +357,11 @@ final class ToolWindowArea extends JPanel {
             && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Panel panel ? view.panelHeader(panel.id()) : null;
     }
 
-    /** Borrow only the kit header; the panel and its footer remain owned by the view. */
-    private Runnable mountHeader(dev.jasper.ui.swing.KitView view, String panel, String id) {
+    /**
+     * Borrow only the kit header; the panel and its footer remain owned by the view. Header metadata appears in the
+     * borrowed row as on a native header: detail and dot after the title, contributed actions before Options and Hide.
+     */
+    private Runnable mountHeader(Host host, dev.jasper.ui.swing.KitView view, String panel, String id) {
         var header = view.panelHeader(panel);
         var sources = new java.util.ArrayList<JComponent>();
         collectHeaderSources(header, sources);
@@ -369,13 +378,27 @@ final class ToolWindowArea extends JPanel {
                             slot -> onMove.accept(id, slot), () -> onHide.accept(id)));
                 }
             });
+        // A closed view, or one whose header was replaced (the dock then resyncs), takes no more metadata.
+        java.util.function.BooleanSupplier borrowed = () -> !view.isClosed()
+            && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Panel current
+            && current.id().equals(panel) && view.panelHeader(panel) == header;
+        host.header = state -> { if (borrowed.getAsBoolean()) view.setPanelHostHeader(panel, hostHeader(state)); };
+        host.header.accept(headers.getOrDefault(id, dev.jasper.app.contributions.PanelHeaderState.EMPTY));
         return () -> {
+            host.header = state -> { };
             sources.forEach(releaseDragSource);
             // Plugin disposal can precede removing the dock frame. A closed view has already released its controls.
-            if (!view.isClosed() && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Panel current
-                    && current.id().equals(panel) && view.panelHeader(panel) == header)
+            if (borrowed.getAsBoolean()) {
+                view.setPanelHostHeader(panel, dev.jasper.ui.swing.PanelHostHeader.EMPTY);
                 view.setPanelHostActions(panel, List.of(), event -> {});
+            }
         };
+    }
+
+    /** The module's description of the same metadata; callbacks stay the plugin boundary's guarded, contained ones. */
+    private static dev.jasper.ui.swing.PanelHostHeader hostHeader(dev.jasper.app.contributions.PanelHeaderState state) {
+        return new dev.jasper.ui.swing.PanelHostHeader(state.detail(), state.active(), state.actions().stream()
+            .map(action -> new dev.jasper.ui.swing.PanelHostHeader.Action(action.label(), action.icon(), action.invoke())).toList());
     }
 
     /** The host Options button inside a borrowed header, so the menu opens under it; the header itself otherwise. */

@@ -712,6 +712,59 @@ public abstract class PluginContractTest {
         assertThat(h.panels()).isEmpty();
     }
 
+    /**
+     * PanelHost.setHeader (0.14.2) on a kit (ViewSpec) panel: per-window metadata the host shows in the panel's one
+     * header row, replaced wholesale, cleared by EMPTY, contained when an action fails and ignored after the instance closes.
+     */
+    @Test void aKitPanelsHeaderIsPerWindowReplacedContainedAndIgnoredAfterClose() throws Exception {
+        List<PanelHost> hosts = Collections.synchronizedList(new ArrayList<>());
+        List<String> calls = Collections.synchronizedList(new ArrayList<>());
+        var context = started("test.alpha", Set.of());
+        var icon = new ImageIcon();
+        UUID first = UUID.randomUUID(), second = UUID.randomUUID();
+        javax.swing.SwingUtilities.invokeAndWait(() -> h.ui(() -> {
+            context.panels().registerView(new PanelSpec("test.alpha.hosts", "Hosts", "folder", Anchor.LEFT), host -> {
+                hosts.add(host);
+                host.setHeader(new dev.jasper.sdk.ui.PanelHeader(String.valueOf(hosts.size() + 2), true, List.of(
+                    new dev.jasper.sdk.ui.PanelHeader.Action("New session", icon, () -> calls.add("new")),
+                    new dev.jasper.sdk.ui.PanelHeader.Action("Broken", icon, () -> { throw new IllegalStateException("header failed"); }))));
+                var C = dev.jasper.sdk.ui.ControlState.READY;
+                return context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Panel("hosts", C,
+                    new dev.jasper.sdk.ui.Nodes.Header("hosts-header", C, "Hosts", java.util.OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
+                    Optional.empty(), new dev.jasper.sdk.ui.Nodes.Text("body", C, "Body", dev.jasper.sdk.ui.Nodes.TextRole.BODY), Optional.empty())), e -> { });
+            });
+            assertThat(h.openPanel("test.alpha.hosts", first)).isNotNull();
+            assertThat(h.openPanel("test.alpha.hosts", second)).isNotNull();
+            assertThat(h.panelHeader("test.alpha.hosts", first)).isEqualTo("3|true|New session;Broken");
+            assertThat(h.panelHeader("test.alpha.hosts", second)).isEqualTo("4|true|New session;Broken");
+
+            assertThat(h.runPanelHeaderAction("test.alpha.hosts", first, "New session")).isTrue();
+            assertThat(h.runPanelHeaderAction("test.alpha.hosts", first, "Broken")).as("a failing action is contained").isTrue();
+            assertThat(h.runPanelHeaderAction("test.alpha.hosts", first, "Absent")).isFalse();
+            assertThat(calls).containsExactly("new");
+
+            hosts.get(1).setHeader(new dev.jasper.sdk.ui.PanelHeader("amp", false, List.of(
+                new dev.jasper.sdk.ui.PanelHeader.Action("Import", icon, () -> calls.add("import")))));
+            assertThat(h.panelHeader("test.alpha.hosts", second)).isEqualTo("amp|false|Import");
+            assertThat(h.panelHeader("test.alpha.hosts", first)).as("windows are independent").isEqualTo("3|true|New session;Broken");
+            assertThat(h.runPanelHeaderAction("test.alpha.hosts", second, "Import")).isTrue();
+            assertThat(calls).containsExactly("new", "import");
+
+            hosts.get(0).setHeader(dev.jasper.sdk.ui.PanelHeader.EMPTY);
+            assertThat(h.panelHeader("test.alpha.hosts", first)).isEqualTo("|false|-");
+            assertThatNullPointerException().isThrownBy(() -> hosts.get(0).setHeader(null));
+            assertThat(h.panelHeader("test.alpha.hosts", first)).isEqualTo("|false|-");
+
+            h.closePanel("test.alpha.hosts", second);
+            assertThat(h.panelHeader("test.alpha.hosts", second)).isEqualTo("|false|-");
+            hosts.get(1).setHeader(new dev.jasper.sdk.ui.PanelHeader("late", true, List.of(
+                new dev.jasper.sdk.ui.PanelHeader.Action("Import", icon, () -> calls.add("late")))));
+            assertThat(h.panelHeader("test.alpha.hosts", second)).as("a closed instance publishes nothing").isEqualTo("|false|-");
+            assertThat(h.runPanelHeaderAction("test.alpha.hosts", second, "Import")).isFalse();
+            assertThat(calls).containsExactly("new", "import");
+        }));
+    }
+
     @Test void railButtonsNameThePluginsOwnActions() {
         var open = new AtomicReference<PluginAction>();
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {

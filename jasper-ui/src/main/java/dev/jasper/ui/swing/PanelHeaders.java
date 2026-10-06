@@ -4,6 +4,7 @@ import dev.jasper.ui.metrics.*;
 import dev.jasper.ui.model.*;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.SurfaceContrast;
 
 import java.awt.*;
 import java.util.*;
@@ -18,11 +19,14 @@ final class PanelHeaders {
     private PanelHeaders() {}
 
     static final class HeaderControl extends ControlRegistry.Control {
-        final JLabel title = Labels.literal(), count = Labels.literal();
+        final JLabel title = Labels.literal(), count = Labels.literal(), detail = Labels.literal();
         final JPanel descriptor = new JPanel(), host = new JPanel();
         Map<String, Buttons.ButtonControl> hosts = new LinkedHashMap<>();
         Consumer<UiEvent> hostEvents = e -> {};
         Menus.MenuControl overflow;
+        /** Host header metadata; its actions are matched to {@link #contributed} by position. */
+        PanelHostHeader hostHeader = PanelHostHeader.EMPTY;
+        final List<Buttons.ButtonControl> contributed = new ArrayList<>();
 
         HeaderControl(KitView view, Nodes.Header node) {
             super(view, node, new JPanel());
@@ -31,12 +35,20 @@ final class PanelHeaders {
             host.setOpaque(false);
             KitOwnership.mark(title, node.id() + ".title");
             KitOwnership.mark(count, node.id() + ".count");
+            KitOwnership.mark(detail, node.id() + ".host-detail");
             title.putClientProperty("html.disable", true);
             count.putClientProperty("html.disable", true);
+            detail.putClientProperty("html.disable", true);
             own(
                     () -> {
                         hosts.values().forEach(ControlRegistry.Control::close);
                         hosts.clear();
+                    });
+            own(
+                    () -> {
+                        contributed.forEach(ControlRegistry.Control::close);
+                        contributed.clear();
+                        hostHeader = PanelHostHeader.EMPTY;
                     });
             own(
                     () -> {
@@ -80,8 +92,64 @@ final class PanelHeaders {
             for (var action : actions) next.get(action.id()).update(action);
             for (var old : hosts.values()) if (next.get(old.node.id()) != old) old.close();
             hosts = next;
-            Stacks.mount(host, hosts.values().stream().map(c -> c.component).toList());
+            mountHost();
             refresh();
+        }
+
+        /**
+         * Shows host metadata: the detail and dot after the count, and the contributed actions first in the host slot,
+         * as a native tool window header orders contributed, options and hide. Controls are kept by position, so a
+         * metadata refresh keeps focus and identity; each activation runs the current description's action once.
+         */
+        void hostHeader(PanelHostHeader header) {
+            Objects.requireNonNull(header);
+            var actions = header.actions();
+            while (contributed.size() > actions.size()) contributed.removeLast().close();
+            for (int i = 0; i < actions.size(); i++) {
+                var action = actions.get(i);
+                var button = new Nodes.Button(node.id() + ".host-header-action-" + i, ControlState.READY, "",
+                        // The node's glyph name is never resolved: the control shows the host's artwork.
+                        "more", Nodes.ButtonKind.GHOST, "host-header-action-" + i, action.label());
+                if (i == contributed.size()) {
+                    int index = i;
+                    contributed.add(new Buttons.ButtonControl(view, button, e -> {
+                        if (interactive() && index < hostHeader.actions().size()) hostHeader.actions().get(index).invoke().run();
+                    }, action.icon()));
+                } else {
+                    var control = contributed.get(i);
+                    control.artwork = action.icon();
+                    control.update(button);
+                }
+            }
+            hostHeader = header;
+            mountHost();
+            refresh();
+        }
+
+        private void mountHost() {
+            var controls = new ArrayList<JComponent>();
+            contributed.forEach(c -> controls.add(c.component));
+            hosts.values().forEach(c -> controls.add(c.component));
+            Stacks.mount(host, controls);
+        }
+
+        /** The connected dot: the success status held to the indicator floor on the panel surface it sits on. */
+        private Icon dot() {
+            return new Icon() {
+                @Override public int getIconWidth() { return ThemePainting.metric(context(), DesignMetrics.Role.STATUS_DOT); }
+                @Override public int getIconHeight() { return getIconWidth(); }
+                @Override public void paintIcon(Component c, Graphics graphics, int x, int y) {
+                    var g = (Graphics2D) graphics.create();
+                    try {
+                        ThemePainting.antialias(g);
+                        g.setColor(SurfaceContrast.on(context().theme().semantic(), SemanticColor.STATUS_SUCCESS,
+                                SemanticColor.SURFACE_PANEL, SurfaceContrast.INDICATOR));
+                        g.fillOval(x, y, getIconWidth(), getIconHeight());
+                    } finally {
+                        g.dispose();
+                    }
+                }
+            };
         }
 
         @Override
@@ -97,11 +165,24 @@ final class PanelHeaders {
                     count, context(), Typography.Role.COUNT, SemanticColor.TEXT_SECONDARY);
             title.setEnabled(component.isEnabled());
             count.setEnabled(component.isEnabled());
+            detail.setText(hostHeader.detail());
+            detail.setToolTipText(hostHeader.detail().isEmpty() ? null : hostHeader.detail());
+            detail.setIcon(hostHeader.active() ? dot() : null);
+            detail.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
+            detail.setVisible(!hostHeader.detail().isEmpty() || hostHeader.active());
+            Composition.style(
+                    detail, context(), Typography.Role.COUNT, SemanticColor.TEXT_SECONDARY);
+            detail.setEnabled(component.isEnabled());
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
             component.setBorder(new EmptyBorder(0, pad, 0, pad));
             component.setLayout(new HeaderLayout(this));
             descriptor.setLayout(new Navigation.InlineLayout(context()));
             host.setLayout(new Navigation.InlineLayout(context()));
+            for (var control : contributed) {
+                control.parentEnabled = interactive();
+                control.button.panel = true;
+                control.refresh();
+            }
             for (var control : hosts.values()) {
                 control.parentEnabled = interactive();
                 control.button.panel = true;
@@ -133,7 +214,7 @@ final class PanelHeaders {
                 int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
                 overflow.main.setBorder(new EmptyBorder(ring, ring, ring, ring));
             }
-            var wanted = new ArrayList<JComponent>(List.of(title, count, descriptor));
+            var wanted = new ArrayList<JComponent>(List.of(title, count, detail, descriptor));
             if (overflow != null) wanted.add(overflow.component);
             wanted.add(host);
             Stacks.mount(component, wanted);
@@ -220,7 +301,13 @@ final class PanelHeaders {
                             Math.max(0, right - left - cw - (cw > 0 ? g : 0)));
             place(owner.title, left, tw, p.getHeight());
             left += tw + g;
-            if (cw > 0) place(owner.count, left, cw, p.getHeight());
+            if (cw > 0) {
+                place(owner.count, left, cw, p.getHeight());
+                left += cw + g;
+            }
+            // Host detail takes what the title and count leave, as the native header's detail does.
+            if (owner.detail.isVisible())
+                place(owner.detail, left, Math.min(owner.detail.getPreferredSize().width, Math.max(0, right - left)), p.getHeight());
         }
 
         void place(Component c, int x, int w, int height) {

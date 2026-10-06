@@ -108,6 +108,54 @@ class KitMountingTest {
         });
     }
 
+    /**
+     * A kit (ViewSpec) panel's PanelHost.setHeader reaches its window as application header metadata, with the panel's
+     * own kit header available to borrow; actions are contained and become inert when the instance closes.
+     */
+    @Test void aViewPanelsHeaderReachesTheWindowContainedAndInertAfterClose() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var failures=new java.util.ArrayList<PluginRuntime.Failure>();
+            var containment=new Containment(java.awt.EventQueue::isDispatchThread,failures::add);
+            var model=new dev.jasper.app.contributions.Contributions();
+            var fixture=new TerminalFixture();
+            var terminals=new HostedTerminals("test.kit",new CapabilityGate("test.kit",java.util.Set.of()),fixture.registry,Runnable::run,() -> true,() -> true,new HostedSessions("test.kit",containment,Runnable::run,id -> null));
+            var ui=new HostedUi("test.kit",model,containment,Runnable::run,() -> true,() -> true,getClass().getClassLoader(),() -> dev.jasper.sdk.Variant.DARK,h -> () -> {},AppContractTest.headlessWindows(),terminals);
+            var kit=new HostedKit("test.kit",() -> true,ui::kitThemes,ui.appearance(),containment);ui.kit(kit);
+            var calls=new java.util.ArrayList<String>();
+            var icon=new ImageIcon();
+            ui.panels().registerView(new PanelSpec("test.kit.hosts","Hosts","folder",Anchor.LEFT),host -> {
+                host.setHeader(new PanelHeader("3",true,java.util.List.of(
+                    new PanelHeader.Action("New session",icon,() -> calls.add("new")),
+                    new PanelHeader.Action("Broken",icon,() -> {throw new IllegalStateException("header failed");}))));
+                return kit.create(new ViewSpec(new Nodes.Panel("hosts",ControlState.READY,
+                    new Nodes.Header("hosts-header",ControlState.READY,"Hosts",java.util.OptionalInt.empty(),java.util.Optional.empty(),java.util.Optional.empty(),java.util.List.of()),
+                    java.util.Optional.empty(),new Nodes.Text("body",ControlState.READY,"Body",Nodes.TextRole.BODY),java.util.Optional.empty())),e -> {});
+            });
+            var headers=new java.util.ArrayList<dev.jasper.app.contributions.PanelHeaderState>();
+            var site=new dev.jasper.app.contributions.PanelSite(fixture.addWindow(),() -> {},() -> {},() -> true,headers::add);
+            var component=model.panels().getFirst().factory().apply(site);
+            assertThat(component).isInstanceOf(dev.jasper.ui.swing.KitView.class);
+            var view=(dev.jasper.ui.swing.KitView)component;
+            assertThat(view.spec().root()).as("a kit Panel root: the window borrows its header").isInstanceOf(dev.jasper.ui.model.Nodes.Panel.class);
+            assertThat(view.panelHeader("hosts")).isNotNull();
+            var header=headers.getLast();
+            assertThat(header.detail()).isEqualTo("3");
+            assertThat(header.active()).isTrue();
+            assertThat(header.actions()).extracting(dev.jasper.app.contributions.PanelHeaderState.Action::label).containsExactly("New session","Broken");
+            assertThat(header.actions().getFirst().icon()).isSameAs(icon);
+            header.actions().forEach(action -> action.invoke().run());
+            assertThat(calls).containsExactly("new");
+            assertThat(failures).as("a failing header action is contained").hasSize(1);
+            site.notifyClosed();
+            assertThat(headers.getLast()).isEqualTo(dev.jasper.app.contributions.PanelHeaderState.EMPTY);
+            assertThat(view.isClosed()).isTrue();
+            header.actions().forEach(action -> action.invoke().run());
+            assertThat(calls).containsExactly("new");
+            assertThat(failures).hasSize(1);
+            ui.closeAll();kit.close();
+        });
+    }
+
     @Test void singletonReplacementRejectsForeignAndClosesOwnedContentExactlyOnce() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var containment = new Containment(java.awt.EventQueue::isDispatchThread);

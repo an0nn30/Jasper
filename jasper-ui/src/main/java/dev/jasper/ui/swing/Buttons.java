@@ -15,11 +15,14 @@ final class Buttons {
     private Buttons() {}
     static final class ButtonControl extends ControlRegistry.Control {
         final KitButton button;
+        /** Host-supplied artwork shown instead of the node's named icon (borrowed panel headers only); null for named icons. */
+        javax.swing.Icon artwork;
         ButtonControl(KitView view, Nodes.Button node) {
             this(view, node, view::dispatch);
         }
-        ButtonControl(KitView view, Nodes.Button node, java.util.function.Consumer<UiEvent> events) {
-            super(view, node, new KitButton(view.context())); button = (KitButton)component;
+        ButtonControl(KitView view, Nodes.Button node, java.util.function.Consumer<UiEvent> events) { this(view, node, events, null); }
+        ButtonControl(KitView view, Nodes.Button node, java.util.function.Consumer<UiEvent> events, javax.swing.Icon artwork) {
+            super(view, node, new KitButton(view.context())); button = (KitButton)component; this.artwork = artwork;
             button.putClientProperty("html.disable", true);
             button.setOpaque(false); button.setContentAreaFilled(false); button.setBorderPainted(false); button.setFocusPainted(false);
             button.setRolloverEnabled(true); button.setHorizontalAlignment(SwingConstants.CENTER);
@@ -37,9 +40,13 @@ final class Buttons {
             button.setForeground(ThemePainting.color(context(), button.textRole(false)));
             boolean embedded = value.presentation() == Nodes.ButtonPresentation.EMBEDDED;
             button.embedded = embedded;
-            button.setIcon(value.icon().isEmpty() ? null : context().icons().icon(value.icon(), context().theme().semantic(), button.textRole(false),
-                UIScale.scale(context().icons().size(embedded && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL))));
-            button.setDisabledIcon(button.getIcon()); button.putClientProperty("Jasper.button.icon", value.icon().isEmpty() ? null : value.icon());
+            if (artwork != null) { button.setIcon(artwork); button.putClientProperty("Jasper.button.icon", null); }
+            else {
+                button.setIcon(value.icon().isEmpty() ? null : context().icons().icon(value.icon(), context().theme().semantic(), button.textRole(false),
+                    UIScale.scale(context().icons().size(embedded && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL))));
+                button.putClientProperty("Jasper.button.icon", value.icon().isEmpty() ? null : value.icon());
+            }
+            button.setDisabledIcon(button.getIcon());
             button.setToolTipText(value.tooltip().isEmpty() ? null : value.tooltip());
             button.getAccessibleContext().setAccessibleName(value.label().isEmpty() ? value.tooltip() : value.label());
             button.getAccessibleContext().setAccessibleDescription(value.state().error());

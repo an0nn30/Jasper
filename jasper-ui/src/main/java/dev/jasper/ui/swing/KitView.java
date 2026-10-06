@@ -113,6 +113,12 @@ public final class KitView extends JPanel implements AutoCloseable {
     public JComponent panelHeader(String panelId) { requireOpen(); return panel(panelId).header.component; }
     /** Host integration slot, separate from the descriptor event callback. */
     public void setPanelHostActions(String panelId, List<Nodes.Button> actions, Consumer<UiEvent> events) { requireOpen(); panel(panelId).header.hostActions(actions, events); revalidate(); repaint(); }
+    /**
+     * Host header metadata (detail, connected dot, contributed icon actions) shown in the borrowed header's one row,
+     * contributed actions before the host actions. Replacing it keeps controls by position; {@link PanelHostHeader#EMPTY}
+     * clears it. A replacement panel header starts empty; closing the view releases every contributed action.
+     */
+    public void setPanelHostHeader(String panelId, PanelHostHeader header) { requireOpen(); panel(panelId).header.hostHeader(Objects.requireNonNull(header)); revalidate(); repaint(); }
     private Panels.PanelControl panel(String id) {
         var control = reconciler.control(Objects.requireNonNull(id));
         if (control instanceof Panels.PanelControl panel) return panel;

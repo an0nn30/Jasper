@@ -510,4 +510,7 @@ commands in `LocalSpec` remain a separate decision. Remote uses this for its WSL
 `ToolWindowArea`, which retains metadata while hidden and updates live headers without rebuilding
 plugin content. Header actions use the normal plugin containment boundary. Closing a site clears
 its metadata and invalidates retained callbacks. The testkit exposes `panelHeader(id, windowId)`
-for inspecting and invoking the same per-window contract.
+for inspecting and invoking the same per-window contract (and `closePanel(id, windowId)` to discard an instance).
+A panel whose content is a kit `Panel` view (`registerView`) shows the same metadata in its own header row, which the
+window borrows: `ToolWindowArea` passes it to the module's host-only `KitView.setPanelHostHeader`, so there is never
+a second header. The shared `PluginContractTest` covers the contract on the host and the fake.

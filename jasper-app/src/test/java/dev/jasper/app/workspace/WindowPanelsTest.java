@@ -192,6 +192,85 @@ class WindowPanelsTest {
         });
     }
 
+    /** PanelHost.setHeader (SDK 0.14.2) on a kit panel: the window's borrowed kit header shows it and releases it once. */
+    @Test void aKitPanelsHeaderMetadataReachesItsBorrowedHeaderAndIsReleasedWithTheInstance() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            var theme = dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.Theme.DARK);
+            try (var bindings = new dev.jasper.app.appearance.AppearanceBindings(new dev.jasper.ui.theme.ThemePair(theme, theme),
+                    failure -> { throw new AssertionError(failure); }, () -> false)) {
+                var calls = new ArrayList<String>();
+                var sites = new ArrayList<PanelSite>();
+                var views = new ArrayList<dev.jasper.ui.swing.KitView>();
+                var icon = new ImageIcon();
+                PanelEntry entry = model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> {
+                    sites.add(site);
+                    site.setHeader(new dev.jasper.app.contributions.PanelHeaderState("3", false, List.of(
+                        new dev.jasper.app.contributions.PanelHeaderState.Action("New session", icon, () -> calls.add("new")))));
+                    var view = new dev.jasper.ui.swing.KitView(bindings.context(dev.jasper.ui.theme.ThemeRoute.CHROME),
+                        new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Panel("hosts", dev.jasper.ui.model.ControlState.READY,
+                            new dev.jasper.ui.model.Nodes.Header("hosts-header", dev.jasper.ui.model.ControlState.READY, "Hosts",
+                                java.util.OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
+                            Optional.empty(), new dev.jasper.ui.model.Nodes.Text("body", dev.jasper.ui.model.ControlState.READY, "Body",
+                                dev.jasper.ui.model.Nodes.TextRole.BODY), Optional.empty())), event -> {});
+                    site.onClosed(view::close);
+                    views.add(view);
+                    return view;
+                });
+                toggle(model, owner, "dev.x.hosts");
+                var header = views.getFirst().panelHeader("hosts");
+                assertThat(owner.area().headerOf(Slot.LEFT_TOP)).isNull();
+                assertThat(names(header)).containsExactly("New session", "Options", "Hide");
+                assertThat(labels(header)).contains("Hosts", "3");
+                sites.getFirst().setHeader(new dev.jasper.app.contributions.PanelHeaderState("4", true, List.of(
+                    new dev.jasper.app.contributions.PanelHeaderState.Action("New session", icon, () -> calls.add("newer")))));
+                assertThat(labels(header)).contains("4").doesNotContain("3");
+                var created = button(header, "New session");
+                created.doClick();
+                assertThat(calls).containsExactly("newer");
+                toggle(model, owner, "dev.x.hosts");
+                assertThat(names(header)).as("hidden: released").isEmpty();
+                toggle(model, owner, "dev.x.hosts");
+                assertThat(names(header)).as("shown again with the retained metadata").containsExactly("New session", "Options", "Hide");
+                assertThat(labels(header)).contains("4");
+                var shown = button(header, "New session");
+                entry.close();
+                assertThat(sites).hasSize(1);
+                assertThat(shown.getActionListeners()).as("closing the instance releases the header actions").isEmpty();
+                shown.doClick();
+                assertThat(calls).containsExactly("newer");
+            }
+        });
+    }
+
+    private static List<AbstractButton> headerButtons(java.awt.Container root) {
+        var result = new ArrayList<AbstractButton>();
+        for (var child : root.getComponents()) {
+            if (child instanceof AbstractButton button) result.add(button);
+            else if (child instanceof java.awt.Container nested) result.addAll(headerButtons(nested));
+        }
+        return result;
+    }
+
+    private static List<String> names(java.awt.Container root) {
+        return headerButtons(root).stream().map(b -> b.getAccessibleContext().getAccessibleName()).toList();
+    }
+
+    private static AbstractButton button(java.awt.Container root, String name) {
+        return headerButtons(root).stream().filter(b -> name.equals(b.getAccessibleContext().getAccessibleName())).findFirst().orElseThrow();
+    }
+
+    private static List<String> labels(java.awt.Container root) {
+        var result = new ArrayList<String>();
+        for (var child : root.getComponents()) {
+            if (child instanceof JLabel label && label.isVisible() && label.getText() != null && !label.getText().isEmpty()) result.add(label.getText());
+            if (child instanceof java.awt.Container nested && child.isVisible()) result.addAll(labels(nested));
+        }
+        return result;
+    }
+
     @Test void aFailedFactoryShowsAPlaceholderAndRemovalOrCloseNotifiesTheInstance() throws Exception {
         edt(() -> {
             var model = new Contributions();
