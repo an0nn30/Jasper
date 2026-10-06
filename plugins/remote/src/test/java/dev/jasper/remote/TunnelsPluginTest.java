@@ -11,7 +11,7 @@ import dev.jasper.remote.tunnels.TunnelKind;
 import dev.jasper.remote.tunnels.TunnelState;
 import dev.jasper.remote.ui.HostRows;
 import dev.jasper.remote.ui.HostsPanel;
-import dev.jasper.remote.ui.tunnels.TunnelsPanel;
+import dev.jasper.remote.testsupport.Kits;
 import dev.jasper.remote.ui.tunnels.TunnelsScope;
 import dev.jasper.remote.ui.tunnels.TunnelsTestAccess;
 import dev.jasper.remote.ui.tunnels.TunnelsUi;
@@ -126,9 +126,14 @@ class TunnelsPluginTest {
             host.searchScope(TunnelsScope.ID, "", started.window(), null);
             started.plugin().tunnelStore().put(db.withEdited("renamed", db.hostId(), TunnelKind.LOCAL, "127.0.0.1", 0, "127.0.0.1", second.port()));
             RemotePluginTest.settle(host);
-            host.executeInScope(TunnelsScope.ID, "tunnel." + db.id(), "edit", started.window(), null);
+            Kits.edt(() -> host.executeInScope(TunnelsScope.ID, "tunnel." + db.id(), "edit", started.window(), null));
             assertThat(host.windows()).as("the editor opens on the tunnel as saved now").containsExactly("dialog|Edit renamed|true");
-            TunnelsTestAccess.cancel(started.plugin().tunnels().currentEditor()).doClick();
+            Kits.edt(() -> {
+                var editor = started.plugin().tunnels().currentEditor();
+                assertThat(Kits.node(editor.view(), dev.jasper.remote.ui.tunnels.TunnelEditor.NAME, dev.jasper.sdk.ui.Nodes.Field.class).value()).isEqualTo("renamed");
+                TunnelsTestAccess.cancel(editor);
+            });
+            assertThat(host.windows()).as("Cancel closed the editor").isEmpty();
             host.executeInScope(TunnelsScope.ID, "tunnel." + db.id(), "toggle", started.window(), null);
             await(host, () -> manager.state(db.id()) instanceof TunnelState.Up, "the tunnel to come up");
             assertThat(manager.running(db.id()).orElseThrow().targetPort()).as("it started as saved now").isEqualTo(second.port());
@@ -142,13 +147,15 @@ class TunnelsPluginTest {
         try (var server = new LoopbackServer(); var echo = new EchoServer(); var host = new FakePluginHost()) {
             Started started = start(host, server, dir);
             var tunnels = started.plugin().tunnels();
-            assertThat(host.invoke(TunnelsUi.FORWARD, started.window(), null)).isTrue();
+            assertThat(Kits.value(() -> host.invoke(TunnelsUi.FORWARD, started.window(), null))).isTrue();
             assertThat(host.windows()).containsExactly("dialog|Forward a Port|true");
-            var panel = tunnels.currentForward();
-            TunnelsTestAccess.host(panel).setSelectedItem(started.prod());
-            TunnelsTestAccess.targetHost(panel).setText("127.0.0.1");
-            TunnelsTestAccess.remotePort(panel).setText(String.valueOf(echo.port()));
-            TunnelsTestAccess.forward(panel).doClick();
+            Kits.edt(() -> {
+                var panel = tunnels.currentForward();
+                TunnelsTestAccess.host(panel, started.prod());
+                TunnelsTestAccess.targetHost(panel, "127.0.0.1");
+                TunnelsTestAccess.remotePort(panel, String.valueOf(echo.port()));
+                TunnelsTestAccess.forward(panel);
+            });
             assertThat(host.windows()).as("the dialog closed").isEmpty();
             var manager = tunnels.manager();
             assertThat(manager.quickForwards()).singleElement().satisfies(tunnel -> assertThat(tunnel.quick()).isTrue());
@@ -157,7 +164,8 @@ class TunnelsPluginTest {
             int port = ((TunnelState.Up) manager.state(quick.id())).boundPort();
             assertThat(EchoServer.roundTrip(port, "quick")).isEqualTo("quick");
             assertThat(host.searchScope(TunnelsScope.ID, "", started.window(), null)).containsExactly("tunnel." + quick.id() + "|localhost:" + port + "|true");
-            host.executeInScope(TunnelsScope.ID, "tunnel." + quick.id(), "toggle", started.window(), null);
+            // Forwarding revealed the Tunnels panel, a kit view: stopping updates it, so on the EDT.
+            Kits.edt(() -> host.executeInScope(TunnelsScope.ID, "tunnel." + quick.id(), "toggle", started.window(), null));
             assertThat(manager.quickForwards()).as("stopping a quick forward forgets it").isEmpty();
             assertThat(host.failures()).isEmpty();
         }
@@ -224,26 +232,31 @@ class TunnelsPluginTest {
             Started started = start(host, server, dir);
             var tunnels = started.plugin().tunnels();
             var manager = tunnels.manager();
-            assertThat(host.invoke(TunnelsUi.FORWARD, started.window(), null)).isTrue();
-            var forward = tunnels.currentForward();
-            TunnelsTestAccess.host(forward).setSelectedItem(started.prod());
-            TunnelsTestAccess.targetHost(forward).setText("127.0.0.1");
-            TunnelsTestAccess.remotePort(forward).setText(String.valueOf(echo.port()));
-            TunnelsTestAccess.forward(forward).doClick();
+            assertThat(Kits.value(() -> host.invoke(TunnelsUi.FORWARD, started.window(), null))).isTrue();
+            Kits.edt(() -> {
+                var forward = tunnels.currentForward();
+                TunnelsTestAccess.host(forward, started.prod());
+                TunnelsTestAccess.targetHost(forward, "127.0.0.1");
+                TunnelsTestAccess.remotePort(forward, String.valueOf(echo.port()));
+                TunnelsTestAccess.forward(forward);
+            });
             Tunnel quick = manager.quickForwards().getFirst();
             await(host, () -> manager.state(quick.id()) instanceof TunnelState.Up, "the quick forward to come up");
             int port = ((TunnelState.Up) manager.state(quick.id())).boundPort();
             assertThat(EchoServer.roundTrip(port, "quick")).isEqualTo("quick");
             // Save as Tunnel...: the panel's route for a quick forward; the editor keeps the id and the forwarding.
-            var panel = (TunnelsPanel) host.openPanel(TunnelsUi.PANEL, started.window());
-            TunnelsTestAccess.activate(panel, quick.id());
-            TunnelsTestAccess.name(tunnels.currentEditor()).setText("kept");
-            TunnelsTestAccess.save(tunnels.currentEditor()).doClick();
+            Kits.edt(() -> {
+                host.openPanel(TunnelsUi.PANEL, started.window());
+                TunnelsTestAccess.activate(TunnelsTestAccess.panel(tunnels, started.window()), quick.id());
+                assertThat(host.windows()).as("Save as Tunnel").contains("dialog|Save as Tunnel|true");
+                TunnelsTestAccess.name(tunnels.currentEditor(), "kept");
+                TunnelsTestAccess.save(tunnels.currentEditor());
+            });
             RemotePluginTest.settle(host);
             assertThat(started.plugin().tunnelStore().tunnel(quick.id())).as("saved under the same id").isPresent();
             assertThat(manager.quickForwards()).as("it left the quick list").isEmpty();
             assertThat(manager.state(quick.id())).as("and keeps running").isInstanceOf(TunnelState.Up.class);
-            rewrite(started.plugin(), List.of(), 5);
+            Kits.edt(() -> rewrite(started.plugin(), List.of(), 5));
             await(host, () -> manager.state(quick.id()).equals(TunnelState.STOPPED), "the removed tunnel to stop");
             assertThat(manager.active()).isZero();
             assertThatThrownBy(() -> new Socket(InetAddress.ofLiteral("127.0.0.1"), port).close()).as("nothing listens any more").isInstanceOf(ConnectException.class);
@@ -279,8 +292,8 @@ class TunnelsPluginTest {
             Tunnel db = Tunnel.create("db", started.prod().id(), TunnelKind.LOCAL, "127.0.0.1", 0, "127.0.0.1", echo.port());
             started.plugin().tunnelStore().put(db);
             RemotePluginTest.settle(host);
-            var panel = (TunnelsPanel) host.openPanel(TunnelsUi.PANEL, started.window());
-            manager.start(db, null);
+            Kits.edt(() -> { host.openPanel(TunnelsUi.PANEL, started.window()); manager.start(db, null); });
+            var panel = Kits.value(() -> TunnelsTestAccess.panel(tunnels, started.window()));
             await(host, () -> manager.state(db.id()) instanceof TunnelState.Up, "the tunnel to come up");
             int port = ((TunnelState.Up) manager.state(db.id())).boundPort();
             dev.jasper.remote.testsupport.Kits.edt(() -> {
@@ -305,13 +318,13 @@ class TunnelsPluginTest {
             Tunnel db = Tunnel.create("db", started.prod().id(), TunnelKind.LOCAL, "127.0.0.1", 0, "127.0.0.1", echo.port());
             store.put(db);
             RemotePluginTest.settle(host);
-            var panel = (TunnelsPanel) host.openPanel(TunnelsUi.PANEL, started.window());
-            manager.start(db, null);
+            Kits.edt(() -> { host.openPanel(TunnelsUi.PANEL, started.window()); manager.start(db, null); });
+            var panel = Kits.value(() -> TunnelsTestAccess.panel(tunnels, started.window()));
             await(host, () -> manager.state(db.id()) instanceof TunnelState.Up, "the tunnel to come up");
             int port = ((TunnelState.Up) manager.state(db.id())).boundPort();
             Files.writeString(store.file(), "[[tunnel]\nname = ");
             Files.setLastModifiedTime(store.file(), FileTime.from(Instant.now().plusSeconds(5)));
-            store.poll();
+            Kits.edt(store::poll);
             await(host, () -> store.error().isPresent(), "the broken file to be noticed");
             dev.jasper.remote.testsupport.Kits.edt(() -> {
                 TunnelsTestAccess.delete(panel, db.id());
@@ -342,12 +355,14 @@ class TunnelsPluginTest {
             int port = ((TunnelState.Up) manager.state(web.id())).boundPort();
             assertThat(EchoServer.roundTrip(port, "before")).isEqualTo("before");
             // An unrelated save through the New Tunnel dialog rewrites the whole file and re-reads it.
-            assertThat(host.invoke(TunnelsUi.NEW, started.window(), null)).isTrue();
+            assertThat(Kits.value(() -> host.invoke(TunnelsUi.NEW, started.window(), null))).isTrue();
             var editor = tunnels.currentEditor();
-            TunnelsTestAccess.name(editor).setText("other");
-            TunnelsTestAccess.listenPort(editor).setText("0");
-            TunnelsTestAccess.forwardPort(editor).setText("1");
-            TunnelsTestAccess.save(editor).doClick();
+            Kits.edt(() -> {
+                TunnelsTestAccess.name(editor, "other");
+                TunnelsTestAccess.listenPort(editor, "0");
+                TunnelsTestAccess.forwardPort(editor, "1");
+                TunnelsTestAccess.save(editor);
+            });
             await(host, () -> store.tunnels().size() == 2, "the unrelated save");
             assertThat(store.tunnels()).extracting(Tunnel::name).containsExactly("web", "other");
             assertThat(store.tunnels().getFirst().id()).as("the entry kept its identity").isEqualTo(web.id());
@@ -369,14 +384,16 @@ class TunnelsPluginTest {
             Files.setLastModifiedTime(store.file(), FileTime.from(Instant.now().plusSeconds(5)));
             store.poll();
             await(host, () -> !store.warnings().isEmpty(), "the skipped entry to be noticed");
-            assertThat(host.invoke(TunnelsUi.NEW, started.window(), null)).isTrue();
+            assertThat(Kits.value(() -> host.invoke(TunnelsUi.NEW, started.window(), null))).isTrue();
             var editor = tunnels.currentEditor();
-            TunnelsTestAccess.name(editor).setText("other");
-            TunnelsTestAccess.listenPort(editor).setText("0");
-            TunnelsTestAccess.forwardPort(editor).setText("1");
-            TunnelsTestAccess.save(editor).doClick();
+            Kits.edt(() -> {
+                TunnelsTestAccess.name(editor, "other");
+                TunnelsTestAccess.listenPort(editor, "0");
+                TunnelsTestAccess.forwardPort(editor, "1");
+                TunnelsTestAccess.save(editor);
+            });
             RemotePluginTest.settle(host);
-            assertThat(TunnelsTestAccess.message(editor)).startsWith("tunnels.toml has entries Remote cannot read; fix or remove them before saving: ")
+            assertThat(Kits.value(() -> TunnelsTestAccess.message(editor))).startsWith("tunnels.toml has entries Remote cannot read; fix or remove them before saving: ")
                 .contains("tunnel 1");
             assertThat(tunnels.currentEditor()).as("the editor stays open").isSameAs(editor);
             assertThat(Files.readString(store.file())).as("and the file is untouched").isEqualTo(text);

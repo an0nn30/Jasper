@@ -46,13 +46,13 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.swing.Icon;
-import javax.swing.JComponent;
 import javax.swing.Timer;
 
 /**
  * Registers the tunnels surface — the Tunnels panel, its actions, the SSH menu group, Forward a Port on the terminal
  * menu, the palette scope and the status item — and keeps the manager in step with tunnels.toml: a removed tunnel stops,
- * a tunnel whose forwarding changed restarts. UI thread only.
+ * a tunnel whose forwarding changed restarts. The panel and dialogs are kit views from {@code context.kit()}, closed with
+ * their surface. UI thread only.
  */
 public final class TunnelsUi implements AutoCloseable {
     public static final String PANEL = "dev.jasper.remote.tunnels.panel", TOGGLE = "dev.jasper.remote.tunnels",
@@ -114,7 +114,7 @@ public final class TunnelsUi implements AutoCloseable {
             invoked -> manager.stopAll());
         stopAll.setEnabled(false);
         context.menus().terminalContext().add(FORWARD);
-        context.panels().register(new PanelSpec(PANEL, "Tunnels", icon, Anchor.LEFT).withToggleActionId(TOGGLE), this::create);
+        context.panels().registerView(new PanelSpec(PANEL, "Tunnels", icon, Anchor.LEFT).withToggleActionId(TOGGLE), this::create);
         scope = new TunnelsScope(this::all, store::error, manager::state, this::hostName,
             this::toggle, (window, tunnel) -> current(tunnel.id()).ifPresent(this::browse),
             (window, tunnel) -> current(tunnel.id()).filter(now -> !now.quick()).ifPresent(now -> edit(window, Optional.of(now), Optional.empty())));
@@ -149,6 +149,8 @@ public final class TunnelsUi implements AutoCloseable {
     public TunnelEditor currentEditor() { return currentEditor; }
     public ForwardPanel currentForward() { return currentForward; }
     public ConfirmPanel currentConfirm() { return currentConfirm; }
+    /** The window's Tunnels panel, once it was opened there. */
+    TunnelsPanel panel(UUID windowId) { return panels.get(windowId); }
 
     /** Plugin stop: every tunnel stops and the dialogs close. */
     @Override public void close() {
@@ -160,18 +162,23 @@ public final class TunnelsUi implements AutoCloseable {
         manager.close();
     }
 
-    private JComponent create(PanelHost panelHost) {
+    private dev.jasper.sdk.ui.UiView create(PanelHost panelHost) {
         WindowHandle window = panelHost.window();
-        var panel = new TunnelsPanel(new TunnelsPanel.Actions(tunnel -> manager.start(tunnel, window), tunnel -> manager.stop(tunnel.id()),
+        // The switch, Enter and the menu act through the manager, whose confirmed state alone redraws the row.
+        var panel = new TunnelsPanel(context.kit(), new TunnelsPanel.Actions(tunnel -> manager.start(tunnel, window), tunnel -> manager.stop(tunnel.id()),
             tunnel -> edit(window, Optional.of(tunnel), Optional.empty()), this::duplicate, tunnel -> delete(window, tunnel),
             tunnel -> edit(window, Optional.of(tunnel), Optional.empty()), this::browse, this::copyAddress,
-            () -> edit(window, Optional.empty(), Optional.empty())), context.appearance()::icon, icon);
+            () -> edit(window, Optional.empty(), Optional.empty())), context.appearance()::icon);
         panel.onHeaderChanged(panelHost::setHeader);
         panels.put(window.id(), panel);
         panelHosts.put(window.id(), panelHost);
-        panelHost.onClosed(() -> { panels.remove(window.id()); panelHosts.remove(window.id()); });
+        // The host disposed the view; the panel goes inert, so no later state change or tick touches it.
+        panelHost.onClosed(() -> {
+            panel.close();
+            if (panels.get(window.id()) == panel) { panels.remove(window.id()); panelHosts.remove(window.id()); }
+        });
         fill(panel);
-        return panel;
+        return panel.view();
     }
 
     private void fill(TunnelsPanel panel) { panel.setTunnels(store.tunnels(), quickOnly(), store.error(), manager::state, this::hostName); }
@@ -257,15 +264,16 @@ public final class TunnelsUi implements AutoCloseable {
         String title = editing.isEmpty() ? "New Tunnel" : editing.get().quick() ? "Save as Tunnel" : "Edit " + editing.get().name();
         PluginDialog dialog = dialog(window, title);
         TunnelEditor[] editor = new TunnelEditor[1];
-        editor[0] = new TunnelEditor(hosts.get(), store.tunnels(), editing, preferredHost, tunnel -> store.put(tunnel).whenComplete((ignored, failure) -> ui.execute(() -> {
+        editor[0] = new TunnelEditor(context.kit(), hosts.get(), store.tunnels(), editing, preferredHost, tunnel -> store.put(tunnel).whenComplete((ignored, failure) -> ui.execute(() -> {
             if (closed) return;
+            // A closed editor ignores the message; the save itself stands, as before.
             if (failure != null) { editor[0].showError(message(failure)); return; }
             editing.filter(Tunnel::quick).ifPresent(saved -> manager.saved(saved.id()));
             dialog.close();
         })), dialog::close);
         currentEditor = editor[0];
-        dialog.setContent(editor[0]);
-        dialog.onClosed(() -> { if (currentEditor == editor[0]) currentEditor = null; });
+        dialog.setContent(editor[0].view());
+        dialog.onClosed(() -> { editor[0].close(); if (currentEditor == editor[0]) currentEditor = null; });
         dialog.show();
     }
 
@@ -273,7 +281,7 @@ public final class TunnelsUi implements AutoCloseable {
         if (closed || !window.isOpen()) return;
         PluginDialog dialog = dialog(window, "Forward a Port");
         ForwardPanel[] panel = new ForwardPanel[1];
-        panel[0] = new ForwardPanel(hosts.get(), fromPane, TunnelsUi::freeLoopbackPort, tunnel -> {
+        panel[0] = new ForwardPanel(context.kit(), hosts.get(), fromPane, TunnelsUi::freeLoopbackPort, tunnel -> {
             if (tunnel.quick()) {
                 manager.forward(tunnel, window);
                 dialog.close();
@@ -289,8 +297,8 @@ public final class TunnelsUi implements AutoCloseable {
             }));
         }, dialog::close);
         currentForward = panel[0];
-        dialog.setContent(panel[0]);
-        dialog.onClosed(() -> { if (currentForward == panel[0]) currentForward = null; });
+        dialog.setContent(panel[0].view());
+        dialog.onClosed(() -> { panel[0].close(); if (currentForward == panel[0]) currentForward = null; });
         dialog.show();
     }
 
