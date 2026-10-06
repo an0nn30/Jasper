@@ -56,6 +56,12 @@ final class Tables {
             return columns.isEmpty() ? "" : value().rows().get(i).cells().getOrDefault(columns.getFirst().id(), "");
         }
 
+        /** A table keeps Enter with no focused row, as the JTable it replaced did (its Enter moved the selection). */
+        @Override
+        boolean keepsEnterWithoutFocus() {
+            return true;
+        }
+
         @Override
         boolean reportsClicks() {
             return true;

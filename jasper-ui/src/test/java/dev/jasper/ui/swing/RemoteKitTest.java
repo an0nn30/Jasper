@@ -277,6 +277,127 @@ class RemoteKitTest {
         });
     }
 
+    static final String HOSTILE = "<html><img src='http://127.0.0.1:9/x.png'>web";
+
+    /** Every component under {@code root} (itself included) that shows a tooltip. */
+    static List<JComponent> tipped(Component root) {
+        var found = new ArrayList<JComponent>();
+        if (root instanceof JComponent c && c.getToolTipText() != null) found.add(c);
+        if (root instanceof Container parent) for (var child : parent.getComponents()) found.addAll(tipped(child));
+        return found;
+    }
+
+    static void literalTips(Component root, String text) {
+        var parts = tipped(root);
+        assertThat(parts).as("parts showing the tooltip").isNotEmpty();
+        for (var part : parts) {
+            var tip = part.createToolTip(); tip.setTipText(text);
+            assertThat(tip.getClientProperty("html.disable")).as("%s tooltip is literal", part.getClass().getName()).isEqualTo(Boolean.TRUE);
+            assertThat(tip.getClientProperty("html")).as("%s builds no HTML view", part.getClass().getName()).isNull();
+        }
+    }
+
+    @Test void everyRowPartShowingTheRowTooltipShowsItAsLiteralText() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var table = new Table("files", READY, List.of(new Column("name", "Name", TextRole.BODY, false), new Column("size", "Size", TextRole.DESCRIPTION, true)),
+                List.of(new TableRow("notes", Map.of("name", "notes.txt", "size", "6 B"), Optional.of("file"), false, Optional.empty(), HOSTILE)), Set.of(), "open", List.of());
+            var row = new ListItem("a", Optional.of(new StatusDot("a.dot", READY, StatusKind.SUCCESS)),
+                List.of(new Text("a.name", READY, "web", TextRole.BODY), new Nodes.Icon("a.icon", READY, "tunnel", Hue.NONE, IconSize.CAPTION, "Tunnel")),
+                List.of(new Chip("a.chip", READY, "SSH", Hue.BLUE), new Progress("a.progress", READY, .5, "Half")),
+                List.of(new StatusDot("a.state", READY, StatusKind.WARNING)), false, Optional.empty(), HOSTILE);
+            var spec = new ViewSpec(new Stack("root", READY, LayoutRole.VERTICAL, List.of(tunnels(List.of(row), Set.of(), "", ""), table)));
+            try (var view = new KitView(context, spec, e -> {})) {
+                view.setSize(480, 400); InteractiveRowsTest.layout(view);
+                var list = ((ItemLists.ListControl) view.control("tunnels")).mounted.get("a");
+                assertThat(list.controls.get("a.dot").component.getToolTipText()).as("the status dot shows the row tooltip").isEqualTo(HOSTILE);
+                literalTips(list, HOSTILE);
+                literalTips(((Tables.TableControl) view.control("files")).mounted.get("notes"), HOSTILE);
+            } finally { release(context); }
+        });
+    }
+
+    /** The component a pointer at {@code point} (row coordinates) reaches: the deepest one listening for the mouse. */
+    static JComponent receiver(JComponent row, Point point) {
+        Component c = SwingUtilities.getDeepestComponentAt(row, point.x, point.y);
+        while (c != null && c != row && c.getMouseListeners().length == 0) c = c.getParent();
+        return (JComponent) c;
+    }
+
+    @Test void theRowTooltipShowsOverEveryPartOfTheRowIncludingEmptySlotArea() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, new ViewSpec(tunnels(List.of(tunnel("a", "web, modified 2026-10-05 09:12", false)), Set.of(), "", "")), e -> {})) {
+                view.setSize(480, 240); InteractiveRowsTest.layout(view);
+                var row = ((ItemLists.ListControl) view.control("tunnels")).mounted.get("a");
+                for (var part : List.of(row.leading, row.title, row.subtitle, row.trailing)) {
+                    assertThat(part.getWidth()).as("laid out").isPositive();
+                    for (var corner : List.of(new Point(part.getWidth() - 1, part.getHeight() - 1), new Point(part.getWidth() - 1, 0))) {
+                        var point = SwingUtilities.convertPoint(part, corner, row);
+                        var target = receiver(row, point);
+                        var at = SwingUtilities.convertPoint(row, point, target);
+                        var move = new MouseEvent(target, MouseEvent.MOUSE_MOVED, 0, 0, at.x, at.y, 0, false);
+                        assertThat(target.getToolTipText(move)).as("tooltip at %s of %s", corner, target.getClass().getName()).isEqualTo("web, modified 2026-10-05 09:12");
+                    }
+                }
+            } finally { release(context); }
+        });
+    }
+
+    @Test void withoutAFocusedInteractiveRowEnterAndDeletePassOn() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, new ViewSpec(tunnels(List.of(tunnel("a", "", false), tunnel("b", "", false)), Set.of(), "toggle", "delete")), events::add)) {
+                view.setSize(420, 240); InteractiveRowsTest.layout(view);
+                var owner = (ItemLists.ListControl) view.control("tunnels");
+                assertThat(owner.focusItem).isNull();
+                assertThat(bound(owner.canvas, "DELETE")).as("no focused row: Delete passes on").isFalse();
+                assertThat(bound(owner.canvas, "BACK_SPACE")).isFalse();
+                assertThat(bound(owner.canvas, "ENTER")).as("no focused row: Enter passes on").isFalse();
+                owner.focusItem = "a";
+                assertThat(bound(owner.canvas, "DELETE")).isTrue();
+                assertThat(bound(owner.canvas, "ENTER")).isTrue();
+                var off = new ControlState(true, false, false, "");
+                view.update(new ViewSpec(new ItemList("tunnels", off, ListKind.DOUBLE, List.of(tunnel("a", "", false), tunnel("b", "", false)), Set.of(), "edit", List.of(),
+                    SelectionMode.SINGLE, Optional.empty(), OptionalInt.empty(), "toggle", "delete")));
+                assertThat(owner.focusItem).isEqualTo("a");
+                assertThat(bound(owner.canvas, "DELETE")).as("a disabled list passes Delete on").isFalse();
+                assertThat(bound(owner.canvas, "ENTER")).as("and Enter").isFalse();
+                assertThat(events).isEmpty();
+            } finally { release(context); }
+            var tables = KitFixtures.context();
+            var files = new Table("files", READY, List.of(new Column("name", "Name", TextRole.BODY, false)), List.of(new TableRow("a", Map.of("name", "a"), Optional.empty())),
+                Set.of(), "open", List.of());
+            try (var view = new KitView(tables, new ViewSpec(files), e -> {})) {
+                var owner = (Tables.TableControl) view.control("files");
+                assertThat(owner.focusItem).isNull();
+                assertThat(bound(owner.canvas, "ENTER")).as("a table keeps Enter without a focused row, as the JTable did").isTrue();
+                assertThat(bound(owner.canvas, "DELETE")).as("but has no Delete action").isFalse();
+            } finally { release(tables); }
+        });
+    }
+
+    static KeyEvent press(Component on, int code) {
+        return new KeyEvent(on, KeyEvent.KEY_PRESSED, 0, 0, code, KeyEvent.CHAR_UNDEFINED);
+    }
+
+    @Test void aRealDeleteKeyOnAFocusedInlineControlNeverReachesTheListsDeleteAction() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, new ViewSpec(tunnels(List.of(tunnel("a", "", false), tunnel("b", "", false)), Set.of("a"), "toggle", "delete")), events::add)) {
+                view.setSize(420, 240); InteractiveRowsTest.layout(view);
+                var owner = (ItemLists.ListControl) view.control("tunnels");
+                owner.focusItem = "a";
+                for (String part : List.of("a.run", "a.star")) for (int code : List.of(KeyEvent.VK_DELETE, KeyEvent.VK_BACK_SPACE)) {
+                    SwingUtilities.processKeyBindings(press(owner.mounted.get("a").controls.get(part).component, code));
+                    assertThat(events).as("%s key %s", part, code).isEmpty();
+                }
+                assertThat(SwingUtilities.processKeyBindings(press(owner.canvas, KeyEvent.VK_DELETE))).as("the rows themselves take it").isTrue();
+                assertThat(events).containsExactly(new UiEvent.Action("delete"));
+            } finally { release(context); }
+        });
+    }
+
     @Test void aPendingSwitchShowsAMidWarningTrackAndStaysOperable() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();

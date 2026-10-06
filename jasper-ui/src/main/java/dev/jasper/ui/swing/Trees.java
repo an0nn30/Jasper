@@ -181,11 +181,8 @@ final class Trees {
                 int width = i < trailingWidths.length ? trailingWidths[i] : label.getPreferredSize().width;
                 label.setPreferredSize(new java.awt.Dimension(width + label.getInsets().left + label.getInsets().right, label.getPreferredSize().height));
             }
-            String tooltip = item.tooltip().isBlank() ? null : item.tooltip();
-            row.setToolTipText(tooltip);
-            row.getAccessibleContext().setAccessibleDescription(tooltip);
-            ((javax.swing.JComponent) row.controls.get(titleId).component).setToolTipText(tooltip);
-            for (var part : trailing) ((javax.swing.JComponent) row.controls.get(part.id()).component).setToolTipText(tooltip);
+            // The row, its slots and its passive texts (title, trailing columns, count) show the item's literal tooltip.
+            row.tooltip(item.tooltip());
             if (!item.leaf()) {
                 var c = (Buttons.ButtonControl) row.controls.get(leading.getFirst().id());
                 if (c.button.getClientProperty("Jasper.treeCommand") == null) {

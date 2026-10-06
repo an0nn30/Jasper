@@ -360,9 +360,11 @@ Plan 2 Task 8-kit Remote additions (Sessions, Tunnels, SFTP and transfer rows; c
 mirroring module ↔ SDK ↔ host `KitValues` ↔ fake and SDK version rule — the SDK stays 0.14.2 and Task 11 versions these
 record components; prior constructors remain and default to the old meaning):
 - `ListItem.tooltip` and `TableRow.tooltip` (blank = none): the row's literal tooltip (html disabled) and accessible
-  description, shown over the row and its passive content (Text, Icon, Chip, StatusDot; a table's cells); a row's
-  buttons, switches and choices keep their own tooltips. A heading rejects a tooltip. Live text (tunnel counters)
-  follows the descriptor on every update.
+  description, shown anywhere on the row: over its slots' empty area and its passive content (Text, Icon, Chip,
+  StatusDot; a table's cells; a tree row's title and columns use the same rule); a row's buttons, switches and choices
+  keep their own tooltips. Every kit component that can show a tooltip shows it as literal text (html disabled), since
+  row tooltips carry user data. A heading rejects a tooltip. Live text (tunnel counters) follows the descriptor on
+  every update.
 - Item lists report a plain left single click as `Clicked(id,itemId)` after its `Selected`, under exactly the table and
   tree rules (no keys, modifiers, non-left buttons, popup-trigger presses or second clicks); RESULTS lists and headings
   never report it. A click on a row's own Button, MenuButton or Toggle is that control's intent only: it reports the
@@ -372,7 +374,9 @@ record components; prior constructors remain and default to the old meaning):
 - `ItemList.deleteAction` (blank = Delete and Backspace are not the rows' keys and pass on to the host): Delete or
   Backspace on the focused row reports `Action(deleteAction)`; an unselected focused row is selected first (reporting
   `Selected`). Inline controls never receive these keys from the list, and Backspace never feeds type-ahead. RESULTS
-  lists reject both key actions (their rows never take focus).
+  lists reject both key actions (their rows never take focus). With no focused row, or while the rows are not
+  interactive, Delete, Backspace and Enter are not the rows' keys and pass on to the host (fix round 1); a table alone
+  keeps Enter without a focused row, as the JTable it replaced did.
 - `Toggle.pending` (default false): the knob rests midway on `status.warning` while the domain confirms a change; the
   switch stays operable and reports `Toggled(id, !checked)`, where `checked` is always the confirmed state; its
   accessible description is "Pending" unless an error or tooltip says more.

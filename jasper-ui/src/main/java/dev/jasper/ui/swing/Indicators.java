@@ -47,6 +47,8 @@ final class Indicators {
     static final class Dot extends JPanel {
         final KitContext context;
         Dot(KitContext context) { this.context = context; setOpaque(false); }
+        /** Tooltips are literal text: row tooltips carry user data, and Swing HTML could load remote resources. */
+        @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
         @Override public Dimension getPreferredSize() { int size = ThemePainting.metric(context, DesignMetrics.Role.STATUS_DOT); return new Dimension(size, size); }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create(); try {
@@ -88,6 +90,8 @@ final class Indicators {
             super(0, 1000); this.context = context; setOpaque(false); setBorderPainted(false);
             setUI(new BasicProgressBarUI() { @Override protected void startAnimationTimer() {} @Override protected void stopAnimationTimer() {} });
         }
+        /** Tooltips are literal text: row tooltips carry user data, and Swing HTML could load remote resources. */
+        @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
         @Override public Dimension getPreferredSize() { return new Dimension(getFontMetrics(getFont()).stringWidth(getString()) + 2*ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING), ThemePainting.height(context, DesignMetrics.Role.INLINE_ACTION, Typography.Role.CAPTION)); }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create(); try {
@@ -114,6 +118,8 @@ final class Indicators {
     static final class StrengthMeter extends JPanel {
         final KitContext context; int filled; String label = "";
         StrengthMeter(KitContext context) { this.context = context; setOpaque(false); }
+        /** Tooltips are literal text: row tooltips carry user data, and Swing HTML could load remote resources. */
+        @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
         @Override public Dimension getPreferredSize() { return new Dimension(Math.max(getFontMetrics(getFont()).stringWidth(label), 4*ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_HEIGHT)) + 3*ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_GAP), ThemePainting.height(context, DesignMetrics.Role.INLINE_ACTION, Typography.Role.CAPTION)); }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create(); try {

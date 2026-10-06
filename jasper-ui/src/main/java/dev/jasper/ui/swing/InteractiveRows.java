@@ -79,7 +79,11 @@ final class InteractiveRows {
             // passes on to the host, as a single-line field's Enter does without a trailing action.
             canvas.getInputMap().put(KeyStroke.getKeyStroke("ENTER"), "ENTER");
             canvas.getActionMap().put("ENTER", new AbstractAction() {
-                @Override public boolean isEnabled() { return !closed && !enterKey().isBlank(); }
+                // While the rows are not interactive Enter is not theirs and passes on; so it does without a focused row,
+                // except in a table, which keeps Enter as the JTable it replaced did.
+                @Override public boolean isEnabled() {
+                    return !closed && (focusItem != null || keepsEnterWithoutFocus()) && interactive() && !enterKey().isBlank();
+                }
                 @Override public void actionPerformed(ActionEvent event) { if (focusItem != null) enter(focusItem); }
             });
             // Delete and Backspace report a collection's delete action for the focused row; without one they pass on.
@@ -87,7 +91,7 @@ final class InteractiveRows {
                 canvas.getInputMap().put(KeyStroke.getKeyStroke(stroke), "delete");
             }
             canvas.getActionMap().put("delete", new AbstractAction() {
-                @Override public boolean isEnabled() { return !closed && !deletion().isBlank(); }
+                @Override public boolean isEnabled() { return !closed && focusItem != null && interactive() && !deletion().isBlank(); }
                 @Override public void actionPerformed(ActionEvent event) { if (focusItem != null) delete(focusItem); }
             });
             bind(
@@ -122,6 +126,11 @@ final class InteractiveRows {
         abstract String activation();
 
         abstract List<MenuItem> contextActions();
+
+        /** Whether Enter with no focused row stays with the rows (doing nothing) instead of passing on; tables only. */
+        boolean keepsEnterWithoutFocus() {
+            return false;
+        }
 
         /** What Enter on the focused row reports; the activate action unless a collection gives Enter its own. */
         String enterKey() {
@@ -730,6 +739,8 @@ final class InteractiveRows {
             leading.addMouseListener(mouse);
             title.addMouseListener(mouse);
             subtitle.addMouseListener(mouse);
+            // The trailing slot listens too, so its empty area shows the row tooltip and still reaches the row.
+            trailing.addMouseListener(mouse);
         }
 
         @Override
@@ -739,8 +750,16 @@ final class InteractiveRows {
             return tip;
         }
 
+        /** A row slot; its tooltip (the row's, over the slot's empty area) is literal text. */
         static JPanel part() {
-            var p = new JPanel();
+            var p = new JPanel() {
+                @Override
+                public JToolTip createToolTip() {
+                    var tip = super.createToolTip();
+                    tip.putClientProperty("html.disable", true);
+                    return tip;
+                }
+            };
             p.setOpaque(false);
             return p;
         }
@@ -832,6 +851,8 @@ final class InteractiveRows {
             String tooltip = text == null || text.isBlank() ? null : text;
             setToolTipText(tooltip);
             getAccessibleContext().setAccessibleDescription(tooltip);
+            // The slots cover the row, so they show it too: anywhere on the row, as a list row's tooltip did.
+            for (var part : List.of(leading, title, subtitle, trailing)) part.setToolTipText(tooltip);
             for (var c : controls.values()) {
                 if (!(c.component instanceof JComponent component)) continue;
                 switch (c.node) {
@@ -884,6 +905,7 @@ final class InteractiveRows {
             cells.clear();
             setToolTipText(null);
             getAccessibleContext().setAccessibleDescription(null);
+            for (var part : List.of(leading, title, subtitle, trailing)) part.setToolTipText(null);
             leading.removeAll();
             title.removeAll();
             subtitle.removeAll();
