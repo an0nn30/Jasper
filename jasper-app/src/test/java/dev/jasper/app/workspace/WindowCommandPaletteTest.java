@@ -234,10 +234,80 @@ class WindowCommandPaletteTest {
             }
         });
     }
+    @Test void theCardDripsOpenFastThenSlowWithoutMovingOrResizing() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                var clock = new java.util.concurrent.atomic.AtomicLong(1_000_000_000L);
+                var palette = owner.commandPalette(); palette.useClock(clock::get);
+                var root = install(owner);
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                var card = palette.component();
+                Rectangle placed = card.getBounds();
+                assertThat(palette.revealRunning()).isTrue();
+                assertThat(card.revealedHeight()).as("the reveal starts closed").isZero();
+                int previous = 0;
+                for (int quarter = 1; quarter <= 4; quarter++) {
+                    clock.addAndGet(WindowCommandPalette.REVEAL_MILLIS * 1_000_000L / 4);
+                    palette.animate(clock.get());
+                    LayoutTestSupport.layoutTree(root);
+                    assertThat(card.getBounds()).as("only the visible edge moves").isEqualTo(placed);
+                    assertThat(card.revealedHeight()).as("quarter %d", quarter).isGreaterThanOrEqualTo(previous);
+                    previous = card.revealedHeight();
+                    if (quarter == 1) assertThat(previous).as("fast at first").isGreaterThan(placed.height / 2);
+                }
+                assertThat(card.revealedHeight()).isEqualTo(placed.height);
+                assertThat(palette.revealRunning()).isFalse();
+            }
+        });
+    }
+    @Test void theDripEasesOutMonotonically() {
+        assertThat(WindowCommandPalette.drip(0)).isZero();
+        assertThat(WindowCommandPalette.drip(1)).isEqualTo(1);
+        double previous = 0, previousStep = Double.MAX_VALUE;
+        for (int i = 1; i <= 20; i++) {
+            double value = WindowCommandPalette.drip(i / 20.0), step = value - previous;
+            assertThat(value).isGreaterThan(previous);
+            assertThat(step).as("each step is smaller than the last").isLessThan(previousStep);
+            previous = value; previousStep = step;
+        }
+    }
+    @Test void disabledAnimationsOpenTheCardFullyAndDisablingMidwayFinishesTheReveal() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                var clock = new java.util.concurrent.atomic.AtomicLong(1_000_000_000L);
+                var palette = owner.commandPalette(); palette.useClock(clock::get);
+                var root = install(owner);
+                owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(palette.revealRunning()).isFalse();
+                assertThat(palette.component().revealedHeight()).isEqualTo(palette.component().getHeight()).isPositive();
+                palette.dismiss();
+
+                owner.setAnimations(dev.jasper.app.config.AnimationSettings.defaults());
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(palette.revealRunning()).isTrue();
+                owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
+                assertThat(palette.revealRunning()).isFalse();
+                assertThat(palette.component().revealedHeight()).isEqualTo(palette.component().getHeight());
+                palette.dismiss();
+
+                owner.setAnimations(dev.jasper.app.config.AnimationSettings.defaults());
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                clock.addAndGet(WindowCommandPalette.REVEAL_MILLIS * 1_000_000L / 3);
+                palette.animate(clock.get());
+                palette.dismiss();
+                assertThat(palette.revealRunning()).as("dismissing stops the reveal").isFalse();
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(palette.revealRunning()).as("every fresh open drips again").isTrue();
+                assertThat(palette.component().revealedHeight()).isZero();
+            }
+        });
+    }
     @Test void overlayShadowTintsTowardThePopupDropShadowColour() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
                 var root = install(owner);
+                owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
                 owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
                 var overlay = (JComponent) owner.commandPalette().component().getParent();
                 var card = owner.commandPalette().component().getBounds();
@@ -355,6 +425,8 @@ class WindowCommandPaletteTest {
                 var fake = new PaletteScopesTest.FakeScope();
                 fake.rows = List.of(new PaletteRow("alpha", "Alpha", "a detail", null, null, true, null));
                 owner.scopes().register(fake);
+                // A settled card: while it drips open, only its shown part takes presses.
+                owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
                 owner.commandPalette().open(fake.id());
                 LayoutTestSupport.layoutTree(root);
                 var palette = owner.commandPalette().component();

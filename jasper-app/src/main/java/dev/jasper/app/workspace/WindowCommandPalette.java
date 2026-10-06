@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.config.AnimationSettings;
 import dev.jasper.app.config.ViewMode;
 import dev.jasper.app.palette.CommandPalette;
 import dev.jasper.app.palette.PaletteController;
@@ -8,11 +9,14 @@ import dev.jasper.app.palette.ScopeRegistry;
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.function.LongSupplier;
 import javax.swing.*;
 
 /** Workspace adapter for palette overlay, captured terminal capabilities and focus restoration. */
 final class WindowCommandPalette implements AutoCloseable {
     private static final int TOP_ANCHOR_DIVISOR = 5;
+    /** How long an opening card takes to drop to its full height. */
+    static final int REVEAL_MILLIS = 300;
     private final WindowContent owner;
     private final String defaultScopeId;
     private final PaletteController controller;
@@ -23,6 +27,10 @@ final class WindowCommandPalette implements AutoCloseable {
     private TerminalPane originPane;
     private Component priorFocus;
     private boolean closed;
+    private AnimationSettings animations = AnimationSettings.defaults();
+    private LongSupplier clock = System::nanoTime;
+    private Timer reveal;
+    private long revealStart;
     private final ComponentAdapter resize = new ComponentAdapter() {
         @Override public void componentResized(ComponentEvent event) { layoutOverlay(); }
         @Override public void componentMoved(ComponentEvent event) { layoutOverlay(); }
@@ -78,6 +86,7 @@ final class WindowCommandPalette implements AutoCloseable {
             if (controller.open(id, originPane == null ? PaletteTarget.window(owner.id()) : target(originPane), this::validOrigin, queryOrNull, rowIdOrNull)) {
                 if (!wasOpen) overlay.swallowing = false;
                 overlay.setVisible(true); layoutOverlay();
+                if (!wasOpen) startReveal();
                 palette.queryField().requestFocusInWindow();
             }
         }
@@ -98,12 +107,52 @@ final class WindowCommandPalette implements AutoCloseable {
     }
 
     private void restoreAndHide() {
+        stopReveal();
         boolean restorePriorFocus = validOrigin();
         overlay.setVisible(overlay.swallowing);
         if (restorePriorFocus && priorFocus != null && priorFocus.isShowing()
                 && SwingUtilities.isDescendingFrom(priorFocus, owner)) priorFocus.requestFocusInWindow();
         else owner.focusSelected();
         priorFocus = null; originTab = null; originPane = null;
+    }
+
+    void setAnimations(AnimationSettings settings) {
+        animations = settings;
+        if (!settings.enabled()) stopReveal();
+    }
+
+    /** Tests drive the reveal with the same monotonic clock it starts from. */
+    void useClock(LongSupplier replacement) { clock = replacement; }
+
+    /** The card drops open vertically: its bottom edge leaves the field fast and settles slowly. */
+    private void startReveal() {
+        stopReveal();
+        if (!animations.enabled()) return;
+        revealStart = clock.getAsLong();
+        palette.setReveal(0); overlay.repaint();
+        reveal = new Timer(8, event -> animate(clock.getAsLong()));
+        reveal.start();
+    }
+
+    /** One elapsed-time frame of the reveal. */
+    void animate(long now) {
+        if (reveal == null) return;
+        double elapsed = Math.max(0, Math.min(1, (now - revealStart) / (REVEAL_MILLIS * 1_000_000.0)));
+        palette.setReveal(drip(elapsed)); overlay.repaint();
+        if (elapsed >= 1) stopReveal();
+    }
+
+    /** Quartic ease-out: most of the height in the first third, then a slow settle. */
+    static double drip(double elapsed) {
+        double rest = 1 - elapsed;
+        return 1 - rest * rest * rest * rest;
+    }
+
+    boolean revealRunning() { return reveal != null; }
+
+    private void stopReveal() {
+        if (reveal != null) { reveal.stop(); reveal = null; }
+        palette.setReveal(1); overlay.repaint();
     }
 
     void setVisibleRows(int value) { controller.setVisibleRows(value); }
@@ -167,7 +216,7 @@ final class WindowCommandPalette implements AutoCloseable {
 
     @Override public void close() {
         if (closed) return;
-        controller.close(); closed = true; uninstall();
+        stopReveal(); controller.close(); closed = true; uninstall();
     }
 
     private final class Overlay extends JComponent {
@@ -210,6 +259,8 @@ final class WindowCommandPalette implements AutoCloseable {
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 Rectangle card = palette.getBounds();
+                card.height = palette.revealedHeight();
+                if (card.height <= 0) return;
                 Color shadow = UIManager.getColor("Popup.dropShadowColor");
                 if (shadow == null) shadow = Color.BLACK;
                 g.setColor(new Color(shadow.getRed(), shadow.getGreen(), shadow.getBlue(), owner.theme().chrome().dark() ? 4 : 2));

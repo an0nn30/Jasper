@@ -838,6 +838,10 @@ use the same `ui.animations.enabled` policy. Tab content and keyboard focus chan
 Tab motion follows the [Alacritty reference](design/alacritty-tabs.md): first reveal takes 490 ms,
 subsequent opening 475 ms and closing 425 ms. Selection and hiding the last remaining tab
 bar are immediate. A single workspace tab has no visible tab bar.
+
+The command palette drips open: over 300 ms its bottom edge eases down from the top of the card (quartic ease-out,
+fast then slow) while its rows stay in place, so the query field takes typing at once. Only a fresh open animates;
+switching scopes or changing results does not, and dismissing or disabling animations shows the card's final state.
 The temporary **Open tab duration**, **Close tab duration**, and **Switch tab duration** tuning fields have been removed.
 Existing `ui.animations.tab_open_ms`, `ui.animations.tab_close_ms`, and `ui.animations.tab_switch_ms` values are
 ignored silently and left in the configuration file; they no longer affect motion. Other unknown animation keys
