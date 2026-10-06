@@ -91,6 +91,9 @@ leaves the original caller-owned. DETAIL uses character-array painting, never a 
 Replacement/removal/kind change/close wipe owned values; `clearSecret` and replacement remask details.
 Copy emits only `Action(copyAction)`; the domain callback uses `withSecret` and its credential clipboard
 service. No secret-bearing immutable string or general clipboard write is added by the kit.
+`SecretKind.MULTILINE` (Plan 2 Task 7) is an editable secure note: a wrapping text area over the same wipeable
+buffer, shown in clear, with no reveal group, copy action or reveal control; its storage, transfer and wipe rules
+are those of INPUT.
 
 Updates invoked from an in-progress update are rejected before mutation at module/SDK/fake boundaries.
 Disposal still contains callback diagnostics and permits reentrant close; normal event handlers can

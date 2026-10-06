@@ -127,6 +127,20 @@ class TextFieldsTest {
             } finally { release(context); }
         });
     }
+    @Test void browseIsNamedForItsFieldAcrossUpdatesAndThemeChanges() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, stack(new Field("p", ControlState.READY, FieldKind.PATH, "", "", "Private key path", "browse-path")), e -> {})) {
+                var browse = find(view, "p.browse", JButton.class);
+                assertThat(browse.getText()).isEqualTo("Browse\u2026");
+                assertThat(browse.getAccessibleContext().getAccessibleName()).isEqualTo("Browse for Private key path");
+                view.update(stack(new Field("p", ControlState.READY, FieldKind.PATH, "", "", "Public key path", "browse-path")));
+                assertThat(browse.getAccessibleContext().getAccessibleName()).isEqualTo("Browse for Public key path");
+                context.binding().publish(new dev.jasper.ui.theme.ThemePair(KitFixtures.custom(), KitFixtures.custom()));
+                assertThat(browse.getAccessibleContext().getAccessibleName()).isEqualTo("Browse for Public key path");
+            } finally { release(context); }
+        });
+    }
     @Test void parentAvailabilityAlsoDisablesInlineBrowseAction() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();

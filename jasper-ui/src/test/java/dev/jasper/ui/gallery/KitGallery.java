@@ -55,6 +55,7 @@ public final class KitGallery {
         result.addAll(StateFixtures.create());
         result.add(new Fixture("stored-secret-masked","","stored-secret-masked",320,88,new ViewSpec(new Secret("stored-secret",ControlState.READY,"","Passphrase","",SecretKind.DETAIL,"copy-secret"))));
         result.add(new Fixture("stored-secret-revealed","","stored-secret-revealed",320,88,new ViewSpec(new Secret("stored-secret",ControlState.READY,"","Passphrase","",SecretKind.DETAIL,"copy-secret"))));
+        result.add(new Fixture("secure-note","","normal",360,220,new ViewSpec(new Secret("secure-note",ControlState.READY,"Write a note","Secure note","",SecretKind.MULTILINE,""))));
         result.add(new Fixture("dropdown-open","","dropdown-open",240,130,new ViewSpec(new Nodes.Choice("dropdown",ControlState.READY,ChoiceKind.DROPDOWN,List.of(new Option("ssh","SSH",Optional.of(Hue.GREEN)),new Option("local","Local",Optional.of(Hue.BLUE)),new Option("sftp","SFTP",Optional.of(Hue.PURPLE))),"ssh","Protocol","protocol"))));
         return List.copyOf(result);
     }

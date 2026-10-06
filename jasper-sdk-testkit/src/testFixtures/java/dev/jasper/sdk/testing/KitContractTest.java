@@ -124,6 +124,27 @@ public abstract class KitContractTest {
         view.replaceSecret("detail",new char[]{'q'});view.update(spec("Input"));view.update(new ViewSpec(descriptor));view.withSecret("detail",chars -> assertThat(chars).isEmpty());
         stop(kit);assertThatThrownBy(() -> view.replaceSecret("detail",new char[]{'s'})).isInstanceOf(IllegalStateException.class);
     }); }
+    /** A secure-note secret: clear multiline input over wipeable storage, no reveal group or copy action. */
+    protected static ViewSpec note(Nodes.SecretKind kind) { return new ViewSpec(new Nodes.Stack("root",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
+        new Nodes.Text("title",ControlState.READY,"Note",Nodes.TextRole.BODY),
+        new Nodes.Secret("note",ControlState.READY,"","Secure note","",kind,"")))); }
+    @Test void multilineSecretsTakeTypedTextAndWipeOnKindChangeAndClose() throws Exception { edt(() -> {
+        assertThatThrownBy(() -> new Nodes.Secret("n",ControlState.READY,"","Note","pair",Nodes.SecretKind.MULTILINE,"")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Nodes.Secret("n",ControlState.READY,"","Note","",Nodes.SecretKind.MULTILINE,"copy")).isInstanceOf(IllegalArgumentException.class);
+        var kit=kit("owner");var events=new ArrayList<UiEvent>();var view=kit.create(note(Nodes.SecretKind.MULTILINE),events::add);
+        secret(view,"note","first line\nsecond".toCharArray());
+        assertThat(events).containsOnly(new UiEvent.SecretChanged("note"));
+        assertThat(events.toString()+view.spec()).doesNotContain("first line");
+        view.update(note(Nodes.SecretKind.MULTILINE));
+        char[][] held={null};view.withSecret("note",chars -> {held[0]=chars;assertThat(chars).containsExactly("first line\nsecond".toCharArray());});
+        assertThat(held[0]).containsOnly((char)0);
+        events.clear();char[] owned={'a','\n','b'};view.replaceSecret("note",owned);assertThat(events).isEmpty();assertThat(owned).containsExactly('a','\n','b');
+        view.withSecret("note",chars -> assertThat(chars).containsExactly('a','\n','b'));
+        view.update(note(Nodes.SecretKind.INPUT));view.withSecret("note",chars -> assertThat(chars).isEmpty());
+        view.update(note(Nodes.SecretKind.MULTILINE));view.withSecret("note",chars -> assertThat(chars).isEmpty());
+        secret(view,"note","x".toCharArray());view.clearSecret("note");view.withSecret("note",chars -> assertThat(chars).isEmpty());
+        view.close();assertThatThrownBy(() -> view.withSecret("note",chars -> {})).isInstanceOf(IllegalStateException.class);stop(kit);
+    }); }
     @Test void createUpdateActionAndClose() throws Exception { edt(() -> {
         var kit=kit("owner"); var events=new ArrayList<UiEvent>(); var view=kit.create(spec("Before"),events::add);
         view.update(spec("After")); assertThat(view.spec()).isEqualTo(spec("After"));

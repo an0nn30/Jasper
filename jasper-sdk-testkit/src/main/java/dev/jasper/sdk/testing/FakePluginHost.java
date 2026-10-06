@@ -920,6 +920,20 @@ public final class FakePluginHost implements AutoCloseable {
             .map(w -> w.content).filter(java.util.Objects::nonNull).findFirst();
     }
 
+    /**
+     * The owned view mounted on an open plugin window or dialog, for driving {@code UiView} content in headless tests
+     * (secrets through {@link FakeKitView#setSecret}, intents through {@link FakeKitView#emit}). Call it on the UI thread.
+     * @param pluginId surface owner
+     * @param title exact surface title
+     * @return the mounted view while the surface is open, empty after close, for raw content or if absent
+     */
+    public java.util.Optional<FakeKitView> windowView(String pluginId, String title) {
+        FakePluginContext context = contexts.get(pluginId);
+        if (context == null) return java.util.Optional.empty();
+        return context.ui.windows.stream().filter(w -> !w.closed && w.title.equals(title))
+            .map(w -> w.mounted).filter(java.util.Objects::nonNull).findFirst();
+    }
+
     /** The currently shown plugin windows. */
     public List<String> windows() {
         List<String> lines = new ArrayList<>();

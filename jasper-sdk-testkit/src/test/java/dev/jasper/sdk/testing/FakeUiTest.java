@@ -194,4 +194,26 @@ class FakeUiTest {
         }
     }
 
+    @Test void exposesTheOwnedViewMountedOnAnOpenSurfaceUntilCloseOrReplacement() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            try (var host = new FakePluginHost()) {
+                var context = host.start(INFO, Set.of(), Set.of(), c -> {});
+                var owner = context.terminals().window(host.addTerminalWindow()).orElseThrow();
+                var dialog = context.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Unlock", owner, true));
+                assertThat(host.windowView(INFO.id(), "Unlock")).isEmpty();
+                var spec = new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Secret("password", dev.jasper.sdk.ui.ControlState.READY, "", "Password", ""));
+                var view = context.kit().create(spec, e -> {});
+                dialog.setContent(view); dialog.show();
+                assertThat(host.windowView(INFO.id(), "Unlock")).containsSame((FakeKitView) view);
+                assertThat(host.windowView("other.plugin", "Unlock")).isEmpty();
+                dialog.setContent(new javax.swing.JPanel());
+                assertThat(host.windowView(INFO.id(), "Unlock")).as("raw content replaced the view").isEmpty();
+                var next = context.kit().create(spec, e -> {}); dialog.setContent(next);
+                ((FakeKitView) next).setSecret("password", "fixture".toCharArray());
+                dialog.close();
+                assertThat(host.windowView(INFO.id(), "Unlock")).isEmpty();
+                assertThatThrownBy(next::spec).as("closing the surface disposes its view").isInstanceOf(IllegalStateException.class);
+            }
+        });
+    }
 }

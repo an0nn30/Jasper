@@ -12,13 +12,26 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.*;
 
-/** Live secrets stay in wipeable documents; reveal changes only echo characters, never text. */
+/**
+ * Live secrets stay in wipeable documents; reveal changes only echo characters, never text. A MULTILINE secret edits
+ * the same wipeable buffer in a wrapping text area shown in clear (a secure note), with no reveal or copy control.
+ */
 final class SecretFields {
     private SecretFields() {}
+
+    /** A MULTILINE secret shows this many wrapped lines before it scrolls, as the former secure-note editor did. */
+    static final int MULTILINE_ROWS = 8;
+
+    /** The preferred width of a MULTILINE secret, in columns, as the former secure-note editor's. */
+    static final int MULTILINE_COLUMNS = 32;
 
     static final class SecretControl extends ControlRegistry.Control {
         final SecretBuffer buffer = new SecretBuffer();
         final JPasswordField input = new JPasswordField();
+        /** The wrapping editor of a MULTILINE secret over {@link #buffer}; null for the other kinds. */
+        final JTextArea area;
+        final JScrollPane areaScroll;
+        final boolean multiline;
         final JLabel label = Labels.literal(), error = Labels.literal(), lock = Labels.literal();
         final Buttons.KitButton reveal, copy;
         final boolean detail;
@@ -31,19 +44,40 @@ final class SecretFields {
         SecretControl(KitView view, Nodes.Secret node) {
             super(view, node, new JPanel(new BorderLayout()));
             detail = node.kind() == Nodes.SecretKind.DETAIL;
+            multiline = node.kind() == Nodes.SecretKind.MULTILINE;
             own(() -> java.util.Arrays.fill(detailValue, (char) 0));
             own(buffer);
-            input.setDocument(buffer);
             masked = input.getEchoChar();
             input.setOpaque(false);
             input.setBorder(new EmptyBorder(0, 0, 0, 0));
-            KitOwnership.mark(input, node.id() + ".input");
             input.putClientProperty("JPasswordField.cutCopyAllowed", false);
-            surface = new TextFields.FieldSurface(context(), input, false);
-            surface.focus = new ThemePainting.Focus(input, surface, view);
-            own(surface.focus);
-            surface.add(input, BorderLayout.CENTER);
-            surface.add(lock, BorderLayout.WEST);
+            if (multiline) {
+                // The password field never holds this buffer: one document belongs to one editor.
+                area = new JTextArea(buffer, null, MULTILINE_ROWS, MULTILINE_COLUMNS);
+                area.setLineWrap(true);
+                area.setWrapStyleWord(true);
+                area.setOpaque(false);
+                area.setBorder(new EmptyBorder(0, 0, 0, 0));
+                KitOwnership.mark(area, node.id() + ".input");
+                areaScroll = new JScrollPane(area);
+                areaScroll.setBorder(new EmptyBorder(0, 0, 0, 0));
+                areaScroll.setOpaque(false);
+                areaScroll.getViewport().setOpaque(false);
+                surface = new TextFields.FieldSurface(context(), area, true);
+                surface.focus = new ThemePainting.Focus(area, surface, view);
+                own(surface.focus);
+                surface.add(areaScroll, BorderLayout.CENTER);
+            } else {
+                area = null;
+                areaScroll = null;
+                input.setDocument(buffer);
+                KitOwnership.mark(input, node.id() + ".input");
+                surface = new TextFields.FieldSurface(context(), input, false);
+                surface.focus = new ThemePainting.Focus(input, surface, view);
+                own(surface.focus);
+                surface.add(input, BorderLayout.CENTER);
+                surface.add(lock, BorderLayout.WEST);
+            }
             reveal = new Buttons.KitButton(context());
             reveal.kind = Nodes.ButtonKind.GHOST;
             KitOwnership.mark(reveal, node.id() + ".reveal");
@@ -60,7 +94,7 @@ final class SecretFields {
                     };
             reveal.addActionListener(action);
             own(() -> reveal.removeActionListener(action));
-            surface.add(reveal, BorderLayout.EAST);
+            if (!multiline) surface.add(reveal, BorderLayout.EAST);
             copy = new Buttons.KitButton(context());
             copy.kind = Nodes.ButtonKind.GHOST;
             KitOwnership.mark(copy, node.id() + ".copy");
@@ -145,7 +179,7 @@ final class SecretFields {
                 container.add(row, BorderLayout.CENTER);
                 surface.remove(input);
             } else container.add(surface, BorderLayout.CENTER);
-            label.setLabelFor(detail ? detailDisplay : input);
+            label.setLabelFor(detail ? detailDisplay : multiline ? area : input);
             DocumentListener listener =
                     new DocumentListener() {
                         @Override
@@ -227,6 +261,28 @@ final class SecretFields {
             reveal.repaint();
         }
 
+        private void refreshArea(Nodes.Secret secret, boolean enabled) {
+            area.setEnabled(enabled);
+            area.setEditable(enabled);
+            area.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.TEXT_CURSOR : Cursor.DEFAULT_CURSOR));
+            area.setFont(ThemePainting.font(context(), Typography.Role.BODY));
+            area.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
+            area.setDisabledTextColor(area.getForeground());
+            area.setCaretColor(area.getForeground());
+            area.setSelectionColor(ThemePainting.color(context(), SemanticColor.SELECTION_BG));
+            area.setSelectedTextColor(area.getForeground());
+            area.getAccessibleContext().setAccessibleName(secret.label());
+            area.getAccessibleContext()
+                    .setAccessibleDescription(
+                            secret.state().error().isEmpty() ? secret.hint() : secret.state().error());
+            areaScroll.setEnabled(enabled);
+            areaScroll.getVerticalScrollBar().setEnabled(enabled);
+            areaScroll.getVerticalScrollBar()
+                    .setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_INPUT));
+            areaScroll.getVerticalScrollBar()
+                    .setForeground(ThemePainting.color(context(), SemanticColor.BORDER_INPUT));
+        }
+
         @Override
         void update(Nodes.Node next) {
             if (!((Nodes.Secret) node).revealGroup().equals(((Nodes.Secret) next).revealGroup()))
@@ -252,7 +308,7 @@ final class SecretFields {
 
         @Override
         JComponent focusTarget() {
-            return detail ? reveal : input;
+            return detail ? reveal : multiline ? area : input;
         }
 
         @Override
@@ -262,8 +318,10 @@ final class SecretFields {
             boolean enabled = component.isEnabled();
             input.setEnabled(enabled);
             input.setEditable(enabled && !detail);
+            if (multiline) refreshArea(secret, enabled);
             surface.setEnabled(enabled);
             reveal.setEnabled(enabled);
+            reveal.setVisible(!multiline);
             detailDisplay.setEnabled(enabled);
             detailDisplay.getAccessibleContext().setAccessibleName(secret.label());
             detailDisplay
@@ -301,6 +359,7 @@ final class SecretFields {
             label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY));
             label.setEnabled(enabled);
             label.setVisible(!embedded && !surface.hero);
+            lock.setVisible(!embedded && !surface.hero && !multiline);
             error.setText(secret.state().error());
             error.setVisible(!secret.state().error().isEmpty());
             error.setEnabled(enabled);
@@ -322,8 +381,13 @@ final class SecretFields {
                             0, 0, 0, ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP)));
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
             int padding =
-                    ThemePainting.metric(context(), DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
-            surface.setBorder(new EmptyBorder(ring, padding, ring, ring));
+                    ThemePainting.metric(
+                            context(),
+                            multiline
+                                    ? DesignMetrics.Role.TEXTAREA_PADDING
+                                    : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
+            if (multiline) surface.setBorder(new EmptyBorder(ring * 2, padding, ring * 2, padding));
+            else surface.setBorder(new EmptyBorder(ring, padding, ring, ring));
             reveal.setBorder(new EmptyBorder(ring, ring, ring, ring));
             copy.setBorder(new EmptyBorder(ring, ring, ring, ring));
             reveal.setFont(ThemePainting.font(context(), Typography.Role.LABEL));

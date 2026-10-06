@@ -146,7 +146,12 @@ public final class Nodes {
         }
     }
 
-    public enum SecretKind { INPUT, DETAIL }
+    /**
+     * INPUT is a masked single-line entry with a reveal control; DETAIL a read-only stored value with reveal and optional
+     * copy. MULTILINE is an editable, wrapping secure-note area over the same wipeable storage, shown in clear, with no
+     * reveal or copy control, so it takes neither a reveal group nor a copy action.
+     */
+    public enum SecretKind { INPUT, DETAIL, MULTILINE }
 
     public record Secret(String id, ControlState state, String hint, String label, String revealGroup, SecretKind kind, String copyAction) implements Node {
         public Secret {
@@ -154,6 +159,8 @@ public final class Nodes {
             Objects.requireNonNull(hint);
             ModelChecks.label(label, "label");
             Objects.requireNonNull(revealGroup); Objects.requireNonNull(kind); Objects.requireNonNull(copyAction);
+            if (kind == SecretKind.MULTILINE && (!revealGroup.isEmpty() || !copyAction.isEmpty()))
+                throw new IllegalArgumentException("A multiline secret has no reveal group or copy action");
         }
         public Secret(String id, ControlState state, String hint, String label, String revealGroup) {
             this(id,state,hint,label,revealGroup,SecretKind.INPUT,"");

@@ -137,7 +137,59 @@ class SecretFieldsTest {
             } finally { view.close(); release(context); }
         });
     }
-    static char[] storage(JPasswordField input) {
+    static Secret note(String id) { return new Secret(id, ControlState.READY, "", "Secure note", "", SecretKind.MULTILINE, ""); }
+    @Test void partialDeletionKeepsTheRemainingCharactersAndWipesTheOldStorage() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, stack(secret("a", "")), e -> {})) {
+                var a = find(view, "a.input", JPasswordField.class);
+                char[] value = "secret".toCharArray(); view.replaceSecret("a", value); java.util.Arrays.fill(value, (char) 0);
+                char[] before = storage(a);
+                a.getDocument().remove(1, 3);
+                assertThat(before).containsOnly((char) 0);
+                view.withSecret("a", chars -> assertThat(chars).containsExactly('s', 'e', 't'));
+                view.clearSecret("a"); view.withSecret("a", chars -> assertThat(chars).isEmpty());
+            } catch (javax.swing.text.BadLocationException impossible) { throw new AssertionError(impossible); }
+            finally { release(context); }
+        });
+    }
+    @Test void multilineSecretEditsInClearWrapsAndHasNoRevealOrCopy() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, stack(note("note")), events::add)) {
+                var area = find(view, "note.input", JTextArea.class);
+                assertThat(area).isNotNull(); assertThat(area.getLineWrap()).isTrue(); assertThat(area.getWrapStyleWord()).isTrue();
+                assertThat(area.getRows()).isEqualTo(SecretFields.MULTILINE_ROWS);
+                assertThat(find(view, "note.reveal", JButton.class)).as("no reveal control is mounted").isNull();
+                assertThat(find(view, "note.copy", JButton.class)).as("no copy control is mounted").isNull();
+                assertThat(area.getAccessibleContext().getAccessibleName()).isEqualTo("Secure note");
+                area.setText("first line\nsecond \u03bb");
+                assertThat(events).containsOnly(new UiEvent.SecretChanged("note"));
+                assertThat(events.toString()).doesNotContain("first line"); assertThat(view.spec().toString()).doesNotContain("first line");
+                char[][] temporary = {null};
+                view.withSecret("note", chars -> { temporary[0] = chars; assertThat(chars).containsExactly("first line\nsecond \u03bb".toCharArray()); });
+                assertThat(temporary[0]).containsOnly((char) 0);
+                events.clear(); char[] owned = "replaced\ntext".toCharArray(); view.replaceSecret("note", owned);
+                assertThat(events).isEmpty(); assertThat(owned).containsExactly("replaced\ntext".toCharArray());
+                assertThat(area.getText()).isEqualTo("replaced\ntext");
+                char[] live = storage(area); view.clearSecret("note"); assertThat(live).containsOnly((char) 0); assertThat(area.getDocument().getLength()).isZero();
+                var undo = new javax.swing.undo.UndoManager(); area.getDocument().addUndoableEditListener(undo);
+                area.setText("again"); live = storage(area);
+                view.update(stack(secret("note", "")));
+                assertThat(live).containsOnly((char) 0);
+                assertThat(find(view, "note.input", JPasswordField.class)).as("a kind change replaces the control").isNotNull();
+                view.withSecret("note", chars -> assertThat(chars).isEmpty());
+                view.update(stack(note("note"))); var next = find(view, "note.input", JTextArea.class);
+                next.setText("closing"); char[] closing = storage(next); view.close();
+                assertThat(closing).containsOnly((char) 0); assertThat(undo.canUndo()).isFalse();
+            } finally { release(context); }
+        });
+    }
+    @Test void multilineSecretRejectsRevealGroupsAndCopyActions() {
+        assertThatThrownBy(() -> new Secret("n", ControlState.READY, "", "Note", "pair", SecretKind.MULTILINE, "")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Secret("n", ControlState.READY, "", "Note", "", SecretKind.MULTILINE, "copy")).isInstanceOf(IllegalArgumentException.class);
+    }
+    static char[] storage(javax.swing.text.JTextComponent input) {
         var segment = new Segment();
         try { input.getDocument().getText(0, input.getDocument().getLength(), segment); return segment.array; }
         catch (javax.swing.text.BadLocationException impossible) { throw new AssertionError(impossible); }

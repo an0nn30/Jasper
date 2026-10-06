@@ -175,7 +175,11 @@ final class TextFields {
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
             int padding = ThemePainting.metric(context(), field.kind() == Nodes.FieldKind.TEXTAREA ? DesignMetrics.Role.TEXTAREA_PADDING : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
             surface.setBorder(new EmptyBorder(ring * 2, padding, ring * 2, padding));
-            if (browse != null) { browse.parentEnabled = parentEnabled; browse.update(browseNode(field)); browse.component.setVisible(!field.trailingAction().isBlank()); }
+            if (browse != null) {
+                browse.parentEnabled = parentEnabled; browse.update(browseNode(field)); browse.component.setVisible(!field.trailingAction().isBlank());
+                // The visible label stays "Browse…"; the accessible name says which field it fills.
+                browse.component.getAccessibleContext().setAccessibleName("Browse for " + field.label());
+            }
             ((BorderLayout)line.getLayout()).setHgap(ThemePainting.metric(context(), DesignMetrics.Role.BUTTON_GAP));
             ((BorderLayout)container.getLayout()).setVgap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
             container.revalidate(); container.repaint();

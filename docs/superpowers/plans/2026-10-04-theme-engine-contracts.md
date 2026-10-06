@@ -171,7 +171,7 @@ unique within their owning control; references resolve only in that control. Do 
 | MenuButton | `String label, String icon, ButtonKind kind, String action, List<MenuItem> items, String tooltip, ButtonPresentation presentation` |
 | StatusDot | `StatusKind kind` |
 | Field | `FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation` (numeric present exactly for NUMBER) |
-| Secret | `String hint, String label, String revealGroup, SecretKind kind, String copyAction` (no string value) |
+| Secret | `String hint, String label, String revealGroup, SecretKind kind, String copyAction` (no string value; MULTILINE takes no reveal group or copy action) |
 | Choice | `ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon, Optional<ChoiceSearch> search` (present exactly for SEARCHABLE) |
 | Toggle | `String label, boolean checked, String action, boolean compact, String tooltip` |
 | Chip | `String label, Hue hue` |
@@ -337,6 +337,19 @@ rule; prior constructors remain and default to the old meaning):
 - The app no longer publishes `Jasper.notification.{background,borderColor,foreground,mutedForeground,linkForeground}`;
   notifications read module roles. An authored `[ui]` key of that name is an unsupported override with no consumer, which
   the Task 11 unsupported-override diagnostic must report.
+
+Plan 2 Task 7 Vault additions (secure notes; same mirroring and SDK version rule, controller ruling 1):
+- `SecretKind.MULTILINE` is an editable secure-note area: a wrapping, scrolling text area over the same wipeable kit
+  `SecretBuffer` as INPUT, shown in clear (as the former Vault note editor), `MULTILINE_ROWS` (8) lines tall and
+  `MULTILINE_COLUMNS` (32) wide before it scrolls, with no lock glyph, reveal or copy control. Its descriptor takes
+  neither a reveal group nor a copy action (both records reject them). Typing reports only `SecretChanged(id)`; Enter
+  inserts a newline (the form's Enter submit already skips text areas); `withSecret`, `replaceSecret` and
+  `clearSecret` behave exactly as for INPUT, and kind change, removal and close erase the buffer. The fake's
+  `setSecret` accepts INPUT and MULTILINE (DETAIL stays read-only).
+- A PATH field's Browse button keeps its visible "Browse…" label and is accessibly named "Browse for <field label>"
+  (no API), restoring the per-field names the Vault editors had.
+- Testkit: `FakePluginHost.windowView(pluginId, title)` returns the `FakeKitView` mounted on an open plugin window or
+  dialog (empty after close or for raw content); it joins the Task 11 0.15 testkit surface with `closePanel`.
 
 Plan 2 Task 6b-2 palette additions (command palette; same mirroring and SDK version rule). Prior constructors remain
 and default to the old meaning (not a heading, no visible-row count):
@@ -594,7 +607,7 @@ references and cycles yield origin/key-aware actionable diagnostics; optional `$
 resolve to null. Function `derived`/`lazy` inputs become colors in the immutable snapshot, with
 no live UI lookup. New publications recompute from current authored inputs.
 
-`SecretKind` is INPUT or DETAIL. The five-argument constructor remains INPUT with no copy action.
+`SecretKind` is INPUT, DETAIL or (Plan 2 Task 7) MULTILINE. The five-argument constructor remains INPUT with no copy action.
 DETAIL is read-only, uses mutable owned character storage and char-array painting, and keeps reveal
 and optional copy controls enabled independently of editability. No stored value enters a text
 component, descriptor, event, metadata or diagnostic. `replaceSecret(id, char[])` synchronously copies
@@ -603,7 +616,7 @@ its original. Replacement, kind change, removal and close erase owned data; deta
 clear also remask. `withSecret` always erases its callback copy in finally. A detail copy control emits
 only `Action(copyAction)`; the domain handler calls `withSecret` and transfers to its existing credential
 clipboard/async owner, which remains responsible for that independent lifetime. The kit never silently
-writes the system clipboard. Fake input simulation rejects DETAIL; the fake/host mirror transfers.
+writes the system clipboard. Fake input simulation rejects DETAIL (it accepts INPUT and the Task 7 MULTILINE); the fake/host mirror transfers.
 
 A nested `update` during reconciliation is rejected before mutation by KitView, HostedKitView and
 FakeKitView. Disposal callbacks retain existing contained-diagnostic behavior, outer reconciliation
