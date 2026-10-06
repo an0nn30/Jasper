@@ -8,12 +8,13 @@ import javax.swing.*;
 final class KitContent implements AutoCloseable {
  private static final Map<JComponent,KitContent> OWNERS=new IdentityHashMap<>();
  private final java.awt.event.HierarchyListener hierarchy = e -> {if((e.getChangeFlags() & java.awt.event.HierarchyEvent.PARENT_CHANGED)!=0)refresh();};
- private final HostedKit owner;private final CustomContent content;private Subscription themeChanges;private Subscription workspaceChanges;private boolean closed;
- KitContent(HostedKit owner,CustomContent content){this.owner=owner;this.content=content;if(OWNERS.containsKey(content.component())||content.component().getParent()!=null)throw new IllegalArgumentException("Content is already owned or mounted");OWNERS.put(content.component(),this);
+ private final HostedKit owner;private final CustomContent content;private final java.util.function.Supplier<dev.jasper.ui.theme.ThemeRoute> route;private Subscription themeChanges;private Subscription workspaceChanges;private boolean closed;
+ /** @param route the owning view's current theme slot: a workspace content tab's specialized content takes workspace colours */
+ KitContent(HostedKit owner,CustomContent content,java.util.function.Supplier<dev.jasper.ui.theme.ThemeRoute> route){this.owner=owner;this.content=content;this.route=java.util.Objects.requireNonNull(route);if(OWNERS.containsKey(content.component())||content.component().getParent()!=null)throw new IllegalArgumentException("Content is already owned or mounted");OWNERS.put(content.component(),this);
   try{content.component().addHierarchyListener(hierarchy);refresh();if(owner.appearance!=null){themeChanges=owner.appearance.onChanged(v -> refresh());workspaceChanges=owner.appearance.onWorkspaceChanged(v -> refresh());}}catch(Throwable failure){abort();throw failure;}
  }
  private void refresh(){if(closed)return;var appearance=owner.appearance;if(appearance==null)return;
-  var component=content.component();var background=appearance.color(SemanticColor.SURFACE_INPUT);var foreground=appearance.color(SemanticColor.TEXT_PRIMARY);double opacity=appearance.workspaceOpacity(component);
+  var component=content.component();var background=owner.color(route.get(),dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT);var foreground=owner.color(route.get(),dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY);double opacity=appearance.workspaceOpacity(component);
   component.setForeground(foreground);component.setBackground(new Color(background.getRed(),background.getGreen(),background.getBlue(),(int)Math.round(background.getAlpha()*opacity)));component.setOpaque(opacity==1);component.repaint();
  }
  void abort(){if(closed)return;closed=true;content.component().removeHierarchyListener(hierarchy);OWNERS.remove(content.component(),this);if(workspaceChanges!=null)workspaceChanges.close();if(themeChanges!=null)themeChanges.close();}

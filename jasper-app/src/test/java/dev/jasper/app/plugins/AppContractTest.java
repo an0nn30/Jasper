@@ -287,6 +287,7 @@ class AppContractTest extends PluginContractTest {
                     return action.isPresent();
                 });
             }
+            @Override public String viewRoute(dev.jasper.sdk.ui.UiView view) { return ((HostedKitView) view).component().route().name(); }
             @Override public void closePanel(String panelId, java.util.UUID windowId) {
                 onEdt(() -> { var site = sites.remove(panelId + "|" + windowId); if (site != null) site.notifyClosed(); });
             }

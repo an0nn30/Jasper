@@ -596,11 +596,18 @@ final class HostedUi {
                 if(existing.isPresent()) return openTab(spec, owner, existing.get().entry.component());
                 // Reserve before publishing: a view cannot be owned by two surface lifetimes.
                 view.mount(spec);
+                // Workspace content takes the workspace theme slot, as terminals and editors do, on an opaque workspace
+                // surface; its specialized content paints its own background or glass above that. Moves keep both.
+                var component = view.component();
+                component.route(dev.jasper.ui.theme.ThemeRoute.WORKSPACE); component.paintsSurface(true);
                 try {
-                    var tab = openTab(spec, owner, view.component());
+                    var tab = openTab(spec, owner, component);
                     tab.onClosed(view::close);
                     return tab;
-                } catch(RuntimeException | Error failure) {view.unmount(spec);throw failure;}
+                } catch(RuntimeException | Error failure) {
+                    component.route(dev.jasper.ui.theme.ThemeRoute.CHROME); component.paintsSurface(false);
+                    view.unmount(spec);throw failure;
+                }
             }
             @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
                 guard("openTab");

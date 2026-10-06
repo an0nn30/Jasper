@@ -120,6 +120,7 @@ final class ViewReconciler implements AutoCloseable {
         return mounted.values().stream().anyMatch(owner -> owner instanceof Menus.MenuControl menu && menu.popup.isVisible()
             || owner instanceof Choices.ChoiceControl choice && choice.input instanceof javax.swing.JComboBox<?> combo && combo.isPopupVisible());
     }
+    ControlRegistry.Control mounted(String id) { return mounted.get(id); }
     ControlRegistry.Control control(String id) {
         var control = mounted.get(id);
         if(control == null) for(var owner:mounted.values()) if(owner instanceof InteractiveRows.RowsControl rows) { control=rows.inline(id); if(control!=null)break; }

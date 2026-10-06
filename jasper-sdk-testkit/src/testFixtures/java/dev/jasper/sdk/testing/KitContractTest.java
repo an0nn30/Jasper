@@ -252,4 +252,37 @@ public abstract class KitContractTest {
             view.close();assertThat(first.get()).isEqualTo(1);assertThat(second.get()).isEqualTo(1);
         } finally {view.close();stop(kit);}
     }); }
+    /**
+     * Editor chrome (Plan 2 Task 9-kit): a DOCUMENT split whose specialized document stays registered while hidden behind a
+     * loading state, an inline find bar with field Shift+Enter, Escape and a stack Escape, a pressed option button, a Vim
+     * command line with a caret and an error tint, and a filter field driving a list.
+     */
+    static ViewSpec editor(boolean loading, boolean matchCase, int caret) {
+        var hidden=new ControlState(false,true,false,"");
+        var find=new Nodes.Field("find",ControlState.READY,Nodes.FieldKind.SEARCH,"needle","Find","Find","next",Optional.empty(),Nodes.FieldPresentation.EMBEDDED,"previous","close","");
+        var option=new Nodes.Button("case",ControlState.READY,"Aa","",Nodes.ButtonKind.GHOST,"case","Match case",Nodes.ButtonPresentation.STANDARD,Optional.empty(),Optional.of(matchCase));
+        var bar=new Nodes.Stack("find-bar",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(find,option),"close");
+        var vim=new Nodes.Text("vim-line",ControlState.READY,":s/a/b",Nodes.TextRole.MONO,Optional.of(Nodes.Severity.DANGER),OptionalInt.of(caret));
+        var filter=new Nodes.Field("filter",ControlState.READY,Nodes.FieldKind.SEARCH,"","Filter","Filter","choose",Optional.empty(),Nodes.FieldPresentation.STANDARD,"","","languages");
+        var languages=new Nodes.ItemList("languages",ControlState.READY,Nodes.ListKind.SINGLE,List.of(new ListItem("java",Optional.empty(),List.of(new Nodes.Text("java.name",ControlState.READY,"Java",Nodes.TextRole.BODY)),List.of(),List.of())),Set.of(),"choose",List.of());
+        return new ViewSpec(new Nodes.Split("tab",ControlState.READY,Nodes.SplitKind.DOCUMENT,List.of(
+            new Nodes.Custom("document",loading?hidden:ControlState.READY,"text",Nodes.CustomKind.EDITOR,"Document"),
+            new Nodes.Empty("state",loading?ControlState.READY:hidden,new Nodes.Icon("state.icon",ControlState.READY,"file",Nodes.Hue.NEUTRAL,Nodes.IconSize.EMPTY,"File"),"Loading notes.txt…","",List.of()),
+            bar,vim,filter,languages)));
+    }
+    @Test void editorChromeDescriptorsKeepTheirDocumentAndReportTheirKeys() throws Exception { edt(() -> {
+        var kit=kit("owner");var events=new ArrayList<UiEvent>();var disposed=new java.util.concurrent.atomic.AtomicInteger();
+        var view=kit.create(editor(true,false,6),events::add);
+        var document=new javax.swing.JTextArea("kept");
+        view.registerContent(new CustomContent("text",Nodes.CustomKind.EDITOR,new javax.swing.JScrollPane(document),disposed::incrementAndGet));
+        assertThat(view.spec()).isEqualTo(editor(true,false,6));
+        view.update(editor(false,true,2));assertThat(view.spec()).isEqualTo(editor(false,true,2));
+        assertThat(disposed.get()).as("showing the hidden document keeps its registration").isZero();
+        view.focus("find");view.focus("filter");
+        emit(view,new UiEvent.Action("previous"));emit(view,new UiEvent.Action("close"));emit(view,new UiEvent.Action("case"));
+        emit(view,new UiEvent.Selected("languages",Set.of("java")));emit(view,new UiEvent.Action("choose"));
+        assertThat(events).containsExactly(new UiEvent.Action("previous"),new UiEvent.Action("close"),new UiEvent.Action("case"),
+            new UiEvent.Selected("languages",Set.of("java")),new UiEvent.Action("choose"));
+        stop(kit);assertThat(disposed.get()).isEqualTo(1);
+    }); }
 }

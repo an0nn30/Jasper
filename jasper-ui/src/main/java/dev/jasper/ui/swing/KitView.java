@@ -2,6 +2,7 @@ package dev.jasper.ui.swing;
 
 import dev.jasper.ui.metrics.MotionPolicy;
 import dev.jasper.ui.model.*;
+import dev.jasper.ui.theme.ThemeRoute;
 import java.awt.*;
 import java.beans.PropertyChangeListener;
 import java.util.List;
@@ -41,7 +42,7 @@ public final class KitView extends JPanel implements AutoCloseable {
      * and keep their accessible names and actions. App-only; not part of the plugin SDK.
      */
     public KitView(KitContext context, ViewSpec spec, Consumer<UiEvent> events, boolean pointerOnly) {
-        requireEdt(); this.pointerOnly = pointerOnly; this.context = Objects.requireNonNull(context); this.events = Objects.requireNonNull(events);
+        requireEdt(); this.pointerOnly = pointerOnly; this.context = new KitContext(Objects.requireNonNull(context)); this.events = Objects.requireNonNull(events);
         this.reconciler = new ViewReconciler(this); this.motion = context.motionPolicy();
         setLayout(new BorderLayout()); setOpaque(false); KitOwnership.mark(this, "view");
         defaults = UIManager.getDefaults();
@@ -124,6 +125,34 @@ public final class KitView extends JPanel implements AutoCloseable {
         if (control instanceof Panels.PanelControl panel) return panel;
         throw new IllegalArgumentException("Node is not a panel: " + id);
     }
+    /**
+     * App-only: moves this view to the other theme slot (a plugin view mounted as workspace content takes the workspace
+     * route, as terminals and editors do), re-applying every control's appearance in place without replacing controls,
+     * input or registered content. Other views built from the same caller context keep their route. EDT confined.
+     */
+    public void route(ThemeRoute route) {
+        requireOpen(); Objects.requireNonNull(route);
+        if (context.route() == route) return;
+        context.route(route); refresh(); repaint();
+    }
+    /** The theme slot this view currently paints from. */
+    public ThemeRoute route() { return context.route(); }
+    /**
+     * App-only: whether this view paints its route's panel surface behind its controls. A workspace content tab does,
+     * opaque, as its former raw panels did; registered specialized content paints its own background (or glass) above it.
+     * Off by default: a view is otherwise transparent over its host. EDT confined.
+     */
+    public void paintsSurface(boolean value) {
+        requireOpen();
+        if (surface == value) return;
+        surface = value; setOpaque(value); repaint();
+    }
+    private boolean surface;
+    @Override protected void paintComponent(Graphics graphics) {
+        if (!surface) { super.paintComponent(graphics); return; }
+        graphics.setColor(context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
+        graphics.fillRect(0, 0, getWidth(), getHeight());
+    }
     /** App-only available content height excluding native chrome, in logical pixels; EDT confined. */
     public void setAvailableHeight(int logicalPixels) {
         requireOpen(); if (logicalPixels <= 0) throw new IllegalArgumentException("Available height must be positive");
@@ -133,6 +162,8 @@ public final class KitView extends JPanel implements AutoCloseable {
     boolean dismissPopup() { return reconciler.dismissPopup(); }
     boolean popupOpen() { return reconciler.popupOpen(); }
     ControlRegistry.Control control(String id) { return reconciler.control(id); }
+    /** The control mounted for a node id, or null; never moves a row's keyboard focus. */
+    ControlRegistry.Control controlOrNull(String id) { return reconciler.mounted(id); }
     KitContext context() { return context; }
     MotionPolicy motion() { return motion; }
     void dispatch(UiEvent event) {

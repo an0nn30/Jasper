@@ -446,7 +446,7 @@ final class FakeUi {
             @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, dev.jasper.sdk.ui.UiView content) {
                 context.requireOpen();var view=context.kit().requireOwned(content);
                 for(var entry:contents)if(entry.key.equals(spec.key())){entry.select();return entry;}
-                view.mount(spec);try{var tab=openTab(spec,owner,view.component);tab.onClosed(view::close);return tab;}catch(RuntimeException | Error failure){view.unmount(spec);throw failure;}
+                view.mount(spec);view.route="WORKSPACE";try{var tab=openTab(spec,owner,view.component);tab.onClosed(view::close);return tab;}catch(RuntimeException | Error failure){view.route="CHROME";view.unmount(spec);throw failure;}
             }
             @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
                 context.requireOpen();

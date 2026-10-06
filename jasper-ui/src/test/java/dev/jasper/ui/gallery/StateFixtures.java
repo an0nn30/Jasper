@@ -109,6 +109,29 @@ public final class StateFixtures {
         }
         result.add(sheet("remote-rows", new ItemList("remote-tunnels", READY, ListKind.DOUBLE, remote, Set.of("remote-web"), "edit", List.of(), SelectionMode.SINGLE,
             Optional.empty(), OptionalInt.empty(), "toggle", "delete"), 360, 200));
+        // Plan 2 Task 9-kit: Editor chrome. A DOCUMENT split with the document filling the height, an inline find bar
+        // (Shift+Enter and Escape on the field, Escape over the whole bar, pressed and unpressed option buttons), a Vim
+        // command line with its caret and an error message, and a language filter driving its list.
+        var hiddenState = new ControlState(false, true, false, "");
+        var findField = new Field("editor-find", READY, FieldKind.SEARCH, "needle", "Find", "Find", "next", Optional.empty(), FieldPresentation.EMBEDDED, "previous", "close", "");
+        var findBar = new Stack("editor-find-bar", READY, LayoutRole.INLINE, List.of(findField,
+            new Button("editor-previous", READY, "Previous", "", ButtonKind.SECONDARY, "previous", ""),
+            new Button("editor-next", READY, "Next", "", ButtonKind.SECONDARY, "next", ""),
+            new Button("editor-case", READY, "Aa", "", ButtonKind.GHOST, "case", "Match case", ButtonPresentation.STANDARD, Optional.empty(), Optional.of(true)),
+            new Button("editor-word", READY, "W", "", ButtonKind.GHOST, "word", "Whole word", ButtonPresentation.STANDARD, Optional.empty(), Optional.of(false)),
+            text("editor-matches", "2 matches", TextRole.CAPTION)), "close");
+        var vimLine = new Stack("editor-vim", READY, LayoutRole.INLINE, List.of(
+            new Text("editor-vim-line", READY, ":%s/old/new/g", TextRole.MONO, Optional.empty(), OptionalInt.of(6)),
+            new Text("editor-vim-error", READY, "E486: Pattern not found", TextRole.MONO, Optional.of(Severity.DANGER), OptionalInt.empty())));
+        result.add(sheet("editor-document", new Split("editor-tab", READY, SplitKind.DOCUMENT, List.of(
+            new Custom("editor-text", READY, "editor-text", CustomKind.EDITOR, "Document"),
+            new Empty("editor-loading", hiddenState, new Icon("editor-loading-icon", READY, "file", Hue.NEUTRAL, IconSize.EMPTY, "File"), "Loading notes.txt…", "", List.of()),
+            findBar, vimLine)), 780, 440));
+        var languages = new ArrayList<ListItem>();
+        for (String name : List.of("Java", "JavaScript", "JSON")) languages.add(new ListItem("editor-language-" + name, Optional.empty(), List.of(text("editor-language-" + name + "-name", name, TextRole.BODY)), List.of(), List.of()));
+        result.add(sheet("editor-language", new Stack("editor-language-picker", READY, LayoutRole.VERTICAL, List.of(
+            new Field("editor-language-filter", READY, FieldKind.SEARCH, "ja", "Filter languages", "Filter languages", "choose", Optional.empty(), FieldPresentation.STANDARD, "", "", "editor-languages"),
+            new ItemList("editor-languages", READY, ListKind.SINGLE, languages, Set.of("editor-language-Java"), "choose", List.of(), SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(14)))), 360, 360));
         for (SplitKind kind : SplitKind.values()) result.add(sheet("split-" + kind, new Split("split", READY, kind, List.of(text("left", "Sidebar", TextRole.BODY), text("right", "Detail", TextRole.BODY))), 600, 100));
         for (FormKind kind : FormKind.values()) result.add(sheet("form-" + kind, new Form("form", READY, kind, kind.name(), Optional.empty(), List.of(row("row", "Label", field("input", "", "Value", FieldKind.TEXT))), Optional.empty(), List.of(button("save", "Save", ButtonKind.PRIMARY)), "cancel"), 480, 200));
         for (CustomKind kind : CustomKind.values()) result.add(sheet("custom-" + kind, new Custom("custom", READY, "preview", kind, kind.name()), 480, 180));

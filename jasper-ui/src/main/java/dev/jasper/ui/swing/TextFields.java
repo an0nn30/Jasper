@@ -34,6 +34,18 @@ final class TextFields {
             input.setOpaque(false); input.setBorder(new EmptyBorder(0, 0, 0, 0)); KitOwnership.mark(input, node.id() + ".input");
             if (node.kind() == Nodes.FieldKind.PORT) ((AbstractDocument)input.getDocument()).setDocumentFilter(new NumericFilter());
             if (node.kind() != Nodes.FieldKind.TEXTAREA && node.kind() != Nodes.FieldKind.PATH) bindSubmit();
+            if (node.kind() != Nodes.FieldKind.TEXTAREA) {
+                bindKey("shift ENTER", "field.alternate", () -> !((Nodes.Field)this.node).alternateAction().isBlank(),
+                    () -> emit(new UiEvent.Action(((Nodes.Field)this.node).alternateAction())));
+                if (node.kind() != Nodes.FieldKind.NUMBER) for (var move : java.util.Map.of("UP", -1, "KP_UP", -1, "DOWN", 1, "KP_DOWN", 1, "PAGE_UP", -2, "PAGE_DOWN", 2).entrySet())
+                    bindKey(move.getKey(), "field.list." + move.getKey(), () -> list() != null, () -> {
+                        var rows = list(); if (rows == null) return;
+                        int delta = move.getValue();
+                        rows.follow(Math.abs(delta) == 2 ? Integer.signum(delta) * rows.page() : delta);
+                    });
+            }
+            bindKey("ESCAPE", "field.cancel", () -> !((Nodes.Field)this.node).cancelAction().isBlank(),
+                () -> emit(new UiEvent.Action(((Nodes.Field)this.node).cancelAction())));
             if (node.kind() == Nodes.FieldKind.NUMBER) {
                 ((AbstractDocument)input.getDocument()).setDocumentFilter(new NumberFilter(() -> ((Nodes.Field)this.node).numeric().orElseThrow()));
                 bindStep("UP", 1); bindStep("DOWN", -1); bindStep("KP_UP", 1); bindStep("KP_DOWN", -1);
@@ -86,6 +98,26 @@ final class TextFields {
                 }
             });
             own(() -> { input.getInputMap(JComponent.WHEN_FOCUSED).remove(key); input.getActionMap().remove(name); });
+        }
+        /**
+         * A key the field owns only while {@code when} holds (an action is configured, its list is mounted): otherwise
+         * the key passes on, as Enter without a trailing action does.
+         */
+        private void bindKey(String stroke, String name, java.util.function.BooleanSupplier when, Runnable run) {
+            KeyStroke key = KeyStroke.getKeyStroke(stroke);
+            input.getInputMap(JComponent.WHEN_FOCUSED).put(key, name);
+            input.getActionMap().put(name, new AbstractAction() {
+                @Override public boolean isEnabled() { return !closed && when.getAsBoolean(); }
+                @Override public void actionPerformed(java.awt.event.ActionEvent event) { if (isEnabled() && interactive()) run.run(); }
+            });
+            own(() -> { input.getInputMap(JComponent.WHEN_FOCUSED).remove(key); input.getActionMap().remove(name); });
+        }
+        /** The interactive item list this field's arrow keys move, or null. */
+        private InteractiveRows.RowsControl list() {
+            String id = ((Nodes.Field)node).listId();
+            if (id.isBlank()) return null;
+            var control = view.controlOrNull(id);
+            return control instanceof ItemLists.ListControl rows && rows.interactive() ? rows : null;
         }
         /** Arrow keys step a NUMBER field by its step, clamped to its bounds; the edit reaches the host like typing. */
         private void bindStep(String stroke, int direction) {

@@ -10,7 +10,32 @@ import static dev.jasper.sdk.ui.Nodes.*;
 public record ViewSpec(Node root) {
     public ViewSpec {
         Objects.requireNonNull(root);
-        validate(root, new HashSet<>(), new HashSet<>(), 0, new int[]{0});
+        var ids = new HashSet<String>();
+        validate(root, ids, new HashSet<>(), 0, new int[]{0});
+        var lists = new HashSet<String>(); var listRefs = new HashSet<String>();
+        lists(root, lists, listRefs);
+        if (!lists.containsAll(listRefs)) throw new IllegalArgumentException("A field's list must be an ItemList in the same view");
+    }
+    /** ItemList ids, and the lists fields move with their arrow keys. */
+    private static void lists(Node node, Set<String> lists, Set<String> refs) {
+        if (node instanceof ItemList list) lists.add(list.id());
+        if (node instanceof Field field && !field.listId().isBlank()) refs.add(field.listId());
+        var children = new ArrayList<Node>();
+        switch (node) {
+            case Stack n -> children.addAll(n.children());
+            case Card n -> children.addAll(n.children());
+            case Split n -> children.addAll(n.children());
+            case FormRow n -> { children.add(n.control()); n.trailing().ifPresent(children::add); }
+            case SettingRow n -> children.add(n.control());
+            case Section n -> children.add(n.body());
+            case Empty n -> { children.add(n.icon()); children.addAll(n.actions()); }
+            case Header n -> { n.context().ifPresent(children::add); n.primary().ifPresent(children::add); }
+            case Panel n -> { children.add(n.header()); n.searchOrNavigation().ifPresent(children::add); children.add(n.body()); n.footer().ifPresent(children::add); }
+            case Form n -> { n.hero().ifPresent(children::add); children.addAll(n.sections()); n.preview().ifPresent(children::add); children.addAll(n.actions()); }
+            case ItemList n -> { n.addAction().ifPresent(children::add); for (var item : n.items()) { item.leading().ifPresent(children::add); children.addAll(item.title()); children.addAll(item.subtitle()); children.addAll(item.trailing()); } }
+            default -> { }
+        }
+        for (var child : children) lists(child, lists, refs);
     }
     private static void references(Set<String> selected, Set<String> ids) {
         if (!ids.containsAll(selected)) throw new IllegalArgumentException("Unknown item reference");

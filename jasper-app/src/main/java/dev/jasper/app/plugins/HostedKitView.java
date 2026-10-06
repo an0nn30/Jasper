@@ -37,7 +37,7 @@ final class HostedKitView implements UiView {
  @Override public boolean composing(String fieldId){guard();return view.composing(fieldId);}
  @Override public void registerContent(CustomContent content){guard();Objects.requireNonNull(content);KitDiagnostics.validate(content);
   var expected=KitContent.find(spec.root(),content.id());if(expected==null||expected.kind()!=content.kind())throw new IllegalArgumentException("No matching Custom content id/kind");
-  var owned=new KitContent(owner,content);try{view.registerContent(content.id(),content.component(),owned);}catch(Throwable failure){owned.abort();throw failure;}
+  var owned=new KitContent(owner,content,view::route);try{view.registerContent(content.id(),content.component(),owned);}catch(Throwable failure){owned.abort();throw failure;}
  }
  @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {view.close();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;updated=() -> { };mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
 }

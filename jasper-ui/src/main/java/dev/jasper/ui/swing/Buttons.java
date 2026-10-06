@@ -36,6 +36,7 @@ final class Buttons {
         @Override void hero(boolean value) { button.hero=value; }
         @Override void refresh() {
             var value = (Nodes.Button)node; state(); button.kind = value.kind(); button.iconSeverity = value.iconSeverity().orElse(null);
+            button.toggle = value.selected().isPresent(); button.getModel().setSelected(value.selected().orElse(false));
             button.setText(value.label()); button.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
             button.setForeground(ThemePainting.color(context(), button.textRole(false)));
             boolean embedded = value.presentation() == Nodes.ButtonPresentation.EMBEDDED;
@@ -68,10 +69,27 @@ final class Buttons {
         float disabledOpacity=.42f;
         /** A severity tinting the glyph at rest and on hover (a favourite's warning star); null takes the kind's text colour. */
         Nodes.Severity iconSeverity;
+        /** A toggle button (Button.selected present): assistive technology reads it as one, checked while selected. */
+        boolean toggle;
         ThemePainting.Focus focus;
         KitButton(KitContext context) { this.context = context; }
+        // A push-button model never flips its selection on a click: the owner confirms a toggle's state in its next update.
+        @Override public javax.accessibility.AccessibleContext getAccessibleContext() {
+            if (accessibleContext == null) accessibleContext = new AccessibleJButton() {
+                @Override public javax.accessibility.AccessibleRole getAccessibleRole() {
+                    return toggle ? javax.accessibility.AccessibleRole.TOGGLE_BUTTON : super.getAccessibleRole();
+                }
+                @Override public javax.accessibility.AccessibleStateSet getAccessibleStateSet() {
+                    var states = super.getAccessibleStateSet();
+                    if (toggle && isSelected()) { states.add(javax.accessibility.AccessibleState.CHECKED); states.add(javax.accessibility.AccessibleState.PRESSED); }
+                    return states;
+                }
+            };
+            return accessibleContext;
+        }
         @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
         SemanticColor textRole(boolean hover) {
+            if (toggle && isSelected()) return SemanticColor.TEXT_PRIMARY;
             return switch (kind) {
                 case PRIMARY -> SemanticColor.TEXT_ONACCENT; case SECONDARY -> SemanticColor.TEXT_PRIMARY;
                 case GHOST -> hover ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_SECONDARY;
@@ -106,12 +124,13 @@ final class Buttons {
             try {
                 if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(disabledOpacity));
                 boolean hover = isEnabled() && getModel().isRollover();
-                Color fill = embedded ? null : fill(hover);
+                // A selected toggle shows the segmented control's selected fill, embedded or not.
+                Color fill = toggle && isSelected() ? ThemePainting.color(context, SemanticColor.SEGMENT_SELECTED_BG) : embedded ? null : fill(hover);
                 if (isEnabled() && getModel().isPressed() && fill != null) {
                     Color darkened = ColorMath.mix(ThemePainting.color(context, SemanticColor.SURFACE_APP), fill, .08);
                     fill = new Color(darkened.getRed(), darkened.getGreen(), darkened.getBlue(), fill.getAlpha());
                 }
-                Color border = embedded ? null : border();
+                Color border = toggle && isSelected() ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : embedded ? null : border();
                 ThemePainting.rounded(g, this, context, fill, border, !embedded && focus != null && focus.visible(), false);
                 g.setFont(getFont()); g.setColor(ThemePainting.color(context, textRole(hover)));
                 Insets insets = getInsets(); Rectangle icon = new Rectangle(), text = new Rectangle();

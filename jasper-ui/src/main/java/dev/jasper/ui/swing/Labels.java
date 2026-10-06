@@ -19,6 +19,8 @@ final class Labels {
          */
         boolean flow;
         int flowColumns;
+        /** Where a monospaced text draws its insertion bar, in characters; negative for none. */
+        int caret = -1;
         final Composition.WrappedText wrapped = new Composition.WrappedText();
         int wrappedHeight(int width) {
             wrapped.text = getText() == null ? "" : getText(); wrapped.setFont(getFont());
@@ -55,7 +57,23 @@ final class Labels {
                 if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
                 if (getIcon() != null) getIcon().paintIcon(this, g, icon.x, icon.y);
                 if (clipped != null) g.drawString(clipped, text.x, text.y + g.getFontMetrics().getAscent());
+                if (caret >= 0 && display != null && clipped != null) paintCaret(g, display, clipped, text, bounds);
             } finally { g.dispose(); }
+        }
+        /**
+         * A one-pixel insertion bar in the text colour after {@link #caret} characters, as a command line draws its cursor.
+         * When the text is shortened the bar keeps its place from the visible end (leading ellipsis) or start.
+         */
+        private void paintCaret(Graphics2D g, String display, String clipped, Rectangle text, Rectangle bounds) {
+            var metrics = g.getFontMetrics(); String full = getText() == null ? "" : getText();
+            int at = Math.min(caret, full.length());
+            int x = clipped.equals(full) ? text.x + metrics.stringWidth(full.substring(0, at))
+                : Boolean.TRUE.equals(getClientProperty("Jasper.leadingEllipsis")) ? text.x + metrics.stringWidth(clipped) - metrics.stringWidth(full.substring(at))
+                : text.x + metrics.stringWidth(full.substring(0, at));
+            if (x < bounds.x || x > bounds.x + bounds.width) return;
+            int width = Math.max(1, com.formdev.flatlaf.util.UIScale.scale(1));
+            g.setColor(getForeground());
+            g.fillRect(x, bounds.y + 1, width, Math.max(1, bounds.height - 2));
         }
     }
     static final class TextControl extends ControlRegistry.Control {
@@ -64,11 +82,13 @@ final class Labels {
             var text = (Nodes.Text)node; var label = (JLabel)component; state();
             label.putClientProperty("Jasper.leadingEllipsis",text.role()==Nodes.TextRole.MONO || text.role()==Nodes.TextRole.MONO_SMALL);
             label.setText(text.text()); label.setFont(ThemePainting.font(context(), Typography.Role.valueOf(text.role().name())));
-            label.setForeground(ThemePainting.color(context(), switch (text.role()) {
+            label.setForeground(ThemePainting.color(context(), text.severity().isPresent() ? tint(text.severity().get()) : switch (text.role()) {
                 case LABEL, DESCRIPTION, CAPTION, COUNT -> SemanticColor.TEXT_SECONDARY;
                 case SECTION_LABEL -> SemanticColor.TEXT_TERTIARY;
                 default -> SemanticColor.TEXT_PRIMARY;
             }));
+            ((LiteralLabel)label).caret = text.caret().orElse(-1);
+            label.repaint();
         }
     }
     /** The colour a severity tints a glyph with: information in the accent, warnings and dangers in their status colours. */

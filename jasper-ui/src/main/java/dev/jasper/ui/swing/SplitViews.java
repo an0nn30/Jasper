@@ -25,10 +25,17 @@ final class SplitViews {
             component.setLayout(new Layout(this));
         }
 
+        /** DOCUMENT: the children that may fill the remaining height (Custom and Empty), in order. */
+        final java.util.Set<Component> fills = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+
         @Override
         void children(List<ControlRegistry.Control> controls) {
+            fills.clear();
+            for (var c : controls) if (c.node instanceof Nodes.Custom || c.node instanceof Nodes.Empty) fills.add(c.component);
             Stacks.mount(component, controls.stream().map(c -> c.component).toList());
         }
+
+        boolean document() { return ((Nodes.Split) node).kind() == Nodes.SplitKind.DOCUMENT; }
     }
 
     static final class Layout implements Composition.WidthLayout {
@@ -59,8 +66,19 @@ final class SplitViews {
             return result;
         }
 
+        /** DOCUMENT: the first visible Custom or Empty child, which takes the height the others leave. */
+        Component fill(List<Component> children) {
+            for (Component c : children) if (owner.fills.contains(c)) return c;
+            return null;
+        }
+
         @Override
         public int height(Container p, int width) {
+            if (owner.document()) {
+                int h = 0;
+                for (Component c : visible(p)) h += Composition.height(c, width);
+                return h;
+            }
             var children = visible(p); var widths = widths(width, children.size());
             int h = 0;
             for (int i = 0; i < children.size(); i++) h = Math.max(h, Composition.height(children.get(i), widths[i]));
@@ -69,6 +87,11 @@ final class SplitViews {
 
         @Override
         public Dimension preferredLayoutSize(Container p) {
+            if (owner.document()) {
+                int w = 0;
+                for (Component c : visible(p)) w = Math.max(w, c.getPreferredSize().width);
+                return new Dimension(w, height(p, p.getWidth() > 0 ? p.getWidth() : w));
+            }
             int w = 0;
             for (Component c : p.getComponents())
                 if (c.isVisible()) w += c.getPreferredSize().width;
@@ -78,6 +101,18 @@ final class SplitViews {
 
         @Override
         public void layoutContainer(Container p) {
+            if (owner.document()) {
+                var children = visible(p); Component fill = fill(children);
+                int width = p.getWidth(), others = 0;
+                for (Component c : children) if (c != fill) others += Composition.height(c, width);
+                int y = 0;
+                for (Component c : children) {
+                    int h = c == fill ? Math.max(0, p.getHeight() - others) : Composition.height(c, width);
+                    c.setBounds(0, y, width, h);
+                    y += h;
+                }
+                return;
+            }
             var children = visible(p); var widths = widths(p.getWidth(), children.size());
             int x = 0;
             for (int i = 0; i < children.size(); i++) {

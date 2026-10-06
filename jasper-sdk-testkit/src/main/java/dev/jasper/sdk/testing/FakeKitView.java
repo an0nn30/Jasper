@@ -13,6 +13,9 @@ public final class FakeKitView implements UiView {
  private Object mount;
  void unmount(Object target){if(mount==target)mount=null;}
  final javax.swing.JPanel component = new javax.swing.JPanel();
+ /** The theme slot the host would paint this view from: CHROME, or WORKSPACE once mounted as a content tab (as the
+  * application routes workspace content); package-private, read by the shared contract harness only. */
+ String route="CHROME";
  void mount(Object target){guard();if(mount!=null && mount!=target)throw new IllegalArgumentException("View is already mounted");mount=target;}
 
  private Consumer<UiEvent> events;

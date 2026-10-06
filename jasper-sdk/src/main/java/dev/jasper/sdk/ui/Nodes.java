@@ -29,16 +29,37 @@ public final class Nodes {
     public enum ListKind { SINGLE, DOUBLE, COMPACT, ORDERED, RESULTS }
     public enum FormKind { HERO, SHEET, FULL, SETTINGS }
     public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION }
+    /**
+     * SIDEBAR_DETAIL and THREE_COLUMN place their children side by side. DOCUMENT stacks them top to bottom for a document
+     * surface (an editor tab): every visible child takes its preferred height except the first visible Custom or Empty
+     * child, which fills the height left over; hidden children take no space.
+     */
     public enum SplitKind { SIDEBAR_DETAIL, THREE_COLUMN, DOCUMENT }
     public enum CustomKind { EDITOR, TERMINAL, CHART, PREVIEW }
     /** STANDARD reserves the scroll bar's width; OVERLAY shows a transient thumb over the rows only while scrolling. */
     public enum ScrollPolicy { STANDARD, OVERLAY }
 
-    public record Text(String id, ControlState state, String text, TextRole role) implements Node {
+    /**
+     * A present {@code severity} draws the text in that severity's colour (INFO the accent, WARNING and DANGER the status
+     * colours), as {@link Icon#severity()} tints a glyph, instead of its role's colour. A present {@code caret} (MONO and
+     * MONO_SMALL text only, from 0 to the text's length) draws a thin insertion bar in the text's colour after that many
+     * characters, as a command line shows its cursor.
+     */
+    public record Text(String id, ControlState state, String text, TextRole role, Optional<Severity> severity, OptionalInt caret) implements Node {
         public Text {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(text);
             Objects.requireNonNull(role);
+            Objects.requireNonNull(severity);
+            Objects.requireNonNull(caret);
+            if (caret.isPresent()) {
+                if (role != TextRole.MONO && role != TextRole.MONO_SMALL) throw new IllegalArgumentException("A caret belongs to monospaced text only");
+                if (caret.getAsInt() < 0 || caret.getAsInt() > text.length()) throw new IllegalArgumentException("Caret outside the text");
+            }
+        }
+        /** Text in its role's colour, without a caret. */
+        public Text(String id, ControlState state, String text, TextRole role) {
+            this(id, state, text, role, Optional.empty(), OptionalInt.empty());
         }
     }
 
@@ -71,10 +92,13 @@ public final class Nodes {
     /**
      * A present {@code iconSeverity} tints the button's glyph with that severity's colour (as {@link Icon#severity()}
      * does) at rest and on hover, instead of the kind's text colour; for example a favourite's warning star. The label
-     * keeps the kind's colour.
+     * keeps the kind's colour. A present {@code selected} makes it a toggle button (a search option such as match case):
+     * the kit paints the pressed treatment while it is true and reports its pressed state to assistive technology; a
+     * click reports the Action and the owner confirms the new state in its next update. Only GHOST and SECONDARY buttons
+     * take it.
      */
     public record Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation,
-                         Optional<Severity> iconSeverity) implements Node {
+                         Optional<Severity> iconSeverity, Optional<Boolean> selected) implements Node {
         public Button {
             ModelChecks.id(id); Objects.requireNonNull(state);
             ModelChecks.button(label, icon, tooltip);
@@ -82,6 +106,16 @@ public final class Nodes {
             ModelChecks.label(action, "action");
             Objects.requireNonNull(presentation);
             Objects.requireNonNull(iconSeverity);
+            Objects.requireNonNull(selected);
+            if (selected.isPresent() && kind != ButtonKind.GHOST && kind != ButtonKind.SECONDARY)
+                throw new IllegalArgumentException("Only ghost and secondary buttons have a pressed state");
+        }
+        /**
+         * A button whose glyph takes its kind's colour (or {@code iconSeverity}'s) and that has no pressed state.
+         */
+        public Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation,
+                      Optional<Severity> iconSeverity) {
+            this(id, state, label, icon, kind, action, tooltip, presentation, iconSeverity, Optional.empty());
         }
         /** A button whose glyph takes its kind's colour. */
         public Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation) {
@@ -136,8 +170,16 @@ public final class Nodes {
      */
     public enum FieldPresentation { STANDARD, EMBEDDED, TRANSPARENT }
 
-    /** A NUMBER field states its {@link Numeric} shape; other kinds have none. */
-    public record Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation) implements Node {
+    /**
+     * A NUMBER field states its {@link Numeric} shape; other kinds have none. {@code alternateAction} is what Shift+Enter
+     * in a single-line field runs (a find field's Previous); {@code cancelAction} is what Escape in the field runs. Blank
+     * passes either key on, to an enclosing stack or form. A nonblank {@code listId} names an ItemList in the same view:
+     * Up, Down, Page Up and Page Down in the field move that list's selection (reporting its Selected) while the focus
+     * stays in the field, and Enter stays {@code trailingAction}. A TEXTAREA takes neither {@code alternateAction} nor
+     * {@code listId}, and a NUMBER field (whose arrows step it) takes no {@code listId}.
+     */
+    public record Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,
+                        String alternateAction, String cancelAction, String listId) implements Node {
         public Field {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -148,6 +190,15 @@ public final class Nodes {
             Objects.requireNonNull(numeric);
             Objects.requireNonNull(presentation);
             if ((kind == FieldKind.NUMBER) != numeric.isPresent()) throw new IllegalArgumentException("Numeric bounds belong to NUMBER fields only, which require them");
+            Objects.requireNonNull(alternateAction); Objects.requireNonNull(cancelAction); Objects.requireNonNull(listId);
+            if (!listId.isBlank()) ModelChecks.id(listId);
+            if (kind == FieldKind.TEXTAREA && (!alternateAction.isBlank() || !listId.isBlank()))
+                throw new IllegalArgumentException("A multiline field takes no Shift+Enter action or list");
+            if (kind == FieldKind.NUMBER && !listId.isBlank()) throw new IllegalArgumentException("A number field's arrow keys step its value, not a list");
+        }
+        /** A field whose Shift+Enter and Escape pass on and that moves no list. */
+        public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation) {
+            this(id, state, kind, value, hint, label, trailingAction, numeric, presentation, "", "", "");
         }
         public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric) {
             this(id, state, kind, value, hint, label, trailingAction, numeric, FieldPresentation.STANDARD);
@@ -272,11 +323,20 @@ public final class Nodes {
         }
     }
 
-    public record Stack(String id, ControlState state, LayoutRole role, List<Node> children) implements Node {
+    /**
+     * A nonblank {@code cancelAction} is what Escape runs from any focused control inside the stack that does not take
+     * Escape itself (a field's own {@code cancelAction}, an open popup), as an inline find bar closes; blank passes it on.
+     */
+    public record Stack(String id, ControlState state, LayoutRole role, List<Node> children, String cancelAction) implements Node {
         public Stack {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(role);
             children = List.copyOf(children);
+            Objects.requireNonNull(cancelAction);
+        }
+        /** A stack that leaves Escape to its children and ancestors. */
+        public Stack(String id, ControlState state, LayoutRole role, List<Node> children) {
+            this(id, state, role, children, "");
         }
     }
 

@@ -2,6 +2,7 @@ package dev.jasper.ui.swing;
 
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.UiEvent;
 import dev.jasper.ui.theme.SemanticColor;
 
 import java.awt.*;
@@ -24,7 +25,26 @@ final class Stacks {
             component.setOpaque(false);
             tile = new Tile(view.context());
             KitOwnership.mark(tile, node.id() + ".tile");
+            bindCancel();
             refresh();
+        }
+
+        /**
+         * Escape from any focused control inside the stack runs its cancelAction (an inline find bar closing) unless a
+         * nearer owner takes the key first (a field's own cancelAction, an open popup); blank passes Escape on.
+         */
+        private void bindCancel() {
+            var input = component.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
+            KeyStroke key = KeyStroke.getKeyStroke("ESCAPE"); String name = "stack.cancel";
+            input.put(key, name);
+            component.getActionMap().put(name, new AbstractAction() {
+                @Override public boolean isEnabled() { return !closed && !((Nodes.Stack) node).cancelAction().isBlank(); }
+                @Override public void actionPerformed(java.awt.event.ActionEvent event) {
+                    if (!isEnabled() || view.dismissPopup() || !interactive()) return;
+                    emit(new UiEvent.Action(((Nodes.Stack) node).cancelAction()));
+                }
+            });
+            own(() -> { input.remove(key); component.getActionMap().remove(name); });
         }
 
         @Override

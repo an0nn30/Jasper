@@ -45,7 +45,7 @@ final class KitSettingRows {
         if (replacement != node) return replacement;
         UnaryOperator<Nodes.Node> child = value -> project(value, replace);
         return switch (node) {
-            case Nodes.Stack n -> new Nodes.Stack(n.id(), n.state(), n.role(), n.children().stream().map(child).toList());
+            case Nodes.Stack n -> new Nodes.Stack(n.id(), n.state(), n.role(), n.children().stream().map(child).toList(), n.cancelAction());
             case Nodes.Card n -> new Nodes.Card(n.id(), n.state(), n.kind(), n.children().stream().map(child).toList());
             case Nodes.Split n -> new Nodes.Split(n.id(), n.state(), n.kind(), n.children().stream().map(child).toList());
             case Nodes.Section n -> new Nodes.Section(n.id(), n.state(), n.title(), child.apply(n.body()));

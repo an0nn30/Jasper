@@ -507,6 +507,26 @@ final class InteractiveRows {
             canvas.requestFocusInWindow();
         }
 
+        /**
+         * An external field's arrow keys (Field.listId): moves the keyboard row {@code steps} selectable rows, clamped to
+         * the ends, selects it and keeps it in view, leaving the keyboard focus where it is.
+         */
+        void follow(int steps) {
+            if (size() == 0 || !interactive() || steps == 0) return;
+            int current = focusItem == null ? -1 : indexOf(focusItem);
+            int i = current < 0 ? nextSelectable(-1, 1) : current;
+            for (int k = current < 0 ? 1 : 0; k < Math.abs(steps); k++) i = nextSelectable(i, Integer.signum(steps));
+            if (i < 0 || !selectable(i)) return;
+            select(itemId(i), false);
+            ensure(i);
+        }
+
+        /** How many rows the viewport shows, for Page Up and Page Down; at least one. */
+        int page() {
+            int extent = scroll.getViewport().getExtentSize().height;
+            return Math.max(1, rowHeight <= 0 ? 1 : extent / rowHeight);
+        }
+
         void ensure(int index) {
             position(index);
             sync();

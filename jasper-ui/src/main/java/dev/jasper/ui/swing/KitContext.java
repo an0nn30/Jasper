@@ -9,7 +9,8 @@ import java.util.function.BooleanSupplier;
 /** Shared rendering values. Host owns binding/registry; each view owns its motion registrations. */
 public final class KitContext {
     private final ThemeBinding binding;
-    private final ThemeRoute route;
+    /** Changed only through the one view that owns this copy (KitView.route), on the EDT. */
+    private volatile ThemeRoute route;
     private final DesignMetrics metrics;
     private final IconRegistry icons;
     private final BooleanSupplier animationsEnabled;
@@ -18,6 +19,11 @@ public final class KitContext {
         this.metrics = Objects.requireNonNull(metrics); this.icons = Objects.requireNonNull(icons);
         this.animationsEnabled = Objects.requireNonNull(animationsEnabled);
     }
+    /** A view's private copy, so re-routing one view never re-routes another sharing the caller's context. */
+    KitContext(KitContext source) {
+        this(source.binding, source.route, source.metrics, source.icons, source.animationsEnabled);
+    }
+    void route(ThemeRoute value) { route = Objects.requireNonNull(value); }
     public ThemeBinding binding() { return binding; }
     public ThemeRoute route() { return route; }
     public DesignMetrics metrics() { return metrics; }

@@ -188,4 +188,47 @@ class KitValuesTest {
         assertThatThrownBy(() -> new UiEvent.Clicked("tree", " ")).isInstanceOf(IllegalArgumentException.class);
         assertThat(new UiEvent.Clicked("tree", "leaf").itemId()).isEqualTo("leaf");
     }
+
+    /** Plan 2 Task 9-kit: the Editor's text caret and severity, field keys and list, stack Escape and toggle buttons, with their defaults. */
+    @Test void editorCapabilitiesAreValidatedAndDefaultToNone() {
+        var plain = new Text("t", ControlState.READY, "abc", TextRole.MONO);
+        assertThat(plain.severity()).isEmpty(); assertThat(plain.caret()).isEmpty();
+        assertThat(new Text("t", ControlState.READY, "abc", TextRole.MONO, Optional.of(Severity.DANGER), OptionalInt.of(3)).caret()).hasValue(3);
+        assertThat(new Text("t", ControlState.READY, "", TextRole.MONO_SMALL, Optional.empty(), OptionalInt.of(0)).caret()).hasValue(0);
+        assertThatThrownBy(() -> new Text("t", ControlState.READY, "abc", TextRole.BODY, Optional.empty(), OptionalInt.of(1))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Text("t", ControlState.READY, "abc", TextRole.MONO, Optional.empty(), OptionalInt.of(4))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Text("t", ControlState.READY, "abc", TextRole.MONO, Optional.empty(), OptionalInt.of(-1))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Text("t", ControlState.READY, "abc", TextRole.MONO, null, OptionalInt.empty())).isInstanceOf(NullPointerException.class);
+
+        var field = new Field("f", ControlState.READY, FieldKind.SEARCH, "", "Find", "Find", "next");
+        assertThat(List.of(field.alternateAction(), field.cancelAction(), field.listId())).containsOnly("");
+        var find = new Field("f", ControlState.READY, FieldKind.SEARCH, "", "Find", "Find", "next", Optional.empty(), FieldPresentation.EMBEDDED, "previous", "close", "");
+        assertThat(find.alternateAction()).isEqualTo("previous"); assertThat(find.cancelAction()).isEqualTo("close");
+        assertThatThrownBy(() -> new Field("f", ControlState.READY, FieldKind.TEXTAREA, "", "", "Notes", "", Optional.empty(), FieldPresentation.STANDARD, "x", "", ""))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Field("f", ControlState.READY, FieldKind.TEXTAREA, "", "", "Notes", "", Optional.empty(), FieldPresentation.STANDARD, "", "", "list"))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThat(new Field("f", ControlState.READY, FieldKind.TEXTAREA, "", "", "Notes", "", Optional.empty(), FieldPresentation.STANDARD, "", "close", "").cancelAction()).isEqualTo("close");
+        assertThatThrownBy(() -> new Field("f", ControlState.READY, FieldKind.NUMBER, "1", "", "Size", "", Optional.of(new Numeric(0, 9, 1, 0)), FieldPresentation.STANDARD, "", "", "list"))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Field("f", ControlState.READY, FieldKind.TEXT, "", "", "Name", "", Optional.empty(), FieldPresentation.STANDARD, null, "", "")).isInstanceOf(NullPointerException.class);
+        var filter = new Field("filter", ControlState.READY, FieldKind.SEARCH, "", "Filter", "Filter", "choose", Optional.empty(), FieldPresentation.STANDARD, "", "", "languages");
+        var languages = new ItemList("languages", ControlState.READY, ListKind.SINGLE, List.of(new ListItem("java", Optional.empty(), List.of(text("java.name")), List.of(), List.of())), Set.of(), "choose", List.of());
+        assertThat(new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL, List.of(filter, languages))).root()).isNotNull();
+        assertThatThrownBy(() -> new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL, List.of(filter))))
+            .as("a field's list must be in the view").isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL, List.of(filter, text("languages")))))
+            .as("and must be an item list").isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(new Nodes.Stack("s", ControlState.READY, LayoutRole.INLINE, List.of()).cancelAction()).isEmpty();
+        assertThat(new Nodes.Stack("s", ControlState.READY, LayoutRole.INLINE, List.of(), "close").cancelAction()).isEqualTo("close");
+        assertThatThrownBy(() -> new Nodes.Stack("s", ControlState.READY, LayoutRole.INLINE, List.of(), null)).isInstanceOf(NullPointerException.class);
+
+        assertThat(new Button("b", ControlState.READY, "Aa", "", ButtonKind.GHOST, "case", "Match case").selected()).isEmpty();
+        assertThat(new Button("b", ControlState.READY, "Aa", "", ButtonKind.GHOST, "case", "Match case", ButtonPresentation.STANDARD, Optional.empty(), Optional.of(true)).selected()).hasValue(true);
+        assertThat(new Button("b", ControlState.READY, "Aa", "", ButtonKind.SECONDARY, "case", "Match case", ButtonPresentation.STANDARD, Optional.empty(), Optional.of(false)).selected()).hasValue(false);
+        assertThatThrownBy(() -> new Button("b", ControlState.READY, "Go", "", ButtonKind.PRIMARY, "go", "", ButtonPresentation.STANDARD, Optional.empty(), Optional.of(true)))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Button("b", ControlState.READY, "Go", "", ButtonKind.GHOST, "go", "", ButtonPresentation.STANDARD, Optional.empty(), null)).isInstanceOf(NullPointerException.class);
+    }
 }

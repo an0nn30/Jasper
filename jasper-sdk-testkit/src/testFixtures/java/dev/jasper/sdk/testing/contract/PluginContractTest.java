@@ -145,6 +145,7 @@ public abstract class PluginContractTest {
             var window=ctx.windows().create(new WindowSpec("test.owned.window","Window",new Dimension(400,300),true));
             assertThatThrownBy(() -> window.setContent(alien)).isInstanceOf(IllegalArgumentException.class);
             window.setContent(view);window.setContent(view);
+            assertThat(h.viewRoute(view)).as("window content keeps the chrome slot").isEqualTo("CHROME");
             assertThat(ctx.windows().create(new WindowSpec("test.owned.window","Window",new Dimension(400,300),true))).isSameAs(window);
             var veto=window.onClosing(() -> false);
             assertThat(h.requestClose("test.owned.window")).isFalse();assertThat(disposed.get()).isZero();
@@ -152,8 +153,11 @@ public abstract class PluginContractTest {
             var document=ctx.kit().create(descriptor,e -> {});
             document.registerContent(new dev.jasper.sdk.ui.CustomContent("document",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,new javax.swing.JTextArea("retained"),disposed::incrementAndGet));
             assertThatThrownBy(() -> ctx.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("foreign","Foreign"),null,alien)).isInstanceOf(IllegalArgumentException.class);
+            assertThat(h.viewRoute(document)).as("a view before it is mounted").isEqualTo("CHROME");
             var tab=ctx.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("doc","Document"),null,document);
-            tab.move(true);assertThat(tab.isSeparate()).isTrue();tab.move(false);assertThat(tab.isSeparate()).isFalse();
+            assertThat(h.viewRoute(document)).as("workspace content takes the workspace slot").isEqualTo("WORKSPACE");
+            tab.move(true);assertThat(tab.isSeparate()).isTrue();assertThat(h.viewRoute(document)).as("a move keeps it").isEqualTo("WORKSPACE");
+            tab.move(false);assertThat(tab.isSeparate()).isFalse();assertThat(h.viewRoute(document)).isEqualTo("WORKSPACE");
             var guard=ctx.windows().onTabsClosing((tabs,batch) -> CompletableFuture.completedFuture(false));
             assertThat(tab.requestClose().join()).isFalse();assertThat(disposed.get()).isEqualTo(1);
             guard.close();assertThat(tab.requestClose().join()).isTrue();assertThat(disposed.get()).isEqualTo(2);

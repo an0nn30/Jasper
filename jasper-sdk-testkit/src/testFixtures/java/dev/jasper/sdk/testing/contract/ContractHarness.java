@@ -77,6 +77,12 @@ public interface ContractHarness extends AutoCloseable {
 
     /** UI thread: discards an open panel instance as its window would when the window or registration goes away. */
     void closePanel(String panelId, java.util.UUID windowId);
+    /**
+     * UI thread: the theme slot the host paints a kit view of this runtime from, {@code CHROME} or {@code WORKSPACE}. A view
+     * mounted as a workspace content tab ({@code Windows.openTab}) takes {@code WORKSPACE}, as terminals and editors do;
+     * windows, dialogs and panels keep {@code CHROME}. Plan 2 Task 9-kit (host-only; no SDK member).
+     */
+    String viewRoute(dev.jasper.sdk.ui.UiView view);
 
     /** Rail buttons as action ids in placement order; buttons of closed actions omitted. */
     List<String> rail();

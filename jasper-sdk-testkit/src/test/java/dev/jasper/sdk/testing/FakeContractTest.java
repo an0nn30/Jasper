@@ -51,6 +51,7 @@ class FakeContractTest extends PluginContractTest {
                 return action.isPresent();
             }
             @Override public void closePanel(String panelId, java.util.UUID windowId) { host.closePanel(panelId, windowId); }
+            @Override public String viewRoute(dev.jasper.sdk.ui.UiView view) { return ((FakeKitView) view).route; }
             @Override public List<String> rail() { return host.rail(); }
             @Override public List<String> windows() { return host.windows(); }
             @Override public boolean requestClose(String windowId) { return host.requestClose(windowId); }

@@ -141,4 +141,25 @@ class KitValuesTest {
   assertThat(rows.rows().getFirst().tooltip()).isEqualTo("notes — 6 B");
   assertThat(KitValues.toSdk(new dev.jasper.ui.model.UiEvent.Clicked("tunnels","a"))).isEqualTo(new UiEvent.Clicked("tunnels","a"));
  }
+ /** Plan 2 Task 9-kit: the Editor's caret and severity text, field keys and list, stack Escape, toggle buttons and the DOCUMENT split project without loss. */
+ @Test void editorCapabilitiesProjectWithoutLoss(){
+  var find=new Field("find",READY,FieldKind.SEARCH,"x","Find","Find","next",Optional.empty(),FieldPresentation.EMBEDDED,"previous","close","");
+  var filter=new Field("filter",READY,FieldKind.SEARCH,"","Filter","Filter","choose",Optional.empty(),FieldPresentation.STANDARD,"","","languages");
+  var languages=new ItemList("languages",READY,ListKind.SINGLE,List.of(new ListItem("java",Optional.empty(),List.of(text("java.name")),List.of(),List.of())),Set.of(),"choose",List.of());
+  var option=new Button("case",READY,"Aa","",ButtonKind.GHOST,"case","Match case",ButtonPresentation.STANDARD,Optional.empty(),Optional.of(true));
+  var vim=new Text("vim",READY,":s/a/b",TextRole.MONO,Optional.of(Severity.DANGER),OptionalInt.of(3));
+  var bar=new Nodes.Stack("bar",READY,LayoutRole.INLINE,List.of(find,option,vim),"close");
+  var spec=new ViewSpec(new Split("tab",READY,SplitKind.DOCUMENT,List.of(new Custom("doc",READY,"document",CustomKind.EDITOR,"Document"),bar,filter,languages)));
+  assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
+  var module=(dev.jasper.ui.model.Nodes.Split)KitValues.toModule(spec).root();
+  var stack=(dev.jasper.ui.model.Nodes.Stack)module.children().get(1);
+  assertThat(stack.cancelAction()).isEqualTo("close");
+  var field=(dev.jasper.ui.model.Nodes.Field)stack.children().get(0);
+  assertThat(List.of(field.alternateAction(),field.cancelAction())).containsExactly("previous","close");
+  assertThat(((dev.jasper.ui.model.Nodes.Button)stack.children().get(1)).selected()).hasValue(true);
+  var caret=(dev.jasper.ui.model.Nodes.Text)stack.children().get(2);
+  assertThat(caret.severity()).hasValue(dev.jasper.ui.model.Nodes.Severity.DANGER);assertThat(caret.caret()).hasValue(3);
+  assertThat(((dev.jasper.ui.model.Nodes.Field)module.children().get(2)).listId()).isEqualTo("languages");
+  assertThat(module.kind()).isEqualTo(dev.jasper.ui.model.Nodes.SplitKind.DOCUMENT);
+ }
 }

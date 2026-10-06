@@ -33,6 +33,8 @@ final class HostedKit implements UiKit,AutoCloseable {
         return new javax.swing.Icon(){public int getIconWidth(){return 16;}public int getIconHeight(){return 16;}
             public void paintIcon(java.awt.Component c,java.awt.Graphics g,int x,int y){if(live())icons.icon(name,binding.current().chrome().semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,16).paintIcon(c,g,x,y);}};
     }
+    /** A semantic colour of one theme slot, as the kit paints it; registered specialized content follows its view's slot. */
+    java.awt.Color color(ThemeRoute route,dev.jasper.ui.theme.SemanticColor role){return route.select(themes.get()).semantic().color(role);}
     boolean live(){return !closed.get() && open.getAsBoolean();}
     void guard(){if(!EventQueue.isDispatchThread())throw new IllegalStateException("Kit requires EDT");if(!live())throw new IllegalStateException("Plugin kit is closed");}
     private void initialize(){guard();if(binding!=null)return;icons=new IconRegistry();binding=new ThemeBinding(themes.get(),e -> failed());
