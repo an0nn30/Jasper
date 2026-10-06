@@ -28,7 +28,8 @@ class ThemeMigrationCoverageTest {
             if ((disposition.startsWith("Removed in Plan 2 Tasks 2-3; authority=") || disposition.startsWith("Removed in Plan 2 Task 5; authority=")
                     || disposition.startsWith("Removed in Plan 2 Task 6a; authority=") || disposition.startsWith("Removed in Plan 2 Task 6b; authority=")
                     || disposition.startsWith("Removed in Plan 2 Task 6c; authority=")
-                    || disposition.startsWith("Removed in Plan 2 Task 7; authority="))) {
+                    || disposition.startsWith("Removed in Plan 2 Task 7; authority=")
+                    || disposition.startsWith("Removed in Plan 2 Task 8a; authority="))) {
                 assertThat(Files.exists(ROOT.resolve(row.get(0)))).as("removed source: %s", row.get(0)).isFalse();
                 String authority = disposition.substring(disposition.indexOf("authority=") + 10).split(";", 2)[0];
                 assertThat(Files.isRegularFile(ROOT.resolve(authority))).as("replacement authority: %s", authority).isTrue();

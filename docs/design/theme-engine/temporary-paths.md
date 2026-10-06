@@ -209,7 +209,7 @@ fix round 1 replaced `SettingsDialog.askDiscard`'s `JOptionPane` with a modal ki
 
 The dynamic WorkspacePalette callers are exactly:
 - Task 7: `plugins/vault/.../ui/ManagerPanel.java` — **removed by Task 7** (2026-10-05): the manager is an owned kit view and reads no `WorkspacePalette`.
-- Task 8: `plugins/remote/.../ui/HostsPanel.java`, `ui/tunnels/TunnelsPanel.java`, `ui/transfers/TransferStrip.java`.
+- Task 8: `plugins/remote/.../ui/HostsPanel.java` — **removed by Task 8a** (2026-10-06): the Sessions panel is an owned kit view and reads no `WorkspacePalette`; `ui/tunnels/TunnelsPanel.java` (8b) and `ui/transfers/TransferStrip.java` (8c) remain.
 - Task 9: `plugins/editor/.../ui/EditorTab.java`, `vim/ui/VimBar.java`; editor/syntax snapshots also serve Editor through Appearance.
 - Task 10: `plugins/fileserver/.../ui/FileServersPanel.java`.
 
@@ -326,6 +326,17 @@ muted-label/border painter was the only dynamic `Jasper.workspace.*` reader), an
 Task 11's: `context.appearance().icon(IconName)` artwork for the Open action and the status item. The `WorkspaceDefaults`
 publication stays for the Task 8–10 callers listed above until Task 11.
 
+## Task 8a consumer removal (Remote Sessions and host dialogs)
+
+Plan 2 Task 8a moved Remote's Sessions panel (`HostsPanel`, registered with `registerView`) and its host-family dialogs
+(`HostEditor`, `ConnectionPanel`, `HostKeyPanel`, `ImportPanel`, `GroupNamePanel`, `ConfirmPanel`) to owned SDK
+`UiView`s built from `context.kit()`. These files no longer read `WorkspacePalette.current`, `UIManager` fonts,
+`PanelStyle`, fixed colours (`0x304e77`, `0x38ba54`, `0x49515c`) or paint anything; `ConnectionDots` (custom-painted
+bouncing dots with its own `Timer`) is deleted in favour of the kit's indeterminate `Progress`. Remaining raw Remote
+paths and owners: `PanelStyle`, `SftpPanel`, `SftpUi` dialogs, `DestinationPanel`, the transfer strip and its dialogs and
+`FlatToolBar` (8c); `TunnelsPanel`, `TunnelSwitch`, `TunnelsUi` dialogs, `TunnelEditor`, `ForwardPanel` (8b); the raw
+`PanelHeader.Action` icons from `context.appearance().icon(BundledIcon)` (Task 11 with `PanelHeader`).
+
 ## Task 5 review fix round 1 — native geometry, vendor roles and open status-surface item
 
 **Preserved native geometry (no visual change in Plan 2).** Native adapters keep their pre-migration values
@@ -418,7 +429,7 @@ raw (they need real design work) with these exact owners. Every path below has a
 | `jasper-sdk/src/main/java/dev/jasper/sdk/ui/PanelHeader.java` (SDK 0.14.2, main's bump kept) | `Action.icon` is a raw `javax.swing.Icon` | Task 11 (0.15 cutover) replaces raw SDK icons |
 | `jasper-app/src/main/java/dev/jasper/app/contributions/PanelHeaderState.java` | carries the raw action icons to the native header | Task 11 with `PanelHeader` |
 | `jasper-app/src/main/java/dev/jasper/app/workspace/WindowTabs.java` (`surface(boolean)`) | the tab surface blend toward white/black: selected `.035` dark / `.12` light, unselected `.3` dark / `.06` light (main's values, following the branch's former `shade` precedent) | Plan 3 Task 10 (tab surface composition becomes module roles) |
-| `plugins/remote/src/main/java/dev/jasper/remote/ui/PanelStyle.java`, `ui/tunnels/TunnelSwitch.java` and the redesigned `HostsPanel`/`SftpPanel`/`TunnelsPanel` | `UIManager.getFont("Label.font")`, fixed accent colours `0x3274f6`/`0x2467de`, custom-painted switch | Task 8 |
+| `plugins/remote/src/main/java/dev/jasper/remote/ui/PanelStyle.java`, `ui/tunnels/TunnelSwitch.java` and the redesigned `SftpPanel`/`TunnelsPanel` (`HostsPanel` and `ConnectionDots` done by Task 8a) | `UIManager.getFont("Label.font")`, fixed accent colours `0x3274f6`/`0x2467de`, custom-painted switch | Task 8b (tunnels), 8c (SFTP; deletes `PanelStyle`) |
 | `plugins/fileserver/src/main/java/dev/jasper/fileserver/ui/PanelStyle.java`, `ui/RowArtwork.java`, `ui/ProtocolChip.java` and FS-3/FS-4 `ServerEditor` additions | the same raw font/accent reads and painted chips/artwork | Task 10 |
 | `plugins/indexer/src/main/java/dev/jasper/indexer/ui/IndexerSettingsPanel.java`, `ui/FilesScope.java`, `IndexerPlugin.java` (Project Index, eighth bundled plugin) | raw Swing settings page; palette rows with raw SDK icons | Task 10 (Task 11 for the SDK icon path) |
 

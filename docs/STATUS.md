@@ -1,7 +1,39 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-05
+## Current state — 2026-10-06
 
+- **Theme engine Plan 2 Task 8a implemented: Remote Sessions panel and host dialogs on kit views; review pending**
+  (2026-10-06). The Sessions panel (`HostsPanel`, now registered with `registerView`) and the host editor, connecting
+  overlay, host-key question, config import, default-group rename and delete confirmations are owned SDK `UiView`s from
+  `context.kit()`; they read no `WorkspacePalette`, `UIManager` font, `PanelStyle` or fixed colour, and `ConnectionDots`
+  is deleted (ruling G7: the kit's indeterminate `Progress`, whose timer lifecycle assertions moved to jasper-ui
+  `RemoteKitTest`). Behaviour kept: rows keyed by host UUID / profile id / group name; selection survives refreshes;
+  showing the panel selects the first host; Enter or a double click connects, opens a distribution or toggles a group,
+  and a plain click toggles a group (ruling G2); the favourite star is always shown (outline, or `star.filled` tinted
+  WARNING for favourites; ruling G4) and its click reports only its action; collapsed groups persist; the card's
+  Connect/Open Shell/Open keeps primary styling but is no default button; header count and New session / Import sessions
+  travel through `PanelHost.setHeader` (Task 6d acceptance, asserted in a real window by `StagedRemoteSessionsTest` and
+  through the testkit `panelHeader`). Enter/Escape (rulings Task8 Enter and G11): no Remote dialog has a primary, so
+  Enter saves, trusts, imports or deletes nothing (baseline `f16ae32f` had no default buttons); Enter renames the
+  default group only from its field (`Field.trailingAction`); Escape runs each dialog's Cancel, including the connecting
+  overlay's Cancel/Close (it cancels a live attempt) and the host-key question (Cancel, as closing it does). Status after
+  a closed overlay and Vault picks after a closed editor are ignored. Behaviour deviations: a right-click no longer
+  selects the row (each row owns its menu, which acts on that row; 6c rule); the row tooltip (now the row's accessible
+  description rather than its name) also names the jump host. Visual-only changes (ledgered in `migration.csv`): kit
+  rows with a StatusDot instead of the ● glyph and the kit selection colour instead of `0x304e77`; chevrons and a COUNT
+  text on group rows instead of folder icons; the outline star always visible; the card is a kit Card (server tile,
+  name, MONO address, credential caption with a StatusDot or lock glyph, Edit ghost icon, Connect with the `terminal`
+  glyph); the empty hint is DESCRIPTION text; the search field is the kit SEARCH field; dialogs carry kit labels above
+  inputs, switches instead of checkboxes (Favorite, Track shell folder, import rows), a SEGMENTED auth choice, a
+  SEARCHABLE free-entry group choice with a "Blank: <default> (default)" caption instead of the placeholder, an ORDERED
+  key list with kit move/remove instead of four buttons; host-key text is BODY with a MONO fingerprint instead of HTML
+  bold/code; the connecting overlay's progress bar hides once finished and the overlay/import/group dialogs lose their
+  fixed minimum sizes. Tests: Remote plugin tests drive the EDT-confined kit views on the EDT (new `testsupport/Kits`,
+  plugin completions marshal through `Kits.UI`); `ManagedImportIntegrationTest` now runs on the test thread with EDT
+  hops, waiting for the loopback banner off the EDT under a JUnit timeout. GUI checks for the user: Sessions panel rows
+  (star tint and hover, group click/Enter, row menus, distro badges), the card in dark and light, the Add/Edit Host,
+  Verify host key, Import and Rename default group dialogs (Enter/Escape), and the connecting overlay's progress and
+  Escape.
 - **Theme engine Plan 2 Task 8-kit implemented: kit capabilities for the Remote migration; review pending** (2026-10-05).
   Task 8 is split (controller ruling) into 8-kit, 8a (Sessions and dialogs), 8b (Tunnels) and 8c (SFTP and transfers).
   8-kit adds, mirrored module ↔ SDK ↔ host `KitValues` ↔ testkit fake with a shared contract case (SDK version unchanged;
