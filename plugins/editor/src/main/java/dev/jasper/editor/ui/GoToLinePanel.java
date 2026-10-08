@@ -1,62 +1,83 @@
 package dev.jasper.editor.ui;
 
-import java.awt.BorderLayout;
-import java.awt.FlowLayout;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
+import java.util.List;
+import java.util.Optional;
 import java.util.function.IntConsumer;
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
 
-/** Go to Line: a line number from 1 to the tab's line count; anything else is marked and ignored. */
-public final class GoToLinePanel extends JPanel {
-    private final JTextField field = new JTextField(8);
+/**
+ * Go to Line on an owned kit sheet: a line number from 1 to the tab's line count. Enter in the field submits (its
+ * trailing action, as its action listener did) and Go is the form's primary, the former default button; anything else
+ * puts an error on the field (which keeps the dialog open and disables Go until the next edit). Escape cancels.
+ * UI thread only; the surface that mounts {@link #view()} disposes it, and {@link #close()} makes late calls inert.
+ */
+public final class GoToLinePanel implements AutoCloseable {
+    public static final String FORM = "go-to-line", LINE = "go-to-line.line", GO = "go-to-line.go", CANCEL = "go-to-line.cancel",
+        GO_ACTION = "go", CANCEL_ACTION = "cancel";
+    private final UiView view;
     private final int lineCount;
     private final IntConsumer go;
+    private String text, error = "";
+    private boolean closed;
 
     /**
+     * @param kit the plugin's kit
      * @param currentLine the caret's line, from 1
      * @param lineCount the tab's line count
      * @param go receives a valid line, from 1
      * @param cancel closes the dialog
      */
-    public GoToLinePanel(int currentLine, int lineCount, IntConsumer go, Runnable cancel) {
-        super(new BorderLayout(0, 10));
+    public GoToLinePanel(UiKit kit, int currentLine, int lineCount, IntConsumer go, Runnable cancel) {
         this.lineCount = lineCount;
         this.go = go;
-        setBorder(BorderFactory.createEmptyBorder(16, 16, 12, 16));
-        field.setText(String.valueOf(currentLine));
-        field.addActionListener(event -> submit());
-        var ok = new JButton("Go");
-        ok.addActionListener(event -> submit());
-        var no = new JButton("Cancel");
-        no.addActionListener(event -> cancel.run());
-        var row = new JPanel(new BorderLayout(8, 0));
-        row.add(new JLabel("Line (1–" + lineCount + "):"), BorderLayout.WEST);
-        row.add(field, BorderLayout.CENTER);
-        var buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        buttons.add(no);
-        buttons.add(ok);
-        add(row, BorderLayout.CENTER);
-        add(buttons, BorderLayout.SOUTH);
-        Forms.defaultButton(this, ok);
+        text = String.valueOf(currentLine);
+        view = kit.create(new ViewSpec(form()), event -> {
+            if (closed) return;
+            switch (event) {
+                case UiEvent.Edited edited when edited.id().equals(LINE) -> { text = edited.text(); error = ""; render(); }
+                case UiEvent.Action action when action.id().equals(GO_ACTION) -> submit();
+                case UiEvent.Action action when action.id().equals(CANCEL_ACTION) -> cancel.run();
+                default -> { }
+            }
+        });
     }
 
-    /** Goes to the typed line when it is valid; otherwise outlines the field in the theme's error colour. */
+    /** @return the owned view to mount */
+    public UiView view() { return view; }
+
+    /** Goes to the typed line when it is valid; otherwise marks the field with an error and stays open. */
     public void submit() {
+        if (closed) return;
         try {
-            int line = Integer.parseInt(field.getText().strip());
+            int line = Integer.parseInt(text.strip());
             if (line >= 1 && line <= lineCount) {
-                field.putClientProperty("JComponent.outline", null);
+                if (!error.isEmpty()) { error = ""; render(); }
                 go.accept(line);
                 return;
             }
         } catch (NumberFormatException notANumber) {
             // Marked below.
         }
-        field.putClientProperty("JComponent.outline", "error");
+        error = "Enter a line from 1 to " + lineCount;
+        render();
     }
 
-    JTextField field() { return field; }
+    private void render() { if (!closed) view.update(new ViewSpec(form())); }
+
+    private Nodes.Form form() {
+        var field = new Nodes.Field(LINE, new ControlState(true, true, false, error), Nodes.FieldKind.TEXT, text, "",
+            "Line (1–" + lineCount + "):", GO_ACTION);
+        var actions = List.of(
+            new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL_ACTION, ""),
+            new Nodes.Button(GO, ControlState.READY, "Go", "", Nodes.ButtonKind.PRIMARY, GO_ACTION, ""));
+        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.SHEET, "Go to Line", Optional.empty(), List.of(field), Optional.empty(),
+            actions, CANCEL_ACTION);
+    }
+
+    @Override public void close() { if (closed) return; closed = true; view.close(); }
 }

@@ -415,12 +415,14 @@ public final class EditorWindow {
         selected().filter(tab -> tab.session().state() == DocumentSession.State.READY).ifPresent(tab -> {
             RSyntaxTextArea area = tab.area();
             PluginDialog dialog = context.windows().dialog(new DialogSpec("Go to Line", owner(), true));
-            dialog.setContent(new GoToLinePanel(area.getCaretLineNumber() + 1, area.getLineCount(), line -> {
+            var panel = new GoToLinePanel(context.kit(), area.getCaretLineNumber() + 1, area.getLineCount(), line -> {
                 dialog.close();
                 try { area.setCaretPosition(area.getLineStartOffset(line - 1)); }
                 catch (BadLocationException impossible) { return; }
                 area.requestFocusInWindow();
-            }, dialog::close));
+            }, dialog::close);
+            dialog.onClosed(panel::close);
+            dialog.setContent(panel.view());
             dialog.show();
         });
     }
@@ -428,7 +430,9 @@ public final class EditorWindow {
     public void chooseLanguage() {
         selected().ifPresent(tab -> {
             PluginDialog dialog = context.windows().dialog(new DialogSpec("Language", owner(), true));
-            dialog.setContent(new LanguagePicker(tab.session().style(), style -> { dialog.close(); tab.session().setStyle(style); }));
+            var picker = new LanguagePicker(context.kit(), tab.session().style(), style -> { dialog.close(); tab.session().setStyle(style); }, dialog::close);
+            dialog.onClosed(picker::close);
+            dialog.setContent(picker.view());
             dialog.show();
         });
     }

@@ -12,7 +12,9 @@ import dev.jasper.editor.local.LocalDocument;
 import dev.jasper.editor.session.DocumentSession;
 import dev.jasper.editor.session.Question;
 import dev.jasper.editor.syntax.Languages;
+import dev.jasper.editor.testsupport.Kits;
 import dev.jasper.editor.testsupport.StubDocument;
+import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
@@ -358,19 +360,43 @@ class EditorWindowTest {
 
     @Test void theLanguagePickerSoftWrapGoToLineAndToggleCommentActOnTheCurrentTab() throws Exception {
         EditorTab tab = opened(file("notes.txt", "one\ntwo\nthree\n"));
-        window.chooseLanguage();
-        var picker = (LanguagePicker) host.windowContent("dev.jasper.editor", "Language").orElseThrow();
-        picker.filter("tom");
-        picker.chooseSelected();
+        Kits.edt(() -> {
+            window.chooseLanguage();
+            var picker = host.windowView("dev.jasper.editor", "Language").orElseThrow();
+            Kits.type(picker, LanguagePicker.FILTER, "tom");
+            Kits.press(picker, LanguagePicker.CHOOSE);
+            assertThat(Kits.closed(picker)).as("choosing closes the dialog and disposes its view").isTrue();
+        });
         assertThat(tab.session().style()).isEqualTo(Languages.TOML);
         assertThat(host.windows()).isEmpty();
         assertThat(host.contentTabs()).hasSize(1);
+        Kits.edt(() -> {
+            window.chooseLanguage();
+            Kits.escape(host.windowView("dev.jasper.editor", "Language").orElseThrow());
+        });
+        assertThat(host.windows()).as("Escape closes the picker").isEmpty();
+        assertThat(tab.session().style()).as("without changing the language").isEqualTo(Languages.TOML);
         window.toggleWrap();
         assertThat(tab.area().getLineWrap()).isTrue();
-        window.goToLine();
-        var goTo = (GoToLinePanel) host.windowContent("dev.jasper.editor", "Go to Line").orElseThrow();
-        goTo.field().setText("3");
-        goTo.submit();
+        Kits.edt(() -> {
+            window.goToLine();
+            var goTo = host.windowView("dev.jasper.editor", "Go to Line").orElseThrow();
+            assertThat(Kits.node(goTo, GoToLinePanel.LINE, Nodes.Field.class).value()).as("the field starts at the caret's line").isEqualTo("1");
+            Kits.type(goTo, GoToLinePanel.LINE, "9");
+            Kits.press(goTo, GoToLinePanel.GO_ACTION);
+            assertThat(host.windowView("dev.jasper.editor", "Go to Line")).as("an invalid line keeps the dialog open").containsSame(goTo);
+            assertThat(Kits.node(goTo, GoToLinePanel.LINE, Nodes.Field.class).state().error()).isNotEmpty();
+            Kits.type(goTo, GoToLinePanel.LINE, "3");
+            Kits.press(goTo, GoToLinePanel.GO_ACTION);
+            assertThat(Kits.closed(goTo)).isTrue();
+        });
+        assertThat(host.windows()).isEmpty();
+        assertThat(tab.area().getCaretLineNumber()).isEqualTo(2);
+        Kits.edt(() -> {
+            window.goToLine();
+            Kits.escape(host.windowView("dev.jasper.editor", "Go to Line").orElseThrow());
+        });
+        assertThat(host.windows()).as("Escape closes Go to Line").isEmpty();
         assertThat(tab.area().getCaretLineNumber()).isEqualTo(2);
         window.toggleComment();
         assertThat(tab.area().getText()).contains("#three");
