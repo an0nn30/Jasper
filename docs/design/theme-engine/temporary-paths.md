@@ -364,6 +364,19 @@ values or `WorkspaceDefaults`. Remaining raw Remote paths are Task 11's only: th
 item and action icons from `context.appearance().icon(...)` (`SftpUi`, `TransferUi`, `TunnelsUi`, `RemotePlugin`,
 `SessionsToolbar`); `javax.swing.Timer` and the AWT clipboard are nonvisual.
 
+## Task 9a consumer removal (Editor dialogs)
+
+Plan 2 Task 9a moved the Editor's question sheet (`Forms.QuestionView`, mounted by `DialogAsker`), the Saving dialog
+(`Forms.ProgressView`, mounted by `SaveWait`, whose non-modal dialog and nested loop are unchanged), Go to Line
+(`GoToLinePanel`) and the Language picker (`LanguagePicker`) to owned SDK `UiView`s from `context.kit()`, mounted with
+`PluginDialog.setContent(UiView)`. These files no longer read `UIManager` (the question's `Label.font`), set FlatLaf client
+properties (`JComponent.outline=error`, `JTextField.placeholderText`, `html.disable`), install a root default button or
+build raw Swing controls; none of them read `WorkspacePalette.current`, `LegacyAppearanceDefaults` keys or
+`WorkspaceDefaults`. `Forms.bind` (a plain key-binding helper, no styling) stays only for `FindBar` until Task 9b.
+Remaining Editor raw paths and owners: `EditorTab` (`WorkspacePalette.current` banner border; raw tab chrome and
+`openTab(JComponent)`), `FindBar`, `GlassSurface`, `EditorTheme`'s `FlatLaf.style` write (Task 9b) and `VimBar`
+(`WorkspacePalette.current`, Task 9c); the `Jasper.editor*` aliases and `WorkspaceDefaults` publication stay until Task 11.
+
 ## Task 5 review fix round 1 — native geometry, vendor roles and open status-surface item
 
 **Preserved native geometry (no visual change in Plan 2).** Native adapters keep their pre-migration values

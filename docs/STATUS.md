@@ -1,8 +1,31 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-06
+## Current state — 2026-10-07
 
-- **Theme engine Plan 2 Task 9-kit implemented: kit capabilities for the Editor migration; review pending** (2026-10-06).
+- **Theme engine Plan 2 Task 9a implemented: Editor dialogs on kit views; one open question, review pending** (2026-10-07).
+  The question sheet (`Forms.QuestionView`, mounted by `DialogAsker`), Saving (`Forms.ProgressView`, mounted by `SaveWait`;
+  the non-modal dialog and nested loop kept), Go to Line (`GoToLinePanel`) and Language (`LanguagePicker`) are owned SDK
+  `UiView`s from `context.kit()`, mounted with `PluginDialog.setContent(UiView)`; closing a dialog closes its controller,
+  so late events and a save finishing after Saving closed never touch a disposed view. Enter matches baseline `f16ae32f`
+  (asserted in the real host through Swing's key path under FlatLaf, `EditorEnterBaselineTest`): the question's default
+  choice (first, or Cancel for a destructive question) is its only PRIMARY and takes Enter from anywhere, Space presses
+  the focused button; Go to Line submits from its field (`trailingAction`) and its PRIMARY Go, an invalid line puts an
+  inline error on the field (`ControlState.error`, Go disabled until the next edit) and keeps the dialog open; Language's
+  SEARCH filter chooses on Enter and moves the list with Up/Down/Page keys (`Field.listId`), rows choose on Enter or a
+  double click, no PRIMARY; Saving takes no Enter. Accepted deviation (ruling): Escape picks the dismissing choice
+  (destructive questions: Cancel) or Cancel in every Editor dialog. Visual-only, accepted (task-9-report.md items 5–8):
+  kit sheet title, PRIMARY default button, field label above the line field and inline error text, kit search field and
+  COMPACT rows, kit indeterminate progress with its "Saving" caption. Removed from these files: raw Swing panels, the
+  `UIManager` `Label.font` read, FlatLaf client properties and the root default-button helper (`Forms.bind` stays for
+  `FindBar` until 9b). Evidence: Editor descriptor scenarios (`build/theme-migration-evidence/editor-descriptors`) and the
+  real-host dark/light captures `EditorRenderEvidenceTest` (`editor-hosted`, non-blank checked) on the new staged-host
+  helper `StagedEditorHost`; frozen before images untouched. Open (NEEDS_CONTEXT, task-9-report.md 9a): the host re-packs
+  the Language dialog as the filtered list shrinks (500 → 164 px for "ja", 108 px with no match); the baseline dialog
+  kept its 14-row height. Not run: GUI. GUI checks for the user: the four dialogs in dark and light; Enter/Space/Escape
+  on the question with focus on a non-default button; Go to Line's inline error; Up/Down in the Language filter and
+  the dialog height while filtering. Also carried and reviewed with 9a: kit fix `d2c6a37c` (a field's list keys run the
+  look and feel's own binding while their list is hidden, disabled, busy or unmounted).
+- **Theme engine Plan 2 Task 9-kit complete: kit capabilities for the Editor migration (review clean after fix round 1)** (2026-10-06).
   Task 9 is split (controller ruling) into 9-kit, 9a (Editor dialogs), 9b (document tab and find bar) and 9c (Vim bar).
   9-kit adds, mirrored module ↔ SDK ↔ host `KitValues`/settings-row rewriters ↔ testkit fake with a shared contract case
   (SDK version unchanged; Task 11 versions the new record components; every prior constructor kept):
