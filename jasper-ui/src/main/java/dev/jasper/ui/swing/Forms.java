@@ -139,25 +139,29 @@ final class Forms {
             Composition.style(
                     title, context(), Typography.Role.HERO_TITLE, SemanticColor.TEXT_PRIMARY);
             ((Surface) component).sheet = form.kind() == Nodes.FormKind.SHEET;
-            int side =
-                    ThemePainting.metric(
-                            context(),
-                            form.kind() == Nodes.FormKind.HERO
-                                    ? DesignMetrics.Role.HERO_SIDES
-                                    : DesignMetrics.Role.FORM_SIDES);
+            boolean hero = form.kind() == Nodes.FormKind.HERO || form.kind() == Nodes.FormKind.HERO_COMPACT;
+            boolean compact = form.kind() == Nodes.FormKind.HERO_COMPACT;
+            int side = ThemePainting.metric(context(), hero ? DesignMetrics.Role.HERO_SIDES : DesignMetrics.Role.FORM_SIDES);
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.FOOTER_PADDING);
-            body.setBorder(new EmptyBorder(pad, side, 0, side));
-            body.setLayout(
-                    new Composition.Vertical(
-                            ThemePainting.metric(
-                                    context(),
-                                    form.kind() == Nodes.FormKind.SHEET
-                                            ? DesignMetrics.Role.SHEET_SECTION_GAP
-                                            : DesignMetrics.Role.SECTION_GAP)));
-            footer.setBorder(new EmptyBorder(pad, side, pad, side));
+            int focusClearance = hero ? ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING) : 0;
+            body.setBorder(new EmptyBorder(hero ? ThemePainting.metric(context(), DesignMetrics.Role.HERO_TOP) : pad,
+                    side, focusClearance, side));
+            body.setLayout(hero ? new Composition.Vertical(ThemePainting.metric(context(), DesignMetrics.Role.HERO_SECTION_GAP)) {
+                @Override int gap(Component previous, Component next) {
+                    if (form.hero().isPresent() && previous == view.control(form.hero().get().id()).component)
+                        return ThemePainting.metric(context(), compact ? DesignMetrics.Role.HERO_COMPACT_INTRO_GAP : DesignMetrics.Role.HERO_INTRO_GAP);
+                    return previous instanceof Cards.CardSurface
+                        ? ThemePainting.metric(context(), DesignMetrics.Role.HERO_FOOTNOTE_GAP) : super.gap(previous, next);
+                }
+            } : new Composition.Vertical(ThemePainting.metric(context(), form.kind() == Nodes.FormKind.SHEET
+                    ? DesignMetrics.Role.SHEET_SECTION_GAP : DesignMetrics.Role.SECTION_GAP)));
+            int footerTop = hero ? ThemePainting.metric(context(), compact
+                    ? DesignMetrics.Role.HERO_COMPACT_FOOTER_TOP : DesignMetrics.Role.HERO_FOOTER_TOP) - focusClearance : pad;
+            footer.setBorder(new EmptyBorder(footerTop, side,
+                    hero ? ThemePainting.metric(context(), DesignMetrics.Role.HERO_FOOTER_BOTTOM) : pad, side));
             footer.setLayout(new FooterLayout(this));
             actions.setLayout(
-                    form.kind() == Nodes.FormKind.HERO
+                    hero
                             ? new GridLayout(
                                     1,
                                     0,
@@ -228,6 +232,24 @@ final class Forms {
     }
 
     static final class Body extends JPanel implements Scrollable {
+        @Override public Dimension getPreferredSize() {
+            if (getLayout() instanceof Composition.WidthLayout layout && getParent() instanceof JViewport viewport
+                    && viewport.getParent() instanceof JScrollPane scroll && scroll.getWidth() > 0) {
+                // Measure the current scroll allocation, not this body's stale width after an earlier scrollbar.
+                // Otherwise a queued native repack can retain a scrollbar solely because its old width wraps text.
+                Insets insets = scroll.getInsets();
+                int width = Math.max(1, scroll.getWidth() - insets.left - insets.right);
+                int availableHeight = scroll.getHeight() - insets.top - insets.bottom;
+                int height = layout.height(this, width);
+                if (height > availableHeight) {
+                    width = Math.max(1, width - scroll.getVerticalScrollBar().getPreferredSize().width);
+                    height = layout.height(this, width);
+                }
+                return new Dimension(width, height);
+            }
+            return super.getPreferredSize();
+        }
+
         @Override
         public Dimension getPreferredScrollableViewportSize() {
             return getPreferredSize();
@@ -272,6 +294,7 @@ final class Forms {
                             view.context(),
                             switch (f.kind()) {
                                 case HERO -> DesignMetrics.Role.HERO_WIDTH;
+                                case HERO_COMPACT -> DesignMetrics.Role.HERO_COMPACT_WIDTH;
                                 case SHEET -> DesignMetrics.Role.SHEET_WIDTH;
                                 default -> DesignMetrics.Role.FORM_WIDTH;
                             });
@@ -336,7 +359,7 @@ final class Forms {
             Insets i = parent.getInsets();
             int contentWidth = Math.max(0, width - i.left - i.right);
             int actionWidth =
-                    ((Nodes.Form) owner.node).kind() == Nodes.FormKind.HERO
+                    (((Nodes.Form) owner.node).kind() == Nodes.FormKind.HERO || ((Nodes.Form) owner.node).kind() == Nodes.FormKind.HERO_COMPACT)
                             ? contentWidth
                             : Math.min(contentWidth, owner.actions.getPreferredSize().width);
             int actionHeight = Composition.height(owner.actions, actionWidth);
@@ -381,6 +404,7 @@ final class Forms {
                                             owner.context(),
                                             switch (((Nodes.Form) owner.node).kind()) {
                                                 case HERO -> DesignMetrics.Role.HERO_WIDTH;
+                                                case HERO_COMPACT -> DesignMetrics.Role.HERO_COMPACT_WIDTH;
                                                 case SHEET -> DesignMetrics.Role.SHEET_WIDTH;
                                                 default -> DesignMetrics.Role.FORM_WIDTH;
                                             });

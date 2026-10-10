@@ -16,7 +16,8 @@ final class SettingRows {
 
     static final class RowControl extends ControlRegistry.Control {
         final Composition.WrappedText title, description;
-        boolean panelFooter;
+        boolean panelFooter, hero;
+        @Override void hero(boolean value) { hero=value; }
 
         RowControl(KitView view, Nodes.SettingRow node) {
             super(view, node, new SearchHighlight(view.context()));
@@ -32,15 +33,17 @@ final class SettingRows {
         void refresh() {
             state();
             var row = (Nodes.SettingRow) node;
-            title.text(row.title());
+            title.text(row.title() + (row.titleNote().isEmpty() ? "" : " · " + row.titleNote()));
+            title.noteStart = row.titleNote().isEmpty() ? -1 : row.title().length();
+            title.noteColor = ThemePainting.color(context(), SemanticColor.TEXT_TERTIARY);
             description.text(row.description());
             description.setVisible(!row.description().isEmpty());
             Composition.style(title, context(), Typography.Role.LABEL, SemanticColor.TEXT_PRIMARY);
             Composition.style(
-                    description, context(), Typography.Role.CAPTION, SemanticColor.TEXT_TERTIARY);
+                    description, context(), Typography.Role.SETTING_DESCRIPTION, SemanticColor.TEXT_TERTIARY);
             title.setEnabled(component.isEnabled());
             description.setEnabled(component.isEnabled());
-            int side = ThemePainting.metric(context(), DesignMetrics.Role.CARD_PADDING),
+            int side = ThemePainting.metric(context(), DesignMetrics.Role.SETTING_SIDE_PADDING),
                     vertical =
                             ThemePainting.metric(
                                     context(), DesignMetrics.Role.SETTING_VERTICAL_PADDING);
@@ -109,18 +112,24 @@ final class SettingRows {
                     : 0;
         }
 
+        /** A switch reserves its own halo; align its painted track while keeping the halo in the row padding. */
+        int paintInset(Container parent) {
+            return parent.getComponentCount() > 2 && parent.getComponent(2) instanceof Switches.SwitchButton
+                ? Math.min(parent.getInsets().right, ThemePainting.metric(owner.context(), DesignMetrics.Role.FOCUS_RING)) : 0;
+        }
+
         @Override
         public int height(Container p, int width) {
             Insets i = p.getInsets();
-            int tw = trailing(p, width), w = Math.max(0, width - i.left - i.right - tw - gap());
+            int tw = trailing(p, width), w = Math.max(0, width - i.left - i.right - tw + 2 * paintInset(p) - gap());
             int text =
                     owner.title.height(w)
-                            + (owner.description.isVisible() ? owner.description.height(w) : 0);
+                            + (owner.description.isVisible() ? owner.description.height(w) + ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_DESCRIPTION_GAP) : 0);
             int control = p.getComponentCount() > 2 ? Composition.height(p.getComponent(2), tw) : 0;
             return Math.max(
                     owner.panelFooter ? 0 : ThemePainting.metric(
                             owner.context(),
-                            owner.description.isVisible()
+                            owner.hero && owner.description.isVisible() ? DesignMetrics.Role.HERO_SETTING_HEIGHT : owner.description.isVisible()
                                     ? DesignMetrics.Role.SETTING_DESCRIPTION_HEIGHT
                                     : DesignMetrics.Role.SETTING_HEIGHT),
                     i.top + i.bottom + Math.max(text, control));
@@ -141,17 +150,18 @@ final class SettingRows {
         public void layoutContainer(Container p) {
             Insets i = p.getInsets();
             int tw = trailing(p, p.getWidth()),
-                    w = Math.max(0, p.getWidth() - i.left - i.right - tw - gap()),
+                    w = Math.max(0, p.getWidth() - i.left - i.right - tw + 2 * paintInset(p) - gap()),
                     th = owner.title.height(w),
-                    dh = owner.description.isVisible() ? owner.description.height(w) : 0;
+                    dh = owner.description.isVisible() ? owner.description.height(w) + ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_DESCRIPTION_GAP) : 0;
             int y = Math.max(i.top, (p.getHeight() - th - dh) / 2);
             owner.title.setBounds(i.left, y, w, th);
-            owner.description.setBounds(i.left, y + th, w, dh);
+            int descriptionGap = owner.description.isVisible() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_DESCRIPTION_GAP) : 0;
+            owner.description.setBounds(i.left, y + th + descriptionGap, w, Math.max(0, dh - descriptionGap));
             if (p.getComponentCount() > 2) {
                 Component c = p.getComponent(2);
                 int h = Composition.height(c, tw);
                 c.setBounds(
-                        p.getWidth() - i.right - tw,
+                        p.getWidth() - i.right - tw + paintInset(p),
                         Math.max(i.top, (p.getHeight() - h) / 2),
                         tw,
                         h);

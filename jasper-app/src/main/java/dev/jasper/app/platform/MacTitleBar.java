@@ -38,6 +38,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     private WindowDecorations.CustomTitleBar nativeTitle;
     private int nativeLeft, nativeRight;
     private boolean active = true;
+    private boolean dialogHero;
     private boolean closed;
     private final ComponentAdapter frameBounds = new ComponentAdapter() {
         @Override public void componentResized(ComponentEvent event) { refreshNativeGeometry(); }
@@ -122,6 +123,15 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         revalidate(); repaint();
     }
 
+    /** Hero content already supplies its heading; keep native controls over the dialog surface. */
+    public void setDialogHero(boolean hero) {
+        if (closed || header != null) return;
+        dialogHero = hero;
+        title.setVisible(!hero);
+        headerGeometryChanged();
+        refreshColors();
+    }
+
     /** Public JBR API only. Root properties above remain the fallback on other runtimes. */
     public void attach(Window window) {
         if (!(window instanceof Frame) && !(window instanceof Dialog))
@@ -162,7 +172,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     }
 
     private int titleHeight() {
-        return header == null ? UIScale.scale(TITLE_HEIGHT)
+        return header == null ? UIScale.scale(dialogHero ? 20 : TITLE_HEIGHT)
             : Math.max(UIScale.scale(TITLE_HEIGHT), header.getPreferredSize().height);
     }
 
@@ -172,7 +182,9 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         return new Dimension(safeInset() + Math.max(UIScale.scale(8), nativeRight)
             + header.getMinimumSize().width - insets.left - insets.right, titleHeight());
     }
-    @Override public Dimension getPreferredSize() { return new Dimension(Math.max(UIScale.scale(400), getMinimumSize().width), titleHeight()); }
+    @Override public Dimension getPreferredSize() {
+        return new Dimension(Math.max(header == null ? 0 : UIScale.scale(400), getMinimumSize().width), titleHeight());
+    }
 
     @Override public void doLayout() {
         refreshNativeGeometry();
@@ -200,7 +212,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     public void setActive(boolean active) { this.active = active; refreshColors(); }
 
     private void refreshColors() {
-        setBackground(ThemeZone.color(null, SemanticColor.SURFACE_APP));
+        setBackground(ThemeZone.color(null, dialogHero ? SemanticColor.SURFACE_DIALOG : SemanticColor.SURFACE_APP));
         title.setFont(SystemFonts.ui(header == null ? Font.BOLD : Font.PLAIN, 13f));
         title.setForeground(ThemeZone.color(this, active ? SemanticColor.TEXT_SECONDARY : SemanticColor.TEXT_TERTIARY));
         repaint();
@@ -212,7 +224,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
             Color highlight = dev.jasper.ui.theme.ColorMath.opacity(ThemeZone.color(this, SemanticColor.HOVER_OVERLAY), .08);
             if (highlight != null) { g.setColor(highlight); g.fillRect(0, 0, getWidth(), UIScale.scale(1)); }
         }
-        if (header == null) {
+        if (header == null && !dialogHero) {
             g.setColor(ThemeZone.color(null, SemanticColor.BORDER_SUBTLE));
             g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
         }

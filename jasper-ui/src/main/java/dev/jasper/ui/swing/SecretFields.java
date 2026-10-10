@@ -94,7 +94,7 @@ final class SecretFields {
                     };
             reveal.addActionListener(action);
             own(() -> reveal.removeActionListener(action));
-            if (!multiline) surface.add(reveal, BorderLayout.EAST);
+            if (!multiline && node.kind() != Nodes.SecretKind.CONFIRMATION) surface.add(reveal, BorderLayout.EAST);
             copy = new Buttons.KitButton(context());
             copy.kind = Nodes.ButtonKind.GHOST;
             KitOwnership.mark(copy, node.id() + ".copy");
@@ -224,7 +224,7 @@ final class SecretFields {
                                 public boolean isEnabled() {
                                     var secret = (Nodes.Secret) node;
                                     return !closed
-                                            && secret.kind() == Nodes.SecretKind.INPUT
+                                            && (secret.kind() == Nodes.SecretKind.INPUT || secret.kind() == Nodes.SecretKind.CONFIRMATION)
                                             && !secret.submitAction().isBlank();
                                 }
 
@@ -355,7 +355,7 @@ final class SecretFields {
             if (multiline) refreshArea(secret, enabled);
             surface.setEnabled(enabled);
             reveal.setEnabled(enabled);
-            reveal.setVisible(!multiline);
+            reveal.setVisible(!multiline && secret.kind() != Nodes.SecretKind.CONFIRMATION);
             detailDisplay.setEnabled(enabled);
             detailDisplay.getAccessibleContext().setAccessibleName(secret.label());
             detailDisplay

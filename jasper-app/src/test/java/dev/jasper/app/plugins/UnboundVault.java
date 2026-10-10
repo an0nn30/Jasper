@@ -55,6 +55,7 @@ final class UnboundVault {
         List<dev.jasper.sdk.ui.Nodes.Node> children = switch (node) {
             case dev.jasper.sdk.ui.Nodes.Form n -> n.sections();
             case dev.jasper.sdk.ui.Nodes.Stack n -> n.children();
+            case dev.jasper.sdk.ui.Nodes.Card n -> n.children();
             case dev.jasper.sdk.ui.Nodes.SettingRow n -> List.of(n.control());
             default -> List.of();
         };
@@ -67,6 +68,7 @@ final class UnboundVault {
         List<dev.jasper.ui.model.Nodes.Node> children = switch (node) {
             case dev.jasper.ui.model.Nodes.Form n -> n.sections();
             case dev.jasper.ui.model.Nodes.Stack n -> n.children();
+            case dev.jasper.ui.model.Nodes.Card n -> n.children();
             case dev.jasper.ui.model.Nodes.SettingRow n -> List.of(n.control());
             default -> List.of();
         };

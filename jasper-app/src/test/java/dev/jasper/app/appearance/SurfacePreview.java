@@ -1,0 +1,79 @@
+package dev.jasper.app.appearance;
+
+import java.awt.image.BufferedImage;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import javax.imageio.ImageIO;
+
+/** Opt-in real staged-owner comparison output; originals are never modified. */
+public final class SurfacePreview {
+    private record Capture(BufferedImage image, String metadata) {}
+
+    /** Optional arguments: output directory, surface substring, theme, state. */
+    public static void main(String[] args) throws Exception {
+        Path output = Path.of(args.length > 0 ? args[0] : "build/theme-surfaces");
+        String filter = args.length > 1 ? args[1] : "";
+        for (String theme : args.length > 2 ? List.of(args[2]) : List.of("calibration", "dark", "light", "custom")) {
+            for (String id : List.of("vault-create", "vault-unlock")) {
+                if (!filter.isEmpty() && !id.contains(filter)) continue;
+                var states = id.equals("vault-create")
+                    ? List.of("empty", "focus", "entered", "revealed", "mismatch", "busy")
+                    : List.of("empty", "entered", "revealed", "busy", "error");
+                for (String state : states) {
+                    if (args.length > 3 && !state.equals(args[3])) continue;
+                    try (var opened = SurfaceFixtures.open(id, state, theme)) {
+                        Path directory = Files.createDirectories(output.resolve(theme).resolve(id));
+                        // Busy submission and all metadata share one EDT turn, before any async completion can close the view.
+                        Capture capture = SurfaceFixtures.edt(() -> capture(opened, id));
+                        ImageIO.write(capture.image(), "png", directory.resolve(state + ".png").toFile());
+                        Files.writeString(directory.resolve(state + ".txt"), capture.metadata());
+                    }
+                }
+            }
+        }
+    }
+
+    private static Capture capture(SurfaceFixtures.Opened opened, String id) {
+        var image = opened.capture(2);
+        var metadata = new StringBuilder("provenance=real staged plugin/headless Java2D\ndeviceScale=2\nlogicalUiScale="
+            + System.getProperty("flatlaf.uiScale", "1") + "\npreferred=" + opened.preferred() + "\n");
+        for (String anchor : List.of("form.hero.tile", "form.heading", "intro", "password", "password.input", "cancel", "submit"))
+            metadata.append(anchor).append('=').append(opened.bounds(anchor)).append('\n');
+        if (id.equals("vault-create")) {
+            for (String anchor : List.of("strength", "confirm", "bind.card", "form.warning"))
+                metadata.append(anchor).append('=').append(opened.bounds(anchor)).append('\n');
+        }
+        var textIds = id.equals("vault-create")
+            ? List.of("form.heading", "intro", "bind.row.title", "bind.row.description", "form.warning.text")
+            : List.of("form.heading", "intro");
+        for (String textId : textIds) metadata.append(textMetrics(opened, textId));
+        return new Capture(image, metadata.toString());
+    }
+
+    private static String textMetrics(SurfaceFixtures.Opened opened, String id) {
+        var component = (javax.swing.JComponent)opened.component(id);
+        var image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try {
+            graphics.scale(2, 2);
+            graphics.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            graphics.setRenderingHint(java.awt.RenderingHints.KEY_FRACTIONALMETRICS, java.awt.RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+            graphics.setFont(component.getFont());
+            var metrics = graphics.getFontMetrics();
+            int baseline = metrics.getAscent();
+            if (component instanceof javax.swing.JLabel label && !id.equals("intro")) {
+                var insets = label.getInsets();
+                var icon = new java.awt.Rectangle();
+                var text = new java.awt.Rectangle();
+                javax.swing.SwingUtilities.layoutCompoundLabel(label, metrics, label.getText(), label.getIcon(),
+                    label.getVerticalAlignment(), label.getHorizontalAlignment(), label.getVerticalTextPosition(), label.getHorizontalTextPosition(),
+                    new java.awt.Rectangle(insets.left, insets.top, label.getWidth() - insets.left - insets.right,
+                        label.getHeight() - insets.top - insets.bottom), icon, text, label.getIconTextGap());
+                baseline += text.y;
+            }
+            return id + ".typography=" + component.getFont().getFontName(java.util.Locale.ROOT)
+                + ",size=" + component.getFont().getSize2D() + ",firstPaintBaselineLogical=" + (opened.bounds(id).y + baseline) + "\n";
+        } finally { graphics.dispose(); }
+    }
+}

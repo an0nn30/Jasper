@@ -38,7 +38,11 @@ public final class KitContext {
             if ("defaultFont".equals(key) && value instanceof java.awt.Font font) override[0] = font;
             if ("Label.font".equals(key) && value instanceof java.awt.Font font) override[1] = font;
         });
-        return override[0] == null ? new Typography() : new Typography(override[0].getFamily(), (override[1] == null ? override[0] : override[1]).getSize2D());
+        if (override[0] == null) return new Typography();
+        float size = (override[1] == null ? override[0] : override[1]).getSize2D();
+        // Host provenance distinguishes size-only system settings from an explicit family, even Helvetica Neue.
+        return Boolean.FALSE.equals(javax.swing.UIManager.get("Jasper.uiFontFamilyOverride"))
+            ? new Typography(size) : new Typography(override[0].getFamily(), size);
     }
     public MotionPolicy motionPolicy() { return new MotionPolicy(animationsEnabled); }
 }

@@ -40,16 +40,20 @@ final class Composition {
             this.gap = gap;
         }
 
+        int gap(Component previous, Component next) { return gap; }
+
         @Override
         public int height(Container parent, int width) {
             Insets i = parent.getInsets();
-            int h = i.top + i.bottom, count = 0;
+            int h = i.top + i.bottom;
+            Component previous = null;
             for (Component c : parent.getComponents())
                 if (c.isVisible()) {
                     h += Composition.height(c, Math.max(0, width - i.left - i.right));
-                    count++;
+                    if (previous != null) h += gap(previous, c);
+                    previous = c;
                 }
-            return h + Math.max(0, count - 1) * gap;
+            return h;
         }
 
         @Override
@@ -66,11 +70,14 @@ final class Composition {
         public void layoutContainer(Container parent) {
             Insets i = parent.getInsets();
             int y = i.top, w = Math.max(0, parent.getWidth() - i.left - i.right);
+            Component previous = null;
             for (Component c : parent.getComponents())
                 if (c.isVisible()) {
+                    if (previous != null) y += gap(previous,c);
                     int h = Composition.height(c, w);
                     c.setBounds(i.left, y, w, h);
-                    y += h + gap;
+                    y += h;
+                    previous = c;
                 }
         }
     }
@@ -94,6 +101,9 @@ final class Composition {
     static final class WrappedText extends JComponent {
         String text = "";
         boolean centered;
+        int lineHeight;
+        int noteStart = -1;
+        Color noteColor;
 
         WrappedText() {
             setOpaque(false);
@@ -139,7 +149,7 @@ final class Composition {
         }
 
         int height(int width) {
-            return lines(Math.max(1, width)).size() * getFontMetrics(getFont()).getHeight();
+            return lines(Math.max(1, width)).size() * Math.max(lineHeight, getFontMetrics(getFont()).getHeight());
         }
 
         @Override
@@ -158,13 +168,16 @@ final class Composition {
                 g.setColor(getForeground());
                 if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
                 var fm = g.getFontMetrics();
-                int y = fm.getAscent();
+                int y = fm.getAscent(), consumed = 0;
                 for (String line : lines(getWidth())) {
-                    g.drawString(
-                            line,
-                            centered ? Math.max(0, (getWidth() - fm.stringWidth(line)) / 2) : 0,
-                            y);
-                    y += fm.getHeight();
+                    int x = centered ? Math.max(0, (getWidth() - fm.stringWidth(line)) / 2) : 0;
+                    int start = text.indexOf(line, consumed);
+                    int split = noteStart < 0 ? line.length() : Math.max(0, Math.min(line.length(), noteStart - start));
+                    String leading = line.substring(0, split);
+                    g.setColor(getForeground()); g.drawString(leading, x, y);
+                    if (split < line.length()) { g.setColor(noteColor); g.drawString(line.substring(split), x + fm.stringWidth(leading), y); }
+                    consumed = start + line.length();
+                    y += Math.max(lineHeight, fm.getHeight());
                 }
             } finally {
                 g.dispose();

@@ -586,3 +586,8 @@ delegate recovery paths still reinstall. An initialized-FlatLaf probe reproduces
 and zero after the fix, with the same selected text; focused/other-owner/closed headless cases and delegate recovery
 are covered. Full UI check (440 tests) and affected app/host scope (74 tests) passed with zero failures/errors/skips; installDist refreshed (64 tasks, 7 executed/57 up-to-date). Prior full9,658 evidence remains frozen at16aa; native keyboard rerun and scoped
 independent review are pending, so this is not a native acceptance claim.
+
+
+## Plan3 Task1 disposition — 2026-10-10
+
+`SurfaceFixtures`, `SurfacePreview`, `SurfaceGeometryTest`, and owner-package `KitViewTestAccess` are permanent test-only actual-feature harness owners, not production test hooks or alternate page implementations. They start the staged Vault in disposable homes, capture mounted KitViews, and preserve domain policy. Calibration/custom TOML lives in test resources and installs through the ordinary native theme catalog for controller QA; no production defaults contain fixture colors. No temporary production path is introduced.

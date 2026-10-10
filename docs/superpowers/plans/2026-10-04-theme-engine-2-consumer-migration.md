@@ -1,5 +1,10 @@
 # Theme Engine Plan 2 — Consumer and SDK Migration Implementation Plan
 
+**Current verdict — 2026-10-10:** Independently approved through `0b367eee`. The final four Important/two Minor findings and native F3 font-focus follow-up are resolved; controller native keyboard/light-switch reruns confirm those fixes only. Plan3 owns reference composition/native visual acceptance. Pending statements in the historical execution notes below are superseded by this verdict.
+
+### Historical final-fix evidence
+
+
 Native F3 follow-up (2026-10-10): controller keyboard QA at `16aa1e4a` retained font text/selection but
 transferred actual focus to Search settings during the theme watcher refresh. The shared editable SearchChoice
 now retains its already-owned kit delegate/editor attachment, refreshes module styles in place, and lets Swing

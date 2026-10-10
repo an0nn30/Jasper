@@ -131,7 +131,7 @@ final class Indicators {
         StrengthMeter(KitContext context) { this.context = context; setOpaque(false); }
         /** Tooltips are literal text: row tooltips carry user data, and Swing HTML could load remote resources. */
         @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
-        @Override public Dimension getPreferredSize() { return new Dimension(Math.max(getFontMetrics(getFont()).stringWidth(label), 4*ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_HEIGHT)) + 3*ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_GAP), ThemePainting.height(context, DesignMetrics.Role.INLINE_ACTION, Typography.Role.CAPTION)); }
+        @Override public Dimension getPreferredSize() { if (label.isEmpty()) return new Dimension(ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_WIDTH), ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_HEIGHT)); return new Dimension(Math.max(getFontMetrics(getFont()).stringWidth(label), 4*ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_HEIGHT)) + 3*ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_GAP), ThemePainting.height(context, DesignMetrics.Role.INLINE_ACTION, Typography.Role.CAPTION)); }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create(); try {
                 ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));

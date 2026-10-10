@@ -11,6 +11,21 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class IconRegistryTest {
+    @Test void heroOpticalStrokeIsExplicitAndControlArtworkKeepsItsRegisteredStroke() {
+        try (var registry = new IconRegistry()) {
+            registry.register("test:line", "M 2 8 H 14");
+            var palette = KitFixtures.dark().semantic();
+            assertThat(strokeAt2x(registry.hero("test:line", palette, Nodes.Hue.BLUE, 24))).isBetween(3.4, 3.6);
+            assertThat(strokeAt2x(registry.icon("test:line", palette, Nodes.Hue.BLUE, 24))).isBetween(4.4, 4.6);
+            assertThat(strokeAt2x(registry.icon("test:line", palette, Nodes.Hue.BLUE, 14))).isBetween(2.5, 2.75);
+        }
+    }
+    private static double strokeAt2x(Icon icon) {
+        var image = new BufferedImage(icon.getIconWidth()*2, icon.getIconHeight()*2, BufferedImage.TYPE_INT_ARGB);
+        var g=image.createGraphics(); try { g.scale(2,2); icon.paintIcon(null,g,0,0); } finally { g.dispose(); }
+        double alpha=0; for(int y=0;y<image.getHeight();y++) alpha += (image.getRGB(image.getWidth()/2,y) >>> 24) / 255.0;
+        return alpha;
+    }
     @Test void sharedBuiltinArtworkSurvivesIndependentRegistryAndCustomLifetimes() {
         var first=new IconRegistry();
         try(var second=new IconRegistry()) {

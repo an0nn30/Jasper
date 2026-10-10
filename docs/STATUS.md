@@ -2,6 +2,9 @@
 
 ## Current state — 2026-10-10
 
+- **Theme engine Plan2 independently approved through `0b367eee`; Plan3 underway.** The four Important and two Minor final-review findings, including the native font-focus follow-up, are fixed and independently approved. Retained full/scoped checks and controller native keyboard/switch evidence are in the Plan2 SDD final-review handoff. Earlier pending-review entries below are historical, not the current verdict. Plan3 Task1 implements real staged-owner hero fixtures and calibrated Vault composition, including readiness, shared annotation/confirmation semantics, compact native packing and error reflow. Native C verifies width/chrome and wrong-password visibility; shared switch paint now exactly matches its reference bounds; system-size-only settings retain role font faces through explicit provenance. Scoped suites pass; per-task review and final pixel acceptance remain pending. No page is accepted yet.
+- **Expanded visual authority (user authorization, 2026-10-10):** all16 Desktop references are preserved byte-identically in [the reference manifest](design/theme-engine/reference/desktop-2026-10-10/manifest.json). Desktop overlapping states take precedence; old-only states remain required. Native QA uses a separate synthetic home, with no merge/push/AOT/benchmark authorization.
+
 - **Native F3 follow-up (2026-10-10).** controller keyboard QA at `16aa1e4a` retained font text/selection but
   transferred actual focus to Search settings during the theme watcher refresh. The shared editable SearchChoice
   now retains its already-owned kit delegate/editor attachment, refreshes module styles in place, and lets Swing

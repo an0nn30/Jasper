@@ -27,3 +27,8 @@ spec review to establish plugin-panel composition. It supplies the panel referen
 initial set. The original local 2810×2026 image is preserved, rather than the chat's resized preview.
 The specification explains how unpictured surfaces are reviewed. These images have not been resized,
 recolored or edited.
+
+
+## Additional Desktop references — 2026-10-10
+
+The [manifest](desktop-2026-10-10/manifest.json) lists16 preserved byte-identical originals, SHA-256 hashes, original dimensions, exact content crops, scale anchors and per-task coverage. Filenames remain unchanged. `rename_vault_dialog.png` depicts **Unlock Vault**, not rename. Desktop images take precedence for overlapping states; the October4 originals above remain required for old-only sheets, menus and populated panels. Board annotations are not application pages. Original PNG profiles are retained; color analysis converts to sRGB without geometric resampling.

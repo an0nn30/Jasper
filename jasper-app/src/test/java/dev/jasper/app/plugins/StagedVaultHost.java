@@ -43,14 +43,17 @@ final class StagedVaultHost implements AutoCloseable {
     final List<String> problems = new CopyOnWriteArrayList<>();
     final UUID window;
 
-    StagedVaultHost(Path data, boolean dark) throws Exception {
+    StagedVaultHost(Path data, boolean dark) throws Exception { this(data, dark, null); }
+
+    StagedVaultHost(Path data, boolean dark, WorkspaceAppearanceFixture appearance) throws Exception {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins")).resolve(UnboundVault.ID);
         UnboundVault.settings(data);
         contributions = onEdtValue(Contributions::new);
         auxiliary = onEdtValue(AppContractTest::headlessWindows);
         terminals = onEdtValue(TerminalFixture::new);
         host = AppContractTest.host(data, Duration.ofMillis(200), contributions, new AtomicBoolean(dark), auxiliary, terminals.registry,
-            problems, new CopyOnWriteArrayList<>());
+            new NotificationsFixture(problems), new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>(),
+            PluginRuntime.ShellProfiles.NONE, new CopyOnWriteArrayList<>(), appearance, GlassSource.NONE);
         loader = new PluginClassLoader(UnboundVault.ID, ManagedVaultLoadingTest.jars(staged), getClass().getClassLoader(), Map.of());
         Plugin plugin = (Plugin) loader.loadClass("dev.jasper.vault.VaultPlugin").getConstructor().newInstance();
         var opened = new AtomicReference<UUID>();
@@ -173,9 +176,10 @@ final class StagedVaultHost implements AutoCloseable {
         if (node.id().equals(id)) return node;
         List<dev.jasper.ui.model.Nodes.Node> children = switch (node) {
             case dev.jasper.ui.model.Nodes.Form n -> {
-                var all = new java.util.ArrayList<dev.jasper.ui.model.Nodes.Node>(n.sections()); n.preview().ifPresent(all::add); all.addAll(n.actions()); yield all;
+                var all = new java.util.ArrayList<dev.jasper.ui.model.Nodes.Node>(n.sections()); n.hero().ifPresent(all::add); n.preview().ifPresent(all::add); all.addAll(n.actions()); yield all;
             }
             case dev.jasper.ui.model.Nodes.Stack n -> n.children();
+            case dev.jasper.ui.model.Nodes.Card n -> n.children();
             case dev.jasper.ui.model.Nodes.SettingRow n -> List.of(n.control());
             case dev.jasper.ui.model.Nodes.Empty n -> n.actions().stream().map(b -> (dev.jasper.ui.model.Nodes.Node) b).toList();
             default -> List.of();

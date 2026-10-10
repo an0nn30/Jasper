@@ -37,7 +37,8 @@ public final class PasswordPanel implements AutoCloseable {
     private final boolean creating;
     private final String primaryTitle, introText;
     private final Map<String, String> errors = new LinkedHashMap<>();
-    private boolean bound, busy, closed;
+    private boolean bound, busy, closed, ready;
+    private int strength;
     private String status = "";
     private Runnable onSubmit = () -> { }, onCancel = () -> { };
     private Host host;
@@ -64,7 +65,7 @@ public final class PasswordPanel implements AutoCloseable {
     }
 
     private static PasswordPanel unlockPanel(String prefix, UnlockPrompt prompt) {
-        var panel = new PasswordPanel(prefix, "Unlock", false, false, "Enter the master password to unlock the vault.");
+        var panel = new PasswordPanel(prefix, "Unlock", false, false, "Enter your master password to use saved credentials.");
         prompt.onError(text -> {
             if (panel.closed || !panel.host.open()) return;
             panel.status = text; panel.busy = false; panel.render();
@@ -75,7 +76,7 @@ public final class PasswordPanel implements AutoCloseable {
             if (typed.length == 0) { Arrays.fill(typed, (char) 0); return; }
             panel.busy = true; panel.status = "Unlocking...";
             panel.host.view().clearSecret(panel.password);
-            panel.render();
+            panel.updateReadiness(); panel.render();
             prompt.submit(typed);
         };
         panel.onCancel = prompt::cancel;
@@ -84,13 +85,14 @@ public final class PasswordPanel implements AutoCloseable {
 
     /** The create form: two matching passwords of at least {@value #MIN_LENGTH} characters and the bind choice. */
     public static PasswordPanel create(UiKit kit, boolean bindDefault, BiConsumer<char[], Boolean> onCreate, Runnable onCancel) {
-        var panel = new PasswordPanel("", "Create Vault", true, bindDefault, "Choose a master password. It cannot be recovered if forgotten.");
+        var panel = new PasswordPanel("", "Create Vault", true, bindDefault, "Choose a master password to protect your saved credentials.");
         panel.onSubmit = () -> {
             char[] typed = panel.copy(panel.password), again = panel.copy(panel.confirm);
             try {
                 if (typed.length < MIN_LENGTH) { panel.errors.put(panel.password, "Use at least " + MIN_LENGTH + " characters"); panel.render(); return; }
                 if (!Arrays.equals(typed, again)) { panel.errors.put(panel.confirm, "The passwords do not match"); panel.render(); return; }
                 panel.host.view().clearSecret(panel.password); panel.host.view().clearSecret(panel.confirm);
+                panel.updateReadiness(); panel.render();
                 onCreate.accept(typed.clone(), panel.bound);
             } finally { Arrays.fill(typed, (char) 0); Arrays.fill(again, (char) 0); }
         };
@@ -127,7 +129,7 @@ public final class PasswordPanel implements AutoCloseable {
             case UiEvent.Action action when action.id().equals(cancel) -> { onCancel.run(); return true; }
             case UiEvent.Toggled toggled when toggled.id().equals(bind) -> { bound = toggled.checked(); render(); return true; }
             case UiEvent.SecretChanged changed when changed.id().equals(password) || changed.id().equals(confirm) -> {
-                if (!errors.isEmpty()) { errors.clear(); render(); }
+                errors.clear(); updateReadiness(); render();
                 return true;
             }
             default -> { return false; }
@@ -136,18 +138,39 @@ public final class PasswordPanel implements AutoCloseable {
 
     private ControlState state(String id) { return new ControlState(true, !busy, false, errors.getOrDefault(id, "")); }
 
-    /** The form node: intro, password fields, the bind switch when creating, the status line and Cancel / primary. */
+    /** Derives only non-secret presentation state while borrowed arrays remain wipeable. */
+    private void updateReadiness() {
+        host.view().withSecret(password, typed -> {
+            strength = typed.length == 0 ? 0 : Math.min(4, 1 + typed.length / MIN_LENGTH);
+            if (creating) host.view().withSecret(confirm, again -> ready = typed.length >= MIN_LENGTH && Arrays.equals(typed, again));
+            else ready = typed.length > 0;
+        });
+    }
+
+    /** The standalone hero; domain policy remains in the submit handler. */
     Nodes.Form node() {
-        var sections = new ArrayList<Nodes.Node>();
-        sections.add(new Nodes.Text(intro, ControlState.READY, introText, Nodes.TextRole.BODY));
-        sections.add(secret(password, "Master password:"));
+        var hero = new Nodes.Stack(form + ".hero", ControlState.READY, Nodes.LayoutRole.HERO, List.of(
+            new Nodes.Icon(form + ".icon", ControlState.READY, creating ? "shield" : "lock", Nodes.Hue.BLUE, Nodes.IconSize.HERO, creating ? "Protect credentials" : "Locked vault"),
+            new Nodes.Text(form + ".heading", ControlState.READY, creating ? "Create Vault" : "Unlock Vault", Nodes.TextRole.HERO_TITLE),
+            new Nodes.Text(intro, ControlState.READY, introText, Nodes.TextRole.DESCRIPTION)));
+        var fields = new ArrayList<Nodes.Node>();
+        fields.add(secret(password, "Master password"));
         if (creating) {
-            sections.add(secret(confirm, "Confirm:"));
-            sections.add(new Nodes.SettingRow(bind + ".row", ControlState.READY, "Bind to this device (recommended)", "",
-                new Nodes.Toggle(bind, new ControlState(true, !busy, false, ""), "Bind to this device (recommended)", bound, bind, false), false));
+            fields.add(new Nodes.Strength("strength", ControlState.READY, strength, ""));
+            fields.add(secret(confirm, "Confirm password"));
+        }
+        var sections = new ArrayList<Nodes.Node>();
+        sections.add(new Nodes.Stack(form + ".fields", ControlState.READY, Nodes.LayoutRole.VERTICAL, fields));
+        if (creating) {
+            sections.add(new Nodes.Card(bind + ".card", ControlState.READY, Nodes.CardKind.SETTINGS, List.of(
+                new Nodes.SettingRow(bind + ".row", ControlState.READY, "Bind to this device", "The vault can only be opened on this computer",
+                    new Nodes.Toggle(bind, new ControlState(true, !busy, false, ""), "Bind to this device (recommended)", bound, bind, false), false, false, "Recommended"))));
+            sections.add(new Nodes.Stack(form + ".warning", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+                new Nodes.Icon(form + ".warning.icon", ControlState.READY, "warning", Nodes.Hue.NONE, Nodes.IconSize.CAPTION, "Warning", Optional.of(Nodes.Severity.WARNING)),
+                new Nodes.Text(form + ".warning.text", ControlState.READY, "Your master password cannot be recovered if forgotten.", Nodes.TextRole.CAPTION))));
         }
         sections.add(statusLine());
-        return new Nodes.Form(form, ControlState.READY, Nodes.FormKind.FULL, primaryTitle, Optional.empty(), sections, Optional.empty(),
+        return new Nodes.Form(form, ControlState.READY, creating ? Nodes.FormKind.HERO : Nodes.FormKind.HERO_COMPACT, primaryTitle, Optional.of(hero), sections, Optional.empty(),
             List.of(cancelButton(), submitButton()), cancel);
     }
 
@@ -163,7 +186,7 @@ public final class PasswordPanel implements AutoCloseable {
 
     /** Enter in a password field submits, as the former fields' action listeners did. */
     private Nodes.Secret secret(String id, String label) {
-        return new Nodes.Secret(id, state(id), "", label, REVEAL_GROUP, Nodes.SecretKind.INPUT, "", submit);
+        return new Nodes.Secret(id, state(id), label, label, REVEAL_GROUP, creating && id.equals(confirm) ? Nodes.SecretKind.CONFIRMATION : Nodes.SecretKind.INPUT, "", submit);
     }
 
     private Nodes.Text statusLine() { return new Nodes.Text(message, new ControlState(!status.isEmpty(), true, false, ""), status, Nodes.TextRole.BODY); }
@@ -172,7 +195,7 @@ public final class PasswordPanel implements AutoCloseable {
 
     /** The primary submit button (Unlock or Create Vault). */
     Nodes.Button submitButton() {
-        return new Nodes.Button(submit, new ControlState(true, true, busy, ""), primaryTitle, "", Nodes.ButtonKind.PRIMARY, submit, "");
+        return new Nodes.Button(submit, new ControlState(true, ready && !busy, busy, ""), primaryTitle, "", Nodes.ButtonKind.PRIMARY, submit, "");
     }
 
     boolean busy() { return busy; }
@@ -185,6 +208,7 @@ public final class PasswordPanel implements AutoCloseable {
         if (closed || !host.open()) return;
         host.view().clearSecret(password);
         if (creating) host.view().clearSecret(confirm);
+        updateReadiness(); render();
     }
 
     /** Prevents duplicate submits while a background create is running. */

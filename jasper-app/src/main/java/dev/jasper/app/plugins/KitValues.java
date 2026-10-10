@@ -19,7 +19,7 @@ final class KitValues {
  case dev.jasper.sdk.ui.Nodes.Strength n -> new dev.jasper.ui.model.Nodes.Strength(n.id(), toModule(n.state()), n.filled(), n.label());
  case dev.jasper.sdk.ui.Nodes.Stack n -> new dev.jasper.ui.model.Nodes.Stack(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.LayoutRole.valueOf(n.role().name()), n.children().stream().map(KitValues::toModule).toList(), n.cancelAction());
  case dev.jasper.sdk.ui.Nodes.FormRow n -> new dev.jasper.ui.model.Nodes.FormRow(n.id(), toModule(n.state()), n.label(), n.caption(), toModule(n.control()), n.trailing().map(KitValues::toModule), n.highlighted());
- case dev.jasper.sdk.ui.Nodes.SettingRow n -> new dev.jasper.ui.model.Nodes.SettingRow(n.id(), toModule(n.state()), n.title(), n.description(), toModule(n.control()), n.dependent(), n.highlighted());
+ case dev.jasper.sdk.ui.Nodes.SettingRow n -> new dev.jasper.ui.model.Nodes.SettingRow(n.id(), toModule(n.state()), n.title(), n.description(), toModule(n.control()), n.dependent(), n.highlighted(), n.titleNote());
  case dev.jasper.sdk.ui.Nodes.Card n -> new dev.jasper.ui.model.Nodes.Card(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.CardKind.valueOf(n.kind().name()), n.children().stream().map(KitValues::toModule).toList());
  case dev.jasper.sdk.ui.Nodes.Section n -> new dev.jasper.ui.model.Nodes.Section(n.id(), toModule(n.state()), n.title(), toModule(n.body()));
  case dev.jasper.sdk.ui.Nodes.Empty n -> new dev.jasper.ui.model.Nodes.Empty(n.id(), toModule(n.state()), toModule(n.icon()), n.title(), n.description(), n.actions().stream().map(KitValues::toModule).toList());

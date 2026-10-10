@@ -700,7 +700,7 @@ class PanelCompositionTest {
                                                 List.of(original.footer().orElseThrow()))));
                         assertThat(view.control("sftp-footer")).isSameAs(restored);
                         assertThat(restored.panelFooter).isFalse();
-                        assertThat(restored.component.getInsets().left).isEqualTo(s(14));
+                        assertThat(restored.component.getInsets().left).isEqualTo(s(13));
                     } finally {
                         release(ctx);
                     }

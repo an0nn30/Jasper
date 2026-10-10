@@ -109,3 +109,114 @@ calibration 2x and dark/light/custom 1x open dropdowns, calibration Credential V
 and context menu, and dark 2x revealed stored secret. These checks cover selected popup fill,
 read-only secret masking/reveal and inset, semantic colors, radii and context hue. They do not
 claim fresh visual inspection of all 42 contact sheets or native application acceptance.
+
+## Plan 3 Task 1 — actual Vault owners, Desktop reference family
+
+The authorized 2026-10-10 set adds sixteen hash-preserved originals under
+[reference/desktop-2026-10-10](reference/desktop-2026-10-10/manifest.json). Existing nine references
+remain for states without a newer overlap. Create and Unlock use the Desktop originals as primary.
+
+`./gradlew :jasper-app:themeSurfacePreview` opens the real staged Vault plugin through PluginHost,
+using a disposable fixture home and unbound synthetic vaults. It writes 44 actual-owner captures
+under `jasper-app/build/theme-surfaces` (calibration, dark, light and custom; Create empty/focus/
+entered/revealed/mismatch/busy and Unlock empty/entered/revealed/busy/error). No Window is created.
+The fixture settles the real switch animation; only empty Create's depicted binding is switched on,
+and no depicted bound state is submitted. Synthetic focus is explicitly headless evidence.
+The fixture restores focus-manager state, closes owners and wipes/deletes its temporary home.
+
+The native-installable fixture palette is
+`jasper-app/src/test/resources/dev/jasper/app/appearance/desktop-hero.toml`, named **Desktop Hero
+Calibration**; custom counterpart is `custom-hero.toml`. Install through the normal theme catalog
+in an isolated QA home. Colors are theme semantic overrides, never feature-local paint. Display
+profile source pixels are converted to common sRGB for analysis; dominant dialog #1f232b,
+input #14161c, card #1b1d22, hero tile #2b3240, primary #e6e8ec and accent #3478f6 are explicit
+fixture evidence rather than production defaults.
+
+Source scale is 2×, independently established by fields, switch and card anchors. Candidate
+Java2D device scale is 2× with logical UI scale 1; images are never resized. Normal mounted
+preferred content sizes are Create400×428 and Unlock380×264 logical. Busy/error capture height
+follows the actual preferred size, as native DialogFit does. The exact analysis crops are Create
+original820×912 at [10,46,800,856], Unlock original770×578 (measured frame extent764×568) at [2,38,760,528]. These are content
+anchor comparisons, **not whole-window matches**: traffic-light bottoms occur at their top edge.
+Actual full-frame reference interior is Create[10,8,800,894]; Unlock[2,0,760,566] has a cropped top.
+
+Shared measured composition amendments are HERO_COMPACT380, CONFIRMATION secrets (group reveal,
+no separate eye or hidden AX child), and optional SettingRow.titleNote (tertiary annotation,
+backward-compatible constructors). The tile outer footprint is54×54 logical; the52×52 measurement
+in the initial audit was its interior. Shared HERO optical icon stroke is1.75logical at24px;
+ordinary control icon strokes and the16-grid registration contract remain. An actual native
+400px minimum imposed by title-only MacTitleBar was reproduced by a mounted-root regression and
+removed; workspace preference remains400. HERO semantics hide the duplicate title and share
+SURFACE_DIALOG without a divider. Native controls remain genuine JBR controls.
+
+Controller's immutable WIP-A bundle passed actual readiness/reveal/theme/focus and synthetic
+create/unlock behavior, while exposing the400px clamp and contrasting titlebar. Manager-inline
+Unlock remains the separate Task4 surface. Controller native WIP-B confirmed the HERO20 title height, full visible native controls, unified
+chrome and compact width; normal28/workspace behavior is retained. Native acceptance and final
+regular-face calibration findings are recorded below and with the Task1 implementation report; headless
+captures alone do not accept native control clearance, dragging, focus or full-frame matching.
+
+
+Final mounted text calibration compares installed HN Regular, HN Light and Apple regular at identical
+physical scale, preserving each unresized capture. HN Light was rejected (description554px versus
+reference572, placeholder190 versus203). Apple regular improved translated placeholder mask overlap
+61.7%→78.6% and setting title44.6%→88.6%; description results were mixed (Create72.6% essentially
+tied, Unlock75.7%→67.7%). The coherent macOS default uses Apple regular roles, HN Medium600 with
+.018 tracking, DESCRIPTION12.5/18px line spacing, CAPTION11.5, and SETTING_DESCRIPTION11. Explicit
+user families and proportional sizes remain authoritative. This reduces regular ink-mass drift from
+24–32% to16–18%; it does not identify the authored source font or waive remaining differences.
+
+Final normal logical anchors (the harness also records exact first painted baselines and font faces):
+
+| Anchor | Create | Unlock |
+| --- | --- | --- |
+| Preferred content | 400×428 | 380×264 |
+| Tile outer x,y,w,h | 173,19,54,54 | 163,19,54,54 |
+| Title x,y,w,h; baseline | 155,87,89,19;102 | 144,87,91,19;102 |
+| Description x,y,w,h; first baseline | 28,110,344,36;123 | 28,110,324,18;123 |
+| Password | 28,164,344,32 | 28,146,324,32 |
+| Meter / confirmation | 28,202,280,3 / 28,215,344,32 | absent |
+| Bind card | 28,271,344,54 | absent |
+| Warning | 28,339,344,15 | absent |
+| Equal actions | x28/204,y374,w168,h30 | x28/194,y210,w158,h30 |
+
+Measured original/candidate text ink boxes in source pixels (alpha threshold0.2, common sRGB,
+not arbitrary cropped screenshot bounds): Create title [313,181,175,24] / [311,181,175,24]; first
+description [114,227,572,24] / [111,227,575,24]; second [333,264,133,19] / [331,263,134,19];
+placeholder [80,350,203,24] / [78,350,205,25]. Unlock title [292,181,178,24] / [290,182,178,23];
+description [68,228,623,24] / [66,227,626,24]. Shield [383,71,34,42] / [383,70,34,42]; lock
+[363,72,34,40] / [363,72,34,41]. These small residual shape/position differences remain recorded,
+not declared pixel acceptance. Shared HERO stroke is1.75logical; ordinary24px stroke2.25 and
+14px control stroke1.3125 remain covered by alpha-width tests.
+
+Native WIP-B additionally exposed a stale narrow viewport after wrong-password reflow. The real
+mounted regression deliberately lays out the error at the old height before repacking. It failed
+with a retained vertical scrollbar; Form Body now measures current scroll allocation rather than
+its stale scrollbar-narrowed width, and repacks with the visible error at380×304. Controller native
+C recapture confirmed760×648 source pixels with the message fully visible, one-line description,
+no scrollbar, input cleared and focused, and disabled primary; correct-password recovery passed. Native captures are JPEG; common-space
+analysis records compression limits, and lossless actual-owner PNGs provide exact paint evidence.
+
+
+Final shared SettingRow optical alignment uses13logical side padding and aligns the painted switch
+track, accounting for its3logical halo reserve only where row padding can contain it. The prior
+painted right inset17 displaced the switch8 source pixels left of the reference. A RED regression
+measured17 versus13; default/enlarged13/20pt tests cover wrapped annotations, actual focus-ring paint,
+toggled state and retained control identity. Zero-padding panel footers retain focus containment.
+This is a shared row policy, with no Vault-specific position. It changes production after native C
+and requires the controller's final committed-snapshot comparison.
+
+Retained native C common-sRGB color evidence: dialog reference(31,35,43) versus JPEG-native(30,35,45),
+input exact(20,22,28), card exact(27,29,34), secondary reference(45,50,60) versus(45,50,61), disabled
+primary reference(40,73,134) versus(37,70,127). JPEG/profile differences and disabled-opacity policy
+must be distinguished during final cross-family calibration; no monitor compensation or blind palette
+adjustment was made. Remaining font ink differences likewise remain named review work, not a waiver.
+
+
+Final switch mask reference/candidate is identical at[654,578,64,36]source pixels. The controller's
+size-only provenance audit also found that system13 could replace HN Medium headings with SFNS:
+actual ThemeController RED/GREEN now covers system13→20→default, mounted BODY/HERO and native
+adapter roles, plus explicit Helvetica Neue/Serif. KitContext and NativeControlStyles use the
+existing Jasper.uiFontFamilyOverride flag to preserve default role policy at a custom size; they
+never infer an explicit choice from a font name. This follow-up changes production after native C
+but leaves normal default-size captures unchanged.

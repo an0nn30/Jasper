@@ -222,3 +222,16 @@ tasks.register<JavaExec>("themeMigrationPreview") {
     environment("APPDATA", "$captureHome/AppData/Roaming")
     jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
 }
+
+// Exact device-scale captures of real staged feature owners in disposable homes.
+tasks.register<JavaExec>("themeSurfacePreview") {
+    group = "verification"
+    description = "Captures actual mounted feature views for reference calibration, headlessly."
+    dependsOn(tasks.testClasses, stagePlugins)
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "dev.jasper.app.appearance.SurfacePreview"
+    providers.gradleProperty("jasper.uiScale").orNull?.let { systemProperty("flatlaf.uiScale", it) }
+    systemProperty("jasper.stagedPlugins", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
+    args(layout.buildDirectory.dir("theme-surfaces").get().asFile.absolutePath)
+    jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
+}

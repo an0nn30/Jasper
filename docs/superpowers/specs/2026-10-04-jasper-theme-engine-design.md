@@ -417,3 +417,10 @@ Written plans: [engine and kit](../plans/2026-10-04-theme-engine-1-engine-and-ki
 [surface refactoring](../plans/2026-10-04-theme-engine-3-surface-refactor.md).
 Their [shared contract appendix](../plans/2026-10-04-theme-engine-contracts.md) records exact
 cross-task APIs, defaults and compatibility decisions. Plan review precedes product implementation.
+
+
+## Authorized reference completion amendment — 2026-10-10
+
+The user authorized continuous implementation and controller-owned native capture against all16 Desktop images, preserved with hashes in `docs/design/theme-engine/reference/desktop-2026-10-10/manifest.json`. Overlapping Desktop states are primary; original-only states remain binding. Native QA uses an isolated synthetic home. Source scale, crops, geometry, text ink/baselines, icons, states, and profile-normalized colors require separate evidence; arbitrary resize/global similarity cannot establish acceptance.
+
+Task1's measured shared amendments are HERO_COMPACT (380 logical preferred width, same hero controls), CONFIRMATION secrets (single-line submit/wipe/reveal-group behavior without a local reveal button), and optional SettingRow titleNote in a tertiary tone. Constructors for prior SettingRow call shapes remain supported. Hero glyphs use a 1.75 logical-pixel optical stroke at 24px, retaining the 16-grid/1.4–1.6 registration contract for ordinary icons. On macOS, default regular roles use the installed native Apple text face; Helvetica Neue 600 roles resolve its installed Medium face with measured .018 tracking. Explicit user-family overrides bypass the default regular-face mapping. DESCRIPTION remains 12.5pt with shared 18px line spacing, CAPTION remains 11.5pt, and SettingRow descriptions use the shared 11pt SETTING_DESCRIPTION role. User font family/size overrides remain authoritative. See calibration.md for actual mounted measurements and native status.

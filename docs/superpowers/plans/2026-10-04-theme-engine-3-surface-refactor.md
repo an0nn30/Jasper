@@ -1,8 +1,13 @@
 # Theme Engine Plan 3 — Surface Composition and Visual Matching Implementation Plan
 
+**Execution status — 2026-10-10:** Plan2 prerequisite independently approved at `0b367eee`. Task1 implemented with measured calibration and scoped verification; independent per-task review and final pixel acceptance remain pending. No page is accepted yet. User authorization extends this plan to all16 Desktop references plus old-only states and continuous controller native capture in an isolated home. The historical unattended-GUI prohibition is superseded only for that controller-owned QA.
+
+**Measured Task1 amendments:** reusable `FormKind.HERO_COMPACT` owns380px width; HERO remains400px. `SecretKind.CONFIRMATION` follows its group's reveal without an extra eye. Optional `SettingRow.titleNote` renders a tertiary annotation with source-compatible constructors. Central hero typography/layout/icon optical stroke follows exact2× mounted evidence; feature owners contain no style literals. These are controller-approved reference-driven extensions of the shared descriptor contract.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Refactor all migrated surfaces onto canonical composition and match the nine supplied visual references using active-theme colors.
+**Goal:** Refactor all migrated surfaces onto canonical composition and match the original references and all16 additional Desktop references using active-theme colors.
 
 **Architecture:** Feature controllers produce existing kit descriptors; the kit owns every design metric and paint treatment. Domain operations and the SDK boundary are already migrated in Plan 2. Reference comparisons use actual mounted feature views, and the shared gallery catches any kit correction affecting multiple features.
 
@@ -61,10 +66,12 @@ preview, resize the candidate arbitrarily, or overwrite source images.
 
 ## Task 1 — Vault hero dialogs and actual-feature preview harness
 
+**Implementation evidence:** UI444/app88/Vault160 (one opt-in Keychain skip)/SDK64/testkit135 pass; final switch correction passes UI444/mounted6; system-size-only provenance passes actual ThemeController tests. Native C verifies compact380 width, genuine20px hero chrome and visible wrong-password reflow. Shared default regular-font policy, SettingRow optical alignment and remaining ink/profile differences are recorded in calibration.md. This implementation checkbox does not accept the page pixels.
+
 **Files:** Modify `P(vault)/ui/PasswordPanel.java` and existing prompt mounting owners; add `PT(vault)/ui/PasswordCompositionTest.java`, app test harness files above, `jasper-app/build.gradle.kts` preview task; update calibration.md with measured hero anchors.
 **Interfaces:** Existing SDK UiView controller uses Nodes.Form HERO, hero stack, Secret fields, Strength, SettingRow and equal action group. App harness returns `Opened` with view/snapshot/bounds/close.
 
-- [ ] Add failing descriptor/geometry tests: centered tile/title/subtitle; Unlock one password with reveal and focus; Create password+confirm, four-segment meter, device-binding setting, warning row; equal buttons. Use a meaningful guard against accidental secret descriptors:
+- [x] Add failing descriptor/geometry tests: centered tile/title/subtitle; Unlock one password with reveal and focus; Create password+confirm, four-segment meter, device-binding setting, warning row; equal buttons. Use a meaningful guard against accidental secret descriptors:
   ```java
   @Test void secretDescriptorCannotCaptureTypedPassword() {
       var node = new dev.jasper.sdk.ui.Nodes.Secret("password",
@@ -75,10 +82,10 @@ preview, resize the candidate arbitrarily, or overwrite source images.
   }
   ```
   Pair this structural check with a live typed-secret/theme-switch/close test; a static string check alone is insufficient.
-- [ ] Run `./gradlew :jasper-plugin-vault:test --tests '*Password*Test'`; verify layout expectations fail before restructuring. Add app preview harness tests and confirm a fixture opens no Window.
-- [ ] Build hero composition matching unlock-vault.png/create-vault.png. Preserve 8-character/matching policy already enforced by Vault, actual bind default and async outcomes. Meter is informational; do not introduce a stricter entropy requirement. Toggle/reveal/error handling comes from kit.
-- [ ] Render both references at their calibrated bounds with focus/disabled/error/busy states in calibration, dark, light and custom themes. Compare bounds/typography/icon paths separately from colors; fix shared metrics once where appropriate. Run Vault behavior tests and app SurfaceGeometryTest.
-- [ ] Review artifacts and tests, then commit `Compose Vault create and unlock dialogs with canonical hero controls`.
+- [x] Run `./gradlew :jasper-plugin-vault:test --tests '*Password*Test'`; verify layout expectations fail before restructuring. Add app preview harness tests and confirm a fixture opens no Window.
+- [x] Build hero composition matching unlock-vault.png/create-vault.png. Preserve 8-character/matching policy already enforced by Vault, actual bind default and async outcomes. Meter is informational; do not introduce a stricter entropy requirement. Toggle/reveal/error handling comes from kit.
+- [x] Render both references at their calibrated bounds with focus/disabled/error/busy states in calibration, dark, light and custom themes. Compare bounds/typography/icon paths separately from colors; fix shared metrics once where appropriate. Run Vault behavior tests and app SurfaceGeometryTest.
+- [x] Review artifacts and tests, then commit `Compose Vault create and unlock dialogs with canonical hero controls`.
 
 ## Task 2 — Add Host grouped form
 

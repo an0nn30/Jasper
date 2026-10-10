@@ -12,7 +12,9 @@ import java.util.function.Consumer;
 
 /** Native source for the same appearance contract exercised by the fake. */
 final class WorkspaceAppearanceFixture {
-    private ResolvedTheme current = new ThemeController().current();
+    private ResolvedTheme current;
+    WorkspaceAppearanceFixture() { this(new ThemeController().current()); }
+    WorkspaceAppearanceFixture(ResolvedTheme initial) { current = initial; }
     private final List<Consumer<ResolvedTheme>> listeners = new ArrayList<>();
     ResolvedTheme current() { return current; }
     Subscription subscribe(Consumer<ResolvedTheme> listener) {

@@ -11,6 +11,8 @@ final class Labels {
     private Labels() {}
     static JLabel literal() { var label = new LiteralLabel(); label.putClientProperty("html.disable", true); return label; }
     static class LiteralLabel extends JLabel {
+        private static final java.awt.font.FontRenderContext PAINT_CONTEXT =
+            new java.awt.font.FontRenderContext(null, true, true);
         /** Wraps to the width a FormRow gives it. */
         boolean wrap;
         /**
@@ -28,7 +30,17 @@ final class Labels {
         }
         boolean wraps() { return wrap || flow; }
         @Override public Dimension getPreferredSize() {
-            if (!flow || isPreferredSizeSet()) return super.getPreferredSize();
+            if (!flow || isPreferredSizeSet()) {
+                var size = super.getPreferredSize();
+                if (!isPreferredSizeSet() && getText() != null && getFont() != null) {
+                    // Painting uses fractional metrics; Swing's default integer metrics can otherwise
+                    // give the label too little width and elide a title that fits its measured text.
+                    int painted = (int)Math.ceil(getFont().getStringBounds(getText(),
+                        PAINT_CONTEXT).getWidth());
+                    size.width += Math.max(0, painted - getFontMetrics(getFont()).stringWidth(getText()));
+                }
+                return size;
+            }
             var metrics = getFontMetrics(getFont()); Insets insets = getInsets();
             int widest = 0;
             for (String line : (getText() == null ? "" : getText()).split("\n", -1)) widest = Math.max(widest, metrics.stringWidth(line));
@@ -88,6 +100,9 @@ final class Labels {
                 default -> SemanticColor.TEXT_PRIMARY;
             }));
             ((LiteralLabel)label).caret = text.caret().orElse(-1);
+            ((LiteralLabel)label).wrapped.lineHeight = text.role() == Nodes.TextRole.DESCRIPTION
+                ? Math.round(ThemePainting.metric(context(), dev.jasper.ui.metrics.DesignMetrics.Role.DESCRIPTION_LINE_HEIGHT)
+                    * context().typography().bodySize() / 13f) : 0;
             label.repaint();
         }
     }
@@ -107,6 +122,7 @@ final class Labels {
             var icon = (Nodes.Icon)node; var label = (JLabel)component; state();
             int size = com.formdev.flatlaf.util.UIScale.scale(context().icons().size(icon.size()));
             label.setIcon(tileSize > 0 ? context().icons().tile(icon.name(), context().theme().semantic(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(tileSize), selected)
+                : icon.size() == Nodes.IconSize.HERO && icon.severity().isEmpty() ? context().icons().hero(icon.name(), context().theme().semantic(), icon.hue(), size)
                 : icon.severity().isPresent() ? context().icons().icon(icon.name(), context().theme().semantic(), tint(icon.severity().get()), size)
                 : context().icons().icon(icon.name(), context().theme().semantic(), icon.hue(), size));
             label.getAccessibleContext().setAccessibleName(icon.accessibleName());

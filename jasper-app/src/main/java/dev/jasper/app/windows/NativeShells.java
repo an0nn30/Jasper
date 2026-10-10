@@ -219,7 +219,16 @@ public final class NativeShells {
     /** Shared, headless-testable title setup for both kinds of SDK/application auxiliary surface. */
     static MacTitleBar installTitleBar(JRootPane root, AuxiliarySurface surface, boolean supported) {
         MacTitleBar bar = MacTitleBar.install(root, surface.holder(), () -> { }, supported);
-        if (bar != null) bar.setTitle(surface.title());
+        if (bar != null) {
+            bar.setTitle(surface.title());
+            for (var child : surface.holder().getComponents()) {
+                if (child instanceof dev.jasper.ui.swing.KitView view
+                        && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Form form) {
+                    bar.setDialogHero(form.kind() == dev.jasper.ui.model.Nodes.FormKind.HERO
+                        || form.kind() == dev.jasper.ui.model.Nodes.FormKind.HERO_COMPACT);
+                }
+            }
+        }
         return bar;
     }
 

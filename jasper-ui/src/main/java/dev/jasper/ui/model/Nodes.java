@@ -29,7 +29,7 @@ public final class Nodes {
      * moves its selection, a left press activates a row, and fixed row and heading heights keep it steady.
      */
     public enum ListKind { SINGLE, DOUBLE, COMPACT, ORDERED, RESULTS }
-    public enum FormKind { HERO, SHEET, FULL, SETTINGS }
+    public enum FormKind { HERO, HERO_COMPACT, SHEET, FULL, SETTINGS }
     public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION }
     /**
      * SIDEBAR_DETAIL and THREE_COLUMN place their children side by side. DOCUMENT stacks them top to bottom for a document
@@ -211,14 +211,15 @@ public final class Nodes {
     }
 
     /**
-     * INPUT is a masked single-line entry with a reveal control; DETAIL a read-only stored value with reveal and optional
+     * INPUT is a masked single-line entry with a reveal control; CONFIRMATION is the same editable input without its own
+     * reveal control, following its reveal group. DETAIL a read-only stored value with reveal and optional
      * copy. MULTILINE is an editable, wrapping secure-note area over the same wipeable storage, shown in clear, with no
      * reveal or copy control, so it takes neither a reveal group nor a copy action.
      */
-    public enum SecretKind { INPUT, DETAIL, MULTILINE }
+    public enum SecretKind { INPUT, CONFIRMATION, DETAIL, MULTILINE }
 
     /**
-     * A present {@code submitAction} (INPUT only) is what Enter in the field runs: the field keeps the key, as a single-line
+     * A present {@code submitAction} (INPUT or CONFIRMATION) is what Enter in the field runs: the field keeps the key, as a single-line
      * field with a trailing action does, so the containing form's primary is not pressed. Blank passes Enter on.
      */
     public record Secret(String id, ControlState state, String hint, String label, String revealGroup, SecretKind kind, String copyAction, String submitAction) implements Node {
@@ -229,7 +230,7 @@ public final class Nodes {
             Objects.requireNonNull(revealGroup); Objects.requireNonNull(kind); Objects.requireNonNull(copyAction); Objects.requireNonNull(submitAction);
             if (kind == SecretKind.MULTILINE && (!revealGroup.isEmpty() || !copyAction.isEmpty()))
                 throw new IllegalArgumentException("A multiline secret has no reveal group or copy action");
-            if (kind != SecretKind.INPUT && !submitAction.isEmpty())
+            if (kind != SecretKind.INPUT && kind != SecretKind.CONFIRMATION && !submitAction.isEmpty())
                 throw new IllegalArgumentException("Only an input secret takes a submit action");
         }
         public Secret(String id, ControlState state, String hint, String label, String revealGroup, SecretKind kind, String copyAction) {
@@ -357,15 +358,19 @@ public final class Nodes {
     }
 
     /** {@code highlighted} marks a row matching the host's current search. */
-    public record SettingRow(String id, ControlState state, String title, String description, Node control, boolean dependent, boolean highlighted) implements Node {
+    public record SettingRow(String id, ControlState state, String title, String description, Node control, boolean dependent, boolean highlighted, String titleNote) implements Node {
         public SettingRow {
             ModelChecks.id(id); Objects.requireNonNull(state);
             ModelChecks.label(title, "title");
-            Objects.requireNonNull(description);
+            Objects.requireNonNull(description); Objects.requireNonNull(titleNote);
             Objects.requireNonNull(control);
         }
+        /** An ordinary setting row without a trailing title annotation. */
+        public SettingRow(String id, ControlState state, String title, String description, Node control, boolean dependent, boolean highlighted) {
+            this(id, state, title, description, control, dependent, highlighted, "");
+        }
         public SettingRow(String id, ControlState state, String title, String description, Node control, boolean dependent) {
-            this(id, state, title, description, control, dependent, false);
+            this(id, state, title, description, control, dependent, false, "");
         }
     }
 

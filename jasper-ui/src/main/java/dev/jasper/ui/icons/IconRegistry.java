@@ -30,6 +30,10 @@ public final class IconRegistry implements AutoCloseable {
     public Icon icon(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize) {
         return painted(name, tint(palette, hue), null, logicalSize, false);
     }
+    /** Hero glyphs retain a 1.75-logical-pixel optical stroke at the canonical 24px size. */
+    public Icon hero(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize) {
+        return painted(name, tint(palette, hue), null, logicalSize, false, true);
+    }
     /** Explicit semantic text tint for hover, accent fills and status indications. */
     public Icon icon(String name, SemanticPalette palette, SemanticColor tint, int logicalSize) {
         return painted(name, palette.color(tint), null, logicalSize, false);
@@ -62,7 +66,10 @@ public final class IconRegistry implements AutoCloseable {
             case HERO -> DesignMetrics.Role.ICON_HERO;
         });
     }
-    private synchronized Icon painted(String name, Color foreground, Color background, int size, boolean tile) {
+    private Icon painted(String name, Color foreground, Color background, int size, boolean tile) {
+        return painted(name, foreground, background, size, tile, false);
+    }
+    private synchronized Icon painted(String name, Color foreground, Color background, int size, boolean tile, boolean hero) {
         requireOpen(); Objects.requireNonNull(name);
         if (size < 1 || size > 512) throw new IllegalArgumentException("Invalid logical icon size");
         var artwork = artworks.get(name);
@@ -80,7 +87,7 @@ public final class IconRegistry implements AutoCloseable {
                         g.fill(new RoundRectangle2D.Double(0, 0, size, size, radius, radius));
                         double inset = size * .2; g.translate(inset, inset); g.scale(size * .6 / 16, size * .6 / 16);
                     } else g.scale(size / 16.0, size / 16.0);
-                    g.setColor(foreground); g.setStroke(new BasicStroke(artwork.stroke(), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    g.setColor(foreground); g.setStroke(new BasicStroke(hero ? 7f / 6f : artwork.stroke(), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                     g.draw(path);
                 } finally { g.dispose(); }
             }
@@ -128,7 +135,8 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("chevron.right", "M 6 4 L 10 8 L 6 12"),
             Map.entry("chevron.up", "M 4 10 L 8 6 L 12 10"),
             Map.entry("search", "M 11 7 A 4 4 0 1 1 3 7 A 4 4 0 1 1 11 7 M 10 10 L 14 14"),
-            Map.entry("lock", "M 5 7 V 5 A 3 3 0 0 1 11 5 V 7 M 3 7 H 13 V 14 H 3 Z M 8 10 V 11"),
+            Map.entry("shield", "M 8 1.333 L 12.85 3.667 V 7.5 C 12.85 11 11 13.333 8 14.333 C 5 13.333 3.15 11 3.15 7.5 V 3.667 Z M 6.5 7 H 9.5 Q 10 7 10 7.5 V 10.5 Q 10 11 9.5 11 H 6.5 Q 6 11 6 10.5 V 7.5 Q 6 7 6.5 7 M 7 7 V 6 A 1 1 0 0 1 9 6 V 7"),
+            Map.entry("lock", "M 5 7 V 5 A 3 3 0 0 1 11 5 V 7 M 4.25 7 H 11.75 Q 12.85 7 12.85 8.25 V 12.75 Q 12.85 14 11.75 14 H 4.25 Q 3.15 14 3.15 12.75 V 8.25 Q 3.15 7 4.25 7 M 8 10.5 H 8.05"),
             Map.entry("edit", "M 3 10 L 10 3 L 13 6 L 6 13 L 2 14 Z M 9 4 L 12 7"),
             Map.entry("delete", "M 2 4 H 14 M 6 4 V 2 H 10 V 4 M 4 4 L 5 14 H 11 L 12 4 M 7 7 V 11 M 9 7 V 11"),
             Map.entry("copy", "M 6 5 H 14 V 14 H 6 Z M 10 5 V 2 H 2 V 11 H 6"),

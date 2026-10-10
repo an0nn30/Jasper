@@ -184,10 +184,12 @@ class FormsTest {
                             var description = find(view, "setting.description", JComponent.class);
                             var control = find(view, "toggle", JComponent.class);
                             assertThat(description.getHeight()).isGreaterThan(s(25));
+                            int ring = ThemePainting.metric(ctx, dev.jasper.ui.metrics.DesignMetrics.Role.FOCUS_RING);
                             assertThat(description.getX() + description.getWidth())
-                                    .isLessThanOrEqualTo(control.getX() - 12);
-                            assertThat(control.getX() + control.getWidth())
-                                    .isLessThanOrEqualTo(row.getWidth() - 14);
+                                    .isLessThanOrEqualTo(control.getX() + ring - s(12));
+                            assertThat(control.getX() + control.getWidth() - ring)
+                                    .isEqualTo(row.getWidth() - s(13));
+                            assertThat(control.getX() + control.getWidth()).isLessThanOrEqualTo(row.getWidth());
                         }
                     } finally {
                         UIManager.put("defaultFont", old);
@@ -550,9 +552,9 @@ class FormsTest {
                         var title = find(view, "hero-title", JComponent.class);
                         var description = find(view, "hero-description", JComponent.class);
                         assertThat(tile).isNotNull();
-                        assertThat(tile.getSize()).isEqualTo(new Dimension(s(52), s(52)));
-                        assertThat(tile.getX() + s(26)).isEqualTo(s(170));
-                        assertThat(title.getY() - tile.getY() - s(52)).isEqualTo(s(14));
+                        assertThat(tile.getSize()).isEqualTo(new Dimension(s(54), s(54)));
+                        assertThat(tile.getX() + s(27)).isEqualTo(s(170));
+                        assertThat(title.getY() - tile.getY() - s(54)).isEqualTo(s(14));
                         assertThat(description.getY() - title.getY() - title.getHeight())
                                 .isEqualTo(s(4));
                     } finally {

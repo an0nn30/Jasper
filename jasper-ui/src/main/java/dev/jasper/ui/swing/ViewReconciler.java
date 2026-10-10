@@ -67,7 +67,7 @@ final class ViewReconciler implements AutoCloseable {
         ControlRegistry.children(node).forEach(child -> inherit(child, next, childrenEnabled));
     }
     private void applyHero(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
-        boolean hero = node instanceof Nodes.Form form ? form.kind() == Nodes.FormKind.HERO : inherited;
+        boolean hero = node instanceof Nodes.Form form ? (form.kind() == Nodes.FormKind.HERO || form.kind() == Nodes.FormKind.HERO_COMPACT) : inherited;
         next.get(node.id()).hero(hero);
         ControlRegistry.children(node).forEach(child -> applyHero(child, next, hero));
     }
@@ -85,13 +85,14 @@ final class ViewReconciler implements AutoCloseable {
      */
     private void applyFlow(Nodes.Node node, Map<String, ControlRegistry.Control> next) {
         boolean vertical = node instanceof Nodes.Form || node instanceof Nodes.Card || node instanceof Nodes.Section
-                || node instanceof Nodes.Stack stack && (stack.role() == Nodes.LayoutRole.VERTICAL || stack.role() == Nodes.LayoutRole.DETAIL);
+                || node instanceof Nodes.Stack stack && (stack.role() == Nodes.LayoutRole.VERTICAL || stack.role() == Nodes.LayoutRole.DETAIL || stack.role() == Nodes.LayoutRole.HERO);
         for (var child : ControlRegistry.children(node)) {
             if (vertical && child instanceof Nodes.Text text && switch (text.role()) {
                         case BODY, DESCRIPTION, CAPTION -> true;
                         default -> false;
                     } && next.get(child.id()).component instanceof Labels.LiteralLabel label) {
                 label.flow = true;
+                label.wrapped.centered = node instanceof Nodes.Stack parent && parent.role() == Nodes.LayoutRole.HERO;
                 label.flowColumns = view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.TEXT_FLOW_COLUMNS);
             }
             applyFlow(child, next);

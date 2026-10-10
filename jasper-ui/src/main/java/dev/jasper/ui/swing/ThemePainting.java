@@ -19,7 +19,11 @@ final class ThemePainting {
         return UIScale.scale(context.metrics().contentHeight(role, context.typography().font(text), new FontRenderContext(null, true, true)));
     }
     static Color color(KitContext context, SemanticColor role) { return context.theme().semantic().color(role); }
-    static void antialias(Graphics2D g) { g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON); }
+    static void antialias(Graphics2D g) {
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+    }
     static void rounded(Graphics2D g, JComponent component, KitContext context, Color fill, Color border, boolean focus, boolean error) {
         antialias(g);
         int radius = metric(context, DesignMetrics.Role.CONTROL_RADIUS);

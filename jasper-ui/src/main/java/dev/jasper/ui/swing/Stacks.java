@@ -122,6 +122,8 @@ final class Stacks {
                 g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_CONTROL));
                 int radius = ThemePainting.metric(context, DesignMetrics.Role.HERO_TILE_RADIUS);
                 g.fillRoundRect(0, 0, getWidth(), getHeight(), radius * 2, radius * 2);
+                g.setColor(ThemePainting.color(context, SemanticColor.BORDER_CONTROL));
+                g.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, radius * 2, radius * 2);
             } finally {
                 g.dispose();
             }
@@ -172,7 +174,7 @@ final class Stacks {
             for (Component c : parent.getComponents())
                 if (c.isVisible()) {
                     if (previous != null) y += gap(previous);
-                    int width = Math.min(parent.getWidth(), c.getPreferredSize().width),
+                    int width = c instanceof Labels.LiteralLabel label && label.wraps() ? parent.getWidth() : Math.min(parent.getWidth(), c.getPreferredSize().width),
                             h = Composition.height(c, width);
                     c.setBounds((parent.getWidth() - width) / 2, y, width, h);
                     y += h;
@@ -200,7 +202,8 @@ final class Stacks {
         int gap() {
             return ThemePainting.metric(
                     context,
-                    role == Nodes.LayoutRole.ACTIONS
+                    role == Nodes.LayoutRole.INLINE ? DesignMetrics.Role.INLINE_GAP
+                            : role == Nodes.LayoutRole.ACTIONS
                             ? DesignMetrics.Role.BUTTON_GAP
                             : horizontal()
                                     ? DesignMetrics.Role.COLUMN_GAP
@@ -287,6 +290,7 @@ final class Stacks {
                             ? children.stream().mapToInt(c -> c.getPreferredSize().width).sum()
                             : 0;
             for (Component child : children) {
+                if (!horizontal() && child instanceof Indicators.StrengthMeter) height += ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_TOP_GAP) - gap();
                 int childWidth =
                         horizontal()
                                 ? fittedWidth(child, available, children.size(), total)
@@ -328,8 +332,9 @@ final class Stacks {
                             ? children.stream().mapToInt(c -> c.getPreferredSize().width).sum()
                             : 0;
             for (Component child : children) {
+                if (!horizontal() && child instanceof Indicators.StrengthMeter) y += ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_TOP_GAP) - gap();
                 int childWidth =
-                        horizontal() ? fittedWidth(child, width, children.size(), total) : width;
+                        horizontal() ? fittedWidth(child, width, children.size(), total) : child instanceof Indicators.StrengthMeter ? Math.min(width, child.getPreferredSize().width) : width;
                 int childHeight = Composition.height(child, childWidth);
                 if (horizontal()) {
                     child.setBounds(

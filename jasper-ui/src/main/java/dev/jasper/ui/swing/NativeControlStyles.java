@@ -22,7 +22,9 @@ public final class NativeControlStyles {
             if ("Label.font".equals(key) && value instanceof Font font) override[1] = font;
         });
         Font base = override[1] == null ? override[0] : override[1];
-        var typography = base == null ? new Typography() : new Typography(base.getFamily(), base.getSize2D());
+        var typography = base == null ? new Typography()
+            : Boolean.FALSE.equals(UIManager.get("Jasper.uiFontFamilyOverride"))
+                ? new Typography(base.getSize2D()) : new Typography(base.getFamily(), base.getSize2D());
         Font result = typography.font(role);
         return result.deriveFont(UIScale.scale(result.getSize2D()));
     }
