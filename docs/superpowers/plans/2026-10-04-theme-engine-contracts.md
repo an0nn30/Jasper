@@ -183,7 +183,7 @@ unique within their owning control; references resolve only in that control. Do 
 | Card | `CardKind kind, List<Node> children` |
 | Section | `String title, Node body` |
 | Empty | `Node icon, String title, String description, List<Node> actions` |
-| ItemList | `ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows, String enterAction, String deleteAction` (RESULTS takes neither key action) |
+| ItemList | `ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows, String enterAction, String deleteAction, String detailsAction, String copyAction, String cancelAction` (RESULTS takes no key action) |
 | Header | `String title, OptionalInt count, Optional<Node> context, Optional<Node> primary, List<MenuItem> overflow` |
 | Panel | `Header header, Optional<Node> searchOrNavigation, Node body, Optional<Node> footer` |
 | Form | `FormKind kind, String title, Optional<Node> hero, List<Node> sections, Optional<Node> preview, List<Button> actions, String cancelAction` |
@@ -397,6 +397,7 @@ record components; prior constructors remain and default to the old meaning):
   lists reject both key actions (their rows never take focus). With no focused row, or while the rows are not
   interactive, Delete, Backspace and Enter are not the rows' keys and pass on to the host (fix round 1); a table alone
   keeps Enter without a focused row, as the JTable it replaced did.
+- `ItemList.detailsAction`, `copyAction` and `cancelAction` (blank by default): D, the platform menu modifier+C and Escape emit their respective `Action` only while the row canvas itself has focus and the row remains current and interactive. They do not alter selection. Hidden, disabled, busy, NONE, blank or unfocused rows leave the key to Swing/outer handling; embedded controls and fields retain their own keys. RESULTS rejects all three. A blank `cancelAction` lets a containing Stack own Escape. This is mirrored in module/SDK/host/fake and was added for File Servers in Task 10 without a version bump (Task 11 owns cutover).
 - `Toggle.pending` (default false): the knob rests midway on `status.warning` while the domain confirms a change; the
   switch stays operable and reports `Toggled(id, !checked)`, where `checked` is always the confirmed state; its
   accessible description is "Pending" unless an error or tooltip says more.

@@ -24,6 +24,8 @@ Task 11 enforces only the final owners. The actual staged preservation/corner/tr
 are under `editor-hosted`; accepted banner/track visual differences and their Plan 3 Task 8 owner are ledgered in
 [temporary-paths.md](temporary-paths.md).
 
+Task 10 File Server descriptor states (empty, starting and failed) are asserted in its plugin suite; real hosted dark/light captures of the staged File Server empty panel, New editor and saved row are written to `jasper-app/build/theme-migration-evidence/fileserver-hosted/` by `FileServerRenderEvidenceTest`. The test mounts the staged plugin in an actual app `WindowContent`, asserts one borrowed header title plus New/count, and drives real Enter/D/Escape key paths without opening a native window or reading live user folders. Sample settings descriptors are asserted through the fake settings host. Final geometry remains Plan 3.
+
 ## Immutable before snapshot
 
 [before-f16ae32f/manifest.json](before-f16ae32f/manifest.json) records production revision, capture

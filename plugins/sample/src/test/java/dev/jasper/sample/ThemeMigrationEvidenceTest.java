@@ -14,16 +14,10 @@ class ThemeMigrationEvidenceTest {
                 host.start(new PluginInfo("dev.jasper.sample", "Sample", "0.1.0", Set.of()), Set.of(), Set.of(), new SamplePlugin());
                 var page = host.settingsPanel("dev.jasper.sample").orElseThrow();
                 save("sample", theme, "settings", page, 680, 280);
-                slider(page).setValue(1200);
+                host.settingsPanelView("dev.jasper.sample").orElseThrow().emit(
+                    new dev.jasper.sdk.ui.UiEvent.Edited("settings:demo_step_millis", "1200"));
                 save("sample", theme, "settings-draft", page, 680, 280);
             }
         });
-    }
-    private static javax.swing.JSlider slider(java.awt.Container root) {
-        for (var child : root.getComponents()) {
-            if (child instanceof javax.swing.JSlider found) return found;
-            if (child instanceof java.awt.Container nested) { var found = slider(nested); if (found != null) return found; }
-        }
-        return null;
     }
 }

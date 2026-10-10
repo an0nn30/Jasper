@@ -211,7 +211,7 @@ The dynamic WorkspacePalette callers are exactly:
 - Task 7: `plugins/vault/.../ui/ManagerPanel.java` — **removed by Task 7** (2026-10-05): the manager is an owned kit view and reads no `WorkspacePalette`.
 - Task 8: `plugins/remote/.../ui/HostsPanel.java` — **removed by Task 8a** (2026-10-06): the Sessions panel is an owned kit view and reads no `WorkspacePalette`; `ui/tunnels/TunnelsPanel.java` — **removed by Task 8b** (2026-10-06): the Tunnels panel is an owned kit view; `ui/transfers/TransferStrip.java` — **removed by Task 8c** (2026-10-06): the transfer rows are kit descriptors rendered in the SFTP kit panel. No Remote file reads `WorkspacePalette` any more.
 - Task 9: EditorTab and VimBar migrated to descriptors in 9b/9c; no WorkspacePalette.current reader remains in Editor. Editor/syntax snapshots serve DocumentArea through Appearance; alias publication removal stays Task 11.
-- Task 10: `plugins/fileserver/.../ui/FileServersPanel.java`.
+- Task 10: FileServersPanel and its editor/confirmation now use owned kit descriptors; `PanelStyle`, `RowArtwork`, `ProtocolChip` and the test-only `ZoneColors` paint scaffold are removed. File Server, Sample and Indexer still pass raw `Icon` objects through legacy `ActionSpec`, `StatusItem`, `PanelHeader` or `ScopeSpec` signatures until the coordinated Task 11 cutover. Sample Step delay uses NUMBER 0–5000 step 1; only its old slider drag/tick affordance changed. History/Snippets palette labels and actions have no independent raw UI path.
 
 Correction to the initial Task 5 audit: a literal-key search appeared to show zero WorkspaceDefaults readers;
 the SDK constructs these keys dynamically. Independent chrome/workspace selection tests through each

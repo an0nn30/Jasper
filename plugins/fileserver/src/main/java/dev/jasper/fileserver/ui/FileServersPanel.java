@@ -1,22 +1,20 @@
 package dev.jasper.fileserver.ui;
 
-import dev.jasper.sdk.ui.WorkspacePalette;
-import dev.jasper.sdk.ui.PanelHeader;
 import dev.jasper.fileserver.definition.Bind;
 import dev.jasper.fileserver.definition.Protocol;
 import dev.jasper.fileserver.definition.ServerDefinition;
 import dev.jasper.fileserver.runtime.ActivityLog;
 import dev.jasper.fileserver.runtime.ServerRegistry;
 import dev.jasper.fileserver.runtime.ServerState.Phase;
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.CardLayout;
-import java.awt.Component;
-import java.awt.Font;
-import java.awt.Rectangle;
-import java.awt.event.ActionEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.ListItem;
+import dev.jasper.sdk.ui.MenuItem;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.PanelHeader;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.ZoneId;
@@ -25,560 +23,309 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import javax.swing.AbstractAction;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.DefaultListModel;
-import javax.swing.JButton;
 import javax.swing.Icon;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JMenuItem;
-import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
-import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
-import javax.swing.JTextArea;
-import javax.swing.KeyStroke;
-import javax.swing.ListCellRenderer;
-import javax.swing.ListSelectionModel;
-import javax.swing.SwingUtilities;
-import javax.swing.ToolTipManager;
-import javax.swing.UIManager;
 
-/**
- * The "File Servers" rail panel: compact rows with protocol, address, copy and start/stop controls. Details and
- * activity open through the row menu, double-click or D. One per window; the plugin supplies the servers and actions.
- */
-public final class FileServersPanel extends JPanel {
+/** The per-window File Servers rail panel. Rows show confirmed state; the borrowed header owns count and New. */
+public final class FileServersPanel implements AutoCloseable {
     public record Actions(Consumer<UUID> toggle, Consumer<Optional<UUID>> edit, Consumer<UUID> duplicate, Consumer<UUID> delete,
                           Consumer<UUID> reveal, Consumer<String> copy, Consumer<UUID> copyPassword, Consumer<UUID> clearActivity,
                           Consumer<UUID> fingerprints) { }
 
+    public static final String ROOT = "fileserver.panel", HEADER = "fileserver.header", ROWS = "fileserver.rows",
+        EMPTY = "fileserver.empty", DETAILS = "fileserver.details", ACTIVATE = "fileserver.details.open",
+        ENTER_TOGGLE = "fileserver.toggle.selected", KEY_DETAILS = "fileserver.details.key",
+        KEY_COPY = "fileserver.copy.key", KEY_CANCEL = "fileserver.details.close.key";
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ROOT);
-    private static final int CONTROL_WIDTH = 42;
-    private Consumer<PanelHeader> headerChanged = header -> { };
-    private boolean detailsOpen;
 
-    final JButton add = new JButton("+");
-    final JList<ServerRows.Row> list;
-    final JPanel empty;
-    final JButton emptyAction = new JButton("Share Folder…");
-    private final JTextArea emptyProblem = note("", true);
-    private final JPanel cards = new JPanel(new CardLayout());
-    private final JPanel header = new JPanel();
-    final JPanel details = new JPanel(new BorderLayout(0, 6)) {
-        @Override public java.awt.Dimension getPreferredSize() {
-            return isVisible() ? super.getPreferredSize() : new java.awt.Dimension(0, 0);
-        }
-        @Override public java.awt.Dimension getMinimumSize() {
-            return isVisible() ? super.getMinimumSize() : new java.awt.Dimension(0, 0);
-        }
-    };
-    final JLabel cardName = label(""), cardState = label(""), cardFolder = label(""), cardAccess = label(""), cardWarnings = label("");
-    final JTextArea cardTls = note("");
-    final JTextArea cardHostKey = note("");
-    final JPanel addresses = new JPanel();
-    final List<JButton> addressCopies = new ArrayList<>();
-    final JButton toggle = new JButton("Start"), edit = new JButton("Edit…");
-    final JTextArea activity = new JTextArea(8, 24);
-    final JButton clearActivity = new JButton("Clear"), copyActivity = new JButton("Copy");
-    final JSplitPane split;
-    private final DefaultListModel<ServerRows.Row> model = new DefaultListModel<>();
+    private final UiView view;
     private final Actions actions;
     private final Function<UUID, List<ActivityLog.Entry>> log;
     private final Path home;
     private final String firewall;
     private final ZoneId zone;
-    private final int dividerSize;
-    private List<ServerRegistry.View> views = List.of();
-    private Optional<String> problem = Optional.empty();
-    private Optional<String> tlsFingerprint = Optional.empty();
-    private Optional<String> hostKeyFingerprint = Optional.empty();
+    private final Icon headerAddIcon;
+    private Consumer<PanelHeader> headerChanged = header -> { };
+    private List<ServerRegistry.View> servers = List.of();
+    private Optional<String> problem = Optional.empty(), tlsFingerprint = Optional.empty(), hostKeyFingerprint = Optional.empty();
+    private String activity = "";
     private UUID selected;
-    private boolean rebuilding;
+    private boolean detailsOpen, closed;
 
-    public FileServersPanel(Actions actions, Function<UUID, List<ActivityLog.Entry>> log, Path home, String firewallHint, ZoneId zone) {
-        this(actions, log, home, firewallHint, zone, null);
-    }
-
-    public FileServersPanel(Actions actions, Function<UUID, List<ActivityLog.Entry>> log, Path home, String firewallHint, ZoneId zone, Icon emptyIcon) {
-        super(new BorderLayout(0, 6));
+    public FileServersPanel(UiKit kit, Actions actions, Function<UUID, List<ActivityLog.Entry>> log,
+                            Path home, String firewallHint, ZoneId zone, Icon headerAddIcon) {
         this.actions = actions; this.log = log; this.home = home; this.firewall = firewallHint; this.zone = zone;
-        setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
-        // The tool window header carries the title.
-        header.setLayout(new BoxLayout(header, BoxLayout.X_AXIS));
-        header.add(Box.createHorizontalGlue());
-        add.setToolTipText("New file server");
-        add.putClientProperty("JButton.buttonType", "toolBarButton");
-        header.add(add);
-        // Add is owned by the window header; no second toolbar row.
-
-        list = new JList<>(model) {
-            @Override public boolean getScrollableTracksViewportWidth() { return true; }
-            @Override public javax.swing.JToolTip createToolTip() {
-                var tip = super.createToolTip();
-                tip.putClientProperty("html.disable", true);
-                return tip;
-            }
-            @Override public String getToolTipText(MouseEvent event) {
-                int index = locationToIndex(event.getPoint());
-                Rectangle cell = index < 0 ? null : getCellBounds(index, index);
-                return cell != null && cell.contains(event.getPoint()) && model.get(index) instanceof ServerRows.Server row ? tooltip(row.view()) : null;
-            }
-        };
-        ToolTipManager.sharedInstance().registerComponent(list);
-        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        list.setCellRenderer(new Renderer());
-        var top = new JPanel(new BorderLayout());
-        var scroll = new JScrollPane(list);
-        scroll.setBorder(BorderFactory.createEmptyBorder());
-        scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        top.add(scroll, BorderLayout.CENTER);
-
-        var card = new JPanel();
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        cardName.setFont(cardName.getFont().deriveFont(Font.BOLD));
-        addresses.setLayout(new BoxLayout(addresses, BoxLayout.Y_AXIS));
-        for (JComponent part : List.<JComponent>of(cardName, cardState, cardFolder, cardAccess, cardWarnings, cardTls, cardHostKey, addresses)) {
-            part.setAlignmentX(LEFT_ALIGNMENT);
-            card.add(part);
-        }
-        var buttons = new JPanel();
-        buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
-        buttons.setAlignmentX(LEFT_ALIGNMENT);
-        buttons.add(toggle);
-        buttons.add(Box.createHorizontalStrut(6));
-        buttons.add(edit);
-        buttons.add(Box.createHorizontalGlue());
-        card.add(Box.createVerticalStrut(6));
-        card.add(buttons);
-        details.add(card, BorderLayout.NORTH);
-        var activityHeader = new JPanel();
-        activityHeader.setLayout(new BoxLayout(activityHeader, BoxLayout.X_AXIS));
-        activityHeader.add(label("Activity"));
-        activityHeader.add(Box.createHorizontalGlue());
-        activityHeader.add(clearActivity);
-        activityHeader.add(Box.createHorizontalStrut(4));
-        activityHeader.add(copyActivity);
-        activity.setEditable(false);
-        var activityPanel = new JPanel(new BorderLayout(0, 4));
-        activityPanel.add(activityHeader, BorderLayout.NORTH);
-        activityPanel.add(new JScrollPane(activity), BorderLayout.CENTER);
-        details.add(activityPanel, BorderLayout.CENTER);
-        details.setVisible(false);
-        split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, top, details);
-        dividerSize = split.getDividerSize();
-        split.setResizeWeight(0.5);
-        split.setBorder(BorderFactory.createEmptyBorder());
-        cards.add(split, "populated");
-        empty = PanelStyle.emptyState(emptyIcon, "No File Servers",
-            "Share a local folder over HTTP with devices on your network.", emptyAction);
-        emptyProblem.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
-        var emptyPage = new JPanel(new BorderLayout());
-        emptyPage.add(emptyProblem, BorderLayout.NORTH);
-        emptyPage.add(empty, BorderLayout.CENTER);
-        cards.add(emptyPage, "empty");
-        add(cards, BorderLayout.CENTER);
-        emptyAction.addActionListener(event -> actions.edit().accept(Optional.empty()));
-
-        list.addListSelectionListener(event -> { if (!event.getValueIsAdjusting() && !rebuilding) selectionChanged(); });
-        list.addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent event) {
-                int index = list.locationToIndex(event.getPoint());
-                if (index < 0) return;
-                Rectangle cell = list.getCellBounds(index, index);
-                if (cell == null || !cell.contains(event.getPoint())) return;
-                if (SwingUtilities.isRightMouseButton(event)) {
-                    list.setSelectedIndex(index);
-                    JPopupMenu menu = menuFor(index);
-                    if (menu != null) menu.show(list, event.getX(), event.getY());
-                    return;
-                }
-                if (!(model.get(index) instanceof ServerRows.Server row)) return;
-                if (!SwingUtilities.isLeftMouseButton(event)) return;
-                list.setSelectedIndex(index);
-                int trailing = cell.x + cell.width - event.getX();
-                if (trailing <= PanelStyle.scale(list, CONTROL_WIDTH)) {
-                    if (event.getClickCount() == 1) toggleSelected();
-                } else if (trailing <= PanelStyle.scale(list, CONTROL_WIDTH + 28)) {
-                    if (event.getClickCount() == 1) copyAddress(row.view());
-                } else if (event.getClickCount() == 2) showDetails(true);
-            }
-        });
-        list.getInputMap().put(KeyStroke.getKeyStroke("ENTER"), "toggleServer");
-        list.getInputMap().put(KeyStroke.getKeyStroke("SPACE"), "toggleServer");
-        list.getActionMap().put("toggleServer", new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent event) { toggleSelected(); }
-        });
-        bind("D", "serverDetails", () -> showDetails(!detailsOpen));
-        bind("ESCAPE", "hideDetails", () -> showDetails(false));
-        bind("shift F10", "serverMenu", () -> {
-            int index = list.getSelectedIndex();
-            JPopupMenu menu = menuFor(index);
-            Rectangle bounds = index < 0 ? null : list.getCellBounds(index, index);
-            if (menu != null && bounds != null) menu.show(list, bounds.x + 8, bounds.y + bounds.height);
-        });
-        bind(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("mac") ? "meta C" : "ctrl C",
-            "copyAddress", () -> selectedView().ifPresent(this::copyAddress));
-        add.addActionListener(event -> actions.edit().accept(Optional.empty()));
-        toggle.addActionListener(event -> toggleSelected());
-        edit.addActionListener(event -> selectedView().ifPresent(view -> actions.edit().accept(Optional.of(view.definition().id()))));
-        clearActivity.addActionListener(event -> selectedView().ifPresent(view -> actions.clearActivity().accept(view.definition().id())));
-        copyActivity.addActionListener(event -> actions.copy().accept(activity.getText()));
-        rebuild();
+        this.headerAddIcon = headerAddIcon;
+        view = kit.create(new ViewSpec(node()), this::event);
     }
 
-    /** Supplies the window-owned count and add action. Called on the UI thread. */
+    public UiView view() { return view; }
+    @Override public void close() { if (closed) return; closed = true; view.close(); headerChanged = header -> { }; }
+
+    /** Supplies the window-owned count and New action; never adds another title row. */
     public void onHeaderChanged(Consumer<PanelHeader> listener) { headerChanged = listener; publishHeader(); }
 
     private void publishHeader() {
-        headerChanged.accept(new PanelHeader(views.isEmpty() ? "" : String.valueOf(views.size()), false,
-            List.of(new PanelHeader.Action("New File Server…", new RowArtwork(RowArtwork.Kind.ADD, false, false),
-                () -> actions.edit().accept(Optional.empty())))));
+        if (closed) return;
+        headerChanged.accept(new PanelHeader(servers.isEmpty() ? "" : String.valueOf(servers.size()), false,
+            List.of(new PanelHeader.Action("New File Server…", headerAddIcon,
+                () -> { if (!closed) actions.edit().accept(Optional.empty()); }))));
     }
 
-    private void bind(String stroke, String name, Runnable action) {
-        list.getInputMap().put(KeyStroke.getKeyStroke(stroke), name);
-        list.getActionMap().put(name, new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent event) { action.run(); }
-        });
-    }
-
-    private void toggleSelected() {
-        selectedView().filter(view -> view.state().phase() != Phase.STOPPING).ifPresent(view -> actions.toggle().accept(view.definition().id()));
-    }
-
-    private void copyAddress(ServerRegistry.View view) {
-        view.addresses().stream().findFirst().ifPresent(uri -> actions.copy().accept(uri.toString()));
-    }
-
-    void showDetails(boolean open) {
-        detailsOpen = open;
-        refreshCard();
-    }
-
-    public void setServers(List<ServerRegistry.View> views, Optional<String> problem) {
-        this.views = List.copyOf(views);
-        this.problem = problem;
+    public void setServers(List<ServerRegistry.View> next, Optional<String> problem) {
+        if (closed) return;
+        servers = List.copyOf(next); this.problem = problem;
+        if (selectedView().isEmpty()) selected = servers.isEmpty() ? null : servers.getFirst().definition().id();
         publishHeader();
-        rebuild();
+        refreshActivity();
+        render();
     }
 
-    /** The shared certificate's fingerprint, or empty before it exists; shown for servers that use TLS. */
     public void setTlsFingerprint(Optional<String> fingerprint) {
-        if (fingerprint.equals(tlsFingerprint)) return;
-        tlsFingerprint = fingerprint;
-        refreshCard();
+        if (!closed && !fingerprint.equals(tlsFingerprint)) { tlsFingerprint = fingerprint; render(); }
     }
 
-    /** The SSH host key's fingerprint, or empty before it exists; shown for SFTP servers. */
     public void setHostKeyFingerprint(Optional<String> fingerprint) {
-        if (fingerprint.equals(hostKeyFingerprint)) return;
-        hostKeyFingerprint = fingerprint;
-        refreshCard();
+        if (!closed && !fingerprint.equals(hostKeyFingerprint)) { hostKeyFingerprint = fingerprint; render(); }
     }
 
-    /** Re-reads the selected server's activity log. */
+    /** Re-reads the selected server's bounded activity log. */
     public void refreshActivity() {
-        String text = selectedView().map(view -> log.apply(view.definition().id()).stream()
+        if (closed) return;
+        String next = selectedView().map(server -> log.apply(server.definition().id()).stream()
             .map(entry -> TIME.format(entry.at().atZone(zone)) + " " + entry.text()).collect(Collectors.joining("\n"))).orElse("");
-        if (!text.equals(activity.getText())) {
-            activity.setText(text);
-            activity.setCaretPosition(activity.getDocument().getLength());
-        }
+        if (!next.equals(activity)) { activity = next; render(); }
     }
 
     public Optional<UUID> selected() { return Optional.ofNullable(selected); }
-
     public void select(UUID id) {
-        int index = indexOf(id);
-        if (index >= 0) list.setSelectedIndex(index);
+        if (closed || servers.stream().noneMatch(server -> server.definition().id().equals(id))) return;
+        selected = id; refreshActivity(); render(); view.reveal("row." + id + ".name");
     }
 
     Optional<ServerRegistry.View> selectedView() {
-        return views.stream().filter(view -> view.definition().id().equals(selected)).findFirst();
+        return servers.stream().filter(server -> server.definition().id().equals(selected)).findFirst();
     }
 
-    JPopupMenu menuFor(int index) {
-        if (index < 0 || index >= model.size() || !(model.get(index) instanceof ServerRows.Server row)) return null;
-        ServerRegistry.View view = row.view();
-        UUID id = view.definition().id();
-        Phase phase = view.state().phase();
-        var menu = new JPopupMenu();
-        var toggleItem = item(phase.startable() ? "Start" : phase == Phase.STARTING ? "Cancel Start" : "Stop", () -> actions.toggle().accept(id));
-        toggleItem.setEnabled(phase != Phase.STOPPING);
-        menu.add(toggleItem);
-        menu.addSeparator();
-        if (view.temporary()) {
-            menu.add(item("Save as a Server…", () -> actions.edit().accept(Optional.of(id))));
-        } else {
-            menu.add(item("Edit…", () -> actions.edit().accept(Optional.of(id))));
-            menu.add(item("Duplicate", () -> actions.duplicate().accept(id)));
-            menu.add(item("Delete…", () -> actions.delete().accept(id)));
-        }
-        menu.add(item("Reveal Folder", () -> actions.reveal().accept(id)));
-        var copyAddress = item("Copy Address", () -> view.addresses().stream().findFirst().ifPresent(uri -> actions.copy().accept(uri.toString())));
-        copyAddress.setEnabled(!view.addresses().isEmpty());
-        menu.add(copyAddress);
-        var copyPassword = item("Copy Password", () -> actions.copyPassword().accept(id));
-        copyPassword.setEnabled(phase == Phase.RUNNING && view.user().isPresent());
-        menu.add(copyPassword);
-        var fingerprints = item("Show Fingerprints…", () -> actions.fingerprints().accept(id));
-        fingerprints.setEnabled(view.definition().tls() || view.definition().protocol() == Protocol.SFTP);
-        menu.add(fingerprints);
-        menu.addSeparator();
-        menu.add(item(detailsOpen ? "Hide Details" : "Show Details", () -> {
-            select(id);
-            showDetails(!detailsOpen);
-        }));
-        return menu;
-    }
-
-    private void rebuild() {
-        rebuilding = true;
-        try {
-            model.clear();
-            ServerRows.rows(views, problem).forEach(model::addElement);
-            if (selectedView().isEmpty()) selected = firstServer();
-            int index = indexOf(selected);
-            if (index >= 0) list.setSelectedIndex(index); else list.clearSelection();
-        } finally {
-            rebuilding = false;
-        }
-        boolean none = views.isEmpty();
-        empty.setVisible(none);
-        list.setVisible(!none);
-        header.setVisible(!none);
-        emptyProblem.setText(problem.map(message -> "servers.toml: " + message).orElse(""));
-        emptyProblem.setVisible(none && problem.isPresent());
-        ((CardLayout) cards.getLayout()).show(cards, none ? "empty" : "populated");
-        refreshCard();
-        refreshActivity();
-    }
-
-    private void selectionChanged() {
-        if (list.getSelectedValue() instanceof ServerRows.Server row) selected = row.view().definition().id();
-        refreshCard();
-        refreshActivity();
-    }
-
-    private void refreshCard() {
-        Optional<ServerRegistry.View> chosen = selectedView();
-        boolean showing = detailsOpen && chosen.isPresent();
-        details.setVisible(showing);
-        split.setResizeWeight(showing ? .5 : 1);
-        split.setDividerSize(showing ? dividerSize : 0);
-        if (showing && split.getDividerLocation() >= split.getHeight() - dividerSize) split.setDividerLocation(.5);
-        else if (!showing) split.setDividerLocation(1.0);
-        addresses.removeAll();
-        addressCopies.clear();
-        if (chosen.isPresent()) {
-            ServerRegistry.View view = chosen.get();
-            ServerDefinition definition = view.definition();
-            cardName.setText(definition.name());
-            cardState.setText(ServerRows.state(view.state()));
-            cardFolder.setText(ServerRows.folder(definition.folder(), home));
-            cardAccess.setText(definition.protocol().label() + " :" + definition.port() + " · " + ServerRows.access(definition) + " · "
-                + definition.bind().label() + view.user().map(user -> " · user " + user).orElse(""));
-            List<String> warnings = ServerRows.warnings(definition);
-            cardWarnings.setText(warnings.isEmpty() ? "" : "⚠ " + String.join(" · ", warnings));
-            cardWarnings.setVisible(!warnings.isEmpty());
-            cardTls.setText(tlsFingerprint.map(fingerprint -> "TLS certificate SHA-256 " + fingerprint)
-                .orElse("TLS certificate: created when the server first starts"));
-            cardTls.setVisible(definition.tls());
-            cardHostKey.setText(hostKeyFingerprint.map(fingerprint -> "SSH host key " + fingerprint)
-                .orElse("SSH host key: created when the server first starts"));
-            cardHostKey.setVisible(definition.protocol() == Protocol.SFTP);
-            for (URI uri : view.addresses()) {
-                var row = new JPanel();
-                row.setLayout(new BoxLayout(row, BoxLayout.X_AXIS));
-                row.setAlignmentX(LEFT_ALIGNMENT);
-                row.add(label(uri.toString()));
-                row.add(Box.createHorizontalStrut(6));
-                var copy = new JButton("Copy");
-                copy.addActionListener(event -> actions.copy().accept(uri.toString()));
-                addressCopies.add(copy);
-                row.add(copy);
-                addresses.add(row);
+    private void event(UiEvent event) {
+        if (closed) return;
+        switch (event) {
+            case UiEvent.Selected selection when selection.id().equals(ROWS) -> {
+                selection.ids().stream().findFirst().flatMap(FileServersPanel::rowUuid).ifPresent(id -> { selected = id; refreshActivity(); render(); });
             }
-            Phase phase = view.state().phase();
-            toggle.setText(switch (phase) {
-                case STOPPED, WAITING_FOR_VAULT -> "Start";
-                case FAILED -> "Retry";
-                case STARTING -> "Cancel";
-                case RUNNING -> "Stop";
-                case STOPPING -> "Stopping…";
-            });
-            toggle.setEnabled(phase != Phase.STOPPING);
-            edit.setText(view.temporary() ? "Save as a Server…" : "Edit…");
+            case UiEvent.Toggled toggle when toggle.id().startsWith("switch:") ->
+                rowUuid(toggle.id().substring("switch:".length())).ifPresent(id -> server(id)
+                    .filter(server -> server.state().phase() != Phase.STOPPING).ifPresent(server -> actions.toggle().accept(id)));
+            case UiEvent.Action action -> action(action.id());
+            default -> { }
         }
-        revalidate();
-        repaint();
     }
 
-    private String tooltip(ServerRegistry.View view) {
+    private void action(String id) {
+        switch (id) {
+            case "fileserver.empty.new" -> actions.edit().accept(Optional.empty());
+            case ACTIVATE, KEY_DETAILS -> { if (selectedView().isPresent()) { detailsOpen = id.equals(ACTIVATE) || !detailsOpen; render(); } }
+            case KEY_CANCEL -> { detailsOpen = false; render(); }
+            case ENTER_TOGGLE -> selectedView().filter(server -> server.state().phase() != Phase.STOPPING)
+                .ifPresent(server -> actions.toggle().accept(server.definition().id()));
+            case KEY_COPY -> selectedView().ifPresent(this::copyAddress);
+            case "fileserver.details.toggle" -> selectedView().filter(server -> server.state().phase() != Phase.STOPPING)
+                .ifPresent(server -> actions.toggle().accept(server.definition().id()));
+            case "fileserver.details.edit" -> selectedView().ifPresent(server -> actions.edit().accept(Optional.of(server.definition().id())));
+            case "fileserver.activity.clear" -> selectedView().ifPresent(server -> actions.clearActivity().accept(server.definition().id()));
+            case "fileserver.activity.copy" -> actions.copy().accept(activity);
+            default -> {
+                if (id.startsWith("copy:")) rowUuid(id.substring(5)).flatMap(this::server).ifPresent(this::copyAddress);
+                else if (id.startsWith("uri:")) copyUri(id);
+                else if (id.startsWith("menu:")) menuAction(id);
+            }
+        }
+    }
+
+    private void copyAddress(ServerRegistry.View server) {
+        server.addresses().stream().findFirst().ifPresent(uri -> actions.copy().accept(uri.toString()));
+    }
+
+    private void copyUri(String action) {
+        int colon = action.indexOf(':', 4);
+        if (colon < 0) return;
+        rowUuid(action.substring(4, colon)).flatMap(this::server).ifPresent(server -> {
+            try { int index = Integer.parseInt(action.substring(colon + 1));
+                if (index >= 0 && index < server.addresses().size()) actions.copy().accept(server.addresses().get(index).toString());
+            } catch (NumberFormatException ignored) { }
+        });
+    }
+
+    private void menuAction(String action) {
+        int colon = action.lastIndexOf(':');
+        if (colon < 0) return;
+        String verb = action.substring(5, colon);
+        rowUuid(action.substring(colon + 1)).flatMap(this::server).ifPresent(server -> {
+            UUID id = server.definition().id();
+            switch (verb) {
+                case "toggle" -> { if (server.state().phase() != Phase.STOPPING) actions.toggle().accept(id); }
+                case "edit" -> actions.edit().accept(Optional.of(id));
+                case "duplicate" -> actions.duplicate().accept(id);
+                case "delete" -> actions.delete().accept(id);
+                case "reveal" -> actions.reveal().accept(id);
+                case "copy" -> copyAddress(server);
+                case "password" -> actions.copyPassword().accept(id);
+                case "fingerprints" -> actions.fingerprints().accept(id);
+                case "details" -> { selected = id; detailsOpen = !detailsOpen; refreshActivity(); render(); }
+                default -> { }
+            }
+        });
+    }
+
+    private Optional<ServerRegistry.View> server(UUID id) {
+        return servers.stream().filter(server -> server.definition().id().equals(id)).findFirst();
+    }
+    private static Optional<UUID> rowUuid(String row) {
+        try { return Optional.of(UUID.fromString(row.startsWith("server:") ? row.substring(7) : row)); }
+        catch (IllegalArgumentException invalid) { return Optional.empty(); }
+    }
+    private static String rowId(UUID id) { return "server:" + id; }
+
+    private void render() { if (!closed) view.update(new ViewSpec(node())); }
+    private static ControlState state(boolean visible, boolean enabled) { return new ControlState(visible, enabled, false, ""); }
+    private static Nodes.Text text(String id, String value, Nodes.TextRole role) { return new Nodes.Text(id, ControlState.READY, value, role); }
+
+    private Nodes.Panel node() {
+        var header = new Nodes.Header(HEADER, ControlState.READY, "File Servers", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
+        if (servers.isEmpty()) {
+            var children = new ArrayList<Nodes.Node>();
+            problem.ifPresent(error -> children.add(new Nodes.Text("fileserver.problem", ControlState.READY, "servers.toml: " + error,
+                Nodes.TextRole.BODY, Optional.of(Nodes.Severity.DANGER), OptionalInt.empty())));
+            children.add(new Nodes.Empty(EMPTY, ControlState.READY,
+                new Nodes.Icon("fileserver.empty.icon", ControlState.READY, "server", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "File Servers"),
+                "No File Servers", "Share a local folder over HTTP with devices on your network.",
+                List.of(new Nodes.Button("fileserver.empty.new", ControlState.READY, "Share Folder…", "add", Nodes.ButtonKind.SECONDARY,
+                    "fileserver.empty.new", ""))));
+            return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.empty(),
+                new Nodes.Stack("fileserver.empty.body", ControlState.READY, Nodes.LayoutRole.VERTICAL, children), Optional.empty());
+        }
+        var rows = new ArrayList<ListItem>();
+        problem.ifPresent(error -> rows.add(new ListItem("fileserver.problem.row", Optional.of(new Nodes.Icon("fileserver.problem.icon", ControlState.READY,
+            "error", Nodes.Hue.NONE, Nodes.IconSize.CONTROL, "Error", Optional.of(Nodes.Severity.DANGER))),
+            List.of(text("fileserver.problem.text", "servers.toml: " + error, Nodes.TextRole.BODY)), List.of(), List.of())));
+        for (ServerRows.Row row : ServerRows.rows(servers, Optional.empty())) {
+            switch (row) {
+                case ServerRows.Header heading -> rows.add(new ListItem("fileserver.temporary", Optional.empty(),
+                    List.of(text("fileserver.temporary.title", heading.title(), Nodes.TextRole.SECTION_LABEL)), List.of(), List.of(), true));
+                case ServerRows.Server server -> rows.add(item(server.view()));
+                case ServerRows.Problem ignored -> { }
+            }
+        }
+        var list = new Nodes.ItemList(ROWS, ControlState.READY, Nodes.ListKind.DOUBLE, rows,
+            selected == null ? Set.of() : Set.of(rowId(selected)), ACTIVATE, List.of(), Nodes.SelectionMode.SINGLE,
+            Optional.empty(), OptionalInt.empty(), ENTER_TOGGLE, "", KEY_DETAILS, KEY_COPY, KEY_CANCEL);
+        var body = new ArrayList<Nodes.Node>();
+        body.add(list);
+        selectedView().ifPresent(server -> body.add(details(server)));
+        return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.empty(),
+            new Nodes.Stack("fileserver.body", ControlState.READY, Nodes.LayoutRole.VERTICAL, body), Optional.empty());
+    }
+
+    private ListItem item(ServerRegistry.View server) {
+        ServerDefinition definition = server.definition();
+        UUID id = definition.id(); String prefix = "row." + id;
+        Phase phase = server.state().phase();
+        var subtitle = new ArrayList<Nodes.Node>();
+        subtitle.add(new Nodes.Chip(prefix + ".protocol", ControlState.READY, definition.protocol().label(), protocolHue(definition.protocol())));
+        subtitle.add(text(prefix + ".address", ServerRows.address(server), Nodes.TextRole.MONO_SMALL));
+        String warning = ServerRows.warnings(definition).stream().findFirst().orElse("");
+        if (phase != Phase.RUNNING && phase != Phase.STOPPED)
+            subtitle.add(new Nodes.Text(prefix + ".state", ControlState.READY, ServerRows.state(server.state()), Nodes.TextRole.DESCRIPTION,
+                Optional.of(phase == Phase.FAILED ? Nodes.Severity.DANGER : Nodes.Severity.WARNING), OptionalInt.empty()));
+        else if (!warning.isEmpty())
+            subtitle.add(new Nodes.Text(prefix + ".warning", ControlState.READY, "Warning · " + warning, Nodes.TextRole.DESCRIPTION,
+                Optional.of(Nodes.Severity.WARNING), OptionalInt.empty()));
+        var copy = new Nodes.Button("copy:" + id, state(true, !server.addresses().isEmpty()), "", "copy", Nodes.ButtonKind.GHOST,
+            "copy:" + id, "Copy address", Nodes.ButtonPresentation.EMBEDDED);
+        var toggle = new Nodes.Toggle("switch:" + id, state(true, phase != Phase.STOPPING),
+            phase == Phase.STARTING ? "Cancel start" : phase == Phase.STOPPING ? "Stopping" : phase == Phase.RUNNING ? "Stop server" : "Start server",
+            phase == Phase.RUNNING, "switch:" + id, true, "", phase == Phase.STARTING || phase == Phase.STOPPING);
+        String description = definition.name() + ", " + definition.protocol().label() + ", " + ServerRows.address(server) + ", " + tooltip(server);
+        return new ListItem(rowId(id), Optional.of(new Nodes.Icon(prefix + ".folder", ControlState.READY, "folder", Nodes.Hue.NEUTRAL,
+            Nodes.IconSize.CONTROL, "Folder")),
+            List.of(text(prefix + ".name", definition.name(), Nodes.TextRole.BODY)), subtitle, List.of(copy, toggle), false,
+            Optional.of(menu(server)), description);
+    }
+
+    private static Nodes.Hue protocolHue(Protocol protocol) {
+        return switch (protocol) { case HTTP -> Nodes.Hue.BLUE; case SFTP -> Nodes.Hue.GREEN; case FTP -> Nodes.Hue.AMBER; case TFTP -> Nodes.Hue.PURPLE; };
+    }
+
+    private String tooltip(ServerRegistry.View server) {
         var parts = new ArrayList<String>();
-        parts.add(ServerRows.state(view.state()));
-        parts.addAll(ServerRows.warnings(view.definition()));
-        if (view.state().phase() == Phase.RUNNING && !(view.definition().bind() instanceof Bind.Loopback)) parts.add(firewall);
+        parts.add(ServerRows.state(server.state())); parts.addAll(ServerRows.warnings(server.definition()));
+        if (server.state().phase() == Phase.RUNNING && !(server.definition().bind() instanceof Bind.Loopback)) parts.add(firewall);
         return String.join(" · ", parts);
     }
 
-    private UUID firstServer() {
-        for (int i = 0; i < model.size(); i++) if (model.get(i) instanceof ServerRows.Server row) return row.view().definition().id();
-        return null;
-    }
-
-    private int indexOf(UUID id) {
-        if (id == null) return -1;
-        for (int i = 0; i < model.size(); i++) if (model.get(i) instanceof ServerRows.Server row && row.view().definition().id().equals(id)) return i;
-        return -1;
-    }
-
-    private static JMenuItem item(String title, Runnable action) {
-        var item = new JMenuItem(title);
-        item.addActionListener(event -> action.run());
-        return item;
-    }
-
-    private static JLabel label(String text) {
-        var label = new JLabel();
-        // html.disable must be set before the text: the UI installs the HTML view when the text is set
-        label.putClientProperty("html.disable", Boolean.TRUE);
-        label.setText(text);
-        return label;
-    }
-
-    /** Wrapping, read-only text that looks like a label; a JTextArea never renders HTML. */
-    private static JTextArea note(String text) { return note(text, false); }
-
-    private static JTextArea note(String text, boolean problem) {
-        var note = new JTextArea(text) {
-            private Color semanticForeground;
-            @Override public void setBounds(int x, int y, int width, int height) {
-                // Hidden children are laid out at a degenerate size; a wrapped text area would keep measuring at it.
-                if (width <= 0 || height <= 0) { width = 0; height = 0; }
-                super.setBounds(x, y, width, height);
-            }
-            @Override protected void paintComponent(java.awt.Graphics graphics) {
-                var palette = WorkspacePalette.current(this);
-                Color foreground = problem ? palette.error() : palette.textMuted();
-                // The host may compose more keys into FlatLaf.style; compare our semantic value instead.
-                if (!foreground.equals(semanticForeground)) {
-                    semanticForeground = foreground;
-                    putClientProperty("FlatLaf.style", java.util.Map.of("foreground", foreground));
-                }
-                setForeground(foreground);
-                super.paintComponent(graphics);
-            }
-            @Override public void updateUI() {
-                super.updateUI();
-                setFont(UIManager.getFont("Label.font"));
-
-                setOpaque(false);
-            }
-        };
-        note.setLineWrap(true);
-        note.setWrapStyleWord(true);
-        note.setEditable(false);
-        note.setFocusable(false);
-        return note;
-    }
-
-    private final class Renderer implements ListCellRenderer<ServerRows.Row> {
-        @Override public Component getListCellRendererComponent(JList<? extends ServerRows.Row> owner, ServerRows.Row value, int index,
-                                                                boolean isSelected, boolean focused) {
-            boolean highlighted = isSelected && (focused || owner.hasFocus());
-            Color background = highlighted ? owner.getSelectionBackground() : owner.getBackground();
-            Color foreground = highlighted ? owner.getSelectionForeground() : owner.getForeground();
-            return switch (value) {
-                case ServerRows.Problem problem -> plain("servers.toml: " + problem.message(), highlighted ? foreground : WorkspacePalette.current(owner).error(), background, owner.getFont());
-                case ServerRows.Header header -> plain(header.title(), highlighted ? foreground : WorkspacePalette.current(owner).textMuted(), background, owner.getFont().deriveFont(Font.BOLD));
-                case ServerRows.Server server -> serverRow(owner, server.view(), foreground, background);
-            };
+    private List<MenuItem> menu(ServerRegistry.View server) {
+        UUID id = server.definition().id(); Phase phase = server.state().phase();
+        var result = new ArrayList<MenuItem>();
+        result.add(menuItem("toggle", id, phase.startable() ? "Start" : phase == Phase.STARTING ? "Cancel Start" : "Stop", phase != Phase.STOPPING));
+        result.add(separator("first", id));
+        result.add(menuItem("edit", id, server.temporary() ? "Save as a Server…" : "Edit…", true));
+        if (!server.temporary()) {
+            result.add(menuItem("duplicate", id, "Duplicate", true));
+            result.add(menuItem("delete", id, "Delete…", true));
         }
+        result.add(menuItem("reveal", id, "Reveal Folder", true));
+        result.add(menuItem("copy", id, "Copy Address", !server.addresses().isEmpty()));
+        result.add(menuItem("password", id, "Copy Password", phase == Phase.RUNNING && server.user().isPresent()));
+        result.add(menuItem("fingerprints", id, "Show Fingerprints…", server.definition().tls() || server.definition().protocol() == Protocol.SFTP));
+        result.add(separator("second", id));
+        result.add(menuItem("details", id, detailsOpen ? "Hide Details" : "Show Details", true));
+        return List.copyOf(result);
+    }
 
-        private Component plain(String text, Color foreground, Color background, Font font) {
-            var label = label(text);
-            label.setOpaque(true);
-            label.setBackground(background);
-            label.setForeground(foreground);
-            label.setFont(font);
-            label.setBorder(BorderFactory.createEmptyBorder(3, 6, 3, 6));
-            label.setToolTipText(text);
-            return label;
-        }
+    private static MenuItem menuItem(String verb, UUID id, String label, boolean enabled) {
+        return new MenuItem("menu." + verb + ":" + id, label, "", "menu:" + verb + ":" + id, enabled, false);
+    }
+    private static MenuItem separator(String part, UUID id) { return new MenuItem("separator." + part + ":" + id, "", "", "", false, true); }
 
-        private Component serverRow(JList<?> owner, ServerRegistry.View view, Color foreground, Color background) {
-            ServerDefinition definition = view.definition();
-            Phase phase = view.state().phase();
-            var row = new JPanel(new BorderLayout(PanelStyle.scale(owner, 9), 0)) {
-                @Override public java.awt.Dimension getPreferredSize() {
-                    var size = super.getPreferredSize();
-                    size.height = Math.max(size.height, PanelStyle.scale(owner, 48));
-                    return size;
-                }
-            };
-            row.setOpaque(true);
-            row.setBackground(background);
-            row.setBorder(BorderFactory.createEmptyBorder(PanelStyle.scale(owner, 7), PanelStyle.scale(owner, 4), PanelStyle.scale(owner, 7), PanelStyle.scale(owner, 4)));
-            var folder = new JLabel(new RowArtwork(RowArtwork.Kind.FOLDER, false, false));
-            row.add(folder, BorderLayout.WEST);
-            Font font = view.temporary() ? owner.getFont().deriveFont(Font.ITALIC) : owner.getFont();
-            var lines = new JPanel();
-            lines.setLayout(new BoxLayout(lines, BoxLayout.Y_AXIS));
-            lines.setOpaque(false);
-            lines.setForeground(foreground);
-            var name = text(definition.name(), foreground, font);
-            name.setAlignmentX(LEFT_ALIGNMENT);
-            lines.add(name);
-            var address = new JPanel(new BorderLayout(PanelStyle.scale(owner, 6), 0));
-            address.setOpaque(false);
-            address.setAlignmentX(LEFT_ALIGNMENT);
-            address.add(new ProtocolChip(definition.protocol(), font, WorkspacePalette.current(owner).background()), BorderLayout.WEST);
-            address.add(text(ServerRows.address(view), WorkspacePalette.current(owner).textMuted(),
-                new Font(Font.MONOSPACED, Font.PLAIN, font.getSize()).deriveFont(Math.max(10f, font.getSize2D() - 1))), BorderLayout.CENTER);
-            lines.add(address);
-            if (phase != Phase.RUNNING && phase != Phase.STOPPED) {
-                var status = text(ServerRows.state(view.state()), phase == Phase.FAILED ? WorkspacePalette.current(owner).error() : WorkspacePalette.current(owner).warning(), font);
-                status.setAlignmentX(LEFT_ALIGNMENT);
-                lines.add(status);
-            } else if (!ServerRows.warnings(definition).isEmpty()) {
-                var warning = text("Warning · " + ServerRows.warnings(definition).getFirst(), WorkspacePalette.current(owner).warning(), font);
-                warning.setAlignmentX(LEFT_ALIGNMENT);
-                lines.add(warning);
-            }
-            row.add(lines, BorderLayout.CENTER);
-            var controls = new JPanel(new BorderLayout(PanelStyle.scale(owner, 8), 0));
-            controls.setOpaque(false);
-            var copy = new JLabel(new RowArtwork(RowArtwork.Kind.COPY, false, false));
-            copy.setEnabled(!view.addresses().isEmpty());
-            copy.getAccessibleContext().setAccessibleName("Copy address");
-            controls.add(copy, BorderLayout.WEST);
-            var control = new JLabel(new RowArtwork(RowArtwork.Kind.SWITCH, phase == Phase.RUNNING,
-                phase == Phase.STARTING || phase == Phase.STOPPING));
-            control.setEnabled(phase != Phase.STOPPING);
-            control.getAccessibleContext().setAccessibleName(phase == Phase.STARTING ? "Cancel start" : phase == Phase.STOPPING ? "Stopping" : phase == Phase.RUNNING ? "Stop server" : "Start server");
-            controls.add(control, BorderLayout.EAST);
-            row.add(controls, BorderLayout.EAST);
-            String description = definition.name() + ", " + definition.protocol().label() + ", " + ServerRows.address(view) + ", " + tooltip(view);
-            row.setToolTipText(description);
-            row.getAccessibleContext().setAccessibleName(description);
-            return row;
+    private Nodes.Node details(ServerRegistry.View server) {
+        ServerDefinition definition = server.definition();
+        Phase phase = server.state().phase();
+        var details = new ArrayList<Nodes.Node>();
+        details.add(text("fileserver.card.name", definition.name(), Nodes.TextRole.DETAIL_TITLE));
+        details.add(text("fileserver.card.state", ServerRows.state(server.state()), Nodes.TextRole.DESCRIPTION));
+        details.add(text("fileserver.card.folder", ServerRows.folder(definition.folder(), home), Nodes.TextRole.MONO_SMALL));
+        details.add(text("fileserver.card.access", definition.protocol().label() + " :" + definition.port() + " · " + ServerRows.access(definition)
+            + " · " + definition.bind().label() + server.user().map(user -> " · user " + user).orElse(""), Nodes.TextRole.DESCRIPTION));
+        List<String> warnings = ServerRows.warnings(definition);
+        if (!warnings.isEmpty()) details.add(new Nodes.Text("fileserver.card.warnings", ControlState.READY,
+            "Warning · " + String.join(" · ", warnings), Nodes.TextRole.DESCRIPTION, Optional.of(Nodes.Severity.WARNING), OptionalInt.empty()));
+        if (definition.tls()) details.add(text("fileserver.card.tls", tlsFingerprint.map(fingerprint -> "TLS certificate SHA-256 " + fingerprint)
+            .orElse("TLS certificate: created when the server first starts"), Nodes.TextRole.DESCRIPTION));
+        if (definition.protocol() == Protocol.SFTP) details.add(text("fileserver.card.hostkey", hostKeyFingerprint.map(fingerprint -> "SSH host key " + fingerprint)
+            .orElse("SSH host key: created when the server first starts"), Nodes.TextRole.DESCRIPTION));
+        for (int i = 0; i < server.addresses().size(); i++) {
+            URI uri = server.addresses().get(i);
+            details.add(new Nodes.Stack("fileserver.card.uri." + i, ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+                text("fileserver.card.uri.text." + i, uri.toString(), Nodes.TextRole.MONO_SMALL),
+                new Nodes.Button("uri:" + definition.id() + ":" + i, ControlState.READY, "Copy", "copy", Nodes.ButtonKind.GHOST,
+                    "uri:" + definition.id() + ":" + i, ""))));
         }
-
-        private JLabel text(String value, Color foreground, Font font) {
-            var label = label(value);
-            label.setForeground(foreground);
-            label.setFont(font);
-            return label;
-        }
+        details.add(new Nodes.Stack("fileserver.card.actions", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
+            new Nodes.Button("fileserver.details.toggle", state(true, phase != Phase.STOPPING),
+                switch (phase) { case STOPPED, WAITING_FOR_VAULT -> "Start"; case FAILED -> "Retry"; case STARTING -> "Cancel";
+                    case RUNNING -> "Stop"; case STOPPING -> "Stopping…"; }, "", Nodes.ButtonKind.SECONDARY, "fileserver.details.toggle", ""),
+            new Nodes.Button("fileserver.details.edit", ControlState.READY, server.temporary() ? "Save as a Server…" : "Edit…", "edit",
+                Nodes.ButtonKind.SECONDARY, "fileserver.details.edit", ""))));
+        details.add(text("fileserver.activity.title", "Activity", Nodes.TextRole.SECTION_LABEL));
+        details.add(text("fileserver.activity.log", activity, Nodes.TextRole.MONO_SMALL));
+        details.add(new Nodes.Stack("fileserver.activity.actions", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
+            new Nodes.Button("fileserver.activity.clear", ControlState.READY, "Clear", "remove", Nodes.ButtonKind.GHOST, "fileserver.activity.clear", ""),
+            new Nodes.Button("fileserver.activity.copy", ControlState.READY, "Copy", "copy", Nodes.ButtonKind.GHOST, "fileserver.activity.copy", ""))));
+        return new Nodes.Card(DETAILS, state(detailsOpen, true), Nodes.CardKind.MIXED, details);
     }
 }

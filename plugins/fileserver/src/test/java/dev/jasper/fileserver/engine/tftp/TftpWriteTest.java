@@ -90,7 +90,8 @@ class TftpWriteTest {
             assertThat(done.direction()).isEqualTo(ServerEvent.Direction.UPLOAD);
             assertThat(done.complete()).isTrue();
         });
-        assertThat(transferred().getFirst().bytes()).isEqualTo(2000);
+        assertThat(transferred()).extracting(ServerEvent.Transferred::bytes)
+            .as("both completed uploads, independent of worker completion order").containsExactlyInAnyOrder(2000L, 8L);
     }
 
     @Test void netasciiWritesBecomeLocalLineEnds() throws Exception {

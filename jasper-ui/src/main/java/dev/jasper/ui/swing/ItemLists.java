@@ -24,7 +24,28 @@ final class ItemLists {
 
         ListControl(KitView view, Nodes.ItemList node) {
             super(view, node);
+            rowKey("D", "details", Nodes.ItemList::detailsAction);
+            rowKey(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("mac") ? "meta C" : "ctrl C",
+                "copy", Nodes.ItemList::copyAction);
+            rowKey("ESCAPE", "cancel", Nodes.ItemList::cancelAction);
             refresh();
+        }
+
+        /** These keys belong to the focused row canvas only; disabled or blank descriptors pass them outward. */
+        private void rowKey(String stroke, String key, java.util.function.Function<Nodes.ItemList, String> action) {
+            String binding = "item-list." + key;
+            canvas.getInputMap().put(KeyStroke.getKeyStroke(stroke), binding);
+            canvas.getActionMap().put(binding, new AbstractAction() {
+                @Override public boolean isEnabled() {
+                    return !closed && focusItem != null && rowInteractive() && !action.apply(value()).isBlank();
+                }
+                @Override public void actionPerformed(java.awt.event.ActionEvent event) {
+                    String row = focusItem;
+                    String named = action.apply(value());
+                    if (row != null && stillCurrent(row) && selectable(indexOf(row)) && !named.isBlank()
+                        && named.equals(action.apply(value()))) emit(new UiEvent.Action(named));
+                }
+            });
         }
 
         Nodes.ItemList value() {

@@ -1,31 +1,35 @@
 package dev.jasper.fileserver.ui;
 
-import java.awt.BorderLayout;
-import java.awt.FlowLayout;
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
+import java.util.List;
+import java.util.Optional;
 
-/** A question with two answers, shown in a host dialog. */
-public final class ConfirmPanel extends JPanel {
-    final JLabel message;
-    final JButton confirm, cancel;
+/** A two-answer question in a host dialog. */
+public final class ConfirmPanel implements AutoCloseable {
+    private final UiView view;
+    private boolean closed;
 
-    public ConfirmPanel(String text, String confirmLabel, String cancelLabel, Runnable onConfirm, Runnable onCancel) {
-        super(new BorderLayout(0, 12));
-        setBorder(BorderFactory.createEmptyBorder(16, 20, 12, 20));
-        message = new JLabel();
-        message.putClientProperty("html.disable", Boolean.TRUE);
-        message.setText(text);
-        add(message, BorderLayout.CENTER);
-        confirm = new JButton(confirmLabel);
-        cancel = new JButton(cancelLabel);
-        var buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
-        buttons.add(cancel);
-        buttons.add(confirm);
-        add(buttons, BorderLayout.SOUTH);
-        confirm.addActionListener(event -> onConfirm.run());
-        cancel.addActionListener(event -> onCancel.run());
+    public ConfirmPanel(UiKit kit, String text, String confirmLabel, String cancelLabel, Runnable onConfirm, Runnable onCancel) {
+        view = kit.create(new ViewSpec(new Nodes.Form("fileserver.confirm", ControlState.READY, Nodes.FormKind.SHEET,
+            "Confirm", Optional.empty(), List.of(new Nodes.Text("fileserver.confirm.message", ControlState.READY,
+                text, Nodes.TextRole.BODY)), Optional.empty(), List.of(
+                new Nodes.Button("fileserver.confirm.cancel", ControlState.READY, cancelLabel, "", Nodes.ButtonKind.SECONDARY, "cancel", ""),
+                new Nodes.Button("fileserver.confirm.accept", ControlState.READY, confirmLabel, "", Nodes.ButtonKind.SECONDARY, "confirm", "")),
+            "cancel")), event -> {
+            if (closed || !(event instanceof UiEvent.Action action)) return;
+            switch (action.id()) {
+                case "fileserver.confirm.accept" -> onConfirm.run();
+                case "fileserver.confirm.cancel" -> onCancel.run();
+                default -> { }
+            }
+        });
     }
+
+    public UiView view() { return view; }
+    @Override public void close() { if (closed) return; closed = true; view.close(); }
 }

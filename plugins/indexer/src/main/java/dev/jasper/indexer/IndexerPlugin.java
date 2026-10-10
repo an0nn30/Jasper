@@ -60,7 +60,12 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import javax.swing.JOptionPane;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.DialogSpec;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.ViewSpec;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
@@ -101,8 +106,7 @@ public final class IndexerPlugin implements Plugin {
                 timer.setRepeats(false);
                 timer.start();
                 return timer::stop;
-            }, IndexerPlugin::copy, Path.of(System.getProperty("user.home")), List.of("git"),
-                question -> JOptionPane.showConfirmDialog(null, question, "Project Index", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION);
+            }, IndexerPlugin::copy, Path.of(System.getProperty("user.home")), List.of("git"), null);
         }
     }
 
@@ -152,8 +156,8 @@ public final class IndexerPlugin implements Plugin {
         context.menus().standard(StandardMenu.FILE).add(INDEX_FOLDER);
         context.palette().register(new FilesScope(projects, new FilesScope.Hooks(this::current, this::openBlocked, this::reachable,
             this::hostLabel, this::connected, this::open, this::terminal, this::copyText, environment.clipboard()), GOTO, icon));
-        context.settings().page(new IndexerSettingsPanel(settings, projects, indexer, this::location, this::reachable, this::connected,
-            () -> context.terminals().activeWindow().ifPresent(this::indexFolder), environment.confirm()));
+        context.settings().page(new IndexerSettingsPanel(context.kit(), settings, projects, indexer, this::location, this::reachable, this::connected,
+            () -> context.terminals().activeWindow().ifPresent(this::indexFolder), this::confirmRemove));
         watcher = new CwdWatcher(projects, indexer, settings, prompts, new CwdWatcher.Hooks(this::detect, this::connectedPlace,
             this::detectRemote, pane -> context.terminals().pane(pane).map(handle -> handle.tab().window()), environment.after(),
             environment.home()));
@@ -168,6 +172,34 @@ public final class IndexerPlugin implements Plugin {
                     context.log().log(System.Logger.Level.WARNING, "Project Index could not handle a terminal event", broken);
                 }
             }
+        });
+    }
+
+    /** Settings removal is immediate only after an owner-window kit confirmation. */
+    private void confirmRemove(String question, Runnable accepted) {
+        if (environment.confirm() != null) {
+            if (environment.confirm().test(question)) accepted.run();
+            return;
+        }
+        context.terminals().activeWindow().ifPresent(window -> {
+            var dialog = context.windows().dialog(new DialogSpec("Remove Project?", window, true));
+            var closed = new AtomicBoolean();
+            var view = context.kit().create(new ViewSpec(new Nodes.Form("indexer.remove.confirm", ControlState.READY,
+                Nodes.FormKind.SHEET, "Remove Project?", Optional.empty(), List.of(new Nodes.Text("indexer.remove.message",
+                    ControlState.READY, question, Nodes.TextRole.BODY)), Optional.empty(), List.of(
+                    new Nodes.Button("indexer.remove.cancel", ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, "cancel", ""),
+                    new Nodes.Button("indexer.remove.accept", ControlState.READY, "Remove", "", Nodes.ButtonKind.PRIMARY, "remove", "")),
+                "indexer.remove.cancel")), event -> {
+                if (closed.get() || !(event instanceof UiEvent.Action action)) return;
+                switch (action.id()) {
+                    case "indexer.remove.accept" -> { closed.set(true); dialog.close(); accepted.run(); }
+                    case "indexer.remove.cancel" -> { closed.set(true); dialog.close(); }
+                    default -> { }
+                }
+            });
+            dialog.setContent(view);
+            dialog.onClosed(() -> { closed.set(true); view.close(); });
+            dialog.show();
         });
     }
 

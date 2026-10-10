@@ -405,7 +405,8 @@ public final class Nodes {
      * A plain left single click on a row also reports {@link UiEvent.Clicked} after its selection. RESULTS lists take
      * neither action.
      */
-    public record ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows, String enterAction, String deleteAction) implements Node {
+    /** List rows may bind D, platform Copy and Escape while their row canvas alone is focused; blank actions pass through. */
+    public record ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows, String enterAction, String deleteAction, String detailsAction, String copyAction, String cancelAction) implements Node {
         public ItemList {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -418,14 +419,19 @@ public final class Nodes {
             if (selectionMode == SelectionMode.SINGLE && selectedIds.size() > 1) throw new IllegalArgumentException("Single selection accepts at most one item");
             if (visibleRows.isPresent() && visibleRows.getAsInt() < 1) throw new IllegalArgumentException("Visible rows must be positive");
             Objects.requireNonNull(enterAction); Objects.requireNonNull(deleteAction);
-            if (kind == ListKind.RESULTS && (!enterAction.isEmpty() || !deleteAction.isEmpty()))
-                throw new IllegalArgumentException("RESULTS rows never take focus, so they have no Enter or Delete action");
+            Objects.requireNonNull(detailsAction); Objects.requireNonNull(copyAction); Objects.requireNonNull(cancelAction);
+            if (kind == ListKind.RESULTS && (!enterAction.isEmpty() || !deleteAction.isEmpty() || !detailsAction.isEmpty() || !copyAction.isEmpty() || !cancelAction.isEmpty()))
+                throw new IllegalArgumentException("RESULTS rows never take focus, so they have no row key actions");
             ModelChecks.unique(items, ListItem::id);
             ModelChecks.unique(contextActions, MenuItem::id);
             for (var item : items) if (item.heading()) {
                 if (kind == ListKind.ORDERED) throw new IllegalArgumentException("Ordered lists have no headings");
                 if (selectedIds.contains(item.id())) throw new IllegalArgumentException("A heading is never selected");
             }
+        }
+        /** A list without D, Copy or Escape row actions. */
+        public ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows, String enterAction, String deleteAction) {
+            this(id, state, kind, items, selectedIds, activateAction, contextActions, selectionMode, addAction, visibleRows, enterAction, deleteAction, "", "", "");
         }
         /** A list whose Enter reports its activate action and which has no Delete action. */
         public ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows) {

@@ -19,14 +19,14 @@ import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.ToolbarItem;
 import dev.jasper.sdk.ui.WindowSpec;
-import java.awt.BorderLayout;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.ViewSpec;
 import java.awt.Dimension;
 import java.util.List;
 import java.util.Optional;
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
+import java.util.OptionalInt;
 import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.terminal.TerminalEvents;
 import dev.jasper.sdk.terminal.OpenRequest;
@@ -53,6 +53,7 @@ public final class SamplePlugin implements Plugin {
     private static final String ECHO = "dev.jasper.sample.echo";
     private static final String GREETINGS = "dev.jasper.sample.greetings";
     private static final String GREETINGS_OPEN = "dev.jasper.sample.greetings.open";
+    private static final String FLASK = "plugin";
 
     /** Created by the runtime. */
     public SamplePlugin() { }
@@ -63,7 +64,7 @@ public final class SamplePlugin implements Plugin {
         context.events().subscribe(AppEvents.THEME_CHANGED,
             event -> context.log().log(System.Logger.Level.INFO, "The look is now " + event.variant()));
         var settings = new SampleSettings(context.settings());
-        context.settings().page(new SampleSettingsPanel(settings));
+        context.settings().page(new SampleSettingsPanel(context.kit(), settings));
         long stepMillis = settings.stepMillis.get();
         if (settings.ui.get()) installUi(context, stepMillis);
         if (settings.terminal.get()) installTerminalDemo(context);
@@ -107,36 +108,38 @@ public final class SamplePlugin implements Plugin {
     private static void installPanelAndWindow(PluginContext context, long stepMillis) {
         var icon = context.appearance().icon("dev/jasper/sample/flask.svg");
         // One instance per window, built the first time the panel is shown there.
-        context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", icon, Anchor.LEFT), host -> {
-            var run = new JButton("Run sample activity");
-            run.addActionListener(event -> context.background().execute(() -> demo(context, stepMillis)));
-            var panel = new JPanel(new BorderLayout(0, 8));
-            panel.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-            panel.add(new JLabel("Runs a short demo activity in the background."), BorderLayout.NORTH);
-            panel.add(run, BorderLayout.SOUTH);
-            return panel;
-        });
+        context.panels().registerView(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, Anchor.LEFT), host ->
+            context.kit().create(new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
+                new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
+                Optional.empty(), new Nodes.Stack("sample.body", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+                    new Nodes.Text("sample.description", ControlState.READY, "Runs a short demo activity in the background.", Nodes.TextRole.DESCRIPTION),
+                    new Nodes.Button("sample.run", ControlState.READY, "Run sample activity", FLASK, Nodes.ButtonKind.PRIMARY, "run", ""))),
+                Optional.empty())), event -> {
+                    if (event instanceof UiEvent.Action action && action.id().equals("sample.run"))
+                        context.background().execute(() -> demo(context, stepMillis));
+                }));
 
         context.actions().register(ActionSpec.of("dev.jasper.sample.about", "About Sample").withIcon(icon), invoked -> {
             // The application builds the frame, title bar and menu bar; a singleton comes back while it is open.
             PluginWindow window = context.windows().create(
                 new WindowSpec("dev.jasper.sample.about-window", "About Sample", new Dimension(360, 200), true));
-            var details = new JButton("Details…");
-            details.addActionListener(event -> {
+            var content = context.kit().create(new ViewSpec(new Nodes.Stack("sample.about", ControlState.READY,
+                Nodes.LayoutRole.VERTICAL, List.of(
+                    new Nodes.Text("sample.about.text", ControlState.READY,
+                        "This window's chrome belongs to Jasper; its content to the plugin.", Nodes.TextRole.BODY),
+                    new Nodes.Button("sample.about.details", ControlState.READY, "Details…", "", Nodes.ButtonKind.SECONDARY, "details", "")))), event -> {
+                if (!(event instanceof UiEvent.Action action) || !action.id().equals("sample.about.details")) return;
                 PluginDialog dialog = context.windows().dialog(new DialogSpec("Sample details", window, true));
-                var close = new JButton("Close");
-                close.addActionListener(closing -> dialog.close());
-                var body = new JPanel(new BorderLayout(0, 8));
-                body.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
-                body.add(new JLabel("Sample plugin " + context.plugin().version()), BorderLayout.CENTER);
-                body.add(close, BorderLayout.SOUTH);
+                var body = context.kit().create(new ViewSpec(new Nodes.Form("sample.details", ControlState.READY,
+                    Nodes.FormKind.SHEET, "Sample details", Optional.empty(), List.of(
+                        new Nodes.Text("sample.version", ControlState.READY, "Sample plugin " + context.plugin().version(), Nodes.TextRole.BODY)),
+                    Optional.empty(), List.of(new Nodes.Button("sample.close", ControlState.READY, "Close", "", Nodes.ButtonKind.SECONDARY, "close", "")),
+                    "close")), answer -> {
+                    if (answer instanceof UiEvent.Action chosen && chosen.id().equals("sample.close")) dialog.close();
+                });
                 dialog.setContent(body);
                 dialog.show();
             });
-            var content = new JPanel(new BorderLayout(0, 8));
-            content.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
-            content.add(new JLabel("This window's chrome belongs to Jasper; its content to the plugin."), BorderLayout.CENTER);
-            content.add(details, BorderLayout.SOUTH);
             window.setContent(content);
             window.show();
             window.toFront();

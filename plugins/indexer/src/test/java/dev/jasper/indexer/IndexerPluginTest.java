@@ -78,6 +78,39 @@ class IndexerPluginTest {
 
     Path projectsFile() { return root.resolve("plugins/dev.jasper.indexer/data/projects.toml"); }
 
+    @Test void removalConfirmationUsesAnOwnedKitSheetAndIgnoresLateAnswers() throws Exception {
+        var candidate = new IndexerPlugin(new IndexerPlugin.Environment(ui, Instant::now,
+            (delay, task) -> () -> { }, clipboard::add, home, List.of("git"), null));
+        try (var host = host()) {
+            host.start(IndexerTesting.INFO, Set.of(), Set.of(), candidate);
+            window(host);
+            var method = IndexerPlugin.class.getDeclaredMethod("confirmRemove", String.class, Runnable.class);
+            method.setAccessible(true);
+            var accepted = new java.util.concurrent.atomic.AtomicInteger();
+            javax.swing.SwingUtilities.invokeAndWait(() -> {
+                try { method.invoke(candidate, "Remove fixture project?", (Runnable) accepted::incrementAndGet); }
+                catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+                var view = host.windowView(IndexerPlugin.ID, "Remove Project?").orElseThrow();
+                var form = (dev.jasper.sdk.ui.Nodes.Form) view.spec().root();
+                assertThat(form.cancelAction()).isEqualTo("indexer.remove.cancel");
+                assertThat(form.actions()).anyMatch(button -> button.id().equals("indexer.remove.accept")
+                    && button.kind() == dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY);
+                view.emit(new dev.jasper.sdk.ui.UiEvent.Action("indexer.remove.cancel"));
+                assertThat(accepted).hasValue(0);
+                assertThatThrownBy(() -> view.emit(new dev.jasper.sdk.ui.UiEvent.Action("indexer.remove.accept")))
+                    .isInstanceOf(IllegalStateException.class);
+                assertThat(accepted).hasValue(0);
+            });
+            javax.swing.SwingUtilities.invokeAndWait(() -> {
+                try { method.invoke(candidate, "Remove fixture project?", (Runnable) accepted::incrementAndGet); }
+                catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+                host.windowView(IndexerPlugin.ID, "Remove Project?").orElseThrow()
+                    .emit(new dev.jasper.sdk.ui.UiEvent.Action("indexer.remove.accept"));
+                assertThat(accepted).hasValue(1);
+            });
+        }
+    }
+
     @Test void registersItsActionsMenuScopeGroupsAndSettingsPage() {
         try (var host = host()) {
             host.start(IndexerTesting.INFO, Set.of(), Set.of(), plugin());

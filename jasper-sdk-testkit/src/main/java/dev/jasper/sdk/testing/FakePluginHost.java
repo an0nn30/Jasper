@@ -345,6 +345,12 @@ public final class FakePluginHost implements AutoCloseable {
         });
     }
 
+    /** The owned descriptor view of a plugin Settings page, if that page has been opened. */
+    public java.util.Optional<FakeKitView> settingsPanelView(String pluginId) {
+        var host = panelHosts.get(pluginId);
+        return host == null || host.closed ? java.util.Optional.empty() : java.util.Optional.ofNullable(host.view);
+    }
+
     /** Applies the open settings draft; invalid rows reject Apply. */
     public void applySettingsPanel(String pluginId) {
         var rows=panelHosts.get(pluginId);var context=contexts.get(pluginId);

@@ -76,7 +76,6 @@ import java.util.function.Consumer;
 import java.util.function.IntPredicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
@@ -186,7 +185,7 @@ public final class FileServerPlugin implements Plugin {
         scope = new FileServerScope(() -> registry.servers(), environment.home(), this::toggle,
             (window, id) -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)), SERVERS);
         context.palette().register(scope);
-        context.panels().register(new PanelSpec(PANEL, "File Servers", icon, Anchor.LEFT).withToggleActionId(SHOW), this::createPanel);
+        context.panels().registerView(new PanelSpec(PANEL, "File Servers", "server", Anchor.LEFT).withToggleActionId(SHOW), this::createPanel);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 70));
         status.setIcon(icon);
         status.setAction(SHOW);
@@ -223,6 +222,7 @@ public final class FileServerPlugin implements Plugin {
     ServerRegistry registry() { return registry; }
     ServerEditor currentEditor() { return currentEditor; }
     ConfirmPanel currentConfirm() { return currentConfirm; }
+    FileServersPanel panel(UUID window) { return panels.get(window); }
     WindowHandle windowHandle(UUID id) { return context.terminals().window(id).orElseThrow(); }
 
     /** Engine events reach the transfer activities only while the plugin runs: a late one must not open an activity on a closed context. */
@@ -237,9 +237,9 @@ public final class FileServerPlugin implements Plugin {
         catch (UnknownHostException | SecurityException unknown) { return ""; }
     }
 
-    private JComponent createPanel(PanelHost host) {
+    private dev.jasper.sdk.ui.UiView createPanel(PanelHost host) {
         WindowHandle window = host.window();
-        var panel = new FileServersPanel(new FileServersPanel.Actions(
+        var panel = new FileServersPanel(context.kit(), new FileServersPanel.Actions(
             id -> toggle(window, id),
             editing -> editing.ifPresentOrElse(id -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)),
                 () -> edit(window, Optional.empty(), false)),
@@ -247,7 +247,7 @@ public final class FileServerPlugin implements Plugin {
             id -> registry.password(id).ifPresent(environment.clipboard()), registry::clearActivity,
             id -> showFingerprints(window, id)),
             registry::activity, environment.home(), ServerRows.firewallHint(environment.osName()), environment.zone(),
-            context.appearance().icon(IconName.SERVER));
+            context.appearance().icon(IconName.ADD));
         panel.onHeaderChanged(host::setHeader);
         panel.setTlsFingerprint(tls.cachedFingerprint());
         panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
@@ -255,8 +255,8 @@ public final class FileServerPlugin implements Plugin {
         panels.put(window.id(), panel);
         panelHosts.put(window.id(), host);
         host.onVisibility(visible -> { if (visible) registry.refreshAddresses(); });
-        host.onClosed(() -> { panels.remove(window.id()); panelHosts.remove(window.id()); });
-        return panel;
+        host.onClosed(() -> { panel.close(); panels.remove(window.id()); panelHosts.remove(window.id()); });
+        return panel.view();
     }
 
     void toggle(WindowHandle window, UUID id) {
@@ -277,7 +277,7 @@ public final class FileServerPlugin implements Plugin {
         PluginDialog dialog = context.windows().dialog(new DialogSpec(title, window, true));
         boolean[] closed = {false};
         ServerEditor[] editor = new ServerEditor[1];
-        editor[0] = new ServerEditor(store.definitions(), initial, existing, Engines.AVAILABLE, environment.nics().get(), vault.isPresent(),
+        editor[0] = new ServerEditor(context.kit(), store.definitions(), initial, existing, Engines.AVAILABLE, environment.nics().get(), vault.isPresent(),
             this::accountName, () -> pickAccount(window),
             () -> context.windows().chooseDirectory(window, "Folder to share", initial.map(ServerDefinition::folder)),
             new ServerEditor.KeySources(() -> keyFiles(window), FileServerPlugin::pasted),
@@ -292,8 +292,8 @@ public final class FileServerPlugin implements Plugin {
             })),
             dialog::close);
         currentEditor = editor[0];
-        dialog.setContent(editor[0]);
-        dialog.onClosed(() -> { closed[0] = true; if (currentEditor == editor[0]) currentEditor = null; });
+        dialog.setContent(editor[0].view());
+        dialog.onClosed(() -> { closed[0] = true; editor[0].close(); if (currentEditor == editor[0]) currentEditor = null; });
         dialog.show();
     }
 
@@ -438,12 +438,13 @@ public final class FileServerPlugin implements Plugin {
         PluginDialog dialog = context.windows().dialog(new DialogSpec(title, window, true));
         boolean[] decided = {false};
         ConfirmPanel[] panel = new ConfirmPanel[1];
-        panel[0] = new ConfirmPanel(text, confirmLabel, cancelLabel,
+        panel[0] = new ConfirmPanel(context.kit(), text, confirmLabel, cancelLabel,
             () -> { decided[0] = true; dialog.close(); onConfirm.run(); },
             () -> { decided[0] = true; dialog.close(); onCancel.run(); });
         currentConfirm = panel[0];
-        dialog.setContent(panel[0]);
+        dialog.setContent(panel[0].view());
         dialog.onClosed(() -> {
+            panel[0].close();
             if (currentConfirm == panel[0]) currentConfirm = null;
             if (!decided[0]) { decided[0] = true; onCancel.run(); }
         });
@@ -452,6 +453,7 @@ public final class FileServerPlugin implements Plugin {
 
     private void definitionsChanged() {
         if (stopped) return;
+        if (!SwingUtilities.isEventDispatchThread()) { environment.ui().execute(this::definitionsChanged); return; }
         registry.setDefinitions(store.definitions());
         List<String> warnings = store.warnings();
         if (!warnings.isEmpty() && !warnings.equals(reportedWarnings)) for (String warning : warnings) {
@@ -468,6 +470,7 @@ public final class FileServerPlugin implements Plugin {
 
     private void serversChanged() {
         if (stopped) return;
+        if (!SwingUtilities.isEventDispatchThread()) { environment.ui().execute(this::serversChanged); return; }
         refreshPanels();
         scope.changed();
         int running = registry.running();
@@ -491,6 +494,10 @@ public final class FileServerPlugin implements Plugin {
     }
 
     private void refreshPanels() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            environment.ui().execute(this::refreshPanels);
+            return;
+        }
         for (FileServersPanel panel : panels.values()) {
             panel.setTlsFingerprint(tls.cachedFingerprint());
             panel.setHostKeyFingerprint(hostKey.cachedFingerprint());

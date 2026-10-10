@@ -2,8 +2,11 @@
 
 ## Current state — 2026-10-10
 
-- **Theme engine Plan 2 Task 9c implemented, review pending; 9b independently approved** (2026-10-10).
-  EditorTab is an owned SDK UiView descriptor controller mounted with openTab(UiView); DOCUMENT retains its hidden
+- **Theme engine Plan 2 Task 10 implemented, independent review pending** (2026-10-10). File Servers, Sample and Project Index standard plugin content now use owned SDK kit views; File Server panel publishes count and New to the borrowed `PanelHost` header, with compact confirmed switches, protocol hue, row menus and row-canvas-only D/Copy/Escape actions. These ItemList actions are mirrored in module, SDK, host and fake with blank defaults, passive/RESULTS limits and focused key tests; SDK version remains Task 11. File Server security/protocol validation, asynchronous account chooser and closed-view guards remain, and registry/store UI refreshes marshal to the EDT. Sample Step delay is a host setting NUMBER row 0–5000 step 1 with draft/Apply/Cancel; the slider drag/tick affordance changes by controller ruling. Project Index removal uses an owner-window kit sheet with captured project identity and page lifetime; its immediate action is distinct from staged settings. History/Snippets were audited as palette-only semantic label/action consumers with no raw surface. Legacy `ActionSpec`/`StatusItem`/`PanelHeader`/`ScopeSpec` Icon adapters await coordinated Task 11. File Server raw paint classes are removed. Five plugin suites (406 tests), focused kit/host tests (12 tests) and `verifyPluginArchitecture` passed; evidence is recorded in `.superpowers/sdd/2026-10-04-theme-engine-2-consumer-migration/task-10-report.md`. Full repo gate is Task 12; native GUI/geometry acceptance is Plan 3.
+
+- **Theme engine Plan 2 Task 9c independently approved after fix round 1** (2026-10-10, `e7cbd8c9`). Its native visual debts remain Plan 3 Task 8; no Task 9 code is pending.
+
+- **Task 9 implementation detail.** EditorTab is an owned SDK UiView descriptor controller mounted with openTab(UiView); DOCUMENT retains its hidden
   custom child while loading/failed, with descriptor banners, Retry/Cancel and shared Find/Replace fields, options and
   match counts. Find requests focus then explicit UiView.selectAll(Field id), mirrored module/SDK/host/fake: live text,
   no edit or focus change, invalid/non-Field IDs rejected, usual EDT/closed guards; SDK version stays until Task 11.

@@ -36,6 +36,21 @@ public abstract class KitContractTest {
         stop(kit);
     }); }
 
+    @Test void listCanvasShortcutDescriptorsRoundTripAndRevealRows() throws Exception { edt(() -> {
+        var row = new ListItem("server:one", Optional.empty(), List.of(new Nodes.Text("server.name", ControlState.READY,
+            "Server", Nodes.TextRole.BODY)), List.of(), List.of());
+        var list = new Nodes.ItemList("servers", ControlState.READY, Nodes.ListKind.DOUBLE, List.of(row), Set.of("server:one"),
+            "details", List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.empty(), "toggle", "delete",
+            "details-key", "copy-key", "cancel-key");
+        var kit = kit("owner"); var view = kit.create(new ViewSpec(list), event -> { });
+        assertThat(view.spec().root()).isEqualTo(list);
+        view.reveal("server.name");
+        assertThatThrownBy(() -> new Nodes.ItemList("results", ControlState.READY, Nodes.ListKind.RESULTS, List.of(row),
+            Set.of(), "", List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.empty(), "", "",
+            "details-key", "", "")).isInstanceOf(IllegalArgumentException.class);
+        stop(kit);
+    }); }
+
     /** Settings descriptors: tree counts/emphasis, highlighted rows, number bounds and both searchable choice modes. */
     protected static ViewSpec settings(boolean highlighted, String entry) {
         var toggle=new Nodes.Toggle("toggle",ControlState.READY,"Ligatures",true,"toggle",false);

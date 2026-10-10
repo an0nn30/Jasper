@@ -13,6 +13,15 @@ public final class TestUi implements Executor {
     public int pending() { return queue.size(); }
 
     public void drain() {
-        for (Runnable task; (task = queue.poll()) != null; ) task.run();
+        for (Runnable task; (task = queue.poll()) != null; ) {
+            if (javax.swing.SwingUtilities.isEventDispatchThread()) task.run();
+            else {
+                try { javax.swing.SwingUtilities.invokeAndWait(task); }
+                catch (java.lang.reflect.InvocationTargetException failure) {
+                    throw new AssertionError("UI task failed", failure.getCause());
+                }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }
+            }
+        }
     }
 }

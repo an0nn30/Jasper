@@ -57,19 +57,21 @@ class SamplePluginTest {
         }
     }
 
-    @Test void offersItsOwnSettingsPage() {
-        try (var host = new FakePluginHost()) {
+    @Test void offersItsOwnSettingsPage() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.declared("dev.jasper.sample"))
                 .containsExactly("demo_activity", "demo_ui", "demo_terminal", "demo_session", "demo_scope", "demo_step_millis");
             var page = host.settingsPanel("dev.jasper.sample").orElseThrow();
-            assertThat(((javax.swing.JLabel) page.getComponent(0)).getText()).isEqualTo("Run the Buddy activity at start");
-            var slider = find(page, javax.swing.JSlider.class);
-            assertThat(slider.getValue()).isEqualTo(300);
-            slider.setValue(1200);
+            assertThat(host.failures()).isEmpty();
+            var view = host.settingsPanelView("dev.jasper.sample").orElseThrow();
+            assertThat(view.spec().root()).isInstanceOf(dev.jasper.sdk.ui.Nodes.Form.class);
+            assertThat(find(page, javax.swing.JSlider.class)).isNull();
+            assertThat(((dev.jasper.sdk.ui.Nodes.Form) view.spec().root()).sections()).hasSize(6);
+            view.emit(new dev.jasper.sdk.ui.UiEvent.Edited("settings:demo_step_millis", "1200"));
             assertThat(host.pendingSettings("dev.jasper.sample")).containsEntry("demo_step_millis", 1200);
             assertThat(host.settingsPanelChanges("dev.jasper.sample")).isPositive();
-        }
+        } });
     }
 
     private static <T> T find(java.awt.Container root, Class<T> type) {
@@ -111,8 +113,8 @@ class SamplePluginTest {
         }
     }
 
-    @Test void theDemoUiAddsAPanelARailButtonAndAWindow() {
-        try (var host = new FakePluginHost()) {
+    @Test void theDemoUiAddsAPanelARailButtonAndAWindow() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.sample", "demo_ui", true);
             host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
             host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
@@ -125,7 +127,7 @@ class SamplePluginTest {
             assertThat(host.invoke("dev.jasper.sample.about", java.util.UUID.randomUUID(), null)).isTrue();
             assertThat(host.windows()).as("a singleton").containsExactly("dev.jasper.sample.about-window|About Sample|true");
             assertThat(host.failures()).isEmpty();
-        }
+        } });
     }
 
     private static final PluginInfo OBSERVING = new PluginInfo("dev.jasper.sample", "Sample", "0.1.0",
