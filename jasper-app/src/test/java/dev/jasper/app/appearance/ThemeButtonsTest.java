@@ -31,7 +31,7 @@ class ThemeButtonsTest {
                 SwingUtilities.updateComponentTreeUI(parent);
                 SwingUtilities.updateComponentTreeUI(dialog);
                 assertThat(button.getUI()).isInstanceOf(FlatButtonUI.class);
-                assertThat(button.getFont().getSize2D()).as("form font").isEqualTo(12f);
+                assertThat(button.getFont().getSize2D()).as("form font").isEqualTo(13f);
                 assertThat(button.getPreferredSize().height).isBetween(20, 28);
                 assertThat(fill(button)).as(theme.name()).isEqualTo(UIManager.getColor("Button.background"));
                 // IntelliJ Light's default button is a slight gradient; sample within a small tolerance.

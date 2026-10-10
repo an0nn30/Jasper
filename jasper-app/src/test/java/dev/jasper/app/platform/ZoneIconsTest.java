@@ -21,7 +21,8 @@ class ZoneIconsTest {
             var root = new JPanel();
             root.putClientProperty("Jasper.zone", "workspace");
             root.putClientProperty("Jasper.workspace.dark", true);
-            var icon = AppIcons.bundled("general/search");
+            root.putClientProperty("Jasper.workspaceTheme", dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
+            var icon = AppIcons.semantic("search");
             var light = fixed(false);
             var dark = fixed(true);
             assertThat(pixels(icon, label)).isEqualTo(pixels(light, label));
@@ -30,12 +31,11 @@ class ZoneIconsTest {
             assertThat(ThemeZone.dark(label, false)).isTrue();
             assertThat(pixels(icon, label)).isEqualTo(pixels(dark, label));
             var disabled = UIManager.getLookAndFeel().getDisabledIcon(label, icon);
-            assertThat(pixels(disabled, label)).isEqualTo(pixels(dark.getDisabledIcon(), label));
+            assertThat(pixels(disabled, label)).isEqualTo(pixels(((com.formdev.flatlaf.FlatLaf.DisabledIconProvider) dark).getDisabledIcon(), label));
             assertThat(pixels(disabled, label)).isNotEqualTo(pixels(icon, label));
             assertThat(icon.getIconWidth()).isEqualTo(16);
             assertThat(disabled.getIconHeight()).isEqualTo(16);
             assertThat(AppIcons.dropdown().getIconWidth()).isEqualTo(8);
-            assertThat(pixels(AppIcons.forBackground(icon, Color.WHITE), label)).isEqualTo(pixels(light, label));
             for (JComponent boundary : new JComponent[]{new JPopupMenu(), new JToolTip(), new JRootPane(), new JPanel()}) {
                 if (boundary.getClass() == JPanel.class) boundary.putClientProperty("Jasper.zone", "chrome");
                 root.add(boundary);
@@ -45,11 +45,13 @@ class ZoneIconsTest {
             }
             root.add(label);
             root.putClientProperty("Jasper.workspace.dark", null);
-            assertThat(pixels(disabled, label)).isEqualTo(pixels(light.getDisabledIcon(), label));
+            root.putClientProperty("Jasper.workspaceTheme", null);
+            assertThat(pixels(disabled, label)).isEqualTo(pixels(((com.formdev.flatlaf.FlatLaf.DisabledIconProvider) light).getDisabledIcon(), label));
             assertThat(pixels(icon, label)).isEqualTo(pixels(light, label));
             themes.configure(Theme.DARK);
             assertThat(pixels(icon, label)).isEqualTo(pixels(dark, label));
             root.putClientProperty("Jasper.workspace.dark", false);
+            root.putClientProperty("Jasper.workspaceTheme", dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT));
             assertThat(pixels(icon, label)).isEqualTo(pixels(light, label));
             root.remove(label);
             assertThat(pixels(icon, label)).isEqualTo(pixels(dark, label));
@@ -66,7 +68,7 @@ class ZoneIconsTest {
                 Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults());
             dev.jasper.app.workspace.WorkspaceTheme.apply(root, themes.current());
             var key = AppIcons.named("KEY");
-            var plugin = AppIcons.plugin(getClass().getClassLoader(), "dev/jasper/app/icons/palette-probe.svg");
+            var plugin = new FlatSVGIcon("dev/jasper/app/icons/palette-probe.svg", 16, 16, getClass().getClassLoader());
             var original = pixels(plugin, label);
             var chromeKey = pixels(key, label);
             root.add(label);
@@ -84,9 +86,10 @@ class ZoneIconsTest {
         } finally { new ThemeController(); }
     }
 
-    private static FlatSVGIcon fixed(boolean dark) {
-        return new FlatSVGIcon(ZoneIconsTest.class.getClassLoader().getResource(
-            "dev/jasper/app/icons/intellij/general/search" + (dark ? "_dark" : "") + ".svg"));
+    private static Icon fixed(boolean dark) {
+        var theme = dev.jasper.app.appearance.ThemeManager.generated(dark ? Theme.DARK : dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+        return AppIcons.forSurface(AppIcons.semantic("search"), theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL),
+            theme.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
     }
 
     private static int[] pixels(Icon icon, Component component) {

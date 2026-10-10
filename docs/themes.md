@@ -33,7 +33,7 @@ and Vault rail panels remain chrome. Vim errors, bell feedback and banner rules 
 
 FlatLaf 3.7 has no per-control progress text styling; an external plugin's string-painted progress bar can retain
 chrome text colors. Bundled transfers use a bar without painted text and a separate status label. Custom renderers
-and painters use mounted-owner palette lookup; see [plugin authoring](plugin-authoring.md#hosted-pane-control-styling).
+and painters use mounted-owner palette lookup; see [plugin authoring](plugin-authoring.md#supported-custom-content).
 
 User visual acceptance: try light chrome/dark workspace and the reverse, then two themes of the same darkness;
 inspect controls, selections, combo dropdowns, rail panels and popups; retain an edited document while moving,

@@ -60,7 +60,7 @@ class PluginThemeParityTest {
             jar(home.resolve("themes/vampire.jar"), entries(
                 "META-INF/plugin.xml", pluginXml("Vampire", "/" + ENTRY), ENTRY, json));
             var converted = dev.jasper.ui.themeimport.ThemeConverter.convert(home.resolve("themes/vampire.jar")).getFirst();
-            assertThat(converted.warnings().stream().filter(w -> !w.contains("discarded non-color override"))).singleElement().asString().contains("no console colours", "Jasper Dark");
+            assertThat(converted.warnings().stream().filter(w -> !w.contains("discarded non-color override") && !w.contains("no longer controls Jasper native UI"))).singleElement().asString().contains("no console colours", "Jasper Dark");
             Theme theme = Theme.of("converted", new Theme.UserFile(home.resolve("vampire.toml"), converted.document()));
             String label = converted.sourceEntry();
 

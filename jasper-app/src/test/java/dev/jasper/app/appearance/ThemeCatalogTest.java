@@ -16,6 +16,33 @@ import static org.assertj.core.api.Assertions.*;
 class ThemeCatalogTest {
     @TempDir Path home;
 
+    @Test void obsoleteNativeOverridesWarnWithoutRejectingOrRewritingTheTheme() throws Exception {
+        Files.createDirectories(themes());
+        String source = """
+            name = "Legacy colors"
+            extends = "Jasper Dark"
+            [ui]
+            "Jasper.notification.background" = "#123456"
+            "MainToolbar.searchField.background" = "#234567"
+            "ToolWindow.background" = "#345678"
+            "Jasper.titleBackground" = "#456789"
+            """;
+        Path file = themes().resolve("legacy.toml"); Files.writeString(file, source);
+        var snapshot = catalog().scan();
+        assertThat(snapshot.find("Legacy colors")).isPresent();
+        assertThat(snapshot.problems()).hasSize(2).allSatisfy(problem -> {
+            assertThat(problem.file()).isEqualTo(file);
+            assertThat(problem.line()).isPositive();
+            assertThat(problem.message()).contains("[semantic]", "retained");
+        });
+        assertThat(snapshot.problems()).extracting(ThemeCatalog.Problem::message)
+            .anySatisfy(message -> assertThat(message).contains("Jasper.notification.background"))
+            .anySatisfy(message -> assertThat(message).contains("MainToolbar.searchField.background", "surface.input"));
+        assertThat(Files.readString(file)).isEqualTo(source);
+        assertThat(ThemeGenerator.generate(snapshot.find("Legacy colors").orElseThrow().source().document()).semantic()
+            .color(dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR)).isEqualTo(new Color(0x345678));
+    }
+
     private Path themes() { return home.resolve("themes"); }
     private ThemeCatalog catalog() { return ThemeCatalog.beside(home.resolve("config.toml")); }
 

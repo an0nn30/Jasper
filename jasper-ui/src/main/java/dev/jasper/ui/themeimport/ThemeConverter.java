@@ -182,11 +182,13 @@ public final class ThemeConverter {
         var flattened = ThemeResolver.resolve(document, name -> java.util.stream.Stream.concat(
             available.stream().filter(item -> item.name().strip().equalsIgnoreCase(name.strip())),
             NativeThemeParents.named(name).stream()).toList());
-        var filtered = ImportedColors.filter(flattened.ui());
+        var filtered = ImportedColors.filter(flattened.ui(), false);
         flattened = new ThemeDocument(flattened.origin(), flattened.name(), flattened.dark(), flattened.parent(),
             flattened.parentLine(), flattened.uiComplete(), flattened.metadata(), flattened.seeds(), flattened.ansi(),
             flattened.tokens(), flattened.syntax(), filtered.colors(), flattened.icons(), flattened.workspace(), flattened.semanticOverrides());
-        return new ConversionResult(flattened, filtered.warnings(), source.getFileName().toString());
+        var warnings = new ArrayList<>(filtered.warnings());
+        ThemeToml.warnings(text, source.getFileName().toString()).forEach(warning -> warnings.add(warning.message()));
+        return new ConversionResult(flattened, warnings, source.getFileName().toString());
     }
 
     private static EditorScheme.Result missingScheme(boolean dark) {

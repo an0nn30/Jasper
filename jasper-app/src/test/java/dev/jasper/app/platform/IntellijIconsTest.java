@@ -41,11 +41,7 @@ class IntellijIconsTest {
                 assertThat(hash).as(fields[0]).isEqualTo(fields[2]);
             }
         }
-        assertThat(listed).hasSize(1744);
-        assertThat(AppIcons.bundledIds()).hasSize(885);
-        for (String id : AppIcons.bundledIds()) assertThat(listed).contains(id + ".svg");
-        assertThat(listed.stream().filter(path -> !path.endsWith("_dark.svg"))
-            .map(path -> path.substring(0, path.length() - 4))).containsExactlyInAnyOrderElementsOf(AppIcons.bundledIds());
+        assertThat(listed).containsExactlyInAnyOrder("terminal/toolwindow/terminal.svg", "nodes/pluginLogo.svg", "nodes/pluginLogo_dark.svg");
         for (String file : new String[]{"LICENSE.txt", "NOTICE.txt", "SOURCE.md"})
             try (var in = getClass().getResourceAsStream("/" + BASE + file)) { assertThat(in).as(file).isNotNull(); }
         try (var in = getClass().getResourceAsStream("/" + BASE + "LICENSE.txt")) {
@@ -53,75 +49,6 @@ class IntellijIconsTest {
             assertThat(license.stripLeading()).startsWith("Apache License");
             assertThat(license).contains("Version 2.0, January 2004");
         }
-    }
-
-    @Test void completeCatalogParsesAndPaintsInBothThemesAtBothScales() {
-        var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-        try {
-            for (var theme : List.of(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, Theme.DARK)) {
-                themes.configure(theme);
-                for (String id : AppIcons.bundledIds()) {
-                    var raw = new FlatSVGIcon(BASE + id + ".svg");
-                    assertThat(raw.hasFound()).as(id).isTrue();
-                    var icon = AppIcons.bundled(id);
-                    assertThat(icon.getIconWidth()).isEqualTo(16);
-                    assertThat(icon.getIconHeight()).isEqualTo(16);
-                    for (int scale : new int[]{1, 2}) {
-                        var image = new BufferedImage(16 * scale, 16 * scale, BufferedImage.TYPE_INT_ARGB);
-                        var graphics = image.createGraphics();
-                        try { graphics.scale(scale, scale); icon.paintIcon(new JLabel(), graphics, 0, 0); }
-                        finally { graphics.dispose(); }
-                    }
-                }
-            }
-        } finally { new ThemeController(); }
-    }
-
-    @Test void nonSquareArtworkIsCenteredWithoutStretching() {
-        var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-        try {
-            for (var theme : List.of(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, Theme.DARK)) {
-                themes.configure(theme);
-                var raw = new FlatSVGIcon(BASE + "breakpoints/questionBadge.svg");
-                var expected = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
-                var graphics = expected.createGraphics();
-                try {
-                    graphics.translate(2.4, 0);
-                    graphics.scale(1.6, 1.6);
-                    raw.paintIcon(new JLabel(), graphics, 0, 0);
-                } finally { graphics.dispose(); }
-                assertThat(pixels(AppIcons.bundled("breakpoints/questionBadge")))
-                    .isEqualTo(expected.getRGB(0, 0, 16, 16, null, 0, 16));
-            }
-        } finally { new ThemeController(); }
-    }
-
-    @Test void retainedIconKeepsProportionsWhenDarkArtworkHasDifferentDimensions() {
-        var theme = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-        try {
-            var icon = AppIcons.bundled("welcome/open");
-            pixels(icon);
-            theme.configure(Theme.DARK);
-            var raw = new FlatSVGIcon(BASE + "welcome/open.svg");
-            assertThat(raw.getIconWidth()).isEqualTo(21);
-            assertThat(raw.getIconHeight()).isEqualTo(20);
-            var expected = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
-            var graphics = expected.createGraphics();
-            try {
-                double scale = 16.0 / 21;
-                graphics.translate(0, (16 - scale * 20) / 2);
-                graphics.scale(scale, scale);
-                raw.paintIcon(new JLabel(), graphics, 0, 0);
-            } finally { graphics.dispose(); }
-            assertThat(pixels(icon)).isEqualTo(expected.getRGB(0, 0, 16, 16, null, 0, 16));
-        } finally { new ThemeController(); }
-    }
-
-    @Test void catalogRejectsPathsAndUnknownIdsAndCachesSelections() {
-        org.assertj.core.api.Assertions.assertThatIllegalArgumentException().isThrownBy(() -> AppIcons.bundled("../general/add"));
-        org.assertj.core.api.Assertions.assertThatIllegalArgumentException().isThrownBy(() -> AppIcons.bundled("general/add.svg"));
-        org.assertj.core.api.Assertions.assertThatIllegalArgumentException().isThrownBy(() -> AppIcons.bundled(null));
-        assertThat(AppIcons.bundled("general/add")).isSameAs(AppIcons.bundled("general/add"));
     }
 
     @Test void flatLafRemapsIntellijPaletteColoursForTheRunningTheme() {

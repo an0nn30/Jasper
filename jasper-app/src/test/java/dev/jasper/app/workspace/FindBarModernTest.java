@@ -96,12 +96,12 @@ class FindBarModernTest {
             edt(() -> {
                 var query = bar[0].queryField();
                 assertThat(query.getClientProperty(FlatClientProperties.OUTLINE)).isEqualTo(FlatClientProperties.OUTLINE_ERROR);
-                assertThat(query.getBackground()).isEqualTo(UIManager.getColor("Jasper.findErrorBackground"));
+                assertThat(query.getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.theme(null).tokens().get(dev.jasper.ui.theme.Token.ERROR_BACKGROUND));
                 assertThat(bar[0].countLabel().getText()).isEqualTo("0 results");
                 assertThat(bar[0].countLabel().getFont()).isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.LABEL));
                 SwingUtilities.updateComponentTreeUI(bar[0]);
                 assertThat(query.getBackground()).as("a theme switch keeps the no-match tint")
-                    .isEqualTo(UIManager.getColor("Jasper.findErrorBackground"));
+                    .isEqualTo(dev.jasper.app.platform.ThemeZone.theme(null).tokens().get(dev.jasper.ui.theme.Token.ERROR_BACKGROUND));
                 var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
                 themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new dev.jasper.app.config.WorkspaceThemeChoice("Jasper Dark"),
                     Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults());
@@ -115,7 +115,7 @@ class FindBarModernTest {
                 assertThat(query.getClientProperty(FlatClientProperties.STYLE)).isEqualTo("borderWidth: 0; focusWidth: 0; innerFocusWidth: 0");
                 themes.configureTerminal(dev.jasper.app.config.TerminalColors.MATCH);
                 WorkspaceTheme.apply(bar[0], themes.current()); bar[0].refreshTheme();
-                assertThat(query.getBackground()).isEqualTo(UIManager.getColor("Jasper.findErrorBackground"));
+                assertThat(query.getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.theme(null).tokens().get(dev.jasper.ui.theme.Token.ERROR_BACKGROUND));
                 assertThat(query.getForeground()).isEqualTo(UIManager.getColor("TextField.foreground"));
                 assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.STYLE)).isEqualTo(ghostStyle(bar[0].caseButton()));
                 assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.BUTTON_TYPE)).isEqualTo(FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);

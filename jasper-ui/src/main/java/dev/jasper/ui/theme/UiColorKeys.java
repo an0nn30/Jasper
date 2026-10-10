@@ -34,6 +34,34 @@ public final class UiColorKeys {
         "Separator.foreground", SemanticColor.BORDER_SUBTLE,
         "StatusBar.background", SemanticColor.SURFACE_STATUS);
 
+    /**
+     * Nonfatal guidance for explicit authored keys whose old native consumer has been removed.
+     * The color remains valid data for round trips and vendor delegates. Call only on authored data,
+     * never the generated UiTemplate defaults; supported canonical and legacy aliases remain valid.
+     */
+    public static java.util.Optional<String> nativeOverrideWarning(String key) {
+        if (SEMANTIC_ROLES.containsKey(key) || chromeAliases().containsKey(key)) return java.util.Optional.empty();
+        String roles = null;
+        if (key.startsWith("Jasper.notification.")) roles = "surface.panel, text.primary, text.secondary, border.subtle, status.danger";
+        else if (key.startsWith("MainToolbar.searchField.") || key.startsWith("SearchEverywhere.SearchField."))
+            roles = "surface.input, surface.control.hover, border.input, text.primary, text.placeholder";
+        else if (key.startsWith("EditorTabs.")) roles = "accent, text.primary (tab surfaces follow the workspace terminal palette)";
+        else roles = switch (key) {
+            case "TitlePane.foreground", "TitlePane.inactiveForeground", "MainToolbar.foreground" -> "text.primary, text.secondary, text.tertiary";
+            case "MainToolbar.borderColor", "Borders.color" -> "border.subtle";
+            case "Button.toolbar.hoverBackground", "Button.toolbar.pressedBackground", "Button.toolbar.selectedBackground" -> "hover.overlay, surface.control.hover, segment.selected.bg";
+            case "Popup.dropShadowColor" -> "surface.scrim";
+            case "DragAndDrop.areaBackground", "DragAndDrop.borderColor", "TabbedPane.underlineColor" -> "accent";
+            case "Label.infoForeground" -> "text.secondary";
+            case "Actions.Green" -> "status.success";
+            case "Actions.Yellow" -> "status.warning";
+            case "Actions.Red" -> "status.danger";
+            default -> null;
+        };
+        return roles == null ? java.util.Optional.empty() : java.util.Optional.of("[ui] key \"" + key
+            + "\" no longer controls Jasper native UI; use [semantic] " + roles + "; color retained for vendor delegates and serialization");
+    }
+
     /** Whether a legacy UI key describes a color or a referenced color variable. */
     public static boolean supports(String key) {
         if (key.endsWith("UI")) return false;

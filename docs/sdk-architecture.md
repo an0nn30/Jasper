@@ -408,24 +408,19 @@ announces on `flush()` and reports one value for every component; the contract c
 
 `PluginRuntime.appearance` accepts app-native `ResolvedTheme` suppliers and subscriptions. The `plugins` package
 alone adapts native tokens and syntax to SDK values (its allowed dependencies include `appearance`). The appearance
-controller publishes native Color/Boolean `Jasper.workspace.*` defaults after successful theme application, including
-chrome-derived syntax in match mode; no SDK values enter UIManager. `WorkspacePalette.current(component)` walks
-JDK client properties to distinguish workspace controls from chrome renderers. The SDK/testkit remain JDK-only.
+controller publishes module ThemePair snapshots. SDK palettes are explicit host projections; no SDK
+values or workspace fallback palettes enter UIManager. The SDK/testkit remain JDK-only.
 `FakePluginHost.setWorkspace` and the actual hosted adapter share the same contract tests for values, notifications,
 same-variant changes, disposal and safe variant reads. The fake accepts its creating test thread or the real Swing EDT for appearance work, while rejecting background workers.
 Fake workspace changes publish their snapshot and notify current subscribers together during `flush()`. Until then,
 workspace getters expose the last flushed value. Consecutive queued changes each expose their own complete snapshot
 inside the callback; duplicate pending values are quiet. Subscriptions added before publication receive that change,
 and registrations closed before delivery remain silent. Chrome's existing fake variant/event behavior is unchanged.
-Retained host-owned named icons select light or dark artwork at paint time from the component's current zone, including
-after reparenting. Workspace markers are app-native JDK properties; popup, tooltip and root-pane boundaries return to
-chrome. Custom plugin SVG artwork remains authored. Hosted center panes now use an app-native WorkspaceStyler;
-no SDK change beyond the existing 0.12.0 palettes is needed. Ordinary controls follow workspace recipes, with plugin
-inline styles above class styles above generated values. Exempt document subtrees retain plugin ownership; dynamic
-children and removal are lifetime-managed. A workspace combo's explicitly owned dropdown list is the sole popup
-exception. Custom renderers pass their mounted list/table/tree to `WorkspacePalette.current`, and borders pass their
-paint component; rail renderers therefore stay chrome. See [plugin authoring](plugin-authoring.md#hosted-pane-control-styling)
-for direct-color ownership, replacement, cleanup and the bundled audit.
+Retained app-native icons use module glyphs and the receiving component's live theme. Shallow workspace
+markers belong to WindowContent/WorkspaceTheme and are cleared on removal; popup, tooltip and root-pane
+boundaries return to chrome. Kit views own standard controls and scoped custom content. The former
+recursive WorkspaceStyler/recipe/popup adapters are removed. App-native JComponent transports are private
+mount plumbing, never an SDK raw-control path. Manifest identity previews retain their PNG/SVG decoder.
 
 ### Declared settings (plan C1; SDK 0.9 completes them)
 
@@ -492,4 +487,30 @@ PluginResolver remains pure version/dependency selection. PluginLoader checks ex
 owner/name/descriptors, removed types and directly implemented old factory declarations before class
 initialization. It examines effective JarFile multi-release entries for JBR 25 and ignores inactive
 future/non-multi variants. Generic erasure and reflection remain limits; linkage errors are still
-contained during entry creation and callbacks. Internal legacy app style/catalog cleanup is Task 11b.
+contained during entry creation and callbacks. Task 11b removes private app legacy style/catalog adapters.
+
+### Compiled presentation ownership (SDK 0.15)
+
+The build gate `gradle/architecture/PluginPresentationCheck.java` runs with the selected JBR25 toolchain,
+independently of the Gradle JVM. It parses compiled authored main classes (not vendor jars), inspects
+constructor/style/graphics member references and declared paint methods, and resolves class hierarchies
+without initialization. Domain Color/Point/Dimension, timers and undo/string APIs remain legitimate.
+Its negative fixtures invoke the same production checker, including same-package and exact-owner
+ordinary-control attempts. This is a build-time ownership check, not a reflective-code security sandbox.
+
+Exact custom sources are `plugins/editor/src/main/java/dev/jasper/editor/ui/DocumentArea.java` and
+`plugins/editor/src/main/java/dev/jasper/editor/vim/VimTextArea.java` (including nested classes whose
+SourceFile agrees). DocumentArea may construct its JComponent canvas, VimTextArea, RTextScrollPane and
+vendor-popup JMenuItem; VimTextArea may construct RSyntaxTextArea and its exact RSyntaxTextAreaUI
+subclass. EditorTab may construct DocumentArea to register it. Even these owners cannot construct
+ordinary JButton/JPanel controls. No package exemption exists.
+
+The specialized helper `plugins/editor/src/main/java/dev/jasper/editor/ui/EditorTheme.java` is allowed
+only document/gutter/scroll/viewports background and opacity, RSyntaxTextArea foreground/caret/selection,
+and JComponent opacity for gutter children. Its Gutter client property marks the single opacity follower.
+It cannot paint, construct controls, read global presentation defaults, or style arbitrary ordinary controls.
+The exact member-owner allowlist is in the checker; FlatLaf style writers remain forbidden.
+
+The SDK gate inspects public/protected JVM descriptors and generic signatures. The only Swing signature
+values are CustomContent.JComponent and ContentCommand.KeyStroke; Color/Dimension and Appearance's
+Component opacity lookup are the supported AWT values. App SDK imports remain confined to app.plugins.

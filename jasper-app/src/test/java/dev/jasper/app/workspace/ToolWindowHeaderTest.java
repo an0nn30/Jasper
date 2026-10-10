@@ -54,7 +54,7 @@ class ToolWindowHeaderTest {
 
     @Test void contributedActionsLiveInTheHeaderAndSurviveMetadataRefresh() {
         var header = new ToolWindowHeader("Sessions", JPopupMenu::new, () -> { });
-        var icon = dev.jasper.app.platform.AppIcons.bundled("general/add");
+        var icon = dev.jasper.app.platform.AppIcons.named("ADD");
         header.presentation(new dev.jasper.app.contributions.PanelHeaderState("5", false, List.of(
             new dev.jasper.app.contributions.PanelHeaderState.Action("Import sessions", icon, () -> events.add("import")))));
         var actions = descendants(header).stream().filter(c -> c instanceof javax.swing.JButton button

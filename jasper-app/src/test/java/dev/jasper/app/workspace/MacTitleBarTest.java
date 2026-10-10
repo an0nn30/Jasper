@@ -246,7 +246,7 @@ class MacTitleBarTest {
                     try { bar.paint(graphics); } finally { graphics.dispose(); }
                     for (int x : new int[] {5, 119, 121, 350, 795})
                         assertThat(new Color(image.getRGB(x, 2))).as("header pixel %s in %s", x, theme)
-                            .isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                            .isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
                 }
             }
         });

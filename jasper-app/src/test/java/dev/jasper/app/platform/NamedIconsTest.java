@@ -33,7 +33,7 @@ class NamedIconsTest {
         var theme = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
         try {
             for (String name : NamedIcons.NAMES)
-                if (!name.equals("KEY")) assertThat(AppIcons.bundledIds()).contains(NamedIcons.id(name));
+                assertThat(new dev.jasper.ui.icons.IconRegistry().names()).contains(NamedIcons.kitName(name));
             var icon = AppIcons.named("LOCK");
             var before = pixels(icon, 1);
             theme.configure(Theme.DARK);
@@ -43,17 +43,6 @@ class NamedIconsTest {
     }
 
     @Test void keyFallbackRetainsMeaningProvenanceAndLiveThemeColor() throws Exception {
-        String base = "/dev/jasper/app/icons/standard/";
-        try (var manifest = getClass().getResourceAsStream(base + "assets.tsv")) {
-            var rows = new String(manifest.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).lines().skip(1).toList();
-            assertThat(rows).hasSize(1);
-            var fields = rows.getFirst().split("\\t");
-            assertThat(fields[0]).isEqualTo("KEY.svg");
-            try (var svg = getClass().getResourceAsStream(base + fields[0])) {
-                assertThat(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
-                    .digest(svg.readAllBytes()))).isEqualTo(fields[2]);
-            }
-        }
         var theme = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
         try {
             var key = AppIcons.named("KEY");

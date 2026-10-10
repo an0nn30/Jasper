@@ -1,17 +1,9 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.ui.theme.GeneratedTheme;
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.ui.theme.Token;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Window;
-import java.util.Objects;
 import java.util.function.BooleanSupplier;
 import javax.swing.JComponent;
-import javax.swing.JPopupMenu;
-import javax.swing.JRootPane;
-import javax.swing.UIManager;
 
 /** App-owned workspace zone values. Lookups never cross chrome or popup/window boundaries. EDT only. */
 public final class WorkspaceTheme {
@@ -43,29 +35,4 @@ public final class WorkspaceTheme {
         root.repaint();
     }
 
-    public static Color color(Component component, Token token, String... chromeKeys) {
-        return resolvedColor(workspace(component), token, chromeKeys);
-    }
-
-    static GeneratedTheme workspace(Component component) {
-        for (Component current = component; current != null; current = current.getParent()) {
-            if (current instanceof JPopupMenu || current instanceof JRootPane || current instanceof Window) return null;
-            if (current instanceof JComponent root) {
-                Object zone = root.getClientProperty("Jasper.zone");
-                if ("chrome".equals(zone)) return null;
-                if ("workspace".equals(zone))
-                    return root.getClientProperty("Jasper.workspaceTheme") instanceof GeneratedTheme theme ? theme : null;
-            }
-        }
-        return null;
-    }
-
-    static Color resolvedColor(GeneratedTheme workspace, Token token, String... chromeKeys) {
-        if (workspace != null) return Objects.requireNonNull(workspace.tokens().get(token), token.name());
-        for (String key : chromeKeys) {
-            Color color = UIManager.getColor(key);
-            if (color != null) return color;
-        }
-        throw new IllegalStateException("Missing chrome colors: " + String.join(", ", chromeKeys));
-    }
 }

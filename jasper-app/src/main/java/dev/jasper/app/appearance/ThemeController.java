@@ -70,7 +70,6 @@ public final class ThemeController implements AutoCloseable {
         current = state.resolve();
         appearance = new AppearanceBindings(current.pair(), ThemeController::reportFailure, () -> animationsEnabled);
         new dev.jasper.ui.swing.AppearanceTransaction(appearance.binding(), ignored -> installOrThrow(state.choice()), ignored -> {}).apply(current.pair());
-        WorkspaceDefaults.publish(current.workspace());
         platformFont = UIManager.getFont("defaultFont") != null ? UIManager.getFont("defaultFont") : UIManager.getFont("Label.font");
         platformLabelSize = UIManager.getFont("Label.font").getSize2D();
     }
@@ -120,7 +119,6 @@ public final class ThemeController implements AutoCloseable {
                     installOrThrow(candidate.choice());
                 }
                 UIManager.put("Jasper.uiFontFamilyOverride", !font.family().equalsIgnoreCase("system"));
-                WorkspaceDefaults.publish(next.workspace());
                 uiFont = font;
                 state = candidate;
                 current = next;

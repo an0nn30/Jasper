@@ -16,30 +16,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PluginPaneAppearanceTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> new ThemeController()); }
 
-    @Test void failedMountReleasesPartialStylerAndZone() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            var contributions = new Contributions(); owner.connectContributions(contributions);
-            var panel = new JPanel() {
-                boolean fail = true;
-                @Override public java.awt.Component[] getComponents() {
-                    if (fail) { fail = false; throw new IllegalStateException("fixture traversal failure"); }
-                    return super.getComponents();
-                }
-            };
-            int tabs = owner.tabStrip().getTabCount();
-            org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-                contributions.content().open("fixture", "failed", "Failed", owner.id(), panel))
-                .isInstanceOf(IllegalStateException.class).hasMessage("fixture traversal failure");
-            assertThat(panel.getClientProperty("Jasper.zone")).isNull();
-            assertThat(panel.getClientProperty("Jasper.workspaceStylerRoot")).isNull();
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(tabs);
-            assertThat(contributions.content().entries()).isEmpty();
-            var retry = contributions.content().open("fixture", "failed", "Recovered", owner.id(), panel);
-            assertThat(contributions.content().entries()).containsExactly(retry);
-        });
-    }
-
     @Test void failureWhilePublishingZoneAlsoRollsBackMount() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
@@ -70,16 +46,15 @@ class PluginPaneAppearanceTest {
             var contributions = new Contributions(); owner.connectContributions(contributions);
             var panel = new JPanel(); var list = new JList<>(new String[] {"entry"}); panel.add(list);
             var entry = contributions.content().open("fixture", "pane", "Pane", owner.id(), panel);
-            assertThat(list.getSelectionBackground()).as("style %s generated %s", list.getClientProperty("FlatLaf.style"),
-                list.getClientProperty("Jasper.workspaceStyle"))
-                .isEqualTo(themes.current().workspace().tokens().get(Token.SELECTION));
+            assertThat(dev.jasper.app.platform.ThemeZone.theme(list)).isSameAs(themes.current().workspace());
+            assertThat(list.getClientProperty("FlatLaf.style")).isNull();
             contributions.content().remove(entry);
             assertThat(list.getClientProperty("Jasper.workspaceStyle")).isNull();
             assertThat(panel.getClientProperty("Jasper.zone")).isNull();
         });
     }
 
-    @Test void sameDarknessUpdateRecolorsRetainedControls() throws Exception {
+    @Test void sameDarknessUpdatePublishesToRetainedRoutes() throws Exception {
         edt(() -> {
             var themes = new ThemeController(Theme.JASPER_LIGHT);
             var owner = content(launcher(new ArrayDeque<>()), themes);
@@ -87,12 +62,11 @@ class PluginPaneAppearanceTest {
             var panel = new JPanel(); var list = new JList<>(new String[] {"entry"}); panel.add(list);
             contributions.content().open("fixture", "pane", "Pane", owner.id(), panel);
             themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
-            assertThat(list.getSelectionBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SELECTION));
+            assertThat(dev.jasper.app.platform.ThemeZone.theme(list)).isSameAs(themes.current().workspace());
             themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA, UiFontConfig.defaults());
-            assertThat(list.getBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SURFACE_SUNKEN));
-            assertThat(list.getSelectionBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SELECTION_INACTIVE));
-            assertThat(((java.util.Map<?, ?>) list.getClientProperty("Jasper.workspaceStyle")).get("selectionBackground"))
-                .isEqualTo(themes.current().workspace().tokens().get(Token.SELECTION));
+            assertThat(dev.jasper.app.platform.ThemeZone.theme(list)).isSameAs(themes.current().workspace());
+            assertThat(list.getClientProperty("FlatLaf.style")).isNull();
+            assertThat(list.getClientProperty("Jasper.workspaceStyle")).isNull();
         });
     }
 
@@ -117,7 +91,7 @@ class PluginPaneAppearanceTest {
             assertThat(removed.getClientProperty("Jasper.workspace.dark")).isNull();
             assertThat(removed.getClientProperty("Jasper.workspace.foreground")).isNull();
             assertThat(removedList.getClientProperty("Jasper.workspaceStyle")).isNull();
-            assertThat(retainedList.getBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SURFACE_SUNKEN));
+            assertThat(dev.jasper.app.platform.ThemeZone.theme(retainedList)).isSameAs(themes.current().workspace());
         });
     }
 
@@ -146,12 +120,12 @@ class PluginPaneAppearanceTest {
             assertThat(moved.getClientProperty("Jasper.workspace.dark")).isNull();
             assertThat(moved.getClientProperty("Jasper.workspace.foreground")).isNull();
             assertThat(movedList.getClientProperty("Jasper.workspaceStyle")).isNull();
-            assertThat(retainedList.getBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SURFACE_SUNKEN));
+            assertThat(dev.jasper.app.platform.ThemeZone.theme(retainedList)).isSameAs(themes.current().workspace());
             detached.close();
         });
     }
 
-    @Test void movingContentBetweenWindowsRestoresThenRestyles() throws Exception {
+    @Test void movingContentBetweenWindowsReplacesRouteAndRetainsDocument() throws Exception {
         edt(() -> {
             var firstTheme = new ThemeController(Theme.JASPER_LIGHT);
             firstTheme.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
@@ -164,21 +138,21 @@ class PluginPaneAppearanceTest {
             var undo = new javax.swing.undo.UndoManager(); document.addUndoableEditListener(undo);
             text.append(" after"); text.select(1, 4);
             var entry = contributions.content().open("fixture", "pane", "Pane", first.id(), text);
-            assertThat(text.getClientProperty("Jasper.workspaceStyle")).isNotNull();
+            assertThat(dev.jasper.app.platform.ThemeZone.theme(text)).isSameAs(firstTheme.current().workspace());
             contributions.content().move(entry, true);
             assertThat(text.getClientProperty("Jasper.workspaceStyle")).isNull();
             assertThat(text.getDocument()).isSameAs(document);
             assertThat(undo.canUndo()).isTrue();
             assertThat(text.getSelectedText()).isEqualTo("efo");
             contributions.content().move(entry, false);
-            assertThat(text.getClientProperty("Jasper.workspaceStyle")).isNotNull();
+            assertThat(dev.jasper.app.platform.ThemeZone.theme(text)).isSameAs(firstTheme.current().workspace());
             assertThat(text.getDocument()).isSameAs(document);
             assertThat(undo.canUndo()).isTrue();
             second.close();
         });
     }
 
-    @Test void completeChromeWithoutOptionalToolWindowKeyStillStylesHostedPane() throws Exception {
+    @Test void completeChromeWithoutOptionalToolWindowKeyStillRoutesHostedPane() throws Exception {
         edt(() -> {
             var base = dev.jasper.app.appearance.ThemeFixtures.DARCULA.source().document();
             var ui = new java.util.LinkedHashMap<>(base.ui());
@@ -195,12 +169,12 @@ class PluginPaneAppearanceTest {
             var panel = new JPanel(); var list = new JList<>(new String[] {"entry"}); panel.add(list);
             contributions.content().open("fixture", "pane", "Pane", owner.id(), panel);
             assertThat(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR)).isNotNull();
-            assertThat(list.getBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SURFACE_SUNKEN));
-            assertThat(list.getSelectionBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SELECTION_INACTIVE));
+            assertThat(dev.jasper.app.platform.ThemeZone.theme(list)).isSameAs(themes.current().workspace());
+            assertThat(list.getClientProperty("FlatLaf.style")).isNull();
         });
     }
 
-    @Test void pluginStopAndWindowCloseReleaseAllStyles() throws Exception {
+    @Test void pluginStopAndWindowCloseReleaseRoutes() throws Exception {
         edt(() -> {
             var themes = new ThemeController(Theme.JASPER_LIGHT);
             themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
@@ -251,7 +225,7 @@ class PluginPaneAppearanceTest {
         });
     }
 
-    @Test void exemptEditorSubtreeKeepsOwnColorsButNearbyControlsAreStyled() throws Exception {
+    @Test void hostedDescendantsKeepTheirOwnPresentationWithoutExemption() throws Exception {
         edt(() -> {
             var themes = new ThemeController(Theme.JASPER_LIGHT);
             themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
@@ -262,7 +236,8 @@ class PluginPaneAppearanceTest {
             var nearby = new JList<>(new String[] {"entry"}); root.add(editor); root.add(nearby);
             contributions.content().open("fixture", "editor", "Editor", owner.id(), root);
             assertThat(area.getClientProperty("Jasper.workspaceStyle")).isNull();
-            assertThat(nearby.getSelectionBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SELECTION));
+            assertThat(dev.jasper.app.platform.ThemeZone.theme(nearby)).isSameAs(themes.current().workspace());
+            assertThat(nearby.getClientProperty("FlatLaf.style")).isNull();
         });
     }
 }

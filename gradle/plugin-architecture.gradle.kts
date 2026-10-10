@@ -25,6 +25,8 @@ val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
             val output = process.inputStream.bufferedReader().readText()
             check(process.waitFor() == 0) { output }; return output
         }
+        val checker = file("gradle/architecture/PluginPresentationCheck.java").absolutePath
+        tool("java", listOf(checker, "--self-test", layout.buildDirectory.dir("presentation-check-fixtures").get().asFile.absolutePath))
         fun jdk(name: String) = name.startsWith("java.") || name.startsWith("javax.") || name.startsWith("jdk.") || name.startsWith("com.sun.net.httpserver.")
         val edge = Regex("^\\s*(\\S+)\\s+->\\s+(\\S+)\\s*(.*)$")
         for ((path, imports) in pluginImports) {
@@ -35,6 +37,8 @@ val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
             }.toSet()
             // Bundled libraries are whatever the plugin ships beside its jar: its runtime classpath.
             val bundled = module.configurations.getByName("runtimeClasspath").asPath
+            // Source launch is explicitly the JetBrains25 toolchain, never the Gradle daemon JVM.
+            tool("java", listOf("--class-path", bundled, checker, classes.absolutePath))
             val args = mutableListOf("--multi-release", "25", "--ignore-missing-deps", "-verbose:class", "-filter:none")
             if (bundled.isNotEmpty()) args += listOf("--class-path", bundled)
             tool("jdeps", args + classes.absolutePath).lineSequence().forEach { line ->

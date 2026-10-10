@@ -138,18 +138,21 @@ class BundledSamplePluginTest {
             onEdt(() -> {
                 var icon = contributions.action("dev.jasper.remote.hosts").orElseThrow().icon();
                 assertThat(icon.getIconWidth()).isEqualTo(16);
-                assertThat(icon).isSameAs(dev.jasper.app.platform.AppIcons.named("NETWORK"));
-                assertThat(contributions.action("dev.jasper.remote.connect").orElseThrow().icon()).isSameAs(icon);
-                assertThat(contributions.action("dev.jasper.remote.sessions.manage").orElseThrow().icon()).isSameAs(icon);
+                assertThat(icon).isInstanceOfSatisfying(dev.jasper.app.platform.PresentationIcon.class,
+                    named -> assertThat(named.name()).isEqualTo("server"));
+                assertThat(dev.jasper.app.testsupport.IconPixels.of(icon)).isEqualTo(
+                    dev.jasper.app.testsupport.IconPixels.of(new dev.jasper.ui.icons.IconRegistry().icon("server",
+                        dev.jasper.app.platform.ThemeZone.theme(null).semantic(), dev.jasper.ui.model.Nodes.Hue.NONE, 16)));
+                assertThat(dev.jasper.app.testsupport.IconPixels.of(contributions.action("dev.jasper.remote.connect").orElseThrow().icon())).isEqualTo(dev.jasper.app.testsupport.IconPixels.of(icon));
+                assertThat(dev.jasper.app.testsupport.IconPixels.of(contributions.action("dev.jasper.remote.sessions.manage").orElseThrow().icon())).isEqualTo(dev.jasper.app.testsupport.IconPixels.of(icon));
                 assertThat(contributions.panels()).hasSize(3).allSatisfy(panel -> {
                     assertThat(panel.icon()).isNotNull();
-                    // The tunnels panel has no semantic icon name, so it takes the catalog's swap-panels icon.
-                    assertThat(panel.icon()).isIn(dev.jasper.app.platform.AppIcons.named("FOLDER"), dev.jasper.app.platform.AppIcons.named("NETWORK"),
-                        dev.jasper.app.platform.AppIcons.bundled("actions/swapPanels"));
+                    assertThat(panel.icon()).isInstanceOfSatisfying(dev.jasper.app.platform.PresentationIcon.class,
+                        named -> assertThat(named.name()).isIn("folder", "server", "tunnel"));
                 });
-                assertThat(contributions.status()).hasSize(3).anySatisfy(status -> assertThat(status.icon()).isSameAs(icon));
+                assertThat(contributions.status()).hasSize(3).anySatisfy(status -> assertThat(dev.jasper.app.testsupport.IconPixels.of(status.icon())).isEqualTo(dev.jasper.app.testsupport.IconPixels.of(icon)));
                 assertThat(contributions.toolbar()).singleElement().isInstanceOfSatisfying(
-                    dev.jasper.app.contributions.ToolbarEntry.Dropdown.class, menu -> assertThat(menu.icon()).isSameAs(icon));
+                    dev.jasper.app.contributions.ToolbarEntry.Dropdown.class, menu -> assertThat(dev.jasper.app.testsupport.IconPixels.of(menu.icon())).isEqualTo(dev.jasper.app.testsupport.IconPixels.of(icon)));
             });
         } finally {
             var pending = new AtomicReference<List<CompletableFuture<?>>>();

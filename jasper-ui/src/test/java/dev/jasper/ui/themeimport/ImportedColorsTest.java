@@ -6,6 +6,25 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class ImportedColorsTest {
+    @Test void obsoleteAuthoredNativeColorsAreRetainedAndExplainedInImportWarnings() {
+        var source = Map.<String,Object>of("Jasper.notification.background", "#12345680",
+            "MainToolbar.searchField.background", "#234567", "ToolWindow.background", "#345678",
+            "Jasper.titleBackground", "#456789");
+        var result = ImportedColors.filter(source);
+        assertThat(result.colors()).containsExactlyInAnyOrderEntriesOf(source);
+        assertThat(result.warnings()).hasSize(2).allSatisfy(w -> assertThat(w).contains("[semantic]", "retained"));
+        assertThat(dev.jasper.ui.theme.UiColorKeys.nativeOverrideWarning("Jasper.notification.background")).get()
+            .asString().contains("status.danger").doesNotContain("status.error");
+        assertThat(dev.jasper.ui.theme.UiColorKeys.nativeOverrideWarning("Actions.Red")).get()
+            .asString().contains("status.danger");
+        var loaded = new ThemeLoader(Map.of("authored.json", """
+            {"name":"Authored","dark":true,"ui":{"Jasper.notification.background":"#123456",
+             "MainToolbar.searchField.background":"#234567","ToolWindow.background":"#345678"}}
+            """)::get, Map.of()).load("authored.json");
+        assertThat(loaded.warnings()).hasSize(2).allSatisfy(w -> assertThat(w).startsWith("authored.json:").contains("[ui] key"));
+        assertThat(loaded.ui()).containsEntry("Jasper.notification.background", "#123456");
+    }
+
     @Test void provenLegacyColorSlotsSurviveWhileGeometryAndBooleansAreDiagnosedOnce() {
         var keys = java.util.List.of("*.disabledText", "Button.disabledText", "*.selectionBackgroundInactive", "*.selectionForegroundInactive",
             "ScrollBar.trackHighlight", "TabbedPane.focus", "VersionControl.RefLabel.backgroundBase");

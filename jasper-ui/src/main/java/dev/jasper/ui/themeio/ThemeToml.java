@@ -108,6 +108,30 @@ public final class ThemeToml {
             ansi, tokens, syntax, ui, file.icons(), file.workspace(), semantic);
     }
 
+    /** A nonfatal authored-key warning with its source line and actionable canonical-role guidance. */
+    public record Warning(String key, int line, String message) {}
+
+    /** Inspect explicit [ui] keys only; callers parse/validate the document before requesting warnings. */
+    public static List<Warning> warnings(String text, String origin) {
+        var toml = Toml.parse(text);
+        if (toml.hasErrors()) return List.of();
+        var warnings = new ArrayList<Warning>();
+        TomlTable ui = toml.getTable("ui");
+        if (ui != null) warnings(ui, "", origin, warnings);
+        return List.copyOf(warnings);
+    }
+
+    private static void warnings(TomlTable table, String prefix, String origin, List<Warning> result) {
+        for (String part : table.keySet()) {
+            String key = prefix + part;
+            var warning = dev.jasper.ui.theme.UiColorKeys.nativeOverrideWarning(key);
+            if (warning.isPresent()) {
+                var position = table.inputPositionOf(List.of(part));
+                result.add(new Warning(key, position == null ? 0 : position.line(), origin + ": " + warning.get()));
+            } else if (table.get(List.of(part)) instanceof TomlTable child) warnings(child, key + ".", origin, result);
+        }
+    }
+
     /** Typed reads from one parsed file, each failure naming the key's line. */
     private record Reader(TomlParseResult toml, String origin) {
         int line(List<String> path) {

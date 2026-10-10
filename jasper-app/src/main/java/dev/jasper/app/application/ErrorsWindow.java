@@ -38,7 +38,7 @@ final class ErrorsWindow {
         this.incidents = incidents;
         this.hooks = hooks;
         this.zone = zone;
-        contributions.addAction(SHOW_ERRORS, "Notifications: Show Errors", AppIcons.bundled("status/error"),
+        contributions.addAction(SHOW_ERRORS, "Notifications: Show Errors", AppIcons.semantic("error"),
             List.of("notifications", "errors", "exceptions", "stack trace", "incidents", "problems"), Optional.empty(),
             invocation -> show(Optional.empty()));
     }

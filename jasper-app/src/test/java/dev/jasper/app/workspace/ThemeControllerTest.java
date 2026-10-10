@@ -95,7 +95,7 @@ class ThemeControllerTest {
             var old = controller.current();
             var laf = UIManager.getLookAndFeel();
             var font = UIManager.getFont("Label.font");
-            var aliases = Map.of("Jasper.titleBackground", UIManager.getColor("Jasper.titleBackground"),
+            var aliases = Map.of("Jasper.titleBackground", dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP),
                 "Jasper.tabUnderline", UIManager.getColor("Jasper.tabUnderline"),
                 "Button.foreground", UIManager.getColor("Button.foreground"));
             var changes = new ArrayList<ResolvedTheme>();
@@ -177,8 +177,8 @@ class ThemeControllerTest {
             for (TerminalPane pane : retained[0].panes()) {
                 assertThat(pane.view().palette().background()).isEqualTo(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette().background());
                 // The invalid pattern keeps its no-match tint, in the new theme's colour.
-                assertThat(pane.findBar().queryField().getBackground()).isEqualTo(UIManager.getColor(
-                    pane == first[0] ? "Jasper.findErrorBackground" : "TextField.background"));
+                assertThat(pane.findBar().queryField().getBackground()).isEqualTo(pane == first[0] ? dev.jasper.app.platform.ThemeZone.theme(pane).tokens().get(dev.jasper.ui.theme.Token.ERROR_BACKGROUND)
+                    : dev.jasper.app.platform.ThemeZone.color(pane, dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT));
             }
             assertThat(first[0].session()).isSameAs(session[0]);
             assertThat(first[0].view().fontSize()).isEqualTo(23);
@@ -349,10 +349,10 @@ class ThemeControllerTest {
             for (Theme theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                 themes.configure(theme);
                 assertThat(owner.getBackground()).isEqualTo(theme.palette().background());
-                assertThat(owner.toolbar().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
-                assertThat(owner.leftStripe().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
-                assertThat(owner.rightStripe().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
-                assertThat(UIManager.getColor("ToolBar.background")).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                assertThat(owner.toolbar().getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
+                assertThat(owner.leftStripe().getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
+                assertThat(owner.rightStripe().getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
+                assertThat(UIManager.getColor("ToolBar.background")).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
                 for (String prefix : new String[]{"Panel", "TextField", "MenuItem", "PopupMenu", "Button"}) {
                     assertThat(contrast(UIManager.getColor(prefix + ".foreground"), UIManager.getColor(prefix + ".background")))
                         .as(prefix + " normal text in " + theme).isGreaterThanOrEqualTo(4.5);

@@ -42,22 +42,23 @@ class ToolWindowSurfaceTest {
             assertThat(UIManager.getColor("Panel.background")).isNotEqualTo(surface);
             assertThat(content.getParent().getBackground()).as("tool window frame").isEqualTo(surface);
             assertThat(area.headerOf(Slot.LEFT_TOP).getBackground()).as("the header has no bar colour").isEqualTo(surface);
-            assertThat(content.getBackground()).isEqualTo(surface);
-            assertThat(inner.getBackground()).isEqualTo(surface);
-            assertThat(scroll.getViewport().getBackground()).isEqualTo(surface);
+            assertThat(content.getBackground()).isEqualTo(UIManager.getColor("Panel.background"));
+            assertThat(inner.getBackground()).isEqualTo(UIManager.getColor("Panel.background"));
+            assertThat(scroll.getViewport().getBackground()).isEqualTo(UIManager.getColor("Viewport.background"));
             assertThat(field.getBackground()).isEqualTo(UIManager.getColor("TextField.background"));
             assertThat(fixed.getBackground()).as("a plugin's own colour").isEqualTo(Color.MAGENTA);
             var later = new JPanel();
             inner.add(later);
-            assertThat(later.getBackground()).as("added after the panel opened").isEqualTo(surface);
+            assertThat(later.getBackground()).as("no recursive observer after the panel opened").isEqualTo(UIManager.getColor("Panel.background"));
 
             ThemeTestSupport.install(Theme.DARK);
             SwingUtilities.updateComponentTreeUI(area);
             area.refreshTheme();
             Color dark = UIManager.getColor("ToolWindow.background");
             assertThat(dark).isEqualTo(new Color(0x191c20));
-            for (var component : List.<JComponent>of(content, inner, later, area.headerOf(Slot.LEFT_TOP)))
-                assertThat(component.getBackground()).isEqualTo(dark);
+            assertThat(area.headerOf(Slot.LEFT_TOP).getBackground()).isEqualTo(dark);
+            for (var component : List.<JComponent>of(content, inner, later))
+                assertThat(component.getBackground()).isEqualTo(UIManager.getColor("Panel.background"));
             assertThat(fixed.getBackground()).isEqualTo(Color.MAGENTA);
         } finally { UIManager.setLookAndFeel(original); }
     }
@@ -76,10 +77,10 @@ class ToolWindowSurfaceTest {
                     var image = new java.awt.image.BufferedImage(host.getWidth(), host.getHeight(), 2);
                     var graphics = image.createGraphics();
                     try { host.paint(graphics); } finally { graphics.dispose(); }
-                    assertThat(new Color(image.getRGB(0, 0))).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                    assertThat(new Color(image.getRGB(0, 0))).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
                     var insets = host.getInsets();
                     assertThat(new Color(image.getRGB(insets.left, insets.top))).as("opaque plugin cannot square the rounded corner")
-                        .isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                        .isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
                     assertThat(new Color(image.getRGB(host.getWidth() / 2, host.getHeight() / 2))).isEqualTo(Color.MAGENTA);
                     assertThat(host.contains(insets.left, insets.top)).isFalse();
                     assertThat(host.contains(host.getWidth() / 2, host.getHeight() / 2)).isTrue();
@@ -139,7 +140,7 @@ class ToolWindowSurfaceTest {
             var content = new JPanel();
             content.add(new JScrollPane(list)); content.add(new JScrollPane(table)); content.add(new JScrollPane(tree)); content.add(combo);
             showing(Slot.LEFT_TOP, content, 250);
-            assertThat(content.getBackground()).isEqualTo(UIManager.getColor("ToolWindow.background"));
+            assertThat(content.getBackground()).isEqualTo(UIManager.getColor("Panel.background"));
 
             // A renderer painted with the owner's selection colour, as the Remote plugin's host rows are.
             var selection = new ColorUIResource(UIManager.getColor("List.selectionBackground"));

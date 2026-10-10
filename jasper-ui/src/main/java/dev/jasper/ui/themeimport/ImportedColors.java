@@ -22,6 +22,11 @@ public final class ImportedColors {
 
     /** Filters non-color data, preserving valid platform choices and diagnosing a partially discarded key once. */
     public static Result filter(Map<String, Object> source) {
+        return filter(source, true);
+    }
+
+    // Native resolution includes inherited/generated defaults; diagnose authored input separately.
+    static Result filter(Map<String, Object> source, boolean diagnoseNativeOverrides) {
         Objects.requireNonNull(source);
         var colors = new LinkedHashMap<String, Object>();
         var warnings = new ArrayList<String>();
@@ -40,7 +45,10 @@ public final class ImportedColors {
                     if (!retained.isEmpty()) kept = Collections.unmodifiableMap(retained);
                 } else if (usable(key, value)) kept = value;
             }
-            if (kept != null) colors.put(key, kept);
+            if (kept != null) {
+                colors.put(key, kept);
+                if (diagnoseNativeOverrides) UiColorKeys.nativeOverrideWarning(key).ifPresent(warnings::add);
+            }
             if (kept == null || discarded) warnings.add("discarded non-color override \"" + key + "\"");
         });
         return new Result(colors, warnings);

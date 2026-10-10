@@ -756,7 +756,7 @@ force-close remaining handles after the application's quit/restart guard has app
 Use stable session keys when Save As changes document identity; deduplicate file paths in
 the document model, not by changing a live tab's key. Do not encode remote paths as local
 `Path` values. Use `Appearance.editorPalette()` for specialized text surfaces. Since SDK 0.12.0, use
-`workspacePalette()` and `syntaxPalette()` for workspace controls and syntax, and subscribe to
+`workspacePalette()` and `syntaxPalette()` for specialized workspace content and syntax, and subscribe to
 `onWorkspaceChanged` to refresh them even when darkness stays the same. Palette reads and subscription registration
 belong on the UI thread; variant getters may run on any thread. Dispose subscriptions with their widgets.
 All palette values come explicitly from `Appearance`; SDK UIManager fallback readers were removed in 0.15. For an Editor-like control, reapply `editorPalette()` and `syntaxPalette()` on every
@@ -766,7 +766,7 @@ Since SDK 0.14.1, a surface that should follow a translucent window reads `Appea
 the UI thread (it is 1 unless the component is in the workspace area of a translucent window, so tool and side panels
 stay opaque), fills its own background once with that alpha (`AlphaComposite.Src`, unantialiased rectangles) and keeps
 the components above it non-opaque; `onWorkspaceChanged` also fires when the opacity changes or the component moves to
-another window. Keep selection, carets and bars solid. The Editor plugin's `GlassSurface` is the reference.
+another window. Keep selection, carets and bars solid. The Editor plugin's `DocumentArea` is the reference.
 
 
 ### Supported custom content
@@ -782,3 +782,25 @@ the loader checks effective multi-release class files for exact removed SDK memb
 including obsolete factory implementations. Errors identify the class and member to migrate.
 Erased generic icon values and reflective member lookup cannot all be detected statically;
 existing lifecycle and callback linkage containment remains in place.
+
+### Enforced custom source ownership
+
+The build gate `gradle/architecture/PluginPresentationCheck.java` runs with the selected JBR25 toolchain,
+independently of the Gradle JVM. It parses compiled authored main classes (not vendor jars), inspects
+constructor/style/graphics member references and declared paint methods, and resolves class hierarchies
+without initialization. Domain Color/Point/Dimension, timers and undo/string APIs remain legitimate.
+Its negative fixtures invoke the same production checker, including same-package and exact-owner
+ordinary-control attempts. This is a build-time ownership check, not a reflective-code security sandbox.
+
+Exact custom sources are `plugins/editor/src/main/java/dev/jasper/editor/ui/DocumentArea.java` and
+`plugins/editor/src/main/java/dev/jasper/editor/vim/VimTextArea.java` (including nested classes whose
+SourceFile agrees). DocumentArea may construct its JComponent canvas, VimTextArea, RTextScrollPane and
+vendor-popup JMenuItem; VimTextArea may construct RSyntaxTextArea and its exact RSyntaxTextAreaUI
+subclass. EditorTab may construct DocumentArea to register it. Even these owners cannot construct
+ordinary JButton/JPanel controls. No package exemption exists.
+
+The specialized helper `plugins/editor/src/main/java/dev/jasper/editor/ui/EditorTheme.java` is allowed
+only document/gutter/scroll/viewports background and opacity, RSyntaxTextArea foreground/caret/selection,
+and JComponent opacity for gutter children. Its Gutter client property marks the single opacity follower.
+It cannot paint, construct controls, read global presentation defaults, or style arbitrary ordinary controls.
+The exact member-owner allowlist is in the checker; FlatLaf style writers remain forbidden.

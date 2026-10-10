@@ -224,7 +224,7 @@ class ToolWindowAreaTest {
                 try { area.paint(g); } finally { g.dispose(); }
                 var gap = divider.getBounds();
                 assertThat(gap).isEqualTo(new Rectangle(250, 0, 6, 600));
-                int chrome = UIManager.getColor("Jasper.titleBackground").getRGB();
+                int chrome = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP).getRGB();
                 for (int x = gap.x; x < gap.x + gap.width; x++) for (int y = gap.y; y < gap.y + gap.height; y += 7)
                     assertThat(image.getRGB(x, y)).as("the gap has no border or grip, %s", theme).isEqualTo(chrome);
                 assertThat(divider.getCursor().getType()).isEqualTo(Cursor.E_RESIZE_CURSOR);
@@ -346,7 +346,7 @@ class ToolWindowAreaTest {
         var registered = new ArrayList<javax.swing.JComponent>();
         area.dragSource = (component, id) -> registered.add(component);
         String id = DockTestSupport.id(Slot.LEFT_TOP);
-        var icon = dev.jasper.app.platform.AppIcons.bundled("general/add");
+        var icon = dev.jasper.app.platform.AppIcons.named("ADD");
         area.setHeader(id, new dev.jasper.app.contributions.PanelHeaderState("prod-web-1", true, List.of(
             new dev.jasper.app.contributions.PanelHeaderState.Action("Add", icon, () -> {}))));
         DockTestSupport.show(area, Slot.LEFT_TOP, new JPanel(), 260);
@@ -362,7 +362,7 @@ class ToolWindowAreaTest {
         String id = "panel.sessions";
         var content = new JPanel();
         var calls = new ArrayList<String>();
-        var icon = dev.jasper.app.platform.AppIcons.bundled("general/add");
+        var icon = dev.jasper.app.platform.AppIcons.named("ADD");
         area.setHeader(id, new dev.jasper.app.contributions.PanelHeaderState("5", false, List.of(
             new dev.jasper.app.contributions.PanelHeaderState.Action("Add session", icon, () -> calls.add("first")))));
         area.setContent(id, "Sessions", content);

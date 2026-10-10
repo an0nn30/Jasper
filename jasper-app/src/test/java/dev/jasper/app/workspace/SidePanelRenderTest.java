@@ -89,7 +89,7 @@ class SidePanelRenderTest {
         assertThat(pixel(image, area, header, header.getWidth() / 2, header.getHeight() / 2)).as(name + "header has no bar colour")
             .isEqualTo(UIManager.getColor("ToolWindow.background"));
 
-        assertThat(pixel(image, area, panel.header, 12, 2)).as(name + "panel").isEqualTo(UIManager.getColor("ToolWindow.background"));
+        assertThat(pixel(image, area, panel.header, 12, 2)).as(name + "raw fixture owns its panel surface").isEqualTo(UIManager.getColor("Panel.background"));
         var field = panel.search;
         assertThat(pixel(image, area, field, field.getWidth() - 10, field.getHeight() / 2)).as(name + "search field")
             .isEqualTo(UIManager.getColor("TextField.background"));
@@ -98,9 +98,6 @@ class SidePanelRenderTest {
                 .isEqualTo(UIManager.getColor("Button.background"));
         assertThat(pixel(image, area, panel.list, row(panel.list, 1))).as(name + "selected row")
             .isEqualTo(UIManager.getColor("List.selectionBackground"));
-        var selected = panel.list.getCellBounds(1, 1);
-        assertThat(pixel(image, area, panel.list, selected.width - 5, selected.y))
-            .as(name + "rounded composite renderer corner").isEqualTo(panel.list.getBackground());
         assertThat(pixel(image, area, panel.list, row(panel.list, 0))).as(name + "unselected row")
             .isEqualTo(UIManager.getColor("List.background"));
     }

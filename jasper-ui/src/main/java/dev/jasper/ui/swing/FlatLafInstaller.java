@@ -29,7 +29,7 @@ public final class FlatLafInstaller {
         SnapshotLaf(IntelliJTheme source, GeneratedTheme snapshot) { super(source); this.snapshot = snapshot; }
         @Override public javax.swing.UIDefaults getDefaults() {
             var defaults = super.getDefaults();
-            defaults.put("Jasper.installedTheme", snapshot);
+            publish(defaults, snapshot);
             return defaults;
         }
     }
@@ -49,7 +49,10 @@ public final class FlatLafInstaller {
         laf.setExtraDefaults(fixed);
         try { UIManager.setLookAndFeel(laf); }
         catch (javax.swing.UnsupportedLookAndFeelException failure) { throw new IllegalStateException("Cannot install generated appearance", failure); }
-        var defaults = UIManager.getLookAndFeelDefaults();
+    }
+
+    // A LAF reinstall (including rollback) obtains fresh defaults; publish the same immutable snapshot every time.
+    private static void publish(javax.swing.UIDefaults defaults, GeneratedTheme theme) {
         defaults.put("Jasper.installedTheme", theme);
         FlatLafThemeData.explicitColors(theme.uiKeys()).forEach((key, color) -> defaults.put(key, new ColorUIResource(color)));
         for (var role : SemanticColor.values()) defaults.put("Jasper.semantic." + role.key(), new ColorUIResource(theme.semantic().color(role)));

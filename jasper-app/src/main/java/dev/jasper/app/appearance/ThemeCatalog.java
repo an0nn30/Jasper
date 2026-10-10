@@ -190,7 +190,10 @@ public final class ThemeCatalog {
             if (previous != null && fingerprint.equals(previous.fingerprint())) return previous;
             try {
                 String text = java.nio.charset.StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();
-                return new Read(fingerprint, List.of(), ThemeToml.parse(text, name), List.of());
+                var document = ThemeToml.parse(text, name);
+                var warnings = ThemeToml.warnings(text, name).stream()
+                    .map(warning -> new Problem(file, warning.line(), warning.message())).toList();
+                return new Read(fingerprint, List.of(), document, warnings);
             } catch (ThemeFileException failure) {
                 return new Read(fingerprint, List.of(), null, List.of(new Problem(file, failure.line(), failure.getMessage())));
             }

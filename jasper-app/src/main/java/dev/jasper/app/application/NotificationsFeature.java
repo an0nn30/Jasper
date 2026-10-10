@@ -51,7 +51,7 @@ final class NotificationsFeature implements AutoCloseable {
         this.kit = java.util.Objects.requireNonNull(kit, "kit");
         center.register(GENERAL);
         center.register(CONFIG);
-        var icon = AppIcons.bundled("toolwindows/notifications");
+        var icon = AppIcons.semantic("bell");
         contributions.addAction(SHOW_HISTORY, "Notifications: Show History", icon,
             List.of("notifications", "history", "messages", "errors", "panel"), Optional.empty(),
             invocation -> contributions.requestPanel(new Contributions.PanelRequest(invocation.windowId(), PANEL_ID,

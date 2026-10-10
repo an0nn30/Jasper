@@ -102,12 +102,13 @@ class WorkspaceValuesTest {
             assertThat(ThemeManager.generated(Theme.DARK)).isSameAs(nativeValues);
             var values = ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.DARCULA);
             assertThat(ThemeManager.install(dev.jasper.app.appearance.ThemeFixtures.DARCULA)).isTrue();
-            var mismatches = new java.util.ArrayList<String>();
-            UiTokenKeys.KEYS.forEach((token, key) -> {
-                var color = UIManager.getLookAndFeelDefaults().getColor(key);
-                if (color != null && !color.equals(dev.jasper.ui.themeimport.FlatLafThemeData.explicitColors(values.uiKeys()).getOrDefault(key, values.tokens().get(token)))) mismatches.add(key + ": " + values.tokens().get(token) + " != " + color);
-            });
-            assertThat(mismatches).isEmpty();
+            assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(values);
+            for (var role : dev.jasper.ui.theme.SemanticColor.values())
+                assertThat(UIManager.getColor("Jasper.semantic." + role.key())).as(role.key()).isEqualTo(values.semantic().color(role));
+            UIManager.setLookAndFeel(UIManager.getLookAndFeel());
+            assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(values);
+            for (var role : dev.jasper.ui.theme.SemanticColor.values())
+                assertThat(UIManager.getColor("Jasper.semantic." + role.key())).as("reinstalled " + role.key()).isEqualTo(values.semantic().color(role));
         } finally { UIManager.setLookAndFeel(original); }
     }
 

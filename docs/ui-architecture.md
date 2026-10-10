@@ -199,7 +199,7 @@ Plan 2 Task 9b adds `KitView.selectAll(fieldId)` (SDK UiView/host/fake mirrored)
 text without Edited or forced focus; unknown/non-Field IDs reject IllegalArgumentException and usual EDT/open guards
 apply. Find explicitly focuses then selects. Specialized EDITOR roots accept multiline text/scroll or nonstandard
 JComponent document canvases; ordinary JPanel/control roots remain rejected. Shared contracts exercise module/host/fake
-admission and selection. Source-owner enforcement remains Task 11; final Editor owners are DocumentArea and
+admission and selection. Compiled source-owner enforcement is installed by Task11b; final Editor owners are DocumentArea and
 VimTextArea. Task 9c removes the temporary raw VimBar bridge; Vim feedback is ordinary descriptor content.
 
 Plan 2 Task 9c adds mirrored SelectionMode.NONE for passive ItemList/Table rows: selectedIds must be empty,
@@ -207,3 +207,14 @@ canvas is not a focus stop, and row pointer/key selection and activation are sup
 own enabled behavior and text paints at full opacity. Field.listId keys fall back to the LAF for a passive list.
 Data-row height counting is separate from selection capability. Inline-row reveal waits for first viewport sizing
 through pendingReveal and does not change logical row focus or keyboard focus.
+
+### Authored native override diagnostics
+
+UiColorKeys.nativeOverrideWarning classifies explicit authored keys whose old native consumer is gone:
+Jasper.notification.*, MainToolbar.searchField.*, SearchEverywhere.SearchField.*, EditorTabs.* and the
+inventoried title/toolbar/status/search-shadow/drop-guide keys. Canonical semantic-role mappings and legacy
+chrome aliases stay supported. ThemeToml warnings include file/key/line in ThemeCatalog problems; imported
+colors surface guidance through ConversionResult warnings. These are nonfatal: color-only data and original
+source bytes remain intact. Generated UiTemplate defaults are never passed to the warning classifier.
+FlatLaf still receives color-only data for retained vendor delegates and identity previews; Jasper's native
+controls and kit use canonical roles. SnapshotLaf reapplies that exact policy whenever defaults are rebuilt.

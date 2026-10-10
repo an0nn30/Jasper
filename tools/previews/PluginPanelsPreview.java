@@ -35,7 +35,10 @@ import java.util.function.Consumer;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 
-/** Actual plugin panels, chrome surfaces and live tool-window headers; never opens a native window. */
+/**
+ * Historical pre-0.15 panel preview, excluded from builds. Its old raw panel/icon APIs no longer exist.
+ * Use the staged real-plugin render tests for current SDK-owned views; Task 12 audits archival tooling.
+ */
 public final class PluginPanelsPreview {
     public static void main(String[] args) throws Exception {
         var output = Path.of(args[0]); Files.createDirectories(output);

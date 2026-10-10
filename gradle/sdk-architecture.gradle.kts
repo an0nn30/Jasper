@@ -23,12 +23,15 @@ val verifySdkArchitecture = tasks.register("verifySdkArchitecture") {
             val output = process.inputStream.bufferedReader().readText()
             check(process.waitFor() == 0) { output }; return output
         }
+        val checker = file("gradle/architecture/PluginPresentationCheck.java").absolutePath
+        tool("java", listOf(checker, "--sdk-self-test", layout.buildDirectory.dir("sdk-signature-fixtures").get().asFile.absolutePath))
         fun jdk(name: String) = name.startsWith("java.") || name.startsWith("javax.") || name.startsWith("jdk.")
         fun packageOf(name: String) = name.substringBeforeLast('.')
         val edge = Regex("^\\s*(dev\\.jasper\\.sdk\\.\\S+)\\s+->\\s+(\\S+).*$")
         for (path in sdkModules) {
             val module = sdkProjects.getValue(path)
             val classes = module.layout.buildDirectory.dir("classes/java/main").get().asFile
+            if (path == ":jasper-sdk") tool("java", listOf(checker, "--sdk", classes.absolutePath))
             val classpath = module.configurations.getByName("runtimeClasspath").asPath
             val args = mutableListOf("--multi-release", "25", "--ignore-missing-deps", "-verbose:class", "-filter:none")
             if (classpath.isNotEmpty()) args += listOf("--class-path", classpath)

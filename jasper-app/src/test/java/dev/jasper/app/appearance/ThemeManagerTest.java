@@ -102,7 +102,7 @@ class ThemeManagerTest {
                 .isSameAs(ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT));
             // IntelliJ's border classes are dropped, so FlatLaf keeps its own.
             assertThat(UIManager.getBorder("ScrollPane.border")).isInstanceOf(com.formdev.flatlaf.ui.FlatScrollPaneBorder.class);
-            assertThat(UIManager.getFont("Label.font").getSize2D()).isEqualTo(12f);
+            assertThat(UIManager.getFont("Label.font").getSize2D()).isEqualTo(13f);
         } finally { UIManager.setLookAndFeel(original); }
     }
 
@@ -124,6 +124,8 @@ class ThemeManagerTest {
             assertThat(FlatLaf.isLafDark()).isTrue();
             var expected = new LinkedHashMap<String, String>();
             for (int i = 0; i < TODAYS_DARK.length; i += 2) expected.put(TODAYS_DARK[i], TODAYS_DARK[i + 1]);
+            expected.put("Button.foreground", hex(ThemeManager.generated(Theme.DARK).semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY)));
+            expected.put("Component.borderColor", hex(ThemeManager.generated(Theme.DARK).semantic().color(dev.jasper.ui.theme.SemanticColor.BORDER_INPUT)));
             assertColours(expected);
             assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(12);
             assertThat(UIManager.getInt("Component.minimumHeight")).isEqualTo(28);
@@ -163,9 +165,10 @@ class ThemeManagerTest {
             ThemeManager.install(Theme.DARK);
             // ThemeController rolls back like this when a later install fails.
             UIManager.setLookAndFeel(light);
-            assertColours(Map.of("SearchEverywhere.Tab.selectedBackground", "#dfdfdf", "Jasper.titleBackground", "#f2f2f2",
-                "Jasper.tabUnderline", "#4083c9"));
-            assertThat(UIManager.getFont("Label.font").getSize2D()).isEqualTo(12f);
+            assertColours(Map.of("SearchEverywhere.Tab.selectedBackground", "#dfdfdf", "Jasper.semantic.surface.app",
+                hex(ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT).semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP)),
+                "Jasper.semantic.accent", hex(ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT).semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT))));
+            assertThat(UIManager.getFont("Label.font").getSize2D()).isEqualTo(13f);
         } finally { UIManager.setLookAndFeel(original); }
     }
 
@@ -203,7 +206,7 @@ class ThemeManagerTest {
 
     @Test void theVendoredIntellijThemesLoadWithoutWarnings() {
         for (String file : List.of("intellij/Light.theme.json", "intellij/darcula.theme.json"))
-            assertThat(dev.jasper.ui.themeimport.LegacyThemeTestSupport.bundled(file).warnings()).as(file).allMatch(w -> w.contains("discarded non-color override"));
+            assertThat(dev.jasper.ui.themeimport.LegacyThemeTestSupport.bundled(file).warnings()).as(file).allMatch(w -> w.contains("discarded non-color override") || w.contains("no longer controls Jasper native UI"));
     }
 
     @Test void anInstalledThemeInstallsWithItsOwnColoursAndDerivedChromeKeys(@TempDir Path home) throws Exception {
@@ -215,7 +218,7 @@ class ThemeManagerTest {
             assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Fixture Dark");
             assertThat(UIManager.getColor("Panel.background")).isEqualTo(new Color(0x123456));
             assertThat(FlatLaf.isLafDark()).isTrue();
-            assertThat(UIManager.getColor("Jasper.titleBackground")).isNotNull();
+            assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP)).isNotNull();
         } finally { UIManager.setLookAndFeel(original); }
     }
 
@@ -238,7 +241,7 @@ class ThemeManagerTest {
             assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT))
                 .as("native search reads its canonical role directly").isEqualTo(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT));
             assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(2 * dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.CONTROL_RADIUS));
-            assertThat(UIManager.getFont("Label.font").getSize2D()).as("app defaults still apply").isEqualTo(12f);
+            assertThat(UIManager.getFont("Label.font").getSize2D()).as("canonical module typography replaces the legacy app override").isEqualTo(13f);
         } finally { UIManager.setLookAndFeel(original); }
     }
 

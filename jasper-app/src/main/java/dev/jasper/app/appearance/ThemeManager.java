@@ -38,11 +38,22 @@ public final class ThemeManager {
         return install(generated(theme));
     }
 
-    /** Installs the module snapshot plus temporary legacy defaults; installation failures propagate. */
+    /** Installs the module snapshot plus app-owned native window defaults; installation failures propagate. */
     static boolean install(GeneratedTheme theme) {
         requireEdt();
         dev.jasper.ui.swing.FlatLafInstaller.install(theme);
-        LegacyAppearanceDefaults.install(theme);
+        // Native delegate installation only; all palette/style generation belongs to jasper-ui.
+        var laf = (com.formdev.flatlaf.FlatLaf) javax.swing.UIManager.getLookAndFeel();
+        var extra = new java.util.LinkedHashMap<>(laf.getExtraDefaults());
+        int divider = dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.NATIVE_SPLIT_DIVIDER);
+        extra.put("SplitPane.dividerSize", Integer.toString(divider));
+        extra.put("SplitPaneDivider.border", "dev.jasper.app.workspace.SplitDividerBorder");
+        extra.put("TitlePane.centerTitle", "true");
+        laf.setExtraDefaults(extra);
+        var defaults = javax.swing.UIManager.getLookAndFeelDefaults();
+        defaults.put("SplitPane.dividerSize", divider);
+        defaults.put("SplitPaneDivider.border", new javax.swing.UIDefaults.ProxyLazyValue("dev.jasper.app.workspace.SplitDividerBorder"));
+        defaults.put("TitlePane.centerTitle", true);
         return true;
     }
 

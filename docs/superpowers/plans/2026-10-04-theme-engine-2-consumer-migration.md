@@ -1,12 +1,23 @@
 # Theme Engine Plan 2 — Consumer and SDK Migration Implementation Plan
 
+**Task11b status (2026-10-10):** Implemented; independent review pending. Task11a approved through f8b94570.
+Private defaults/recursive adapters and authored standard-control catalogs removed; shallow native routes and
+PresentationIcon receiver snapshots retained. JBR25 bytecode construction/style/paint and SDK signature gates use
+shared negative/positive fixture functions with exact custom source owners. Engine warnings diagnose ignored authored
+native keys without rejecting or rewriting color data; SnapshotLaf owns reinstall/rollback color persistence.
+Controller deviation: remove legacy global12pt and use canonical module13pt/user typography; Plan3 owns native text
+footprint calibration. Three app-native delegate settings remain with named module divider metric. Detailed commands,
+counts, preserved behavioral coverage and intermediate failures: local task-11b-report.md. Task11 awaits review;
+full repo/distribution gate stays Task12.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Task 11a review fix round 2:** Receiver-local name/path snapshot registrations replace republished same-name artwork while preserving both generations through failure and pruning after successful retry. Actual card/history/palette pixel regressions pass; rereview pending. Source semantic identity and SDK contract unchanged; no11b scope change.
+**Task 11a review fix round 2:** Receiver-local name/path snapshot registrations replace republished same-name artwork while preserving both generations through failure and pruning after successful retry. Actual card/history/palette pixel regressions pass; independently approved through f8b94570. Source semantic identity and SDK contract unchanged; no11b scope change.
 
-**Task 11a review fix round 1:** Receiver glyph lifetime now spans successful reconciliation (both generations retained on failure), and host/fake validate all descriptor icon positions before create/update mutation, including deferred menus. Real card/history/palette transitions and shared validation contracts pass; rereview pending. No11b scope change.
+**Task 11a review fix round 1:** Receiver glyph lifetime now spans successful reconciliation (both generations retained on failure), and host/fake validate all descriptor icon positions before create/update mutation, including deferred menus. Real card/history/palette transitions and shared validation contracts pass; independently approved through f8b94570. No11b scope change.
 
-**Task 11 split/status (2026-10-10):** 11a public SDK0.15 boundary, all consumers, semantic icon projection and exact loader admission implemented; independent review pending. 11b private legacy removal and construction/paint enforcement pending. Task 11 overall remains incomplete. Task 10 is independently approved after fix round 1. SDK/testkit/all eight plugin suites, focused host suites and existing gates passed; report: `.superpowers/sdd/2026-10-04-theme-engine-2-consumer-migration/task-11a-report.md`. Public fallback readers are removed now; private adapter publication/removal stays 11b. A receiver-owned registry copies immutable constrained glyph snapshots for native palette/notifications, retaining expiry/history behavior and live receiver theme routing; fixed built-in artwork is parsed once. This narrow app-model integration is part of11a.
+**Task 11 split/status (2026-10-10):** 11a public SDK0.15 boundary, all consumers, semantic icon projection and exact loader admission independently approved through f8b94570. 11b private legacy removal and construction/paint enforcement implemented; independent review pending. Task 11 overall remains incomplete. Task 10 is independently approved after fix round 1. SDK/testkit/all eight plugin suites, focused host suites and existing gates passed; report: `.superpowers/sdd/2026-10-04-theme-engine-2-consumer-migration/task-11a-report.md`. Public fallback readers are removed now; private adapter publication/removal stays 11b. A receiver-owned registry copies immutable constrained glyph snapshots for native palette/notifications, retaining expiry/history behavior and live receiver theme routing; fixed built-in artwork is parsed once. This narrow app-model integration is part of11a.
 
 **Goal:** Make the new engine the only styling authority, migrate all bundled plugins, and enforce the new SDK boundary while preserving feature behavior.
 
@@ -255,7 +266,7 @@ Execution: 9-kit, 9a, 9b and 9c independently reviewed; 9c approved after fix ro
 **Files:** Modify `SDK/JasperSdk.java`, final `SDK/ui`/`SDK/settings` signatures from Task 4, `APP/plugins/{PluginResolver,HostedUi,HostedKit}.java`, `APP/pluginmanager/PluginIcons.java`, `FAKE` implementations, all eight `plugins/*/src/main/resources/plugin.toml` (Project Index joined with the main merge), `gradle/{sdk-architecture,plugin-architecture,application-architecture}.gradle.kts`; add `AT/plugins/KitCompatibilityTest.java` and forbidden-construction fixtures.
 **Interfaces:** SDK version becomes `0.15.0`; bundled ranges become `>=0.15.0, <0.16`. Final signatures are those in Task 4. Also change `ActionSpec.icon` and `ScopeSpec.icon` to `Optional<String>`, `ContentPresentation.icon` to a semantic `String`, and `StatusItem.setIcon` to take a semantic `String` (preserve each existing optional convention). `StatusProgressState` has no icon member; do not add one. Update `SDK/palette/ScopeSpec.java` and all host/fake adapters. Remove old raw factory/mount methods and arbitrary Icon overloads for standard controls; named kit icons and constrained monochrome registration remain.
 
-- [ ] Add a complete version assertion:
+- [x] Add a complete version assertion:
   ```java
   @Test void advertisesTheKitCompatibilityBoundary() {
       assertThat(dev.jasper.sdk.JasperSdk.VERSION).isEqualTo("0.15.0");
@@ -264,8 +275,8 @@ Execution: 9-kit, 9a, 9b and 9c independently reviewed; 9c approved after fix ro
   Add resolver tests for old `<0.15` plugin, falsely broad range with obsolete bytecode references, and valid 0.15 kit plugin. Expected: actionable incompatibility before activation when detectable; contained linkage failure otherwise. Add architecture negative fixtures for JButton construction, paint override and arbitrary icon color outside custom-content allowance.
 - [x] Run SDK boundary and loader compatibility RED/GREEN regressions (Task 11a evidence/report).
 - [x] Remove development-only overloads and factory bridge names after all consumers compile against final API. Update exact-version assertions in SDK tests and manifests/test resources/docs. Scan plugin bytecode entry-point references for removed SDK methods at admission where feasible; retain existing classloader containment for unanticipated linkage failures. Do not blanket-reject ordinary domain use of JDK AWT value types.
-- [ ] Enforce no direct visible Swing construction/styling/painting in standard plugin code; recognize narrow approved custom-content owners. Remove obsolete app appearance/FlatLaf/style adapters, retained legacy `WorkspacePalette.current()` UIManager fallback paths and unneeded duplicated icon resources. Keep legacy theme-file parsing only in the new engine.
-- [x] Run SDK/testkit contracts, every plugin test and existing architecture gates (11a). Independent review pending; 11b adds the new enforcement fixtures before overall completion. Commit `Cut over to kit-only SDK 0.15 and remove legacy presentation paths`.
+- [x] Enforce no direct visible Swing construction/styling/painting in standard plugin code; recognize narrow approved custom-content owners. Remove obsolete app appearance/FlatLaf/style adapters, retained legacy `WorkspacePalette.current()` UIManager fallback paths and unneeded duplicated icon resources. Keep legacy theme-file parsing only in the new engine.
+- [x] Run SDK/testkit contracts, every plugin test and existing architecture gates (11a). 11a independently approved;11b adds compiled enforcement and adapter/consumer checks, independent review pending. Commit `Cut over to kit-only SDK 0.15 and remove legacy presentation paths`.
 
 ## Task 12 — Migration completion, documentation and distribution review
 

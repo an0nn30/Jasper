@@ -263,25 +263,15 @@ the same native catalog. Settings › Appearance offers both as dropdowns, with 
 
 ## Hosted workspace styling
 
-`WindowContent` owns one `WorkspaceStyler` per mounted plugin center pane. `WorkspaceStyles` describes verified
-FlatLaf 3.7 control recipes; `WorkspaceStyleLayer` composes generated styles beneath plugin class and inline
-styles and reversibly owns direct fallback setters. The application keeps one chrome LAF. Before a chrome delegate
-rebuild, host layers release generated state; afterwards they rebase defaults and reapply the latest workspace.
-In match mode generated values and combo overrides are removed while observation remains for later independent use.
+`WindowContent` publishes only the mounted root's app-owned WorkspaceTheme markers. Publication checks
+the hosted entry identity between property writes, so synchronous removal/move callbacks cannot overwrite
+the destination route. Unmount/close clears the markers. Kit views and specialized content own descendants;
+there are no recursive styles, combo popup bridges or descendant observers. ToolWindowSurface colors only
+the native shell; ToolWindowHeader reads its own module surface. Platform ThemeZone routes native paint and
+PresentationIcon; immutable artwork snapshots and receiving registries retain the Task11a lifetime rules.
 
-The EDT-owned tree styler observes dynamic children and associated table headers/combo editors by identity, stops
-at chrome/exempt/popup boundaries, and styles only a combo's own dropdown popup. An excluded associated header/editor
-retains one source-owned hierarchy listener to detect a return to eligible ancestry; no generated styles or general
-property/container listeners remain on it. Removal, pane moves, plugin stop, and window disposal close layers,
-listeners, popup overrides and queued work. No static component registry is used.
-
-Mount acquisition rolls back partially published markers/styles if construction fails. Failed content opens leave
-no ghost registry entry; failed moves restore the source or another main host when available. If neither can mount,
-the live document remains explicitly unmounted and reopening the same key retries that entry without discarding edits.
-Synchronous zone callbacks can move/dispose a pane, so publication validates ownership before continuing.
-
-Editor syntax area, viewport and gutter are exempt; the outer scroll pane, scrollbars, banners and Vim bar remain
-eligible. Bundled renderers and custom borders use the SDK's mounted-owner lookup; Vim's error/bell maps are plugin
-inline styles and outrank generated values. The host sees only app-native tokens and JDK client properties. The
-[plugin authoring audit](plugin-authoring.md#hosted-pane-control-styling) records domain colors and the delegate-owned
-progress text limitation. Native visual acceptance remains a user-only check.
+ThemeManager installs the module snapshot and only three app-native delegate settings: the named module
+NATIVE_SPLIT_DIVIDER metric, app SplitDividerBorder and centered native titles. SnapshotLaf republishes
+module explicit/canonical colors when defaults are recreated, including reinstall and rollback. There is no
+app palette fallback publisher, copied generator or AppListUI. Default raw-native text now follows the
+canonical 13-point module baseline instead of the obsolete global12 override; explicit user fonts remain.

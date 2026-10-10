@@ -2,13 +2,10 @@ package dev.jasper.app.plugins;
 
 import dev.jasper.app.settings.Setting;
 import dev.jasper.app.settingsui.PageContext;
-import dev.jasper.app.settingsui.SchemaPage;
 import dev.jasper.app.settingsui.SettingsDraft;
 import dev.jasper.app.settingsui.SettingsPage;
 import dev.jasper.sdk.settings.SettingsPanel;
 import dev.jasper.sdk.settings.SettingsPanelHost;
-import java.awt.BorderLayout;
-import java.awt.Dimension;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -18,7 +15,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.BorderFactory;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JPanel;
 
 /**
  * A plugin's own page in Settings: its component, standard rows for its declared settings over the plugin's own
@@ -32,8 +28,6 @@ final class PluginPanelPage implements SettingsPage {
     private final Containment containment;
     private final PageContext context;
     private final SettingsDraft draft;
-    private final PageContext own;
-    private final List<SchemaPage> rows = new ArrayList<>();
     private final Runnable stopListening;
     private final dev.jasper.app.lifecycle.Subscription draftListening;
     private final JLabel message = PluginPageBody.message();
@@ -57,7 +51,6 @@ final class PluginPanelPage implements SettingsPage {
         this.pluginId = pluginId; this.title = title; this.declared = declared; this.panel = panel;
         this.containment = containment; this.context = context;
         draft = new SettingsDraft(declared.values());
-        own = context.withDraft(draft);
         stopListening = declared.onReloaded(() -> {
             draft.rebase(declared.values());
             refreshRows();
@@ -126,12 +119,11 @@ final class PluginPanelPage implements SettingsPage {
     }
 
     /** A rejected file holds up only this page's own edits to its declared settings, which could not be saved to it. */
-    @Override public boolean valid() { return !disposed && !(declared.rejected() && draft.modified()) && kitRows.valid() && rows.stream().allMatch(SchemaPage::valid); }
+    @Override public boolean valid() { return !disposed && !(declared.rejected() && draft.modified()) && kitRows.valid(); }
 
     @Override public void reset() {
         if(disposed)return;
         kitRows.reset();
-        rows.forEach(SchemaPage::reset);
         draft.reset(declared.handles().stream().<Setting<?>>map(DeclaredSetting::appSetting).toList());
         containment.run(pluginId, "settings page reset", panel::reset);
         refreshRows();
@@ -151,7 +143,6 @@ final class PluginPanelPage implements SettingsPage {
 
     @Override public void highlight(String query) {
         if(disposed)return;
-        rows.forEach(row -> row.highlight(query));
         kitRows.highlight(query);
         containment.run(pluginId, "settings page highlight", () -> panel.highlight(query));
         refreshRows();
@@ -162,7 +153,6 @@ final class PluginPanelPage implements SettingsPage {
         if(disposed)return;disposed=true;
         stopListening.run();
         draftListening.close();
-        rows.forEach(SchemaPage::dispose);
         if (body != null && !applied) containment.run(pluginId, "settings page reset", panel::reset);
         if(view!=null)view.close();
         containment.run(pluginId, "settings page dispose", panel::dispose);
@@ -211,16 +201,4 @@ final class PluginPanelPage implements SettingsPage {
         }
     }
 
-    /** A standard row that keeps its preferred height, so a plugin's vertical box cannot stretch it. */
-    private static final class KeepsHeight extends JPanel {
-        KeepsHeight(JComponent row) {
-            super(new BorderLayout());
-            setOpaque(false);
-            add(row, BorderLayout.CENTER);
-        }
-
-        @Override public Dimension getMaximumSize() {
-            return isMaximumSizeSet() ? super.getMaximumSize() : new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
-        }
-    }
 }

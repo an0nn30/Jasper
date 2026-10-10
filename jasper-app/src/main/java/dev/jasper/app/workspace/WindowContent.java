@@ -54,7 +54,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final Runnable quit;
     private final Runnable onEmpty;
     private final java.util.Map<Component, dev.jasper.app.contributions.ContentEntry> hosted = new IdentityHashMap<>();
-    private final Map<JComponent, WorkspaceStyler> hostedStylers = new IdentityHashMap<>();
     private dev.jasper.app.contributions.ContentRegistry contentRegistry;
     private Subscription contentHost;
     private Runnable bringToFront = () -> {};
@@ -780,23 +779,17 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     private void mountContent(dev.jasper.app.contributions.ContentEntry entry) {
         JComponent component = entry.component();
-        WorkspaceStyler styler = null;
         try {
             WorkspaceTheme.apply(component, themes.current());
-            styler = new WorkspaceStyler(component);
-            hostedStylers.put(component, styler);
             hosted.put(component, entry);
             contentListeners.put(component, entry.onChanged(this::update));
             tabs.addTab(entry.title(), component);
-            styler.apply(themes.current());
             selectTab(component); update();
         } catch (RuntimeException | Error failure) {
             var listener = contentListeners.remove(component);
             if (listener != null) listener.close();
             hosted.remove(component);
             tabs.remove(component);
-            hostedStylers.remove(component);
-            if (styler != null) styler.close();
             WorkspaceTheme.clear(component);
             throw failure;
         }
@@ -804,11 +797,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (backgroundOpacity < 1) glassListener.run();
     }
     private void unmountContent(dev.jasper.app.contributions.ContentEntry entry) {
-        if (!hosted.containsKey(entry.component()) && !hostedStylers.containsKey(entry.component())) return;
+        if (!hosted.containsKey(entry.component())) return;
         var listener = contentListeners.remove(entry.component());
         if (listener != null) listener.close();
-        var styler = hostedStylers.remove(entry.component());
-        if (styler != null) styler.close();
         hosted.remove(entry.component()); tabs.remove(entry.component());
         WorkspaceTheme.clear(entry.component()); update();
         if (backgroundOpacity < 1) glassListener.run();
@@ -1195,13 +1186,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void applyTheme(ResolvedTheme theme, boolean updateDelegates) {
         if (closed) return;
         var retained = terminalTabs();
-        var suspended = new ArrayList<WorkspaceStyler>();
         retained.forEach(TerminalTab::beginThemeUpdate);
         try {
-            if (updateDelegates) for (var styler : new ArrayList<>(hostedStylers.values())) {
-                styler.beforeUiUpdate();
-                suspended.add(styler);
-            }
             if (updateDelegates) SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
             if (updateDelegates && (bindingRoot == null || menuBar().getParent() == null)) SwingUtilities.updateComponentTreeUI(menuBar());
             leftStripe.refreshTheme();
@@ -1210,11 +1196,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             area.setTerminalBackground(theme.palette().background());
             WorkspaceTheme.apply(windowTabs, theme);
             windowTabs.refresh();
-            for (var component : new ArrayList<>(hostedStylers.keySet())) {
-                var styler = hostedStylers.get(component);
-                if (styler == null) continue;
-                WorkspaceTheme.apply(component, theme, () -> hostedStylers.get(component) == styler);
-                if (hostedStylers.get(component) == styler) styler.apply(theme);
+            for (var component : new ArrayList<>(hosted.keySet())) {
+                var entry = hosted.get(component);
+                if (entry != null) WorkspaceTheme.apply(entry.component(), theme, () -> hosted.get(component) == entry);
             }
             if (updateDelegates && contributed != null) contributed.refreshTheme();
             for (TerminalTab tab : retained) {
@@ -1235,7 +1219,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             requestGlass();
             revalidate(); repaint();
         } finally {
-            for (var styler : suspended) styler.afterUiUpdate();
             retained.forEach(TerminalTab::endThemeUpdate);
         }
     }
@@ -1396,9 +1379,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         scopes.close();
         closed = true;
         if (contentHost != null) { contentHost.close(); contentHost = null; }
-        for (var component : new ArrayList<>(hostedStylers.keySet())) {
-            hostedStylers.remove(component).close();
-            WorkspaceTheme.clear(component);
+        for (var component : new ArrayList<>(hosted.keySet())) {
+            WorkspaceTheme.clear(hosted.get(component).component());
         }
         syncPaletteDispatcher();
         unregisterConfiguration.run(); disconnectConfiguration();

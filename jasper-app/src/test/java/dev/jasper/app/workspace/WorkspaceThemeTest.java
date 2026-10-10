@@ -89,7 +89,7 @@ class WorkspaceThemeTest {
             assertThat(root.getClientProperty("Jasper.workspaceTheme")).isSameAs(themes.current().workspace());
             assertThat(((JLabel) root.getComponent(0)).getForeground()).isEqualTo(themes.current().palette().foreground());
             assertStripSurfaces(owner);
-            assertThat(owner.toolbar().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+            assertThat(owner.toolbar().getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, SemanticColor.SURFACE_APP));
             assertThat(new JPopupMenu().getBackground()).isEqualTo(UIManager.getColor("PopupMenu.background"));
             themes.configureTerminal(TerminalColors.MATCH);
             assertThat(root.getClientProperty("Jasper.zone")).isEqualTo("workspace");
@@ -101,7 +101,7 @@ class WorkspaceThemeTest {
         edt(() -> {
             var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            var titleBackground = UIManager.getColor("Jasper.titleBackground");
+            var titleBackground = dev.jasper.app.platform.ThemeZone.color(null, SemanticColor.SURFACE_APP);
             var statusBackground = UIManager.getColor("StatusBar.background");
             var panelBackground = UIManager.getColor("Panel.background");
             var labelForeground = UIManager.getColor("Label.foreground");
@@ -143,16 +143,16 @@ class WorkspaceThemeTest {
             themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
             var workspace = new JPanel(); WorkspaceTheme.apply(workspace, themes.current());
             var child = new JLabel(); workspace.add(child);
-            assertThat(WorkspaceTheme.color(child, Token.TEXT, "Label.foreground"))
+            assertThat(dev.jasper.app.platform.ThemeZone.color(child, SemanticColor.TEXT_PRIMARY))
                 .isEqualTo(themes.current().workspace().tokens().get(Token.TEXT));
             var chrome = new JPanel(); chrome.putClientProperty("Jasper.zone", "chrome"); workspace.add(chrome); chrome.add(child);
-            assertThat(WorkspaceTheme.color(child, Token.TEXT, "Label.foreground")).isEqualTo(UIManager.getColor("Label.foreground"));
+            assertThat(dev.jasper.app.platform.ThemeZone.color(child, SemanticColor.TEXT_PRIMARY)).isEqualTo(UIManager.getColor("Label.foreground"));
             var popup = new JPopupMenu(); popup.setInvoker(workspace); popup.add(child);
-            assertThat(WorkspaceTheme.color(child, Token.TEXT, "Label.foreground")).isEqualTo(UIManager.getColor("Label.foreground"));
+            assertThat(dev.jasper.app.platform.ThemeZone.color(child, SemanticColor.TEXT_PRIMARY)).isEqualTo(UIManager.getColor("Label.foreground"));
             var dialogRoot = new JRootPane(); workspace.add(dialogRoot); dialogRoot.getContentPane().add(child);
-            assertThat(WorkspaceTheme.color(child, Token.TEXT, "Label.foreground")).isEqualTo(UIManager.getColor("Label.foreground"));
+            assertThat(dev.jasper.app.platform.ThemeZone.color(child, SemanticColor.TEXT_PRIMARY)).isEqualTo(UIManager.getColor("Label.foreground"));
             workspace.add(child); WorkspaceTheme.clear(workspace);
-            assertThat(WorkspaceTheme.color(child, Token.TEXT, "Label.foreground")).isEqualTo(UIManager.getColor("Label.foreground"));
+            assertThat(dev.jasper.app.platform.ThemeZone.color(child, SemanticColor.TEXT_PRIMARY)).isEqualTo(UIManager.getColor("Label.foreground"));
         });
     }
 
@@ -178,7 +178,7 @@ class WorkspaceThemeTest {
     @Test void dividerPaintUsesWorkspaceColorWhileChromeDefaultsStayLight() throws Exception {
         edt(() -> {
             var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            var chromeDivider = UIManager.getColor("Jasper.splitDivider");
+            var chromeDivider = dev.jasper.app.platform.ThemeZone.color(null, SemanticColor.BORDER_SUBTLE);
             themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
             var split = new JSplitPane(); WorkspaceTheme.apply(split, themes.current());
             split.setSize(400, 300); split.setDividerLocation(180); split.doLayout();
@@ -187,7 +187,7 @@ class WorkspaceThemeTest {
             var graphics = image.createGraphics(); divider.paint(graphics); graphics.dispose();
             assertThat(new java.awt.Color(image.getRGB(divider.getWidth() / 2, 1)))
                 .isEqualTo(themes.current().workspace().tokens().get(Token.DIVIDER));
-            assertThat(UIManager.getColor("Jasper.splitDivider")).isEqualTo(chromeDivider);
+            assertThat(dev.jasper.app.platform.ThemeZone.color(null, SemanticColor.BORDER_SUBTLE)).isEqualTo(chromeDivider);
         });
     }
 

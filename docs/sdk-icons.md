@@ -33,3 +33,8 @@ The 0.15 boundary removes `IconName`, `BundledIcon`, their fake raw Icon values,
 overloads and SDK UIManager palette readers. Declare `sdk = ">=0.15.0, <0.16"` after migrating.
 
 Native palette and notification views retain immutable glyph snapshots in registries scoped to the receiving view. Removing the original registration prevents new use; already-posted notification history can still show its captured glyph after expiry or plugin shutdown. Each receiver resolves tint from its live theme and releases unused registrations after successful reconciliation or when closed. Failed reconciliation keeps both glyph generations available until recovery or close.
+
+Private app cleanup in Task11b removes the old authored standard-control catalog and resource loaders.
+The native tray template and manifest identity fallback keep their original artwork and legal provenance.
+The notification action now uses the module bell glyph. PresentationIcon/PresentationIcons remain the
+supported app-internal immutable snapshot projection, including receiver-local aliases and failure retention.

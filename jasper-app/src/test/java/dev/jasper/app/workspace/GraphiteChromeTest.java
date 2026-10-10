@@ -69,7 +69,7 @@ class GraphiteChromeTest {
                     var inset = host.getInsets();
                     int left = inset.left, top = inset.top;
                     int right = host.getWidth() - inset.right - 1, bottom = host.getHeight() - inset.bottom - 1;
-                    int chrome = UIManager.getColor("Jasper.titleBackground").getRGB();
+                    int chrome = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP).getRGB();
                     var image = new java.awt.image.BufferedImage(host.getWidth(), host.getHeight(), 2);
                     // A damaged backing surface plus a tab-only dirty rectangle reproduces Swing's
                     // opaque-child optimization. Full printAll snapshots do not exercise this path.
@@ -95,7 +95,7 @@ class GraphiteChromeTest {
             owner.selectTheme(Theme.DARK);
             assertThat(owner.theme().palette().background()).isEqualTo(new Color(0x191c20));
             assertThat(UIManager.getColor("ToolWindow.background")).isEqualTo(new Color(0x191c20));
-            assertThat(UIManager.getColor("Jasper.titleBackground")).isEqualTo(new Color(0x25292e));
+            assertThat(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP)).isEqualTo(new Color(0x25292e));
             assertThat(UIManager.getColor("Jasper.tabUnderline")).isEqualTo(new Color(0x8eb8d2));
             assertThat(java.util.Arrays.stream(owner.leftStripe().getComponents())
                 .filter(javax.swing.JButton.class::isInstance)
@@ -116,7 +116,7 @@ class GraphiteChromeTest {
                         var bottom = javax.swing.SwingUtilities.convertPoint(grid, 0, grid.getHeight(), root);
                         var image = new java.awt.image.BufferedImage(1000, 640, 2);
                         var g = image.createGraphics(); root.printAll(g); g.dispose();
-                        int chrome = UIManager.getColor("Jasper.titleBackground").getRGB();
+                        int chrome = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP).getRGB();
                         int terminal = owner.theme().palette().background().getRGB();
                         assertThat(image.getRGB(bottom.x, bottom.y + 7)).as("lower left curve exposes chrome").isEqualTo(chrome);
                         assertThat(image.getRGB(bottom.x + grid.getWidth() - 1, bottom.y + 7)).as("lower right curve exposes chrome").isEqualTo(chrome);
@@ -147,7 +147,7 @@ class GraphiteChromeTest {
                     root.setSize(1000, 640); layoutTree(root); layoutTree(root);
                     var image = new java.awt.image.BufferedImage(1000, 640, 2);
                     var g = image.createGraphics(); root.printAll(g); g.dispose();
-                    int chrome = UIManager.getColor("Jasper.titleBackground").getRGB();
+                    int chrome = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP).getRGB();
                     var railEdge = javax.swing.SwingUtilities.convertPoint(owner.leftStripe(), owner.leftStripe().getWidth() - 1, 120, root);
                     assertThat(image.getRGB(railEdge.x, railEdge.y)).as("no stripe border").isEqualTo(chrome);
                     var rightEdge = javax.swing.SwingUtilities.convertPoint(owner.rightStripe(), 0, 120, root);

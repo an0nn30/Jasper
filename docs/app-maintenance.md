@@ -345,16 +345,16 @@ Run `./gradlew check` and all architecture guards; hand native visual acceptance
 
 ## Maintaining SDK icons
 
-`NamedIcons` is the sole semantic-to-artwork mapping; `AppIcons` owns rendering and caching.
-All ordinary controls use vendored New UI artwork; KEY retains the centrally tinted Tabler
-key because the upstream set has no equivalent. No plugin needs to draw its own common icons.
+SDK0.15 standard presentation uses semantic names and constrained monochrome IconAsset registration.
+The module IconRegistry owns glyph paths; NamedIcons maps only app-native names to module meanings.
+AppIcons has no raw plugin loader or authored catalog. PresentationIcon/PresentationIcons carry immutable
+snapshots into native models and receiver-owned registries; preserve their failure/lifetime tests.
 
-`tools/icons/fetch-intellij-icons.py` vendors the full platform and Terminal `expui` trees at
-pinned commit/tree IDs, verifies staged downloads, and generates `BundledIcon` plus the host
-index. Preserve Apache LICENSE.txt, upstream NOTICE.txt and assets.tsv hashes. Add semantic
-meanings to both `IconName` and `NamedIcons`; callers never choose physical SVG paths.
-See [SDK icons](sdk-icons.md). Run `./gradlew check` for complete-catalog light/dark rendering,
-provenance, SDK and plugin isolation checks. Native application launch remains user-run.
+Only three IntelliJ SVGs remain: ResidentTray's terminal template and PluginIcons' light/dark manifest-identity
+fallback. Keep their assets.tsv hashes, SOURCE.md, Apache LICENSE and NOTICE. PluginIcons.decode still
+handles manifest PNG/SVG previews. Application branding is separate and unchanged. The old catalog fetcher
+is removed so it cannot regenerate obsolete SDK types. Run platform icon, manifest-preview and architecture
+checks after changes. Native GUI acceptance remains user-run. See [SDK icons](sdk-icons.md).
 
 ## Remote lives in a plugin
 
@@ -563,21 +563,15 @@ row. `ToolWindowArea.sync` and `WindowContent.syncRailVisibility` tell the windo
 (`onMinimumSizeChanged`) so the frame's minimum follows a split, or the stripes, appearing or going
 away. Keep clipping and hit testing in the
 host, and route descendant repaints
-through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` still
-owns theme-background propagation and preserves plugin-selected colors. The active theme's
-`ToolWindow.background` supplies the inner surface. `UiTemplate` maps it to the `sidebar` token and list/tree/table backgrounds to `surface_sunken`; edit the
-`[tokens]` in `jasper-dark.toml` or `jasper-light.toml` to tune the contrast.
-Stripe selection uses the theme's toolbar-button background and the original theme-aware icon;
-do not substitute the tab accent or a different selected icon variant.
+through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` paints only the
+app-owned root using `surface.sidebar`; it does not observe or recursively restyle plugin descendants.
+The native header paints its own canonical surface. Shared kit views consume their routed palette
+and own their control/selection geometry. App-native stripe selection retains its semantic icon.
 
-
-Selection geometry is shared through `ThemeManager.APP_DEFAULTS`: lists, trees, tables,
-combo-box popups and menus use a 4px radius with a 4px horizontal inset. FlatLaf joins
-adjacent selected rows and maintains focus/selection repainting. `AppListUI` extends
-that painting to composite plugin renderers by intercepting full-row fills of the list's
-selection color; it leaves their component hierarchy, layout and custom colors alone.
-The palette uses the same geometry for selections, hover and scope highlights.
-`SelectionRenderingTest` saves light/dark headless previews in `build/render-preview`.
+Selection geometry for standard controls belongs to the shared kit. Native FlatLaf controls keep
+their delegate behavior and receive canonical module colors; there is no app list delegate or global
+selection-default recipe. `SelectionRenderingTest` retains light/dark selected-fill and readable-text
+coverage, while kit control tests cover their owned rounded selections.
 
 
 Workspace boundaries use continuous chrome instead of painted rules: rail, toolbar,

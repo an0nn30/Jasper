@@ -78,8 +78,13 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                         }
                 }
             } else {
+                val removed = setOf("dev.jasper.app.appearance.LegacyAppearanceDefaults", "dev.jasper.app.appearance.WorkspaceDefaults",
+                    "dev.jasper.app.appearance.AppListUI", "dev.jasper.app.workspace.WorkspaceStyler", "dev.jasper.app.workspace.WorkspaceStyles",
+                    "dev.jasper.app.workspace.WorkspaceStyleLayer", "dev.jasper.app.workspace.WorkspaceComboPopup")
+                check(types.none { topLevel(it) in removed }) { "Removed private presentation adapter reintroduced" }
                 for (batch in types.chunked(100)) {
                     val code = tool("javap", listOf("-classpath", classes.absolutePath, "-c", "-p") + batch)
+                    check(removed.none { code.contains(it.replace('.', '/')) }) { "Application references removed private presentation adapters" }
                     check(!code.contains("dev/jasper/terminal/internal/") && !code.contains("TerminalSession.internalAccess")) {
                         "Application bypasses supported terminal API"
                     }

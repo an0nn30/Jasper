@@ -40,7 +40,7 @@ class TerminalColorsTest {
                 .containsExactlyElementsOf(Theme.DARK.palette().ansi());
             assertThat(hidden.view().palette().ansi()).isNotEqualTo(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette().ansi());
             assertThat(owners[1].currentPane().view().palette()).as("another window").isEqualTo(Theme.DARK.palette());
-            assertThat(owner.toolbar().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+            assertThat(owner.toolbar().getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
             var find = hidden.findBar();
             assertThat(find.queryField().getForeground()).as("the find bar follows workspace tokens")
                 .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.ui.theme.Token.TEXT));

@@ -87,6 +87,24 @@ class ImportParityTest {
         assertThat(result.warnings()).singleElement().asString().contains("Button.arc");
     }
 
+    @Test void nativeWarningsDescribeOnlyAuthoredKeysAndPreserveTheirColors() throws Exception {
+        String text = """
+            name='Authored warnings'
+            extends='Jasper Dark'
+            [ui]
+            'Jasper.notification.background'='#123456'
+            'EditorTabs.hoverBackground'='#234567'
+            'ToolWindow.background'='#345678'
+            """;
+        Path source = file("authored-warnings.toml", text);
+        var result = ThemeConverter.convert(source).getFirst();
+        assertThat(result.warnings()).hasSize(2).allSatisfy(warning ->
+            assertThat(warning).contains("authored-warnings.toml:", "[semantic]", "no longer controls Jasper native UI"));
+        assertThat(result.document().ui()).containsEntry("Jasper.notification.background", "#123456")
+            .containsEntry("EditorTabs.hoverBackground", "#234567").containsEntry("ToolWindow.background", "#345678");
+        assertThat(java.nio.file.Files.readString(source)).isEqualTo(text);
+    }
+
     @Test void symlinkSourcesAndSidecarsAndEntitySidecarsFailConversion() throws Exception {
         Path theme = file("target.theme.json", "{\"name\":\"Target\"}");
         Path linked = home.resolve("linked.theme.json");

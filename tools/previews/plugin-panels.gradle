@@ -1,3 +1,4 @@
+// Historical pre-0.15 tool; currently unsupported. Task 12 owns archival audit/removal-or-update.
 // ./gradlew -I tools/previews/plugin-panels.gradle :jasper-app:pluginPanelsPreview
 // Opt-in, headless rendering. No windows, shells, network sessions or user settings.
 gradle.projectsEvaluated {

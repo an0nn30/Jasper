@@ -46,26 +46,6 @@ class AppIconsTest {
         });
     }
 
-    @Test void selectedSurfacesChooseUntintedVariantsWithoutChangingSharedIcons() throws Exception {
-        edt(() -> {
-            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            try {
-                var original = AppIcons.bundled("terminal/toolwindow/terminal");
-                int[] light = IntellijIconsTest.pixels(original);
-                themes.configure(Theme.DARK);
-                int[] dark = IntellijIconsTest.pixels(original);
-                assertThat(dark).isNotEqualTo(light);
-                assertThat(IntellijIconsTest.pixels(AppIcons.forBackground(original, java.awt.Color.WHITE))).isEqualTo(light);
-                assertThat(IntellijIconsTest.pixels(original)).isEqualTo(dark);
-                themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-                assertThat(IntellijIconsTest.pixels(AppIcons.forBackground(original, java.awt.Color.BLACK))).isEqualTo(dark);
-                assertThat(IntellijIconsTest.pixels(original)).isEqualTo(light);
-                var custom = new javax.swing.ImageIcon(new java.awt.image.BufferedImage(16, 16, 2));
-                assertThat(AppIcons.forBackground(custom, java.awt.Color.BLACK)).isSameAs(custom);
-            } finally { new ThemeController(); }
-        });
-    }
-
     /**
      * Folder tabs paint on the independent terminal palette, not the chrome/workspace route. A named (module-tinted)
      * icon placed there is tinted for that surface: the surface's own foreground, held to the 3:1 non-text floor.
@@ -132,7 +112,7 @@ class AppIconsTest {
             }
             assertThatIllegalArgumentException().isThrownBy(() -> AppIcons.icon("unknown")).withMessageContaining("unknown");
             assertThat(java.util.Arrays.stream(AppIcons.class.getMethods()).map(java.lang.reflect.Method::getName))
-                .doesNotContain("toolbarIcon", "forToolbar");
+                .doesNotContain("toolbarIcon", "forToolbar", "bundled", "bundledIds", "plugin");
         });
     }
 }
