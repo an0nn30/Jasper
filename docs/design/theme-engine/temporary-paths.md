@@ -1,6 +1,6 @@
 # Plan 1 temporary theme paths and Plan 2 removal ownership
 
-## Task 11b disposition — 2026-10-10 (implemented; independent review pending)
+## Task 11b disposition — 2026-10-10 (independently approved through 2fc3bea8)
 
 Removed LegacyAppearanceDefaults, WorkspaceDefaults, AppListUI, WorkspaceStyler/Styles/StyleLayer/ComboPopup,
 WorkspaceTheme fallback color lookups, WindowContent styler ownership/suspension and ToolWindowSurface recursion.
@@ -21,8 +21,8 @@ Authored unsupported native overrides now produce engine-owned actionable warnin
 Raw color-only module publication remains for vendor delegates/identity artwork, not as native-control authority.
 Generated defaults are not diagnosed; source bytes stay intact. The obsolete app12pt global override is removed;
 canonical module13pt/user typography applies. Controller assigns final native text footprint calibration to Plan3.
-Same-LAF reinstall/rollback persistence now belongs to SnapshotLaf.getDefaults. Overall Task11 awaits11b review;
-Task11a is independently approved at f8b94570. Full repository/distribution verification belongs to Task12.
+Same-LAF reinstall/rollback persistence now belongs to SnapshotLaf.getDefaults. Task11a and11b are independently approved.
+Task12 owns full repository/distribution verification and the controller owns the whole-branch review.
 
 ## Task 11a cutover disposition — 2026-10-10
 
@@ -544,8 +544,24 @@ FlatLaf.style escape. Evidence: EditorDocumentPreservationTest, editor-hosted/mi
 
 ## Historical preview-tool handoff (Task11b)
 
-Task12 owns audit/removal-or-update of `tools/previews/PluginPanelsPreview.java` and its opt-in caller
-`tools/previews/plugin-panels.gradle`. They are excluded from normal builds and still describe pre-0.15 raw
-panel constructors/icon APIs. The only documentation references to invocation are historical STATUS entries.
-No obsolete adapter is retained to compile this tool. Current staged real-plugin render tests are authoritative;
-the new actual-feature preview harness is Plan3 Task1.
+Task12 retired `tools/previews/PluginPanelsPreview.java` and `tools/previews/plugin-panels.gradle` after a caller
+and documentation audit: the init script was the sole runnable caller; all invocation references in STATUS are
+historical. They required removed pre-0.15 raw panel/icon APIs and were excluded from normal compilation.
+Current staged real-plugin render tests remain authoritative. Plan3 Task1 owns the new actual-feature preview
+harness; do not resurrect a raw adapter for old tooling.
+
+## Task12 source completion and composition handoff
+
+The stopped-plugin Settings page (`PluginStubPage`), rejected-file message (`PluginPageBody`, mounted by
+`PluginSettingsPage`/`PluginPanelPage`) and failed-plugin-page fallback now use the dialog's chrome kit context.
+They close their own views, retain contained plugin failures and route the Open in Editor button by its action id.
+Their former raw margins are replaced by the shared DETAIL composition. Plan3 Task9 owns final Settings geometry.
+The base kit Choice now reinstalls its delegate and semantic popup styling in `updateUI`; this lifecycle defect
+was reproduced from the native baseline and fixed centrally, not deferred as composition.
+
+Existing earlier sections are a chronological removal ledger. Completed Task11 removals supersede earlier
+Task11 TODO language. Remaining native workspace layout/geometry entries are Plan3 Task10; Editor strip/banner
+and scrollbar composition is Plan3 Task8; app settings/choosers/palette/notifications are Plan3 Task9;
+Vault is Plan3 Tasks1/4, Add Host Task2, New File Server Task3, Remote panels Tasks5–6 and
+File Server rows/transfer companions Task7. No private styling engine or
+raw standard-plugin UI compatibility path remains. See [completion evidence](completion.md).

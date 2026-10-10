@@ -169,3 +169,11 @@ absolute and match pinned channel materialization (or obtain an explicit documen
 ruling). Affected themes must not receive exact parity acceptance until corrected. No architecture/API
 task depends on this edge; native/user acceptance is still pending. See the
 [final verification handoff](design/theme-engine/verification.md).
+
+## Consumer migration completion
+
+Plan 2 uses the kit as the only standard-control presentation authority. SDK 0.15 is incompatible with
+pre-0.15 raw UI factories and raw presentation icons; all eight bundled manifests cut over together.
+The [completion audit](design/theme-engine/completion.md) records exact gate scope, owner tests, headless
+rendering, distribution checks and the named Plan 3 composition owners. App host Settings error/stub
+content uses the dialog kit context and closes with its page; it is not covered by the plugin-only compiled gate.

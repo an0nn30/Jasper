@@ -1,5 +1,7 @@
 package dev.jasper.app.plugins;
 
+import com.formdev.flatlaf.util.UIScale;
+
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.sdk.contracts.ThemeMigrationCapture;
 import java.nio.file.Files;
@@ -67,7 +69,7 @@ class VaultRenderEvidenceTest {
     static void save(String theme, String state, AuxiliarySurface surface, int width, int height) throws Exception {
         onEdt(() -> {
             JComponent holder = surface.holder();
-            ThemeMigrationCapture.save(FAMILY, theme, state, holder, width, height);
+            ThemeMigrationCapture.save(FAMILY, theme, state, holder, UIScale.scale(width), UIScale.scale(height));
         });
         assertThat(Files.size(Path.of("build/theme-migration-evidence", FAMILY, theme, state + ".png"))).isPositive();
     }

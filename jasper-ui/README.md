@@ -4,10 +4,10 @@ Standalone theme engine and Swing UI kit. `jasper-ui` has no dependency on the
 application, terminal, Buddy, SDK or plugins. The app adapts its configuration
 and library APIs into these values; plugins use SDK contracts and host adapters.
 
-The initial extraction provides immutable theme documents, inheritance resolution,
+The engine provides immutable theme documents, inheritance resolution,
 terminal color values, syntax styles and workspace glass levels in `dev.jasper.ui.theme`,
-and native TOML parsing in `dev.jasper.ui.themeio`. Existing application implementations
-remain temporary extraction sources until the coordinated consumer migration.
+and native TOML parsing in `dev.jasper.ui.themeio`. All migrated app and plugin consumers use this
+authority; [completion evidence](../docs/design/theme-engine/completion.md) separates source migration from Plan 3 composition.
 
 `TerminalColors` takes background before foreground and defensively copies exactly
 16 nonnull ANSI colors. The terminal library's palette constructor takes foreground

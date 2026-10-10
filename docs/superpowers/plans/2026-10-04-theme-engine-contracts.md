@@ -7,6 +7,10 @@ Plans 2–3 consumers remain unexecuted. See the [review record](../../design/th
 Authority: [approved spec](../specs/2026-10-04-jasper-theme-engine-design.md).
 This is a shared contract appendix, not a fourth implementation plan.
 
+**Current consumer status (2026-10-10):** Plan 2 Tasks1–11 independently approved, Task12 completion audit
+in progress. The historical Plan1 status above is superseded for consumer ownership. SDK0.15 final names and
+private app removal are implemented; final whole-branch review and Plan3 native composition are separate gates.
+
 ## Source and package notation
 
 All paths in the plans are repository-relative to the `codex/theme-engine` worktree.

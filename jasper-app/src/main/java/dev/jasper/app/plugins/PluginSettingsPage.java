@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
+import dev.jasper.ui.swing.KitView;
 
 /**
  * The page Settings generates for a running plugin's declared settings: rows in declaration order under their
@@ -27,11 +27,13 @@ final class PluginSettingsPage implements SettingsPage {
     private final SchemaPage inner;
     private final Runnable stopListening;
     private final dev.jasper.app.lifecycle.Subscription draftListening;
-    private final JLabel message = PluginPageBody.message();
+    private KitView message;
+    private final PageContext context;
     private JComponent body;
 
     PluginSettingsPage(String pluginId, String title, DeclaredSettings declared, PageContext context) {
         this.title = title;
+        this.context = context;
         this.declared = declared;
         draft = new SettingsDraft(declared.values());
         var own = context.withDraft(draft);
@@ -46,7 +48,7 @@ final class PluginSettingsPage implements SettingsPage {
 
     SettingsDraft draft() { return draft; }
     DeclaredSettings declared() { return declared; }
-    JLabel message() { return message; }
+    KitView message() { return message; }
 
     /** The rows of a plugin's page: declaration order, a heading wherever the section changes. */
     static SchemaPage.Spec spec(String id, String title, List<DeclaredSetting<?>> handles) {
@@ -98,6 +100,7 @@ final class PluginSettingsPage implements SettingsPage {
 
     @Override public JComponent component() {
         if (body == null) {
+            message = PluginPageBody.message(context.kit().get());
             body = new PluginPageBody(message, inner.component());
             showMessage();
         }
@@ -126,6 +129,7 @@ final class PluginSettingsPage implements SettingsPage {
         stopListening.run();
         draftListening.close();
         inner.dispose();
+        if (message != null) message.close();
     }
 
     private void showMessage() { PluginPageBody.showMessage(message, declared); }

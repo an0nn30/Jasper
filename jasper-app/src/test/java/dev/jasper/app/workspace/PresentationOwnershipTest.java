@@ -60,6 +60,7 @@ class PresentationOwnershipTest {
     @Test void toolSurfaceDoesNotStyleOrObserveDescendants() throws Exception {
         edt(() -> {
             try (var themes = new ThemeController()) {
+                themes.configure(dev.jasper.app.appearance.Theme.DARK);
                 var root = new JPanel(); var child = new JPanel(); root.add(child);
                 var color = child.getBackground();
                 int listeners = root.getContainerListeners().length;

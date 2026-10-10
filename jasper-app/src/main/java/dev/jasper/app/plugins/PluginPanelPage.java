@@ -12,9 +12,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.swing.BorderFactory;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
+import dev.jasper.ui.swing.KitView;
 
 /**
  * A plugin's own page in Settings: its component, standard rows for its declared settings over the plugin's own
@@ -30,7 +29,7 @@ final class PluginPanelPage implements SettingsPage {
     private final SettingsDraft draft;
     private final Runnable stopListening;
     private final dev.jasper.app.lifecycle.Subscription draftListening;
-    private final JLabel message = PluginPageBody.message();
+    private KitView message, failureView;
     private JComponent content;
     private JComponent body;
     /** Whether the page applied successfully and nothing changed since, so there is nothing for the panel to drop. */
@@ -65,7 +64,7 @@ final class PluginPanelPage implements SettingsPage {
 
     /** The plugin's component, or the message saying why it could not be built; null until {@link #component}. */
     JComponent content() { return content; }
-    JLabel message() { return message; }
+    KitView message() { return message; }
 
     @Override public String id() { return PluginRuntime.settingsPageId(pluginId); }
     @Override public String title() { return title; }
@@ -89,6 +88,7 @@ final class PluginPanelPage implements SettingsPage {
     @Override public JComponent component() {
         if(disposed)throw new IllegalStateException("Settings page is closed");
         if (body != null) return body;
+        message = PluginPageBody.message(context.kit().get());
         var made = new AtomicReference<JComponent>();
         Throwable failure = containment.attempt(pluginId, "settings page", () -> { var owned=java.util.Objects.requireNonNull(panel.create(rowHost),"Settings view");
             var next=kit.requireOwned(owned);next.mount(this);view=next;view.hostSpec=kitRows::refresh;
@@ -101,13 +101,11 @@ final class PluginPanelPage implements SettingsPage {
         return body;
     }
 
-    private static JComponent failed(Throwable failure) {
+    private JComponent failed(Throwable failure) {
         String why = failure == null ? "it returned nothing."
             : failure.getMessage() != null ? failure.getMessage() : failure.toString();
-        var label = new JLabel("This page could not be shown: " + why);
-        label.putClientProperty("html.disable", true);
-        label.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
-        return label;
+        failureView = PluginPageBody.text(context.kit().get(), "This page could not be shown: " + why, false);
+        return failureView;
     }
 
     @Override public boolean modified() {
@@ -155,6 +153,8 @@ final class PluginPanelPage implements SettingsPage {
         draftListening.close();
         if (body != null && !applied) containment.run(pluginId, "settings page reset", panel::reset);
         if(view!=null)view.close();
+        if(message!=null)message.close();
+        if(failureView!=null)failureView.close();
         containment.run(pluginId, "settings page dispose", panel::dispose);
         onDisposed.run();onDisposed=() -> {};
     }

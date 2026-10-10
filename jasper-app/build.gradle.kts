@@ -213,6 +213,7 @@ tasks.register<JavaExec>("themeMigrationPreview") {
     dependsOn(tasks.testClasses, stagePlugins)
     classpath = sourceSets["test"].runtimeClasspath
     mainClass = "dev.jasper.app.appearance.ThemeMigrationPreview"
+    providers.gradleProperty("jasper.uiScale").orNull?.let { systemProperty("flatlaf.uiScale", it) }
     systemProperty("jasper.stagedPlugins", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
     val captureHome = layout.buildDirectory.dir("theme-migration-home").get().asFile.absolutePath
     systemProperty("user.home", captureHome)

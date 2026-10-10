@@ -275,3 +275,11 @@ NATIVE_SPLIT_DIVIDER metric, app SplitDividerBorder and centered native titles. 
 module explicit/canonical colors when defaults are recreated, including reinstall and rollback. There is no
 app palette fallback publisher, copied generator or AppListUI. Default raw-native text now follows the
 canonical 13-point module baseline instead of the obsolete global12 override; explicit user fonts remain.
+
+## Consumer migration completion
+
+Plan 2 uses the kit as the only standard-control presentation authority. SDK 0.15 is incompatible with
+pre-0.15 raw UI factories and raw presentation icons; all eight bundled manifests cut over together.
+The [completion audit](design/theme-engine/completion.md) records exact gate scope, owner tests, headless
+rendering, distribution checks and the named Plan 3 composition owners. App host Settings error/stub
+content uses the dialog kit context and closes with its page; it is not covered by the plugin-only compiled gate.

@@ -14,6 +14,28 @@ class ChoicesTest {
     static Choice choice(ChoiceKind kind, String selected, ControlState state) {
         return new Choice("choice", state, kind, List.of(new Option("a", "<html>Alpha", Optional.of(Hue.BLUE)), new Option("b", "Beta", Optional.empty())), selected, "Protocol", "choose-protocol");
     }
+    @Test void dropdownRetainsKitDelegateSelectionAndPopupStyleAcrossSwingUpdates() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, stack(choice(ChoiceKind.DROPDOWN, "b", ControlState.READY)), events::add)) {
+                var combo = find(view, "choice.input", JComboBox.class);
+                var delegate = combo.getUI().getClass();
+                for (int i = 0; i < 3; i++) {
+                    SwingUtilities.updateComponentTreeUI(view);
+                    assertThat(combo.getUI().getClass()).isEqualTo(delegate);
+                    assertThat(combo.getSelectedItem()).isEqualTo(choice(ChoiceKind.DROPDOWN, "b", ControlState.READY).options().get(1));
+                    var popup = (javax.swing.plaf.basic.BasicComboPopup) combo.getUI().getAccessibleChild(combo, 0);
+                    assertThat(popup.getList().getBackground()).isEqualTo(context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_MENU));
+                    assertThat(popup.getList().getFixedCellHeight()).isGreaterThan(0);
+                    combo.setSize(240, 40); combo.doLayout();
+                    assertThat(ButtonsTest.paint(combo).getRGB(120, 6)).isEqualTo(context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL).getRGB());
+                }
+                assertThat(events).isEmpty();
+                combo.setSelectedIndex(0);
+                assertThat(events).containsExactly(new UiEvent.Selected("choice", Set.of("a")));
+            } finally { release(context); }
+        });
+    }
     @Test void existingDropdownPopupTracksSemanticMenuColorsAndRows() {
         Edt.run(() -> {
             var context=KitFixtures.context();

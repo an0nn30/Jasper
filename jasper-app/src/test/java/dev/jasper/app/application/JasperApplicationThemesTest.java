@@ -30,7 +30,16 @@ class JasperApplicationThemesTest {
         try {
             edt(() -> app[0] = new JasperApplication(service, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown));
             Files.writeString(file, Files.readString(file).replace("#112233", "#445566")); worker.poll();
-            edt(() -> assertThat(UIManager.getColor("Panel.background")).isEqualTo(new Color(0x445566)));
+            edt(() -> {
+                var installed = dev.jasper.ui.swing.FlatLafInstaller.installedTheme();
+                assertThat(installed.uiKeys()).containsEntry("Panel.background", "#445566");
+                // The inherited explicit surface token wins over the legacy UI alias after the raw adapter cutover.
+                assertThat(installed.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL)).isEqualTo(new Color(0x21252a));
+                assertThat(UIManager.getColor("Panel.background")).isEqualTo(new Color(0x21252a));
+            });
+            assertThat(Files.readString(config)).isEqualTo(text);
+            Files.writeString(file, Files.readString(file) + "[semantic]\n'surface.panel'='#637485'\n"); worker.poll();
+            edt(() -> assertThat(UIManager.getColor("Panel.background")).isEqualTo(new Color(0x637485)));
             assertThat(Files.readString(config)).isEqualTo(text);
         } finally {
             if (app[0] != null) { edt(app[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); }

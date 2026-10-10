@@ -1,8 +1,8 @@
 # UI architecture
 
 `jasper-ui` is the independent theme engine and Swing kit. The app composes it with Terminal
-and Buddy; plugins compile against the JDK-only SDK projection. Existing application consumers
-remain extraction sources until Plan 2. Plan 1's final branch review is Task 14.
+and Buddy; plugins compile against the JDK-only SDK projection. The coordinated Plan 2 migration makes this module the sole algorithm/token authority.
+Plan 3 owns final surface composition; the [completion record](design/theme-engine/completion.md) records the handoff.
 
 | Package | Allowed outgoing UI packages | Ownership |
 | --- | --- | --- |

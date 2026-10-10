@@ -40,6 +40,47 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StagedRemoteSftpTest {
     @TempDir Path root;
 
+    /** Measures the real mounted owner at its normal 5 Hz cadence, including layout and paint. */
+    @SuppressWarnings("try") // Staged host shutdown is awaited by the test; interruption is propagated.
+    @Test @Timeout(value = 90, unit = TimeUnit.SECONDS)
+    void measuresChangedTransfersWithTwoHundredListedFilesAtFiveHertz() throws Exception {
+        try (var remote = new StagedRemoteHost(root, true)) {
+            remote.openSftp(); remote.quietTransfers();
+            onEdt(() -> {
+                var files = new ArrayList<Object>();
+                for (int i=0;i<200;i++) files.add(remote.fileEntry("file-"+i+".txt", "FILE", 3700, 1000));
+                remote.sftpListing("prod", "/srv/app", files);
+                remote.sftp().setSize(360, 720);
+            });
+            StagedVaultHost.settle();
+            var ids = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+            var samples = new ArrayList<Double>();
+            for (int tick=0;tick<25;tick++) {
+                int step=tick;
+                long due=System.nanoTime()+200_000_000L;
+                onEdt(() -> {
+                    long start=System.nanoTime();
+                    var rows = new ArrayList<Object[]>();
+                    for (int i=0;i<ids.size();i++) rows.add(new Object[]{ids.get(i), "archive-"+i+".zip", step+" MiB / 100 MiB", step/100.0, false});
+                    remote.transferRows(rows);
+                    var view=remote.sftp(); StagedRemoteTunnelsTest.layout(view);
+                    var image=new java.awt.image.BufferedImage(360,720,java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                    var graphics=image.createGraphics(); try {view.paint(graphics);} finally {graphics.dispose();}
+                    if(step>=5) samples.add((System.nanoTime()-start)/1_000_000.0);
+                    assertThat(StagedRemoteHost.labels(view)).contains(step+" MiB / 100 MiB");
+                });
+                long remaining=due-System.nanoTime();
+                if(remaining>0) TimeUnit.NANOSECONDS.sleep(remaining);
+            }
+            var sorted=samples.stream().sorted().toList();
+            System.out.printf(java.util.Locale.ROOT,
+                "SFTP_PERF runtime=%s vendor=%s files=200 transfers=3 warmup=5 measured=20 cadenceHz=5 meanMs=%.3f p95Ms=%.3f maxMs=%.3f%n",
+                System.getProperty("java.runtime.version"),System.getProperty("java.vendor"),
+                samples.stream().mapToDouble(Double::doubleValue).average().orElseThrow(), sorted.get(18), sorted.getLast());
+            assertThat(remote.problems).isEmpty();
+        }
+    }
+
     @Test @Timeout(value = 90, unit = TimeUnit.SECONDS)
     void theSftpHeaderKeepsItsConnectionAndDotAndTheBrowserKeepsItsKeysAndGeometry() throws Exception {
         try (var remote = new StagedRemoteHost(root, true)) {

@@ -807,3 +807,11 @@ only document/gutter/scroll/viewports background and opacity, RSyntaxTextArea fo
 and JComponent opacity for gutter children. Its Gutter client property marks the single opacity follower.
 It cannot paint, construct controls, read global presentation defaults, or style arbitrary ordinary controls.
 The exact member-owner allowlist is in the checker; FlatLaf style writers remain forbidden.
+
+## Consumer migration completion
+
+Plan 2 uses the kit as the only standard-control presentation authority. SDK 0.15 is incompatible with
+pre-0.15 raw UI factories and raw presentation icons; all eight bundled manifests cut over together.
+The [completion audit](design/theme-engine/completion.md) records exact gate scope, owner tests, headless
+rendering, distribution checks and the named Plan 3 composition owners. App host Settings error/stub
+content uses the dialog kit context and closes with its page; it is not covered by the plugin-only compiled gate.

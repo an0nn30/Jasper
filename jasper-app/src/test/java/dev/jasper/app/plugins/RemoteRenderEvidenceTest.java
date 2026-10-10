@@ -1,5 +1,7 @@
 package dev.jasper.app.plugins;
 
+import com.formdev.flatlaf.util.UIScale;
+
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.sdk.contracts.ThemeMigrationCapture;
 import dev.jasper.sdk.ui.OverlaySpec;
@@ -230,7 +232,7 @@ class RemoteRenderEvidenceTest {
 
     /** Captures and checks the frame shows content: a blank, uniform frame fails. */
     static void save(String theme, String state, JComponent component, int width, int height) throws Exception {
-        onEdt(() -> ThemeMigrationCapture.save(FAMILY, theme, state, component, width, height));
+        onEdt(() -> ThemeMigrationCapture.save(FAMILY, theme, state, component, UIScale.scale(width), UIScale.scale(height)));
         var image = ImageIO.read(Path.of("build/theme-migration-evidence", FAMILY, theme, state + ".png").toFile());
         var colours = new HashSet<Integer>();
         for (int y = 0; y < image.getHeight(); y += 2) for (int x = 0; x < image.getWidth(); x += 2) colours.add(image.getRGB(x, y));

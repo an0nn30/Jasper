@@ -91,3 +91,6 @@ and Terminal > Font & Colors share the catalog. `themeimport` owns offline conve
 import operations and legacy-file recovery; `application.ThemeUpgrade` runs before ConfigService. The old stores
 are retired. See [themes](../docs/themes.md), [maintenance](../docs/app-maintenance.md#themes) and
 [third-party notices](../THIRD-PARTY-THEMES.md). Theme files reload live; Settings › Appearance imports them.
+
+The [Plan 2 completion audit](../docs/design/theme-engine/completion.md) records SDK 0.15 migration,
+headless validation and distribution visibility. Final screen composition is owned by Plan 3.

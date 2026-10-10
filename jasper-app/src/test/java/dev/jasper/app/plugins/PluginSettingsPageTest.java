@@ -140,7 +140,7 @@ class PluginSettingsPageTest {
             page.component();
             assertThat(page.valid()).as("an untouched page does not hold up the dialog").isTrue();
             assertThat(page.message().isVisible()).isTrue();
-            assertThat(page.message().getText()).contains("has errors");
+            assertThat(((javax.swing.JLabel) StagedVaultHost.named(page.message(), "plugin-page-text")).getText()).contains("has errors");
             page.draft().stage(size, Optional.of(15));
             assertThat(page.valid()).as("an edit cannot be saved to a rejected file").isFalse();
             page.reset();

@@ -1,5 +1,7 @@
 package dev.jasper.app.plugins;
 
+import com.formdev.flatlaf.util.UIScale;
+
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.app.workspace.DesktopTestSupport;
@@ -83,14 +85,14 @@ class FileServerRenderEvidenceTest {
                     assertThat(labels(header)).contains("File Servers");
                     assertThat(names(header)).contains("New File Server…", "Options", "Hide");
                     assertThat(labels(window).stream().filter("File Servers"::equals).count()).isEqualTo(1);
-                    ThemeMigrationCapture.save("fileserver-hosted", theme, "empty", panel, 540, 420);
+                    ThemeMigrationCapture.save("fileserver-hosted", theme, "empty", panel, UIScale.scale(540), UIScale.scale(420));
                     button(header, "New File Server…").doClick(0);
                 });
                 StagedVaultHost.await(() -> auxiliary.open().stream().anyMatch(surface -> surface.title().equals("New File Server") && !surface.closed()),
                     "editor dialog");
                 var editor = onEdtValue(() -> auxiliary.open().stream().filter(surface -> surface.title().equals("New File Server") && !surface.closed()).findFirst().orElseThrow());
                 onEdt(() -> {
-                    ThemeMigrationCapture.save("fileserver-hosted", theme, "new-server", editor.holder(), 820, 650);
+                    ThemeMigrationCapture.save("fileserver-hosted", theme, "new-server", editor.holder(), UIScale.scale(820), UIScale.scale(650));
                     ((JTextComponent) StagedVaultHost.named(editor.holder(), "server.name.input")).setText("Fixture");
                     ((JTextComponent) StagedVaultHost.named(editor.holder(), "server.folder.input")).setText(home.toString());
                     press(StagedVaultHost.named(editor.holder(), "server.name.input"), KeyEvent.VK_D, 'd');
@@ -103,7 +105,7 @@ class FileServerRenderEvidenceTest {
                 StagedVaultHost.await(() -> labels(find(window, "fileserver.panel").panelHeader("fileserver.panel")).contains("1"), "borrowed header count");
                 onEdt(() -> {
                     KitView panel = find(window, "fileserver.panel");
-                    ThemeMigrationCapture.save("fileserver-hosted", theme, "one-server", panel, 540, 500);
+                    ThemeMigrationCapture.save("fileserver-hosted", theme, "one-server", panel, UIScale.scale(540), UIScale.scale(500));
                     var row = firstRow(panel);
                     assertThat(row).as("a mounted File Server row").isNotNull();
                     StagedRemoteTunnelsTest.click(row, 1);
@@ -116,7 +118,7 @@ class FileServerRenderEvidenceTest {
                     press(canvas, KeyEvent.VK_D, 'd');
                     assertThat(StagedVaultHost.named(panel, "fileserver.details").isVisible()).isTrue();
                     seedActivity(plugin, window.id());
-                    ThemeMigrationCapture.save("fileserver-hosted", theme, "activity", panel, 540, 650);
+                    ThemeMigrationCapture.save("fileserver-hosted", theme, "activity", panel, UIScale.scale(540), UIScale.scale(650));
                     var history = (JScrollPane) StagedVaultHost.named(panel, "fileserver.activity.log");
                     assertThat(history.getViewport().getViewSize().height).isGreaterThan(history.getViewport().getExtentSize().height);
                     assertThat(history.getViewport().getViewPosition().y).as("newest activity stays visible").isGreaterThan(0);

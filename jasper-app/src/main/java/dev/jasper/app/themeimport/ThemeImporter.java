@@ -23,8 +23,9 @@ public final class ThemeImporter {
     public enum ConflictChoice { REPLACE, KEEP_BOTH, SKIP }
     public record Item(String id, ConversionResult conversion, Optional<Path> target,
                        Optional<String> expectedSha256, boolean shadowsBundled) {}
-    public record ImportPlan(List<Item> items, List<ThemeConverter.Failure> failures) {
-        public ImportPlan { items = List.copyOf(items); failures = List.copyOf(failures); }
+    public record ImportPlan(List<Item> items, List<ThemeConverter.Failure> failures, List<String> warnings) {
+        public ImportPlan { items = List.copyOf(items); failures = List.copyOf(failures); warnings = List.copyOf(warnings); }
+        public ImportPlan(List<Item> items, List<ThemeConverter.Failure> failures) { this(items, failures, List.of()); }
     }
     public record Imported(String id, String name, Path path) {}
     public record ImportReport(List<Imported> imported, List<String> warnings, List<ThemeConverter.Failure> failures) {
@@ -41,12 +42,16 @@ public final class ThemeImporter {
         worker();
         var conversion = ThemeConverter.convertAll(source);
         var failures = new ArrayList<>(conversion.failures());
+        var warnings = new ArrayList<String>();
         var items = new ArrayList<Item>();
         try {
             files.locked(() -> {
                 var snapshot = snapshot();
                 var owners = owners(snapshot);
-                snapshot.problems().forEach(problem -> failures.add(new ThemeConverter.Failure(problem.file().toString(), problem.message())));
+                snapshot.problems().forEach(problem -> {
+                    if (problem.advisory()) warnings.add(problem.file() + ": " + problem.message());
+                    else failures.add(new ThemeConverter.Failure(problem.file().toString(), problem.message()));
+                });
                 for (var result : conversion.results()) {
                     try {
                         ThemeFiles.serialized(result.document());
@@ -61,13 +66,13 @@ public final class ThemeImporter {
                 return null;
             });
         } catch (IOException | RuntimeException failure) { failures.add(new ThemeConverter.Failure(source.toString(), message(failure))); }
-        return new ImportPlan(items, failures);
+        return new ImportPlan(items, failures, warnings);
     }
 
     /** Validates the whole selection first. Publication may partly succeed; only committed files appear in imported. */
     public ImportReport commit(ImportPlan plan, Map<String, ConflictChoice> choices) {
         worker();
-        var imported = new ArrayList<Imported>(); var warnings = new ArrayList<String>();
+        var imported = new ArrayList<Imported>(); var warnings = new ArrayList<>(plan.warnings());
         var failures = new ArrayList<>(plan.failures());
         Map<String, ConflictChoice> selected = Map.copyOf(choices);
         try {

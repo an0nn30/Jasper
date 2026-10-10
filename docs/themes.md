@@ -24,16 +24,13 @@ dropdowns: **Theme** (the UI theme) and **Workspace scheme**, whose first entry,
 Terminal › Font & Colors links to them. The workspace scheme switches independently, including between two dark
 themes. The pane tab strip, find controls,
 split dividers, terminal palette, zone-aware icons and Editor syntax follow it. Menus, sidebars and dialogs follow
-the UI theme. Ordinary controls in hosted center plugin panes also follow the workspace, including lists, tables,
-trees, selections, headers, combo dropdowns, scrollbars, disabled controls and progress track/fill colors. A workspace
-combo's own dropdown is the sole popup exception: other menus and tooltips remain chrome. Plugin-authored styles and
-exempt custom document surfaces retain ownership. Moving a pane out of the workspace or selecting `match` removes
-the host's generated overrides without losing document edits, selection or undo. Remote SFTP/Tunnels, File Server
-and Vault rail panels remain chrome. Vim errors, bell feedback and banner rules resolve the mounted zone.
-
-FlatLaf 3.7 has no per-control progress text styling; an external plugin's string-painted progress bar can retain
-chrome text colors. Bundled transfers use a bar without painted text and a separate status label. Custom renderers
-and painters use mounted-owner palette lookup; see [plugin authoring](plugin-authoring.md#supported-custom-content).
+the UI theme. Standard plugin controls and their dropdowns are kit-owned and resolve the mounted
+chrome/workspace route. Moving a view updates its route while preserving document edits, selection and undo.
+Remote SFTP/Tunnels, File Server and Vault rail panels remain chrome. Vim errors and bell feedback follow the
+mounted Editor route. Specialized document content consumes explicit palettes; the native host publishes a
+shallow route marker and does not recursively restyle plugin descendants. Themes supply colors while the kit
+owns geometry, typography, delegates and popup presentation. Raw ordinary Swing controls and plugin-authored
+style overrides are unsupported in SDK 0.15; see [plugin authoring](plugin-authoring.md#supported-custom-content).
 
 User visual acceptance: try light chrome/dark workspace and the reverse, then two themes of the same darkness;
 inspect controls, selections, combo dropdowns, rail panels and popups; retain an edited document while moving,

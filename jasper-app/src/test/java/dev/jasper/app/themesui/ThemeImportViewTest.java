@@ -18,6 +18,19 @@ class ThemeImportViewTest {
         for (int i = 0; i < box.getItemCount(); i++) if (((dev.jasper.ui.model.Option) box.getItemAt(i)).label().equals(label)) { box.setSelectedIndex(i); return; }
         throw new AssertionError("No choice " + label);
     }
+    @Test void catalogAdvisoryAppearsOnceAlongsideIndependentProviderWarnings() {
+        var conversion = new ConversionResult(Theme.DARK.source().document(), List.of("provider warning"), "provider");
+        var one = new ThemeImporter.Item("one", conversion, Optional.empty(), Optional.empty(), false);
+        var two = new ThemeImporter.Item("two", conversion, Optional.empty(), Optional.empty(), false);
+        var view = new ThemeImportView(KitTestSupport.context(),
+            new ThemeImporter.ImportPlan(List.of(one, two), List.of(), List.of("catalog appearance advisory")), choices -> {}, () -> {});
+        try {
+            String text = KitTestSupport.require(view.view, "details", JLabel.class).getText();
+            assertThat(text.split("catalog appearance advisory", -1)).hasSize(2);
+            assertThat(text).contains("provider warning");
+            assertThat(KitTestSupport.require(view.view, "import", JButton.class).isEnabled()).isTrue();
+        } finally { view.view.close(); }
+    }
     @Test void distinctProviderDecisionsAreLiteralAndDefaultsSafe() {
         var conversion=new ConversionResult(Theme.DARK.source().document(),List.of("<html>console fallback"),"provider");
         var old=new ThemeImporter.Item("old",conversion,Optional.of(Path.of("mine.toml")),Optional.of("hash"),false);

@@ -79,11 +79,11 @@ class IntellijThemesTest {
         assertThat(text("SOURCE.md")).contains("DefaultColorSchemesManager.xml");
     }
 
-    @Test void everyBundledThemeResolvesAsAPluginThemesParentWithoutWarnings() {
+    @Test void everyBundledThemeResolvesAsAPluginThemesParentWithOnlyPolicyAdvisories() {
         PARENTS.forEach((id, dark) -> {
             String json = "{\"name\": \"Child of " + id + "\", \"dark\": " + dark + ", \"parentTheme\": \"" + id + "\"}";
             var resolved = ThemeParents.load("child.theme.json", json);
-            assertThat(resolved.warnings()).as(id).allMatch(w -> w.contains("discarded non-color override"));
+            assertThat(resolved.warnings()).as(id).allMatch(w -> w.contains("discarded non-color override") || (w.contains("no longer controls Jasper native UI") && w.contains("use [semantic]")));
             assertThat(resolved.dark()).as(id).isEqualTo(dark);
         });
     }

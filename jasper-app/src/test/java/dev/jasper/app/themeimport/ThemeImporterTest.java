@@ -15,6 +15,30 @@ import static org.assertj.core.api.Assertions.*;
 
 class ThemeImporterTest {
     @TempDir Path home;
+    @Test void catalogAppearanceAdvisoriesStayWarningsWhileMalformedFilesStayFailures() throws Exception {
+        Path themes = home.resolve("themes"); Files.createDirectories(themes);
+        Path warned = themes.resolve("warned.toml");
+        String original = "name='Warned'\nextends='Jasper Dark'\n[ui]\n'SearchEverywhere.SearchField.background'='#123456'\n";
+        Files.writeString(warned, original);
+        var importer = new ThemeImporter(home);
+        var plan = importer.plan(source("New theme"));
+        assertThat(plan.items()).hasSize(1);
+        assertThat(plan.failures()).isEmpty();
+        var report = importer.commit(plan, Map.of());
+        assertThat(report.imported()).hasSize(1);
+        assertThat(report.failures()).isEmpty();
+        assertThat(report.warnings().stream().filter(w -> w.contains("warned.toml") && w.contains("SearchEverywhere.SearchField.background"))).hasSize(1);
+        assertThat(Files.readString(warned)).isEqualTo(original);
+        Files.writeString(themes.resolve("broken.toml"), "name = [not toml");
+        var mixed = importer.plan(source("Another theme"));
+        assertThat(mixed.items()).hasSize(1);
+        assertThat(mixed.failures()).singleElement().satisfies(failure -> assertThat(failure.sourceEntry()).endsWith("broken.toml"));
+        var imported = importer.commit(mixed, Map.of());
+        assertThat(imported.imported()).hasSize(1);
+        assertThat(imported.failures()).hasSize(1);
+        assertThat(imported.warnings()).anySatisfy(warning -> assertThat(warning).contains("warned.toml", "SearchEverywhere.SearchField.background"));
+    }
+
     @Test void planningRejectsUnresolvedColorsWithSourceDiagnostics() throws Exception {
         var importer = new ThemeImporter(home);
         for (var ui : ThemeFilesTest.invalidUi()) {
@@ -54,7 +78,10 @@ class ThemeImporterTest {
                     assertThat(failure.message()).contains("cannot resolve [ui] color Panel.background"));
                 assertThat(Files.readAllBytes(target)).isEqualTo(original);
                 assertThat(catalog.scan().find("Example")).containsSame(selected);
-                assertThat(catalog.latest().problems()).isEmpty();
+                assertThat(catalog.latest().problems()).allSatisfy(problem -> {
+                    assertThat(problem.advisory()).isTrue();
+                    assertThat(problem.message()).contains("SearchEverywhere.SearchField.background", "[semantic]");
+                });
                 javax.swing.SwingUtilities.invokeAndWait(() -> {
                     assertThat(controller[0].choice()).isSameAs(selected);
                     assertThat(controller[0].current().chrome().name()).isEqualTo("Example");

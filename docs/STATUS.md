@@ -2,6 +2,21 @@
 
 ## Current state — 2026-10-10
 
+- **Plan2 Task12 implemented and verified; independent whole-branch review pending (2026-10-10).**
+  Tasks1–11 are independently approved through `2fc3bea8`; older pending-review bullets below are historical.
+  Task12 fixes plain Choice delegate loss on Swing updates and completes app-host plugin Settings stub/rejected-file/
+  failure controls with shared dialog KitContext/DETAIL and owned disposal. Controller-approved full-gate findings
+  preserve nonfatal catalog advisories through import planning/reporting, literal raw/canonical reload precedence,
+  and exact retained resource provenance. Historical raw preview tooling is retired; existing headless previews
+  now drive current owners and forward optional scale with equivalent logical plugin/title-bar capture bounds.
+  `./gradlew check :jasper-app:installDist` passed: 9,645 XML tests, zero failures/errors, six environment skips;
+  107 tasks, 24 executed/83 up-to-date. App/Buddy/terminal/UI tests executed; SDK/testkit/eight plugin suites were
+  up-to-date. Eight installed SDK0.15 plugin manifests, jar confinement and staged/build hashes were inspected.
+  Fresh default/enlarged captures, all-shipped/imported live-theme/font smoke and actual History500/SFTP5Hz timings
+  are in the [completion audit](design/theme-engine/completion.md). JavaDoc/fixture warning backlog is recorded,
+  not declared clean. Final report-only docs and opt-in preview corrections have focused verification after the
+  full gate. Independent whole-branch review remains controller-owned; Plan3 owns final native composition.
+
 - **Theme engine Plan2 Task11b implemented; independent review pending.** Task11a is independently approved
   through f8b94570. Private appearance/default publishers, recursive workspace styling, raw app icon loaders/catalog
   and unused raw settings-row scaffolding are removed. Shallow native routes, scoped PresentationIcon snapshot

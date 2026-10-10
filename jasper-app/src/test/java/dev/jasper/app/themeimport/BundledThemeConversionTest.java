@@ -41,7 +41,7 @@ class BundledThemeConversionTest {
         }
         var lines = Files.readAllLines(notices);
         var policyWarnings = lines.stream().filter(line -> line.startsWith("  - Conversion:")).toList();
-        assertThat(policyWarnings).isNotEmpty().allMatch(line -> line.contains("discarded non-color override"));
+        assertThat(policyWarnings).isNotEmpty().allMatch(line -> line.contains("discarded non-color override") || (line.contains("no longer controls Jasper native UI") && line.contains("use [semantic]")));
         assertThat(String.join("\n", lines.stream().filter(line -> !line.startsWith("  - Conversion:")).toList()) + "\n")
             .isEqualTo(Files.readString(ROOT.resolve("THIRD-PARTY-THEMES.md")));
     }
@@ -116,7 +116,10 @@ class BundledThemeConversionTest {
         var index = Files.readAllLines(bundled.resolve("index.txt"));
         for (String file : index) Files.copy(bundled.resolve(file), themes.resolve(file));
         var snapshot = dev.jasper.app.appearance.ThemeCatalog.beside(root.resolve("config.toml")).scan();
-        assertThat(snapshot.problems()).isEmpty();
+        assertThat(snapshot.problems()).allSatisfy(problem -> {
+            assertThat(problem.advisory()).isTrue();
+            assertThat(problem.message()).contains("no longer controls Jasper native UI", "use [semantic]");
+        });
         assertThat(snapshot.themes()).hasSize(index.size());
         assertThat(snapshot.names()).doesNotHaveDuplicates();
     }

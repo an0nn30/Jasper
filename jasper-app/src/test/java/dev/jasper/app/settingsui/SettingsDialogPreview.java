@@ -142,7 +142,8 @@ public final class SettingsDialogPreview {
                 SwingUtilities.invokeAndWait(() -> {
                     dialog.pages().stream().filter(page -> page.id().equals("plugins")).findFirst().orElseThrow().highlight("Tidy Tabs");
                     render(holder[0], output.resolve("plugins-" + suffix));
-                    tabbed(holder[0]).setSelectedIndex(1);
+                    // Details are now beside the list; show the contained-failure row through the page's real filter.
+                    dialog.pages().stream().filter(page -> page.id().equals("plugins")).findFirst().orElseThrow().highlight("Broken Example");
                     render(holder[0], output.resolve("plugins-details-" + suffix));
                     dialog.select("plugin.dev.example.editor");
                     render(holder[0], output.resolve("plugin-editor-" + suffix));
@@ -188,22 +189,6 @@ public final class SettingsDialogPreview {
     }
 
     private static void render(JComponent component, Path file) { render(component, file, 1000); }
-
-    private static javax.swing.JTabbedPane tabbed(java.awt.Component root) {
-        var found = findTabbed(root);
-        if (found == null) throw new IllegalStateException("No tabbed pane on the Plugins page");
-        return found;
-    }
-
-    private static javax.swing.JTabbedPane findTabbed(java.awt.Component component) {
-        if (component instanceof javax.swing.JTabbedPane tabs) return tabs;
-        if (component instanceof java.awt.Container container)
-            for (var child : container.getComponents()) {
-                var found = findTabbed(child);
-                if (found != null) return found;
-            }
-        return null;
-    }
 
     private static void render(JComponent component, Path file, int width) {
         component.setSize(width, 700);

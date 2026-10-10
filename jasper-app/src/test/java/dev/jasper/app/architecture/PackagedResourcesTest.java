@@ -27,7 +27,13 @@ class PackagedResourcesTest {
     @Test void productionJarPreservesResourcesAndContainsNoBuddyOrTestImplementation() throws Exception {
         try (var jar = new JarFile(System.getProperty("jasper.appJar"))) {
             for (String name : java.util.List.of(
-                "dev/jasper/app/icons/intellij/general/search.svg",
+                "dev/jasper/app/icons/intellij/terminal/toolwindow/terminal.svg",
+                "dev/jasper/app/icons/intellij/nodes/pluginLogo.svg",
+                "dev/jasper/app/icons/intellij/nodes/pluginLogo_dark.svg",
+                "dev/jasper/app/icons/intellij/assets.tsv",
+                "dev/jasper/app/icons/intellij/LICENSE.txt",
+                "dev/jasper/app/icons/intellij/NOTICE.txt",
+                "dev/jasper/app/icons/intellij/SOURCE.md",
                 "dev/jasper/app/icons/app/linux/icon-16.png",
                 "dev/jasper/app/icons/app/linux/icon-24.png",
                 "dev/jasper/app/icons/app/linux/icon-32.png",
@@ -60,9 +66,6 @@ class PackagedResourcesTest {
                 "dev/jasper/app/icons/app/windows/icon-72.png",
                 "dev/jasper/app/icons/app/windows/icon-80.png",
                 "dev/jasper/app/icons/app/windows/icon-96.png",
-                "dev/jasper/app/icons/intellij/general/settings.svg",
-                "dev/jasper/app/icons/intellij/general/refresh.svg",
-                "dev/jasper/app/icons/intellij/general/locked.svg",
                 "dev/jasper/app/shell-integration/bash/rc.bash",
                 "dev/jasper/app/shell-integration/fish/fish/vendor_conf.d/jasper.fish",
                 "dev/jasper/app/shell-integration/jasper.bash",
@@ -75,6 +78,9 @@ class PackagedResourcesTest {
                 "dev/jasper/app/themes/legacy-aliases.json"
             )) assertThat(jar.getJarEntry(name)).as(name).isNotNull();
             var names = jar.stream().filter(entry -> !entry.isDirectory()).map(java.util.jar.JarEntry::getName).toList();
+            assertThat(names.stream().filter(n -> n.startsWith("dev/jasper/app/icons/intellij/") && n.endsWith(".svg")).toList())
+                .containsExactlyInAnyOrder("dev/jasper/app/icons/intellij/terminal/toolwindow/terminal.svg",
+                    "dev/jasper/app/icons/intellij/nodes/pluginLogo.svg", "dev/jasper/app/icons/intellij/nodes/pluginLogo_dark.svg");
             assertThat(names).noneMatch(n -> n.startsWith("dev/jasper/buddy/") || n.startsWith("dev/jasper/app/buddy/")
                 || n.contains("TestSupport") || n.contains("Preview.class") || n.contains("ControlledSessionChild"));
             assertThat(jar.getJarEntry("dev/jasper/app/themes/FlatLaf.properties")).isNull();

@@ -35,6 +35,7 @@ final class ThemeImportView {
             for (var warning : item.conversion().warnings()) text.append(item.conversion().sourceEntry()).append(": ").append(warning).append('\n');
             if (item.shadowsBundled()) text.append(item.conversion().document().name()).append(": overrides a bundled theme\n");
         }
+        for (var warning : plan.warnings()) text.append(warning).append('\n');
         for (var failure : plan.failures()) text.append(failure.sourceEntry()).append(": ").append(failure.message()).append('\n');
         details = text.toString().strip();
         view = new KitView(context, spec(), event -> {

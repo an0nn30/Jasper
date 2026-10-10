@@ -208,6 +208,13 @@ final class Choices {
             setBorder(new EmptyBorder(ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0, ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0));
             setUI(kitUi());
         }
+        /** Swing reinstalls delegates on theme changes; ordinary choices retain kit painting and popup roles. */
+        @Override public void updateUI() {
+            if (context == null) { super.updateUI(); return; }
+            setUI(kitUi());
+            if (getRenderer() instanceof Component renderer) SwingUtilities.updateComponentTreeUI(renderer);
+            refreshPopup();
+        }
         /** The kit's popup for this combo; a searchable combo supplies its own. */
         ComboPopup createKitPopup(JComboBox<Object> comboBox) {
             popup = new BasicComboPopup(comboBox) {

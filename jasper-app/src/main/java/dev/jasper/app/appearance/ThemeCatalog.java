@@ -29,10 +29,11 @@ public final class ThemeCatalog {
     /** Theme files larger than this are refused. */
     public static final int MAX_THEME_FILE = 256 * 1024;
 
-    /** A problem with one file in the themes folder, shown as a configuration warning; {@code line} is 0 when unknown. */
-    public record Problem(Path file, int line, String message) {
+    /** A file diagnostic; advisory means the theme remains valid, and line is zero when unknown. */
+    public record Problem(Path file, int line, String message, boolean advisory) {
         public Problem { Objects.requireNonNull(file); Objects.requireNonNull(message); }
-        public Problem(Path file, String message) { this(file, 0, message); }
+        public Problem(Path file, int line, String message) { this(file, line, message, false); }
+        public Problem(Path file, String message) { this(file, 0, message, false); }
     }
 
     /** One scan: the themes in precedence order, and the problems met. */
@@ -192,7 +193,7 @@ public final class ThemeCatalog {
                 String text = java.nio.charset.StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();
                 var document = ThemeToml.parse(text, name);
                 var warnings = ThemeToml.warnings(text, name).stream()
-                    .map(warning -> new Problem(file, warning.line(), warning.message())).toList();
+                    .map(warning -> new Problem(file, warning.line(), warning.message(), true)).toList();
                 return new Read(fingerprint, List.of(), document, warnings);
             } catch (ThemeFileException failure) {
                 return new Read(fingerprint, List.of(), null, List.of(new Problem(file, failure.line(), failure.getMessage())));

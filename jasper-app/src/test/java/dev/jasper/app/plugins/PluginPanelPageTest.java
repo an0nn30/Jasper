@@ -289,6 +289,41 @@ class PluginPanelPageTest {
         });
     }
 
+    @Test void hostOwnedFailureAndStoppedPagesFollowLiveThemeAndCloseTheirViews() {
+        start(settings -> {
+            settings.declare(SettingSpec.of("vim", SettingKind.bool(), false).label("Vim mode"));
+            settings.page(rows -> { throw new IllegalStateException("<html>boom"); });
+        });
+        onEdt(() -> {
+            try (var themes = new dev.jasper.app.appearance.ThemeController()) {
+                var live = new PageContext(null, id -> {}, Runnable::run, (title, initial) -> Optional.empty(), () -> {}, () -> null,
+                    () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
+                var page = (PluginPanelPage) host.settingsPages(live).getFirst();
+                var stub = new PluginStubPage("dev.example.off", "Off", "<html>unavailable", () -> {}, live.kit());
+                try {
+                    var body = page.component(); var stopped = stub.component();
+                    var failure = (JLabel) StagedVaultHost.named(page.content(), "plugin-page-text");
+                    var reason = (JLabel) StagedVaultHost.named(stopped, "plugin-stub.reason");
+                    for (var theme : List.of(dev.jasper.app.appearance.Theme.JASPER_LIGHT, dev.jasper.app.appearance.Theme.DARK)) {
+                        themes.configure(theme, new dev.jasper.app.config.UiFontConfig("system", 24));
+                        assertThat(page.component()).isSameAs(body);
+                        assertThat(stub.component()).isSameAs(stopped);
+                        assertThat(failure.getText()).isEqualTo("This page could not be shown: <html>boom");
+                        assertThat(reason.getText()).isEqualTo("Not running: <html>unavailable");
+                        assertThat(failure.getClientProperty("html")).isNull();
+                        assertThat(failure.getForeground()).isEqualTo(live.kit().get().theme().semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
+                        assertThat(reason.getForeground()).isEqualTo(live.kit().get().theme().semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
+                        assertThat(failure.getFont().getSize2D()).isGreaterThanOrEqualTo(24);
+                        dev.jasper.sdk.contracts.ThemeMigrationCapture.save("plugin-settings-host",theme.id(),"failed",body,640,360);
+                        dev.jasper.sdk.contracts.ThemeMigrationCapture.save("plugin-settings-host",theme.id(),"stopped",stopped,640,360);
+                    }
+                } finally { page.dispose(); stub.dispose(); }
+                assertThat(((dev.jasper.ui.swing.KitView) page.content()).isClosed()).isTrue();
+                assertThat(page.message().isClosed()).isTrue();
+            }
+        });
+    }
+
     @Test void aPageThatFailsToBuildShowsWhyAndSettingsCarriesOn() {
         start(settings -> {
             settings.declare(SettingSpec.of("vim", SettingKind.bool(), false).label("Vim mode"));
@@ -297,8 +332,8 @@ class PluginPanelPageTest {
         var page = (PluginPanelPage) onEdtValue(() -> host.settingsPages(context)).getFirst();
         onEdt(() -> {
             assertThat(page.component()).isNotNull();
-            assertThat(page.content()).isInstanceOf(JLabel.class);
-            assertThat(((JLabel) page.content()).getText()).isEqualTo("This page could not be shown: boom");
+            assertThat(page.content()).isInstanceOf(dev.jasper.ui.swing.KitView.class);
+            assertThat(((JLabel) StagedVaultHost.named(page.content(), "plugin-page-text")).getText()).isEqualTo("This page could not be shown: boom");
         });
         assertThat(host.failures(ID)).isPositive();
     }
@@ -311,7 +346,7 @@ class PluginPanelPageTest {
         var page = (PluginPanelPage) onEdtValue(() -> host.settingsPages(context)).getFirst();
         onEdt(() -> {
             page.component();
-            assertThat(((JLabel) page.content()).getText())
+            assertThat(((JLabel) StagedVaultHost.named(page.content(), "plugin-page-text")).getText())
                 .isEqualTo("This page could not be shown: java.lang.IllegalStateException");
         });
     }
@@ -322,8 +357,9 @@ class PluginPanelPageTest {
         var page = (PluginPanelPage) onEdtValue(() -> host.settingsPages(context)).getFirst();
         onEdt(() -> {
             page.component();
+            assertThat(page.message()).isInstanceOf(dev.jasper.ui.swing.KitView.class);
             assertThat(page.message().isVisible()).isTrue();
-            assertThat(page.message().getText()).contains("has errors");
+            assertThat(((JLabel) StagedVaultHost.named(page.message(), "plugin-page-text")).getText()).contains("has errors");
             assertThat(page.valid()).as("an untouched page does not hold up the dialog").isTrue();
             panel.host.stage(panel.size, 20);
             assertThat(page.valid()).as("an edit cannot be saved to a rejected file").isFalse();
@@ -417,7 +453,7 @@ class PluginPanelPageTest {
     @Test void eachPluginGetsOnePageAndASupersededCopyGetsNone() {
         assertThat(PluginRuntime.stubbed(status("dev.example.x", PluginStatus.State.SKIPPED,
             "superseded by version 2.0.0 from DEVELOPMENT"))).isFalse();
-        var running = new PluginStubPage("dev.example.run", "Run", "", () -> { });
+        var running = new PluginStubPage("dev.example.run", "Run", "", () -> { }, context.kit());
         var statuses = List.of(
             status("dev.example.run", PluginStatus.State.ACTIVE, ""),
             status("dev.example.run", PluginStatus.State.DISABLED, "safe mode"),
@@ -428,7 +464,7 @@ class PluginPanelPageTest {
             status("dev.example.two", PluginStatus.State.NEEDS_CONSENT, "not reviewed yet"),
             status("dev.example.gap", PluginStatus.State.SKIPPED, "requires dev.example.none, which is not installed"));
         var pages = PluginRuntime.withStubs(List.of(running), statuses,
-            status -> new PluginStubPage(status.id(), status.name(), status.reason(), () -> { }));
+            status -> new PluginStubPage(status.id(), status.name(), status.reason(), () -> { }, context.kit()));
         assertThat(pages).map(SettingsPage::id).doesNotHaveDuplicates()
             .containsExactlyInAnyOrder("plugin.dev.example.run", "plugin.dev.example.two", "plugin.dev.example.gap");
         assertThat(pages).contains(running);
@@ -436,14 +472,17 @@ class PluginPanelPageTest {
 
     @Test void pluginsThatAreNotRunningGetAStubAndOnlyWhenTheUserMeantThemToRun() {
         var opened = new ArrayList<String>();
-        var stub = new PluginStubPage("dev.example.off", "Off", "not reviewed yet", () -> opened.add("open"));
+        var stub = new PluginStubPage("dev.example.off", "Off", "not reviewed yet", () -> opened.add("open"), context.kit());
         onEdt(() -> {
             assertThat(stub.id()).isEqualTo("plugin.dev.example.off");
             assertThat(stub.parent()).contains("tools");
-            stub.component();
+            assertThat(stub.component()).isInstanceOf(dev.jasper.ui.swing.KitView.class);
             assertThat(stub.text()).isEqualTo("Start Off to edit its settings.");
             assertThat(stub.reason()).isEqualTo("Not running: not reviewed yet");
-            stub.open.doClick();
+            var open = (javax.swing.AbstractButton) StagedVaultHost.named(stub.component(), "plugin-stub.open");
+            open.doClick(0);
+            stub.dispose(); stub.dispose();
+            open.doClick(0); // closed host content cannot call into the owner again.
         });
         assertThat(opened).containsExactly("open");
         assertThat(PluginRuntime.stubbed(status(PluginStatus.State.NEEDS_CONSENT, "not reviewed yet"))).isTrue();

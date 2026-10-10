@@ -835,7 +835,7 @@ public final class PluginRuntime {
         PluginCatalog.Launch started = launch;
         if (current == null || started == null) return List.of();
         return withStubs(current.settingsPages(context), started.statuses(),
-            status -> new PluginStubPage(status.id(), status.name(), status.reason(), () -> openSettingsFile(status.id())));
+            status -> new PluginStubPage(status.id(), status.name(), status.reason(), () -> openSettingsFile(status.id()), context.kit()));
     }
 
     /**

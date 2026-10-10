@@ -167,3 +167,6 @@ name for `detail`; `active` adds a connected status dot. Each `PanelHeader.Actio
 accessible label, icon and UI-thread callback. Header updates work while the panel is hidden;
 callbacks are contained like other plugin actions and become inert when the instance closes.
 Use `PanelHeader.EMPTY` to clear the contribution. The final semantic-action signature requires SDK 0.15.0.
+
+The [Plan 2 completion audit](../docs/design/theme-engine/completion.md) records SDK 0.15 migration,
+headless validation and distribution visibility. Final screen composition is owned by Plan 3.

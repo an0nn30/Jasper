@@ -53,13 +53,17 @@ public final class TitleBarPreview {
         System.out.println(output);
     }
 
-    private static void render(JRootPane root, WindowContent owner, MacTitleBar bar, Path output, Theme theme, String name, int width) {
+    private static void render(JRootPane root, WindowContent owner, MacTitleBar bar, Path output, Theme theme, String name, int logicalWidth) {
+        int width = com.formdev.flatlaf.util.UIScale.scale(logicalWidth);
         int height = bar.getPreferredSize().height;
-        WindowTabsTest.layout(root, width, 620);
+        WindowTabsTest.layout(root, width, com.formdev.flatlaf.util.UIScale.scale(620));
         assertThat(bar.getWidth()).isEqualTo(width);
         assertThat(owner.tabStrip().getTabCount()).as("actual tab owner for %s", name).isEqualTo(name.equals("single") ? 1 : 2);
-        assertThat(owner.windowTabs().getWidth()).isEqualTo(width);
-        assertThat(owner.windowTabs().getHeight()).isPositive();
+        assertThat(owner.windowTabs().isVisible()).isEqualTo(!name.equals("single"));
+        if (owner.windowTabs().isVisible()) {
+            assertThat(owner.windowTabs().getWidth()).isEqualTo(width);
+            assertThat(owner.windowTabs().getHeight()).isPositive();
+        }
         if (name.equals("tmux-tabs")) assertThat(WindowTabsTest.named(owner.windowTabs(), "select:Reviewing the notification implementation")).isNotNull();
         var field = owner.chrome().search();
         assertThat(root.getWidth()).as("containing root width for %s", name).isEqualTo(width);
@@ -67,7 +71,7 @@ public final class TitleBarPreview {
         assertThat(field.getHeight()).isPositive();
         assertThat(field.getX()).isGreaterThanOrEqualTo(0);
         assertThat(field.getX() + field.getWidth()).isLessThanOrEqualTo(width);
-        assertThat(field.collapsed()).as("only narrow captures collapse context").isEqualTo(width < 500);
+        assertThat(field.collapsed()).as("only narrow captures collapse context").isEqualTo(logicalWidth < 500);
         if (name.equals("tmux-tabs")) assertThat(field.contextText()).contains("Claude Code");
         if (name.startsWith("remote")) assertThat(field.contextText()).contains("staging-01");
         var image = new BufferedImage(width * 2, height * 2, BufferedImage.TYPE_INT_RGB);
@@ -78,6 +82,7 @@ public final class TitleBarPreview {
         catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
         // Tabs are owned below the titlebar. Preserve their actual region separately from the strip.
         var tabs = owner.windowTabs();
+        if (!tabs.isVisible()) return; // One tab intentionally has no strip in the current workspace.
         var tabImage = new BufferedImage(width * 2, tabs.getHeight() * 2, BufferedImage.TYPE_INT_RGB);
         var tabGraphics = tabImage.createGraphics();
         try { tabGraphics.scale(2, 2); tabs.printAll(tabGraphics); }
