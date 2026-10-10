@@ -47,6 +47,7 @@ public record ViewSpec(Node root) {
                 references(n.selectedIds(), new HashSet<>(n.items().stream().map(ListItem::id).toList()));
                 for (var item : n.items()) { item.leading().ifPresent(children::add); children.addAll(item.title()); children.addAll(item.subtitle()); children.addAll(item.trailing()); }
             }
+            case PickerMenu ignored -> {}
             case Choice n -> {
                 if (!n.selectedId().isEmpty()) references(Set.of(n.selectedId()), new HashSet<>(n.options().stream().map(Option::id).toList()));
             }

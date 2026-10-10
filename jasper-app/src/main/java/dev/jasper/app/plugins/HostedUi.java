@@ -74,7 +74,7 @@ final class HostedUi {
     private final List<Consumer<Variant>> workspaceHandlers = new ArrayList<>();
 
     private HostedKit kit;
-    void kit(HostedKit value) { kit = java.util.Objects.requireNonNull(value); }
+    void kit(HostedKit value) { kit = java.util.Objects.requireNonNull(value); kit.anchorHost=windows; }
     private final String pluginId;
     private final Contributions model;
     private final Containment containment;
@@ -681,11 +681,19 @@ final class HostedUi {
                 closers.add(surface::close);
                 return new OwnedDialog(surface);
             }
+            @Override public dev.jasper.sdk.ui.PluginPopover popover(dev.jasper.sdk.ui.UiAnchor value) {
+                guard("popover");var anchor=HostedAnchor.require(value,windows);
+                var popup=new HostedPopover(kit,anchor);var stop=tracked(popup::close);popup.onClosed(stop::close);return popup;
+            }
             @Override public PluginDialog dialog(DialogSpec spec) {
                 guard("dialog");
                 WindowOwner owner = resolveContentOwner(spec.owner());
                 AuxiliarySurface surface;
-                if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window)
+                if (owner instanceof dev.jasper.sdk.ui.UiAnchor value) {
+                    var anchor=HostedAnchor.require(value,windows);
+                    surface=windows.dialog(spec.title(),spec.modal(),anchor.target);
+                    var registration=anchor.onClosed(surface::close);surface.onClosed(registration::close);
+                } else if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window)
                     surface = windows.dialog(spec.title(), spec.modal(), window.surface);
                 else if (owner instanceof WindowHandle terminalWindow && terminals.ownsOpenWindow(terminalWindow)) surface = windows.dialog(spec.title(), spec.modal(), terminalWindow.id());
                 else throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");

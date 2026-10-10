@@ -1,0 +1,95 @@
+package dev.jasper.app.plugins;
+
+import dev.jasper.sdk.plugin.Plugin;
+import dev.jasper.ui.swing.KitView;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.nio.file.*;
+import java.time.Duration;
+import java.util.*;
+import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.function.*;
+import javax.imageio.ImageIO;
+import javax.swing.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import static dev.jasper.app.plugins.AppContractTest.*;
+import static dev.jasper.app.plugins.StagedVaultHost.*;
+import static org.assertj.core.api.Assertions.*;
+
+/** Actual staged Vault -> owned popup -> editor -> Remote import, through the real host, with synthetic sshDir. */
+class StagedAnchoredPickerTest {
+ @TempDir Path root;
+ @Test void sixCompactStatesAndRealCreationRenderFromTheMountedImportRoute()throws Exception{
+  var theme=onEdtValue(dev.jasper.app.appearance.ThemeController::new);
+  var themeDocument=dev.jasper.ui.themeio.ThemeToml.parse(Files.readString(Path.of(System.getProperty("jasper.repoRoot"),"jasper-app/src/test/resources/dev/jasper/app/plugins/desktop-picker.toml")),"picker-calibration");
+  var reference=dev.jasper.ui.theme.ThemeGenerator.generate(dev.jasper.ui.theme.ThemeResolver.resolve(themeDocument));
+  var pair=new dev.jasper.app.appearance.ResolvedTheme(reference,reference);
+  var appearance=onEdtValue(()->new WorkspaceAppearanceFixture(pair));
+  try(var vault=new StagedVaultHost(root.resolve("home"),true,appearance)){
+   vault.createVault("synthetic-preview-password");onEdt(()->vault.surface("Credential Vault").close());
+   var ssh=Files.createDirectories(root.resolve("ssh"));Files.writeString(ssh.resolve("config"),"Host picker-demo\n HostName picker-demo.invalid\n User fixture\n");
+   var staged=Path.of(System.getProperty("jasper.stagedPlugins")).resolve("dev.jasper.remote");
+   try(var loader=new PluginClassLoader("dev.jasper.remote",ManagedVaultLoadingTest.jars(staged),getClass().getClassLoader(),Map.of("dev.jasper.vault.api",vault.loader))){
+    var constructor=loader.loadClass("dev.jasper.remote.RemotePlugin").getDeclaredConstructor(Executor.class,Function.class,BiFunction.class,Path.class);constructor.setAccessible(true);
+    var remote=(Plugin)constructor.newInstance((Executor)SwingUtilities::invokeLater,(Function<Object,Optional<Object>>)c->Optional.empty(),(BiFunction<Duration,Runnable,Runnable>)(delay,task)->()->{},ssh);
+    onEdt(()->vault.host.start(new HostedPlugin(StagedRemoteHost.REMOTE,Set.of(),Set.of("dev.jasper.vault","dev.jasper.editor"),Set.of("dev.jasper.remote.api"),loader,()->remote)));
+    vault.invoke("dev.jasper.remote.import");var form=vault.awaitSurface("Import from ~/.ssh/config");await(()->form.shown()&&form.holder().getComponentCount()>0,"import preview mounted");
+    onEdt(()->{
+     capture("empty",kitView(form));click(form,"import.choose.0.input");
+     var menu=menu(vault);capture("open-empty",menu);search(menu,"staging");capture("no-matches",menu);enter(named(menu,"credential.menu.search"));
+     click(vault.surface("New Credential"),"create.login");var editor=vault.surface("Add Login");
+     assertThat(editor.ownerSurface()).contains(form);type(editor,"name.input","fixture login");type(editor,"username.input","fixture-with-a-deliberately-long-synthetic-username");type(editor,"password.input","synthetic-secret");click(editor,"save");
+    });
+    await(()->menus(vault).size()==1,"picker returns after saving Login");
+    onEdt(()->{
+     var menu=menu(vault);assertThat(((dev.jasper.ui.model.Nodes.PickerMenu)menu.spec().root()).query()).isEqualTo("staging");
+     search(menu,"");select(menu,1);enter(named(menu,"credential.menu.search"));
+    });
+    await(()->!((dev.jasper.ui.model.Nodes.Choice)node(form,"import.choose.0")).face().orElseThrow().primary().isEmpty(),"chosen metadata projected");
+    onEdt(()->{capture("selected",kitView(form));KitView menu;
+     click(form,"import.choose.0.input");menu=menu(vault);capture("open",menu);capture("open-face",kitView(form));
+     var field=(JTextField)named(menu,"credential.menu.search");var document=field.getDocument();field.setText("fixt");field.setCaretPosition(2);capture("filtering",menu);
+     var light=dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+     appearance.setPair(new dev.jasper.app.appearance.ResolvedTheme(light,light));capture("filtering-light",menu);
+     appearance.setPair(theme.current());capture("filtering-default-theme",menu);appearance.setPair(pair);
+     var raw=new HashMap<Object,Object>();UIManager.getDefaults().forEach(raw::put);var font=raw.get("defaultFont");try{UIManager.put("defaultFont",new Font("Dialog",Font.PLAIN,20));capture("filtering-enlarged",menu);capture("selected-enlarged",kitView(form));}finally{UIManager.put("defaultFont",font);}
+     menu.setAvailableHeight(90);capture("filtering-short",menu);assertThat(menu.getPreferredSize().height).isLessThanOrEqualTo(90);menu.setAvailableHeight(Integer.MAX_VALUE);
+     capture("selected-narrow",kitView(form),330);
+     assertThat(field.getDocument()).isSameAs(document);assertThat(field.getCaretPosition()).isEqualTo(2);
+     field.setText("staging");capture("no-matches-selected",menu);
+     field.getActionMap().get("picker.escape").actionPerformed(null);
+    });
+    settle();onEdt(()->click(form,"import.import"));
+    var review=vault.awaitSurface("Import SSH keys");onEdt(()->{capture("disabled-review",kitView(form));click(review,"commit");});
+    await(()->!node(form,"import.import").state().enabled()&&((dev.jasper.ui.model.Nodes.Text)node(form,"import.status")).text().contains("saved"),"import completion");
+    onEdt(()->{capture("disabled",kitView(form));assertThat(vault.problems).isEmpty();});
+   }
+  }finally{onEdt(theme::close);}
+ }
+ static List<HostedKitView> menus(StagedVaultHost vault){try{
+  var contextsField=PluginHost.class.getDeclaredField("contexts");contextsField.setAccessible(true);var context=(HostedContext)((Map<?,?>)contextsField.get(vault.host)).get("dev.jasper.vault");
+  var kit=(HostedKit)context.kit();var viewsField=HostedKit.class.getDeclaredField("views");viewsField.setAccessible(true);
+  @SuppressWarnings("unchecked")var views=(Set<HostedKitView>)viewsField.get(kit);
+  return views.stream().filter(v->v.spec().root() instanceof dev.jasper.sdk.ui.Nodes.PickerMenu).toList();
+ }catch(ReflectiveOperationException e){throw new AssertionError(e);}}
+ static KitView menu(StagedVaultHost vault){return menus(vault).getFirst().component();}
+ static void search(KitView menu,String text){((JTextField)named(menu,"credential.menu.search")).setText(text);}
+ static void select(KitView menu,int index){((JList<?>)named(menu,"credential.menu.rows")).setSelectedIndex(index);}
+ static void capture(String state,KitView view){capture(state,view,0);}
+ static void capture(String state,KitView view,int width){
+  try{
+   Path output=Path.of("build/theme-migration-evidence/anchored-picker/actual");Files.createDirectories(output);
+   var size=view.getPreferredSize();if(width>0)size.width=width;view.setSize(size);layout(view);
+   var image=new BufferedImage(size.width*2,size.height*2,BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();g.scale(2,2);view.printAll(g);g.dispose();ImageIO.write(image,"png",output.resolve(state+".png").toFile());
+   var input=named(view,"import.choose.0.input");var bounds=input==null?new Rectangle():SwingUtilities.convertRectangle(input.getParent(),input.getBounds(),view);
+   var field=named(view,"credential.menu.search");
+   var defaults=new HashMap<Object,Object>();UIManager.getDefaults().forEach(defaults::put);
+   String typography="\"searchFont\":"+json(field==null?null:field.getFont())+",\"searchFontSize2D\":"+(field==null?"null":field.getFont().getSize2D())+",\"uiScale\":"+com.formdev.flatlaf.util.UIScale.getUserScaleFactor()+",\"defaultFontOverride\":"+json(defaults.get("defaultFont"))+",\"labelFontOverride\":"+json(defaults.get("Label.font"))+",\"familyOverride\":"+json(UIManager.get("Jasper.uiFontFamilyOverride"))+",";
+   Files.writeString(output.resolve(state+".json"),"{"+typography+"\"state\":\""+state+"\",\"owner\":\""+view.spec().root().getClass().getSimpleName()+"\",\"logicalWidth\":"+size.width+",\"logicalHeight\":"+size.height+",\"deviceScale\":2,\"faceBounds\": ["+bounds.x+","+bounds.y+","+bounds.width+","+bounds.height+"],\"native\":false}");
+  }catch(java.io.IOException e){throw new java.io.UncheckedIOException(e);}
+ }
+ static String json(Object value){return value==null?"null":"\""+value.toString().replace("\\","\\\\").replace("\"","\\\"")+"\"";}
+ static void layout(Container c){for(int n=0;n<3;n++){c.doLayout();for(var child:c.getComponents())if(child instanceof Container nested)layout(nested);}}
+}

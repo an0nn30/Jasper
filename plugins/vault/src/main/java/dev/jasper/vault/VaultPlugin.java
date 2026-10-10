@@ -115,6 +115,7 @@ public class VaultPlugin implements Plugin {
                 case LOCKED -> service.requestUnlock(owner);
                 case UNLOCKED -> CompletableFuture.completedFuture(true);
             }, this::showImport, this::vaultChanged);
+        service.anchoredPicker(prompt -> new dev.jasper.vault.ui.AnchoredPicker(context,manager,prompt).show(), anchor -> context.windows().popover(anchor).close());
         context.services().publishPerConsumer(VaultApi.class, service::forConsumer);
         locked = "lock";
         unlocked = "unlock";
@@ -250,13 +251,16 @@ public class VaultPlugin implements Plugin {
     private void showUnlock(UnlockPrompt prompt) {
         currentUnlock = prompt;
         prompt.onDismiss(() -> { if (currentUnlock == prompt) currentUnlock = null; });
-        if (managerWindow != null && managerWindow.showUnlock(prompt)) return;
-        PluginDialog dialog = context.windows().dialog(new DialogSpec("Unlock Vault", owner(prompt.owner()), true));
+        if (!prompt.anchored() && managerWindow != null && managerWindow.showUnlock(prompt)) return;
+        var presentation=prompt.presentationOwner();
+        PluginDialog dialog = context.windows().dialog(new DialogSpec("Unlock Vault", prompt.anchored()?presentation:owner(prompt.owner()), true));
         PasswordPanel panel = PasswordPanel.unlock(context.kit(), prompt);
         dialog.setContent(panel.view());
-        prompt.onDismiss(() -> { panel.clear(); dialog.close(); });
+        boolean[] active={true};
+        prompt.onPresentationRetired(()->{active[0]=false;panel.close();dialog.close();});
+        prompt.onDismiss(() -> {if(active[0]){panel.clear();dialog.close();}});
         // The surface disposed the view first; close the form before the prompt can report to it.
-        dialog.onClosed(() -> { panel.close(); prompt.cancel(); });
+        dialog.onClosed(() -> { panel.close();if(active[0]&&prompt.presentationOwner()==presentation)prompt.cancel(); });
         dialog.show();
     }
 

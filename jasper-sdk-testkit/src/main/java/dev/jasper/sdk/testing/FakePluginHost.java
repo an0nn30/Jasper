@@ -966,6 +966,9 @@ public final class FakePluginHost implements AutoCloseable {
             .map(w -> w.mounted).filter(java.util.Objects::nonNull).findFirst();
     }
 
+    /** Shown producer-owned popover views, in creation order, for deterministic input/lifetime tests.
+     * @param pluginId content producer @return live mounted views */
+    public List<FakeKitView> popoverViews(String pluginId){var context=contexts.get(pluginId);if(context==null)return List.of();return context.ui.popovers.stream().filter(p->p.shown&&!p.closed&&p.content!=null).map(p->p.content).toList();}
     /** The currently shown plugin windows. */
     public List<String> windows() {
         List<String> lines = new ArrayList<>();

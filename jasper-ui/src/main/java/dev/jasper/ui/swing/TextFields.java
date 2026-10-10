@@ -324,6 +324,7 @@ final class TextFields {
     }
     static final class FieldSurface extends JPanel {
         boolean hero;
+        DesignMetrics.Role heightRole=DesignMetrics.Role.FIELD_HEIGHT;
         final KitContext context; final JTextComponent input; final boolean multiline;
         Typography.Role role = Typography.Role.BODY; String hint = ""; boolean error;
         /** The parent surface is the field's backdrop: no input fill, the outline kept. */
@@ -334,7 +335,7 @@ final class TextFields {
         }
         @Override public Dimension getPreferredSize() {
             var size = super.getPreferredSize();
-            int height = ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_FIELD_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT, role);
+            int height = ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_FIELD_HEIGHT : heightRole, role);
             return new Dimension(size.width, multiline ? Math.max(size.height, height) : height);
         }
         /**

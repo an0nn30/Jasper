@@ -49,6 +49,15 @@ public final class AuxiliaryWindows implements AutoCloseable {
         return track(new AuxiliarySurface("", title, AuxiliarySurface.Kind.DIALOG, modal, new Dimension(1, 1), null, owner, shells));
     }
 
+    /** A checked control attachment resolves to its actual containing native surface, including a modal dialog. */
+    public AuxiliarySurface dialog(String title, boolean modal, javax.swing.JComponent anchor) {
+        for(var surface:open) if(surface.shown() && javax.swing.SwingUtilities.isDescendingFrom(anchor,surface.holder()))
+            return dialog(title,modal,surface);
+        if(!anchor.isShowing())throw new IllegalArgumentException("Anchor has no shown owner");
+        var result=new AuxiliarySurface("",title,AuxiliarySurface.Kind.DIALOG,modal,new Dimension(1,1),null,null,shells);
+        result.anchorOwner(anchor);return track(result);
+    }
+
     /**
      * A modal dialog that remembers its bounds under {@code id}: over the terminal window {@code ownerWindowOrNull}, or
      * application-modal with no owner when it is null. Showing it blocks until it closes.

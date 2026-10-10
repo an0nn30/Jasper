@@ -157,6 +157,7 @@ final class FakeUi {
         actions.clear(); toolbar.clear(); sections.clear(); topLevelIds.clear(); status.clear();
         for (Panel panel : List.copyOf(panels)) panel.instances.values().forEach(PanelInstance::close);
         panels.clear(); railActions.clear();
+        for(var popup:List.copyOf(popovers))popup.close();
         for (FakeWindow window : List.copyOf(windows)) window.close();
     }
 
@@ -438,6 +439,19 @@ final class FakeUi {
         } finally { if (document != null) document.pins--; }
     }
 
+    private FakeKitView.Attachment requireAnchor(dev.jasper.sdk.ui.UiAnchor value){
+        if(!(value instanceof FakeKitView.Attachment anchor)||anchor.host!=host||!anchor.isOpen())throw new IllegalArgumentException("Foreign or expired anchor");return anchor;
+    }
+    final class FakePopover implements dev.jasper.sdk.ui.PluginPopover {
+        final FakeKitView.Attachment anchor;final List<Runnable> listeners=new ArrayList<>();
+        FakeKitView content;boolean closed,shown;final Subscription lifetime;
+        FakePopover(FakeKitView.Attachment anchor){this.anchor=anchor;lifetime=anchor.onClosed(this::close);}
+        public void setContent(dev.jasper.sdk.ui.UiView view){context.requireOpen();if(closed)throw new IllegalStateException("Popover closed");var next=context.kit().requireOwned(view);next.mount(this);if(next==content)return;var previous=content;content=next;if(previous!=null)previous.close();}
+        public void show(){context.requireOpen();if(closed||!anchor.isOpen())throw new IllegalArgumentException("Expired anchor");if(content==null)throw new IllegalStateException("Missing popup content");shown=true;}
+        public Subscription onClosed(Runnable handler){java.util.Objects.requireNonNull(handler);if(closed){handler.run();return () -> {}; }listeners.add(handler);return () -> listeners.remove(handler);}
+        public void close(){if(closed)return;closed=true;if(lifetime!=null)lifetime.close();if(content!=null)content.close();popovers.remove(this);for(var listener:List.copyOf(listeners))listener.run();listeners.clear();}
+    }
+    final List<FakePopover> popovers=new ArrayList<>();
     Windows windows() {
         return new Windows() {
             @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, dev.jasper.sdk.ui.UiView content) {
@@ -506,16 +520,19 @@ final class FakeUi {
                 windows.add(overlay);
                 return overlay;
             }
+            @Override public dev.jasper.sdk.ui.PluginPopover popover(dev.jasper.sdk.ui.UiAnchor value){context.requireOpen();var popup=new FakePopover(requireAnchor(value));popovers.add(popup);return popup;}
             @Override public PluginDialog dialog(DialogSpec spec) {
                 context.requireOpen();
                 WindowOwner owner = spec.owner();
                 FakeWindow parent = null;
-                if (owner instanceof FakeWindow window) {
+                if(owner instanceof dev.jasper.sdk.ui.UiAnchor value){var anchor=requireAnchor(value);if(anchor.mounted instanceof FakeWindow window)parent=window;
+                } else if (owner instanceof FakeWindow window) {
                     if (window.closed || !windows.contains(window)) throw new IllegalArgumentException("A dialog needs an open owner window");
                     parent = window;
                 } else if (!(owner instanceof WindowHandle) && !(owner instanceof FakeContent content && contents.contains(content)))
                     throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
                 var dialog = new FakeWindow("dialog", spec.title(), parent);
+                if(owner instanceof dev.jasper.sdk.ui.UiAnchor value){var registration=value.onClosed(dialog::close);dialog.onClosed(registration::close);}
                 if (owner instanceof FakeContent content) {
                     if (spec.modal()) content.pins++;
                     var registration = content.onClosed(dialog::close);

@@ -8,6 +8,7 @@ import java.util.Objects;
 public final class DesignMetrics {
     public static final DesignMetrics DEFAULT = new DesignMetrics();
     public enum Role {
+        PICKER_VERTICAL_PADDING(4), PICKER_COMPACT_HEIGHT(22), PICKER_DEFAULT_HEIGHT(28), PICKER_WIDTH(222), PICKER_FACE_WIDTH(190), PICKER_PADDING(5), PICKER_SEARCH_HEIGHT(21), PICKER_SEARCH_TOP(6), PICKER_UTILITY_HEIGHT(26), PICKER_ROW_HEIGHT(28), PICKER_TILE(16), PICKER_FACE_TILE(14), PICKER_GAP(6), PICKER_ROW_GAP(9), PICKER_GLYPH(8), PICKER_FOOTER_TOP(4), PICKER_MENU_BOTTOM(2), PICKER_EMPTY_TEXT_INSET(5), PICKER_EMPTY_HEIGHT(43), PICKER_DISABLED_PERCENT(45),
         FIELD_HEIGHT(28), BUTTON_HEIGHT(28), HERO_FIELD_HEIGHT(32), HERO_BUTTON_HEIGHT(30),
         PANEL_ACTION(24), INLINE_ACTION(22), FORM_LABEL_WIDTH(96), COLUMN_GAP(12), INLINE_GAP(9), CARD_PADDING(14),
         ROW_GAP(10), SECTION_GAP(20), SHEET_SECTION_GAP(14), FORM_SIDES(24), HERO_SIDES(28),
@@ -78,6 +79,7 @@ public final class DesignMetrics {
     public int contentHeight(Role height, Font font, FontRenderContext context) {
         Objects.requireNonNull(font); Objects.requireNonNull(context);
         int padding = switch (height) {
+            case PICKER_COMPACT_HEIGHT,PICKER_DEFAULT_HEIGHT,PICKER_SEARCH_HEIGHT,PICKER_ROW_HEIGHT,PICKER_UTILITY_HEIGHT -> 4;
             case FIELD_HEIGHT, HERO_FIELD_HEIGHT -> value(Role.FIELD_VERTICAL_PADDING);
             case BUTTON_HEIGHT, HERO_BUTTON_HEIGHT, PANEL_ACTION, INLINE_ACTION -> value(Role.BUTTON_VERTICAL_PADDING);
             default -> throw new IllegalArgumentException("Not a content height role: " + height);

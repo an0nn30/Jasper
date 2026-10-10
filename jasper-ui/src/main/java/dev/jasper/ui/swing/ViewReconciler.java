@@ -112,9 +112,11 @@ final class ViewReconciler implements AutoCloseable {
         for (var owner : mounted.values()) if (owner instanceof Menus.MenuControl menu) dismissed |= menu.dismiss();
         for (var owner : mounted.values()) if (owner instanceof BreadcrumbControls.BreadcrumbsControl crumbs) dismissed |= crumbs.dismiss();
         for (var owner : mounted.values()) if (owner instanceof Choices.ChoiceControl choice && choice.input instanceof javax.swing.JComboBox<?> combo && combo.isPopupVisible()) { combo.hidePopup(); dismissed = true; }
+        for(var owner:mounted.values())if(owner instanceof Choices.ChoiceControl choice && choice.input.getClientProperty("Jasper.pickerDismiss") instanceof Runnable dismiss){dismiss.run();dismissed=true;}
         return dismissed;
     }
     boolean popupOpen() {
+        if(mounted.values().stream().anyMatch(owner -> owner instanceof Choices.ChoiceControl choice && Boolean.TRUE.equals(choice.input.getClientProperty("Jasper.pickerExpanded"))))return true;
         if(mounted.values().stream().anyMatch(owner -> owner instanceof PanelHeaders.HeaderControl header && header.popupOpen()))return true;
         if(mounted.values().stream().anyMatch(owner -> owner instanceof InteractiveRows.RowsControl rows && rows.popupOpen()))return true;
         if(mounted.values().stream().anyMatch(owner -> owner instanceof BreadcrumbControls.BreadcrumbsControl crumbs && crumbs.popup.isVisible()))return true;

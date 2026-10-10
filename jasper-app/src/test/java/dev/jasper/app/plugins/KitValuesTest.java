@@ -14,6 +14,7 @@ class KitValuesTest {
   List<Node> nodes=List.of(text("text"),new Icon("icon",READY,"add",Hue.BLUE,IconSize.CONTROL,"Add"),button("button"),
    new MenuButton("menuButton",READY,"Menu","",ButtonKind.SECONDARY,"go",menu,"Tip"),new StatusDot("status",READY,StatusKind.SUCCESS),
    new Field("field",READY,FieldKind.PATH,"/tmp","Hint","Path","browse"),new Secret("secret",READY,"Hint","Secret","group"),
+   new PickerMenu("menu",READY,"","Search",List.of(new PickerItem("a","A","caption","key",Hue.GREEN),new PickerItem("none","None","","remove",Hue.NONE,PickerItemKind.UTILITY)),"a","a","Empty","Create","create","cancel"),
    new Choice("choice",READY,ChoiceKind.DROPDOWN,List.of(new Option("a","A",Optional.of(Hue.GREEN))),"a","Choice","select"),
    new Toggle("toggle",READY,"Toggle",true,"toggleAction",true),new Chip("chip",READY,"Chip",Hue.AMBER),
    new Progress("progress",READY,.5,"Half"),new Strength("strength",READY,3,"Strong"),

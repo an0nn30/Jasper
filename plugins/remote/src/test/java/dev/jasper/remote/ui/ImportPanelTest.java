@@ -52,10 +52,10 @@ class ImportPanelTest {
             var view = panel.view();
             assertThat(primaries(view)).isEmpty();
             assertThat(form(view).actions()).extracting(Nodes.Button::label).containsExactly("Refresh", "Cancel", "Import");
-            assertThat(button(view, ImportPanel.choose(0)).label()).isEqualTo("Choose credential…");
-            click(view, ImportPanel.choose(0));
+            assertThat(node(view, ImportPanel.choose(0), Nodes.Choice.class).face()).hasValueSatisfying(face -> assertThat(face.density()).isEqualTo(Nodes.PickerDensity.COMPACT));
+            emit(view,new UiEvent.Action(ImportPanel.choose(0)));
             assertThat(picked).containsExactly("prod");
-            panel.credential(rows.getFirst().id(), "Work login");
+            panel.credential(rows.getFirst().id(),new dev.jasper.vault.api.CredentialDescriptor(UUID.randomUUID(),"Work login","user",dev.jasper.vault.api.Kind.ACCOUNT_PASSWORD));
             assertThat(texts(view)).contains("Vault: Work login");
             press(view, form(view).cancelAction());
             assertThat(cancelled[0]).isEqualTo(1);

@@ -13,7 +13,7 @@ final class ControlRegistry {
     static void validate(Nodes.Node node) {
         switch (node) {
             case Nodes.Custom ignored -> {} case Nodes.Text ignored -> {} case Nodes.Icon ignored -> {} case Nodes.Button ignored -> {} case Nodes.Field ignored -> {}
-            case Nodes.Secret ignored -> {} case Nodes.Choice ignored -> {} case Nodes.Toggle ignored -> {}
+            case Nodes.PickerMenu ignored -> {} case Nodes.Secret ignored -> {} case Nodes.Choice ignored -> {} case Nodes.Toggle ignored -> {}
             case Nodes.Chip ignored -> {} case Nodes.StatusDot ignored -> {} case Nodes.Progress ignored -> {} case Nodes.Strength ignored -> {}
             case Nodes.MenuButton ignored -> {}
             case Nodes.ItemList n -> { for(var item:n.items()) { item.leading().ifPresent(ControlRegistry::validate); item.title().forEach(ControlRegistry::validate); item.subtitle().forEach(ControlRegistry::validate); item.trailing().forEach(ControlRegistry::validate); } n.addAction().ifPresent(ControlRegistry::validate); }
@@ -32,6 +32,7 @@ final class ControlRegistry {
             case Nodes.Field field -> new TextFields.FieldControl(view, field);
             case Nodes.Secret secret -> new SecretFields.SecretControl(view, secret);
             case Nodes.Choice choice -> new Choices.ChoiceControl(view, choice);
+            case Nodes.PickerMenu menu -> new PickerMenus.MenuControl(view,menu);
             case Nodes.Toggle toggle -> new Switches.ToggleControl(view, toggle);
             case Nodes.Chip chip -> new Indicators.ChipControl(view, chip);
             case Nodes.StatusDot dot -> new Indicators.DotControl(view, dot);

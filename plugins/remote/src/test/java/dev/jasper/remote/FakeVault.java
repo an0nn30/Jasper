@@ -27,6 +27,8 @@ public final class FakeVault implements Plugin {
     public List<dev.jasper.vault.api.SshKeySource> importedSources = List.of();
     public List<UUID> selectedIds = List.of();
     public CompletableFuture<Optional<dev.jasper.vault.api.SshKeyImportResult>> pendingImport;
+    public CompletableFuture<Optional<CredentialDescriptor>> pendingPick;
+    public Runnable duringPick=()->{};
     public LockState state = LockState.UNLOCKED;
 
     public UUID password(String name, String username, String password) {
@@ -58,7 +60,7 @@ public final class FakeVault implements Plugin {
                 @Override public CompletableFuture<Optional<Credential>> credential(UUID id) {
                     return CompletableFuture.completedFuture(state == LockState.UNLOCKED ? Optional.ofNullable(secrets.get(id)).map(java.util.function.Supplier::get) : Optional.empty());
                 }
-                @Override public CompletableFuture<Optional<CredentialDescriptor>> pick(WindowHandle owner) { return CompletableFuture.completedFuture(descriptors.values().stream().findFirst()); }
+                @Override public CompletableFuture<Optional<CredentialDescriptor>> pick(WindowHandle owner) { duringPick.run();return pendingPick==null?CompletableFuture.completedFuture(descriptors.values().stream().findFirst()):pendingPick; }
             };
         });
     }

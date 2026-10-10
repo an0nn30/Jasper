@@ -67,7 +67,7 @@ class ThemeImportViewTest {
         view.view.setSize(view.view.getPreferredSize());
         for (int pass=0;pass<3;pass++) KitTestSupport.layout(view.view);
         var details=KitTestSupport.require(view.view,"details",JLabel.class);
-        int line=details.getFontMetrics(details.getFont()).getHeight();
+        int line=Math.max(details.getFontMetrics(details.getFont()).getHeight(), Math.round(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.DESCRIPTION_LINE_HEIGHT)*dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()/13f));
         int columns=details.getFontMetrics(details.getFont()).charWidth('m')*dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.TEXT_FLOW_COLUMNS);
         assertThat(details.getPreferredSize().width).as("no wider than the flow cap").isLessThanOrEqualTo(columns);
         assertThat(details.getHeight()).as("at least one line per warning").isGreaterThanOrEqualTo(warnings.size()*line);

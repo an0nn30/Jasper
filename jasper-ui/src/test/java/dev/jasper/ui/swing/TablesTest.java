@@ -13,6 +13,22 @@ import org.junit.jupiter.api.Test;
 import java.util.*;
 
 class TablesTest {
+    @Test void numericContentMinimumRedistributesOnlyTheDeficitAndStaysBounded(){Edt.run(()->{
+        var context=KitFixtures.context();
+        var columns=List.of(new Column("name","Name",TextRole.BODY,false,2.4,Optional.empty()),new Column("size","Size",TextRole.DESCRIPTION,true,1,Optional.empty()));
+        var rows=List.of(new TableRow("a",Map.of("name","file.bin","size","123456789 GB"),Optional.of("file")));
+        try(var view=new KitView(context,new ViewSpec(new Table("files",ControlState.READY,columns,rows,Set.of(),"open",List.of())),e->{})){
+            view.setSize(220,120);InteractiveRowsTest.layout(view);var owner=(Tables.TableControl)view.control("files");var row=owner.mounted.get("a");var number=row.title.getComponent(1);
+            assertThat(number.getWidth()).isGreaterThanOrEqualTo(number.getPreferredSize().width);
+            assertThat(owner.header.getComponent(1).getWidth()).isEqualTo(number.getWidth());
+            view.setSize(600,120);InteractiveRowsTest.layout(view);assertThat(number.getWidth()).isBetween(160,185);
+            view.setSize(36,120);InteractiveRowsTest.layout(view);assertThat(number.getWidth()).isPositive();assertThat(number.getX()+number.getWidth()).isLessThanOrEqualTo(row.title.getWidth());
+            var raw=new HashMap<Object,Object>();javax.swing.UIManager.getDefaults().forEach(raw::put);
+            try{javax.swing.UIManager.put("defaultFont",new java.awt.Font("Dialog",java.awt.Font.PLAIN,20));view.setSize(400,180);InteractiveRowsTest.layout(view);assertThat(number.getWidth()).isGreaterThanOrEqualTo(number.getPreferredSize().width);assertThat(owner.header.getComponent(1).getWidth()).isEqualTo(number.getWidth());}
+            finally{javax.swing.UIManager.put("defaultFont",raw.get("defaultFont"));}
+            assertThat(owner.mounted.get("a")).isSameAs(row);
+        }finally{release(context);}
+    });}
     @Test
     void largeTableUsesBoundedMountedRows() {
         Edt.run(

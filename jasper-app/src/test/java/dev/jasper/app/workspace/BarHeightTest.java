@@ -77,15 +77,17 @@ class BarHeightTest {
                 assertThat(status.getMinimumSize().height).isEqualTo(UIScale.scale(height));
             }
             owner.setStatusBarHeight(20);
+            var original=new java.util.HashMap<Object,Object>();UIManager.getDefaults().forEach(original::put);
+            int normal=status.getPreferredSize().height;
             Font font = UIManager.getFont("Label.font");
             try {
-                UIManager.put("Label.font", font.deriveFont(40f));
+                UIManager.put("defaultFont", font.deriveFont(40f));
                 status.refreshTheme();
                 int text = status.getFontMetrics(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.CAPTION)).getHeight();
                 assertThat(status.getPreferredSize().height).as("a large UI font grows the bar").isGreaterThanOrEqualTo(text)
-                    .isGreaterThan(UIScale.scale(20));
+                    .isGreaterThan(normal);
             } finally {
-                UIManager.put("Label.font", null);
+                UIManager.put("defaultFont",original.get("defaultFont"));
                 status.refreshTheme();
             }
             assertThat(status.getPreferredSize().height).isEqualTo(UIScale.scale(20));

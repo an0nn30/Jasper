@@ -10,6 +10,7 @@ import java.util.function.Consumer;
 /** Functional, EDT-confined plugin kit; construct freely, then operate on the EDT. */
 public final class FakeKit implements UiKit, AutoCloseable {
     private final String owner;
+    Object anchorHost;
     private final Set<FakeKitView> views = new LinkedHashSet<>();
     private final Map<String,IconAsset> icons = new java.util.concurrent.ConcurrentHashMap<>();
     private final List<String> failures = new ArrayList<>();
@@ -17,7 +18,7 @@ public final class FakeKit implements UiKit, AutoCloseable {
     public FakeKit(String owner) { this.owner=Objects.requireNonNull(owner); }
     static void edt() { if(!EventQueue.isDispatchThread()) throw new IllegalStateException("Kit requires EDT"); }
     void guard() { edt(); if(closed.get()) throw new IllegalStateException("Kit is closed"); }
-    private static final Set<String> BUILT_INS=Set.of("bookmark","home","desktop","preview","logout","download","help","history","link","match.case","folder.add","window.add","paste","pause","regex","remove","save","settings","split","unlock","zoom","add","more","menu","collapse","chevron.down","chevron.right","chevron.up","search","shield","lock","edit","delete","copy","reveal","refresh","upload","back","forward","folder","file","server","key","login","note","tunnel","terminal","play","warning","info","error","plugin","check","close","sparkle","star","star.filled");
+    private static final Set<String> BUILT_INS=Set.of("none","user","bookmark","home","desktop","preview","logout","download","help","history","link","match.case","folder.add","window.add","paste","pause","regex","remove","save","settings","split","unlock","zoom","add","more","menu","collapse","chevron.down","chevron.right","chevron.up","search","shield","lock","edit","delete","copy","reveal","refresh","upload","back","forward","folder","file","server","key","login","note","tunnel","terminal","play","warning","info","error","plugin","check","close","sparkle","star","star.filled");
     void validateIcon(String name){if(name!=null && !BUILT_INS.contains(name) && !icons.containsKey(name))throw new IllegalArgumentException("Unknown icon: " + name);}
     void validateIcons(ViewSpec spec) {
         var available=new HashSet<>(BUILT_INS);available.addAll(icons.keySet());

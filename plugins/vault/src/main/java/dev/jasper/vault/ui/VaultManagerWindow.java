@@ -34,7 +34,7 @@ public final class VaultManagerWindow implements AutoCloseable {
     private final SecretClipboard clipboard;
     private final Supplier<String> status;
     private final Runnable generate;
-    private final Map<PluginDialog, EditorForm> dialogs = new IdentityHashMap<>();
+    private final EntryPresenter editors;
     private PluginWindow window;
     private WindowHandle owner;
     private UnlockPrompt unlockPrompt;
@@ -44,7 +44,7 @@ public final class VaultManagerWindow implements AutoCloseable {
     public VaultManagerWindow(PluginContext context, LockManager lock, VaultManager manager,
                               VaultService service, SecretClipboard clipboard, Supplier<String> status, Runnable generate) {
         this.context = context; this.lock = lock; this.manager = manager; this.service = service;
-        this.clipboard = clipboard; this.status = status; this.generate = generate;
+        this.clipboard = clipboard; this.status = status; this.generate = generate;this.editors=new EntryPresenter(context);
     }
     public boolean isOpen() { return window != null; }
     /** The plugin's kit, for the forms this window owns. */
@@ -89,18 +89,7 @@ public final class VaultManagerWindow implements AutoCloseable {
     /** Every form, including the generator, gets the same modal ownership and close-time wipe. */
     public void dialog(String title, Function<Runnable, ? extends EditorForm> factory) {
         if (window == null || lock.state() != LockState.UNLOCKED) return;
-        PluginDialog dialog = context.windows().dialog(new DialogSpec(title, window, true));
-        EditorForm form;
-        try { form = factory.apply(dialog::close); }
-        catch (RuntimeException failure) {
-            dialog.close();
-            context.notifications().group().error("Could not open the form", title + ": " + EditorForm.message(failure), failure);
-            return;
-        }
-        form.setFileChooser(dialog::chooseFile);
-        dialogs.put(dialog, form); dialog.setContent(form.view());
-        dialog.onClosed(() -> { form.close(); dialogs.remove(dialog); });
-        dialog.show();
+        editors.show(window,title,factory,()->{});
     }
     private void add(VaultManager.Type type) {
         UiKit kit = context.kit();
@@ -158,10 +147,7 @@ public final class VaultManagerWindow implements AutoCloseable {
             changed();
         });
     }
-    private void closeDialogs() {
-        for (var entry : List.copyOf(dialogs.entrySet())) { entry.getValue().close(); entry.getKey().close(); }
-        dialogs.clear();
-    }
+    private void closeDialogs() {editors.close();}
     @Override public void close() {
         closeDialogs();
         if (window != null) window.close();

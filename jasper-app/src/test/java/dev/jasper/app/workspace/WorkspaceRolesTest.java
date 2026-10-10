@@ -39,6 +39,9 @@ class WorkspaceRolesTest {
                  new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Text("label", dev.jasper.ui.model.ControlState.READY,
                      "Existing view", dev.jasper.ui.model.Nodes.TextRole.BODY)), event -> {})) {
             var label = (JLabel) view.getComponent(0);
+            // Live controls may resolve lazy JButton defaults when rollback republishes fonts.
+            // Resolve them before the snapshot so equality checks state, not lazy-cache timing.
+            new JButton("warm rollback defaults");
             var beforeLaf = raw(UIManager.getLookAndFeelDefaults());
             var beforeOverrides = raw(UIManager.getDefaults());
             var transaction = new dev.jasper.ui.swing.AppearanceTransaction(binding, next -> {
@@ -54,7 +57,7 @@ class WorkspaceRolesTest {
             try {
                 UIManager.put("defaultFont", new java.awt.Font("Dialog", java.awt.Font.PLAIN, 21));
                 UIManager.put("Label.font", new java.awt.Font("Dialog", java.awt.Font.PLAIN, 21));
-                assertThat(label.getFont().getSize2D()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(21f));
+                assertThat(label.getFont().getSize2D()).isEqualTo(21f);
             } finally {
                 UIManager.put("Label.font", beforeOverrides.get("Label.font"));
                 UIManager.put("defaultFont", beforeOverrides.get("defaultFont"));

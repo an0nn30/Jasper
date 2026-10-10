@@ -6,6 +6,8 @@ public interface UiView extends Subscription {
  /** Reconcile stable ids and kinds.
  * @param spec next tree */
  void update(ViewSpec spec);
+ /** Mint attachment authority from an eligible mounted action or PICKER. @param nodeId control id @return scoped capability */
+ UiAnchor anchor(String nodeId);
  /** Current descriptor, without pending edits or secrets.
  * @return immutable tree */
  ViewSpec spec();

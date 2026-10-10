@@ -60,6 +60,7 @@ final class Choices {
                 picker.focus = new ThemePainting.Focus(picker, picker, view); own(picker.focus);
                 ActionListener listener = event -> { String action = ((Nodes.Choice)this.node).action(); if (!action.isBlank()) emit(new UiEvent.Action(action)); };
                 picker.addActionListener(listener); own(() -> picker.removeActionListener(listener));
+                bind(picker,"ENTER",()->picker.doClick(0));bind(picker,"DOWN",()->picker.doClick(0));
             } else { input = new SegmentTrack(context()); own(this::closeOptions); }
             input.putClientProperty("html.disable", true); KitOwnership.mark(input, node.id() + ".input");
             if (input instanceof ChoiceCombo combo) { combo.focus = new ThemePainting.Focus(combo, combo, view); own(combo.focus); }
@@ -92,8 +93,9 @@ final class Choices {
                     combo.setSelectedItem(choice.options().stream().filter(o -> o.id().equals(choice.selectedId())).findFirst().orElse(null));
                 } else if (input instanceof PickerButton picker) {
                     Option option = choice.options().stream().filter(o -> o.id().equals(choice.selectedId())).findFirst().orElse(null);
-                    picker.empty = option == null;
-                    picker.setText(option == null ? "Choose…" : option.label());
+                    picker.face=choice.face().orElse(null);
+                    picker.empty = picker.face==null ? option == null : picker.face.primary().isEmpty();
+                    picker.setText(picker.face==null ? option == null ? "Choose…" : option.label() : picker.empty ? "Choose…" : picker.face.primary());
                     picker.setForeground(ThemePainting.color(context(), picker.textRole(false)));
                     picker.setIcon(choice.icon().isEmpty() ? null : context().icons().icon(choice.icon(), context().theme().semantic(), SemanticColor.TEXT_SECONDARY,
                         com.formdev.flatlaf.util.UIScale.scale(context().icons().size(Nodes.IconSize.CONTROL))));
@@ -184,13 +186,15 @@ final class Choices {
         }
     }
     static final class PickerButton extends Buttons.KitButton {
-        final KitContext context; boolean empty;
+        final KitContext context; boolean empty; Nodes.PickerFace face;
         PickerButton(KitContext context) { super(context); this.context = context; }
+        @Override public Dimension getPreferredSize(){if(face==null)return super.getPreferredSize();return new Dimension(ThemePainting.metric(context,DesignMetrics.Role.PICKER_FACE_WIDTH),ThemePainting.height(context,face.density()==Nodes.PickerDensity.COMPACT ? DesignMetrics.Role.PICKER_COMPACT_HEIGHT : DesignMetrics.Role.PICKER_DEFAULT_HEIGHT,face.density()==Nodes.PickerDensity.COMPACT?Typography.Role.PICKER_COMPACT:Typography.Role.BODY));}
         @Override Color fill(boolean hover) {
             return ThemePainting.color(context, hover ? SemanticColor.SURFACE_CONTROL_HOVER : SemanticColor.SURFACE_CONTROL);
         }
         @Override SemanticColor textRole(boolean hover) { return empty ? SemanticColor.TEXT_TERTIARY : SemanticColor.TEXT_PRIMARY; }
         @Override protected void paintComponent(Graphics graphics) {
+            if(face!=null){PickerMenus.paintFace(this,graphics,context,face,empty,focus!=null&&focus.visible());return;}
             super.paintComponent(graphics);
             var g = (Graphics2D)graphics.create();
             try {

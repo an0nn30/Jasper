@@ -35,7 +35,7 @@ final class FormRows {
             caption.text(row.caption());
             caption.setVisible(!row.caption().isEmpty());
             Composition.style(
-                    label, context(), Typography.Role.LABEL, SemanticColor.TEXT_SECONDARY);
+                    label, context(), row.control() instanceof Nodes.Choice choice && choice.face().filter(face -> face.density()==Nodes.PickerDensity.COMPACT).isPresent()?Typography.Role.PICKER_COMPACT:Typography.Role.LABEL, SemanticColor.TEXT_SECONDARY);
             Composition.style(
                     caption, context(), Typography.Role.CAPTION, SemanticColor.TEXT_TERTIARY);
             label.setEnabled(component.isEnabled());

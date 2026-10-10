@@ -177,7 +177,7 @@ class SchemaPageTest {
         for (int pass = 0; pass < 3; pass++) KitTestSupport.layout(body);
         var label = labelWithText(body, text);
         assertThat(label).as("the description is shown whole").isNotNull();
-        int line = label.getFontMetrics(label.getFont()).getHeight();
+        int line = Math.max(label.getFontMetrics(label.getFont()).getHeight(), Math.round(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.DESCRIPTION_LINE_HEIGHT)*dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()/13f));
         assertThat(label.getHeight()).as("several lines").isGreaterThanOrEqualTo(3 * line);
         assertThat(label.getHeight() % line).isZero();
         JButton migrate = kit(page, page.actionButtons().getFirst(), JButton.class);

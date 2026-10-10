@@ -62,7 +62,7 @@ public final class FakePluginContext implements PluginContext {
     final dev.jasper.sdk.notifications.Notifications notifications;
 
     FakePluginContext(FakePluginHost host, PluginInfo info, Set<String> requires, Plugin plugin) {
-        this.kit = new FakeKit(info.id());
+        this.kit = new FakeKit(info.id()); this.kit.anchorHost=host;
         this.host = host; this.info = info; this.requires = requires; this.plugin = plugin;
         this.terminals = new FakeTerminals(this, host.workspace);
         this.ui = new FakeUi(host, this);

@@ -36,3 +36,15 @@ Cover spoof/stale/cross-host/hidden/disabled/reparent capabilities, owned-child 
 Only synthetic supplied sshDir/config, explicit User, .invalid HostName and no IdentityFile. Never read, copy or symlink the user's ~/.ssh/config. Native launches must additionally isolate JVM user.home or use a verified existing owner injection before Import; jasper.home alone is insufficient. No host connections are needed.
 
 Plan deviation: Task2 expands into two runnable tasks because the reference's popup anatomy crosses the existing Vault producer/Remote consumer boundary. This deliberately adds a narrow generic attachment capability instead of weakening view ownership or replacing Vault consent with consumer metadata selection. Cost if wrong: extra SDK/host/fake lifecycle/API surface and import-controller changes; tests and per-task review must validate that boundary before subsequent consumers depend on it.
+
+
+### Shared unlock-owner transfer clarification (controller ruling, 2026-10-10)
+
+Each unlock waiter retains its own presentation/terminal owner. A valid current presentation stays
+in place when another waiter joins. If that presentation becomes invalid and live waiters survive,
+retire its close/error/dismiss bindings and clear/dispose its secret form before closing it; re-present
+the same unsettled prompt over an eligible surviving request, preserving an anchor owner when one
+exists. Preserve an in-flight unlock attempt and suppress stale callbacks. This transition creates
+no new unlock or grant. User Cancel on the current presentation keeps the normal shared-cancel
+semantics; cancellation of a picker withdraws only its waiter. Cover both joining orders, last-waiter
+cancellation and invalidation while unlock completion is pending.

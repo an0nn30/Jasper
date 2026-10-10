@@ -88,6 +88,8 @@ public abstract class KitContractTest {
     }
     private static Map<String,java.util.function.Function<String,Nodes.Node>> descriptorIconCases() {
         var cases=new LinkedHashMap<String,java.util.function.Function<String,Nodes.Node>>();
+        cases.put("picker-face",name -> new Nodes.Choice("rich",ControlState.READY,Nodes.ChoiceKind.PICKER,List.of(),"","Credential","pick","",Optional.empty(),Optional.of(new Nodes.PickerFace("Name","Caption",name,Nodes.Hue.GREEN,Nodes.PickerDensity.COMPACT))));
+        cases.put("picker-menu",name -> new Nodes.PickerMenu("menu",ControlState.READY,"","Search",List.of(new Nodes.PickerItem("row","Row","Caption",name,Nodes.Hue.BLUE)),"row","row","Empty","Create","create","cancel"));
         cases.put("icon",KitContractTest::descriptorIcon);
         cases.put("button",KitContractTest::descriptorButton);
         cases.put("menu-button",name -> new Nodes.MenuButton("menu",ControlState.READY,"Menu",name,Nodes.ButtonKind.GHOST,"",List.of(descriptorMenu("")),""));

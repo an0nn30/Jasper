@@ -17,6 +17,7 @@ import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MockUiTest {
+    private static JLabel findLabel(Container owner,String text){for(var child:owner.getComponents()){if(child instanceof JLabel label&&text.equals(label.getText()))return label;if(child instanceof Container nested){var found=findLabel(nested,text);if(found!=null)return found;}}return null;}
     @org.junit.jupiter.api.AfterEach void cleanup() throws Exception { closeOwners(); }
 
     @Test void referenceRowsAndSurfaceRemainContinuousAtActualWindowSize() throws Exception {
@@ -93,7 +94,9 @@ class MockUiTest {
                 assertThat(after.getRGB(x, y)).as("right segment remains visible").isEqualTo(before.getRGB(x, y));
             // The slash remains subdued independently of the metadata text color.
             boolean foundSeparator = false;
-            for (int y = 16; y < 44; y++) for (int x = 100; x < 156; x++)
+            var slash=findLabel(status,"/");assertThat(slash).isNotNull();
+            var bounds=SwingUtilities.convertRectangle(slash.getParent(),slash.getBounds(),status);
+            for (int y = bounds.y*2; y < (bounds.y+bounds.height)*2; y++) for (int x = bounds.x*2; x < (bounds.x+bounds.width)*2; x++)
                 foundSeparator |= (after.getRGB(x, y) & 0xffffff) == 0x343a42;
             assertThat(foundSeparator).isTrue();
         });

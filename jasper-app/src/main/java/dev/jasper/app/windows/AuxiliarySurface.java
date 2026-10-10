@@ -51,6 +51,9 @@ public final class AuxiliarySurface {
     private final List<Runnable> activatedListeners = new ArrayList<>();
     private String title;
     private Shell shell;
+    private JComponent anchorOwner;
+    void anchorOwner(JComponent anchor){anchorOwner=anchor;}
+    Optional<JComponent> anchorOwner(){return Optional.ofNullable(anchorOwner);}
     private boolean shown;
     private boolean closed;
     private Rectangle lastBounds;

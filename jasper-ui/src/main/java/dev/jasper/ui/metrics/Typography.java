@@ -13,6 +13,7 @@ import java.util.Set;
 public final class Typography {
     public enum Role {
         HERO_TITLE(15, 600), DETAIL_TITLE(16, 600), WINDOW_TITLE(13, 600), PANEL_TITLE(13, 600),
+        PICKER_COMPACT(10, 400), PICKER_CAPTION(9, 400),
         BODY(13, 400), BODY_STRONG(13, 500), LABEL(12.5f, 400), DESCRIPTION(12.5f, 400),
         CAPTION(11.5f, 400), SETTING_DESCRIPTION(11, 400), SECTION_LABEL(11, 600), COUNT(11, 400), CHIP(9.5f, 400), MONO(12, 400), MONO_SMALL(11.5f, 400);
         private final float size;

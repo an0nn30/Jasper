@@ -9,7 +9,7 @@ import java.util.Objects;
 /** Immutable, semantic view vocabulary; no pixel dimensions, delegates or secret values. */
 public final class Nodes {
     private Nodes() {}
-    public sealed interface Node permits Text, Icon, Button, MenuButton, StatusDot, Field, Secret, Choice, Toggle, Chip, Progress, Strength, Stack, FormRow, SettingRow, Card, Section, Empty, ItemList, Header, Panel, Form, Split, Table, Tree, Breadcrumbs, Custom {
+    public sealed interface Node permits Text, Icon, Button, MenuButton, StatusDot, Field, Secret, Choice, PickerMenu, Toggle, Chip, Progress, Strength, Stack, FormRow, SettingRow, Card, Section, Empty, ItemList, Header, Panel, Form, Split, Table, Tree, Breadcrumbs, Custom {
         String id();
         ControlState state();
     }
@@ -255,7 +255,29 @@ public final class Nodes {
         }
     }
 
-    public record Choice(String id, ControlState state, ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon, Optional<ChoiceSearch> search) implements Node {
+    /** The full form and inline picker share one renderer at two explicit densities. */
+    public enum PickerDensity { DEFAULT, COMPACT }
+    /** Grant-free display metadata. Empty primary means the placeholder face. */
+    public record PickerFace(String primary, String caption, String icon, Hue hue, PickerDensity density) {
+        public PickerFace { Objects.requireNonNull(primary);Objects.requireNonNull(caption);Objects.requireNonNull(icon);Objects.requireNonNull(hue);Objects.requireNonNull(density); }
+    }
+    /** One selectable popup row; its id is also the Action emitted on explicit acceptance. */
+    public enum PickerItemKind { VALUE, UTILITY }
+    public record PickerItem(String id,String label,String caption,String icon,Hue hue,PickerItemKind kind) {
+        public PickerItem { ModelChecks.id(id);Objects.requireNonNull(label);Objects.requireNonNull(caption);Objects.requireNonNull(icon);Objects.requireNonNull(hue);Objects.requireNonNull(kind); }
+        public PickerItem(String id,String label,String caption,String icon,Hue hue){this(id,label,caption,icon,hue,PickerItemKind.VALUE);}
+    }
+    /** Rich searchable menu: checked value and keyboard-active row are distinct. Edited/Selected name this node;
+     * Enter/pointer acceptance emits the row id or footerAction; Escape emits cancelAction. */
+    public record PickerMenu(String id,ControlState state,String query,String placeholder,List<PickerItem> items,
+            String checkedId,String activeId,String noMatches,String footerLabel,String footerAction,String cancelAction) implements Node {
+        public PickerMenu { ModelChecks.id(id);Objects.requireNonNull(state);Objects.requireNonNull(query);Objects.requireNonNull(placeholder);
+            items=List.copyOf(items);ModelChecks.unique(items,PickerItem::id);Objects.requireNonNull(checkedId);Objects.requireNonNull(activeId);
+            Objects.requireNonNull(noMatches);ModelChecks.label(footerLabel,"footerLabel");ModelChecks.id(footerAction);ModelChecks.id(cancelAction);
+            if(items.stream().anyMatch(item -> item.id().equals(footerAction)))throw new IllegalArgumentException("Footer id collides with item"); }
+    }
+
+    public record Choice(String id, ControlState state, ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon, Optional<ChoiceSearch> search, Optional<PickerFace> face) implements Node {
         public Choice {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -264,12 +286,17 @@ public final class Nodes {
             ModelChecks.label(label, "label");
             Objects.requireNonNull(action);
             Objects.requireNonNull(icon);
-            Objects.requireNonNull(search);
+            Objects.requireNonNull(search);Objects.requireNonNull(face);
+            if(face.isPresent() && kind!=ChoiceKind.PICKER)throw new IllegalArgumentException("Rich face requires PICKER");
             if (kind != ChoiceKind.PICKER && !icon.isEmpty()) throw new IllegalArgumentException("Icon cue requires PICKER");
             if ((kind == ChoiceKind.SEARCHABLE) != search.isPresent()) throw new IllegalArgumentException("Search configuration belongs to SEARCHABLE choices only, which require it");
             if (search.isPresent() && search.get().pinned() > options.size()) throw new IllegalArgumentException("More pinned entries than options");
             if (search.isPresent() && search.get().entry().isPresent() && !selectedId.isEmpty()) throw new IllegalArgumentException("Free entry owns the value; no option is selected");
             ModelChecks.unique(options, Option::id);
+        }
+        /** Compatibility constructor, without rich picker metadata. */
+        public Choice(String id,ControlState state,ChoiceKind kind,List<Option> options,String selectedId,String label,String action,String icon,Optional<ChoiceSearch> search) {
+            this(id,state,kind,options,selectedId,label,action,icon,search,Optional.empty());
         }
         /** A choice without search; SEARCHABLE requires the full constructor. */
         public Choice(String id, ControlState state, ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon) {

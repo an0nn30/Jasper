@@ -527,3 +527,19 @@ pre-0.15 raw UI factories and raw presentation icons; all eight bundled manifest
 The [completion audit](design/theme-engine/completion.md) records exact gate scope, owner tests, headless
 rendering, distribution checks and the named Plan 3 composition owners. App host Settings error/stub
 content uses the dialog kit context and closes with its page; it is not covered by the plugin-only compiled gate.
+
+### Anchored producer UI
+
+`UiView.anchor(id)` mints a host-authenticated `UiAnchor` only for an eligible, mounted
+button or PICKER control. Its captured host, view, control and mount ancestry remain authoritative;
+hide, disable, busy, removal, retyping, reparenting, closure and plugin stop invalidate it permanently.
+A same-control descriptor/theme refresh and an owned child covering it preserve the capability.
+`Windows.popover(anchor)` is a nonblocking attachment whose content must belong to the producer's kit.
+The anchor also admits an owned `DialogSpec` child above the source's actual native surface.
+Neither path delegates view ownership or data/grant authority. The fake and host share
+`AnchorContractTest`; ordinary foreign-content admission stays unchanged.
+
+The mirrored `PickerFace` density and `PickerMenu` descriptors carry metadata and user intent only.
+The menu separates checked id from active id, retains search/caret/scroll on appearance refresh, and
+emits explicit row/footer/cancel actions. Vault owns consent, creation and one-time grants; Remote's
+Import controller owns the per-candidate selection and its separate durable import operation.

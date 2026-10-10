@@ -87,9 +87,10 @@ class ThemeImportTest {
             assertThat(label.getPreferredSize().width).isLessThanOrEqualTo(columns);
             sheet.setSize(sheet.getPreferredSize()); dev.jasper.app.testsupport.KitTestSupport.layout(sheet);
             assertThat(label.getWidth()).isLessThanOrEqualTo(sheet.getWidth());
-            int lines = label.getHeight() / metrics.getHeight();
+            int lineHeight=Math.max(metrics.getHeight(),Math.round(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.DESCRIPTION_LINE_HEIGHT)*dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()/13f));
+            int lines = label.getHeight() / lineHeight;
             assertThat(lines).as("both paragraphs, their break and the wrapped tail").isGreaterThanOrEqualTo(4);
-            assertThat(label.getHeight() % metrics.getHeight()).isZero();
+            assertThat(label.getHeight() % lineHeight).isZero();
             var close = buttons(sheet).stream().filter(b -> b.getText().equals("Close")).findFirst().orElseThrow();
             assertThat(close.getWidth()).as("the action row is laid out").isPositive();
             assertThat(close.getY() + close.getHeight()).isLessThanOrEqualTo(sheet.getHeight());

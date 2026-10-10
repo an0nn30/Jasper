@@ -11,8 +11,10 @@ public final class FakeKitView implements UiView {
  private ViewSpec spec;
  private ViewSpec sourceSpec;
  private boolean updating;
- private Object mount;
- void unmount(Object target){if(mount==target)mount=null;}
+ Object mount;
+ private final List<Attachment> anchors=new ArrayList<>();
+ void invalidateAnchors(){for(var a:List.copyOf(anchors))a.close();}
+ void unmount(Object target){if(mount==target){invalidateAnchors();mount=null;}}
  final javax.swing.JPanel component = new javax.swing.JPanel();
  /** The theme slot the host would paint this view from: CHROME, or WORKSPACE once mounted as a content tab (as the
   * application routes workspace content); package-private, read by the shared contract harness only. */
@@ -31,6 +33,17 @@ public final class FakeKitView implements UiView {
  private final Map<String,int[]> fieldSelections=new HashMap<>();
  FakeKitView(FakeKit owner, ViewSpec spec, Consumer<UiEvent> events) {this.owner=owner;this.events=Objects.requireNonNull(events);update(spec);}
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
+ @Override public UiAnchor anchor(String id){guard();var anchor=new Attachment(id);if(!anchor.isOpen())throw new IllegalArgumentException("Unmounted or ineligible control");anchors.add(anchor);return anchor;}
+ final class Attachment implements UiAnchor {
+  final Object host=owner.anchorHost, mounted=mount;
+  final String id;final List<String> ancestry;final Object kind;boolean done;final List<Runnable> listeners=new ArrayList<>();
+  Attachment(String id){this.id=id;kind=kind(index(spec.root()).get(id));ancestry=path(spec.root(),id);}
+  private Object kind(Nodes.Node node){return node instanceof Nodes.Button ? Nodes.Button.class : node instanceof Nodes.Choice c && c.kind()==Nodes.ChoiceKind.PICKER ? c.kind() : null;}
+  private boolean eligible(Nodes.Node node,boolean parent){boolean live=parent&&node.state().visible()&&node.state().enabled()&&!node.state().busy();if(node.id().equals(id))return live;for(var child:children(node))if(eligible(child,live))return true;return false;}
+  @Override public boolean isOpen(){if(!done&&(closed.get()||mounted==null||mount!=mounted||host==null||kind==null||!kind.equals(kind(index(spec.root()).get(id)))||!ancestry.equals(path(spec.root(),id))||!eligible(spec.root(),true)||mounted instanceof FakeUi.FakeWindow w&&(!w.shown||w.closed)))close();return !done;}
+  @Override public dev.jasper.sdk.Subscription onClosed(Runnable listener){Objects.requireNonNull(listener);if(!isOpen()){listener.run();return () -> {}; }listeners.add(listener);return () -> listeners.remove(listener);}
+  @Override public void close(){if(done)return;done=true;anchors.remove(this);for(var listener:List.copyOf(listeners))listener.run();listeners.clear();}
+ }
  @Override public ViewSpec spec(){guard();return spec;}
  /** Host-only original plugin descriptor, before draft/search row projection. */
  ViewSpec sourceSpec(){guard();return sourceSpec;}
@@ -45,8 +58,9 @@ public final class FakeKitView implements UiView {
     fieldText.put(field.id(),field.value());fieldSelections.remove(field.id());
    }
   }
-  sourceSpec=source;spec=next;if(focused!=null&&!nodes.containsKey(focused))focused=null;}finally{updating=false;}
+  sourceSpec=source;spec=next;for(var a:List.copyOf(anchors))a.isOpen();if(focused!=null&&!nodes.containsKey(focused))focused=null;}finally{updating=false;}
  }
+ private static List<String> path(Nodes.Node root,String id){if(root.id().equals(id))return List.of(root.id());for(var child:children(root)){var nested=path(child,id);if(!nested.isEmpty()){var result=new ArrayList<String>();result.add(root.id());result.addAll(nested);return result;}}return List.of();}
  private static Map<String,Nodes.Node> index(Nodes.Node root){var result=new HashMap<String,Nodes.Node>();walk(root,result);return result;}
  private static void walk(Nodes.Node node,Map<String,Nodes.Node> result){result.put(node.id(),node);for(var child:children(node))walk(child,result);}
  private void requireSecret(String id){guard();if(!(index(spec.root()).get(id) instanceof Nodes.Secret))throw new IllegalArgumentException("Not a secret node");}
@@ -82,7 +96,7 @@ public final class FakeKitView implements UiView {
  private void dispose(CustomContent content){
   // Claim removal before invoking plugin code; reentrant close may consume the remaining snapshot.
   if(contents.get(content.id())!=content)return;contents.remove(content.id());CONTENT_OWNERS.remove(content.component(),this);try{content.lifetime().close();}catch(Throwable failure){owner.failed();}}
- @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {for(var value:secrets.values())Arrays.fill(value,(char)0);secrets.clear();fieldText.clear();fieldSelections.clear();for(var content:List.copyOf(contents.values()))dispose(content);contents.clear();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
+ @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {invalidateAnchors();for(var value:secrets.values())Arrays.fill(value,(char)0);secrets.clear();fieldText.clear();fieldSelections.clear();for(var content:List.copyOf(contents.values()))dispose(content);contents.clear();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
     static List<Nodes.Node> children(Nodes.Node node) {
         var result = new ArrayList<Nodes.Node>();
         switch (node) {

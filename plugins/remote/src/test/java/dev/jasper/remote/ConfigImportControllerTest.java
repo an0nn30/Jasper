@@ -15,6 +15,43 @@ import static org.assertj.core.api.Assertions.*;
  * worker thread, and the plugin's continuations (Vault futures completed by the test) run inline there.
  */
 class ConfigImportControllerTest {
+    @Test void replacementAndRefreshWithdrawOnlyTheirOwnPicker(@TempDir Path dir) throws Exception {
+        edt(() -> {
+            Files.writeString(dir.resolve("config"),"Host one\n HostName one.invalid\n User fixture\nHost two\n HostName two.invalid\n User fixture\n");
+            try(var app=new FakePluginHost()) {
+                var vault=new FakeVault();vault.password("login","fixture","synthetic");vault.pendingPick=new CompletableFuture<>();
+                app.start(FakeVault.INFO,Set.of(),Set.of(),vault);
+                var remote=new TestRemotePlugin(dev.jasper.remote.testsupport.Kits.UI,c->Optional.empty(),(d,r)->()->{},dir);
+                app.start(RemotePluginTest.INFO,Set.of(),Set.of("dev.jasper.vault"),remote);
+                var window=app.addTerminalWindow();app.invoke(RemotePlugin.IMPORT,window,null);RemotePluginTest.settle(app);
+                var panel=remote.currentImport();chooseCredential(panel,0);var first=vault.pendingPick;
+                vault.pendingPick=new CompletableFuture<>();chooseCredential(panel,1);assertThat(first).isCancelled();
+                var second=vault.pendingPick;refreshImport(panel);assertThat(second).isCancelled();
+                assertThat(importStatus(panel)).contains("Refreshing");
+                RemotePluginTest.settle(app);assertThat(remote.currentImport()).isNotSameAs(panel);
+            }
+        });
+    }
+
+    @Test void reentrantRefreshBeforeLegacyPickReturnsWithdrawsTheReturnedFuture(@TempDir Path dir)throws Exception{
+        edt(()->{Files.writeString(dir.resolve("config"),"Host one\n HostName one.invalid\n User fixture\n");try(var app=new FakePluginHost()){
+            var vault=new FakeVault();vault.password("login","fixture","synthetic");vault.pendingPick=new CompletableFuture<>();app.start(FakeVault.INFO,Set.of(),Set.of(),vault);
+            var remote=new TestRemotePlugin(dev.jasper.remote.testsupport.Kits.UI,c->Optional.empty(),(d,r)->()->{},dir);app.start(RemotePluginTest.INFO,Set.of(),Set.of("dev.jasper.vault"),remote);
+            app.invoke(RemotePlugin.IMPORT,app.addTerminalWindow(),null);RemotePluginTest.settle(app);var old=remote.currentImport();vault.duringPick=()->refreshImport(old);
+            chooseCredential(old,0);assertThat(vault.pendingPick).isCancelled();RemotePluginTest.settle(app);assertThat(remote.currentImport()).isNotSameAs(old);assertThat(importStatus(remote.currentImport())).doesNotContain("could not");
+        }});
+    }
+    @Test void failedRefreshKeepsOldRowsInertAndLatePickerCannotApply(@TempDir Path dir)throws Exception{
+        edt(()->{Files.writeString(dir.resolve("config"),"Host one\n HostName one.invalid\n User fixture\n");try(var app=new FakePluginHost()){
+            var vault=new FakeVault();var id=vault.password("login","fixture","synthetic");vault.pendingPick=new CompletableFuture<>(){@Override public boolean cancel(boolean ignored){return false;}};app.start(FakeVault.INFO,Set.of(),Set.of(),vault);
+            var remote=new TestRemotePlugin(dev.jasper.remote.testsupport.Kits.UI,c->Optional.empty(),(d,r)->()->{},dir);app.start(RemotePluginTest.INFO,Set.of(),Set.of("dev.jasper.vault"),remote);
+            app.invoke(RemotePlugin.IMPORT,app.addTerminalWindow(),null);RemotePluginTest.settle(app);var old=remote.currentImport();chooseCredential(old,0);
+            Files.writeString(remote.store().file(),"[broken");refreshImport(old);RemotePluginTest.settle(app);vault.pendingPick.complete(Optional.of(vault.descriptors.get(id)));
+            assertThat(importStatus(old)).contains("could not be read");assertThat(dev.jasper.remote.testsupport.Kits.node(old.view(),"import.choose.0",dev.jasper.sdk.ui.Nodes.Choice.class).state().enabled()).isFalse();
+            chooseCredential(old,0);importButton(old);assertThat(remote.store().hosts()).isEmpty();
+            Files.writeString(remote.store().file(),HostFile.format(List.of()));refreshImport(old);RemotePluginTest.settle(app);assertThat(remote.currentImport()).isNotSameAs(old);
+        }});
+    }
     @Test void waitsForDurableVaultResultThenRepairsExistingHost(@TempDir Path dir) throws Exception {
         edt(() -> {
             Files.writeString(dir.resolve("config"), "Host prod\n HostName new\n IdentityFile key\n");
@@ -30,6 +67,7 @@ class ConfigImportControllerTest {
                 assertThat(importChecked(panel, 0)).as("an existing host needs an explicit Update").isFalse(); importCheck(panel, 0, true);
                 importButton(panel); RemotePluginTest.settle(app);
                 assertThat(remote.store().hosts()).containsExactly(old);
+                refreshImport(panel);chooseCredential(panel,0);assertThat(remote.currentImport()).isSameAs(panel);assertThat(vault.pendingImport).isNotCancelled();
                 var source = vault.importedSources.getFirst(); UUID id = UUID.randomUUID();
                 vault.pendingImport.complete(Optional.of(new SshKeyImportResult(Map.of(source.requestId(), new CredentialDescriptor(id, "key", "fp", Kind.SSH_KEY, true)), List.of())));
                 RemotePluginTest.settle(app);

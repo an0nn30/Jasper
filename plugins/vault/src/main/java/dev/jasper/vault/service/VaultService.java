@@ -45,6 +45,11 @@ public final class VaultService {
     private UnlockPrompt unlock;
     private final Map<Grant, GrantPrompt> grantPrompts = new HashMap<>();
     private final List<PickPrompt> pickPrompts = new ArrayList<>();
+    private Consumer<AnchoredPickPrompt> showAnchored;
+    private Consumer<dev.jasper.sdk.ui.UiAnchor> validateAnchor;
+    private final Set<AnchoredPickPrompt> anchored=new HashSet<>();
+    /** Installs the producer and host capability validation before the API is published. */
+    public void anchoredPicker(Consumer<AnchoredPickPrompt> show,Consumer<dev.jasper.sdk.ui.UiAnchor> validate){showAnchored=java.util.Objects.requireNonNull(show);validateAnchor=java.util.Objects.requireNonNull(validate);}
     private final Set<Grant> oneTime = new HashSet<>();
     private final Map<String, WindowHandle> lastOwner = new HashMap<>();
 
@@ -71,25 +76,29 @@ public final class VaultService {
     public void lockStateChanged(LockState state) {
         if (state == LockState.UNLOCKED) return;
         closeImports();
+        for(var prompt:List.copyOf(anchored))prompt.cancel();
         oneTime.clear();
         for (GrantPrompt prompt : List.copyOf(grantPrompts.values())) prompt.answer(GrantPrompt.Decision.DENY);
         for (PickPrompt prompt : List.copyOf(pickPrompts)) prompt.cancel();
     }
 
     /** The unlock prompt over {@code owner}, shared with every other requester; {@code true} once unlocked. */
-    public CompletableFuture<Boolean> requestUnlock(WindowHandle owner) {
+    public CompletableFuture<Boolean> requestUnlock(WindowHandle owner) {return requestUnlock(owner,owner,future -> {});}
+    private CompletableFuture<Boolean> requestUnlock(WindowHandle owner,dev.jasper.sdk.WindowOwner presentation,Consumer<CompletableFuture<Boolean>> attached) {
         switch (lock.state()) {
             case UNLOCKED: return CompletableFuture.completedFuture(true);
             case NO_VAULT: notifications.warning(NO_VAULT_TITLE, NO_VAULT_NOTICE); return CompletableFuture.completedFuture(false);
             default:
         }
         if (unlock == null) {
-            unlock = new UnlockPrompt(owner, lock, () -> unlock = null);
-            CompletableFuture<Boolean> waiter = unlock.attach();
-            showUnlock.accept(unlock);
+            unlock = new UnlockPrompt(owner, presentation, lock, () -> unlock = null);
+            unlock.representWith(showUnlock);
+            CompletableFuture<Boolean> waiter = unlock.attach(owner,presentation);
+            attached.accept(waiter);
+            if(!waiter.isDone())showUnlock.accept(unlock);
             return waiter;
         }
-        return unlock.attach();
+        var waiter=unlock.attach(owner,presentation);attached.accept(waiter);return waiter;
     }
 
     /** Every account and key without secrets; empty unless unlocked. */
@@ -239,6 +248,25 @@ public final class VaultService {
                     showGrant.accept(prompt);
                 } else { observedOwner.accept(prompt.owner()); prompt.attach(result); }
             });
+            return result;
+        }
+
+        @Override public CompletableFuture<dev.jasper.vault.api.CredentialPickResult> pick(WindowHandle owner,dev.jasper.vault.api.CredentialPickRequest request) {
+            if(showAnchored==null)throw new UnsupportedOperationException("Anchored picker is unavailable");
+            validateAnchor.accept(request.anchor());lastOwner.put(consumer.id(),owner);
+            var result=new CompletableFuture<dev.jasper.vault.api.CredentialPickResult>();
+            var prompt=new AnchoredPickPrompt(owner,request,result,VaultService.this::descriptors,
+                chosen -> oneTime.add(new Grant(consumer.id(),chosen)),ui==null?Runnable::run:ui);
+            anchored.add(prompt);prompt.onDismiss(() -> anchored.remove(prompt));
+            var lifetime=request.anchor().onClosed(prompt::cancel);prompt.onDismiss(lifetime::close);
+            if(!prompt.settled()) {
+                var unlocked=requestUnlock(owner,request.anchor(),waiter -> prompt.onDismiss(() -> waiter.cancel(false)));
+                unlocked.whenComplete((ok,failure) -> {
+                    if(prompt.settled())return;
+                    if(failure!=null||!Boolean.TRUE.equals(ok)||!request.anchor().isOpen()){prompt.cancel();return;}
+                    try{showAnchored.accept(prompt);}catch(RuntimeException problem){prompt.cancel();throw problem;}
+                });
+            }
             return result;
         }
 

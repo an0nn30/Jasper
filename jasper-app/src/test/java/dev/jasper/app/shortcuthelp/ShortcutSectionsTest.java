@@ -100,16 +100,16 @@ class ShortcutSectionsTest {
                 panel.setSize(700, 400);
                 layout(panel);
                 var scroll = KitTestSupport.require(panel, ShortcutTree.ID, JScrollPane.class);
-                var image = new java.awt.image.BufferedImage(scroll.getWidth(), scroll.getHeight(), java.awt.image.BufferedImage.TYPE_INT_RGB);
+                var image = new java.awt.image.BufferedImage(scroll.getWidth()*2, scroll.getHeight()*2, java.awt.image.BufferedImage.TYPE_INT_RGB);
                 var graphics = image.createGraphics();
-                try { scroll.paint(graphics); } finally { graphics.dispose(); }
+                try { graphics.scale(2,2);scroll.paint(graphics); } finally { graphics.dispose(); }
                 var title = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/action/literal/title", JLabel.class);
                 assertThat(title.getText()).as("literal, never HTML").isEqualTo("<html>Action");
                 var row = SwingUtilities.convertRectangle(title.getParent(), title.getBounds(), scroll);
                 int foreground = title.getForeground().getRGB() & 0xffffff;
                 int textPixels = 0;
-                for (int y = Math.max(0, row.y); y < Math.min(scroll.getHeight(), row.y + row.height); y++)
-                    for (int x = Math.max(0, row.x); x < Math.min(scroll.getWidth(), row.x + row.width); x++)
+                for (int y = Math.max(0, row.y*2); y < Math.min(image.getHeight(), (row.y + row.height)*2); y++)
+                    for (int x = Math.max(0, row.x*2); x < Math.min(image.getWidth(), (row.x + row.width)*2); x++)
                         if ((image.getRGB(x, y) & 0xffffff) == foreground) textPixels++;
                 assertThat(textPixels).as("the row actually lays out and paints its labels").isGreaterThan(10);
                 var rowComponent = (JComponent) title.getParent().getParent();

@@ -14,6 +14,7 @@ import java.util.function.*;
 /** Lazy plugin lifetime: legacy contexts may be constructed off EDT; actual kit operations may not. */
 final class HostedKit implements UiKit,AutoCloseable {
     final String owner;
+    Object anchorHost;
     final Containment containment;
     final Appearance appearance;
     private final BooleanSupplier open;
@@ -47,7 +48,7 @@ final class HostedKit implements UiKit,AutoCloseable {
     private void initialize(){guard();if(binding!=null)return;binding=new ThemeBinding(themes.get(),e -> failed());
         if(appearance!=null)updates=appearance.onChanged(v -> refresh());
     }
-    void refresh(){guard();if(binding!=null)binding.publish(themes.get());}
+    void refresh(){guard();if(binding!=null){binding.publish(themes.get());for(var view:List.copyOf(views))view.updated.run();}}
     void failed(){KitDiagnostics.failure(containment,owner);}
     void removed(HostedKitView view){views.remove(view);}
     @Override public HostedKitView create(ViewSpec spec,Consumer<UiEvent> events){initialize();validateIcons(spec);var view=new HostedKitView(this,new KitContext(binding,ThemeRoute.CHROME,DesignMetrics.DEFAULT,icons,animations),spec,events);views.add(view);return view;}

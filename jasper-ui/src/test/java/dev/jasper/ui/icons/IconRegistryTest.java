@@ -40,7 +40,7 @@ class IconRegistryTest {
     }
     @Test void everySourceNameRendersInEverySizeThemeAndSelection() {
         try (var registry = new IconRegistry()) {
-            assertThat(registry.names()).contains("add", "more", "collapse", "search", "lock", "edit", "delete", "copy", "reveal",
+            assertThat(registry.names()).contains("none", "add", "more", "collapse", "search", "lock", "edit", "delete", "copy", "reveal",
                 "refresh", "upload", "back", "forward", "folder", "file", "server", "key", "login", "note", "tunnel", "terminal",
                 "play", "warning", "info", "check", "close", "chevron.down", "chevron.up", "sparkle");
             for (var name : registry.names()) for (int size : new int[]{12, 14, 16, 20, 24})

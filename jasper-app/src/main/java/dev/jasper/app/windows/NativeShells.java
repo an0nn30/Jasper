@@ -144,7 +144,7 @@ public final class NativeShells {
 
     private AuxiliarySurface.Shell dialog(AuxiliarySurface surface) {
         Window owner = surface.ownerSurface().map(natives::get)
-            .orElseGet(() -> surface.ownerWindow().map(terminalWindows).orElse(null));
+            .orElseGet(() -> surface.anchorOwner().map(javax.swing.SwingUtilities::getWindowAncestor).orElseGet(() -> surface.ownerWindow().map(terminalWindows).orElse(null)));
         boolean remembered = !surface.id().isEmpty();
         Dialog.ModalityType modality = !surface.modal() ? Dialog.ModalityType.MODELESS
             : owner == null ? Dialog.ModalityType.APPLICATION_MODAL : Dialog.ModalityType.DOCUMENT_MODAL;

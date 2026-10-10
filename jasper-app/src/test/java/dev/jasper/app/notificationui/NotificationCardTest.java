@@ -258,12 +258,15 @@ class NotificationCardTest {
     /** Links that a theme or font change shows anew still count the pointer over them as hovering the card. */
     @Test void linksShownAfterARestyleKeepTheCardHovered() {
         var bindings = KitTestSupport.bindings(true);
-        Object font = javax.swing.UIManager.get("defaultFont");
+        var defaults=new java.util.HashMap<Object,Object>();javax.swing.UIManager.getDefaults().forEach(defaults::put);
+        NotificationCard shown=null;
         try {
-            javax.swing.UIManager.put("defaultFont", new java.awt.Font(java.awt.Font.DIALOG, java.awt.Font.PLAIN, 40));
-            var card = card(bindings.context(ThemeRoute.CHROME), posted(withActions(titled("Restyle"), List.of("One", "Two", "Three", "Four"))), false);
+            // Keep geometry at 13pt while the explicit label override changes the amount of text that fits.
+            javax.swing.UIManager.put("defaultFont", new java.awt.Font(java.awt.Font.DIALOG,java.awt.Font.PLAIN,13));
+            javax.swing.UIManager.put("Label.font", new java.awt.Font(java.awt.Font.DIALOG,java.awt.Font.PLAIN,40));
+            var card = card(bindings.context(ThemeRoute.CHROME), posted(withActions(titled("Restyle"), List.of("One", "Two", "Three", "Four"))), false);shown=card;
             int before = card.actionLabels().size();
-            javax.swing.UIManager.put("defaultFont", font);
+            javax.swing.UIManager.put("Label.font",new java.awt.Font(java.awt.Font.DIALOG,java.awt.Font.PLAIN,13));
             bindings.binding().publish(ThemeTestSupport.pair(false));
             assertThat(card.actionLabels()).as("more links fit after the change").hasSizeGreaterThan(before);
             layOut(card);
@@ -271,13 +274,12 @@ class NotificationCardTest {
                 var button = link(card, i);
                 for (var listener : button.getMouseListeners())
                     listener.mouseEntered(new MouseEvent(button, MouseEvent.MOUSE_ENTERED, 0, 0, 1, 1, 0, false));
-                assertThat(card.hovered()).as("hover from link %d", i).isTrue();
-                card.setHovered(false);
+                assertThat(card.hovered()).as("hover from link %d", i).isTrue();card.setHovered(false);
             }
-            card.close();
         } finally {
-            javax.swing.UIManager.put("defaultFont", font);
-            bindings.close();
+            if(shown!=null)shown.close();
+            javax.swing.UIManager.put("Label.font",defaults.get("Label.font"));
+            javax.swing.UIManager.put("defaultFont",defaults.get("defaultFont"));bindings.close();
         }
     }
 

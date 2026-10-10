@@ -17,6 +17,7 @@ final class ThemePainting {
     static Font font(KitContext context, Typography.Role role) { return SwingTypography.effective(context.typography().font(role)); }
     static int height(KitContext context, DesignMetrics.Role role, Typography.Role text) {
         DesignMetrics.Role padding = switch (role) {
+            case PICKER_COMPACT_HEIGHT,PICKER_DEFAULT_HEIGHT,PICKER_SEARCH_HEIGHT,PICKER_ROW_HEIGHT,PICKER_UTILITY_HEIGHT -> DesignMetrics.Role.PICKER_VERTICAL_PADDING;
             case FIELD_HEIGHT, HERO_FIELD_HEIGHT -> DesignMetrics.Role.FIELD_VERTICAL_PADDING;
             case BUTTON_HEIGHT, HERO_BUTTON_HEIGHT, PANEL_ACTION, INLINE_ACTION -> DesignMetrics.Role.BUTTON_VERTICAL_PADDING;
             default -> throw new IllegalArgumentException("Not a content height role: " + role);

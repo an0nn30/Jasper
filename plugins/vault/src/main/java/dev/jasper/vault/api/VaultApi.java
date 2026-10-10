@@ -42,4 +42,17 @@ public interface VaultApi {
 
     /** The user's choice from a picker over {@code owner}; the choice is a one-time grant for this plugin. */
     CompletableFuture<Optional<CredentialDescriptor>> pick(WindowHandle owner);
+
+    /** Anchored chooser. Older implementations retain their modal picker and map empty to Cancelled (no clear).
+     * Current Vault validates attachment and owns the chooser and consent; callers cannot authorize by UUID. */
+    default CompletableFuture<CredentialPickResult> pick(WindowHandle owner, CredentialPickRequest request) {
+        var result=new CompletableFuture<CredentialPickResult>();
+        var lifetime=request.anchor().onClosed(() -> result.cancel(false));
+        if(result.isDone()){lifetime.close();return result;}
+        CompletableFuture<Optional<CredentialDescriptor>> legacy;
+        try{legacy=pick(owner);}catch(RuntimeException failure){lifetime.close();throw failure;}
+        result.whenComplete((answer,failure)->{lifetime.close();if(result.isCancelled())legacy.cancel(false);});
+        legacy.whenComplete((answer,failure)->{if(failure!=null)result.completeExceptionally(failure);else result.complete(answer.<CredentialPickResult>map(CredentialPickResult.Chosen::new).orElseGet(CredentialPickResult.Cancelled::new));});
+        return result;
+    }
 }

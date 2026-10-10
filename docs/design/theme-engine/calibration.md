@@ -231,3 +231,58 @@ The reusable SDK/module `SUPPORTING` layout leaves leading adornments at natural
 These fixes preserve the open font-ink/palette/native-frame residuals above. Controller native D confirms focus/draft retention and Escape/native close at the previous commit; fixed-head recapture is required. Compiler fixture-close warnings (review M1) remain deferred to Task11 hygiene. No page is accepted.
 
 Review-fix captures: all44 default actual-owner outputs regenerated. Exact RGB comparison against retained pre-fix empty captures is identical for Create800×856 and Unlock760×528; all prior default anchors remain. At configured20, auto UIScale1.5, Create naturally allocates600×645logical (PNG1200×1290): CAPTION17.692308pt, warning[42,512,516,22], first baseline530. A deliberate sub-preferred340logical allocation yields340×800 (PNG680×1600), warning[42,623,256,66] with three complete lines, first baseline641, actions y719. The existing equal primary action elides at that stress-only width below the600logical preference; this is recorded separately from the complete warning and is not an all-controls constrained-layout acceptance. Both images visually inspected, no reference-image resizing. Evidence lives in `task1-fix1-default-comparison.json` and build `theme-surfaces-system20` / `theme-surfaces-system20-narrow` with metadata.
+
+## Plan 3 Task2a: actual anchored picker route (2026-10-10)
+
+The Desktop `combo_box_mock.png` is 1990×1664, SHA-256
+`09539eb2f89f4d0830bc9c8044fb020e17e3334402bf4e1fb6300bc2a9bb53b4`.
+The full original and its audit were inspected. Its compact field outer envelope is approximately
+`222,206,380,44`; the 44-pixel height, 2-pixel border and 6-pixel outer focus independently support
+2× source scale and COMPACT22, without changing DEFAULT28. Source search fill is
+`1531,269,418,40`; menu width is about444 source pixels including border. Shared roles now give
+190×22 compact /190×28 default faces, 222-wide menu, 21 visible search, 28 VALUE/26 UTILITY allocations (24 utility active fill), 6 search top/5 horizontal padding, 43 empty area with a 5 bottom text inset, 16 menu tiles,
+14 face tiles, 8 picker glyphs, 4 footer top gap/2 bottom padding, compact10/caption9 typography and disabled45% opacity. Font scaling remains central.
+
+`StagedAnchoredPickerTest` loads actual staged Vault and Remote under PluginHost, creates an unbound
+synthetic Vault/Login, opens actual Import with a supplied synthetic sshDir, and renders the mounted
+producer/consumer. Empty, selected, open, filtering, no-match and genuine review/completion-disabled
+states are in `jasper-app/build/theme-migration-evidence/anchored-picker/actual/`, with PNG/JSON
+owner/bounds/scale evidence. Additional light, enlarged, short popup and narrow Import captures use
+the same route, with an intentionally long synthetic username. The dedicated Credential FormRow
+prevents the host-summary text from shrinking the nominal face; narrow layouts clip the caption.
+Creation routes through the existing Login/path-key manager operations, without grants on save.
+
+The tracked `jasper-app/src/test/resources/dev/jasper/app/plugins/desktop-picker.toml` (also copied to scratch `desktop-picker.toml`) is the supported source-calibration theme used by these actual-owner renders. Its source-profile-converted measured control/menu, border and search colors differ deliberately from the hero palette. The `filtering-default-theme` image retains shipped Jasper Dark evidence separately. Source search21 is a visible kit outline and its allocation; the prior stock field lost6 logical pixels to internal focus insets. Full popup444×214 no-match now matches the source envelope.
+
+Scratch `task-2a-overlays.py` produces original-pixel crops, ICC-to-sRGB conversion and equal-scale
+side-by-side/50% overlays; no image resizing. Different supported synthetic content/row counts are
+retained. The model has no credential groups, so Home Lab/Work captions are not fabricated.
+Broad palette/font/native-chrome matching remains open: shipped Jasper Dark's accent/category hues differ from the source-calibration palette, and headless output cannot prove native attachment, physical
+focus, IME or outside dismissal. Native controller verification and final pixel acceptance are pending;
+no page is accepted. Task2b consumes DEFAULT28; Task4 refines sheets using this real presenter.
+
+
+The full-gate narrow SFTP probe exposed a genuine shared table allocation defect after the approved
+platform typography became active: the numeric size cell received55 pixels for57 pixels of ink.
+Tables now cache content minima with their data/font snapshot and preserve ordinary weighted
+allocation unless a column falls below its minimum. Only that deficit is redistributed; header and
+body use the same calculation. Impossibly narrow viewports retain bounded weighted/ellipsis layout.
+Focused coverage checks long values, wide/narrow/enlarged alignment and unchanged virtualization.
+
+The final bounded picker role probe records actual `.AppleSystemUIFont` at 11pt, UIScale1.0,
+no developer defaultFont/Label.font override and family override false before correction; 10/9
+shared compact/caption roles reduce same-text empty ink298×19 to272×17 (source273×17), footer
+174×16 to160×15 (source158×15). No source family identification is claimed. Footer label ink
+remains about1px right/up and2px wider at2×; device rasterization and native capture remain open.
+The source None utility is a circle with an ascending slash; shared `none` artwork and 8logical
+picker glyphs replace the minus and oversized plus/category artwork. The footer uses a4logical
+leading separator gap, a24logical active fill and2logical menu bottom padding. VALUE rows remain28,
+ordinary UTILITY rows26, footer allocation30; default face remains28 with BODY typography.
+
+Controller final comparison inspection retains concrete shared-picker residuals for native calibration:
+the search magnifier is visibly larger than the source; the separator is inset while source spans
+the popup width; search outline/rounding differs; footer/message ink mass differs despite close
+bounding boxes. These are app-owned shared-renderer differences, not dismissed as native chrome.
+Current headless geometry evidence remains distinct from future actual native popup/focus proof.
+Controller explicitly requested freezing this candidate and carrying these residuals into review/native
+calibration rather than adding unreviewed ad hoc patches during the stable gate.

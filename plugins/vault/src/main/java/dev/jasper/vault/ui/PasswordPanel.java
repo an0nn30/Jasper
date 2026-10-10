@@ -66,6 +66,7 @@ public final class PasswordPanel implements AutoCloseable {
 
     private static PasswordPanel unlockPanel(String prefix, UnlockPrompt prompt) {
         var panel = new PasswordPanel(prefix, "Unlock", false, false, "Enter your master password to use saved credentials.");
+        panel.busy=prompt.busy();panel.status=panel.busy?"Unlocking...":prompt.error().orElse("");
         prompt.onError(text -> {
             if (panel.closed || !panel.host.open()) return;
             panel.status = text; panel.busy = false; panel.render();

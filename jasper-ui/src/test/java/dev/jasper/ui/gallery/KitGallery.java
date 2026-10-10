@@ -57,6 +57,8 @@ public final class KitGallery {
         result.add(new Fixture("stored-secret-revealed","","stored-secret-revealed",320,88,new ViewSpec(new Secret("stored-secret",ControlState.READY,"","Passphrase","",SecretKind.DETAIL,"copy-secret"))));
         result.add(new Fixture("secure-note","","normal",360,220,new ViewSpec(new Secret("secure-note",ControlState.READY,"Write a note","Secure note","",SecretKind.MULTILINE,""))));
         result.add(new Fixture("dropdown-open","","dropdown-open",240,130,new ViewSpec(new Nodes.Choice("dropdown",ControlState.READY,ChoiceKind.DROPDOWN,List.of(new Option("ssh","SSH",Optional.of(Hue.GREEN)),new Option("local","Local",Optional.of(Hue.BLUE)),new Option("sftp","SFTP",Optional.of(Hue.PURPLE))),"ssh","Protocol","protocol"))));
+        for(var density:PickerDensity.values())result.add(new Fixture("rich-picker-"+density,"","selected",220,50,new ViewSpec(new Nodes.Choice("picker",ControlState.READY,ChoiceKind.PICKER,List.of(),"","Credential","pick","lock",Optional.empty(),Optional.of(new PickerFace("root","Stored key · fixture","key",Hue.GREEN,density))))));
+        result.add(new Fixture("picker-menu","","normal",222,118,new ViewSpec(new PickerMenu("menu",ControlState.READY,"","Search credentials",List.of(new PickerItem("none","None","","none",Hue.NONE,PickerItemKind.UTILITY),new PickerItem("root","root","Stored key","key",Hue.GREEN)),"root","root","No matches","New Credential…","create","cancel"))));
         return List.copyOf(result);
     }
     private static Fixture panelState(String name, String panel, String state, java.util.function.Consumer<PanelFixtures.Demo> transition) {

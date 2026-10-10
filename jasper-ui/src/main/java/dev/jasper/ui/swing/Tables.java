@@ -28,6 +28,19 @@ final class Tables {
 
     static final class TableControl extends InteractiveRows.RowsControl {
         final JPanel header = new JPanel();
+        private List<Column> measuredColumns=List.of();
+        private List<TableRow> measuredRows=List.of();
+        private List<Font> measuredFonts=List.of();
+        private int[] minimums=new int[0];
+        private void measureColumns(){
+            var columns=value().columns();var fonts=columns.stream().map(c->ThemePainting.font(context(),Typography.Role.valueOf(c.role().name()))).toList();
+            if(measuredColumns.equals(columns)&&measuredRows.equals(value().rows())&&measuredFonts.equals(fonts))return;
+            measuredColumns=columns;measuredRows=value().rows();measuredFonts=fonts;minimums=new int[columns.size()];
+            for(int i=0;i<columns.size();i++){
+                var column=columns.get(i);var probe=Labels.literal();probe.setFont(fonts.get(i));probe.setText("…");minimums[i]=probe.getPreferredSize().width;
+                if(column.numeric())for(var row:measuredRows){probe.setText(row.cells().getOrDefault(column.id(),""));minimums[i]=Math.max(minimums[i],probe.getPreferredSize().width);}
+            }
+        }
 
         TableControl(KitView view, Nodes.Table node) {
             super(view, node, pane(view, node));
@@ -106,11 +119,12 @@ final class Tables {
         }
 
         WeightLayout weights() {
-            return new WeightLayout(value().columns().stream().mapToDouble(Column::weight).toArray());
+            return new WeightLayout(value().columns().stream().mapToDouble(Column::weight).toArray(),minimums);
         }
 
         @Override
         void data() {
+            measureColumns();
             header.removeAll();
             header.setLayout(weights());
             for (var column : value().columns()) {
@@ -195,9 +209,26 @@ final class Tables {
     /** Columns side by side, each taking its weight's share of the width; children beyond the weights get none. */
     static final class WeightLayout implements LayoutManager {
         final double[] weights;
+        final int[] minimums;
 
-        WeightLayout(double[] weights) {
-            this.weights = weights;
+        WeightLayout(double[] weights) {this(weights,new int[weights.length]);}
+        WeightLayout(double[] weights,int[] minimums) {this.weights=weights;this.minimums=minimums;}
+        /** Preserve ordinary weighted widths; freeze only undersized columns and redistribute their deficit. */
+        private int[] allocation(int width){
+            int count=weights.length;var sizes=new double[count];var fixed=new boolean[count];
+            int required=java.util.Arrays.stream(minimums).sum();boolean feasible=required<=width;
+            double remaining=width,total=java.util.Arrays.stream(weights).sum();
+            if(feasible)for(int pass=0;pass<count;pass++){
+                boolean changed=false;
+                for(int i=0;i<count;i++)if(!fixed[i]&&total>0&&remaining*weights[i]/total<minimums[i]){
+                    fixed[i]=true;sizes[i]=minimums[i];remaining-=minimums[i];total-=weights[i];changed=true;
+                }
+                if(!changed)break;
+            }
+            for(int i=0;i<count;i++)if(!fixed[i])sizes[i]=total>0?Math.max(0,remaining)*weights[i]/total:0;
+            var result=new int[count];double end=0;int previous=0;
+            for(int i=0;i<count;i++){end+=sizes[i];int edge=Math.min(width,(int)Math.round(end));result[i]=Math.max(0,edge-previous);previous=edge;}
+            return result;
         }
 
         @Override
@@ -228,19 +259,9 @@ final class Tables {
             Insets insets = parent.getInsets();
             int width = Math.max(0, parent.getWidth() - insets.left - insets.right),
                     height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);
-            double total = 0;
-            for (double weight : weights) total += weight;
-            double sum = 0;
-            var children = parent.getComponents();
-            for (int i = 0; i < children.length; i++) {
-                if (i >= weights.length || total <= 0) {
-                    children[i].setBounds(0, 0, 0, 0);
-                    continue;
-                }
-                int start = (int) Math.round(width * sum / total);
-                sum += weights[i];
-                int end = (int) Math.round(width * sum / total);
-                children[i].setBounds(insets.left + start, insets.top, end - start, height);
+            int[] sizes=allocation(width);int x=insets.left;var children=parent.getComponents();
+            for(int i=0;i<children.length;i++){
+                int w=i<sizes.length?sizes[i]:0;children[i].setBounds(x,insets.top,w,height);x+=w;
             }
         }
     }

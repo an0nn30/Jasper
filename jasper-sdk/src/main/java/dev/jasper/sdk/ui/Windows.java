@@ -12,6 +12,9 @@ import java.util.function.Supplier;
 
 /** Application-built windows and dialogs with consistent chrome. */
 public interface Windows {
+    /** Create a nonblocking popup attached to a host-issued live capability.
+     * @param anchor attachment authority from this host @return initially hidden popup */
+    PluginPopover popover(UiAnchor anchor);
     /** Opens an owned view as content; moving retains it, final closure disposes it. */
     ContentTab openTab(ContentSpec spec, WindowOwner owner, UiView content);
 

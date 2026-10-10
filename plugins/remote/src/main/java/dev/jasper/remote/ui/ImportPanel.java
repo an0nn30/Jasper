@@ -26,6 +26,8 @@ public final class ImportPanel implements AutoCloseable {
     private final List<String> details = new ArrayList<>();
     private final String skipped;
     private final UiView view;
+    private final java.util.Map<UUID,dev.jasper.vault.api.CredentialDescriptor> presentations=new java.util.HashMap<>();
+    private boolean stale;
     private String status = "", cancelLabel = "Cancel";
     private boolean enabled = true, closed;
 
@@ -50,15 +52,15 @@ public final class ImportPanel implements AutoCloseable {
                     for (int i = 0; i < this.candidates.size(); i++)
                         if (toggled.id().equals(check(i)) && enabled && this.candidates.get(i).errors().isEmpty()) { checked.set(i, toggled.checked()); render(); }
                 }
-                case UiEvent.Action action when action.id().equals(IMPORT) -> {
+                case UiEvent.Action action when action.id().equals(IMPORT) && enabled -> {
                     var selected = new ArrayList<ConfigImport.Candidate>();
                     for (int i = 0; i < this.candidates.size(); i++) if (checked.get(i) && this.candidates.get(i).errors().isEmpty()) selected.add(this.candidates.get(i));
                     importSelected.accept(List.copyOf(selected));
                 }
                 case UiEvent.Action action when action.id().equals(CANCEL) -> onCancel.run();
-                case UiEvent.Action action when action.id().equals(REFRESH) -> onRefresh.run();
+                case UiEvent.Action action when action.id().equals(REFRESH) && (enabled||stale) -> onRefresh.run();
                 case UiEvent.Action action -> {
-                    for (int i = 0; i < this.candidates.size(); i++) if (action.id().equals(choose(i))) pick.accept(this.candidates.get(i));
+                    for (int i = 0; i < this.candidates.size(); i++) if (enabled && this.candidates.get(i).errors().isEmpty() && this.candidates.get(i).identities().isEmpty() && action.id().equals(choose(i))) pick.accept(this.candidates.get(i));
                 }
                 default -> { }
             }
@@ -70,13 +72,21 @@ public final class ImportPanel implements AutoCloseable {
     /** The status line as shown. */
     public String status() { return status; }
 
-    public void credential(UUID candidate, String name) {
-        for (int i = 0; i < candidates.size(); i++) if (candidates.get(i).id().equals(candidate)) details.set(i, "Vault: " + name);
+    public dev.jasper.sdk.ui.UiAnchor anchor(UUID candidate) {
+        for(int i=0;i<candidates.size();i++)if(candidates.get(i).id().equals(candidate))return view.anchor(choose(i));
+        throw new IllegalArgumentException("Unknown candidate");
+    }
+    /** Project only controller-confirmed metadata; it is never an authorization or a second domain choice. */
+    public void credential(UUID candidate, dev.jasper.vault.api.CredentialDescriptor descriptor) {
+        if(descriptor==null)presentations.remove(candidate);else presentations.put(candidate,descriptor);
+        for (int i=0;i<candidates.size();i++)if(candidates.get(i).id().equals(candidate))details.set(i,descriptor==null?"Choose a stored Vault key or password":"Vault: "+descriptor.name());
         render();
     }
+    public void refreshing(){stale=true;enabled=false;status="Refreshing SSH configuration…";presentations.clear();
+        for(int i=0;i<candidates.size();i++)if(candidates.get(i).identities().isEmpty()&&candidates.get(i).errors().isEmpty())details.set(i,"Choose a stored Vault key or password");render();}
     public void busy() { enabled = false; status = "Reviewing credentials in Vault…"; render(); }
     public void editable() { enabled = true; render(); }
-    public void failed(String message) { enabled = true; status = message; render(); }
+    public void failed(String message) { enabled = !stale; status = message; render(); }
     public void completed(String message) { enabled = false; cancelLabel = "Close"; status = message; render(); }
 
     private void render() { if (!closed) view.update(new ViewSpec(form())); }
@@ -95,13 +105,15 @@ public final class ImportPanel implements AutoCloseable {
                     new Nodes.Toggle(check(i), state(true, choosable), label, checked.get(i), check(i), false),
                     // A switch shows its label only to assistive technology; the row reads it beside the switch, as the
                     // former checkbox's own text did.
-                    new Nodes.Text(name(i), ControlState.READY, label, Nodes.TextRole.BODY),
-                    new Nodes.Button(choose(i), state(c.identities().isEmpty(), choosable), "Choose credential…", "", Nodes.ButtonKind.SECONDARY, choose(i), ""))),
+                    new Nodes.Text(name(i), ControlState.READY, label, Nodes.TextRole.BODY))),
+                new Nodes.Stack("import.credential-line."+i,state(c.identities().isEmpty(),true),Nodes.LayoutRole.INLINE,List.of(
+                  new Nodes.FormRow("import.credential-row."+i,ControlState.READY,"Credential","",
+                    new Nodes.Choice(choose(i), state(c.identities().isEmpty(), choosable), Nodes.ChoiceKind.PICKER,List.of(),"","Credential",choose(i),"lock",Optional.empty(),Optional.of(presentations.get(c.id())==null?new Nodes.PickerFace("","","lock",Nodes.Hue.NONE,Nodes.PickerDensity.COMPACT):dev.jasper.vault.api.CredentialPresentation.face(presentations.get(c.id()),Nodes.PickerDensity.COMPACT))),Optional.empty()))),
                 new Nodes.Text(detail(i), ControlState.READY, details.get(i), Nodes.TextRole.DESCRIPTION))));
         }
         sections.add(new Nodes.Text(SKIPPED, state(!skipped.isEmpty(), true), skipped, Nodes.TextRole.DESCRIPTION));
         var actions = List.of(
-            new Nodes.Button(REFRESH, state(true, enabled), "Refresh", "", Nodes.ButtonKind.SECONDARY, REFRESH, ""),
+            new Nodes.Button(REFRESH, state(true, enabled||stale), "Refresh", "", Nodes.ButtonKind.SECONDARY, REFRESH, ""),
             new Nodes.Button(CANCEL, ControlState.READY, cancelLabel, "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
             new Nodes.Button(IMPORT, state(true, enabled && !candidates.isEmpty()), "Import", "", Nodes.ButtonKind.SECONDARY, IMPORT, ""));
         // The status sits beside the buttons, as it sat above them, so a long preview never scrolls it away.
