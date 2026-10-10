@@ -35,6 +35,11 @@
   Task9c scoped final verification: Editor4818 (both corpus runs), Remote470, UI417, SDK67, testkit132 and affected app120,
   each zero failures/errors/skips; all five architecture gates passed. Whole-repository gate stays Task12. 9c independent
   review pending; 9b independently approved (fake Field-kind-reset minor owned by Task11; warning cleanup by Task12).
+  Task9c review fix round1 corrects NONE row layout/paint to distinguish ordinary data from genuine headings, preserving
+  visible leading/subtitle/trailing controls and real pointer input. SINGLE→NONE→SINGLE clears prior user selection,
+  row focus/anchor and deferred selection reveal even when all declared selections are empty. Six targeted regressions
+  first failed; final UI check423, shared testkit132 and hosted Editor preservation/kit contracts27 pass, zero failures.
+  Scoped rereview remains pending; unaffected corpus/plugin suites were not rerun for this shared row-only fix.
   Native GUI acceptance of dialogs and document/Find/Vim remains pending with the user/controller; no GUI was launched.
 
 - **Theme engine Plan 2 Task 9a independently approved: Editor dialogs on kit views; native acceptance pending** (2026-10-10).

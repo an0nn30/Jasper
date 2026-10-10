@@ -20,6 +20,8 @@ import javax.accessibility.AccessibleRole;
 import javax.accessibility.AccessibleState;
 import javax.swing.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Plan 2 Task 9-kit: what the Editor's chrome needs from the kit. A DOCUMENT split whose specialized document fills the
@@ -116,6 +118,124 @@ class EditorKitTest {
                 assertThat(events).containsExactly(new UiEvent.Selected("rows",Set.of("b")));
             }finally {release(context);}
         });
+    }
+
+    @Test void passiveDataRowsLayOutEverySlotAndDeliverPointerInputWhileHeadingsKeepTheirRule() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();var events=new ArrayList<UiEvent>();
+            var item=new ListItem("data",Optional.of(new Text("leading",READY,"L",TextRole.BODY)),
+                List.of(new Text("title",READY,"Title",TextRole.BODY)),
+                List.of(new Text("subtitle",READY,"Subtitle",TextRole.CAPTION)),
+                List.of(new Nodes.Button("copy",READY,"Copy","",ButtonKind.GHOST,"copy","")));
+            var heading=new ListItem("heading",Optional.empty(),List.of(new Text("section",READY,"Section",TextRole.BODY)),List.of(),List.of(),true);
+            var list=new ItemList("rows",READY,ListKind.DOUBLE,List.of(item,heading),Set.of(),"activate",List.of(),SelectionMode.NONE,Optional.empty());
+            try(var view=new KitView(context,new ViewSpec(list),events::add)) {
+                view.setSize(500,200);InteractiveRowsTest.layout(view);
+                var control=(InteractiveRows.RowsControl)view.control("rows");var row=control.mounted.get("data");
+                for(var id:List.of("leading","title","subtitle","copy")) {
+                    var component=find(view,id,JComponent.class);
+                    var bounds=SwingUtilities.convertRectangle(component.getParent(),component.getBounds(),row);
+                    assertThat(bounds.width).as("%s visible width",id).isPositive();
+                    assertThat(bounds.height).as("%s visible height",id).isPositive();
+                    assertThat(row.getBounds().width).isGreaterThanOrEqualTo(bounds.x+bounds.width);
+                    assertThat(component.getParent().getWidth()).as("%s parent width",id).isPositive();
+                    assertThat(component.getParent().getHeight()).as("%s parent height",id).isPositive();
+                }
+                var button=find(view,"copy",AbstractButton.class);
+                var point=SwingUtilities.convertPoint(button,button.getWidth()/2,button.getHeight()/2,row);
+                var target=SwingUtilities.getDeepestComponentAt(row,point.x,point.y);
+                assertThat(target).as("laid-out pointer hit target").isSameAs(button);
+                pointerClick(target,SwingUtilities.convertPoint(row,point,target));
+                assertThat(events).containsExactly(new UiEvent.Action("copy"));
+                assertThat(control.selected).isEmpty();
+                // NONE must not paint data rows as section headings, nor paint selection/hover/focus effects.
+                row.hover=true;control.selected.add("data");control.focusItem="data";
+                assertThat(rowBackground(row).getRGB(0,0)).isZero();
+                assertThat(rowBackground(row).getRGB(5,5)).isZero();
+                var section=control.mounted.get("heading");
+                assertThat(section.title.getWidth()).isPositive();
+                for(var part:List.of(section.leading,section.subtitle,section.trailing))assertThat(part.getBounds()).isEqualTo(new Rectangle());
+                assertThat(rowBackground(section).getRGB(0,0)).isEqualTo(context.theme().semantic().color(SemanticColor.BORDER_SUBTLE).getRGB());
+                assertThat(rowBackground(section).getRGB(5,5)).isZero();
+                pointerClick(section,new Point(5,5));assertThat(events).containsExactly(new UiEvent.Action("copy"));
+            }finally{release(context);}
+        });
+    }
+
+    @Test void passiveTablesKeepColumnWidthsAndOrdinaryRowInsets() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();
+            var table=new Table("rows",READY,List.of(new Column("name","Name",TextRole.BODY,false,1,Optional.empty()),
+                new Column("size","Size",TextRole.MONO,true,2,Optional.empty())),
+                List.of(new TableRow("a",Map.of("name","Alpha","size","123"),Optional.empty()),
+                    new TableRow("b",Map.of("name","Beta","size","456"),Optional.empty())),Set.of(),"",List.of(),SelectionMode.NONE);
+            try(var view=new KitView(context,new ViewSpec(table),event -> {})) {
+                view.setSize(500,180);InteractiveRowsTest.layout(view);
+                var control=(Tables.TableControl)view.control("rows");var row=control.mounted.get("a");
+                int pad=ThemePainting.metric(context,DesignMetrics.Role.ICON_GAP);
+                assertThat(row.title.getBounds()).isEqualTo(new Rectangle(pad,0,row.getWidth()-2*pad,row.getHeight()));
+                assertThat(row.cells.get(0).getWidth()).isPositive();
+                assertThat(row.cells.get(1).getWidth()).isBetween(2*row.cells.get(0).getWidth()-1,2*row.cells.get(0).getWidth()+1);
+                assertThat(row.cells.get(1).getX()).isEqualTo(row.cells.get(0).getWidth());
+                assertThat(row.cells.get(0).getHeight()).isEqualTo(row.getHeight());
+                assertThat(((JLabel)row.cells.get(1)).getHorizontalAlignment()).isEqualTo(SwingConstants.RIGHT);
+                assertThat(rowBackground(control.mounted.get("b")).getRGB(0,0)).as("ordinary table row has no heading rule").isZero();
+            }finally{release(context);}
+        });
+    }
+
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void passiveTransitionClearsUserSelectionEvenWhenDeclaredSelectionStaysEmpty(boolean table) {
+        Edt.run(() -> {
+            var context=KitFixtures.context();var events=new ArrayList<UiEvent>();
+            try(var view=new KitView(context,new ViewSpec(transitionRows(table,SelectionMode.SINGLE,Set.of())),events::add)) {
+                view.setSize(300,180);InteractiveRowsTest.layout(view);
+                var control=(InteractiveRows.RowsControl)view.control("rows");
+                pointerClick(control.mounted.get("b"),new Point(5,5));
+                assertThat(control.selected).containsExactly("b");assertThat(control.focusItem).isEqualTo("b");assertThat(control.anchor).isEqualTo("b");
+                assertThat(events).contains(new UiEvent.Selected("rows",Set.of("b")));
+                view.update(new ViewSpec(transitionRows(table,SelectionMode.NONE,Set.of())));events.clear();
+                assertThat(control.selected).as("NONE internal selection").isEmpty();
+                assertThat(control.focusItem).isNull();assertThat(control.focusControl).isNull();assertThat(control.anchor).isNull();assertThat(control.pendingReveal).isNull();
+                view.update(new ViewSpec(transitionRows(table,SelectionMode.SINGLE,Set.of())));
+                assertThat(control.selected).isEmpty();assertThat(control.focusItem).isNull();assertThat(control.anchor).isNull();assertThat(control.pendingReveal).isNull();
+                SwingUtilities.processKeyBindings(key(control.canvas,KeyEvent.VK_DOWN,0));
+                assertThat(events).containsExactly(new UiEvent.Selected("rows",Set.of("a")));
+            }finally{release(context);}
+        });
+    }
+
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void enteringPassiveCancelsADeferredSelectionRevealBeforeFirstLayout(boolean table) {
+        Edt.run(() -> {
+            var context=KitFixtures.context();
+            try(var view=new KitView(context,new ViewSpec(transitionRows(table,SelectionMode.SINGLE,Set.of("b"))),event -> {})) {
+                var control=(InteractiveRows.RowsControl)view.control("rows");
+                assertThat(control.pendingReveal).isEqualTo("b");
+                view.update(new ViewSpec(transitionRows(table,SelectionMode.NONE,Set.of())));
+                assertThat(control.pendingReveal).as("stale selection reveal").isNull();
+                view.update(new ViewSpec(transitionRows(table,SelectionMode.SINGLE,Set.of())));
+                view.setSize(300,180);InteractiveRowsTest.layout(view);
+                assertThat(control.selected).isEmpty();assertThat(control.focusItem).isNull();assertThat(control.anchor).isNull();
+                assertThat(control.scroll.getViewport().getViewPosition().y).isZero();
+            }finally{release(context);}
+        });
+    }
+
+    static Nodes.Node transitionRows(boolean table,SelectionMode mode,Set<String> selected) {
+        return table ? new Table("rows",READY,List.of(new Column("name","Name",TextRole.BODY,false)),
+            List.of(new TableRow("a",Map.of("name","Alpha"),Optional.empty()),new TableRow("b",Map.of("name","Beta"),Optional.empty())),selected,"activate",List.of(),mode)
+            : new ItemList("rows",READY,ListKind.COMPACT,List.of(language("a","Alpha"),language("b","Beta")),selected,"activate",List.of(),mode,Optional.empty());
+    }
+
+    static void pointerClick(Component target,Point at) {
+        for(int type:new int[]{java.awt.event.MouseEvent.MOUSE_PRESSED,java.awt.event.MouseEvent.MOUSE_RELEASED,java.awt.event.MouseEvent.MOUSE_CLICKED})
+            target.dispatchEvent(new java.awt.event.MouseEvent(target,type,0,type==java.awt.event.MouseEvent.MOUSE_PRESSED?InputEvent.BUTTON1_DOWN_MASK:0,at.x,at.y,1,false,java.awt.event.MouseEvent.BUTTON1));
+    }
+
+    static BufferedImage rowBackground(InteractiveRows.Row row) {
+        var image=new BufferedImage(row.getWidth(),row.getHeight(),BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();
+        try{row.paintComponent(g);}finally{g.dispose();}return image;
     }
 
     @Test void revealingAnInlineRowBeforeLayoutWaitsForTheViewportWithoutChangingFocus() {

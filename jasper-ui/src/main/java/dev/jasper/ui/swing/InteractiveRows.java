@@ -23,7 +23,7 @@ final class InteractiveRows {
         final LinkedHashMap<String, Row> mounted = new LinkedHashMap<>();
         final Set<String> selected = new LinkedHashSet<>();
         Set<String> declaredSelection;
-        boolean declaredMultiple;
+        boolean declaredMultiple, declaredPassive;
         String focusItem, focusControl;
         int rowHeight;
         boolean syncing;
@@ -309,17 +309,20 @@ final class InteractiveRows {
             state();
             data();
             if (!Objects.equals(declaredSelection, specifiedSelection())
-                    || declaredMultiple != multiple()) {
+                    || declaredMultiple != multiple() || declaredPassive != passive()) {
                 // A selection the host made (not the echo of the user's own) is scrolled into view, and the arrow keys
                 // and Space continue from it, as from a selection the user made.
                 if (!selected.equals(specifiedSelection()) && !specifiedSelection().isEmpty()) {
                     pendingReveal = specifiedSelection().stream().min(Comparator.comparingInt(this::indexOf)).orElse(null);
                     if (pendingReveal != null && !Objects.equals(focusItem, pendingReveal)) { focusItem = pendingReveal; focusControl = null; }
                 }
+                // Entering passive mode revokes selection-driven scrolling; later explicit reveals still work.
+                if (passive()) pendingReveal = null;
                 selected.clear();
                 selected.addAll(specifiedSelection());
                 declaredSelection = specifiedSelection();
                 declaredMultiple = multiple();
+                declaredPassive = passive();
             }
             selected.removeIf(id -> !containsItem(id));
             if (focusItem != null && indexOf(focusItem) < 0) {
@@ -1004,7 +1007,7 @@ final class InteractiveRows {
 
         @Override
         public void doLayout() {
-            if (!owner.selectable(index)) { headingLayout(); return; }
+            if (!owner.dataRow(index)) { headingLayout(); return; }
             if (owner.resultsLayout()) { resultLayout(); return; }
             int pad = ThemePainting.metric(owner.context(), DesignMetrics.Role.ICON_GAP),
                     x = pad + indent,
@@ -1086,7 +1089,7 @@ final class InteractiveRows {
 
         @Override
         protected void paintComponent(Graphics g) {
-            if (!owner.selectable(index)) {
+            if (!owner.dataRow(index)) {
                 // A heading after other rows opens its section with a hairline rule.
                 if (index > 0) {
                     g.setColor(ThemePainting.color(owner.context(), SemanticColor.BORDER_SUBTLE));
@@ -1094,6 +1097,7 @@ final class InteractiveRows {
                 }
                 return;
             }
+            if (owner.passive()) return;
             if (owner.resultsLayout()) {
                 Color fill = owner.selected.contains(id) ? ThemePainting.color(owner.context(), SemanticColor.SELECTION_BG)
                         : hover ? ColorMath.opacity(ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY), .05) : null;
