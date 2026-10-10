@@ -7,18 +7,14 @@ import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.UiKit;
 import dev.jasper.sdk.ui.UiView;
 import dev.jasper.sdk.ui.ViewSpec;
-import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
-import javax.swing.AbstractAction;
-import javax.swing.JComponent;
-import javax.swing.KeyStroke;
 
 /**
- * The Editor's question and Saving dialogs as owned kit views from the plugin's {@link UiKit} (Plan 2 Task 9a), and the
- * key-binding helper the find bar keeps until Task 9b. Each view is UI-thread only; the surface that mounts it disposes
+ * The Editor's question and Saving dialogs as owned kit views from the plugin's {@link UiKit} (Plan 2 Task 9a).
+ * Each view is UI-thread only; the surface that mounts it disposes
  * it, and closing its owner makes late events inert.
  */
 final class Forms {
@@ -91,11 +87,4 @@ final class Forms {
         @Override public void close() { if (closed) return; closed = true; view.close(); }
     }
 
-    /** Puts a key binding on a component: {@code stroke} runs {@code action} under {@code condition}. The find bar's, until Task 9b. */
-    static void bind(JComponent component, int condition, KeyStroke stroke, String name, Runnable action) {
-        component.getInputMap(condition).put(stroke, name);
-        component.getActionMap().put(name, new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent event) { action.run(); }
-        });
-    }
 }

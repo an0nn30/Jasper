@@ -33,6 +33,7 @@ final class HostedKitView implements UiView {
  @Override public void clearSecret(String id){guard();view.clearSecret(id);}
  @Override public void replaceSecret(String id,char[] value){guard();view.replaceSecret(id,value);}
  @Override public void focus(String id){guard();view.focus(id);}
+ @Override public void selectAll(String id){guard();view.selectAll(id);}
  @Override public void reveal(String id){guard();view.reveal(id);}
  @Override public boolean composing(String fieldId){guard();return view.composing(fieldId);}
  @Override public void registerContent(CustomContent content){guard();Objects.requireNonNull(content);KitDiagnostics.validate(content);

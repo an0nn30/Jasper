@@ -117,6 +117,7 @@ public final class KitViews {
         @Override public void clearSecret(String id) { use("clearSecret " + id); if (!closed) delegate.clearSecret(id); }
         @Override public void replaceSecret(String id, char[] value) { use("replaceSecret " + id); if (!closed) delegate.replaceSecret(id, value); }
         @Override public void focus(String id) { use("focus " + id); if (!closed) delegate.focus(id); }
+        @Override public void selectAll(String id) { use("selectAll " + id); if (!closed) delegate.selectAll(id); }
         @Override public void reveal(String id) { use("reveal " + id); if (!closed) delegate.reveal(id); }
         @Override public boolean composing(String id) { return delegate.composing(id); }
         @Override public void registerContent(CustomContent content) { delegate.registerContent(content); }

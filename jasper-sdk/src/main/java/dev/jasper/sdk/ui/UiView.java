@@ -24,6 +24,9 @@ public interface UiView extends Subscription {
  /** Focus a node.
  * @param id node id */
  void focus(String id);
+ /** Select the current live text of a Field without editing it or moving focus. Non-Field ids are rejected.
+ * @param fieldId ordinary text field node */
+ void selectAll(String fieldId);
  /** Scroll a node into view without moving keyboard focus, such as the first row a search matches.
  * @param id node id */
  void reveal(String id);

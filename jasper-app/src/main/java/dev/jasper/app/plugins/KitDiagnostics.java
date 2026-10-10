@@ -13,7 +13,7 @@ final class KitDiagnostics {
         if(root instanceof JComponent component && KitOwnership.owns(component)) throw new IllegalArgumentException("Kit-owned components cannot be registered as plugin content");
         boolean editor=root instanceof JTextArea || root instanceof JTextPane || root instanceof JEditorPane;
         boolean canvas=root instanceof JComponent && !(root instanceof JPanel) && !(root instanceof javax.swing.text.JTextComponent) && !(root instanceof AbstractButton) && !(root instanceof JLabel) && !(root instanceof JList) && !(root instanceof JTable) && !(root instanceof JTree) && !(root instanceof JComboBox) && !(root instanceof JSpinner) && !(root instanceof JSlider);
-        if(content.kind()==dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR ? !editor : !canvas)
+        if(content.kind()==dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR ? !(editor || canvas) : !canvas)
             throw new IllegalArgumentException("Ordinary plugin controls require kit descriptors");
     }
 }

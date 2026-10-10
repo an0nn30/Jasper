@@ -22,8 +22,6 @@ import dev.jasper.sdk.ui.SyntaxRole;
 import dev.jasper.sdk.ui.SyntaxStyle;
 import dev.jasper.sdk.ui.WorkspacePalette;
 import java.awt.Color;
-import java.awt.Component;
-import java.awt.Container;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -40,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 
+@org.junit.jupiter.api.extension.ExtendWith(dev.jasper.editor.testsupport.EdtTests.class)
 class EditorPluginTest {
     @TempDir Path home;
     private static final PluginInfo INFO = new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of("palette.contribute"));
@@ -221,12 +220,14 @@ class EditorPluginTest {
 
     @Test void sameDarkWorkspaceChangeRecoloursOpenTabsWithoutLosingEdits() throws Exception {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
-            host.start(INFO, Set.of(), Set.of(), plugin());
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
             var consumer = new AtomicReference<PluginContext>();
             host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
             consumer.get().services().require(Editor.class).open(Files.writeString(home.resolve("a.json"), "{\"a\": true}\n"));
             while (host.runBackground() > 0) { }
-            RSyntaxTextArea area = find(host.contentComponent(host.contentTabs().getFirst())).orElseThrow();
+            var windowField = EditorPlugin.class.getDeclaredField("window"); windowField.setAccessible(true);
+            RSyntaxTextArea area = ((EditorWindow) windowField.get(plugin)).selected().orElseThrow().area();
             area.append("extra");
             area.select(1, 4);
             var document = area.getDocument();
@@ -246,16 +247,6 @@ class EditorPluginTest {
             assertThat(area.getSelectionEnd()).isEqualTo(4);
             assertThat(area.canUndo()).isTrue();
         }
-    }
-
-    private static Optional<RSyntaxTextArea> find(Component component) {
-        if (component instanceof RSyntaxTextArea area) return Optional.of(area);
-        if (component instanceof Container container)
-            for (Component child : container.getComponents()) {
-                Optional<RSyntaxTextArea> found = find(child);
-                if (found.isPresent()) return found;
-            }
-        return Optional.empty();
     }
 
     @Test void badSettingsAreReportedAtStartAndOnEveryChange() {

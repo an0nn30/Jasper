@@ -610,7 +610,7 @@ clears it with the host actions on hide/replace/remove/close. `ContractHarness` 
 `runPanelHeaderAction` and `closePanel` (fake: `FakePluginHost.closePanel`) for the shared contract test; no SDK change.
 
 The SDK mirrors Nodes/support records/ViewSpec/UiEvent in `dev.jasper.sdk.ui`, without module imports.
-`UiView extends Subscription` exposes update/spec/withSecret/clearSecret/replaceSecret/focus and typed content
+`UiView extends Subscription` exposes update/spec/withSecret/clearSecret/replaceSecret/focus/selectAll and typed content
 registration via `void registerContent(CustomContent content)`, but never `component()`. `UiKit.create(ViewSpec,Consumer<UiEvent>): UiView` is implemented
 by `HostedKit` and `FakeKit`. `PluginContext.kit(): UiKit` supplies the factory. `KitValues` exhaustively
 maps the two sealed vocabularies and events. Host-owned views cannot be passed to another plugin.
@@ -628,8 +628,8 @@ New SDK custom content is explicit `CustomContent(String id,CustomKind kind,JCom
 AutoCloseable lifetime)` and receives semantic appearance/opacity refreshes. Only approved custom
 content code may construct the specialized Swing widget; other plugin UI uses descriptors.
 Task 11–12 execution ruling: this is a generic capability, without plugin-id restrictions. Runtime
-validation accepts a multiline text/editor root (or its scroll wrapper) for EDITOR, and a purpose-built
-JComponent canvas/preview root for TERMINAL/CHART/PREVIEW. Ordinary JPanel form trees, buttons,
+validation accepts a multiline text/editor root (or its scroll wrapper) or purpose-built nonstandard
+JComponent document canvas for EDITOR, and a purpose-built JComponent canvas/preview root for TERMINAL/CHART/PREVIEW. Ordinary JPanel form trees, buttons,
 labels, fields and data/choice controls are rejected as specialized roots. Necessary implementation
 children under an accepted specialized root are allowed; this is API discipline, not a sandbox.
 Host registration ownership is recorded independently of widget class names, with cross-view/component
@@ -908,3 +908,13 @@ surface-tinted icons, status text and the running dot on `surface.status` (4.5) 
 Temporary raw defaults and plugin styling retain only the exact consumers/removal owners in
 [temporary-paths](../../design/theme-engine/temporary-paths.md). Dynamic SDK current() readers require
 WorkspaceDefaults publication until Tasks 7–10/11, correcting the early literal-key audit.
+
+### Plan 2 Task 9b — precise field selection and Editor owners
+
+`UiView.selectAll(String fieldId)` and module `KitView.selectAll` select the current live Nodes.Field input text,
+without emitting Edited or forcing focus. Unknown/non-Field IDs (including Secret) throw IllegalArgumentException;
+normal EDT/open-handle guards apply. Host and fake mirror it; fake records logical selection without secret copying.
+Find requests focus then selectAll. SDK version stays unchanged until coordinated Task 11 cutover.
+EDITOR wrapper admission is mirrored module CustomContents/host/fake with shared positive editor-canvas and negative
+ordinary-root cases. Final Editor custom source owners are ui/DocumentArea.java and vim/VimTextArea.java only;
+VimBar remains an explicit temporary 9b bridge removed by 9c, not a permanent custom allowance. Task 11 enforces owners.

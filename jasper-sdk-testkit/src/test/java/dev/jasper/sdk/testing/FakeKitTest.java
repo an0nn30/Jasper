@@ -38,5 +38,7 @@ class FakeKitContractTest extends KitContractTest {
  protected void emit(dev.jasper.sdk.ui.UiView view,dev.jasper.sdk.ui.UiEvent event){((FakeKitView)view).emit(event);}
  protected void secret(dev.jasper.sdk.ui.UiView view,String id,char[] value){((FakeKitView)view).setSecret(id,value);}
  protected void owns(dev.jasper.sdk.ui.UiKit kit,dev.jasper.sdk.ui.UiView view){((FakeKit)kit).requireOwned(view);}
+ protected void fieldText(dev.jasper.sdk.ui.UiView view,String id,String text){((FakeKitView)view).emit(new dev.jasper.sdk.ui.UiEvent.Edited(id,text));}
+ protected int[] fieldSelection(dev.jasper.sdk.ui.UiView view,String id){return ((FakeKitView)view).fieldSelection(id);}
  protected void stop(dev.jasper.sdk.ui.UiKit kit){((FakeKit)kit).close();}
 }

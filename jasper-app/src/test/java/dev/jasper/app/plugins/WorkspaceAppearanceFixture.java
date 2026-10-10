@@ -19,6 +19,7 @@ final class WorkspaceAppearanceFixture {
         listeners.add(listener); listener.accept(current);
         return new Subscription(() -> listeners.remove(listener));
     }
+    void setPair(ResolvedTheme value) { current=value; for(var listener:List.copyOf(listeners))listener.accept(current); }
     void setVariant(Variant variant) {
         var old = current.chrome();
         var chrome = new GeneratedTheme(old.name(), variant == Variant.DARK, old.author(), old.tokens(), old.syntax(),

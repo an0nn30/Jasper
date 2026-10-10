@@ -97,6 +97,13 @@ public final class KitView extends JPanel implements AutoCloseable {
     void revealSecrets(SecretFields.SecretControl source, boolean revealed) { reconciler.revealSecrets(source, revealed); }
     /** Focus a control; an offscreen inline row control is first scrolled into view and mounted. */
     public void focus(String id) { requireOpen(); reconciler.control(Objects.requireNonNull(id)).focusTarget().requestFocusInWindow(); }
+    /** Select all live text of an ordinary field without emitting an edit or moving focus. */
+    public void selectAll(String fieldId) {
+        requireOpen();
+        var control = reconciler.control(Objects.requireNonNull(fieldId));
+        if (!(control instanceof TextFields.FieldControl field)) throw new IllegalArgumentException("Node is not a field: " + fieldId);
+        field.input.selectAll();
+    }
     /**
      * Scroll a node into view without moving keyboard focus, for example the first row matching a search while the
      * search field keeps focus and caret. An offscreen inline row control is first mounted.

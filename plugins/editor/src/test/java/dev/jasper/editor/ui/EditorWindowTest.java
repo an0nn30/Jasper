@@ -29,7 +29,6 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.swing.JMenuItem;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +36,7 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_PYTHON;
 
+@org.junit.jupiter.api.extension.ExtendWith(dev.jasper.editor.testsupport.EdtTests.class)
 class EditorWindowTest {
     @TempDir Path home;
     private FakePluginHost host;
@@ -91,6 +91,21 @@ class EditorWindowTest {
         window.openLocal(file);
         drain();
         return window.selected().orElseThrow();
+    }
+
+    @Test void hostedDocumentUsesTheKitDocumentLayoutEvenWhileLoading() throws Exception {
+        Kits.edt(() -> {
+            window.openLocal(file("kit.txt", "text"));
+            var views = ((dev.jasper.sdk.testing.FakeKit) context.kit()).views();
+            assertThat(views).hasSize(1);
+            assertThat(views.getFirst().spec().root()).isInstanceOf(Nodes.Split.class);
+            var root = (Nodes.Split) views.getFirst().spec().root();
+            assertThat(root.kind()).isEqualTo(Nodes.SplitKind.DOCUMENT);
+            assertThat(root.children()).anySatisfy(node -> {
+                assertThat(node).isInstanceOf(Nodes.Custom.class);
+                assertThat(node.state().visible()).as("loading hides rather than removes the document").isFalse();
+            });
+        });
     }
 
     @Test void aTabsGlassSurfaceFollowsTheWorkspaceOpacity() throws Exception {
@@ -156,6 +171,22 @@ class EditorWindowTest {
         assertThat(tab.area().getText()).isEqualTo("a = 1\n");
         assertThat(window.headerTitle(0)).isEqualTo("config.toml");
         assertThat(window.showingEmpty()).isFalse();
+    }
+
+    @Test void asynchronousSaveMayFinishAfterTheHostedTabCloses() throws Exception {
+        Path file = file("late-save.txt", "before");
+        var tab = opened(file);
+        tab.area().append(" after");
+        window.save();
+        assertThat(tab.session().saving()).isTrue();
+        host.contentTabs().getFirst().close();
+        assertThat(Kits.closed(tab.view())).isTrue();
+        assertThat(window.sessions()).isEmpty();
+        drain();
+        assertThat(Files.readString(file)).isEqualTo("before after");
+        assertThat(tab.session().saving()).isFalse();
+        assertThat(window.sessions()).isEmpty();
+        assertThat(host.failures()).isEmpty();
     }
 
     @Test void editingShowsTheMarkerAndSavingWritesTheFile() throws Exception {
@@ -411,11 +442,8 @@ class EditorWindowTest {
         assertThat(tab.area().getText()).isEqualTo("a = 22\n");
     }
 
-    @Test void theMenuListsEveryCommandAndSettingsApplyToOpenTabs() throws Exception {
+    @Test void settingsApplyToOpenTabs() throws Exception {
         EditorTab tab = opened(file("a.json", "{}\n"));
-        assertThat(window.menu().getComponents()).extracting(item -> ((JMenuItem) item).getText())
-            .contains("Save", "Save As…", "Save All", "Open…", "New File", "Close Tab", "Find…", "Replace…", "Go to Line…",
-                "Toggle Comment", "Revert to Saved", "Language…", "Toggle Soft Wrap", "Toggle Vim Mode");
         settings.set(new EditorSettings("Monospaced", 18, 2, false, 1, false));
         window.apply();
         assertThat(tab.area().getFont().getSize()).isEqualTo(18);
@@ -488,7 +516,7 @@ class EditorWindowTest {
     /** Types Vim keys on the event thread, where the caret follows the text as in the app. */
     private static void vimKeys(EditorTab tab, String keys) throws Exception {
         var vim = tab.vimEditor().orElseThrow();
-        javax.swing.SwingUtilities.invokeAndWait(() -> { for (var key : dev.jasper.editor.vim.KeyInput.parse(keys)) vim.feed(key); });
+        Kits.edt(() -> { for (var key : dev.jasper.editor.vim.KeyInput.parse(keys)) vim.feed(key); });
     }
 
     @Test void theVimrcIsReadWhenVimFirstTurnsOnAndReloadReadsItAgain() throws Exception {

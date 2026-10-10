@@ -194,3 +194,10 @@ Pure generation can take `RuntimePlatform` explicitly. Ordered authored UI liter
 references, aliases and supported deterministic functions reach the semantic snapshot before the
 explicit native-token and canonical override layers. `systemColor` requires a resolvable fallback;
 missing required references/cycles diagnose the source origin/key. Optional references may be null.
+
+Plan 2 Task 9b adds `KitView.selectAll(fieldId)` (SDK UiView/host/fake mirrored): select current live Nodes.Field
+text without Edited or forced focus; unknown/non-Field IDs reject IllegalArgumentException and usual EDT/open guards
+apply. Find explicitly focuses then selects. Specialized EDITOR roots accept multiline text/scroll or nonstandard
+JComponent document canvases; ordinary JPanel/control roots remain rejected. Shared contracts exercise module/host/fake
+admission and selection. Source-owner enforcement remains Task 11; final Editor owners are DocumentArea and
+VimTextArea, with only an explicit temporary raw VimBar bridge until immediately following Task 9c.

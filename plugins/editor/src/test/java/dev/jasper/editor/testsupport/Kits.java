@@ -67,6 +67,8 @@ public final class Kits {
         var result = new ArrayList<Nodes.Node>();
         switch (node) {
             case Nodes.Form n -> { n.hero().ifPresent(result::add); result.addAll(n.sections()); n.preview().ifPresent(result::add); result.addAll(n.actions()); }
+            case Nodes.Split n -> result.addAll(n.children());
+            case Nodes.Empty n -> { result.add(n.icon()); result.addAll(n.actions()); }
             case Nodes.Stack n -> result.addAll(n.children());
             case Nodes.FormRow n -> { result.add(n.control()); n.trailing().ifPresent(result::add); }
             case Nodes.Section n -> result.add(n.body());
@@ -120,6 +122,7 @@ public final class Kits {
         @Override public void clearSecret(String id) { use("clearSecret " + id); if (!closed) delegate.clearSecret(id); }
         @Override public void replaceSecret(String id, char[] value) { use("replaceSecret " + id); if (!closed) delegate.replaceSecret(id, value); }
         @Override public void focus(String id) { use("focus " + id); if (!closed) delegate.focus(id); }
+        @Override public void selectAll(String id) { use("selectAll " + id); if (!closed) delegate.selectAll(id); }
         @Override public void reveal(String id) { use("reveal " + id); if (!closed) delegate.reveal(id); }
         @Override public boolean composing(String id) { return delegate.composing(id); }
         @Override public void registerContent(CustomContent content) { delegate.registerContent(content); }

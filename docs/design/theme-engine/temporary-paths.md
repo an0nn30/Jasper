@@ -372,10 +372,8 @@ Plan 2 Task 9a moved the Editor's question sheet (`Forms.QuestionView`, mounted 
 `PluginDialog.setContent(UiView)`. These files no longer read `UIManager` (the question's `Label.font`), set FlatLaf client
 properties (`JComponent.outline=error`, `JTextField.placeholderText`, `html.disable`), install a root default button or
 build raw Swing controls; none of them read `WorkspacePalette.current`, `LegacyAppearanceDefaults` keys or
-`WorkspaceDefaults`. `Forms.bind` (a plain key-binding helper, no styling) stays only for `FindBar` until Task 9b.
-Remaining Editor raw paths and owners: `EditorTab` (`WorkspacePalette.current` banner border; raw tab chrome and
-`openTab(JComponent)`), `FindBar`, `GlassSurface`, `EditorTheme`'s `FlatLaf.style` write (Task 9b) and `VimBar`
-(`WorkspacePalette.current`, Task 9c); the `Jasper.editor*` aliases and `WorkspaceDefaults` publication stay until Task 11.
+`WorkspaceDefaults`. Task 9b removes the remaining `Forms.bind` helper.
+Remaining Editor raw path is the explicit Vim bridge below; the `Jasper.editor*` aliases and `WorkspaceDefaults` publication stay until Task 11.
 
 ## Task 5 review fix round 1 — native geometry, vendor roles and open status-surface item
 
@@ -483,3 +481,23 @@ notification-groups editor rewritten onto the Task 6a kit `ValueEditor`), `Anima
 motion through `TAB_*_MILLIS`). Task 11's bundled-plugin manifest work now covers eight plugins (editor,
 fileserver, history, indexer, remote, sample, snippets, vault); `ThemeMigrationCoverageTest` discovers them from
 `plugins/` and requires a `dev.jasper.indexer` owner.
+
+## Task 9b document and Find removal; exact temporary Vim bridge
+
+EditorTab/FindBar are descriptor controllers mounted by openTab(UiView); no WorkspacePalette.current remains there.
+GlassSurface is deleted into DocumentArea; EditorTheme's FlatLaf.style writer is removed. Final exact custom owners
+are `plugins/editor/src/main/java/dev/jasper/editor/ui/DocumentArea.java` and
+`plugins/editor/src/main/java/dev/jasper/editor/vim/VimTextArea.java`, including the vendor text popup. No package-wide
+allowance. Runtime EDITOR admits nonstandard JComponent document canvases and text/scroll roots, rejecting ordinary
+panels/controls; Task 11 enforces the exact source list.
+
+**Temporary, Task 9c removal owner:** `plugins/editor/src/main/java/dev/jasper/editor/vim/ui/VimBar.java` stays unchanged
+as a raw standard-UI child inside DocumentArea solely for runnable Task 9b. Immediately following Task 9c converts it
+to descriptors and removes this bridge before Task 9 is complete; it is not a permanent custom-content allowance.
+The Jasper.editor aliases/WorkspaceDefaults publishers remain Task 11 removal owners.
+
+**Accepted visual-only, Plan 3 Task 8 composition owner:** banner separation/padding replaces the former divider
+(current kit text/buttons keep all actions/state); native FlatLaf scrollbar track measures #2b2e37 against editor
+#191b20. Real-host corner correctly paints editor RGB at one Src alpha (204 main/.8, 115 detached/.45); track color
+is preserved through reparenting. Any final track styling goes through the shared kit, without an Editor delegate or
+FlatLaf.style escape. Evidence: EditorDocumentPreservationTest, editor-hosted/mixed/document-scroll-{main,moved}.

@@ -14,6 +14,8 @@ public abstract class KitContractTest {
     protected abstract void secret(UiView view, String id, char[] value);
     protected abstract void owns(UiKit kit, UiView view);
     protected abstract void stop(UiKit kit);
+    protected abstract void fieldText(UiView view,String id,String text);
+    protected abstract int[] fieldSelection(UiView view,String id);
     protected static void edt(Runnable body) throws Exception { SwingUtilities.invokeAndWait(body); }
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
@@ -229,6 +231,40 @@ public abstract class KitContractTest {
         emit(handle[0],new UiEvent.Action("update"));assertThat(handle[0].spec()).isEqualTo(spec("After"));handle[0].close();
         handle[0]=kit.create(spec("Before"),e -> {handle[0].close();throw new IllegalStateException("after close");});
         assertThatCode(() -> emit(handle[0],new UiEvent.Action("close"))).doesNotThrowAnyException();assertThatThrownBy(handle[0]::spec).isInstanceOf(IllegalStateException.class);stop(kit);
+    }); }
+    @Test void selectAllUsesLiveTextWithoutEditingOrFocusingAndRejectsNonFields() throws Exception { edt(() -> {
+        var kit=kit("owner"); var events=new ArrayList<UiEvent>();
+        var view=kit.create(new ViewSpec(new Nodes.Stack("root",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
+            new Nodes.Field("field",ControlState.READY,Nodes.FieldKind.SEARCH,"old","","Search",""),
+            new Nodes.Secret("secret",ControlState.READY,"","Password","")))),events::add);
+        fieldText(view,"field","current input"); events.clear();
+        view.selectAll("field");
+        assertThat(fieldSelection(view,"field")).containsExactly(0,13);
+        assertThat(events).isEmpty();
+        for(var id:List.of("root","secret","unknown"))
+            assertThatThrownBy(() -> view.selectAll(id)).isInstanceOf(IllegalArgumentException.class);
+        view.close();assertThatThrownBy(() -> view.selectAll("field")).isInstanceOf(IllegalStateException.class);stop(kit);
+    }); }
+    @Test void editorAcceptsAPurposeBuiltCanvasButRejectsOrdinaryRoots() throws Exception { edt(() -> {
+        var kit=kit("owner");
+        var custom=new ViewSpec(new Nodes.Custom("node",ControlState.READY,"content",Nodes.CustomKind.EDITOR,"Editor"));
+        for (var root : List.of(new javax.swing.JPanel(), new javax.swing.JButton("Button"), new javax.swing.JLabel("Label"),
+                new javax.swing.JList<>(), new javax.swing.JTable(), new javax.swing.JTree(), new javax.swing.JComboBox<>(),
+                new javax.swing.JSpinner(), new javax.swing.JSlider(), new javax.swing.JScrollPane(new javax.swing.JPanel()))) {
+            var rejected=kit.create(custom,e -> {});
+            assertThatThrownBy(() -> rejected.registerContent(new CustomContent("content",Nodes.CustomKind.EDITOR,root,() -> {})))
+                .isInstanceOf(IllegalArgumentException.class);
+            rejected.close();
+        }
+        var view=kit.create(custom,e -> {});
+        var disposed=new java.util.concurrent.atomic.AtomicInteger();
+        var canvas=new javax.swing.JComponent() { };
+        canvas.setLayout(new java.awt.BorderLayout());
+        canvas.add(new javax.swing.JScrollPane(new javax.swing.JTextArea("retained")));
+        view.registerContent(new CustomContent("content",Nodes.CustomKind.EDITOR,canvas,disposed::incrementAndGet));
+        view.update(custom);
+        assertThat(disposed).hasValue(0);
+        view.close(); assertThat(disposed).hasValue(1); stop(kit);
     }); }
     @Test void customContentCannotCrossOwnersAndDisposesOnRemoval() throws Exception { edt(() -> {
         var first=kit("first");var second=kit("second");var custom=new ViewSpec(new Nodes.Custom("node",ControlState.READY,"content",Nodes.CustomKind.EDITOR,"Editor"));

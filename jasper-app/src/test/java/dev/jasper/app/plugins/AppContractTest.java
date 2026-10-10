@@ -89,7 +89,7 @@ class AppContractTest extends PluginContractTest {
             GlassSource.NONE);
     }
 
-    private static PluginHost host(Path data, Duration drainGrace,
+    static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
                            TerminalRegistry terminals, NotificationsFixture notifications, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles,

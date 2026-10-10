@@ -1,7 +1,5 @@
 package dev.jasper.editor.ui;
 
-import dev.jasper.editor.testsupport.ZoneColors;
-import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.editor.local.LocalDocument;
 import dev.jasper.editor.local.LocalFiles;
 import dev.jasper.editor.session.DocumentSession;
@@ -27,25 +25,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 
+@org.junit.jupiter.api.extension.ExtendWith(dev.jasper.editor.testsupport.EdtTests.class)
 class EditorTabTest {
-    @Test void bannerRuleFollowsMountedZoneWithoutLosingPadding() throws Exception {
-        javax.swing.SwingUtilities.invokeAndWait(() -> {
-            try (var colors = new ZoneColors()) {
-                var tab = new EditorTab(DocumentSession.untitled("Untitled", environment), closed::add, false);
-                tab.apply(new EditorSettings("Monospaced", 17, 2, false, 10, false), new EditorTheme(), EditorThemeTest.EDITOR, EditorThemeTest.syntax(0x223300));
-                var banner = (javax.swing.JComponent) tab.bannerFirst().getParent();
-                while (banner.getBorder() == null) banner = (javax.swing.JComponent) banner.getParent();
-                for (var parent : List.of(colors.workspace, colors.chrome, colors.workspace)) {
-                    parent.add(tab);
-                    assertThat(ZoneColors.rule(banner, 30, 39)).isEqualTo(WorkspacePalette.current(banner).border());
-                    assertThat(banner.getInsets()).isEqualTo(new java.awt.Insets(6, 10, 7, 10));
-                    colors.put("Jasper.workspace.border", new java.awt.Color(0x123456));
-                }
-                tab.dispose();
-            }
-        });
-    }
-
     /** A component without a peer is never validated, so lays each container out top-down, twice for scroll panes. */
     private static void layOut(java.awt.Component component) {
         for (int pass = 0; pass < 2; pass++) layOutOnce(component);
@@ -74,39 +55,39 @@ class EditorTabTest {
     }
 
     @Test void translucentWorkspaceLetsTheGlassSurfaceFillTextAndGutterOnceAtTheWorkspaceOpacity() throws Exception {
-        javax.swing.SwingUtilities.invokeAndWait(() -> {
-            var tab = new EditorTab(DocumentSession.untitled("Untitled", environment), closed::add, false);
+        dev.jasper.editor.testsupport.Kits.edt(() -> {
+            var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), DocumentSession.untitled("Untitled", environment), closed::add, false);
             var settings = new EditorSettings("Monospaced", 17, 2, false, 10, false);
             var syntax = EditorThemeTest.syntax(0x223300);
             tab.apply(settings, new EditorTheme(), EditorThemeTest.EDITOR, syntax, 0.5);
-            tab.setSize(600, 400);
-            layOut(tab);
+            tab.surface().setSize(600, 400);
+            layOut(tab.surface());
             measure(tab);
             var image = new java.awt.image.BufferedImage(600, 400, java.awt.image.BufferedImage.TYPE_INT_ARGB);
             var g = image.createGraphics();
-            tab.paint(g);
+            tab.surface().paint(g);
             g.dispose();
             var view = tab.scroll().getViewport();
-            var inArea = javax.swing.SwingUtilities.convertPoint(view, view.getWidth() - 20, view.getHeight() - 20, tab);
+            var inArea = javax.swing.SwingUtilities.convertPoint(view, view.getWidth() - 20, view.getHeight() - 20, tab.surface());
             int text = image.getRGB(inArea.x, inArea.y);
             assertThat(text >>> 24).isEqualTo(128);
             assertThat(text & 0xFFFFFF).isEqualTo(EditorThemeTest.EDITOR.background().getRGB() & 0xFFFFFF);
             var header = tab.scroll().getRowHeader();
-            var inGutter = javax.swing.SwingUtilities.convertPoint(header, header.getWidth() / 2, header.getHeight() - 20, tab);
+            var inGutter = javax.swing.SwingUtilities.convertPoint(header, header.getWidth() / 2, header.getHeight() - 20, tab.surface());
             int gutter = image.getRGB(inGutter.x, inGutter.y);
             assertThat(gutter >>> 24).isEqualTo(128);
             assertThat(gutter & 0xFFFFFF).isEqualTo(EditorThemeTest.EDITOR.gutter().getRGB() & 0xFFFFFF);
             // The gutter's border line at its right edge must be glass too, not a solid stripe.
-            var inEdge = javax.swing.SwingUtilities.convertPoint(header, header.getWidth() - 1, header.getHeight() - 20, tab);
+            var inEdge = javax.swing.SwingUtilities.convertPoint(header, header.getWidth() - 1, header.getHeight() - 20, tab.surface());
             int edge = image.getRGB(inEdge.x, inEdge.y);
             assertThat(edge >>> 24).isEqualTo(128);
             assertThat(edge & 0xFFFFFF).isEqualTo(EditorThemeTest.EDITOR.gutter().getRGB() & 0xFFFFFF);
 
             tab.apply(settings, new EditorTheme(), EditorThemeTest.EDITOR, syntax, 1.0);
-            layOut(tab);
+            layOut(tab.surface());
             var opaque = new java.awt.image.BufferedImage(600, 400, java.awt.image.BufferedImage.TYPE_INT_ARGB);
             var g2 = opaque.createGraphics();
-            tab.paint(g2);
+            tab.surface().paint(g2);
             g2.dispose();
             assertThat(opaque.getRGB(inArea.x, inArea.y) >>> 24).isEqualTo(255);
             tab.dispose();
@@ -118,25 +99,26 @@ class EditorTabTest {
     private final SessionEnvironment environment = new SessionEnvironment(background::add, Runnable::run, Question::dismissed, () -> 1 << 20);
     private final List<EditorTab> closed = new ArrayList<>();
 
+    private static dev.jasper.sdk.ui.Nodes.Button button(EditorTab tab, String id) { return dev.jasper.editor.testsupport.Kits.button(tab.view(), id); }
+    private static String stateText(EditorTab tab) { return dev.jasper.editor.testsupport.Kits.node(tab.view(), EditorTab.STATE, dev.jasper.sdk.ui.Nodes.Empty.class).title(); }
+    private static void click(EditorTab tab, String id) { dev.jasper.editor.testsupport.Kits.click(tab.view(), id); }
+
     @BeforeEach void languages() { Languages.register(); }
 
     private void drain() { while (!background.isEmpty()) background.removeFirst().run(); }
 
     private EditorTab open(Path file) {
-        var tab = new EditorTab(new DocumentSession(new LocalDocument(file, background::add), environment), closed::add, false);
+        var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), new DocumentSession(new LocalDocument(file, background::add), environment), closed::add, false);
         tab.session().load();
         return tab;
     }
 
-    @Test void editorOwnedSurfacesAreExemptBeforeMountingWhileControlsRemainEligible() {
-        var tab = new EditorTab(DocumentSession.untitled("Untitled", environment), closed::add, false);
-        assertThat(tab.area().getClientProperty("Jasper.workspace.exempt")).isEqualTo(true);
-        assertThat(tab.scroll().getViewport().getClientProperty("Jasper.workspace.exempt")).isEqualTo(true);
-        assertThat(tab.scroll().getGutter().getClientProperty("Jasper.workspace.exempt")).isEqualTo(true);
-        assertThat(tab.scroll().getClientProperty("Jasper.workspace.exempt")).isNull();
-        assertThat(tab.scroll().getVerticalScrollBar().getClientProperty("Jasper.workspace.exempt")).isNull();
-        assertThat(tab.retryButton().getClientProperty("Jasper.workspace.exempt")).isNull();
-        assertThat(tab.bannerFirst().getClientProperty("Jasper.workspace.exempt")).isNull();
+    @Test void theSpecializedDocumentIsRegisteredWhileOrdinaryControlsAreDescriptors() {
+        var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), DocumentSession.untitled("Untitled", environment), closed::add, false);
+        assertThat(dev.jasper.editor.testsupport.Kits.node(tab.view(), EditorTab.DOCUMENT, dev.jasper.sdk.ui.Nodes.Custom.class).kind())
+            .isEqualTo(dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR);
+        assertThat(dev.jasper.editor.testsupport.Kits.node(tab.view(), EditorTab.RETRY, dev.jasper.sdk.ui.Nodes.Button.class).state().visible()).isFalse();
+        tab.dispose();
     }
 
     @Test void focusAskedForWhileLoadingArrivesWhenTheTextShows() throws Exception {
@@ -154,6 +136,21 @@ class EditorTabTest {
         assertThat(focused).as("a loaded tab takes focus at once").hasValue(2);
     }
 
+    @Test void aLoadFinishingAfterViewShutdownNeverReplacesTextFocusesOrRefreshesTheView() throws Exception {
+        var kit = new dev.jasper.editor.testsupport.Kits.RecordingKit("dev.jasper.editor");
+        var session = new DocumentSession(new LocalDocument(Files.writeString(folder.resolve("late.txt"), "late text"), background::add), environment);
+        var tab = new EditorTab(kit, session, closed::add, true);
+        var focused = new java.util.concurrent.atomic.AtomicInteger();
+        tab.focusAction(focused::incrementAndGet);
+        session.load();tab.focusText();tab.view().close();
+        drain();tab.focusText();
+        assertThat(tab.area().getText()).isEmpty();
+        assertThat(focused).hasValue(0);
+        assertThat(kit.lateCalls).isEmpty();
+        assertThat(kit.delegate.failures()).isEmpty();
+        tab.dispose();
+    }
+
     @Test void aFailedLoadDropsTheFocusRequest() throws Exception {
         var tab = open(folder.resolve("missing.txt"));
         var focused = new java.util.concurrent.atomic.AtomicInteger();
@@ -167,8 +164,8 @@ class EditorTabTest {
     @Test void showsLoadingThenTheTextInItsLanguage() throws Exception {
         var tab = open(Files.writeString(folder.resolve("a.toml"), "a = 1\n"));
         assertThat(tab.showingText()).isFalse();
-        assertThat(tab.stateText()).isEqualTo("Loading a.toml…");
-        assertThat(tab.dismissButton().getText()).isEqualTo("Cancel");
+        assertThat(stateText(tab)).isEqualTo("Loading a.toml…");
+        assertThat(button(tab, EditorTab.DISMISS).label()).isEqualTo("Cancel");
         drain();
         assertThat(tab.showingText()).isTrue();
         assertThat(tab.area().getText()).isEqualTo("a = 1\n");
@@ -209,13 +206,13 @@ class EditorTabTest {
     @Test void aFailureShowsRetryAndCloseAndABinaryFileHasNoRetry() throws Exception {
         var missing = open(folder.resolve("gone.txt"));
         drain();
-        assertThat(missing.stateText()).isEqualTo("gone.txt does not exist.");
-        assertThat(missing.retryButton().isVisible()).isTrue();
-        missing.dismissButton().doClick();
+        assertThat(stateText(missing)).isEqualTo("gone.txt does not exist.");
+        assertThat(button(missing, EditorTab.RETRY).state().visible()).isTrue();
+        click(missing, EditorTab.DISMISS);
         assertThat(closed).containsExactly(missing);
         var binary = open(Files.write(folder.resolve("x.bin"), new byte[] {1, 0, 2}));
         drain();
-        assertThat(binary.retryButton().isVisible()).isFalse();
+        assertThat(button(binary, EditorTab.RETRY).state().visible()).isFalse();
     }
 
     @Test void theBannerOffersReloadOrKeepMineAndCloseOrKeep() throws Exception {
@@ -225,26 +222,26 @@ class EditorTabTest {
         tab.area().setText("a: mine\n");
         Files.writeString(file, "a: 22\n");
         tab.session().externalChange(LocalFiles.revision(file));
-        assertThat(tab.bannerVisible()).isTrue();
-        assertThat(tab.bannerText()).isEqualTo("b.yaml changed on disk.");
-        assertThat(tab.bannerFirst().getText()).isEqualTo("Reload");
-        assertThat(tab.bannerSecond().getText()).isEqualTo("Keep Mine");
-        tab.bannerFirst().doClick();
+        assertThat(dev.jasper.editor.testsupport.Kits.node(tab.view(), EditorTab.BANNER, dev.jasper.sdk.ui.Nodes.Stack.class).state().visible()).isTrue();
+        assertThat(dev.jasper.editor.testsupport.Kits.node(tab.view(), "document.banner.text", dev.jasper.sdk.ui.Nodes.Text.class).text()).isEqualTo("b.yaml changed on disk.");
+        assertThat(button(tab, EditorTab.FIRST).label()).isEqualTo("Reload");
+        assertThat(button(tab, EditorTab.SECOND).label()).isEqualTo("Keep Mine");
+        click(tab, EditorTab.FIRST);
         drain();
         assertThat(tab.area().getText()).isEqualTo("a: 22\n");
-        assertThat(tab.bannerVisible()).isFalse();
+        assertThat(dev.jasper.editor.testsupport.Kits.node(tab.view(), EditorTab.BANNER, dev.jasper.sdk.ui.Nodes.Stack.class).state().visible()).isFalse();
         Files.delete(file);
         tab.session().externalChange(Optional.empty());
-        assertThat(tab.bannerText()).isEqualTo("b.yaml was deleted.");
-        tab.bannerSecond().doClick();
+        assertThat(dev.jasper.editor.testsupport.Kits.node(tab.view(), "document.banner.text", dev.jasper.sdk.ui.Nodes.Text.class).text()).isEqualTo("b.yaml was deleted.");
+        click(tab, EditorTab.SECOND);
         assertThat(tab.session().dirty()).isTrue();
-        assertThat(tab.bannerVisible()).isFalse();
+        assertThat(dev.jasper.editor.testsupport.Kits.node(tab.view(), EditorTab.BANNER, dev.jasper.sdk.ui.Nodes.Stack.class).state().visible()).isFalse();
         tab.session().externalChange(Optional.empty());
         assertThat(closed).isEmpty();
     }
 
     @Test void commandsOverrideTheTextAreasOwnBindingsAndJoinItsMenu() {
-        var tab = new EditorTab(DocumentSession.untitled("Untitled", environment), closed::add, false);
+        var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), DocumentSession.untitled("Untitled", environment), closed::add, false);
         int[] ran = {0};
         var saveAs = KeyNames.stroke(KeyEvent.VK_S, InputEvent.SHIFT_DOWN_MASK);
         tab.bind(List.of(new Command("save-as", "Save As…", Optional.of(saveAs), true, () -> ran[0]++),
@@ -260,7 +257,7 @@ class EditorTabTest {
     }
 
     @Test void settingsApplyTheFontAndTabSize() {
-        var tab = new EditorTab(DocumentSession.untitled("Untitled", environment), closed::add, false);
+        var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), DocumentSession.untitled("Untitled", environment), closed::add, false);
         tab.apply(new EditorSettings("Monospaced", 17, 2, false, 10, false), new EditorTheme(),
             EditorThemeTest.EDITOR, EditorThemeTest.syntax(0x223300));
         assertThat(tab.area().getFont().getSize()).isEqualTo(17);

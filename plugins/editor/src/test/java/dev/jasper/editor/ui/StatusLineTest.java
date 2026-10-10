@@ -8,13 +8,14 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
+@org.junit.jupiter.api.extension.ExtendWith(dev.jasper.editor.testsupport.EdtTests.class)
 class StatusLineTest {
     private final SessionEnvironment environment = new SessionEnvironment(Runnable::run, Runnable::run, Question::dismissed, () -> 1024);
 
     @Test void describesTheCaretLanguageEncodingEndingsIndentationAndWrap() {
         Languages.register();
         var session = DocumentSession.untitled("Untitled", environment);
-        var tab = new EditorTab(session, closing -> { }, false);
+        var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), session, closing -> { }, false);
         tab.area().setText("abc\ndef");
         tab.area().setCaretPosition(6);
         session.setStyle(Languages.TOML);

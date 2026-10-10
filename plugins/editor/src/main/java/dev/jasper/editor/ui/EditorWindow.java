@@ -25,7 +25,6 @@ import dev.jasper.sdk.ui.ContentSpec;
 import dev.jasper.sdk.ui.ContentPresentation;
 import dev.jasper.sdk.terminal.PaneHandle;
 import dev.jasper.sdk.terminal.WindowHandle;
-import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
@@ -43,7 +42,6 @@ import java.util.function.Predicate;
 import javax.swing.Action;
 import javax.swing.Icon;
 import javax.swing.JComponent;
-import javax.swing.JPopupMenu;
 import javax.swing.Timer;
 import javax.swing.text.BadLocationException;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
@@ -60,7 +58,6 @@ public final class EditorWindow {
     private final Predicate<OpenRequest> openers;
     private final Locations locations;
     private final EditorModel model = new EditorModel();
-    private final EditorTheme theme = new EditorTheme();
     private final java.util.Map<EditorTab, ContentTab> hosted = new java.util.LinkedHashMap<>();
     private EditorTab selectedTab;
     private WindowOwner origin;
@@ -146,7 +143,7 @@ public final class EditorWindow {
         serverIcon = context.appearance().icon(IconName.SERVER);
         ask = question -> environment.askers().apply(owner()).apply(question);
         await = (message, saves) -> environment.waits().apply(owner()).apply(message, saves);
-        findBar = new FindBar(() -> selected().map(EditorTab::area));
+        findBar = new FindBar(() -> selected().map(EditorTab::area), this::refreshFind, id -> selected().ifPresent(tab -> { tab.view().focus(id); tab.view().selectAll(id); }));
         status = new StatusLine(this::chooseLanguage, this::toggleWrap, this::toggleVim);
         commands = List.of(
             command("save", "Save", KeyEvent.VK_S, 0, this::save),
@@ -231,11 +228,11 @@ public final class EditorWindow {
 
     /** Settings or the theme changed: applies them to every tab. */
     public void apply() {
+        if (disposed) return;
         EditorSettings settings = environment.settings().get();
         if (vimToggled != null && vimToggled == settings.vim()) vimToggled = null;
         for (EditorTab tab : editorTabs()) {
-            tab.apply(settings, theme, context.appearance().editorPalette(), context.appearance().syntaxPalette(),
-                context.appearance().workspaceOpacity(tab));
+            tab.settings(settings);
             tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
         }
         readVimrcOnce();
@@ -458,12 +455,6 @@ public final class EditorWindow {
     String headerDetail(int index) { return model.detail(editorTabs().get(index).session()); }
     boolean showingEmpty() { return showingEmpty; }
 
-    JPopupMenu menu() {
-        var menu = new JPopupMenu();
-        for (Command command : commands) menu.add(EditorTab.menuItem(command));
-        return menu;
-    }
-
     /**
      * The closing guard (spec 2.3), asked when the window closes and when Jasper quits: waits for running saves,
      * then asks about unsaved tabs, and saves them all when asked to. Re-checks after each wait, since edits made
@@ -656,9 +647,9 @@ public final class EditorWindow {
     private void add(DocumentSession session, java.util.concurrent.atomic.AtomicReference<WindowOwner> ownerRef) {
         EditorSettings settings = environment.settings().get();
         session.setWrap(settings.softWrap());
-        var tab = new EditorTab(session, this::closeTab, environment.timers());
-        tab.apply(settings, theme, context.appearance().editorPalette(), context.appearance().syntaxPalette(),
-            context.appearance().workspaceOpacity(tab));
+        var tab = new EditorTab(context.kit(), session, this::closeTab, environment.timers());
+        tab.appearance(context.appearance());
+        tab.settings(settings);
         tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
         var tabCommands = commands.stream().map(command -> new Command(command.id(), command.title(), command.stroke(), command.bound(),
             () -> { activate(tab); command.run().run(); })).toList();
@@ -667,12 +658,13 @@ public final class EditorWindow {
         tab.area().setTransferHandler(new FileDrop(tab.area().getTransferHandler(), this::openLocalFiles));
         tab.area().addCaretListener(event -> { if (selected().orElse(null) == tab) refreshStatus(); });
         session.addListener(() -> {
+            if (!hosted.containsKey(tab)) return;
             refreshHeaders();
             if (selected().orElse(null) == tab) refreshStatus();
         });
         model.add(session);
         numbers.put(session, nextNumber++);
-        var handle = context.windows().openTab(new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name()), origin, tab);
+        var handle = context.windows().openTab(new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name()), origin, tab.view());
         hosted.put(tab, handle); ownerRef.set(handle);
         handle.setFocusTarget(tab::focusText);
         handle.onActive(active -> { if (active) activate(tab); });
@@ -708,11 +700,12 @@ public final class EditorWindow {
     private void activate(EditorTab tab) {
         if (!hosted.containsKey(tab)) return;
         if (selectedTab != tab && selectedTab != null) {
-            selectedTab.remove(findBar);
+            selectedTab.find(null);
             previous = selectedTab;
         }
-        selectedTab = tab; tab.add(findBar, BorderLayout.SOUTH); tab.revalidate(); refreshStatus();
+        selectedTab = tab; tab.find(findBar); refreshStatus();
     }
+    private void refreshFind() { if (!disposed && selectedTab != null) selectedTab.render(); }
     private void step(int delta) {
         var all = editorTabs(); if (all.size() > 1) select(all.get(Math.floorMod(all.indexOf(selectedTab) + delta, all.size())).session());
     }

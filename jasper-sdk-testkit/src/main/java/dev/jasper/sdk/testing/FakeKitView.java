@@ -26,12 +26,22 @@ public final class FakeKitView implements UiView {
  private final Map<String,CustomContent> contents=new HashMap<>();
  private final AtomicBoolean closed=new AtomicBoolean();
  private String focused;
+ private final Map<String,String> fieldText=new HashMap<>();
+ private final Map<String,int[]> fieldSelections=new HashMap<>();
  FakeKitView(FakeKit owner, ViewSpec spec, Consumer<UiEvent> events) {this.owner=owner;this.events=Objects.requireNonNull(events);update(spec);}
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
  @Override public ViewSpec spec(){guard();return spec;}
  @Override public void update(ViewSpec next){guard();Objects.requireNonNull(next);if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{next=hostSpec.apply(next);var nodes=index(next.root());
   secrets.entrySet().removeIf(e -> {if(nodes.get(e.getKey()) instanceof Nodes.Secret nextSecret && index(spec.root()).get(e.getKey()) instanceof Nodes.Secret oldSecret && nextSecret.kind()==oldSecret.kind())return false;Arrays.fill(e.getValue(),(char)0);return true;});
   for(var content:List.copyOf(contents.values()))if(nodes.values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id()) && c.kind()==content.kind() && index(spec.root()).get(c.id()) instanceof Nodes.Custom previous && previous.contentId().equals(content.id()) && previous.kind()==content.kind())){dispose(content);}
+  fieldText.keySet().removeIf(id -> !(nodes.get(id) instanceof Nodes.Field));
+  fieldSelections.keySet().removeIf(id -> !(nodes.get(id) instanceof Nodes.Field));
+  var previous=spec==null ? Map.<String,Nodes.Node>of() : index(spec.root());
+  for(var node:nodes.values())if(node instanceof Nodes.Field field) {
+   if(!(previous.get(field.id()) instanceof Nodes.Field old) || !old.value().equals(field.value())) {
+    fieldText.put(field.id(),field.value());fieldSelections.remove(field.id());
+   }
+  }
   spec=next;if(focused!=null&&!nodes.containsKey(focused))focused=null;}finally{updating=false;}
  }
  private static Map<String,Nodes.Node> index(Nodes.Node root){var result=new HashMap<String,Nodes.Node>();walk(root,result);return result;}
@@ -43,6 +53,9 @@ public final class FakeKitView implements UiView {
  @Override public void withSecret(String id,Consumer<char[]> use){requireSecret(id);Objects.requireNonNull(use);char[] copy=secrets.getOrDefault(id,new char[0]).clone();try{use.accept(copy);}finally{Arrays.fill(copy,(char)0);}}
  @Override public void clearSecret(String id){requireSecret(id);var old=secrets.remove(id);if(old!=null)Arrays.fill(old,(char)0);}
  @Override public void focus(String id){guard();if(!index(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");focused=id;}
+ @Override public void selectAll(String id){guard();if(!(index(spec.root()).get(id) instanceof Nodes.Field))throw new IllegalArgumentException("Not a field node");fieldSelections.put(id,new int[]{0,fieldText.get(id).length()});}
+ /** The fake's logical field selection, independently recorded from focus. */
+ public int[] fieldSelection(String id){guard();if(!(index(spec.root()).get(id) instanceof Nodes.Field))throw new IllegalArgumentException("Not a field node");return fieldSelections.getOrDefault(id,new int[]{0,0}).clone();}
  private String revealed;
  @Override public void reveal(String id){guard();if(!index(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");revealed=id;}
  /** The node last scrolled into view; reveal never moves logical focus.
@@ -57,7 +70,7 @@ public final class FakeKitView implements UiView {
  /** Requested logical focus. */
  public Optional<String> focused(){guard();return Optional.ofNullable(focused);}
  /** Deliver a typed event through containment. */
- public void emit(UiEvent event){guard();try{if(hostEvents.test(event))return;events.accept(Objects.requireNonNull(event));}catch(Throwable failure){owner.failed();}}
+ public void emit(UiEvent event){guard();if(event instanceof UiEvent.Edited edit && index(spec.root()).get(edit.id()) instanceof Nodes.Field){fieldText.put(edit.id(),edit.text());fieldSelections.remove(edit.id());}try{if(hostEvents.test(event))return;events.accept(Objects.requireNonNull(event));}catch(Throwable failure){owner.failed();}}
  @Override public void registerContent(CustomContent content){guard();Objects.requireNonNull(content);
   if(index(spec.root()).values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id())&&c.kind()==content.kind()))throw new IllegalArgumentException("No matching Custom content");
   if(contents.containsKey(content.id()))throw new IllegalArgumentException("Content already registered");
@@ -66,7 +79,7 @@ public final class FakeKitView implements UiView {
  private void dispose(CustomContent content){
   // Claim removal before invoking plugin code; reentrant close may consume the remaining snapshot.
   if(contents.get(content.id())!=content)return;contents.remove(content.id());CONTENT_OWNERS.remove(content.component(),this);try{content.lifetime().close();}catch(Throwable failure){owner.failed();}}
- @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {for(var value:secrets.values())Arrays.fill(value,(char)0);secrets.clear();for(var content:List.copyOf(contents.values()))dispose(content);contents.clear();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
+ @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {for(var value:secrets.values())Arrays.fill(value,(char)0);secrets.clear();fieldText.clear();fieldSelections.clear();for(var content:List.copyOf(contents.values()))dispose(content);contents.clear();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
     static List<Nodes.Node> children(Nodes.Node node) {
         var result = new ArrayList<Nodes.Node>();
         switch (node) {

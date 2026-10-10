@@ -48,6 +48,38 @@ class EditorKitTest {
         return new ViewSpec(new Stack("bar", READY, LayoutRole.INLINE, List.of(field, option("next-button", "Next", Optional.empty())), stackCancel));
     }
 
+    @Test void editorCanvasAdmissionRejectsOrdinaryRootsAndDisposesTheAcceptedWrapper() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); int[] disposed = {0};
+            var spec = new ViewSpec(new Nodes.Custom("node", READY, "content", CustomKind.EDITOR, "Editor"));
+            try (var view = new KitView(context, spec, event -> {})) {
+                for (var ordinary : List.of(new JPanel(), new JButton(), new JLabel(), new JList<>(),
+                        new JTable(), new JTree(), new JComboBox<>(), new JSpinner(), new JSlider(), new JScrollPane(new JPanel())))
+                    assertThatThrownBy(() -> view.registerContent("content", ordinary, () -> {})).isInstanceOf(IllegalArgumentException.class);
+                var document = new JComponent() {};
+                document.setLayout(new BorderLayout()); document.add(new JScrollPane(new JTextArea()));
+                view.registerContent("content", document, () -> disposed[0]++);
+            } finally { release(context); }
+            assertThat(disposed[0]).isEqualTo(1);
+        });
+    }
+
+    @Test void explicitSelectAllUsesLiveFieldTextWithoutEditingOrChangingFocus() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, bar(findField("", ""), ""), events::add)) {
+                var input = editor(view, "find"); input.setText("live query"); events.clear();
+                var focused = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+                view.selectAll("find");
+                assertThat(input.getSelectedText()).isEqualTo("live query");
+                assertThat(KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner()).isSameAs(focused);
+                assertThat(events).isEmpty();
+                assertThatThrownBy(() -> view.selectAll("next-button")).isInstanceOf(IllegalArgumentException.class);
+                assertThatThrownBy(() -> view.selectAll("missing")).isInstanceOf(IllegalArgumentException.class);
+            } finally { release(context); }
+        });
+    }
+
     @Test void shiftEnterInAFieldRunsItsAlternateActionAndPassesOnWithoutOne() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();

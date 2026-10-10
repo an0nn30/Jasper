@@ -58,15 +58,32 @@ final class StagedEditorHost implements AutoCloseable {
     final Plugin plugin;
     final PluginContext context;
     final PluginWindow owner;
+    final javax.swing.JPanel mainHolder = new javax.swing.JPanel(new java.awt.BorderLayout());
+    final javax.swing.JPanel separateHolder = new javax.swing.JPanel(new java.awt.BorderLayout());
     private final Map<AuxiliarySurface, StagedRemoteHost.PackedDialog> dialogs = new HashMap<>();
 
     StagedEditorHost(Path data, boolean dark) throws Exception {
+        this(data, dark, null);
+    }
+
+    StagedEditorHost(Path data, boolean dark, WorkspaceAppearanceFixture appearance) throws Exception {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins")).resolve(EDITOR.id());
         contributions = onEdtValue(Contributions::new);
         auxiliary = onEdtValue(() -> new AuxiliaryWindows(dev.jasper.app.persistence.UiState.inMemory(), this::shell));
         terminals = onEdtValue(TerminalFixture::new);
+        onEdt(() -> {
+            var main = terminals.addWindow(); var separate = terminals.addWindow();
+            contributions.content().addHost(new dev.jasper.app.contributions.ContentHost(main, false,
+                e -> mainHolder.add(e.component()), e -> mainHolder.remove(e.component()), e -> e.active(true), () -> { }));
+            contributions.content().addHost(new dev.jasper.app.contributions.ContentHost(separate, true,
+                e -> separateHolder.add(e.component()), e -> separateHolder.remove(e.component()), e -> e.active(true), () -> { }));
+            contributions.content().setFactory(detached -> detached ? separate : main);
+        });
         host = AppContractTest.host(data.resolve("home"), Duration.ofMillis(200), contributions, new AtomicBoolean(dark), auxiliary,
-            terminals.registry, problems, new CopyOnWriteArrayList<>());
+            terminals.registry, new NotificationsFixture(problems), new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>(),
+            PluginRuntime.ShellProfiles.NONE, new CopyOnWriteArrayList<>(), appearance,
+            new GlassSource(component -> SwingUtilities.isDescendingFrom(component, separateHolder) ? .45 : .8,
+                listener -> new dev.jasper.app.lifecycle.Subscription(() -> { })));
         loader = new PluginClassLoader(EDITOR.id(), ManagedVaultLoadingTest.jars(staged), getClass().getClassLoader(), Map.of());
         plugin = (Plugin) loader.loadClass("dev.jasper.editor.EditorPlugin").getConstructor().newInstance();
         onEdt(() -> host.start(new HostedPlugin(EDITOR, Set.of(), Set.of(), Set.of("dev.jasper.editor.api"), loader, () -> plugin)));
@@ -82,6 +99,27 @@ final class StagedEditorHost implements AutoCloseable {
             window.show();
             return window;
         });
+    }
+
+    /** The production controller, created lazily as its commands do; UI thread. */
+    Object editorWindow() {
+        try { var method=plugin.getClass().getDeclaredMethod("window"); method.setAccessible(true); return method.invoke(plugin); }
+        catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+    }
+    static Object call(Object target,String name,Class<?>[] types,Object... args) {
+        try { java.lang.reflect.Method method;
+            try { method=target.getClass().getMethod(name,types); } catch (NoSuchMethodException missing) { method=target.getClass().getDeclaredMethod(name,types); }
+            method.setAccessible(true);return method.invoke(target,args); }
+        catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+    }
+    static Object call(Object target,String name) { return call(target,name,new Class<?>[0]); }
+    Object selectedTab() { return ((Optional<?>)call(editorWindow(),"selected")).orElseThrow(); }
+    UiView documentView() { return (UiView)call(selectedTab(),"view"); }
+    javax.swing.JTextArea documentText() { return (javax.swing.JTextArea)call(selectedTab(),"area"); }
+    dev.jasper.sdk.ui.ContentTab contentTab() {
+        try { var field=editorWindow().getClass().getDeclaredField("hosted");field.setAccessible(true);
+            return (dev.jasper.sdk.ui.ContentTab)((Map<?,?>)field.get(editorWindow())).get(selectedTab()); }
+        catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 
     /** Plugin dialogs get a packed stand-in (as {@code NativeShells} packs them); every other surface touches no native window. */
@@ -195,15 +233,26 @@ final class StagedEditorHost implements AutoCloseable {
     static void down(Component component) { press(component, KeyEvent.VK_DOWN, 0, KeyEvent.CHAR_UNDEFINED); }
     static void up(Component component) { press(component, KeyEvent.VK_UP, 0, KeyEvent.CHAR_UNDEFINED); }
 
-    @Override public void close() throws Exception {
+    @Override public void close() {
         var pending = new AtomicReference<List<CompletableFuture<?>>>(List.of());
         try {
             onEdt(() -> pending.set(host.stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt(); throw new IllegalStateException("Interrupted stopping staged Editor", interrupted);
+        } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException failure) {
+            throw new IllegalStateException("Could not stop staged Editor", failure);
         } finally {
-            onEdt(auxiliary::close);
-            loader.close();
-            dev.jasper.app.workspace.DesktopTestSupport.closeOwners();
+            try { onEdt(auxiliary::close); }
+            finally {
+                try { loader.close(); }
+                catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                finally {
+                    try { dev.jasper.app.workspace.DesktopTestSupport.closeOwners(); }
+                    catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
+                    catch (Exception failure) { throw new IllegalStateException(failure); }
+                }
+            }
         }
     }
 }

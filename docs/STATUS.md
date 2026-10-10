@@ -2,7 +2,28 @@
 
 ## Current state — 2026-10-10
 
-- **Theme engine Plan 2 Task 9a implemented: Editor dialogs on kit views; Language height resolved, review pending** (2026-10-10).
+- **Theme engine Plan 2 Task 9b implemented, review pending; 9c remains pending** (2026-10-10).
+  EditorTab is an owned SDK UiView descriptor controller mounted with openTab(UiView); DOCUMENT retains its hidden
+  custom child while loading/failed, with descriptor banners, Retry/Cancel and shared Find/Replace fields, options and
+  match counts. Find requests focus then explicit UiView.selectAll(Field id), mirrored module/SDK/host/fake: live text,
+  no edit or focus change, invalid/non-Field IDs rejected, usual EDT/closed guards; SDK version stays until Task 11.
+  Exact final custom source owners: plugins/editor/src/main/java/dev/jasper/editor/ui/DocumentArea.java and
+  plugins/editor/src/main/java/dev/jasper/editor/vim/VimTextArea.java; no whole-ui exemption. DocumentArea owns text,
+  gutter, EditorTheme, one Src glass fill and the vendor popup; GlassSurface and EditorTheme's FlatLaf.style writer are
+  removed. EDITOR admission accepts purpose-built nonstandard JComponent canvases plus text/scroll roots, mirrored in
+  module/host/fake with positive and ordinary-root rejection contracts; Task 11 enforces exact source owners.
+  Explicit temporary bridge: unchanged plugins/editor/src/main/java/dev/jasper/editor/vim/ui/VimBar.java remains a
+  child of DocumentArea only until immediately following Task 9c, which must remove it before Task 9 is complete.
+  Real staged-host evidence preserves document identity/text/undo/selection/caret/language/dirty/close guard and Find
+  values/options through dark→different-dark and main↔detached opacity changes (.8/.45), pin behavior and actual key
+  paths. View shutdown stops palette/session refresh; async save may finish after close; settings Cancel is inert.
+  Accepted visual-only: banner divider absent (Plan 3 Task 8 owns separation/padding); G8 native FlatLaf scrollbar track
+  #2b2e37 differs from editor #191b20, preserved through reparenting, while corner has editor RGB and one glass alpha
+  (204/115). Plan 3 Task 8 owns any track change through shared kit, without plugin delegate/style escape.
+  9a is independently approved; carried Language-height/warning-attribution documentation minors corrected in 9b.
+  Native GUI acceptance of dialogs and document/Find/Vim remains pending with the user; no GUI was launched.
+
+- **Theme engine Plan 2 Task 9a independently approved: Editor dialogs on kit views; native acceptance pending** (2026-10-10).
   The question sheet (`Forms.QuestionView`, mounted by `DialogAsker`), Saving (`Forms.ProgressView`, mounted by `SaveWait`;
   the non-modal dialog and nested loop kept), Go to Line (`GoToLinePanel`) and Language (`LanguagePicker`) are owned SDK
   `UiView`s from `context.kit()`, mounted with `PluginDialog.setContent(UiView)`; closing a dialog closes its controller,
@@ -16,16 +37,14 @@
   (destructive questions: Cancel) or Cancel in every Editor dialog. Visual-only, accepted (task-9-report.md items 5–8):
   kit sheet title, PRIMARY default button, field label above the line field and inline error text, kit search field and
   COMPACT rows, kit indeterminate progress with its "Saving" caption. Removed from these files: raw Swing panels, the
-  `UIManager` `Label.font` read, FlatLaf client properties and the root default-button helper (`Forms.bind` stays for
-  `FindBar` until 9b). Evidence: Editor descriptor scenarios (`build/theme-migration-evidence/editor-descriptors`) and the
+  `UIManager` `Label.font` read, FlatLaf client properties and the root default-button helper (the remaining `Forms.bind` helper was removed in 9b). Evidence: Editor descriptor scenarios (`build/theme-migration-evidence/editor-descriptors`) and the
   real-host dark/light captures `EditorRenderEvidenceTest` (`editor-hosted`, non-blank checked) on the new staged-host
   helper `StagedEditorHost`; frozen before images untouched. Resolved 2026-10-10 (controller ruling (a)): an ItemList
   named by a field's `listId` reserves its `visibleRows` height even with fewer or zero results; all list kinds follow
   this rule, including RESULTS with its fixed data-row metric. No SDK member changes; other lists keep their sizing.
   The real-host Language dialog now retains its 14-row packed height through filtering, no matches and clearing in dark
   and light (`EditorEnterBaselineTest`); empty-result renders join the existing dark/light captures. Regression proved
-  RED against the pre-fix kit (540×500 → 540×164 for "ja") and GREEN with the module fix. Review remains pending across
-  `bba2a385..HEAD`; 9b/9c remain unstarted. Not run: GUI. GUI checks for the user: the four dialogs in dark and light; Enter/Space/Escape
+  RED against the pre-fix kit (540×500 → 540×164 for "ja") and GREEN with the module fix. Independent 9a review approved; 9b implemented and 9c pending. Not run: GUI. GUI checks for the user: the four dialogs in dark and light; Enter/Space/Escape
   on the question with focus on a non-default button; Go to Line's inline error; Up/Down in the Language filter and
   the dialog height while filtering. Also carried in the 9a review scope: kit fix `d2c6a37c` (a field's list keys run the
   look and feel's own binding while their list is hidden, disabled, busy or unmounted).

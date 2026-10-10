@@ -7,19 +7,22 @@ construction and paint overrides; explicit appearance and temporary extraction o
 it. `ThemeMigrationCoverageTest` repeats source discovery and checks paths, task assignments,
 existing-test paths and every bundled plugin id. Inventory integrity is not completed migration.
 
-The ledger contains 289 standard-ui, 2 custom-content, 31 native-platform and 649 nonvisual-helper
-rows. 532 rows are production owners and 439 are explicitly test/fixture ownership. A fixture-only
+The initial Task 1 snapshot contained 289 standard-ui, 2 custom-content, 31 native-platform and 649 nonvisual-helper
+rows (532 production owners and 439 explicitly test/fixture owners); the CSV expands as new owners migrate. A fixture-only
 Swing scaffold preserves evidence; its disposition does not require production migration in Task 12.
 Nonvisual helpers include geometry/data/configuration/architecture false positives; native-platform
 rows retain native window ownership. The [Plan 1 temporary paths](temporary-paths.md) remain binding;
 exact Java copy-removal dispositions are carried into the CSV, while resource removals stay in that
 ledger. No new production owner or API gap was required to construct these captures.
 
-Editor custom document painting is restricted to `EditorTab`'s document area (`RSyntaxTextArea` or
-`VimTextArea`, `RTextScrollPane` document/gutter and the existing `EditorTab.GlassSurface`) and
-`VimTextArea`. The EditorTab root is mixed: find, status, prompts, settings, Vim chrome and all
-surrounding controls remain standard UI owners for Task 9 / Plan 3 Task 8. A custom document area
-never exempts the enclosing editor surface.
+Editor custom document painting has exactly two final source owners:
+`plugins/editor/src/main/java/dev/jasper/editor/ui/DocumentArea.java` and
+`plugins/editor/src/main/java/dev/jasper/editor/vim/VimTextArea.java`. DocumentArea owns RSTA/scroll/gutter,
+EditorTheme application, glass Src fill and the vendor popup. EditorTab/FindBar are descriptors; no enclosing
+surface or package is exempt. Task 9b's explicit unchanged raw VimBar child is a temporary bridge removed by 9c
+before Task 9 completes; Task 11 enforces only the final owners. The actual staged preservation/corner/track images
+are under `editor-hosted`; accepted banner/track visual differences and their Plan 3 Task 8 owner are ledgered in
+[temporary-paths.md](temporary-paths.md).
 
 ## Immutable before snapshot
 

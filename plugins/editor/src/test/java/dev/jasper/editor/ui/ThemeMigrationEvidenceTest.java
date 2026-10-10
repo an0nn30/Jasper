@@ -3,7 +3,6 @@ package dev.jasper.editor.ui;
 import dev.jasper.editor.session.Question;
 import dev.jasper.editor.syntax.Languages;
 import dev.jasper.editor.testsupport.Kits;
-import dev.jasper.sdk.contracts.ThemeMigrationCapture;
 import dev.jasper.sdk.testing.FakeKit;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.UiView;
@@ -12,35 +11,29 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
-import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.fife.ui.rsyntaxtextarea.SyntaxConstants;
-import static dev.jasper.sdk.contracts.ThemeMigrationCapture.save;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ThemeMigrationEvidenceTest {
-    @Test void capturesFindReplaceInvalidPatternAndTheDocument() throws Exception {
-        ThemeMigrationCapture.themes(theme -> {
-            var area = new RSyntaxTextArea("example one\nexample two\n");
-            var find = new FindBar(() -> Optional.of(area));
-            find.open(false); find.findField().setText("example");
-            assertThat(find.status()).isEqualTo("2 matches");
-            save("editor", theme, "find", find, 1100, 70);
-            find.open(true); save("editor", theme, "replace", find, 1100, 110);
-            find.regex().doClick(); find.findField().setText("(");
-            assertThat(find.status()).isEqualTo("Invalid pattern");
-            save("editor", theme, "find-invalid-pattern", find, 1100, 110);
-            find.close();
+    @Test void describesFindReplaceInvalidPatternAndTheDocument() throws Exception {
+        Kits.edt(() -> {
+            var kit = new FakeKit("dev.jasper.editor");
             var environment = new dev.jasper.editor.session.SessionEnvironment(Runnable::run, Runnable::run, Question::dismissed, () -> 1 << 20);
-            var tab = new EditorTab(dev.jasper.editor.session.DocumentSession.untitled("Fixture document", environment), closed -> { }, false);
+            var tab = new EditorTab(kit, dev.jasper.editor.session.DocumentSession.untitled("Fixture document", environment), closed -> { }, false);
+            var find = new FindBar(() -> Optional.of(tab.area()), tab::render, id -> { tab.view().focus(id); tab.view().selectAll(id); });
+            tab.find(find);
             try {
-                tab.apply(new EditorSettings("Monospaced", 13, 4, false, 10, false), new EditorTheme(), dev.jasper.sdk.ui.EditorPalette.current(), dev.jasper.sdk.ui.SyntaxPalette.current());
-                tab.area().setText("// Fixture document\nint value = 42;\n");
-                tab.area().setSyntaxEditingStyle(org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_JAVA);
-                measure(tab.area());
-                save("editor", theme, "document", tab, 780, 440);
+                tab.area().setText("example one\nexample two\n");
+                describe("document", tab.view());
+                find.open(false); Kits.type(tab.view(), FindBar.FIND, "example");
+                assertThat(find.status()).isEqualTo("2 matches"); describe("find", tab.view());
+                find.open(true); describe("replace", tab.view());
+                Kits.press(tab.view(), FindBar.REGEX); Kits.type(tab.view(), FindBar.FIND, "(");
+                assertThat(find.status()).isEqualTo("Invalid pattern"); describe("find-invalid-pattern", tab.view());
+                find.close();
                 tab.vim(Optional.of(new dev.jasper.editor.vim.Vim(dev.jasper.editor.vim.VimHost.detached())));
-                save("editor", theme, "document-vim", tab, 780, 440);
-            } finally { tab.dispose(); }
+                describe("document-vim-bridge", tab.view());
+            } finally { tab.dispose(); kit.close(); }
         });
     }
 
@@ -83,17 +76,5 @@ class ThemeMigrationEvidenceTest {
     static void describe(String state, UiView view) throws Exception {
         Files.createDirectories(DESCRIPTORS);
         Files.writeString(DESCRIPTORS.resolve(state + ".txt"), view.spec().toString() + "\n");
-    }
-    // Existing EditorTabTest uses this pinned 3.6.0 headless-only first-font initialization too.
-    private static void measure(RSyntaxTextArea area) {
-        var image = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-        var graphics = image.createGraphics();
-        try {
-            var refresh = RSyntaxTextArea.class.getDeclaredMethod("refreshFontMetrics", java.awt.Graphics2D.class);
-            refresh.setAccessible(true); refresh.invoke(area, graphics);
-            var flag = RSyntaxTextArea.class.getDeclaredField("metricsNeverRefreshed");
-            flag.setAccessible(true); flag.setBoolean(area, false);
-        } catch (ReflectiveOperationException failure) { throw new IllegalStateException(failure); }
-        finally { graphics.dispose(); }
     }
 }

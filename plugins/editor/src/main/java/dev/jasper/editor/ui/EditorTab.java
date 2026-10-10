@@ -1,338 +1,177 @@
 package dev.jasper.editor.ui;
 
-import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.editor.session.DocumentSession;
 import dev.jasper.editor.vim.EditorDefaults;
 import dev.jasper.editor.vim.Vim;
 import dev.jasper.editor.vim.VimEditor;
 import dev.jasper.editor.vim.VimTextArea;
-import dev.jasper.editor.vim.ui.VimBar;
-import dev.jasper.sdk.ui.EditorPalette;
-import dev.jasper.sdk.ui.SyntaxPalette;
-import java.awt.BorderLayout;
-import java.awt.CardLayout;
-import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridBagLayout;
-import java.awt.event.ActionEvent;
+import dev.jasper.sdk.ui.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
-import javax.swing.AbstractAction;
-import javax.swing.Action;
-import javax.swing.BorderFactory;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JMenuItem;
-import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
 import javax.swing.Timer;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.BadLocationException;
 import org.fife.ui.rtextarea.RTextScrollPane;
 
-/**
- * One tab's view (spec 2, 2.3): the text area bound to its session, the loading and failure states, the banner, and
- * with Vim mode on the Vim bar (Vim spec 5.2).
- */
-public final class EditorTab extends JPanel {
-    private static final String TEXT = "text", STATE = "state";
+/** One document's descriptor controller. Only {@link DocumentArea} owns specialized Swing document content. */
+public final class EditorTab {
+    static final String DOCUMENT = "document", CONTENT = "document.content", STATE = "document.state", BANNER = "document.banner";
+    static final String RETRY = "document.retry", DISMISS = "document.dismiss", FIRST = "document.banner.first", SECOND = "document.banner.second";
     private final DocumentSession session;
-    private final VimTextArea area = new VimTextArea();
-    private final VimBar vimBar = new VimBar();
-    private final RTextScrollPane scroll;
-    private final GlassSurface text;
-    private final CardLayout cards = new CardLayout();
-    private final JPanel body = new JPanel(cards);
-    private final JLabel stateText = new JLabel();
-    private final JButton retry = new JButton("Retry");
-    private final JButton dismiss = new JButton("Close");
-    private final JPanel banner = new JPanel(new BorderLayout(8, 0));
-    private final JLabel bannerText = new JLabel();
-    private final JButton bannerFirst = new JButton();
-    private final JButton bannerSecond = new JButton();
+    private final DocumentArea document = new DocumentArea();
+    private final UiView view;
+    private final Consumer<EditorTab> close;
     private final Timer edits;
     private final boolean debounce;
-    private boolean replacing;
-    private String showing = STATE;
-    private Runnable focusArea = area::requestFocusInWindow;
-    private boolean focusPending;
+    private final DocumentListener editListener = new DocumentListener() {
+        @Override public void insertUpdate(DocumentEvent event) { edited(); }
+        @Override public void removeUpdate(DocumentEvent event) { edited(); }
+        @Override public void changedUpdate(DocumentEvent event) { }
+    };
+    private boolean replacing, closed, focusPending;
+    private Runnable focusArea = () -> area().requestFocusInWindow();
     private VimEditor vim;
     private int tabSize = 4;
+    private FindBar find;
 
-    /**
-     * @param session the tab's document
-     * @param close closes this tab (Cancel, Close and the deleted banner's Close)
-     * @param debounce whether edits reach the session 300 ms after typing stops; tests pass false for at once
-     */
-    public EditorTab(DocumentSession session, Consumer<EditorTab> close, boolean debounce) {
-        super(new BorderLayout());
+    /** Creates an owned kit view; closing the hosted view ends document refreshes as well. */
+    public EditorTab(UiKit kit, DocumentSession session, Consumer<EditorTab> close, boolean debounce) {
         this.session = session;
+        this.close = close;
         this.debounce = debounce;
-        area.setCodeFoldingEnabled(true);
-        area.setMarkOccurrences(true);
-        area.setBracketMatchingEnabled(true);
-        area.setAnimateBracketMatching(false);
-        area.setHighlightCurrentLine(true);
-        area.setAntiAliasingEnabled(true);
-        scroll = new RTextScrollPane(area);
-        scroll.setLineNumbersEnabled(true);
-        scroll.setFoldIndicatorEnabled(true);
-        scroll.setBorder(BorderFactory.createEmptyBorder());
-        area.putClientProperty("Jasper.workspace.exempt", true);
-        scroll.getViewport().putClientProperty("Jasper.workspace.exempt", true);
-        scroll.getGutter().putClientProperty("Jasper.workspace.exempt", true);
-        edits = new Timer(300, event -> session.textEdited());
+        edits = new Timer(300, event -> { if (!closed) session.textEdited(); });
         edits.setRepeats(false);
-        area.getDocument().addDocumentListener(new DocumentListener() {
-            @Override public void insertUpdate(DocumentEvent event) { edited(); }
-            @Override public void removeUpdate(DocumentEvent event) { edited(); }
-            @Override public void changedUpdate(DocumentEvent event) { }
-        });
-        session.attach(area::getText, this::replaceText);
-        stateText.putClientProperty("html.disable", true);
-        bannerText.putClientProperty("html.disable", true);
-        stateText.setAlignmentX(CENTER_ALIGNMENT);
-        var buttons = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 8));
-        buttons.setOpaque(false);
-        buttons.add(retry);
-        buttons.add(dismiss);
-        var stack = new JPanel();
-        stack.setLayout(new BoxLayout(stack, BoxLayout.Y_AXIS));
-        stack.setOpaque(false);
-        stack.add(stateText);
-        stack.add(buttons);
-        var state = new JPanel(new GridBagLayout());
-        state.add(stack);
-        text = new GlassSurface(scroll);
-        text.add(scroll, BorderLayout.CENTER);
-        text.add(vimBar, BorderLayout.SOUTH);
-        vimBar.setVisible(false);
-        body.add(text, TEXT);
-        body.add(state, STATE);
-        retry.addActionListener(event -> session.load());
-        dismiss.addActionListener(event -> { session.cancelLoad(); close.accept(this); });
-        var bannerButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
-        bannerButtons.setOpaque(false);
-        bannerButtons.add(bannerFirst);
-        bannerButtons.add(bannerSecond);
-        banner.add(bannerText, BorderLayout.CENTER);
-        banner.add(bannerButtons, BorderLayout.EAST);
-        bannerFirst.addActionListener(event -> {
-            if (session.banner() == DocumentSession.Banner.DELETED) close.accept(this);
-            else session.reloadFromBanner();
-        });
-        bannerSecond.addActionListener(event -> {
-            if (session.banner() == DocumentSession.Banner.DELETED) session.keepDeleted();
-            else session.keepMine();
-        });
-        add(banner, BorderLayout.NORTH);
-        add(body, BorderLayout.CENTER);
+        area().getDocument().addDocumentListener(editListener);
+        session.attach(area()::getText, this::replaceText);
+        view = kit.create(spec(), this::event);
+        view.registerContent(new CustomContent(CONTENT, Nodes.CustomKind.EDITOR, document, this::shutdown));
         session.addListener(this::refresh);
         refresh();
     }
 
-    /** Stops a pending typing notification and Vim mode on final disposal (not on a move). */
-    public void dispose() {
-        edits.stop();
-        vim(Optional.empty());
-    }
-
+    public UiView view() { return view; }
     public DocumentSession session() { return session; }
-    public VimTextArea area() { return area; }
+    public VimTextArea area() { return document.area; }
+    public RTextScrollPane scroll() { return document.scroll; }
+    DocumentArea surface() { return document; }
 
-    /**
-     * Gives the text keyboard focus, or, while the document is still loading and the text is hidden, as soon as it
-     * shows. A failed load drops the request.
-     */
-    public void focusText() {
-        if (showingText()) focusArea.run();
-        else focusPending = true;
+    /** Stops typing notifications, palette subscriptions and Vim on final disposal, never on a move. */
+    public void dispose() { shutdown(); view.close(); }
+    private void shutdown() {
+        if (closed) return;
+        closed = true;
+        focusPending = false;
+        edits.stop();
+        area().getDocument().removeDocumentListener(editListener);
+        if (vim != null) { document.vimBar.detach(); vim.close(); vim = null; }
+        document.close();
+        find = null;
     }
 
-    /** Replaces how the text takes focus, for tests (a component without a peer never becomes the focus owner). */
+    void appearance(Appearance appearance) { document.appearance(appearance); }
+    void settings(EditorSettings settings) {
+        if (closed) return;
+        tabSize = settings.tabSize();
+        document.settings(settings);
+        if (vim != null) vim.editorDefaults(defaults());
+    }
+    void find(FindBar value) { if (closed) return; find = value; render(); }
+    void render() { if (!closed) view.update(spec()); }
+
+    /** Focuses the document immediately or once its pending read succeeds. A failure drops the request. */
+    public void focusText() {
+        if (closed) return;
+        if (showingText()) focusArea.run(); else focusPending = true;
+    }
     void focusAction(Runnable value) { focusArea = value; }
 
-    /**
-     * Turns Vim mode on or off for this tab; the text and its undo history stay.
-     *
-     * @param global Vim's global state to turn it on with, or empty to turn it off
-     */
+    /** Toggles Vim without replacing the text or undo history. The raw bar bridge is removed by Task 9c. */
     public void vim(Optional<Vim> global) {
-        if (global.isPresent() == (vim != null)) return;
+        if (closed || global.isPresent() == (vim != null)) return;
         if (global.isPresent()) {
-            vim = new VimEditor(global.get(), area, defaults());
+            vim = new VimEditor(global.get(), area(), defaults());
             vim.documentInfo(session::location, session::dirty);
-            vimBar.attach(vim);
-        } else {
-            vimBar.detach();
-            vim.close();
-            vim = null;
-        }
-        vimBar.setVisible(vim != null);
-        revalidate();
+            document.vimBar.attach(vim);
+        } else { document.vimBar.detach(); vim.close(); vim = null; }
+        document.vimBar.setVisible(vim != null);
+        document.revalidate();
     }
-
-    /** @return this tab's Vim editor while Vim mode is on */
     public Optional<VimEditor> vimEditor() { return Optional.ofNullable(vim); }
-    public RTextScrollPane scroll() { return scroll; }
 
-    /**
-     * @param settings font and tab size
-     * @param theme the colours
-     * @param editor workspace editor surfaces
-     * @param syntax workspace token styles
-     */
+    /** Applies explicit document values; hosted tabs use their appearance subscription and settings instead. */
     public void apply(EditorSettings settings, EditorTheme theme, EditorPalette editor, SyntaxPalette syntax) {
         apply(settings, theme, editor, syntax, 1.0);
     }
-
-    GlassSurface surface() { return text; }
-
-    /**
-     * @param settings font and tab size
-     * @param theme the colours
-     * @param editor workspace editor surfaces
-     * @param syntax workspace token styles
-     * @param opacity the workspace opacity behind this tab; below 1 its text and gutter backgrounds are translucent
-     */
     public void apply(EditorSettings settings, EditorTheme theme, EditorPalette editor, SyntaxPalette syntax, double opacity) {
-        Font font = settings.font();
-        area.setFont(font);
-        theme.apply(area, scroll, editor, syntax, opacity);
-        scroll.getGutter().setLineNumberFont(font);
-        area.setTabSize(settings.tabSize());
+        if (closed) return;
+        document.apply(settings, theme, editor, syntax, opacity);
         tabSize = settings.tabSize();
-        vimBar.apply(font);
         if (vim != null) vim.editorDefaults(defaults());
-        banner.setBorder(new javax.swing.border.AbstractBorder() {
-            @Override public java.awt.Insets getBorderInsets(java.awt.Component component, java.awt.Insets insets) {
-                insets.set(6, 10, 7, 10); return insets;
-            }
-            @Override public void paintBorder(java.awt.Component component, java.awt.Graphics graphics, int x, int y, int width, int height) {
-                graphics.setColor(WorkspacePalette.current(component).border());
-                graphics.fillRect(x, y + height - 1, width, 1);
-            }
-        });
-        text.glass(opacity, editor.background(), editor.gutter());
     }
-
-    /** @param commands bound in the text area's own map, which overrides RSyntaxTextArea's defaults for the same strokes */
-    public void bind(List<Command> commands) {
-        for (Command command : commands) {
-            if (!command.bound() || command.stroke().isEmpty()) continue;
-            area.getInputMap(JComponent.WHEN_FOCUSED).put(command.stroke().get(), command.id());
-            area.getActionMap().put(command.id(), action(command));
-            area.allowInNormalMode(command.id());
-        }
-    }
-
-    /** @param commands added below RSyntaxTextArea's own right-click items */
-    public void addToPopup(List<Command> commands) {
-        JPopupMenu popup = area.getPopupMenu();
-        popup.addSeparator();
-        for (Command command : commands) popup.add(menuItem(command));
-    }
-
-    /**
-     * @param command a command
-     * @return a Swing action running it
-     */
-    public static Action action(Command command) {
-        return new AbstractAction(command.title()) {
-            @Override public void actionPerformed(ActionEvent event) { command.run().run(); }
-        };
-    }
-
-    /**
-     * @param command a command
-     * @return a menu item titled with it, with its shortcut as the accelerator, running it
-     */
-    public static JMenuItem menuItem(Command command) {
-        var item = new JMenuItem(command.title());
-        command.stroke().ifPresent(item::setAccelerator);
-        item.addActionListener(event -> command.run().run());
-        return item;
-    }
-
-    boolean showingText() { return showing.equals(TEXT); }
-    boolean vimBarVisible() { return vimBar.isVisible(); }
-    String stateText() { return stateText.getText(); }
-    JButton retryButton() { return retry; }
-    JButton dismissButton() { return dismiss; }
-    boolean bannerVisible() { return banner.isVisible(); }
-    String bannerText() { return bannerText.getText(); }
-    JButton bannerFirst() { return bannerFirst; }
-    JButton bannerSecond() { return bannerSecond; }
+    public void bind(List<Command> commands) { document.bind(commands); }
+    public void addToPopup(List<Command> commands) { document.addToPopup(commands); }
+    boolean showingText() { return session.state() == DocumentSession.State.READY; }
+    boolean vimBarVisible() { return document.vimBar.isVisible(); }
 
     private void edited() {
-        if (replacing) return;
-        if (debounce) edits.restart();
-        else session.textEdited();
+        if (closed || replacing) return;
+        if (debounce) edits.restart(); else session.textEdited();
     }
-
     private void replaceText(String text, boolean keepPosition) {
-        int line = keepPosition ? area.getCaretLineNumber() : 0;
+        if (closed) return;
+        int line = keepPosition ? area().getCaretLineNumber() : 0;
         replacing = true;
-        try { area.setText(text); }
-        finally { replacing = false; }
-        area.discardAllEdits();
-        try { area.setCaretPosition(area.getLineStartOffset(Math.min(line, area.getLineCount() - 1))); }
-        catch (BadLocationException impossible) { area.setCaretPosition(0); }
+        try { area().setText(text); } finally { replacing = false; }
+        area().discardAllEdits();
+        try { area().setCaretPosition(area().getLineStartOffset(Math.min(line, area().getLineCount() - 1))); }
+        catch (BadLocationException impossible) { area().setCaretPosition(0); }
         if (vim != null) vim.textReplaced();
     }
-
-    /** Vim's tab options start from the Editor's tab size and the tab's Tabs or Spaces (Vim spec 3.8). */
     private EditorDefaults defaults() { return new EditorDefaults(tabSize, !session.tabs(), true, session.wrap()); }
-
     private void refresh() {
-        switch (session.state()) {
-            case LOADING -> {
-                stateText.setText("Loading " + session.name() + session.host().map(host -> " from " + host).orElse("") + "…");
-                retry.setVisible(false);
-                dismiss.setText("Cancel");
-                showCard(STATE);
-            }
-            case FAILED -> {
-                focusPending = false;
-                stateText.setText(session.failure());
-                retry.setVisible(session.retryable());
-                dismiss.setText("Close");
-                showCard(STATE);
-            }
-            case READY -> {
-                showCard(TEXT);
-                if (focusPending) {
-                    focusPending = false;
-                    focusArea.run();
-                }
-            }
-        }
-        if (!area.getSyntaxEditingStyle().equals(session.style())) area.setSyntaxEditingStyle(session.style());
-        area.setLineWrap(session.wrap());
-        // Vim wraps at any character (VimEditor turns word wrapping off while it is on).
-        area.setWrapStyleWord(vim == null);
-        area.setTabsEmulated(!session.tabs());
+        if (closed) return;
+        if (session.state() == DocumentSession.State.FAILED) focusPending = false;
+        if (!area().getSyntaxEditingStyle().equals(session.style())) area().setSyntaxEditingStyle(session.style());
+        area().setLineWrap(session.wrap());
+        area().setWrapStyleWord(vim == null);
+        area().setTabsEmulated(!session.tabs());
         if (vim != null) vim.editorDefaults(defaults());
-        switch (session.banner()) {
-            case NONE -> banner.setVisible(false);
-            case CHANGED -> banner(session.name() + " changed on disk.", "Reload", "Keep Mine");
-            case DELETED -> banner(session.name() + " was deleted.", "Close", "Keep");
+        render();
+        if (showingText() && focusPending) { focusPending = false; focusArea.run(); }
+    }
+    private void event(UiEvent event) {
+        if (closed) return;
+        if (find != null && find.event(event)) return;
+        if (!(event instanceof UiEvent.Action action)) return;
+        switch (action.id()) {
+            case RETRY -> { if (session.state() == DocumentSession.State.FAILED && session.retryable()) session.load(); }
+            case DISMISS -> { session.cancelLoad(); close.accept(this); }
+            case FIRST -> { if (session.banner() == DocumentSession.Banner.DELETED) close.accept(this); else if (session.banner() == DocumentSession.Banner.CHANGED) session.reloadFromBanner(); }
+            case SECOND -> { if (session.banner() == DocumentSession.Banner.DELETED) session.keepDeleted(); else if (session.banner() == DocumentSession.Banner.CHANGED) session.keepMine(); }
+            default -> { }
         }
     }
-
-    private void showCard(String card) {
-        showing = card;
-        cards.show(body, card);
+    private ViewSpec spec() {
+        boolean ready = showingText(), failed = session.state() == DocumentSession.State.FAILED;
+        var children = new ArrayList<Nodes.Node>();
+        boolean banner = session.banner() != DocumentSession.Banner.NONE;
+        boolean deleted = session.banner() == DocumentSession.Banner.DELETED;
+        children.add(new Nodes.Stack(BANNER, visible(banner), Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.Text("document.banner.text", ControlState.READY, session.name() + (deleted ? " was deleted." : " changed on disk."), Nodes.TextRole.BODY),
+            button(FIRST, deleted ? "Close" : "Reload", true), button(SECOND, deleted ? "Keep" : "Keep Mine", true))));
+        children.add(new Nodes.Custom(DOCUMENT, visible(ready), CONTENT, Nodes.CustomKind.EDITOR, "Document"));
+        children.add(new Nodes.Empty(STATE, visible(!ready), new Nodes.Icon("document.state.icon", ControlState.READY,
+            failed ? "error" : "file", Nodes.Hue.NONE, Nodes.IconSize.EMPTY, failed ? "Load failed" : "Loading"),
+            failed ? session.failure() : "Loading " + session.name() + session.host().map(host -> " from " + host).orElse("") + "…", "",
+            List.of(button(RETRY, "Retry", failed && session.retryable()), button(DISMISS, failed ? "Close" : "Cancel", true))));
+        if (find != null) children.add(find.node());
+        return new ViewSpec(new Nodes.Split("document.tab", ControlState.READY, Nodes.SplitKind.DOCUMENT, children));
     }
-
-    private void banner(String text, String first, String second) {
-        bannerText.setText(text);
-        bannerFirst.setText(first);
-        bannerSecond.setText(second);
-        banner.setVisible(true);
+    private static ControlState visible(boolean value) { return new ControlState(value, true, false, ""); }
+    private static Nodes.Button button(String id, String label, boolean visible) {
+        return new Nodes.Button(id, visible(visible), label, "", Nodes.ButtonKind.SECONDARY, id, "");
     }
 }
