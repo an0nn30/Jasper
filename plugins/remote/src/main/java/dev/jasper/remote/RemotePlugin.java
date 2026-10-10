@@ -59,7 +59,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import javax.swing.Icon;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
@@ -101,8 +100,8 @@ public class RemotePlugin implements Plugin {
     private PluginAction splitAction;
     private SessionsToolbar sessionsToolbar;
     private Timer poll;
-    private Icon icon;
-    private Icon serverIcon;
+    private String icon;
+    private String serverIcon;
     private boolean stopped;
     private final Set<CompletableFuture<HostKeyVerifier.Decision>> questions = new java.util.HashSet<>();
     private final Map<UUID, HostsPanel> panels = new HashMap<>();
@@ -151,8 +150,8 @@ public class RemotePlugin implements Plugin {
         connections = new Connections(settings::connection, trust, agentFactory.apply(context), store::host,
             credentialSource, this::askHostKey, context.background(), ui, schedule);
         connections.onChanged(this::refreshStatus);
-        icon = context.appearance().icon(dev.jasper.sdk.ui.IconName.NETWORK);
-        serverIcon = context.appearance().icon(dev.jasper.sdk.ui.IconName.SERVER);
+        icon = "server";
+        serverIcon = "server";
         // Before the panels: each names its toggle action, which must already be registered.
         registerNavigation();
 
@@ -200,7 +199,7 @@ public class RemotePlugin implements Plugin {
             (folder, window) -> store.host(folder.hostId()).ifPresent(saved -> openHostIn(window, saved, folder.path())), context.background()));
         follower=new dev.jasper.remote.ui.sftp.DirectoryFollower(ui,schedule,id->sftpUi.following(id)||context.terminals().activePane().map(pane->pane.id().equals(id)).orElse(false),this::probedDirectory,sftpUi::notice);
         sftpUi.onFollowRequested(follower::request);
-        context.actions().register(ActionSpec.of(SFTP,"Open SFTP here").withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp","files","browse","remote"))
+        context.actions().register(ActionSpec.of(SFTP,"Open SFTP here").withIcon("folder").withKeywords(List.of("sftp","files","browse","remote"))
                 .withDefaultBinding("cmd+shift+o").withContext(dev.jasper.sdk.ui.ShortcutContext.terminal()),invoked->{
             invoked.pane().flatMap(this::sftpPane).ifPresentOrElse(pane->sftpUi.show(invoked.window(),pane),()->sftpUi.show(invoked.window()));
         });
@@ -221,7 +220,7 @@ public class RemotePlugin implements Plugin {
         context.palette().register(scope);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 60));
         status.setIcon(icon); status.setAction(HOSTS); status.setVisible(false);
-        context.panels().registerView(new PanelSpec(PANEL, "Sessions", icon, Anchor.LEFT).withToggleActionId(HOSTS), this::createPanel);
+        context.panels().register(new PanelSpec(PANEL, "Sessions", icon, Anchor.LEFT).withToggleActionId(HOSTS), this::createPanel);
         sessionsToolbar = new SessionsToolbar(context, store, icon, this::activateHost, window -> {
             PanelHost panel = panelHosts.get(window.id());
             if (panel == null) showPanel(window); else panel.show();
@@ -260,7 +259,7 @@ public class RemotePlugin implements Plugin {
                 .withKeywords(List.of("ssh", "hosts", "panel", "show", "hide")).withDefaultBindings("cmd+alt+1", "alt+1"),
             invoked -> showPanel(invoked.window()));
         context.actions().register(ActionSpec.of(SFTP_TOGGLE, "Toggle SFTP")
-                .withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp", "files", "panel", "show", "hide"))
+                .withIcon("folder").withKeywords(List.of("sftp", "files", "panel", "show", "hide"))
                 .withDefaultBindings("cmd+alt+2", "alt+2"),
             invoked -> sftpUi.toggle(invoked.window()));
     }
@@ -617,7 +616,7 @@ public class RemotePlugin implements Plugin {
         WindowHandle window = host.window();
         var panel = new HostsPanel(context.kit(), new HostsPanel.Actions(h -> openHost(window, h), h -> window.activeTab().flatMap(tab -> tab.activePane()).ifPresent(pane -> splitHost(pane, h)),
             editing -> editHost(window, editing), h -> reportMutation("Could not duplicate the host", store.put(duplicate(h))), h -> deleteHost(window, h),
-            (h, favorite) -> reportMutation("Could not update favorites", store.put(h.withFavorite(favorite))), () -> importConfig(window)), context.appearance()::icon);
+            (h, favorite) -> reportMutation("Could not update favorites", store.put(h.withFavorite(favorite))), () -> importConfig(window)));
         panel.onHeaderChanged(host::setHeader);
         panel.setCredentialLabels(this::credentialLabel);
         panel.setDefaultGroup(panelState.defaultGroup());

@@ -29,12 +29,13 @@ class VersionRangeTest {
             assertThatIllegalArgumentException().as(bad).isThrownBy(() -> VersionRange.parse(bad));
     }
 
-    @Test void pluginsBuiltForOlderMinorsAreIncompatibleWithZeroFourteen() {
+    @Test void pluginsBuiltForOlderMinorsAreIncompatibleWithZeroFifteen() {
         var host = Version.parse(dev.jasper.sdk.JasperSdk.VERSION);
         assertThat(VersionRange.parse(">=0.10.1, <0.11").contains(host)).isFalse();
         assertThat(VersionRange.parse(">=0.11.0, <0.12").contains(host)).isFalse();
         assertThat(VersionRange.parse(">=0.12.0, <0.13").contains(host)).isFalse();
         assertThat(VersionRange.parse(">=0.13.0, <0.14").contains(host)).isFalse();
-        assertThat(VersionRange.parse(">=0.14.0, <0.15").contains(host)).isTrue();
+        assertThat(VersionRange.parse(">=0.14.0, <0.15").contains(host)).isFalse();
+        assertThat(VersionRange.parse(">=0.15.0, <0.16").contains(host)).isTrue();
     }
 }

@@ -13,9 +13,12 @@ import javax.swing.Icon;
 
 /** Named, monochrome vector art. Registrations are scoped; returned icons are immutable theme snapshots. */
 public final class IconRegistry implements AutoCloseable {
+    // Fixed immutable engine artwork is parsed once; each receiving view still owns its custom registrations.
+    private static final Map<String, IconArtwork> BUILT_INS = builtIns().entrySet().stream().collect(
+        java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> new IconArtwork(entry.getValue())));
     private final Map<String, IconArtwork> artworks = new LinkedHashMap<>();
     private boolean closed;
-    public IconRegistry() { builtIns().forEach((name, path) -> artworks.put(name, new IconArtwork(path))); }
+    public IconRegistry() { artworks.putAll(BUILT_INS); }
     public synchronized Set<String> names() { requireOpen(); return Set.copyOf(artworks.keySet()); }
     public synchronized IconRegistration register(String name, String pathData) {
         requireOpen(); Objects.requireNonNull(name);

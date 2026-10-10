@@ -1,5 +1,11 @@
 # Plan 1 temporary theme paths and Plan 2 removal ownership
 
+## Task 11a cutover disposition — 2026-10-10
+
+This current disposition supersedes the historical pending API notes below. SDK0.15 removes all public raw presentation Icon boundaries, Appearance.icon loaders, IconName/BundledIcon, raw mounts, factory bridge names/interfaces and SDK WorkspacePalette/EditorPalette/SyntaxPalette.current fallback readers. All eight bundled plugins use semantic presentation names and final kit mounts. Manifest identity images remain a separate app-managed preview. Palette rows and notification card/history icons copy constrained monochrome paths into receiver-owned registries; reset/replacement and view close release them. Expired records retain only the immutable presentation value for remounting. The fixed module builtin artwork catalog is parsed once; custom maps remain scoped.
+
+Exact remaining private owners for **Task 11b**, with no supported SDK access: `jasper-app/.../appearance/LegacyAppearanceDefaults.java`, `appearance/WorkspaceDefaults.java`; `workspace/{WorkspaceStyler,WorkspaceStyles,WorkspaceStyleLayer,WorkspaceComboPopup,WorkspaceTheme}.java` and raw ToolWindowSurface/WindowContent recursion; `platform/AppIcons.java` native authored SVG catalog/loaders and associated native resources/aliases; any now-unused raw `PluginPanelPage` row layout helpers and private `HostedUi` component mounting plumbing. 11b audits/removes these against remaining native owners and adds exact custom-owner construction/paint enforcement. Existing native icon uses cannot be broadly deleted in11a. Overall Task11 is incomplete until11b is approved.
+
 Audited 2026-10-04 after Tasks 1–13; updated for integrated Plan 2 Tasks 2–3 on 2026-10-05. This is the exact-path extraction/removal ledger linked by
 [Plan 2](../../superpowers/plans/2026-10-04-theme-engine-2-consumer-migration.md); it does not claim
 consumer migration. The designated reusable algorithm/value authority is `jasper-ui`'s `theme`,

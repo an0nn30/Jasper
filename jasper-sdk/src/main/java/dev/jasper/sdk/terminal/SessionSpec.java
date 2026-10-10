@@ -3,7 +3,6 @@ package dev.jasper.sdk.terminal;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
-import javax.swing.Icon;
 
 /**
  * A session your plugin provides. The pane appears first, waiting; {@code connector} is then called on the
@@ -16,7 +15,7 @@ import javax.swing.Icon;
  * @param onExit what happens to the pane when the session ends
  * @param connector starts one connection attempt
  */
-public record SessionSpec(String title, Optional<Icon> icon, ExitPolicy onExit, Consumer<PendingSession> connector) {
+public record SessionSpec(String title, Optional<String> icon, ExitPolicy onExit, Consumer<PendingSession> connector) {
     /** Rejects nulls and a blank title. */
     public SessionSpec {
         Objects.requireNonNull(title, "title");

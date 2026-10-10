@@ -23,7 +23,7 @@ class HostedChooserTest {
     private final TerminalFixture fixture = new TerminalFixture();
     private final HostedTerminals terminals = new HostedTerminals("dev.x.tool", new CapabilityGate("dev.x.tool", Set.of()),
         fixture.registry, Runnable::run, () -> true, () -> true,
-        new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null));
+        new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null, name -> new javax.swing.ImageIcon()));
     private final AtomicBoolean open = new AtomicBoolean(true);
     private final AtomicReference<Runnable> during = new AtomicReference<>(() -> {});
     private final AtomicBoolean disposed = new AtomicBoolean();
@@ -96,7 +96,7 @@ class HostedChooserTest {
     @Test void foreignAndDeadOwnersAreRejectedBeforeOpening() {
         var foreign = new TerminalFixture();
         var other = new HostedTerminals("dev.x.tool", new CapabilityGate("dev.x.tool", Set.of()), foreign.registry,
-            Runnable::run, () -> true, () -> true, new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null));
+            Runnable::run, () -> true, () -> true, new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null, name -> new javax.swing.ImageIcon()));
         assertThatIllegalArgumentException().isThrownBy(() -> ui.windows().chooseFiles(other.windowHandle(foreign.addWindow()), "Upload", Optional.empty()));
         assertThatIllegalArgumentException().isThrownBy(() -> ui.windows().chooseFiles(terminals.windowHandle(UUID.randomUUID()), "Upload", Optional.empty()));
         assertThat(requests).isEmpty();

@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 
 /** Indexed projects with immediate project actions and host-owned draft rows for declared settings. UI thread. */
-public final class IndexerSettingsPanel implements SettingsPanel.View {
+public final class IndexerSettingsPanel implements SettingsPanel {
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT).withZone(ZoneId.systemDefault());
     private static final String TABLE = "indexer.projects", ADD = "indexer.add", REINDEX = "indexer.reindex", REMOVE = "indexer.remove";
     private final UiKit kit;
@@ -56,7 +56,7 @@ public final class IndexerSettingsPanel implements SettingsPanel.View {
         this.reachable = reachable; this.connected = connected; this.addFolder = addFolder; this.confirm = confirm;
     }
 
-    @Override public UiView createView(SettingsPanelHost host) {
+    @Override public UiView create(SettingsPanelHost host) {
         pageGeneration++;
         this.host = host;
         selected = null;
@@ -133,12 +133,12 @@ public final class IndexerSettingsPanel implements SettingsPanel.View {
         var sections = new ArrayList<Nodes.Node>();
         sections.add(new Nodes.Section("indexer.projects.section", ControlState.READY, "Projects",
             new Nodes.Stack("indexer.projects.body", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(table, buttons))));
-        sections.add(host.rowNode(settings.prompt));
-        sections.add(host.rowNode(settings.markers));
-        sections.add(host.rowNode(settings.excludes));
-        sections.add(host.rowNode(settings.ignored));
-        sections.add(host.rowNode(settings.maxFiles));
-        sections.add(host.rowNode(settings.refreshMinutes));
+        sections.add(host.row(settings.prompt));
+        sections.add(host.row(settings.markers));
+        sections.add(host.row(settings.excludes));
+        sections.add(host.row(settings.ignored));
+        sections.add(host.row(settings.maxFiles));
+        sections.add(host.row(settings.refreshMinutes));
         return new Nodes.Form("indexer.settings", ControlState.READY, Nodes.FormKind.SETTINGS,
             "Project Index", Optional.empty(), sections, Optional.empty(), List.of());
     }

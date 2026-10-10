@@ -52,6 +52,7 @@ final class HostedPalette implements Palette {
         if (!spec.id().startsWith(pluginId + "."))
             throw new IllegalArgumentException("A scope id must start with " + pluginId + ".: " + spec.id());
         spec.shortcutActionId().ifPresent(ui::requireOwn);
+        spec.icon().ifPresent(ui::validateIcon);
         dev.jasper.app.lifecycle.Subscription added = model.addScope(new Adapted(scope, spec));
         return ui.tracked(added::close);
     }
@@ -70,9 +71,9 @@ final class HostedPalette implements Palette {
             context.maxResults(), context.macOs());
     }
 
-    private static dev.jasper.app.palette.PaletteRow appRow(PaletteRow row) {
+    private dev.jasper.app.palette.PaletteRow appRow(PaletteRow row) {
         return new dev.jasper.app.palette.PaletteRow(row.id(), row.title(), row.detail().orElse(null), row.tag().orElse(null),
-            row.icon().orElse(null), row.enabled(), row);
+            row.icon().map(ui::icon).orElse(null), row.enabled(), row);
     }
 
     private static dev.jasper.app.palette.PaletteStep.Result appResult(PaletteStep.Result result) {
@@ -95,7 +96,7 @@ final class HostedPalette implements Palette {
 
         @Override public String id() { return spec.id(); }
         @Override public String label() { return spec.label(); }
-        @Override public Icon icon() { return spec.icon().orElse(null); }
+        @Override public Icon icon() { return spec.icon().map(ui::icon).orElse(null); }
         @Override public String description() { return spec.description(); }
         @Override public String placeholder() { return spec.placeholder(); }
         @Override public List<dev.jasper.app.palette.PaletteVerb> verbs() { return verbs; }

@@ -57,6 +57,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
     private static final String STEP_FIELD = "step.field.";
 
     private final KitContext kit;
+    private final dev.jasper.app.platform.PresentationIcons presentationIcons = new dev.jasper.app.platform.PresentationIcons();
     private final boolean macOs;
     private final Consumer<String> queryChanged;
     private final ObjIntConsumer<PaletteEntry> execute;
@@ -86,7 +87,8 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
     CommandPalette(KitContext kit, boolean macOs, Consumer<String> queryChanged, ObjIntConsumer<PaletteEntry> execute,
                    Function<String, Optional<ScopePrefix>> prefixes, Consumer<PaletteScope> chipTyped) {
         super(new BorderLayout());
-        this.kit = Objects.requireNonNull(kit);
+        this.kit = presentationIcons.context(Objects.requireNonNull(kit));
+        kit = this.kit;
         this.macOs = macOs;
         this.queryChanged = Objects.requireNonNull(queryChanged);
         this.execute = Objects.requireNonNull(execute);
@@ -182,6 +184,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
     }
 
     private ViewSpec resultsSpec() {
+        presentationIcons.reset();
         var items = new ArrayList<ListItem>();
         for (int i = 0; i < entries.size(); i++) items.add(item(i, entries.get(i)));
         Set<String> selection = selected < 0 ? Set.of() : Set.of(id(selected));
@@ -191,15 +194,15 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
 
     private static String id(int index) { return "entry." + index; }
 
-    private static ListItem item(int index, PaletteEntry entry) {
+    private ListItem item(int index, PaletteEntry entry) {
         String id = id(index);
         return switch (entry) {
             case PaletteEntry.Header header -> new ListItem(id, Optional.empty(),
                 List.of(text(id + ".title", header.label(), Nodes.TextRole.CAPTION)), List.of(), List.of(), true);
             case PaletteEntry.Item item -> {
                 PaletteRow row = item.row();
-                // Plugin artwork arrives as raw icons until Task 11 names it; only host glyphs have a kit name.
-                Optional<Nodes.Node> icon = Optional.ofNullable(row.icon()).flatMap(AppIcons::kitName)
+                // Preserve the semantic name and scoped monochrome artwork in this receiving kit context.
+                Optional<Nodes.Node> icon = Optional.ofNullable(row.icon()).flatMap(value -> presentationIcons.name(value))
                     .map(name -> new Nodes.Icon(id + ".icon", ControlState.READY, name, Nodes.Hue.NONE, Nodes.IconSize.RAIL, row.title()));
                 Nodes.TextRole role = !row.enabled() ? Nodes.TextRole.DESCRIPTION
                     : item.scope().monospaceRows() ? Nodes.TextRole.MONO : Nodes.TextRole.BODY;
@@ -641,6 +644,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         closed = true;
         try { themeSubscription.close(); } catch (Exception ignored) { /* closing a subscription has nothing to report */ }
         views.forEach(KitView::close);
+        presentationIcons.close();
     }
 
     // ---- Package-private access for headless tests ------------------------------------------------------------------

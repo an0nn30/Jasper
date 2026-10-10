@@ -69,7 +69,7 @@ public final class FakePluginContext implements PluginContext {
         this.palette = new FakePalette(host, this);
         this.fileSources = new FakeFileSources(host, this);
         this.settings = new FakePluginSettings(host, info.id(), host.dataRoot().resolve(info.id()).resolve(info.id() + ".toml"));
-        this.notifications = host.notifications.of(info.id(), () -> state != State.CLOSED);
+        this.notifications = host.notifications.of(info.id(), () -> state != State.CLOSED, name -> kit().validateIcon(name));
     }
 
     void requireOpen() {
@@ -223,17 +223,6 @@ public final class FakePluginContext implements PluginContext {
             }
             @Override public Subscription onChanged(java.util.function.Consumer<Variant> handler) {
                 requireOpen();var subscription=host.subscribeAppearance(info.id(),handler);own(subscription);return subscription;
-            }
-            @Override public javax.swing.Icon icon(dev.jasper.sdk.ui.IconName name) {
-                return new FakeNamedIcon(java.util.Objects.requireNonNull(name, "name"));
-            }
-            @Override public javax.swing.Icon icon(dev.jasper.sdk.ui.BundledIcon name) {
-                return new FakeBundledIcon(java.util.Objects.requireNonNull(name, "name"));
-            }
-            @Override public javax.swing.Icon icon(String svgResourcePath) {
-                if (svgResourcePath == null || plugin.getClass().getClassLoader().getResource(svgResourcePath) == null)
-                    throw new IllegalArgumentException("No such icon resource: " + svgResourcePath);
-                return FakeUi.blankIcon();
             }
         };
     }

@@ -44,44 +44,13 @@ class RemotePluginTest {
         return new TestRemotePlugin(Kits.UI, context -> Optional.empty(), (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
     }
 
-    @Test void hostRequestsNetworkAndServerIcons(@TempDir Path dir) {
-        try (var host = new FakePluginHost()) {
-            var delegate = plugin(dir.resolve("ssh"));
-            var icons = new ArrayList<dev.jasper.sdk.testing.FakeNamedIcon>();
-            host.start(INFO, Set.of(), Set.of(), new dev.jasper.sdk.plugin.Plugin() {
-                public void start(dev.jasper.sdk.plugin.PluginContext context) throws Exception {
-                    var appearance = (dev.jasper.sdk.ui.Appearance) java.lang.reflect.Proxy.newProxyInstance(
-                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.ui.Appearance.class}, (proxy, method, args) -> {
-                            if (method.getName().equals("icon")) {
-                                // Semantic names everywhere but the tunnels icon, which has none.
-                                if (args[0] instanceof dev.jasper.sdk.ui.BundledIcon bundled)
-                                    assertThat(bundled).isEqualTo(dev.jasper.sdk.ui.BundledIcon.ACTIONS_SWAP_PANELS);
-                                else assertThat(args[0]).isInstanceOf(dev.jasper.sdk.ui.IconName.class);
-                            }
-                            try {
-                                Object value = method.invoke(context.appearance(), args);
-                                if (value instanceof dev.jasper.sdk.testing.FakeNamedIcon icon) icons.add(icon);
-                                return value;
-                            } catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
-                        });
-                    var wrapped = (dev.jasper.sdk.plugin.PluginContext) java.lang.reflect.Proxy.newProxyInstance(
-                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.plugin.PluginContext.class}, (proxy, method, args) -> {
-                            if (method.getName().equals("appearance")) return appearance;
-                            try { return method.invoke(context, args); }
-                            catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
-                        });
-                    delegate.start(wrapped);
-                }
-                public void stop() { delegate.stop(); }
-            });
-            settle(host);
+    @Test void hostContributesSemanticServerIcons(@TempDir Path dir) {
+        try(var host=new FakePluginHost()) {
+            host.start(INFO,Set.of(),Set.of(),plugin(dir.resolve("ssh")));settle(host);
             assertThat(host.failures()).isEmpty();
-            assertThat(icons).anyMatch(icon->icon.name()==dev.jasper.sdk.ui.IconName.NETWORK);
-            assertThat(icons).as("session tab icon").anyMatch(icon->icon.name()==dev.jasper.sdk.ui.IconName.SERVER);
+            assertThat(host.actionSpec("dev.jasper.remote.connect").orElseThrow().icon()).contains("server");
             assertThat(host.toolbar()).anyMatch(item -> item.contains("Sessions"));
-            assertThat(host.panels()).containsExactly("dev.jasper.remote.sftp.panel|SFTP|LEFT+split|dev.jasper.remote.sftp.toggle",
-                "dev.jasper.remote.tunnels.panel|Tunnels|LEFT|dev.jasper.remote.tunnels",
-                "dev.jasper.remote.panel|Sessions|LEFT|dev.jasper.remote.hosts");
+            assertThat(host.panels()).containsExactly("dev.jasper.remote.sftp.panel|SFTP|LEFT+split|dev.jasper.remote.sftp.toggle", "dev.jasper.remote.tunnels.panel|Tunnels|LEFT|dev.jasper.remote.tunnels", "dev.jasper.remote.panel|Sessions|LEFT|dev.jasper.remote.hosts");
         }
     }
 

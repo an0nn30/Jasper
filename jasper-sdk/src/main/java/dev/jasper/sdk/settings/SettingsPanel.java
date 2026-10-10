@@ -1,7 +1,7 @@
 package dev.jasper.sdk.settings;
 
 import java.util.List;
-import javax.swing.JComponent;
+import dev.jasper.sdk.ui.UiView;
 
 /**
  * A plugin's own page in Settings, used instead of the page Settings generates from its declarations, in the manner
@@ -10,13 +10,6 @@ import javax.swing.JComponent;
  * state of the plugin's own.
  */
 public interface SettingsPanel {
-    /** Transitional kit-only page; needs no legacy component factory. */
-    @FunctionalInterface
-    interface View extends SettingsPanel {
-        @Override default JComponent create(SettingsPanelHost host) { throw new UnsupportedOperationException("Owned view page"); }
-        /** Builds the owned page, once per Settings opening. */
-        dev.jasper.sdk.ui.UiView createView(SettingsPanelHost host);
-    }
 
     /**
      * Builds the page, once per opening of Settings, when the page is first shown.
@@ -24,7 +17,7 @@ public interface SettingsPanel {
      * @param host standard rows and unsaved values for the plugin's declared settings
      * @return the page's component
      */
-    JComponent create(SettingsPanelHost host);
+    UiView create(SettingsPanelHost host);
 
     /**
      * Extra words Settings' search matches for this page.

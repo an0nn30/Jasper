@@ -53,7 +53,7 @@ public final class SamplePlugin implements Plugin {
     private static final String ECHO = "dev.jasper.sample.echo";
     private static final String GREETINGS = "dev.jasper.sample.greetings";
     private static final String GREETINGS_OPEN = "dev.jasper.sample.greetings.open";
-    private static final String FLASK = "plugin";
+    private static final String FLASK = "dev.jasper.sample:flask";
     private static final String RUN_BUTTON = "sample.run", DETAILS_BUTTON = "sample.about.details", CLOSE_BUTTON = "sample.close";
 
     /** Created by the runtime. */
@@ -61,6 +61,7 @@ public final class SamplePlugin implements Plugin {
 
     // example:plugin:start
     @Override public void start(PluginContext context) {
+        context.kit().registerIcon(new dev.jasper.sdk.ui.IconAsset("dev.jasper.sample:flask", "M 6 2 H 10 M 6.67 6 H 9.33 M 6.67 2 V 6 L 4 13.33 Q 3.8 14 4.33 14 H 11.67 Q 12.2 14 12 13.33 L 9.33 6 V 2"));
         context.log().log(System.Logger.Level.INFO, "Sample plugin " + context.plugin().version() + " started");
         context.events().subscribe(AppEvents.THEME_CHANGED,
             event -> context.log().log(System.Logger.Level.INFO, "The look is now " + event.variant()));
@@ -79,7 +80,7 @@ public final class SamplePlugin implements Plugin {
     private static void installUi(PluginContext context, long stepMillis) {
         PluginAction[] demo = new PluginAction[1];
         demo[0] = context.actions().register(ActionSpec.of(DEMO, "Run Sample Activity")
-                .withIcon(context.appearance().icon("dev/jasper/sample/flask.svg"))
+                .withIcon("dev.jasper.sample:flask")
                 .withKeywords(List.of("sample", "demo", "activity"))
                 .withDefaultBinding("cmd+alt+j"),
             invoked -> {
@@ -107,9 +108,8 @@ public final class SamplePlugin implements Plugin {
 
     // example:pluginpanels:start
     private static void installPanelAndWindow(PluginContext context, long stepMillis) {
-        var icon = context.appearance().icon("dev/jasper/sample/flask.svg");
         // One instance per window, built the first time the panel is shown there.
-        context.panels().registerView(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, Anchor.LEFT), host ->
+        context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, Anchor.LEFT), host ->
             context.kit().create(new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
                 new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
                 Optional.empty(), new Nodes.Stack("sample.body", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
@@ -120,7 +120,7 @@ public final class SamplePlugin implements Plugin {
                         context.background().execute(() -> demo(context, stepMillis));
                 }));
 
-        context.actions().register(ActionSpec.of("dev.jasper.sample.about", "About Sample").withIcon(icon), invoked -> {
+        context.actions().register(ActionSpec.of("dev.jasper.sample.about", "About Sample").withIcon(FLASK), invoked -> {
             // The application builds the frame, title bar and menu bar; a singleton comes back while it is open.
             PluginWindow window = context.windows().create(
                 new WindowSpec("dev.jasper.sample.about-window", "About Sample", new Dimension(360, 200), true));

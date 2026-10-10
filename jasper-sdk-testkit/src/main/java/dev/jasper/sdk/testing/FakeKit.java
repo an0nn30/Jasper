@@ -11,12 +11,14 @@ import java.util.function.Consumer;
 public final class FakeKit implements UiKit, AutoCloseable {
     private final String owner;
     private final Set<FakeKitView> views = new LinkedHashSet<>();
-    private final Map<String,IconAsset> icons = new LinkedHashMap<>();
+    private final Map<String,IconAsset> icons = new java.util.concurrent.ConcurrentHashMap<>();
     private final List<String> failures = new ArrayList<>();
     private final AtomicBoolean closed = new AtomicBoolean();
     public FakeKit(String owner) { this.owner=Objects.requireNonNull(owner); }
     static void edt() { if(!EventQueue.isDispatchThread()) throw new IllegalStateException("Kit requires EDT"); }
     void guard() { edt(); if(closed.get()) throw new IllegalStateException("Kit is closed"); }
+    private static final Set<String> BUILT_INS=Set.of("bookmark","home","desktop","preview","logout","download","help","history","link","match.case","folder.add","window.add","paste","pause","regex","remove","save","settings","split","unlock","zoom","add","more","menu","collapse","chevron.down","chevron.right","chevron.up","search","lock","edit","delete","copy","reveal","refresh","upload","back","forward","folder","file","server","key","login","note","tunnel","terminal","play","warning","info","error","plugin","check","close","sparkle","star","star.filled");
+    void validateIcon(String name){if(name!=null && !BUILT_INS.contains(name) && !icons.containsKey(name))throw new IllegalArgumentException("Unknown icon: " + name);}
     void failed() { failures.add("Plugin kit callback failed"); }
     void removed(FakeKitView view) { views.remove(view); }
     @Override public FakeKitView create(ViewSpec spec, Consumer<UiEvent> events) { guard();var view=new FakeKitView(this,spec,events);views.add(view);return view; }

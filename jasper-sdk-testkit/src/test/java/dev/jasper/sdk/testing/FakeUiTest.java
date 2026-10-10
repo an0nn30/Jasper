@@ -26,7 +26,7 @@ class FakeUiTest {
                 invoked -> ran.add(invoked.window().id() + "/" + invoked.pane().isPresent()));
             context.actions().register(ActionSpec.of("dev.x.tool.stop", "Stop"), invoked -> { });
             context.toolbar().add(ToolbarItem.action("dev.x.tool.run"));
-            context.toolbar().add(ToolbarItem.menu(new javax.swing.ImageIcon(), "Tool", List.of("dev.x.tool.run", "dev.x.tool.stop")));
+            context.toolbar().add(ToolbarItem.menu("file", "Tool", List.of("dev.x.tool.run", "dev.x.tool.stop")));
             var view = context.menus().standard(StandardMenu.VIEW);
             view.add("dev.x.tool.run");
             view.addSeparator();
@@ -180,19 +180,19 @@ class FakeUiTest {
             host.flush();
             assertThat(context.appearance().variant()).isEqualTo(Variant.LIGHT);
             assertThat(seen).containsExactly(Variant.LIGHT);
-            assertThatIllegalArgumentException().isThrownBy(() -> context.appearance().icon("no/such/icon.svg"));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.actions().register(ActionSpec.of("dev.x.tool.bad", "Bad").withIcon("missing"),e -> {}));
         }
     }
-    @Test void retainsRealDialogContentUntilClose() {
+    @Test void retainsRealDialogContentUntilClose() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), c -> {});
             var owner = context.terminals().window(host.addTerminalWindow()).orElseThrow();
             var dialog = context.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Inspect", owner, true));
-            var panel = new javax.swing.JPanel(); dialog.setContent(panel); dialog.show();
-            assertThat(host.windowContent(INFO.id(), "Inspect")).containsSame(panel);
+            var panel = KitFixtures.view(context); dialog.setContent(panel); dialog.show();
+            assertThat(host.windowView(INFO.id(), "Inspect")).containsSame((FakeKitView)panel);
             dialog.close(); assertThat(host.windowContent(INFO.id(), "Inspect")).isEmpty();
         }
-    }
+    }); }
 
     @Test void exposesTheOwnedViewMountedOnAnOpenSurfaceUntilCloseOrReplacement() throws Exception {
         javax.swing.SwingUtilities.invokeAndWait(() -> {
@@ -206,8 +206,9 @@ class FakeUiTest {
                 dialog.setContent(view); dialog.show();
                 assertThat(host.windowView(INFO.id(), "Unlock")).containsSame((FakeKitView) view);
                 assertThat(host.windowView("other.plugin", "Unlock")).isEmpty();
-                dialog.setContent(new javax.swing.JPanel());
-                assertThat(host.windowView(INFO.id(), "Unlock")).as("raw content replaced the view").isEmpty();
+                var replacement = KitFixtures.view(context); dialog.setContent(replacement);
+                assertThat(host.windowView(INFO.id(), "Unlock")).containsSame((FakeKitView)replacement);
+                assertThatThrownBy(view::spec).isInstanceOf(IllegalStateException.class);
                 var next = context.kit().create(spec, e -> {}); dialog.setContent(next);
                 ((FakeKitView) next).setSecret("password", "fixture".toCharArray());
                 dialog.close();

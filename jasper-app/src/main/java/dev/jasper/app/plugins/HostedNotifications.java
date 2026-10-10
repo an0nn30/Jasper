@@ -38,6 +38,8 @@ final class HostedNotifications implements Notifications {
     static final String ACTIVITIES = ".activities";
 
     private final String pluginId;
+    private final java.util.function.Function<String,javax.swing.Icon> icons;
+    private final Consumer<String> validateIcon;
     private final PluginRuntime.NotificationHost host;
     private final Containment containment;
     private final Consumer<Runnable> ui;
@@ -51,7 +53,8 @@ final class HostedNotifications implements Notifications {
 
     /** UI thread: declares the plugin's default group and the host's activities group for it. */
     HostedNotifications(String pluginId, String pluginName, PluginRuntime.NotificationHost host, Containment containment,
-                        Consumer<Runnable> ui, BooleanSupplier onUi) {
+                        Consumer<Runnable> ui, BooleanSupplier onUi, java.util.function.Function<String,javax.swing.Icon> icons, Consumer<String> validateIcon) {
+        this.icons=icons;this.validateIcon=validateIcon;
         this.pluginId = pluginId;
         this.host = host;
         this.containment = containment;
@@ -104,7 +107,7 @@ final class HostedNotifications implements Notifications {
     /** The application's request for a plugin's spec; actions and the body run inside the plugin's containment. */
     private NotificationRequest request(String group, NotificationSpec spec) {
         var request = NotificationRequest.of(group, severity(spec.severity()), spec.title()).withContent(spec.content()).withSource(pluginId);
-        if (spec.icon().isPresent()) request = request.withIcon(spec.icon().get());
+        if (spec.icon().isPresent()) request = request.withIcon(icons.apply(spec.icon().get()));
         for (var action : spec.actions())
             request = request.withAction(new dev.jasper.app.notifications.NotificationAction(action.label(),
                 () -> containment.run(pluginId, "notification action " + action.label(), action.run()), action.expires()));
@@ -161,6 +164,7 @@ final class HostedNotifications implements Notifications {
         @Override public NotificationHandle post(NotificationSpec spec) {
             Objects.requireNonNull(spec, "spec");
             requireOpen();
+            spec.icon().ifPresent(validateIcon);
             NotificationRequest request = request(id, spec);
             var handle = new Handle();
             if (spec.cause().isPresent())

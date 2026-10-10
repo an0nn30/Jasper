@@ -11,7 +11,7 @@ enforces that from bytecode, and `check` runs Javadoc with doclint.
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
 | `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent`, `ConnectionSpec`, `ConnectionHandle`, `ConnectionEvent` |
 | `dev.jasper.sdk.services` | `Services`, `ServiceUnavailableException` |
-| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `IconName`, `BundledIcon`, `Panels`, `PanelSpec`, `PanelHost`, `PanelHeader`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `ContentTab`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Platform` |
+| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `Panels`, `PanelSpec`, `PanelHost`, `PanelHeader`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `ContentTab`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Platform` |
 | `dev.jasper.sdk.notifications` | `Notifications`, `NotificationGroup`, `GroupSpec`, `NotificationSpec`, `NotificationAction`, `NotificationHandle`, `Severity`, `DisplayMode` |
 | `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `ShellProfileInfo`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
 | `dev.jasper.sdk.palette` | `Palette`, `PaletteScope`, `ScopeSpec`, `PaletteVerb`, `PaletteRow`, `PaletteResults`, `PaletteStep`, `PaletteQuery` |
@@ -28,19 +28,15 @@ Unit-test a plugin with `dev.jasper.sdk.testing.FakePluginHost` from `jasper-sdk
 Packaged Jasper ships a trimmed Java runtime: [The Java runtime](../docs/plugin-authoring.md#the-java-runtime) lists
 the JDK modules a plugin may rely on.
 
-## Icons (SDK 0.8)
+## Icons and mounting (SDK 0.15)
 
-```java
-var lock = context.appearance().icon(IconName.LOCK);
-var unlock = context.appearance().icon(IconName.UNLOCK);
-```
-
-Import `dev.jasper.sdk.ui.IconName`. Plugins request only the meaning, without image paths.
-Icons use IntelliJ New UI artwork, selected centrally and fitted into a 16px square.
-SDK 0.8.2 also exposes all 885 catalog choices through `Appearance.icon(BundledIcon)`.
-Bundled plugins require `sdk = ">=0.9.0, <0.10"` (SDK 0.9.0 removed `PluginConfig`); Remote requires `sdk = ">=0.9.1, <0.10"` for shell profiles. Before 0.9, Vault required `>=0.8.2` and Editor `>=0.8.5` for app-hosted document tabs and theme palettes.
-Older custom hosts inherit UnsupportedOperationException until they implement each catalog.
-See the [catalog, size rules and testkit example](../docs/sdk-icons.md).
+Presentation icons are semantic strings such as `"lock"` and `"unlock"`. Register scoped
+monochrome paths with `UiKit.registerIcon`; see [icons](../docs/sdk-icons.md).
+Panels and settings factories return `UiView`; window surfaces and tabs mount only `UiView`.
+Settings hosts supply `Nodes.Node` rows. The host owns ordinary controls and their presentation.
+Specialized content retains explicit Appearance palettes and workspace opacity.
+All bundled manifests require `sdk = ">=0.15.0, <0.16"`. This is a breaking boundary: raw factories,
+Appearance icon loaders, arbitrary Icon arguments and palette fallback readers are removed.
 
 ## File workflows and progress (0.7.5)
 
@@ -89,7 +85,7 @@ programs or computers, such as a file server; the user consents to it like any o
 it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after plugin windows and content tabs;
 a `false` decision cancels, and a guard that throws or fails allows the quit. A resident macOS Jasper that only goes to
 the background on Cmd+Q does not ask them. `FakePluginHost.requestQuit` asks these guards too. Plugins declare
-`sdk = ">=0.14.0, <0.15"`.
+`sdk = ">=0.15.0, <0.16"`.
 
 SDK 0.11.0 also adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
 `global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
@@ -144,7 +140,7 @@ action, an icon or a window. Jasper posts a succeeded or failed activity in `<pl
 `FakePluginHost.notifications()` records posts as `group|SEVERITY|title|content[|Cause]`, lists declared groups and
 runs an action (`runAction`) or the body (`click`); `new FakeNotifications().group(id)` records for a component under
 test. A plugin built for 0.13 that called `notices()` moves to `notifications()` and declares
-`sdk = ">=0.14.0, <0.15"`.
+`sdk = ">=0.15.0, <0.16"`.
 
 ## Workspace opacity (SDK 0.14.1)
 
@@ -161,7 +157,7 @@ unantialiased rectangles (antialiased translucent fills fall back to software re
 lag). Everything above it (viewports, gutters, text areas) must be non-opaque, or it covers the glass. Keep selection,
 carets, find bars and banners solid. `FakePluginHost.setWorkspaceOpacity(double)` scripts the value in tests; it is
 announced on `flush()` and the fake reports it for every component, while the real host reports 1.0 for components
-outside a translucent window. Plugins that use it declare `sdk = ">=0.14.1, <0.15"`.
+outside a translucent window. Plugins that use it declare `sdk = ">=0.15.0, <0.16"`.
 
 ## Panel headers (SDK 0.14.2)
 
@@ -170,4 +166,4 @@ its title and icon-only actions before the host's options/hide controls. Use a c
 name for `detail`; `active` adds a connected status dot. Each `PanelHeader.Action` carries an
 accessible label, icon and UI-thread callback. Header updates work while the panel is hidden;
 callbacks are contained like other plugin actions and become inert when the instance closes.
-Use `PanelHeader.EMPTY` to clear the contribution. Plugins using this API require SDK 0.14.2.
+Use `PanelHeader.EMPTY` to clear the contribution. The final semantic-action signature requires SDK 0.15.0.

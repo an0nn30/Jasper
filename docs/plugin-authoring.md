@@ -16,7 +16,7 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.14.0, <0.15"
+sdk = ">=0.15.0, <0.16"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen
 exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
@@ -44,11 +44,12 @@ classes in `dev.jasper.*` platform packages or in a package a dependency exports
 <!-- example:plugin -->
 ```java
 @Override public void start(PluginContext context) {
+    context.kit().registerIcon(new dev.jasper.sdk.ui.IconAsset("dev.jasper.sample:flask", "M 6 2 H 10 M 6.67 6 H 9.33 M 6.67 2 V 6 L 4 13.33 Q 3.8 14 4.33 14 H 11.67 Q 12.2 14 12 13.33 L 9.33 6 V 2"));
     context.log().log(System.Logger.Level.INFO, "Sample plugin " + context.plugin().version() + " started");
     context.events().subscribe(AppEvents.THEME_CHANGED,
         event -> context.log().log(System.Logger.Level.INFO, "The look is now " + event.variant()));
     var settings = new SampleSettings(context.settings());
-    context.settings().page(new SampleSettingsPanel(settings));
+    context.settings().page(new SampleSettingsPanel(context.kit(), settings));
     long stepMillis = settings.stepMillis.get();
     if (settings.ui.get()) installUi(context, stepMillis);
     if (settings.terminal.get()) installTerminalDemo(context);
@@ -75,7 +76,7 @@ built-in chrome; a plugin supplies titles, icons and handlers, never components.
 private static void installUi(PluginContext context, long stepMillis) {
     PluginAction[] demo = new PluginAction[1];
     demo[0] = context.actions().register(ActionSpec.of(DEMO, "Run Sample Activity")
-            .withIcon(context.appearance().icon("dev/jasper/sample/flask.svg"))
+            .withIcon("dev.jasper.sample:flask")
             .withKeywords(List.of("sample", "demo", "activity"))
             .withDefaultBinding("cmd+alt+j"),
         invoked -> {
@@ -115,49 +116,26 @@ private static void installUi(PluginContext context, long stepMillis) {
   everywhere it was placed.
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
 - **Status items** are global: one handle updates the item in every window.
-- **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6 added
-  `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.9.3, <0.10"` for their manifest
-  `icon` (Remote also needs 0.9.1 for shell profiles and History 0.9.2 for `withInRecents`; before 0.9, Vault needed `>=0.8.2` for icon meanings,
-  Remote `>=0.8.3` for remote directory hints and Editor `>=0.8.4` for `onCloseCommand`, quit guards
-  and `chooseSaveFile`).
-  Jasper supplies IntelliJ New UI artwork; plugins need no artwork. Returned icons are 16px.
-  SDK 0.8.2 exposes the complete catalog with `icon(BundledIcon)`, for example
-  `context.appearance().icon(BundledIcon.TOOLWINDOWS_PROJECT)`.
-  For custom artwork, draw a 16×16 SVG in the IntelliJ light palette (grey `#6E6E6E`, blue
-  `#389FD6`, green `#59A869`, red `#DB5860`, yellow `#EDA200`) and load it with
-  `icon("path/in/your/jar.svg")`: it is drawn in its own colours, and palette colours follow
-  dark and light themes. Colour carries meaning: green for run or success, red for stop or
-  error, blue for navigation and transfer, grey for everything else. A session's
-  `SessionSpec.icon` becomes its tab icon. See the [catalog and testing example](sdk-icons.md).
+- **Icons.** Pass semantic names such as `"lock"`, `"server"` and `"file"` to presentation records.
+  Register a plugin-owned monochrome path with `context.kit().registerIcon(new IconAsset("your.plugin:icon", path))`.
+  The host validates names and resolves the mounted theme on each paint. See [icons](sdk-icons.md).
 - **Threads.** Register and mutate on the event thread. Event handlers already run there, so
   updating a status item from a handler, as the sample does, needs no marshaling.
 
 ## Consistent buttons, flexible layouts
 
-Use ordinary `JButton` components inside plugin content. They are drawn by FlatLaf in the
-installed theme's colours, classic IntelliJ Light or Jasper Dark, with 12-point labels; text
-fields, dropdowns and lists use the theme's own colours and selection. Leave plain panels at the
-look and feel's background so a side panel shows the theme's tool window colour, and read any
-colour you need from `UIManager` keys rather than hard-coding it, so it follows a theme change.
+Build standard UI with `Nodes` descriptors and `context.kit().create(ViewSpec, handler)`.
+Use semantic layout, typography, hue and control roles; the host owns geometry, painting,
+keyboard routing and theme refresh. Update a retained view with stable IDs to preserve input,
+selection and focus. `UiView.selectAll(fieldId)` selects live field text without editing or focusing.
+A form's primary and cancel actions own Enter and Escape through its descriptors.
 
-Swing actions, mnemonics, focus and disabled states retain their behavior. Set the hosting
-`JRootPane`'s default button when a form attaches and release it when the form detaches, so a
-removed form cannot retain Enter-key ownership. Layout remains plugin-owned, and long labels
-or custom fonts can grow without clipping. The terminal toolbar keeps its independent geometry.
-
-Jasper supplies the rounded outer tool-panel surface and gutter; plugins need not draw their own outer frame.
-Lists, trees, tables and popup selections inherit a small corner radius. Composite list renderers
-should fill their row using `list.getSelectionBackground()` when selected; Jasper rounds that
-fill while preserving renderer content and layout. Explicit custom colors remain plugin-owned.
-
-Plugins own their layout managers and spacing. Let buttons use their preferred sizes, avoid
-hard-coded colors or replacement UI delegates, and use `JRootPane.setDefaultButton` for a dialog's
-primary action where appropriate. Custom-painted controls and explicit appearance overrides are
-outside automatic branding. No additional SDK factory or dependency is required.
+Only specialized document or preview content uses `CustomContent`: register its component and
+lifetime on its owned view. Ordinary controls must remain descriptors.
 
 ## Panels, the rail and windows
 
-A panel is a Swing component docked as a tool window in every terminal window, as in IntelliJ:
+A panel is an owned `UiView` docked as a tool window in every terminal window, as in IntelliJ:
 stripes of icons on the window's left and right edges, and six slots. The left and right sides each
 have an upper and a lower half; the bottom area, the window's full width under the sides, has a left
 and a right half. `Anchor` picks the side and `PanelSpec.withSplit()` (SDK 0.13.0) the second half;
@@ -181,8 +159,8 @@ factory or when its model changes. `detail` is a count or connection name; `acti
 Each `PanelHeader.Action(label, icon, callback)` is an icon-only header button with an accessible name
 and tooltip. Keep callbacks scoped to that factory's window. Header state survives hiding and moving
 the panel, and callbacks become inert when the instance closes. It works the same for a kit `Panel` view
-registered with `registerView`: the detail, dot and actions join that panel's own header row. Use `PanelHeader.EMPTY` to clear it;
-do not add a duplicate action row inside the panel. Declare `sdk = ">=0.14.2, <0.15"` when using it.
+registered with `register`: the detail, dot and actions join that panel's own header row. Use `PanelHeader.EMPTY` to clear it;
+do not add a duplicate action row inside the panel. Declare `sdk = ">=0.15.0, <0.16"` when using it.
 
 A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window
 is a frame Jasper builds: icon, macOS title bar, menu bar, theme tracking and remembered bounds are
@@ -192,38 +170,39 @@ they are parented correctly without your plugin ever seeing a frame.
 <!-- example:pluginpanels -->
 ```java
 private static void installPanelAndWindow(PluginContext context, long stepMillis) {
-    var icon = context.appearance().icon("dev/jasper/sample/flask.svg");
     // One instance per window, built the first time the panel is shown there.
-    context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", icon, Anchor.LEFT), host -> {
-        var run = new JButton("Run sample activity");
-        run.addActionListener(event -> context.background().execute(() -> demo(context, stepMillis)));
-        var panel = new JPanel(new BorderLayout(0, 8));
-        panel.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-        panel.add(new JLabel("Runs a short demo activity in the background."), BorderLayout.NORTH);
-        panel.add(run, BorderLayout.SOUTH);
-        return panel;
-    });
+    context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, Anchor.LEFT), host ->
+        context.kit().create(new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
+            new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
+            Optional.empty(), new Nodes.Stack("sample.body", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+                new Nodes.Text("sample.description", ControlState.READY, "Runs a short demo activity in the background.", Nodes.TextRole.DESCRIPTION),
+                new Nodes.Button(RUN_BUTTON, ControlState.READY, "Run sample activity", FLASK, Nodes.ButtonKind.PRIMARY, RUN_BUTTON, ""))),
+            Optional.empty())), event -> {
+                if (event instanceof UiEvent.Action action && action.id().equals(RUN_BUTTON))
+                    context.background().execute(() -> demo(context, stepMillis));
+            }));
 
-    context.actions().register(ActionSpec.of("dev.jasper.sample.about", "About Sample").withIcon(icon), invoked -> {
+    context.actions().register(ActionSpec.of("dev.jasper.sample.about", "About Sample").withIcon(FLASK), invoked -> {
         // The application builds the frame, title bar and menu bar; a singleton comes back while it is open.
         PluginWindow window = context.windows().create(
             new WindowSpec("dev.jasper.sample.about-window", "About Sample", new Dimension(360, 200), true));
-        var details = new JButton("Details…");
-        details.addActionListener(event -> {
+        var content = context.kit().create(new ViewSpec(new Nodes.Stack("sample.about", ControlState.READY,
+            Nodes.LayoutRole.VERTICAL, List.of(
+                new Nodes.Text("sample.about.text", ControlState.READY,
+                    "This window's chrome belongs to Jasper; its content to the plugin.", Nodes.TextRole.BODY),
+                new Nodes.Button(DETAILS_BUTTON, ControlState.READY, "Details…", "", Nodes.ButtonKind.SECONDARY, DETAILS_BUTTON, "")))), event -> {
+            if (!(event instanceof UiEvent.Action action) || !action.id().equals(DETAILS_BUTTON)) return;
             PluginDialog dialog = context.windows().dialog(new DialogSpec("Sample details", window, true));
-            var close = new JButton("Close");
-            close.addActionListener(closing -> dialog.close());
-            var body = new JPanel(new BorderLayout(0, 8));
-            body.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
-            body.add(new JLabel("Sample plugin " + context.plugin().version()), BorderLayout.CENTER);
-            body.add(close, BorderLayout.SOUTH);
+            var body = context.kit().create(new ViewSpec(new Nodes.Form("sample.details", ControlState.READY,
+                Nodes.FormKind.SHEET, "Sample details", Optional.empty(), List.of(
+                    new Nodes.Text("sample.version", ControlState.READY, "Sample plugin " + context.plugin().version(), Nodes.TextRole.BODY)),
+                Optional.empty(), List.of(new Nodes.Button(CLOSE_BUTTON, ControlState.READY, "Close", "", Nodes.ButtonKind.SECONDARY, CLOSE_BUTTON, "")),
+                CLOSE_BUTTON)), answer -> {
+                if (answer instanceof UiEvent.Action chosen && chosen.id().equals(CLOSE_BUTTON)) dialog.close();
+            });
             dialog.setContent(body);
             dialog.show();
         });
-        var content = new JPanel(new BorderLayout(0, 8));
-        content.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
-        content.add(new JLabel("This window's chrome belongs to Jasper; its content to the plugin."), BorderLayout.CENTER);
-        content.add(details, BorderLayout.SOUTH);
         window.setContent(content);
         window.show();
         window.toFront();
@@ -548,7 +527,7 @@ reported as unknown. Declaring after `start` returns throws. SDK 0.9 removed `Pl
 Settings shows a page for your plugin under Tools, generated from your declarations: rows in declaration order, a
 heading wherever `section` changes, the description under each control, and an editor chosen by kind or by
 `editor(EditorHint...)`. To build the page yourself, call `context.settings().page(panel)` during `start` with a
-`SettingsPanel`: `create(host)` builds the component, `host.row(setting)` gives you the standard row for a declared
+`SettingsPanel`: `create(host)` builds an owned `UiView`, `host.row(setting)` gives you the standard `Nodes.Node` row for a declared
 setting, and `host.stage(setting, value)` sets a value from a control of your own; Settings saves them on Apply. Use
 `modified`, `apply` and `reset` only for state of your own, and `keywords` and `highlight` for search. Your panel
 lives as long as your plugin, so Settings calls `reset` before `dispose` whenever it closes a page it showed without a
@@ -708,17 +687,14 @@ window's instance. Require `>=0.7.2` in the manifest when calling it.
 
 ### UI typography
 
-Plugin controls inherit the host's live `ui.font.family` and `ui.font.size` settings through Swing
-defaults. Prefer the default component fonts. For custom headings, derive style and a small size
-offset from `UIManager.getFont("Label.font")` in `updateUI()` so an already-open panel refreshes.
-List renderers derive from their owning list on each render. Do not cache absolute fonts or use
-fixed component heights that clip enlarged text; let preferred sizes follow font metrics.
-Terminal content and intentionally monospaced code previews remain separate typography roles.
+Use `Nodes.TextRole` and the kit's layout roles. Jasper applies the live UI font settings
+without rebuilding your controller or changing stored input. Document/editor typography
+remains part of the specialized editor contract.
 
 ### Centered progress overlays
 
 With SDK 0.7.3+, use `context.windows().overlay(new OverlaySpec("Connecting", window))` for
-short-lived progress inside a terminal window. Set ordinary Swing content, supply a Cancel button
+short-lived progress inside a terminal window. Set owned `UiView` content, supply a Cancel button
 that aborts your work and calls `close()`, then call `show()` (nonblocking). There is no title bar,
 dragging, Escape dismissal or outside-click dismissal. Only one overlay may be reserved per window
 across plugins; a competing request throws `IllegalStateException`. Owner close and plugin stop
@@ -783,9 +759,7 @@ the document model, not by changing a live tab's key. Do not encode remote paths
 `workspacePalette()` and `syntaxPalette()` for workspace controls and syntax, and subscribe to
 `onWorkspaceChanged` to refresh them even when darkness stays the same. Palette reads and subscription registration
 belong on the UI thread; variant getters may run on any thread. Dispose subscriptions with their widgets.
-Use `WorkspacePalette.current(component)` in shared renderers so sidebar controls continue to follow chrome.
-The no-argument `current()` reads the published workspace palette. A popup or tooltip stays with chrome even when
-opened from a workspace pane. For an Editor-like control, reapply `editorPalette()` and `syntaxPalette()` on every
+All palette values come explicitly from `Appearance`; SDK UIManager fallback readers were removed in 0.15. For an Editor-like control, reapply `editorPalette()` and `syntaxPalette()` on every
 workspace event; an event can change colors while `workspaceVariant()` remains `DARK` or `LIGHT`. Keep the document
 and undo model when changing only its styles.
 Since SDK 0.14.1, a surface that should follow a translucent window reads `Appearance.workspaceOpacity(component)` on
@@ -795,66 +769,16 @@ the components above it non-opaque; `onWorkspaceChanged` also fires when the opa
 another window. Keep selection, carets and bars solid. The Editor plugin's `GlassSurface` is the reference.
 
 
-### Hosted pane control styling
+### Supported custom content
 
-The host styles ordinary Swing controls only while mounted in a center workspace pane. It keeps one installed
-chrome LAF. Generated workspace styles sit below plugin `FlatLaf.styleClass` values, with plugin inline
-`FlatLaf.style` (String or Map) taking highest precedence. Replace either property while mounted to update it;
-the host preserves the latest plugin object and type, without mutating plugin maps. `Jasper.workspaceStyle`
-identifies host-generated values and is not a plugin customization property.
+The SDK 0.15 standard UI contract is kit-only. Raw ordinary-control factories, arbitrary Swing Icon
+arguments, Appearance icon loaders and UIManager palette readers are removed. `CustomContent`
+retains specialized EDITOR/PREVIEW components, explicit host palettes and workspace opacity.
+Bundled Editor's approved custom source owners are `ui/DocumentArea.java` and `vim/VimTextArea.java`.
+The manifest `icon` remains an identity image preview; it is separate from presentation glyphs.
 
-For properties without delegate style support, the host uses supported component color setters. Plain plugin
-colors and observed plugin setter changes retain ownership. Swing `UIResource` defaults remain replaceable;
-a silent same-RGB replacement with the current UIManager default is treated as delegate-owned, because no event
-distinguishes that assignment from delegate installation. Prefer a plain `Color` or a plugin inline style when
-claiming a color. Custom-painted surfaces and transient renderer components still need palette-aware code.
-
-Set `Jasper.workspace.exempt` to `Boolean.TRUE` on a component to exempt its entire subtree, as Editor does for
-syntax/document surfaces. Dynamic children, replacement viewports/editors, and table headers are tracked by the
-host. Moving/removing a pane, returning to `match`, closing it, or stopping its plugin restores generated overrides;
-plugin-owned values survive. The host owns and removes its observation listeners and popup overrides. Plugins
-still close their own appearance subscriptions, timers, and document resources.
-
-Renderers resolve the mounted list/table/tree owner, never the temporary renderer label. Borders resolve their
-paint component on each paint. If a stateful control publishes plugin-owned styles (for example Vim error/bell
-feedback), refresh them on appearance callbacks and the first paint after reparenting or a palette change. Compare
-the complete immutable palette, not just darkness. A delegate `updateUI()` must not permanently replace semantic
-muted text with chrome defaults. Menus, tooltips and dialogs stay chrome; the dropdown owned by a workspace combo
-is the sole popup exception. The host explicitly marks that combo's popup list so owner-based lookup works there.
-
-```java
-area.putClientProperty("Jasper.workspace.exempt", Boolean.TRUE);
-list.setCellRenderer((owner, value, index, selected, focused) -> {
-    WorkspacePalette palette = WorkspacePalette.current(owner);
-    JLabel label = new JLabel(String.valueOf(value));
-    label.setOpaque(true);
-    label.setBackground(selected ? owner.getSelectionBackground() : palette.surfaceSunken());
-    label.setForeground(selected ? owner.getSelectionForeground() : palette.text());
-    return label;
-});
-```
-
-The bundled audit covers all eight plugins. Semantic status dots remain colored independently of selected row
-text/background; normal card text uses ordinary control colors. The audit used
-`rg -n 'UIManager.getColor|new Color\(|Color\.' plugins/*/src/main/java` plus setter/renderer/paint searches.
-
-| Plugin / occurrence | Treatment |
-|---|---|
-| Remote `HostsPanel`: active host/distro dots, muted WSL badge | Changed: mounted list palette success/muted; selected badge uses selection text |
-| Remote `TunnelsPanel`: status dots, error/detail/heading rows; `WrappedNote.updateUI` | Changed: mounted list success/warning/error/muted; normal note text refreshes at paint after delegate rebuild |
-| Remote `TransferStrip`: cached separator | Changed: paint-owner border, original top rule and seven-pixel total inset retained |
-| Remote transfer `JProgressBar`, SFTP tables/toolbars/dialogs | Inherited standard controls; rail and dialog locations stay chrome |
-| File Server `Renderer`: problem/header/state colors; wrapping `note.updateUI` | Changed: owner palette, selection text preserved, muted notes refresh after delegate rebuild; normal detail cards inherited |
-| Vault `ManagerPanel`: row detail/type, empty/status labels, empty-frame border | Changed: renderer-owner muted values, paint-time muted labels and border; selected text preserved |
-| Vault `PickerPanel` and grant renderer, dialogs/settings | Inherited owner control colors; chrome-only when hosted in dialogs/settings |
-| Editor `EditorTab` banner separator | Changed: paint-owner border, original bottom rule and padding retained |
-| Editor `VimBar`: fixed error, output text, panel background/bell | Changed: mounted palette, plugin-owned style maps, first-paint palette comparison; 150 ms bell and 12-row limit retained |
-| Editor `EditorTheme`: fixed Color copies and blending | Domain-owned syntax/document surfaces; unchanged, exempt from generic styles |
-| Editor `vim/HighlightedYank`: configured RGBA color | Domain-owned user setting; unchanged |
-| History, Snippets, Sample, Project Index | No custom color/painter occurrences; inherited standard controls (or palette contributions rendered by the host) |
-
-FlatLaf 3.7 supports per-control progress track/fill colors but not progress text colors. Text on an external
-plugin's string-painted progress bar remains delegate-owned and can retain chrome colors. The audited bundled
-bars in Editor `Forms.progress`, Remote `ConnectionPanel`, and Remote `TransferStrip` all retain
-`stringPainted == false`; their status text uses separate ordinary labels.
-Plugins need no FlatLaf dependency, SDK change, or version bump for these conventions.
+Old truthful SDK ranges are rejected by the pure resolver. Before initializing a plugin class,
+the loader checks effective multi-release class files for exact removed SDK members and types,
+including obsolete factory implementations. Errors identify the class and member to migrate.
+Erased generic icon values and reflective member lookup cannot all be detected statically;
+existing lifecycle and callback linkage containment remains in place.

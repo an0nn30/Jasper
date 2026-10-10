@@ -6,7 +6,6 @@ import dev.jasper.remote.tunnels.Tunnel;
 import dev.jasper.remote.tunnels.TunnelKind;
 import dev.jasper.remote.tunnels.TunnelState;
 import dev.jasper.remote.tunnels.TunnelsEngineTestAccess;
-import dev.jasper.sdk.testing.FakeBundledIcon;
 import dev.jasper.sdk.testing.FakeKit;
 import dev.jasper.sdk.testing.FakeKitView;
 import dev.jasper.sdk.ui.ListItem;
@@ -47,7 +46,7 @@ class TunnelsPanelTest {
     TunnelsPanel panel() { return panel(new FakeKit("dev.jasper.remote")); }
 
     /** The double-click interval is injected (500 ms), so the machine's setting never decides an outcome. */
-    TunnelsPanel panel(UiKit kit) { return panel = new TunnelsPanel(kit, actions, FakeBundledIcon::new, () -> now[0], 500_000_000L); }
+    TunnelsPanel panel(UiKit kit) { return panel = new TunnelsPanel(kit, actions, () -> now[0], 500_000_000L); }
 
     void note(String what, Tunnel tunnel) { events.add(what + " " + (tunnel.quick() ? "quick" : tunnel.name())); }
 

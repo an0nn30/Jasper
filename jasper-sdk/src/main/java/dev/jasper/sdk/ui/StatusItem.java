@@ -1,7 +1,6 @@
 package dev.jasper.sdk.ui;
 
 import dev.jasper.sdk.Subscription;
-import javax.swing.Icon;
 
 /**
  * A status bar item the application renders in every window. One handle drives them all; per-window
@@ -20,7 +19,7 @@ public interface StatusItem extends Subscription {
      *
      * @param icon the icon, or null for none
      */
-    void setIcon(Icon icon);
+    void setIcon(String icon);
 
     /**
      * Sets the tooltip.

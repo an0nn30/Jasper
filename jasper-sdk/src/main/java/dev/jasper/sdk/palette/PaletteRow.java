@@ -2,7 +2,6 @@ package dev.jasper.sdk.palette;
 
 import java.util.Objects;
 import java.util.Optional;
-import javax.swing.Icon;
 
 /**
  * One result row as plain data; the palette paints every scope's rows the same way. The host never
@@ -17,7 +16,7 @@ import javax.swing.Icon;
  * @param enabled false paints the row dimmed and makes it unavailable
  * @param token   scope-private, may be null
  */
-public record PaletteRow(String id, String title, Optional<String> detail, Optional<String> tag, Optional<Icon> icon,
+public record PaletteRow(String id, String title, Optional<String> detail, Optional<String> tag, Optional<String> icon,
                          boolean enabled, Object token) {
     /** Validates the id and title; blank {@code detail} and {@code tag} become empty. */
     public PaletteRow {
@@ -58,7 +57,7 @@ public record PaletteRow(String id, String title, Optional<String> detail, Optio
      *
      * @param value the icon, or null for none
      *  @return a copy with that icon */
-    public PaletteRow withIcon(Icon value) { return new PaletteRow(id, title, detail, tag, Optional.ofNullable(value), enabled, token); }
+    public PaletteRow withIcon(String value) { return new PaletteRow(id, title, detail, tag, Optional.ofNullable(value), enabled, token); }
 
     /**
      * Derives a value.

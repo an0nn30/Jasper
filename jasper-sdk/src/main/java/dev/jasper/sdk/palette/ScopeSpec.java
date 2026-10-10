@@ -6,7 +6,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
-import javax.swing.Icon;
 
 /**
  * What a scope is: identity, wording, verbs and how it is reached. The palette shows an All tab first,
@@ -27,7 +26,7 @@ import javax.swing.Icon;
  *                         recently and most used items (since 0.9.2)
  */
 public record ScopeSpec(String id, String label, String description, String placeholder, List<PaletteVerb> verbs,
-                        boolean monospaceRows, Optional<Icon> icon, Optional<String> shortcutActionId, boolean inAll,
+                        boolean monospaceRows, Optional<String> icon, Optional<String> shortcutActionId, boolean inAll,
                         boolean inRecents) {
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_-]*(\\.[a-z0-9_-]+)+");
 
@@ -59,7 +58,7 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @param inAll            whether the All tab searches this scope
      */
     public ScopeSpec(String id, String label, String description, String placeholder, List<PaletteVerb> verbs,
-                     boolean monospaceRows, Optional<Icon> icon, Optional<String> shortcutActionId, boolean inAll) {
+                     boolean monospaceRows, Optional<String> icon, Optional<String> shortcutActionId, boolean inAll) {
         this(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll, true);
     }
 
@@ -98,7 +97,7 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @param value the tab icon, or null for none
      * @return a copy with that icon
      */
-    public ScopeSpec withIcon(Icon value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, Optional.ofNullable(value), shortcutActionId, inAll, inRecents); }
+    public ScopeSpec withIcon(String value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, Optional.ofNullable(value), shortcutActionId, inAll, inRecents); }
 
     /**
      * Derives a value.

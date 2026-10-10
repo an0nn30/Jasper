@@ -2,7 +2,6 @@ package dev.jasper.sdk.ui;
 
 import java.util.List;
 import java.util.Objects;
-import javax.swing.Icon;
 
 /** Per-window panel header metadata. Set through {@link PanelHost#setHeader} on the UI thread.
  * @param detail count or connection name beside the title; empty to omit
@@ -23,7 +22,7 @@ public record PanelHeader(String detail, boolean active, List<Action> actions) {
      * @param icon action artwork
      * @param invoke action callback
      */
-    public record Action(String label, Icon icon, Runnable invoke) {
+    public record Action(String label, String icon, Runnable invoke) {
         /** Creates an action with a nonblank label. */
         public Action {
             if (Objects.requireNonNull(label, "label").isBlank()) throw new IllegalArgumentException("Blank action label");

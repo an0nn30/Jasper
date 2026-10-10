@@ -3,7 +3,6 @@ package dev.jasper.remote.ui.tunnels;
 import dev.jasper.remote.tunnels.Tunnel;
 import dev.jasper.remote.tunnels.TunnelKind;
 import dev.jasper.remote.tunnels.TunnelState;
-import dev.jasper.sdk.ui.BundledIcon;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.ListItem;
 import dev.jasper.sdk.ui.MenuItem;
@@ -54,7 +53,6 @@ public final class TunnelsPanel implements AutoCloseable {
     static final String SWITCH = "switch:", MENU = "menu:", ROW = "tunnel:";
 
     private final Actions actions;
-    private final Function<BundledIcon, javax.swing.Icon> icons;
     private final LongSupplier nanos;
     private final long multiClickNanos;
     private final UiView view;
@@ -69,16 +67,16 @@ public final class TunnelsPanel implements AutoCloseable {
     private boolean closed;
 
     /** {@code icons} supplies the header action's artwork, which the window draws. */
-    public TunnelsPanel(UiKit kit, Actions actions, Function<BundledIcon, javax.swing.Icon> icons) {
-        this(kit, actions, icons, System::nanoTime, multiClickInterval());
+    public TunnelsPanel(UiKit kit, Actions actions) {
+        this(kit, actions, System::nanoTime, multiClickInterval());
     }
 
     /**
      * {@code nanos} and {@code multiClickNanos} (the desktop's double-click interval) tell a double click on a switch from
      * two separate operations: the old switch acted once per gesture.
      */
-    TunnelsPanel(UiKit kit, Actions actions, Function<BundledIcon, javax.swing.Icon> icons, LongSupplier nanos, long multiClickNanos) {
-        this.actions = Objects.requireNonNull(actions); this.icons = Objects.requireNonNull(icons); this.nanos = Objects.requireNonNull(nanos);
+    TunnelsPanel(UiKit kit, Actions actions, LongSupplier nanos, long multiClickNanos) {
+        this.actions = Objects.requireNonNull(actions); this.nanos = Objects.requireNonNull(nanos);
         if (multiClickNanos < 0) throw new IllegalArgumentException("multiClickNanos must not be negative");
         this.multiClickNanos = multiClickNanos;
         view = kit.create(new ViewSpec(node()), this::handle);
@@ -221,7 +219,7 @@ public final class TunnelsPanel implements AutoCloseable {
     private void publishHeader() {
         if (headerChanged == null || closed) return;
         headerChanged.accept(new PanelHeader(saved.isEmpty() && quick.isEmpty() ? "" : String.valueOf(saved.size() + quick.size()), false,
-            List.of(new PanelHeader.Action("New Tunnel…", icons.apply(BundledIcon.GENERAL_ADD), () -> { if (!closed) actions.add().run(); }))));
+            List.of(new PanelHeader.Action("New Tunnel…", "add", () -> { if (!closed) actions.add().run(); }))));
     }
 
     private void render() { if (!closed && view != null) view.update(new ViewSpec(node())); }

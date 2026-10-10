@@ -96,7 +96,7 @@ public final class FakeNotifications {
      */
     public NotificationGroup group(String id) {
         declare(Objects.requireNonNull(id, "id"), id, DisplayMode.CARD);
-        return new Group(id, id, () -> true);
+        return new Group(id, id, () -> true, new FakeKit(id)::validateIcon);
     }
 
     /**
@@ -152,7 +152,7 @@ public final class FakeNotifications {
     }
 
     /** A plugin's notifications; {@code open} turns false once its context closes. */
-    Notifications of(String pluginId, BooleanSupplier open) { return new PluginView(pluginId, open); }
+    Notifications of(String pluginId, BooleanSupplier open, java.util.function.Consumer<String> validateIcon) { return new PluginView(pluginId, open, validateIcon); }
 
     /** A plugin starts: its default group and the host's activities group exist. */
     void declareDefaults(String pluginId, String name) {
@@ -195,12 +195,14 @@ public final class FakeNotifications {
     private final class PluginView implements Notifications {
         private final String pluginId;
         private final BooleanSupplier open;
+        private final java.util.function.Consumer<String> validateIcon;
         private final Group defaultGroup;
         private final Map<String, Group> declared = new ConcurrentHashMap<>();
 
-        PluginView(String pluginId, BooleanSupplier open) {
+        PluginView(String pluginId, BooleanSupplier open, java.util.function.Consumer<String> validateIcon) {
+            this.validateIcon=validateIcon;
             this.pluginId = pluginId; this.open = open;
-            defaultGroup = new Group(pluginId, pluginId, open);
+            defaultGroup = new Group(pluginId, pluginId, open, validateIcon);
         }
 
         @Override public NotificationGroup group() { return defaultGroup; }
@@ -215,7 +217,7 @@ public final class FakeNotifications {
                 throw new IllegalArgumentException("The host declares " + spec.id() + " for activity outcomes");
             return declared.computeIfAbsent(spec.id(), id -> {
                 declare(id, spec.name(), spec.defaultMode());
-                return new Group(pluginId, id, open);
+                return new Group(pluginId, id, open, validateIcon);
             });
         }
     }
@@ -224,14 +226,16 @@ public final class FakeNotifications {
         private final String pluginId;
         private final String id;
         private final BooleanSupplier open;
+        private final java.util.function.Consumer<String> validateIcon;
 
-        Group(String pluginId, String id, BooleanSupplier open) { this.pluginId = pluginId; this.id = id; this.open = open; }
+        Group(String pluginId, String id, BooleanSupplier open, java.util.function.Consumer<String> validateIcon) { this.validateIcon=validateIcon; this.pluginId = pluginId; this.id = id; this.open = open; }
 
         @Override public String id() { return id; }
 
         @Override public NotificationHandle post(NotificationSpec spec) {
             Objects.requireNonNull(spec, "spec");
             if (!open.getAsBoolean()) throw new IllegalStateException("Plugin context is closed: " + pluginId);
+            spec.icon().ifPresent(validateIcon);
             var post = new Post(pluginId, id, spec);
             posts.add(post);
             return new NotificationHandle() {

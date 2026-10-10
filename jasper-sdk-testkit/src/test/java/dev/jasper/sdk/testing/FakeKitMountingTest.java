@@ -21,8 +21,8 @@ class FakeKitMountingTest {
                         context.settings().declare(SettingSpec.of("number",SettingKind.number(0,10),1.0).label("Number")),
                         context.settings().declare(SettingSpec.of("text",SettingKind.text(value -> !value.isBlank(),"Required"),"before").label("Text")),
                         context.settings().declare(SettingSpec.of("list",SettingKind.stringList(),List.of("before")).label("List")));
-                    context.settings().page((SettingsPanel.View) rows -> {
-                        var body=new Nodes.Section("section",ControlState.READY,"Settings",new Nodes.Card("card",ControlState.READY,Nodes.CardKind.SETTINGS,settings.stream().map(rows::rowNode).toList()));
+                    context.settings().page((SettingsPanel) rows -> {
+                        var body=new Nodes.Section("section",ControlState.READY,"Settings",new Nodes.Card("card",ControlState.READY,Nodes.CardKind.SETTINGS,settings.stream().map(rows::row).toList()));
                         var made=(FakeKitView)context.kit().create(new ViewSpec(body),event -> {throw new AssertionError("Owned setting event leaked");});view.set(made);return made;
                     });
                 });
@@ -51,7 +51,7 @@ class FakeKitMountingTest {
             try(var host=new FakePluginHost()) {
                 var view=new AtomicReference<FakeKitView>();var rows=new AtomicReference<SettingsPanelHost>();var size=new AtomicReference<Setting<Integer>>();
                 java.util.function.Function<SettingsPanelHost,ViewSpec> spec=h -> {
-                    var hostRow=(Nodes.SettingRow)h.rowNode(size.get());
+                    var hostRow=(Nodes.SettingRow)h.row(size.get());
                     return new ViewSpec(new Nodes.Card("card",ControlState.READY,Nodes.CardKind.SETTINGS,List.of(
                         new Nodes.SettingRow(hostRow.id(),hostRow.state(),hostRow.title(),hostRow.description(),hostRow.control(),hostRow.dependent(),true),
                         new Nodes.SettingRow("own",ControlState.READY,"Own","",new Nodes.Toggle("own-toggle",ControlState.READY,"Own",true,"own-toggle",false),false,true),
@@ -59,7 +59,7 @@ class FakeKitMountingTest {
                 };
                 host.start(new PluginInfo("test.highlight","Highlight","1.0.0",Set.of()),Set.of(),Set.of(),context -> {
                     size.set(context.settings().declare(SettingSpec.of("size",SettingKind.integer(1,10),4).label("Size")));
-                    context.settings().page((SettingsPanel.View) h -> {rows.set(h);var made=(FakeKitView)context.kit().create(spec.apply(h),e -> {});view.set(made);return made;});
+                    context.settings().page((SettingsPanel) h -> {rows.set(h);var made=(FakeKitView)context.kit().create(spec.apply(h),e -> {});view.set(made);return made;});
                 });
                 host.settingsPanel("test.highlight");
                 view.get().update(spec.apply(rows.get()));
@@ -75,7 +75,7 @@ class FakeKitMountingTest {
                 var view=new AtomicReference<FakeKitView>();var rows=new AtomicReference<SettingsPanelHost>();var size=new AtomicReference<Setting<Integer>>();
                 host.start(new PluginInfo("test.reset","Reset","1.0.0",Set.of()),Set.of(),Set.of(),context -> {
                     size.set(context.settings().declare(SettingSpec.of("size",SettingKind.integer(1,10),4).label("Size")));
-                    context.settings().page((SettingsPanel.View) h -> {rows.set(h);var made=(FakeKitView)context.kit().create(new ViewSpec(h.rowNode(size.get())),e -> {});view.set(made);return made;});
+                    context.settings().page((SettingsPanel) h -> {rows.set(h);var made=(FakeKitView)context.kit().create(new ViewSpec(h.row(size.get())),e -> {});view.set(made);return made;});
                 });
                 size.get().set(7).join();host.settingsPanel("test.reset");
                 view.get().emit(new UiEvent.Action("settings:size:reset"));host.applySettingsPanel("test.reset");
@@ -94,7 +94,7 @@ class FakeKitMountingTest {
                 var view=new AtomicReference<FakeKitView>();var rows=new AtomicReference<SettingsPanelHost>();var size=new AtomicReference<Setting<Integer>>();
                 var context=host.start(new PluginInfo("test.reload","Reload","1.0.0",Set.of()),Set.of(),Set.of(),started -> {
                     size.set(started.settings().declare(SettingSpec.of("size",SettingKind.integer(1,10),4).label("Size")));
-                    started.settings().page((SettingsPanel.View) h -> {rows.set(h);var made=(FakeKitView)started.kit().create(new ViewSpec(h.rowNode(size.get())),e -> {});view.set(made);return made;});
+                    started.settings().page((SettingsPanel) h -> {rows.set(h);var made=(FakeKitView)started.kit().create(new ViewSpec(h.row(size.get())),e -> {});view.set(made);return made;});
                 });
                 host.settingsPanel("test.reload");assertThat(context.settings.reloadListenerCount()).isEqualTo(1);size.get().set(6).join();
                 assertThat(displayedSize(view.get())).isEqualTo("6");
@@ -127,12 +127,11 @@ class FakeKitMountingTest {
             }
         });
     }
-    @Test void settingsFactoryFailureIsContainedAndKitRouteNeverCallsLegacyFactory() throws Exception {
+    @Test void settingsFactoryFailureIsContained() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try(var host=new FakePluginHost()) {
-                host.start(new PluginInfo("test.failure","Failure","1.0.0",Set.of()),Set.of(),Set.of(),context -> context.settings().page(new SettingsPanel.View(){
-                    public JComponent create(SettingsPanelHost h){throw new AssertionError("Legacy factory must not run");}
-                    public UiView createView(SettingsPanelHost h){throw new IllegalStateException("Factory failure");}
+                host.start(new PluginInfo("test.failure","Failure","1.0.0",Set.of()),Set.of(),Set.of(),context -> context.settings().page(new SettingsPanel(){
+                    public UiView create(SettingsPanelHost h){throw new IllegalStateException("Factory failure");}
                 }));
                 assertThat(host.settingsPanel("test.failure")).isPresent();
                 assertThat(host.settingsPanel("test.failure")).isPresent();assertThat(host.failures()).hasSize(1);
@@ -147,8 +146,8 @@ class FakeKitMountingTest {
                 var size=new AtomicReference<Setting<Integer>>();var calls=new ArrayList<String>();
                 host.start(new PluginInfo("test.page","Page","1.0.0",Set.of()),Set.of(),Set.of(),context -> {
                     size.set(context.settings().declare(SettingSpec.of("size",SettingKind.integer(1,10),4).label("Size")));
-                    context.settings().page(new SettingsPanel.View(){
-                        public UiView createView(SettingsPanelHost h){rows.set(h);var result=(FakeKitView)context.kit().create(new ViewSpec(h.rowNode(size.get())),e -> calls.add(e.id()));view.set(result);return result;}
+                    context.settings().page(new SettingsPanel(){
+                        public UiView create(SettingsPanelHost h){rows.set(h);var result=(FakeKitView)context.kit().create(new ViewSpec(h.row(size.get())),e -> calls.add(e.id()));view.set(result);return result;}
                         public void apply(){calls.add("apply");}
                         public void reset(){calls.add("reset");}
                         public void dispose(){calls.add("dispose");}
@@ -179,13 +178,13 @@ class FakeKitMountingTest {
             try(var host=new FakePluginHost()){
                 var context=host.start(new PluginInfo("test.panel","Panel","1.0.0",Set.of()),Set.of(),Set.of(),c -> {});
                 var views=new ArrayList<UiView>();var disposed=new AtomicInteger();
-                var registration=context.panels().registerView(new PanelSpec("test.panel.files","Files","folder",Anchor.LEFT).withSplit(),h -> {
+                var registration=context.panels().register(new PanelSpec("test.panel.files","Files","folder",Anchor.LEFT).withSplit(),h -> {
                     var view=context.kit().create(new ViewSpec(new Nodes.Custom("node",ControlState.READY,"document",Nodes.CustomKind.EDITOR,"Document")),e -> {});
                     view.registerContent(new CustomContent("document",Nodes.CustomKind.EDITOR,new JTextArea(),disposed::incrementAndGet));views.add(view);return view;
                 });
                 UUID one=UUID.randomUUID();host.openPanel("test.panel.files",one);host.openPanel("test.panel.files",one);host.openPanel("test.panel.files",UUID.randomUUID());
                 assertThat(views).hasSize(2);registration.close();registration.close();assertThat(disposed.get()).isEqualTo(2);
-                context.panels().registerView(new PanelSpec("test.panel.broken","Broken","folder",Anchor.LEFT),h -> {throw new IllegalStateException("failure");});
+                context.panels().register(new PanelSpec("test.panel.broken","Broken","folder",Anchor.LEFT),h -> {throw new IllegalStateException("failure");});
                 assertThat(host.openPanel("test.panel.broken",one)).isNull();assertThat(host.failures()).hasSize(1);
             }
         });

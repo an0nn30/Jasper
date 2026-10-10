@@ -28,7 +28,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import javax.swing.Icon;
 
 /** The per-window File Servers rail panel. Rows show confirmed state; the borrowed header owns count and New. */
 public final class FileServersPanel implements AutoCloseable {
@@ -48,7 +47,7 @@ public final class FileServersPanel implements AutoCloseable {
     private final Path home;
     private final String firewall;
     private final ZoneId zone;
-    private final Icon headerAddIcon;
+    private final String headerAddIcon;
     private Consumer<PanelHeader> headerChanged = header -> { };
     private List<ServerRegistry.View> servers = List.of();
     private Optional<String> problem = Optional.empty(), tlsFingerprint = Optional.empty(), hostKeyFingerprint = Optional.empty();
@@ -58,7 +57,7 @@ public final class FileServersPanel implements AutoCloseable {
     private boolean detailsOpen, closed;
 
     public FileServersPanel(UiKit kit, Actions actions, Function<UUID, List<ActivityLog.Entry>> log,
-                            Path home, String firewallHint, ZoneId zone, Icon headerAddIcon) {
+                            Path home, String firewallHint, ZoneId zone, String headerAddIcon) {
         this.actions = actions; this.log = log; this.home = home; this.firewall = firewallHint; this.zone = zone;
         this.headerAddIcon = headerAddIcon;
         view = kit.create(new ViewSpec(node()), this::event);

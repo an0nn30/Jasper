@@ -26,7 +26,7 @@ final class FakeContent implements ContentTab {
         this.ui=ui;this.key=spec.key();this.owner=owner;this.component=component;
         presentation=new ContentPresentation(spec.title(),"",null,false,"","");
     }
-    public void setPresentation(ContentPresentation value){if(!closed)presentation=value;}
+    public void setPresentation(ContentPresentation value){if(!closed){ui.context.kit().validateIcon(value.icon());presentation=value;}}
     public void setCommands(List<ContentCommand> values){if(!closed)commands=List.copyOf(values);}
     public void setStatus(List<ContentStatus> values){if(!closed)status=List.copyOf(values);}
     public void setFocusTarget(Runnable value){if(!closed)focus=value;}

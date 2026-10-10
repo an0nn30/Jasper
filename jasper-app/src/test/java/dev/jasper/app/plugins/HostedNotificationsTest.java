@@ -20,7 +20,7 @@ class HostedNotificationsTest {
 
     /** EDT: a plugin's notifications whose work for the UI thread waits in {@code queued}, so a test can order it. */
     private HostedNotifications hosted() {
-        return new HostedNotifications("dev.example.tool", "Tool", fixture.host, new Containment(() -> true), queued::add, () -> false);
+        return new HostedNotifications("dev.example.tool", "Tool", fixture.host, new Containment(() -> true), queued::add, () -> false, name -> new javax.swing.ImageIcon(), name -> {});
     }
 
     private void runQueued() { while (!queued.isEmpty()) queued.removeFirst().run(); }

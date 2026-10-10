@@ -14,7 +14,6 @@ import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Anchor;
-import dev.jasper.sdk.ui.BundledIcon;
 import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.PanelHost;
 import dev.jasper.sdk.ui.PanelSpec;
@@ -45,7 +44,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import javax.swing.Icon;
 import javax.swing.Timer;
 
 /**
@@ -68,9 +66,9 @@ public final class TunnelsUi implements AutoCloseable {
     private final Supplier<List<RemoteHost>> hosts;
     private final Function<UUID, Optional<RemoteHost>> host;
     private final Consumer<String> clipboard;
-    private final Icon icon;
+    private final String icon;
     private final NotificationGroup notifications;
-    private Icon warningIcon;
+    private String warningIcon;
     private final Map<UUID, TunnelsPanel> panels = new HashMap<>();
     private final Map<UUID, PanelHost> panelHosts = new HashMap<>();
     private final Set<PluginDialog> dialogs = new HashSet<>();
@@ -100,7 +98,7 @@ public final class TunnelsUi implements AutoCloseable {
         this.context = context; this.ui = ui; this.store = store; this.manager = manager; this.hosts = hosts; this.host = host;
         this.clipboard = clipboard;
         notifications = context.notifications().group(new GroupSpec(NOTIFICATIONS, "Tunnels", DisplayMode.CARD));
-        icon = context.appearance().icon(BundledIcon.ACTIONS_SWAP_PANELS);
+        icon = "tunnel";
         // Actions first: the panel names its toggle, and menus may only name registered actions.
         context.actions().register(ActionSpec.of(TOGGLE, "Toggle Tunnels").withIcon(icon)
             .withKeywords(List.of("tunnels", "ports", "forward", "panel", "show", "hide")), invoked -> context.panels().toggle(PANEL, invoked.window()));
@@ -114,7 +112,7 @@ public final class TunnelsUi implements AutoCloseable {
             invoked -> manager.stopAll());
         stopAll.setEnabled(false);
         context.menus().terminalContext().add(FORWARD);
-        context.panels().registerView(new PanelSpec(PANEL, "Tunnels", icon, Anchor.LEFT).withToggleActionId(TOGGLE), this::create);
+        context.panels().register(new PanelSpec(PANEL, "Tunnels", icon, Anchor.LEFT).withToggleActionId(TOGGLE), this::create);
         scope = new TunnelsScope(this::all, store::error, manager::state, this::hostName,
             this::toggle, (window, tunnel) -> current(tunnel.id()).ifPresent(this::browse),
             (window, tunnel) -> current(tunnel.id()).filter(now -> !now.quick()).ifPresent(now -> edit(window, Optional.of(now), Optional.empty())));
@@ -168,7 +166,7 @@ public final class TunnelsUi implements AutoCloseable {
         var panel = new TunnelsPanel(context.kit(), new TunnelsPanel.Actions(tunnel -> manager.start(tunnel, window), tunnel -> manager.stop(tunnel.id()),
             tunnel -> edit(window, Optional.of(tunnel), Optional.empty()), this::duplicate, tunnel -> delete(window, tunnel),
             tunnel -> edit(window, Optional.of(tunnel), Optional.empty()), this::browse, this::copyAddress,
-            () -> edit(window, Optional.empty(), Optional.empty())), context.appearance()::icon);
+            () -> edit(window, Optional.empty(), Optional.empty())));
         panel.onHeaderChanged(panelHost::setHeader);
         panels.put(window.id(), panel);
         panelHosts.put(window.id(), panelHost);
@@ -207,7 +205,7 @@ public final class TunnelsUi implements AutoCloseable {
             .map(tunnel -> TunnelRows.title(tunnel, manager.state(tunnel.id())) + ": " + TunnelRows.stateText(manager.state(tunnel.id())))
             .collect(Collectors.joining(", ")));
         if (failing > 0) {
-            if (warningIcon == null) warningIcon = context.appearance().icon(BundledIcon.STATUS_WARNING);
+            if (warningIcon == null) warningIcon = "warning";
             status.setIcon(warningIcon);
         } else status.setIcon(icon);
         status.setVisible(active > 0 || failing > 0);

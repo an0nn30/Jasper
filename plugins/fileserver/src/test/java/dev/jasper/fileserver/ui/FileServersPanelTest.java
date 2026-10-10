@@ -28,7 +28,7 @@ class FileServersPanelTest {
                 id -> events.add("reveal " + name(id)), text -> events.add("copy " + text),
                 id -> events.add("password " + name(id)), id -> events.add("clear " + name(id)),
                 id -> events.add("fingerprints " + name(id))), id -> logs.getOrDefault(id, List.of()), HOME,
-                "If other computers can't connect, check your firewall.", ZoneOffset.UTC, new javax.swing.ImageIcon(new byte[0]));
+                "If other computers can't connect, check your firewall.", ZoneOffset.UTC, "add");
             panel.onHeaderChanged(headers::add); result.set(panel);
         });
         return result.get();

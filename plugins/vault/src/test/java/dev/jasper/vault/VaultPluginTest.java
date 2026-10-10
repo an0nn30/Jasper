@@ -282,32 +282,11 @@ class VaultPluginTest {
         }
     }); }
 
-    @Test void requestsLockAndUnlockIcons() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
-        try (var host = new FakePluginHost()) {
-            var delegate = plugin();
-            var icons = new java.util.ArrayList<dev.jasper.sdk.testing.FakeNamedIcon>();
-            host.start(INFO, Set.of(), Set.of(), new dev.jasper.sdk.plugin.Plugin() {
-                public void start(dev.jasper.sdk.plugin.PluginContext context) throws Exception {
-                    var appearance = (dev.jasper.sdk.ui.Appearance) java.lang.reflect.Proxy.newProxyInstance(
-                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.ui.Appearance.class}, (proxy, method, args) -> {
-                            try {
-                                Object value = method.invoke(context.appearance(), args);
-                                if (value instanceof dev.jasper.sdk.testing.FakeNamedIcon icon) icons.add(icon);
-                                return value;
-                            } catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
-                        });
-                    var wrapped = (dev.jasper.sdk.plugin.PluginContext) java.lang.reflect.Proxy.newProxyInstance(
-                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.plugin.PluginContext.class}, (proxy, method, args) -> {
-                            if (method.getName().equals("appearance")) return appearance;
-                            try { return method.invoke(context, args); }
-                            catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
-                        });
-                    delegate.start(wrapped);
-                }
-                public void stop() { delegate.stop(); }
-            });
+    @Test void contributesSemanticLockIcon() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
+        try(var host=new FakePluginHost()) {
+            host.start(INFO,Set.of(),Set.of(),plugin());
             assertThat(host.failures()).isEmpty();
-            assertThat(icons).extracting(dev.jasper.sdk.testing.FakeNamedIcon::name).containsExactly(dev.jasper.sdk.ui.IconName.LOCK, dev.jasper.sdk.ui.IconName.UNLOCK);
+            assertThat(host.actionSpec("dev.jasper.vault.open").orElseThrow().icon()).contains("lock");
         }
     }); }
 

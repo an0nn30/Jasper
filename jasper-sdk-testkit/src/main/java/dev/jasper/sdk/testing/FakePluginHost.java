@@ -90,8 +90,15 @@ public final class FakePluginHost implements AutoCloseable {
     private final Thread appearanceThread = Thread.currentThread();
     record Workspace(Variant variant, dev.jasper.sdk.ui.WorkspacePalette palette,
                      dev.jasper.sdk.ui.EditorPalette editor, dev.jasper.sdk.ui.SyntaxPalette syntax) {}
-    private volatile Workspace appearance = new Workspace(Variant.DARK, dev.jasper.sdk.ui.WorkspacePalette.current(),
-        dev.jasper.sdk.ui.EditorPalette.current(), dev.jasper.sdk.ui.SyntaxPalette.current());
+    private volatile Workspace appearance = initialWorkspace();
+    private static Workspace initialWorkspace(){
+        var bg=new java.awt.Color(0x202124);var fg=new java.awt.Color(0xdedede);var accent=new java.awt.Color(0x7faaff);
+        var palette=new dev.jasper.sdk.ui.WorkspacePalette(bg,bg,bg,fg,fg,fg,accent,fg,bg,accent,fg,fg,fg);
+        var editor=new dev.jasper.sdk.ui.EditorPalette(bg,fg,fg,accent,bg,bg,fg);
+        var styles=new java.util.EnumMap<dev.jasper.sdk.ui.SyntaxRole,dev.jasper.sdk.ui.SyntaxStyle>(dev.jasper.sdk.ui.SyntaxRole.class);
+        for(var role:dev.jasper.sdk.ui.SyntaxRole.values())styles.put(role,new dev.jasper.sdk.ui.SyntaxStyle(fg,false,role==dev.jasper.sdk.ui.SyntaxRole.COMMENT || role==dev.jasper.sdk.ui.SyntaxRole.DOC_COMMENT));
+        return new Workspace(Variant.DARK,palette,editor,new dev.jasper.sdk.ui.SyntaxPalette(styles));
+    }
     private Workspace requestedAppearance = appearance;
     private boolean workspaceMatches = true;
     private volatile double workspaceOpacity = 1.0;
@@ -336,8 +343,7 @@ public final class FakePluginHost implements AutoCloseable {
             var rows = new FakeSettingsPanelHost(context.settings);
             panelHosts.put(pluginId, rows);
             try {
-            var owned=panel instanceof dev.jasper.sdk.settings.SettingsPanel.View ? java.util.Objects.requireNonNull(((dev.jasper.sdk.settings.SettingsPanel.View)panel).createView(rows),"Settings view") : null;
-            if(owned==null){rows.component=panel.create(rows);return rows.component;}
+            var owned=java.util.Objects.requireNonNull(panel.create(rows),"Settings view");
             var view=context.kit().requireOwned(owned);view.mount(rows);rows.view=view;view.hostSpec=rows::descriptor;
             view.hostEvents=rows::event;
             rows.component=view.component;return rows.component;
@@ -1392,7 +1398,7 @@ public final class FakePluginHost implements AutoCloseable {
             var registered = scope(scopeId);
             PaletteResults results = registered.scope().search(query, query(registered, windowId, paneIdOrNull));
             var rows = new LinkedHashMap<String, PaletteRow>();
-            for (PaletteRow row : results.rows()) rows.put(row.id(), row);
+            for (PaletteRow row : results.rows()) {row.icon().ifPresent(registered.context().kit()::validateIcon);rows.put(row.id(), row);}
             lastRows.put(scopeId, rows);
             return results.rows().stream().map(row -> row.id() + "|" + row.title() + "|" + row.enabled()).toList();
         }

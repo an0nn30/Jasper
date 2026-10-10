@@ -41,7 +41,6 @@ import java.nio.file.Path;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
-import javax.swing.Icon;
 import javax.swing.JComponent;
 
 /** One fake plugin's recorded chrome contributions, with the same rules as the application. */
@@ -107,7 +106,7 @@ final class FakeUi {
             progress = value; text = value.text(); tooltip = value.detail(); actionId = value.actionId();
         }
         @Override public void setText(String value) { if (!closed) text = value == null ? "" : value.replace("\r", "").replace("\n", " "); }
-        @Override public void setIcon(Icon icon) { }
+        @Override public void setIcon(String icon) { if(!closed) ui.context.kit().validateIcon(icon); }
         @Override public void setTooltip(String value) { if (!closed) tooltip = value; }
         @Override public void setAction(String value) { if (value != null) ui.requireOwn(value); if (!closed) actionId = value; }
         @Override public void setVisible(boolean value) { if (!closed) visible = value; }
@@ -180,6 +179,7 @@ final class FakeUi {
             context.requireOpen();
             java.util.Objects.requireNonNull(handler, "handler");
             requireNamespace(spec.id(), "An action");
+            spec.icon().ifPresent(context.kit()::validateIcon);
             spec.context().id().ifPresent(owned -> requireNamespace(owned,
                 spec.context().kind() == ShortcutContext.Kind.PANEL ? "A panel context" : "A window context"));
             if (actions.containsKey(spec.id())) throw new IllegalArgumentException("Action already registered: " + spec.id());
@@ -201,7 +201,7 @@ final class FakeUi {
             context.requireOpen();
             switch (item) {
                 case ToolbarItem.Button button -> requireOwn(button.actionId());
-                case ToolbarItem.Dropdown dropdown -> dropdown.actionIds().forEach(this::requireOwn);
+                case ToolbarItem.Dropdown dropdown -> { context.kit().validateIcon(dropdown.icon());dropdown.actionIds().forEach(this::requireOwn); }
             }
             toolbar.add(item);
             return () -> { for (int i = 0; i < toolbar.size(); i++) if (toolbar.get(i) == item) { toolbar.remove(i); break; } };
@@ -259,7 +259,6 @@ final class FakeUi {
         final List<BooleanSupplier> guards = new ArrayList<>(); final List<Runnable> closedHandlers = new ArrayList<>();
         FakeWindow(String id, String title, FakeWindow owner) { this.id = id; this.title = title; this.owner = owner; }
         FakeKitView mounted;
-        @Override public void setContent(JComponent content) { if (!closed) {this.content = java.util.Objects.requireNonNull(content);if(mounted!=null){mounted.close();mounted=null;}} }
         @Override public void setContent(dev.jasper.sdk.ui.UiView content) {
             context.requireOpen();var next=context.kit().requireOwned(content);
             if(closed)throw new IllegalStateException("Surface is closed");next.mount(this);
@@ -338,6 +337,7 @@ final class FakeUi {
         @Override public void setHeader(dev.jasper.sdk.ui.PanelHeader value) {
             java.util.Objects.requireNonNull(value);
             if (done) return;
+            value.actions().forEach(action -> context.kit().validateIcon(action.icon()));
             header = new dev.jasper.sdk.ui.PanelHeader(value.detail(), value.active(), value.actions().stream()
                 .map(action -> new dev.jasper.sdk.ui.PanelHeader.Action(action.label(), action.icon(), () -> {
                     if (done) return;
@@ -374,15 +374,12 @@ final class FakeUi {
             context.requireOpen();
             java.util.Objects.requireNonNull(factory, "factory");
             requireNamespace(spec.id(), "A panel");
+            context.kit().validateIcon(spec.icon());
             spec.toggleActionId().ifPresent(FakeUi.this::requireOwn);
             for (Panel existing : panels) if (existing.spec.id().equals(spec.id())) throw new IllegalArgumentException("Panel already registered: " + spec.id());
             var panel = new Panel(spec, factory);
             panels.add(panel);
             return () -> { if (panels.remove(panel)) { panel.instances.values().forEach(PanelInstance::close); panel.instances.clear(); } };
-          }
-          @Override public Subscription registerView(PanelSpec spec, PanelFactory.View factory) {
-            java.util.Objects.requireNonNull(factory);
-            return register(spec, host -> {var view=context.kit().requireOwned(factory.createView(host));view.mount(host);host.onClosed(view::close);return view.component;});
           }
           @Override public void toggle(String panelId, WindowHandle window) {
             context.requireOpen();
@@ -404,7 +401,7 @@ final class FakeUi {
             if (existing != null) { existing.show(); return existing.content; }
             try {
                 var instance = new PanelInstance(windowId);
-                instance.content = panel.factory.create(instance);
+                var view=context.kit().requireOwned(panel.factory.create(instance));view.mount(instance);instance.onClosed(view::close);instance.content = view.component;
                 if (instance.content != null) panel.instances.put(windowId, instance);
                 return instance.content;
             } catch (RuntimeException | LinkageError failure) {
@@ -446,9 +443,9 @@ final class FakeUi {
             @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, dev.jasper.sdk.ui.UiView content) {
                 context.requireOpen();var view=context.kit().requireOwned(content);
                 for(var entry:contents)if(entry.key.equals(spec.key())){entry.select();return entry;}
-                view.mount(spec);view.route="WORKSPACE";try{var tab=openTab(spec,owner,view.component);tab.onClosed(view::close);return tab;}catch(RuntimeException | Error failure){view.route="CHROME";view.unmount(spec);throw failure;}
+                view.mount(spec);view.route="WORKSPACE";try{var tab=openComponent(spec,owner,view.component);tab.onClosed(view::close);return tab;}catch(RuntimeException | Error failure){view.route="CHROME";view.unmount(spec);throw failure;}
             }
-            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
+            private dev.jasper.sdk.ui.ContentTab openComponent(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
                 context.requireOpen();
                 for(var entry:contents)if(entry.key.equals(spec.key())){entry.select();return entry;}
                 if (owner instanceof FakeContent tab) {
@@ -527,14 +524,6 @@ final class FakeUi {
                 windows.add(dialog);
                 return dialog;
             }
-        };
-    }
-
-    static Icon blankIcon() {
-        return new Icon() {
-            @Override public void paintIcon(java.awt.Component component, java.awt.Graphics graphics, int x, int y) { }
-            @Override public int getIconWidth() { return 16; }
-            @Override public int getIconHeight() { return 16; }
         };
     }
 

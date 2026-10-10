@@ -36,6 +36,7 @@ import javax.swing.JPanel;
 final class HistoryRow extends JPanel implements AutoCloseable {
     static final String CONTENT = "content", META = "meta", ACTION = "action:", REMOVE = "remove";
     private final KitContext kit;
+    private final dev.jasper.app.platform.PresentationIcons presentationIcons = new dev.jasper.app.platform.PresentationIcons();
     private final NotificationCenter center;
     private final String group;
     private final DateTimeFormatter time;
@@ -48,7 +49,8 @@ final class HistoryRow extends JPanel implements AutoCloseable {
 
     HistoryRow(KitContext kit, NotificationCenter center, Notification notification, String group, DateTimeFormatter time) {
         super(new BorderLayout());
-        this.kit = kit;
+        this.kit = presentationIcons.context(kit);
+        kit = this.kit;
         this.center = center;
         this.group = group;
         this.time = time;
@@ -84,6 +86,7 @@ final class HistoryRow extends JPanel implements AutoCloseable {
     /** The same entry with a new read, count or expired state. */
     void update(Notification next) {
         if (closed) return;
+        presentationIcons.reset();
         notification = next;
         title.setRole(role(next));
         texts();
@@ -123,7 +126,7 @@ final class HistoryRow extends JPanel implements AutoCloseable {
         else if (action.id().startsWith(ACTION)) center.runAction(notification.id(), Integer.parseInt(action.id().substring(ACTION.length())));
     }
 
-    private ViewSpec leadSpec() { return new ViewSpec(NotificationStyle.icon("severity", notification)); }
+    private ViewSpec leadSpec() { return new ViewSpec(NotificationStyle.icon("severity", notification, presentationIcons)); }
 
     private ViewSpec bodySpec() {
         var request = notification.request();
@@ -195,5 +198,6 @@ final class HistoryRow extends JPanel implements AutoCloseable {
         if (closed) return;
         closed = true;
         lead.close(); body.close(); side.close();
+        presentationIcons.close();
     }
 }

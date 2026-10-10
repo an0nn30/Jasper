@@ -377,8 +377,7 @@ restores the old `JTable` component popup (Remote SFTP: Up, New folder…, Uploa
 testkit fake has no pointer geometry, so it has no counterpart; consumers state the shared menu in the descriptor.
 
 Plan 2 Task 8-kit Remote additions (Sessions, Tunnels, SFTP and transfer rows; controller rulings G1–G5; same
-mirroring module ↔ SDK ↔ host `KitValues` ↔ fake and SDK version rule — the SDK stays 0.14.2 and Task 11 versions these
-record components; prior constructors remain and default to the old meaning):
+mirroring module ↔ SDK ↔ host `KitValues` ↔ fake and SDK version rule — Task 11a versions these record components at SDK 0.15.0; prior constructors remain and default to the old meaning):
 - `ListItem.tooltip` and `TableRow.tooltip` (blank = none): the row's literal tooltip (html disabled) and accessible
   description, shown anywhere on the row: over its slots' empty area and its passive content (Text, Icon, Chip,
   StatusDot; a table's cells; a tree row's title and columns use the same rule); a row's buttons, switches and choices
@@ -599,7 +598,7 @@ placement/collapse/drag behavior to this header. Exactly one title/count/action 
 Task 6d (post-merge, 2026-10-05): `setPanelHostHeader` is the third module/app panel-header method, also not
 projected into UiView. `UI/swing/PanelHostHeader.java` is
 `public record PanelHostHeader(String detail, boolean active, List<Action> actions)` with `EMPTY` and
-`record Action(String label, javax.swing.Icon icon, Runnable invoke)` (nonblank label, non-null icon and callback;
+`record Action(String label, String icon, Runnable invoke)` (nonblank label, non-null icon and callback;
 the list is copied). The header shows the detail after the title and count (COUNT typography, TEXT_SECONDARY), a
 `STATUS_DOT`-sized dot before it when active (`SurfaceContrast.on(STATUS_SUCCESS, SURFACE_PANEL, INDICATOR)`), and
 icon-only GHOST panel-action buttons with the host's artwork first in the host slot, before the `setPanelHostActions`
@@ -808,14 +807,18 @@ uses the same validator for actionable source failures, and commit independently
 
 ## Plan 2 Task 4 mounted-view contracts and temporary names
 
-The coordinated final signatures remain PanelFactory.create → UiView, Panels.register with that factory,
+The final SDK 0.15 signatures are PanelFactory.create → UiView, Panels.register with that factory,
 WindowSurface.setContent(UiView), Windows.openTab(ContentSpec,WindowOwner,UiView), SettingsPanel.create
-→ UiView and SettingsPanelHost.row → Nodes.Node. During bundled migration only, PanelFactory.View /
-Panels.registerView and SettingsPanel.View.createView / SettingsPanelHost.rowNode carry the typed path.
-A SettingsPanel.View implementer needs no dummy legacy create; hosts select that marker deterministically
-and reject null/foreign/disposed/already-mounted views. The legacy SettingsPanel remains functional until
-Task 11. PanelSpec accepts either a legacy Icon or semantic iconName, never both/neither, and preserves
-anchor, split and toggle-action identity. Exact member removal mapping is in the temporary-path ledger.
+→ UiView and SettingsPanelHost.row → Nodes.Node. Transitional nested View types, registerView/createView,
+rowNode and raw factories are removed. PanelSpec is `(id,title,String icon,anchor,toggleActionId,split)`
+with the semantic four-argument constructor and withToggleActionId/withSplit behavior retained.
+ActionSpec/ScopeSpec/PaletteRow/NotificationSpec/SessionSpec use Optional<String> icons;
+ContentPresentation.icon and StatusItem.setIcon accept nullable String; PanelHeader.Action and
+ToolbarItem.Dropdown/menu require String. Appearance.icon, IconName/BundledIcon and palette
+current()/UIManager readers are removed. Specialized palettes/opacity and CustomContent remain.
+StatusProgressState has no icon member or withIcon method; the original Task 11 reference was erroneous.
+Names are kit built-ins or scoped plugin IconAsset registrations, validated by host/fake on entry.
+Retained host icons select the live engine palette from their paint component's chrome/workspace route.
 
 Views have one surface lifetime. Re-setting the identical view is idempotent; replacing window content
 closes the old view; final window/panel/tab/settings closure closes its view once. Tab reparenting retains

@@ -44,6 +44,7 @@ final class NotificationCard extends JPanel implements AutoCloseable {
     static final String MORE_LABEL = "More ▾";
 
     private final KitContext kit;
+    private final dev.jasper.app.platform.PresentationIcons presentationIcons = new dev.jasper.app.platform.PresentationIcons();
     private final NotificationCenter center;
     private final boolean sticky;
     private Notification notification;
@@ -60,7 +61,8 @@ final class NotificationCard extends JPanel implements AutoCloseable {
     Consumer<Boolean> onHover = value -> {};
 
     NotificationCard(KitContext kit, NotificationCenter center, Notification notification, boolean sticky) {
-        this.kit = kit;
+        this.kit = presentationIcons.context(kit);
+        kit = this.kit;
         this.center = center;
         this.sticky = sticky;
         this.notification = notification;
@@ -70,7 +72,7 @@ final class NotificationCard extends JPanel implements AutoCloseable {
         title = new TextBlock(kit, Typography.Role.BODY_STRONG, SemanticColor.TEXT_PRIMARY, 0);
         count = new TextBlock(kit, Typography.Role.BODY, SemanticColor.TEXT_SECONDARY, 1);
         content = new TextBlock(kit, Typography.Role.BODY, SemanticColor.TEXT_PRIMARY, CONTENT_LINES);
-        icon = new KitView(kit, new ViewSpec(NotificationStyle.icon(ICON, notification)), event -> { }, true);
+        icon = new KitView(kit, new ViewSpec(NotificationStyle.icon(ICON, notification, presentationIcons)), event -> { }, true);
         for (int i = 0; i < VISIBLE_ACTIONS; i++) {
             var link = new KitView(kit, linkSpec(i, "Action"), this::event, true);
             link.setVisible(false);
@@ -100,9 +102,10 @@ final class NotificationCard extends JPanel implements AutoCloseable {
     /** Shows {@code next}: the same entry with a new count, or new text. */
     void update(Notification next) {
         if (closed) return;
+        presentationIcons.reset();
         notification = next;
         var request = next.request();
-        icon.update(new ViewSpec(NotificationStyle.icon(ICON, next)));
+        icon.update(new ViewSpec(NotificationStyle.icon(ICON, next, presentationIcons)));
         title.setText(request.title());
         count.setText(next.count() > 1 ? "×" + next.count() : "");
         count.setVisible(next.count() > 1);
@@ -337,6 +340,7 @@ final class NotificationCard extends JPanel implements AutoCloseable {
         closed = true;
         try { theme.close(); } catch (Exception ignored) { /* the binding outlives the card */ }
         icon.close(); links.forEach(KitView::close); more.close(); close.close();
+        presentationIcons.close();
     }
 
     boolean closed() { return closed; }

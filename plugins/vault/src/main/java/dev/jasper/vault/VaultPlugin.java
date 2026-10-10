@@ -1,6 +1,5 @@
 package dev.jasper.vault;
 
-import dev.jasper.sdk.ui.IconName;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
@@ -10,7 +9,6 @@ import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import java.time.Duration;
-import javax.swing.Icon;
 import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginDialog;
@@ -58,7 +56,7 @@ public class VaultPlugin implements Plugin {
     public static final String LOCK = "dev.jasper.vault.lock";
     public static final String STATUS = "dev.jasper.vault.status";
     private StatusItem status;
-    private Icon locked, unlocked;
+    private String locked, unlocked;
     private static final int TICK_MILLIS = 5_000;
 
     private final Function<PluginContext, DeviceSecrets> secretsFactory;
@@ -118,8 +116,8 @@ public class VaultPlugin implements Plugin {
                 case UNLOCKED -> CompletableFuture.completedFuture(true);
             }, this::showImport, this::vaultChanged);
         context.services().publishPerConsumer(VaultApi.class, service::forConsumer);
-        locked = context.appearance().icon(IconName.LOCK);
-        unlocked = context.appearance().icon(IconName.UNLOCK);
+        locked = "lock";
+        unlocked = "unlock";
         context.actions().register(ActionSpec.of(OPEN, "Open Vault...").withIcon(locked).withKeywords(List.of("vault", "credentials", "password", "unlock")).withDefaultBinding("cmd+\\"),
             invoked -> open(invoked.window(), Optional.empty()));
         lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock"))

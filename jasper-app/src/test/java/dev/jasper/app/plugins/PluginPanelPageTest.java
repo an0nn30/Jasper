@@ -67,7 +67,7 @@ class PluginPanelPageTest {
         var size=new AtomicReference<Setting<Integer>>();
         onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID,"Panel","1.0.0",Set.of()),Set.of(),Set.of(),Set.of(),getClass().getClassLoader(),() -> context -> {
             size.set(context.settings().declare(SettingSpec.of("size",SettingKind.integer(1,10),4).label("Size")));
-            context.settings().page((SettingsPanel.View) h -> {rows.set(h);var made=(HostedKitView)context.kit().create(new dev.jasper.sdk.ui.ViewSpec(h.rowNode(size.get())),e -> {});view.set(made);return made;});
+            context.settings().page((SettingsPanel) h -> {rows.set(h);var made=(HostedKitView)context.kit().create(new dev.jasper.sdk.ui.ViewSpec(h.row(size.get())),e -> {});view.set(made);return made;});
         })));
         onEdtValue(() -> size.get().set(7)).get(5,TimeUnit.SECONDS);
         var page=onEdtValue(() -> (PluginPanelPage)host.settingsPages(context).getFirst());
@@ -98,8 +98,8 @@ class PluginPanelPageTest {
             getClass().getClassLoader(), () -> plugin -> {
                 var delay = plugin.settings().declare(SettingSpec.of("delay", SettingKind.integer(0, 5000), 300)
                     .label("Step delay").description("Milliseconds between steps"));
-                plugin.settings().page((SettingsPanel.View) rows -> {
-                    var made = (HostedKitView) plugin.kit().create(new dev.jasper.sdk.ui.ViewSpec(rows.rowNode(delay)), event -> { });
+                plugin.settings().page((SettingsPanel) rows -> {
+                    var made = (HostedKitView) plugin.kit().create(new dev.jasper.sdk.ui.ViewSpec(rows.row(delay)), event -> { });
                     view.set(made);
                     return made;
                 });
@@ -137,7 +137,7 @@ class PluginPanelPageTest {
     @Test void kitPanelRowsKeepTheirSearchHighlightThroughTheHostsRowRewriting() throws Exception {
         var view=new AtomicReference<HostedKitView>();var size=new AtomicReference<Setting<Integer>>();var rows=new AtomicReference<SettingsPanelHost>();
         java.util.function.Function<SettingsPanelHost,dev.jasper.sdk.ui.ViewSpec> spec=h -> {
-            var hostRow=(dev.jasper.sdk.ui.Nodes.SettingRow)h.rowNode(size.get());
+            var hostRow=(dev.jasper.sdk.ui.Nodes.SettingRow)h.row(size.get());
             var ready=dev.jasper.sdk.ui.ControlState.READY;
             return new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Card("card",ready,dev.jasper.sdk.ui.Nodes.CardKind.SETTINGS,List.of(
                 new dev.jasper.sdk.ui.Nodes.SettingRow(hostRow.id(),hostRow.state(),hostRow.title(),hostRow.description(),hostRow.control(),hostRow.dependent(),true),
@@ -146,7 +146,7 @@ class PluginPanelPageTest {
         };
         onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID,"Panel","1.0.0",Set.of()),Set.of(),Set.of(),Set.of(),getClass().getClassLoader(),() -> context -> {
             size.set(context.settings().declare(SettingSpec.of("size",SettingKind.integer(1,10),4).label("Size")));
-            context.settings().page((SettingsPanel.View) h -> {rows.set(h);var made=(HostedKitView)context.kit().create(spec.apply(h),e -> {});view.set(made);return made;});
+            context.settings().page((SettingsPanel) h -> {rows.set(h);var made=(HostedKitView)context.kit().create(spec.apply(h),e -> {});view.set(made);return made;});
         })));
         var page=onEdtValue(() -> (PluginPanelPage)host.settingsPages(context).getFirst());
         onEdt(() -> {
@@ -174,10 +174,10 @@ class PluginPanelPageTest {
         var callbacks=new ArrayList<String>();
         onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID,"Panel","1.0.0",Set.of()),Set.of(),Set.of(),Set.of(),getClass().getClassLoader(),() -> started -> {
             setting.set(started.settings().declare(SettingSpec.of("size",SettingKind.integer(1,10),4).label("Size")));
-            started.settings().page(new SettingsPanel.View(){
-                @Override public dev.jasper.sdk.ui.UiView createView(SettingsPanelHost rows){
+            started.settings().page(new SettingsPanel(){
+                @Override public dev.jasper.sdk.ui.UiView create(SettingsPanelHost rows){
                     pageHost.set(rows);
-                    var result=(HostedKitView)started.kit().create(new dev.jasper.sdk.ui.ViewSpec(rows.rowNode(setting.get())),event -> callbacks.add(event.id()));
+                    var result=(HostedKitView)started.kit().create(new dev.jasper.sdk.ui.ViewSpec(rows.row(setting.get())),event -> callbacks.add(event.id()));
                     view.set(result);return result;
                 }
                 @Override public void apply(){callbacks.add("apply");}
@@ -216,26 +216,25 @@ class PluginPanelPageTest {
         onEdt(() -> {reopened.component();host.stop();assertThatThrownBy(view.get()::spec).isInstanceOf(IllegalStateException.class);});
     }
 
+    private dev.jasper.sdk.ui.UiKit pluginKit;
     private void start(Consumer<PluginSettings> declare) {
         onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID, "Panel", "1.0.0", Set.of()), Set.of(), Set.of(), Set.of(),
-            PluginPanelPageTest.class.getClassLoader(), () -> started -> declare.accept(started.settings()))));
+            PluginPanelPageTest.class.getClassLoader(), () -> started -> {pluginKit=started.kit();declare.accept(started.settings());})));
         assertThat(host.active(ID)).isTrue();
     }
 
     /** A plugin page with one standard row, one control of its own for {@code size}, and its own state. */
     private static final class Panel implements SettingsPanel {
+        final dev.jasper.sdk.ui.UiKit kit;
         final Setting<Boolean> vim;
         final Setting<Integer> size;
         final List<String> calls = new ArrayList<>();
         boolean ownModified;
         SettingsPanelHost host;
-        Panel(Setting<Boolean> vim, Setting<Integer> size) { this.vim = vim; this.size = size; }
-        @Override public JComponent create(SettingsPanelHost host) {
-            this.host = host;
-            var page = new JPanel();
-            page.add(host.row(vim));
-            page.add(new JLabel("size " + host.pending(size)));
-            return page;
+        Panel(Setting<Boolean> vim, Setting<Integer> size, dev.jasper.sdk.ui.UiKit kit) { this.vim = vim; this.size = size; this.kit=kit; }
+        @Override public dev.jasper.sdk.ui.UiView create(SettingsPanelHost host) {
+            this.host=host;
+            return kit.create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("page",dev.jasper.sdk.ui.ControlState.READY,dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL,List.of(host.row(vim),new dev.jasper.sdk.ui.Nodes.Text("size",dev.jasper.sdk.ui.ControlState.READY,"size "+host.pending(size),dev.jasper.sdk.ui.Nodes.TextRole.BODY)))),e -> {});
         }
         @Override public List<String> keywords() { return List.of("panel", "custom"); }
         @Override public void highlight(String query) { calls.add("highlight " + query); }
@@ -250,7 +249,7 @@ class PluginPanelPageTest {
         start(settings -> {
             var vim = settings.declare(SettingSpec.of("vim", SettingKind.bool(), false).label("Vim mode").keywords("modal"));
             var size = settings.declare(SettingSpec.of("font_size", SettingKind.integer(8, 48), 13).label("Font size"));
-            panel.set(new Panel(vim, size));
+            panel.set(new Panel(vim, size, pluginKit));
             settings.page(panel.get());
         });
         return panel.get();
@@ -342,20 +341,15 @@ class PluginPanelPageTest {
 
     /** A plugin page laid out like the Sample's: standard rows in a vertical box. */
     private static final class BoxPanel implements SettingsPanel {
+        final dev.jasper.sdk.ui.UiKit kit;
         final Setting<Boolean> vim;
         final Setting<Integer> size;
         final List<JComponent> rows = new ArrayList<>();
-        BoxPanel(Setting<Boolean> vim, Setting<Integer> size) { this.vim = vim; this.size = size; }
-        @Override public JComponent create(SettingsPanelHost host) {
-            var page = new JPanel();
-            page.setLayout(new BoxLayout(page, BoxLayout.Y_AXIS));
-            for (var setting : List.<Setting<?>>of(vim, size)) {
-                JComponent row = host.row(setting);
-                row.setAlignmentX(0);
-                rows.add(row);
-                page.add(row);
-            }
-            return page;
+        BoxPanel(Setting<Boolean> vim, Setting<Integer> size, dev.jasper.sdk.ui.UiKit kit) { this.vim = vim; this.size = size; this.kit=kit; }
+        @Override public dev.jasper.sdk.ui.UiView create(SettingsPanelHost host) {
+            var view=(HostedKitView)kit.create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("page",dev.jasper.sdk.ui.ControlState.READY,dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL,List.of(host.row(vim),host.row(size)))),e -> {});
+            for(var id:List.of("settings:vim:row","settings:font_size:row")) rows.add(dev.jasper.app.testsupport.KitTestSupport.require(view.component(),id,JComponent.class));
+            return view;
         }
     }
 
@@ -364,7 +358,7 @@ class PluginPanelPageTest {
         start(settings -> {
             var vim = settings.declare(SettingSpec.of("vim", SettingKind.bool(), false).label("Vim mode"));
             var size = settings.declare(SettingSpec.of("font_size", SettingKind.integer(8, 48), 13).label("Font size"));
-            panel.set(new BoxPanel(vim, size));
+            panel.set(new BoxPanel(vim, size, pluginKit));
             settings.page(panel.get());
         });
         var page = onEdtValue(() -> host.settingsPages(context)).getFirst();

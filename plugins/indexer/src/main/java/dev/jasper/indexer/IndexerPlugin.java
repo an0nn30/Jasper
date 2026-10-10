@@ -31,7 +31,6 @@ import dev.jasper.sdk.terminal.TerminalEvents;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ActionContext;
 import dev.jasper.sdk.ui.ActionSpec;
-import dev.jasper.sdk.ui.IconName;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
@@ -142,7 +141,7 @@ public final class IndexerPlugin implements Plugin {
         var lister = new LocalLister(environment.git(), environment.home());
         indexer = new Indexer(projects, new IndexStore(context.dataDirectory()), job -> list(lister, job), context.background(),
             environment.ui(), environment.clock(), this::progress, results, context.notifications().group(), context.log());
-        var icon = context.appearance().icon(IconName.SEARCH);
+        var icon = "search";
         context.actions().register(ActionSpec.of(GOTO, "Go to File…").withIcon(icon)
                 .withKeywords(List.of("file", "open", "project", "index", "find"))
                 .withDefaultBindings("cmd+p", "ctrl+alt+shift+p"),

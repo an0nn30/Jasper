@@ -131,6 +131,62 @@ public abstract class PluginContractTest {
         return context.get();
     }
 
+    @Test void semanticPresentationIconsValidateOwnershipAtEveryBoundary() {
+        var started=new AtomicReference<PluginContext>();
+        h.start(info("test.icons",Capabilities.PALETTE_CONTRIBUTE,Capabilities.SESSION_PROVIDE),Set.of(),Set.of(),started::set);
+        var context=started.get();
+        UUID window=h.addTerminalWindow();
+        h.ui(() -> {
+            var registration=context.kit().registerIcon(new dev.jasper.sdk.ui.IconAsset("test.icons:own","M 2 2 L 14 14"));
+            context.actions().register(ActionSpec.of("test.icons.menuaction","Menu action"),e -> {});
+            var status=context.statusBar().add(new StatusItemSpec("test.icons.status",Side.RIGHT,0));
+            var tab=context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("content","Content"),null,kitView(context));
+            var panel=new AtomicReference<PanelHost>();
+            context.panels().register(new PanelSpec("test.icons.panel","Panel","file",Anchor.LEFT),host -> {panel.set(host);return kitView(context);});
+            h.openPanel("test.icons.panel",window);
+            for(String name:List.of("missing","foreign:own")) {
+                assertThatIllegalArgumentException().as("action "+name).isThrownBy(() -> context.actions().register(ActionSpec.of("test.icons.bad","Bad").withIcon(name),e -> {}));
+                assertThatIllegalArgumentException().as("panel "+name).isThrownBy(() -> context.panels().register(new PanelSpec("test.icons.badpanel","Bad",name,Anchor.LEFT),host -> kitView(context)));
+                assertThatIllegalArgumentException().as("toolbar "+name).isThrownBy(() -> context.toolbar().add(ToolbarItem.menu(name,"Menu",List.of("test.icons.menuaction"))));
+                assertThatIllegalArgumentException().as("status "+name).isThrownBy(() -> status.setIcon(name));
+                assertThatIllegalArgumentException().as("content "+name).isThrownBy(() -> tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Content","",name,false,"","")));
+                assertThatIllegalArgumentException().as("header "+name).isThrownBy(() -> panel.get().setHeader(new dev.jasper.sdk.ui.PanelHeader("",false,List.of(new dev.jasper.sdk.ui.PanelHeader.Action("Action",name,() -> {})))));
+                assertThatIllegalArgumentException().as("notification "+name).isThrownBy(() -> context.notifications().group().post(NotificationSpec.of(Severity.INFO,"Title").withContent("Body").withIcon(name)));
+                assertThatIllegalArgumentException().as("scope "+name).isThrownBy(() -> context.palette().register(iconScope(name)));
+                assertThatIllegalArgumentException().as("session "+name).isThrownBy(() -> context.terminals().openTab(context.terminals().window(window).orElseThrow(),OpenRequest.session(new SessionSpec("Bad",Optional.of(name),ExitPolicy.KEEP_OPEN,pending -> {}))));
+            }
+            assertThat(h.openRequests()).as("invalid icons must not create terminal panes").isEmpty();
+            for(String name:List.of("file","test.icons:own")) {
+                context.actions().register(ActionSpec.of("test.icons.action"+(name.equals("file")?"1":"2"),"Action").withIcon(name),e -> {});
+                status.setIcon(name);tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Content","",name,false,"",""));
+                context.toolbar().add(ToolbarItem.menu(name,"Menu",List.of("test.icons.menuaction")));
+                panel.get().setHeader(new dev.jasper.sdk.ui.PanelHeader("",false,List.of(new dev.jasper.sdk.ui.PanelHeader.Action("Action",name,() -> {}))));
+                context.notifications().group().post(NotificationSpec.of(Severity.INFO,"Title").withContent("Body").withIcon(name));
+            }
+            status.setIcon(null);tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Content","",null,false,"",""));
+            registration.close();
+            assertThatIllegalArgumentException().isThrownBy(() -> status.setIcon("test.icons:own"));
+            status.close();tab.close();h.closePanel("test.icons.panel",window);
+            assertThatCode(() -> {
+                status.setIcon("missing");
+                tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Content","","missing",false,"",""));
+                panel.get().setHeader(new dev.jasper.sdk.ui.PanelHeader("",false,List.of(new dev.jasper.sdk.ui.PanelHeader.Action("Action","missing",() -> {}))));
+            }).doesNotThrowAnyException();
+        });
+    }
+    private static PaletteScope iconScope(String icon) {
+        return new PaletteScope() {
+            public ScopeSpec spec(){return ScopeSpec.of("test.icons.scope","Scope","Search",List.of(PASTE)).withIcon(icon);}
+            public PaletteResults search(String query,PaletteQuery context){return PaletteResults.none();}
+            public void execute(PaletteRow row,PaletteVerb verb,PaletteQuery context){}
+            public Subscription onChanged(Runnable listener){return () -> {};}
+        };
+    }
+
+    private static dev.jasper.sdk.ui.UiView kitView(PluginContext context) {
+        return context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body",dev.jasper.sdk.ui.ControlState.READY,"Content",dev.jasper.sdk.ui.Nodes.TextRole.BODY)), e -> {});
+    }
+
     @Test void ownedViewsMountReplaceAndMoveWithExistingGuards() throws Exception {
         var context = new AtomicReference<PluginContext>();
         var other = new AtomicReference<PluginContext>();
@@ -497,7 +553,7 @@ public abstract class PluginContractTest {
             run.set(context.actions().register(ActionSpec.of("test.alpha.run", "Run"), invoked -> { }));
             context.actions().register(ActionSpec.of("test.alpha.stop", "Stop"), invoked -> { });
             context.toolbar().add(ToolbarItem.action("test.alpha.run"));
-            context.toolbar().add(ToolbarItem.menu(new javax.swing.ImageIcon(), "Alpha", List.of("test.alpha.run", "test.alpha.stop")));
+            context.toolbar().add(ToolbarItem.menu("file", "Alpha", List.of("test.alpha.run", "test.alpha.stop")));
             assertThatIllegalArgumentException().isThrownBy(() -> context.toolbar().add(ToolbarItem.action("new_tab")));
             assertThatIllegalArgumentException().isThrownBy(() -> context.menus().standard(StandardMenu.FILE).add("test.alpha.absent"));
         });
@@ -648,7 +704,7 @@ public abstract class PluginContractTest {
             context.actions().register(ActionSpec.of("test.alpha.run", "Run"), invoked -> { });
             context.menus().standard(StandardMenu.TAB).add("test.alpha.run");
             context.appearance().onChanged(seen::add);
-            assertThatIllegalArgumentException().isThrownBy(() -> context.appearance().icon("no/such/icon.svg"));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.actions().register(ActionSpec.of("test.alpha.bad", "Bad").withIcon("missing"), e -> {}));
         });
         assertThat(alpha.get().appearance().variant()).isEqualTo(Variant.DARK);
         h.setVariant(Variant.LIGHT);
@@ -664,12 +720,12 @@ public abstract class PluginContractTest {
     @Test void aPanelMayNameOneOfThePluginsOwnActionsAsItsToggle() {
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
             context.actions().register(ActionSpec.of("test.alpha.show", "Toggle Hosts"), invoked -> { });
-            context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", new ImageIcon(), Anchor.LEFT)
-                .withToggleActionId("test.alpha.show"), host -> new JLabel());
-            context.panels().register(new PanelSpec("test.alpha.files", "Files", new ImageIcon(), Anchor.RIGHT), host -> new JLabel());
+            context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", "file", Anchor.LEFT)
+                .withToggleActionId("test.alpha.show"), host -> kitView(context));
+            context.panels().register(new PanelSpec("test.alpha.files", "Files", "file", Anchor.RIGHT), host -> kitView(context));
             for (String toggle : List.of("test.alpha.absent", "test.beta.show", "new_tab"))
                 assertThatIllegalArgumentException().as(toggle).isThrownBy(() -> context.panels().register(
-                    new PanelSpec("test.alpha.other", "Other", new ImageIcon(), Anchor.LEFT).withToggleActionId(toggle), host -> new JLabel()));
+                    new PanelSpec("test.alpha.other", "Other", "file", Anchor.LEFT).withToggleActionId(toggle), host -> kitView(context)));
         });
         assertThat(h.panels()).as("a failed assertion above stops the plugin and removes its panels")
             .containsExactly("test.alpha.hosts|Hosts|LEFT|test.alpha.show", "test.alpha.files|Files|RIGHT");
@@ -678,11 +734,11 @@ public abstract class PluginContractTest {
     @Test void aSplitPanelKeepsItsSplitBesideItsToggleAndStartsInTheSecondaryHalf() {
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
             context.actions().register(ActionSpec.of("test.alpha.show", "Toggle Files"), invoked -> { });
-            context.panels().register(new PanelSpec("test.alpha.files", "Files", new ImageIcon(), Anchor.LEFT).withSplit()
-                .withToggleActionId("test.alpha.show"), host -> new JLabel());
-            context.panels().register(new PanelSpec("test.alpha.log", "Log", new ImageIcon(), Anchor.BOTTOM).withSplit(),
-                host -> new JLabel());
-            context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", new ImageIcon(), Anchor.RIGHT), host -> new JLabel());
+            context.panels().register(new PanelSpec("test.alpha.files", "Files", "file", Anchor.LEFT).withSplit()
+                .withToggleActionId("test.alpha.show"), host -> kitView(context));
+            context.panels().register(new PanelSpec("test.alpha.log", "Log", "file", Anchor.BOTTOM).withSplit(),
+                host -> kitView(context));
+            context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", "file", Anchor.RIGHT), host -> kitView(context));
         });
         assertThat(h.panels()).containsExactly("test.alpha.files|Files|LEFT+split|test.alpha.show",
             "test.alpha.log|Log|BOTTOM+split", "test.alpha.hosts|Hosts|RIGHT");
@@ -692,20 +748,20 @@ public abstract class PluginContractTest {
         List<PanelHost> hosts = Collections.synchronizedList(new ArrayList<>());
         var registration = new AtomicReference<Subscription>();
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
-            registration.set(context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", new ImageIcon(), Anchor.RIGHT),
-                host -> { hosts.add(host); return new JLabel("hosts"); }));
-            context.panels().register(new PanelSpec("test.alpha.broken", "Broken", new ImageIcon(), Anchor.BOTTOM),
+            registration.set(context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", "file", Anchor.RIGHT),
+                host -> { hosts.add(host); return kitView(context); }));
+            context.panels().register(new PanelSpec("test.alpha.broken", "Broken", "file", Anchor.BOTTOM),
                 host -> { throw new IllegalStateException("factory failure"); });
             assertThatIllegalArgumentException().isThrownBy(() -> context.panels().register(
-                new PanelSpec("test.alpha.hosts", "Twice", new ImageIcon(), Anchor.LEFT), host -> new JLabel()));
+                new PanelSpec("test.alpha.hosts", "Twice", "file", Anchor.LEFT), host -> kitView(context)));
             assertThatIllegalArgumentException().isThrownBy(() -> context.panels().register(
-                new PanelSpec("test.beta.panel", "Foreign", new ImageIcon(), Anchor.LEFT), host -> new JLabel()));
+                new PanelSpec("test.beta.panel", "Foreign", "file", Anchor.LEFT), host -> kitView(context)));
         });
         assertThat(h.panels()).containsExactly("test.alpha.hosts|Hosts|RIGHT", "test.alpha.broken|Broken|BOTTOM");
         assertThat(hosts).as("no instance until a window shows the panel").isEmpty();
         UUID window = UUID.randomUUID();
         h.ui(() -> {
-            assertThat(h.openPanel("test.alpha.hosts", window)).isInstanceOf(JLabel.class);
+            assertThat(h.openPanel("test.alpha.hosts", window)).isNotNull();
             assertThat(h.openPanel("test.alpha.broken", window)).as("a throwing factory is contained").isNull();
             assertThat(h.openPanel("test.alpha.absent", window)).isNull();
         });
@@ -724,10 +780,10 @@ public abstract class PluginContractTest {
         List<PanelHost> hosts = Collections.synchronizedList(new ArrayList<>());
         List<String> calls = Collections.synchronizedList(new ArrayList<>());
         var context = started("test.alpha", Set.of());
-        var icon = new ImageIcon();
+        var icon = "file";
         UUID first = UUID.randomUUID(), second = UUID.randomUUID();
         javax.swing.SwingUtilities.invokeAndWait(() -> h.ui(() -> {
-            context.panels().registerView(new PanelSpec("test.alpha.hosts", "Hosts", "folder", Anchor.LEFT), host -> {
+            context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", "folder", Anchor.LEFT), host -> {
                 hosts.add(host);
                 host.setHeader(new dev.jasper.sdk.ui.PanelHeader(String.valueOf(hosts.size() + 2), true, List.of(
                     new dev.jasper.sdk.ui.PanelHeader.Action("New session", icon, () -> calls.add("new")),
@@ -1557,8 +1613,10 @@ public abstract class PluginContractTest {
             harness.ui(() -> {
                 var windows = context.get().windows();
                 var component = new javax.swing.JTextArea("keep this text");
-                var tab = windows.openTab(new dev.jasper.sdk.ui.ContentSpec("file", "File"), null, component);
-                assertThat(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("file", "Again"), null, new javax.swing.JPanel())).isSameAs(tab);
+                var content=context.get().kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Custom("editor",dev.jasper.sdk.ui.ControlState.READY,"editor",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,"Editor")),e -> {});
+                content.registerContent(new dev.jasper.sdk.ui.CustomContent("editor",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,component,() -> {}));
+                var tab = windows.openTab(new dev.jasper.sdk.ui.ContentSpec("file", "File"), null, content);
+                assertThat(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("file", "Again"), null, kitView(context.get()))).isSameAs(tab);
                 var disposed = new AtomicInteger(); tab.onClosed(disposed::incrementAndGet);
                 var dialog = windows.dialog(new DialogSpec("Question", tab, true));
                 dialog.show(); tab.move(true);
@@ -1617,7 +1675,7 @@ public abstract class PluginContractTest {
 
     @Test void aPluginGivesOneSettingsPageAndOnlyWhileStarting() {
         var settings = new AtomicReference<PluginSettings>();
-        SettingsPanel panel = panelHost -> new JLabel("Mine");
+        SettingsPanel panel = panelHost -> { throw new AssertionError("Page must remain lazy"); };
         h.start(info("test.page"), Set.of(), Set.of(), context -> {
             settings.set(context.settings());
             context.settings().page(panel);

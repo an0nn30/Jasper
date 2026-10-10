@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Transitional dynamic SDK readers must remain live until their own consumer migration. */
+/** Explicit host adapters preserve the engine palettes through independent theme selection. */
 @ExtendWith(EdtTestExtension.class)
 class LegacyPalettePublicationTest {
     @Test void dynamicWorkspaceEditorAndSyntaxReadersTrackIndependentSelectionAndMatch() {
@@ -19,20 +19,20 @@ class LegacyPalettePublicationTest {
             for (Theme workspace : java.util.List.of(Theme.DARK, Theme.JASPER_LIGHT, Theme.DARK)) {
                 themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice(workspace.name()), workspace, UiFontConfig.defaults());
                 var expected = themes.current().workspace();
-                assertThat(WorkspacePalette.current(component).text()).isEqualTo(expected.tokens().get(Token.TEXT));
-                assertThat(WorkspacePalette.current().background()).isEqualTo(expected.tokens().get(Token.SURFACE));
-                var editor = EditorPalette.current();
+                assertThat(HostedPalettes.workspace(themes.current().workspace()).text()).isEqualTo(expected.tokens().get(Token.TEXT));
+                assertThat(HostedPalettes.workspace(themes.current().workspace()).background()).isEqualTo(expected.tokens().get(Token.SURFACE));
+                var editor = HostedPalettes.editor(themes.current().workspace());
                 assertThat(editor.background()).isEqualTo(expected.tokens().get(Token.EDITOR_BACKGROUND));
                 assertThat(editor.selection()).isEqualTo(expected.tokens().get(Token.EDITOR_SELECTION));
                 for (var role : SyntaxRole.values()) {
                     var style = expected.syntax().get(dev.jasper.ui.theme.SyntaxRole.valueOf(role.name()));
-                    assertThat(SyntaxPalette.current().style(role)).isEqualTo(new SyntaxStyle(style.color(), style.bold(), style.italic()));
+                    assertThat(HostedPalettes.syntax(themes.current().workspace()).style(role)).isEqualTo(new SyntaxStyle(style.color(), style.bold(), style.italic()));
                 }
                 assertThat(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP))
                     .isEqualTo(themes.current().chrome().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
             }
             themes.configureTerminal(TerminalColors.MATCH);
-            assertThat(WorkspacePalette.current().text()).isEqualTo(themes.current().chrome().tokens().get(Token.TEXT));
+            assertThat(HostedPalettes.workspace(themes.current().workspace()).text()).isEqualTo(themes.current().chrome().tokens().get(Token.TEXT));
         }
     }
 }

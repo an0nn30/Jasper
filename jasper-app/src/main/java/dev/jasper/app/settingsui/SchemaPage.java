@@ -223,7 +223,7 @@ public final class SchemaPage implements SettingsPage {
                     close(children, group, title, sections++);
                     title = section.title();
                 }
-                case RowItem row -> { if (row.shown()) group.add(rowNode(rows.get(rowIndex++))); }
+                case RowItem row -> { if (row.shown()) group.add(row(rows.get(rowIndex++))); }
                 case ActionItem ignored -> group.add(actionNode(actions.get(actionIndex++)));
             }
         }
@@ -239,7 +239,7 @@ public final class SchemaPage implements SettingsPage {
         group.clear();
     }
 
-    private Nodes.Node rowNode(Row<?> row) {
+    private Nodes.Node row(Row<?> row) {
         boolean enabled = row.enabled.test(context.draft());
         var state = new ControlState(true, enabled, false, row.error);
         var reset = new Nodes.Button(row.resetId(), new ControlState(row.resettable, true, false, ""), "", "refresh",

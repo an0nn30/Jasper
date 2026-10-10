@@ -7,7 +7,6 @@ import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ActionSpec;
-import dev.jasper.sdk.ui.IconName;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.ToolbarItem;
 import java.nio.charset.StandardCharsets;
@@ -22,7 +21,6 @@ import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import javax.swing.Icon;
 
 /**
  * Keeps the Sessions dropdown in sync with the WSL distributions and the saved hosts. Distributions come first, titled
@@ -33,8 +31,8 @@ final class SessionsToolbar implements AutoCloseable {
     private static final String MANAGE = "dev.jasper.remote.sessions.manage";
     private final PluginContext context;
     private final HostStore store;
-    private final Icon icon;
-    private final Icon distroIcon;
+    private final String icon;
+    private final String distroIcon;
     private final BiConsumer<WindowHandle, RemoteHost> activate;
     private final Supplier<List<ShellProfileInfo>> distros;
     private final BiConsumer<WindowHandle, ShellProfileInfo> openDistro;
@@ -44,12 +42,12 @@ final class SessionsToolbar implements AutoCloseable {
     private List<String> placed = List.of();
     private Subscription placement;
 
-    SessionsToolbar(PluginContext context, HostStore store, Icon icon, BiConsumer<WindowHandle, RemoteHost> activate,
+    SessionsToolbar(PluginContext context, HostStore store, String icon, BiConsumer<WindowHandle, RemoteHost> activate,
                     Consumer<WindowHandle> showHosts, Supplier<List<ShellProfileInfo>> distros,
                     BiConsumer<WindowHandle, ShellProfileInfo> openDistro) {
         this.context = context; this.store = store; this.icon = icon; this.activate = activate;
         this.distros = distros; this.openDistro = openDistro;
-        this.distroIcon = context.appearance().icon(IconName.TERMINAL);
+        this.distroIcon = "terminal";
         manage = context.actions().register(ActionSpec.of(MANAGE, "Manage Sessions...").withIcon(icon),
             invoked -> showHosts.accept(invoked.window()));
         refresh();

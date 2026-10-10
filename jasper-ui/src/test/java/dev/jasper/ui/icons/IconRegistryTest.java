@@ -11,6 +11,18 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class IconRegistryTest {
+    @Test void sharedBuiltinArtworkSurvivesIndependentRegistryAndCustomLifetimes() {
+        var first=new IconRegistry();
+        try(var second=new IconRegistry()) {
+            first.register("owner:custom","M 2 2 L 14 14");
+            assertThat(second.names()).doesNotContain("owner:custom");
+            var before=paint(second.icon("file",KitFixtures.dark().semantic(),Nodes.Hue.NONE,16));
+            first.close();
+            assertThat(second.names()).contains("file").doesNotContain("owner:custom");
+            var after=paint(second.icon("file",KitFixtures.dark().semantic(),Nodes.Hue.NONE,16));
+            assertThat(after.getRGB(0,0,16,16,null,0,16)).containsExactly(before.getRGB(0,0,16,16,null,0,16));
+        }
+    }
     @Test void everySourceNameRendersInEverySizeThemeAndSelection() {
         try (var registry = new IconRegistry()) {
             assertThat(registry.names()).contains("add", "more", "collapse", "search", "lock", "edit", "delete", "copy", "reveal",

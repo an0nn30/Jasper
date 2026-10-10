@@ -33,7 +33,7 @@ class HostsPanelTest {
     final ShellProfileInfo debian = new ShellProfileInfo("wsl:Debian", "Debian", ShellProfileInfo.Kind.WSL, Optional.of("WSL 2"));
     final ShellProfileInfo pwsh = new ShellProfileInfo("pwsh", "PowerShell 7", ShellProfileInfo.Kind.LOCAL_SHELL, Optional.empty());
 
-    HostsPanel panel() { return new HostsPanel(new FakeKit("dev.jasper.remote"), actions, dev.jasper.sdk.testing.FakeBundledIcon::new); }
+    HostsPanel panel() { return new HostsPanel(new FakeKit("dev.jasper.remote"), actions); }
 
     HostsPanel withDistros() {
         var panel = panel();
@@ -175,7 +175,7 @@ class HostsPanelTest {
         edt(() -> {
             long[] now = {0};
             // The interval is injected (500 ms here), so the machine's double-click setting never decides the outcome.
-            var panel = new HostsPanel(new FakeKit("dev.jasper.remote"), actions, dev.jasper.sdk.testing.FakeBundledIcon::new, () -> now[0], 500_000_000L);
+            var panel = new HostsPanel(new FakeKit("dev.jasper.remote"), actions, () -> now[0], 500_000_000L);
             panel.setHosts(List.of(prod, nas), Optional.empty());
             String nasStar = star(panel, indexOf(panel, nas)).action(), prodStar = star(panel, indexOf(panel, prod)).action();
             press(panel.view(), nasStar);
@@ -192,19 +192,19 @@ class HostsPanelTest {
     @Test void theStarsDoubleClickIntervalIsTheInjectedOne() throws Exception {
         edt(() -> {
             long[] now = {0};
-            var shortInterval = new HostsPanel(new FakeKit("dev.jasper.remote"), actions, dev.jasper.sdk.testing.FakeBundledIcon::new, () -> now[0], 100_000_000L);
+            var shortInterval = new HostsPanel(new FakeKit("dev.jasper.remote"), actions, () -> now[0], 100_000_000L);
             shortInterval.setHosts(List.of(nas), Optional.empty());
             String nasStar = star(shortInterval, indexOf(shortInterval, nas)).action();
             press(shortInterval.view(), nasStar);
             now[0] += 120_000_000L; press(shortInterval.view(), nasStar);
             assertThat(events).as("120 ms is past a 100 ms interval: two clicks").containsExactly("favorite nas true", "favorite nas true");
             events.clear();
-            var longInterval = new HostsPanel(new FakeKit("dev.jasper.remote"), actions, dev.jasper.sdk.testing.FakeBundledIcon::new, () -> now[0], 900_000_000L);
+            var longInterval = new HostsPanel(new FakeKit("dev.jasper.remote"), actions, () -> now[0], 900_000_000L);
             longInterval.setHosts(List.of(nas), Optional.empty());
             press(longInterval.view(), nasStar);
             now[0] += 700_000_000L; press(longInterval.view(), nasStar);
             assertThat(events).as("700 ms is within a 900 ms interval: one double click").containsExactly("favorite nas true");
-            assertThatThrownBy(() -> new HostsPanel(new FakeKit("dev.jasper.remote"), actions, dev.jasper.sdk.testing.FakeBundledIcon::new, () -> 0, -1))
+            assertThatThrownBy(() -> new HostsPanel(new FakeKit("dev.jasper.remote"), actions, () -> 0, -1))
                 .isInstanceOf(IllegalArgumentException.class);
         });
     }
@@ -623,7 +623,7 @@ class HostsPanelTest {
     @Test void closingThePanelMakesLateUpdatesInert() throws Exception {
         edt(() -> {
             var kit = new RecordingKit("dev.jasper.remote");
-            var panel = new HostsPanel(kit, actions, dev.jasper.sdk.testing.FakeBundledIcon::new);
+            var panel = new HostsPanel(kit, actions);
             panel.setHosts(List.of(prod), Optional.empty());
             panel.close();
             panel.setHosts(List.of(prod, nas), Optional.empty()); panel.setDistros(List.of(ubuntu), p -> 0); panel.shown(); panel.focusWhenOpened();

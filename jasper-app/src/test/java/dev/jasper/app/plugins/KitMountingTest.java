@@ -19,7 +19,7 @@ class KitMountingTest {
             model.content().addHost(new dev.jasper.app.contributions.ContentHost(main,false,e -> {if(failMain.get())throw new IllegalStateException("recovery failed");holder.add(e.component());},e -> holder.remove(e.component()),e -> {},() -> {}));
             model.content().addHost(new dev.jasper.app.contributions.ContentHost(separate,true,e -> {throw new IllegalStateException("destination failed");},e -> {},e -> {},() -> {}));
             model.content().setFactory(detached -> detached?separate:main);
-            var terminals=new HostedTerminals("test.kit",new CapabilityGate("test.kit",java.util.Set.of()),fixture.registry,Runnable::run,() -> true,() -> true,new HostedSessions("test.kit",containment,Runnable::run,id -> null));
+            var terminals=new HostedTerminals("test.kit",new CapabilityGate("test.kit",java.util.Set.of()),fixture.registry,Runnable::run,() -> true,() -> true,new HostedSessions("test.kit",containment,Runnable::run,id -> null, name -> new javax.swing.ImageIcon()));
             var ui=new HostedUi("test.kit",model,containment,Runnable::run,() -> true,() -> true,getClass().getClassLoader(),() -> dev.jasper.sdk.Variant.DARK,h -> () -> {},AppContractTest.headlessWindows(),terminals);
             var kit=new HostedKit("test.kit",() -> true,ui::kitThemes,ui.appearance(),containment);ui.kit(kit);
             var disposed=new AtomicInteger();var original=kit.create(HostedKitTest.custom(Nodes.CustomKind.EDITOR,"doc"),e -> {});
@@ -89,12 +89,12 @@ class KitMountingTest {
             var containment=new Containment(java.awt.EventQueue::isDispatchThread,failures::add);
             var model=new dev.jasper.app.contributions.Contributions();
             var fixture=new TerminalFixture();
-            var terminals=new HostedTerminals("test.kit",new CapabilityGate("test.kit",java.util.Set.of()),fixture.registry,Runnable::run,() -> true,() -> true,new HostedSessions("test.kit",containment,Runnable::run,id -> null));
+            var terminals=new HostedTerminals("test.kit",new CapabilityGate("test.kit",java.util.Set.of()),fixture.registry,Runnable::run,() -> true,() -> true,new HostedSessions("test.kit",containment,Runnable::run,id -> null, name -> new javax.swing.ImageIcon()));
             var ui=new HostedUi("test.kit",model,containment,Runnable::run,() -> true,() -> true,getClass().getClassLoader(),() -> dev.jasper.sdk.Variant.DARK,h -> () -> {},AppContractTest.headlessWindows(),terminals);
             var kit=new HostedKit("test.kit",() -> true,ui::kitThemes,ui.appearance(),containment);ui.kit(kit);
             var disposed=new AtomicInteger();
             var spec=new PanelSpec("test.kit.files","Files","folder",Anchor.LEFT).withSplit();
-            var registration=ui.panels().registerView(spec,h -> {
+            var registration=ui.panels().register(spec,h -> {
                 var view=kit.create(HostedKitTest.custom(Nodes.CustomKind.EDITOR,"doc"),e -> {});
                 view.registerContent(new CustomContent("doc",Nodes.CustomKind.EDITOR,new JTextArea(),disposed::incrementAndGet));return view;
             });
@@ -102,7 +102,7 @@ class KitMountingTest {
             var site=new dev.jasper.app.contributions.PanelSite(fixture.addWindow(),() -> {},() -> {},() -> true);
             assertThat(entry.factory().apply(site)).isInstanceOf(dev.jasper.ui.swing.KitView.class);
             site.notifyClosed();site.notifyClosed();registration.close();assertThat(disposed.get()).isEqualTo(1);
-            ui.panels().registerView(new PanelSpec("test.kit.bad","Bad","folder",Anchor.LEFT),h -> {throw new IllegalStateException("failure");});
+            ui.panels().register(new PanelSpec("test.kit.bad","Bad","folder",Anchor.LEFT),h -> {throw new IllegalStateException("failure");});
             assertThat(model.panels().getFirst().factory().apply(site)).isNull();assertThat(failures).hasSize(1);
             ui.closeAll();kit.close();
         });
@@ -118,12 +118,12 @@ class KitMountingTest {
             var containment=new Containment(java.awt.EventQueue::isDispatchThread,failures::add);
             var model=new dev.jasper.app.contributions.Contributions();
             var fixture=new TerminalFixture();
-            var terminals=new HostedTerminals("test.kit",new CapabilityGate("test.kit",java.util.Set.of()),fixture.registry,Runnable::run,() -> true,() -> true,new HostedSessions("test.kit",containment,Runnable::run,id -> null));
+            var terminals=new HostedTerminals("test.kit",new CapabilityGate("test.kit",java.util.Set.of()),fixture.registry,Runnable::run,() -> true,() -> true,new HostedSessions("test.kit",containment,Runnable::run,id -> null, name -> new javax.swing.ImageIcon()));
             var ui=new HostedUi("test.kit",model,containment,Runnable::run,() -> true,() -> true,getClass().getClassLoader(),() -> dev.jasper.sdk.Variant.DARK,h -> () -> {},AppContractTest.headlessWindows(),terminals);
             var kit=new HostedKit("test.kit",() -> true,ui::kitThemes,ui.appearance(),containment);ui.kit(kit);
             var calls=new java.util.ArrayList<String>();
-            var icon=new ImageIcon();
-            ui.panels().registerView(new PanelSpec("test.kit.hosts","Hosts","folder",Anchor.LEFT),host -> {
+            var icon="file";
+            ui.panels().register(new PanelSpec("test.kit.hosts","Hosts","folder",Anchor.LEFT),host -> {
                 host.setHeader(new PanelHeader("3",true,java.util.List.of(
                     new PanelHeader.Action("New session",icon,() -> calls.add("new")),
                     new PanelHeader.Action("Broken",icon,() -> {throw new IllegalStateException("header failed");}))));
@@ -142,7 +142,7 @@ class KitMountingTest {
             assertThat(header.detail()).isEqualTo("3");
             assertThat(header.active()).isTrue();
             assertThat(header.actions()).extracting(dev.jasper.app.contributions.PanelHeaderState.Action::label).containsExactly("New session","Broken");
-            assertThat(header.actions().getFirst().icon()).isSameAs(icon);
+            assertThat(header.actions().getFirst().icon().getIconWidth()).isEqualTo(16);
             header.actions().forEach(action -> action.invoke().run());
             assertThat(calls).containsExactly("new");
             assertThat(failures).as("a failing header action is contained").hasSize(1);

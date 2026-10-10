@@ -17,11 +17,16 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SamplePluginTest {
+    private static void start(FakePluginHost host,PluginInfo info,Set<String> requires,Set<String> optional,dev.jasper.sdk.plugin.Plugin plugin) {
+        Runnable start=() -> host.start(info,requires,optional,plugin);
+        if(javax.swing.SwingUtilities.isEventDispatchThread()){start.run();return;}
+        try{javax.swing.SwingUtilities.invokeAndWait(start);}catch(Exception failure){throw new AssertionError(failure);}
+    }
     private static final PluginInfo INFO = new PluginInfo("dev.jasper.sample", "Sample", "0.1.0", Set.of());
 
     @Test void isInertByDefault() {
         try (var host = new FakePluginHost()) {
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.active("dev.jasper.sample")).isTrue();
             assertThat(host.runBackground()).isZero();
             host.flush();
@@ -34,7 +39,7 @@ class SamplePluginTest {
         try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.sample", "demo_activity", true);
             host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.runBackground()).isEqualTo(1);
             host.flush();
             assertThat(host.activityLog()).first().satisfies(event -> {
@@ -52,14 +57,14 @@ class SamplePluginTest {
     @Test void reportsAnOutOfRangeStepDelay() {
         try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.sample", "demo_step_millis", 60_000L);
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.settingsReports("dev.jasper.sample")).containsExactly("demo_step_millis: Use a whole number from 0–5000.");
         }
     }
 
     @Test void offersItsOwnSettingsPage() throws Exception {
         javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.declared("dev.jasper.sample"))
                 .containsExactly("demo_activity", "demo_ui", "demo_terminal", "demo_session", "demo_scope", "demo_step_millis");
             var page = host.settingsPanel("dev.jasper.sample").orElseThrow();
@@ -92,7 +97,7 @@ class SamplePluginTest {
             host.activateTerminalWindow(window);
             host.setSetting("dev.jasper.sample", "demo_ui", true);
             host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             javax.swing.SwingUtilities.invokeAndWait(() -> {
                 host.openPanel("dev.jasper.sample.panel", window);
                 var panel = host.panelView("dev.jasper.sample.panel", window).orElseThrow();
@@ -125,7 +130,7 @@ class SamplePluginTest {
 
     @Test void contributesNothingToTheChromeByDefault() {
         try (var host = new FakePluginHost()) {
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.actions()).isEmpty();
             assertThat(host.toolbar()).isEmpty();
             assertThat(host.status()).isEmpty();
@@ -136,7 +141,7 @@ class SamplePluginTest {
         try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.sample", "demo_ui", true);
             host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.failures()).isEmpty();
             assertThat(host.actions()).contains("dev.jasper.sample.demo|Run Sample Activity|true");
             assertThat(host.toolbar()).containsExactly("button:dev.jasper.sample.demo");
@@ -158,7 +163,7 @@ class SamplePluginTest {
         javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.sample", "demo_ui", true);
             host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.failures()).isEmpty();
             assertThat(host.panels()).containsExactly("dev.jasper.sample.panel|Sample|LEFT");
             assertThat(host.rail()).containsExactly("dev.jasper.sample.about");
@@ -181,7 +186,7 @@ class SamplePluginTest {
                 SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty(), "zsh"));
             host.activateTerminalWindow(window);
             host.setSetting("dev.jasper.sample", "demo_terminal", true);
-            host.start(OBSERVING, Set.of(), Set.of(), new SamplePlugin());
+            start(host,OBSERVING, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.failures()).isEmpty();
             assertThat(host.menu("context")).contains("item:dev.jasper.sample.greet");
             assertThat(host.status()).as("hidden until a command finishes").noneMatch(line -> line.startsWith("dev.jasper.sample.last"));
@@ -200,7 +205,7 @@ class SamplePluginTest {
     @Test void theTerminalDemoIsSkippedWithoutItsCapabilities() {
         try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.sample", "demo_terminal", true);
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.active("dev.jasper.sample")).isTrue();
             assertThat(host.failures()).isEmpty();
             assertThat(host.actions()).noneMatch(line -> line.startsWith("dev.jasper.sample.greet"));
@@ -213,7 +218,7 @@ class SamplePluginTest {
             host.activateTerminalWindow(window);
             host.setSetting("dev.jasper.sample", "demo_session", true);
             host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
-            host.start(new PluginInfo("dev.jasper.sample", "Sample", "0.1.0", Set.of(Capabilities.SESSION_PROVIDE)), Set.of(), Set.of(), new SamplePlugin());
+            start(host,new PluginInfo("dev.jasper.sample", "Sample", "0.1.0", Set.of(Capabilities.SESSION_PROVIDE)), Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.failures()).isEmpty();
             assertThat(host.invoke("dev.jasper.sample.echo", window, null)).isTrue();
             assertThat(host.openRequests()).containsExactly("session-tab|" + window + "|Sample echo");
@@ -237,7 +242,7 @@ class SamplePluginTest {
                 UUID pane = host.addTerminalPane(tab, new PaneInfo("zsh", Optional.of(Path.of("/src")), Optional.empty(), 80, 24, true,
                     SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty(), "zsh"));
                 host.setSetting("dev.jasper.sample", "demo_scope", true);
-                host.start(new PluginInfo("dev.jasper.sample", "Sample", "0.1.0", Set.of(Capabilities.PALETTE_CONTRIBUTE, Capabilities.TERMINAL_INJECT)),
+                start(host,new PluginInfo("dev.jasper.sample", "Sample", "0.1.0", Set.of(Capabilities.PALETTE_CONTRIBUTE, Capabilities.TERMINAL_INJECT)),
                     Set.of(), Set.of(), new SamplePlugin());
                 assertThat(host.failures()).isEmpty();
                 assertThat(host.scopes()).containsExactly("dev.jasper.sample.greetings|Greetings|paste,paste_run");
@@ -251,32 +256,12 @@ class SamplePluginTest {
             }
         }
 
-    @Test void theDemoActionAndStatusItemUseThePluginFlaskSvg() {
-        try (var host = new FakePluginHost()) {
-            host.setSetting("dev.jasper.sample", "demo_ui", true);
-            var delegate = new SamplePlugin();
-            var paths = new java.util.ArrayList<String>();
-            host.start(INFO, Set.of(), Set.of(), new dev.jasper.sdk.plugin.Plugin() {
-                public void start(dev.jasper.sdk.plugin.PluginContext context) throws Exception {
-                    var appearance = (dev.jasper.sdk.ui.Appearance) java.lang.reflect.Proxy.newProxyInstance(
-                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.ui.Appearance.class}, (proxy, method, args) -> {
-                            if (method.getName().equals("icon") && args != null && args.length == 1 && args[0] instanceof String path)
-                                paths.add(path);
-                            try { return method.invoke(context.appearance(), args); }
-                            catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
-                        });
-                    var wrapped = (dev.jasper.sdk.plugin.PluginContext) java.lang.reflect.Proxy.newProxyInstance(
-                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.plugin.PluginContext.class}, (proxy, method, args) -> {
-                            if (method.getName().equals("appearance")) return appearance;
-                            try { return method.invoke(context, args); }
-                            catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
-                        });
-                    delegate.start(wrapped);
-                }
-                public void stop() { delegate.stop(); }
-            });
+    @Test void demoActionAndPanelUseRegisteredMonochromeFlask() {
+        try(var host=new FakePluginHost()) {
+            host.setSetting("dev.jasper.sample","demo_ui",true);
+            start(host,INFO,Set.of(),Set.of(),new SamplePlugin());
             assertThat(host.failures()).isEmpty();
-            assertThat(paths).containsExactly("dev/jasper/sample/flask.svg", "dev/jasper/sample/flask.svg");
+            assertThat(host.actionSpec("dev.jasper.sample.demo").orElseThrow().icon()).contains("dev.jasper.sample:flask");
         }
     }
 }

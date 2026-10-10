@@ -73,6 +73,22 @@ class CommandPaletteTest {
         return row;
     }
 
+    @Test void semanticCustomArtworkReachesRowsAndClosesWithTheReceivingPalette() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var source=KitTestSupport.context();
+            var palette=palette(source,true,new ArrayList<>());
+            var icon=new dev.jasper.app.platform.PresentationIcon("owner:custom","M 2 2 L 14 14");
+            palette.setEntries(List.of(new PaletteEntry.Item(COMMANDS,new PaletteRow("custom","Custom",null,null,icon,true,null))),null,null);
+            var list=(dev.jasper.ui.model.Nodes.ItemList)palette.resultsView().spec().root();
+            assertThat(((dev.jasper.ui.model.Nodes.Icon)list.items().getFirst().leading().orElseThrow()).name()).isEqualTo("owner:custom");
+            assertThat(palette.kit().icons().names()).contains("owner:custom");
+            assertThat(source.icons().names()).doesNotContain("owner:custom");
+            palette.setEntries(List.of(),null,null);
+            assertThat(palette.kit().icons().names()).doesNotContain("owner:custom");
+            palette.close();assertThatIllegalStateException().isThrownBy(() -> palette.kit().icons().names());
+        });
+    }
+
     @Test void queryNotifiesWhenClearedAndKeepsNativeEditingActions() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var changes = new ArrayList<String>();

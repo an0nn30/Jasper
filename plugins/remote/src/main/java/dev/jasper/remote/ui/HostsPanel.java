@@ -3,7 +3,6 @@ package dev.jasper.remote.ui;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
-import dev.jasper.sdk.ui.BundledIcon;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.ListItem;
 import dev.jasper.sdk.ui.MenuItem;
@@ -52,7 +51,6 @@ public final class HostsPanel implements AutoCloseable {
     private static final String WSL_GROUP = "group.wsl", ERROR = "error";
 
     private final Actions actions;
-    private final Function<BundledIcon, javax.swing.Icon> icons;
     private final UiView view;
     private final Set<String> collapsed = new HashSet<>();
     private boolean wslCollapsed;
@@ -80,19 +78,19 @@ public final class HostsPanel implements AutoCloseable {
     private long lastStarAt;
 
     /** {@code icons} supplies the header actions' artwork, which the window draws. */
-    public HostsPanel(UiKit kit, Actions actions, Function<BundledIcon, javax.swing.Icon> icons) {
-        this(kit, actions, icons, System::nanoTime, multiClickNanos());
+    public HostsPanel(UiKit kit, Actions actions) {
+        this(kit, actions, System::nanoTime, multiClickNanos());
     }
 
     /**
      * {@code clock} (nanoseconds) and {@code multiClickNanos} (the desktop's double-click interval) tell a double click on a
      * star from two separate clicks.
      */
-    HostsPanel(UiKit kit, Actions actions, Function<BundledIcon, javax.swing.Icon> icons, LongSupplier clock, long multiClickNanos) {
+    HostsPanel(UiKit kit, Actions actions, LongSupplier clock, long multiClickNanos) {
         this.clock = Objects.requireNonNull(clock);
         if (multiClickNanos < 0) throw new IllegalArgumentException("multiClickNanos must not be negative");
         this.multiClickNanos = multiClickNanos;
-        this.actions = Objects.requireNonNull(actions); this.icons = Objects.requireNonNull(icons);
+        this.actions = Objects.requireNonNull(actions);
         this.activate = actions.connect();
         rebuildRows();
         view = kit.create(new ViewSpec(node()), this::handle);
@@ -294,8 +292,8 @@ public final class HostsPanel implements AutoCloseable {
         if (count == headerCount) return;
         headerCount = count;
         headerChanged.accept(new PanelHeader(String.valueOf(count), false, List.of(
-            new PanelHeader.Action("New session", icons.apply(BundledIcon.GENERAL_ADD), () -> { if (!closed) actions.edit().accept(Optional.empty()); }),
-            new PanelHeader.Action("Import sessions", icons.apply(BundledIcon.GENERAL_IMPORT), () -> { if (!closed) actions.importConfig().run(); }))));
+            new PanelHeader.Action("New session", "add", () -> { if (!closed) actions.edit().accept(Optional.empty()); }),
+            new PanelHeader.Action("Import sessions", "download", () -> { if (!closed) actions.importConfig().run(); }))));
     }
 
     private static ControlState state(boolean visible) { return new ControlState(visible, true, false, ""); }

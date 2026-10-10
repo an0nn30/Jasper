@@ -2,7 +2,6 @@ package dev.jasper.sdk.ui;
 
 import java.util.List;
 import java.util.Objects;
-import javax.swing.Icon;
 
 /** Something a plugin places in the main toolbar. The application draws it in the toolbar's own style. */
 public sealed interface ToolbarItem permits ToolbarItem.Button, ToolbarItem.Dropdown {
@@ -23,7 +22,7 @@ public sealed interface ToolbarItem permits ToolbarItem.Button, ToolbarItem.Drop
      * @param title non-blank label
      * @param actionIds one or more actions this plugin registered; copied
      */
-    record Dropdown(Icon icon, String title, List<String> actionIds) implements ToolbarItem {
+    record Dropdown(String icon, String title, List<String> actionIds) implements ToolbarItem {
         /** Validates and copies. */
         public Dropdown {
             Objects.requireNonNull(icon, "icon");
@@ -49,5 +48,5 @@ public sealed interface ToolbarItem permits ToolbarItem.Button, ToolbarItem.Drop
      * @param actionIds one or more actions this plugin registered
      * @return the item
      */
-    static ToolbarItem menu(Icon icon, String title, List<String> actionIds) { return new Dropdown(icon, title, actionIds); }
+    static ToolbarItem menu(String icon, String title, List<String> actionIds) { return new Dropdown(icon, title, actionIds); }
 }

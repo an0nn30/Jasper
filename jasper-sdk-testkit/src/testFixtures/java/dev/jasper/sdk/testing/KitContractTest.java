@@ -274,6 +274,10 @@ public abstract class KitContractTest {
         assertThat(events).isEmpty();
         for(var id:List.of("root","secret","unknown"))
             assertThatThrownBy(() -> view.selectAll(id)).isInstanceOf(IllegalArgumentException.class);
+        view.update(new ViewSpec(new Nodes.Field("field",ControlState.READY,Nodes.FieldKind.TEXTAREA,"old","","Search","")));
+        view.selectAll("field");
+        assertThat(fieldSelection(view,"field")).containsExactly(0,3);
+        assertThat(events).isEmpty();
         view.close();assertThatThrownBy(() -> view.selectAll("field")).isInstanceOf(IllegalStateException.class);stop(kit);
     }); }
     @Test void editorAcceptsAPurposeBuiltCanvasButRejectsOrdinaryRoots() throws Exception { edt(() -> {

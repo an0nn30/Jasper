@@ -20,7 +20,7 @@ class FakeContractTest extends PluginContractTest {
             }
             @Override public List<String> settingsReports(String pluginId) { return host.settingsReports(pluginId); }
             @Override public void start(PluginInfo info, Set<String> requires, Set<String> optional, Plugin plugin) {
-                host.start(info, requires, optional, plugin);
+                ui(() -> host.start(info, requires, optional, plugin));
             }
             @Override public boolean active(String pluginId) { return host.active(pluginId); }
             @Override public void setWorkspace(dev.jasper.sdk.Variant variant, dev.jasper.sdk.ui.WorkspacePalette palette,
@@ -28,7 +28,10 @@ class FakeContractTest extends PluginContractTest {
                 host.setWorkspace(variant, palette, editor, syntax);
             }
             @Override public void setWorkspaceOpacity(double opacity) { host.setWorkspaceOpacity(opacity); }
-            @Override public void ui(Runnable action) { action.run(); }
+            @Override public void ui(Runnable action) {
+                if(javax.swing.SwingUtilities.isEventDispatchThread()){action.run();return;}
+                try {javax.swing.SwingUtilities.invokeAndWait(action);}catch(Exception failure){throw new AssertionError(failure);}
+            }
             @Override public void flush() { host.flush(); }
             @Override public <T> void publishApp(Topic<T> topic, T payload) { host.publishApp(topic, payload); }
             @Override public List<ActivityEvent> activityLog() { return host.activityLog(); }

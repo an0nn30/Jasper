@@ -24,7 +24,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
-import javax.swing.Icon;
 
 /**
  * "Recent files": the files the Editor opened, newest first. A query matches the name, host or location, ignoring
@@ -47,7 +46,7 @@ public final class RecentFilesScope implements PaletteScope {
     private final Supplier<Instant> clock;
     private final BiConsumer<EditorDocument, WindowOwner> open;
     private final NotificationGroup notifications;
-    private final Icon icon;
+    private final String icon;
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
 
     /**
@@ -59,7 +58,7 @@ public final class RecentFilesScope implements PaletteScope {
      * @param icon the tab icon, or null
      */
     public RecentFilesScope(RecentFiles recent, Reopeners reopeners, Supplier<Instant> clock, BiConsumer<EditorDocument, WindowOwner> open,
-                            NotificationGroup notifications, Icon icon) {
+                            NotificationGroup notifications, String icon) {
         this.recent = Objects.requireNonNull(recent); this.reopeners = Objects.requireNonNull(reopeners);
         this.clock = Objects.requireNonNull(clock); this.open = Objects.requireNonNull(open); this.notifications = Objects.requireNonNull(notifications);
         this.icon = icon;

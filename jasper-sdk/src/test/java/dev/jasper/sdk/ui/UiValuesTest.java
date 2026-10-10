@@ -27,7 +27,7 @@ class UiValuesTest {
         assertThat(spec.otherDefaultBinding()).isEmpty();
         assertThat(spec.context()).isEqualTo(ShortcutContext.global());
         var paired = spec.withDefaultBindings("cmd+alt+1", "alt+1").withContext(ShortcutContext.panel("dev.x.tool.hosts"))
-            .withKeywords(List.of("hosts")).withIcon(new javax.swing.ImageIcon());
+            .withKeywords(List.of("hosts")).withIcon("file");
         assertThat(paired.defaultBinding()).hasValue("cmd+alt+1");
         assertThat(paired.otherDefaultBinding()).hasValue("alt+1");
         assertThat(paired.context()).isEqualTo(ShortcutContext.panel("dev.x.tool.hosts"));
@@ -42,11 +42,11 @@ class UiValuesTest {
     @Test void toolbarItemsAndStatusSpecsValidate() {
         assertThat(ToolbarItem.action("dev.x.run")).isEqualTo(new ToolbarItem.Button("dev.x.run"));
         var ids = new ArrayList<>(List.of("dev.x.a", "dev.x.b"));
-        var dropdown = (ToolbarItem.Dropdown) ToolbarItem.menu(new javax.swing.ImageIcon(), "Hosts", ids);
+        var dropdown = (ToolbarItem.Dropdown) ToolbarItem.menu("file", "Hosts", ids);
         ids.clear();
         assertThat(dropdown.actionIds()).containsExactly("dev.x.a", "dev.x.b");
-        assertThatIllegalArgumentException().isThrownBy(() -> ToolbarItem.menu(new javax.swing.ImageIcon(), " ", List.of("dev.x.a")));
-        assertThatIllegalArgumentException().isThrownBy(() -> ToolbarItem.menu(new javax.swing.ImageIcon(), "Hosts", List.of()));
+        assertThatIllegalArgumentException().isThrownBy(() -> ToolbarItem.menu("file", " ", List.of("dev.x.a")));
+        assertThatIllegalArgumentException().isThrownBy(() -> ToolbarItem.menu("file", "Hosts", List.of()));
         assertThatNullPointerException().isThrownBy(() -> ToolbarItem.menu(null, "Hosts", List.of("dev.x.a")));
         assertThatNullPointerException().isThrownBy(() -> ToolbarItem.action(null));
 

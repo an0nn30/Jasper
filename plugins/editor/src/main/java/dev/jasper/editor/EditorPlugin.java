@@ -19,7 +19,6 @@ import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.ActionSpec;
-import dev.jasper.sdk.ui.IconName;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.StandardMenu;
 import java.awt.GraphicsEnvironment;
@@ -68,7 +67,7 @@ public final class EditorPlugin implements Plugin {
         Reopeners reopeners = new Reopeners(file -> new LocalDocument(file, context.background()));
         recent = RecentFiles.load(context.dataDirectory().resolve("recent-files.toml"), context.background(), settings::recentFilesDays, Instant.now());
         var scope = new RecentFilesScope(recent, reopeners, Instant::now, (document, owner) -> window().open(document, owner),
-            context.notifications().group(), context.appearance().icon(IconName.FILE));
+            context.notifications().group(), "file");
         context.settings().onChanged(() -> ui.execute(() -> { if (window != null) window.apply(); }));
         context.settings().onChanged(() -> ui.execute(() -> { recent.prune(Instant.now()); scope.changed(); }));
         context.appearance().onWorkspaceChanged(variant -> ui.execute(() -> { if (window != null) window.apply(); }));
@@ -83,7 +82,7 @@ public final class EditorPlugin implements Plugin {
             @Override public Subscription opener(Predicate<OpenRequest> handler) { return openers.register(handler); }
             @Override public Subscription locationDocuments(String sourceId, LocationResolver resolver) { return locations.register(sourceId, resolver); }
         });
-        context.actions().register(ActionSpec.of(OPEN, "Open in Editor…").withIcon(context.appearance().icon(IconName.FILE))
+        context.actions().register(ActionSpec.of(OPEN, "Open in Editor…").withIcon("file")
                 .withKeywords(List.of("editor", "open", "file", "edit")).withDefaultBinding("cmd+o"),
             invoked -> window().openFrom(invoked.window(), invoked.pane()));
         context.actions().register(ActionSpec.of(NEW, "New Editor File").withKeywords(List.of("editor", "new", "file", "untitled")),

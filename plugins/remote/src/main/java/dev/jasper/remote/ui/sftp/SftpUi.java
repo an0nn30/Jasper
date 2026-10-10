@@ -19,7 +19,7 @@ import java.util.function.*;
 
 /**
  * Per-window explorers and captured picker flows; the coordinator owns all queued jobs. Each window's explorer is an
- * owned kit view ({@code registerView}); its dialogs (host chooser, new folder, delete, existing items, Copy to host) are
+ * owned kit view ({@code register}); its dialogs (host chooser, new folder, delete, existing items, Copy to host) are
  * kit forms from {@code context.kit()}, each closed with its dialog. Back, Forward and the parent folder are panel
  * shortcuts (Alt+Left, Alt+Right, Alt+Up by default) anywhere in the SFTP panel, listed in the Keymap.
  */
@@ -54,7 +54,7 @@ public final class SftpUi implements AutoCloseable {
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
                   Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,dev.jasper.remote.ui.transfers.TransferStrip> transferStrip,Consumer<WindowHandle> releaseStrip,Consumer<String> clipboard) {
         this.context=context;this.ui=ui;this.background=background;this.connections=connections;this.endpoints=endpoints;this.transfers=transfers;this.hosts=hosts;this.activePane=activePane;this.transferStrip=transferStrip;this.releaseStrip=releaseStrip;this.clipboard=clipboard;
-        context.panels().registerView(new PanelSpec(PANEL,"SFTP",context.appearance().icon(IconName.FOLDER),Anchor.LEFT).withToggleActionId(TOGGLE).withSplit(),this::create);
+        context.panels().register(new PanelSpec(PANEL,"SFTP","folder",Anchor.LEFT).withToggleActionId(TOGGLE).withSplit(),this::create);
         // Ruling G6: the old panel-wide Alt+Left/Alt+Right and the table's Alt+Up, now rebindable panel shortcuts.
         shortcut(BACK,"SFTP: Back","alt+left",SftpPanel::back);
         shortcut(FORWARD,"SFTP: Forward","alt+right",SftpPanel::forward);

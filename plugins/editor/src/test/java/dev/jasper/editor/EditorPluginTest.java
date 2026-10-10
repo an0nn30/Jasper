@@ -236,7 +236,7 @@ class EditorPluginTest {
             var appearance = consumer.get().appearance();
             var editor = new EditorPalette(new Color(0x202020), Color.WHITE, Color.YELLOW,
                 Color.BLUE, Color.GRAY, Color.BLACK, Color.LIGHT_GRAY);
-            host.setWorkspace(appearance.workspaceVariant(), WorkspacePalette.current(), editor, new SyntaxPalette(styles));
+            host.setWorkspace(appearance.workspaceVariant(), appearance.workspacePalette(), editor, new SyntaxPalette(styles));
             host.flush();
             assertThat(area.getSyntaxScheme().getStyle(TokenTypes.RESERVED_WORD).foreground)
                 .isEqualTo(styles.get(SyntaxRole.KEYWORD).color());

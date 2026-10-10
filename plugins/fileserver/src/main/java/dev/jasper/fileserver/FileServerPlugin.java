@@ -30,7 +30,6 @@ import dev.jasper.sdk.ui.ActionContext;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Anchor;
 import dev.jasper.sdk.ui.DialogSpec;
-import dev.jasper.sdk.ui.IconName;
 import dev.jasper.sdk.ui.PanelHost;
 import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
@@ -150,11 +149,11 @@ public final class FileServerPlugin implements Plugin {
         registry = new ServerRegistry(Engines.factory(new LoginThrottle(Clock.systemUTC()), environment.nics(), tls, settings::passiveRange, hostKey), logins,
             context.background(), environment.ui(), Clock.systemUTC(), settings.activityEntries::get, this::observe);
         store = new DefinitionStore(context.dataDirectory().resolve("servers.toml"), context.background(), environment.ui());
-        var icon = context.appearance().icon(IconName.SERVER);
+        var icon = "server";
         context.actions().register(ActionSpec.of(SHOW, "Toggle File Servers").withIcon(icon)
                 .withKeywords(List.of("file server", "share", "http", "ftp", "sftp", "tftp", "panel")),
             invoked -> context.panels().toggle(PANEL, invoked.window()));
-        context.actions().register(ActionSpec.of(NEW, "New File Server…").withIcon(context.appearance().icon(IconName.ADD))
+        context.actions().register(ActionSpec.of(NEW, "New File Server…").withIcon("add")
                 .withKeywords(List.of("file server", "share", "folder", "http")),
             invoked -> edit(invoked.window(), Optional.empty(), false));
         stopAll = context.actions().register(ActionSpec.of(STOP_ALL, "Stop All File Servers").withKeywords(List.of("file server", "stop", "share")),
@@ -185,7 +184,7 @@ public final class FileServerPlugin implements Plugin {
         scope = new FileServerScope(() -> registry.servers(), environment.home(), this::toggle,
             (window, id) -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)), SERVERS);
         context.palette().register(scope);
-        context.panels().registerView(new PanelSpec(PANEL, "File Servers", "server", Anchor.LEFT).withToggleActionId(SHOW), this::createPanel);
+        context.panels().register(new PanelSpec(PANEL, "File Servers", "server", Anchor.LEFT).withToggleActionId(SHOW), this::createPanel);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 70));
         status.setIcon(icon);
         status.setAction(SHOW);
@@ -247,7 +246,7 @@ public final class FileServerPlugin implements Plugin {
             id -> registry.password(id).ifPresent(environment.clipboard()), registry::clearActivity,
             id -> showFingerprints(window, id)),
             registry::activity, environment.home(), ServerRows.firewallHint(environment.osName()), environment.zone(),
-            context.appearance().icon(IconName.ADD));
+            "add");
         panel.onHeaderChanged(host::setHeader);
         panel.setTlsFingerprint(tls.cachedFingerprint());
         panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
@@ -334,7 +333,7 @@ public final class FileServerPlugin implements Plugin {
         if (!Engines.AVAILABLE.contains(protocol)) return;
         String type = protocol.label() + (tls ? "S" : "");
         String id = ID + ".share-" + type.toLowerCase(Locale.ROOT);
-        context.actions().register(ActionSpec.of(id, type).withIcon(context.appearance().icon(IconName.SERVER))
+        context.actions().register(ActionSpec.of(id, type).withIcon("server")
                 .withKeywords(List.of("file server", "share path", "folder", type.toLowerCase(Locale.ROOT))),
             invoked -> sharePath(invoked, protocol, tls));
         menu.add(id);

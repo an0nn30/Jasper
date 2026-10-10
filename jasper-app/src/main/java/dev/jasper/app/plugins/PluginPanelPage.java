@@ -97,12 +97,11 @@ final class PluginPanelPage implements SettingsPage {
         if(disposed)throw new IllegalStateException("Settings page is closed");
         if (body != null) return body;
         var made = new AtomicReference<JComponent>();
-        Throwable failure = containment.attempt(pluginId, "settings page", () -> { var owned=panel instanceof SettingsPanel.View ? java.util.Objects.requireNonNull(((SettingsPanel.View)panel).createView(rowHost),"Settings view") : null;
-            if(owned!=null){
-                var next=kit.requireOwned(owned);next.mount(this);view=next;view.hostSpec=kitRows::refresh;
+        Throwable failure = containment.attempt(pluginId, "settings page", () -> { var owned=java.util.Objects.requireNonNull(panel.create(rowHost),"Settings view");
+            var next=kit.requireOwned(owned);next.mount(this);view=next;view.hostSpec=kitRows::refresh;
                 view.hostEvents=event -> {boolean handled=kitRows.event(event);if(handled)refreshRows();return handled;};
                 made.set(view.component());
-            }else made.set(panel.create(rowHost)); return null; });
+            return null; });
         content = failure == null && made.get() != null ? made.get() : failed(failure);
         body = new PluginPageBody(message, content);
         PluginPageBody.showMessage(message, declared);
@@ -173,16 +172,8 @@ final class PluginPanelPage implements SettingsPage {
     /** What the plugin's page may use: standard rows and the page's draft. */
     private final class Host implements SettingsPanelHost {
         private void guard(){if(disposed)throw new IllegalStateException("Settings page is closed");}
-        @Override public dev.jasper.sdk.ui.Nodes.Node rowNode(dev.jasper.sdk.settings.Setting<?> setting){guard();return kitRows.row(setting);}
+        @Override public dev.jasper.sdk.ui.Nodes.Node row(dev.jasper.sdk.settings.Setting<?> setting){guard();return kitRows.row(setting);}
 
-        @Override public JComponent row(dev.jasper.sdk.settings.Setting<?> setting) {
-            guard();DeclaredSetting<?> handle = declared.handle(setting);
-            var spec = SchemaPage.page(id() + "." + handle.key(), title);
-            PluginSettingsPage.row(spec, handle);
-            SchemaPage page = spec.build(own);
-            rows.add(page);
-            return new KeepsHeight(page.component());
-        }
 
         @SuppressWarnings("unchecked")
         @Override public <T> T pending(dev.jasper.sdk.settings.Setting<T> setting) {

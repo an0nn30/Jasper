@@ -23,7 +23,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import javax.swing.Icon;
 
 /**
  * "Files": every indexed project's files, ranked by {@link FileMatcher} with the current project first. Enter opens a
@@ -69,7 +68,7 @@ public final class FilesScope implements PaletteScope {
     private final Projects projects;
     private final Hooks hooks;
     private final String shortcutActionId;
-    private final Icon icon;
+    private final String icon;
     private final Deque<FileRef> recent = new ArrayDeque<>();
 
     /**
@@ -78,7 +77,7 @@ public final class FilesScope implements PaletteScope {
      * @param shortcutActionId the Go to File action, registered before the scope
      * @param icon the tab icon, or null
      */
-    public FilesScope(Projects projects, Hooks hooks, String shortcutActionId, Icon icon) {
+    public FilesScope(Projects projects, Hooks hooks, String shortcutActionId, String icon) {
         this.projects = Objects.requireNonNull(projects, "projects");
         this.hooks = Objects.requireNonNull(hooks, "hooks");
         this.shortcutActionId = Objects.requireNonNull(shortcutActionId, "shortcutActionId");

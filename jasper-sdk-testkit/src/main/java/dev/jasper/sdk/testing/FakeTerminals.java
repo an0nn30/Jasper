@@ -248,7 +248,10 @@ final class FakeTerminals implements Terminals {
     private void requireFor(OpenRequest request) {
         switch (Objects.requireNonNull(request, "request")) {
             case OpenRequest.Local local -> require(Capabilities.TERMINAL_OPEN);
-            case OpenRequest.Session session -> require(Capabilities.SESSION_PROVIDE);
+            case OpenRequest.Session session -> {
+                require(Capabilities.SESSION_PROVIDE);
+                session.spec().icon().ifPresent(context.kit()::validateIcon);
+            }
         }
     }
 }

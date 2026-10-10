@@ -15,8 +15,7 @@ import java.util.Optional;
 
 /**
  * What cards, history rows and the Errors window share: the severity glyph and module values read from the chrome
- * KitContext (colours, fonts and the former geometry as named metrics). Nothing here reads UIManager. A poster's own
- * icon is not shown on this branch (ruling P5/G7): the SDK still carries it as a raw icon until Task 11 makes it named.
+ * KitContext (colours, fonts and the former geometry as named metrics). Nothing here reads UIManager. Named poster artwork retains the severity tint; absent artwork uses the severity glyph.
  * EDT only.
  */
 final class NotificationStyle {
@@ -41,9 +40,10 @@ final class NotificationStyle {
     }
 
     /** The notification's severity glyph, tinted by its severity. */
-    static Nodes.Icon icon(String id, Notification notification) {
+    static Nodes.Icon icon(String id, Notification notification, dev.jasper.app.platform.PresentationIcons icons) {
         Severity severity = notification.request().severity();
-        return new Nodes.Icon(id, ControlState.READY, glyph(severity), Nodes.Hue.NONE, Nodes.IconSize.RAIL, severityName(severity),
+        var name = notification.request().icon().flatMap(value -> icons.name(value)).orElseGet(() -> glyph(severity));
+        return new Nodes.Icon(id, ControlState.READY, name, Nodes.Hue.NONE, Nodes.IconSize.RAIL, severityName(severity),
             Optional.of(tone(severity)));
     }
 

@@ -11,17 +11,17 @@ import java.util.List;
 import java.util.Optional;
 
 /** The sample Settings page uses host-owned draft rows, including its 0–5000 ms step delay. */
-final class SampleSettingsPanel implements SettingsPanel.View {
+final class SampleSettingsPanel implements SettingsPanel {
     private final UiKit kit;
     private final SampleSettings settings;
 
     SampleSettingsPanel(UiKit kit, SampleSettings settings) { this.kit = kit; this.settings = settings; }
 
-    @Override public UiView createView(SettingsPanelHost host) {
+    @Override public UiView create(SettingsPanelHost host) {
         return kit.create(new ViewSpec(new Nodes.Form("sample.settings", ControlState.READY, Nodes.FormKind.SETTINGS,
             "Sample", Optional.empty(), List.of(
-                host.rowNode(settings.activity), host.rowNode(settings.ui), host.rowNode(settings.terminal),
-                host.rowNode(settings.session), host.rowNode(settings.scope), host.rowNode(settings.stepMillis)),
+                host.row(settings.activity), host.row(settings.ui), host.row(settings.terminal),
+                host.row(settings.session), host.row(settings.scope), host.row(settings.stepMillis)),
             Optional.empty(), List.of())), event -> { });
     }
 

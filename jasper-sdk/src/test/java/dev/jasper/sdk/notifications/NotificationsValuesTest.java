@@ -46,7 +46,7 @@ class NotificationsValuesTest {
         assertThat(NotificationAction.of("Go", () -> { }).expires()).isTrue();
         Runnable body = () -> { };
         var cause = new IllegalStateException("x");
-        var icon = new ImageIcon();
+        var icon = "file";
         var rich = NotificationSpec.of(Severity.ERROR, "t").withActivate(body).withCause(cause).withIcon(icon);
         assertThat(rich.activate()).containsSame(body);
         assertThat(rich.cause()).containsSame(cause);

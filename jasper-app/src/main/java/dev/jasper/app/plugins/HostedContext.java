@@ -77,7 +77,7 @@ final class HostedContext implements PluginContext {
         this.executor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("jasper-plugin-" + id + "-", 0).factory());
         this.gate = new CapabilityGate(id, hosted.info().capabilities());
         HostedTerminals[] self = new HostedTerminals[1];
-        var sessions = new HostedSessions(id, host.containment, host.cleanup, paneId -> self[0].detachedPaneHandle(paneId));
+        var sessions = new HostedSessions(id, host.containment, host.cleanup, paneId -> self[0].detachedPaneHandle(paneId), name -> uiIcon(name));
         this.terminals = new HostedTerminals(id, gate, host.environment.terminals(), host.environment.ui(), host.environment.onUi(),
             () -> state != State.CLOSED, sessions, host.environment.profiles(), host.containment);
         self[0] = terminals;
@@ -92,8 +92,10 @@ final class HostedContext implements PluginContext {
         this.palette = new HostedPalette(id, gate, host.environment.contributions(), host.containment, ui, terminals);
         this.fileSources = new HostedFileSources(id, gate, host.environment.contributions(), host.containment, ui, terminals);
         this.notifications = new HostedNotifications(id, hosted.info().name(), host.environment.notifications(), host.containment,
-            host.environment.ui(), host.environment.onUi());
+            host.environment.ui(), host.environment.onUi(), ui::icon, ui::validateIcon);
     }
+
+    private javax.swing.Icon uiIcon(String name){return ui.icon(name);}
 
     private void requireOpen() {
         if (state == State.CLOSED) throw new IllegalStateException("Plugin context is closed: " + id);

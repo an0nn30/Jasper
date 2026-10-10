@@ -6,6 +6,54 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 class HostedKitTest {
  static ViewSpec custom(Nodes.CustomKind kind,String content){return new ViewSpec(new Nodes.Custom("node",ControlState.READY,content,kind,"Document"));}
+ @Test void presentationIconsFollowTheirPaintRouteAndSameVariantThemeChanges() throws Exception {SwingUtilities.invokeAndWait(() -> {
+  var light=dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+  var dark=dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.Theme.DARK);
+  var other=dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.DARCULA);
+  var themes=new java.util.concurrent.atomic.AtomicReference<>(new dev.jasper.ui.theme.ThemePair(light,dark));
+  var kit=new HostedKit("owner",() -> true,themes::get,null,new Containment(java.awt.EventQueue::isDispatchThread));
+  dev.jasper.ui.swing.FlatLafInstaller.install(light);
+  var icon=kit.icon("add");var chrome=new JPanel();var workspace=new JPanel();workspace.putClientProperty("Jasper.zone","workspace");workspace.putClientProperty("Jasper.workspaceTheme",dark);
+  try(var registry=new dev.jasper.ui.icons.IconRegistry()) {
+   assertThat(icon.getIconWidth()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(registry.size(dev.jasper.ui.model.Nodes.IconSize.RAIL)));
+   assertThat(icon.getIconHeight()).isEqualTo(icon.getIconWidth());
+   assertThat(pixels(icon,chrome)).containsExactly(pixels(registry.icon("add",light.semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,16),chrome));
+   assertThat(pixels(icon,workspace)).containsExactly(pixels(registry.icon("add",dark.semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,16),workspace));
+   var before=pixels(icon,workspace);themes.set(new dev.jasper.ui.theme.ThemePair(light,other));workspace.putClientProperty("Jasper.workspaceTheme",other);
+   assertThat(pixels(icon,workspace)).containsExactly(pixels(registry.icon("add",other.semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,16),workspace));
+   assertThat(pixels(icon,workspace)).isNotEqualTo(before);
+   kit.close();
+  } finally {new dev.jasper.app.appearance.ThemeController();}
+ });}
+ @Test void customPresentationSnapshotsOutliveTheSenderAndBelongToReceivingViews() throws Exception {SwingUtilities.invokeAndWait(() -> {
+  var pair=dev.jasper.app.appearance.ThemeTestSupport.pair(false);
+  var kit=new HostedKit("owner",() -> true,() -> pair,null,new Containment(java.awt.EventQueue::isDispatchThread));
+  var registration=kit.registerIcon(new IconAsset("owner:custom","M 2 2 L 14 14"));
+  var icon=kit.icon("owner:custom");
+  try(var receiver=new dev.jasper.app.platform.PresentationIcons();var binding=new dev.jasper.ui.theme.ThemeBinding(pair,e -> {throw new AssertionError(e);});var original=new dev.jasper.ui.icons.IconRegistry()) {
+   var source=new dev.jasper.ui.swing.KitContext(binding,dev.jasper.ui.theme.ThemeRoute.WORKSPACE,dev.jasper.ui.metrics.DesignMetrics.DEFAULT,original,() -> false);
+   var context=receiver.context(source);
+   assertThat(context.binding()).isSameAs(binding);assertThat(context.route()).isEqualTo(source.route());
+   assertThat(context.metrics()).isSameAs(source.metrics());assertThat(context.animationsEnabled()).isSameAs(source.animationsEnabled());
+   assertThat(receiver.name(icon)).contains("owner:custom");
+   assertThat(original.names()).doesNotContain("owner:custom");
+   registration.close();assertThatIllegalArgumentException().isThrownBy(() -> kit.icon("owner:custom"));kit.close();
+   receiver.reset();assertThat(context.icons().names()).doesNotContain("owner:custom");
+   // History may remount an expired record after its original plugin stopped: only the immutable path crosses.
+   assertThat(receiver.name(icon)).contains("owner:custom");
+   var first=pixels(context.icons().icon("owner:custom",context.theme().semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,16),new JPanel());
+   var other=dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.DARCULA);
+   binding.publish(new dev.jasper.ui.theme.ThemePair(pair.chrome(),other));
+   var next=pixels(context.icons().icon("owner:custom",context.theme().semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,16),new JPanel());
+   assertThat(next).isNotEqualTo(first);
+   receiver.close();assertThatIllegalStateException().isThrownBy(() -> context.icons().names());
+  }
+ });}
+ private static int[] pixels(javax.swing.Icon icon,java.awt.Component component) {
+  var image=new java.awt.image.BufferedImage(16,16,java.awt.image.BufferedImage.TYPE_INT_ARGB);var graphics=image.createGraphics();
+  try{icon.paintIcon(component,graphics,0,0);}finally{graphics.dispose();}
+  return image.getRGB(0,0,16,16,null,0,16);
+ }
  @Test void customLifecycleAndOrdinaryControlRejection() throws Exception {SwingUtilities.invokeAndWait(() -> {
   var kit=new HostedKit("editor",() -> true,() -> dev.jasper.app.appearance.ThemeTestSupport.pair(false),null,new Containment(java.awt.EventQueue::isDispatchThread));
   var view=kit.create(custom(Nodes.CustomKind.EDITOR,"doc"),e -> {});
@@ -79,7 +127,9 @@ class HostedKitTest {
    public java.awt.Color color(SemanticColor role){return source.color(role);}
    public dev.jasper.sdk.Variant variant(){return source.variant();}
    public double workspaceOpacity(java.awt.Component component){return source.workspaceOpacity(component);}
-   public javax.swing.Icon icon(String path){return source.icon(path);}
+   public WorkspacePalette workspacePalette(){return source.workspacePalette();}
+   public EditorPalette editorPalette(){return source.editorPalette();}
+   public SyntaxPalette syntaxPalette(){return source.syntaxPalette();}
    public dev.jasper.sdk.Subscription onChanged(java.util.function.Consumer<dev.jasper.sdk.Variant> handler){var subscription=source.onChanged(handler);themeSubscriptions.incrementAndGet();return () -> {subscription.close();themeSubscriptions.decrementAndGet();};}
    public dev.jasper.sdk.Subscription onWorkspaceChanged(java.util.function.Consumer<dev.jasper.sdk.Variant> handler){var subscription=source.onWorkspaceChanged(handler);workspaceSubscriptions.incrementAndGet();return () -> {subscription.close();workspaceSubscriptions.decrementAndGet();};}
   };

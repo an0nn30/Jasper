@@ -41,7 +41,7 @@ public final class FakeKitView implements UiView {
   fieldSelections.keySet().removeIf(id -> !(nodes.get(id) instanceof Nodes.Field));
   var previous=spec==null ? Map.<String,Nodes.Node>of() : index(spec.root());
   for(var node:nodes.values())if(node instanceof Nodes.Field field) {
-   if(!(previous.get(field.id()) instanceof Nodes.Field old) || !old.value().equals(field.value())) {
+   if(!(previous.get(field.id()) instanceof Nodes.Field old) || old.kind()!=field.kind() || !old.value().equals(field.value())) {
     fieldText.put(field.id(),field.value());fieldSelections.remove(field.id());
    }
   }

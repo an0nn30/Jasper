@@ -40,12 +40,8 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
 
     private void guard() { if (closed) throw new IllegalStateException("Settings page is closed"); }
 
-    @Override public JComponent row(Setting<?> setting) {
-        guard();
-        return new JLabel(settings.handle(setting).spec().label());
-    }
 
-    @Override public Nodes.Node rowNode(Setting<?> setting) {
+    @Override public Nodes.Node row(Setting<?> setting) {
         guard();
         var handle = settings.handle(setting);
         var row = rows.computeIfAbsent("settings:" + handle.key(), ignored -> new Row(handle));
@@ -119,7 +115,7 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
                 var owned = rows.values().stream().filter(value -> row.id().equals("settings:" + value.setting.key() + ":row")).findFirst();
                 if (owned.isPresent()) {
                     // Rebuilt from the draft, keeping the presentation the plugin asked for (its search highlight).
-                    var fresh = (Nodes.SettingRow) rowNode(owned.get().setting);
+                    var fresh = (Nodes.SettingRow) row(owned.get().setting);
                     return new Nodes.SettingRow(fresh.id(), fresh.state(), fresh.title(), fresh.description(), fresh.control(), fresh.dependent(),
                         row.highlighted() || KitSettingRows.matches(owned.get().setting.spec(), query));
                 }

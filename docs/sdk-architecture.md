@@ -286,37 +286,13 @@ disagree, the implementation is wrong, not the contract.
 Explicit commands in `LocalSpec`, and a stronger locality signal than the host name, such as a
 per-session token from Jasper's own shell integration.
 
-## Semantic and plugin icons (SDK 0.7.4)
+## Semantic presentation icons (SDK 0.15)
 
-SDK 0.8.0 removed `OldGnomeIcon` and `Appearance.icon(String, OldGnomeIcon)`; plugins use
-`icon(IconName)` or `icon(String)`.
-
-HostedUi and FakePluginContext implement `Appearance.icon(IconName)`; no contribution
-record changes. HostedUi converts enum names into validated app-native catalog keys at the
-plugin boundary. SDK types never enter platform/workspace/contribution production packages.
-
-Shared action, menu and palette icons stay 16px. WindowContributions also populates Swing's
-SMALL_ICON property so menu items receive the compact artwork. SVG foreground recoloring
-stays live. See [the icon catalog and compatibility contract](sdk-icons.md).
-
-### Host-owned semantic catalog (SDK 0.7.4)
-
-`Appearance.icon(IconName)` is now preferred. The SDK carries meanings only. HostedUi
-translates the enum at the boundary; AppIcons/NamedIcons select the app-owned SVG, never
-the plugin loader. The old custom overload remains supported. Vault uses semantic LOCK/UNLOCK
-in its status/menu and manager controls. The fake returns inspectable `FakeNamedIcon(name)`;
-older custom Appearance implementations inherit an explicit UnsupportedOperationException for
-this method until they implement it.
-
-### Chrome icons and session tab icons (SDK 0.7.6)
-
-- `IconName` gains `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`. Artwork is now IntelliJ New UI SVG (0.8.2),
-  vendored under `jasper-app/.../icons/intellij/` (Apache-2.0, hash-pinned in `assets.tsv`).
-- Behaviour change: `Appearance.icon(String)` no longer recolours to the chrome foreground. It
-  draws the SVG as authored; FlatLaf's global colour filter maps IntelliJ light-palette colours
-  to the running theme. Grey `#6E6E6E` artwork looks as before.
-- `SessionSpec.icon` is no longer reserved: it is the tab icon. Empty shows `IconName.TERMINAL`.
-  Inside the app the icon travels opaquely on `SessionRequest`.
+All standard presentation icon boundaries carry semantic strings. HostedKit validates the
+plugin's scoped registry and produces paint-time theme-resolved icons only inside app.plugins.
+Host-native contribution values may still carry Swing Icon; no arbitrary Icon enters through SDK.
+The fake validates the same built-ins and owned registrations. Manifest identity previews remain
+an app-managed image path, separate from ordinary presentation. See [icons](sdk-icons.md).
 
 SDK 0.7.2 adds `Panels.toggle(panelId, window)` for a plugin's own registered panel.
 It dispatches the same per-window lazy toggle as the rail; the app and testkit both
@@ -347,16 +323,6 @@ Remote owns its SFTP endpoints and persistent SQLite transfer store. Its accepte
 loops start while the plugin context is live; stop signals them synchronously, and they
 quiesce endpoints and close the queue/lock without submitting new shutdown tasks. The app
 knows only the SDK contributions, not transfer state or SFTP classes.
-
-### Full New UI icon catalog (SDK 0.8.2)
-
-`Appearance.icon(BundledIcon)` exposes 885 generated choices from the complete platform and
-Terminal New UI collections. HostedUi translates the enum to an app-native ID; AppIcons
-validates it against the generated index and caches the host-owned SVG. No SDK type enters
-app.platform. Icons select dark siblings live and preserve aspect ratio in a 16px square.
-The fake returns `FakeBundledIcon`; older hosts inherit an explicit unsupported default.
-Vault manager controls and Remote page chevrons now use semantic icons, removing their
-private painters. See [the catalog contract](sdk-icons.md).
 
 ### Provider remote-directory hints (SDK 0.8.3)
 
@@ -511,6 +477,19 @@ commands in `LocalSpec` remain a separate decision. Remote uses this for its WSL
 plugin content. Header actions use the normal plugin containment boundary. Closing a site clears
 its metadata and invalidates retained callbacks. The testkit exposes `panelHeader(id, windowId)`
 for inspecting and invoking the same per-window contract (and `closePanel(id, windowId)` to discard an instance).
-A panel whose content is a kit `Panel` view (`registerView`) shows the same metadata in its own header row, which the
+A panel whose content is a kit `Panel` view (`register`) shows the same metadata in its own header row, which the
 window borrows: `ToolWindowArea` passes it to the module's host-only `KitView.setPanelHostHeader`, so there is never
 a second header. The shared `PluginContractTest` covers the contract on the host and the fake.
+
+### SDK 0.15 admission and public factory boundary
+
+PanelFactory.create and SettingsPanel.create return UiView, Panels.register accepts the final factory,
+and SettingsPanelHost.row returns Nodes.Node. WindowSurface and Windows.openTab accept only owned views.
+PanelSpec has a single semantic String icon component. Appearance palettes are explicit host contracts;
+SDK palette current()/UIManager fallback readers and raw artwork loaders are gone.
+
+PluginResolver remains pure version/dependency selection. PluginLoader checks exact removed JVM
+owner/name/descriptors, removed types and directly implemented old factory declarations before class
+initialization. It examines effective JarFile multi-release entries for JBR 25 and ignores inactive
+future/non-multi variants. Generic erasure and reflection remain limits; linkage errors are still
+contained during entry creation and callbacks. Internal legacy app style/catalog cleanup is Task 11b.

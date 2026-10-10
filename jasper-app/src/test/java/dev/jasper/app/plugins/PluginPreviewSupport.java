@@ -51,23 +51,7 @@ public final class PluginPreviewSupport implements AutoCloseable {
             var settings = context.settings();
             var ui = settings.declare(SettingSpec.of("demo_ui", SettingKind.bool(), false).label("Show the sample action"));
             var delay = settings.declare(SettingSpec.of("demo_step_millis", SettingKind.integer(0, 5000), 300).label("Step delay"));
-            settings.page(rows -> {
-                var page = new JPanel();
-                page.setLayout(new BoxLayout(page, BoxLayout.Y_AXIS));
-                page.setOpaque(false);
-                JComponent row = rows.row(ui);
-                row.setAlignmentX(0);
-                page.add(row);
-                var slider = new JSlider(0, 5000, rows.pending(delay));
-                var own = new JPanel(new BorderLayout(8, 0));
-                own.setOpaque(false);
-                own.setBorder(BorderFactory.createEmptyBorder(8, 20, 8, 20));
-                own.setAlignmentX(0);
-                own.add(new JLabel("Step delay"), BorderLayout.WEST);
-                own.add(slider, BorderLayout.CENTER);
-                page.add(own);
-                return page;
-            });
+            settings.page(rows -> context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("sample",dev.jasper.sdk.ui.ControlState.READY,dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL,List.of(rows.row(ui),rows.row(delay)))), e -> {}));
         });
     }
 

@@ -12,7 +12,6 @@ import dev.jasper.app.dock.Slot;
 import dev.jasper.app.contributions.PanelSite;
 import dev.jasper.app.contributions.StatusEntry;
 import dev.jasper.app.contributions.ToolbarEntry;
-import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.sdk.Subscription;
@@ -82,7 +81,6 @@ final class HostedUi {
     private final Consumer<Runnable> ui;
     private final BooleanSupplier onUi;
     private final BooleanSupplier open;
-    private final ClassLoader loader;
     private final Supplier<Variant> variant;
     private final Function<Consumer<Variant>, Subscription> themeSubscriber;
     private final AuxiliaryWindows windows;
@@ -113,7 +111,7 @@ final class HostedUi {
              Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> subscribe,
              GlassSource glass) {
         this.pluginId = pluginId; this.model = model; this.containment = containment; this.ui = ui; this.onUi = onUi;
-        this.open = open; this.loader = loader; this.variant = variant; this.themeSubscriber = themeSubscriber;
+        this.open = open; this.variant = variant; this.themeSubscriber = themeSubscriber;
         this.windows = windows;
         this.terminals = terminals;
         this.glass = glass == null ? GlassSource.NONE : glass;
@@ -199,7 +197,7 @@ final class HostedUi {
             requireNamespace(spec.id(), "An action");
             spec.context().id().ifPresent(owned -> requireNamespace(owned,
                 spec.context().kind() == ShortcutContext.Kind.PANEL ? "A panel context" : "A window context"));
-            ActionEntry entry = model.addAction(spec.id(), spec.title(), spec.icon().orElse(null), spec.keywords(),
+            ActionEntry entry = model.addAction(spec.id(), spec.title(), spec.icon().map(HostedUi.this::icon).orElse(null), spec.keywords(),
                 spec.defaultBinding(), spec.otherDefaultBinding(), keyContext(spec.context()),
                 invocation -> containment.run(pluginId, "action " + spec.id(), () ->
                     handler.accept(new Context(terminals.windowHandle(invocation.windowId()), invocation.paneId().map(terminals::paneHandle)))));
@@ -231,7 +229,7 @@ final class HostedUi {
                 case ToolbarItem.Button button -> { requireOwn(button.actionId()); yield new ToolbarEntry.Button(button.actionId()); }
                 case ToolbarItem.Dropdown dropdown -> {
                     dropdown.actionIds().forEach(this::requireOwn);
-                    yield new ToolbarEntry.Dropdown(dropdown.icon(), dropdown.title(), dropdown.actionIds());
+                    yield new ToolbarEntry.Dropdown(icon(dropdown.icon()), dropdown.title(), dropdown.actionIds());
                 }
             };
             var registration = model.addToolbar(entry);
@@ -267,10 +265,11 @@ final class HostedUi {
             guard("add");
             requireNamespace(spec.id(), "A status item");
             StatusEntry entry = model.addStatus(spec.id(), spec.side() == Side.LEFT, spec.priority());
-            Subscription removal = tracked(entry::close);
+            var closed = new AtomicBoolean();
+            Subscription removal = tracked(() -> {closed.set(true);entry.close();});
             return new StatusItem() {
                 @Override public void setText(String text) { requireUi("setText"); entry.setText(text); }
-                @Override public void setIcon(Icon icon) { requireUi("setIcon"); entry.setIcon(icon); }
+                @Override public void setIcon(String icon) { requireUi("setIcon"); if(!closed.get())entry.setIcon(icon(icon)); }
                 @Override public void setTooltip(String text) { requireUi("setTooltip"); entry.setTooltip(text); }
                 @Override public void setAction(String actionId) {
                     requireUi("setAction");
@@ -313,6 +312,9 @@ final class HostedUi {
         return new dev.jasper.ui.theme.ThemePair(theme, theme);
     }
 
+    Icon icon(String name) { return name == null ? null : kit.icon(name); }
+    void validateIcon(String name) { if(name != null) kit.validateIcon(name); }
+
     Appearance appearance() {
         return new Appearance() {
             @Override public java.awt.Color color(dev.jasper.sdk.ui.SemanticColor role) { requireUi("color"); return kitThemes().chrome().semantic().color(dev.jasper.ui.theme.SemanticColor.valueOf(java.util.Objects.requireNonNull(role).name())); }
@@ -323,18 +325,15 @@ final class HostedUi {
             @Override public Variant workspaceVariant() { return HostedUi.this.workspaceVariant(); }
             @Override public dev.jasper.sdk.ui.WorkspacePalette workspacePalette() {
                 requireUi("workspacePalette");
-                return appearanceSnapshot == null ? dev.jasper.sdk.ui.WorkspacePalette.current()
-                    : HostedPalettes.workspace(appearanceSnapshot.workspace());
+                return HostedPalettes.workspace(kitThemes().workspace());
             }
             @Override public dev.jasper.sdk.ui.EditorPalette editorPalette() {
                 requireUi("editorPalette");
-                return appearanceSnapshot == null ? dev.jasper.sdk.ui.EditorPalette.current()
-                    : HostedPalettes.editor(appearanceSnapshot.workspace());
+                return HostedPalettes.editor(kitThemes().workspace());
             }
             @Override public dev.jasper.sdk.ui.SyntaxPalette syntaxPalette() {
                 requireUi("syntaxPalette");
-                return appearanceSnapshot == null ? dev.jasper.sdk.ui.SyntaxPalette.current()
-                    : HostedPalettes.syntax(appearanceSnapshot.workspace());
+                return HostedPalettes.syntax(kitThemes().workspace());
             }
             @Override public double workspaceOpacity(java.awt.Component component) {
                 requireUi("workspaceOpacity");
@@ -357,13 +356,6 @@ final class HostedUi {
                 var closed=new AtomicBoolean();Consumer<Variant> guarded=v -> {if(!closed.get())handler.accept(v);};themeHandlers.add(guarded);
                 var removal=tracked(() -> {closed.set(true);themeHandlers.remove(guarded);});return () -> {closed.set(true);removal.close();};
             }
-            @Override public Icon icon(dev.jasper.sdk.ui.IconName name) {
-                return AppIcons.named(java.util.Objects.requireNonNull(name, "name").name());
-            }
-            @Override public Icon icon(dev.jasper.sdk.ui.BundledIcon name) {
-                return AppIcons.bundled(java.util.Objects.requireNonNull(name, "name").id());
-            }
-            @Override public Icon icon(String svgResourcePath) { return AppIcons.plugin(loader, svgResourcePath); }
         };
     }
 
@@ -378,23 +370,14 @@ final class HostedUi {
             requireNamespace(spec.id(), "A panel");
             spec.toggleActionId().ifPresent(HostedUi.this::requireOwn);
             // Anchor plus split is IntelliJ's anchor plus split: one of the six slots. The SDK's own Side is imported here.
-            var entry = model.addPanel(spec.id(), spec.title(), spec.iconName() == null ? spec.icon() : kit.icon(spec.iconName()),
+            var entry = model.addPanel(spec.id(), spec.title(), icon(spec.icon()),
                 Slot.of(dev.jasper.app.dock.Side.valueOf(spec.defaultAnchor().name()), spec.split()),
                 spec.toggleActionId(), site -> {
                 JComponent[] built = {null};
-                containment.run(pluginId, "panel " + spec.id(), () -> built[0] = factory.create(host(site)));
+                containment.run(pluginId, "panel " + spec.id(), () -> { var host=host(site);var view=kit.requireOwned(factory.create(host));view.mount(host);host.onClosed(view::close);built[0]=view.component(); });
                 return built[0];
             });
             return tracked(entry::close);
-          }
-          @Override public Subscription registerView(dev.jasper.sdk.ui.PanelSpec spec, dev.jasper.sdk.ui.PanelFactory.View factory) {
-            java.util.Objects.requireNonNull(factory);
-            return register(spec, host -> {
-                var view = kit.requireOwned(factory.createView(host));
-                view.mount(host);
-                host.onClosed(view::close);
-                return view.component();
-            });
           }
           @Override public void toggle(String panelId, WindowHandle window) {
             guard("toggle");
@@ -408,12 +391,15 @@ final class HostedUi {
 
     private PanelHost host(PanelSite site) {
         return new PanelHost() {
+            private boolean closed;
+            { site.onClosed(() -> closed=true); }
             @Override public WindowHandle window() { return terminals.windowHandle(site.windowId()); }
             @Override public void setHeader(dev.jasper.sdk.ui.PanelHeader header) {
                 requireUi("setHeader");
+                java.util.Objects.requireNonNull(header);if(closed)return;
                 site.setHeader(new dev.jasper.app.contributions.PanelHeaderState(header.detail(), header.active(),
                     header.actions().stream().map(action -> new dev.jasper.app.contributions.PanelHeaderState.Action(
-                        action.label(), action.icon(), () -> containment.run(pluginId, "panel header action", action.invoke()))).toList()));
+                        action.label(), icon(action.icon()), () -> containment.run(pluginId, "panel header action", action.invoke()))).toList()));
             }
             @Override public void show() { requireUi("show"); site.show(); }
             @Override public void hide() { requireUi("hide"); site.hide(); }
@@ -443,7 +429,6 @@ final class HostedUi {
         final AuxiliarySurface surface;
         HostedKitView mounted;
         Surface(AuxiliarySurface surface) { this.surface = surface; surface.onClosed(() -> { if(mounted!=null){mounted.close();mounted=null;} }); }
-        @Override public void setContent(JComponent content) { requireUi("setContent"); if(surface.closed())return; surface.fitContent(false); surface.setContent(content); if(mounted!=null){mounted.close();mounted=null;} }
         @Override public void setContent(dev.jasper.sdk.ui.UiView content) {
             guard("setContent");
             var next = kit.requireOwned(content);
@@ -496,7 +481,7 @@ final class HostedUi {
     private final class OwnedContent implements dev.jasper.sdk.ui.ContentTab {
         final dev.jasper.app.contributions.ContentEntry entry;
         OwnedContent(dev.jasper.app.contributions.ContentEntry entry) { this.entry = entry; }
-        public void setPresentation(dev.jasper.sdk.ui.ContentPresentation v) { requireUi("content presentation"); entry.presentation(v.title(), v.detail(), v.icon(), v.dirty(), v.location(), v.host()); }
+        public void setPresentation(dev.jasper.sdk.ui.ContentPresentation v) { requireUi("content presentation"); if(entry.closed())return; entry.presentation(v.title(), v.detail(), icon(v.icon()), v.dirty(), v.location(), v.host()); }
         public void setCommands(List<dev.jasper.sdk.ui.ContentCommand> values) { requireUi("content commands"); entry.commands(values.stream().map(v ->
             new dev.jasper.app.contributions.ContentCommand(v.id(), v.title(), v.shortcut(), v.enabled(), () -> containment.run(pluginId, "content command", v.run()))).toList()); }
         public void setStatus(List<dev.jasper.sdk.ui.ContentStatus> values) { requireUi("content status"); entry.status(values.stream().map(v ->
@@ -593,14 +578,14 @@ final class HostedUi {
                 guard("openTab");
                 var view = kit.requireOwned(content);
                 var existing = ownedContent.values().stream().filter(c -> c.entry.key().equals(spec.key())).findFirst();
-                if(existing.isPresent()) return openTab(spec, owner, existing.get().entry.component());
+                if(existing.isPresent()) return openComponent(spec, owner, existing.get().entry.component());
                 // Reserve before publishing: a view cannot be owned by two surface lifetimes.
                 view.mount(spec);
                 // Workspace content takes the workspace theme slot, as terminals and editors do, on an opaque workspace
                 // surface; its specialized content paints its own background or glass above that. Moves keep both.
                 view.route(dev.jasper.ui.theme.ThemeRoute.WORKSPACE, true);
                 try {
-                    var tab = openTab(spec, owner, view.component());
+                    var tab = openComponent(spec, owner, view.component());
                     tab.onClosed(view::close);
                     return tab;
                 } catch(RuntimeException | Error failure) {
@@ -608,7 +593,7 @@ final class HostedUi {
                     view.unmount(spec);throw failure;
                 }
             }
-            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
+            private dev.jasper.sdk.ui.ContentTab openComponent(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
                 guard("openTab");
                 java.util.UUID window = null;
                 if (owner != null) {
