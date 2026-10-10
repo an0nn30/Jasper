@@ -183,8 +183,11 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
             "Search " + name.toLowerCase(Locale.ROOT), "", Optional.empty(), Nodes.FieldPresentation.TRANSPARENT));
     }
 
+    private void renderResults() {
+        presentationIcons.reconcile(() -> render(resultsView, resultsSpec()));
+    }
+
     private ViewSpec resultsSpec() {
-        presentationIcons.reset();
         var items = new ArrayList<ListItem>();
         for (int i = 0; i < entries.size(); i++) items.add(item(i, entries.get(i)));
         Set<String> selection = selected < 0 ? Set.of() : Set.of(id(selected));
@@ -413,7 +416,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         listCard = first < 0 ? EMPTY : RESULTS;
         if (!stepShowing()) cardLayout.show(cards, listCard);
         render(emptyView, emptySpec());
-        render(resultsView, resultsSpec());
+        renderResults();
         updateHint();
         revalidate();
         repaint();
@@ -444,7 +447,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
     private void select(int index) {
         if (index < 0 || index >= entries.size() || !entries.get(index).selectable()) return;
         selected = index;
-        render(resultsView, resultsSpec());
+        renderResults();
         updateHint();
     }
 
@@ -458,7 +461,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
     int itemHeight() { return scaled(DesignMetrics.Role.RESULTS_ROW_HEIGHT); }
 
     /** How many result rows the list shows before it scrolls; section headings among them add their own height. */
-    void setVisibleRows(int rows) { visibleRows = rows; render(resultsView, resultsSpec()); revalidate(); }
+    void setVisibleRows(int rows) { visibleRows = rows; renderResults(); revalidate(); }
     int visibleRows() { return visibleRows; }
 
     String hintText() {

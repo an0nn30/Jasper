@@ -28,7 +28,7 @@ final class HostedKitView implements UiView {
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
  KitView component(){guard();return view;}
  void dispatch(UiEvent event){if(closed.get()||!owner.live())return;try{if(hostEvents.test(event))return;events.accept(event);}catch(Throwable failure){owner.failed();}}
- @Override public void update(ViewSpec next){guard();if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{var projected=hostSpec.apply(next);view.update(KitValues.toModule(projected));sourceSpec=next;spec=projected;}finally{updating=false;}updated.run();}
+ @Override public void update(ViewSpec next){guard();if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{owner.validateIcons(next);var projected=hostSpec.apply(next);if(projected!=next)owner.validateIcons(projected);view.update(KitValues.toModule(projected));sourceSpec=next;spec=projected;}finally{updating=false;}updated.run();}
  @Override public ViewSpec spec(){guard();return spec;}
  /** Host-only original plugin descriptor, before draft/search row projection. */
  ViewSpec sourceSpec(){guard();return sourceSpec;}

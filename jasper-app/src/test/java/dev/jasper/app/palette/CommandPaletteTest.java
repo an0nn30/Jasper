@@ -89,6 +89,23 @@ class CommandPaletteTest {
         });
     }
 
+    @Test void sameRowReplacesCustomArtworkBeforeReleasingThePreviousGlyph() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            for (String nextName : List.of("file", "owner:next")) {
+                var palette=palette(new ArrayList<>());
+                try {
+                    var old=new dev.jasper.app.platform.PresentationIcon("owner:old","M 2 2 L 14 14");
+                    palette.setEntries(List.of(new PaletteEntry.Item(COMMANDS,new PaletteRow("row","Row",null,null,old,true,null))),null,null);
+                    var next=new dev.jasper.app.platform.PresentationIcon(nextName,nextName.contains(":") ? "M 2 14 L 14 2" : null);
+                    palette.setEntries(List.of(new PaletteEntry.Item(COMMANDS,new PaletteRow("row","Row",null,null,next,true,null))),null,null);
+                    var list=(dev.jasper.ui.model.Nodes.ItemList)palette.resultsView().spec().root();
+                    assertThat(((dev.jasper.ui.model.Nodes.Icon)list.items().getFirst().leading().orElseThrow()).name()).isEqualTo(nextName);
+                    assertThat(palette.kit().icons().names()).doesNotContain("owner:old").contains(nextName);
+                } finally { palette.close(); }
+            }
+        });
+    }
+
     @Test void queryNotifiesWhenClearedAndKeepsNativeEditingActions() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var changes = new ArrayList<String>();

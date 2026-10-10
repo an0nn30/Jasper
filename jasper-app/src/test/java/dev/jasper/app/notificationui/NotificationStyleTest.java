@@ -61,4 +61,20 @@ class NotificationStyleTest {
         }
     }
 
+    @Test void coalescedCardReplacesCustomArtworkWithBuiltinAndDifferentCustomArtwork() {
+        for (String nextName : java.util.List.of("file", "owner:next")) {
+            var center = new NotificationCenter(Runnable::run, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC), () -> Delivery.Presence.FOCUSED);
+            center.register(new NotificationGroup("test.cards", "Cards", "jasper", DisplayMode.CARD));
+            var request = NotificationRequest.of("test.cards", Severity.WARNING, "Repeated");
+            var id = center.post(request.withIcon(new dev.jasper.app.platform.PresentationIcon("owner:old", "M 2 2 L 14 14"))).orElseThrow();
+            try (var card = new NotificationCard(dev.jasper.app.testsupport.KitTestSupport.context(), center, center.find(id).orElseThrow(), false)) {
+                var next = new dev.jasper.app.platform.PresentationIcon(nextName, nextName.contains(":") ? "M 2 14 L 14 2" : null);
+                assertThat(center.post(request.withIcon(next))).contains(id);
+                card.update(center.find(id).orElseThrow());
+                assertThat(((Nodes.Icon) card.iconView().spec().root()).name()).isEqualTo(nextName);
+                assertThat(card.notification().count()).isEqualTo(2);
+            }
+        }
+    }
+
 }

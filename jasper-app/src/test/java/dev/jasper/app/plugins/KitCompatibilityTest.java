@@ -97,6 +97,7 @@ class KitCompatibilityTest {
         var loaded=PluginLoader.load(candidate,Map.of(),Plugin.class.getClassLoader());
         try(var loader=loaded.loader()) {
             var plugin=loaded.instantiate();
+            assertThat(plugin.getClass().getClassLoader()).isSameAs(loader);
             javax.swing.SwingUtilities.invokeAndWait(() -> {
                 var host=new dev.jasper.sdk.testing.FakePluginHost();
                 host.start(new dev.jasper.sdk.PluginInfo("test.kit","Kit","1.0.0",Set.of()),Set.of(),Set.of(),plugin);

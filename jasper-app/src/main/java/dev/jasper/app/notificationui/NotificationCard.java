@@ -102,23 +102,24 @@ final class NotificationCard extends JPanel implements AutoCloseable {
     /** Shows {@code next}: the same entry with a new count, or new text. */
     void update(Notification next) {
         if (closed) return;
-        presentationIcons.reset();
-        notification = next;
-        var request = next.request();
-        icon.update(new ViewSpec(NotificationStyle.icon(ICON, next, presentationIcons)));
-        title.setText(request.title());
-        count.setText(next.count() > 1 ? "×" + next.count() : "");
-        count.setVisible(next.count() > 1);
-        content.setText(request.content());
-        content.setVisible(!request.content().isEmpty());
-        fillActions(request.actions());
-        setCursor(request.activate().isPresent() ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) : Cursor.getDefaultCursor());
-        close.update(closeSpec());
-        getAccessibleContext().setAccessibleName(NotificationStyle.severityName(request.severity()) + ": " + request.title());
-        getAccessibleContext().setAccessibleDescription(request.content());
-        arrange(true);
-        revalidate();
-        repaint();
+        presentationIcons.reconcile(() -> {
+            notification = next;
+            var request = next.request();
+            icon.update(new ViewSpec(NotificationStyle.icon(ICON, next, presentationIcons)));
+            title.setText(request.title());
+            count.setText(next.count() > 1 ? "×" + next.count() : "");
+            count.setVisible(next.count() > 1);
+            content.setText(request.content());
+            content.setVisible(!request.content().isEmpty());
+            fillActions(request.actions());
+            setCursor(request.activate().isPresent() ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) : Cursor.getDefaultCursor());
+            close.update(closeSpec());
+            getAccessibleContext().setAccessibleName(NotificationStyle.severityName(request.severity()) + ": " + request.title());
+            getAccessibleContext().setAccessibleDescription(request.content());
+            arrange(true);
+            revalidate();
+            repaint();
+        });
     }
 
     void setHovered(boolean value) {

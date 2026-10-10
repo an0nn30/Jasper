@@ -49,6 +49,30 @@ class HostedKitTest {
    receiver.close();assertThatIllegalStateException().isThrownBy(() -> context.icons().names());
   }
  });}
+ @Test void failedPresentationReconciliationRetainsBothGenerationsUntilRecovery() throws Exception {SwingUtilities.invokeAndWait(() -> {
+  try(var receiver=new dev.jasper.app.platform.PresentationIcons()) {
+   var context=receiver.context(dev.jasper.app.testsupport.KitTestSupport.context());
+   var old=new dev.jasper.app.platform.PresentationIcon("owner:old","M 2 2 L 14 14");
+   var next=new dev.jasper.app.platform.PresentationIcon("owner:next","M 2 14 L 14 2");
+   receiver.reconcile(() -> receiver.name(old));
+   var oldSpec=new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Icon("glyph",dev.jasper.ui.model.ControlState.READY,"owner:old",dev.jasper.ui.model.Nodes.Hue.NONE,dev.jasper.ui.model.Nodes.IconSize.RAIL,"Old"));
+   try(var view=new dev.jasper.ui.swing.KitView(context,oldSpec,e -> {})) {
+    var invalid=new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Stack("invalid",dev.jasper.ui.model.ControlState.READY,dev.jasper.ui.model.Nodes.LayoutRole.VERTICAL,java.util.List.of(
+     new dev.jasper.ui.model.Nodes.Icon("next",dev.jasper.ui.model.ControlState.READY,"owner:next",dev.jasper.ui.model.Nodes.Hue.NONE,dev.jasper.ui.model.Nodes.IconSize.RAIL,"Next"),
+     new dev.jasper.ui.model.Nodes.Icon("missing",dev.jasper.ui.model.ControlState.READY,"missing",dev.jasper.ui.model.Nodes.Hue.NONE,dev.jasper.ui.model.Nodes.IconSize.RAIL,"Missing"))));
+    assertThatIllegalArgumentException().isThrownBy(() -> receiver.reconcile(() -> {receiver.name(next);view.update(invalid);}));
+    assertThat(view.spec()).isEqualTo(oldSpec);
+    assertThat(context.icons().names()).contains("owner:old","owner:next");
+    // The actual previously mounted view remains paintable after failed reconciliation.
+    view.setSize(40,40);var image=new java.awt.image.BufferedImage(40,40,java.awt.image.BufferedImage.TYPE_INT_ARGB);var graphics=image.createGraphics();
+    try{view.doLayout();view.printAll(graphics);}finally{graphics.dispose();}
+    assertThat(java.util.Arrays.stream(image.getRGB(0,0,40,40,null,0,40)).anyMatch(pixel -> pixel!=0)).isTrue();
+    var nextSpec=new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Icon("glyph",dev.jasper.ui.model.ControlState.READY,"owner:next",dev.jasper.ui.model.Nodes.Hue.NONE,dev.jasper.ui.model.Nodes.IconSize.RAIL,"Next"));
+    receiver.reconcile(() -> {receiver.name(next);view.update(nextSpec);});
+    assertThat(context.icons().names()).contains("owner:next").doesNotContain("owner:old");
+   }
+  }
+ });}
  private static int[] pixels(javax.swing.Icon icon,java.awt.Component component) {
   var image=new java.awt.image.BufferedImage(16,16,java.awt.image.BufferedImage.TYPE_INT_ARGB);var graphics=image.createGraphics();
   try{icon.paintIcon(component,graphics,0,0);}finally{graphics.dispose();}

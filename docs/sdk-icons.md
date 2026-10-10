@@ -32,4 +32,4 @@ separate from the kit glyph registry and do not grant a custom standard-control 
 The 0.15 boundary removes `IconName`, `BundledIcon`, their fake raw Icon values, all `Appearance.icon`
 overloads and SDK UIManager palette readers. Declare `sdk = ">=0.15.0, <0.16"` after migrating.
 
-Native palette and notification views retain immutable glyph snapshots in registries scoped to the receiving view. Removing the original registration prevents new use; already-posted notification history can still show its captured glyph after expiry or plugin shutdown. Each receiver resolves tint from its live theme and releases registrations when replaced or closed.
+Native palette and notification views retain immutable glyph snapshots in registries scoped to the receiving view. Removing the original registration prevents new use; already-posted notification history can still show its captured glyph after expiry or plugin shutdown. Each receiver resolves tint from its live theme and releases unused registrations after successful reconciliation or when closed. Failed reconciliation keeps both glyph generations available until recovery or close.

@@ -86,15 +86,16 @@ final class HistoryRow extends JPanel implements AutoCloseable {
     /** The same entry with a new read, count or expired state. */
     void update(Notification next) {
         if (closed) return;
-        presentationIcons.reset();
-        notification = next;
-        title.setRole(role(next));
-        texts();
-        lead.update(leadSpec());
-        body.update(bodySpec());
-        side.update(sideSpec());
-        revalidate();
-        repaint();
+        presentationIcons.reconcile(() -> {
+            notification = next;
+            title.setRole(role(next));
+            texts();
+            lead.update(leadSpec());
+            body.update(bodySpec());
+            side.update(sideSpec());
+            revalidate();
+            repaint();
+        });
     }
 
     private void texts() {

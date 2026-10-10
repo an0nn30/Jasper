@@ -29,6 +29,12 @@ final class HostedKit implements UiKit,AutoCloseable {
     HostedKit(String owner,BooleanSupplier open,Supplier<ThemePair> themes,Appearance appearance,Containment containment,BooleanSupplier animations){this.owner=owner;this.open=open;this.themes=themes;this.appearance=appearance;this.containment=containment;this.animations=Objects.requireNonNull(animations);}
     boolean animationsEnabled(){return animations.getAsBoolean();}
     void validateIcon(String name){if(name != null && !icons.names().contains(name))throw new IllegalArgumentException("Unknown icon: " + name);}
+    void validateIcons(ViewSpec spec) {
+        var available=icons.names();
+        KitIconNames.validate(Objects.requireNonNull(spec), name -> {
+            if (!available.contains(name)) throw new IllegalArgumentException("Unknown icon: " + name);
+        });
+    }
     javax.swing.Icon icon(String name){validateIcon(name);
         var asset=assets.get(name);
         return new dev.jasper.app.platform.PresentationIcon(name, asset == null ? null : asset.pathData());
@@ -44,7 +50,7 @@ final class HostedKit implements UiKit,AutoCloseable {
     void refresh(){guard();if(binding!=null)binding.publish(themes.get());}
     void failed(){KitDiagnostics.failure(containment,owner);}
     void removed(HostedKitView view){views.remove(view);}
-    @Override public HostedKitView create(ViewSpec spec,Consumer<UiEvent> events){initialize();var view=new HostedKitView(this,new KitContext(binding,ThemeRoute.CHROME,DesignMetrics.DEFAULT,icons,animations),spec,events);views.add(view);return view;}
+    @Override public HostedKitView create(ViewSpec spec,Consumer<UiEvent> events){initialize();validateIcons(spec);var view=new HostedKitView(this,new KitContext(binding,ThemeRoute.CHROME,DesignMetrics.DEFAULT,icons,animations),spec,events);views.add(view);return view;}
     @Override public Subscription registerIcon(IconAsset asset) {
         initialize(); Objects.requireNonNull(asset);
         if(!asset.name().startsWith(owner+":"))throw new IllegalArgumentException("Foreign icon namespace");

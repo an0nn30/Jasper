@@ -20,6 +20,82 @@ public abstract class KitContractTest {
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
         new Nodes.Secret("secret",ControlState.READY,"","Password","")))); }
+    @Test void everyDescriptorIconPositionValidatesOwnershipBeforeCreateOrUpdateMutation() throws Exception { edt(() -> {
+        var kit=kit("owner");
+        var foreign=kit("foreign");
+        foreign.registerIcon(new IconAsset("foreign:custom","M 2 2 L 14 14"));
+        try {
+            for (var entry : descriptorIconCases().entrySet()) {
+                var original=spec("Original");
+                var view=kit.create(original,e -> {});
+                view.replaceSecret("secret",new char[]{'s','e','c','r','e','t'});
+                for (String name : List.of("missing", "foreign:custom")) {
+                    var invalid=iconSpec(entry.getValue().apply(name));
+                    assertThatIllegalArgumentException().as(entry.getKey()+" create "+name).isThrownBy(() -> kit.create(invalid,e -> {}));
+                    assertThatIllegalArgumentException().as(entry.getKey()+" update "+name).isThrownBy(() -> view.update(invalid));
+                    assertThat(view.spec()).as(entry.getKey()+" unchanged descriptor").isEqualTo(original);
+                    view.withSecret("secret",value -> assertThat(value).containsExactly('s','e','c','r','e','t'));
+                }
+                var registration=kit.registerIcon(new IconAsset("owner:custom","M 2 2 L 14 14"));
+                for(String name : List.of("file", "owner:custom")) {
+                    var valid=iconSpec(entry.getValue().apply(name));
+                    var created=kit.create(valid,e -> {});assertThat(created.spec()).isEqualTo(valid);created.close();
+                    view.update(valid);assertThat(view.spec()).isEqualTo(valid);
+                }
+                // Remove the live use before unregistering; subsequent contributions must reject the old name.
+                view.update(original);registration.close();
+                var removed=iconSpec(entry.getValue().apply("owner:custom"));
+                assertThatIllegalArgumentException().as(entry.getKey()+" unregistered create").isThrownBy(() -> kit.create(removed,e -> {}));
+                assertThatIllegalArgumentException().as(entry.getKey()+" unregistered update").isThrownBy(() -> view.update(removed));
+                assertThat(view.spec()).isEqualTo(original);view.close();
+                assertThatIllegalStateException().as(entry.getKey()+" closed guard before icon validation").isThrownBy(() -> view.update(removed));
+            }
+            // Empty button/choice cues, blank menu cues and absent Optional row icons remain valid.
+            var empty=new ViewSpec(new Nodes.Stack("empty",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
+                descriptorButton(""),
+                new Nodes.MenuButton("menu-empty",ControlState.READY,"Menu","",Nodes.ButtonKind.GHOST,"",List.of(descriptorMenu("  ")),""),
+                new Nodes.Choice("choice-empty",ControlState.READY,Nodes.ChoiceKind.PICKER,List.of(),"","Pick","pick",""),
+                descriptorTable(Optional.empty(),Optional.empty(),List.of()),
+                new Nodes.Tree("tree-empty",ControlState.READY,List.of(new TreeItem("leaf","Leaf",Optional.empty(),true,List.of())),Set.of(),Set.of(),""))));
+            var view=kit.create(empty,e -> {});view.update(empty);view.close();
+        } finally {stop(kit);stop(foreign);}
+    }); }
+    private static ViewSpec iconSpec(Nodes.Node node) {
+        return new ViewSpec(new Nodes.Stack("outer",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
+            new Nodes.Section("section",ControlState.READY,"Section",new Nodes.Card("card",ControlState.READY,Nodes.CardKind.MIXED,List.of(node))))));
+    }
+    private static Nodes.Icon descriptorIcon(String name) {return new Nodes.Icon("glyph",ControlState.READY,name,Nodes.Hue.NONE,Nodes.IconSize.RAIL,"Glyph");}
+    private static Nodes.Button descriptorButton(String name) {return new Nodes.Button("button",ControlState.READY,"Button",name,Nodes.ButtonKind.GHOST,"run","");}
+    private static MenuItem descriptorMenu(String name) {return new MenuItem("menu-item","Item",name,"run",true,false);}
+    private static Nodes.Table descriptorTable(Optional<String> icon,Optional<List<MenuItem>> rowMenu,List<MenuItem> menu) {
+        return new Nodes.Table("table",ControlState.READY,List.of(new Column("col","Column",Nodes.TextRole.BODY,false)),
+            List.of(new TableRow("row",Map.of("col","Value"),icon,false,rowMenu)),Set.of(),"",menu);
+    }
+    private static Map<String,java.util.function.Function<String,Nodes.Node>> descriptorIconCases() {
+        var cases=new LinkedHashMap<String,java.util.function.Function<String,Nodes.Node>>();
+        cases.put("icon",KitContractTest::descriptorIcon);
+        cases.put("button",KitContractTest::descriptorButton);
+        cases.put("menu-button",name -> new Nodes.MenuButton("menu",ControlState.READY,"Menu",name,Nodes.ButtonKind.GHOST,"",List.of(descriptorMenu("")),""));
+        cases.put("menu-item",name -> new Nodes.MenuButton("menu",ControlState.READY,"Menu","",Nodes.ButtonKind.GHOST,"",List.of(descriptorMenu(name)),""));
+        cases.put("choice",name -> new Nodes.Choice("choice",ControlState.READY,Nodes.ChoiceKind.PICKER,List.of(),"","Pick","pick",name));
+        cases.put("header-overflow",name -> new Nodes.Header("header",ControlState.READY,"Header",OptionalInt.empty(),Optional.empty(),Optional.empty(),List.of(descriptorMenu(name))));
+        cases.put("table-row",name -> descriptorTable(Optional.of(name),Optional.empty(),List.of()));
+        cases.put("table-row-menu",name -> descriptorTable(Optional.empty(),Optional.of(List.of(descriptorMenu(name))),List.of()));
+        cases.put("table-menu",name -> descriptorTable(Optional.empty(),Optional.empty(),List.of(descriptorMenu(name))));
+        cases.put("tree-hidden-child",name -> new Nodes.Tree("tree",ControlState.READY,List.of(new TreeItem("branch","Branch",Optional.empty(),false,List.of(new TreeItem("leaf","Leaf",Optional.of(name),true,List.of())))),Set.of(),Set.of(),""));
+        cases.put("tree-row-menu",name -> new Nodes.Tree("tree",ControlState.READY,List.of(new TreeItem("leaf","Leaf",Optional.empty(),true,List.of(),OptionalInt.empty(),false,"",Optional.empty(),List.of(),Optional.of(List.of(descriptorMenu(name))))),Set.of(),Set.of(),""));
+        cases.put("breadcrumb-menu",name -> new Nodes.Breadcrumbs("crumbs",ControlState.READY,List.of(new Crumb("crumb","Crumb",List.of(descriptorMenu(name)))),"Path",false,"","edit","submit","cancel"));
+        cases.put("list-menu",name -> new Nodes.ItemList("list",ControlState.READY,Nodes.ListKind.SINGLE,List.of(),Set.of(),"",List.of(descriptorMenu(name))));
+        cases.put("list-row-menu",name -> new Nodes.ItemList("list",ControlState.READY,Nodes.ListKind.SINGLE,List.of(new ListItem("row",Optional.empty(),List.of(),List.of(),List.of(),false,Optional.of(List.of(descriptorMenu(name))))),Set.of(),"",List.of()));
+        cases.put("list-add",name -> new Nodes.ItemList("list",ControlState.READY,Nodes.ListKind.SINGLE,List.of(),Set.of(),"",List.of(),Nodes.SelectionMode.SINGLE,Optional.of(descriptorButton(name))));
+        for(String slot : List.of("leading","title","subtitle","trailing")) cases.put("list-"+slot,name -> {
+            var row=new ListItem("row",slot.equals("leading")?Optional.of(descriptorIcon(name)):Optional.empty(),
+                slot.equals("title")?List.of(descriptorIcon(name)):List.of(),slot.equals("subtitle")?List.of(descriptorIcon(name)):List.of(),slot.equals("trailing")?List.of(descriptorIcon(name)):List.of());
+            return new Nodes.ItemList("list",ControlState.READY,Nodes.ListKind.SINGLE,List.of(row),Set.of(),"",List.of());
+        });
+        return cases;
+    }
+
     @Test void passiveRowsRoundTripRevealAndRejectAnyDeclaredSelection() throws Exception { edt(() -> {
         var item = new ListItem("row",Optional.empty(),List.of(new Nodes.Text("line",ControlState.READY,"Error output",Nodes.TextRole.MONO,
             Optional.of(Nodes.Severity.DANGER),OptionalInt.empty())),List.of(),List.of());
