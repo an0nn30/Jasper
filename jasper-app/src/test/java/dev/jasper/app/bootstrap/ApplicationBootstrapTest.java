@@ -130,6 +130,21 @@ class ApplicationBootstrapTest {
         assertThat(ApplicationBootstrap.handsOff(new AppArguments(null, false, false), dirs)).isFalse();
     }
 
+    @Test void aLoginLaunchStopsBeforeStartingWhenAResidentAlreadyServes(@TempDir Path dir) throws Exception {
+        AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
+        var background = new AppArguments(null, false, true);
+        assertThat(ApplicationBootstrap.alreadyResident(background, dirs)).as("nothing listening: it may become resident").isFalse();
+        try (HandoffSocket endpoint = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(),
+                dirs.daemonLock(), request -> { throw new AssertionError("a login launch never hands off"); })) {
+            assertThat(endpoint).isNotNull();
+            assertThat(ApplicationBootstrap.alreadyResident(background, dirs)).isTrue();
+            // An ordinary launch hands off instead, and a standalone one is refused later with its own warning.
+            assertThat(ApplicationBootstrap.alreadyResident(new AppArguments(null, false, false), dirs)).isFalse();
+            assertThat(ApplicationBootstrap.alreadyResident(new AppArguments(null, false, true, true, null, false), dirs)).isFalse();
+        }
+        assertThat(ApplicationBootstrap.alreadyResident(background, dirs)).as("the resident has gone").isFalse();
+    }
+
     @Test void residentRoleIsOnlyTrueWithTheSettingOnAndNoConfigOverride() {
         assertThat(ApplicationBootstrap.residentRole(new AppArguments(null, false, false), true)).isTrue();
         assertThat(ApplicationBootstrap.residentRole(new AppArguments(null, false, false), false)).isFalse();

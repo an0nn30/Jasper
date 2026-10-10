@@ -67,7 +67,13 @@ sequenceDiagram
 `StartupResources` rolls back reverse acquisition order once and suppresses cleanup
 failures onto the original error. Pre-EDT and EDT composition use separate scopes.
 A successful resident handoff creates no window. Endpoint bind failure cannot silently
-leave a background process. Logging cleanup and final process waiting do not block Swing.
+leave a background process. A `--background` (login) launch exits before reading the
+configuration when another process already owns the endpoint. On Windows the owner
+records its process id beside the token (`token.pid`), and a handing-off launcher lends
+it Windows' foreground right (`platform.WindowsForeground`) before sending the request, so an existing window can be raised immediately. A settled resident Windows
+process opts out of execution-speed throttling and keeps a soft working-set floor
+(`platform.WindowsProcess`); each window's timing line reports how long Jasper had no
+window and, on Windows, the page faults until the window was shown. Logging cleanup and final process waiting do not block Swing.
 
 Plugins start once, before the first window. Shutdown arms an exit deadline first, closes
 application-owned state, then stops plugins in reverse order; their drained background work

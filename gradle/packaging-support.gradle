@@ -62,21 +62,27 @@ ext.bundledNatives = { String os, String architecture ->
         ]
     }
     if (os == 'windows') {
+        // pty4j names its folder after JNA's architecture, and ships cyglaunch.exe for x64 only.
+        boolean arm = architecture == 'aarch64'
+        String flatLafArchitecture = arm ? 'arm64' : 'x86_64'
+        String jnaArchitecture = arm ? 'aarch64' : 'x86-64'
+        List<String> ptyFiles = ['conpty.dll', 'OpenConsole.exe'] + (arm ? [] : ['cyglaunch.exe']) +
+            ['win-helper.dll', 'winpty-agent.exe', 'winpty.dll']
         return [
-            [jar: flatLaf, entry: 'com/formdev/flatlaf/natives/flatlaf-windows-x86_64.dll',
-             path: 'native/flatlaf-windows-x86_64.dll', executable: false, loaded: true],
-            [jar: jna, entry: 'com/sun/jna/win32-x86-64/jnidispatch.dll', path: 'native/jnidispatch.dll',
+            [jar: flatLaf, entry: "com/formdev/flatlaf/natives/flatlaf-windows-${flatLafArchitecture}.dll".toString(),
+             path: "native/flatlaf-windows-${flatLafArchitecture}.dll".toString(), executable: false, loaded: true],
+            [jar: jna, entry: "com/sun/jna/win32-${jnaArchitecture}/jnidispatch.dll".toString(), path: 'native/jnidispatch.dll',
              executable: false, loaded: true],
-        ] + ['conpty.dll', 'OpenConsole.exe', 'cyglaunch.exe', 'win-helper.dll', 'winpty-agent.exe', 'winpty.dll'].collect { String name ->
-            [jar: pty4j, entry: "resources/com/pty4j/native/win/x86-64/${name}".toString(),
-             path: "native/win/x86-64/${name}".toString(), executable: false, loaded: false]
+        ] + ptyFiles.collect { String name ->
+            [jar: pty4j, entry: "resources/com/pty4j/native/win/${jnaArchitecture}/${name}".toString(),
+             path: "native/win/${jnaArchitecture}/${name}".toString(), executable: false, loaded: false]
         }
     }
     []
 }
 
 // The launcher options that point FlatLaf, JNA and pty4j at those files ($APPDIR is the launcher's app directory).
-// pty4j looks in native/darwin or native/win/x86-64 below its folder. jna.nosys keeps JNA off java.library.path.
+// pty4j looks in native/darwin or native/win/<x86-64|aarch64> below its folder. jna.nosys keeps JNA off java.library.path.
 // No jna.noclasspath or jna.nounpack: JNA's properties are process-wide, and a plugin that bundles its own JNA must
 // still be able to extract its own copy (docs/plugin-authoring.md, "The Java runtime").
 ext.bundledNativeJvmOptions = { String os ->

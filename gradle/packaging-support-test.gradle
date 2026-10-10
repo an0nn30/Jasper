@@ -45,6 +45,13 @@ verifySupport.configure {
             'native/win/x86-64/conpty.dll', 'native/win/x86-64/OpenConsole.exe', 'native/win/x86-64/cyglaunch.exe',
             'native/win/x86-64/win-helper.dll', 'native/win/x86-64/winpty-agent.exe', 'native/win/x86-64/winpty.dll']
         assert bundledNatives('windows', 'x64').findAll { it.loaded }*.path == ['native/flatlaf-windows-x86_64.dll', 'native/jnidispatch.dll']
+        // Windows on Arm: native ARM64 libraries, and no cyglaunch.exe (pty4j ships it for x64 only).
+        def windowsArm = bundledNatives('windows', 'aarch64')
+        assert windowsArm*.path == ['native/flatlaf-windows-arm64.dll', 'native/jnidispatch.dll',
+            'native/win/aarch64/conpty.dll', 'native/win/aarch64/OpenConsole.exe',
+            'native/win/aarch64/win-helper.dll', 'native/win/aarch64/winpty-agent.exe', 'native/win/aarch64/winpty.dll']
+        assert windowsArm*.entry.take(3) == ['com/formdev/flatlaf/natives/flatlaf-windows-arm64.dll',
+            'com/sun/jna/win32-aarch64/jnidispatch.dll', 'resources/com/pty4j/native/win/aarch64/conpty.dll']
         assert bundledNatives('linux', 'x64').isEmpty() && bundledNatives('linux', 'aarch64').isEmpty()
         // Each pattern names exactly its own jar among the packaged ones.
         List<String> jars = ['flatlaf-3.7.jar', 'flatlaf-extras-3.7.jar', 'jna-5.14.0.jar', 'jna-platform-5.14.0.jar', 'pty4j-0.13.10.jar']

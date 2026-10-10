@@ -94,6 +94,7 @@ public final class HandoffSocket implements AutoCloseable {
                 opened = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
                 opened.bind(UnixDomainSocketAddress.of(socketPath));
                 String token = writeToken(tokenPath);
+                writeOwner(tokenPath);
                 var endpoint = new HandoffSocket(opened, socketPath, tokenPath, lockPath, token, handler);
                 endpoint.acceptor.start();
                 return endpoint;
@@ -161,6 +162,25 @@ public final class HandoffSocket implements AutoCloseable {
         }
     }
 
+    /**
+     * The process id the current owner recorded beside its token, or -1 when there is none or it cannot be read. A
+     * hint, not proof: an owner that died without closing leaves its id behind, so only a successful
+     * {@link #handOff} shows the owner was live. Windows needs it before the handoff, to pass on the foreground right.
+     */
+    public static long ownerPid(Path tokenPath) {
+        try {
+            long pid = Long.parseLong(Files.readString(ownerPath(tokenPath), StandardCharsets.UTF_8).strip());
+            return pid > 0 ? pid : -1;
+        } catch (IOException | RuntimeException unavailable) {
+            return -1;
+        }
+    }
+
+    /** Beside the token rather than in it, so a launcher from another build still reads the token it expects. */
+    static Path ownerPath(Path tokenPath) {
+        return tokenPath.resolveSibling(tokenPath.getFileName() + ".pid");
+    }
+
     /** The jar or classes directory this build was loaded from; null when it cannot be determined. */
     public static Path codeSource() {
         try {
@@ -201,6 +221,7 @@ public final class HandoffSocket implements AutoCloseable {
             if (owned(socketPath)) return;
             Files.deleteIfExists(socketPath);
             Files.deleteIfExists(tokenPath);
+            Files.deleteIfExists(ownerPath(tokenPath));
         } catch (IOException | RuntimeException unavailable) {
             // Including OverlappingFileLockException: leave the files rather than risk a successor's.
         }
@@ -270,6 +291,13 @@ public final class HandoffSocket implements AutoCloseable {
             StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
         restrict(tokenPath, "rw-------");
         return token;
+    }
+
+    private static void writeOwner(Path tokenPath) throws IOException {
+        Path owner = ownerPath(tokenPath);
+        Files.writeString(owner, ProcessHandle.current().pid() + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE,
+            StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+        restrict(owner, "rw-------");
     }
 
     private static String readToken(Path tokenPath) {
