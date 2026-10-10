@@ -77,4 +77,30 @@ class NotificationStyleTest {
         }
     }
 
+    @Test void coalescedCardReplacesThePathWhenTheSemanticNameIsRepublished() {
+        var context=dev.jasper.app.testsupport.KitTestSupport.context();
+        var center=new NotificationCenter(Runnable::run,Clock.fixed(Instant.EPOCH,ZoneOffset.UTC),() -> Delivery.Presence.FOCUSED);
+        center.register(new NotificationGroup("test.cards","Cards","jasper",DisplayMode.CARD));
+        var request=NotificationRequest.of("test.cards",Severity.WARNING,"Repeated");
+        var first=new dev.jasper.app.platform.PresentationIcon("owner:mark","M 2 2 L 14 14");
+        var id=center.post(request.withIcon(first)).orElseThrow();
+        try(var card=new NotificationCard(context,center,center.find(id).orElseThrow(),false)) {
+            var label=dev.jasper.app.testsupport.KitTestSupport.require(card.iconView(),NotificationCard.ICON,javax.swing.JLabel.class);
+            var before=dev.jasper.app.testsupport.IconPixels.of(label.getIcon());
+            var next=new dev.jasper.app.platform.PresentationIcon("owner:mark","M 2 14 L 14 2");
+            assertThat(center.post(request.withIcon(next))).contains(id);
+            card.update(center.find(id).orElseThrow());
+            assertThat(card.notification().request().icon()).contains(next);
+            assertChangedSnapshot(label,context,before);
+        }
+    }
+    static void assertChangedSnapshot(javax.swing.JLabel label,dev.jasper.ui.swing.KitContext context,int[] before) {
+        try(var expected=new dev.jasper.ui.icons.IconRegistry()) {
+            expected.register("owner:mark","M 2 14 L 14 2");
+            var actual=dev.jasper.app.testsupport.IconPixels.of(label.getIcon());
+            assertThat(actual).isNotEqualTo(before).containsExactly(dev.jasper.app.testsupport.IconPixels.of(
+                expected.icon("owner:mark",context.theme().semantic(),dev.jasper.ui.theme.SemanticColor.STATUS_WARNING,label.getIcon().getIconWidth())));
+        }
+    }
+
 }

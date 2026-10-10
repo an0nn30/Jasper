@@ -30,4 +30,21 @@ class HistoryRowTest {
             }
         }
     }
+    @Test void coalescedHistoryReplacesThePathWhenTheSemanticNameIsRepublished() {
+        var context=KitTestSupport.context();
+        var center=new NotificationCenter(Runnable::run,Clock.fixed(Instant.EPOCH,ZoneOffset.UTC),() -> Delivery.Presence.FOCUSED);
+        center.register(new NotificationGroup("test.rows","Rows","jasper",DisplayMode.CARD));
+        var request=NotificationRequest.of("test.rows",Severity.WARNING,"Repeated");
+        var id=center.post(request.withIcon(new PresentationIcon("owner:mark","M 2 2 L 14 14"))).orElseThrow();
+        try(var row=new HistoryRow(context,center,center.find(id).orElseThrow(),"Rows",DateTimeFormatter.ISO_INSTANT)) {
+            var label=KitTestSupport.require(row,"severity",javax.swing.JLabel.class);
+            var before=dev.jasper.app.testsupport.IconPixels.of(label.getIcon());
+            var next=new PresentationIcon("owner:mark","M 2 14 L 14 2");
+            assertThat(center.post(request.withIcon(next))).contains(id);
+            row.update(center.find(id).orElseThrow());
+            assertThat(row.notification().request().icon()).contains(next);
+            NotificationStyleTest.assertChangedSnapshot(label,context,before);
+        }
+    }
+
 }

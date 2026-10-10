@@ -73,6 +73,41 @@ class HostedKitTest {
    }
   }
  });}
+ @Test void sameNameNewSnapshotSurvivesFailedReconciliationAndRetry() throws Exception {SwingUtilities.invokeAndWait(() -> {
+  var source=new HostedKit("owner",() -> true,() -> dev.jasper.app.appearance.ThemeTestSupport.pair(false),null,new Containment(java.awt.EventQueue::isDispatchThread));
+  var registration=source.registerIcon(new IconAsset("owner:mark","M 2 2 L 14 14"));var old=source.icon("owner:mark");
+  registration.close();source.registerIcon(new IconAsset("owner:mark","M 2 14 L 14 2"));var next=source.icon("owner:mark");source.close();
+  try(var receiver=new dev.jasper.app.platform.PresentationIcons();var expected=new dev.jasper.ui.icons.IconRegistry()) {
+   var context=receiver.context(dev.jasper.app.testsupport.KitTestSupport.context());
+   var oldName=receiver.name(old).orElseThrow();
+   var oldSpec=receiverIconSpec(oldName);
+   try(var view=new dev.jasper.ui.swing.KitView(context,oldSpec,e -> {})) {
+    var before=dev.jasper.app.testsupport.IconPixels.of(dev.jasper.app.testsupport.KitTestSupport.require(view,"glyph",JLabel.class).getIcon());
+    var attemptedName=new java.util.concurrent.atomic.AtomicReference<String>();
+    assertThatIllegalArgumentException().isThrownBy(() -> receiver.reconcile(() -> {
+     attemptedName.set(receiver.name(next).orElseThrow());
+     // Fail while creating a new subtree, before mutating the retained control.
+     view.update(new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Stack("invalid",dev.jasper.ui.model.ControlState.READY,dev.jasper.ui.model.Nodes.LayoutRole.VERTICAL,java.util.List.of(
+      new dev.jasper.ui.model.Nodes.Icon("next",dev.jasper.ui.model.ControlState.READY,attemptedName.get(),dev.jasper.ui.model.Nodes.Hue.NONE,dev.jasper.ui.model.Nodes.IconSize.RAIL,"Next"),
+      new dev.jasper.ui.model.Nodes.Icon("missing",dev.jasper.ui.model.ControlState.READY,"missing",dev.jasper.ui.model.Nodes.Hue.NONE,dev.jasper.ui.model.Nodes.IconSize.RAIL,"Missing")))));
+    }));
+    assertThat(view.spec()).isEqualTo(oldSpec);
+    assertThat(dev.jasper.app.testsupport.IconPixels.of(dev.jasper.app.testsupport.KitTestSupport.require(view,"glyph",JLabel.class).getIcon())).containsExactly(before);
+    assertThat(attemptedName.get()).isNotEqualTo(oldName);
+    assertThat(context.icons().names().stream().filter(name -> name.contains(":"))).hasSize(2);
+    expected.register("owner:mark","M 2 14 L 14 2");
+    var expectedPixels=dev.jasper.app.testsupport.IconPixels.of(expected.icon("owner:mark",context.theme().semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,16));
+    assertThat(dev.jasper.app.testsupport.IconPixels.of(context.icons().icon(attemptedName.get(),context.theme().semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,16))).containsExactly(expectedPixels);
+    receiver.reconcile(() -> view.update(receiverIconSpec(receiver.name(next).orElseThrow())));
+    var after=dev.jasper.app.testsupport.KitTestSupport.require(view,"glyph",JLabel.class).getIcon();
+    assertThat(dev.jasper.app.testsupport.IconPixels.of(after)).isNotEqualTo(before).containsExactly(dev.jasper.app.testsupport.IconPixels.of(expected.icon("owner:mark",context.theme().semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,after.getIconWidth())));
+    assertThat(context.icons().names().stream().filter(name -> name.contains(":"))).hasSize(1);
+   }
+  }
+ });}
+ private static dev.jasper.ui.model.ViewSpec receiverIconSpec(String name) {
+  return new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Icon("glyph",dev.jasper.ui.model.ControlState.READY,name,dev.jasper.ui.model.Nodes.Hue.NONE,dev.jasper.ui.model.Nodes.IconSize.RAIL,"Glyph"));
+ }
  private static int[] pixels(javax.swing.Icon icon,java.awt.Component component) {
   var image=new java.awt.image.BufferedImage(16,16,java.awt.image.BufferedImage.TYPE_INT_ARGB);var graphics=image.createGraphics();
   try{icon.paintIcon(component,graphics,0,0);}finally{graphics.dispose();}

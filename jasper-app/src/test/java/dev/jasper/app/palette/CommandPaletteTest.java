@@ -106,6 +106,24 @@ class CommandPaletteTest {
         });
     }
 
+    @Test void sameRowRepublishedNameUsesItsNewImmutablePath() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try(var palette=palette(new ArrayList<>())) {
+                var old=new dev.jasper.app.platform.PresentationIcon("owner:mark","M 2 2 L 14 14");
+                palette.setEntries(List.of(new PaletteEntry.Item(COMMANDS,new PaletteRow("row","Row",null,null,old,true,null))),null,null);
+                var before=KitTestSupport.require(palette.resultsView(),"entry.0.icon",javax.swing.JLabel.class).getIcon();
+                var next=new dev.jasper.app.platform.PresentationIcon("owner:mark","M 2 14 L 14 2");
+                palette.setEntries(List.of(new PaletteEntry.Item(COMMANDS,new PaletteRow("row","Row",null,null,next,true,null))),null,null);
+                var after=KitTestSupport.require(palette.resultsView(),"entry.0.icon",javax.swing.JLabel.class).getIcon();
+                try(var expected=new dev.jasper.ui.icons.IconRegistry()) {
+                    expected.register("owner:mark","M 2 14 L 14 2");
+                    assertThat(dev.jasper.app.testsupport.IconPixels.of(after)).isNotEqualTo(dev.jasper.app.testsupport.IconPixels.of(before))
+                        .containsExactly(dev.jasper.app.testsupport.IconPixels.of(expected.icon("owner:mark",palette.kit().theme().semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,after.getIconWidth())));
+                }
+            }
+        });
+    }
+
     @Test void queryNotifiesWhenClearedAndKeepsNativeEditingActions() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var changes = new ArrayList<String>();
