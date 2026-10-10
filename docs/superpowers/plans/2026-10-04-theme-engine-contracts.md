@@ -949,3 +949,12 @@ real module input/focus/paint/embedded-control tests cover interaction. SDK vers
 Data-row geometry counts ordinary rows independently of whether they can be selected. UiView.reveal of inline row
 content uses pendingReveal when the viewport has no size, mounts/reveals at first sizing and never changes logical
 row focus or keyboard focus. No new UiView member is required.
+
+
+### Plan2 final-review editable Choice attachment correction
+
+Native keyboard QA at16aa1e4a showed that retaining editor identity alone did not retain focus: BasicComboBoxUI
+uninstall detaches its children and Swing transfers editor focus. Editable SearchChoice keeps its existing
+kit-owned delegate/editor attachment on `updateUI`, refreshing live editor/popup module styles and allowing
+normal child UI refresh. Noneditable Choice and replacement of a foreign delegate still reinstall the kit UI.
+No synthetic focus restoration or delayed focus request is used, so an unfocused or closed view cannot steal focus.

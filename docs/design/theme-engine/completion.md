@@ -1,5 +1,14 @@
 # Plan 2 consumer migration completion audit
 
+Native F3 follow-up (2026-10-10): controller keyboard QA at `16aa1e4a` retained font text/selection but
+transferred actual focus to Search settings during the theme watcher refresh. The shared editable SearchChoice
+now retains its already-owned kit delegate/editor attachment, refreshes module styles in place, and lets Swing
+refresh the attached child editor UI; no synthetic/deferred focus request is introduced. Noneditable and foreign-
+delegate recovery paths still reinstall. An initialized-FlatLaf probe reproduces one editor detachment at16aa
+and zero after the fix, with the same selected text; focused/other-owner/closed headless cases and delegate recovery
+are covered. Full UI check (440 tests) and affected app/host scope (74 tests) passed with zero failures/errors/skips; installDist refreshed (64 tasks, 7 executed/57 up-to-date). Prior full9,658 evidence remains frozen at16aa; native keyboard rerun and scoped
+independent review are pending, so this is not a native acceptance claim.
+
 **Final-review fix wave (2026-10-10):** The whole-branch review found four Important defects and two Minor issues.
 The consolidated fixes retain NUMBER document/shape/normalization behavior, editable Choice pending editor state
 across real FlatLaf publication/tree refresh, readable fallback light/dark switches, and title-hint/card-count

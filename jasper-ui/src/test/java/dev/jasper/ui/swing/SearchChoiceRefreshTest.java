@@ -10,6 +10,70 @@ import static org.assertj.core.api.Assertions.*;
 
 @SuppressWarnings("try")
 class SearchChoiceRefreshTest {
+    @Test void editableChoiceRecoversItsKitDelegateWhenAnotherUiWasInstalled() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>(); var oldLaf = UIManager.getLookAndFeel();
+            FlatLafInstaller.install(context.theme());
+            try (var view = new KitView(context, entry("Monospaced"), events::add)) {
+                var combo = (SearchChoices.Combo)((Choices.ChoiceControl)view.control("font")).input;
+                var editor = combo.editorField(); editor.select(2, 6);
+                combo.setUI(new javax.swing.plaf.basic.BasicComboBoxUI());
+                assertThat(combo.getUI()).isNotInstanceOf(Choices.ChoiceCombo.KitUi.class);
+                SwingUtilities.updateComponentTreeUI(view);
+                assertThat(combo.getUI()).isInstanceOf(Choices.ChoiceCombo.KitUi.class);
+                assertThat(combo.editorField()).isSameAs(editor); assertThat(editor.getSelectedText()).isEqualTo("nosp");
+                assertThat(editor.getText()).isEqualTo("Monospaced"); assertThat(events).isEmpty();
+                assertThat(Arrays.stream(editor.getKeyListeners()).filter(k -> k == combo.searchPopup().keys)).hasSize(1);
+            } finally {
+                KitViewTest.release(context);
+                try { UIManager.setLookAndFeel(oldLaf); } catch (Exception failure) { throw new AssertionError(failure); }
+            }
+        });
+    }
+
+    @Test void editableThemeRefreshNeverDetachesTheEditorOrChangesTheFocusOwner() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var oldLaf = UIManager.getLookAndFeel();
+            var oldFocus = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            var focus = new SettingsKitTest.Focus();
+            FlatLafInstaller.install(context.theme());
+            var other = new JTextField("Search settings");
+            try (var view = new KitView(context, entry("Monospaced"), event -> {})) {
+                var combo = (SearchChoices.Combo)((Choices.ChoiceControl)view.control("font")).input;
+                var editor = combo.editorField();
+                var detached = new ArrayList<java.awt.Component>();
+                combo.addContainerListener(new java.awt.event.ContainerAdapter() {
+                    @Override public void componentRemoved(java.awt.event.ContainerEvent event) {
+                        if (event.getChild() == editor) detached.add(editor);
+                    }
+                });
+                java.awt.KeyboardFocusManager.setCurrentKeyboardFocusManager(focus);
+                for (var target : List.of(editor, other)) {
+                    focus.focus(target); editor.select(2, 6);
+                    for (var theme : List.of(KitFixtures.light(), KitFixtures.dark())) {
+                        assertThat(editor.getSelectedText()).as("before install").isEqualTo("nosp");
+                        FlatLafInstaller.install(theme);
+                        assertThat(editor.getSelectedText()).as("after install").isEqualTo("nosp");
+                        context.binding().publish(new ThemePair(theme, theme));
+                        assertThat(editor.getSelectedText()).as("after binding publication").isEqualTo("nosp");
+                        SwingUtilities.updateComponentTreeUI(view);
+                        assertThat(detached).as("detaching the focused editor transfers native focus and disrupts IME").isEmpty();
+                        assertThat(focus.getFocusOwner()).isSameAs(target);
+                        assertThat(editor.getParent()).isSameAs(combo);
+                        assertThat(editor.getSelectedText()).isEqualTo("nosp");
+                        assertThat(editor.getForeground()).isEqualTo(theme.semantic().color(SemanticColor.TEXT_PRIMARY));
+                        assertThat(combo.searchPopup().getList().getForeground()).isEqualTo(theme.semantic().color(SemanticColor.TEXT_PRIMARY));
+                    }
+                }
+                focus.focus(other); view.close(); SwingUtilities.updateComponentTreeUI(view);
+                assertThat(focus.getFocusOwner()).isSameAs(other); assertThat(detached).isEmpty();
+            } finally {
+                java.awt.KeyboardFocusManager.setCurrentKeyboardFocusManager(oldFocus); KitViewTest.release(context);
+                try { UIManager.setLookAndFeel(oldLaf); } catch (Exception failure) { throw new AssertionError(failure); }
+            }
+        });
+    }
+
     @Test void queuedEntryNormalizationUsesLatestRevisionAndStopsAtClose() {
         KitView[] views = {null, null}; KitContext[] contexts = {null}; JTextField[] fields = {null, null};
         var events = new ArrayList<UiEvent>();

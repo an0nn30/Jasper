@@ -75,14 +75,20 @@ final class SearchChoices {
             addPropertyChangeListener("editor", editorChange);
         }
 
-        /** Swing replays the look and feel on every theme install; the kit's own UI, and so the search, survives it. */
+        /**
+         * Refresh an editable kit delegate in place: BasicComboBoxUI uninstall removes every child, which transfers
+         * native focus away from its editor and can interrupt IME even when the same editor is installed again.
+         * Module painting/popup styles are live; Swing's tree refresh still updates the attached editor's own UI.
+         */
         @Override public void updateUI() {
             if (context == null) { super.updateUI(); return; }
-            unobserveEditor();
-            setUI(kitUi());
+            if (!freeEntry || !(getUI() instanceof Choices.ChoiceCombo.KitUi)) {
+                unobserveEditor();
+                setUI(kitUi());
+                observeEditor();
+            }
             if (getRenderer() instanceof Component renderer) SwingUtilities.updateComponentTreeUI(renderer);
-            observeEditor();
-            styleEditor();
+            refreshPopup();
         }
 
         @Override ComboPopup createKitPopup(JComboBox<Object> comboBox) {
