@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class AppearanceTransactionTest {
-    @Test void explicitBodyOverrideUsesUnscaledLabelSizeAndLiveViewTracksItsRemoval() {
+    @Test void explicitBodyOverrideUsesExactPointSizeAndLiveViewTracksItsRemoval() {
         Edt.run(() -> {
             Object[] old = {null, null};
             UIManager.getDefaults().forEach((key,value) -> { if (key.equals("defaultFont")) old[0]=value; if (key.equals("Label.font")) old[1]=value; });
@@ -24,12 +24,12 @@ class AppearanceTransactionTest {
                 var spec = new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Text("label", dev.jasper.ui.model.ControlState.READY, "Body", dev.jasper.ui.model.Nodes.TextRole.BODY));
                 try (var view = new KitView(context, spec, event -> {})) {
                     var label = (JLabel) view.getComponent(0);
-                    assertThat(label.getFont().getSize2D()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(19.5f));
+                    assertThat(label.getFont().getSize2D()).isEqualTo(19.5f);
                     UIManager.put("Label.font", new Font("Monospaced", Font.PLAIN, 24));
-                    assertThat(label.getFont().getSize2D()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(24f));
+                    assertThat(label.getFont().getSize2D()).isEqualTo(24f);
                     UIManager.put("Label.font", null);
                     assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(20);
-                    assertThat(label.getFont().getSize2D()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(20f));
+                    assertThat(label.getFont().getSize2D()).isEqualTo(20f);
                     UIManager.put("defaultFont", null);
                     assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(13);
                     assertThat(label.getFont().getSize2D()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(13f));

@@ -8,6 +8,33 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class SurfaceGeometryTest {
+    @Test void recoveryWarningRemainsVisibleWithActualEnlargedSettingsAndConstrainedWidth() throws Exception {
+        var themes = SurfaceFixtures.edt(ThemeController::new);
+        try (var open = SurfaceFixtures.open("vault-create", "entered")) {
+            for (float size : new float[]{20, 32, 13}) SurfaceFixtures.edt(() -> {
+                themes.configure(Theme.DARK, new dev.jasper.app.config.UiFontConfig("system", size));
+                for (int width : new int[]{com.formdev.flatlaf.util.UIScale.scale(400), 340}) {
+                    var view = open.view();
+                    view.setSize(width, 2000); SurfaceFixtures.arrange(view);
+                    view.setSize(width, view.getPreferredSize().height); SurfaceFixtures.arrange(view);
+                    var label = (javax.swing.JLabel)open.component("form.warning.text");
+                    var icon = open.component("form.warning.icon");
+                    int lineHeight = label.getFontMetrics(label.getFont()).getHeight();
+                    double textWidth = label.getFont().getStringBounds(label.getText(), new java.awt.font.FontRenderContext(null,true,true)).getWidth();
+                    assertThat(label.getHeight()).as("full warning at size %s width %s", size,width)
+                        .isGreaterThanOrEqualTo((int)Math.ceil(textWidth / label.getWidth()) * lineHeight);
+                    assertThat(icon.getWidth()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(12));
+                    assertThat(open.bounds("form.warning.text").y + label.getHeight()).isLessThanOrEqualTo(open.bounds("cancel").y);
+                    assertThat(((javax.swing.JScrollPane)open.component("form.scroll")).getVerticalScrollBar().isVisible()).isFalse();
+                    assertThat(((JPasswordField)open.component("confirm.input")).getPassword()).containsExactly("synthetic-preview-password".toCharArray());
+                    var image = new java.awt.image.BufferedImage(width, view.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                    var graphics = image.createGraphics(); try { view.paint(graphics); } finally { graphics.dispose(); }
+                }
+                return null;
+            });
+        } finally { SurfaceFixtures.edt(() -> { themes.configure(Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults()); themes.close(); return null; }); }
+    }
+
     @Test void actualVaultOwnersUseReferenceHeroGeometryWithoutCreatingWindows() throws Exception {
         int windows=Window.getWindows().length;
         for(String id:java.util.List.of("vault-create","vault-unlock")) try(var open=SurfaceFixtures.open(id,"empty")) {

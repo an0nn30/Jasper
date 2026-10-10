@@ -47,7 +47,7 @@ public final class KitView extends JPanel implements AutoCloseable {
         setLayout(new BorderLayout()); setOpaque(false); KitOwnership.mark(this, "view");
         defaults = UIManager.getDefaults();
         fontChanges = event -> {
-            if (!"defaultFont".equals(event.getPropertyName()) && !"Label.font".equals(event.getPropertyName())) return;
+            if (!"defaultFont".equals(event.getPropertyName()) && !"Label.font".equals(event.getPropertyName()) && !"Jasper.uiFontFamilyOverride".equals(event.getPropertyName())) return;
             if (EventQueue.isDispatchThread()) refresh(); else EventQueue.invokeLater(this::refresh);
         };
         try {

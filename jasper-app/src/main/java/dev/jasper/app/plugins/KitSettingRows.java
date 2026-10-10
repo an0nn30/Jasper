@@ -71,7 +71,9 @@ final class KitSettingRows {
         for(var entry:controls.entrySet())if(n.id().equals(entry.getKey()+":row")){
             var fresh=(Nodes.SettingRow)row(entry.getValue());
             boolean highlighted=matches(specs.apply(entry.getValue()),query) || n instanceof Nodes.SettingRow asked && asked.highlighted();
-            return new Nodes.SettingRow(fresh.id(),fresh.state(),fresh.title(),fresh.description(),fresh.control(),fresh.dependent(),highlighted);
+            return n instanceof Nodes.SettingRow asked
+                ? new Nodes.SettingRow(fresh.id(),fresh.state(),asked.title(),asked.description(),fresh.control(),asked.dependent(),highlighted,asked.titleNote())
+                : fresh;
         }
         return switch(n){
             case Nodes.Stack v -> new Nodes.Stack(v.id(),v.state(),v.role(),v.children().stream().map(this::replace).toList(),v.cancelAction());
@@ -81,7 +83,7 @@ final class KitSettingRows {
             case Nodes.Split v -> new Nodes.Split(v.id(),v.state(),v.kind(),v.children().stream().map(this::replace).toList());
             case Nodes.Panel v -> new Nodes.Panel(v.id(),v.state(),(Nodes.Header)replace(v.header()),v.searchOrNavigation().map(this::replace),replace(v.body()),v.footer().map(this::replace));
             case Nodes.FormRow v -> new Nodes.FormRow(v.id(),v.state(),v.label(),v.caption(),replace(v.control()),v.trailing().map(this::replace),v.highlighted());
-            case Nodes.SettingRow v -> new Nodes.SettingRow(v.id(),v.state(),v.title(),v.description(),replace(v.control()),v.dependent(),v.highlighted());
+            case Nodes.SettingRow v -> new Nodes.SettingRow(v.id(),v.state(),v.title(),v.description(),replace(v.control()),v.dependent(),v.highlighted(),v.titleNote());
             case Nodes.Empty v -> new Nodes.Empty(v.id(),v.state(),replace(v.icon()),v.title(),v.description(),v.actions().stream().map(this::replace).toList());
             case Nodes.Header v -> new Nodes.Header(v.id(),v.state(),v.title(),v.count(),v.context().map(this::replace),v.primary(),v.overflow());
             default -> n;

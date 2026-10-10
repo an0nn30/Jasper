@@ -60,7 +60,7 @@ final class KitSettingRows {
             case Nodes.Section n -> new Nodes.Section(n.id(), n.state(), n.title(), child.apply(n.body()));
             case Nodes.Form n -> new Nodes.Form(n.id(), n.state(), n.kind(), n.title(), n.hero().map(child), n.sections().stream().map(child).toList(), n.preview().map(child), n.actions(), n.cancelAction());
             case Nodes.FormRow n -> new Nodes.FormRow(n.id(), n.state(), n.label(), n.caption(), child.apply(n.control()), n.trailing().map(child), n.highlighted());
-            case Nodes.SettingRow n -> new Nodes.SettingRow(n.id(), n.state(), n.title(), n.description(), child.apply(n.control()), n.dependent(), n.highlighted());
+            case Nodes.SettingRow n -> new Nodes.SettingRow(n.id(), n.state(), n.title(), n.description(), child.apply(n.control()), n.dependent(), n.highlighted(), n.titleNote());
             case Nodes.Header n -> new Nodes.Header(n.id(), n.state(), n.title(), n.count(), n.context().map(child), n.primary(), n.overflow());
             case Nodes.Panel n -> new Nodes.Panel(n.id(), n.state(), (Nodes.Header) child.apply(n.header()), n.searchOrNavigation().map(child), child.apply(n.body()), n.footer().map(child));
             case Nodes.Empty n -> new Nodes.Empty(n.id(), n.state(), child.apply(n.icon()), n.title(), n.description(), n.actions().stream().map(child).toList());

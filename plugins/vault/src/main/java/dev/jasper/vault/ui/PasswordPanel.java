@@ -165,7 +165,7 @@ public final class PasswordPanel implements AutoCloseable {
             sections.add(new Nodes.Card(bind + ".card", ControlState.READY, Nodes.CardKind.SETTINGS, List.of(
                 new Nodes.SettingRow(bind + ".row", ControlState.READY, "Bind to this device", "The vault can only be opened on this computer",
                     new Nodes.Toggle(bind, new ControlState(true, !busy, false, ""), "Bind to this device (recommended)", bound, bind, false), false, false, "Recommended"))));
-            sections.add(new Nodes.Stack(form + ".warning", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            sections.add(new Nodes.Stack(form + ".warning", ControlState.READY, Nodes.LayoutRole.SUPPORTING, List.of(
                 new Nodes.Icon(form + ".warning.icon", ControlState.READY, "warning", Nodes.Hue.NONE, Nodes.IconSize.CAPTION, "Warning", Optional.of(Nodes.Severity.WARNING)),
                 new Nodes.Text(form + ".warning.text", ControlState.READY, "Your master password cannot be recovered if forgotten.", Nodes.TextRole.CAPTION))));
         }

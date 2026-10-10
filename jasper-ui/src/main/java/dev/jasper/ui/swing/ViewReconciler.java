@@ -81,11 +81,11 @@ final class ViewReconciler implements AutoCloseable {
     }
     /**
      * Body, description and caption text flows (wraps, keeping its line breaks) where its parent stacks content vertically: VERTICAL and DETAIL
-     * stacks, form bodies, cards and sections. Inline stacks, list rows and titles (BODY_STRONG included) keep one truncated line.
+     * stacks, form bodies, cards and sections. SUPPORTING flows beside natural adornments. Inline stacks, list rows and titles (BODY_STRONG included) keep one truncated line.
      */
     private void applyFlow(Nodes.Node node, Map<String, ControlRegistry.Control> next) {
         boolean vertical = node instanceof Nodes.Form || node instanceof Nodes.Card || node instanceof Nodes.Section
-                || node instanceof Nodes.Stack stack && (stack.role() == Nodes.LayoutRole.VERTICAL || stack.role() == Nodes.LayoutRole.DETAIL || stack.role() == Nodes.LayoutRole.HERO);
+                || node instanceof Nodes.Stack stack && (stack.role() == Nodes.LayoutRole.VERTICAL || stack.role() == Nodes.LayoutRole.DETAIL || stack.role() == Nodes.LayoutRole.HERO || stack.role() == Nodes.LayoutRole.SUPPORTING);
         for (var child : ControlRegistry.children(node)) {
             if (vertical && child instanceof Nodes.Text text && switch (text.role()) {
                         case BODY, DESCRIPTION, CAPTION -> true;

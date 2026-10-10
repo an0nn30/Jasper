@@ -116,8 +116,8 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
                 if (owned.isPresent()) {
                     // Rebuilt from the draft, keeping the presentation the plugin asked for (its search highlight).
                     var fresh = (Nodes.SettingRow) row(owned.get().setting);
-                    return new Nodes.SettingRow(fresh.id(), fresh.state(), fresh.title(), fresh.description(), fresh.control(), fresh.dependent(),
-                        row.highlighted() || KitSettingRows.matches(owned.get().setting.spec(), query));
+                    return new Nodes.SettingRow(fresh.id(), fresh.state(), row.title(), row.description(), fresh.control(), row.dependent(),
+                        row.highlighted() || KitSettingRows.matches(owned.get().setting.spec(), query), row.titleNote());
                 }
             }
             return node;

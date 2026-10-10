@@ -14,9 +14,15 @@ import javax.swing.*;
 final class ThemePainting {
     private ThemePainting() {}
     static int metric(KitContext context, DesignMetrics.Role role) { return UIScale.scale(context.metrics().value(role)); }
-    static Font font(KitContext context, Typography.Role role) { Font font = context.typography().font(role); return font.deriveFont(UIScale.scale(font.getSize2D())); }
+    static Font font(KitContext context, Typography.Role role) { return SwingTypography.effective(context.typography().font(role)); }
     static int height(KitContext context, DesignMetrics.Role role, Typography.Role text) {
-        return UIScale.scale(context.metrics().contentHeight(role, context.typography().font(text), new FontRenderContext(null, true, true)));
+        DesignMetrics.Role padding = switch (role) {
+            case FIELD_HEIGHT, HERO_FIELD_HEIGHT -> DesignMetrics.Role.FIELD_VERTICAL_PADDING;
+            case BUTTON_HEIGHT, HERO_BUTTON_HEIGHT, PANEL_ACTION, INLINE_ACTION -> DesignMetrics.Role.BUTTON_VERTICAL_PADDING;
+            default -> throw new IllegalArgumentException("Not a content height role: " + role);
+        };
+        int line = (int)Math.ceil(font(context, text).getLineMetrics("Ag", new FontRenderContext(null, true, true)).getHeight());
+        return Math.max(metric(context, role), line + metric(context, padding));
     }
     static Color color(KitContext context, SemanticColor role) { return context.theme().semantic().color(role); }
     static void antialias(Graphics2D g) {

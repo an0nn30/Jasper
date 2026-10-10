@@ -5,6 +5,9 @@
 **Measured Task1 amendments:** reusable `FormKind.HERO_COMPACT` owns380px width; HERO remains400px. `SecretKind.CONFIRMATION` follows its group's reveal without an extra eye. Optional `SettingRow.titleNote` renders a tertiary annotation with source-compatible constructors. Central hero typography/layout/icon optical stroke follows exact2× mounted evidence; feature owners contain no style literals. These are controller-approved reference-driven extensions of the shared descriptor contract.
 
 
+**Task1 review fix scope extension:** controller authorized inherited C1 font-size correction before I3: effective host point-size overrides bypass font-derived UIScale multiplication, unset catalog roles still scale once, geometry/device transforms remain independent, and live family provenance refreshes mounted views. I1 preserves owned/arbitrary settings-row presentation across host/fake refresh; I2 uses previous visible siblings for meter spacing. Added mirrored `LayoutRole.SUPPORTING` for natural leading adornments with a wrapping final body, preserving ordinary INLINE behavior. Focused verification and actual enlarged-owner captures are required; independent re-review/native recapture are pending, not visual acceptance.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Refactor all migrated surfaces onto canonical composition and match the original references and all16 additional Desktop references using active-theme colors.

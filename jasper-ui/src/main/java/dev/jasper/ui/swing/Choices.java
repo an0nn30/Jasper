@@ -119,7 +119,7 @@ final class Choices {
                         var button = (SegmentButton)input.getComponent(i); Option option = options.get(i);
                         button.setEnabled(input.isEnabled()); button.setSelected(option.id().equals(choice.selectedId()));
                         var font = context().typography().font(Typography.Role.LABEL, button.isSelected());
-                        button.setFont(font.deriveFont(com.formdev.flatlaf.util.UIScale.scale(font.getSize2D())));
+                        button.setFont(SwingTypography.effective(font));
                         button.setForeground(ThemePainting.color(context(), button.isSelected() ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_SECONDARY));
                         button.setIcon(option.hue().map(h -> (javax.swing.Icon)new HueDot(context(), h)).orElse(null)); button.setDisabledIcon(button.getIcon());
                         int pad = ThemePainting.metric(context(), DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);

@@ -101,8 +101,8 @@ final class Labels {
             }));
             ((LiteralLabel)label).caret = text.caret().orElse(-1);
             ((LiteralLabel)label).wrapped.lineHeight = text.role() == Nodes.TextRole.DESCRIPTION
-                ? Math.round(ThemePainting.metric(context(), dev.jasper.ui.metrics.DesignMetrics.Role.DESCRIPTION_LINE_HEIGHT)
-                    * context().typography().bodySize() / 13f) : 0;
+                ? Math.round(context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.DESCRIPTION_LINE_HEIGHT)
+                    * ThemePainting.font(context(), Typography.Role.BODY).getSize2D() / 13f) : 0;
             label.repaint();
         }
     }

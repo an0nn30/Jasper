@@ -140,8 +140,8 @@ class PluginPanelPageTest {
             var hostRow=(dev.jasper.sdk.ui.Nodes.SettingRow)h.row(size.get());
             var ready=dev.jasper.sdk.ui.ControlState.READY;
             return new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Card("card",ready,dev.jasper.sdk.ui.Nodes.CardKind.SETTINGS,List.of(
-                new dev.jasper.sdk.ui.Nodes.SettingRow(hostRow.id(),hostRow.state(),hostRow.title(),hostRow.description(),hostRow.control(),hostRow.dependent(),true),
-                new dev.jasper.sdk.ui.Nodes.SettingRow("own",ready,"Own","",new dev.jasper.sdk.ui.Nodes.Toggle("own-toggle",ready,"Own",true,"own-toggle",false),false,true),
+                new dev.jasper.sdk.ui.Nodes.SettingRow(hostRow.id(),hostRow.state(),"Presented size","Presented description",hostRow.control(),true,true,"Recommended"),
+                new dev.jasper.sdk.ui.Nodes.SettingRow("own",ready,"Own","",new dev.jasper.sdk.ui.Nodes.Toggle("own-toggle",ready,"Own",true,"own-toggle",false),false,true,"Optional"),
                 new dev.jasper.sdk.ui.Nodes.FormRow("form",ready,"Form","",new dev.jasper.sdk.ui.Nodes.Text("form-text",ready,"x",dev.jasper.sdk.ui.Nodes.TextRole.BODY),Optional.empty(),true))));
         };
         onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID,"Panel","1.0.0",Set.of()),Set.of(),Set.of(),Set.of(),getClass().getClassLoader(),() -> context -> {
@@ -154,6 +154,16 @@ class PluginPanelPageTest {
             view.get().update(spec.apply(rows.get()));
             view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Edited("settings:size","5"));
             var card=(dev.jasper.sdk.ui.Nodes.Card)view.get().spec().root();
+            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow)card.children().get(0)).titleNote()).isEqualTo("Recommended");
+            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow)card.children().get(0)).title()).isEqualTo("Presented size");
+            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow)card.children().get(0)).description()).isEqualTo("Presented description");
+            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow)card.children().get(0)).dependent()).isTrue();
+            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow)card.children().get(1)).titleNote()).isEqualTo("Optional");
+            page.highlight("size");
+            var searched=(dev.jasper.sdk.ui.Nodes.Card)view.get().spec().root();
+            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow)searched.children().get(0)).titleNote()).isEqualTo("Recommended");
+            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow)searched.children().get(1)).titleNote()).isEqualTo("Optional");
+
             assertThat(card.children()).as("plugin and host rows keep the highlight the plugin asked for").allSatisfy(node -> assertThat(
                 node instanceof dev.jasper.sdk.ui.Nodes.SettingRow row ? row.highlighted() : ((dev.jasper.sdk.ui.Nodes.FormRow)node).highlighted()).isTrue());
             for(String id:List.of("settings:size:row","own","form"))

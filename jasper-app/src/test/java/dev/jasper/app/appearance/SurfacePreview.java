@@ -10,10 +10,16 @@ import javax.imageio.ImageIO;
 public final class SurfacePreview {
     private record Capture(BufferedImage image, String metadata) {}
 
-    /** Optional arguments: output directory, surface substring, theme, state. */
+    /** Optional arguments: output directory, surface substring, theme, state, system font size, constrained logical width. */
     public static void main(String[] args) throws Exception {
         Path output = Path.of(args.length > 0 ? args[0] : "build/theme-surfaces");
         String filter = args.length > 1 ? args[1] : "";
+        ThemeController fonts = args.length > 4 ? SurfaceFixtures.edt(() -> {
+            var controller = new ThemeController();
+            controller.configure(Theme.DARK, new dev.jasper.app.config.UiFontConfig("system",Float.parseFloat(args[4])));
+            return controller;
+        }) : null;
+        try {
         for (String theme : args.length > 2 ? List.of(args[2]) : List.of("calibration", "dark", "light", "custom")) {
             for (String id : List.of("vault-create", "vault-unlock")) {
                 if (!filter.isEmpty() && !id.contains(filter)) continue;
@@ -23,6 +29,7 @@ public final class SurfacePreview {
                 for (String state : states) {
                     if (args.length > 3 && !state.equals(args[3])) continue;
                     try (var opened = SurfaceFixtures.open(id, state, theme)) {
+                        if (args.length > 5) opened.width(Integer.parseInt(args[5]));
                         Path directory = Files.createDirectories(output.resolve(theme).resolve(id));
                         // Busy submission and all metadata share one EDT turn, before any async completion can close the view.
                         Capture capture = SurfaceFixtures.edt(() -> capture(opened, id));
@@ -32,12 +39,13 @@ public final class SurfacePreview {
                 }
             }
         }
+        } finally { if (fonts != null) SurfaceFixtures.edt(() -> { fonts.configure(Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults()); fonts.close(); return null; }); }
     }
 
     private static Capture capture(SurfaceFixtures.Opened opened, String id) {
         var image = opened.capture(2);
         var metadata = new StringBuilder("provenance=real staged plugin/headless Java2D\ndeviceScale=2\nlogicalUiScale="
-            + System.getProperty("flatlaf.uiScale", "1") + "\npreferred=" + opened.preferred() + "\n");
+            + com.formdev.flatlaf.util.UIScale.getUserScaleFactor() + "\npreferred=" + opened.preferred() + "\n");
         for (String anchor : List.of("form.hero.tile", "form.heading", "intro", "password", "password.input", "cancel", "submit"))
             metadata.append(anchor).append('=').append(opened.bounds(anchor)).append('\n');
         if (id.equals("vault-create")) {
@@ -62,7 +70,7 @@ public final class SurfacePreview {
             graphics.setFont(component.getFont());
             var metrics = graphics.getFontMetrics();
             int baseline = metrics.getAscent();
-            if (component instanceof javax.swing.JLabel label && !id.equals("intro")) {
+            if (component instanceof javax.swing.JLabel label && !id.equals("intro") && !id.equals("form.warning.text")) {
                 var insets = label.getInsets();
                 var icon = new java.awt.Rectangle();
                 var text = new java.awt.Rectangle();

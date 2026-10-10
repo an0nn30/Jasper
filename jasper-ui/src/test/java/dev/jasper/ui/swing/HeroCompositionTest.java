@@ -11,6 +11,70 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class HeroCompositionTest {
+    @Test void supportingTextPaintsEveryLineBesideANaturalFirstLineAdornment() {
+        Edt.run(() -> {
+            var previous = new java.util.HashMap<String,Object>();
+            UIManager.getDefaults().forEach((key,value) -> { if (key.equals("defaultFont") || key.equals("Label.font")) previous.put((String)key,value); });
+            var context = KitFixtures.context();
+            String text = "Your master password cannot be recovered if forgotten. Keep it safe for future use.";
+            try {
+                for (int size : List.of(13,20,32)) {
+                    var font = new Font("Serif", Font.PLAIN, size);
+                    UIManager.put("defaultFont",font); UIManager.put("Label.font",font);
+                    var spec = new ViewSpec(new Nodes.Stack("support",ControlState.READY,LayoutRole.SUPPORTING,List.of(
+                        new Nodes.Icon("icon",ControlState.READY,"warning",Hue.NONE,IconSize.CAPTION,"Warning"),
+                        new Text("body",ControlState.READY,text,TextRole.CAPTION))));
+                    try (var view = new KitView(context,spec,event -> {})) {
+                        for (int width : List.of(344,180)) {
+                            view.setSize(width,1000); view.doLayout();
+                            int height = view.getPreferredSize().height;
+                            var painted = KitFixtures.render(view,width,height,1);
+                            var label = (Labels.LiteralLabel)view.control("body").component;
+                            var icon = view.control("icon").component;
+                            assertThat(icon.getWidth()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(12));
+                            assertThat(label.getX()).isEqualTo(icon.getWidth()+com.formdev.flatlaf.util.UIScale.scale(9));
+                            assertThat(icon.getY()).isEqualTo(Math.max(0,(label.getFontMetrics(label.getFont()).getHeight()-icon.getHeight())/2));
+                            assertThat(label.wraps()).isTrue();
+                            var lines = label.wrapped.lines(label.getWidth());
+                            assertThat(String.join(" ",lines)).isEqualTo(text);
+                            assertThat(lines).hasSizeGreaterThan(1);
+                            assertThat(label.getHeight()).isEqualTo(lines.size()*label.getFontMetrics(label.getFont()).getHeight());
+                            int lineHeight = label.getFontMetrics(label.getFont()).getHeight();
+                            for (int line=0;line<lines.size();line++) {
+                                boolean ink=false;
+                                for(int y=line*lineHeight;y<(line+1)*lineHeight;y++) for(int x=label.getX();x<width;x++)
+                                    ink |= (painted.getRGB(x,y) >>> 24) != 0;
+                                assertThat(ink).as("painted line %s at font %s width %s",line,size,width).isTrue();
+                            }
+                        }
+                    }
+                }
+            } finally { previous.forEach(UIManager::put); if(!previous.containsKey("defaultFont"))UIManager.put("defaultFont",null); if(!previous.containsKey("Label.font"))UIManager.put("Label.font",null); KitViewTest.release(context); }
+        });
+    }
+
+    @Test void strengthSpacingUsesOnlyPreviousVisibleSiblings() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var meter = new Strength("meter", ControlState.READY, 0, "");
+            var preceding = new Text("before", ControlState.READY, "Before", TextRole.BODY);
+            try (var view = new KitView(context, KitViewTest.stack(meter), event -> {})) {
+                for (var children : List.of(List.<Node>of(meter), List.<Node>of(meter, preceding),
+                        List.<Node>of(preceding, meter), List.<Node>of(new Text("before", new ControlState(false,true,false,""), "Before", TextRole.BODY), meter))) {
+                    view.update(new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL, children)));
+                    var preferred = view.getPreferredSize();
+                    assertThat(preferred.height).isGreaterThanOrEqualTo(3);
+                    KitFixtures.render(view, 300, preferred.height, 1);
+                    var control = view.control("meter").component;
+                    int expected = children.getFirst() == preceding ? view.control("before").component.getHeight() + 6 : 0;
+                    assertThat(control.getY()).isEqualTo(expected);
+                    assertThat(control.getHeight()).isEqualTo(3);
+                    assertThat(control.getY()+control.getHeight()).isLessThanOrEqualTo(preferred.height);
+                }
+            } finally { KitViewTest.release(context); }
+        });
+    }
+
     @Test void confirmationFollowsGroupRevealAndRetainsSubmitAndWipe() {
         Edt.run(() -> {
             var context=KitFixtures.context(); var events=new ArrayList<UiEvent>();

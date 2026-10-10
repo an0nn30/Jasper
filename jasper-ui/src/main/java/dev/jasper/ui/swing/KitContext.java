@@ -32,17 +32,7 @@ public final class KitContext {
     public GeneratedTheme theme() { return route.select(binding.current()); }
     /** User font settings survive theme installs. FlatLaf owns scaling; role fonts remain unscaled logical values. */
     public Typography typography() {
-        // FlatLaf's LAF defaultFont is already scaled. A host's UIManager override is the unscaled user setting.
-        java.awt.Font[] override = {null, null};
-        javax.swing.UIManager.getDefaults().forEach((key, value) -> {
-            if ("defaultFont".equals(key) && value instanceof java.awt.Font font) override[0] = font;
-            if ("Label.font".equals(key) && value instanceof java.awt.Font font) override[1] = font;
-        });
-        if (override[0] == null) return new Typography();
-        float size = (override[1] == null ? override[0] : override[1]).getSize2D();
-        // Host provenance distinguishes size-only system settings from an explicit family, even Helvetica Neue.
-        return Boolean.FALSE.equals(javax.swing.UIManager.get("Jasper.uiFontFamilyOverride"))
-            ? new Typography(size) : new Typography(override[0].getFamily(), size);
+        return SwingTypography.typography();
     }
     public MotionPolicy motionPolicy() { return new MotionPolicy(animationsEnabled); }
 }

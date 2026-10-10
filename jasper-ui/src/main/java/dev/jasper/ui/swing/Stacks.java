@@ -57,7 +57,7 @@ final class Stacks {
             component.setLayout(
                     stack.role() == Nodes.LayoutRole.HERO
                             ? new HeroLayout(this)
-                            : stack.role() == Nodes.LayoutRole.NAVIGATION ? new Navigation.InlineLayout(context()) : new StackLayout(context(), stack.role()));
+                            : stack.role() == Nodes.LayoutRole.SUPPORTING ? new SupportingLayout(context()) : stack.role() == Nodes.LayoutRole.NAVIGATION ? new Navigation.InlineLayout(context()) : new StackLayout(context(), stack.role()));
             component.revalidate();
             component.repaint();
         }
@@ -183,6 +183,47 @@ final class Stacks {
         }
     }
 
+    /** Natural leading adornments beside a flexible final body, aligned to its first line. */
+    static final class SupportingLayout implements Composition.WidthLayout {
+        private final KitContext context;
+        SupportingLayout(KitContext context) { this.context = context; }
+        private int gap() { return ThemePainting.metric(context, DesignMetrics.Role.INLINE_GAP); }
+        private List<Component> visible(Container parent) {
+            return java.util.Arrays.stream(parent.getComponents()).filter(Component::isVisible).toList();
+        }
+        private int leadingWidth(List<Component> children) {
+            return children.stream().limit(Math.max(0, children.size()-1)).mapToInt(c -> c.getPreferredSize().width + gap()).sum();
+        }
+        @Override public void addLayoutComponent(String name, Component component) {}
+        @Override public void removeLayoutComponent(Component component) {}
+        @Override public Dimension minimumLayoutSize(Container parent) { return preferredLayoutSize(parent); }
+        @Override public Dimension preferredLayoutSize(Container parent) {
+            var children = visible(parent); var insets = parent.getInsets();
+            int width = insets.left + insets.right + leadingWidth(children)
+                + (children.isEmpty() ? 0 : children.getLast().getPreferredSize().width);
+            return new Dimension(width, height(parent, parent.getWidth() > 0 ? parent.getWidth() : width));
+        }
+        @Override public int height(Container parent, int width) {
+            var children = visible(parent); var insets = parent.getInsets();
+            int result = 0, bodyWidth = Math.max(0, width - insets.left - insets.right - leadingWidth(children));
+            for (Component child : children) result = Math.max(result,
+                Composition.height(child, child == children.getLast() ? bodyWidth : child.getPreferredSize().width));
+            return insets.top + insets.bottom + result;
+        }
+        @Override public void layoutContainer(Container parent) {
+            var children = visible(parent); if (children.isEmpty()) return;
+            var insets = parent.getInsets(); var body = children.getLast();
+            int x = insets.left, bodyWidth = Math.max(0, parent.getWidth() - insets.left - insets.right - leadingWidth(children));
+            int lineHeight = body.getFontMetrics(body.getFont()).getHeight();
+            for (Component child : children) {
+                int width = child == body ? bodyWidth : child.getPreferredSize().width;
+                int height = Composition.height(child, width);
+                child.setBounds(x, insets.top + (child == body ? 0 : Math.max(0, (lineHeight-height)/2)), width, height);
+                x += width + gap();
+            }
+        }
+    }
+
     static final class StackLayout implements Composition.WidthLayout {
         final KitContext context;
         final Nodes.LayoutRole role;
@@ -289,19 +330,18 @@ final class Stacks {
                     horizontal()
                             ? children.stream().mapToInt(c -> c.getPreferredSize().width).sum()
                             : 0;
+            Component previous = null;
             for (Component child : children) {
-                if (!horizontal() && child instanceof Indicators.StrengthMeter) height += ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_TOP_GAP) - gap();
+                if (!horizontal() && previous != null) height += verticalGap(child);
                 int childWidth =
                         horizontal()
                                 ? fittedWidth(child, available, children.size(), total)
                                 : available;
                 int childHeight = Composition.height(child, childWidth);
                 height = horizontal() ? Math.max(height, childHeight) : height + childHeight;
+                previous = child;
             }
-            return insets.top
-                    + insets.bottom
-                    + height
-                    + (horizontal() ? 0 : Math.max(0, children.size() - 1) * gap());
+            return insets.top + insets.bottom + height;
         }
 
         @Override
@@ -331,8 +371,9 @@ final class Stacks {
                     horizontal()
                             ? children.stream().mapToInt(c -> c.getPreferredSize().width).sum()
                             : 0;
+            Component previous = null;
             for (Component child : children) {
-                if (!horizontal() && child instanceof Indicators.StrengthMeter) y += ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_TOP_GAP) - gap();
+                if (!horizontal() && previous != null) y += verticalGap(child);
                 int childWidth =
                         horizontal() ? fittedWidth(child, width, children.size(), total) : child instanceof Indicators.StrengthMeter ? Math.min(width, child.getPreferredSize().width) : width;
                 int childHeight = Composition.height(child, childWidth);
@@ -345,9 +386,14 @@ final class Stacks {
                     x += childWidth + gap();
                 } else {
                     child.setBounds(x, y, childWidth, childHeight);
-                    y += childHeight + gap();
+                    y += childHeight;
                 }
+                previous = child;
             }
+        }
+        private int verticalGap(Component child) {
+            return child instanceof Indicators.StrengthMeter
+                ? ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_TOP_GAP) : gap();
         }
     }
 }

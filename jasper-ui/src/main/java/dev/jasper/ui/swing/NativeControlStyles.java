@@ -14,19 +14,9 @@ import javax.swing.*;
  */
 public final class NativeControlStyles {
     private NativeControlStyles() {}
-    /** User typography with the display scale applied exactly once. */
+    /** Exact host point-size overrides, or catalog roles with user scaling applied once. */
     public static Font font(Typography.Role role) {
-        Font[] override = {null, null};
-        UIManager.getDefaults().forEach((key, value) -> {
-            if ("defaultFont".equals(key) && value instanceof Font font) override[0] = font;
-            if ("Label.font".equals(key) && value instanceof Font font) override[1] = font;
-        });
-        Font base = override[1] == null ? override[0] : override[1];
-        var typography = base == null ? new Typography()
-            : Boolean.FALSE.equals(UIManager.get("Jasper.uiFontFamilyOverride"))
-                ? new Typography(base.getSize2D()) : new Typography(base.getFamily(), base.getSize2D());
-        Font result = typography.font(role);
-        return result.deriveFont(UIScale.scale(result.getSize2D()));
+        return SwingTypography.effective(SwingTypography.typography().font(role));
     }
     /** Scaled spacing from the fixed module catalog. */
     public static int metric(DesignMetrics.Role role) { return UIScale.scale(DesignMetrics.DEFAULT.value(role)); }

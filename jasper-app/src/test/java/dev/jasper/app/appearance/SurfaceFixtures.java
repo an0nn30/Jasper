@@ -60,7 +60,8 @@ public final class SurfaceFixtures {
         private final Path home;
         private final KitViewTestAccess owner;
         private final String id, state;
-        private final int width, minimumHeight;
+        private final int minimumHeight;
+        private int width;
         private int height;
         private boolean closed;
         Opened(Path home, KitViewTestAccess owner, String id, String state) {
@@ -78,6 +79,7 @@ public final class SurfaceFixtures {
         public void error() throws InterruptedException { owner.error(); }
         public void theme(String name) throws Exception { owner.theme(SurfaceFixtures.theme(name)); layout(); }
         public Dimension preferred() { return edt(() -> view().getPreferredSize()); }
+        public void width(int value) { width = value; layout(); }
         public void layout() { edt(() -> { height = Math.max(minimumHeight, view().getPreferredSize().height); view().setSize(width,height); arrange(view()); return null; }); }
         /** Device scale2 is an actual Java2D transform. Synthetic focus is explicitly headless, never native proof. */
         public BufferedImage capture(int scale) {

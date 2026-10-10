@@ -7,6 +7,57 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class UiTypographyTest {
+    @Test void actualMountedAndAdapterSizesApplyConfiguredPointsAndDisplayScaleOnce() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            String previousScale = System.getProperty("flatlaf.uiScale");
+            try {
+                for (String scale : new String[]{null, "2"}) {
+                    if (scale == null) System.clearProperty("flatlaf.uiScale"); else System.setProperty("flatlaf.uiScale", scale);
+                    var themes = new ThemeController();
+                    var context = themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME);
+                    var spec = new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Stack("root", dev.jasper.ui.model.ControlState.READY,
+                        dev.jasper.ui.model.Nodes.LayoutRole.VERTICAL, java.util.List.of(
+                            new dev.jasper.ui.model.Nodes.Text("body", dev.jasper.ui.model.ControlState.READY, "Body", dev.jasper.ui.model.Nodes.TextRole.BODY),
+                            new dev.jasper.ui.model.Nodes.Text("description", dev.jasper.ui.model.ControlState.READY, "First\nSecond", dev.jasper.ui.model.Nodes.TextRole.DESCRIPTION),
+                            new dev.jasper.ui.model.Nodes.Secret("password", dev.jasper.ui.model.ControlState.READY,"Password","Password",""))));
+                    try (var view = new dev.jasper.ui.swing.KitView(context, spec, event -> {})) {
+                        for (var config : java.util.List.of(UiFontConfig.defaults(), new UiFontConfig("system", 20),
+                                new UiFontConfig("Serif", 20), new UiFontConfig("Helvetica Neue", 18.5f), UiFontConfig.defaults())) {
+                            themes.configure(Theme.DARK, config);
+                            float expected = config.size() == 0 ? 13 * com.formdev.flatlaf.util.UIScale.getUserScaleFactor() : config.size();
+                            var body = dev.jasper.app.testsupport.KitTestSupport.require(view, "body", JLabel.class);
+                            assertThat(body.getFont().getSize2D()).as("mounted config=%s scale=%s", config, scale).isEqualTo(expected);
+                            var input = dev.jasper.app.testsupport.KitTestSupport.require(view,"password.input",JPasswordField.class);
+                            assertThat(input.getFont().getSize2D()).isEqualTo(expected);
+                            int minimumHeight = com.formdev.flatlaf.util.UIScale.scale(28);
+                            int actualLine = (int)Math.ceil(input.getFont().getLineMetrics("Ag",new java.awt.font.FontRenderContext(null,true,true)).getHeight());
+                            assertThat(input.getParent().getPreferredSize().height).as("field accommodates actual text plus scaled padding once")
+                                .isEqualTo(Math.max(minimumHeight, actualLine + com.formdev.flatlaf.util.UIScale.scale(12)));
+                            var description = dev.jasper.app.testsupport.KitTestSupport.require(view,"description",JLabel.class);
+                            int expectedLineHeight = Math.max(Math.round(18*expected/13),description.getFontMetrics(description.getFont()).getHeight());
+                            assertThat(description.getPreferredSize().height).as("two description lines sized once").isEqualTo(2*expectedLineHeight);
+                            assertThat(dev.jasper.ui.swing.NativeControlStyles.font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(expected);
+                            assertThat(dev.jasper.ui.swing.NativeControlStyles.font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getSize2D()).isCloseTo(expected * 15 / 13, within(.001f));
+                            assertThat(new JLabel().getFont().getSize2D()).as("native form policy").isEqualTo(expected);
+                            if (config.family().equals("Serif")) assertThat(body.getFont().getFamily()).isEqualTo(Font.SERIF);
+                            assertThat(dev.jasper.ui.swing.NativeControlStyles.metric(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT))
+                                .isEqualTo(com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT)));
+                            var image = new java.awt.image.BufferedImage(200, 80, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                            var graphics = image.createGraphics();
+                            try { graphics.scale(2, 2); view.setSize(100, 40); view.doLayout(); view.paint(graphics);
+                                assertThat(graphics.getTransform().getScaleX()).isEqualTo(2);
+                                assertThat(body.getFont().getSize2D()).as("device transform never mutates logical point size").isEqualTo(expected);
+                            } finally { graphics.dispose(); }
+                        }
+                    } finally { themes.configure(Theme.DARK, UiFontConfig.defaults()); themes.close(); }
+                }
+            } finally {
+                if (previousScale == null) System.clearProperty("flatlaf.uiScale"); else System.setProperty("flatlaf.uiScale", previousScale);
+                var reset = new ThemeController(); reset.close();
+            }
+        });
+    }
+
     @Test void sizeOnlySystemSettingsKeepSharedRoleFacesAndExplicitFamiliesRemainExplicit() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var themes = new ThemeController();

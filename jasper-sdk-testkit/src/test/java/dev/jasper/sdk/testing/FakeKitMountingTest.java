@@ -53,8 +53,8 @@ class FakeKitMountingTest {
                 java.util.function.Function<SettingsPanelHost,ViewSpec> spec=h -> {
                     var hostRow=(Nodes.SettingRow)h.row(size.get());
                     return new ViewSpec(new Nodes.Card("card",ControlState.READY,Nodes.CardKind.SETTINGS,List.of(
-                        new Nodes.SettingRow(hostRow.id(),hostRow.state(),hostRow.title(),hostRow.description(),hostRow.control(),hostRow.dependent(),true),
-                        new Nodes.SettingRow("own",ControlState.READY,"Own","",new Nodes.Toggle("own-toggle",ControlState.READY,"Own",true,"own-toggle",false),false,true),
+                        new Nodes.SettingRow(hostRow.id(),hostRow.state(),"Presented size","Presented description",hostRow.control(),true,true,"Recommended"),
+                        new Nodes.SettingRow("own",ControlState.READY,"Own","",new Nodes.Toggle("own-toggle",ControlState.READY,"Own",true,"own-toggle",false),false,true,"Optional"),
                         new Nodes.FormRow("form",ControlState.READY,"Form","",new Nodes.Text("form-text",ControlState.READY,"x",Nodes.TextRole.BODY),Optional.empty(),true))));
                 };
                 host.start(new PluginInfo("test.highlight","Highlight","1.0.0",Set.of()),Set.of(),Set.of(),context -> {
@@ -65,6 +65,16 @@ class FakeKitMountingTest {
                 view.get().update(spec.apply(rows.get()));
                 view.get().emit(new UiEvent.Edited("settings:size","5"));
                 var card=(Nodes.Card)view.get().spec().root();
+            assertThat(((Nodes.SettingRow)card.children().get(0)).titleNote()).isEqualTo("Recommended");
+            assertThat(((Nodes.SettingRow)card.children().get(0)).title()).isEqualTo("Presented size");
+            assertThat(((Nodes.SettingRow)card.children().get(0)).description()).isEqualTo("Presented description");
+            assertThat(((Nodes.SettingRow)card.children().get(0)).dependent()).isTrue();
+            assertThat(((Nodes.SettingRow)card.children().get(1)).titleNote()).isEqualTo("Optional");
+            host.highlightSettingsPanel("test.highlight", "size");
+            var searched=(Nodes.Card)view.get().spec().root();
+            assertThat(((Nodes.SettingRow)searched.children().get(0)).titleNote()).isEqualTo("Recommended");
+            assertThat(((Nodes.SettingRow)searched.children().get(1)).titleNote()).isEqualTo("Optional");
+
                 assertThat(card.children()).allSatisfy(node -> assertThat(node instanceof Nodes.SettingRow row ? row.highlighted() : ((Nodes.FormRow)node).highlighted()).isTrue());
             }
         });

@@ -30,7 +30,8 @@ public final class Nodes {
      */
     public enum ListKind { SINGLE, DOUBLE, COMPACT, ORDERED, RESULTS }
     public enum FormKind { HERO, HERO_COMPACT, SHEET, FULL, SETTINGS }
-    public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION }
+    /** SUPPORTING keeps leading adornments natural-sized beside a wrapping final text/body child. */
+    public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION, SUPPORTING }
     /**
      * SIDEBAR_DETAIL and THREE_COLUMN place their children side by side. DOCUMENT stacks them top to bottom for a document
      * surface (an editor tab): every visible child takes its preferred height except the first visible Custom or Empty
