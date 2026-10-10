@@ -9,6 +9,25 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 class AnchoredPickTest extends VaultServiceTest {
  static final class Anchor implements UiAnchor {boolean open=true;final List<Runnable> listeners=new ArrayList<>();public boolean isOpen(){return open;}public Subscription onClosed(Runnable r){listeners.add(r);return ()->listeners.remove(r);}public void close(){if(!open)return;open=false;List.copyOf(listeners).forEach(Runnable::run);}}
+ @Test void workerCancellationBetweenLivenessAndMembershipCannotGrant(@TempDir Path dir){
+  var api=service(dir).forConsumer(SSH);populate();var shown=new ArrayList<AnchoredPickPrompt>();service.anchoredPicker(shown::add,a->{});
+  var base=new Anchor();Runnable[] checkpoint={()->{}};
+  var anchor=new UiAnchor(){public boolean isOpen(){checkpoint[0].run();return base.isOpen();}public Subscription onClosed(Runnable r){return base.onClosed(r);}public void close(){base.close();}};
+  var result=api.pick(window,new CredentialPickRequest(anchor,Optional.empty(),true));
+  checkpoint[0]=()->{checkpoint[0]=()->{};java.util.concurrent.CompletableFuture.runAsync(()->result.cancel(false)).join();};
+  shown.getLast().choose(PROD);assertThat(result).isCancelled();
+  var next=api.credential(PROD);assertThat(next).as("cancelled selection leaves no grant").isNotDone();grants.getLast().cancel();
+ }
+ @Test void chosenCompletionMayImmediatelyFetchItsOneUseGrant(@TempDir Path dir){
+  var api=service(dir).forConsumer(SSH);populate();var shown=new ArrayList<AnchoredPickPrompt>();service.anchoredPicker(shown::add,a->{});
+  var result=api.pick(window,new CredentialPickRequest(new Anchor(),Optional.empty(),true));
+  var fetched=result.thenCompose(choice->{
+   assertThat(java.util.concurrent.CompletableFuture.supplyAsync(()->result.cancel(false)).orTimeout(5,java.util.concurrent.TimeUnit.SECONDS).join()).isFalse();
+   return api.credential(((CredentialPickResult.Chosen)choice).credential().id());
+  });
+  shown.getLast().choose(PROD);try(var credential=fetched.join().orElseThrow()){assertThat(credential.username()).contains("deploy");}
+  assertThat(grants).isEmpty();var second=api.credential(PROD);assertThat(second).isNotDone();grants.getLast().cancel();
+ }
  @Test void explicitSelectionGrantsExactlyOneUseAndClearDoesNotGrant(@TempDir Path dir){
   var api=service(dir).forConsumer(SSH);populate();var shown=new ArrayList<AnchoredPickPrompt>();service.anchoredPicker(shown::add,a->{});
   var result=api.pick(window,new CredentialPickRequest(new Anchor(),Optional.empty(),true));

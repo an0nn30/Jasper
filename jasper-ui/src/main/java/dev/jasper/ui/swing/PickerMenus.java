@@ -18,7 +18,7 @@ final class PickerMenus {
     static void paintFace(JButton button,Graphics graphics,KitContext c,Nodes.PickerFace face,boolean empty,boolean focus){
         var g=(Graphics2D)graphics.create();try{
             ThemePainting.antialias(g);
-            if(!button.isEnabled())g.setComposite(AlphaComposite.SrcOver.derive(metric(c,DesignMetrics.Role.PICKER_DISABLED_PERCENT)/100f));
+            if(!button.isEnabled())g.setComposite(AlphaComposite.SrcOver.derive(c.metrics().value(DesignMetrics.Role.PICKER_DISABLED_PERCENT)/100f));
             boolean expanded=Boolean.TRUE.equals(button.getClientProperty("Jasper.pickerExpanded"));
             ThemePainting.rounded(g,button,c,ThemePainting.color(c,button.isEnabled()&&button.getModel().isRollover()?SemanticColor.SURFACE_CONTROL_HOVER:SemanticColor.SURFACE_CONTROL),ThemePainting.color(c,SemanticColor.BORDER_CONTROL),focus||expanded,false);
             int pad=metric(c,DesignMetrics.Role.PICKER_PADDING),gap=metric(c,DesignMetrics.Role.PICKER_GAP),tile=metric(c,DesignMetrics.Role.PICKER_FACE_TILE);
@@ -51,22 +51,28 @@ final class PickerMenus {
         final JLabel searchIcon=Labels.literal();
         final DefaultListModel<Nodes.PickerItem> model=new DefaultListModel<>();
         final JList<Nodes.PickerItem> list=new JList<>(model){@Override public boolean getScrollableTracksViewportWidth(){return true;}};
-        final JScrollPane scroll=new JScrollPane(list);
+        final JScrollPane scroll=new JScrollPane(list){@Override protected void paintChildren(Graphics graphics){
+            super.paintChildren(graphics);
+            if(model.isEmpty())return;
+            var cell=list.getCellBounds(model.size()-1,model.size()-1);if(cell==null)return;
+            int y=SwingUtilities.convertPoint(list,0,cell.y,this).y;
+            if(y>=0&&y<getHeight()){graphics.setColor(ThemePainting.color(context(),SemanticColor.BORDER_SUBTLE));graphics.drawLine(0,y,getWidth(),y);}
+        }};
         final JLabel empty=Labels.literal();
         final JPanel body=new JPanel(new BorderLayout());
         final JPanel searchBox=new JPanel(new BorderLayout());
         boolean applying,composing;
-        String query;
+        String query,appliedActive;
         MenuControl(KitView view,Nodes.PickerMenu node){
             super(view,node,new JPanel(new BorderLayout()){@Override protected void paintComponent(Graphics g){Menus.paintSurface(this,g,view.context());}});
             search=new JTextField();search.putClientProperty("html.disable",true);KitOwnership.mark(search,node.id()+".search");KitOwnership.mark(list,node.id()+".rows");
             component.setOpaque(false);body.setOpaque(false);searchBox.setOpaque(false);
             search.setOpaque(false);search.setBorder(new EmptyBorder(0,0,0,0));
-            searchSurface=new TextFields.FieldSurface(context(),search,false);searchSurface.role=Typography.Role.PICKER_COMPACT;searchSurface.heightRole=DesignMetrics.Role.PICKER_SEARCH_HEIGHT;
+            searchSurface=new TextFields.FieldSurface(context(),search,false);searchSurface.role=Typography.Role.PICKER_COMPACT;searchSurface.heightRole=DesignMetrics.Role.PICKER_SEARCH_HEIGHT;searchSurface.radiusRole=DesignMetrics.Role.PICKER_SEARCH_RADIUS;
             searchSurface.focus=new ThemePainting.Focus(search,searchSurface,view);own(searchSurface.focus);
             searchSurface.add(search);searchSurface.add(searchIcon,BorderLayout.WEST);searchBox.add(searchSurface);component.add(searchBox,BorderLayout.NORTH);component.add(body,BorderLayout.CENTER);
             list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);list.setFocusable(false);list.setOpaque(false);list.setCellRenderer((l,value,index,selected,focus)->new Row(this,value,selected));
-            scroll.setBorder(null);scroll.setOpaque(false);scroll.getViewport().setOpaque(false);scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+            scroll.setBorder(new EmptyBorder(0,0,0,0));scroll.setOpaque(false);scroll.getViewport().setOpaque(false);scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
             body.add(empty,BorderLayout.NORTH);body.add(scroll);empty.setHorizontalAlignment(SwingConstants.CENTER);
             DocumentListener document=new DocumentListener(){void changed(){if(!applying)emit(new UiEvent.Edited(MenuControl.this.node.id(),search.getText()));}public void insertUpdate(DocumentEvent e){changed();}public void removeUpdate(DocumentEvent e){changed();}public void changedUpdate(DocumentEvent e){changed();}};
             search.getDocument().addDocumentListener(document);own(()->search.getDocument().removeDocumentListener(document));
@@ -86,15 +92,19 @@ final class PickerMenus {
         @Override void refresh(){state();var n=(Nodes.PickerMenu)node;applying=true;try{
             if(!Objects.equals(query,n.query())){query=n.query();if(!search.getText().equals(query))search.setText(query);}
             search.setEnabled(interactive());search.setFont(ThemePainting.font(context(),Typography.Role.PICKER_COMPACT));search.setForeground(ThemePainting.color(context(),SemanticColor.TEXT_PRIMARY));search.setCaretColor(search.getForeground());search.setBackground(ThemePainting.color(context(),SemanticColor.SURFACE_INPUT));
-            searchSurface.hint=n.placeholder();searchIcon.setIcon(context().icons().icon("search",context().theme().semantic(),SemanticColor.TEXT_TERTIARY,metric(context(),DesignMetrics.Role.ICON_CAPTION)));
-            searchIcon.setBorder(new EmptyBorder(0,0,0,metric(context(),DesignMetrics.Role.PICKER_GAP)));
+            searchSurface.hint=n.placeholder();searchIcon.setIcon(context().icons().icon("search",context().theme().semantic(),SemanticColor.TEXT_TERTIARY,metric(context(),DesignMetrics.Role.PICKER_SEARCH_GLYPH)));
+            searchIcon.setBorder(new EmptyBorder(0,0,0,metric(context(),DesignMetrics.Role.PICKER_SEARCH_GAP)));
             search.getAccessibleContext().setAccessibleName(n.placeholder());
-            int pad=metric(context(),DesignMetrics.Role.PICKER_PADDING);searchBox.setBorder(new EmptyBorder(metric(context(),DesignMetrics.Role.PICKER_SEARCH_TOP),pad,pad,pad));
-            searchSurface.setBorder(new EmptyBorder(0,pad,0,pad));
+            int pad=metric(context(),DesignMetrics.Role.PICKER_PADDING);searchBox.setBorder(new EmptyBorder(metric(context(),DesignMetrics.Role.PICKER_SEARCH_TOP),metric(context(),DesignMetrics.Role.PICKER_SEARCH_SIDE),pad,metric(context(),DesignMetrics.Role.PICKER_SEARCH_SIDE)));
+            searchSurface.setBorder(new EmptyBorder(0,metric(context(),DesignMetrics.Role.PICKER_SEARCH_PADDING),0,metric(context(),DesignMetrics.Role.PICKER_SEARCH_PADDING)));
             searchBox.setPreferredSize(new Dimension(metric(context(),DesignMetrics.Role.PICKER_WIDTH),metric(context(),DesignMetrics.Role.PICKER_SEARCH_TOP)+height(context(),DesignMetrics.Role.PICKER_SEARCH_HEIGHT)+pad));
             var rows=new ArrayList<>(n.items());rows.add(new Nodes.PickerItem(n.footerAction(),n.footerLabel(),"","add",Nodes.Hue.NONE,Nodes.PickerItemKind.UTILITY));
-            if(!Collections.list(model.elements()).equals(rows)){model.clear();model.addAll(rows);}
-            for(int i=0;i<model.size();i++)if(model.get(i).id().equals(n.activeId())){list.setSelectedIndex(i);break;}
+            boolean changedRows=!Collections.list(model.elements()).equals(rows);
+            if(changedRows){model.clear();model.addAll(rows);}
+            if(changedRows||!Objects.equals(appliedActive,n.activeId())){
+                for(int i=0;i<model.size();i++)if(model.get(i).id().equals(n.activeId())){list.setSelectedIndex(i);break;}
+                appliedActive=n.activeId();
+            }
             list.setFixedCellHeight(-1);list.setVisibleRowCount(Math.min(9,model.size()));list.setBorder(new EmptyBorder(0,pad,metric(context(),DesignMetrics.Role.PICKER_MENU_BOTTOM),pad));list.setFont(search.getFont());
             scroll.setPreferredSize(new Dimension(metric(context(),DesignMetrics.Role.PICKER_WIDTH),Math.min(rows.stream().limit(9).mapToInt(item->rowHeight(this,item)).sum()+metric(context(),DesignMetrics.Role.PICKER_MENU_BOTTOM),Math.max(height(context(),DesignMetrics.Role.PICKER_UTILITY_HEIGHT),view.availableHeight()-searchBox.getPreferredSize().height-(n.items().isEmpty()?metric(context(),DesignMetrics.Role.PICKER_EMPTY_HEIGHT):0)))));
             empty.setBorder(new EmptyBorder(0,0,metric(context(),DesignMetrics.Role.PICKER_EMPTY_TEXT_INSET),0));empty.setText(n.noMatches());empty.setVisible(n.items().isEmpty());empty.setFont(ThemePainting.font(context(),Typography.Role.PICKER_CAPTION));empty.setForeground(ThemePainting.color(context(),SemanticColor.TEXT_TERTIARY));empty.setPreferredSize(new Dimension(metric(context(),DesignMetrics.Role.PICKER_WIDTH),metric(context(),DesignMetrics.Role.PICKER_EMPTY_HEIGHT)));
@@ -109,7 +119,6 @@ final class PickerMenus {
             ThemePainting.antialias(g);boolean footer=item.id().equals(n.footerAction());
             int pad=metric(c,DesignMetrics.Role.PICKER_PADDING),tile=metric(c,DesignMetrics.Role.PICKER_TILE),gap=metric(c,DesignMetrics.Role.PICKER_ROW_GAP);
             int top=footer?metric(c,DesignMetrics.Role.PICKER_FOOTER_TOP):0,rowHeight=getHeight()-top;
-            if(footer){g.setColor(ThemePainting.color(c,SemanticColor.BORDER_SUBTLE));g.drawLine(0,0,getWidth(),0);}
             if(active){g.setColor(ThemePainting.color(c,SemanticColor.ACCENT));int radius=metric(c,DesignMetrics.Role.MENU_ITEM_RADIUS);g.fillRoundRect(0,top+1,getWidth(),rowHeight-2,radius*2,radius*2);}
             if(item.kind()==Nodes.PickerItemKind.UTILITY){int glyph=metric(c,DesignMetrics.Role.PICKER_GLYPH);c.icons().icon(item.icon(),c.theme().semantic(),active?SemanticColor.TEXT_ONACCENT:footer?SemanticColor.TEXT_LINK:SemanticColor.TEXT_TERTIARY,glyph).paintIcon(this,g,pad+(tile-glyph)/2,top+(rowHeight-glyph)/2);}
             else tile(g,this,c,item.icon(),item.hue(),pad,(getHeight()-tile)/2,tile,active);

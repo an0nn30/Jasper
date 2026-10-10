@@ -286,3 +286,37 @@ bounding boxes. These are app-owned shared-renderer differences, not dismissed a
 Current headless geometry evidence remains distinct from future actual native popup/focus proof.
 Controller explicitly requested freezing this candidate and carrying these residuals into review/native
 calibration rather than adding unreviewed ad hoc patches during the stable gate.
+
+
+### Task2a fix round1: installed host envelope and remaining ink
+
+Native picker-a at `d40439c3` was not accepted: an actual444×214 popup acquired LAF
+wrapper insets4/1/4/1 and a scroll border, reducing its content, adding a scrollbar and clipping
+the footer. A headless reproducer now performs `updateComponentTreeUI` on the actual host
+JPopupMenu/kit tree. Non-UIResource zero borders survive refresh in both shared host and
+menu scroll container; no popup-size inflation. Staged captures now explicitly record
+`hostWrapper=true`, zero insets and absent scrollbars except the intentionally short viewport.
+
+Shared search roles are radius5, side6, padding7, glyph9, gap7 (logical); default face28 and
+compact22 remain unchanged. The divider is painted across the scroll container rather than
+inside the inset row. Search focus still uses the shared keyboard-focus halo with its matching
+radius. No focus suppression or per-string offsets were introduced. Equal-scale no-match
+comparison retains444×214: color-threshold source/actual magnifier boxes15×15/13×13;
+message boxes both[85,96,273,17]; footer source[71,176,158,15], actual[72,175,160,15].
+The source divider has two strong device rows; actual full-width line has different antialias
+ink. Search outline edges/rounding, glyph stroke and footer/message ink mass remain distinct.
+These are measured app-owned residuals for the native rerun, not waived by equal boxes.
+
+Narrow font provenance inspection found picker-a config has no `ui.font` override.
+ConfigurationController passes its default `UiFontConfig(system,0)` to ThemeController,
+which clears developer defaultFont/form-font entries and uses the platform family.
+The staged actual owner records plain `.AppleSystemUIFont`,10pt, weight1,width1,posture0,
+tracking0, UIScale1, no defaultFont/Label.font override and family override false.
+This finds no bootstrap override explaining heavier native ink; it does not prove the actual
+native raster font is identical. No font-family search or global size change was made.
+
+Fresh fix-round comparison/capture/input hashes are separate from d404 evidence in the
+scratch fix1 manifest; picker-a native originals remain immutable. All874 affected tests pass
+(zero failures/errors, one existing skip); SDK/fake are unchanged/up-to-date. Controller must
+rerun actual Save/Cancel (Login and path-key), popup layout and keyboard behavior in picker-b.
+Independent re-review and final pixel acceptance remain pending; no page is accepted.

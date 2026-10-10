@@ -324,7 +324,7 @@ final class TextFields {
     }
     static final class FieldSurface extends JPanel {
         boolean hero;
-        DesignMetrics.Role heightRole=DesignMetrics.Role.FIELD_HEIGHT;
+        DesignMetrics.Role heightRole=DesignMetrics.Role.FIELD_HEIGHT,radiusRole=DesignMetrics.Role.CONTROL_RADIUS;
         final KitContext context; final JTextComponent input; final boolean multiline;
         Typography.Role role = Typography.Role.BODY; String hint = ""; boolean error;
         /** The parent surface is the field's backdrop: no input fill, the outline kept. */
@@ -364,7 +364,7 @@ final class TextFields {
             try {
                 ThemePainting.rounded(g, this, context, transparent ? null : ThemePainting.color(context, SemanticColor.SURFACE_INPUT),
                     ThemePainting.color(context, error ? SemanticColor.BORDER_ERROR : focus.visible() ? SemanticColor.BORDER_FOCUS : SemanticColor.BORDER_INPUT),
-                    focus.visible(), error);
+                    focus.visible(), error,radiusRole);
             } finally { g.dispose(); }
         }
         @Override protected void paintChildren(Graphics graphics) {

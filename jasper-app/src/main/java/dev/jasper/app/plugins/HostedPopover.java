@@ -28,7 +28,7 @@ final class HostedPopover implements PluginPopover {
     };
     HostedPopover(HostedKit kit,HostedAnchor anchor){
         this.kit=kit;this.anchor=anchor;
-        popup.setLayout(new BorderLayout());popup.setBorder(null);popup.setOpaque(false);
+        popup.setLayout(new BorderLayout());popup.setBorder(new javax.swing.border.EmptyBorder(0,0,0,0));popup.setOpaque(false);
         popup.addPopupMenuListener(new PopupMenuListener(){public void popupMenuWillBecomeVisible(PopupMenuEvent e){}public void popupMenuWillBecomeInvisible(PopupMenuEvent e){close();}public void popupMenuCanceled(PopupMenuEvent e){close();}});
         lifetime=anchor.onClosed(this::close);
         anchor.target.addHierarchyBoundsListener(moved);UIManager.getDefaults().addPropertyChangeListener(fonts);

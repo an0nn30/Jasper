@@ -32,10 +32,13 @@ final class ThemePainting {
         g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
     }
     static void rounded(Graphics2D g, JComponent component, KitContext context, Color fill, Color border, boolean focus, boolean error) {
+        rounded(g,component,context,fill,border,focus,error,DesignMetrics.Role.CONTROL_RADIUS);
+    }
+    static void rounded(Graphics2D g,JComponent component,KitContext context,Color fill,Color border,boolean focus,boolean error,DesignMetrics.Role radiusRole) {
         antialias(g);
-        int radius = metric(context, DesignMetrics.Role.CONTROL_RADIUS);
+        int radius = metric(context, radiusRole);
         double w = component.getWidth(), h = component.getHeight();
-        component.putClientProperty("Jasper.kit.halo", focus || error ? new Halo(context, error) : null);
+        component.putClientProperty("Jasper.kit.halo", focus || error ? new Halo(context, error,radiusRole) : null);
         if (w <= 0 || h <= 0) return;
         var shape = new RoundRectangle2D.Double(0, 0, w, h, radius * 2.0, radius * 2.0);
         if (fill != null) { g.setColor(fill); g.fill(shape); }
@@ -44,7 +47,7 @@ final class ThemePainting {
             g.draw(new RoundRectangle2D.Double(.5, .5, w - 1, h - 1, radius * 2.0, radius * 2.0));
         }
     }
-    private record Halo(KitContext context, boolean error) {}
+    private record Halo(KitContext context, boolean error,DesignMetrics.Role radiusRole) {}
     /** View-owned final overlay: ring lies outside nominal bounds, clipped only by viewports/root. */
     static void halos(KitView root, Graphics graphics) { halos(root, root, graphics); }
     private static void halos(KitView root, Container container, Graphics graphics) {
@@ -58,7 +61,7 @@ final class ThemePainting {
                         if (ancestor instanceof JViewport) g.clip(SwingUtilities.convertRectangle(ancestor, new Rectangle(0, 0, ancestor.getWidth(), ancestor.getHeight()), root));
                     }
                     var bounds = SwingUtilities.convertRectangle(component.getParent(), component.getBounds(), root);
-                    int ring = metric(halo.context(), DesignMetrics.Role.FOCUS_RING), radius = metric(halo.context(), DesignMetrics.Role.CONTROL_RADIUS);
+                    int ring = metric(halo.context(), DesignMetrics.Role.FOCUS_RING), radius = metric(halo.context(), halo.radiusRole());
                     var outer = new java.awt.geom.Area(new RoundRectangle2D.Double(bounds.x - ring, bounds.y - ring, bounds.width + 2.0 * ring, bounds.height + 2.0 * ring, 2.0 * (radius + ring), 2.0 * (radius + ring)));
                     outer.subtract(new java.awt.geom.Area(new RoundRectangle2D.Double(bounds.x, bounds.y, bounds.width, bounds.height, 2.0 * radius, 2.0 * radius)));
                     g.setColor(ColorMath.opacity(color(halo.context(), halo.error() ? SemanticColor.BORDER_ERROR : SemanticColor.BORDER_FOCUS), halo.error() ? .22 : .25));

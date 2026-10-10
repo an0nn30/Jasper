@@ -287,6 +287,7 @@ final class Forms {
 
         @Override
         public Dimension getPreferredSize() {
+            if (view.isClosed()) return new Dimension();
             var owner = (FormControl) view.control(getName());
             var f = (Nodes.Form) owner.node;
             int width =

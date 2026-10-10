@@ -8,12 +8,24 @@ import java.util.function.*;
 public final class AnchoredPickPrompt {
  private final WindowHandle owner;
  private final CredentialPickRequest request;
- private final CompletableFuture<CredentialPickResult> result;
+ /** Reserve one terminal outcome before granting, without running completion callbacks under a lock. */
+ static final class PickFuture extends CompletableFuture<CredentialPickResult> {
+  private final java.util.concurrent.atomic.AtomicBoolean claimed=new java.util.concurrent.atomic.AtomicBoolean();
+  boolean chosen(CredentialPickResult.Chosen value,Runnable grant){
+   if(!claimed.compareAndSet(false,true))return false;
+   grant.run(); // visible before completion invokes a reentrant first fetch
+   return super.complete(value);
+  }
+  @Override public boolean cancel(boolean interrupt){return claimed.compareAndSet(false,true)?super.cancel(interrupt):isCancelled();}
+  @Override public boolean complete(CredentialPickResult value){return claimed.compareAndSet(false,true)&&super.complete(value);}
+  @Override public boolean completeExceptionally(Throwable failure){return claimed.compareAndSet(false,true)&&super.completeExceptionally(failure);}
+ }
+ private final PickFuture result;
  private final Supplier<List<CredentialDescriptor>> choices;
  private final Consumer<UUID> grant;
  private final List<Runnable> dismiss=new ArrayList<>();
  private boolean settled;
- AnchoredPickPrompt(WindowHandle owner,CredentialPickRequest request,CompletableFuture<CredentialPickResult> result,
+ AnchoredPickPrompt(WindowHandle owner,CredentialPickRequest request,PickFuture result,
        Supplier<List<CredentialDescriptor>> choices,Consumer<UUID> grant,Executor ui){
   this.owner=owner;this.request=request;this.result=result;this.choices=choices;this.grant=grant;
   result.whenComplete((value,failure)->{if(result.isCancelled())ui.execute(this::cancel);});
@@ -26,7 +38,7 @@ public final class AnchoredPickPrompt {
  public void choose(UUID id){
   if(settled()||!request.anchor().isOpen())return;
   var chosen=choices.get().stream().filter(d->d.id().equals(id)).findFirst();if(chosen.isEmpty())return;
-  settled=true;grant.accept(id);result.complete(new CredentialPickResult.Chosen(chosen.orElseThrow()));dismiss();
+  if(result.chosen(new CredentialPickResult.Chosen(chosen.orElseThrow()),()->{settled=true;grant.accept(id);}))dismiss();
  }
  public void clear(){if(!settled()&&request.allowClear()&&request.anchor().isOpen())finish(new CredentialPickResult.Cleared());}
  public void cancel(){if(!settled)finish(new CredentialPickResult.Cancelled());}

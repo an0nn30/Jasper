@@ -254,7 +254,7 @@ public final class VaultService {
         @Override public CompletableFuture<dev.jasper.vault.api.CredentialPickResult> pick(WindowHandle owner,dev.jasper.vault.api.CredentialPickRequest request) {
             if(showAnchored==null)throw new UnsupportedOperationException("Anchored picker is unavailable");
             validateAnchor.accept(request.anchor());lastOwner.put(consumer.id(),owner);
-            var result=new CompletableFuture<dev.jasper.vault.api.CredentialPickResult>();
+            var result=new AnchoredPickPrompt.PickFuture();
             var prompt=new AnchoredPickPrompt(owner,request,result,VaultService.this::descriptors,
                 chosen -> oneTime.add(new Grant(consumer.id(),chosen)),ui==null?Runnable::run:ui);
             anchored.add(prompt);prompt.onDismiss(() -> anchored.remove(prompt));

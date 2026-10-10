@@ -40,12 +40,19 @@ class StagedAnchoredPickerTest {
      capture("empty",kitView(form));click(form,"import.choose.0.input");
      var menu=menu(vault);capture("open-empty",menu);search(menu,"staging");capture("no-matches",menu);enter(named(menu,"credential.menu.search"));
      click(vault.surface("New Credential"),"create.login");var editor=vault.surface("Add Login");
-     assertThat(editor.ownerSurface()).contains(form);type(editor,"name.input","fixture login");type(editor,"username.input","fixture-with-a-deliberately-long-synthetic-username");type(editor,"password.input","synthetic-secret");click(editor,"save");
+     assertThat(editor.ownerSurface()).contains(form);
+     var closingView=kitView(editor);var closingForm=closingView.getComponent(0);closingView.addContainerListener(new java.awt.event.ContainerAdapter(){@Override public void componentRemoved(java.awt.event.ContainerEvent event){closingForm.getPreferredSize();}});
+     type(editor,"name.input","fixture login");type(editor,"username.input","fixture-with-a-deliberately-long-synthetic-username");type(editor,"password.input","synthetic-secret");click(editor,"save");
     });
     await(()->menus(vault).size()==1,"picker returns after saving Login");
     onEdt(()->{
      var menu=menu(vault);assertThat(((dev.jasper.ui.model.Nodes.PickerMenu)menu.spec().root()).query()).isEqualTo("staging");
-     search(menu,"");select(menu,1);enter(named(menu,"credential.menu.search"));
+     search(menu,"");key(menu,"down");
+     var field=(JTextField)named(menu,"credential.menu.search");var document=field.getDocument();
+     var light=dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.Theme.JASPER_LIGHT);appearance.setPair(new dev.jasper.app.appearance.ResolvedTheme(light,light));appearance.setPair(pair);
+     var defaults=new HashMap<Object,Object>();UIManager.getDefaults().forEach(defaults::put);try{UIManager.put("defaultFont",new Font("Dialog",Font.PLAIN,20));}finally{UIManager.put("defaultFont",defaults.get("defaultFont"));}
+     assertThat(field.getDocument()).isSameAs(document);assertThat(((dev.jasper.ui.model.Nodes.PickerItem)((JList<?>)named(menu,"credential.menu.rows")).getSelectedValue()).label()).isEqualTo("fixture login");
+     enter(field);
     });
     await(()->!((dev.jasper.ui.model.Nodes.Choice)node(form,"import.choose.0")).face().orElseThrow().primary().isEmpty(),"chosen metadata projected");
     onEdt(()->{capture("selected",kitView(form));KitView menu;
@@ -62,7 +69,9 @@ class StagedAnchoredPickerTest {
      field.getActionMap().get("picker.escape").actionPerformed(null);
     });
     settle();onEdt(()->click(form,"import.import"));
-    var review=vault.awaitSurface("Import SSH keys");onEdt(()->{capture("disabled-review",kitView(form));click(review,"commit");});
+    var review=vault.awaitSurface("Import SSH keys");onEdt(()->{capture("disabled-review",kitView(form));
+     var defaults=new HashMap<Object,Object>();UIManager.getDefaults().forEach(defaults::put);try{UIManager.put("defaultFont",new Font("Dialog",0,1).deriveFont(32.5f));assertThat(com.formdev.flatlaf.util.UIScale.getUserScaleFactor()).isEqualTo(2.5f);capture("disabled-review-250",kitView(form));}finally{UIManager.put("defaultFont",defaults.get("defaultFont"));}
+     click(review,"commit");});
     await(()->!node(form,"import.import").state().enabled()&&((dev.jasper.ui.model.Nodes.Text)node(form,"import.status")).text().contains("saved"),"import completion");
     onEdt(()->{capture("disabled",kitView(form));assertThat(vault.problems).isEmpty();});
    }
@@ -76,17 +85,23 @@ class StagedAnchoredPickerTest {
  }catch(ReflectiveOperationException e){throw new AssertionError(e);}}
  static KitView menu(StagedVaultHost vault){return menus(vault).getFirst().component();}
  static void search(KitView menu,String text){((JTextField)named(menu,"credential.menu.search")).setText(text);}
+ static void key(KitView menu,String key){((JTextField)named(menu,"credential.menu.search")).getActionMap().get("picker."+key).actionPerformed(null);}
  static void select(KitView menu,int index){((JList<?>)named(menu,"credential.menu.rows")).setSelectedIndex(index);}
  static void capture(String state,KitView view){capture(state,view,0);}
  static void capture(String state,KitView view,int width){
   try{
    Path output=Path.of("build/theme-migration-evidence/anchored-picker/actual");Files.createDirectories(output);
-   var size=view.getPreferredSize();if(width>0)size.width=width;view.setSize(size);layout(view);
-   var image=new BufferedImage(size.width*2,size.height*2,BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();g.scale(2,2);view.printAll(g);g.dispose();ImageIO.write(image,"png",output.resolve(state+".png").toFile());
+   var size=view.getPreferredSize();if(width>0)size.width=width;
+   var popup=(JPopupMenu)SwingUtilities.getAncestorOfClass(JPopupMenu.class,view);
+   JComponent painted=popup==null?view:popup;
+   if(popup!=null)SwingUtilities.updateComponentTreeUI(popup);
+   painted.setSize(size);layout(painted);
+   if(popup!=null){assertThat(popup.getInsets()).isEqualTo(new Insets(0,0,0,0));var rows=(JList<?>)named(view,"credential.menu.rows");var scroll=(JScrollPane)SwingUtilities.getAncestorOfClass(JScrollPane.class,rows);if(!state.equals("filtering-short"))assertThat(scroll.getVerticalScrollBar().isVisible()).isFalse();}
+   var image=new BufferedImage(size.width*2,size.height*2,BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();g.scale(2,2);painted.printAll(g);g.dispose();ImageIO.write(image,"png",output.resolve(state+".png").toFile());
    var input=named(view,"import.choose.0.input");var bounds=input==null?new Rectangle():SwingUtilities.convertRectangle(input.getParent(),input.getBounds(),view);
    var field=named(view,"credential.menu.search");
    var defaults=new HashMap<Object,Object>();UIManager.getDefaults().forEach(defaults::put);
-   String typography="\"searchFont\":"+json(field==null?null:field.getFont())+",\"searchFontSize2D\":"+(field==null?"null":field.getFont().getSize2D())+",\"uiScale\":"+com.formdev.flatlaf.util.UIScale.getUserScaleFactor()+",\"defaultFontOverride\":"+json(defaults.get("defaultFont"))+",\"labelFontOverride\":"+json(defaults.get("Label.font"))+",\"familyOverride\":"+json(UIManager.get("Jasper.uiFontFamilyOverride"))+",";
+   String typography="\"hostWrapper\":"+(popup!=null)+",\"searchFontAttributes\":"+json(field==null?null:field.getFont().getAttributes())+",\"searchFont\":"+json(field==null?null:field.getFont())+",\"searchFontSize2D\":"+(field==null?"null":field.getFont().getSize2D())+",\"uiScale\":"+com.formdev.flatlaf.util.UIScale.getUserScaleFactor()+",\"defaultFontOverride\":"+json(defaults.get("defaultFont"))+",\"labelFontOverride\":"+json(defaults.get("Label.font"))+",\"familyOverride\":"+json(UIManager.get("Jasper.uiFontFamilyOverride"))+",";
    Files.writeString(output.resolve(state+".json"),"{"+typography+"\"state\":\""+state+"\",\"owner\":\""+view.spec().root().getClass().getSimpleName()+"\",\"logicalWidth\":"+size.width+",\"logicalHeight\":"+size.height+",\"deviceScale\":2,\"faceBounds\": ["+bounds.x+","+bounds.y+","+bounds.width+","+bounds.height+"],\"native\":false}");
   }catch(java.io.IOException e){throw new java.io.UncheckedIOException(e);}
  }

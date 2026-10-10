@@ -108,12 +108,21 @@ public class EditorForm implements AutoCloseable {
         catch (FieldError invalid) {
             busy = false; message = ""; errors.put(invalid.field, invalid.getMessage()); render(); return;
         } catch (RuntimeException failure) { pending = CompletableFuture.failedFuture(failure); }
-        pending.whenComplete((ignored, failure) -> {
+        pending.whenComplete((ignored, failure) -> onUi(() -> {
             busy = false;
             if (closed) return;
-            if (failure == null) { close(); dismiss.run(); return; }
+            if (failure == null) { finish(); return; }
             message = message(failure); render();
-        });
+        }));
+    }
+
+    private static void onUi(Runnable action) {
+        if (javax.swing.SwingUtilities.isEventDispatchThread()) action.run();
+        else javax.swing.SwingUtilities.invokeLater(action);
+    }
+    private void finish() {
+        // A native owner must still close if content cleanup fails; its close callback is idempotent.
+        try { close(); } finally { dismiss.run(); }
     }
 
     private void browse(TextRow row) {
@@ -134,7 +143,7 @@ public class EditorForm implements AutoCloseable {
         if (closed) return;
         switch (event) {
             case UiEvent.Action action when action.id().equals(SAVE) -> save();
-            case UiEvent.Action action when action.id().equals(CANCEL) -> { if (cancelEnabled) { close(); dismiss.run(); } }
+            case UiEvent.Action action when action.id().equals(CANCEL) -> { if (cancelEnabled) finish(); }
             case UiEvent.Action action when action.id().startsWith(BROWSE) -> rows.stream()
                 .filter(row -> row instanceof TextRow text && text.kind() == Nodes.FieldKind.PATH && (BROWSE + text.id()).equals(action.id()))
                 .findFirst().ifPresent(row -> browse((TextRow) row));

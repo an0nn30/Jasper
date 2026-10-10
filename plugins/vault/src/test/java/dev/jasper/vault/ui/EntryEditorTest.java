@@ -24,6 +24,18 @@ import static org.assertj.core.api.Assertions.*;
 class EntryEditorTest {
     static FakeKit kit() { return new FakeKit("dev.jasper.vault"); }
 
+    @Test void workerSaveCompletionReturnsToUiAndClosedDraftIgnoresLateCompletion() throws Exception {
+        for(boolean cancel: new boolean[]{false,true}){
+            var pending=new CompletableFuture<Void>();var form=new AtomicReference<EntryEditor>();var dismissed=new java.util.concurrent.atomic.AtomicInteger();var offUi=new java.util.concurrent.atomic.AtomicBoolean();
+            edt(()->{
+                var entry=EntryEditor.login(kit(),null,value->{value.auth().zero();return pending;},()->{if(!javax.swing.SwingUtilities.isEventDispatchThread())offUi.set(true);dismissed.incrementAndGet();});form.set(entry);
+                var view=entry.view();emit(view,new UiEvent.Edited(EntryEditor.NAME,"synthetic"));emit(view,new UiEvent.Edited(EntryEditor.USERNAME,"fixture"));type(view,EntryEditor.PASSWORD,"synthetic-secret");press(view,EditorForm.SAVE);
+                if(cancel)press(view,EditorForm.CANCEL);
+            });
+            CompletableFuture.runAsync(()->pending.complete(null)).join();edt(()->{});
+            assertThat(offUi).isFalse();assertThat(dismissed).hasValue(1);edt(()->assertThat(form.get().closed()).isTrue());
+        }
+    }
     @Test void saveIsTheFormsOnlyPrimaryAndEscapeCancels() throws Exception {
         edt(() -> {
             var form = EntryEditor.key(kit(), null, value -> CompletableFuture.completedFuture(null), () -> { });

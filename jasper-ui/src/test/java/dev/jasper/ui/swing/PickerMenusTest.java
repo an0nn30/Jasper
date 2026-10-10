@@ -7,6 +7,45 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 import static dev.jasper.ui.swing.KitViewTest.*;
 class PickerMenusTest {
+ @Test void keyboardIntentSurvivesThemeAndFontRefresh(){Edt.run(()->{
+  var context=KitFixtures.context();var events=new ArrayList<UiEvent>();
+  var items=List.of(new Nodes.PickerItem("none","None","","none",Nodes.Hue.NONE,Nodes.PickerItemKind.UTILITY),new Nodes.PickerItem("login","Login","Password","user",Nodes.Hue.BLUE));
+  var menu=new Nodes.PickerMenu("menu",ControlState.READY,"","Search",items,"login","none","No matches","New Credential…","create","cancel");
+  var raw=new HashMap<Object,Object>();UIManager.getDefaults().forEach(raw::put);
+  try(var view=new KitView(context,new ViewSpec(menu),events::add)){
+   var field=find(view,"menu.search",JTextField.class);var rows=find(view,"menu.rows",JList.class);var document=field.getDocument();
+   for(String expected:List.of("login","create")){
+    field.getActionMap().get("picker.down").actionPerformed(null);
+    var theme=KitFixtures.light();context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme,theme));
+    UIManager.put("defaultFont",new java.awt.Font("Dialog",0,18));UIManager.put("defaultFont",raw.get("defaultFont"));
+    assertThat(((Nodes.PickerItem)rows.getSelectedValue()).id()).isEqualTo(expected);assertThat(field.getDocument()).isSameAs(document);
+    field.getActionMap().get("picker.enter").actionPerformed(null);assertThat(events.getLast()).isEqualTo(new UiEvent.Action(expected));
+   }
+  }finally{UIManager.put("defaultFont",raw.get("defaultFont"));release(context);}
+ });}
+ @Test void disabledOpacityIsDimensionlessAtEveryUiScale(){Edt.run(()->{
+  var context=KitFixtures.context();float previous=com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
+  try{
+   var method=com.formdev.flatlaf.util.UIScale.class.getDeclaredMethod("setUserScaleFactor",float.class,boolean.class);method.setAccessible(true);
+   try{for(float scale:new float[]{1f,1.5f,2.5f}){
+    method.invoke(null,scale,false);var button=new JButton();button.setEnabled(false);button.setSize(Math.round(190*scale),Math.round(22*scale));
+    var image=new java.awt.image.BufferedImage(button.getWidth(),button.getHeight(),java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();
+    try{PickerMenus.paintFace(button,g,context,new Nodes.PickerFace("Login","Password","user",Nodes.Hue.BLUE,Nodes.PickerDensity.COMPACT),false,false);}finally{g.dispose();}
+    assertThat(image.getRGB(button.getWidth()*3/4,button.getHeight()/2)>>>24).as("opacity at %s",scale).isBetween(114,116);
+   }}finally{method.invoke(null,previous,false);}
+  }catch(ReflectiveOperationException failure){throw new AssertionError(failure);}finally{release(context);}
+ });}
+ @Test void installedPopupWrapperFitsExactMenuWithoutScrollbar(){Edt.run(()->{
+  var context=KitFixtures.context();FlatLafInstaller.install(context.theme());
+  var menu=new Nodes.PickerMenu("menu",ControlState.READY,"staging","Search credentials",List.of(),"","create","No credentials match “staging”","New Credential…","create","cancel");
+  try(var view=new KitView(context,new ViewSpec(menu),e->{})){
+   var popup=new JPopupMenu();popup.setLayout(new java.awt.BorderLayout());popup.setBorder(new javax.swing.border.EmptyBorder(0,0,0,0));popup.setOpaque(false);popup.add(view);popup.setPopupSize(222,107);popup.setSize(222,107);SwingUtilities.updateComponentTreeUI(popup);layout(popup);
+   var rows=find(view,"menu.rows",JList.class);var scroll=(JScrollPane)SwingUtilities.getAncestorOfClass(JScrollPane.class,rows);
+   assertThat(popup.getInsets()).as("native host wrapper insets").isEqualTo(new java.awt.Insets(0,0,0,0));
+   assertThat(view.getSize()).isEqualTo(new java.awt.Dimension(222,107));
+   assertThat(scroll.getVerticalScrollBar().isVisible()).isFalse();assertThat(rows.getCellBounds(0,0).width).isEqualTo(212);
+  }finally{release(context);}
+ });}
  @Test void referenceMenuAllocatesItsVisibleSearchAndUtilityRowsWithoutHorizontalClipping(){Edt.run(()->{
   var context=KitFixtures.context();var menu=new Nodes.PickerMenu("menu",ControlState.READY,"staging","Search credentials",List.of(),"","create","No credentials match “staging”","New Credential…","create","cancel");
   try(var view=new KitView(context,new ViewSpec(menu),e->{})){

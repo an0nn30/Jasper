@@ -45,6 +45,16 @@ class FormsTest {
             if (c instanceof Container child) layout(child);
     }
 
+    @Test void nativeRemovalMayMeasureAClosingFormWithoutLookingUpDisposedControls() {
+        dev.jasper.ui.testsupport.Edt.run(() -> {
+            var context=dev.jasper.ui.testsupport.KitFixtures.context();
+            var form=new Nodes.Form("form",ControlState.READY,Nodes.FormKind.FULL,"Entry",java.util.Optional.empty(),java.util.List.of(new Nodes.Text("body",ControlState.READY,"Draft",Nodes.TextRole.BODY)),java.util.Optional.empty(),java.util.List.of(),"");
+            var view=new KitView(context,new ViewSpec(form),event->{});var surface=view.getComponent(0);
+            view.addContainerListener(new java.awt.event.ContainerAdapter(){@Override public void componentRemoved(java.awt.event.ContainerEvent event){surface.getPreferredSize();}});
+            try{assertThatCode(view::close).doesNotThrowAnyException();assertThat(surface.getPreferredSize()).isEqualTo(new java.awt.Dimension());}
+            finally{view.close();release(context);}
+        });
+    }
     @Test
     void formRowAlignsLabelControlHelperAndTrailingPortInsidePaddedCard() {
         Edt.run(

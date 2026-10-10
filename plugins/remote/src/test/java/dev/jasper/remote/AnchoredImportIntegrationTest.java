@@ -53,6 +53,13 @@ class AnchoredImportIntegrationTest {
    });
    var first=Kits.value(()->api.credential(credential.id()));Kits.settle(host);try(var secret=first.join().orElseThrow()){assertThat(secret.username()).contains("fixture");}
    var second=Kits.value(()->api.credential(credential.id()));Kits.settle(host);assertThat(second).isNotDone();Kits.edt(()->second.cancel(false));
+   // A real consumer may fetch synchronously from the Chosen completion; cancellation cannot steal it.
+   var immediate=Kits.value(()->{
+    var picked=api.pick(context.terminals().window(window).orElseThrow(),new CredentialPickRequest(remote.currentImport().view().anchor("import.choose.0"),Optional.empty(),true));
+    var fetched=picked.thenCompose(choice->api.credential(((CredentialPickResult.Chosen)choice).credential().id()));
+    host.popoverViews("dev.jasper.vault").getFirst().emit(new UiEvent.Action(credential.id().toString()));
+    assertThat(picked.cancel(false)).isFalse();return fetched;
+   });Kits.settle(host);try(var secret=immediate.join().orElseThrow()){assertThat(secret.username()).contains("fixture");}
    Kits.edt(()->{
     chooseCredential(remote.currentImport(),0);host.popoverViews("dev.jasper.vault").getFirst().emit(new UiEvent.Action("credential.none"));
     assertThat(Kits.node(remote.currentImport().view(),"import.choose.0",Nodes.Choice.class).face().orElseThrow().primary()).isEmpty();
