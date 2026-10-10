@@ -21,7 +21,9 @@ public final class Nodes {
     public enum FieldKind { TEXT, SEARCH, PORT, PATH, TEXTAREA, NUMBER }
     public enum ChoiceKind { DROPDOWN, PICKER, SEGMENTED, SEARCHABLE }
     public enum CardKind { FORM, SETTINGS, MIXED }
-    public enum SelectionMode { SINGLE, MULTIPLE }
+    /** NONE keeps rows readable and scrollable but removes row selection, activation and the canvas focus stop.
+     * Independently interactive inline controls keep their behavior. NONE requires empty selectedIds. */
+    public enum SelectionMode { NONE, SINGLE, MULTIPLE }
     /**
      * RESULTS is a one-line result list driven by an external field (a command palette): it never takes focus, the host
      * moves its selection, a left press activates a row, and fixed row and heading heights keep it steady.
@@ -412,6 +414,7 @@ public final class Nodes {
             Objects.requireNonNull(activateAction);
             contextActions = List.copyOf(contextActions);
             Objects.requireNonNull(selectionMode); Objects.requireNonNull(addAction); Objects.requireNonNull(visibleRows);
+            if (selectionMode == SelectionMode.NONE && !selectedIds.isEmpty()) throw new IllegalArgumentException("Passive rows cannot be selected");
             if (selectionMode == SelectionMode.SINGLE && selectedIds.size() > 1) throw new IllegalArgumentException("Single selection accepts at most one item");
             if (visibleRows.isPresent() && visibleRows.getAsInt() < 1) throw new IllegalArgumentException("Visible rows must be positive");
             Objects.requireNonNull(enterAction); Objects.requireNonNull(deleteAction);
@@ -500,6 +503,7 @@ public final class Nodes {
             Objects.requireNonNull(activateAction);
             contextActions = List.copyOf(contextActions);
             Objects.requireNonNull(selectionMode); Objects.requireNonNull(scroll);
+            if (selectionMode == SelectionMode.NONE && !selectedIds.isEmpty()) throw new IllegalArgumentException("Passive rows cannot be selected");
             if (selectionMode == SelectionMode.SINGLE && selectedIds.size() > 1) throw new IllegalArgumentException("Single selection accepts at most one item");
             ModelChecks.unique(columns, Column::id);
             ModelChecks.unique(rows, TableRow::id);

@@ -48,6 +48,94 @@ class EditorKitTest {
         return new ViewSpec(new Stack("bar", READY, LayoutRole.INLINE, List.of(field, option("next-button", "Next", Optional.empty())), stackCancel));
     }
 
+    @Test void passiveListsAndTablesKeepReadableScrollableRowsWithoutSelectionOrActivation() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            var items = new ArrayList<ListItem>(); var rows = new ArrayList<TableRow>();
+            for (int i = 0; i < 30; i++) {
+                items.add(new ListItem("row" + i, Optional.empty(), List.of(new Text("text" + i, READY, "Output " + i,
+                    TextRole.MONO, Optional.of(Severity.DANGER), OptionalInt.empty())), List.of(),
+                    List.of(new Nodes.Button("action" + i, READY, "Copy", "", ButtonKind.GHOST, "copy", ""))));
+                rows.add(new TableRow("row" + i, Map.of("name", "Output " + i), Optional.empty()));
+            }
+            var list = new ItemList("output", READY, ListKind.COMPACT, items, Set.of(), "activate", List.of(), SelectionMode.NONE,
+                Optional.empty(), OptionalInt.of(12));
+            var table = new Table("output", READY, List.of(new Column("name", "Name", TextRole.MONO, false)), rows,
+                Set.of(), "activate", List.of(), SelectionMode.NONE);
+            for (Nodes.Node node : List.of(list, table)) {
+                try (var view = new KitView(context, new ViewSpec(node), events::add)) {
+                    view.setSize(500, 250); InteractiveRowsTest.layout(view); events.clear();
+                    var control = (InteractiveRows.RowsControl) view.control("output");
+                    assertThat(control.canvas.isFocusable()).isFalse();
+                    var row = control.mounted.get("row0");
+                    var click = new java.awt.event.MouseEvent(row, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 5, 5, 1, false, java.awt.event.MouseEvent.BUTTON1);
+                    row.dispatchEvent(click);
+                    row.dispatchEvent(new java.awt.event.MouseEvent(row, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 5, 5, 2, false, java.awt.event.MouseEvent.BUTTON1));
+                    SwingUtilities.processKeyBindings(key(control.canvas, KeyEvent.VK_DOWN, 0));
+                    SwingUtilities.processKeyBindings(key(control.canvas, KeyEvent.VK_SPACE, 0));
+                    SwingUtilities.processKeyBindings(key(control.canvas, KeyEvent.VK_ENTER, 0));
+                    assertThat(control.selected).isEmpty(); assertThat(control.focusItem).isNull(); assertThat(events).isEmpty();
+                    assertThat(control.canvas.isEnabled()).isTrue();
+                    if (node instanceof ItemList) {
+                        assertThat(control.canvas.getPreferredScrollableViewportSize().height).isEqualTo(12 * control.rowHeight);
+                        var text = find(view, "text0", JLabel.class);
+                        assertThat(text.isEnabled()).as("passive does not dim error text").isTrue();
+                        assertThat(text.getForeground()).isEqualTo(context.theme().semantic().color(SemanticColor.STATUS_DANGER));
+                        var pixels=paint(text,140,28); int opaqueInk=0;
+                        for(int y=0;y<pixels.getHeight();y++)for(int x=0;x<pixels.getWidth();x++)
+                            if((pixels.getRGB(x,y)>>>24)>200)opaqueInk++;
+                        assertThat(opaqueInk).as("passive error glyphs paint at full opacity").isGreaterThan(10);
+                        find(view, "action0", AbstractButton.class).doClick();
+                        assertThat(events).containsExactly(new UiEvent.Action("copy"));
+                        view.reveal("text29");
+                    } else control.ensure(29);
+                    assertThat(control.scroll.getViewport().getViewPosition().y).isGreaterThan(0);
+                }
+            }
+            release(context);
+        });
+    }
+
+    @Test void changingExistingRowsToPassiveClearsTheirFocusAndReturningToSingleRestoresInput() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();var events=new ArrayList<UiEvent>();
+            var items=List.of(language("a","Alpha"),language("b","Beta"));
+            var active=new ItemList("rows",READY,ListKind.COMPACT,items,Set.of("a"),"activate",List.of());
+            var passive=new ItemList("rows",READY,ListKind.COMPACT,items,Set.of(),"activate",List.of(),SelectionMode.NONE,Optional.empty());
+            try(var view=new KitView(context,new ViewSpec(active),events::add)) {
+                view.setSize(300,180);InteractiveRowsTest.layout(view);
+                var control=(InteractiveRows.RowsControl)view.control("rows");
+                SwingUtilities.processKeyBindings(key(control.canvas,KeyEvent.VK_DOWN,0));
+                assertThat(control.selected).containsExactly("b");
+                view.update(new ViewSpec(passive)); events.clear();
+                assertThat(control.canvas.isFocusable()).isFalse(); assertThat(control.focusItem).isNull();assertThat(control.selected).isEmpty();
+                SwingUtilities.processKeyBindings(key(control.canvas,KeyEvent.VK_ENTER,0));assertThat(events).isEmpty();
+                view.update(new ViewSpec(active));events.clear();
+                assertThat(control.canvas.isFocusable()).isTrue();
+                SwingUtilities.processKeyBindings(key(control.canvas,KeyEvent.VK_DOWN,0));
+                assertThat(events).containsExactly(new UiEvent.Selected("rows",Set.of("b")));
+            }finally {release(context);}
+        });
+    }
+
+    @Test void revealingAnInlineRowBeforeLayoutWaitsForTheViewportWithoutChangingFocus() {
+        Edt.run(() -> {
+            var context=KitFixtures.context(); var items=new ArrayList<ListItem>();
+            for(int i=0;i<30;i++)items.add(language("row"+i,"Line "+i));
+            var list=new ItemList("output",READY,ListKind.COMPACT,items,Set.of(),"",List.of(),SelectionMode.NONE,Optional.empty(),OptionalInt.of(12));
+            try(var view=new KitView(context,new ViewSpec(list),event -> {})) {
+                view.reveal("row29.name");
+                view.setSize(400,250); InteractiveRowsTest.layout(view);
+                var control=(InteractiveRows.RowsControl)view.control("output");
+                assertThat(control.scroll.getViewport().getViewPosition().y).isGreaterThan(0);
+                assertThat(control.focusItem).isNull(); assertThat(control.focusControl).isNull();
+                var label=find(view,"row29.name",JLabel.class);
+                var bounds=SwingUtilities.convertRectangle(label.getParent(),label.getBounds(),control.canvas);
+                assertThat(control.scroll.getViewport().getViewRect().intersects(bounds)).isTrue();
+            }finally {release(context);}
+        });
+    }
+
     @Test void editorCanvasAdmissionRejectsOrdinaryRootsAndDisposesTheAcceptedWrapper() {
         Edt.run(() -> {
             var context = KitFixtures.context(); int[] disposed = {0};

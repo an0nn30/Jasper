@@ -92,7 +92,7 @@ final class InteractiveRows {
                 // While the rows are not interactive Enter is not theirs and passes on; so it does without a focused row,
                 // except in a table, which keeps Enter as the JTable it replaced did.
                 @Override public boolean isEnabled() {
-                    return !closed && (focusItem != null || keepsEnterWithoutFocus()) && interactive() && !enterKey().isBlank();
+                    return !closed && (focusItem != null || keepsEnterWithoutFocus()) && rowInteractive() && !enterKey().isBlank();
                 }
                 @Override public void actionPerformed(ActionEvent event) { if (focusItem != null) enter(focusItem); }
             });
@@ -101,7 +101,7 @@ final class InteractiveRows {
                 canvas.getInputMap().put(KeyStroke.getKeyStroke(stroke), "delete");
             }
             canvas.getActionMap().put("delete", new AbstractAction() {
-                @Override public boolean isEnabled() { return !closed && focusItem != null && interactive() && !deletion().isBlank(); }
+                @Override public boolean isEnabled() { return !closed && focusItem != null && rowInteractive() && !deletion().isBlank(); }
                 @Override public void actionPerformed(ActionEvent event) { if (focusItem != null) delete(focusItem); }
             });
             bind(
@@ -132,6 +132,13 @@ final class InteractiveRows {
         abstract Set<String> specifiedSelection();
 
         abstract boolean multiple();
+
+        /** Selection capability is separate from enabled state so passive rows retain full-opacity inline controls. */
+        boolean passive() {
+            return node instanceof Nodes.ItemList list && list.selectionMode() == Nodes.SelectionMode.NONE
+                || node instanceof Nodes.Table table && table.selectionMode() == Nodes.SelectionMode.NONE;
+        }
+        boolean rowInteractive() { return interactive() && !passive(); }
 
         abstract String activation();
 
@@ -183,9 +190,12 @@ final class InteractiveRows {
             return 1;
         }
 
-        /** Whether the item can be selected, activated, hovered or given a menu; item-list headings cannot. */
+        /** A data row counts toward visibleRows even when its selection mode is NONE; headings do not. */
+        boolean dataRow(int index) { return true; }
+
+        /** Whether a row can be selected, activated, hovered or given a menu. */
         boolean selectable(int index) {
-            return true;
+            return !passive() && dataRow(index);
         }
 
         /** Whether every row is {@link #rowHeight} tall; otherwise {@link #rowHeightAt} sizes each row. */
@@ -253,7 +263,7 @@ final class InteractiveRows {
             int height = 0, rows = 0;
             for (int i = 0; i < size() && rows < visible.getAsInt(); i++) {
                 height += heightAt(i);
-                if (selectable(i)) rows++;
+                if (dataRow(i)) rows++;
             }
             if (keepsVisibleHeight() && rows < visible.getAsInt()) height += (visible.getAsInt() - rows) * reservedRowHeight();
             return height;
@@ -328,7 +338,8 @@ final class InteractiveRows {
                                     + ThemePainting.metric(context(), DesignMetrics.Role.ROW_GAP));
             rowHeight = Math.max(rowHeight, minimumRowHeight());
             measureRows();
-            canvas.setFocusable(!externallyDriven());
+            canvas.setFocusable(!externallyDriven() && !passive());
+            if (passive()) { focusItem = null; focusControl = null; anchor = null; }
             canvas.setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_APP));
             scroll.getVerticalScrollBar().setUnitIncrement(rowHeight);
             canvas.revalidate();
@@ -403,11 +414,11 @@ final class InteractiveRows {
         }
 
         boolean stillCurrent(String item) {
-            return !closed && indexOf(item) >= 0 && interactive();
+            return !closed && indexOf(item) >= 0 && rowInteractive();
         }
 
         void select(String id, boolean toggle) {
-            if (!interactive() || indexOf(id) < 0 || !selectable(indexOf(id))) return;
+            if (!rowInteractive() || indexOf(id) < 0 || !selectable(indexOf(id))) return;
             focusItem = id;
             focusControl = null;
             anchor = id;
@@ -451,6 +462,7 @@ final class InteractiveRows {
         }
 
         void clicked(Row row, MouseEvent e) {
+            if (!rowInteractive()) return;
             boolean context = row.contextPress;
             row.contextPress = false;
             if (externallyDriven()) return;
@@ -467,7 +479,7 @@ final class InteractiveRows {
         /** Shift-click: with multiple selection, every row from the anchor through {@code id}; otherwise a plain select. */
         void range(String id) {
             if (!multiple() || anchor == null || indexOf(anchor) < 0) { select(id, false); return; }
-            if (!interactive() || indexOf(id) < 0) return;
+            if (!rowInteractive() || indexOf(id) < 0) return;
             int from = indexOf(anchor), to = indexOf(id);
             selected.clear();
             for (int i = Math.min(from, to); i <= Math.max(from, to); i++) if (selectable(i)) selected.add(itemId(i));
@@ -480,7 +492,7 @@ final class InteractiveRows {
 
         void extend(int delta) {
             if (!multiple()) { move(delta); return; }
-            if (size() == 0 || !interactive()) return;
+            if (size() == 0 || !rowInteractive()) return;
             int i = step(delta);
             if (i < 0) return;
             if (anchor == null) anchor = itemId(i);
@@ -491,7 +503,7 @@ final class InteractiveRows {
 
         /** Selects the first item whose text starts with what was typed within the type-ahead window. */
         void typeAhead(char c, long when) {
-            if (Character.isISOControl(c) || size() == 0 || !interactive()) return;
+            if (Character.isISOControl(c) || size() == 0 || !rowInteractive()) return;
             long window = context().metrics().value(DesignMetrics.Role.TYPE_AHEAD_MILLIS);
             typed = typedAt != Long.MIN_VALUE && when - typedAt <= window ? typed + c : String.valueOf(c);
             typedAt = when;
@@ -513,7 +525,7 @@ final class InteractiveRows {
         }
 
         void move(int delta) {
-            if (size() == 0 || !interactive()) return;
+            if (size() == 0 || !rowInteractive()) return;
             int i = step(delta);
             if (i < 0) return;
             String id = itemId(i);
@@ -527,7 +539,7 @@ final class InteractiveRows {
          * the ends, selects it and keeps it in view, leaving the keyboard focus where it is.
          */
         void follow(int steps) {
-            if (size() == 0 || !interactive() || steps == 0) return;
+            if (size() == 0 || !rowInteractive() || steps == 0) return;
             int current = focusItem == null ? -1 : indexOf(focusItem);
             int i = current < 0 ? nextSelectable(-1, 1) : current;
             for (int k = current < 0 ? 1 : 0; k < Math.abs(steps); k++) i = nextSelectable(i, Integer.signum(steps));
@@ -556,6 +568,8 @@ final class InteractiveRows {
                         .setViewPosition(
                                 new Point(0, Math.max(0, y - Math.max(0, h - height) / 2)));
         }
+
+        boolean revealInline(String id) { return false; }
 
         ControlRegistry.Control inline(String id) {
             return null;

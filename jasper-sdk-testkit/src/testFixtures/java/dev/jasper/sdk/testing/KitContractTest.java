@@ -20,6 +20,22 @@ public abstract class KitContractTest {
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
         new Nodes.Secret("secret",ControlState.READY,"","Password","")))); }
+    @Test void passiveRowsRoundTripRevealAndRejectAnyDeclaredSelection() throws Exception { edt(() -> {
+        var item = new ListItem("row",Optional.empty(),List.of(new Nodes.Text("line",ControlState.READY,"Error output",Nodes.TextRole.MONO,
+            Optional.of(Nodes.Severity.DANGER),OptionalInt.empty())),List.of(),List.of());
+        var list = new Nodes.ItemList("output",ControlState.READY,Nodes.ListKind.COMPACT,List.of(item),Set.of(),"",List.of(),Nodes.SelectionMode.NONE,Optional.empty(),OptionalInt.of(12));
+        var table = new Nodes.Table("table",ControlState.READY,List.of(new Column("name","Name",Nodes.TextRole.MONO,false)),
+            List.of(new TableRow("row",Map.of("name","Output"),Optional.empty())),Set.of(),"",List.of(),Nodes.SelectionMode.NONE);
+        var kit=kit("owner"); var spec=new ViewSpec(new Nodes.Stack("root",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(list,table)));
+        var events=new ArrayList<UiEvent>(); var view=kit.create(spec,events::add);
+        assertThat(view.spec()).isEqualTo(spec); view.reveal("line"); view.reveal("table"); assertThat(events).isEmpty();
+        assertThatThrownBy(() -> new Nodes.ItemList("bad",ControlState.READY,Nodes.ListKind.COMPACT,List.of(item),Set.of("row"),"",List.of(),Nodes.SelectionMode.NONE,Optional.empty()))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Nodes.Table("bad",ControlState.READY,table.columns(),table.rows(),Set.of("row"),"",List.of(),Nodes.SelectionMode.NONE))
+            .isInstanceOf(IllegalArgumentException.class);
+        stop(kit);
+    }); }
+
     /** Settings descriptors: tree counts/emphasis, highlighted rows, number bounds and both searchable choice modes. */
     protected static ViewSpec settings(boolean highlighted, String entry) {
         var toggle=new Nodes.Toggle("toggle",ControlState.READY,"Ligatures",true,"toggle",false);

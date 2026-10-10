@@ -202,6 +202,95 @@ class EditorDocumentPreservationTest {
         } finally {onEdt(() -> {controller.close();new dev.jasper.app.appearance.ThemeController();});}
     }
 
+    @Test @Timeout(value=60,unit=TimeUnit.SECONDS)
+    void vimFeedbackUsesTheHostedKitAndKeepsCommandAndOutputThroughThemeAndMove() throws Exception {
+        var appearance=onEdtValue(WorkspaceAppearanceFixture::new);
+        var chrome=onEdtValue(() -> ThemeManager.generated(Theme.JASPER_LIGHT));
+        var first=onEdtValue(() -> ThemeManager.generated(Theme.DARK));
+        var next=onEdtValue(() -> ThemeManager.generated(ThemeManager.builtIns().stream()
+            .filter(theme -> theme.dark() && !theme.equals(Theme.DARK)).findFirst().orElseThrow()));
+        onEdt(() -> appearance.setPair(new ResolvedTheme(chrome,first)));
+        try(var editor=new StagedEditorHost(root,true,appearance)) {
+            Object[] state=onEdtValue(() -> {
+                call(editor.editorWindow(),"newUntitled");
+                var area=editor.documentText();
+                area.setText(java.util.stream.IntStream.range(0,30).mapToObj(i -> "line " + i + "\n").collect(java.util.stream.Collectors.joining()));
+                area.setCaretPosition(0); measure(area);
+                call(editor.editorWindow(),"toggleVim");
+                var vim=((Optional<?>)call(editor.selectedTab(),"vimEditor")).orElseThrow();
+                var view=(KitView)editor.contributions.content().entries().getFirst().component();
+                feed(editor,vim,"/line<Left>");
+                var status=named(view,"vim.status",JLabel.class);
+                assertThat(status.getText()).isEqualTo("/line");
+                assertThat(status.getFont()).isNotEqualTo(area.getFont());
+                var sdk=editor.documentView();
+                var descriptor=(dev.jasper.sdk.ui.Nodes.Text)findNode(sdk.spec().root(),"vim.status");
+                assertThat(descriptor.caret()).hasValue(4);
+                assertThat(descriptor.role()).isEqualTo(dev.jasper.sdk.ui.Nodes.TextRole.MONO);
+                Object document=area.getDocument();
+                feed(editor,vim,"<Esc>:%p<CR>");
+                dev.jasper.sdk.contracts.ThemeMigrationCapture.save("editor-hosted","dark","document-vim-output",view,1100,700);
+                var output=named(view,"vim.output",javax.swing.JScrollPane.class);
+                var canvas=output.getViewport().getView();
+                assertThat(canvas.isFocusable()).isFalse();
+                assertThat(output.getViewport().getViewPosition().y).as("last output line is revealed; output=%s preferred=%s extent=%s canvas=%s bar=%s",output.getBounds(),output.getPreferredSize(),output.getViewport().getExtentSize(),canvas.getSize(),named(view,"vim.bar",javax.swing.JComponent.class).getBounds()).isGreaterThan(0);
+                var last=named(view,"vim.output.text.29",JLabel.class);
+                var rect=javax.swing.SwingUtilities.convertRectangle(last.getParent(),last.getBounds(),canvas);
+                assertThat(output.getViewport().getViewRect().intersects(rect)).as("last line is actually visible").isTrue();
+                output.getViewport().setViewPosition(new java.awt.Point(0,0));
+                return new Object[]{vim,view,document,output};
+            });
+            onEdt(() -> appearance.setPair(new ResolvedTheme(chrome,next)));
+            onEdt(() -> {
+                var view=(KitView)state[1];var output=(javax.swing.JScrollPane)state[3];
+                assertThat(editor.documentText().getDocument()).isSameAs(state[2]);
+                assertThat(named(view,"vim.status",JLabel.class).getForeground()).isEqualTo(next.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
+                assertThat(output.getViewport().getViewPosition().y).isZero();
+                editor.contentTab().move(true);
+                assertThat(editor.documentText().getDocument()).isSameAs(state[2]);
+                assertThat(output.getViewport().getViewPosition().y).as("moving preserves output scroll").isZero();
+                feed(editor,state[0],"<CR>\"qp");
+                assertThat(named(view,"vim.status",JLabel.class).getForeground()).isEqualTo(next.semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT));
+                dev.jasper.sdk.contracts.ThemeMigrationCapture.save("editor-hosted","dark","document-vim-bell",view,1100,520);
+            });
+            TimeUnit.MILLISECONDS.sleep(250);
+            onEdt(() -> {
+                var view=(KitView)state[1];
+                assertThat(named(view,"vim.status",JLabel.class).getForeground()).isEqualTo(next.semantic().color(dev.jasper.ui.theme.SemanticColor.STATUS_DANGER));
+                dev.jasper.sdk.contracts.ThemeMigrationCapture.save("editor-hosted","dark","document-vim-error",view,1100,520);
+                feed(editor,state[0],"/line<Left>");
+                var command=(dev.jasper.sdk.ui.Nodes.Text)findNode(editor.documentView().spec().root(),"vim.status");
+                assertThat(command.caret()).hasValue(4);
+                appearance.setPair(new ResolvedTheme(chrome,first));
+                assertThat(findNode(editor.documentView().spec().root(),"vim.status")).isEqualTo(command);
+                assertThat(named(view,"vim.status",JLabel.class).getForeground()).isEqualTo(first.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
+                dev.jasper.sdk.contracts.ThemeMigrationCapture.save("editor-hosted","dark","document-vim-command-after-theme",view,1100,520);
+                feed(editor,state[0],"<Esc>2d");
+                assertThat(named(view,"vim.command",JLabel.class).getText()).isEqualTo("2d");
+                dev.jasper.sdk.contracts.ThemeMigrationCapture.save("editor-hosted","dark","document-vim-pending-command",view,1100,520);
+                var before=editor.documentView().spec();
+                call(editor.editorWindow(),"toggleVim");
+                assertThat(named(view,"vim.bar",javax.swing.JComponent.class).isVisible()).isFalse();
+                feed(editor,state[0],"i");
+                assertThat(named(view,"vim.bar",javax.swing.JComponent.class).isVisible()).isFalse();
+                assertThat(editor.documentView().spec()).isNotEqualTo(before);
+                assertThat(editor.documentText().getDocument()).isSameAs(state[2]);
+            });
+        }
+    }
+    private static dev.jasper.sdk.ui.Nodes.Node findNode(dev.jasper.sdk.ui.Nodes.Node node,String id) {
+        if(node.id().equals(id))return node;
+        if(node instanceof dev.jasper.sdk.ui.Nodes.Split split)for(var child:split.children()){var found=findNode(child,id);if(found!=null)return found;}
+        if(node instanceof dev.jasper.sdk.ui.Nodes.Stack stack)for(var child:stack.children()){var found=findNode(child,id);if(found!=null)return found;}
+        return null;
+    }
+    private static void feed(StagedEditorHost editor,Object vim,String keys) {
+        try {
+            Class<?> key=editor.loader.loadClass("dev.jasper.editor.vim.KeyInput");
+            for(Object value:(List<?>)key.getMethod("parse",String.class).invoke(null,keys))call(vim,"feed",new Class<?>[]{key},value);
+        }catch(ReflectiveOperationException failure){throw new AssertionError(failure);}
+    }
+
     private static double opacity(StagedEditorHost editor) { return (double)call(call(editor.selectedTab(),"surface"),"opacity"); }
     private static Color keyword(StagedEditorHost editor,JTextArea area) {
         try {

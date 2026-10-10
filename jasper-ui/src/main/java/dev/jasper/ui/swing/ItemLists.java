@@ -130,7 +130,7 @@ final class ItemLists {
         }
 
         @Override
-        boolean selectable(int index) {
+        boolean dataRow(int index) {
             return index < 0 || index >= size() || !value().items().get(index).heading();
         }
 
@@ -313,6 +313,16 @@ final class ItemLists {
         void index(Nodes.Node n, int index) {
             nodeRows.put(n.id(), index);
             ControlRegistry.children(n).forEach(child -> index(child, index));
+        }
+
+        /** Reveal can arrive before layout and never changes the row's logical keyboard focus. */
+        @Override
+        boolean revealInline(String id) {
+            Integer index = nodeRows.get(id);
+            if (index == null) return false;
+            pendingReveal = itemId(index);
+            ensure(index);
+            return true;
         }
 
         @Override

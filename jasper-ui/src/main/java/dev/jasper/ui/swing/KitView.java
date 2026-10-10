@@ -110,7 +110,9 @@ public final class KitView extends JPanel implements AutoCloseable {
      */
     public void reveal(String id) {
         requireOpen();
-        var component = reconciler.control(Objects.requireNonNull(id)).component;
+        Objects.requireNonNull(id);
+        if (reconciler.revealInline(id)) return;
+        var component = reconciler.control(id).component;
         component.scrollRectToVisible(new Rectangle(0, 0, component.getWidth(), component.getHeight()));
     }
     /**

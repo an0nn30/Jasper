@@ -209,7 +209,7 @@ BLUE/GREEN/AMBER/PURPLE/NEUTRAL/NONE; IconSize is CAPTION/CONTROL/RAIL/EMPTY/HER
 ButtonKind is PRIMARY/SECONDARY/GHOST/DESTRUCTIVE_GHOST/LINK; ButtonPresentation is STANDARD/EMBEDDED;
 StatusKind is SUCCESS/WARNING/DANGER/IDLE; Severity is INFO/WARNING/DANGER;
 FieldKind is TEXT/SEARCH/PORT/PATH/TEXTAREA/NUMBER; FieldPresentation is STANDARD/EMBEDDED/TRANSPARENT; ChoiceKind is DROPDOWN/PICKER/SEGMENTED/SEARCHABLE;
-CardKind is FORM/SETTINGS/MIXED; ListKind is SINGLE/DOUBLE/COMPACT/ORDERED/RESULTS; SelectionMode is SINGLE/MULTIPLE;
+CardKind is FORM/SETTINGS/MIXED; ListKind is SINGLE/DOUBLE/COMPACT/ORDERED/RESULTS; SelectionMode is NONE/SINGLE/MULTIPLE;
 FormKind is HERO/SHEET/FULL/SETTINGS; LayoutRole is VERTICAL/INLINE/ACTIONS/HERO/DETAIL/FOOTER/NAVIGATION;
 SplitKind is SIDEBAR_DETAIL/THREE_COLUMN/DOCUMENT; CustomKind is EDITOR/TERMINAL/CHART/PREVIEW; ScrollPolicy is STANDARD/OVERLAY.
 Header primary nodes are restricted to Button or MenuButton. MenuButton's `action` is blank for a
@@ -917,4 +917,16 @@ normal EDT/open-handle guards apply. Host and fake mirror it; fake records logic
 Find requests focus then selectAll. SDK version stays unchanged until coordinated Task 11 cutover.
 EDITOR wrapper admission is mirrored module CustomContents/host/fake with shared positive editor-canvas and negative
 ordinary-root cases. Final Editor custom source owners are ui/DocumentArea.java and vim/VimTextArea.java only;
-VimBar remains an explicit temporary 9b bridge removed by 9c, not a permanent custom allowance. Task 11 enforces owners.
+VimBar's explicit temporary 9b bridge is removed in 9c; its feedback is descriptors. Task 11 enforces owners.
+
+## Plan 2 Task 9c passive output and reveal ruling
+
+Mirrored module/SDK `SelectionMode.NONE` applies to ItemList and Table. It requires empty selectedIds, removes the
+canvas keyboard focus stop and suppresses pointer/key row selection and activation. It preserves scrolling/reveal,
+full-opacity enabled text and independently interactive inline controls. Existing name-based KitValues projections,
+host adapters and fake descriptor storage preserve NONE. Shared contracts cover roundtrip/reveal/selection rejection;
+real module input/focus/paint/embedded-control tests cover interaction. SDK version cutover remains Task 11.
+`Field.listId` navigation treats a NONE list as unavailable and uses the LAF fallback; changing back resumes navigation.
+Data-row geometry counts ordinary rows independently of whether they can be selected. UiView.reveal of inline row
+content uses pendingReveal when the viewport has no size, mounts/reveals at first sizing and never changes logical
+row focus or keyboard focus. No new UiView member is required.

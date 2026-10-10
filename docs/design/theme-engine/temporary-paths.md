@@ -210,7 +210,7 @@ fix round 1 replaced `SettingsDialog.askDiscard`'s `JOptionPane` with a modal ki
 The dynamic WorkspacePalette callers are exactly:
 - Task 7: `plugins/vault/.../ui/ManagerPanel.java` — **removed by Task 7** (2026-10-05): the manager is an owned kit view and reads no `WorkspacePalette`.
 - Task 8: `plugins/remote/.../ui/HostsPanel.java` — **removed by Task 8a** (2026-10-06): the Sessions panel is an owned kit view and reads no `WorkspacePalette`; `ui/tunnels/TunnelsPanel.java` — **removed by Task 8b** (2026-10-06): the Tunnels panel is an owned kit view; `ui/transfers/TransferStrip.java` — **removed by Task 8c** (2026-10-06): the transfer rows are kit descriptors rendered in the SFTP kit panel. No Remote file reads `WorkspacePalette` any more.
-- Task 9: `plugins/editor/.../ui/EditorTab.java`, `vim/ui/VimBar.java`; editor/syntax snapshots also serve Editor through Appearance.
+- Task 9: EditorTab and VimBar migrated to descriptors in 9b/9c; no WorkspacePalette.current reader remains in Editor. Editor/syntax snapshots serve DocumentArea through Appearance; alias publication removal stays Task 11.
 - Task 10: `plugins/fileserver/.../ui/FileServersPanel.java`.
 
 Correction to the initial Task 5 audit: a literal-key search appeared to show zero WorkspaceDefaults readers;
@@ -491,9 +491,19 @@ are `plugins/editor/src/main/java/dev/jasper/editor/ui/DocumentArea.java` and
 allowance. Runtime EDITOR admits nonstandard JComponent document canvases and text/scroll roots, rejecting ordinary
 panels/controls; Task 11 enforces the exact source list.
 
-**Temporary, Task 9c removal owner:** `plugins/editor/src/main/java/dev/jasper/editor/vim/ui/VimBar.java` stays unchanged
-as a raw standard-UI child inside DocumentArea solely for runnable Task 9b. Immediately following Task 9c converts it
-to descriptors and removes this bridge before Task 9 is complete; it is not a permanent custom-content allowance.
+**Removed in Task 9c:** the temporary raw `plugins/editor/src/main/java/dev/jasper/editor/vim/ui/VimBar.java` child
+inside DocumentArea is gone. EditorTab renders its kit descriptors; DocumentArea contains only specialized children.
+No permanent custom-content allowance for VimBar. Status/command/output now use kit MONO (not Editor font), error
+severity DANGER, and a 150ms INFO text bell instead of background flash. Otherwise blank status temporarily shows
+"Bell"; expiry restores current state without overwriting newer feedback. COMPACT rows replace raw JList geometry
+and dividers, visibleRows=min(12,n), passive SelectionMode.NONE and reveal(last) only when output changes.
+Accepted temporary strip alignment drift: showcmd follows status at its natural INLINE width rather than the former
+BorderLayout EAST right edge. Plan 3 Task 8 owns shared-kit alignment/composition; native/final visual acceptance remains
+open. Vim remains above Find, preserving the former ordering.
+The mirrored NONE mode also applies to Table: empty selectedIds, no row selection/activation/canvas focus stop;
+scroll/reveal/full-opacity text and independent inline controls remain enabled. A linked field falls back to the LAF.
+Shared-kit data-row sizing and pending inline reveal preserve capped output and last-line visibility before first layout
+without logical focus mutation. Plan 3 Task 8 owns final strip/output geometry; native acceptance stays user/controller.
 The Jasper.editor aliases/WorkspaceDefaults publishers remain Task 11 removal owners.
 
 **Accepted visual-only, Plan 3 Task 8 composition owner:** banner separation/padding replaces the former divider

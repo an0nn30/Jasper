@@ -200,4 +200,10 @@ text without Edited or forced focus; unknown/non-Field IDs reject IllegalArgumen
 apply. Find explicitly focuses then selects. Specialized EDITOR roots accept multiline text/scroll or nonstandard
 JComponent document canvases; ordinary JPanel/control roots remain rejected. Shared contracts exercise module/host/fake
 admission and selection. Source-owner enforcement remains Task 11; final Editor owners are DocumentArea and
-VimTextArea, with only an explicit temporary raw VimBar bridge until immediately following Task 9c.
+VimTextArea. Task 9c removes the temporary raw VimBar bridge; Vim feedback is ordinary descriptor content.
+
+Plan 2 Task 9c adds mirrored SelectionMode.NONE for passive ItemList/Table rows: selectedIds must be empty,
+canvas is not a focus stop, and row pointer/key selection and activation are suppressed. Embedded controls keep their
+own enabled behavior and text paints at full opacity. Field.listId keys fall back to the LAF for a passive list.
+Data-row height counting is separate from selection capability. Inline-row reveal waits for first viewport sizing
+through pendingReveal and does not change logical row focus or keyboard focus.

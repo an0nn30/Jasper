@@ -19,8 +19,8 @@ Editor custom document painting has exactly two final source owners:
 `plugins/editor/src/main/java/dev/jasper/editor/ui/DocumentArea.java` and
 `plugins/editor/src/main/java/dev/jasper/editor/vim/VimTextArea.java`. DocumentArea owns RSTA/scroll/gutter,
 EditorTheme application, glass Src fill and the vendor popup. EditorTab/FindBar are descriptors; no enclosing
-surface or package is exempt. Task 9b's explicit unchanged raw VimBar child is a temporary bridge removed by 9c
-before Task 9 completes; Task 11 enforces only the final owners. The actual staged preservation/corner/track images
+surface or package is exempt. Task 9c removes Task 9b's temporary raw VimBar child; Vim feedback is a kit descriptor subtree.
+Task 11 enforces only the final owners. The actual staged preservation/corner/track images
 are under `editor-hosted`; accepted banner/track visual differences and their Plan 3 Task 8 owner are ledgered in
 [temporary-paths.md](temporary-paths.md).
 

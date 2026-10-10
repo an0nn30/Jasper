@@ -5,6 +5,7 @@ import dev.jasper.editor.vim.EditorDefaults;
 import dev.jasper.editor.vim.Vim;
 import dev.jasper.editor.vim.VimEditor;
 import dev.jasper.editor.vim.VimTextArea;
+import dev.jasper.editor.vim.ui.VimBar;
 import dev.jasper.sdk.ui.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +35,7 @@ public final class EditorTab {
     private boolean replacing, closed, focusPending;
     private Runnable focusArea = () -> area().requestFocusInWindow();
     private VimEditor vim;
+    private final VimBar vimBar = new VimBar(this::render, this::reveal);
     private int tabSize = 4;
     private FindBar find;
 
@@ -66,7 +68,7 @@ public final class EditorTab {
         focusPending = false;
         edits.stop();
         area().getDocument().removeDocumentListener(editListener);
-        if (vim != null) { document.vimBar.detach(); vim.close(); vim = null; }
+        if (vim != null) { vimBar.detach(); vim.close(); vim = null; }
         document.close();
         find = null;
     }
@@ -80,6 +82,7 @@ public final class EditorTab {
     }
     void find(FindBar value) { if (closed) return; find = value; render(); }
     void render() { if (!closed) view.update(spec()); }
+    private void reveal(String id) { if (!closed) view.reveal(id); }
 
     /** Focuses the document immediately or once its pending read succeeds. A failure drops the request. */
     public void focusText() {
@@ -88,16 +91,15 @@ public final class EditorTab {
     }
     void focusAction(Runnable value) { focusArea = value; }
 
-    /** Toggles Vim without replacing the text or undo history. The raw bar bridge is removed by Task 9c. */
+    /** Toggles Vim without replacing the text or undo history. The bar is an ordinary kit descriptor subtree. */
     public void vim(Optional<Vim> global) {
         if (closed || global.isPresent() == (vim != null)) return;
         if (global.isPresent()) {
             vim = new VimEditor(global.get(), area(), defaults());
             vim.documentInfo(session::location, session::dirty);
-            document.vimBar.attach(vim);
-        } else { document.vimBar.detach(); vim.close(); vim = null; }
-        document.vimBar.setVisible(vim != null);
-        document.revalidate();
+            vimBar.attach(vim);
+        } else { vimBar.detach(); vim.close(); vim = null; }
+        render();
     }
     public Optional<VimEditor> vimEditor() { return Optional.ofNullable(vim); }
 
@@ -114,7 +116,7 @@ public final class EditorTab {
     public void bind(List<Command> commands) { document.bind(commands); }
     public void addToPopup(List<Command> commands) { document.addToPopup(commands); }
     boolean showingText() { return session.state() == DocumentSession.State.READY; }
-    boolean vimBarVisible() { return document.vimBar.isVisible(); }
+    boolean vimBarVisible() { return vim != null; }
 
     private void edited() {
         if (closed || replacing) return;
@@ -167,6 +169,7 @@ public final class EditorTab {
             failed ? "error" : "file", Nodes.Hue.NONE, Nodes.IconSize.EMPTY, failed ? "Load failed" : "Loading"),
             failed ? session.failure() : "Loading " + session.name() + session.host().map(host -> " from " + host).orElse("") + "…", "",
             List.of(button(RETRY, "Retry", failed && session.retryable()), button(DISMISS, failed ? "Close" : "Cancel", true))));
+        children.add(vimBar.node(ready));
         if (find != null) children.add(find.node());
         return new ViewSpec(new Nodes.Split("document.tab", ControlState.READY, Nodes.SplitKind.DOCUMENT, children));
     }

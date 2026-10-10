@@ -32,7 +32,16 @@ class ThemeMigrationEvidenceTest {
                 assertThat(find.status()).isEqualTo("Invalid pattern"); describe("find-invalid-pattern", tab.view());
                 find.close();
                 tab.vim(Optional.of(new dev.jasper.editor.vim.Vim(dev.jasper.editor.vim.VimHost.detached())));
-                describe("document-vim-bridge", tab.view());
+                describe("document-vim-mode", tab.view());
+                var vim=tab.vimEditor().orElseThrow();
+                for(var key:dev.jasper.editor.vim.KeyInput.parse("/example<Left>"))vim.feed(key);
+                assertThat(Kits.node(tab.view(),"vim.status",Nodes.Text.class).caret()).hasValue(7);
+                describe("document-vim-command",tab.view());
+                for(var key:dev.jasper.editor.vim.KeyInput.parse("<Esc>:%p<CR>"))vim.feed(key);
+                describe("document-vim-output",tab.view());
+                for(var key:dev.jasper.editor.vim.KeyInput.parse("<CR>\"qp"))vim.feed(key);
+                assertThat(Kits.node(tab.view(),"vim.status",Nodes.Text.class).severity()).contains(Nodes.Severity.INFO);
+                describe("document-vim-bell",tab.view());
             } finally { tab.dispose(); kit.close(); }
         });
     }

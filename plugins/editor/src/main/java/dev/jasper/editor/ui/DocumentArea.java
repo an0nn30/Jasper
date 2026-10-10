@@ -8,7 +8,6 @@ import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import dev.jasper.editor.vim.VimTextArea;
-import dev.jasper.editor.vim.ui.VimBar;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.EditorPalette;
@@ -25,7 +24,6 @@ import org.fife.ui.rtextarea.RTextScrollPane;
  */
 final class DocumentArea extends JComponent implements AutoCloseable {
     final VimTextArea area = new VimTextArea();
-    final VimBar vimBar = new VimBar();
     final RTextScrollPane scroll;
     private final java.awt.event.HierarchyListener hierarchy = event -> {
         if ((event.getChangeFlags() & java.awt.event.HierarchyEvent.PARENT_CHANGED) != 0) refreshAppearance();
@@ -51,9 +49,6 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         scroll.setFoldIndicatorEnabled(true);
         scroll.setBorder(BorderFactory.createEmptyBorder());
         add(scroll, BorderLayout.CENTER);
-        // Explicit Task 9b intermediate bridge: Task 9c replaces this standard UI child with descriptors.
-        add(vimBar, BorderLayout.SOUTH);
-        vimBar.setVisible(false);
         addHierarchyListener(hierarchy);
     }
 
@@ -82,7 +77,6 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         theme.apply(area, scroll, editor, syntax, opacity);
         scroll.getGutter().setLineNumberFont(settings.font());
         area.setTabSize(settings.tabSize());
-        vimBar.apply(settings.font());
         glass(opacity, editor.background(), editor.gutter());
     }
 
@@ -91,7 +85,6 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         closed = true;
         removeHierarchyListener(hierarchy);
         if (changes != null) changes.close();
-        vimBar.detach();
     }
 
     /** Below 1 this surface paints the glass; at 1 it paints an opaque document surface. */

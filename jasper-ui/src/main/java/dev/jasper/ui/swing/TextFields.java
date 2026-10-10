@@ -157,7 +157,7 @@ final class TextFields {
             String id = ((Nodes.Field)node).listId();
             if (id.isBlank()) return null;
             var control = view.controlOrNull(id);
-            return control instanceof ItemLists.ListControl rows && rows.interactive() && mounted(rows.component) ? rows : null;
+            return control instanceof ItemLists.ListControl rows && rows.rowInteractive() && mounted(rows.component) ? rows : null;
         }
         /** Whether the component and every container above it, up to this view, is visible: no hidden ancestor holds it. */
         private boolean mounted(java.awt.Component component) {

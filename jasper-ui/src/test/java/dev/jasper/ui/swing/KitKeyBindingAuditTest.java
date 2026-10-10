@@ -127,6 +127,12 @@ class KitKeyBindingAuditTest {
                 view.setSize(300, 300); InteractiveRowsTest.layout(view);
                 var input = editor(view, "filter");
                 var states = new LinkedHashMap<String, ViewSpec>();
+                var active = (Stack) picker(READY, READY).root();
+                var holder = (Stack) active.children().get(1);
+                var list = (ItemList) holder.children().getFirst();
+                var passive = new ItemList(list.id(), READY, list.kind(), list.items(), Set.of(), list.activateAction(), list.contextActions(),
+                    SelectionMode.NONE, list.addAction(), list.visibleRows());
+                states.put("passive list", new ViewSpec(new Stack("root", READY, LayoutRole.VERTICAL, List.of(active.children().getFirst(), passive))));
                 states.put("hidden list", picker(hidden, READY));
                 states.put("disabled list", picker(disabled, READY));
                 states.put("busy list", picker(busy, READY));

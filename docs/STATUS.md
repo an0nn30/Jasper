@@ -2,7 +2,7 @@
 
 ## Current state — 2026-10-10
 
-- **Theme engine Plan 2 Task 9b implemented, review pending; 9c remains pending** (2026-10-10).
+- **Theme engine Plan 2 Task 9c implemented, review pending; 9b independently approved** (2026-10-10).
   EditorTab is an owned SDK UiView descriptor controller mounted with openTab(UiView); DOCUMENT retains its hidden
   custom child while loading/failed, with descriptor banners, Retry/Cancel and shared Find/Replace fields, options and
   match counts. Find requests focus then explicit UiView.selectAll(Field id), mirrored module/SDK/host/fake: live text,
@@ -12,8 +12,19 @@
   gutter, EditorTheme, one Src glass fill and the vendor popup; GlassSurface and EditorTheme's FlatLaf.style writer are
   removed. EDITOR admission accepts purpose-built nonstandard JComponent canvases plus text/scroll roots, mirrored in
   module/host/fake with positive and ordinary-root rejection contracts; Task 11 enforces exact source owners.
-  Explicit temporary bridge: unchanged plugins/editor/src/main/java/dev/jasper/editor/vim/ui/VimBar.java remains a
-  child of DocumentArea only until immediately following Task 9c, which must remove it before Task 9 is complete.
+  Task 9c removes the raw VimBar child: EditorTab renders its descriptor subtree, and DocumentArea owns only specialized
+  document children. Status/showcmd/output use kit MONO (accepted font change); error text uses DANGER; the bell is a
+  150 ms INFO accent text tint. Otherwise blank status temporarily says "Bell", restoring current feedback at expiry.
+  COMPACT output uses min(12,n) visible rows and reveal(last) only for changed output, preserving user scroll on theme
+  refresh. Vim disable/close stop the timer and listener; document loading/failure hides the bar.
+  Accepted temporary visual drift: showcmd follows status at its natural INLINE width instead of the former right edge;
+  Plan 3 Task 8 owns shared-kit strip alignment/composition. Vim remains above Find, preserving their existing order.
+  Controller-approved mirrored SelectionMode.NONE keeps ItemList/Table readable and scrollable with empty selectedIds,
+  no canvas focus stop or row selection/activation, and independent embedded controls enabled. Linked Field.listId keys
+  fall back to the LAF for NONE. Shared module/SDK/host/fake contracts retain the new enum; version cutover stays Task 11.
+  Kit row geometry counts data rows separately from selectability; inline reveal before layout uses pendingReveal on
+  first viewport sizing without logical/keyboard focus changes. Actual staged output shows last of30 rows in12 rows,
+  with command caret, output scroll, error/bell palette and document identity retained across dark changes/moves.
   Real staged-host evidence preserves document identity/text/undo/selection/caret/language/dirty/close guard and Find
   values/options through dark→different-dark and main↔detached opacity changes (.8/.45), pin behavior and actual key
   paths. View shutdown stops palette/session refresh; async save may finish after close; settings Cancel is inert.
@@ -21,7 +32,10 @@
   #2b2e37 differs from editor #191b20, preserved through reparenting, while corner has editor RGB and one glass alpha
   (204/115). Plan 3 Task 8 owns any track change through shared kit, without plugin delegate/style escape.
   9a is independently approved; carried Language-height/warning-attribution documentation minors corrected in 9b.
-  Native GUI acceptance of dialogs and document/Find/Vim remains pending with the user; no GUI was launched.
+  Task9c scoped final verification: Editor4818 (both corpus runs), Remote470, UI417, SDK67, testkit132 and affected app120,
+  each zero failures/errors/skips; all five architecture gates passed. Whole-repository gate stays Task12. 9c independent
+  review pending; 9b independently approved (fake Field-kind-reset minor owned by Task11; warning cleanup by Task12).
+  Native GUI acceptance of dialogs and document/Find/Vim remains pending with the user/controller; no GUI was launched.
 
 - **Theme engine Plan 2 Task 9a independently approved: Editor dialogs on kit views; native acceptance pending** (2026-10-10).
   The question sheet (`Forms.QuestionView`, mounted by `DialogAsker`), Saving (`Forms.ProgressView`, mounted by `SaveWait`;
@@ -44,7 +58,7 @@
   this rule, including RESULTS with its fixed data-row metric. No SDK member changes; other lists keep their sizing.
   The real-host Language dialog now retains its 14-row packed height through filtering, no matches and clearing in dark
   and light (`EditorEnterBaselineTest`); empty-result renders join the existing dark/light captures. Regression proved
-  RED against the pre-fix kit (540×500 → 540×164 for "ja") and GREEN with the module fix. Independent 9a review approved; 9b implemented and 9c pending. Not run: GUI. GUI checks for the user: the four dialogs in dark and light; Enter/Space/Escape
+  RED against the pre-fix kit (540×500 → 540×164 for "ja") and GREEN with the module fix. Independent 9a/9b review approved; 9c implemented, independent review pending. Not run: GUI. GUI checks for the user: the four dialogs in dark and light; Enter/Space/Escape
   on the question with focus on a non-default button; Go to Line's inline error; Up/Down in the Language filter and
   the dialog height while filtering. Also carried in the 9a review scope: kit fix `d2c6a37c` (a field's list keys run the
   look and feel's own binding while their list is hidden, disabled, busy or unmounted).

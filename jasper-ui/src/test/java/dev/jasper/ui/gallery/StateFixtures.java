@@ -127,6 +127,11 @@ public final class StateFixtures {
             new Custom("editor-text", READY, "editor-text", CustomKind.EDITOR, "Document"),
             new Empty("editor-loading", hiddenState, new Icon("editor-loading-icon", READY, "file", Hue.NEUTRAL, IconSize.EMPTY, "File"), "Loading notes.txt…", "", List.of()),
             findBar, vimLine)), 780, 440));
+        var output = new ArrayList<ListItem>();
+        for (int i=0;i<20;i++) output.add(new ListItem("vim-output-row-"+i,Optional.empty(),List.of(new Text("vim-output-text-"+i,READY,
+            "Output line "+i,TextRole.MONO,i==19 ? Optional.of(Severity.DANGER) : Optional.empty(),OptionalInt.empty())),List.of(),List.of()));
+        result.add(sheet("editor-vim-output", new ItemList("vim-output",READY,ListKind.COMPACT,output,Set.of(),"",List.of(),
+            SelectionMode.NONE,Optional.empty(),OptionalInt.of(12)),680,400));
         var languages = new ArrayList<ListItem>();
         for (String name : List.of("Java", "JavaScript", "JSON")) languages.add(new ListItem("editor-language-" + name, Optional.empty(), List.of(text("editor-language-" + name + "-name", name, TextRole.BODY)), List.of(), List.of()));
         result.add(sheet("editor-language", new Stack("editor-language-picker", READY, LayoutRole.VERTICAL, List.of(
