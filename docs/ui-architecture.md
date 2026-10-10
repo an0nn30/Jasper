@@ -153,6 +153,11 @@ technology, confirmed by the owner); `Text.severity` tints text and `Text.caret`
 Host-only: `KitView.route(ThemeRoute)` re-routes one view in place (each view owns a copy of its context) and
 `KitView.paintsSurface(true)` paints its slot's `surface.panel` opaque; the app mounts plugin content tabs on the
 workspace slot over that surface, and their registered specialized content follows the view's slot.
+Task 9a's module-only sizing rule: an ItemList named by a field's `listId` reserves its `visibleRows` selectable-row
+height even when filtered or empty, so host-packed picker dialogs keep their height. Every list kind follows this rule;
+RESULTS reserves its fixed data-row metric, and existing heading sizing is retained. Lists without a referencing field
+or without `visibleRows` keep their prior sizing. No SDK shape changes; the fake retains descriptors and validates
+references, while module and real-host tests verify layout.
 
 Palette capabilities (Plan 2 Task 6b-2): `ListItem.heading` is a title-only section row (never selected, activated,
 hovered or given a menu; a hairline opens every heading after the first); `ListKind.RESULTS` is the one-line result

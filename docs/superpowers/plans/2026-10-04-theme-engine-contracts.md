@@ -424,6 +424,13 @@ version unchanged, Task 11 freezes it). Each record change keeps every prior con
   blank action may shadow a look and feel binding (`KitKeyBindingAuditTest`, FlatLaf installed, every field kind,
   secrets and every gallery fixture); a NUMBER field's live arrow keys are the one intended override. A
   TEXTAREA takes neither `alternateAction` nor `listId`; a NUMBER field (whose arrows step it) takes no `listId`.
+  Task 9a controller ruling (a): an `ItemList` named by a field's `listId` and declaring `visibleRows` reserves that many
+  selectable rows in its preferred viewport even with fewer or no items, preserving a filter-driven dialog's packed
+  height. The rule applies to every list kind; RESULTS uses `RESULTS_ROW_HEIGHT` for missing data rows. Existing heading
+  sizing stays intact. Without a referencing field, or without `visibleRows`, the old row-count sizing stays intact.
+  This is a module layout rule with no SDK member or host projection change. The fake preserves the descriptors and
+  reference validation but does not calculate viewport/dialog size; `EditorKitTest` and the real-host
+  `EditorEnterBaselineTest` assert this behavior (dark/light Language filtering, empty results and clearing).
 - `Stack.cancelAction` is what Escape runs from any focused control inside the stack that does not take Escape itself
   (a field's own `cancelAction` runs first; an open kit popup is dismissed first), as an inline find bar closes from
   its field or its buttons. A disabled, busy or hidden stack neither reports nor takes Escape, which then reaches an

@@ -199,6 +199,42 @@ class EditorEnterBaselineTest {
         }
     }
 
+    /** Removing the field-driven list's reserved height must fail here through the host's real DialogFit path. */
+    @Test @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void languageKeepsItsPackedHeightWhileFilteredEmptyAndClearedInDarkAndLight() throws Exception {
+        for (boolean dark : List.of(true, false)) {
+            onEdt(() -> controller.configure(dark ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT));
+            try (var editor = new StagedEditorHost(root.resolve(dark ? "height-dark" : "height-light"), dark)) {
+                List<String> chosen = new CopyOnWriteArrayList<>();
+                onEdt(() -> editor.language("text/python", chosen::add));
+                var picker = editor.awaitSurface("Language");
+                settle();
+                var full = onEdtValue(() -> editor.dialogSize(picker));
+                int allRows = onEdtValue(() -> ((dev.jasper.ui.model.Nodes.ItemList) StagedVaultHost.node(picker, "language.list")).items().size());
+                assertThat(allRows).isGreaterThan(14);
+                for (String query : List.of("ja", "no-such-language-xyz", "")) {
+                    onEdt(() -> ((JTextComponent) require(picker, "language.filter.input")).setText(query));
+                    settle();
+                    onEdt(() -> {
+                        var list = (dev.jasper.ui.model.Nodes.ItemList) StagedVaultHost.node(picker, "language.list");
+                        if (query.isEmpty()) assertThat(list.items()).hasSize(allRows);
+                        else if (query.startsWith("no-such")) {
+                            assertThat(list.items()).isEmpty();
+                            enter(require(picker, "language.filter.input"));
+                            assertThat(picker.closed()).as("Enter with no match leaves the picker open").isFalse();
+                        } else assertThat(list.items()).hasSizeBetween(1, 13);
+                        assertThat(editor.dialogSize(picker)).as("%s dialog size for '%s'", dark ? "dark" : "light", query).isEqualTo(full);
+                        assertThat(picker.holder().getPreferredSize()).as("the preferred size stays stable too").isEqualTo(full);
+                    });
+                }
+                assertThat(chosen).isEmpty();
+                onEdt(() -> escape(require(picker, "language.filter.input")));
+                await(picker::closed, "Escape closes the restored picker");
+                assertThat(editor.problems).isEmpty();
+            }
+        }
+    }
+
     @Test @Timeout(value = 60, unit = TimeUnit.SECONDS)
     void savingTakesNoEnterAndEscapeCancelsWhileALateSaveIsIgnored() throws Exception {
         try (var editor = new StagedEditorHost(root.resolve("saving"), false)) {

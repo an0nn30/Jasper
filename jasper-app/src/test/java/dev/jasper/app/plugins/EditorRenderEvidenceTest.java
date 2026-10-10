@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Real-host, dark and light pixel evidence of the migrated Editor dialogs (Plan 2 Task 9a; Task 7 ruling 2 and the 8a
  * precedent): the staged Editor runs in the application's plugin host ({@link StagedEditorHost}) and its question sheets,
- * Go to Line (valid and invalid), Language picker (all and filtered) and Saving dialog render through the host
+ * Go to Line (valid and invalid), Language picker (all, filtered and empty) and Saving dialog render through the host
  * translation with synthetic text. Each capture waits for its named content to mount and must not be a uniform frame.
  * Output goes to build/theme-migration-evidence/editor-hosted; the frozen before images are untouched.
  */
@@ -71,6 +71,9 @@ class EditorRenderEvidenceTest {
             onEdt(() -> ((JTextComponent) require(language, "language.filter.input")).setText("ja"));
             StagedVaultHost.await(() -> EditorEnterBaselineTest.rowNames(language).size() < 8, "the filtered list");
             save(theme, "language-filtered", language, 420, 520);
+            onEdt(() -> ((JTextComponent) require(language, "language.filter.input")).setText("no-such-language-xyz"));
+            StagedVaultHost.await(() -> EditorEnterBaselineTest.rowNames(language).isEmpty(), "the empty filtered list");
+            save(theme, "language-empty", language, 420, 520);
             onEdt(language::requestClose);
 
             var saves = new CompletableFuture<Boolean>();

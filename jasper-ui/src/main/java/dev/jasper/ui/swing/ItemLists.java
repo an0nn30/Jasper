@@ -151,6 +151,21 @@ final class ItemLists {
             return value().visibleRows();
         }
 
+        /**
+         * A list with {@code visibleRows} that a field in the same view names as its {@code listId} (a filter-driven list,
+         * such as a picker's search results) keeps its visible-rows height while the filter narrows it, as a Swing list's
+         * visible row count did; every other list sizes to its rows. RESULTS lists reserve their fixed data-row height.
+         */
+        @Override
+        boolean keepsVisibleHeight() {
+            return visibleRows().isPresent() && view.namesList(node.id());
+        }
+
+        @Override
+        int reservedRowHeight() {
+            return results() ? ThemePainting.metric(context(), DesignMetrics.Role.RESULTS_ROW_HEIGHT) : rowHeight;
+        }
+
         @Override
         boolean externallyDriven() {
             return results();

@@ -147,6 +147,78 @@ class EditorKitTest {
         });
     }
 
+    static ViewSpec filtered(int count, String listId) {
+        return filtered(count, listId, ListKind.COMPACT, OptionalInt.of(14));
+    }
+
+    static ViewSpec filtered(int count, String listId, ListKind kind, OptionalInt visibleRows) {
+        var items = new ArrayList<ListItem>();
+        for (int i = 0; i < count; i++) items.add(language("l" + i, "Language " + i));
+        var filter = new Field("filter", READY, FieldKind.SEARCH, "", "Filter", "Filter", "choose", Optional.empty(), FieldPresentation.STANDARD, "", "", listId);
+        return new ViewSpec(new Stack("root", READY, LayoutRole.VERTICAL, List.of(filter,
+            new ItemList("languages", READY, kind, items, count == 0 ? Set.of() : Set.of("l0"), "choose", List.of(), SelectionMode.SINGLE,
+                Optional.empty(), visibleRows))));
+    }
+
+    /** Plan 2 Task 9a ruling (a): a list a field names as its listId keeps its visible-rows height while its filter narrows it. */
+    @Test void aListDrivenByAFieldKeepsItsVisibleRowsHeightForAnyRowCountAndOtherListsSizeToTheirRows() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, filtered(40, "languages"), e -> { })) {
+                var list = (ItemLists.ListControl) view.control("languages");
+                int full = view.getPreferredSize().height, listFull = list.component.getPreferredSize().height;
+                assertThat(list.canvas.getPreferredScrollableViewportSize().height).as("fourteen rows").isEqualTo(14 * list.rowHeight);
+                for (int count : new int[] {1, 0, 13, 14, 40}) {
+                    view.update(filtered(count, "languages"));
+                    assertThat(view.getPreferredSize().height).as("%d rows with a driving field", count).isEqualTo(full);
+                    assertThat(list.component.getPreferredSize().height).isEqualTo(listFull);
+                }
+                view.update(filtered(1, ""));
+                assertThat(list.component.getPreferredSize().height).as("without a driving field the list sizes to its row").isLessThan(listFull);
+                int one = view.getPreferredSize().height;
+                view.update(filtered(0, ""));
+                assertThat(view.getPreferredSize().height).as("and shrinks again when empty").isLessThan(one);
+                view.update(filtered(40, ""));
+                assertThat(list.component.getPreferredSize().height).as("a full list is the same either way").isEqualTo(listFull);
+                view.update(filtered(1, "languages"));
+                assertThat(list.component.getPreferredSize().height).as("naming the list again restores its height").isEqualTo(listFull);
+            } finally { release(context); }
+        });
+    }
+
+    @Test void everyListKindReservesItsRequestedHeightEvenWhenItStartsEmpty() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try {
+                for (var kind : ListKind.values()) {
+                    try (var view = new KitView(context, filtered(0, "languages", kind, OptionalInt.of(14)), e -> { })) {
+                        var list = (ItemLists.ListControl) view.control("languages");
+                        int full = list.component.getPreferredSize().height;
+                        int expectedRowHeight = kind == ListKind.RESULTS
+                            ? context.metrics().value(DesignMetrics.Role.RESULTS_ROW_HEIGHT) : list.rowHeight;
+                        assertThat(list.canvas.getPreferredScrollableViewportSize().height)
+                            .as("%s starts with fourteen empty rows", kind).isEqualTo(14 * expectedRowHeight);
+                        for (int count : new int[] {1, 14, 40, 0}) {
+                            view.update(filtered(count, "languages", kind, OptionalInt.of(14)));
+                            assertThat(list.component.getPreferredSize().height).as("%s with %d rows", kind, count).isEqualTo(full);
+                        }
+                    }
+                }
+            } finally { release(context); }
+        });
+    }
+
+    @Test void aFieldDrivenListWithoutVisibleRowsStillSizesToItsRows() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, filtered(1, "languages", ListKind.COMPACT, OptionalInt.empty()), e -> { })) {
+                int one = view.getPreferredSize().height;
+                view.update(filtered(0, "languages", ListKind.COMPACT, OptionalInt.empty()));
+                assertThat(view.getPreferredSize().height).isLessThan(one);
+            } finally { release(context); }
+        });
+    }
+
     @Test void anOptionButtonShowsItsPressedStateReportsItToAssistiveTechnologyAndNeverFlipsByItself() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();

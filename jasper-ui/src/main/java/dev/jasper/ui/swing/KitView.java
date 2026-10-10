@@ -67,6 +67,13 @@ public final class KitView extends JPanel implements AutoCloseable {
         // Native panel hosts reborrow a replacement header after reconciliation, never during it.
         try { firePropertyChange("viewSpec", previous, spec); } catch (Throwable failure) { report(failure); }
     }
+    /** Whether a field of the current descriptor names {@code listId} as the list its keys move ({@code Field.listId}). */
+    boolean namesList(String listId) { return spec != null && namesList(spec.root(), listId); }
+    private static boolean namesList(Nodes.Node node, String listId) {
+        if (node instanceof Nodes.Field field && field.listId().equals(listId)) return true;
+        for (var child : ControlRegistry.children(node)) if (namesList(child, listId)) return true;
+        return false;
+    }
     /** Current immutable descriptor; it never contains mutable input or secret content. */
     public ViewSpec spec() { requireOpen(); return spec; }
     /**

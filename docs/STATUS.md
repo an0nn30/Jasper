@@ -1,8 +1,8 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-07
+## Current state — 2026-10-10
 
-- **Theme engine Plan 2 Task 9a implemented: Editor dialogs on kit views; one open question, review pending** (2026-10-07).
+- **Theme engine Plan 2 Task 9a implemented: Editor dialogs on kit views; Language height resolved, review pending** (2026-10-10).
   The question sheet (`Forms.QuestionView`, mounted by `DialogAsker`), Saving (`Forms.ProgressView`, mounted by `SaveWait`;
   the non-modal dialog and nested loop kept), Go to Line (`GoToLinePanel`) and Language (`LanguagePicker`) are owned SDK
   `UiView`s from `context.kit()`, mounted with `PluginDialog.setContent(UiView)`; closing a dialog closes its controller,
@@ -19,11 +19,15 @@
   `UIManager` `Label.font` read, FlatLaf client properties and the root default-button helper (`Forms.bind` stays for
   `FindBar` until 9b). Evidence: Editor descriptor scenarios (`build/theme-migration-evidence/editor-descriptors`) and the
   real-host dark/light captures `EditorRenderEvidenceTest` (`editor-hosted`, non-blank checked) on the new staged-host
-  helper `StagedEditorHost`; frozen before images untouched. Open (NEEDS_CONTEXT, task-9-report.md 9a): the host re-packs
-  the Language dialog as the filtered list shrinks (500 → 164 px for "ja", 108 px with no match); the baseline dialog
-  kept its 14-row height. Not run: GUI. GUI checks for the user: the four dialogs in dark and light; Enter/Space/Escape
+  helper `StagedEditorHost`; frozen before images untouched. Resolved 2026-10-10 (controller ruling (a)): an ItemList
+  named by a field's `listId` reserves its `visibleRows` height even with fewer or zero results; all list kinds follow
+  this rule, including RESULTS with its fixed data-row metric. No SDK member changes; other lists keep their sizing.
+  The real-host Language dialog now retains its 14-row packed height through filtering, no matches and clearing in dark
+  and light (`EditorEnterBaselineTest`); empty-result renders join the existing dark/light captures. Regression proved
+  RED against the pre-fix kit (540×500 → 540×164 for "ja") and GREEN with the module fix. Review remains pending across
+  `bba2a385..HEAD`; 9b/9c remain unstarted. Not run: GUI. GUI checks for the user: the four dialogs in dark and light; Enter/Space/Escape
   on the question with focus on a non-default button; Go to Line's inline error; Up/Down in the Language filter and
-  the dialog height while filtering. Also carried and reviewed with 9a: kit fix `d2c6a37c` (a field's list keys run the
+  the dialog height while filtering. Also carried in the 9a review scope: kit fix `d2c6a37c` (a field's list keys run the
   look and feel's own binding while their list is hidden, disabled, busy or unmounted).
 - **Theme engine Plan 2 Task 9-kit complete: kit capabilities for the Editor migration (review clean after fix round 1)** (2026-10-06).
   Task 9 is split (controller ruling) into 9-kit, 9a (Editor dialogs), 9b (document tab and find bar) and 9c (Vim bar).

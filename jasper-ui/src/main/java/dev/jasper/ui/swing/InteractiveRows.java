@@ -242,16 +242,31 @@ final class InteractiveRows {
             return low;
         }
 
-        /** The viewport's preferred height: {@link #visibleRows} selectable rows and the headings among them. */
+        /**
+         * The viewport's preferred height: {@link #visibleRows} selectable rows and the headings among them. A list that
+         * {@link #keepsVisibleHeight keeps its height} reserves the missing rows at its row height, so it does not shrink
+         * (and a host-packed dialog around it does not re-pack) when it has fewer rows.
+         */
         int viewportRowsHeight() {
             var visible = visibleRows();
             if (visible.isEmpty()) return top(Math.min(8, size()));
-            int height = 0;
-            for (int i = 0, rows = 0; i < size() && rows < visible.getAsInt(); i++) {
+            int height = 0, rows = 0;
+            for (int i = 0; i < size() && rows < visible.getAsInt(); i++) {
                 height += heightAt(i);
                 if (selectable(i)) rows++;
             }
+            if (keepsVisibleHeight() && rows < visible.getAsInt()) height += (visible.getAsInt() - rows) * reservedRowHeight();
             return height;
+        }
+
+        /** Height reserved for each missing selectable row; variable-height lists may use their data-row metric. */
+        int reservedRowHeight() {
+            return rowHeight;
+        }
+
+        /** Whether the viewport keeps its {@link #visibleRows} height however few rows it has; none by default. */
+        boolean keepsVisibleHeight() {
+            return false;
         }
 
         /** The row a key step lands on: the next selectable row that way, or the first one when none has focus yet. */
