@@ -494,7 +494,10 @@ contained during entry creation and callbacks. Task 11b removes private app lega
 The build gate `gradle/architecture/PluginPresentationCheck.java` runs with the selected JBR25 toolchain,
 independently of the Gradle JVM. It parses compiled authored main classes (not vendor jars), inspects
 constructor/style/graphics member references and declared paint methods, and resolves class hierarchies
-without initialization. Domain Color/Point/Dimension, timers and undo/string APIs remain legitimate.
+without initialization. Ordinary visible receivers cannot receive presentation setters for size/bounds,
+margin, alignment/layout, icon assignment/variants or paint flags, in addition to colors/fonts/borders.
+The receiver hierarchy determines this policy: constructing or resizing a domain Dimension stays legal.
+Domain Color/Point/Dimension, timers and undo/string APIs remain legitimate.
 Its negative fixtures invoke the same production checker, including same-package and exact-owner
 ordinary-control attempts. This is a build-time ownership check, not a reflective-code security sandbox.
 
@@ -511,6 +514,8 @@ and JComponent opacity for gutter children. Its Gutter client property marks the
 It cannot paint, construct controls, read global presentation defaults, or style arbitrary ordinary controls.
 The exact member-owner allowlist is in the checker; FlatLaf style writers remain forbidden.
 
-The SDK gate inspects public/protected JVM descriptors and generic signatures. The only Swing signature
+The SDK gate inspects public/protected JVM descriptors, generic signatures and classfile superclass/interface
+edges, following SDK-owned parents to detect indirect inherited exposure. Raw Swing/AWT inheritance is
+forbidden; value/custom-root descriptor exceptions never authorize extending those types. The only Swing signature
 values are CustomContent.JComponent and ContentCommand.KeyStroke; Color/Dimension and Appearance's
 Component opacity lookup are the supported AWT values. App SDK imports remain confined to app.plugins.

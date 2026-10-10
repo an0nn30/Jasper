@@ -788,7 +788,10 @@ existing lifecycle and callback linkage containment remains in place.
 The build gate `gradle/architecture/PluginPresentationCheck.java` runs with the selected JBR25 toolchain,
 independently of the Gradle JVM. It parses compiled authored main classes (not vendor jars), inspects
 constructor/style/graphics member references and declared paint methods, and resolves class hierarchies
-without initialization. Domain Color/Point/Dimension, timers and undo/string APIs remain legitimate.
+without initialization. Ordinary visible receivers cannot receive presentation setters for size/bounds,
+margin, alignment/layout, icon assignment/variants or paint flags, in addition to colors/fonts/borders.
+The receiver hierarchy determines this policy: constructing or resizing a domain Dimension stays legal.
+Domain Color/Point/Dimension, timers and undo/string APIs remain legitimate.
 Its negative fixtures invoke the same production checker, including same-package and exact-owner
 ordinary-control attempts. This is a build-time ownership check, not a reflective-code security sandbox.
 
