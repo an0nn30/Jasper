@@ -1,6 +1,14 @@
 # Theme Engine Plan 2 — Consumer and SDK Migration Implementation Plan
 
-**Current status (2026-10-10):** Tasks1–11 independently approved through `2fc3bea8`. Task12 implementation
+**Current status (2026-10-10):** Whole-branch review required four Important and two Minor fixes; the consolidated
+fix wave is implemented with preserved baseline probes and meaningful state/paint/action RED/GREEN regressions.
+NUMBER uses incoming shape; editable Choice retains its editor/document/pending input; unauthored off-switch tracks
+are readable; title-hint/card-count surface floors return; source-color oracle and exceptional dialog cleanup are
+corrected. `./gradlew check :jasper-app:installDist` passed: 9,658 XML tests, zero failures/errors, six environment skips; 107 tasks, 22 executed/85 up-to-date. The first full attempt failed only on a missing new fixture inventory row, now recorded;
+that failed evidence remains. This required gate rerun is the bounded deviation from the single full-run brief.
+Independent scoped re-review and controller native rerun remain pending. Plan3/mock acceptance is not complete.
+
+**Historical Task12 implementation status (2026-10-10):** Tasks1–11 independently approved through `2fc3bea8`. Task12 implementation
 and verification complete; controller independent whole-branch review pending. Full check/installDist passed:
 9,645 XML tests, zero failures/errors, six environment skips;107 tasks24executed/83up-to-date. Installed SDK0.15
 manifests/jar confinement/hashes verified. Completion fixes: shared Choice updateUI, app plugin Settings kit

@@ -47,6 +47,33 @@ class ThemeImportTest {
     static List<JButton> buttons(Container root){var out=new ArrayList<JButton>();for(var c:root.getComponents()){if(c instanceof JButton b)out.add(b);if(c instanceof Container nested)out.addAll(buttons(nested));}return out;}
     static List<String> texts(Container root){return dev.jasper.app.testsupport.KitTestSupport.texts(root);}
     /** Plan 2 Task 6c ruling G4: a long message flows over several lines instead of widening the sheet past 44 columns. */
+    @Test void dialogAcceptRejectAndOwnerCloseRetainCancelOnceSemantics() throws Exception {
+        edt(() -> {
+            var cancelled = new AtomicInteger(); var dialogs = new ThemeDialogs(windows, () -> owner, dev.jasper.app.testsupport.KitTestSupport::context);
+            Runnable[] accept = {null}, reject = {null};
+            java.util.function.BiFunction<Runnable, Runnable, dev.jasper.ui.swing.KitView> builder = (yes, no) -> {
+                accept[0] = yes; reject[0] = no;
+                return new dev.jasper.ui.swing.KitView(dialogs.kit(), new dev.jasper.ui.model.ViewSpec(
+                    new dev.jasper.ui.model.Nodes.Text("text", dev.jasper.ui.model.ControlState.READY, "Body", dev.jasper.ui.model.Nodes.TextRole.BODY)), event -> {});
+            };
+            dialogs.view("Accept", builder, cancelled::incrementAndGet); accept[0].run(); dialogs.close();
+            assertThat(cancelled).hasValue(0); assertThat(windows.open()).containsExactly(owner);
+            dialogs.view("Reject", builder, cancelled::incrementAndGet); reject[0].run(); reject[0].run(); dialogs.close();
+            assertThat(cancelled).hasValue(1); assertThat(windows.open()).containsExactly(owner);
+            dialogs.view("Owner", builder, cancelled::incrementAndGet); dialogs.close(); dialogs.close();
+            assertThat(cancelled).hasValue(2); assertThat(windows.open()).containsExactly(owner);
+        });
+    }
+    @Test void failingDialogBuilderClosesSurfaceAndCancelsExactlyOnce() throws Exception {
+        edt(() -> {
+            var cancelled = new AtomicInteger(); var failure = new IllegalArgumentException("builder");
+            var dialogs = new ThemeDialogs(windows, () -> owner, dev.jasper.app.testsupport.KitTestSupport::context);
+            assertThatThrownBy(() -> dialogs.view("Broken", (accept, reject) -> { throw failure; }, cancelled::incrementAndGet))
+                .isSameAs(failure);
+            assertThat(windows.open()).containsExactly(owner); assertThat(cancelled).hasValue(1);
+            dialogs.close(); dialogs.close(); assertThat(cancelled).hasValue(1);
+        });
+    }
     @Test void aLongMessageWrapsInsideItsSheetAndKeepsItsCloseButton() throws Exception {
         String line = "The theme archive could not be read because one of its files is not a valid theme document.";
         String text = line + "\n\n" + line + " " + line;

@@ -70,7 +70,7 @@ final class NotificationCard extends JPanel implements AutoCloseable {
         setOpaque(false);
         setFocusable(false);
         title = new TextBlock(kit, Typography.Role.BODY_STRONG, SemanticColor.TEXT_PRIMARY, 0);
-        count = new TextBlock(kit, Typography.Role.BODY, SemanticColor.TEXT_SECONDARY, 1);
+        count = new TextBlock(kit, Typography.Role.BODY, SemanticColor.TEXT_SECONDARY, 1, SemanticColor.SURFACE_CARD);
         content = new TextBlock(kit, Typography.Role.BODY, SemanticColor.TEXT_PRIMARY, CONTENT_LINES);
         icon = new KitView(kit, new ViewSpec(NotificationStyle.icon(ICON, notification, presentationIcons)), event -> { }, true);
         for (int i = 0; i < VISIBLE_ACTIONS; i++) {

@@ -565,3 +565,15 @@ and scrollbar composition is Plan3 Task8; app settings/choosers/palette/notifica
 Vault is Plan3 Tasks1/4, Add Host Task2, New File Server Task3, Remote panels Tasks5–6 and
 File Server rows/transfer companions Task7. No private styling engine or
 raw standard-plugin UI compatibility path remains. See [completion evidence](completion.md).
+
+
+## Plan2 final-review fix wave (2026-10-10)
+
+Whole-branch review found four Important control/readability defects and two Minor issues. The bounded
+fix wave corrects NUMBER incoming-shape writes; preserves searchable Choice editor/document/pending text
+through delegate refresh; derives a readable unauthored off-switch track; and restores title-hint/card-count
+surface floors centrally. Explicit switch roles retain precedence; text roles remain raw in the shared
+palette while the established per-surface policy adjusts paint. The independent source-color oracle and
+exceptional ThemeDialogs cleanup are corrected too. ShippedControlReadabilityTest is recorded as a test-only
+scaffold in migration.csv. No new standard-control exception or production raw styling owner is introduced.
+Scoped independent re-review and controller native rerun remain pending; no Plan3 composition acceptance is claimed.

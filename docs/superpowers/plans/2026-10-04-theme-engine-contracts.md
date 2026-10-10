@@ -93,6 +93,11 @@ canonical values derive from the resolved old generator as follows; the right si
 | blue/green/amber/purple/neutral hue | ANSI blue/green/yellow/magenta; TEXT_MUTED |
 | secondary button bg; secondary button hover | BUTTON_BACKGROUND; HOVER |
 
+Plan 2 final-review correction (2026-10-10): the unauthored off-track fallback starts at
+`BUTTON_BACKGROUND` and uses `SurfaceContrast.readable` toward final `text.primary` (then black/white)
+only if needed to reach 3:1 against final `toggle.knob`. Explicit canonical `toggle.track.off` and
+`toggle.knob` retain their authored values; no feature-specific switch colors are introduced.
+
 Dependent defaults resolve from the final canonical parent: `border.focus` from `accent`,
 `border.error` from `status.danger`; `accent.hover` and `text.link.hover` mix their final base with
 `text.primary` at 8%; `hover.overlay` uses `text.primary`. `surface.scrim` uses the darkest terminal
@@ -912,6 +917,12 @@ native status bar paints on it. `theme.SurfaceContrast` is the single readabilit
 `blackOrWhite`, `on(palette, role, surface, minimum)`, `TEXT` 4.5, `INDICATOR` 3): the generator's derived tokens,
 surface-tinted icons, status text and the running dot on `surface.status` (4.5) and rail badges on `surface.app`
 (3) use it. `on` applies a floor only where a role is painted; resolved shared roles are never changed.
+
+Plan 2 final-review controller ruling (2026-10-10): title-search hints use the same `on` policy at
+3:1 against their current input/hover fill; notification card repeat counts use 4.5:1 against
+`surface.card`. Authored canonical roles still resolve unchanged. A low-contrast authored color may
+be adjusted at these consuming surfaces, consistently with status text/badges; this is not literal
+paint identity or a global floor on all semantic text roles. No authored-provenance bypass is added.
 
 Temporary raw defaults and plugin styling retain only the exact consumers/removal owners in
 [temporary-paths](../../design/theme-engine/temporary-paths.md). Dynamic SDK current() readers require

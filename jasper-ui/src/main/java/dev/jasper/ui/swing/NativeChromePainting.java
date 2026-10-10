@@ -68,7 +68,8 @@ public final class NativeChromePainting {
             int baseline = (height - metrics.getHeight()) / 2 + metrics.getAscent();
             g.setColor(palette.color(SemanticColor.TEXT_PRIMARY)); g.drawString(clip(context, metrics, end - x), x, baseline);
             if (hintWidth > 0 && width - pad - hintWidth > x) {
-                g.setColor(palette.color(SemanticColor.TEXT_PLACEHOLDER)); g.drawString(hint, width - pad - hintWidth, baseline);
+                g.setColor(SurfaceContrast.on(palette, SemanticColor.TEXT_PLACEHOLDER,
+                    hover ? SemanticColor.SURFACE_CONTROL_HOVER : SemanticColor.SURFACE_INPUT, SurfaceContrast.INDICATOR)); g.drawString(hint, width - pad - hintWidth, baseline);
             }
         } finally { g.dispose(); }
     }

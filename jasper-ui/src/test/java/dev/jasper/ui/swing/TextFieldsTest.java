@@ -12,6 +12,47 @@ import static org.assertj.core.api.Assertions.*;
 import static dev.jasper.ui.swing.KitViewTest.*;
 
 class TextFieldsTest {
+    @Test void incomingNumericShapeControlsDescriptorWritesAndPreservesDocument() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, number("1", 0, 0), events::add)) {
+                var input = editor(view, "n"); var document = input.getDocument();
+                view.update(number("-2", -100, 0));
+                assertThat(input.getText()).isEqualTo("-2");
+                view.update(number("2.5", -100, 1));
+                assertThat(input.getText()).isEqualTo("2.5");
+                input.select(1, 3); view.update(number("2.5", -100, 2));
+                assertThat(input.getSelectedText()).isEqualTo(".5");
+                assertThat(input.getDocument()).isSameAs(document); assertThat(events).isEmpty();
+                input.selectAll(); input.replaceSelection("invalid");
+                assertThat(input.getText()).isEqualTo("2.5"); assertThat(events).isEmpty();
+                input.selectAll(); input.replaceSelection("-3.25");
+                assertThat(input.getText()).isEqualTo("-3.25"); assertThat(events).isNotEmpty();
+            } finally { release(context); }
+        });
+    }
+    @Test void numericNormalizationUsesLatestShapeAndExplicitWriteSupersedesQueuedValue() {
+        KitView[] mounted = {null}; KitContext[] contexts = {null}; var events = new ArrayList<UiEvent>();
+        Edt.run(() -> {
+            contexts[0] = KitFixtures.context();
+            mounted[0] = new KitView(contexts[0], number("1", 0, 0), event -> {
+                events.add(event);
+                if (event instanceof UiEvent.Edited) mounted[0].update(number("-2.5", -100, 1));
+            });
+            var input = editor(mounted[0], "n"); input.setCaretPosition(1); input.replaceSelection("2");
+            mounted[0].update(number("-3.25", -100, 2));
+        });
+        Edt.run(() -> {
+            try {
+                assertThat(editor(mounted[0], "n").getText()).isEqualTo("-3.25");
+                assertThat(events).containsExactly(new UiEvent.Edited("n", "12"));
+            } finally { mounted[0].close(); release(contexts[0]); }
+        });
+    }
+    private static ViewSpec number(String value, double min, int decimals) {
+        return new ViewSpec(new Field("n", ControlState.READY, FieldKind.NUMBER, value, "", "Number", "",
+            java.util.Optional.of(new Numeric(min, 100, 1, decimals))));
+    }
     @Test void synchronousEditEchoUpdatesDescriptorWithoutMutatingInNotification() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var failures = new ArrayList<Throwable>(); var events = new ArrayList<UiEvent>();

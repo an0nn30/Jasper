@@ -185,6 +185,8 @@ final class TextFields {
         }
         @Override void update(Nodes.Node next) {
             var previous = (Nodes.Field)node; var field = (Nodes.Field)next;
+            // Publish the incoming shape before any explicit document write: NumberFilter reads this node.
+            super.update(next);
             if (!previous.value().equals(field.value()) || notifying && !input.getText().equals(field.value())) {
                 long revision = ++valueRevision;
                 if (!input.getText().equals(field.value())) {
@@ -197,7 +199,6 @@ final class TextFields {
                     } else setValue(field.value());
                 }
             }
-            super.update(next);
         }
         private void setValue(String value) {
             if (input.getText().equals(value)) return;

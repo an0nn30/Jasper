@@ -9,6 +9,39 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class SemanticPaletteTest {
+    @Test void explicitSwitchColorsKeepPrecedenceAndFallbackUsesFinalAuthoredKnob() {
+        var explicit = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS + """
+            [semantic]
+            "toggle.track.off" = "#eeeeee80"
+            "toggle.knob" = "#eeeeee"
+            """).semantic();
+        assertThat(explicit.color(SemanticColor.TOGGLE_TRACK_OFF)).isEqualTo(new Color(0xee, 0xee, 0xee, 0x80));
+        assertThat(explicit.color(SemanticColor.TOGGLE_KNOB)).isEqualTo(new Color(0xeeeeee));
+        var fallback = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS + """
+            [semantic]
+            "toggle.knob" = "#3d424b"
+            """).semantic();
+        assertThat(fallback.color(SemanticColor.TOGGLE_KNOB)).isEqualTo(new Color(0x3d424b));
+        assertThat(ColorMath.contrast(fallback.color(SemanticColor.TOGGLE_KNOB), fallback.color(SemanticColor.TOGGLE_TRACK_OFF)))
+            .isGreaterThanOrEqualTo(3);
+    }
+
+    @Test void authoredSharedTextRemainsRawWhileDedicatedSurfacesApplyTheirFloors() {
+        var palette = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS + """
+            [semantic]
+            "text.placeholder" = "#eeeeee"
+            "text.secondary" = "#eeeeee"
+            "surface.input" = "#ffffff"
+            "surface.card" = "#ffffff"
+            """).semantic();
+        assertThat(palette.color(SemanticColor.TEXT_PLACEHOLDER)).isEqualTo(new Color(0xeeeeee));
+        assertThat(palette.color(SemanticColor.TEXT_SECONDARY)).isEqualTo(new Color(0xeeeeee));
+        assertThat(ColorMath.contrast(SurfaceContrast.on(palette, SemanticColor.TEXT_PLACEHOLDER, SemanticColor.SURFACE_INPUT,
+            SurfaceContrast.INDICATOR), Color.WHITE)).isGreaterThanOrEqualTo(3);
+        assertThat(ColorMath.contrast(SurfaceContrast.on(palette, SemanticColor.TEXT_SECONDARY, SemanticColor.SURFACE_CARD,
+            SurfaceContrast.TEXT), Color.WHITE)).isGreaterThanOrEqualTo(4.5);
+    }
+
     @Test void incompleteSemanticPaletteIsRejected() {
         assertThatThrownBy(() -> new SemanticPalette(Map.of())).isInstanceOf(IllegalArgumentException.class);
     }

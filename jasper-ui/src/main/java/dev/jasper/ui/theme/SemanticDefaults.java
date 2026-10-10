@@ -38,6 +38,13 @@ public final class SemanticDefaults {
             };
             colors.put(role, overrides.getOrDefault(role, derived));
         }
+        // An unauthored off track must separate from its knob on light as well as dark surfaces.
+        // Explicit canonical switch colors retain precedence, including deliberate low contrast.
+        if (!overrides.containsKey(TOGGLE_TRACK_OFF)
+                && ColorMath.contrast(colors.get(TOGGLE_TRACK_OFF), colors.get(TOGGLE_KNOB)) < SurfaceContrast.INDICATOR) {
+            colors.put(TOGGLE_TRACK_OFF, SurfaceContrast.readable(colors.get(TOGGLE_TRACK_OFF),
+                colors.get(TOGGLE_KNOB), SurfaceContrast.INDICATOR, colors.get(TEXT_PRIMARY)));
+        }
         return new SemanticPalette(colors);
     }
 

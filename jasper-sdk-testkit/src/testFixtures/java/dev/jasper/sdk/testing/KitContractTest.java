@@ -20,6 +20,21 @@ public abstract class KitContractTest {
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
         new Nodes.Secret("secret",ControlState.READY,"","Password","")))); }
+    @Test void numericShapeUpdatePublishesTheNewLiveValue() throws Exception { edt(() -> {
+        var kit = kit("owner"); var events = new ArrayList<UiEvent>();
+        var view = kit.create(number("1", 0, 0), events::add);
+        try {
+            for (var next : List.of(number("-2", -100, 0), number("2.5", -100, 1))) {
+                view.update(next); view.selectAll("number");
+                assertThat(fieldSelection(view, "number")).containsExactly(0, ((Nodes.Field)next.root()).value().length());
+                assertThat(view.spec()).isEqualTo(next); assertThat(events).isEmpty();
+            }
+        } finally { view.close(); stop(kit); }
+    }); }
+    private static ViewSpec number(String value, double min, int decimals) {
+        return new ViewSpec(new Nodes.Field("number", ControlState.READY, Nodes.FieldKind.NUMBER, value, "", "Number", "",
+            Optional.of(new Nodes.Numeric(min, 100, 1, decimals))));
+    }
     @Test void everyDescriptorIconPositionValidatesOwnershipBeforeCreateOrUpdateMutation() throws Exception { edt(() -> {
         var kit=kit("owner");
         var foreign=kit("foreign");

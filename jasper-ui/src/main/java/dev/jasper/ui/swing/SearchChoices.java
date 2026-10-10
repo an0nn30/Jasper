@@ -56,6 +56,9 @@ final class SearchChoices {
         java.util.function.BooleanSupplier submitted = () -> false;
         private boolean quiet;
         private boolean entering;
+        private boolean disposed;
+        private String declaredEntry;
+        private long entryRevision;
         private final DocumentListener typing = new DocumentListener() {
             @Override public void insertUpdate(DocumentEvent event) { typed(); }
             @Override public void removeUpdate(DocumentEvent event) { typed(); }
@@ -66,15 +69,20 @@ final class SearchChoices {
 
         Combo(KitContext context) {
             super(context);
+            // A non-UIResource editor belongs to this control, not to each installed delegate.
+            // Keeping the component also keeps its document, caret, IME and focus identity.
+            setEditor(new javax.swing.plaf.basic.BasicComboBoxEditor());
             addPropertyChangeListener("editor", editorChange);
         }
 
         /** Swing replays the look and feel on every theme install; the kit's own UI, and so the search, survives it. */
         @Override public void updateUI() {
             if (context == null) { super.updateUI(); return; }
+            unobserveEditor();
             setUI(kitUi());
             if (getRenderer() instanceof Component renderer) SwingUtilities.updateComponentTreeUI(renderer);
             observeEditor();
+            styleEditor();
         }
 
         @Override ComboPopup createKitPopup(JComboBox<Object> comboBox) {
@@ -100,14 +108,27 @@ final class SearchChoices {
             noMatches = search.noMatches();
             boolean free = search.entry().isPresent();
             if (free != freeEntry) { freeEntry = free; setEditable(free); observeEditor(); }
-            search.entry().ifPresent(this::showEntry);
+            if (!free) declaredEntry = null;
+            search.entry().ifPresent(text -> {
+                // A palette refresh must not replay the descriptor over unacknowledged user text.
+                if (!java.util.Objects.equals(declaredEntry, text) || entering) {
+                    declaredEntry = text;
+                    showEntry(text);
+                }
+            });
         }
 
         /** The domain's text; while the user's own edit is being delivered Swing forbids a document write, so it follows. */
         private void showEntry(String text) {
+            long revision = ++entryRevision;
             var field = editorField();
             if (field.getText().equals(text)) return;
-            if (entering) { java.awt.EventQueue.invokeLater(() -> { if (freeEntry && !editorField().getText().equals(text)) quietly(text); }); return; }
+            if (entering) {
+                java.awt.EventQueue.invokeLater(() -> {
+                    if (!disposed && freeEntry && entryRevision == revision && !editorField().getText().equals(text)) quietly(text);
+                });
+                return;
+            }
             quietly(text);
         }
 
@@ -124,13 +145,22 @@ final class SearchChoices {
         }
 
         private void observeEditor() {
+            if (disposed) return;
             var field = getEditor() == null ? null : getEditor().getEditorComponent() instanceof JTextComponent text ? text : null;
             if (field == observed) return;
-            if (observed != null) { observed.getDocument().removeDocumentListener(typing); if (searchPopup != null) observed.removeKeyListener(searchPopup.keys); }
+            unobserveEditor();
             observed = field;
             if (observed != null) {
                 observed.getDocument().addDocumentListener(typing);
                 if (searchPopup != null) observed.addKeyListener(searchPopup.keys);
+            }
+        }
+
+        private void unobserveEditor() {
+            if (observed != null) {
+                observed.getDocument().removeDocumentListener(typing);
+                if (searchPopup != null) observed.removeKeyListener(searchPopup.keys);
+                observed = null;
             }
         }
 
@@ -162,9 +192,9 @@ final class SearchChoices {
         }
 
         void dispose() {
+            disposed = true;
             removePropertyChangeListener("editor", editorChange);
-            if (observed != null) { observed.getDocument().removeDocumentListener(typing); if (searchPopup != null) observed.removeKeyListener(searchPopup.keys); }
-            observed = null;
+            unobserveEditor();
         }
     }
 

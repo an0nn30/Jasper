@@ -21,8 +21,8 @@ import static dev.jasper.app.appearance.ThemeFixtures.*;
 import static org.assertj.core.api.Assertions.*;
 
 /**
- * A converted IntelliJ theme preserves every installed color across native publication/reload,
- * including authored named colors, independent of vendor-name postprocessing.
+ * Authored source colors have independent literal oracles; converted publication and disk reload
+ * preserve installed colors. This does not promise foreign geometry, artwork or complete legacy LAF parity.
  */
 @ExtendWith(EdtTestExtension.class)
 class PluginThemeParityTest {
@@ -35,26 +35,26 @@ class PluginThemeParityTest {
          "ui": {"*": {"background": "background", "foreground": "foreground", "selectionBackground": "selection"},
            "Panel.background": "background", "Link.activeForeground": "comment"}}""";
 
-    @Test void aConvertedPluginThemeInstallsTheSameColoursAsItsThemeFile(@TempDir Path home) throws Exception {
-        assertParity(home, THEME);
+    @Test void convertedSourceColorsAndPublicationRoundTripRemainStable(@TempDir Path home) throws Exception {
+        assertSourceColorsAndRoundTrip(home, THEME);
     }
 
-    @Test void draculaKeepsItsAuthorSpecificAdjustments(@TempDir Path home) throws Exception {
-        assertParity(home, THEME.replace("Fixture", "Zihan Ma").replace("Vampire", "Dracula"));
+    @Test void draculaSourceColorsAndPublicationRoundTripRemainStable(@TempDir Path home) throws Exception {
+        assertSourceColorsAndRoundTrip(home, THEME.replace("Fixture", "Zihan Ma").replace("Vampire", "Dracula"));
     }
 
-    @Test void materialKeepsItsAuthorSpecificAdjustments(@TempDir Path home) throws Exception {
-        assertParity(home, THEME.replace("Fixture", "Mallowigi"));
+    @Test void materialSourceColorsAndPublicationRoundTripRemainStable(@TempDir Path home) throws Exception {
+        assertSourceColorsAndRoundTrip(home, THEME.replace("Fixture", "Mallowigi"));
     }
 
     @Test void namedColoursWithUiSuffixesKeepTheirOriginalHandling(@TempDir Path home) throws Exception {
-        assertParity(home, THEME.replace("\"comment\": \"accentColor\"", """
+        assertSourceColorsAndRoundTrip(home, THEME.replace("\"comment\": \"accentColor\"", """
             "comment": "accentColor", "sampleIcon": "#123456", "sample.border": "#234567",
             "sample.rowHeight": "#345678"
             """));
     }
 
-    private static void assertParity(Path home, String json) throws Exception {
+    private static void assertSourceColorsAndRoundTrip(Path home, String json) throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
             jar(home.resolve("themes/vampire.jar"), entries(
@@ -62,17 +62,21 @@ class PluginThemeParityTest {
             var converted = dev.jasper.ui.themeimport.ThemeConverter.convert(home.resolve("themes/vampire.jar")).getFirst();
             assertThat(converted.warnings().stream().filter(w -> !w.contains("discarded non-color override") && !w.contains("no longer controls Jasper native UI"))).singleElement().asString().contains("no console colours", "Jasper Dark");
             Theme theme = Theme.of("converted", new Theme.UserFile(home.resolve("vampire.toml"), converted.document()));
-            String label = converted.sourceEntry();
-
-            var resolved = dev.jasper.ui.themeimport.LegacyThemeTestSupport.load(label, json);
-            assertThat(ThemeManager.install(ThemeGenerator.generate(converted.document()))).isTrue();
+            var generated = ThemeGenerator.generate(converted.document());
+            // Literal values authored in THEME, independent of either installation and of the converter.
+            assertThat(generated.uiKeys()).containsEntry("Panel.background", "#282a36")
+                .containsEntry("Link.activeForeground", "#ff79c6")
+                .containsEntry("ColorPalette.background", "#282a36")
+                .containsEntry("ColorPalette.foreground", "#f8f8f2")
+                .containsEntry("ColorPalette.selection", "#44475a");
+            assertThat(ThemeManager.install(generated)).isTrue();
             Map<String, String> before = colours();
             assertThat(ThemeManager.install(theme)).isTrue();
             Map<String, String> after = colours();
 
-            assertThat(before).as("the theme file's own install").containsEntry("Component.accentColor", "#ff79c6")
+            assertThat(before).as("literal source accent after canonical installation").containsEntry("Component.accentColor", "#ff79c6")
                 .containsEntry("ColorPalette.accentColor", "#ff79c6");
-            assertThat(differences(before, after)).as("colours that differ (theme file -> converted)").isEmpty();
+            assertThat(differences(before, after)).as("generated snapshot and Theme wrapper installation agree").isEmpty();
             var reloaded = ThemeResolver.resolve(ThemeToml.parse(ThemeTomlWriter.write(theme.source().document()), "export.toml"));
             assertThat(ThemeManager.install(Theme.of("export", new Theme.UserFile(home.resolve("export.toml"), reloaded)))).isTrue();
             assertThat(differences(before, colours())).as("native disk round-trip install").isEmpty();

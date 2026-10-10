@@ -2,6 +2,17 @@
 
 ## Current state — 2026-10-10
 
+- **Plan2 final-review fix wave implemented; scoped re-review/native rerun pending (2026-10-10).**
+  Independent whole-branch review found four Important defects (NUMBER incoming-shape writes, editable Choice
+  delegate state loss, shipped light switch readability, and title-hint/card-count contrast floors) plus two Minor
+  issues (source-parity oracle and ThemeDialogs exceptional cleanup). Central fixes and retained RED/GREEN probes
+  cover them without a new SDK surface or feature RGB values. The controller confirmed per-surface floors may
+  adjust authored low-contrast text where painted while resolved shared roles remain unchanged; explicit switch
+  semantic colors retain precedence. `./gradlew check :jasper-app:installDist` passed: 9,658 XML tests, zero failures/errors, six environment skips; 107 tasks, 22 executed/85 up-to-date.
+  The source inventory now records the added test scaffold. The initial full-gate attempt failed only on that
+  missing row; its app XML/log are retained. Detailed final-fix-report.md/evidence is beside the Task12 SDD report.
+  Independent scoped re-review and controller native captures remain required; Plan3/mock acceptance is outstanding.
+
 - **Plan2 Task12 implemented and verified; independent whole-branch review pending (2026-10-10).**
   Tasks1–11 are independently approved through `2fc3bea8`; older pending-review bullets below are historical.
   Task12 fixes plain Choice delegate loss on Swing updates and completes app-host plugin Settings stub/rejected-file/

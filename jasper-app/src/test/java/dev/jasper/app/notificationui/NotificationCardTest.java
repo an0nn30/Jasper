@@ -67,6 +67,35 @@ class NotificationCardTest {
             .map(AbstractButton.class::cast).toList();
     }
 
+    @Test void repeatCountKeepsItsCardFloorThroughShippedThemeChanges() {
+        var initial = ThemeTestSupport.pair(true);
+        try (var binding = new dev.jasper.ui.theme.ThemeBinding(initial, failure -> { throw new AssertionError(failure); });
+             var icons = new dev.jasper.ui.icons.IconRegistry()) {
+            var kit = new KitContext(binding, ThemeRoute.CHROME, DesignMetrics.DEFAULT, icons, () -> false);
+            var notification = posted(titled("Repeated"));
+            notification = posted(titled("Repeated"));
+            try (var card = card(kit, notification, false)) {
+                var count = Arrays.stream(card.getComponents()).filter(TextBlock.class::isInstance).map(TextBlock.class::cast)
+                    .filter(text -> text.text().equals("×2")).findFirst().orElseThrow();
+                for (String name : List.of("Clear Light", "Jasper Light", "Nord", "Clear Dark", "Jasper Dark")) {
+                    var theme = dev.jasper.ui.theme.ThemeGenerator.generate(ThemeTestSupport.named(name).source().document());
+                    var raw = theme.semantic().color(SemanticColor.TEXT_SECONDARY);
+                    binding.publish(new dev.jasper.ui.theme.ThemePair(theme, theme));
+                    assertThat(dev.jasper.ui.theme.ColorMath.contrast(count.getForeground(), theme.semantic().color(SemanticColor.SURFACE_CARD)))
+                        .as(name + " count/card").isGreaterThanOrEqualTo(4.5);
+                    assertThat(theme.semantic().color(SemanticColor.TEXT_SECONDARY)).isEqualTo(raw);
+                    count.setSize(count.getPreferredSize());
+                    var image = new BufferedImage(count.getWidth(), count.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                    var graphics = image.createGraphics(); try { count.paint(graphics); } finally { graphics.dispose(); }
+                    boolean painted = false;
+                    for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++)
+                        painted |= image.getRGB(x, y) == count.getForeground().getRGB();
+                    assertThat(painted).as(name + " actual count text").isTrue();
+                }
+            }
+        }
+    }
+
     @Test void titleContentAndCountArePlainWrappedText() {
         var card = card(posted(titled("<html><b>Disk</b> full").withContent("word ".repeat(300))), false);
         assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_WIDTH)).as("the former width, named").isEqualTo(360);

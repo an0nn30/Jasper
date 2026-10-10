@@ -36,9 +36,20 @@ final class ThemeDialogs implements AutoCloseable {
         var surface = windows.dialog(title, true, owner.get()); open.add(surface); var answered = new AtomicBoolean();
         Runnable accept = () -> { answered.set(true); surface.close(); };
         Runnable reject = surface::close;
-        var view = contents.apply(accept, reject);
-        surface.onClosed(() -> { open.remove(surface); view.close(); if (answered.compareAndSet(false, true)) cancel.run(); });
-        surface.setContent(view); surface.show();
+        KitView[] content = {null};
+        surface.onClosed(() -> {
+            open.remove(surface);
+            try { if (content[0] != null) content[0].close(); }
+            finally { if (answered.compareAndSet(false, true)) cancel.run(); }
+        });
+        try {
+            content[0] = contents.apply(accept, reject);
+            if (surface.closed()) { content[0].close(); return; }
+            surface.setContent(content[0]); surface.show();
+        } catch (RuntimeException | Error failure) {
+            try { surface.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+            throw failure;
+        }
     }
 
     /** Shows literal {@code text} with a Close button. */

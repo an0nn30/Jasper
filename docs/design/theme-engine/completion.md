@@ -1,5 +1,16 @@
 # Plan 2 consumer migration completion audit
 
+**Final-review fix wave (2026-10-10):** The whole-branch review found four Important defects and two Minor issues.
+The consolidated fixes retain NUMBER document/shape/normalization behavior, editable Choice pending editor state
+across real FlatLaf publication/tree refresh, readable fallback light/dark switches, and title-hint/card-count
+surface floors. Independent literal source-color assertions and exceptional dialog cleanup are corrected.
+Explicit switch roles retain precedence. Shared authored text roles stay raw; the existing consuming-surface policy
+may adjust low-contrast hint/count paint. `./gradlew check :jasper-app:installDist` passed: 9,658 XML tests, zero failures/errors, six environment skips; 107 tasks, 22 executed/85 up-to-date.
+The first full attempt failed only because the new paint-test scaffold needed its migration.csv row; the row is
+recorded and the failed XML/log preserved. This required rerun is documented in the final-fix report. Earlier Task12
+evidence below remains historical and unchanged. Scoped independent re-review and controller native rerun are pending;
+this audit does not claim final Plan3/native/mock acceptance.
+
 Task12 implementation, 2026-10-10. Tasks1–11 are independently approved through `2fc3bea8`.
 The controller owns the independent whole-branch review after this task; this document does not claim it passed.
 Plan3 owns native composition and visual acceptance. No GUI, native benchmark, AOT training, merge or push was

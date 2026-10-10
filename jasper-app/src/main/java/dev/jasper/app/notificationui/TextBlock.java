@@ -27,13 +27,20 @@ final class TextBlock extends JComponent {
     private Typography.Role role;
     private final SemanticColor color;
     private final int maxLines;
+    private final SemanticColor surface;
     private String text = "";
     private int wrapWidth = 1;
     private List<String> lines = List.of();
 
     /** {@code maxLines} 0 means no limit. */
     TextBlock(KitContext kit, Typography.Role role, SemanticColor color, int maxLines) {
+        this(kit, role, color, maxLines, null);
+    }
+
+    /** Optional consuming surface applies the central text floor without changing the shared color role. */
+    TextBlock(KitContext kit, Typography.Role role, SemanticColor color, int maxLines, SemanticColor surface) {
         this.kit = kit;
+        this.surface = surface;
         this.role = role;
         this.color = color;
         this.maxLines = maxLines;
@@ -74,7 +81,8 @@ final class TextBlock extends JComponent {
     /** Reads the role's font and colour again: the card calls this when the theme changes. */
     void restyle() {
         setFont(NotificationStyle.font(kit, role));
-        setForeground(NotificationStyle.color(kit, color));
+        setForeground(surface == null ? NotificationStyle.color(kit, color)
+            : dev.jasper.ui.theme.SurfaceContrast.on(kit.theme().semantic(), color, surface, dev.jasper.ui.theme.SurfaceContrast.TEXT));
         relayout();
     }
 
