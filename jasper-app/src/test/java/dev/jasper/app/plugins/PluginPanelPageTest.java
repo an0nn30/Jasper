@@ -92,6 +92,48 @@ class PluginPanelPageTest {
         onEdtValue(() -> size.get().set(9)).get(5,TimeUnit.SECONDS);
         onEdt(() -> assertThatThrownBy(view.get()::spec).isInstanceOf(IllegalStateException.class));
     }
+    @Test void integerHostRowStepsAcrossItsRangeAndKeepsSearchHighlightThroughDraftRefresh() throws Exception {
+        var view = new AtomicReference<HostedKitView>();
+        onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID, "Panel", "1.0.0", Set.of()), Set.of(), Set.of(), Set.of(),
+            getClass().getClassLoader(), () -> plugin -> {
+                var delay = plugin.settings().declare(SettingSpec.of("delay", SettingKind.integer(0, 5000), 300)
+                    .label("Step delay").description("Milliseconds between steps"));
+                plugin.settings().page((SettingsPanel.View) rows -> {
+                    var made = (HostedKitView) plugin.kit().create(new dev.jasper.sdk.ui.ViewSpec(rows.rowNode(delay)), event -> { });
+                    view.set(made);
+                    return made;
+                });
+            })));
+        var page = onEdtValue(() -> (PluginPanelPage) host.settingsPages(context).getFirst());
+        onEdt(() -> {
+            page.component();
+            var row = (dev.jasper.sdk.ui.Nodes.SettingRow) view.get().spec().root();
+            var field = (dev.jasper.sdk.ui.Nodes.Field) ((dev.jasper.sdk.ui.Nodes.Stack) row.control()).children().getFirst();
+            assertThat(field.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldKind.NUMBER);
+            assertThat(field.numeric()).contains(new dev.jasper.sdk.ui.Nodes.Numeric(0, 5000, 1, 0));
+            assertThat(field.value()).isEqualTo("300");
+            page.highlight("step delay");
+            var input = dev.jasper.app.testsupport.KitTestSupport.require(view.get().component(), "settings:delay.input", javax.swing.JTextField.class);
+            var binding = input.getInputMap(JComponent.WHEN_FOCUSED).get(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_UP, 0));
+            input.getActionMap().get(binding).actionPerformed(new java.awt.event.ActionEvent(input, 0, ""));
+            assertThat(input.getText()).isEqualTo("301");
+            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow) view.get().spec().root()).highlighted()).isTrue();
+            assertThat(dev.jasper.app.testsupport.KitTestSupport.require(view.get().component(), "settings:delay:row", JComponent.class)
+                .getAccessibleContext().getAccessibleDescription()).isEqualTo("Matches search");
+            input.setText("0"); assertThat(((dev.jasper.sdk.ui.Nodes.Field) ((dev.jasper.sdk.ui.Nodes.Stack)
+                ((dev.jasper.sdk.ui.Nodes.SettingRow) view.get().spec().root()).control()).children().getFirst()).value()).isEqualTo("0");
+            input.setText("5000");
+            input.setText("1234");
+            page.highlight("milliseconds");
+            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow) view.get().spec().root()).highlighted()).isTrue();
+            page.highlight("");
+            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow) view.get().spec().root()).highlighted()).isFalse();
+            assertThat(page.modified()).isTrue();
+        });
+        onEdtValue(page::apply).get(5, TimeUnit.SECONDS);
+        assertThat(org.tomlj.Toml.parse(Files.readString(host.environment.settingsFiles().file(ID))).getLong("delay")).isEqualTo(1234);
+        onEdt(page::dispose);
+    }
     @Test void kitPanelRowsKeepTheirSearchHighlightThroughTheHostsRowRewriting() throws Exception {
         var view=new AtomicReference<HostedKitView>();var size=new AtomicReference<Setting<Integer>>();var rows=new AtomicReference<SettingsPanelHost>();
         java.util.function.Function<SettingsPanelHost,dev.jasper.sdk.ui.ViewSpec> spec=h -> {

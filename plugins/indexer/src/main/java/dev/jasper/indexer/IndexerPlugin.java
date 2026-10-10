@@ -75,6 +75,7 @@ import javax.swing.Timer;
  * jobs and pending refreshes.
  */
 public final class IndexerPlugin implements Plugin {
+    private static final String REMOVE_ACCEPT = "indexer.remove.accept", REMOVE_CANCEL = "indexer.remove.cancel";
     /** The plugin id. */
     public static final String ID = "dev.jasper.indexer";
     /** Opens the palette on the Files scope. */
@@ -187,13 +188,13 @@ public final class IndexerPlugin implements Plugin {
             var view = context.kit().create(new ViewSpec(new Nodes.Form("indexer.remove.confirm", ControlState.READY,
                 Nodes.FormKind.SHEET, "Remove Project?", Optional.empty(), List.of(new Nodes.Text("indexer.remove.message",
                     ControlState.READY, question, Nodes.TextRole.BODY)), Optional.empty(), List.of(
-                    new Nodes.Button("indexer.remove.cancel", ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, "cancel", ""),
-                    new Nodes.Button("indexer.remove.accept", ControlState.READY, "Remove", "", Nodes.ButtonKind.PRIMARY, "remove", "")),
-                "indexer.remove.cancel")), event -> {
+                    new Nodes.Button(REMOVE_CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, REMOVE_CANCEL, ""),
+                    new Nodes.Button(REMOVE_ACCEPT, ControlState.READY, "Remove", "", Nodes.ButtonKind.PRIMARY, REMOVE_ACCEPT, "")),
+                REMOVE_CANCEL)), event -> {
                 if (closed.get() || !(event instanceof UiEvent.Action action)) return;
                 switch (action.id()) {
-                    case "indexer.remove.accept" -> { closed.set(true); dialog.close(); accepted.run(); }
-                    case "indexer.remove.cancel" -> { closed.set(true); dialog.close(); }
+                    case REMOVE_ACCEPT -> { closed.set(true); dialog.close(); accepted.run(); }
+                    case REMOVE_CANCEL -> { closed.set(true); dialog.close(); }
                     default -> { }
                 }
             });

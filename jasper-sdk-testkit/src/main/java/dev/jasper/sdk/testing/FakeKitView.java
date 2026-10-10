@@ -9,6 +9,7 @@ public final class FakeKitView implements UiView {
  private static final Map<javax.swing.JComponent,FakeKitView> CONTENT_OWNERS=new IdentityHashMap<>();
  final FakeKit owner;
  private ViewSpec spec;
+ private ViewSpec sourceSpec;
  private boolean updating;
  private Object mount;
  void unmount(Object target){if(mount==target)mount=null;}
@@ -31,7 +32,9 @@ public final class FakeKitView implements UiView {
  FakeKitView(FakeKit owner, ViewSpec spec, Consumer<UiEvent> events) {this.owner=owner;this.events=Objects.requireNonNull(events);update(spec);}
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
  @Override public ViewSpec spec(){guard();return spec;}
- @Override public void update(ViewSpec next){guard();Objects.requireNonNull(next);if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{next=hostSpec.apply(next);var nodes=index(next.root());
+ /** Host-only original plugin descriptor, before draft/search row projection. */
+ ViewSpec sourceSpec(){guard();return sourceSpec;}
+ @Override public void update(ViewSpec next){guard();Objects.requireNonNull(next);if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{var source=next;next=hostSpec.apply(next);var nodes=index(next.root());
   secrets.entrySet().removeIf(e -> {if(nodes.get(e.getKey()) instanceof Nodes.Secret nextSecret && index(spec.root()).get(e.getKey()) instanceof Nodes.Secret oldSecret && nextSecret.kind()==oldSecret.kind())return false;Arrays.fill(e.getValue(),(char)0);return true;});
   for(var content:List.copyOf(contents.values()))if(nodes.values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id()) && c.kind()==content.kind() && index(spec.root()).get(c.id()) instanceof Nodes.Custom previous && previous.contentId().equals(content.id()) && previous.kind()==content.kind())){dispose(content);}
   fieldText.keySet().removeIf(id -> !(nodes.get(id) instanceof Nodes.Field));
@@ -42,7 +45,7 @@ public final class FakeKitView implements UiView {
     fieldText.put(field.id(),field.value());fieldSelections.remove(field.id());
    }
   }
-  spec=next;if(focused!=null&&!nodes.containsKey(focused))focused=null;}finally{updating=false;}
+  sourceSpec=source;spec=next;if(focused!=null&&!nodes.containsKey(focused))focused=null;}finally{updating=false;}
  }
  private static Map<String,Nodes.Node> index(Nodes.Node root){var result=new HashMap<String,Nodes.Node>();walk(root,result);return result;}
  private static void walk(Nodes.Node node,Map<String,Nodes.Node> result){result.put(node.id(),node);for(var child:children(node))walk(child,result);}

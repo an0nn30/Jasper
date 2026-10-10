@@ -2,6 +2,7 @@ package dev.jasper.app.plugins;
 
 import dev.jasper.sdk.settings.*;
 import dev.jasper.sdk.ui.*;
+import dev.jasper.app.settingsui.SearchText;
 import java.util.*;
 import java.util.function.Function;
 
@@ -12,10 +13,12 @@ final class KitSettingRows {
     private final Function<Setting<?>, SettingSpec<?>> specs;
     private final Map<String, Setting<?>> controls = new LinkedHashMap<>();
     private final Map<String, String> errors = new HashMap<>(), edits = new HashMap<>();
+    private String query = "";
     KitSettingRows(SettingsPanelHost host, Function<Setting<?>, SettingSpec<?>> specs, java.util.function.Consumer<Setting<?>> unset) { this.host=host;this.specs=specs;this.unset=unset; }
     boolean valid(){return errors.isEmpty();}
     void staged(Setting<?> setting){String id="settings:"+setting.key();errors.remove(id);edits.remove(id);}
     void reset(){errors.clear();edits.clear();}
+    void highlight(String value){query=Objects.requireNonNull(value);}
     Nodes.Node row(Setting<?> setting){
         var spec=specs.apply(setting);String id="settings:"+setting.key();controls.put(id,setting);
         Object value=host.pending(setting);var state=new ControlState(true,true,false,errors.getOrDefault(id,""));
@@ -27,13 +30,15 @@ final class KitSettingRows {
             control=new Nodes.Choice(id,state,Nodes.ChoiceKind.DROPDOWN,options,selected,spec.label(),id);
         }else {
             String text=value instanceof List<?> list?String.join("\n",list.stream().map(Object::toString).toList()):value.toString();
-            var kind=spec.kind() instanceof SettingKind.StringList?Nodes.FieldKind.TEXTAREA:spec.editor().orElse(null) instanceof EditorHint.File?Nodes.FieldKind.PATH:Nodes.FieldKind.TEXT;
-            control=new Nodes.Field(id,state,kind,edits.getOrDefault(id,text),"",spec.label(),"");
+            var kind=spec.kind() instanceof SettingKind.IntegerRange?Nodes.FieldKind.NUMBER:spec.kind() instanceof SettingKind.StringList?Nodes.FieldKind.TEXTAREA:spec.editor().orElse(null) instanceof EditorHint.File?Nodes.FieldKind.PATH:Nodes.FieldKind.TEXT;
+            var numeric=spec.kind() instanceof SettingKind.IntegerRange range?Optional.of(new Nodes.Numeric(range.min(),range.max(),1,0)):Optional.<Nodes.Numeric>empty();
+            control=new Nodes.Field(id,state,kind,edits.getOrDefault(id,text),"",spec.label(),"",numeric);
         }
         var reset=new Nodes.Button(id+":reset",ControlState.READY,"Reset","",Nodes.ButtonKind.GHOST,id+":reset","Reset to default");
         return new Nodes.SettingRow(id+":row",state,spec.label(),spec.description(),
             new Nodes.Stack(id+":controls",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(control,reset)),false);
     }
+    private static boolean matches(SettingSpec<?> spec,String query){return SearchText.matches(String.join(" ",spec.label(),spec.description(),String.join(" ",spec.keywords())),query);}
     @SuppressWarnings({"unchecked","rawtypes"})
     boolean event(UiEvent event){
         boolean reset=event instanceof UiEvent.Action && event.id().endsWith(":reset");
@@ -65,7 +70,7 @@ final class KitSettingRows {
         // A host row is rebuilt from the draft, keeping the presentation the plugin asked for (its search highlight).
         for(var entry:controls.entrySet())if(n.id().equals(entry.getKey()+":row")){
             var fresh=(Nodes.SettingRow)row(entry.getValue());
-            boolean highlighted=n instanceof Nodes.SettingRow asked && asked.highlighted();
+            boolean highlighted=matches(specs.apply(entry.getValue()),query) || n instanceof Nodes.SettingRow asked && asked.highlighted();
             return new Nodes.SettingRow(fresh.id(),fresh.state(),fresh.title(),fresh.description(),fresh.control(),fresh.dependent(),highlighted);
         }
         return switch(n){

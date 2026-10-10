@@ -403,9 +403,25 @@ public final class Nodes {
      * Enter can differ; blank keeps Enter as {@code activateAction}. A present {@code deleteAction} is what Delete and
      * Backspace on the focused row report (an unselected row is selected first); blank leaves those keys to the host.
      * A plain left single click on a row also reports {@link UiEvent.Clicked} after its selection. RESULTS lists take
-     * neither action.
+     * neither action. {@code detailsAction}, {@code copyAction} and {@code cancelAction} bind D, platform Copy and
+     * Escape only while the row canvas has focus; blank actions pass the key to an enclosing control.
+     *
+     * @param id stable list id
+     * @param state visibility and interaction state
+     * @param kind row presentation
+     * @param items ordered rows
+     * @param selectedIds selected row ids
+     * @param activateAction action for ordinary activation
+     * @param contextActions default row menu
+     * @param selectionMode selection behavior
+     * @param addAction optional footer button
+     * @param visibleRows requested viewport row count
+     * @param enterAction focused-row Enter action
+     * @param deleteAction focused-row Delete action
+     * @param detailsAction focused-row D action
+     * @param copyAction focused-row platform Copy action
+     * @param cancelAction focused-row Escape action
      */
-    /** List rows may bind D, platform Copy and Escape while their row canvas alone is focused; blank actions pass through. */
     public record ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows, String enterAction, String deleteAction, String detailsAction, String copyAction, String cancelAction) implements Node {
         public ItemList {
             ModelChecks.id(id); Objects.requireNonNull(state);

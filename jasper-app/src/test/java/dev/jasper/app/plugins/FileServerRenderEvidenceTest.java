@@ -15,11 +15,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZoneOffset;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.*;
 import javax.swing.SwingUtilities;
+import javax.swing.JScrollPane;
 import javax.swing.text.JTextComponent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -106,8 +108,21 @@ class FileServerRenderEvidenceTest {
                     assertThat(row).as("a mounted File Server row").isNotNull();
                     StagedRemoteTunnelsTest.click(row, 1);
                     var canvas = StagedRemoteTunnelsTest.canvas(row);
+                    assertThat(StagedVaultHost.named(panel, "fileserver.details").isVisible()).as("a single click selects only").isFalse();
+                    StagedRemoteTunnelsTest.click(row, 2);
+                    assertThat(StagedVaultHost.named(panel, "fileserver.details").isVisible()).as("a double click opens details").isTrue();
+                    press(canvas, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED);
+                    assertThat(StagedVaultHost.named(panel, "fileserver.details").isVisible()).isFalse();
                     press(canvas, KeyEvent.VK_D, 'd');
                     assertThat(StagedVaultHost.named(panel, "fileserver.details").isVisible()).isTrue();
+                    seedActivity(plugin, window.id());
+                    ThemeMigrationCapture.save("fileserver-hosted", theme, "activity", panel, 540, 650);
+                    var history = (JScrollPane) StagedVaultHost.named(panel, "fileserver.activity.log");
+                    assertThat(history.getViewport().getViewSize().height).isGreaterThan(history.getViewport().getExtentSize().height);
+                    assertThat(history.getViewport().getViewPosition().y).as("newest activity stays visible").isGreaterThan(0);
+                    assertThat(labels(history)).anyMatch(label -> label.contains("event 11"));
+                    history.getVerticalScrollBar().setValue(0);
+                    assertThat(labels(history)).anyMatch(label -> label.contains("event 0"));
                     press(canvas, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED);
                     assertThat(StagedVaultHost.named(panel, "fileserver.details").isVisible()).isFalse();
                 });
@@ -119,6 +134,27 @@ class FileServerRenderEvidenceTest {
                 DesktopTestSupport.closeOwners();
             }
         } finally { onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); }); }
+    }
+
+    /** Fixture-only seed: drive the mounted panel's existing bounded activity source without opening a listener. */
+    @SuppressWarnings("unchecked")
+    private static void seedActivity(Plugin plugin, UUID windowId) {
+        try {
+            var registryField = plugin.getClass().getDeclaredField("registry"); registryField.setAccessible(true);
+            var registry = registryField.get(plugin);
+            var slotsField = registry.getClass().getDeclaredField("slots"); slotsField.setAccessible(true);
+            var slot = ((Map<UUID, ?>) slotsField.get(registry)).values().iterator().next();
+            var logField = slot.getClass().getDeclaredField("log"); logField.setAccessible(true);
+            var log = logField.get(slot);
+            var entriesField = log.getClass().getDeclaredField("entries"); entriesField.setAccessible(true);
+            var entries = (ArrayDeque<Object>) entriesField.get(log);
+            var entryType = plugin.getClass().getClassLoader().loadClass("dev.jasper.fileserver.runtime.ActivityLog$Entry");
+            var constructor = entryType.getConstructor(Instant.class, String.class);
+            for (int index = 0; index < 12; index++) entries.add(constructor.newInstance(Instant.parse("2026-10-10T10:00:00Z").plusSeconds(index), "event " + index));
+            var panelsField = plugin.getClass().getDeclaredField("panels"); panelsField.setAccessible(true);
+            var owner = ((Map<UUID, ?>) panelsField.get(plugin)).get(windowId);
+            owner.getClass().getMethod("refreshActivity").invoke(owner);
+        } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 
     private static java.awt.Component firstRow(Container root) {

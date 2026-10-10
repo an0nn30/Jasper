@@ -19,9 +19,11 @@ class ConfirmPanelTest {
             var view = (FakeKitView) panel.view();
             assertThat(view.spec().root()).isInstanceOf(Nodes.Form.class);
             assertThat(((Nodes.Text) UiTestAccess.node(view, "fileserver.confirm.message")).text()).isEqualTo("2 file servers are running and will stop.");
-            view.emit(new UiEvent.Action("fileserver.confirm.cancel"));
-            view.emit(new UiEvent.Action("fileserver.confirm.accept"));
-            assertThat(answers).containsExactly("cancel", "quit");
+            var form = (Nodes.Form) view.spec().root();
+            view.emit(new UiEvent.Action(form.actions().getFirst().action()));
+            view.emit(new UiEvent.Action(form.actions().getLast().action()));
+            view.emit(new UiEvent.Action(form.cancelAction()));
+            assertThat(answers).containsExactly("cancel", "quit", "cancel");
             panel.close();
             assertThat(kit.views()).isEmpty();
         });

@@ -28,7 +28,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import javax.swing.Icon;
 
 /** The per-window File Servers rail panel. Rows show confirmed state; the borrowed header owns count and New. */
@@ -54,6 +53,7 @@ public final class FileServersPanel implements AutoCloseable {
     private List<ServerRegistry.View> servers = List.of();
     private Optional<String> problem = Optional.empty(), tlsFingerprint = Optional.empty(), hostKeyFingerprint = Optional.empty();
     private String activity = "";
+    private List<String> activityLines = List.of();
     private UUID selected;
     private boolean detailsOpen, closed;
 
@@ -97,9 +97,10 @@ public final class FileServersPanel implements AutoCloseable {
     /** Re-reads the selected server's bounded activity log. */
     public void refreshActivity() {
         if (closed) return;
-        String next = selectedView().map(server -> log.apply(server.definition().id()).stream()
-            .map(entry -> TIME.format(entry.at().atZone(zone)) + " " + entry.text()).collect(Collectors.joining("\n"))).orElse("");
-        if (!next.equals(activity)) { activity = next; render(); }
+        List<String> nextLines = selectedView().map(server -> log.apply(server.definition().id()).stream()
+            .map(entry -> TIME.format(entry.at().atZone(zone)) + " " + entry.text()).toList()).orElse(List.of());
+        String next = String.join("\n", nextLines);
+        if (!next.equals(activity)) { activity = next; activityLines = nextLines; render(); revealLatestActivity(); }
     }
 
     public Optional<UUID> selected() { return Optional.ofNullable(selected); }
@@ -129,7 +130,7 @@ public final class FileServersPanel implements AutoCloseable {
     private void action(String id) {
         switch (id) {
             case "fileserver.empty.new" -> actions.edit().accept(Optional.empty());
-            case ACTIVATE, KEY_DETAILS -> { if (selectedView().isPresent()) { detailsOpen = id.equals(ACTIVATE) || !detailsOpen; render(); } }
+            case ACTIVATE, KEY_DETAILS -> { if (selectedView().isPresent()) { detailsOpen = id.equals(ACTIVATE) || !detailsOpen; render(); revealLatestActivity(); } }
             case KEY_CANCEL -> { detailsOpen = false; render(); }
             case ENTER_TOGGLE -> selectedView().filter(server -> server.state().phase() != Phase.STOPPING)
                 .ifPresent(server -> actions.toggle().accept(server.definition().id()));
@@ -176,7 +177,7 @@ public final class FileServersPanel implements AutoCloseable {
                 case "copy" -> copyAddress(server);
                 case "password" -> actions.copyPassword().accept(id);
                 case "fingerprints" -> actions.fingerprints().accept(id);
-                case "details" -> { selected = id; detailsOpen = !detailsOpen; refreshActivity(); render(); }
+                case "details" -> { selected = id; detailsOpen = !detailsOpen; refreshActivity(); render(); revealLatestActivity(); }
                 default -> { }
             }
         });
@@ -192,6 +193,9 @@ public final class FileServersPanel implements AutoCloseable {
     private static String rowId(UUID id) { return "server:" + id; }
 
     private void render() { if (!closed) view.update(new ViewSpec(node())); }
+    private void revealLatestActivity() {
+        if (!closed && detailsOpen && !activityLines.isEmpty()) view.reveal("fileserver.activity.text." + (activityLines.size() - 1));
+    }
     private static ControlState state(boolean visible, boolean enabled) { return new ControlState(visible, enabled, false, ""); }
     private static Nodes.Text text(String id, String value, Nodes.TextRole role) { return new Nodes.Text(id, ControlState.READY, value, role); }
 
@@ -322,7 +326,12 @@ public final class FileServersPanel implements AutoCloseable {
             new Nodes.Button("fileserver.details.edit", ControlState.READY, server.temporary() ? "Save as a Server…" : "Edit…", "edit",
                 Nodes.ButtonKind.SECONDARY, "fileserver.details.edit", ""))));
         details.add(text("fileserver.activity.title", "Activity", Nodes.TextRole.SECTION_LABEL));
-        details.add(text("fileserver.activity.log", activity, Nodes.TextRole.MONO_SMALL));
+        var activityRows = new ArrayList<ListItem>();
+        for (int i = 0; i < activityLines.size(); i++) activityRows.add(new ListItem("fileserver.activity.line." + i,
+            Optional.empty(), List.of(text("fileserver.activity.text." + i, activityLines.get(i), Nodes.TextRole.MONO_SMALL)),
+            List.of(), List.of()));
+        details.add(new Nodes.ItemList("fileserver.activity.log", ControlState.READY, Nodes.ListKind.COMPACT,
+            activityRows, Set.of(), "", List.of(), Nodes.SelectionMode.NONE, Optional.empty(), OptionalInt.of(8), "", ""));
         details.add(new Nodes.Stack("fileserver.activity.actions", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
             new Nodes.Button("fileserver.activity.clear", ControlState.READY, "Clear", "remove", Nodes.ButtonKind.GHOST, "fileserver.activity.clear", ""),
             new Nodes.Button("fileserver.activity.copy", ControlState.READY, "Copy", "copy", Nodes.ButtonKind.GHOST, "fileserver.activity.copy", ""))));

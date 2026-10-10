@@ -351,6 +351,15 @@ public final class FakePluginHost implements AutoCloseable {
         return host == null || host.closed ? java.util.Optional.empty() : java.util.Optional.ofNullable(host.view);
     }
 
+    /** Mirrors Settings search on an open plugin page, including its host-owned descriptor rows. */
+    public void highlightSettingsPanel(String pluginId, String query) {
+        var rows = panelHosts.get(pluginId);
+        var context = contexts.get(pluginId);
+        if (rows == null || rows.closed || context == null) throw new IllegalStateException("Settings page unavailable");
+        context.settings.panel().orElseThrow().highlight(query);
+        rows.highlight(query);
+    }
+
     /** Applies the open settings draft; invalid rows reject Apply. */
     public void applySettingsPanel(String pluginId) {
         var rows=panelHosts.get(pluginId);var context=contexts.get(pluginId);
@@ -860,6 +869,17 @@ public final class FakePluginHost implements AutoCloseable {
             if (built != null) return built;
         }
         return null;
+    }
+
+    /** The mounted owned view of an opened panel, when its content is a kit view. */
+    public java.util.Optional<FakeKitView> panelView(String panelId, UUID windowId) {
+        for (var context : contexts.values()) for (var panel : context.ui.panels) {
+            if (!panel.spec.id().equals(panelId)) continue;
+            var instance = panel.instances.get(windowId);
+            if (instance == null || instance.done) return java.util.Optional.empty();
+            return context.kit().views().stream().filter(view -> view.component == instance.content).findFirst();
+        }
+        return java.util.Optional.empty();
     }
 
     /**

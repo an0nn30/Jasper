@@ -7,6 +7,8 @@ import dev.jasper.ui.testsupport.KitFixtures;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.InputEvent;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
 import javax.swing.text.JTextComponent;
 import java.util.*;
 import javax.swing.*;
@@ -81,7 +83,39 @@ class ItemListShortcutsTest {
                 SwingUtilities.processKeyBindings(new KeyEvent(input, KeyEvent.KEY_PRESSED, System.currentTimeMillis(), modifier, KeyEvent.VK_C, 'c'));
                 SwingUtilities.processKeyBindings(new KeyEvent(input, KeyEvent.KEY_PRESSED, System.currentTimeMillis(), 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED));
                 assertThat(events).noneMatch(event -> event instanceof UiEvent.Action);
-                assertThat(input.getText()).isEqualTo("draft");
+                input.setCaretPosition(input.getDocument().getLength());
+                assertThat(SwingUtilities.processKeyBindings(new KeyEvent(input, KeyEvent.KEY_TYPED,
+                    System.currentTimeMillis(), 0, KeyEvent.VK_UNDEFINED, 'd'))).isTrue();
+                assertThat(input.getText()).isEqualTo("draftd");
+                input.select(0, 5);
+                var clipboard = new Clipboard("field-copy");
+                input.getTransferHandler().exportToClipboard(input, clipboard, TransferHandler.COPY);
+                try { assertThat(clipboard.getContents(null).getTransferData(DataFlavor.stringFlavor)).isEqualTo("draft"); }
+                catch (Exception failure) { throw new AssertionError(failure); }
+            } finally { KitViewTest.release(context); }
+        });
+    }
+
+    @Test void inactiveRowEscapeFallsThroughToEnclosingStack() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try {
+                for (var spec : List.of(
+                    list(ControlState.READY, SelectionMode.SINGLE, "", "", ""),
+                    list(new ControlState(false, true, false, ""), SelectionMode.SINGLE, "details", "copy", "cancel"),
+                    list(new ControlState(true, false, false, ""), SelectionMode.SINGLE, "details", "copy", "cancel"),
+                    list(new ControlState(true, true, true, ""), SelectionMode.SINGLE, "details", "copy", "cancel"),
+                    list(ControlState.READY, SelectionMode.NONE, "details", "copy", "cancel"))) {
+                    var events = new ArrayList<UiEvent>();
+                    var root = new Nodes.Stack("outer", ControlState.READY, LayoutRole.VERTICAL, List.of(spec), "outer.cancel");
+                    try (var view = new KitView(context, new ViewSpec(root), events::add)) {
+                        var control = (ItemLists.ListControl) view.control("servers");
+                        control.focusItem = "one";
+                        assertThat(SwingUtilities.processKeyBindings(new KeyEvent(control.canvas, KeyEvent.KEY_PRESSED,
+                            System.currentTimeMillis(), 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED))).isTrue();
+                        assertThat(events).containsExactly(new UiEvent.Action("outer.cancel"));
+                    }
+                }
             } finally { KitViewTest.release(context); }
         });
     }

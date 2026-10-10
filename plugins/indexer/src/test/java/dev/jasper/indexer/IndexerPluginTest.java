@@ -95,17 +95,18 @@ class IndexerPluginTest {
                 assertThat(form.cancelAction()).isEqualTo("indexer.remove.cancel");
                 assertThat(form.actions()).anyMatch(button -> button.id().equals("indexer.remove.accept")
                     && button.kind() == dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY);
-                view.emit(new dev.jasper.sdk.ui.UiEvent.Action("indexer.remove.cancel"));
+                view.emit(new dev.jasper.sdk.ui.UiEvent.Action(form.actions().getFirst().action()));
                 assertThat(accepted).hasValue(0);
-                assertThatThrownBy(() -> view.emit(new dev.jasper.sdk.ui.UiEvent.Action("indexer.remove.accept")))
+                assertThatThrownBy(() -> view.emit(new dev.jasper.sdk.ui.UiEvent.Action(form.actions().getLast().action())))
                     .isInstanceOf(IllegalStateException.class);
                 assertThat(accepted).hasValue(0);
             });
             javax.swing.SwingUtilities.invokeAndWait(() -> {
                 try { method.invoke(candidate, "Remove fixture project?", (Runnable) accepted::incrementAndGet); }
                 catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
-                host.windowView(IndexerPlugin.ID, "Remove Project?").orElseThrow()
-                    .emit(new dev.jasper.sdk.ui.UiEvent.Action("indexer.remove.accept"));
+                var pending = host.windowView(IndexerPlugin.ID, "Remove Project?").orElseThrow();
+                var form = (dev.jasper.sdk.ui.Nodes.Form) pending.spec().root();
+                pending.emit(new dev.jasper.sdk.ui.UiEvent.Action(form.actions().getLast().action()));
                 assertThat(accepted).hasValue(1);
             });
         }

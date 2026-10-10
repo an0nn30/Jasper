@@ -68,10 +68,51 @@ class SamplePluginTest {
             assertThat(view.spec().root()).isInstanceOf(dev.jasper.sdk.ui.Nodes.Form.class);
             assertThat(find(page, javax.swing.JSlider.class)).isNull();
             assertThat(((dev.jasper.sdk.ui.Nodes.Form) view.spec().root()).sections()).hasSize(6);
+            var stepRow = (dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Form) view.spec().root()).sections().getLast();
+            var step = (dev.jasper.sdk.ui.Nodes.Field) ((dev.jasper.sdk.ui.Nodes.Stack) stepRow.control()).children().getFirst();
+            assertThat(step.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldKind.NUMBER);
+            assertThat(step.value()).isEqualTo("300");
+            assertThat(step.numeric()).contains(new dev.jasper.sdk.ui.Nodes.Numeric(0, 5000, 1, 0));
+            host.highlightSettingsPanel("dev.jasper.sample", "step delay");
+            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Form) view.spec().root()).sections().getLast()).highlighted()).isTrue();
             view.emit(new dev.jasper.sdk.ui.UiEvent.Edited("settings:demo_step_millis", "1200"));
             assertThat(host.pendingSettings("dev.jasper.sample")).containsEntry("demo_step_millis", 1200);
+            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Form) view.spec().root()).sections().getLast()).highlighted()).isTrue();
+            host.highlightSettingsPanel("dev.jasper.sample", "milliseconds");
+            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Form) view.spec().root()).sections().getLast()).highlighted()).isTrue();
+            host.highlightSettingsPanel("dev.jasper.sample", "");
+            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Form) view.spec().root()).sections().getLast()).highlighted()).isFalse();
             assertThat(host.settingsPanelChanges("dev.jasper.sample")).isPositive();
         } });
+    }
+
+    @Test void mountedPanelAndWindowButtonsDispatchTheirDeclaredActions() throws Exception {
+        try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            host.setSetting("dev.jasper.sample", "demo_ui", true);
+            host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
+            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            javax.swing.SwingUtilities.invokeAndWait(() -> {
+                host.openPanel("dev.jasper.sample.panel", window);
+                var panel = host.panelView("dev.jasper.sample.panel", window).orElseThrow();
+                var body = (dev.jasper.sdk.ui.Nodes.Stack) ((dev.jasper.sdk.ui.Nodes.Panel) panel.spec().root()).body();
+                var run = (dev.jasper.sdk.ui.Nodes.Button) body.children().getLast();
+                panel.emit(new dev.jasper.sdk.ui.UiEvent.Action(run.action()));
+                assertThat(host.invoke("dev.jasper.sample.about", window, null)).isTrue();
+                var about = host.windowView("dev.jasper.sample", "About Sample").orElseThrow();
+                var details = (dev.jasper.sdk.ui.Nodes.Button) ((dev.jasper.sdk.ui.Nodes.Stack) about.spec().root()).children().getLast();
+                about.emit(new dev.jasper.sdk.ui.UiEvent.Action(details.action()));
+                var dialog = host.windowView("dev.jasper.sample", "Sample details").orElseThrow();
+                var sheet = (dev.jasper.sdk.ui.Nodes.Form) dialog.spec().root();
+                dialog.emit(new dev.jasper.sdk.ui.UiEvent.Action(sheet.cancelAction()));
+                assertThat(host.windowView("dev.jasper.sample", "Sample details")).isEmpty();
+            });
+            assertThat(host.runBackground()).isEqualTo(1);
+            host.flush();
+            assertThat(host.activityLog()).anyMatch(event -> event.state() == ActivityEvent.State.STARTED);
+            assertThat(host.failures()).isEmpty();
+        }
     }
 
     private static <T> T find(java.awt.Container root, Class<T> type) {

@@ -18,6 +18,7 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
     private final Map<String, Row> rows = new LinkedHashMap<>();
     private final Subscription reloads;
     int changes;
+    private String query = "";
     boolean closed, applied;
     FakeKitView view;
     JComponent component;
@@ -81,7 +82,8 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
         refresh();
     }
 
-    private void refresh() { if (!closed && view != null) view.update(view.spec()); }
+    private void refresh() { if (!closed && view != null) view.update(view.sourceSpec()); }
+    void highlight(String value) { guard(); query = java.util.Objects.requireNonNull(value); refresh(); }
     boolean valid() { return rows.values().stream().allMatch(row -> row.error.isEmpty()); }
 
     /** The fake receives typed intent directly and uses FakeSetting's own conversion/validation. */
@@ -118,7 +120,8 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
                 if (owned.isPresent()) {
                     // Rebuilt from the draft, keeping the presentation the plugin asked for (its search highlight).
                     var fresh = (Nodes.SettingRow) rowNode(owned.get().setting);
-                    return new Nodes.SettingRow(fresh.id(), fresh.state(), fresh.title(), fresh.description(), fresh.control(), fresh.dependent(), row.highlighted());
+                    return new Nodes.SettingRow(fresh.id(), fresh.state(), fresh.title(), fresh.description(), fresh.control(), fresh.dependent(),
+                        row.highlighted() || KitSettingRows.matches(owned.get().setting.spec(), query));
                 }
             }
             return node;

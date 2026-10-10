@@ -54,6 +54,7 @@ public final class SamplePlugin implements Plugin {
     private static final String GREETINGS = "dev.jasper.sample.greetings";
     private static final String GREETINGS_OPEN = "dev.jasper.sample.greetings.open";
     private static final String FLASK = "plugin";
+    private static final String RUN_BUTTON = "sample.run", DETAILS_BUTTON = "sample.about.details", CLOSE_BUTTON = "sample.close";
 
     /** Created by the runtime. */
     public SamplePlugin() { }
@@ -113,9 +114,9 @@ public final class SamplePlugin implements Plugin {
                 new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
                 Optional.empty(), new Nodes.Stack("sample.body", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
                     new Nodes.Text("sample.description", ControlState.READY, "Runs a short demo activity in the background.", Nodes.TextRole.DESCRIPTION),
-                    new Nodes.Button("sample.run", ControlState.READY, "Run sample activity", FLASK, Nodes.ButtonKind.PRIMARY, "run", ""))),
+                    new Nodes.Button(RUN_BUTTON, ControlState.READY, "Run sample activity", FLASK, Nodes.ButtonKind.PRIMARY, RUN_BUTTON, ""))),
                 Optional.empty())), event -> {
-                    if (event instanceof UiEvent.Action action && action.id().equals("sample.run"))
+                    if (event instanceof UiEvent.Action action && action.id().equals(RUN_BUTTON))
                         context.background().execute(() -> demo(context, stepMillis));
                 }));
 
@@ -127,15 +128,15 @@ public final class SamplePlugin implements Plugin {
                 Nodes.LayoutRole.VERTICAL, List.of(
                     new Nodes.Text("sample.about.text", ControlState.READY,
                         "This window's chrome belongs to Jasper; its content to the plugin.", Nodes.TextRole.BODY),
-                    new Nodes.Button("sample.about.details", ControlState.READY, "Details…", "", Nodes.ButtonKind.SECONDARY, "details", "")))), event -> {
-                if (!(event instanceof UiEvent.Action action) || !action.id().equals("sample.about.details")) return;
+                    new Nodes.Button(DETAILS_BUTTON, ControlState.READY, "Details…", "", Nodes.ButtonKind.SECONDARY, DETAILS_BUTTON, "")))), event -> {
+                if (!(event instanceof UiEvent.Action action) || !action.id().equals(DETAILS_BUTTON)) return;
                 PluginDialog dialog = context.windows().dialog(new DialogSpec("Sample details", window, true));
                 var body = context.kit().create(new ViewSpec(new Nodes.Form("sample.details", ControlState.READY,
                     Nodes.FormKind.SHEET, "Sample details", Optional.empty(), List.of(
                         new Nodes.Text("sample.version", ControlState.READY, "Sample plugin " + context.plugin().version(), Nodes.TextRole.BODY)),
-                    Optional.empty(), List.of(new Nodes.Button("sample.close", ControlState.READY, "Close", "", Nodes.ButtonKind.SECONDARY, "close", "")),
-                    "close")), answer -> {
-                    if (answer instanceof UiEvent.Action chosen && chosen.id().equals("sample.close")) dialog.close();
+                    Optional.empty(), List.of(new Nodes.Button(CLOSE_BUTTON, ControlState.READY, "Close", "", Nodes.ButtonKind.SECONDARY, CLOSE_BUTTON, "")),
+                    CLOSE_BUTTON)), answer -> {
+                    if (answer instanceof UiEvent.Action chosen && chosen.id().equals(CLOSE_BUTTON)) dialog.close();
                 });
                 dialog.setContent(body);
                 dialog.show();

@@ -55,18 +55,25 @@ class IndexerSettingsPanelTest {
                 host.settingsPanel(IndexerTesting.INFO.id()).orElseThrow();
                 FakeKitView view = host.settingsPanelView(IndexerTesting.INFO.id()).orElseThrow();
                 assertThat(view.spec().root()).isInstanceOf(Nodes.Form.class);
+                host.highlightSettingsPanel(IndexerTesting.INFO.id(), "excluded folders");
+                assertThat(((Nodes.SettingRow) ((Nodes.Form) view.spec().root()).sections().get(3)).highlighted()).isTrue();
+                view.emit(new UiEvent.Edited("settings:excludes", ".git\nnew-hidden"));
+                projects.indexing(APP, false);
+                assertThat(((Nodes.SettingRow) ((Nodes.Form) view.spec().root()).sections().get(3)).highlighted()).isTrue();
+                host.highlightSettingsPanel(IndexerTesting.INFO.id(), "");
+                assertThat(((Nodes.SettingRow) ((Nodes.Form) view.spec().root()).sections().get(3)).highlighted()).isFalse();
                 assertThat(row(view, 0).cells()).containsEntry("name", "app").containsEntry("location", "at /w/app")
                     .containsEntry("files", "2").containsEntry("state", "Fresh");
                 assertThat(action(view, "indexer.reindex").state().enabled()).isFalse();
-                view.emit(new UiEvent.Action("indexer.add"));
+                view.emit(new UiEvent.Action(action(view, "indexer.add").action()));
                 assertThat(adds).hasValue(1);
                 view.emit(new UiEvent.Selected("indexer.projects", Set.of(APP.id())));
-                view.emit(new UiEvent.Action("indexer.reindex"));
+                view.emit(new UiEvent.Action(action(view, "indexer.reindex").action()));
                 assertThat(listed).singleElement().satisfies(job -> assertThat(job.foreground()).isTrue());
                 assertThat(row(view, 0).cells()).containsEntry("state", "Indexing…");
                 assertThat(action(view, "indexer.remove").state().enabled()).as("model change clears selection").isFalse();
                 view.emit(new UiEvent.Selected("indexer.projects", Set.of(APP.id())));
-                view.emit(new UiEvent.Action("indexer.remove"));
+                view.emit(new UiEvent.Action(action(view, "indexer.remove").action()));
                 assertThat(questions).containsExactly("Remove app from Project Index? Its saved index is deleted.");
                 assertThat(projects.entries()).hasSize(1);
                 view.emit(new UiEvent.Selected("indexer.projects", Set.of()));
@@ -74,7 +81,7 @@ class IndexerSettingsPanelTest {
                 assertThat(projects.entries()).as("late confirmation cannot remove after selection changed").hasSize(1);
                 view.emit(new UiEvent.Selected("indexer.projects", Set.of(APP.id())));
                 allow.set(true);
-                view.emit(new UiEvent.Action("indexer.remove"));
+                view.emit(new UiEvent.Action(action(view, "indexer.remove").action()));
                 assertThat(projects.entries()).isEmpty();
                 assertThat(table(view).rows()).isEmpty();
                 assertThat(host.failures()).isEmpty();
@@ -102,6 +109,42 @@ class IndexerSettingsPanelTest {
                 FakeKitView view = fake.settingsPanelView(IndexerTesting.INFO.id()).orElseThrow();
                 assertThat(row(view, 0).cells()).containsEntry("location", "build-01: /srv/app").containsEntry("state", "Stale");
                 assertThat(row(view, 1).cells()).containsEntry("state", "Unavailable");
+            }
+        });
+    }
+
+    @Test void oldConfirmationsCannotCrossPageGenerationOrProjectReplacement() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var projects = new Projects();
+            var registration = new Project(APP, "app", false);
+            projects.add(registration);
+            var notifications = new FakeNotifications();
+            var indexer = new Indexer(projects, new IndexStore(data.resolve("lifetime-store")),
+                job -> new CompletableFuture<Listing>(), new ManualExecutor(), new ManualExecutor(), Instant::now,
+                text -> { }, notifications.group("r"), notifications.group("f"), System.getLogger("test"));
+            var answers = new ArrayList<Runnable>();
+            try (var host = new FakePluginHost(data)) {
+                host.start(IndexerTesting.INFO, Set.of(), Set.of(), context -> context.settings().page(new IndexerSettingsPanel(
+                    context.kit(), new IndexerSettings(context.settings()), projects, indexer, key -> key.root(),
+                    key -> true, key -> true, () -> { }, (question, accepted) -> answers.add(accepted))));
+                host.settingsPanel(IndexerTesting.INFO.id()).orElseThrow();
+                var first = host.settingsPanelView(IndexerTesting.INFO.id()).orElseThrow();
+                first.emit(new UiEvent.Selected("indexer.projects", Set.of(APP.id())));
+                first.emit(new UiEvent.Action(action(first, "indexer.remove").action()));
+                host.closeSettingsPanel(IndexerTesting.INFO.id());
+                host.settingsPanel(IndexerTesting.INFO.id()).orElseThrow();
+                var second = host.settingsPanelView(IndexerTesting.INFO.id()).orElseThrow();
+                second.emit(new UiEvent.Selected("indexer.projects", Set.of(APP.id())));
+                answers.getFirst().run();
+                assertThat(projects.get(APP)).isPresent();
+                second.emit(new UiEvent.Action(action(second, "indexer.remove").action()));
+                projects.remove(APP);
+                projects.add(new Project(APP, "app", false));
+                second.emit(new UiEvent.Selected("indexer.projects", Set.of(APP.id())));
+                answers.getLast().run();
+                answers.getLast().run();
+                assertThat(projects.get(APP).orElseThrow().project()).isNotSameAs(registration);
+                assertThat(host.failures()).isEmpty();
             }
         });
     }

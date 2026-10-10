@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.BiConsumer;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 
 /** Indexed projects with immediate project actions and host-owned draft rows for declared settings. UI thread. */
@@ -45,6 +46,7 @@ public final class IndexerSettingsPanel implements SettingsPanel.View {
     private UiView view;
     private SettingsPanelHost host;
     private String selected;
+    private long pageGeneration;
 
     /** Project actions take effect immediately; declared settings still commit only on Apply. */
     public IndexerSettingsPanel(UiKit kit, IndexerSettings settings, Projects projects, Indexer indexer,
@@ -55,6 +57,7 @@ public final class IndexerSettingsPanel implements SettingsPanel.View {
     }
 
     @Override public UiView createView(SettingsPanelHost host) {
+        pageGeneration++;
         this.host = host;
         selected = null;
         view = kit.create(new ViewSpec(node()), this::event);
@@ -65,6 +68,7 @@ public final class IndexerSettingsPanel implements SettingsPanel.View {
     @Override public List<String> keywords() { return List.of("project", "index", "files", "reindex", "remove", "add folder"); }
 
     @Override public void dispose() {
+        pageGeneration++;
         listening.close();
         listening = () -> { };
         view = null;
@@ -83,9 +87,14 @@ public final class IndexerSettingsPanel implements SettingsPanel.View {
                 case REINDEX -> selected().ifPresent(entry -> indexer.request(entry.project().key(), true, Optional.empty()));
                 case REMOVE -> selected().ifPresent(entry -> {
                     var key = entry.project().key();
+                    var registration = entry.project();
+                    var requestingView = view;
+                    long generation = pageGeneration;
+                    var completed = new AtomicBoolean();
                     confirm.accept("Remove " + entry.project().name() + " from Project Index? Its saved index is deleted.", () -> {
-                        if (view != null && Objects.equals(selected, key.id())
-                            && projects.entries().stream().anyMatch(current -> current.project().key().equals(key))) indexer.remove(key);
+                        if (completed.compareAndSet(false, true) && view == requestingView && pageGeneration == generation
+                            && Objects.equals(selected, key.id())
+                            && projects.get(key).map(current -> current.project() == registration).orElse(false)) indexer.remove(key);
                     });
                 });
                 default -> { }

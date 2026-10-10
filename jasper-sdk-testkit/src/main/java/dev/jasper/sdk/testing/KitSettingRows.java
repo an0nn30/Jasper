@@ -24,15 +24,24 @@ final class KitSettingRows {
             }
             input = new Nodes.Choice(id, state, Nodes.ChoiceKind.DROPDOWN, options, selected, spec.label(), id);
         } else {
-            var kind = value instanceof List<?> ? Nodes.FieldKind.TEXTAREA
+            var kind = spec.kind() instanceof SettingKind.IntegerRange ? Nodes.FieldKind.NUMBER : value instanceof List<?> ? Nodes.FieldKind.TEXTAREA
                 : spec.editor().orElse(null) instanceof EditorHint.File ? Nodes.FieldKind.PATH : Nodes.FieldKind.TEXT;
             String text = invalidText != null ? invalidText : value instanceof List<?> items
                 ? String.join("\n", items.stream().map(Object::toString).toList()) : String.valueOf(value);
-            input = new Nodes.Field(id, state, kind, text, "", spec.label(), "");
+            var numeric = spec.kind() instanceof SettingKind.IntegerRange range
+                ? Optional.of(new Nodes.Numeric(range.min(), range.max(), 1, 0)) : Optional.<Nodes.Numeric>empty();
+            input = new Nodes.Field(id, state, kind, text, "", spec.label(), "", numeric);
         }
         var reset = new Nodes.Button(id + ":reset", ControlState.READY, "Reset", "", Nodes.ButtonKind.GHOST, id + ":reset", "Reset to default");
         return new Nodes.SettingRow(id + ":row", state, spec.label(), spec.description(),
             new Nodes.Stack(id + ":controls", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(input, reset)), false);
+    }
+
+    static boolean matches(SettingSpec<?> spec, String query) {
+        var words = Arrays.stream(query.toLowerCase(Locale.ROOT).trim().split("\\s+")).filter(word -> !word.isEmpty()).toList();
+        if (words.isEmpty()) return false;
+        String text = String.join(" ", spec.label(), spec.description(), String.join(" ", spec.keywords())).toLowerCase(Locale.ROOT);
+        return words.stream().allMatch(text::contains);
     }
 
     static ViewSpec project(ViewSpec spec, UnaryOperator<Nodes.Node> replace) {

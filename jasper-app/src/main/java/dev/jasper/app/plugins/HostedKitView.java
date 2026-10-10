@@ -11,6 +11,7 @@ final class HostedKitView implements UiView {
  final HostedKit owner;
  private final KitView view;
  private ViewSpec spec;
+ private ViewSpec sourceSpec;
  private boolean updating;
  private Object mount;
  void unmount(Object target){if(mount==target)mount=null;}
@@ -23,12 +24,14 @@ final class HostedKitView implements UiView {
  Runnable updated = () -> { };
 
  private final AtomicBoolean closed=new AtomicBoolean();
- HostedKitView(HostedKit owner,KitContext context,ViewSpec spec,Consumer<UiEvent> events){this.owner=owner;this.events=Objects.requireNonNull(events);view=new KitView(context,KitValues.toModule(spec),e -> dispatch(KitValues.toSdk(e)));this.spec=spec;}
+ HostedKitView(HostedKit owner,KitContext context,ViewSpec spec,Consumer<UiEvent> events){this.owner=owner;this.events=Objects.requireNonNull(events);view=new KitView(context,KitValues.toModule(spec),e -> dispatch(KitValues.toSdk(e)));this.spec=spec;sourceSpec=spec;}
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
  KitView component(){guard();return view;}
  void dispatch(UiEvent event){if(closed.get()||!owner.live())return;try{if(hostEvents.test(event))return;events.accept(event);}catch(Throwable failure){owner.failed();}}
- @Override public void update(ViewSpec next){guard();if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{next=hostSpec.apply(next);view.update(KitValues.toModule(next));spec=next;}finally{updating=false;}updated.run();}
+ @Override public void update(ViewSpec next){guard();if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{var projected=hostSpec.apply(next);view.update(KitValues.toModule(projected));sourceSpec=next;spec=projected;}finally{updating=false;}updated.run();}
  @Override public ViewSpec spec(){guard();return spec;}
+ /** Host-only original plugin descriptor, before draft/search row projection. */
+ ViewSpec sourceSpec(){guard();return sourceSpec;}
  @Override public void withSecret(String id,Consumer<char[]> use){guard();view.withSecret(id,use);}
  @Override public void clearSecret(String id){guard();view.clearSecret(id);}
  @Override public void replaceSecret(String id,char[] value){guard();view.replaceSecret(id,value);}

@@ -22,25 +22,38 @@ public final class UiTestAccess {
     public record Label(FakeKitView view, String id) {
         public String getText() { return ((Nodes.Text) node(view, id)).text(); }
     }
-    public static Button add(FileServersPanel panel) { return new Button(() -> fake(panel.view()).emit(new UiEvent.Action("fileserver.empty.new"))); }
+    public record Activity(FakeKitView view) {
+        public String getText() { return ((Nodes.ItemList) node(view, "fileserver.activity.log")).items().stream()
+            .map(item -> ((Nodes.Text) item.title().getFirst()).text()).collect(java.util.stream.Collectors.joining("\n")); }
+    }
+    public static Button button(dev.jasper.sdk.ui.UiView view, String id) {
+        return new Button(() -> {
+            var found = node(fake(view), id);
+            if (!(found instanceof Nodes.Button actual)) throw new AssertionError("Missing button " + id);
+            fake(view).emit(new UiEvent.Action(actual.action()));
+        });
+    }
+    public static Button add(FileServersPanel panel) { return button(panel.view(), "fileserver.empty.new"); }
     public static Button toggle(FileServersPanel panel) { return new Button(() -> panel.selected().ifPresent(id -> fake(panel.view()).emit(new UiEvent.Toggled("switch:" + id, true)))); }
-    public static Label activity(FileServersPanel panel) { return new Label(fake(panel.view()), "fileserver.activity.log"); }
+    public static Activity activity(FileServersPanel panel) { return new Activity(fake(panel.view())); }
     public static Label cardHostKey(FileServersPanel panel) { return new Label(fake(panel.view()), "fileserver.card.hostkey"); }
     public static Label cardTls(FileServersPanel panel) { return new Label(fake(panel.view()), "fileserver.card.tls"); }
     public static Field name(ServerEditor editor) { return new Field(fake(editor.view()), ServerEditor.NAME); }
     public static Field folder(ServerEditor editor) { return new Field(fake(editor.view()), ServerEditor.FOLDER); }
     public static Field port(ServerEditor editor) { return new Field(fake(editor.view()), ServerEditor.PORT); }
-    public static Button save(ServerEditor editor) { return new Button(() -> fake(editor.view()).emit(new UiEvent.Action(ServerEditor.SAVE))); }
+    public static Button save(ServerEditor editor) { return button(editor.view(), ServerEditor.SAVE); }
     public static Label message(ConfirmPanel panel) { return new Label(fake(panel.view()), "fileserver.confirm.message"); }
-    public static Button confirm(ConfirmPanel panel) { return new Button(() -> fake(panel.view()).emit(new UiEvent.Action("fileserver.confirm.accept"))); }
-    public static Button cancel(ConfirmPanel panel) { return new Button(() -> fake(panel.view()).emit(new UiEvent.Action("fileserver.confirm.cancel"))); }
+    public static Button confirm(ConfirmPanel panel) { return button(panel.view(), "fileserver.confirm.accept"); }
+    public static Button cancel(ConfirmPanel panel) { return button(panel.view(), "fileserver.confirm.cancel"); }
     public static JPopupMenu menuFor(FileServersPanel panel, int index) {
         var menu = new JPopupMenu();
         edt(() -> {
             var list = (Nodes.ItemList) node(fake(panel.view()), FileServersPanel.ROWS);
             ListItem item = list.items().stream().filter(row -> row.id().startsWith("server:")).toList().get(index);
             item.contextActions().orElseThrow().forEach(action -> {
+                if (action.separator()) { menu.addSeparator(); return; }
                 var button = new JMenuItem(action.label());
+                button.setEnabled(action.enabled());
                 button.addActionListener(event -> fake(panel.view()).emit(new UiEvent.Action(action.action())));
                 menu.add(button);
             });

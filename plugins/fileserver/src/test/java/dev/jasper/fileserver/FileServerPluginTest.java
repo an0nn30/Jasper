@@ -95,8 +95,10 @@ class FileServerPluginTest {
     }
 
     static void click(javax.swing.JPopupMenu menu, String title) {
-        Arrays.stream(menu.getComponents()).filter(c -> c instanceof JMenuItem item && item.getText().equals(title))
-            .map(c -> (JMenuItem) c).findFirst().ifPresent(item -> UiTestAccess.edt(item::doClick));
+        var item = Arrays.stream(menu.getComponents()).filter(c -> c instanceof JMenuItem found && found.getText().equals(title))
+            .map(c -> (JMenuItem) c).findFirst().orElseThrow(() -> new AssertionError("Missing menu item " + title));
+        assertThat(item.isEnabled()).as("Menu item " + title).isTrue();
+        UiTestAccess.edt(item::doClick);
     }
 
     @Test void servesTheFocusedFolderOverSftpWithASessionPassword() throws Exception {
@@ -190,7 +192,8 @@ class FileServerPluginTest {
 
     @Test void registersItsPanelActionsSettingsAndAHiddenStatus() {
         try (var host = new FakePluginHost(root)) {
-            host.start(INFO, Set.of(), Set.of(), plugin());
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
             settle(host);
             assertThat(host.panels()).containsExactly("dev.jasper.fileserver.panel|File Servers|LEFT|dev.jasper.fileserver.show-panel");
             assertThat(host.actions()).contains("dev.jasper.fileserver.show-panel|Toggle File Servers|true",
@@ -200,6 +203,13 @@ class FileServerPluginTest {
                 .anySatisfy(line -> assertThat(line).startsWith("confirm_quit"))
                 .anySatisfy(line -> assertThat(line).startsWith("activity_entries"))
                 .anySatisfy(line -> assertThat(line).startsWith("passive_ports"));
+            UUID window = host.addTerminalWindow();
+            openPanel(host, plugin, window);
+            var header = host.panelHeader(FileServerPlugin.PANEL, window);
+            assertThat(header.detail()).isEmpty();
+            assertThat(header.actions()).singleElement().satisfies(action -> assertThat(action.label()).isEqualTo("New File Server…"));
+            UiTestAccess.edt(() -> header.actions().getFirst().invoke().run());
+            assertThat(host.windows()).containsExactly("dialog|New File Server|true");
         }
     }
 

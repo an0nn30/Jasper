@@ -49,7 +49,7 @@ final class PluginPanelPage implements SettingsPage {
     private final KitSettingRows kitRows = new KitSettingRows(rowHost, this::settingSpec, rowHost::unset);
     private dev.jasper.sdk.settings.SettingSpec<?> settingSpec(dev.jasper.sdk.settings.Setting<?> setting){return declared.handle(setting).spec();}
     void kit(HostedKit value) { kit=value; }
-    private void refreshRows(){if(view!=null && !disposed)view.update(view.spec());}
+    private void refreshRows(){if(view!=null && !disposed)view.update(view.sourceSpec());}
 
 
     PluginPanelPage(String pluginId, String title, DeclaredSettings declared, SettingsPanel panel, Containment containment,
@@ -153,7 +153,9 @@ final class PluginPanelPage implements SettingsPage {
     @Override public void highlight(String query) {
         if(disposed)return;
         rows.forEach(row -> row.highlight(query));
+        kitRows.highlight(query);
         containment.run(pluginId, "settings page highlight", () -> panel.highlight(query));
+        refreshRows();
     }
 
     /** Lets a page that was shown drop state of its own that was not applied, then releases it. */
