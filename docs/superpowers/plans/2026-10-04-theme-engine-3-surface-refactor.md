@@ -1,11 +1,11 @@
 # Theme Engine Plan 3 — Surface Composition and Visual Matching Implementation Plan
 
-**Execution status — 2026-10-10:** Plan2 prerequisite independently approved at `0b367eee`. Task1 implemented with measured calibration and scoped verification; independent per-task review and final pixel acceptance remain pending. No page is accepted yet. User authorization extends this plan to all16 Desktop references plus old-only states and continuous controller native capture in an isolated home. The historical unattended-GUI prohibition is superseded only for that controller-owned QA.
+**Execution status — 2026-10-10:** Plan2 prerequisite independently approved at `0b367eee`. Task1 implementation and fix round1 independently approved through `83d2435c`; actual native E verifies enlarged warning, font-family/draft/focus preservation and Unlock error/recovery. Scoped checks pass. Final pixel acceptance remains open: no page is accepted. Task2 is split into the complete anchored picker/compact import slice (2a) and grouped Add Host/default picker (2b), per the [binding amendment](../specs/2026-10-10-jasper-anchored-picker-amendment.md). User authorization extends this plan to all16 Desktop references plus old-only states and continuous controller native capture in an isolated home.
 
 **Measured Task1 amendments:** reusable `FormKind.HERO_COMPACT` owns380px width; HERO remains400px. `SecretKind.CONFIRMATION` follows its group's reveal without an extra eye. Optional `SettingRow.titleNote` renders a tertiary annotation with source-compatible constructors. Central hero typography/layout/icon optical stroke follows exact2× mounted evidence; feature owners contain no style literals. These are controller-approved reference-driven extensions of the shared descriptor contract.
 
 
-**Task1 review fix scope extension:** controller authorized inherited C1 font-size correction before I3: effective host point-size overrides bypass font-derived UIScale multiplication, unset catalog roles still scale once, geometry/device transforms remain independent, and live family provenance refreshes mounted views. I1 preserves owned/arbitrary settings-row presentation across host/fake refresh; I2 uses previous visible siblings for meter spacing. Added mirrored `LayoutRole.SUPPORTING` for natural leading adornments with a wrapping final body, preserving ordinary INLINE behavior. Focused verification and actual enlarged-owner captures are required; independent re-review/native recapture are pending, not visual acceptance.
+**Task1 review fix scope extension:** controller authorized inherited C1 font-size correction before I3: effective host point-size overrides bypass font-derived UIScale multiplication, unset catalog roles still scale once, geometry/device transforms remain independent, and live family provenance refreshes mounted views. I1 preserves owned/arbitrary settings-row presentation across host/fake refresh; I2 uses previous visible siblings for meter spacing. Added mirrored `LayoutRole.SUPPORTING` for natural leading adornments with a wrapping final body, preserving ordinary INLINE behavior. Focused verification and actual enlarged-owner captures are required; independent re-review is approved and native E recapture passes those behavior checks; reference/pixel acceptance remains outstanding.
 
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -19,7 +19,7 @@
 **Spec:** [Approved design, especially panel composition §6.1](../specs/2026-10-04-jasper-theme-engine-design.md).
 **Prerequisites:** [Plan 1](2026-10-04-theme-engine-1-engine-and-kit.md) and [Plan 2](2026-10-04-theme-engine-2-consumer-migration.md) implemented, reviewed and verified.
 **Shared contracts:** [Types, paths and test conventions](2026-10-04-theme-engine-contracts.md).
-**Status:** Written for review; not executed. No deviations. Native visual acceptance remains user-run.
+**Status:** In execution. Task1 implementation gate is complete; its measured pixel residuals remain owned by final cross-family calibration/native chrome checks. Task2a/2b are next. Deviations are recorded in the amendments above; controller native validation is explicitly authorized.
 
 ## Global Constraints
 
@@ -90,7 +90,21 @@ preview, resize the candidate arbitrarily, or overwrite source images.
 - [x] Render both references at their calibrated bounds with focus/disabled/error/busy states in calibration, dark, light and custom themes. Compare bounds/typography/icon paths separately from colors; fix shared metrics once where appropriate. Run Vault behavior tests and app SurfaceGeometryTest.
 - [x] Review artifacts and tests, then commit `Compose Vault create and unlock dialogs with canonical hero controls`.
 
-## Task 2 — Add Host grouped form
+## Task 2a — Anchored credential picker and compact Import consumer
+
+**Authority:** [Anchored picker amendment](../specs/2026-10-10-jasper-anchored-picker-amendment.md), including exact ownership, cancellation, creation, six-state and synthetic fixture requirements. This is a complete runnable producer/consumer slice, not a placeholder for Task4.
+**Files:** SDK/module descriptors and UiView/Windows contracts, app hosted UI/native owner bridges, SDK testkit/contract suites, Vault API/service/producer/private creation presenter, Remote ConfigImportController/ImportPanel and their actual staged integration fixtures.
+
+- [ ] Add failing host/fake capability and lifetime contracts for opaque mounted anchors, producer-owned nonblocking popovers and checked native child owners; reject spoofed, cross-host, stale, hidden/disabled/reparented capabilities without weakening ordinary view ownership.
+- [ ] Implement shared rich DEFAULT28/COMPACT22 picker face and menu anatomy, keyboard/current-check separation, search/IME/focus/theme preservation, mirrored descriptor/mapping/admission coverage and natural content sizing.
+- [ ] Implement additive Vault Chosen/Cleared/Cancelled selection API, preserved old modal overload, shared unlock waiter/native ownership, one-time selection grants and real creation footer returning to the pending query without granting on creation alone.
+- [ ] Wire the actual identity-free ImportPanel compact field to controller-owned per-candidate selection. Repair pending operation/revision/reentrant callback/refresh cancellation as specified; retain separate real import REVIEW, durable grants and host conflict validation.
+- [ ] Verify actual staged Vault+Remote behavior and all six compact states with synthetic supplied sshDir, long/enlarged/short-view/theme cases and exact-scale mock overlays. Controller verifies actual popovers/native keyboard and owners with an isolated JVM user.home before invoking Import. No real SSH configuration read or host connection.
+- [ ] Run covering suites/architecture checks, independent review/fixes, then commit with Co-Authored-By trailer. Retain native/pixel debts explicitly; do not claim a gallery proves the actual route.
+
+## Task 2b — Add Host grouped form
+
+**Prerequisite:** Task2a independently approved. Consume its shared anchor/popover, Vault producer/creation and DEFAULT28 face. Preserve ADD_KEY append semantics, pending-request cancellation and ordered-key selection; no duplicate picker renderer or modal-fallback acceptance.
 
 **Files:** Modify `P(remote)/ui/HostEditor.java`, related picker/host-option descriptor builders; add `PT(remote)/ui/HostCompositionTest.java`; extend SurfaceFixtures `host-add`.
 **Interfaces:** Nodes.Form FULL with Connection, Authentication, Options sections; ordered key ItemList and domain picker actions. Stable field ids survive auth/protocol/view updates.
@@ -113,6 +127,8 @@ preview, resize the candidate arbitrarily, or overwrite source images.
 - [ ] Review then commit `Compose New File Server with protocol-aware grouped controls`.
 
 ## Task 4 — Vault manager, menu and attached item sheets
+
+Reuse Task2a's Vault-private creation presenter and anchored picker contracts; finish sheet appearance and canonical legacy modal picker, then recheck both compact Import and default Add Host picker→creation→picker. No duplicate ownership implementation.
 
 **Files:** Modify `P(vault)/ui/{ManagerPanel,VaultManagerWindow,EntryEditor,EditorForm,KeyGeneratorForm,KeyImportPanel,ChangePasswordForm,GrantPanel,PickerPanel}.java`; modify `APP/windows/{AuxiliaryWindows,NativeShells,WindowOverlay,TopModal}.java` only for sheet ownership; add `PT(vault)/ui/VaultCompositionTest.java`, `AT/windows/SheetOwnershipTest.java`.
 **Interfaces:** Three-column Split, semantic list rows/detail cards, window footer, Forms of kind SHEET; existing owner/close APIs retain semantics. App renders sheet beneath title bar and retains parent modality, dragging/resizing and lifetime.

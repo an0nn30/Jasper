@@ -427,3 +427,6 @@ Task1's measured shared amendments are HERO_COMPACT (380 logical preferred width
 
 
 Task1 review amendment (controller authorized, 2026-10-10): mirrored `LayoutRole.SUPPORTING` composes natural leading adornments and a final wrapping body aligned to the first text line; ordinary INLINE remains single-line. Owned and arbitrary settings projection preserves title annotations and incoming presentation while draft state/control values refresh. Inherited font sizing is corrected centrally: exact host effective point-size overrides do not receive FlatLaf's font-derived user scale again, while unset catalog roles still scale once; geometric UIScale and Java2D device transforms remain independent. Actual mounted/native-adapter tests, enlarged warning captures and controller recapture govern verification; this amendment does not waive reference residuals.
+
+
+The [anchored credential picker amendment](2026-10-10-jasper-anchored-picker-amendment.md) defines the Task2a/2b split, checked host-issued anchor/popover ownership, actual Vault consent/creation flows, compact ImportPanel and default Add Host consumers. It is the binding extension for the supplied six-state combo board; Task4 reuses the same presenter.
