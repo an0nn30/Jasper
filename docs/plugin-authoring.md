@@ -830,3 +830,20 @@ Manifests using this key must declare `sdk = ">=0.15.1, <0.16"`. Older hosts rej
 before checking the SDK range; excluding those hosts does not change that parser ordering. To support older hosts,
 omit the key in that release's manifest. Existing manifests without the key continue to use their admitted ranges.
 The runtime checks whether the current host is admitted; it does not parse per-feature comparator policies.
+
+### Selected identity ink (SDK 0.15.2)
+
+`icon_selected_ink = "foreground"` explicitly opts an identity tile into the receiving theme's
+on-accent foreground while selected. The default, `"authored"`, preserves authored RGBA in every
+state. Normal rows, detail headers and ordinary icon routes retain authored pixels with either policy.
+The foreground silhouette uses the original composited alpha, including translucent layers and
+opaque backgrounds, at each prepared device resolution. Disabled treatment is applied once.
+All bundled monochrome identities opt in consistently; third-party omission remains authored.
+
+Only the exact lowercase tokens `authored` and `foreground` are accepted. Other strings warn and
+fall back to authored; nonstrings are invalid descriptors, and unrelated unknown keys remain invalid.
+Manifests using the key must declare `sdk = ">=0.15.2, <0.16"`. Older strict parsers reject the unknown
+key before SDK compatibility resolution; a version floor does not make an old parser accept it.
+The host's immutable identity value includes this policy in equality and receiver aliases; same-byte
+metadata updates therefore refresh selected presentation without replacing the plugin's authored art.
+This is manifest metadata, not a new SDK UI descriptor or general icon-state API.

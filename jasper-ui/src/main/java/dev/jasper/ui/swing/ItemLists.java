@@ -413,6 +413,10 @@ final class ItemLists {
             }
             row.slot(row.subtitle, item.subtitle());
             row.slot(row.trailing, trailing);
+            if(results() && !item.heading() && !selected.contains(item.id()))
+                for(var node:item.subtitle())if(node instanceof Nodes.Text text && text.severity().isEmpty()
+                        && row.controls.get(text.id()).component instanceof JLabel label)
+                    label.setForeground(ThemePainting.color(context(),SemanticColor.TEXT_SECONDARY));
             if (results() && !item.heading() && selected.contains(item.id())) {
                 resultSelection(row, item.title(), SemanticColor.TEXT_ONACCENT, true);
                 resultSelection(row, item.subtitle(), SemanticColor.TEXT_ONACCENT_SECONDARY, true);

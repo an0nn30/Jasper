@@ -1043,7 +1043,8 @@ final class InteractiveRows {
             if (!owner.dataRow(index)) { headingLayout(); return; }
             if (owner.resultsLayout()) { resultLayout(); return; }
             if (owner instanceof Trees.TreeControl tree && tree.layoutPresented(this)) return;
-            int pad = ThemePainting.metric(owner.context(), owner.column >= 0 ? DesignMetrics.Role.COLUMN_LIST_SIDE : owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_PADDING : DesignMetrics.Role.ICON_GAP),
+            boolean settingsNavigation=owner instanceof Trees.TreeControl tree && tree.settingsNavigation;
+            int pad = ThemePainting.metric(owner.context(), settingsNavigation ? DesignMetrics.Role.SETTINGS_NAV_ROW_SIDE : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : owner.column >= 0 ? DesignMetrics.Role.COLUMN_LIST_SIDE : owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_PADDING : DesignMetrics.Role.ICON_GAP),
                     x = pad + indent,
                     width = Math.max(0, getWidth() - pad),
                     h = getHeight();
@@ -1059,7 +1060,7 @@ final class InteractiveRows {
             width = Math.max(x, width - tw - (tw > 0 ? pad : 0));
             int lw = Math.min(leading.getPreferredSize().width, Math.max(0, width - x));
             leading.setBounds(x, 0, lw, h);
-            x += lw + (lw > 0 ? owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_TEXT_GAP) : pad : 0);
+            x += lw + (lw > 0 ? settingsNavigation ? ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTINGS_NAV_TEXT_GAP) : owner.identityRows() ? ThemePainting.metric(owner.context(),DesignMetrics.Role.IDENTITY_ROW_TEXT_GAP) : owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_TEXT_GAP) : pad : 0);
             int content = Math.max(0, width - x);
             if (!cells.isEmpty()) {
                 title.setBounds(x, 0, content, h);
@@ -1067,7 +1068,7 @@ final class InteractiveRows {
             } else if (subtitle.getComponentCount() > 0) {
                 int titleHeight = title.getPreferredSize().height,
                         subtitleHeight = subtitle.getPreferredSize().height;
-                if (owner.column == 1) {
+                if (owner.column == 1 || owner.identityRows()) {
                     int top = Math.max(0, (h - titleHeight - subtitleHeight) / 2);
                     title.setBounds(x, top, content, titleHeight);
                     subtitle.setBounds(x, top + titleHeight, content, subtitleHeight);

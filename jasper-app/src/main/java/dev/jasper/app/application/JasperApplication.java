@@ -948,7 +948,7 @@ public final class JasperApplication {
             Map<String,PluginRuntime.PluginIcon> artwork) {
         return groups.stream().map(group -> new dev.jasper.app.settingsui.NotificationGroupChoices.Group(group.id(), group.name(),
             group.owner().equals(dev.jasper.app.notifications.NotificationRequest.JASPER) ? "Jasper" : pluginName.apply(group.owner()),
-            group.defaultMode().token(), group.owner(), group.owner().equals(dev.jasper.app.notifications.NotificationRequest.JASPER) ? "appearance" : "plugin", Optional.ofNullable(artwork.get(group.owner())).map(PluginRuntime.PluginIcon::artwork), Optional.ofNullable(artwork.get(group.owner())).map(icon -> icon.identityArtwork().tileHue()).orElse(dev.jasper.ui.model.Nodes.Hue.NEUTRAL))).toList();
+            group.defaultMode().token(), group.owner(), group.owner().equals(dev.jasper.app.notifications.NotificationRequest.JASPER) ? "appearance" : "plugin", Optional.ofNullable(artwork.get(group.owner())).map(PluginRuntime.PluginIcon::artwork), Optional.ofNullable(artwork.get(group.owner())).map(icon -> icon.identityArtwork().tileHue()).orElse(dev.jasper.ui.model.Nodes.Hue.NEUTRAL), Optional.ofNullable(artwork.get(group.owner())).map(icon -> icon.identityArtwork().selectedInk()).orElse(dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED))).toList();
     }
 
     private String pluginName(String id) {

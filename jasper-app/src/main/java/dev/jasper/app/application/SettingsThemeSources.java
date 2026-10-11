@@ -25,7 +25,7 @@ final class SettingsThemeSources implements java.util.function.Supplier<List<The
     private static ThemeChoices.Source source(Theme theme) {
         var generated = ThemeGenerator.generate(theme.source().document()); var p = generated.semantic();
         return new ThemeChoices.Source(theme.name(),theme.source() instanceof Theme.Bundled?ThemeSource.BUNDLED:ThemeSource.CATALOG,theme.dark(),
-            new Option.Palette(p.color(SemanticColor.SURFACE_APP).getRGB(),p.color(SemanticColor.SURFACE_SIDEBAR).getRGB(),p.color(SemanticColor.SURFACE_CONTROL).getRGB(),p.color(SemanticColor.TEXT_PRIMARY).getRGB(),p.color(SemanticColor.ACCENT).getRGB()),
+            new Option.Palette(p.color(SemanticColor.SURFACE_INPUT).getRGB(),p.color(SemanticColor.SURFACE_SIDEBAR).getRGB(),p.color(SemanticColor.SURFACE_APP).getRGB(),p.color(SemanticColor.TEXT_PRIMARY).getRGB(),p.color(SemanticColor.ACCENT).getRGB()),
             (float)(generated.glass().opacity()*100),generated.glass().blur());
     }
 }

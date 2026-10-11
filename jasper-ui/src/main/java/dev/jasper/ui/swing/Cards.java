@@ -133,12 +133,13 @@ final class Cards {
                 int r = ThemePainting.metric(context, DesignMetrics.Role.CARD_RADIUS);
                 g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_CARD));
                 g.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), r * 2, r * 2));
+                g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL,RenderingHints.VALUE_STROKE_PURE);
                 g.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE));
                 g.draw(new RoundRectangle2D.Double(.5, .5, getWidth() - 1, getHeight() - 1, r * 2, r * 2));
                 Component previous = null;
                 for (Component child : getComponents()) if (child.isVisible()) {
                     if (previous != null && (settings.contains(child) || settings.contains(previous)))
-                        g.drawLine(1, child.getY(), getWidth() - 2, child.getY());
+                        g.fillRect(1,child.getY(),getWidth()-2,ThemePainting.metric(context,DesignMetrics.Role.HAIRLINE));
                     previous = child;
                 }
             } finally {

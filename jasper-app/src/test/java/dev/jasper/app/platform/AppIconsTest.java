@@ -12,6 +12,28 @@ class AppIconsTest {
     private static final String[] ICONS = {"square-plus", "app-window", "columns-2", "maximize", "search", "settings",
         "refresh", "command", "history", "bookmark", "close", "exit"};
 
+    @Test void originalSearchAndFileReachNativeOwnersAtDeviceAndUserScales() throws Exception {
+        edt(()->{
+            var themes=new ThemeController();float previous=com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
+            try(var registry=new dev.jasper.ui.icons.IconRegistry()) {
+                for(var theme:java.util.List.of(Theme.DARK,dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
+                    themes.configure(theme);
+                    for(float scale:new float[]{1,2}) {
+                        userScale(scale);
+                        for(String meaning:java.util.List.of("SEARCH","FILE")) {
+                            var icon=AppIcons.named(meaning);var expected=registry.icon(meaning.toLowerCase(java.util.Locale.ROOT),dev.jasper.ui.swing.FlatLafInstaller.installedTheme(),dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY,Math.round(16*scale));
+                            for(int device:new int[]{1,2,3})assertThat(pixels(icon,device)).as("%s scale%s device%s",meaning,scale,device).isEqualTo(pixels(expected,device));
+                            var disabled=((com.formdev.flatlaf.FlatLaf.DisabledIconProvider)icon).getDisabledIcon();
+                            assertThat(pixels(disabled,2)).isNotEqualTo(pixels(icon,2));
+                        }
+                    }
+                }
+            }finally {userScale(previous);themes.close();new ThemeController();}
+        });
+    }
+    private static void userScale(float scale){try{var setter=com.formdev.flatlaf.util.UIScale.class.getDeclaredMethod("setUserScaleFactor",float.class,boolean.class);setter.setAccessible(true);setter.invoke(null,scale,false);}catch(ReflectiveOperationException failure){throw new AssertionError(failure);}}
+    private static int[] pixels(javax.swing.Icon icon,int scale){var image=new java.awt.image.BufferedImage(icon.getIconWidth()*scale,icon.getIconHeight()*scale,java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();try{g.scale(scale,scale);icon.paintIcon(null,g,0,0);}finally{g.dispose();}return image.getRGB(0,0,image.getWidth(),image.getHeight(),null,0,image.getWidth());}
+
     @Test void modernApplicationIconsUseModuleNamedTinting() throws Exception {
         edt(() -> {
             new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
@@ -22,7 +44,7 @@ class AppIconsTest {
                     assertThat(icon.getIconHeight()).isEqualTo(16);
                     assertThat(Arrays.stream(IntellijIconsTest.pixels(icon)).anyMatch(pixel -> (pixel >>> 24) != 0)).isTrue();
                 }
-                var expected = new dev.jasper.ui.icons.IconRegistry().icon("search", dev.jasper.ui.swing.FlatLafInstaller.installedTheme().semantic(), dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY, 16);
+                var expected = new dev.jasper.ui.icons.IconRegistry().icon("search", dev.jasper.ui.swing.FlatLafInstaller.installedTheme(), dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY, 16);
                 assertThat(IntellijIconsTest.pixels(AppIcons.icon("search")))
                     .isEqualTo(IntellijIconsTest.pixels(expected));
             } finally { new ThemeController(); }

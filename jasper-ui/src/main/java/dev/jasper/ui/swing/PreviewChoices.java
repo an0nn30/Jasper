@@ -41,7 +41,7 @@ final class PreviewChoices extends ControlRegistry.Control {
         component.setLayout(new GridLayout(1,Math.max(1,tiles.size()),ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_GAP),0));
         for (var option : choice.options()) {
             var tile = tiles.get(option.id());tile.option=option;tile.setSelected(option.id().equals(choice.selectedId()));tile.setEnabled(interactive());
-            tile.setFont(ThemePainting.font(context(),Typography.Role.LABEL));tile.getAccessibleContext().setAccessibleName(option.label());
+            tile.setFont(ThemePainting.font(context(),Typography.Role.BODY));tile.getAccessibleContext().setAccessibleName(option.label());
             tile.getAccessibleContext().setAccessibleDescription(option.description()); tile.setToolTipText(option.description().isBlank()?null:option.description());
         }
         component.revalidate();component.repaint();
@@ -57,27 +57,27 @@ final class PreviewChoices extends ControlRegistry.Control {
             var g=(Graphics2D)graphics.create();
             try {
                 ThemePainting.antialias(g);if(!isEnabled())g.setComposite(AlphaComposite.SrcOver.derive(.42f));
-                int pad=isSelected()?ThemePainting.metric(context(),DesignMetrics.Role.FOCUS_RING):0,caption=ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_LABEL_HEIGHT);
+                int pad=ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_INSET)/2,caption=ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_LABEL_HEIGHT);
                 int h=getHeight()-caption;int radius=ThemePainting.metric(context(),DesignMetrics.Role.CONTROL_RADIUS);
 
                 if(option!=null && option.preview().isPresent()) {
-                    var preview=option.preview().get();var clip=g.getClip();g.clip(new java.awt.geom.RoundRectangle2D.Double(pad,pad,Math.max(0,getWidth()-pad*2),Math.max(0,h-pad*2),radius,radius));
+                    var preview=option.preview().get();var clip=g.getClip();g.clip(new java.awt.geom.RoundRectangle2D.Double(pad,pad,Math.max(0,getWidth()-pad*2),Math.max(0,h-pad*2),radius*2,radius*2));
                     miniature(g,preview.primary(),pad,pad,getWidth()-pad*2,h-pad*2);
                     preview.alternate().ifPresent(other->{g.clipRect(getWidth()/2,0,getWidth(),h);miniature(g,other,pad,pad,getWidth()-pad*2,h-pad*2);});g.setClip(clip);
                 }
                 if(isSelected()){g.setColor(ThemePainting.color(context(),SemanticColor.ACCENT));g.setStroke(new BasicStroke(2));g.drawRoundRect(1,1,getWidth()-3,h-3,radius*2,radius*2);}
                 if(focus!=null&&focus.visible()){g.setColor(ThemePainting.color(context(),SemanticColor.ACCENT));g.drawRoundRect(0,0,getWidth()-1,getHeight()-1,radius*2,radius*2);}
-                g.setFont(getFont());g.setColor(ThemePainting.color(context(),SemanticColor.TEXT_PRIMARY));var fm=g.getFontMetrics();String label=option==null?"":option.label();if(fm.stringWidth(label)>getWidth()){while(!label.isEmpty()&&fm.stringWidth(label+"…")>getWidth())label=label.substring(0,label.offsetByCodePoints(label.length(),-1));label+="…";}g.drawString(label,(getWidth()-fm.stringWidth(label))/2,h+(caption-fm.getHeight())/2+fm.getAscent());
+                g.setFont(getFont());g.setColor(isSelected()?dev.jasper.ui.theme.SurfaceContrast.on(context().theme().semantic(),SemanticColor.TEXT_ONACCENT,SemanticColor.SURFACE_CARD,dev.jasper.ui.theme.SurfaceContrast.TEXT):ThemePainting.color(context(),SemanticColor.TEXT_SECONDARY));var fm=g.getFontMetrics();String label=option==null?"":option.label();if(fm.stringWidth(label)>getWidth()){while(!label.isEmpty()&&fm.stringWidth(label+"…")>getWidth())label=label.substring(0,label.offsetByCodePoints(label.length(),-1));label+="…";}g.drawString(label,(getWidth()-fm.stringWidth(label))/2,h+(caption-fm.getHeight())/2+fm.getAscent());
             } finally {g.dispose();}
         }
         private void miniature(Graphics2D g,Option.Palette p,int x,int y,int w,int h) {
             if(w<=0||h<=0)return;
             g.setColor(new Color(p.background(),true));g.fillRect(x,y,w,h);
-            int side=w*36/100,row=Math.max(2,h/16),gap=Math.max(3,h/12);
+            int side=w*36/100,row=Math.max(2,h/16),gap=Math.max(3,h/16);
             g.setColor(new Color(p.sidebar(),true));g.fillRect(x,y,side,h);
             g.setColor(new Color(p.control(),true));g.fillRoundRect(x+side+gap,y+gap,Math.max(1,w-side-gap*2),Math.max(1,h-gap*2),3,3);
-            for(int i=0;i<3;i++){g.setColor(i==1?new Color(p.accent(),true):dev.jasper.ui.theme.ColorMath.opacity(new Color(p.text(),true),.45));g.fillRoundRect(x+gap,y+gap+i*(row+gap),Math.max(1,side-gap*(i==0?2:3)),row,2,2);}
-            g.setColor(dev.jasper.ui.theme.ColorMath.opacity(new Color(p.text(),true),.45));for(int i=0;i<2;i++)g.fillRoundRect(x+side+gap*2,y+gap*2+i*(row+gap),Math.max(1,(w-side-gap*4)*(i==0?2:3)/3),row,2,2);
+            for(int i=0;i<3;i++){g.setColor(i==1?new Color(p.accent(),true):dev.jasper.ui.theme.ColorMath.opacity(new Color(p.text(),true),.45));g.fillRoundRect(x+gap,y+gap+i*(row+gap),Math.max(1,side*(i==0?67:i==1?50:60)/100),row,2,2);}
+            g.setColor(dev.jasper.ui.theme.ColorMath.opacity(new Color(p.text(),true),.45));for(int i=0;i<2;i++)g.fillRoundRect(x+side+gap*2,y+gap*2+i*(row+gap),Math.max(1,(w-side-gap*4)*(i==0?50:70)/100),row,2,2);
             g.setColor(new Color(p.accent(),true));g.fillRoundRect(x+w-gap*2-w/7,y+h-gap*2-h/8,w/7,h/8,2,2);
         }
     }

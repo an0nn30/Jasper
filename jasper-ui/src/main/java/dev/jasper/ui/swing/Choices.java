@@ -126,11 +126,11 @@ final class Choices {
                     for (int i = 0; i < input.getComponentCount(); i++) {
                         var button = (SegmentButton)input.getComponent(i); Option option = options.get(i);
                         button.setEnabled(input.isEnabled()); button.setSelected(option.id().equals(choice.selectedId()));
-                        var font = context().typography().font(Typography.Role.LABEL, button.isSelected());
+                        var font = context().typography().font(settings?Typography.Role.BODY:Typography.Role.LABEL, !settings && button.isSelected());
                         button.setFont(SwingTypography.effective(font));
                         button.setForeground(button.textColor(false));
                         button.setIcon(option.hue().map(h -> (javax.swing.Icon)new HueDot(context(), h)).orElse(null)); button.setDisabledIcon(button.getIcon());
-                        int pad = ThemePainting.metric(context(), DesignMetrics.Role.SEGMENT_HORIZONTAL_PADDING);
+                        int pad = ThemePainting.metric(context(), settings?DesignMetrics.Role.SETTINGS_SEGMENT_PADDING:DesignMetrics.Role.SEGMENT_HORIZONTAL_PADDING);
                         if(identitySection)pad=Math.max(pad,(ThemePainting.metric(context(),DesignMetrics.Role.IDENTITY_SECTION_WIDTH)/Math.max(1,choice.options().size())-button.getFontMetrics(button.getFont()).stringWidth(option.label()))/2);
                         button.setBorder(new EmptyBorder(0, pad, 0, pad));
                     }
@@ -340,7 +340,7 @@ final class Choices {
         SegmentButton(KitContext context) { super(context); this.context = context; kind = Nodes.ButtonKind.GHOST; }
         @Override SemanticColor textRole(boolean hover) { return isSelected() ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_SECONDARY; }
         @Override Color textColor(boolean hover) {
-            return isSelected() ? dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(), SemanticColor.TEXT_PRIMARY,
+            return isSelected() ? dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(), SemanticColor.TEXT_ONACCENT,
                 SemanticColor.SEGMENT_SELECTED_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT) : super.textColor(hover);
         }
         @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); return new Dimension(size.width, ThemePainting.height(context, DesignMetrics.Role.PANEL_ACTION, Typography.Role.LABEL)); }

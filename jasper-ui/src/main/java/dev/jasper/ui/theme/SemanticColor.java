@@ -21,6 +21,7 @@ public enum SemanticColor {
     BORDER_SUBTLE("border.subtle"),
     BORDER_INPUT("border.input"),
     BORDER_CONTROL("border.control"),
+    BORDER_IDENTITY("border.identity"),
     BORDER_MENU("border.menu"),
     BORDER_FOCUS("border.focus"),
     BORDER_ERROR("border.error"),

@@ -14,7 +14,8 @@ final class BuiltInArtwork {
         static final Map<String, Pair> CATALOG = Map.of(
             "settings", pair("general/settings"), "network", pair("toolwindows/web"),
             "tunnel", pair("actions/swapPanels"), "more.vertical", pair("general/moreVertical"),
-            "chevron.right", pair("general/chevronRight"));
+            "chevron.right", pair("general/chevronRight"),
+            "search", pair("general/search"), "file", pair("fileTypes/text"));
     }
     static Map<String, Pair> catalog() { return Holder.CATALOG; }
     private static Pair pair(String stem) { return new Pair(read(stem + ".svg"), read(stem + "_dark.svg")); }
@@ -28,7 +29,7 @@ final class BuiltInArtwork {
                     var columns=line.split("\\t");
                     if(columns.length!=3 || result.put(columns[0],columns[2])!=null)throw new IOException("Invalid selected hash manifest");
                 }
-                if(result.size()!=10)throw new IOException("Expected ten original resources");
+                if(result.size()!=14)throw new IOException("Expected fourteen original resources");
                 return Map.copyOf(result);
             }catch(IOException failure){throw new IllegalStateException("Required bundled artwork: assets-selected.tsv",failure);}
         }

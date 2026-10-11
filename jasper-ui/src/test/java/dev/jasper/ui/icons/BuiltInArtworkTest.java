@@ -16,12 +16,12 @@ class BuiltInArtworkTest {
         return image.getRGB(0,0,image.getWidth(),image.getHeight(),null,0,image.getWidth());
     }
     @Test void preparationIsAtomicIdempotentAndReportsRequiredResourceHashFailures() {
-        IconRegistry.prepareBuiltIns();var catalog=BuiltInArtwork.catalog();IconRegistry.prepareBuiltIns();assertThat(BuiltInArtwork.catalog()).isSameAs(catalog).hasSize(5);
+        IconRegistry.prepareBuiltIns();var catalog=BuiltInArtwork.catalog();IconRegistry.prepareBuiltIns();assertThat(BuiltInArtwork.catalog()).isSameAs(catalog).hasSize(7);
         assertThatThrownBy(()->BuiltInArtwork.decodeRequired("missing.svg",null,"expected-hash")).hasMessageContaining("missing.svg").hasMessageContaining("expected-hash");
         assertThatThrownBy(()->BuiltInArtwork.decodeRequired("broken.svg",new byte[]{1},"expected-hash")).hasMessageContaining("broken.svg").hasMessageContaining("expected-hash");
     }
     @Test void originalGeometryLayersAndSiblingColorsMatchDirectSourceAtActualSlots() throws Exception {
-        var files=Map.of("settings","general/settings","network","toolwindows/web","tunnel","actions/swapPanels","more.vertical","general/moreVertical","chevron.right","general/chevronRight");
+        var files=Map.of("settings","general/settings","network","toolwindows/web","tunnel","actions/swapPanels","more.vertical","general/moreVertical","chevron.right","general/chevronRight","search","general/search","file","fileTypes/text");
         try(var registry=new IconRegistry()) {
             for(var entry:files.entrySet())for(var theme:List.of(KitFixtures.light(),KitFixtures.dark())) {
                 String file=entry.getValue()+(theme.dark()?"_dark.svg":".svg");

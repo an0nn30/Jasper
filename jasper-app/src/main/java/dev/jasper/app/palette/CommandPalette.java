@@ -204,7 +204,7 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
                 Nodes.TextRole role = !row.enabled() ? Nodes.TextRole.DESCRIPTION
                     : item.scope().monospaceRows() ? Nodes.TextRole.MONO : Nodes.TextRole.BODY;
                 yield new ListItem(id, icon, List.of(text(id + ".title", row.title(), role)),
-                    row.detail() == null ? List.of() : List.of(text(id + ".detail", row.detail(), Nodes.TextRole.DESCRIPTION)),
+                    row.detail() == null ? List.of() : List.of(text(id + ".detail", row.detail(), Nodes.TextRole.BODY)),
                     row.tag() == null ? List.of() : List.of(text(id + ".tag", row.tag(), Nodes.TextRole.CAPTION)));
             }
             case PaletteEntry.More more -> new ListItem(id, Optional.empty(),

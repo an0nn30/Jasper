@@ -130,19 +130,25 @@ public final class PluginRuntime {
         private dev.jasper.ui.icons.EncodedArtwork artwork;
         private dev.jasper.ui.icons.IdentityArtwork identity;
         private final dev.jasper.ui.model.Nodes.Hue tileHue;
+        private final dev.jasper.ui.icons.IdentityArtwork.SelectedInk selectedInk;
         /** Copies the declared jar path and bytes. */
         public PluginIcon(String name, byte[] data) {
             this(name, data, dev.jasper.ui.model.Nodes.Hue.NEUTRAL);
         }
         /** Copies bytes and declared hue from the same shown candidate. */
         public PluginIcon(String name, byte[] data, dev.jasper.ui.model.Nodes.Hue tileHue) {
+            this(name,data,tileHue,dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED);
+        }
+        /** Copies the complete identity declaration from the same shown candidate. */
+        public PluginIcon(String name, byte[] data, dev.jasper.ui.model.Nodes.Hue tileHue, dev.jasper.ui.icons.IdentityArtwork.SelectedInk selectedInk) {
             this.name=Objects.requireNonNull(name,"name");this.data=data.clone();
+            this.selectedInk=Objects.requireNonNull(selectedInk);
             this.tileHue=Objects.requireNonNull(tileHue);
             if(tileHue==dev.jasper.ui.model.Nodes.Hue.NONE) throw new IllegalArgumentException("Invalid identity hue");
         }
-        PluginIcon withHue(dev.jasper.ui.model.Nodes.Hue hue) {
-            if(tileHue==hue)return this;
-            var result=new PluginIcon(name,data,hue);result.artwork=artwork();return result;
+        PluginIcon withMetadata(dev.jasper.ui.model.Nodes.Hue hue, dev.jasper.ui.icons.IdentityArtwork.SelectedInk ink) {
+            if(tileHue==hue && selectedInk==ink)return this;
+            var result=new PluginIcon(name,data,hue,ink);result.artwork=artwork();return result;
         }
         public String name(){return name;}
 
@@ -153,10 +159,10 @@ public final class PluginRuntime {
         public boolean svg() { return name.toLowerCase(java.util.Locale.ROOT).endsWith(".svg"); }
 
         @Override public boolean equals(Object other) {
-            return other instanceof PluginIcon icon && icon.name.equals(name) && icon.tileHue==tileHue && java.util.Arrays.equals(icon.data, data);
+            return other instanceof PluginIcon icon && icon.name.equals(name) && icon.tileHue==tileHue && icon.selectedInk==selectedInk && java.util.Arrays.equals(icon.data, data);
         }
 
-        @Override public int hashCode() { return 31 * (31 * name.hashCode() + java.util.Arrays.hashCode(data)) + tileHue.hashCode(); }
+        @Override public int hashCode() { return Objects.hash(name,java.util.Arrays.hashCode(data),tileHue,selectedInk); }
 
         /** Shared receiving value, retaining the declared format and authored bytes. */
         public synchronized dev.jasper.ui.icons.EncodedArtwork artwork() {
@@ -165,7 +171,7 @@ public final class PluginRuntime {
         }
         /** Shared receiving identity; bytes and hue have one immutable owner. */
         public synchronized dev.jasper.ui.icons.IdentityArtwork identityArtwork() {
-            if(identity==null) identity=new dev.jasper.ui.icons.IdentityArtwork(artwork(),tileHue);
+            if(identity==null) identity=new dev.jasper.ui.icons.IdentityArtwork(artwork(),tileHue,selectedInk);
             return identity;
         }
         @Override public String toString() { return "PluginIcon[" + name + ", " + data.length + " bytes, " + tileHue + "]"; }

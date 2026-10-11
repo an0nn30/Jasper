@@ -106,7 +106,10 @@ final class PluginManagerPanel extends JPanel {
     /** The former paddings and gaps, as named metrics. */
     private void restyle() {
         int pad = metric(DesignMetrics.Role.PLUGIN_MANAGER_PADDING), gap = metric(DesignMetrics.Role.PLUGIN_MANAGER_GAP);
-        setBorder(BorderFactory.createEmptyBorder(pad, pad, pad, pad));
+        int side=metric(DesignMetrics.Role.PLUGIN_MANAGER_SIDE_PADDING);
+        setBorder(BorderFactory.createEmptyBorder(pad, side, pad, pad));
+        bar.setBorder(BorderFactory.createEmptyBorder(0,side,0,side));
+        list.view().setBorder(BorderFactory.createEmptyBorder(0,0,0,side));
         ((BorderLayout) getLayout()).setVgap(gap);
         ((BorderLayout) bar.getLayout()).setHgap(gap);
         top.setVisible(!bannerText.isEmpty() || !notice.isEmpty());

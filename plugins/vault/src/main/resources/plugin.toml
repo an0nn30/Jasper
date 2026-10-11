@@ -2,10 +2,11 @@ id = "dev.jasper.vault"
 name = "Credential Vault"
 version = "0.4.0"
 entry = "dev.jasper.vault.VaultPlugin"
-sdk = ">=0.15.1, <0.16"
+sdk = ">=0.15.2, <0.16"
 description = "Accounts, SSH keys and secure notes in one encrypted file bound to this device; other plugins fetch credentials under per-plugin grants."
 vendor = "Jasper"
 icon_hue = "blue"
+icon_selected_ink = "foreground"
 icon = "icons/vault.svg"
 capabilities = ["palette.contribute"]
 exports = ["dev.jasper.vault.api"]

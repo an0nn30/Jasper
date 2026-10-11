@@ -59,9 +59,9 @@ final class Trees {
         item.contextActions().ifPresent(menu->validateMenus(menu,icons));
         item.children().forEach(child->validateTreeItem(child,icons));
     }
-    static final class TreePane extends javax.swing.JScrollPane {
+    static final class TreePane extends OverlayScrollPane {
         final KitContext context; TreeControl owner;
-        TreePane(KitContext context){this.context=context;}
+        TreePane(KitContext context){super(context,false);this.context=context;}
         @Override protected void paintComponent(java.awt.Graphics graphics) {
             if(owner==null || owner.presentation.isEmpty()){super.paintComponent(graphics);return;}
             var g=(java.awt.Graphics2D)graphics.create();
@@ -120,8 +120,8 @@ final class Trees {
             int width=Math.max(1,scroll.getViewport().getExtentSize().width-detailLeading()-detailTrailing());
             return detail.body.getComponentCount()==0?0:Composition.height(detail.body.getComponent(0),width)+2*detailInset();
         }
-        @Override int minimumRowHeight(){return presentation.isEmpty()?0:ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_ROW_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY);}
-        @Override boolean uniformRows(){return detail==null && presentation.isEmpty();}
+        @Override int minimumRowHeight(){return settingsNavigation?ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_ROW,dev.jasper.ui.metrics.Typography.Role.BODY):presentation.isEmpty()?0:ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_ROW_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY);}
+        @Override boolean uniformRows(){return !settingsNavigation && detail==null && presentation.isEmpty();}
         private int keyWidth(int index,int width) {
             var value=presentation.get(itemId(index));
             if(value==null || value.keycaps().isEmpty())return 0;
@@ -149,8 +149,15 @@ final class Trees {
             row.title.setBounds(start,0,Math.max(0,end-trailing-pad-start),height);row.title.doLayout();
             row.subtitle.setBounds(0,0,0,0);return true;
         }
-        @Override int rowHeightAt(int index){return rowShellHeight(index)+(detail!=null && itemId(index).equals(detail.itemId)?detailHeight():0);}
+        @Override int rowHeightAt(int index){return rowShellHeight(index)+navigationGapAfter(index)+(detail!=null && itemId(index).equals(detail.itemId)?detailHeight():0);}
+        private int navigationGapAfter(int index) {
+            if(!settingsNavigation || index+1>=visible.size())return 0;
+            var next=visible.get(index+1);var current=visible.get(index);
+            return next.depth()==0 && (!next.item().leaf() || current.depth()>0)
+                ? ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_GROUP_GAP):0;
+        }
         @Override int rowShellHeight(int index){
+            if(settingsNavigation && !visible.get(index).item().leaf())return ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_HEADING,dev.jasper.ui.metrics.Typography.Role.SECTION_LABEL);
             var value=presentation.get(itemId(index));
             return value==null || value.keycaps().isEmpty()?rowHeight:Math.max(rowHeight,new Keycaps(context(),value.keycaps().get()).heightAt(keyWidth(index,scroll.getViewport().getExtentSize().width))+2*detailInset());
         }
@@ -161,7 +168,7 @@ final class Trees {
             detail.body.setBounds(detailLeading(),top(index)+rowShellHeight(index)+inset,Math.max(0,width-detailLeading()-inset),Math.max(0,detailHeight()-2*inset));
             detail.body.doLayout();
         }
-        @Override void refresh(){super.refresh();if(detail!=null)detail.body.inheritedEnabled(interactive());}
+        @Override void refresh(){((TreePane)scroll).overlay(settingsNavigation);super.refresh();if(detail!=null)detail.body.inheritedEnabled(interactive());}
         @Override public void close(){try {if(detail!=null)detach(detail);}finally{super.close();}}
 
         Nodes.Tree value() {
@@ -297,7 +304,7 @@ final class Trees {
                     "@tree/" + node.id() + "/" + item.id() + "/status", ControlState.READY, status)));
             row.slot(row.leading, leading);
             for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon") && !settingsNavigation && presentation.isEmpty())icon.tile(0,false);
-            if(settingsNavigation || !presentation.isEmpty())for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon"))icon.tile(context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE),context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE),context().icons().size(Nodes.IconSize.CONTROL),selected.contains(item.id()));
+            if(settingsNavigation || !presentation.isEmpty())for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon"))icon.tile(context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE),context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE),settingsNavigation?context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_GLYPH):context().icons().size(Nodes.IconSize.CONTROL),selected.contains(item.id()));
             String titleId = "@tree/" + node.id() + "/" + item.id() + "/title";
             row.slot(
                     row.title,

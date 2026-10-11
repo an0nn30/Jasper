@@ -13,7 +13,7 @@ import static dev.jasper.ui.theme.SemanticColor.*;
  * tile, ring or hover paint treatment; those opacities belong to the kit.
  */
 public final class SemanticDefaults {
-    private static final List<SemanticColor> DEPENDENT = List.of(TEXT_ONACCENT_SECONDARY, BORDER_FOCUS,
+    private static final List<SemanticColor> DEPENDENT = List.of(TEXT_ONACCENT_SECONDARY, BORDER_IDENTITY, BORDER_FOCUS,
         BORDER_ERROR, ACCENT_HOVER, TEXT_LINK_HOVER, HOVER_OVERLAY, HUE_BLUE_SURFACE, HUE_GREEN_SURFACE, HUE_AMBER_SURFACE, HUE_PURPLE_SURFACE, HUE_NEUTRAL_SURFACE);
 
     private SemanticDefaults() {}
@@ -30,6 +30,7 @@ public final class SemanticDefaults {
             Color derived = switch (role) {
                 case TEXT_ONACCENT_SECONDARY -> ColorMath.opacity(colors.get(TEXT_ONACCENT), .60);
                 case BORDER_FOCUS -> colors.get(ACCENT);
+                case BORDER_IDENTITY -> colors.get(BORDER_CONTROL);
                 case BORDER_ERROR -> colors.get(STATUS_DANGER);
                 case ACCENT_HOVER -> ColorMath.mix(colors.get(TEXT_PRIMARY), colors.get(ACCENT), .08);
                 case TEXT_LINK_HOVER -> ColorMath.mix(colors.get(TEXT_PRIMARY), colors.get(TEXT_LINK), .08);
@@ -84,7 +85,7 @@ public final class SemanticDefaults {
             case HUE_GREEN -> terminal.ansi().get(2);
             case HUE_AMBER -> terminal.ansi().get(3);
             case HUE_PURPLE -> terminal.ansi().get(5);
-            case HUE_BLUE_SURFACE, HUE_GREEN_SURFACE, HUE_AMBER_SURFACE, HUE_PURPLE_SURFACE, HUE_NEUTRAL_SURFACE, TEXT_ONACCENT_SECONDARY, BORDER_FOCUS, BORDER_ERROR, ACCENT_HOVER, TEXT_LINK_HOVER, HOVER_OVERLAY ->
+            case BORDER_IDENTITY, HUE_BLUE_SURFACE, HUE_GREEN_SURFACE, HUE_AMBER_SURFACE, HUE_PURPLE_SURFACE, HUE_NEUTRAL_SURFACE, TEXT_ONACCENT_SECONDARY, BORDER_FOCUS, BORDER_ERROR, ACCENT_HOVER, TEXT_LINK_HOVER, HOVER_OVERLAY ->
                 throw new IllegalStateException("Dependent role cannot resolve before parents: " + role);
         };
     }

@@ -90,6 +90,21 @@ final class DecodedArtwork {
         if(snapshots.size()==8)snapshots.remove(snapshots.keySet().iterator().next());
         snapshots.put(extent,result);return result;
     }
+    /** Flattens already-composited alpha at every prepared density, outside paint; no derived global cache. */
+    static java.awt.Image foreground(java.awt.Image snapshot, java.awt.Color color) {
+        var sources=((java.awt.image.MultiResolutionImage)snapshot).getResolutionVariants();
+        var variants=new java.awt.Image[sources.size()];
+        for(int n=0;n<sources.size();n++) {
+            var source=(BufferedImage)sources.get(n);
+            int width=source.getWidth(),height=source.getHeight();
+            int[] pixels=source.getRGB(0,0,width,height,null,0,width);
+            for(int i=0;i<pixels.length;i++)pixels[i]=(pixels[i]&0xff000000)|(color.getRGB()&0xffffff);
+            var result=new BufferedImage(width,height,BufferedImage.TYPE_INT_ARGB);
+            result.setRGB(0,0,width,height,pixels,0,width);variants[n]=result;
+        }
+        return new java.awt.image.BaseMultiResolutionImage(variants);
+    }
+
     private static void dimensions(double width,double height)throws IOException {
         if(!Double.isFinite(width)||!Double.isFinite(height)||width<=0||height<=0||width>4096||height>4096||width*height>4_194_304)throw new IOException("Artwork dimensions exceed limits");
     }

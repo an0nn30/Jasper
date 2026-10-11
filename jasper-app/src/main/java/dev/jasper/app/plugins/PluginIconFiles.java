@@ -26,7 +26,7 @@ final class PluginIconFiles {
         String key = candidate.id() + "@" + candidate.descriptor().version() + "@" + candidate.directory() + "@" + name;
         // The cache owns raw content only. Presentation belongs to this descriptor, including same-version replacements.
         return CACHE.computeIfAbsent(key, ignored -> load(candidate, name))
-            .map(bytes -> bytes.withHue(candidate.descriptor().iconHue()));
+            .map(bytes -> bytes.withMetadata(candidate.descriptor().iconHue(), candidate.descriptor().iconSelectedInk()));
     }
 
     /** Test seam: how many icons have been read from jars. */

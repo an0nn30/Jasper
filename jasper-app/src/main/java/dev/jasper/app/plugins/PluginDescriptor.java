@@ -7,7 +7,13 @@ import java.util.Set;
 /** A validated {@code plugin.toml}. */
 record PluginDescriptor(String id, String name, Version version, String entry, VersionRange sdk,
                         String description, String vendor, Set<String> capabilities, Set<String> exports,
-                        List<Requirement> requires, String icon, String homepage, dev.jasper.ui.model.Nodes.Hue iconHue) {
+                        List<Requirement> requires, String icon, String homepage, dev.jasper.ui.model.Nodes.Hue iconHue, dev.jasper.ui.icons.IdentityArtwork.SelectedInk iconSelectedInk) {
+    PluginDescriptor(String id, String name, Version version, String entry, VersionRange sdk,
+                     String description, String vendor, Set<String> capabilities, Set<String> exports,
+                     List<Requirement> requires, String icon, String homepage, dev.jasper.ui.model.Nodes.Hue iconHue) {
+        this(id,name,version,entry,sdk,description,vendor,capabilities,exports,requires,icon,homepage,iconHue,
+            dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED);
+    }
     PluginDescriptor(String id, String name, Version version, String entry, VersionRange sdk,
                      String description, String vendor, Set<String> capabilities, Set<String> exports,
                      List<Requirement> requires, String icon, String homepage) {

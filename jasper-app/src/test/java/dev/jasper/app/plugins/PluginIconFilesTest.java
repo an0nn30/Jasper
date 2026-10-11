@@ -96,6 +96,22 @@ class PluginIconFilesTest {
         assertThat(row.icon().orElseThrow().identityArtwork().tileHue()).isEqualTo(dev.jasper.ui.model.Nodes.Hue.GREEN);
         assertThat(row.icon().orElseThrow().data()).isEqualTo(a.data());
     }
+    @Test void cachedBytesUseTheShownCandidatesSelectedInkAndDoNotInheritAPreviousPolicy() throws Exception {
+        var original=candidate("dev.example.ink", "icon = \"icons/tool.svg\"\nicon_hue = \"blue\"\n");
+        PluginJars.addResource(original.jars().getFirst(),"icons/tool.svg",SVG);
+        var descriptor=DescriptorParser.parse(PluginJars.descriptor(original.id(),"1.0.0","fix.Main")+"icon = \"icons/tool.svg\"\nicon_hue = \"blue\"\nicon_selected_ink = \"foreground\"\n");
+        var next=new PluginCandidate(descriptor,original.directory(),original.jars(),original.origin());
+        int before=PluginIconFiles.reads();var a=PluginIconFiles.read(original).orElseThrow();var b=PluginIconFiles.read(next).orElseThrow();
+        assertThat(a.artwork()).isSameAs(b.artwork());assertThat(a).isNotEqualTo(b);
+        assertThat(a.identityArtwork().selectedInk()).isEqualTo(dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED);
+        assertThat(b.identityArtwork().selectedInk()).isEqualTo(dev.jasper.ui.icons.IdentityArtwork.SelectedInk.FOREGROUND);
+        assertThat(PluginIconFiles.read(original)).contains(a);assertThat(PluginIconFiles.reads()-before).isEqualTo(1);
+        var launch=new PluginCatalog.Launch(List.of(original),List.of(PluginStatus.of(original,PluginStatus.State.ACTIVE,"")),PluginCatalog.versions(List.of(original)),false);
+        var state=Map.of(original.id(),new PluginStateStore.Entry(true,java.util.Set.of(),false));
+        var snapshot=PluginCatalog.compute(launch,new PluginCatalog.Disk(List.of(original),Map.of(original.id(),next),state),Version.parse(dev.jasper.sdk.JasperSdk.VERSION),id->0,root);
+        assertThat(snapshot.rows().getFirst().icon()).contains(b);
+    }
+
     @Test void readsTheNamedIconOnceAndGivesNoneWhenMissingOrTooLarge() throws Exception {
         var withIcon = candidate("dev.example.icon", "icon = \"icons/tool.svg\"\n");
         PluginJars.addResource(withIcon.jars().get(0), "icons/tool.svg", SVG);

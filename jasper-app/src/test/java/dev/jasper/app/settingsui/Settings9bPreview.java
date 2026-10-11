@@ -30,11 +30,12 @@ public final class Settings9bPreview {
     private Settings9bPreview() {}
     public static void main(String[] args) throws Exception {
         Path output=Path.of(args[0]),home=Files.createTempDirectory("jasper-settings9b-");
+        boolean allPages=java.util.Arrays.asList(args).contains("--all-pages");
         var holder=new JComponent[1];
         var windows=new AuxiliaryWindows(UiState.inMemory(),surface->{holder[0]=surface.holder();return new AuxiliarySurface.Shell(()->{},()->{},()->{},title->{},()->new Rectangle(0,0,980,681),(title,initial)->Optional.empty());});
         var themes=new ThemeController[1];var runtime=new PluginRuntime[1];var manager=new PluginManager[1];var contributions=new Contributions();
         try {
-            Files.writeString(home.resolve("plugins.toml"),"version = 1\n[plugins.\"dev.jasper.sample\"]\nenabled = false\nconsented = []\n");
+            if(!allPages)Files.writeString(home.resolve("plugins.toml"),"version = 1\n[plugins.\"dev.jasper.sample\"]\nenabled = false\nconsented = []\n");
             Path file=home.resolve("config.toml");Files.writeString(file,SettingsSurfacePreview.CONFIG);Files.createDirectories(home.resolve("themes"));
             try(var in=Settings9bPreview.class.getResourceAsStream("/dev/jasper/app/appearance/desktop-settings.toml")){Files.copy(in,home.resolve("themes/slate-steel.toml"));}
             Files.writeString(home.resolve("themes/custom.toml"),Files.readString(home.resolve("themes/slate-steel.toml")).replace("Slate Steel","Copper Night").replace("#4e7db4","#bc784d"));
@@ -62,6 +63,34 @@ public final class Settings9bPreview {
                 SwingUtilities.invokeAndWait(()->{
                     var d=dialog[0];Path dir=output.resolve(family+"-"+font);
                     try {
+                        if(allPages) {
+                            var inventory=new StringBuilder("id\ttitle\tactual owner\treference disposition\n");
+                            var ids=d.pages().stream().map(SettingsPage::id).collect(java.util.stream.Collectors.toSet());
+                            if(ids.size()!=21 || ids.contains("plugin.dev.jasper.snippets"))throw new AssertionError("Expected14core +7activeTools: "+ids);
+                            for(var page:d.pages()) {
+                                d.select(page.id());
+                                String disposition=List.of("appearance","window","notifications","keymap","plugins").contains(page.id())?"pictured owner; separate source-state comparison":"unpictured actual owner viability";
+                                inventory.append(page.id()).append('\t').append(page.title()).append('\t').append(page.getClass().getName()).append('\t').append(disposition).append('\n');
+                                for(var size:List.of(new Dimension(980,681),new Dimension(640,681),new Dimension(980,400)))
+                                    SettingsSurfacePreview.save(d,holder[0],dir.resolve("all-pages").resolve(page.id()+"-"+size.width+"x"+size.height+".png"),size.width,size.height);
+                            }
+                            var pluginPage=d.pages().stream().filter(page->page.id().equals("plugins")).findFirst().orElseThrow();
+                            d.select("plugins");
+                            for(String name:List.of("Credential Vault","Editor","File Server","Project Index","Remote","Sample","Shell History","Snippets")) {
+                                pluginPage.highlight(name);
+                                SettingsSurfacePreview.save(d,holder[0],dir.resolve("all-identities").resolve(name.replace(' ','-')+".png"),980,682);
+                            }
+                            for(var stub:dev.jasper.app.plugins.SettingsStubTestAccess.pages(()->themes[0].appearance().context(ThemeRoute.CHROME))) {
+                                try {
+                                    var component=stub.component();component.setSize(600,300);KitTestSupport.layout(component);
+                                    var image=new java.awt.image.BufferedImage(1200,600,java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();try{g.scale(2,2);component.printAll(g);}finally{g.dispose();}
+                                    Path fileOut=dir.resolve("conditional-stubs").resolve(stub.id()+".png");Files.createDirectories(fileOut.getParent());javax.imageio.ImageIO.write(image,"png",fileOut.toFile());
+                                    inventory.append(stub.id()).append('\t').append(stub.title()).append('\t').append(stub.getClass().getName()).append("\tunpictured conditional actual owner; isolated600x300 device2\n");
+                                }finally{stub.dispose();}
+                            }
+                            Files.writeString(dir.resolve("all-pages/inventory.tsv"),inventory);
+                            return;
+                        }
                         d.pages().stream().filter(page->page.id().equals("plugins")).findFirst().orElseThrow().highlight("Credential Vault");
                         SettingsSurfacePreview.save(d,holder[0],dir.resolve("plugins-full.png"),980,682);
                         crop(dir.resolve("plugins-full.png"),dir.resolve("plugins-content.png"),472,0,1488,1364);
@@ -98,7 +127,7 @@ public final class Settings9bPreview {
                         SettingsSurfacePreview.save(d,holder[0],dir.resolve("keymap-literal-return.png"),980,681);
                         KitTestSupport.require(d.view(),"editor.set",AbstractButton.class).doClick(0);
                         SettingsSurfacePreview.save(d,holder[0],dir.resolve("keymap-staging-busy.png"),980,681);
-                    } finally {d.cancel();}
+                    } catch(java.io.IOException failure) {throw new java.io.UncheckedIOException(failure);} finally {d.cancel();}
                 });
             }
         } finally {
@@ -108,7 +137,7 @@ public final class Settings9bPreview {
         }
     }
     private static NotificationGroupChoices.Group group(PluginRuntime runtime,String id,String name,String owner,String ownerId) {
-        return new NotificationGroupChoices.Group(id,name,owner,"card",ownerId,"plugin",Optional.ofNullable(runtime.pluginIcons().get(ownerId)).map(PluginRuntime.PluginIcon::artwork),Optional.ofNullable(runtime.pluginIcons().get(ownerId)).map(icon->icon.identityArtwork().tileHue()).orElse(dev.jasper.ui.model.Nodes.Hue.NEUTRAL));
+        return new NotificationGroupChoices.Group(id,name,owner,"card",ownerId,"plugin",Optional.ofNullable(runtime.pluginIcons().get(ownerId)).map(PluginRuntime.PluginIcon::artwork),Optional.ofNullable(runtime.pluginIcons().get(ownerId)).map(icon->icon.identityArtwork().tileHue()).orElse(dev.jasper.ui.model.Nodes.Hue.NEUTRAL),Optional.ofNullable(runtime.pluginIcons().get(ownerId)).map(icon->icon.identityArtwork().selectedInk()).orElse(dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED));
     }
     private static void click(JComponent component) {
         component.dispatchEvent(new MouseEvent(component,MouseEvent.MOUSE_CLICKED,0,0,Math.max(1,component.getWidth()/2),Math.max(1,component.getHeight()/2),1,false,MouseEvent.BUTTON1));

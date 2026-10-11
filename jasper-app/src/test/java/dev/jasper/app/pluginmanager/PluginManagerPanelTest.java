@@ -41,6 +41,22 @@ class PluginManagerPanelTest {
 
     private JButton primary() { return PluginKit.button(panel.detailsPane().header(), PluginDetails.PRIMARY); }
 
+    @Test void actualSourceCopyUsesTwoReadableOverviewLinesAtTheSourceAllocation() throws Exception {
+        var themes=new dev.jasper.app.appearance.ThemeController();
+        themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
+        var actual=new PluginManagerPanel(themes.appearance().context(ThemeRoute.CHROME),handlers);
+        try {
+            String copy="Accounts, SSH keys and secure notes in one encrypted file bound to this device; other plugins fetch credentials under per-plugin grants.";
+            actual.show(snapshot(TestRows.plugin("dev.jasper.vault","Credential Vault").description(copy).row()));
+            actual.setSize(744,582);for(int i=0;i<4;i++)KitTestSupport.layout(actual);
+            var area=actual.detailsPane().textArea();
+            var first=area.modelToView2D(0);var last=area.modelToView2D(copy.length()-1);
+            assertThat(last.getY()-first.getY()).as("same literal source description occupies two lines at744logical content allocation")
+                .isLessThanOrEqualTo(area.getFontMetrics(area.getFont()).getHeight());
+            assertThat(area.getText()).isEqualTo(copy);
+        }finally{actual.close();themes.close();}
+    }
+
     @Test void nativeDescriptionUsesExactlyOnceKitFontAndRetainsItsDocument() {
         var themes=new dev.jasper.app.appearance.ThemeController();
         themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
@@ -109,7 +125,7 @@ class PluginManagerPanelTest {
         panel.setSize(744,600);KitTestSupport.layout(panel);
         var icon=KitTestSupport.find(panel,"icon",JLabel.class);
         assertThat(icon).as("shared receiving icon replaces private canvas").isNotNull();
-        assertThat(icon.getWidth()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(52));
+        assertThat(icon.getWidth()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(54));
         var search=PluginKit.field(panel.searchView(),PluginManagerPanel.SEARCH);
         var point=javax.swing.SwingUtilities.convertPoint(search,search.getWidth(),0,panel);
         var detail=javax.swing.SwingUtilities.convertPoint(panel.detailsPane().component(),0,0,panel);

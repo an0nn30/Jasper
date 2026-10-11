@@ -253,6 +253,11 @@ tasks.register<JavaExec>("settings9bPreview") {
     dependsOn(tasks.testClasses, stagePlugins)
     classpath = sourceSets["test"].runtimeClasspath
     mainClass = "dev.jasper.app.settingsui.Settings9bPreview"
+    val captureHome = layout.buildDirectory.dir("settings-preview-home").get().asFile.absolutePath
+    systemProperty("user.home", captureHome)
+    environment("HISTFILE", "$captureHome/.zsh_history")
+    environment("XDG_CONFIG_HOME", "$captureHome/.config")
+    environment("APPDATA", "$captureHome/AppData/Roaming")
     systemProperty("jasper.stagedPlugins", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
     args(layout.buildDirectory.dir("theme-surfaces9b").get().asFile.absolutePath)
     jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")

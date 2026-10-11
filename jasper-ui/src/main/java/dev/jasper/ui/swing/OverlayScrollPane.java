@@ -12,14 +12,17 @@ import javax.swing.plaf.basic.BasicScrollBarUI;
  * revealing it never moves the columns. A held thumb drag stays visible; the thumb hides after the idle delay and when
  * the pane leaves the screen. EDT only.
  */
-final class OverlayScrollPane extends JScrollPane {
+class OverlayScrollPane extends JScrollPane {
     private final KitContext context;
     private boolean scrolling;
+    private boolean overlay;
+    private final int nativeScrollMode;
     private int previousValue;
     private final Timer idle;
 
-    OverlayScrollPane(KitContext context) {
-        this.context = context;
+    OverlayScrollPane(KitContext context) { this(context,true); }
+    OverlayScrollPane(KitContext context,boolean enabled) {
+        this.context = context;this.overlay=enabled;nativeScrollMode=getViewport().getScrollMode();
         idle = new Timer(context.metrics().value(DesignMetrics.Role.OVERLAY_SCROLLBAR_IDLE_MILLIS), event -> {
             if (getVerticalScrollBar().getValueIsAdjusting()) ((Timer) event.getSource()).restart();
             else stop();
@@ -29,7 +32,7 @@ final class OverlayScrollPane extends JScrollPane {
         setLayout(new ScrollPaneLayout() {
             @Override public void layoutContainer(Container parent) {
                 super.layoutContainer(parent);
-                if (vsb == null || !vsb.isVisible()) return;
+                if (!overlay || vsb == null || !vsb.isVisible()) return;
                 Rectangle bounds = viewport.getBounds();
                 int reserved = vsb.getWidth();
                 boolean leftToRight = parent.getComponentOrientation().isLeftToRight();
@@ -45,10 +48,10 @@ final class OverlayScrollPane extends JScrollPane {
         });
         setComponentZOrder(getVerticalScrollBar(), 0);
         // A blit could copy an old overlay thumb along with the row pixels.
-        getViewport().setScrollMode(JViewport.SIMPLE_SCROLL_MODE);
+        getViewport().setScrollMode(overlay?JViewport.SIMPLE_SCROLL_MODE:nativeScrollMode);
         getVerticalScrollBar().addAdjustmentListener(event -> {
             int value = event.getValue();
-            if (value != previousValue && isShowing()) {
+            if (overlay && value != previousValue && isShowing()) {
                 scrolling = true;
                 repaint();
             }
@@ -60,8 +63,14 @@ final class OverlayScrollPane extends JScrollPane {
         });
     }
 
-    @Override public boolean isOptimizedDrawingEnabled() { return false; }
-    @Override protected boolean isPaintingOrigin() { return true; }
+    void overlay(boolean enabled) {
+        if(overlay==enabled)return;
+        stop();overlay=enabled;getVerticalScrollBar().updateUI();
+        getViewport().setScrollMode(enabled?JViewport.SIMPLE_SCROLL_MODE:nativeScrollMode);
+        revalidate();repaint();
+    }
+    @Override public boolean isOptimizedDrawingEnabled() { return overlay?false:super.isOptimizedDrawingEnabled(); }
+    @Override protected boolean isPaintingOrigin() { return overlay || super.isPaintingOrigin(); }
 
     /** Hides the thumb and cancels the idle timer. */
     void stop() {
@@ -79,6 +88,7 @@ final class OverlayScrollPane extends JScrollPane {
         Thumb() { super(JScrollBar.VERTICAL); }
 
         @Override public void updateUI() {
+            if(!overlay){setOpaque(true);super.updateUI();return;}
             setUI(new BasicScrollBarUI() {
                 @Override protected JButton createDecreaseButton(int orientation) { return empty(); }
                 @Override protected JButton createIncreaseButton(int orientation) { return empty(); }
@@ -100,8 +110,8 @@ final class OverlayScrollPane extends JScrollPane {
             setOpaque(false);
         }
 
-        @Override public void paint(Graphics graphics) { if (scrolling) super.paint(graphics); }
-        @Override public boolean contains(int x, int y) { return scrolling && super.contains(x, y); }
+        @Override public void paint(Graphics graphics) { if (!overlay || scrolling) super.paint(graphics); }
+        @Override public boolean contains(int x, int y) { return (!overlay || scrolling) && super.contains(x, y); }
     }
 
     private static JButton empty() {

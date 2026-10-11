@@ -12,6 +12,22 @@ import static org.assertj.core.api.Assertions.*;
 import static dev.jasper.ui.swing.KitViewTest.*;
 
 class TextFieldsTest {
+    @Test void ordinarySearchUsesOriginalSiblingWhileCompactPanelKeepsItsIndependentGlyph() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            var spec=new ViewSpec(new Nodes.Field("search",ControlState.READY,Nodes.FieldKind.SEARCH,"","Search","Search",""));
+            try(var view=new KitView(context,spec,event->{})) {
+                var field=(TextFields.FieldControl)view.control("search");
+                int extent=com.formdev.flatlaf.util.UIScale.scale(context.icons().size(Nodes.IconSize.CONTROL));
+                assertThat(pixels(field.leading.getIcon())).isEqualTo(pixels(context.icons().icon("search",context.theme(),dev.jasper.ui.theme.SemanticColor.TEXT_PLACEHOLDER,extent)));
+                field.panelSearch=true;field.refresh();
+                int rail=com.formdev.flatlaf.util.UIScale.scale(context.icons().size(Nodes.IconSize.RAIL));
+                assertThat(pixels(field.leading.getIcon())).isEqualTo(pixels(context.icons().panel("search",context.theme().semantic(),dev.jasper.ui.theme.SemanticColor.HUE_NEUTRAL,rail)));
+            }finally{release(context);}
+        });
+    }
+    private static int[] pixels(javax.swing.Icon icon){var image=new java.awt.image.BufferedImage(icon.getIconWidth()*2,icon.getIconHeight()*2,java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();try{g.scale(2,2);icon.paintIcon(null,g,0,0);}finally{g.dispose();}return image.getRGB(0,0,image.getWidth(),image.getHeight(),null,0,image.getWidth());}
+
     @Test void incomingNumericShapeControlsDescriptorWritesAndPreservesDocument() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();

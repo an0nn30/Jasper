@@ -18,7 +18,7 @@ final class DescriptorParser {
     static final List<String> FORBIDDEN_PACKAGES = List.of("dev.jasper.sdk", "dev.jasper.app",
         "dev.jasper.terminal", "dev.jasper.buddy", "java", "javax", "jdk");
     private static final Set<String> KEYS = Set.of("id", "name", "version", "entry", "sdk", "description",
-        "vendor", "capabilities", "exports", "requires", "icon", "homepage", "icon_hue");
+        "vendor", "capabilities", "exports", "requires", "icon", "homepage", "icon_hue", "icon_selected_ink");
     private static final System.Logger LOG = System.getLogger(DescriptorParser.class.getName());
     private static final String CLASS_NAME = "[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+";
     private static final String PACKAGE_NAME = "[a-z_][a-z0-9_]*(\\.[a-z_][a-z0-9_]*)*";
@@ -62,7 +62,20 @@ final class DescriptorParser {
         }
         return new PluginDescriptor(id, name, version, entry, sdk, text(toml, "description", false),
             text(toml, "vendor", false), capabilities, exports, requires(toml, id),
-            icon(text(toml, "icon", false), id), homepage(text(toml, "homepage", false), id), iconHue(toml, id));
+            icon(text(toml, "icon", false), id), homepage(text(toml, "homepage", false), id), iconHue(toml, id), iconSelectedInk(toml, id));
+    }
+
+    private static dev.jasper.ui.icons.IdentityArtwork.SelectedInk iconSelectedInk(TomlTable toml, String id) throws InvalidDescriptor {
+        if (!toml.contains("icon_selected_ink")) return dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED;
+        String value = text(toml, "icon_selected_ink", false);
+        return switch (value) {
+            case "authored" -> dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED;
+            case "foreground" -> dev.jasper.ui.icons.IdentityArtwork.SelectedInk.FOREGROUND;
+            default -> {
+                LOG.log(System.Logger.Level.WARNING, "Plugin " + id + ": invalid icon_selected_ink; using authored: " + value);
+                yield dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED;
+            }
+        };
     }
 
     private static dev.jasper.ui.model.Nodes.Hue iconHue(TomlTable toml, String id) throws InvalidDescriptor {

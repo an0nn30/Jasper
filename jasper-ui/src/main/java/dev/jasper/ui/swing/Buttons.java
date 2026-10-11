@@ -158,6 +158,11 @@ final class Buttons {
         }
         @Override public Dimension getPreferredSize() {
             Dimension size = super.getPreferredSize();
+            if(getText()==null || getText().isEmpty()) {
+                if(circular) {int extent=ThemePainting.metric(context,DesignMetrics.Role.CIRCULAR_ACTION_SIZE);return new Dimension(extent,extent);}
+                if(getParent() instanceof Stacks.StackSurface surface && surface.joined)
+                    return new Dimension(ThemePainting.metric(context,DesignMetrics.Role.JOINED_ACTION_WIDTH),ThemePainting.metric(context,DesignMetrics.Role.JOINED_ACTION_HEIGHT));
+            }
             // The shared painter uses fractional metrics; Swing's integer preferred width can
             // truncate even an unconstrained content-sized label (for example “Choose…”).
             if (getText() != null && !getText().isEmpty()) {

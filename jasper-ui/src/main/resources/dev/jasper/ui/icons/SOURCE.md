@@ -1,6 +1,6 @@
 # Selected Jasper engine originals
 
-This engine catalog admits only ten byte-identical SVG files listed in assets-selected.tsv.
+This engine catalog admits only fourteen byte-identical SVG files listed in assets-selected.tsv.
 Recovered from Jasper revision d0f2747eb3ccb3e0fd8e01f4719cfd18aff17e38 (aab810d2 parent),
 whose upstream revision and original complete-catalog provenance follow below. The complete catalog,
 its generated SDK BundledIcon API and refresh script described below are historical provenance;

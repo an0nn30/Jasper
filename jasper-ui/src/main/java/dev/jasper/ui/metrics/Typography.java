@@ -15,7 +15,7 @@ public final class Typography {
         HERO_TITLE(15, 600), DETAIL_TITLE(16, 600), WINDOW_TITLE(13, 600), PANEL_TITLE(13, 600), PANEL_DETAIL_TITLE(12.5f, 600), PANEL_DETAIL_LABEL(12, 400), PANEL_HEADER_TITLE(12.5f, 600), PANEL_HEADER_COUNT(11.5f, 400), PANEL_SEARCH(12,400), PANEL_ROW_SELECTED(12,500), PANEL_ROW_SECONDARY(13.25f,400), PANEL_DETAIL_MONO(11.65f,400),
         PICKER_COMPACT(10, 400), PICKER_CAPTION(9, 400),
         BODY(13, 400), BODY_STRONG(13, 500), LABEL(12.5f, 400), DESCRIPTION(12.5f, 400),
-        SUPPORTING(11.5f, 400), CAPTION(11.5f, 400), SETTING_DESCRIPTION(11, 400), SECTION_LABEL(11, 600), COUNT(11, 400), CHIP(9.5f, 400), MONO(12, 400), MONO_SMALL(11.5f, 400), MONO_CAPTION(11.5f, 400);
+        SUPPORTING(11.5f, 400), CAPTION(11.5f, 400), SETTING_DESCRIPTION(11, 400), SECTION_LABEL(11, 600), COUNT(11, 400), CHIP(9.5f, 400), MONO(12, 400), MONO_SMALL(11.5f, 400), MONO_CAPTION(11, 400);
         private final float size;
         private final int weight;
         Role(float size, int weight) { this.size = size; this.weight = weight; }
@@ -42,22 +42,21 @@ public final class Typography {
         String resolved = role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION || role == Role.PANEL_DETAIL_MONO ? Font.MONOSPACED : family;
         int weight = selected && role == Role.LABEL ? 500 : role.weight;
         // The native macOS text face best matches regular desktop roles. Explicit user families bypass this policy.
-        if (platformDefault && weight < 600 && resolved.equals("Helvetica Neue") && AppleText.AVAILABLE)
+        if (platformDefault && role != Role.BODY && weight < 600 && resolved.equals("Helvetica Neue") && AppleText.AVAILABLE)
             resolved = ".AppleSystemUIFont";
         // JBR maps Helvetica Neue's numeric semibold to regular. Use its installed medium face;
         // the small family-wide tracking adjustment is calibrated from original desktop title ink.
         if (weight == 600 && resolved.equals("Helvetica Neue") && HelveticaMedium.AVAILABLE)
             return HelveticaMedium.FONT.deriveFont(Map.of(TextAttribute.SIZE, role.size * bodySize / 13f,
-                TextAttribute.TRACKING, .018f));
+                TextAttribute.TRACKING, platformDefault && role == Role.SECTION_LABEL ? .060f : .018f));
         return new Font(resolved, Font.PLAIN, 1).deriveFont(Map.of(
             TextAttribute.SIZE, role.size * bodySize / 13f,
             TextAttribute.WEIGHT, weight == 600 ? TextAttribute.WEIGHT_SEMIBOLD
                 : weight == 500 ? TextAttribute.WEIGHT_MEDIUM : TextAttribute.WEIGHT_REGULAR));
     }
-    /** Selected results retain their declared role family and size, with strong title/detail emphasis. */
+    /** Result selection changes receiving ink; every declared role keeps its family, size and weight. */
     public Font resultFont(Role role, boolean selected) {
-        Font base = font(role);
-        return selected ? base.deriveFont(Map.of(TextAttribute.WEIGHT, TextAttribute.WEIGHT_BOLD)) : base;
+        return font(role);
     }
     private static final class AppleText {
         static final boolean AVAILABLE = !new Font(".AppleSystemUIFont", Font.PLAIN, 1).getFamily(Locale.ROOT).equals(Font.DIALOG);

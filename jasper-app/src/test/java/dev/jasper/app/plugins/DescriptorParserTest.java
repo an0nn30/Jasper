@@ -52,6 +52,54 @@ class DescriptorParserTest {
         assertThatThrownBy(()->DescriptorParser.parse("icon_hue = 12\n"+FULL)).hasMessageContaining("icon_hue must be a string");
         assertThatThrownBy(()->DescriptorParser.parse("arbitrary_hue = \"blue\"\n"+FULL)).hasMessageContaining("Unknown key");
     }
+    @Test void selectedInkDefaultsWarningsAndStructuralErrorsHaveDistinctPolicies() throws Exception {
+        for(var hue:dev.jasper.ui.icons.IdentityArtwork.SelectedInk.values()) {
+            assertThat(DescriptorParser.parse("icon_selected_ink = \""+hue.name().toLowerCase(java.util.Locale.ROOT)+"\"\n"+FULL).iconSelectedInk()).isEqualTo(hue);
+        }
+        assertThat(DescriptorParser.parse(FULL).iconSelectedInk()).isEqualTo(dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED);
+        var logger = java.util.logging.Logger.getLogger(DescriptorParser.class.getName());
+        var previousLevel = logger.getLevel();
+        boolean previousParents = logger.getUseParentHandlers();
+        var records = new java.util.ArrayList<java.util.logging.LogRecord>();
+        var handler = new java.util.logging.Handler() {
+            @Override public void publish(java.util.logging.LogRecord record) { records.add(record); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        handler.setLevel(java.util.logging.Level.ALL);
+        logger.addHandler(handler);
+        logger.setLevel(java.util.logging.Level.ALL);
+        logger.setUseParentHandlers(false);
+        try {
+            var invalid = List.of("none", "RGB", "auto", "Foreground", "");
+            for (String bad : invalid) {
+                assertThat(DescriptorParser.parse("icon_selected_ink = \"" + bad + "\"\n" + FULL).iconSelectedInk())
+                    .isEqualTo(dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED);
+            }
+            assertThat(records).extracting(java.util.logging.LogRecord::getMessage)
+                .containsExactlyElementsOf(invalid.stream()
+                    .map(value -> "Plugin dev.jasper.ssh: invalid icon_selected_ink; using authored: " + value).toList());
+            assertThat(records).allSatisfy(record -> {
+                assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
+                assertThat(record.getLoggerName()).isEqualTo(DescriptorParser.class.getName());
+            });
+        } finally {
+            logger.removeHandler(handler);
+            logger.setLevel(previousLevel);
+            logger.setUseParentHandlers(previousParents);
+        }
+        assertThatThrownBy(()->DescriptorParser.parse("icon_selected_ink = 12\n"+FULL)).hasMessageContaining("icon_selected_ink must be a string");
+        assertThatThrownBy(()->DescriptorParser.parse("arbitrary_hue = \"blue\"\n"+FULL)).hasMessageContaining("Unknown key");
+    }
+    @Test void selectedInkTokensAreAcceptedWithoutWeakeningStrictUnknownKeyValidation() {
+        for (String token : List.of("authored", "foreground"))
+            assertThatCode(() -> DescriptorParser.parse("icon_selected_ink = \"" + token + "\"\n" + FULL)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> DescriptorParser.parse("icon_selected_ink = 12\n" + FULL))
+            .hasMessageContaining("icon_selected_ink must be a string");
+        assertThatThrownBy(() -> DescriptorParser.parse("icon_arbitrary_state = \"foreground\"\n" + FULL))
+            .hasMessageContaining("Unknown key");
+    }
+
     private static final String FULL = """
         id = "dev.jasper.ssh"
         name = "SSH"

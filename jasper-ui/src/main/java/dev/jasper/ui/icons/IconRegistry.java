@@ -24,7 +24,7 @@ public final class IconRegistry implements AutoCloseable {
     private static final Set<String> FINE_PANEL_BUILT_INS = Set.of("add", "search", "edit");
     private final Map<String, Received> encoded = new LinkedHashMap<>();
     private final Map<String, IconArtwork> artworks = new LinkedHashMap<>();
-    private record Received(DecodedArtwork artwork, Nodes.Hue tileHue) { }
+    private record Received(DecodedArtwork artwork, Nodes.Hue tileHue, IdentityArtwork.SelectedInk selectedInk) { }
     private boolean closed;
     public IconRegistry() { prepareBuiltIns(); artworks.putAll(BUILT_INS); }
     /** Optional off-EDT production prewarm; standalone construction remains self-contained. */
@@ -39,18 +39,18 @@ public final class IconRegistry implements AutoCloseable {
     }
     /** Registers authored color artwork atomically; decoding occurs before publication. */
     public synchronized IconRegistration register(String name, EncodedArtwork artwork) {
-        return register(name, artwork, null);
+        return register(name, artwork, null, IdentityArtwork.SelectedInk.AUTHORED);
     }
     /** Registers immutable identity metadata; declared hue takes precedence only in tiles. */
     public synchronized IconRegistration register(String name, IdentityArtwork identity) {
         Objects.requireNonNull(identity);
-        return register(name, identity.artwork(), identity.tileHue());
+        return register(name, identity.artwork(), identity.tileHue(), identity.selectedInk());
     }
-    private IconRegistration register(String name, EncodedArtwork artwork, Nodes.Hue hue) {
+    private IconRegistration register(String name, EncodedArtwork artwork, Nodes.Hue hue, IdentityArtwork.SelectedInk selectedInk) {
         requireOpen(); Objects.requireNonNull(name); Objects.requireNonNull(artwork);
         if (!name.matches("[a-z][a-z0-9.-]*:[a-z][a-z0-9.-]*")) throw new IllegalArgumentException("Icon name must be namespace:name");
         if (artworks.containsKey(name) || encoded.containsKey(name)) throw new IllegalArgumentException("Icon already registered: " + name);
-        var decoded = new Received(artwork.decoded(), hue); encoded.put(name, decoded);
+        var decoded = new Received(artwork.decoded(), hue, selectedInk); encoded.put(name, decoded);
         return new IconRegistration(() -> { synchronized (this) { encoded.remove(name, decoded); } });
     }
     /** Authored artwork ignores tint; callers may reuse its prepared Icon on hover. */
@@ -71,7 +71,7 @@ public final class IconRegistry implements AutoCloseable {
         return ordinary(name, theme, theme.semantic(), theme.semantic().color(tint), logicalSize);
     }
     private Icon ordinary(String name, GeneratedTheme theme, SemanticPalette palette, Color foreground, int size) {
-        return painted(name,foreground,null,size,size,false,false,0,false,select(name,theme,palette,true),null);
+        return painted(name,foreground,null,size,size,false,false,0,false,select(name,theme,palette,true),false);
     }
     private DecodedArtwork select(String name, GeneratedTheme theme, SemanticPalette palette, boolean ordinary) {
         var pair=BuiltInArtwork.catalog().get(name);
@@ -89,8 +89,8 @@ public final class IconRegistry implements AutoCloseable {
             var path=artworks.get(name);
             var registration=encoded.get(name);
             var received=registration==null?null:registration.artwork();
-            Icon light=pair==null && received==null?null:painted(name,Color.BLACK,null,logicalSize,logicalSize,false,false,0,false,pair==null?received:pair.light(),null);
-            Icon dark=pair==null?light:painted(name,Color.BLACK,null,logicalSize,logicalSize,false,false,0,false,pair.dark(),null);
+            Icon light=pair==null && received==null?null:painted(name,Color.BLACK,null,logicalSize,logicalSize,false,false,0,false,pair==null?received:pair.light(),false);
+            Icon dark=pair==null?light:painted(name,Color.BLACK,null,logicalSize,logicalSize,false,false,0,false,pair.dark(),false);
             return new PreparedIcon(name,logicalSize,path,light,dark);
         }
     }
@@ -126,13 +126,13 @@ public final class IconRegistry implements AutoCloseable {
     }
     /** Hero glyphs retain a 1.75-logical-pixel optical stroke at the canonical 24px size. */
     public Icon hero(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize) {
-        return painted(name,tint(palette,hue),null,logicalSize,logicalSize,false,true,0,false,select(name,null,palette,false),null);
+        return painted(name,tint(palette,hue),null,logicalSize,logicalSize,false,true,0,false,select(name,null,palette,false),false);
     }
     /** Compact panel artwork uses a lighter optical stroke for canonical built-ins only.
      * Custom registrations retain their validated authored stroke.
      */
     public synchronized Icon panel(String name, SemanticPalette palette, SemanticColor tint, int logicalSize) {
-        return painted(name, palette.color(tint), null, logicalSize, logicalSize, false, false, 0, artworks.get(name) == BUILT_INS.get(name),select(name,null,palette,false),null);
+        return painted(name, palette.color(tint), null, logicalSize, logicalSize, false, false, 0, artworks.get(name) == BUILT_INS.get(name),select(name,null,palette,false),false);
     }
     /** Explicit semantic text tint for hover, accent fills and status indications. */
     public Icon icon(String name, SemanticPalette palette, SemanticColor tint, int logicalSize) {
@@ -146,7 +146,7 @@ public final class IconRegistry implements AutoCloseable {
         // Existing explicit surface routes retain their path/tint contract. New catalog-only meanings remain usable.
         var pair=artworks.containsKey(name)?null:BuiltInArtwork.catalog().get(name);
         return painted(name,surfaceTint(surface,foreground),null,logicalSize,logicalSize,false,false,0,false,
-            pair==null?null:pair.select(ColorMath.luminance(surface)<.5),null);
+            pair==null?null:pair.select(ColorMath.luminance(surface)<.5),false);
     }
     /** The tint {@link #icon(String, Color, Color, int)} paints; one module rule for surface-tinted artwork. */
     public static Color surfaceTint(Color surface, Color foreground) {
@@ -171,11 +171,20 @@ public final class IconRegistry implements AutoCloseable {
     public Icon tile(String name, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, boolean selected) {
         return tile(name,theme.semantic(),theme,hue,width,height,glyphSize,selected);
     }
+    /** Receiving identity header: normal authored ink with the shared inward semantic contour. */
+    public Icon identityHeader(String name, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize) {
+        return tile(name,theme.semantic(),theme,hue,width,height,glyphSize,false,theme.semantic().color(SemanticColor.BORDER_IDENTITY));
+    }
     private Icon tile(String name, SemanticPalette palette, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, boolean selected) {
+        return tile(name,palette,theme,hue,width,height,glyphSize,selected,null);
+    }
+    private Icon tile(String name, SemanticPalette palette, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, boolean selected, Color outline) {
         if (glyphSize < 0 || glyphSize > Math.min(width, height)) throw new IllegalArgumentException("Invalid tile glyph size");
+        boolean selectedForeground;
         synchronized (this) {
             var identity = encoded.get(name);
             if (identity != null && identity.tileHue() != null) hue = identity.tileHue();
+            selectedForeground = selected && identity != null && identity.selectedInk() == IdentityArtwork.SelectedInk.FOREGROUND;
         }
         Color foreground = selected ? palette.color(SemanticColor.TEXT_ONACCENT) : tint(palette, hue);
         Color fill = selected ? foreground : palette.color(switch(hue) {
@@ -183,15 +192,15 @@ public final class IconRegistry implements AutoCloseable {
             case AMBER -> SemanticColor.HUE_AMBER_SURFACE; case PURPLE -> SemanticColor.HUE_PURPLE_SURFACE;
             case NEUTRAL -> SemanticColor.HUE_NEUTRAL_SURFACE; case NONE -> SemanticColor.TEXT_SECONDARY;
         });
-        return painted(name, foreground, ColorMath.opacity(fill, .18), width, height, true, false, glyphSize,false,select(name,theme,palette,false),null);
+        return painted(name, foreground, ColorMath.opacity(fill, .18), width, height, true, false, glyphSize,false,select(name,theme,palette,false),selectedForeground,outline);
     }
     /** Compact context preserves calibrated legacy settings/chevron optics. */
     public Icon panel(String name,GeneratedTheme theme,SemanticColor tint,int size) {
-        return painted(name,theme.semantic().color(tint),null,size,size,false,false,0,artworks.get(name)==BUILT_INS.get(name),select(name,theme,theme.semantic(),false),null);
+        return painted(name,theme.semantic().color(tint),null,size,size,false,false,0,artworks.get(name)==BUILT_INS.get(name),select(name,theme,theme.semantic(),false),false);
     }
     /** Hero context retains legacy geometry except explicitly admitted identity meanings. */
     public Icon hero(String name,GeneratedTheme theme,Nodes.Hue hue,int size) {
-        return painted(name,tint(theme.semantic(),hue),null,size,size,false,true,0,false,select(name,theme,theme.semantic(),false),null);
+        return painted(name,tint(theme.semantic(),hue),null,size,size,false,true,0,false,select(name,theme,theme.semantic(),false),false);
     }
     public int size(Nodes.IconSize size) {
         return DesignMetrics.DEFAULT.value(switch (size) {
@@ -215,9 +224,12 @@ public final class IconRegistry implements AutoCloseable {
         return painted(name, foreground, background, width, height, tile, hero, glyphSize, false);
     }
     private synchronized Icon painted(String name, Color foreground, Color background, int width, int height, boolean tile, boolean hero, int glyphSize, boolean panel) {
-        return painted(name,foreground,background,width,height,tile,hero,glyphSize,panel,null,null);
+        return painted(name,foreground,background,width,height,tile,hero,glyphSize,panel,null,false);
     }
-    private synchronized Icon painted(String name,Color foreground,Color background,int width,int height,boolean tile,boolean hero,int glyphSize,boolean panel,DecodedArtwork override,java.awt.Image prepared) {
+    private synchronized Icon painted(String name,Color foreground,Color background,int width,int height,boolean tile,boolean hero,int glyphSize,boolean panel,DecodedArtwork override,boolean selectedForeground) {
+        return painted(name,foreground,background,width,height,tile,hero,glyphSize,panel,override,selectedForeground,null);
+    }
+    private synchronized Icon painted(String name,Color foreground,Color background,int width,int height,boolean tile,boolean hero,int glyphSize,boolean panel,DecodedArtwork override,boolean selectedForeground,Color outline) {
         requireOpen(); Objects.requireNonNull(name);
         int size = Math.min(width, height);
         if (size < 1 || Math.max(width, height) > 512) throw new IllegalArgumentException("Invalid logical icon size");
@@ -230,7 +242,9 @@ public final class IconRegistry implements AutoCloseable {
         // Callers supply user-scaled tile extents; optical limits are logical metrics.
         double tileGlyph = glyphSize > 0 ? glyphSize : Math.min(size, Math.min(com.formdev.flatlaf.util.UIScale.scale(16.5f),
             Math.max(com.formdev.flatlaf.util.UIScale.scale(10f), size * .4)));
-        var received=authored==null?null:prepared!=null?prepared:authored.snapshot(Math.max(1,(int)Math.round(tile?tileGlyph:size)));
+        var snapshot=authored==null?null:authored.snapshot(Math.max(1,(int)Math.round(tile?tileGlyph:size)));
+        var received=selectedForeground && snapshot!=null?DecodedArtwork.foreground(snapshot,foreground):snapshot;
+        final float outlineWidth=com.formdev.flatlaf.util.UIScale.scale(1f);
         return new Icon() {
             @Override public int getIconWidth() { return width; }
             @Override public int getIconHeight() { return height; }
@@ -241,6 +255,12 @@ public final class IconRegistry implements AutoCloseable {
                     if (tile) {
                         g.setColor(background); double radius = size * .25 * 2; // RoundRectangle2D accepts an arc diameter
                         g.fill(new RoundRectangle2D.Double(0, 0, width, height, radius, radius));
+                        if(outline!=null) {
+                            double inset=outlineWidth/2.0;var border=(Graphics2D)g.create();
+                            try {border.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL,RenderingHints.VALUE_STROKE_PURE);border.setColor(outline);border.setStroke(new BasicStroke(outlineWidth));
+                                border.draw(new RoundRectangle2D.Double(inset,inset,width-outlineWidth,height-outlineWidth,Math.max(0,radius-outlineWidth),Math.max(0,radius-outlineWidth)));
+                            } finally {border.dispose();}
+                        }
                         double glyph = tileGlyph;
                         if (authored == null) { g.translate((width - glyph) / 2, (height - glyph) / 2); g.scale(glyph / 16, glyph / 16); }
                     } else if (authored == null) g.scale(size / 16.0, size / 16.0);

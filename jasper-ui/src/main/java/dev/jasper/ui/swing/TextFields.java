@@ -279,7 +279,7 @@ final class TextFields {
                 String name=field.kind() == Nodes.FieldKind.PATH ? "folder.filled" : "search";
                 int extent=com.formdev.flatlaf.util.UIScale.scale(context().icons().size(panelSearch ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
                 leading.setIcon(panelSearch ? context().icons().panel(name, context().theme().semantic(), SemanticColor.HUE_NEUTRAL,extent)
-                    : context().icons().icon(name,context().theme().semantic(),SemanticColor.TEXT_PLACEHOLDER,extent));
+                    : context().icons().icon(name,context().theme(),SemanticColor.TEXT_PLACEHOLDER,extent));
             }
             int gap = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_GAP : field.kind() == Nodes.FieldKind.PORT ? DesignMetrics.Role.PORT_PREFIX_GAP : DesignMetrics.Role.ICON_GAP);
             leading.setVisible(field.presentation() != Nodes.FieldPresentation.PLAIN_PATH);

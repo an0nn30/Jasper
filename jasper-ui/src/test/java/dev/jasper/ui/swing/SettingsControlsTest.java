@@ -6,6 +6,92 @@ import javax.swing.*;
 import org.junit.jupiter.api.Test;
 import dev.jasper.ui.testsupport.Edt;
 class SettingsControlsTest {
+    @Test void settingsNavigationOverlayRetainsNativeScrollbarWhenRoleIsRemoved() { Edt.run(()->{
+        var context=dev.jasper.ui.testsupport.KitFixtures.context();
+        var items=new java.util.ArrayList<TreeItem>();for(int i=0;i<50;i++)items.add(new TreeItem("row"+i,"Row "+i,Optional.empty(),true,List.of()));
+        var tree=new Nodes.Tree("tree",ControlState.READY,items,Set.of(),Set.of("row0"),"");
+        try(var view=new KitView(context,new ViewSpec(tree),event->{})) {
+            view.setSize(236,180);layout(view);var control=(Trees.TreeControl)view.control("tree");var pane=control.scroll;var bar=pane.getVerticalScrollBar();var model=bar.getModel();
+            Class<?> nativeUI=bar.getUI().getClass();int nativeMode=pane.getViewport().getScrollMode();
+            for(var orientation:List.of(java.awt.ComponentOrientation.LEFT_TO_RIGHT,java.awt.ComponentOrientation.RIGHT_TO_LEFT)) {
+                view.applyComponentOrientation(orientation);
+                for(int width:new int[]{236,120}) {
+                    view.update(new ViewSpec(new Nodes.Stack("nav",ControlState.READY,Nodes.LayoutRole.SETTINGS_NAVIGATION,List.of(tree))));view.setSize(width,180);layout(view);
+                    assertThat(pane.getViewport().getWidth()).isEqualTo(pane.getWidth());
+                    assertThat(pane.getVerticalScrollBar()).isSameAs(bar);assertThat(bar.getModel()).isSameAs(model);
+                    var overlayUI=bar.getUI();view.update(new ViewSpec(new Nodes.Stack("nav",ControlState.READY,Nodes.LayoutRole.SETTINGS_NAVIGATION,List.of(tree))));assertThat(bar.getUI()).as("idempotent retained refresh").isSameAs(overlayUI);
+                    pane.dispatchEvent(new java.awt.event.MouseWheelEvent(pane,java.awt.event.MouseEvent.MOUSE_WHEEL,1,0,30,30,0,false,java.awt.event.MouseWheelEvent.WHEEL_UNIT_SCROLL,3,1));
+                    assertThat(bar.getValue()).isPositive();
+                    SwingUtilities.updateComponentTreeUI(view);layout(view);assertThat(pane.getViewport().getWidth()).isEqualTo(pane.getWidth());
+                    view.update(new ViewSpec(tree));layout(view);
+                    assertThat(bar.getUI().getClass()).isEqualTo(nativeUI);assertThat(bar.getModel()).isSameAs(model);
+                    assertThat(pane.getViewport().getWidth()).isLessThan(pane.getWidth());assertThat(pane.getViewport().getScrollMode()).isEqualTo(nativeMode);
+                    assertThat(bar.contains(bar.getWidth()/2,bar.getHeight()/2)).isTrue();
+                }
+            }
+        }finally{context.binding().close();context.icons().close();}
+    }); }
+
+    @Test void settingsActionsHaveSourceSizedJoinedAndFooterEnvelopes() { Edt.run(()->{
+        var context=dev.jasper.ui.testsupport.KitFixtures.context();
+        var back=new Nodes.Button("back",ControlState.READY,"","chevron.left",Nodes.ButtonKind.GHOST,"back","Back");
+        var next=new Nodes.Button("next",ControlState.READY,"","chevron.right",Nodes.ButtonKind.GHOST,"next","Next");
+        var help=new Nodes.Button("help",ControlState.READY,"","question",Nodes.ButtonKind.GHOST,"help","Help",Nodes.ButtonPresentation.CIRCULAR);
+        var text=new Nodes.Text("status",ControlState.READY,"",Nodes.TextRole.CAPTION);
+        var ok=new Nodes.Button("ok",ControlState.READY,"OK","",Nodes.ButtonKind.PRIMARY,"ok","");
+        var footer=new Nodes.Stack("footer",ControlState.READY,Nodes.LayoutRole.SETTINGS_FOOTER,List.of(help,text,ok));
+        try(var view=new KitView(context,new ViewSpec(new Nodes.Stack("joined",ControlState.READY,Nodes.LayoutRole.JOINED_ACTIONS,List.of(back,next))),event->{})) {
+            assertThat(view.getPreferredSize()).isEqualTo(new java.awt.Dimension(50,24));
+            view.update(new ViewSpec(footer));view.setSize(600,53);layout(view);
+            assertThat(find(view,"ok",JButton.class).getWidth()).isEqualTo(64);
+            assertThat(find(view,"help",JButton.class).getWidth()).isEqualTo(24);
+        }finally{context.binding().close();context.icons().close();}
+    }); }
+
+    @Test void navigationHasGroupBreaksWithoutExpandingTheHitTargets() { Edt.run(()->{
+        var context=dev.jasper.ui.testsupport.KitFixtures.context();
+        var child=new TreeItem("child","Child",Optional.empty(),true,List.of());
+        var group=new TreeItem("group","Group",Optional.empty(),false,List.of(child));
+        var leaf=new TreeItem("leaf","Root leaf",Optional.empty(),true,List.of());
+        var next=new TreeItem("next","Next group",Optional.empty(),false,List.of());
+        var tree=new Nodes.Tree("tree",ControlState.READY,List.of(group,leaf,next),Set.of("group"),Set.of("child"),"");
+        try(var view=new KitView(context,new ViewSpec(new Nodes.Stack("nav",ControlState.READY,Nodes.LayoutRole.SETTINGS_NAVIGATION,List.of(tree))),event->{})) {
+            view.setSize(236,500);layout(view);var rows=(Trees.TreeControl)view.control("tree");
+            assertThat(rows.mounted.get("child").getHeight()).isEqualTo(29);
+            assertThat(rows.top(2)-rows.top(1)-rows.mounted.get("child").getHeight()).isEqualTo(12);
+            assertThat(rows.top(3)-rows.top(2)-rows.mounted.get("leaf").getHeight()).isEqualTo(12);
+            view.update(new ViewSpec(tree));view.setSize(236,500);layout(view);
+            assertThat(rows.top(2)-rows.top(1)).isEqualTo(rows.mounted.get("child").getHeight());
+        }finally{context.binding().close();context.icons().close();}
+    }); }
+
+    @Test void identityRowTitleAndMetadataAreOneCenteredBlock() { Edt.run(()->{
+        var context=dev.jasper.ui.testsupport.KitFixtures.context();
+        var icon=new Nodes.Icon("identity",ControlState.READY,"plugin",Nodes.Hue.BLUE,Nodes.IconSize.CONTROL,"Owner");
+        var item=new ListItem("row",Optional.of(icon),List.of(new Nodes.Text("title",ControlState.READY,"Title",Nodes.TextRole.BODY)),List.of(new Nodes.Text("metadata",ControlState.READY,"Version",Nodes.TextRole.CAPTION)),List.of());
+        var list=new Nodes.ItemList("list",ControlState.READY,Nodes.ListKind.DOUBLE,List.of(item),Set.of("row"),"",List.of());
+        try(var view=new KitView(context,new ViewSpec(list),event->{})) {
+            view.setArtworkPresentation("identity",ArtworkPresentation.IDENTITY_ROW);view.setSize(258,200);layout(view);
+            var row=((InteractiveRows.RowsControl)view.control("list")).mounted.get("row");
+            assertThat(row.title.getHeight()).isEqualTo(row.title.getPreferredSize().height);
+            assertThat(row.subtitle.getY()).isEqualTo(row.title.getY()+row.title.getHeight());
+        }finally{context.binding().close();context.icons().close();}
+    }); }
+
+    @Test void identityHeaderAddsAnInwardContourWithoutChangingNormalRowsOrAuthoredGlyphs() { Edt.run(()->{
+        var context=dev.jasper.ui.testsupport.KitFixtures.context();
+        var icon=new Nodes.Icon("icon",ControlState.READY,"plugin",Nodes.Hue.BLUE,Nodes.IconSize.HERO,"Owner");
+        try(var view=new KitView(context,new ViewSpec(icon),event->{})) {
+            view.setArtworkPresentation("icon",ArtworkPresentation.IDENTITY_HEADER);
+            var rendered=find(view,"icon",JLabel.class).getIcon();
+            var pixels=new java.awt.image.BufferedImage(108,108,java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            var g=pixels.createGraphics();try {g.scale(2,2);rendered.paintIcon(null,g,0,0);}finally{g.dispose();}
+            assertThat(pixels.getRGB(54,0)).isEqualTo(context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.BORDER_CONTROL).getRGB());
+            assertThat(pixels.getRGB(54,1)).isEqualTo(pixels.getRGB(54,0));
+            assertThat(pixels.getRGB(54,2)).isNotEqualTo(pixels.getRGB(54,0));
+        }finally{context.binding().close();context.icons().close();}
+    }); }
+
     @Test void stepperButtonsRespectBoundsAndRetainTheEditableDocument() { Edt.run(() -> {
         var events = new ArrayList<UiEvent>();
         var field = new Nodes.Field("number", ControlState.READY, Nodes.FieldKind.NUMBER, "3", "px", "Height", "", Optional.of(new Nodes.Numeric(1, 3, 1, 0)), Nodes.FieldPresentation.STEPPER);

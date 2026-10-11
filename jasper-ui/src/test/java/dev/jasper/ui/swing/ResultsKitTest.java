@@ -28,13 +28,34 @@ import org.junit.jupiter.api.Test;
  * selection kept in view), field composition state and unlabelled search fields.
  */
 class ResultsKitTest {
-    @Test void selectionEmphasizesTitleAndDetailAndDeselectionRestoresTheirRoles() {
+    @Test void subtitleInkUsesItsReceivingSlotWhileRoleAndExplicitSeveritySurviveSelection() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            for(var role:List.of(TextRole.BODY,TextRole.MONO)) {
+                var detail=new Text("detail",READY,"Detail",role);
+                var item=new ListItem("one",Optional.empty(),List.of(new Text("title",READY,"Title",TextRole.BODY)),List.of(detail),List.of());
+                try(var view=new KitView(context,new ViewSpec(results(List.of(item),Set.of(),OptionalInt.empty())),event->{})) {
+                    var label=find(view,"detail",JLabel.class);var font=label.getFont();
+                    assertThat(label.getForeground()).isEqualTo(context.theme().semantic().color(SemanticColor.TEXT_SECONDARY));
+                    for(boolean selected:new boolean[]{true,false,true}) {
+                        view.update(new ViewSpec(results(List.of(item),selected?Set.of("one"):Set.of(),OptionalInt.empty())));
+                        assertThat(find(view,"detail",JLabel.class)).isSameAs(label);assertThat(label.getFont()).isEqualTo(font);
+                        assertThat(label.getForeground()).isEqualTo(selected?dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(),SemanticColor.TEXT_ONACCENT_SECONDARY,SemanticColor.SELECTION_BG,dev.jasper.ui.theme.SurfaceContrast.TEXT):context.theme().semantic().color(SemanticColor.TEXT_SECONDARY));
+                    }
+                }
+            }
+            release(context);
+        });
+    }
+
+    @Test void selectionUsesReceivingInkAndPreservesDeclaredTitleAndDetailFonts() {
         Edt.run(() -> {
             var context = KitFixtures.context();
             var items = List.of(heading("section", "Heading"), row("a", "First", "detail", "tag"), row("b", "Second", "other", null));
             try (var view = new KitView(context, new ViewSpec(results(items, Set.of("a"), OptionalInt.empty())), event -> {})) {
                 var title = find(view,"a.title",JLabel.class); var detail = find(view,"a.detail",JLabel.class);
-                assertThat(title.getFont().isBold()).isTrue(); assertThat(detail.getFont().isBold()).isTrue();
+                assertThat(title.getFont()).isEqualTo(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.BODY));
+                assertThat(detail.getFont()).isEqualTo(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.DESCRIPTION));
                 assertThat(find(view,"section.title",JLabel.class).getFont().isBold()).isFalse();
                 assertThat(find(view,"a.tag",JLabel.class).getFont().isBold()).isFalse();
                 view.update(new ViewSpec(results(items,Set.of("b"),OptionalInt.empty())));

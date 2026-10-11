@@ -9,6 +9,14 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class SemanticPaletteTest {
+    @Test void identityContourHasAnIndependentOverrideAndFallsBackToFinalControlBorder() {
+        var role=SemanticColor.of("border.identity");assertThat(role).isPresent();
+        var fallback=ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS+"\n[semantic]\n\"border.control\"=\"#11223380\"\n");
+        assertThat(fallback.semantic().color(role.orElseThrow())).isEqualTo(new Color(0x11,0x22,0x33,0x80));
+        var explicit=ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS+"\n[semantic]\n\"border.control\"=\"#112233\"\n\"border.identity\"=\"#4a5360\"\n");
+        assertThat(explicit.semantic().color(role.orElseThrow())).isEqualTo(new Color(0x4a5360));
+    }
+
     @Test void tileSurfaceDefaultsUseTheFinalHueAndExplicitBasesKeepTheirAlpha() {
         for(boolean dark:new boolean[]{true,false}) {
             var theme=ThemeGeneratorTest.generate((dark ? ThemeGeneratorTest.SEEDS : ThemeGeneratorTest.SEEDS.replace("#1e1e2e", "#fafafa").replace("#cdd6f4", "#383a42"))+"\n[semantic]\n\"hue.blue\" = \"#12345680\"\n");
@@ -57,7 +65,7 @@ class SemanticPaletteTest {
     }
 
     @Test void everySemanticNameRoundTrips() {
-        assertThat(SemanticColor.values()).hasSize(53);
+        assertThat(SemanticColor.values()).hasSize(54);
         assertThat(SemanticColor.of("surface.status")).contains(SemanticColor.SURFACE_STATUS);
         for (var role : SemanticColor.values()) assertThat(SemanticColor.of(role.key())).contains(role);
         assertThat(SemanticColor.of("unknown")).isEmpty();

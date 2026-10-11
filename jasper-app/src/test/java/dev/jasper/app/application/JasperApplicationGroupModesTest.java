@@ -39,6 +39,18 @@ class JasperApplicationGroupModesTest {
             new NotificationGroupChoices.Group("dev.example.tool", "Tool", "dev.example.tool", "sticky", "dev.example.tool", "plugin"));
     }
 
+    @Test void notificationChoicesPreserveTheCompleteShownIdentityIncludingMetadataOnlyRefresh() {
+        var bytes="<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><rect width='16' height='16' fill='red'/></svg>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var authored=new dev.jasper.app.plugins.PluginRuntime.PluginIcon("icon.svg",bytes,dev.jasper.ui.model.Nodes.Hue.BLUE);
+        var foreground=new dev.jasper.app.plugins.PluginRuntime.PluginIcon("icon.svg",bytes,dev.jasper.ui.model.Nodes.Hue.BLUE,dev.jasper.ui.icons.IdentityArtwork.SelectedInk.FOREGROUND);
+        var groups=List.of(new NotificationGroup("dev.example.tool", "Tool", "dev.example.tool", DisplayMode.STICKY));
+        var first=JasperApplication.groupChoices(groups,id->"Tool",Map.of("dev.example.tool",authored)).getFirst();
+        var second=JasperApplication.groupChoices(groups,id->"Tool",Map.of("dev.example.tool",foreground)).getFirst();
+        assertThat(first.identityArtwork()).contains(authored.identityArtwork());
+        assertThat(second.identityArtwork()).contains(foreground.identityArtwork());
+        assertThat(first).isNotEqualTo(second);
+    }
+
     /** notifications.groups applies when Jasper starts and again when the file changes, without a restart. */
     @Test void aConfiguredModeAppliesAtStartAndLive() throws Exception {
         Path file = home.resolve("config.toml");

@@ -281,7 +281,7 @@ final class Stacks {
             int right = parent.getWidth();
             for (int i = parent.getComponentCount() - 1; i >= 2; i--) {
                 Component child = parent.getComponent(i); if (!child.isVisible()) continue;
-                Dimension size = child.getPreferredSize(); right -= size.width;
+                Dimension size = child.getPreferredSize(); size.width=Math.max(size.width,ThemePainting.metric(context,DesignMetrics.Role.SETTINGS_ACTION_MIN_WIDTH)); right -= size.width;
                 child.setBounds(Math.max(0, right), (parent.getHeight() - size.height) / 2, size.width, size.height); right -= gap();
             }
             int left = 0;
