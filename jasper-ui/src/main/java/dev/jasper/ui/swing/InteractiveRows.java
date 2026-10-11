@@ -1132,7 +1132,7 @@ final class InteractiveRows {
                 }
                 return;
             }
-            if (owner.column == 0 || owner.column == 1 || owner.panelSingle) {
+            if (owner.column == 0 || owner.column == 1 || owner.panelSingle || owner instanceof Trees.TreeControl tree && tree.settingsNavigation) {
                 Color fill = owner.selected.contains(id) ? ThemePainting.color(owner.context(), owner.column == 0 ? SemanticColor.SURFACE_CONTROL : SemanticColor.SELECTION_BG)
                     : hover ? ColorMath.opacity(ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY), .05) : null;
                 if (fill != null) {

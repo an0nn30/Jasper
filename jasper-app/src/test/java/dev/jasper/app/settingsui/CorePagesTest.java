@@ -3,6 +3,7 @@ package dev.jasper.app.settingsui;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.jasper.app.config.ConfigLoader;
+import dev.jasper.ui.model.Nodes;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.settings.Setting;
@@ -56,7 +57,7 @@ class CorePagesTest {
             .contains(CoreSettings.UI_FONT_FAMILY, CoreSettings.UI_FONT_SIZE);
         assertThat(page.searchTerms()).doesNotContain(CoreSettings.UI_WORKSPACE_OPACITY.label(), CoreSettings.UI_WORKSPACE_BLUR.label());
         assertThat(page.searchTerms()).doesNotContain("Workspace");
-        assertThat(PageKit.sectionTitles(page)).containsExactly("Theme", "Interface font", "View mode", "Animations");
+        assertThat(PageKit.sectionTitles(page)).containsExactly("Theme", "Interface Font", "View mode", "Animations");
         page.dispose();
     }
 
@@ -67,15 +68,16 @@ class CorePagesTest {
         for (var row : page.rows()) {
             if (row.setting() != CoreSettings.UI_WORKSPACE_OPACITY && row.setting() != CoreSettings.UI_WORKSPACE_BLUR) continue;
             var control = (dev.jasper.ui.model.Nodes.Stack) ((dev.jasper.ui.model.Nodes.SettingRow) PageKit.node(page, "row:" + row.setting().name())).control();
-            assertThat(control.children().getFirst().state().enabled()).as(row.setting().label()).isTrue();
+            assertThat(control.children().getFirst().state().enabled()).as(row.setting().label()).isEqualTo(row.setting()!=CoreSettings.UI_WORKSPACE_OPACITY);
+            if(row.setting()==CoreSettings.UI_WORKSPACE_OPACITY)assertThat(PageKit.node(page,"ui.workspace.opacity:default").state().enabled()).isTrue();
         }
         assertThat(page.searchTerms()).contains(CoreSettings.UI_WORKSPACE_OPACITY.label(), CoreSettings.UI_WORKSPACE_BLUR.label());
         page.dispose();
     }
 
     @Test void theWorkspaceSectionFollowsTheThemeSectionOnlyOnMacOs() {
-        assertThat(sectionTitles(appearance(true))).containsExactly("Theme", "Workspace", "Interface font", "View mode", "Animations");
-        assertThat(sectionTitles(appearance(false))).containsExactly("Theme", "Interface font", "View mode", "Animations");
+        assertThat(sectionTitles(appearance(true))).containsExactly("Theme", "Workspace", "Interface Font", "View mode", "Animations");
+        assertThat(sectionTitles(appearance(false))).containsExactly("Theme", "Interface Font", "View mode", "Animations");
         assertThat(appearance(true).settings()).containsSubsequence(CoreSettings.UI_THEME_NAME, CoreSettings.UI_THEME_WORKSPACE,
             CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR, CoreSettings.UI_FONT_FAMILY);
     }
@@ -92,23 +94,21 @@ class CorePagesTest {
         var spec = appearance(true);
         var page = spec.build(context);
         page.component();
-        int index = spec.settings().indexOf(CoreSettings.UI_WORKSPACE_BLUR);
-        assertThat(page.rows()).hasSameSizeAs(spec.settings());
-        var box = PageKit.kit(page, "ui.workspace.blur.input", javax.swing.JComboBox.class);
-        var items = new ArrayList<String>();
-        for (int i = 0; i < box.getItemCount(); i++) items.add(((dev.jasper.ui.model.Option) box.getItemAt(i)).label());
-        assertThat(items).containsExactly("Use theme's value", "On", "Off");
-        assertThat(((Editors.Pick<?>) page.rows().get(index).editor()).labels()).isEqualTo(items);
+        var toggle=PageKit.kit(page,"ui.workspace.blur",javax.swing.JButton.class);
+        assertThat(toggle.getAccessibleContext().getAccessibleName()).isEqualTo("Use theme's value");
+        assertThat(PageKit.node(page,"ui.workspace.blur:inheritance")).isInstanceOfSatisfying(Nodes.MenuButton.class,
+            menu->assertThat(menu.items()).anySatisfy(item->assertThat(item.label()).isEqualTo("Use theme's value")));
+        assertThat(page.rows()).extracting(row->row.setting().name()).doesNotContain(CoreSettings.UI_THEME_SOURCE.name(),CoreSettings.UI_THEME_FOLLOW_SYSTEM.name());
     }
 
     @Test void theTreeIsTheApprovedOne() {
         var pages = CorePages.pages(JASPER_DARK, system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
         assertThat(pages).extracting(SettingsPage::id).containsExactly("appearance-behavior", "appearance", "window", "notifications",
-            "command-palette", "desk-buddy", "system", "keymap", "terminal", "terminal.font",
-            "terminal.cursor", "terminal.shell", "plugins", "tools");
+            "command-palette", "desk-buddy", "system", "keymap", "plugins", "terminal", "terminal.font",
+            "terminal.cursor", "terminal.shell", "tools");
         assertThat(pages).extracting(page -> page.parent().orElse("")).containsExactly("", "appearance-behavior", "appearance-behavior",
-            "appearance-behavior", "appearance-behavior", "appearance-behavior", "appearance-behavior", "", "", "terminal",
-            "terminal", "terminal", "", "");
+            "appearance-behavior", "appearance-behavior", "appearance-behavior", "appearance-behavior", "", "", "",
+            "terminal", "terminal", "terminal", "");
         assertThat(pages).extracting(SettingsPage::title).contains("Appearance & Behavior", "System Settings", "Font & Colors", "Tools");
         assertThat(pages.getLast().hiddenWhenChildless()).isTrue();
         assertThat(CorePages.DEFAULT_PAGE).isEqualTo("appearance");
@@ -181,7 +181,7 @@ class CorePagesTest {
             .filter(page -> page.settings().contains(CoreSettings.NOTIFICATIONS_GROUPS)).findFirst().orElseThrow();
         var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
         var page = spec.build(PageKit.context(draft, id -> { }, () -> { }));
-        assertThat(PageKit.sectionTitles(page)).containsExactly("Groups");
+        assertThat(PageKit.sectionTitles(page)).containsExactly("System Notifications", "Groups");
         var row = page.rows().stream().filter(candidate -> candidate.setting() == CoreSettings.NOTIFICATIONS_GROUPS)
             .findFirst().orElseThrow();
         assertThat(row.editor()).isInstanceOf(NotificationGroupsEditor.class);

@@ -77,33 +77,36 @@ public final class CorePages {
             SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
                 .section("Theme")
                 .row(UI_THEME_NAME, Editors.theme(themes))
-                .row(UI_THEME_WORKSPACE, Editors.workspaceScheme(themes))
+                .row(UI_THEME_WORKSPACE, Editors.workspaceScheme(themes)).note("Colors for terminal and editor panes")
+                .row(UI_THEME_SOURCE).shownWhen(false)
+                .row(UI_THEME_FOLLOW_SYSTEM).shownWhen(false)
                 .section("Workspace")
-                .row(UI_WORKSPACE_OPACITY, Editors.optionalNumber("Use theme's value", 1, "%")).shownWhen(glass)
-                .row(UI_WORKSPACE_BLUR, Editors.choice(Map.of("theme", "Use theme's value"))).shownWhen(glass)
-                .section("Interface font")
-                .row(UI_FONT_FAMILY, Editors.font(false))
-                .row(UI_FONT_SIZE, Editors.optionalNumber("Use platform size", 0.5, "pt"))
+                .row(UI_WORKSPACE_OPACITY, WorkspaceEditors.opacity(themes)).shownWhen(glass)
+                .row(UI_WORKSPACE_BLUR, WorkspaceEditors.blur(themes)).shownWhen(glass)
+                .section("Interface Font")
+                .row(UI_FONT_FAMILY, Editors.interfaceFont())
+                .row(UI_FONT_SIZE, PlatformFontSize.factory())
                 .section("View mode")
                 .row(WINDOW_VIEW_MODE)
                 .section("Animations")
                 .row(UI_ANIMATIONS_ENABLED),
             SchemaPage.page("window", "Window").parent("appearance-behavior")
-                .section("Toolbar and status bar")
-                .row(WINDOW_TOOLBAR)
-                .row(WINDOW_TOOLBAR_HEIGHT, Editors.integer("px"))
+                .section("Toolbar & Status Bar")
+                .row(WINDOW_TOOLBAR, Editors.segments(Map.of("icons_and_labels", "Icons & Labels", "icons", "Icons Only", "hidden", "Hidden")))
+                .row(WINDOW_TOOLBAR_HEIGHT, Editors.stepper("px"))
                 .row(WINDOW_STATUS_BAR)
-                .row(WINDOW_STATUS_BAR_HEIGHT, Editors.integer("px"))
+                .row(WINDOW_STATUS_BAR_HEIGHT, Editors.dependentHeight()).enabledWhen(draft -> draft.value(WINDOW_STATUS_BAR))
                 .row(WINDOW_NATIVE_DECORATIONS).shownWhen(!com.formdev.flatlaf.util.SystemInfo.isMacOS)
-                .section("Tabs and panels")
-                .row(WINDOW_TAB_HEIGHT, Editors.integer("px"))
-                .row(WINDOW_RAIL_WIDTH, Editors.integer("px"))
-                .section("New windows")
-                .row(WINDOW_COLUMNS, Editors.integer("columns"))
-                .row(WINDOW_LINES, Editors.integer("lines")),
+                .section("Tabs & Panels")
+                .row(WINDOW_TAB_HEIGHT, Editors.stepper("px"))
+                .row(WINDOW_RAIL_WIDTH, Editors.stepper("px"))
+                .section("New Windows")
+                .row(WINDOW_COLUMNS, InitialSizeEditor.factory())
+                .row(WINDOW_LINES).shownWhen(false),
             SchemaPage.page("notifications", "Notifications").parent("appearance-behavior").anchor("finished-command-notifications")
-                .row(NOTIFICATIONS_SYSTEM)
-                .row(NOTIFICATIONS_LONG_COMMAND_SECONDS, Editors.integer("s")).note("0 turns these notifications off.")
+                .section("System Notifications")
+                .row(NOTIFICATIONS_SYSTEM).note("Also post to the OS notification center")
+                .row(NOTIFICATIONS_LONG_COMMAND_SECONDS, Editors.notificationDelay()).note("0 turns these notifications off.")
                 .section("Groups")
                 .row(NOTIFICATIONS_GROUPS, Editors.notificationGroups(groups))
                 .note("How each kind of notification appears. A plugin's groups are listed once it has run."),
@@ -208,8 +211,8 @@ public final class CorePages {
                 childrenOf.apply("appearance-behavior"), context));
             for (var spec : specs.subList(0, 6)) all.add(spec.build(context));
             all.add(supplied.keymap().apply(context));
-            for (var spec : specs.subList(6, specs.size())) all.add(spec.build(context));
             all.add(supplied.plugins().apply(context));
+            for (var spec : specs.subList(6, specs.size())) all.add(spec.build(context));
             all.add(new GroupPage("tools", "Tools", Optional.empty(), true, childrenOf.apply("tools"), context));
             all.addAll(supplied.tools().apply(context));
             return List.copyOf(all);

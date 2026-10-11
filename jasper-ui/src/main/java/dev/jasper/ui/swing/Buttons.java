@@ -66,7 +66,8 @@ final class Buttons {
             button.toggle = value.selected().isPresent(); button.getModel().setSelected(value.selected().orElse(false));
             button.setText(value.label()); button.setFont(ThemePainting.font(context(), button.panelDetail || button.panel ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.LABEL));
             button.setForeground(button.textColor(false));
-            boolean embedded = value.presentation() != Nodes.ButtonPresentation.STANDARD;
+            boolean embedded = value.presentation() == Nodes.ButtonPresentation.EMBEDDED || value.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
+            button.circular=value.presentation()==Nodes.ButtonPresentation.CIRCULAR;
             button.contextual = value.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
             button.embedded = embedded;
             if (hostArtwork != null) { button.setIcon(hostArtwork.icon(context(), button.iconRole(false))); button.putClientProperty("Jasper.button.icon", null); }
@@ -91,7 +92,7 @@ final class Buttons {
     static class KitButton extends JButton {
         private final KitContext context;
         Nodes.ButtonKind kind;
-        boolean hero, panel, fullFooter, orderedAction, panelDetail;
+        boolean hero, panel, fullFooter, orderedAction, panelDetail, circular;
         /** Content-sized for a host arrangement (ButtonPresentation.EMBEDDED): no minimum height and no resting or hover fill. */
         boolean embedded, contextual, panelRow;
         float disabledOpacity=.42f;
@@ -180,7 +181,8 @@ final class Buttons {
                 }
                 Color border = toggle && isSelected() ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : embedded ? null : border();
                 boolean focused = !embedded && focus != null && focus.visible();
-                if (panelDetail) ThemePainting.rounded(g, this, context, fill, border, focused, false,
+                if(circular)ThemePainting.rounded(g,this,context,fill,ThemePainting.color(context,SemanticColor.BORDER_CONTROL),focused,false,Math.min(getWidth(),getHeight())/2.0,ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING),0);
+                else if (panelDetail) ThemePainting.rounded(g, this, context, fill, border, focused, false,
                     UIScale.scale((float)context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_ARC)) / 2.0,
                     ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING),
                     UIScale.scale((float)context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_BOTTOM_TRIM)));

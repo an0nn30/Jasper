@@ -47,19 +47,19 @@ class NotificationGroupsEditorTest {
         if (editor.event(ID, new UiEvent.Action(NotificationGroupsEditor.resetId(ID, index(groupId))))) edits++;
     }
 
-    private Nodes.FormRow row(NotificationGroupsEditor editor, String groupId) {
-        var stack = (Nodes.Stack) editor.node(ID, ControlState.READY);
-        return (Nodes.FormRow) stack.children().get(index(groupId));
+    private Nodes.SettingRow row(NotificationGroupsEditor editor,String groupId) {
+        return (Nodes.SettingRow)find(editor.node(ID,ControlState.READY),ID+":row-"+index(groupId));
     }
-
-    private Nodes.Choice combo(NotificationGroupsEditor editor, String groupId) { return (Nodes.Choice) row(editor, groupId).control(); }
-
-    private Nodes.Button resetButton(NotificationGroupsEditor editor, String groupId) {
-        return (Nodes.Button) row(editor, groupId).trailing().orElseThrow();
+    private static Nodes.Node find(Nodes.Node node,String id){
+        if(node.id().equals(id))return node;
+        var children=switch(node){case Nodes.Stack n->n.children();case Nodes.Card n->n.children();case Nodes.SettingRow n->List.of(n.control());default->List.<Nodes.Node>of();};
+        for(var child:children){var found=find(child,id);if(found!=null)return found;}return null;
     }
+    private Nodes.Choice combo(NotificationGroupsEditor editor,String groupId){return (Nodes.Choice)find(editor.node(ID,ControlState.READY),NotificationGroupsEditor.modeId(ID,index(groupId)));}
+    private Nodes.Button resetButton(NotificationGroupsEditor editor,String groupId){return (Nodes.Button)find(editor.node(ID,ControlState.READY),NotificationGroupsEditor.resetId(ID,index(groupId)));}
 
     private static String rendered(Nodes.Choice choice, String token) {
-        return choice.options().stream().filter(option -> option.id().equals(token)).map(Option::label).findFirst().orElseThrow();
+        return choice.options().stream().filter(option -> option.id().equals(token)).map(option -> option.label()+(option.description().equals("Default")?" (default)":"")).findFirst().orElseThrow();
     }
 
     private static List<String> texts(Nodes.Node node) {
@@ -67,6 +67,8 @@ class NotificationGroupsEditorTest {
         switch (node) {
             case Nodes.Stack stack -> stack.children().forEach(child -> texts.addAll(texts(child)));
             case Nodes.FormRow row -> { texts.add(row.label()); texts.add(row.caption()); }
+            case Nodes.SettingRow row -> { texts.add(row.title()); }
+            case Nodes.Card card -> card.children().forEach(child -> texts.addAll(texts(child)));
             case Nodes.Text text -> texts.add(text.text());
             default -> { }
         }
@@ -81,7 +83,7 @@ class NotificationGroupsEditorTest {
         assertThat(combo(editor, COMMANDS.id()).selectedId()).isEqualTo("card");
         assertThat(combo(editor, CONFIG.id()).selectedId()).isEqualTo("sticky");
         assertThat(combo(editor, COMMANDS.id()).kind()).isEqualTo(Nodes.ChoiceKind.DROPDOWN);
-        assertThat(combo(editor, COMMANDS.id()).label()).isEqualTo("Long-running commands: how its notifications appear");
+        assertThat(combo(editor, COMMANDS.id()).label()).contains("Long-running commands: how its notifications appear", "Jasper", COMMANDS.id());
         assertThat(rendered(combo(editor, COMMANDS.id()), "card")).isEqualTo("Card (default)");
         assertThat(rendered(combo(editor, COMMANDS.id()), "history")).isEqualTo("History only");
         assertThat(rendered(combo(editor, CONFIG.id()), "sticky")).isEqualTo("Sticky card (default)");
@@ -169,9 +171,9 @@ class NotificationGroupsEditorTest {
     @Test void eachGroupsRowShowsItsId() {
         var editor = editor();
         editor.show(Map.of());
-        assertThat(row(editor, COMMANDS.id()).label()).isEqualTo("Long-running commands");
-        assertThat(row(editor, COMMANDS.id()).caption()).contains("Jasper").contains(COMMANDS.id());
-        assertThat(row(editor, CONFIG.id()).caption()).contains(CONFIG.id());
+        assertThat(row(editor, COMMANDS.id()).title()).isEqualTo("Long-running commands");
+        assertThat(combo(editor, COMMANDS.id()).label()).contains("Jasper").contains(COMMANDS.id());
+        assertThat(combo(editor, CONFIG.id()).label()).contains(CONFIG.id());
     }
 
     @Test void eventsForOtherNodesEditNothing() {

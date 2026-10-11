@@ -32,6 +32,7 @@ final class SettingsView extends JPanel implements AutoCloseable {
     final KitView banner;
     final KitView footer;
     final JScrollPane body = new JScrollPane();
+    private final dev.jasper.ui.swing.SettingsShell shell;
     private String query = "";
     private String breadcrumb = "";
     private String bannerText;
@@ -43,38 +44,17 @@ final class SettingsView extends JPanel implements AutoCloseable {
         super(new BorderLayout());
         setOpaque(false);
         search = new KitView(context, searchSpec(), events::accept);
-        navigation = new KitView(context, new ViewSpec(tree.node()), events::accept);
+        navigation = new KitView(context, new ViewSpec(new Nodes.Stack("settings-navigation", ControlState.READY, Nodes.LayoutRole.SETTINGS_NAVIGATION, List.of(tree.node()))), events::accept);
         header = new KitView(context, headerSpec(), events::accept);
         banner = new KitView(context, bannerSpec(), events::accept);
         banner.setVisible(false);
         footer = new KitView(context, footerSpec(), events::accept);
 
-        var left = new JPanel(new BorderLayout());
-        left.setOpaque(false);
-        left.add(search, BorderLayout.NORTH);
-        left.add(navigation, BorderLayout.CENTER);
-
         body.setBorder(BorderFactory.createEmptyBorder());
-        // A page scrolls sideways only when the dialog is narrower than its controls need.
         body.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        body.setOpaque(false);
-        body.getViewport().setOpaque(false);
-        var page = new JPanel(new BorderLayout());
-        page.setOpaque(false);
-        page.add(banner, BorderLayout.NORTH);
-        page.add(body, BorderLayout.CENTER);
-        var right = new JPanel(new BorderLayout());
-        right.setOpaque(false);
-        right.add(header, BorderLayout.NORTH);
-        right.add(page, BorderLayout.CENTER);
-
-        var split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
-        split.setDividerLocation(UIScale.scale(context.metrics().value(DesignMetrics.Role.MANAGER_LIST_WIDTH)));
-        split.setDividerSize(UIScale.scale(context.metrics().value(DesignMetrics.Role.HAIRLINE)));
-        split.setBorder(BorderFactory.createEmptyBorder());
-        split.setOpaque(false);
-        add(split, BorderLayout.CENTER);
-        add(footer, BorderLayout.SOUTH);
+        body.setOpaque(false); body.getViewport().setOpaque(false);
+        shell = new dev.jasper.ui.swing.SettingsShell(context, search, navigation, header, banner, body, footer);
+        add(shell, BorderLayout.CENTER);
 
         bind(KeyEvent.VK_ESCAPE, "cancelSettings", cancelled);
     }
@@ -121,10 +101,14 @@ final class SettingsView extends JPanel implements AutoCloseable {
     }
 
     private ViewSpec headerSpec() {
-        return new ViewSpec(new Nodes.Stack("header", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
-            new Nodes.Text("breadcrumb", ControlState.READY, breadcrumb, Nodes.TextRole.BODY_STRONG),
-            new Nodes.Button(BACK, enabled(back), "", "back", Nodes.ButtonKind.GHOST, BACK, "Back"),
-            new Nodes.Button(FORWARD, enabled(forward), "", "forward", Nodes.ButtonKind.GHOST, FORWARD, "Forward"))));
+        int divider=breadcrumb.lastIndexOf(" › ");
+        String parent=divider<0?"":breadcrumb.substring(0,divider)+" › ";String current=divider<0?breadcrumb:breadcrumb.substring(divider+3);
+        return new ViewSpec(new Nodes.Stack("header",ControlState.READY,Nodes.LayoutRole.NAVIGATION,List.of(
+            new Nodes.Stack("history",ControlState.READY,Nodes.LayoutRole.JOINED_ACTIONS,List.of(
+                new Nodes.Button(BACK,enabled(back),"","chevron.left",Nodes.ButtonKind.GHOST,BACK,"Back"),
+                new Nodes.Button(FORWARD,enabled(forward),"","chevron.right",Nodes.ButtonKind.GHOST,FORWARD,"Forward"))),
+            new Nodes.Text("breadcrumb-parent",new ControlState(!parent.isBlank(),true,false,""),parent,Nodes.TextRole.DESCRIPTION),
+            new Nodes.Text("breadcrumb",ControlState.READY,current,Nodes.TextRole.WINDOW_TITLE))));
     }
 
     private ViewSpec bannerSpec() {
@@ -139,8 +123,8 @@ final class SettingsView extends JPanel implements AutoCloseable {
 
     private ViewSpec footerSpec() {
         var failed = new ControlState(!message.isEmpty(), true, false, "");
-        return new ViewSpec(new Nodes.Stack("footer", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
-            new Nodes.Button(HELP, ControlState.READY, "", "help", Nodes.ButtonKind.GHOST, HELP, "Help"),
+        return new ViewSpec(new Nodes.Stack("footer", ControlState.READY, Nodes.LayoutRole.SETTINGS_FOOTER, List.of(
+            new Nodes.Button(HELP, ControlState.READY, "", "question", Nodes.ButtonKind.GHOST, HELP, "Help", Nodes.ButtonPresentation.CIRCULAR),
             new Nodes.Stack("message-line", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
                 new Nodes.StatusDot("message-status", failed, Nodes.StatusKind.DANGER),
                 new Nodes.Text("message", ControlState.READY, message, Nodes.TextRole.BODY))),
@@ -154,7 +138,7 @@ final class SettingsView extends JPanel implements AutoCloseable {
     /** The search text the user typed; kept in the field's descriptor so a re-render never resets it. */
     void query(String value) { query = value; if (!search.isClosed()) search.update(searchSpec()); }
 
-    void tree() { if (!navigation.isClosed()) navigation.update(new ViewSpec(tree.node())); }
+    void tree() { if (!navigation.isClosed()) navigation.update(new ViewSpec(new Nodes.Stack("settings-navigation", ControlState.READY, Nodes.LayoutRole.SETTINGS_NAVIGATION, List.of(tree.node())))); }
 
     void breadcrumb(String value) { breadcrumb = value; header(); }
 
@@ -189,9 +173,16 @@ final class SettingsView extends JPanel implements AutoCloseable {
     String bannerText() { return bannerText; }
     String query() { return query; }
 
+    private final java.util.Map<Component,java.awt.Point> scrollPositions = new java.util.IdentityHashMap<>();
+    private long pageGeneration;
     void page(JComponent content) {
-        body.setViewportView(content);
-        body.getViewport().setOpaque(false);
+        Component before=body.getViewport().getView();if(before==content)return;
+        if(before!=null)scrollPositions.put(before,body.getViewport().getViewPosition());
+        long generation=++pageGeneration;
+        body.setViewportView(content);body.getViewport().setOpaque(false);
+        var position=scrollPositions.getOrDefault(content,new java.awt.Point());
+        body.getViewport().setViewPosition(position);
+        SwingUtilities.invokeLater(()->{if(generation==pageGeneration&&body.getViewport().getView()==content)body.getViewport().setViewPosition(position);});
     }
 
     /** The mounted kit control named {@code id} in any of the shell's views; for tests and previews. */
@@ -213,6 +204,8 @@ final class SettingsView extends JPanel implements AutoCloseable {
     }
 
     @Override public void close() {
+        pageGeneration++;scrollPositions.clear();
+        shell.close();
         for (var view : List.of(search, navigation, header, banner, footer)) view.close();
     }
 }

@@ -17,13 +17,23 @@ import javax.swing.*;
 final class Stacks {
     private Stacks() {}
 
+    static final class StackSurface extends JPanel {
+        final KitContext context;boolean joined;StackSurface(KitContext context){this.context=context;}
+        @Override protected void paintComponent(Graphics graphics){
+            super.paintComponent(graphics);if(!joined)return;var g=(Graphics2D)graphics.create();
+            try{ThemePainting.antialias(g);int radius=ThemePainting.metric(context,DesignMetrics.Role.CONTROL_RADIUS);g.setColor(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.BORDER_CONTROL));g.drawRoundRect(0,0,getWidth()-1,getHeight()-1,radius*2,radius*2);if(getComponentCount()>1)g.drawLine(getComponent(1).getX(),0,getComponent(1).getX(),getHeight());}finally{g.dispose();}
+        }
+    }
+
     static final class StackControl extends ControlRegistry.Control {
         final Tile tile;
-        boolean detail, sheetHeading, panelDetail;
+        boolean detail, sheetHeading, panelDetail, embedded, settings;
+        List<ControlRegistry.Control> children = List.of();
+        @Override void embeddedLabel(boolean value) { embedded = value; if (settings) children.forEach(c -> Composition.label(c, value)); }
         java.util.Set<Component> captions = java.util.Set.of();
 
         StackControl(KitView view, Nodes.Stack node) {
-            super(view, node, new JPanel());
+            super(view, node, new StackSurface(view.context()));
             component.setOpaque(false);
             tile = new Tile(view.context());
             KitOwnership.mark(tile, node.id() + ".tile");
@@ -54,10 +64,11 @@ final class Stacks {
         void refresh() {
             state();
             var stack = (Nodes.Stack) node;
+            ((StackSurface)component).joined=stack.role()==Nodes.LayoutRole.JOINED_ACTIONS;
             int detailPadding = stack.role() == Nodes.LayoutRole.DETAIL ? ThemePainting.metric(context(), panelDetail ? DesignMetrics.Role.PANEL_DETAIL_PADDING : DesignMetrics.Role.DETAIL_PADDING) : 0;
             component.setBorder(new javax.swing.border.EmptyBorder(detailPadding, detailPadding, panelDetail && stack.role()==Nodes.LayoutRole.DETAIL ? Math.max(0,detailPadding-ThemePainting.metric(context(),DesignMetrics.Role.FOCUS_RING)) : detailPadding, detailPadding));
             component.setLayout(
-                    sheetHeading ? new Navigation.InlineLayout(context(),DesignMetrics.Role.COLUMN_GAP) : stack.role() == Nodes.LayoutRole.HERO
+                    stack.role() == Nodes.LayoutRole.SETTINGS_NAVIGATION ? new FillLayout() : stack.role() == Nodes.LayoutRole.SETTINGS_TRAILING ? new SettingsTrailingLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_GROUP_HEADER ? new SettingsGroupLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_FOOTER ? new SettingsFooterLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_PAGE ? new SettingsLayout(context()) : sheetHeading ? new Navigation.InlineLayout(context(),DesignMetrics.Role.COLUMN_GAP) : stack.role() == Nodes.LayoutRole.HERO
                             ? new HeroLayout(this)
                             : stack.role() == Nodes.LayoutRole.FOOTER ? new FooterStatusLayout(context()) : stack.role() == Nodes.LayoutRole.SUPPORTING ? new SupportingLayout(context()) : stack.role() == Nodes.LayoutRole.NAVIGATION ? new Navigation.InlineLayout(context(), panelDetail && stack.children().stream().anyMatch(n -> n instanceof Nodes.Icon icon && icon.size() == Nodes.IconSize.HERO) ? DesignMetrics.Role.PANEL_DETAIL_IDENTITY_GAP : detail && !panelDetail ? DesignMetrics.Role.DETAIL_HEADING_GAP : DesignMetrics.Role.ICON_GAP) : new StackLayout(context(), stack.role(), stack.children().size()==2 && stack.children().getFirst() instanceof Nodes.Text text && text.role()==Nodes.TextRole.DETAIL_TITLE, captions) {
                                 @Override int gap() { return panelDetail ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_DETAIL_GAP) : super.gap(); }
@@ -79,6 +90,10 @@ final class Stacks {
 
         @Override
         void children(List<ControlRegistry.Control> controls) {
+            children = List.copyOf(controls);
+            if(((Nodes.Stack)node).role()==Nodes.LayoutRole.SETTINGS_GROUP_HEADER)
+                controls.forEach(c->{if(c instanceof Labels.IconControl icon)icon.tile(context().metrics().value(DesignMetrics.Role.SETTINGS_ICON_TILE),context().metrics().value(DesignMetrics.Role.SETTINGS_ICON_TILE),context().icons().size(Nodes.IconSize.CONTROL),false);});
+            if (embedded && settings) controls.forEach(c -> Composition.label(c, true));
             var wanted = new java.util.ArrayList<JComponent>();
             for (var c : controls)
                 if (childParent(c.node) == tile) {
@@ -249,6 +264,95 @@ final class Stacks {
         }
     }
 
+    /** Help/status lead; all remaining actions are pinned to the trailing edge. */
+    static final class SettingsFooterLayout implements Composition.WidthLayout {
+        final KitContext context;
+        SettingsFooterLayout(KitContext context) { this.context = context; }
+        int gap() { return ThemePainting.metric(context, DesignMetrics.Role.BUTTON_GAP); }
+        @Override public int height(Container parent, int width) {
+            int height = 0; for (Component child : parent.getComponents()) if (child.isVisible()) height = Math.max(height, child.getPreferredSize().height);
+            return height;
+        }
+        @Override public Dimension preferredLayoutSize(Container parent) {
+            int width = 0; for (Component child : parent.getComponents()) if (child.isVisible()) width += child.getPreferredSize().width + gap();
+            return new Dimension(width, height(parent, width));
+        }
+        @Override public void layoutContainer(Container parent) {
+            int right = parent.getWidth();
+            for (int i = parent.getComponentCount() - 1; i >= 2; i--) {
+                Component child = parent.getComponent(i); if (!child.isVisible()) continue;
+                Dimension size = child.getPreferredSize(); right -= size.width;
+                child.setBounds(Math.max(0, right), (parent.getHeight() - size.height) / 2, size.width, size.height); right -= gap();
+            }
+            int left = 0;
+            for (int i = 0; i < Math.min(2, parent.getComponentCount()); i++) {
+                Component child = parent.getComponent(i); Dimension size = child.getPreferredSize();
+                int width = Math.max(0, Math.min(size.width, right - left));
+                child.setBounds(left, (parent.getHeight() - size.height) / 2, width, size.height); left += width + gap();
+            }
+        }
+    }
+
+    /** Bounded reading width and responsive rows for ordinary settings pages. */
+    static final class FillLayout implements Composition.WidthLayout {
+        @Override public Dimension preferredLayoutSize(Container p){int w=0,h=0;for(var c:p.getComponents()){w=Math.max(w,c.getPreferredSize().width);h=Math.max(h,c.getPreferredSize().height);}return new Dimension(w,h);}
+        @Override public int height(Container p,int width){return preferredLayoutSize(p).height;}
+        @Override public void layoutContainer(Container p){for(var c:p.getComponents())c.setBounds(0,0,p.getWidth(),p.getHeight());}
+        @Override public void addLayoutComponent(String n,Component c){} @Override public void removeLayoutComponent(Component c){}
+    }
+
+    /** The final action owns a stable slot even when no override currently makes it visible. */
+    static final class SettingsTrailingLayout implements Composition.WidthLayout {
+        final KitContext context;SettingsTrailingLayout(KitContext context){this.context=context;}
+        int gap(){return ThemePainting.metric(context,DesignMetrics.Role.COLUMN_GAP);}
+        int action(Container p){return p.getComponentCount()>1?p.getComponent(1).getPreferredSize().width:0;}
+        @Override public Dimension preferredLayoutSize(Container p){if(p.getComponentCount()==0)return new Dimension();var c=p.getComponent(0).getPreferredSize();return new Dimension(c.width+gap()+action(p),c.height);}
+        @Override public int height(Container p,int width){return p.getComponentCount()==0?0:Composition.height(p.getComponent(0),Math.max(0,width-gap()-action(p)));}
+        @Override public void layoutContainer(Container p){if(p.getComponentCount()==0)return;int a=action(p),w=Math.max(0,p.getWidth()-gap()-a);p.getComponent(0).setBounds(0,0,w,p.getHeight());if(p.getComponentCount()>1)p.getComponent(1).setBounds(w+gap(),0,a,p.getHeight());}
+        @Override public void addLayoutComponent(String n,Component c){} @Override public void removeLayoutComponent(Component c){}
+    }
+    static final class SettingsGroupLayout implements Composition.WidthLayout {
+        final KitContext context;SettingsGroupLayout(KitContext context){this.context=context;}
+        int pad(){return ThemePainting.metric(context,DesignMetrics.Role.SETTING_SIDE_PADDING);}
+        @Override public Dimension preferredLayoutSize(Container p){int w=pad()*2,h=ThemePainting.metric(context,DesignMetrics.Role.SETTINGS_GROUP_HEIGHT);for(var c:p.getComponents()){w+=c.getPreferredSize().width+pad();h=Math.max(h,c.getPreferredSize().height+pad());}return new Dimension(w,h);}
+        @Override public int height(Container p,int width){return preferredLayoutSize(p).height;}
+        @Override public void layoutContainer(Container p){int x=pad();for(int i=0;i<p.getComponentCount();i++){var c=p.getComponent(i);var d=c.getPreferredSize();int w=Math.min(d.width,Math.max(0,p.getWidth()-x-pad()));c.setBounds(i==p.getComponentCount()-1?Math.max(x,p.getWidth()-pad()-w):x,(p.getHeight()-d.height)/2,w,d.height);x+=w+pad();}}
+        @Override public void addLayoutComponent(String n,Component c){} @Override public void removeLayoutComponent(Component c){}
+    }
+
+    static final class SettingsLayout implements Composition.WidthLayout {
+        private final KitContext context;
+        SettingsLayout(KitContext context) { this.context = context; }
+        int side(int width) { return Math.min(ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_PAGE_INSET), Math.max(0, width / 12)); }
+        int arrange(Container parent, int width, boolean layout) {
+            int side = side(width), y = ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_PAGE_TOP);
+            int w = Math.max(0, Math.min(Math.max(fixedWidth(parent), ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_CARD_WIDTH)), width - 2 * side));
+            boolean before = false;
+            for (Component child : parent.getComponents()) if (child.isVisible()) {
+                if (before) y += ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_SECTION_GAP);
+                int height = Composition.height(child, w);
+                if (layout) child.setBounds(side, y, w, height);
+                y += height; before = true;
+            }
+            return y + ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_PAGE_TOP);
+        }
+        @Override public int height(Container parent, int width) { return arrange(parent, width, false); }
+        @Override public Dimension preferredLayoutSize(Container parent) {
+            int width = ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_CARD_WIDTH) + 2 * ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_PAGE_INSET);
+            return new Dimension(Math.max(width, minimumLayoutSize(parent).width), height(parent, parent.getWidth() > 0 ? parent.getWidth() : width));
+        }
+        int fixedWidth(Container parent) {
+            int width = 0;
+            for (Component child : parent.getComponents()) if (child instanceof Container nested) {
+                if (nested.getLayout() instanceof SettingRows.RowLayout row && row.fixedControl()) width = Math.max(width, nested.getPreferredSize().width);
+                else width = Math.max(width, fixedWidth(nested));
+            }
+            return width;
+        }
+        @Override public Dimension minimumLayoutSize(Container parent) { int fixed = fixedWidth(parent); return new Dimension(fixed == 0 ? 0 : fixed + 2 * ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_PAGE_INSET), 0); }
+        @Override public void layoutContainer(Container parent) { arrange(parent, parent.getWidth(), true); }
+    }
+
     static class StackLayout implements Composition.WidthLayout {
         final KitContext context;
         final Nodes.LayoutRole role;
@@ -266,12 +370,13 @@ final class Stacks {
 
         boolean horizontal() {
             return switch (role) {
-                case INLINE, ACTIONS, FOOTER, NAVIGATION -> true;
+                case INLINE, ACTIONS, FOOTER, NAVIGATION, SETTINGS_CONTROLS, JOINED_ACTIONS -> true;
                 default -> false;
             };
         }
 
         int gap() {
+            if(role==Nodes.LayoutRole.JOINED_ACTIONS)return 0;
             return ThemePainting.metric(
                     context,
                     role == Nodes.LayoutRole.DETAIL ? DesignMetrics.Role.SECTION_GAP : role == Nodes.LayoutRole.INLINE ? DesignMetrics.Role.INLINE_GAP
@@ -331,7 +436,7 @@ final class Stacks {
         }
 
         boolean wraps(List<Component> children, int available) {
-            if (role != Nodes.LayoutRole.ACTIONS || children.size() < 2) return false;
+            if ((role != Nodes.LayoutRole.ACTIONS && role != Nodes.LayoutRole.SETTINGS_CONTROLS) || children.size() < 2) return false;
             int total = children.stream().mapToInt(c -> c.getPreferredSize().width).sum() + (children.size() - 1) * gap();
             return total > available;
         }

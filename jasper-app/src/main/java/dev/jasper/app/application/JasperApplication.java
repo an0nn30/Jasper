@@ -79,6 +79,8 @@ public final class JasperApplication {
     private static final System.Logger LOG = System.getLogger(JasperApplication.class.getName());
     private final ThemeController themes;
     private final ThemeCatalog themeCatalog;
+    private final dev.jasper.app.platform.SystemAppearance systemAppearance;
+    private Runnable systemAppearanceListening = () -> { };
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
     /** Workspace glass exists only on macOS; elsewhere plugins see {@code GlassSource.NONE} and windows make no glass requests. */
     private static final boolean WORKSPACE_GLASS = com.formdev.flatlaf.util.SystemInfo.isMacOS;
@@ -221,7 +223,9 @@ public final class JasperApplication {
         startupViewMode = startup.viewMode();
         themeCatalog = service == null ? ThemeCatalog.builtIn() : ThemeCatalog.beside(service.initialState().file());
         if (service != null) scanThemes(service);
-        Theme saved = themeCatalog.latest().find(startup.theme()).orElse(Theme.DARK);
+        systemAppearance = dev.jasper.app.platform.SystemAppearance.open();
+        try {
+        Theme saved = ThemePolicy.resolve(startup, themeCatalog.latest(), systemAppearance.current(), true).theme();
         // First Swing work: every later component may read the installed snapshot. A theme that cannot be installed
         // never stops start-up; the configuration reports it.
         themes = ThemeController.startup(saved,
@@ -245,7 +249,8 @@ public final class JasperApplication {
         buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome().dark()));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
             buddy.companion(), notificationCenter, buddy.companion()::setWorking, JasperApplication::afterDelay);
-        configuration = service == null ? null : new ConfigurationController(themes, service, themeCatalog, new dev.jasper.app.platform.ConfigEditor()::open, () -> migrationProblems);
+        configuration = service == null ? null : new ConfigurationController(themes, service, themeCatalog, new dev.jasper.app.platform.ConfigEditor()::open, () -> migrationProblems, systemAppearance.current());
+        if (configuration != null) systemAppearanceListening = systemAppearance.subscribe(configuration::systemAppearanceChanged);
         Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
         shellProfiles = ShellProfileCatalog.system(savedShell);
         // A supplied launcher (the benchmark, tests) never starts a detected profile, so reg.exe and wsl.exe stay
@@ -282,6 +287,11 @@ public final class JasperApplication {
         if (supports(Desktop.Action.APP_PREFERENCES)) {
             Desktop.getDesktop().setPreferencesHandler(event -> SwingUtilities.invokeLater(() -> openSettings(null, null)));
             preferencesHandlerInstalled = true;
+        }
+        } catch (RuntimeException | Error failure) {
+            systemAppearanceListening.run();
+            systemAppearance.close();
+            throw failure;
         }
     }
 
@@ -815,7 +825,9 @@ public final class JasperApplication {
                         var thread = new Thread(runnable, "jasper-theme-import"); thread.setDaemon(true); return thread;
                     }));
                 return new dev.jasper.app.settingsui.ThemeChoices.Import(imports::start, imports::close);
-            });
+            }, new SettingsThemeSources(themeCatalog), () -> switch (systemAppearance.current().preference()) {
+                case DARK -> Optional.of(true); case LIGHT -> Optional.of(false); case UNAVAILABLE -> Optional.empty();
+            }, listener -> new dev.jasper.app.lifecycle.Subscription(systemAppearance.subscribe(ignored -> listener.run())));
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
                 dev.jasper.app.settingsui.CorePages.pages(themeChoices, system, shells,
                     new dev.jasper.app.settingsui.NotificationGroupChoices(() -> groupChoices(notificationCenter.groups(), this::pluginName)),
@@ -931,7 +943,7 @@ public final class JasperApplication {
             List<dev.jasper.app.notifications.NotificationGroup> groups, java.util.function.Function<String, String> pluginName) {
         return groups.stream().map(group -> new dev.jasper.app.settingsui.NotificationGroupChoices.Group(group.id(), group.name(),
             group.owner().equals(dev.jasper.app.notifications.NotificationRequest.JASPER) ? "Jasper" : pluginName.apply(group.owner()),
-            group.defaultMode().token())).toList();
+            group.defaultMode().token(), group.owner(), group.owner().equals(dev.jasper.app.notifications.NotificationRequest.JASPER) ? "appearance" : "plugin")).toList();
     }
 
     private String pluginName(String id) {
@@ -1470,6 +1482,8 @@ public final class JasperApplication {
         notifications.close();
         if (activityNotifier != null) activityNotifier.close();
         buddyAppearance.close();
+        systemAppearanceListening.run();
+        systemAppearance.close();
         themes.close();
         buddy.close();
         incidentNotices.close();

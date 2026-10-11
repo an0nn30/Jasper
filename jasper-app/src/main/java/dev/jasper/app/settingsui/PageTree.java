@@ -88,8 +88,17 @@ final class PageTree {
     private TreeItem item(SettingsPage page) {
         var children = children(page.id()).stream().map(this::item).toList();
         int matches = count(page.id());
-        return new TreeItem(page.id(), page.title(), Optional.empty(), children.isEmpty(), children,
+        return new TreeItem(page.id(), page.title(), page.icon().or(() -> coreIcon(page.id())), children.isEmpty(), children,
             matches > 0 ? OptionalInt.of(matches) : OptionalInt.empty(), isModified(page.id()));
+    }
+
+    private static Optional<String> coreIcon(String id) {
+        return Optional.ofNullable(switch(id) {
+            case "appearance" -> "appearance"; case "window" -> "window"; case "notifications" -> "bell";
+            case "command-palette" -> "command-palette"; case "desk-buddy" -> "user"; case "system" -> "desktop";
+            case "keymap" -> "keyboard"; case "plugins" -> "plugin"; case "terminal.font" -> "font";
+            case "terminal.cursor" -> "cursor"; case "terminal.shell" -> "terminal"; default -> null;
+        });
     }
 
     /** The kit tree: open branches, the selection, counts while searching and emphasis for unsaved pages. */

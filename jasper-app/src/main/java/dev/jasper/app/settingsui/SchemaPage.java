@@ -223,12 +223,22 @@ public final class SchemaPage implements SettingsPage {
                     close(children, group, title, sections++);
                     title = section.title();
                 }
-                case RowItem row -> { if (row.shown()) group.add(row(rows.get(rowIndex++))); }
+                case RowItem row -> {
+                    if(row.shown()) {
+                        var owner=rows.get(rowIndex++);
+                        if(owner.editor.cardRows())group.addAll(((Nodes.Stack)row(owner)).children());
+                        else if(owner.editor.fullSpan()) {
+                            if(!group.isEmpty()){close(children,group,title,sections++);title=null;}
+                            Nodes.Node content=row(owner);
+                            children.add(title==null?content:new Nodes.Section("section-"+sections++,ControlState.READY,title,content));title=null;
+                        } else group.add(row(owner));
+                    }
+                }
                 case ActionItem ignored -> group.add(actionNode(actions.get(actionIndex++)));
             }
         }
         close(children, group, title, sections);
-        return new ViewSpec(new Nodes.Stack("page:" + spec.id, ControlState.READY, Nodes.LayoutRole.DETAIL, children));
+        return new ViewSpec(new Nodes.Stack("page:" + spec.id, ControlState.READY, Nodes.LayoutRole.SETTINGS_PAGE, children));
     }
 
     /** Ends a section: its title over a settings card of its rows; an empty untitled run adds nothing. */
@@ -244,8 +254,9 @@ public final class SchemaPage implements SettingsPage {
         var state = new ControlState(true, enabled, false, row.error);
         var reset = new Nodes.Button(row.resetId(), new ControlState(row.resettable, true, false, ""), "", "refresh",
             Nodes.ButtonKind.GHOST, row.resetId(), "Reset " + row.setting.label() + " to default");
-        var control = new Nodes.Stack(row.id() + ":controls", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(row.editor.node(row.id(), state), reset));
-        return new Nodes.SettingRow(row.rowId(), ControlState.READY, row.setting.label(), row.comment, control, false, row.highlighted);
+        if (row.editor.fullSpan()) return row.editor.node(row.id(), state);
+        var control = new Nodes.Stack(row.id() + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(row.editor.node(row.id(), state), reset));
+        return new Nodes.SettingRow(row.rowId(), ControlState.READY, row.editor.rowLabel(row.setting.label()), row.comment, control, row.editor.dependent(), row.highlighted);
     }
 
     private Nodes.Node actionNode(ActionRow action) {
@@ -282,7 +293,10 @@ public final class SchemaPage implements SettingsPage {
     private <T> void reset(Row<T> row) {
         row.invalid = false;
         row.error = "";
-        context.draft().stage(row.setting, Optional.empty());
+        var defaults = new java.util.LinkedHashMap<Setting<?>, Optional<?>>();
+        defaults.put(row.setting, Optional.empty());
+        row.editor.relatedSettings().forEach(setting -> defaults.put(setting, Optional.empty()));
+        context.draft().stageAll(defaults);
         context.changed().run();
         render();
     }
@@ -297,13 +311,19 @@ public final class SchemaPage implements SettingsPage {
         }
         if (row.editor.removesAtDefault() && Objects.equals(value, row.setting.defaultValue())) {
             valid(row);
-            context.draft().stage(row.setting, Optional.empty());
+            var defaults = new java.util.LinkedHashMap<Setting<?>, Optional<?>>();
+        defaults.put(row.setting, Optional.empty());
+        row.editor.relatedSettings().forEach(setting -> defaults.put(setting, Optional.empty()));
+        context.draft().stageAll(defaults);
             return;
         }
         Optional<String> problem = row.setting.kind().check(value);
         if (problem.isPresent()) { invalid(row, problem.get()); return; }
+        var changes=new java.util.LinkedHashMap<Setting<?>,Optional<?>>();
+        changes.put(row.setting,Optional.of(value));
+        try { changes.putAll(row.editor.companionValues()); } catch(RuntimeException unreadable) {invalid(row,"Not a valid value.");return;}
         valid(row);
-        context.draft().stage(row.setting, Optional.of(value));
+        context.draft().stageAll(changes);
     }
 
     private void invalid(Row<?> row, String message) {
@@ -329,11 +349,13 @@ public final class SchemaPage implements SettingsPage {
     private <T> void showValue(Row<T> row) {
         T value = context.draft().value(row.setting);
         if (!row.invalid) {
+            row.editor.showRelated();
             T current;
             try { current = row.editor.value(); } catch (RuntimeException unreadable) { current = null; }
             if (!Objects.equals(current, value)) row.editor.show(value);
         }
-        row.resettable = !Objects.equals(value, row.setting.defaultValue());
+        row.resettable = !Objects.equals(value, row.setting.defaultValue()) || row.editor.relatedSettings().stream()
+            .anyMatch(setting -> !Objects.equals(context.draft().value(setting), setting.defaultValue()));
     }
 
     @Override public boolean modified() {

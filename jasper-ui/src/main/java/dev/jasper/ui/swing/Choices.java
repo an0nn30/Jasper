@@ -23,14 +23,14 @@ final class Choices {
         final JComponent input;
         final ArrayList<AutoCloseable> optionLifetimes = new ArrayList<>();
         List<Option> options = List.of();
-        boolean embedded;
+        boolean embedded, settings;
         @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(!value); }
         boolean applying;
         ChoiceControl(KitView view, Nodes.Choice node) {
             super(view, node, new JPanel(new BorderLayout()));
             if (node.kind() == Nodes.ChoiceKind.DROPDOWN) {
                 var combo = new ChoiceCombo(context()); input = combo;
-                combo.setRenderer((list, value, index, selected, focus) -> optionLabel(value, selected && index >= 0));
+                combo.setRenderer((list, value, index, selected, focus) -> optionLabel(value, selected && index >= 0, index >= 0));
                 ActionListener listener = event -> {
                     if (applying) return;
                     if (!interactive()) { refresh(); return; }
@@ -39,7 +39,7 @@ final class Choices {
                 combo.addActionListener(listener); own(() -> combo.removeActionListener(listener));
             } else if (node.kind() == Nodes.ChoiceKind.SEARCHABLE) {
                 var combo = new SearchChoices.Combo(context()); input = combo;
-                combo.setRenderer((list, value, index, selected, focus) -> optionLabel(value, selected && index >= 0));
+                combo.setRenderer((list, value, index, selected, focus) -> optionLabel(value, selected && index >= 0, index >= 0));
                 ActionListener listener = event -> {
                     if (applying || combo.freeEntry) return;
                     if (!interactive()) { refresh(); return; }
@@ -67,7 +67,8 @@ final class Choices {
             var container = (JPanel)component; container.setOpaque(false); container.add(label, BorderLayout.NORTH); container.add(input, BorderLayout.CENTER); container.add(error, BorderLayout.SOUTH);
             label.setLabelFor(input); refresh();
         }
-        private JLabel optionLabel(Option option, boolean selected) {
+        private JComponent optionLabel(Option option, boolean selected, boolean popup) {
+            if(option!=null&&(!option.icon().isBlank()||!option.description().isBlank()))return new RichOptions(context(),option,selected,popup,option.id().equals(((Nodes.Choice)node).selectedId()),input.getWidth()-(popup?2*ThemePainting.metric(context(),DesignMetrics.Role.MENU_SEPARATOR_MARGIN):ThemePainting.metric(context(),DesignMetrics.Role.CHOICE_ARROW_WIDTH)));
             return Choices.optionLabel(context(), option == null ? "Choose…" : option.label(), option == null ? Optional.empty() : option.hue(), selected,
                 option == null ? SemanticColor.TEXT_TERTIARY : null);
         }
@@ -85,11 +86,12 @@ final class Choices {
                 input.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY)); input.setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_CONTROL));
                 if (input instanceof JComboBox<?> raw) {
                     var combo = (JComboBox<Option>)raw;
+                    ((ChoiceCombo)combo).settingsWidth=settings?ThemePainting.metric(context(),choice.options().stream().anyMatch(option->!option.icon().isBlank()||!option.description().isBlank())?DesignMetrics.Role.SETTINGS_RICH_CHOICE_WIDTH:DesignMetrics.Role.SETTINGS_CHOICE_WIDTH):0;
                     if (combo instanceof SearchChoices.Combo searchable) choice.search().ifPresent(searchable::configure);
-                    ((ChoiceCombo)combo).refreshPopup();
                     if (!options.equals(choice.options())) {
                         combo.setModel(new DefaultComboBoxModel<>(choice.options().toArray(Option[]::new))); options = choice.options();
                     }
+                    ((ChoiceCombo)combo).refreshPopup();
                     combo.setSelectedItem(choice.options().stream().filter(o -> o.id().equals(choice.selectedId())).findFirst().orElse(null));
                 } else if (input instanceof PickerButton picker) {
                     Option option = choice.options().stream().filter(o -> o.id().equals(choice.selectedId())).findFirst().orElse(null);
@@ -206,7 +208,7 @@ final class Choices {
         }
     }
     static class ChoiceCombo extends JComboBox<Option> {
-        final KitContext context; ThemePainting.Focus focus; BasicComboPopup popup;
+        final KitContext context; ThemePainting.Focus focus; BasicComboPopup popup; int settingsWidth;
         ChoiceCombo(KitContext context) {
             this.context = context; setOpaque(false);
             setBorder(new EmptyBorder(ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0, ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0));
@@ -230,7 +232,11 @@ final class Choices {
         final BasicComboBoxUI kitUi() { return new KitUi(); }
         /** Kit painting around Swing's combo behaviour; distinct class so a reinstall can be recognised. */
         class KitUi extends BasicComboBoxUI {
+                @Override protected void installDefaults() { super.installDefaults(); padding = new Insets(0,0,0,0); }
                 @Override protected ComboPopup createPopup() { return createKitPopup(comboBox); }
+                private boolean rich(){for(int i=0;i<getItemCount();i++){var option=getItemAt(i);if(!option.icon().isBlank()||!option.description().isBlank())return true;}return false;}
+                @Override protected Rectangle rectangleForCurrentValue() { var bounds=super.rectangleForCurrentValue();if(rich())bounds.width=comboBox.getWidth()-comboBox.getInsets().left-comboBox.getInsets().right-ThemePainting.metric(context,DesignMetrics.Role.CHOICE_ARROW_WIDTH);return bounds; }
+                @Override protected LayoutManager createLayoutManager(){return new ComboBoxLayoutManager(){@Override public void layoutContainer(Container parent){super.layoutContainer(parent);if(arrowButton!=null&&rich()){int width=ThemePainting.metric(context,DesignMetrics.Role.CHOICE_ARROW_WIDTH);var i=comboBox.getInsets();arrowButton.setBounds(comboBox.getWidth()-i.right-width,i.top,width,comboBox.getHeight()-i.top-i.bottom);}}};}
                 @Override protected JButton createArrowButton() { return new JButton() {
                     { setBorder(new EmptyBorder(0, 0, 0, 0)); setContentAreaFilled(false); setOpaque(false); setFocusable(false); }
                     @Override protected void paintComponent(Graphics graphics) {
@@ -250,11 +256,12 @@ final class Choices {
             list.setForeground(ThemePainting.color(context, SemanticColor.TEXT_PRIMARY));
             list.setSelectionBackground(ThemePainting.color(context, SemanticColor.ACCENT));
             list.setSelectionForeground(ThemePainting.color(context, SemanticColor.TEXT_ONACCENT));
-            list.setFixedCellHeight(ThemePainting.height(context, DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.BODY));
+            boolean rich=false;for(int i=0;i<getItemCount();i++){var option=getItemAt(i);if(!option.icon().isBlank()||!option.description().isBlank()){rich=true;break;}}
+            list.setFixedCellHeight(rich?-1:ThemePainting.height(context, DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.BODY));
             list.setFont(ThemePainting.font(context, Typography.Role.BODY));
             popup.revalidate(); popup.repaint(); list.repaint();
         }
-        @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); return new Dimension(size.width, Math.max(size.height, ThemePainting.height(context, DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY))); }
+        @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); return new Dimension(settingsWidth>0?settingsWidth:size.width, Math.max(size.height, ThemePainting.height(context, DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY))); }
         @Override public void paint(Graphics graphics) {
             var g = (Graphics2D)graphics.create(); try { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); super.paint(g); } finally { g.dispose(); }
         }

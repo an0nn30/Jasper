@@ -23,11 +23,8 @@ final class PageBody extends JPanel implements Scrollable {
         add(view, BorderLayout.CENTER);
     }
 
-    /** The page never narrows below the width its controls prefer; the scroller scrolls sideways instead. */
-    @Override public Dimension getMinimumSize() {
-        var minimum = super.getMinimumSize();
-        return new Dimension(Math.max(minimum.width, view.getPreferredSize().width), minimum.height);
-    }
+    /** The shared Settings layout wraps controls at the available width. */
+    @Override public Dimension getMinimumSize() { return view.getMinimumSize(); }
 
     @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
     /** A line of the page's text per step, so scrolling follows the user's font size. */

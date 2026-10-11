@@ -29,9 +29,9 @@ final class ControlRegistry {
             case Nodes.Text text -> new Labels.TextControl(view, text);
             case Nodes.Icon icon -> new Labels.IconControl(view, icon);
             case Nodes.Button button -> new Buttons.ButtonControl(view, button);
-            case Nodes.Field field -> new TextFields.FieldControl(view, field);
+            case Nodes.Field field -> field.presentation() == Nodes.FieldPresentation.STEPPER ? new NumericControls.Stepper(view, field) : field.presentation() == Nodes.FieldPresentation.SLIDER ? new NumericControls.Slider(view, field) : new TextFields.FieldControl(view, field);
             case Nodes.Secret secret -> new SecretFields.SecretControl(view, secret);
-            case Nodes.Choice choice -> new Choices.ChoiceControl(view, choice);
+            case Nodes.Choice choice -> choice.kind() == Nodes.ChoiceKind.PREVIEWS ? new PreviewChoices(view, choice) : new Choices.ChoiceControl(view, choice);
             case Nodes.PickerMenu menu -> new PickerMenus.MenuControl(view,menu);
             case Nodes.Toggle toggle -> new Switches.ToggleControl(view, toggle);
             case Nodes.Chip chip -> new Indicators.ChipControl(view, chip);
@@ -74,7 +74,7 @@ final class ControlRegistry {
     static Object kind(Nodes.Node node) {
         return switch (node) {
             case Nodes.Custom custom -> java.util.List.of(custom.kind(),custom.contentId());
-            case Nodes.Field field -> field.kind();
+            case Nodes.Field field -> field.presentation() == Nodes.FieldPresentation.STEPPER || field.presentation() == Nodes.FieldPresentation.SLIDER ? java.util.List.of(field.kind(), field.presentation()) : field.kind();
             case Nodes.Secret secret -> secret.kind();
             case Nodes.Button button -> button.kind();
             case Nodes.Choice choice -> choice.kind();

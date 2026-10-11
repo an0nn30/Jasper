@@ -229,6 +229,7 @@ def stage = tasks.register('stagePackage', Sync) {
 
 apply from: rootProject.file('gradle/mac-native.gradle')
 apply from: rootProject.file('gradle/mac-glass.gradle')
+apply from: rootProject.file('gradle/mac-appearance.gradle')
 
 def packageApp = tasks.register('packageApp') {
     group = 'distribution'

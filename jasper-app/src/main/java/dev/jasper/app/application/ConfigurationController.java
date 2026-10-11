@@ -36,6 +36,7 @@ final class ConfigurationController implements AutoCloseable {
     private ConfigService.State state;
     private boolean closed;
     private boolean lastChromeDark = true;
+    private dev.jasper.app.platform.SystemAppearance.Observation systemAppearance;
     private final Subscription appearance;
     private Consumer<ConfigSnapshot> applicationListener = snapshot -> {};
     private final List<ConfigDiagnostic> reported = new java.util.ArrayList<>();
@@ -96,6 +97,13 @@ final class ConfigurationController implements AutoCloseable {
     }
     ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog,
                             Consumer<Path> editor, java.util.function.Supplier<List<ThemeCatalog.Problem>> migrationSource) {
+        this(themes, service, catalog, editor, migrationSource,
+            dev.jasper.app.platform.SystemAppearance.Observation.unavailable("No system appearance observer is attached."));
+    }
+    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog,
+                            Consumer<Path> editor, java.util.function.Supplier<List<ThemeCatalog.Problem>> migrationSource,
+                            dev.jasper.app.platform.SystemAppearance.Observation initialAppearance) {
+        this.systemAppearance = Objects.requireNonNull(initialAppearance);
         this.migrationSource = migrationSource;
         requireEdt();
         this.themes = themes; this.service = service; this.catalog = catalog; this.editor = editor;
@@ -268,13 +276,11 @@ final class ConfigurationController implements AutoCloseable {
         var problems = new java.util.ArrayList<ConfigDiagnostic>();
         for (ThemeCatalog.Problem problem : available.problems())
             problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, problem.file(), problem.line(), problem.line() == 0 ? 0 : 1, "", problem.message()));
-        String name = next.snapshot().theme();
-        Theme theme = available.find(name).orElse(null);
-        if (theme == null) {
-            theme = lastChromeDark ? Theme.DARK : Theme.JASPER_LIGHT;
-            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.name",
-                "Unknown theme \"" + name + "\"; using " + theme.name() + ". Available: " + String.join(", ", available.names()) + "."));
-        }
+        var resolved = ThemePolicy.resolve(next.snapshot(), available, systemAppearance, lastChromeDark);
+        Theme theme = resolved.theme();
+        for (String message : resolved.problems())
+            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0,
+                next.snapshot().followSystemTheme() ? "ui.theme.follow_system" : "ui.theme.name", message));
         WorkspaceThemeChoice choice = next.snapshot().workspaceTheme();
         Theme workspace = null;
         if (!choice.matchesChrome()) workspace = available.find(choice.name()).orElse(null);
@@ -298,6 +304,21 @@ final class ConfigurationController implements AutoCloseable {
             themeProblems = List.copyOf(problems);
             throw failure;
         }
+    }
+
+    /** Appearance-only publication: never feeds config listeners or rebases an open Settings draft. */
+    void systemAppearanceChanged(dev.jasper.app.platform.SystemAppearance.Observation observation) {
+        requireEdt();
+        if (closed || systemAppearance.equals(observation)) return;
+        systemAppearance = observation;
+        if (!state.snapshot().followSystemTheme()) return;
+        try { configureThemes(state); }
+        catch (ThemeController.InstallationFailure failure) {
+            owners.stream().findFirst().ifPresent(owner -> owner.onError.accept("Could not apply the theme", failure.getMessage()));
+        }
+        var visible = shown();
+        for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(visible);
+        problemListener.accept(visible);
     }
 
     @Override public void close() {

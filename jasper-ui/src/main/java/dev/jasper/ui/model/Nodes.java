@@ -19,7 +19,7 @@ public final class Nodes {
     public enum ButtonKind { PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK }
     public enum StatusKind { SUCCESS, WARNING, DANGER, IDLE }
     public enum FieldKind { TEXT, SEARCH, PORT, PATH, TEXTAREA, NUMBER }
-    public enum ChoiceKind { DROPDOWN, PICKER, SEGMENTED, SEARCHABLE }
+    public enum ChoiceKind { DROPDOWN, PICKER, SEGMENTED, SEARCHABLE, PREVIEWS }
     public enum CardKind { FORM, SETTINGS, MIXED }
     /** NONE keeps rows readable and scrollable but removes row selection, activation and the canvas focus stop.
      * Independently interactive inline controls keep their behavior. NONE requires empty selectedIds. */
@@ -32,7 +32,7 @@ public final class Nodes {
     /** WINDOW has exactly one full-bleed content section, no hero, and a shared pinned footer. */
     public enum FormKind { HERO, HERO_COMPACT, SHEET, FULL, SETTINGS, WINDOW }
     /** SUPPORTING keeps leading adornments natural-sized beside a wrapping final text/body child. */
-    public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION, SUPPORTING }
+    public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION, SUPPORTING, JOINED_ACTIONS, SETTINGS_PAGE, SETTINGS_CONTROLS, SETTINGS_TRAILING, SETTINGS_GROUP_HEADER, SETTINGS_FOOTER, SETTINGS_NAVIGATION }
     /**
      * SIDEBAR_DETAIL and THREE_COLUMN place their children side by side. DOCUMENT stacks them top to bottom for a document
      * surface (an editor tab): every visible child takes its preferred height except the first visible Custom or Empty
@@ -94,7 +94,7 @@ public final class Nodes {
      * containing item row is selected, hovered or keyboard-active, or while the button itself is hovered/focused.
      * Outside an item row it behaves like EMBEDDED. It never changes action dispatch or selection.
      */
-    public enum ButtonPresentation { STANDARD, EMBEDDED, CONTEXTUAL_EMBEDDED }
+    public enum ButtonPresentation { STANDARD, EMBEDDED, CONTEXTUAL_EMBEDDED, CIRCULAR }
 
     /**
      * A present {@code iconSeverity} tints the button's glyph with that severity's colour (as {@link Icon#severity()}
@@ -177,7 +177,7 @@ public final class Nodes {
      * TECHNICAL uses standard geometry with the monospaced technical-value font.
      * PLAIN_PATH keeps PATH semantics and Browse with no leading folder; other kinds reject it.
      */
-    public enum FieldPresentation { STANDARD, EMBEDDED, TRANSPARENT, TECHNICAL, PLAIN_PATH }
+    public enum FieldPresentation { STANDARD, EMBEDDED, TRANSPARENT, TECHNICAL, PLAIN_PATH, STEPPER, SLIDER }
 
     /**
      * A NUMBER field states its {@link Numeric} shape; other kinds have none. {@code alternateAction} is what Shift+Enter
@@ -199,6 +199,7 @@ public final class Nodes {
             Objects.requireNonNull(numeric);
             Objects.requireNonNull(presentation);
             if ((kind == FieldKind.NUMBER) != numeric.isPresent()) throw new IllegalArgumentException("Numeric bounds belong to NUMBER fields only, which require them");
+            if ((presentation == FieldPresentation.STEPPER || presentation == FieldPresentation.SLIDER) && kind != FieldKind.NUMBER) throw new IllegalArgumentException("Numeric presentation requires NUMBER");
             if (presentation == FieldPresentation.PLAIN_PATH && kind != FieldKind.PATH) throw new IllegalArgumentException("PLAIN_PATH requires PATH");
             Objects.requireNonNull(alternateAction); Objects.requireNonNull(cancelAction); Objects.requireNonNull(listId);
             if (!listId.isBlank()) ModelChecks.id(listId);

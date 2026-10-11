@@ -71,20 +71,20 @@ public final class FakeKitView implements UiView {
  @Override public void withSecret(String id,Consumer<char[]> use){requireSecret(id);Objects.requireNonNull(use);char[] copy=secrets.getOrDefault(id,new char[0]).clone();try{use.accept(copy);}finally{Arrays.fill(copy,(char)0);}}
  @Override public void clearSecret(String id){requireSecret(id);var old=secrets.remove(id);if(old!=null)Arrays.fill(old,(char)0);}
  @Override public void focus(String id){guard();if(!index(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");focused=id;}
- @Override public void selectAll(String id){guard();if(!(index(spec.root()).get(id) instanceof Nodes.Field))throw new IllegalArgumentException("Not a field node");fieldSelections.put(id,new int[]{0,fieldText.get(id).length()});}
+ @Override public void selectAll(String id){guard();if(!(index(spec.root()).get(id) instanceof Nodes.Field field) || field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");fieldSelections.put(id,new int[]{0,fieldText.get(id).length()});}
  /** The fake's logical field selection, independently recorded from focus. */
- public int[] fieldSelection(String id){guard();if(!(index(spec.root()).get(id) instanceof Nodes.Field))throw new IllegalArgumentException("Not a field node");return fieldSelections.getOrDefault(id,new int[]{0,0}).clone();}
+ public int[] fieldSelection(String id){guard();if(!(index(spec.root()).get(id) instanceof Nodes.Field field) || field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");return fieldSelections.getOrDefault(id,new int[]{0,0}).clone();}
  private String revealed;
  @Override public void reveal(String id){guard();if(!index(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");revealed=id;}
  /** The node last scrolled into view; reveal never moves logical focus.
  * @return node id */
  public Optional<String> revealed(){guard();return Optional.ofNullable(revealed);}
  private final Set<String> composing=new HashSet<>();
- @Override public boolean composing(String fieldId){guard();if(!(index(spec.root()).get(fieldId) instanceof Nodes.Field))throw new IllegalArgumentException("Not a field node");return composing.contains(fieldId);}
+ @Override public boolean composing(String fieldId){guard();if(!(index(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");return composing.contains(fieldId);}
  /** Simulate an input method composing (or committing) text in a field.
  * @param fieldId field node
  * @param value whether uncommitted text is pending */
- public void setComposing(String fieldId,boolean value){guard();if(!(index(spec.root()).get(fieldId) instanceof Nodes.Field))throw new IllegalArgumentException("Not a field node");if(value)composing.add(fieldId);else composing.remove(fieldId);}
+ public void setComposing(String fieldId,boolean value){guard();if(!(index(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");if(value)composing.add(fieldId);else composing.remove(fieldId);}
  /** Requested logical focus. */
  public Optional<String> focused(){guard();return Optional.ofNullable(focused);}
  /** Deliver a typed event through containment. */

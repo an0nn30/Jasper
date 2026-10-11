@@ -34,6 +34,8 @@ final class ViewReconciler implements AutoCloseable {
         applyColumns(spec.root(), next, -1, false);
         applyPanelDetail(spec.root(), next, false);
         applyFullForm(spec.root(), next, false);
+        applySettings(spec.root(), next, false);
+        applySettingsNavigation(spec.root(),next,false);
         for (var node : nodes.values()) next.get(node.id()).update(node);
         applyHero(spec.root(), next, false);
         applyTiles(spec.root(), next, 0);
@@ -106,6 +108,18 @@ final class ViewReconciler implements AutoCloseable {
         boolean full = node instanceof Nodes.Form form ? form.kind() == Nodes.FormKind.FULL : inherited;
         if (next.get(node.id()) instanceof SettingRows.RowControl row) row.fullForm = full;
         ControlRegistry.children(node).forEach(child -> applyFullForm(child, next, full));
+    }
+    private void applySettings(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
+        boolean settings = node instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.SETTINGS_PAGE || inherited;
+        if (next.get(node.id()) instanceof SettingRows.RowControl row) row.settings = settings;
+        if (next.get(node.id()) instanceof Stacks.StackControl stack) stack.settings = settings;
+        if (next.get(node.id()) instanceof Choices.ChoiceControl choice)choice.settings=settings;
+        ControlRegistry.children(node).forEach(child -> applySettings(child, next, settings));
+    }
+    private void applySettingsNavigation(Nodes.Node node,Map<String,ControlRegistry.Control> next,boolean inherited) {
+        boolean navigation=inherited||node instanceof Nodes.Stack stack&&stack.role()==Nodes.LayoutRole.SETTINGS_NAVIGATION;
+        if(next.get(node.id()) instanceof Trees.TreeControl tree)tree.settingsNavigation=navigation;
+        ControlRegistry.children(node).forEach(child->applySettingsNavigation(child,next,navigation));
     }
     /** THREE_COLUMN assigns reusable rail/list/detail presentation; identities remain producer data. */
     private void applyColumns(Nodes.Node node, Map<String, ControlRegistry.Control> next, int column, boolean inheritedDetail) {

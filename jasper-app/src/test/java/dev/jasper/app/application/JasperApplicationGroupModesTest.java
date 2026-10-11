@@ -34,9 +34,9 @@ class JasperApplicationGroupModesTest {
             new NotificationGroup("dev.jasper.remote.activities", "Remote activities", "dev.jasper.remote", DisplayMode.CARD),
             new NotificationGroup("dev.example.tool", "Tool", "dev.example.tool", DisplayMode.STICKY));
         assertThat(JasperApplication.groupChoices(groups, id -> id.equals("dev.jasper.remote") ? "Remote" : id)).containsExactly(
-            new NotificationGroupChoices.Group("jasper.commands", "Long-running commands", "Jasper", "card"),
-            new NotificationGroupChoices.Group("dev.jasper.remote.activities", "Remote activities", "Remote", "card"),
-            new NotificationGroupChoices.Group("dev.example.tool", "Tool", "dev.example.tool", "sticky"));
+            new NotificationGroupChoices.Group("jasper.commands", "Long-running commands", "Jasper", "card", "jasper", "appearance"),
+            new NotificationGroupChoices.Group("dev.jasper.remote.activities", "Remote activities", "Remote", "card", "dev.jasper.remote", "plugin"),
+            new NotificationGroupChoices.Group("dev.example.tool", "Tool", "dev.example.tool", "sticky", "dev.example.tool", "plugin"));
     }
 
     /** notifications.groups applies when Jasper starts and again when the file changes, without a restart. */

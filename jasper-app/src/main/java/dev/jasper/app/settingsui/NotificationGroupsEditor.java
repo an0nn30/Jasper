@@ -54,24 +54,33 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
         if (groups.isEmpty())
             return new Nodes.Stack(id, plain, Nodes.LayoutRole.VERTICAL, List.of(
                 new Nodes.Text(id + ":empty", ControlState.READY, "No notification groups yet.", Nodes.TextRole.DESCRIPTION)));
-        Map<String, String> value = value();
-        var lines = new ArrayList<Nodes.Node>();
-        for (int i = 0; i < groups.size(); i++) {
-            var group = groups.get(i);
-            var options = new ArrayList<Option>();
-            for (var mode : MODES.entrySet())
-                options.add(new Option(mode.getKey(), mode.getValue() + (mode.getKey().equals(group.defaultMode()) ? " (default)" : ""),
-                    Optional.empty()));
-            var choice = new Nodes.Choice(modeId(id, i), plain, Nodes.ChoiceKind.DROPDOWN, options, mode(group.id()),
-                group.name() + ": how its notifications appear", "");
-            var reset = new Nodes.Button(resetId(id, i), new ControlState(plain.visible(), plain.enabled() && value.containsKey(group.id()),
-                plain.busy(), ""), "Reset", "", Nodes.ButtonKind.SECONDARY, resetId(id, i), "Reset " + group.name() + " to its default");
-            // config.toml names groups by id, so the caption shows it beside who declared the group.
-            lines.add(new Nodes.FormRow(id + ":row-" + i, plain, group.name(), group.owner() + " · " + group.id(), choice,
-                Optional.of(reset), false));
+        Map<String,String> value=value();
+        var owners=new LinkedHashMap<String,List<Integer>>();
+        for(int i=0;i<groups.size();i++)owners.computeIfAbsent(groups.get(i).ownerId(),ignored->new ArrayList<>()).add(i);
+        var sections=new ArrayList<Nodes.Node>();
+        sections.add(new Nodes.Text(id+":description",plain,"How each kind of notification appears. A plugin's groups are listed once it has run.",Nodes.TextRole.DESCRIPTION));
+        int section=0;
+        for(var indices:owners.values()) {
+            var first=groups.get(indices.getFirst());var lines=new ArrayList<Nodes.Node>();
+            var heading=new ArrayList<Nodes.Node>();
+            if(!first.ownerIcon().isBlank())heading.add(new Nodes.Icon(id+":owner-"+section+":icon",plain,first.ownerIcon(),first.ownerId().equals("jasper")?Nodes.Hue.BLUE:Nodes.Hue.NEUTRAL,Nodes.IconSize.CONTROL,first.owner()));
+            heading.add(new Nodes.Text(id+":owner-"+section+":title",plain,first.owner(),Nodes.TextRole.PANEL_TITLE));
+            heading.add(new Nodes.Text(id+":owner-"+section+":count",plain,indices.size()+" groups",Nodes.TextRole.CAPTION));
+            lines.add(new Nodes.Stack(id+":owner-"+section,plain,Nodes.LayoutRole.SETTINGS_GROUP_HEADER,heading));
+            for(int i:indices) {
+                var group=groups.get(i);var options=new ArrayList<Option>();
+                for(var mode:MODES.entrySet())options.add(new Option(mode.getKey(),mode.getValue(),modeIcon(mode.getKey()),mode.getKey().equals(group.defaultMode())?"Default":""));
+                var choice=new Nodes.Choice(modeId(id,i),plain,Nodes.ChoiceKind.DROPDOWN,options,mode(group.id()),group.name()+": how its notifications appear; "+group.owner()+" · "+group.id(),"");
+                var reset=new Nodes.Button(resetId(id,i),new ControlState(plain.visible()&&value.containsKey(group.id()),plain.enabled()&&value.containsKey(group.id()),plain.busy(),""),"","refresh",Nodes.ButtonKind.GHOST,resetId(id,i),"Reset "+group.name()+" to its default");
+                var control=new Nodes.Stack(modeId(id,i)+":controls",plain,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(choice,reset));
+                lines.add(new Nodes.SettingRow(id+":row-"+i,plain,group.name(),"",control,false,false));
+            }
+            sections.add(new Nodes.Card(id+":owner-card-"+section++,plain,Nodes.CardKind.SETTINGS,lines));
         }
-        return new Nodes.Stack(id, plain, Nodes.LayoutRole.VERTICAL, lines);
+        return new Nodes.Stack(id,plain,Nodes.LayoutRole.VERTICAL,sections);
     }
+    private static String modeIcon(String mode) {return switch(mode){case "card"->"notification.card";case "sticky"->"notification.sticky";case "history"->"notification.history";default->"notification.off";};}
+    @Override public boolean fullSpan(){return true;}
 
     @Override public Map<String, String> value() {
         var value = new LinkedHashMap<>(shown);

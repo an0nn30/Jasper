@@ -183,13 +183,13 @@ class AppearancePageTest {
         var gear = (Nodes.MenuButton) node(page, "ui.theme.name:actions");
         assertThat(gear.tooltip()).isEqualTo("Theme actions");
         assertThat(kit(page, "ui.theme.name:actions.main", JButton.class).getAccessibleContext().getAccessibleName()).isEqualTo("Theme actions");
-        assertThat(gear.items()).extracting(dev.jasper.ui.model.MenuItem::label).containsExactly("Import theme…");
+        assertThat(gear.items()).extracting(dev.jasper.ui.model.MenuItem::label).containsExactly("Import theme…", "Reset to defaults");
         // Press the gear menu's own item, as the user does (opening a native popup needs a screen, so the test
         // presses the mounted item directly).
         var menu = kit(page, "ui.theme.name:actions", javax.swing.JComponent.class).getComponentPopupMenu();
         var items = java.util.Arrays.stream(menu.getComponents()).filter(javax.swing.AbstractButton.class::isInstance)
             .map(javax.swing.AbstractButton.class::cast).toList();
-        assertThat(items).extracting(javax.swing.AbstractButton::getText).containsExactly("Import theme…");
+        assertThat(items).extracting(javax.swing.AbstractButton::getText).containsExactly("Import theme…", "Reset to defaults");
         items.getFirst().doClick();
         assertThat(calls).containsExactly("import");
         page.dispose();

@@ -16,7 +16,7 @@ final class SettingRows {
 
     static final class RowControl extends ControlRegistry.Control {
         final Composition.WrappedText title, description;
-        boolean panelFooter, hero, fullForm, detail;
+        boolean panelFooter, hero, fullForm, detail, settings;
         SecretFields.SecretControl secret;
         @Override void hero(boolean value) { hero=value; }
 
@@ -120,10 +120,15 @@ final class SettingRows {
             return content<owner.title.getPreferredSize().width+gap()+actionWidth(parent);
         }
         @Override public Dimension minimumLayoutSize(Container parent) {
-            return owner.detail ? new Dimension(actionWidth(parent),height(parent,Math.max(actionWidth(parent),parent.getWidth()))) : Composition.WidthLayout.super.minimumLayoutSize(parent);
+            return owner.settings ? new Dimension(0, 0) : owner.detail ? new Dimension(actionWidth(parent),height(parent,Math.max(actionWidth(parent),parent.getWidth()))) : Composition.WidthLayout.super.minimumLayoutSize(parent);
         }
 
+        boolean fixedControl() { return fixed(((Nodes.SettingRow)owner.node).control()); }
+        static boolean fixed(Nodes.Node node) { return node instanceof Nodes.ItemList || node instanceof Nodes.Table || ControlRegistry.children(node).stream().anyMatch(RowLayout::fixed); }
         int trailing(Container p, int width) {
+            if (owner.settings && p.getComponentCount() > 2)
+                return Math.min(p.getComponent(2).getPreferredSize().width, Math.max(0, width - p.getInsets().left - p.getInsets().right - gap() - ThemePainting.metric(owner.context(), DesignMetrics.Role.FORM_LABEL_WIDTH)));
+
             return p.getComponentCount() > 2
                     ? Math.min(
                             Math.max(p.getComponent(2).getPreferredSize().width, ((Nodes.SettingRow)owner.node).control() instanceof Nodes.Choice ? ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_CHOICE_WIDTH) : 0),
@@ -132,6 +137,13 @@ final class SettingRows {
                                     (width - p.getInsets().left - p.getInsets().right - gap()) / 2))
                     : 0;
         }
+
+        boolean stackedSettings(Container p,int width) {
+            if(!owner.settings||p.getComponentCount()<3||fixedControl())return false;
+            var i=p.getInsets();int content=Math.max(0,width-i.left-i.right);
+            return content<Math.max(ThemePainting.metric(owner.context(),DesignMetrics.Role.FORM_LABEL_WIDTH),owner.title.getPreferredSize().width)+gap()+p.getComponent(2).getPreferredSize().width;
+        }
+        int settingsTextHeight(int width){return owner.title.height(width)+(owner.description.isVisible()?owner.description.height(width)+ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTING_DESCRIPTION_GAP):0);}
 
         /** A switch reserves its own halo; align its painted track while keeping the halo in the row padding. */
         int paintInset(Container parent) {
@@ -142,6 +154,7 @@ final class SettingRows {
         @Override
         public int height(Container p, int width) {
             Insets i = p.getInsets();
+            if(stackedSettings(p,width)){int content=Math.max(0,width-i.left-i.right);return i.top+i.bottom+settingsTextHeight(content)+gap()+Composition.height(p.getComponent(2),Math.min(content,p.getComponent(2).getPreferredSize().width));}
             if (owner.detail) {
                 i=detailInsets(p,width);
                 int content=Math.max(0,width-i.left-i.right), gap=ThemePainting.metric(owner.context(),DesignMetrics.Role.DETAIL_VALUE_GAP);
@@ -158,7 +171,7 @@ final class SettingRows {
             return Math.max(
                     owner.panelFooter ? 0 : ThemePainting.metric(
                             owner.context(),
-                            owner.hero && owner.description.isVisible() ? DesignMetrics.Role.HERO_SETTING_HEIGHT : owner.description.isVisible()
+                            owner.settings ? owner.description.isVisible() ? DesignMetrics.Role.SETTINGS_DESCRIPTION_HEIGHT : DesignMetrics.Role.SETTINGS_ROW_HEIGHT : owner.hero && owner.description.isVisible() ? DesignMetrics.Role.HERO_SETTING_HEIGHT : owner.description.isVisible()
                                     ? owner.fullForm ? DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT : DesignMetrics.Role.SETTING_DESCRIPTION_HEIGHT
                                     : DesignMetrics.Role.SETTING_HEIGHT) + (owner.fullForm && !owner.hero ? ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE) : 0),
                     i.top + i.bottom + Math.max(text, control));
@@ -178,6 +191,12 @@ final class SettingRows {
         @Override
         public void layoutContainer(Container p) {
             Insets i = p.getInsets();
+            if(stackedSettings(p,p.getWidth())){
+                int content=Math.max(0,p.getWidth()-i.left-i.right),title=owner.title.height(content),text=settingsTextHeight(content);
+                owner.title.setBounds(i.left,i.top,content,title);
+                owner.description.setBounds(i.left,i.top+title+ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTING_DESCRIPTION_GAP),content,owner.description.isVisible()?owner.description.height(content):0);
+                var control=p.getComponent(2);int width=Math.min(content,control.getPreferredSize().width);control.setBounds(p.getWidth()-i.right-width,i.top+text+gap(),width,Composition.height(control,width));return;
+            }
             if (owner.detail) {
                 i=detailInsets(p,p.getWidth());
                 int content=Math.max(0,p.getWidth()-i.left-i.right), gap=ThemePainting.metric(owner.context(),DesignMetrics.Role.DETAIL_VALUE_GAP);

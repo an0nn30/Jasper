@@ -44,6 +44,16 @@ public final class SettingsDraft {
         changed();
     }
 
+    /** Stages coupled settings atomically, so listeners never see a partial selection. */
+    public void stageAll(Map<Setting<?>, Optional<?>> values) {
+        values.forEach((setting, value) -> {
+            Objects.requireNonNull(value, "value");
+            if (setting.sameSaved(value, baseline.saved(setting))) pending.remove(setting);
+            else pending.put(setting, value);
+        });
+        changed();
+    }
+
     public boolean modified() { return !pending.isEmpty(); }
 
     public boolean modified(Setting<?> setting) { return pending.containsKey(setting); }

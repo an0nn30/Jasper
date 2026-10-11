@@ -239,6 +239,15 @@ public final class CoreSettings {
         .alias("ui.theme.variant").label("Theme").keywords("theme", "dark", "light", "appearance", "look")
         .description("The UI theme by name: \"Jasper Dark\" (the default), \"Jasper Light\", \"Nord\",\n"
             + "\"Clear Dark\", \"Clear Light\", or a native TOML theme in the themes folder beside this file. Choose it in Settings > Appearance, whose theme gear imports theme files. Switches live across windows.").build();
+    public static final Setting<Boolean> UI_THEME_FOLLOW_SYSTEM = Setting.of("ui.theme.follow_system", SettingKind.bool(), false)
+        .label("Match system appearance").keywords("theme", "dark", "light", "system")
+        .description("Follow the operating system's appearance using the actual bundled Jasper Dark and Jasper Light themes.\n"
+            + "Keeps name and source as the remembered manual choice. No custom theme pairs are inferred.").build();
+    public static final Setting<ThemeSource> UI_THEME_SOURCE = Setting.of("ui.theme.source", SettingKind.choice(List.of(
+            Map.entry("catalog", ThemeSource.CATALOG), Map.entry("bundled", ThemeSource.BUNDLED))), ThemeSource.CATALOG)
+        .label("Theme origin").keywords("theme", "bundled")
+        .description("catalog (default) resolves name with installed themes taking precedence; bundled uses only bundled authored sources.\n"
+            + "For an external custom-theme selection, remove source or use catalog and set follow_system=false.").build();
     public static final Setting<Boolean> UI_ANIMATIONS_ENABLED = Setting.of("ui.animations.enabled", SettingKind.bool(), true)
         .label("Enable animations").keywords("animations", "motion", "transitions", "reduce motion")
         .description("Enable animations throughout the app. Disabling finishes running transitions immediately. Updates live in every window.").build();
@@ -258,7 +267,7 @@ public final class CoreSettings {
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
-            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_FONT_FAMILY, UI_FONT_SIZE, UI_THEME_NAME, UI_THEME_WORKSPACE,
+            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_FONT_FAMILY, UI_FONT_SIZE, UI_THEME_NAME, UI_THEME_SOURCE, UI_THEME_FOLLOW_SYSTEM, UI_THEME_WORKSPACE,
             UI_WORKSPACE_OPACITY, UI_WORKSPACE_BLUR, UI_ANIMATIONS_ENABLED),
         Set.of(List.of("keybindings"), List.of("plugins"), List.of("palette", "scopes")),
         Map.ofEntries(

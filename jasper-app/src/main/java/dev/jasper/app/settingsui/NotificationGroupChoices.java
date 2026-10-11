@@ -25,12 +25,14 @@ public record NotificationGroupChoices(Supplier<List<Group>> groups) {
      * @param owner who declared it, as shown: "Jasper" or a plugin's name
      * @param defaultMode how its notifications appear by default: "card", "sticky", "history" or "off"
      */
-    public record Group(String id, String name, String owner, String defaultMode) {
+    public record Group(String id, String name, String owner, String defaultMode, String ownerId, String ownerIcon) {
+        public Group(String id,String name,String owner,String defaultMode) { this(id,name,owner,defaultMode,owner,""); }
         public Group {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(name, "name");
             Objects.requireNonNull(owner, "owner");
             Objects.requireNonNull(defaultMode, "defaultMode");
+            Objects.requireNonNull(ownerId);Objects.requireNonNull(ownerIcon);
         }
     }
 }

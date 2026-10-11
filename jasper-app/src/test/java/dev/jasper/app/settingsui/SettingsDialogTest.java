@@ -75,6 +75,24 @@ class SettingsDialogTest {
         }, hooks());
     }
 
+    @Test void returningToAPageRestoresScrollAndRetainsTheEditedDocument() throws Exception {
+        var dialog=dialog();final Object[] document={null};final java.awt.Point[] position={null};
+        try{
+            edt(()->{
+                dialog.open(null,"appearance");dialog.view().setSize(980,400);KitTestSupport.layout(dialog.view());
+                var input=KitTestSupport.require(page(dialog),"ui.font.family.input",javax.swing.JComboBox.class);
+                var text=(javax.swing.text.JTextComponent)input.getEditor().getEditorComponent();document[0]=text.getDocument();text.setText("Retained Font");text.select(2,7);
+                dialog.view().body.getViewport().setViewPosition(new java.awt.Point(0,100));position[0]=dialog.view().body.getViewport().getViewPosition();
+                dialog.select("window");KitTestSupport.layout(dialog.view());dialog.back();KitTestSupport.layout(dialog.view());
+            });
+            edt(()->{
+                var input=KitTestSupport.require(page(dialog),"ui.font.family.input",javax.swing.JComboBox.class);var text=(javax.swing.text.JTextComponent)input.getEditor().getEditorComponent();
+                assertThat(text.getDocument()).isSameAs(document[0]);assertThat(text.getText()).isEqualTo("Retained Font");
+                assertThat(dialog.view().body.getViewport().getViewPosition()).isEqualTo(position[0]);
+            });
+        }finally{edt(()->{dialog.cancel();windows.close();});}
+    }
+
     @Test void aFragmentRevealsItsPartBeforeThePageIsSelectedEvenWhenItIsAlreadyShown() throws Exception {
         var revealed = new ArrayList<String>();
         var dialog = new SettingsDialog(windows, context -> CorePages.pages(ThemeChoices.of(() -> List.of("Jasper Dark")),
@@ -142,9 +160,9 @@ class SettingsDialogTest {
             assertThat(dialog.view().tree.visibleIds()).contains("appearance-behavior", "appearance", "terminal.shell", "plugins")
                 .doesNotContain("tools");
             assertThat(dialog.currentPage()).isEqualTo("appearance");
-            assertThat(label(dialog, "breadcrumb")).isEqualTo("Appearance & Behavior › Appearance");
+            assertThat(dialog.view().breadcrumb()).isEqualTo("Appearance & Behavior › Appearance");
             assertThat(button(dialog, "apply").isEnabled()).isFalse();
-            assertThat(dialog.view().navigation.spec().root()).as("the page tree is the kit's").isInstanceOf(Nodes.Tree.class);
+            assertThat(((Nodes.Stack) dialog.view().navigation.spec().root()).children().getFirst()).as("the page tree is the kit's").isInstanceOf(Nodes.Tree.class);
             assertThat(dialog.view().search.spec().root()).isEqualTo(new Nodes.Field("search", dev.jasper.ui.model.ControlState.READY,
                 Nodes.FieldKind.SEARCH, "", "Search settings", "Search settings", ""));
         });
@@ -196,12 +214,11 @@ class SettingsDialogTest {
         edt(() -> {
             dialog.open(null, "appearance");
             javax.swing.SwingUtilities.updateComponentTreeUI(dialog.view());
-            var blur = KitTestSupport.require(dialog.view(), "ui.workspace.blur.input", javax.swing.JComboBox.class);
-            assertThat(blur.getItemCount()).isEqualTo(3);
-            blur.setSelectedIndex(1);
+            var blur = KitTestSupport.require(dialog.view(), "ui.workspace.blur", javax.swing.JButton.class);
+            blur.doClick(0);
             assertThat(button(dialog, "apply").isEnabled()).as("Apply after Blur: On").isTrue();
             var useTheme = KitTestSupport.require(dialog.view(), "ui.workspace.opacity:default", javax.swing.JButton.class);
-            assertThat(useTheme.getAccessibleContext().getAccessibleName()).isEqualTo("Use theme's value");
+            assertThat(useTheme.getAccessibleContext().getAccessibleName()).isEqualTo("Use theme's opacity");
             useTheme.doClick();
             assertThat(dialog.draft().modified(CoreSettings.UI_WORKSPACE_OPACITY)).isTrue();
             assertThat(button(dialog, "apply").isEnabled()).as("Apply after turning off Use theme's value").isTrue();
@@ -268,8 +285,8 @@ class SettingsDialogTest {
             dialog.refreshNow();
             assertThat(button(dialog, "apply").isEnabled()).isTrue();
             assertThat(dialog.view().tree.isModified("window")).isTrue();
-            assertThat(item((Nodes.Tree) dialog.view().navigation.spec().root(), "window").emphasized()).as("unsaved pages stand out").isTrue();
-            assertThat(item((Nodes.Tree) dialog.view().navigation.spec().root(), "terminal").emphasized()).isFalse();
+            assertThat(item((Nodes.Tree) ((Nodes.Stack) dialog.view().navigation.spec().root()).children().getFirst(), "window").emphasized()).as("unsaved pages stand out").isTrue();
+            assertThat(item((Nodes.Tree) ((Nodes.Stack) dialog.view().navigation.spec().root()).children().getFirst(), "terminal").emphasized()).isFalse();
             dialog.apply();
         });
         until(() -> fake.applied == 1);
@@ -468,24 +485,24 @@ class SettingsDialogTest {
             var tree = dialog.view().navigation;
             tree.setSize(260, 600);
             KitTestSupport.layout(tree);
-            assertThat(((Nodes.Tree) tree.spec().root()).selectedIds()).containsExactly("window");
+            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).selectedIds()).containsExactly("window");
             // A row click reaches the dialog as a kit selection event naming the page.
             var row = KitTestSupport.require(tree, "@tree/pages/terminal.cursor/title", javax.swing.JLabel.class);
             for (var listener : row.getMouseListeners())
                 listener.mouseClicked(new java.awt.event.MouseEvent(row, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 1, 1, 1, false, java.awt.event.MouseEvent.BUTTON1));
             assertThat(dialog.currentPage()).isEqualTo("terminal.cursor");
-            assertThat(label(dialog, "breadcrumb")).isEqualTo("Terminal › Cursor");
-            assertThat(((Nodes.Tree) tree.spec().root()).selectedIds()).containsExactly("terminal.cursor");
+            assertThat(dialog.view().breadcrumb()).isEqualTo("Terminal › Cursor");
+            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).selectedIds()).containsExactly("terminal.cursor");
             dialog.select("window");
-            assertThat(((Nodes.Tree) tree.spec().root()).expandedIds()).contains("terminal");
+            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).expandedIds()).contains("terminal");
             var collapse = KitTestSupport.require(tree, "@tree/pages/terminal/expand", javax.swing.JButton.class);
             collapse.doClick();
-            assertThat(((Nodes.Tree) tree.spec().root()).expandedIds()).as("closed by the user").doesNotContain("terminal");
+            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).expandedIds()).as("closed by the user").doesNotContain("terminal");
             dialog.search("ligatures");
-            assertThat(((Nodes.Tree) tree.spec().root()).expandedIds()).as("a search opens everything").contains("terminal");
+            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).expandedIds()).as("a search opens everything").contains("terminal");
             dialog.search("");
             dialog.select("window");
-            assertThat(((Nodes.Tree) tree.spec().root()).expandedIds()).as("and clearing it restores the user's choice").doesNotContain("terminal");
+            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).expandedIds()).as("and clearing it restores the user's choice").doesNotContain("terminal");
         });
     }
 

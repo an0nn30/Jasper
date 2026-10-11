@@ -235,3 +235,14 @@ tasks.register<JavaExec>("themeSurfacePreview") {
     args(layout.buildDirectory.dir("theme-surfaces").get().asFile.absolutePath)
     jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
 }
+
+// Exact-scale actual Settings owners, with synthetic config and declared notification fixtures.
+tasks.register<JavaExec>("settingsSurfacePreview") {
+    group = "verification"
+    dependsOn(tasks.testClasses, stagePlugins)
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "dev.jasper.app.settingsui.SettingsSurfacePreview"
+    systemProperty("jasper.stagedPlugins", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
+    args(layout.buildDirectory.dir("theme-surfaces").get().asFile.absolutePath)
+    jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
+}

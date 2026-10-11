@@ -175,6 +175,8 @@ workspace = "match"
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately | Live |
+| `ui.theme.source` | `"catalog"` | Source of the remembered manual theme: `catalog` or `bundled`; Settings changes this together with the name | Live |
+| `ui.theme.follow_system` | `false` | Follow ongoing OS appearance using the actual bundled dark/light themes, while remembering the manual source | Live |
 | `ui.theme.name` | `"Jasper Dark"` | A built-in theme, or a theme file or plugin in the `themes` folder ([Themes](themes.md)) | Live |
 | `ui.theme.workspace` | `"match"` | `"match"`, a native theme name, or an Alacritty theme name ([Themes](themes.md)) | Live |
 | `ui.workspace.opacity` | Workspace theme's value (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
@@ -758,6 +760,23 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 - `"Jasper Dark"` (the default) or `"Jasper Light"`;
 - `"Nord"`, `"Clear Dark"` or `"Clear Light"`;
 - or a native Jasper TOML theme in the `themes` folder beside this file.
+
+`ui.theme.follow_system = true` opts into the operating system's live appearance preference. On macOS,
+Jasper observes application appearance changes, including while Settings is open. Dark and Light use the actual
+bundled Jasper sources. The remembered `name` and `source` stay unchanged; an OS change never writes configuration
+or rebases an uncommitted Settings draft. If the platform observer is unavailable, Jasper reports that limitation
+and uses the remembered manual source until observation recovers.
+
+`ui.theme.source = "catalog"` is the default and preserves existing name lookup, including installed themes shadowing
+bundled names. `source = "bundled"` resolves only an actual bundled theme. A missing bundled name remains a missing
+source request, even when an installed theme has that name. To choose an installed/custom theme by editing the file,
+use `source = "catalog"` (or omit it) and `follow_system = false` together with `name`.
+
+Settings' Dark/Light tiles retain a resolving manual theme of that polarity; otherwise they select the corresponding
+actual bundled source. Selecting a named theme, including an imported entry, exits system mode. Import itself only installs files and reloads
+the catalog; it does not select a theme or change the remembered policy. Duplicate chooser names identify
+installed and bundled sources. The theme gear's Reset to defaults command resets all three coupled keys. There is no
+custom automatic light/dark pair.
 
 The name is matched ignoring case and surrounding spaces. [Themes](themes.md) covers writing and importing
 themes and how a theme colours the workspace. An unknown name is a warning that lists

@@ -37,6 +37,8 @@ class EditorsTest {
             var found = control(child, id);
             if (found != null) return found;
         }
+        if(node instanceof Nodes.Card card)for(var child:card.children()){var found=control(child,id);if(found!=null)return found;}
+        if(node instanceof Nodes.SettingRow row)return control(row.control(),id);
         return null;
     }
 

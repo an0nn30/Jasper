@@ -1,19 +1,39 @@
 # Theme-engine calibration
 
 
-Native Vault repair (2026-10-11) follows Task5 fix1 approval at94ea1e52. A causal repeated-fit
-regression exposes a482×555 measured holder inside a482×172 final root. The shared fitter now
-restores final allocation; actual Vault capture targets emulate unchanged native bounds instead
-of repairing parent layout every time. WINDOW body focus shares the enclosing window cycle;
-SHEET remains contained. Native Add menu delivery remains unresolved; its frozen67691575 diagnostic bundle awaits desktop unlock.
-Temporary tracing was removed from current source. Controller moved the full gate ahead of native
-closure because the desktop lock prevents CUA and the user requested continuous progress; no native
-acceptance requirement is waived.
-No pixel measurements or acceptance claims change; native/title/font calibration remains open.
-Final headless gate passes9,853tests with zero failures/errors and six skips. Against approved Task5,
-all12 Login/path-key sheet PNGs,44 normalized actual Vault geometry metadata,8FileServer,36Remote,
-24Sessions and75gallery images remain identical. The39changed Vault images differ only in
-generated synthetic fingerprints or temporary-home path text; every other pixel is unchanged.
+## Settings Task9a — source comparison and bounded shared changes
+
+Actual SettingsDialog/SchemaPage renders use980×681logical at2×. Untouched Desktop references are
+cropped without resizing: Appearance(4,6,1960,1362), Window(4,2,1960,1362), Notifications(8,2,1960,1362).
+The embedded Display ICC is converted to sRGB only in comparison copies; originals and hashes remain
+unchanged. The authored test-only Slate Steel theme is `jasper-app/src/test/resources/dev/jasper/app/appearance/desktop-settings.toml`.
+Window34/28/28/28/129×47 and opacity90 are fixture values, not changed production defaults.
+Source anchors include236logical sidebar,262content origin,618card width,190×28ordinary choices,
+168×28rich choices,20icon tiles and32×18switches. Crops, font provenance, overlays/differences,
+short/narrow/20pt/light/custom/popup/error/unavailable states are retained in the Task9a scratch report.
+Notifications reference shows an open popup; its comparison uses actual mounted popup rendering.
+
+Settings-specific roles preserve DEFAULT/DETAIL/FULL/SHEET/hero geometry. Installed-LAF Choice padding
+is corrected centrally: BasicComboBoxUI no longer adds its inherited6px inset on top of the renderer's
+10px inset. This intentionally shifts existing ordinary choice text6logical pixels left, with a causal
+installed-LAF test. Icon-only menus remove the redundant second chevron; other menu kinds retain it.
+Actual-owner affected-family comparisons classify these bounded changes separately from generated
+Vault key/path data. AttachedSheet final allocation and WINDOW policy-provider fixes remain intact.
+
+No page is pixel-accepted. Shared body/section ink and tracking differ; preview miniature proportions,
+gear/notification/sidebar artwork optics, stepper unit spacing and popup height remain residuals.
+Controller preview43 comparison also finds Appearance body roughly10logical pixels high, Back/Forward
+about56logical wide versus source50, footer OK50 versus source64 (shifting the action group right),
+and a slightly smaller Help ring. These scoped shared geometry residuals are assigned to Task11.
+The rich popup is336×264device versus source336×250; exact native typography/spacing belongs to the
+controller/Task11, glyph optics to Task10. Appearance reset affordances and blur inheritance are real
+capabilities even where absent from the mock. Real Tools/notification plugin identity artwork is Task9b;
+synthetic Editor preview metadata is declared fixture art, not proof of production manifest routing.
+
+The controller's immutable67691575 native checks now verify footer/traversal and title Add dispatch.
+Lossless desktop capture shows the actual Vault Add popup444×274; window-only CUA had omitted it.
+Its text origin is6device pixels left of the source under qualified Host calibration; ink/art/palette
+and modal owner move/vertical-resize remain open. No popup implementation change follows that capture gap.
 
 The nine [original references](reference/README.md) are unchanged. Measurements below use original
 pixels, excluding shadow/native title bars, never the resized chat preview. Crop tuples are

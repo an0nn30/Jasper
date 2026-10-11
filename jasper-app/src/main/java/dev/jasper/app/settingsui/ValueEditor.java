@@ -32,6 +32,27 @@ public interface ValueEditor<T> {
     /** Whether the control carries the setting's label itself, as a switch does. */
     default boolean labelled() { return false; }
 
+    /** Composite content occupies the whole settings card width. */
+    default boolean fullSpan() { return false; }
+
+    /** Full-span composite rows may join the surrounding settings card. */
+    default boolean cardRows() { return false; }
+
+    /** A compound editor may use one shared row label. */
+    default String rowLabel(String label) { return label; }
+
+    /** The value depends on the preceding setting and is visually subordinate. */
+    default boolean dependent() { return false; }
+
+    /** Additional validated values to stage with this edit. */
+    default java.util.Map<dev.jasper.app.settings.Setting<?>, java.util.Optional<?>> companionValues() { return java.util.Map.of(); }
+
+    /** Synchronizes companion values after the draft changes, without recreating controls. */
+    default void showRelated() { }
+
+    /** Other settings changed/reset together with this editor. */
+    default java.util.List<dev.jasper.app.settings.Setting<?>> relatedSettings() { return java.util.List.of(); }
+
     /** Whether choosing the default value means "remove the key" rather than "save the default". */
     default boolean removesAtDefault() { return false; }
 

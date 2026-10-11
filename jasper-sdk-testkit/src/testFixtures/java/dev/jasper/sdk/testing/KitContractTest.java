@@ -20,6 +20,22 @@ public abstract class KitContractTest {
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
         new Nodes.Secret("secret",ControlState.READY,"","Password","")))); }
+    @Test void settingsControlsPreserveAuthoredPreviewMetadataAndNumericEvents() throws Exception { edt(()->{
+        var kit=kit("owner");var events=new ArrayList<UiEvent>();
+        var palette=new Option.Palette(0xff111111,0xff222222,0xff333333,0xffeeeeee,0xff4488dd);
+        var source=new Option("dark","Dark",Optional.empty(),"appearance","Authored source",Optional.of(new Option.Preview(palette,Optional.of(palette))));
+        var nodes=new ArrayList<Nodes.Node>();
+        nodes.add(new Nodes.Choice("policy",ControlState.READY,Nodes.ChoiceKind.PREVIEWS,List.of(source),"dark","Appearance policy",""));
+        nodes.add(new Nodes.Choice("mode",ControlState.READY,Nodes.ChoiceKind.DROPDOWN,List.of(new Option("card","Card","notification.card","Default")),"card","Notification mode",""));
+        for(var presentation:List.of(Nodes.FieldPresentation.STEPPER,Nodes.FieldPresentation.SLIDER))nodes.add(new Nodes.Field(presentation.name(),ControlState.READY,Nodes.FieldKind.NUMBER,"42","%","Value","",Optional.of(new Nodes.Numeric(0,100,1,0)),presentation));
+        var spec=new ViewSpec(new Nodes.Stack("settings",ControlState.READY,Nodes.LayoutRole.SETTINGS_PAGE,nodes));var view=kit.create(spec,events::add);
+        try {view.update(spec);assertThat(view.spec()).isEqualTo(spec);assertThat(events).isEmpty();
+            assertThatIllegalArgumentException().isThrownBy(()->view.selectAll("SLIDER"));assertThatIllegalArgumentException().isThrownBy(()->view.composing("SLIDER"));
+            emit(view,new UiEvent.Selected("policy",Set.of("dark")));emit(view,new UiEvent.Edited("SLIDER","43"));
+            assertThat(events).containsExactly(new UiEvent.Selected("policy",Set.of("dark")),new UiEvent.Edited("SLIDER","43"));
+        }finally{view.close();stop(kit);}
+    }); }
+
     @Test void windowPlainPathAndDiscreetInputRetainTheAdditiveContract() throws Exception { edt(()->{
         var path=new Nodes.Field("path",ControlState.READY,Nodes.FieldKind.PATH,"/synthetic/key","Hint","Path","browse",Optional.empty(),Nodes.FieldPresentation.PLAIN_PATH);
         assertThatThrownBy(()->new Nodes.Field("bad",ControlState.READY,Nodes.FieldKind.TEXT,"","","Bad","",Optional.empty(),Nodes.FieldPresentation.PLAIN_PATH)).isInstanceOf(IllegalArgumentException.class);
@@ -137,6 +153,7 @@ public abstract class KitContractTest {
         cases.put("button",KitContractTest::descriptorButton);
         cases.put("menu-button",name -> new Nodes.MenuButton("menu",ControlState.READY,"Menu",name,Nodes.ButtonKind.GHOST,"",List.of(descriptorMenu("")),""));
         cases.put("menu-item",name -> new Nodes.MenuButton("menu",ControlState.READY,"Menu","",Nodes.ButtonKind.GHOST,"",List.of(descriptorMenu(name)),""));
+        cases.put("choice-option",name -> new Nodes.Choice("option",ControlState.READY,Nodes.ChoiceKind.DROPDOWN,List.of(new Option("one","One",name,"Default")),"one","Options",""));
         cases.put("choice",name -> new Nodes.Choice("choice",ControlState.READY,Nodes.ChoiceKind.PICKER,List.of(),"","Pick","pick",name));
         cases.put("header-overflow",name -> new Nodes.Header("header",ControlState.READY,"Header",OptionalInt.empty(),Optional.empty(),Optional.empty(),List.of(descriptorMenu(name))));
         cases.put("table-row",name -> descriptorTable(Optional.of(name),Optional.empty(),List.of()));

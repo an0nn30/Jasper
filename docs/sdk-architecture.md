@@ -543,3 +543,22 @@ The mirrored `PickerFace` density and `PickerMenu` descriptors carry metadata an
 The menu separates checked id from active id, retains search/caret/scroll on appearance refresh, and
 emits explicit row/footer/cancel actions. Vault owns consent, creation and one-time grants; Remote's
 Import controller owns the per-candidate selection and its separate durable import operation.
+
+### Shared Settings presentation additions (Task9a)
+
+The mirrored SDK/module vocabulary adds `SETTINGS_PAGE`, `SETTINGS_CONTROLS`, `SETTINGS_TRAILING`,
+`SETTINGS_GROUP_HEADER`, `SETTINGS_FOOTER`, `SETTINGS_NAVIGATION` and `JOINED_ACTIONS` layout roles.
+These select engine-owned geometry; plugins never supply pixels, fonts or renderer code.
+`SETTINGS_TRAILING` composes one content child and one reserved trailing action; `SETTINGS_NAVIGATION`
+wraps one tree. The group header takes a leading semantic icon/title and trailing count. Other layouts
+retain their existing behavior. The host propagates embedded row-label context only within Settings.
+
+`FieldPresentation.STEPPER` and `SLIDER` require NUMBER and its bounded numeric shape. A stepper retains
+its editable document and emits ordinary Edited events; a slider uses pointer/keyboard numeric edits
+and has no text selection/composition surface. `selectAll`, `fieldSelection` and composition operations
+reject sliders in both host and testkit. `ChoiceKind.PREVIEWS` keeps stable selection IDs and uses optional
+authored `Option.Preview` palettes; it never invents theme identity. The compatible three-argument Option
+constructor remains. Optional icon/description/preview fields are copied through KitValues; icon names
+are checked for producer ownership before mount/update, including options in unopened menus.
+`ButtonPresentation.CIRCULAR` requests an engine-owned round outlined face. Fake/real KitContract coverage
+checks these additions and keeps SDK0.15's existing boundary; no Swing/native objects cross the SDK.

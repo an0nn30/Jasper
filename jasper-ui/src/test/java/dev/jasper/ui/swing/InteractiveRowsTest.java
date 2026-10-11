@@ -871,6 +871,13 @@ class InteractiveRowsTest {
                                                 com.formdev.flatlaf.util.UIScale.scale(520),
                                                 com.formdev.flatlaf.util.UIScale.scale(180));
                                         layout(view);
+                                        if(kind==ChoiceKind.PREVIEWS){
+                                            var preview=view.control("choice").component;
+                                            assertThat(preview.getHeight()).isGreaterThanOrEqualTo(preview.getPreferredSize().height);
+                                            assertThat(preview.getAccessibleContext().getAccessibleName()).isEqualTo("Transport");
+                                            assertThat(maxAlpha(ButtonsTest.paint(preview))).isPositive();
+                                            continue;
+                                        }
                                         var control =
                                                 (Choices.ChoiceControl) view.control("choice");
                                         assertThat(control.label.isVisible())

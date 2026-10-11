@@ -71,6 +71,41 @@ public final class Editors {
         }, List.of());
     }
 
+    /** A bounded whole-number stepper with an editable retained value and an integrated unit. */
+    public static Factory<Integer> stepper(String unit) {
+        return new Factory<>((setting, context) -> {
+            var kind = (SettingKind.IntegerRange) setting.kind();
+            return new NumberField<>(setting.label(), new Nodes.Numeric(kind.min(), kind.max(), 1, 0), unit, Integer::valueOf, Nodes.FieldPresentation.STEPPER);
+        }, List.of());
+    }
+
+    /** A bounded duration, keeping its unit in the stepper and its row title concise. */
+    public static Factory<Integer> notificationDelay() {
+        return new Factory<>((setting,context)->{
+            var kind=(SettingKind.IntegerRange)setting.kind();
+            return new NumberField<Integer>(setting.label(),new Nodes.Numeric(kind.min(),kind.max(),1,0),"s",Integer::valueOf,Nodes.FieldPresentation.STEPPER){
+                @Override public String rowLabel(String label){return "Notify after";}
+                @Override public boolean dependent(){return true;}
+            };
+        },List.of("Notify after"));
+    }
+
+    /** A height subordinate to the preceding visibility control. */
+    public static Factory<Integer> dependentHeight() {
+        return new Factory<>((setting,context)-> {
+            var kind=(SettingKind.IntegerRange)setting.kind();
+            return new NumberField<Integer>(setting.label(),new Nodes.Numeric(kind.min(),kind.max(),1,0),"px",Integer::valueOf,Nodes.FieldPresentation.STEPPER){
+                @Override public String rowLabel(String label){return "Height";}
+                @Override public boolean dependent(){return true;}
+            };
+        },List.of("Height"));
+    }
+
+    /** A compact exclusive segmented choice. */
+    public static <E> Factory<E> segments(Map<String,String> names) {
+        return new Factory<>((setting,context) -> new Pick<>(setting.label(),(SettingKind.Choice<E>)setting.kind(),names,Nodes.ChoiceKind.SEGMENTED),List.copyOf(names.values()));
+    }
+
     /** A number field within the kind's range with up to two decimals; Up and Down step by {@code step}. */
     public static Factory<Float> number(double step, String unit) {
         return new Factory<>((setting, context) -> {
@@ -96,6 +131,11 @@ public final class Editors {
         return new Factory<>((setting, context) -> new FontField(setting.label(), () -> Fonts.families(monospaced)), List.of());
     }
 
+    /** Interface font with a readable platform-default choice, retaining arbitrary typed families. */
+    public static Factory<String> interfaceFont() {
+        return new Factory<>((setting,context)->new FontField(setting.label(),()->Fonts.families(false),true),List.of("System"));
+    }
+
     /** The gear menu's one item beside the theme dropdown. */
     static final String IMPORT_THEME = "Import theme…";
     /** The workspace scheme entry for {@code match}. */
@@ -103,7 +143,7 @@ public final class Editors {
 
     /** Every installed theme by name, with a gear whose menu offers Import theme…. */
     public static Factory<String> theme(ThemeChoices themes) {
-        return new Factory<>((setting, context) -> new ThemePick(setting.label(), themes.names(), Map.of(), themes.importer().apply(context)),
+        return new Factory<>((setting, context) -> new ThemeSelection(setting.label(), themes, context),
             List.of(IMPORT_THEME));
     }
 
@@ -191,16 +231,21 @@ public final class Editors {
     }
 
     /** A number as text of the bounds' shape; reading text that is no number throws. */
-    static final class NumberField<T extends Number> implements ValueEditor<T> {
+    static class NumberField<T extends Number> implements ValueEditor<T> {
         private final String label;
         final Nodes.Numeric bounds;
         private final String unit;
         private final Function<String, T> parse;
+        private final Nodes.FieldPresentation presentation;
         String text = "";
         NumberField(String label, Nodes.Numeric bounds, String unit, Function<String, T> parse) {
-            this.label = label; this.bounds = bounds; this.unit = unit; this.parse = parse;
+            this(label,bounds,unit,parse,Nodes.FieldPresentation.STANDARD);
+        }
+        NumberField(String label, Nodes.Numeric bounds, String unit, Function<String,T> parse, Nodes.FieldPresentation presentation) {
+            this.label = label; this.bounds = bounds; this.unit = unit; this.parse = parse; this.presentation=presentation;
         }
         @Override public Nodes.Node node(String id, ControlState state) {
+            if(presentation!=Nodes.FieldPresentation.STANDARD)return new Nodes.Field(id,state,Nodes.FieldKind.NUMBER,text,unit,label,"",Optional.of(bounds),presentation);
             return withUnit(id, new Nodes.Field(id, state, Nodes.FieldKind.NUMBER, text, "", label, "", Optional.of(bounds)), unit, state);
         }
         @Override public T value() { return parse.apply(text.strip()); }
@@ -222,8 +267,12 @@ public final class Editors {
         private final List<String> labels = new ArrayList<>();
         private final List<E> values = new ArrayList<>();
         private int selected = -1;
+        private final Nodes.ChoiceKind presentation;
         Pick(String label, SettingKind.Choice<E> kind, Map<String, String> names) {
-            this.label = label;
+            this(label,kind,names,Nodes.ChoiceKind.DROPDOWN);
+        }
+        Pick(String label, SettingKind.Choice<E> kind, Map<String,String> names, Nodes.ChoiceKind presentation) {
+            this.label=label;this.presentation=presentation;
             for (var token : kind.tokens()) {
                 tokens.add(token.getKey());
                 labels.add(names.getOrDefault(token.getKey(), pretty(token.getKey())));
@@ -235,7 +284,7 @@ public final class Editors {
         @Override public Nodes.Node node(String id, ControlState state) {
             var options = new ArrayList<Option>();
             for (int i = 0; i < tokens.size(); i++) options.add(new Option(tokens.get(i), labels.get(i), Optional.empty()));
-            return new Nodes.Choice(id, state, Nodes.ChoiceKind.DROPDOWN, options, selected < 0 ? "" : tokens.get(selected), label, "");
+            return new Nodes.Choice(id, state, presentation, options, selected < 0 ? "" : tokens.get(selected), label, "");
         }
         @Override public E value() {
             if (selected < 0) throw new IllegalArgumentException("Nothing is chosen");
@@ -271,17 +320,20 @@ public final class Editors {
         private final Supplier<List<String>> families;
         private List<String> offered;
         String text = "";
-        FontField(String label, Supplier<List<String>> families) { this.label = label; this.families = families; offered = List.copyOf(families.get()); }
+        private final boolean system;
+        FontField(String label, Supplier<List<String>> families) { this(label,families,false); }
+        FontField(String label, Supplier<List<String>> families, boolean system) { this.label = label; this.families = families; this.system=system;offered = List.copyOf(families.get()); }
+        @Override public String rowLabel(String label){return system?"Font":label;}
         List<String> suggestions() { return offered; }
         @Override public Nodes.Node node(String id, ControlState state) {
             return new Nodes.Choice(id, state, Nodes.ChoiceKind.SEARCHABLE, options(offered), "", label, "", "",
-                Optional.of(new Nodes.ChoiceSearch(0, "No installed font matches", Optional.of(text))));
+                Optional.of(new Nodes.ChoiceSearch(0, "No installed font matches", Optional.of(system && text.equalsIgnoreCase("system") ? "System" : text))));
         }
         @Override public String value() { return text; }
         @Override public void show(String value) { text = value; }
         @Override public boolean event(String id, UiEvent event) {
             if (!(event instanceof UiEvent.Edited edited) || !edited.id().equals(id)) return false;
-            text = edited.text();
+            text = system && edited.text().equals("System") ? "system" : edited.text();
             return true;
         }
         @Override public void refresh() { offered = List.copyOf(families.get()); }
@@ -299,7 +351,7 @@ public final class Editors {
      * "(not found)" until another is chosen; a name matches an entry as the catalog finds themes, ignoring case and
      * surrounding spaces, and keeps its saved spelling. With an import, a gear beside the dropdown offers Import theme….
      */
-    static final class ThemePick implements ValueEditor<String> {
+    static class ThemePick implements ValueEditor<String> {
         private final String label;
         private final Supplier<List<String>> names;
         private final Map<String, String> leading;

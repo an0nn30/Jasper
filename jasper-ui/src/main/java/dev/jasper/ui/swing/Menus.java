@@ -187,7 +187,7 @@ final class Menus {
         void refresh() {
             state();
             var menu = (Nodes.MenuButton) node;
-            boolean embedded = menu.presentation() != Nodes.ButtonPresentation.STANDARD;
+            boolean embedded = menu.presentation() == Nodes.ButtonPresentation.EMBEDDED || menu.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
             for (var button : java.util.List.of(main, arrow)) {
                 button.kind = menu.kind();
                 button.setEnabled(component.isEnabled());
@@ -196,11 +196,11 @@ final class Menus {
                         pad = ThemePainting.metric(context(), DesignMetrics.Role.MENU_ITEM_PADDING);
                 button.embedded = embedded;
                 button.contextual = menu.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
-                button.setBorder(embedded ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(ring, pad, ring, pad));
+                button.setBorder(embedded ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(ring, menu.label().isBlank()?ring:pad, ring, menu.label().isBlank()?ring:pad));
             }
             ((MenuSurface) component).background.embedded = embedded;
             main.setText(menu.label());
-            if (menu.action().isBlank() && !embedded) {
+            if (menu.action().isBlank() && !embedded && !menu.label().isBlank()) {
                 Insets insets = main.getInsets();
                 main.setBorder(
                         new EmptyBorder(
@@ -232,7 +232,7 @@ final class Menus {
             arrow.setToolTipText("Open menu");
             arrow.getAccessibleContext().setAccessibleName("Open menu");
             arrow.setVisible(!menu.action().isBlank());
-            ((Main) main).menuOnly = menu.action().isBlank() && !embedded;
+            ((Main) main).menuOnly = menu.action().isBlank() && !embedded && !menu.label().isBlank();
             ((MenuSurface) component).background.kind = menu.kind();
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.MENU_PADDING);
             popup.setBorder(new EmptyBorder(pad, pad, pad, pad));

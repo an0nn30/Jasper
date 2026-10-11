@@ -13,7 +13,7 @@ import javax.swing.text.*;
 /** Persistent documents, guarded numeric edits and literal labels/validation for ordinary fields. */
 final class TextFields {
     private TextFields() {}
-    static final class FieldControl extends ControlRegistry.Control {
+    static class FieldControl extends ControlRegistry.Control {
         boolean panelSearch;
         final JTextComponent input;
         final JLabel label = Labels.literal(), error = Labels.literal(), leading = Labels.literal();

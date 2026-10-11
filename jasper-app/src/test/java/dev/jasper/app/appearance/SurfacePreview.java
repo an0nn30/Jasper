@@ -48,6 +48,7 @@ public final class SurfacePreview {
             }
         }
         dev.jasper.app.plugins.SessionsSurfacePreview.capture(output, args);
+        if(filter.isEmpty()||filter.contains("settings"))dev.jasper.app.settingsui.SettingsSurfacePreview.capture(output);
         } finally {
             try { if (fonts != null) SurfaceFixtures.edt(() -> { fonts.configure(Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults()); fonts.close(); return null; }); }
             finally { SurfaceFixtures.edt(() -> { javax.swing.UIManager.put("PasswordField.showCapsLock", priorCaps); return null; }); }
