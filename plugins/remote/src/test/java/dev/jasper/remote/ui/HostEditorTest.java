@@ -76,7 +76,7 @@ class HostEditorTest {
             assertThat(value(editor, HostEditor.NAME)).isEqualTo("bastion");
             var auth = choice(editor, HostEditor.AUTH);
             assertThat(auth.options()).extracting(dev.jasper.sdk.ui.Option::label).as("no Vault installed")
-                .containsExactly("Vault credential (needs Credential Vault)", "SSH agent");
+                .containsExactly("Vault credential (needs Credential Vault)", "SSH Agent");
             assertThat(auth.selectedId()).isEqualTo(HostEditor.AGENT);
             choose(editor, HostEditor.AUTH, HostEditor.VAULT);
             assertThat(choice(editor, HostEditor.AUTH).selectedId()).as("Vault cannot be chosen without the Vault").isEqualTo(HostEditor.AGENT);
@@ -103,7 +103,8 @@ class HostEditorTest {
                 () -> CompletableFuture.completedFuture(Optional.of(login)), () -> {});
             var keys = node(editor.view(), HostEditor.KEYS, Nodes.ItemList.class);
             assertThat(keys.kind()).isEqualTo(Nodes.ListKind.ORDERED);
-            assertThat(texts(editor.view())).contains("first", "second", "2 Vault key(s)");
+            assertThat(texts(editor.view())).contains("first", "second");
+            assertThat(editor.credentialLabel()).isEqualTo("2 Vault key(s)");
             type(editor.view(), HostEditor.HOSTNAME, "changed"); save(editor);
             assertThat(saved.getLast().auth()).isEqualTo(new Auth.VaultKeys(List.of(a, b)));
             emit(editor.view(), new UiEvent.Reordered(HostEditor.KEYS, b.toString(), 0)); save(editor);
@@ -125,7 +126,7 @@ class HostEditorTest {
             var editor = editor(List.of(), Optional.of(host), true, id -> Optional.of("first"), () -> CompletableFuture.completedFuture(Optional.of(login)), () -> {});
             choose(editor, HostEditor.AUTH, HostEditor.AGENT);
             assertThat(node(editor.view(), HostEditor.KEYS, Nodes.ItemList.class).state().enabled()).as("keys apply to Vault only").isFalse();
-            assertThat(button(editor.view(), HostEditor.CHOOSE).state().enabled()).isFalse();
+            assertThat(choice(editor, HostEditor.CHOOSE).state().enabled()).isFalse();
             assertThat(node(editor.view(), HostEditor.KEYS, Nodes.ItemList.class).items()).extracting(dev.jasper.sdk.ui.ListItem::id).containsExactly(a.toString());
             choose(editor, HostEditor.AUTH, HostEditor.VAULT);
             save(editor);
@@ -162,11 +163,12 @@ class HostEditorTest {
         edt(() -> {
             int[] cancelled = {0};
             var editor = editor(List.of(bastion), Optional.empty(), true, id -> Optional.empty(), () -> CompletableFuture.completedFuture(Optional.empty()), () -> cancelled[0]++);
-            assertThat(primaries(editor.view())).isEmpty();
+            assertThat(form(editor.view()).submission()).isEqualTo(Nodes.FormSubmission.NONE);
+            assertThat(primaries(editor.view())).singleElement().satisfies(action -> assertThat(action.id()).isEqualTo(HostEditor.SAVE));
             assertThat(form(editor.view()).actions()).extracting(Nodes.Button::label).containsExactly("Cancel", "Add Host");
             assertThat(all(editor.view())).filteredOn(n -> n instanceof Nodes.Field).allSatisfy(n -> assertThat(((Nodes.Field) n).trailingAction()).isEmpty());
             editor.setDefaultGroupName("Servers");
-            assertThat(texts(editor.view())).anyMatch(text -> text.contains("Servers (default)"));
+            assertThat(node(editor.view(),"row."+HostEditor.GROUP,Nodes.SettingRow.class).description()).contains("Servers (default)");
             assertThat(choice(editor, HostEditor.GROUP).options()).extracting(dev.jasper.sdk.ui.Option::label).containsExactly("Homelab");
             press(editor.view(), form(editor.view()).cancelAction());
             assertThat(cancelled[0]).isEqualTo(1);
@@ -204,7 +206,7 @@ class HostEditorTest {
         assertThat(pending).isCompleted();
         edt(() -> { });
         assertThat(dev.jasper.remote.testsupport.Kits.value(editor::credentialLabel)).isEqualTo("Work login");
-        assertThat(dev.jasper.remote.testsupport.Kits.value(() -> node(editor.view(), HostEditor.CREDENTIAL, Nodes.Text.class).text()))
+        assertThat(dev.jasper.remote.testsupport.Kits.value(() -> choice(editor, HostEditor.CHOOSE).face().orElseThrow().primary()))
             .as("the view shows the choice: the render ran on the EDT, not on the completing thread").isEqualTo("Work login");
         edt(() -> {
             type(editor.view(), HostEditor.NAME, "prod"); type(editor.view(), HostEditor.HOSTNAME, "api.example");

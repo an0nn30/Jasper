@@ -21,21 +21,25 @@ final class PickerMenus {
             if(!button.isEnabled())g.setComposite(AlphaComposite.SrcOver.derive(c.metrics().value(DesignMetrics.Role.PICKER_DISABLED_PERCENT)/100f));
             boolean expanded=Boolean.TRUE.equals(button.getClientProperty("Jasper.pickerExpanded"));
             ThemePainting.rounded(g,button,c,ThemePainting.color(c,button.isEnabled()&&button.getModel().isRollover()?SemanticColor.SURFACE_CONTROL_HOVER:SemanticColor.SURFACE_CONTROL),ThemePainting.color(c,SemanticColor.BORDER_CONTROL),focus||expanded,false);
-            int pad=metric(c,DesignMetrics.Role.PICKER_PADDING),gap=metric(c,DesignMetrics.Role.PICKER_GAP),tile=metric(c,DesignMetrics.Role.PICKER_FACE_TILE);
-            int x=pad+metric(c,DesignMetrics.Role.FOCUS_RING);
-            tile(g,button,c,empty?"lock":face.icon(),empty?Nodes.Hue.NONE:face.hue(),x,(button.getHeight()-tile)/2,tile,false);
+            boolean compact=face.density()==Nodes.PickerDensity.COMPACT;
+            int pad=metric(c,DesignMetrics.Role.PICKER_PADDING),gap=metric(c,compact?DesignMetrics.Role.PICKER_GAP:DesignMetrics.Role.PICKER_DEFAULT_FACE_GAP),tile=metric(c,compact?DesignMetrics.Role.PICKER_FACE_TILE:DesignMetrics.Role.PICKER_DEFAULT_FACE_TILE);
+            int x=metric(c,compact?DesignMetrics.Role.PICKER_COMPACT_FACE_INSET:DesignMetrics.Role.PICKER_DEFAULT_FACE_INSET);
+            tile(g,button,c,empty?"lock":face.icon(),empty?Nodes.Hue.NONE:face.hue(),x,(button.getHeight()-tile)/2,tile,false,metric(c,compact?DesignMetrics.Role.PICKER_COMPACT_FACE_GLYPH:DesignMetrics.Role.PICKER_DEFAULT_FACE_GLYPH));
             x+=tile+gap;
-            var arrow=c.icons().icon(expanded?"chevron.up":"chevron.down",c.theme().semantic(),SemanticColor.TEXT_SECONDARY,metric(c,DesignMetrics.Role.ICON_CAPTION));
+            var arrow=c.icons().icon(expanded?"chevron.up":"chevron.down",c.theme().semantic(),SemanticColor.TEXT_SECONDARY,metric(c,compact?DesignMetrics.Role.PICKER_COMPACT_FACE_CHEVRON:DesignMetrics.Role.PICKER_DEFAULT_FACE_CHEVRON));
             int right=button.getWidth()-pad-arrow.getIconWidth()-metric(c,DesignMetrics.Role.FOCUS_RING);
             arrow.paintIcon(button,g,right,(button.getHeight()-arrow.getIconHeight())/2);
             line(g,c,empty?"Choose…":face.primary(),empty?"":face.caption(),x,0,Math.max(0,right-gap-x),button.getHeight(),false,empty,face.density()==Nodes.PickerDensity.COMPACT,false);
         }finally{g.dispose();}
     }
     private static void tile(Graphics2D g,JComponent owner,KitContext c,String name,Nodes.Hue hue,int x,int y,int size,boolean active){
+        tile(g,owner,c,name,hue,x,y,size,active,metric(c,DesignMetrics.Role.PICKER_GLYPH));
+    }
+    private static void tile(Graphics2D g,JComponent owner,KitContext c,String name,Nodes.Hue hue,int x,int y,int size,boolean active,int glyphSize){
         if(name.isEmpty())return;
         if(hue!=Nodes.Hue.NONE){g.setColor(ColorMath.opacity(active?ThemePainting.color(c,SemanticColor.TEXT_ONACCENT):Choices.hue(c,hue),.18));int radius=metric(c,DesignMetrics.Role.CHIP_RADIUS);g.fillRoundRect(x,y,size,size,radius*2,radius*2);}
         SemanticColor role=active?SemanticColor.TEXT_ONACCENT:switch(hue){case BLUE->SemanticColor.HUE_BLUE;case GREEN->SemanticColor.HUE_GREEN;case AMBER->SemanticColor.HUE_AMBER;case PURPLE->SemanticColor.HUE_PURPLE;case NEUTRAL,NONE->SemanticColor.TEXT_TERTIARY;};
-        int glyph=Math.min(size,metric(c,DesignMetrics.Role.PICKER_GLYPH));
+        int glyph=Math.min(size,glyphSize);
         c.icons().icon(name,c.theme().semantic(),role,glyph).paintIcon(owner,g,x+(size-glyph)/2,y+(size-glyph)/2);
     }
     private static String clipped(FontMetrics fm,String text,int width){if(fm.stringWidth(text)<=width)return text;String ellipsis="…";if(fm.stringWidth(ellipsis)>width)return "";int end=text.length();while(end>0&&fm.stringWidth(text.substring(0,end)+ellipsis)>width)end=text.offsetByCodePoints(end,-1);return text.substring(0,end)+ellipsis;}

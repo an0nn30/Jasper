@@ -56,7 +56,19 @@ final class Forms {
                     new LayoutFocusTraversalPolicy() {
                         @Override
                         public Component getDefaultComponent(Container root) {
-                            return firstInput();
+                            return view.isClosed() ? null : firstInput();
+                        }
+                        @Override public Component getFirstComponent(Container root) {
+                            return view.isClosed() ? null : super.getFirstComponent(root);
+                        }
+                        @Override public Component getLastComponent(Container root) {
+                            return view.isClosed() ? null : super.getLastComponent(root);
+                        }
+                        @Override public Component getComponentAfter(Container root, Component child) {
+                            return view.isClosed() ? null : super.getComponentAfter(root, child);
+                        }
+                        @Override public Component getComponentBefore(Container root, Component child) {
+                            return view.isClosed() ? null : super.getComponentBefore(root, child);
                         }
                     });
             refresh();
@@ -114,6 +126,7 @@ final class Forms {
             if (!interactive() || view.popupOpen() || focus instanceof JTextArea || !valid(node))
                 return;
             var form = (Nodes.Form) node;
+            if (form.submission() == Nodes.FormSubmission.NONE) return;
             form.actions().stream()
                     .filter(a -> a.kind() == Nodes.ButtonKind.PRIMARY)
                     .findFirst()

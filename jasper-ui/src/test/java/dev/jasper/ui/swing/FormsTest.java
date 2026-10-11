@@ -45,6 +45,71 @@ class FormsTest {
             if (c instanceof Container child) layout(child);
     }
 
+    @Test void visualPrimaryMayOptOutOfEnterWithoutLosingClickOrEscape() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new java.util.ArrayList<UiEvent>();
+            // This contract is additive: legacy constructors must still submit the primary.
+            assertThat(java.util.Arrays.stream(Form.class.getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                .contains("submission");
+            try (var view = new KitView(context, new ViewSpec(form(FormKind.FULL, List.of(field("input", FieldKind.TEXT, "")))), events::add)) {
+                var original = (Form) view.spec().root();
+                try {
+                    Class<?> policy = Class.forName("dev.jasper.ui.model.Nodes$FormSubmission");
+                    Object none = java.util.Arrays.stream(policy.getEnumConstants()).filter(v -> v.toString().equals("NONE")).findFirst().orElseThrow();
+                    var constructor = Form.class.getConstructor(String.class, ControlState.class, FormKind.class, String.class,
+                        Optional.class, List.class, Optional.class, List.class, String.class, policy);
+                    view.update(new ViewSpec((Form) constructor.newInstance(original.id(), original.state(), original.kind(), original.title(), original.hero(), original.sections(), original.preview(), original.actions(), "cancel", none)));
+                } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+                var root = find(view, "form", JComponent.class);
+                Object enter = root.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).get(KeyStroke.getKeyStroke("ENTER"));
+                root.getActionMap().get(enter).actionPerformed(new java.awt.event.ActionEvent(root, 0, ""));
+                assertThat(events).isEmpty();
+                find(view, "save", JButton.class).doClick(0);
+                Object escape = root.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).get(KeyStroke.getKeyStroke("ESCAPE"));
+                root.getActionMap().get(escape).actionPerformed(new java.awt.event.ActionEvent(root, 0, ""));
+                assertThat(events).containsExactly(new UiEvent.Action("save"), new UiEvent.Action("cancel"));
+            } finally { release(context); }
+        });
+    }
+
+    @Test void technicalCaptionKeepsMonoMetricsButUsesTheMutedSemanticColor() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            assertThat(java.util.Arrays.stream(TextRole.values()).map(Enum::name)).contains("MONO_CAPTION");
+            try(var view=new KitView(context,new ViewSpec(new Text("preview",ControlState.READY,"ssh user@host",TextRole.valueOf("MONO_CAPTION"))),e->{})) {
+                var label=find(view,"preview",JLabel.class);
+                assertThat(label.getFont().getFamily()).isEqualTo(Font.MONOSPACED);
+                assertThat(label.getForeground()).isEqualTo(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
+            }finally{release(context);}
+        });
+    }
+
+    @Test void technicalFieldUsesTheSameMonospaceRoleAsPortAndKeepsOrdinaryGeometry() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();
+            assertThat(java.util.Arrays.stream(FieldPresentation.values()).map(Enum::name)).contains("TECHNICAL");
+            var technical=new Field("technical",ControlState.READY,FieldKind.TEXT,"host.invalid","","Host","",Optional.empty(),FieldPresentation.valueOf("TECHNICAL"));
+            try(var view=new KitView(context,new ViewSpec(new Stack("root",ControlState.READY,LayoutRole.VERTICAL,List.of(technical,field("port",FieldKind.PORT,"22")))),e->{})) {
+                assertThat(find(view,"technical.input",JTextField.class).getFont()).isEqualTo(find(view,"port.input",JTextField.class).getFont());
+                assertThat(find(view,"technical.label",JLabel.class).isVisible()).isTrue();
+            }finally{release(context);}
+        });
+    }
+
+    @Test void nativeRemovalMayTraverseEveryClosingFormFocusPolicyWithoutDisposedLookup() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();
+            var view=new KitView(context,new ViewSpec(form(FormKind.FULL,List.of(field("input",FieldKind.TEXT,"draft")))),e -> {});
+            var surface=(Container)view.getComponent(0);var policy=surface.getFocusTraversalPolicy();
+            var input=find(view,"input.input",JComponent.class);
+            view.addContainerListener(new java.awt.event.ContainerAdapter(){@Override public void componentRemoved(java.awt.event.ContainerEvent event){
+                policy.getDefaultComponent(surface);policy.getFirstComponent(surface);policy.getLastComponent(surface);
+                policy.getComponentAfter(surface,input);policy.getComponentBefore(surface,input);
+            }});
+            try { assertThatCode(view::close).doesNotThrowAnyException(); } finally { view.close();release(context); }
+        });
+    }
+
     @Test void nativeRemovalMayMeasureAClosingFormWithoutLookingUpDisposedControls() {
         dev.jasper.ui.testsupport.Edt.run(() -> {
             var context=dev.jasper.ui.testsupport.KitFixtures.context();

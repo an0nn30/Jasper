@@ -13,7 +13,7 @@ public final class Nodes {
         String id();
         ControlState state();
     }
-    public enum TextRole { HERO_TITLE, DETAIL_TITLE, WINDOW_TITLE, PANEL_TITLE, BODY, BODY_STRONG, LABEL, DESCRIPTION, CAPTION, SECTION_LABEL, COUNT, CHIP, MONO, MONO_SMALL }
+    public enum TextRole { HERO_TITLE, DETAIL_TITLE, WINDOW_TITLE, PANEL_TITLE, BODY, BODY_STRONG, LABEL, DESCRIPTION, CAPTION, SECTION_LABEL, COUNT, CHIP, MONO, MONO_SMALL, MONO_CAPTION }
     public enum Hue { BLUE, GREEN, AMBER, PURPLE, NEUTRAL, NONE }
     public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, HERO }
     public enum ButtonKind { PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK }
@@ -45,7 +45,7 @@ public final class Nodes {
     /**
      * A present {@code severity} draws the text in that severity's colour (INFO the accent, WARNING and DANGER the status
      * colours), as {@link Icon#severity()} tints a glyph, instead of its role's colour. A present {@code caret} (MONO and
-     * MONO_SMALL text only, from 0 to the text's length) draws a thin insertion bar in the text's colour after that many
+     * MONO_SMALL and MONO_CAPTION text only, from 0 to the text's length) draws a thin insertion bar in the text's colour after that many
      * characters, as a command line shows its cursor.
      */
     public record Text(String id, ControlState state, String text, TextRole role, Optional<Severity> severity, OptionalInt caret) implements Node {
@@ -56,7 +56,7 @@ public final class Nodes {
             Objects.requireNonNull(severity);
             Objects.requireNonNull(caret);
             if (caret.isPresent()) {
-                if (role != TextRole.MONO && role != TextRole.MONO_SMALL) throw new IllegalArgumentException("A caret belongs to monospaced text only");
+                if (role != TextRole.MONO && role != TextRole.MONO_SMALL && role != TextRole.MONO_CAPTION) throw new IllegalArgumentException("A caret belongs to monospaced text only");
                 if (caret.getAsInt() < 0 || caret.getAsInt() > text.length()) throw new IllegalArgumentException("Caret outside the text");
             }
         }
@@ -170,8 +170,9 @@ public final class Nodes {
      * How a field sits in its composition. STANDARD shows the kit label (a SEARCH field never does) over a filled input.
      * EMBEDDED leaves the visible label to the host's own arrangement (the label stays the accessible name). TRANSPARENT
      * is EMBEDDED on a host surface that is the field's backdrop: no input fill, the outline and focus ring kept.
+     * TECHNICAL uses standard geometry with the monospaced technical-value font.
      */
-    public enum FieldPresentation { STANDARD, EMBEDDED, TRANSPARENT }
+    public enum FieldPresentation { STANDARD, EMBEDDED, TRANSPARENT, TECHNICAL }
 
     /**
      * A NUMBER field states its {@link Numeric} shape; other kinds have none. {@code alternateAction} is what Shift+Enter
@@ -519,8 +520,11 @@ public final class Nodes {
         }
     }
 
+    /** Form-level Enter behavior; NONE leaves explicit field actions and button activation intact. */
+    public enum FormSubmission { PRIMARY, NONE }
+
     /** Form content only; cancellation uses an explicit action key, blank means none. */
-    public record Form(String id, ControlState state, FormKind kind, String title, Optional<Node> hero, List<Node> sections, Optional<Node> preview, List<Button> actions, String cancelAction) implements Node {
+    public record Form(String id, ControlState state, FormKind kind, String title, Optional<Node> hero, List<Node> sections, Optional<Node> preview, List<Button> actions, String cancelAction, FormSubmission submission) implements Node {
         public Form {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -530,8 +534,14 @@ public final class Nodes {
             Objects.requireNonNull(preview);
             actions = List.copyOf(actions);
             Objects.requireNonNull(cancelAction);
+            Objects.requireNonNull(submission);
             if (actions.stream().filter(button -> button.kind() == ButtonKind.PRIMARY).count() > 1)
                 throw new IllegalArgumentException("Form supports at most one primary action");
+        }
+        /** Existing forms submit their primary action on Enter. NONE keeps explicit field actions and button activation. */
+        public Form(String id, ControlState state, FormKind kind, String title, Optional<Node> hero,
+                    List<Node> sections, Optional<Node> preview, List<Button> actions, String cancelAction) {
+            this(id, state, kind, title, hero, sections, preview, actions, cancelAction, FormSubmission.PRIMARY);
         }
         public Form(String id, ControlState state, FormKind kind, String title, Optional<Node> hero,
                     List<Node> sections, Optional<Node> preview, List<Button> actions) {

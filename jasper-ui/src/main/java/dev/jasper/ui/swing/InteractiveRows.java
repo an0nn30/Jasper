@@ -916,7 +916,7 @@ final class InteractiveRows {
                 label.putClientProperty(
                         "Jasper.leadingEllipsis",
                         text.role() == Nodes.TextRole.MONO
-                                || text.role() == Nodes.TextRole.MONO_SMALL);
+                                || text.role() == Nodes.TextRole.MONO_SMALL || text.role() == Nodes.TextRole.MONO_CAPTION);
             return c;
         }
 

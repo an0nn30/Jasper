@@ -180,8 +180,9 @@ final class StagedVaultHost implements AutoCloseable {
             }
             case dev.jasper.ui.model.Nodes.Stack n -> n.children();
             case dev.jasper.ui.model.Nodes.Card n -> n.children();
+            case dev.jasper.ui.model.Nodes.Section n -> List.of(n.body());
             case dev.jasper.ui.model.Nodes.SettingRow n -> List.of(n.control());
-            case dev.jasper.ui.model.Nodes.FormRow n -> List.of(n.control());
+            case dev.jasper.ui.model.Nodes.FormRow n -> { var rowChildren = new java.util.ArrayList<dev.jasper.ui.model.Nodes.Node>(); rowChildren.add(n.control());n.trailing().ifPresent(rowChildren::add);yield rowChildren; }
             case dev.jasper.ui.model.Nodes.Empty n -> n.actions().stream().map(b -> (dev.jasper.ui.model.Nodes.Node) b).toList();
             default -> List.of();
         };

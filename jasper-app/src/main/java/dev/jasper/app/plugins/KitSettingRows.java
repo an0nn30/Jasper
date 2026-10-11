@@ -79,7 +79,7 @@ final class KitSettingRows {
             case Nodes.Stack v -> new Nodes.Stack(v.id(),v.state(),v.role(),v.children().stream().map(this::replace).toList(),v.cancelAction());
             case Nodes.Card v -> new Nodes.Card(v.id(),v.state(),v.kind(),v.children().stream().map(this::replace).toList());
             case Nodes.Section v -> new Nodes.Section(v.id(),v.state(),v.title(),replace(v.body()));
-            case Nodes.Form v -> new Nodes.Form(v.id(),v.state(),v.kind(),v.title(),v.hero().map(this::replace),v.sections().stream().map(this::replace).toList(),v.preview().map(this::replace),v.actions(),v.cancelAction());
+            case Nodes.Form v -> new Nodes.Form(v.id(),v.state(),v.kind(),v.title(),v.hero().map(this::replace),v.sections().stream().map(this::replace).toList(),v.preview().map(this::replace),v.actions(),v.cancelAction(),v.submission());
             case Nodes.Split v -> new Nodes.Split(v.id(),v.state(),v.kind(),v.children().stream().map(this::replace).toList());
             case Nodes.Panel v -> new Nodes.Panel(v.id(),v.state(),(Nodes.Header)replace(v.header()),v.searchOrNavigation().map(this::replace),replace(v.body()),v.footer().map(this::replace));
             case Nodes.FormRow v -> new Nodes.FormRow(v.id(),v.state(),v.label(),v.caption(),replace(v.control()),v.trailing().map(this::replace),v.highlighted());

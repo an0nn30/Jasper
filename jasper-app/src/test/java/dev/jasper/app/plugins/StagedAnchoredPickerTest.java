@@ -61,21 +61,34 @@ class StagedAnchoredPickerTest {
      var light=dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.Theme.JASPER_LIGHT);
      appearance.setPair(new dev.jasper.app.appearance.ResolvedTheme(light,light));capture("filtering-light",menu);
      appearance.setPair(theme.current());capture("filtering-default-theme",menu);appearance.setPair(pair);
-     var raw=new HashMap<Object,Object>();UIManager.getDefaults().forEach(raw::put);var font=raw.get("defaultFont");try{UIManager.put("defaultFont",new Font("Dialog",Font.PLAIN,20));capture("filtering-enlarged",menu);capture("selected-enlarged",kitView(form));}finally{UIManager.put("defaultFont",font);}
+     var raw=new HashMap<Object,Object>();UIManager.getDefaults().forEach(raw::put);var font=raw.get("defaultFont");try{UIManager.put("defaultFont",new Font("Dialog",Font.PLAIN,20));capture("filtering-enlarged",menu);capture("selected-enlarged",kitView(form));assertFooterLabelsFit(kitView(form));}finally{UIManager.put("defaultFont",font);}
      menu.setAvailableHeight(90);capture("filtering-short",menu);assertThat(menu.getPreferredSize().height).isLessThanOrEqualTo(90);menu.setAvailableHeight(Integer.MAX_VALUE);
      capture("selected-narrow",kitView(form),330);
      assertThat(field.getDocument()).isSameAs(document);assertThat(field.getCaretPosition()).isEqualTo(2);
      field.setText("staging");capture("no-matches-selected",menu);
      field.getActionMap().get("picker.escape").actionPerformed(null);
     });
+    for(String kind:List.of("login","key")) {
+     onEdt(()->{click(form,"import.choose.0.input");var menu=menu(vault);search(menu,"cancel-fixture");enter(named(menu,"credential.menu.search"));click(vault.surface("New Credential"),"create."+kind);});
+     var editor=vault.awaitSurface(kind.equals("login")?"Add Login":"Add SSH Key");
+     onEdt(()->{teardownProbe(editor);click(editor,"cancel");});
+     await(()->menus(vault).size()==1,"picker returns after "+kind+" Cancel");
+     onEdt(()->{assertThat(((dev.jasper.ui.model.Nodes.PickerMenu)menu(vault).spec().root()).query()).isEqualTo("cancel-fixture");assertThat(vault.problems).isEmpty();key(menu(vault),"escape");});
+    }
     settle();onEdt(()->click(form,"import.import"));
     var review=vault.awaitSurface("Import SSH keys");onEdt(()->{capture("disabled-review",kitView(form));
      var defaults=new HashMap<Object,Object>();UIManager.getDefaults().forEach(defaults::put);try{UIManager.put("defaultFont",new Font("Dialog",0,1).deriveFont(32.5f));assertThat(com.formdev.flatlaf.util.UIScale.getUserScaleFactor()).isEqualTo(2.5f);capture("disabled-review-250",kitView(form));}finally{UIManager.put("defaultFont",defaults.get("defaultFont"));}
      click(review,"commit");});
     await(()->!node(form,"import.import").state().enabled()&&((dev.jasper.ui.model.Nodes.Text)node(form,"import.status")).text().contains("saved"),"import completion");
-    onEdt(()->{capture("disabled",kitView(form));assertThat(vault.problems).isEmpty();});
+    onEdt(()->{capture("disabled",kitView(form));assertThat(vault.problems).isEmpty();teardownProbe(form);click(form,"import.cancel");assertThat(form.closed()).isTrue();assertThat(vault.problems).isEmpty();});
    }
   }finally{onEdt(theme::close);}
+ }
+ static void teardownProbe(dev.jasper.app.windows.AuxiliarySurface surface) {
+  var view=kitView(surface);var root=(Container)view.getComponent(0);var policy=root.getFocusTraversalPolicy();
+  view.addContainerListener(new java.awt.event.ContainerAdapter(){@Override public void componentRemoved(java.awt.event.ContainerEvent event){
+   root.getPreferredSize();assertThat(policy.getDefaultComponent(root)).isNull();assertThat(policy.getFirstComponent(root)).isNull();assertThat(policy.getLastComponent(root)).isNull();
+  }});
  }
  static List<HostedKitView> menus(StagedVaultHost vault){try{
   var contextsField=PluginHost.class.getDeclaredField("contexts");contextsField.setAccessible(true);var context=(HostedContext)((Map<?,?>)contextsField.get(vault.host)).get("dev.jasper.vault");
@@ -106,5 +119,16 @@ class StagedAnchoredPickerTest {
   }catch(java.io.IOException e){throw new java.io.UncheckedIOException(e);}
  }
  static String json(Object value){return value==null?"null":"\""+value.toString().replace("\\","\\\\").replace("\"","\\\"")+"\"";}
- static void layout(Container c){for(int n=0;n<3;n++){c.doLayout();for(var child:c.getComponents())if(child instanceof Container nested)layout(nested);}}
+ static void layout(Container c){for(int n=0;n<3;n++)arrange(c);}
+ static void arrange(Container c){c.doLayout();for(var child:c.getComponents())if(child instanceof Container nested)arrange(nested);}
+ static void assertFooterLabelsFit(java.awt.Container root) {
+  for(var child:root.getComponents()) {
+   if(child instanceof javax.swing.AbstractButton button && java.util.Set.of("Refresh","Cancel","Close","Import").contains(button.getText())) {
+    var insets=button.getInsets();var image=new java.awt.image.BufferedImage(1,1,java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();
+    try {g.setFont(button.getFont());String text=javax.swing.SwingUtilities.layoutCompoundLabel(button,g.getFontMetrics(),button.getText(),button.getIcon(),javax.swing.SwingConstants.CENTER,button.getHorizontalAlignment(),javax.swing.SwingConstants.CENTER,javax.swing.SwingConstants.RIGHT,new java.awt.Rectangle(insets.left,insets.top,button.getWidth()-insets.left-insets.right,button.getHeight()-insets.top-insets.bottom),new java.awt.Rectangle(),new java.awt.Rectangle(),button.getIconTextGap());assertThat(text).as("enlarged footer %s",button.getText()).isEqualTo(button.getText());}finally{g.dispose();}
+   }
+   if(child instanceof java.awt.Container container)assertFooterLabelsFit(container);
+  }
+ }
+
 }

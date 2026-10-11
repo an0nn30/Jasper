@@ -320,3 +320,45 @@ scratch fix1 manifest; picker-a native originals remain immutable. All874 affect
 (zero failures/errors, one existing skip); SDK/fake are unchanged/up-to-date. Controller must
 rerun actual Save/Cancel (Login and path-key), popup layout and keyboard behavior in picker-b.
 Independent re-review and final pixel acceptance remain pending; no page is accepted.
+
+## Plan3 Task2b — actual grouped Add Host (2026-10-10, not accepted)
+
+Actual staged RemotePlugin/HostEditor mounts use the exported Vault anchored API at DEFAULT28. Captures live in
+`jasper-app/build/theme-migration-evidence/add-host/actual/`; every PNG has component bounds/font provenance in
+its sibling text file. States include empty, opened empty/selected, filtering, no matches, selected Login,
+real imported ordered keys/reordered, Agent disabled/valid, busy, persistence error, light, enlarged and narrow/short.
+The real Login selection grants one secret fetch; the next fetch requires normal consent. No connection is made.
+The compact Import six-state captures are regenerated after the shared corrections.
+
+Desktop original content crop `(26,82,1080,1464)` is 540×732 logical at device2. The exact source ICC→sRGB palette
+is `jasper-app/src/test/resources/dev/jasper/app/appearance/desktop-host.toml`, SHA-256
+`437699cd4a486865b2d8cea730a559ddf84a9900d992e56ff51bcf3f72a67407`. No production theme is replaced.
+Unresampled source/candidate/overlay/diff and hashes are retained in scratch `task-2b-comparison/manifest.json`.
+The selected real two-key form naturally prefers **540×705**, empty **540×646**; capture at540×732 pins the footer
+at the comparison envelope but does not prove native geometry. At540×732 candidate Connection card is
+`24,42,492,170`, Authentication `24,254,492,201`, Options `24,497,492,140`; Name `146,56,356,28`,
+picker `146,307,356,28`, ordered keys `146,345,356,96`, footer buttons y684. Native platform chrome is additional
+and must be measured by the controller; do not resize a native screenshot to force agreement.
+
+The default face now uses density-specific shared inset/tile/gap/glyph/chevron metrics. At device2, source
+empty-face text ink starts x68 versus candidate x57 before and x67 after (same text). Lock source bounds
+`23,18..41,38`, candidate before `25,22..35,35`, after `20,16..38,38`. Chevron source12×7 versus candidate
+before15×9, after13×8. Source face708×56 and candidate712×56 are preserved, so trailing absolute positions
+must be interpreted with their different widths. The compact first text-ink x52±1 and default x68±1 have
+focused raster assertions. Icon silhouette/optical origin and one-pixel baseline residuals remain unaccepted.
+
+Full-form anatomy remains open beyond ink: Name top candidate112device vs source106; Auth card508 vs source
+about504; key box690 vs698; Options994 vs about1015 and card bottom1274 vs1317. Shared form label/card spacing,
+ordered-row padding/actions and settings description height account for cumulative drift. Actual free-entry Group
+retains its default explanation, real keys show `Stored key` with fingerprint tooltip because algorithm/bit count
+is not exported metadata, and empty keys do not acquire invented rows. Existing LINK treatment now gives Add Stored
+Key its depicted semantic link color. These domain qualifications do not waive shared spacing/reference work.
+
+Controller cf8 native compact evidence found successful visible creation returns but teardown warnings/blank
+completed Import Close; retained Form traversal during removal now has a concrete RED and a shared inert-after-close
+fix, with staged Cancel/Close regression. Native rerun is pending. Enlarged installed-LAF footer fitting passes
+at system20 after layout, so the earlier transient native Refresh/Cancel ellipsis is not declared fixed or explained.
+The read-only native ink report measures query +15–17% and footer +21–26% relative to frozen headless pixels;
+JPEG/ICC controls do not explain it. Same-live-popup lossless/offscreen and draw-time metadata remain controller
+investigation, without per-string font workarounds. Independent review, native keyboard/focus/consent/teardown,
+all compact/default states and final typography/icon/outline/pixel acceptance remain open. Zero pages accepted.

@@ -565,17 +565,13 @@ public class RemotePlugin implements Plugin {
         PluginDialog dialog = context.windows().dialog(new DialogSpec(editing.isPresent() ? "Edit " + editing.get().name() : "Add Host", window, true));
         HostEditor[] editor = new HostEditor[1];
         boolean[] closed = {false};
-        editor[0] = new HostEditor(context.kit(), ui, store.hosts(), editing, vault.isPresent(), this::credentialName,
-            () -> vault.isPresent() ? vault.get().pick(window) : CompletableFuture.completedFuture(Optional.empty()),
+        editor[0] = new HostEditor(context.kit(), ui, store.hosts(), editing, vault.isPresent(), this::credentialDescriptor,
+            vault.isPresent() ? request -> vault.get().pick(window, request) : null,
             host -> store.put(host).whenComplete((ignored, failure) -> ui.execute(() -> {
-                if (stopped) return;
-                if (failure == null) dialog.close();
-                else {
-                    if (!closed[0]) editor[0].showError(message(failure));
+                if (!stopped && failure != null)
                     context.notifications().group().error("Could not save the host", message(failure), failure);
-                }
             })),
-            dialog::close);
+            () -> { if (!stopped && !closed[0]) dialog.close(); }, dialog::close);
         editor[0].setDefaultGroupName(panelState.defaultGroup());
         currentEditor = editor[0];
         dialog.setContent(editor[0].view());
@@ -702,9 +698,14 @@ public class RemotePlugin implements Plugin {
         };
     }
 
+    private Optional<CredentialDescriptor> credentialDescriptor(UUID id) {
+        if (vault.isEmpty()) return Optional.empty();
+        return vault.get().credentials().stream().filter(descriptor -> descriptor.id().equals(id)).findFirst();
+    }
+
     private Optional<String> credentialName(UUID id) {
         if (vault.isEmpty()) return Optional.empty();
-        return vault.get().credentials().stream().filter(descriptor -> descriptor.id().equals(id)).findFirst().map(CredentialDescriptor::name);
+        return credentialDescriptor(id).map(CredentialDescriptor::name);
     }
 
     private void refreshStatus() {

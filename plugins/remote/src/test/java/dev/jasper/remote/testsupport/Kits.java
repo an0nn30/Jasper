@@ -148,7 +148,7 @@ public final class Kits {
     public static void emit(UiView view, UiEvent event) { fake(view).emit(event); }
     public static void press(UiView view, String action) { emit(view, new UiEvent.Action(action)); }
     /** A button as the user clicks it: its configured action. */
-    public static void click(UiView view, String buttonId) { press(view, button(view, buttonId).action()); }
+    public static void click(UiView view, String buttonId) { var control = node(view, buttonId, Nodes.Node.class); press(view, control instanceof Nodes.Choice c ? c.action() : ((Nodes.Button) control).action()); }
     public static void type(UiView view, String fieldId, String text) { emit(view, new UiEvent.Edited(fieldId, text)); }
 
     public static boolean closed(UiView view) {

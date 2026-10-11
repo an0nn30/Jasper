@@ -15,7 +15,7 @@ public final class Typography {
         HERO_TITLE(15, 600), DETAIL_TITLE(16, 600), WINDOW_TITLE(13, 600), PANEL_TITLE(13, 600),
         PICKER_COMPACT(10, 400), PICKER_CAPTION(9, 400),
         BODY(13, 400), BODY_STRONG(13, 500), LABEL(12.5f, 400), DESCRIPTION(12.5f, 400),
-        CAPTION(11.5f, 400), SETTING_DESCRIPTION(11, 400), SECTION_LABEL(11, 600), COUNT(11, 400), CHIP(9.5f, 400), MONO(12, 400), MONO_SMALL(11.5f, 400);
+        CAPTION(11.5f, 400), SETTING_DESCRIPTION(11, 400), SECTION_LABEL(11, 600), COUNT(11, 400), CHIP(9.5f, 400), MONO(12, 400), MONO_SMALL(11.5f, 400), MONO_CAPTION(11.5f, 400);
         private final float size;
         private final int weight;
         Role(float size, int weight) { this.size = size; this.weight = weight; }
@@ -39,7 +39,7 @@ public final class Typography {
     /** Selected labels use medium weight. Size settings enlarge every role proportionally. */
     public Font font(Role role, boolean selected) {
         Objects.requireNonNull(role);
-        String resolved = role == Role.MONO || role == Role.MONO_SMALL ? Font.MONOSPACED : family;
+        String resolved = role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION ? Font.MONOSPACED : family;
         int weight = selected && role == Role.LABEL ? 500 : role.weight;
         // The native macOS text face best matches regular desktop roles. Explicit user families bypass this policy.
         if (platformDefault && weight < 600 && resolved.equals("Helvetica Neue") && AppleText.AVAILABLE)

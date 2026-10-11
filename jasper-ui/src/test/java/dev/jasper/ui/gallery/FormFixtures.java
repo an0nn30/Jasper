@@ -25,7 +25,7 @@ public final class FormFixtures {
     static SettingRow setting(String id, String title, String description, Node control) { return new SettingRow(id, READY, title, description, control, false); }
     static List<Button> actions(String submit) { return List.of(button("cancel", "Cancel", ButtonKind.SECONDARY), new Button("submit", DISABLED, submit, "", ButtonKind.PRIMARY, "submit", "")); }
     static Form full(String id, String title, List<Node> sections, String preview, String submit) {
-        return new Form(id, READY, FormKind.FULL, title, Optional.empty(), sections, Optional.of(text("preview", preview, TextRole.MONO_SMALL)), actions(submit), "cancel");
+        return new Form(id, READY, FormKind.FULL, title, Optional.empty(), sections, Optional.of(text("preview", preview, TextRole.MONO_CAPTION)), actions(submit), "cancel", id.equals("add-host") ? FormSubmission.NONE : FormSubmission.PRIMARY);
     }
     static Stack hero(String id, String title, String description, String icon) {
         return stack(id, LayoutRole.HERO, icon(id + "-icon", icon, Hue.BLUE, IconSize.HERO), text(id + "-title", title, TextRole.HERO_TITLE), text(id + "-description", description, TextRole.DESCRIPTION));

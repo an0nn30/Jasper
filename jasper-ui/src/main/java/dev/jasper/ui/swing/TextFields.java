@@ -210,7 +210,7 @@ final class TextFields {
         /** A search field is labelled by its glyph and hint; its label stays its accessible name only. */
         boolean labelShown() {
             var field = (Nodes.Field)node;
-            return !embedded && !surface.hero && field.kind() != Nodes.FieldKind.SEARCH && field.presentation() == Nodes.FieldPresentation.STANDARD;
+            return !embedded && !surface.hero && field.kind() != Nodes.FieldKind.SEARCH && (field.presentation() == Nodes.FieldPresentation.STANDARD || field.presentation() == Nodes.FieldPresentation.TECHNICAL);
         }
         static int uncommitted(java.awt.event.InputMethodEvent event) {
             var text = event.getText();
@@ -229,7 +229,7 @@ final class TextFields {
                 scroll.getVerticalScrollBar().setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_INPUT));
                 scroll.getVerticalScrollBar().setForeground(ThemePainting.color(context(), SemanticColor.BORDER_INPUT));
             }
-            var role = field.kind() == Nodes.FieldKind.PORT || field.kind() == Nodes.FieldKind.PATH ? Typography.Role.MONO : Typography.Role.BODY;
+            var role = field.kind() == Nodes.FieldKind.PORT || field.kind() == Nodes.FieldKind.PATH || field.presentation() == Nodes.FieldPresentation.TECHNICAL ? Typography.Role.MONO : Typography.Role.BODY;
             input.setFont(ThemePainting.font(context(), role));
             input.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
             input.setDisabledTextColor(input.getForeground()); input.setCaretColor(input.getForeground());

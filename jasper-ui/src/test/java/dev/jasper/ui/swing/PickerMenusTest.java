@@ -7,6 +7,19 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 import static dev.jasper.ui.swing.KitViewTest.*;
 class PickerMenusTest {
+ @Test void emptyFacesUseSourceDensitySpecificTextInsets(){Edt.run(()->{
+  var context=KitFixtures.context();try{
+   for(var density:Nodes.PickerDensity.values()){
+    var button=new JButton();button.setSize(190,density==Nodes.PickerDensity.COMPACT?22:28);
+    var image=new java.awt.image.BufferedImage(380,button.getHeight()*2,java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();
+    try{g.scale(2,2);PickerMenus.paintFace(button,g,context,new Nodes.PickerFace("","","lock",Nodes.Hue.NONE,density),true,false);}finally{g.dispose();}
+    var ink=ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY);int first=image.getWidth();
+    for(int y=8;y<image.getHeight()-8;y++)for(int x=46;x<200;x++){var pixel=new java.awt.Color(image.getRGB(x,y),true);
+     if(Math.abs(pixel.getRed()-ink.getRed())+Math.abs(pixel.getGreen()-ink.getGreen())+Math.abs(pixel.getBlue()-ink.getBlue())<15)first=Math.min(first,x);}
+    int expected=density==Nodes.PickerDensity.COMPACT?52:68;assertThat(first).as("%s primary ink x at device2",density).isBetween(expected-1,expected+1);
+   }
+  }finally{release(context);}
+ });}
  @Test void keyboardIntentSurvivesThemeAndFontRefresh(){Edt.run(()->{
   var context=KitFixtures.context();var events=new ArrayList<UiEvent>();
   var items=List.of(new Nodes.PickerItem("none","None","","none",Nodes.Hue.NONE,Nodes.PickerItemKind.UTILITY),new Nodes.PickerItem("login","Login","Password","user",Nodes.Hue.BLUE));

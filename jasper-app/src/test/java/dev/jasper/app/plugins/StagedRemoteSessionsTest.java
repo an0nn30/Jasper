@@ -21,6 +21,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StagedRemoteSessionsTest {
     @TempDir Path root;
 
+    @Test void editingSavedVaultReferenceWithoutOptionalVaultDoesNotLinkItsApi() throws Exception {
+        try(var remote=new StagedRemoteHost(root,true)) {
+            Class<?> auth=remote.loader.loadClass("dev.jasper.remote.hosts.Auth");
+            Object credential=remote.loader.loadClass("dev.jasper.remote.hosts.Auth$Vault").getConstructor(java.util.UUID.class).newInstance(java.util.UUID.randomUUID());
+            Class<?> host=remote.loader.loadClass("dev.jasper.remote.hosts.RemoteHost");
+            Object saved=host.getMethod("create",String.class,String.class,int.class,String.class,auth,String.class,java.util.Optional.class)
+                .invoke(null,"saved","saved.invalid",22,"",credential,"",java.util.Optional.empty());
+            var lookup=java.lang.invoke.MethodHandles.privateLookupIn(remote.plugin.getClass(),java.lang.invoke.MethodHandles.lookup());
+            var edit=lookup.findVirtual(remote.plugin.getClass(),"editHost",java.lang.invoke.MethodType.methodType(void.class,dev.jasper.sdk.terminal.WindowHandle.class,java.util.Optional.class));
+            onEdt(()->{try{edit.invoke(remote.plugin,remote.context().terminals().window(remote.window.id()).orElseThrow(),java.util.Optional.of(saved));}
+                catch(Throwable failure){throw new AssertionError(failure);}});
+            var editor=remote.awaitSurface("Edit saved");
+            onEdt(()->{assertThat(require(editor,"host.name.input")).isNotNull();
+                assertThat(((dev.jasper.ui.model.Nodes.Choice)StagedVaultHost.node(editor,"host.choose")).face().orElseThrow().primary()).isEqualTo("credential missing");
+                assertThat(((AbstractButton)require(editor,"host.choose.input")).isEnabled()).isFalse();editor.requestClose();});
+            assertThat(remote.problems).isEmpty();
+        }
+    }
+
     @Test @Timeout(value = 90, unit = TimeUnit.SECONDS)
     void theSessionsHeaderKeepsItsCountAndActionsInARealWindowAndTheHostDialogKeepsItsKeys() throws Exception {
         try (var remote = new StagedRemoteHost(root, true)) {

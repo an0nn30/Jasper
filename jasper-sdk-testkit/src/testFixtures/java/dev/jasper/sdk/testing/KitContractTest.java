@@ -20,6 +20,17 @@ public abstract class KitContractTest {
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
         new Nodes.Secret("secret",ControlState.READY,"","Password","")))); }
+    @Test void formSubmissionPolicySurvivesHostProjectionAndUpdates() throws Exception { edt(() -> {
+        var kit=kit("owner");
+        var action=new Nodes.Button("save",ControlState.READY,"Save","",Nodes.ButtonKind.PRIMARY,"save","");
+        var legacy=new Nodes.Form("form",ControlState.READY,Nodes.FormKind.FULL,"Form",Optional.empty(),List.of(),Optional.empty(),List.of(action),"cancel");
+        assertThat(legacy.submission()).isEqualTo(Nodes.FormSubmission.PRIMARY);
+        var view=kit.create(new ViewSpec(legacy),e -> {});
+        try { for(var policy:Nodes.FormSubmission.values()) {
+            var form=new Nodes.Form("form",ControlState.READY,Nodes.FormKind.FULL,"Form",Optional.empty(),List.of(),Optional.empty(),List.of(action),"cancel",policy);
+            view.update(new ViewSpec(form));assertThat(((Nodes.Form)view.spec().root()).submission()).isEqualTo(policy);
+        }}finally{view.close();stop(kit);}
+    }); }
     @Test void numericShapeUpdatePublishesTheNewLiveValue() throws Exception { edt(() -> {
         var kit = kit("owner"); var events = new ArrayList<UiEvent>();
         var view = kit.create(number("1", 0, 0), events::add);

@@ -591,3 +591,11 @@ independent review are pending, so this is not a native acceptance claim.
 ## Plan3 Task1 disposition — 2026-10-10
 
 `SurfaceFixtures`, `SurfacePreview`, `SurfaceGeometryTest`, and owner-package `KitViewTestAccess` are permanent test-only actual-feature harness owners, not production test hooks or alternate page implementations. They start the staged Vault in disposable homes, capture mounted KitViews, and preserve domain policy. Calibration/custom TOML lives in test resources and installs through the ordinary native theme catalog for controller QA; no production defaults contain fixture colors. No temporary production path is introduced.
+
+## Plan3 Task2b producer route (2026-10-10)
+
+Production Remote Add Host now uses the exported anchored Vault producer with default-density kit faces. The older
+HostEditor Supplier constructor remains a compatibility/test adapter; production RemotePlugin does not call it,
+and its modal producer is not evidence of anchored visual acceptance. No new feature renderer, color literal or
+local theme bridge was introduced. Optional Vault classloading guards remain necessary for Agent-only operation
+and editing previously saved Vault references when Vault is absent.

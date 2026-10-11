@@ -92,11 +92,11 @@ final class Labels {
         TextControl(KitView view, Nodes.Text node) { super(view, node, literal()); refresh(); }
         @Override void refresh() {
             var text = (Nodes.Text)node; var label = (JLabel)component; state();
-            label.putClientProperty("Jasper.leadingEllipsis",text.role()==Nodes.TextRole.MONO || text.role()==Nodes.TextRole.MONO_SMALL);
+            label.putClientProperty("Jasper.leadingEllipsis",text.role()==Nodes.TextRole.MONO || text.role()==Nodes.TextRole.MONO_SMALL || text.role()==Nodes.TextRole.MONO_CAPTION);
             label.setText(text.text()); label.setFont(ThemePainting.font(context(), Typography.Role.valueOf(text.role().name())));
             label.setForeground(ThemePainting.color(context(), text.severity().isPresent() ? tint(text.severity().get()) : switch (text.role()) {
                 case LABEL, DESCRIPTION, CAPTION, COUNT -> SemanticColor.TEXT_SECONDARY;
-                case SECTION_LABEL -> SemanticColor.TEXT_TERTIARY;
+                case SECTION_LABEL, MONO_CAPTION -> SemanticColor.TEXT_TERTIARY;
                 default -> SemanticColor.TEXT_PRIMARY;
             }));
             ((LiteralLabel)label).caret = text.caret().orElse(-1);

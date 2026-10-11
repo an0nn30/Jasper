@@ -1,5 +1,8 @@
 # Theme Engine Plan 3 — Surface Composition and Visual Matching Implementation Plan
 
+**Task2b implementation handoff — 2026-10-10:** grouped Add Host/default picker, real readiness/persistence, ordered UUID selection and lifetime handling implemented. Additive shared FormSubmission.NONE retains older constructor defaults; TECHNICAL fields and MONO_CAPTION are controller-approved reusable roles. Additional bounded deviation fixes native-discovered retained closed Form traversal with a faithful removal RED and actual staged Vault Cancel/Import Close regressions. Density-specific face roles follow exact source measurements. Affected checks and real mounted comparisons pass their behavioral assertions; visual reference residuals, native ink and fresh native teardown/keyboard acceptance remain open. Task2a cf8 fix1 independently approved, with four creation returns and six compact native captures; older pending-review text below is historical. Zero page acceptances.
+
+
 **Task2a fix round1 — 2026-10-10:** I1–I4 and faithful installed-LAF popup regressions are fixed in shared renderer/host and Vault settlement/editor lifetime. Scoped gate passes874 tests, zero failures/errors, one existing skip (unchanged SDK/fake up-to-date). Native picker-b and independent scoped re-review remain required; no page accepted. Search glyph/divider/outline roles changed within the shared engine; remaining ink/raster differences are recorded in calibration/report.
 
 **Execution status — 2026-10-10:** Plan2 prerequisite independently approved at `0b367eee`. Task1 implementation and fix round1 independently approved through `83d2435c`; actual native E verifies enlarged warning, font-family/draft/focus preservation and Unlock error/recovery. Scoped checks pass. Final pixel acceptance remains open: no page is accepted. Task2a implementation now delivers checked host/fake anchors, the real Vault popover/creation producer and compact Import consumer; independent review and controller native verification are pending. No page is accepted. Shared unlock presentation transfers preserve surviving waiters. Source-measured picker geometry and a bounded shared numeric-column correction are included; approved C1 typography is retained with corrected regression fixtures. Task2 is split into the complete anchored picker/compact import slice (2a) and grouped Add Host/default picker (2b), per the [binding amendment](../specs/2026-10-10-jasper-anchored-picker-amendment.md). User authorization extends this plan to all16 Desktop references plus old-only states and continuous controller native capture in an isolated home.
@@ -21,7 +24,7 @@
 **Spec:** [Approved design, especially panel composition §6.1](../specs/2026-10-04-jasper-theme-engine-design.md).
 **Prerequisites:** [Plan 1](2026-10-04-theme-engine-1-engine-and-kit.md) and [Plan 2](2026-10-04-theme-engine-2-consumer-migration.md) implemented, reviewed and verified.
 **Shared contracts:** [Types, paths and test conventions](2026-10-04-theme-engine-contracts.md).
-**Status:** In execution. Task1 implementation gate is complete; its measured pixel residuals remain owned by final cross-family calibration/native chrome checks. Task2a awaits independent review/native checks; Task2b follows. Deviations are recorded in the amendments above; controller native validation is explicitly authorized.
+**Status:** In execution. Task1 implementation gate is complete; its measured pixel residuals remain owned by final cross-family calibration/native chrome checks. Task2a cf8 fix1 is independently approved. Task2b implementation awaits independent review and fresh native checks. Deviations are recorded in the amendments above; controller native validation is explicitly authorized.
 
 ## Global Constraints
 
@@ -113,11 +116,13 @@ preview, resize the candidate arbitrarily, or overwrite source images.
 **Files:** Modify `P(remote)/ui/HostEditor.java`, related picker/host-option descriptor builders; add `PT(remote)/ui/HostCompositionTest.java`; extend SurfaceFixtures `host-add`.
 **Interfaces:** Nodes.Form FULL with Connection, Authentication, Options sections; ordered key ItemList and domain picker actions. Stable field ids survive auth/protocol/view updates.
 
-- [ ] Test Connection's Name, Host+Port, Username and Jump Host rows; Authentication's Vault Credential/SSH Agent segments, credential picker and ordered keys; Options' Group/Favorite/Track Folder rows; SSH preview and Cancel/Add Host footer. Assert the first key cannot move up, last cannot move down, and remove/reorder retain selection by key id.
-- [ ] Run `./gradlew :jasper-plugin-remote:test --tests '*Host*Test'`; confirm new composition expectations fail, preserving existing validation tests.
-- [ ] Replace migration layout with section/card composition matching add-host.png. Keep actual key ordering, agent availability, picker grant flows and directory-follow behavior. Hidden irrelevant fields retain draft state for switching back but submission uses active auth mode only. Technical host/port/key/preview values use mono roles.
-- [ ] Render empty/valid/picker-selected/agent/error/busy with long host and key names. Verify field alignment, footer spacing, scroll on short screens, selection after reorder, theme change during a pending picker and Enter/Esc behavior. Run focused tests and inspect overlays against reference.
-- [ ] Review then commit `Compose Add Host with grouped authentication and ordered keys`.
+- [x] Test Connection's Name, Host+Port, Username and Jump Host rows; Authentication's Vault Credential/SSH Agent segments, credential picker and ordered keys; Options' Group/Favorite/Track Folder rows; SSH preview and Cancel/Add Host footer. Assert the first key cannot move up, last cannot move down, and remove/reorder retain selection by key id.
+- [x] Run `./gradlew :jasper-plugin-remote:test --tests '*Host*Test'`; confirm new composition expectations fail, preserving existing validation tests.
+- [x] Replace migration layout with section/card composition matching add-host.png. Keep actual key ordering, agent availability, picker grant flows and directory-follow behavior. Hidden irrelevant fields retain draft state for switching back but submission uses active auth mode only. Technical host/port/key/preview values use mono roles.
+- [x] Render empty/valid/picker-selected/agent/error/busy with long host and key names. Verify field alignment, footer spacing, scroll on short screens, selection after reorder, theme change during a pending picker and Enter/Esc behavior. Run focused tests and inspect overlays against reference.
+- [x] Self-review then commit `Compose Add Host with grouped authentication and ordered keys`.
+
+**Evidence qualification:** behavioral render checks and source overlays are complete, not pixel acceptance. Ordered-key fixture uses real imported keys; no invented algorithm/group metadata. Native chrome, live ink, final visual matching and independent review are controller-owned pending work.
 
 ## Task 3 — New File Server grouped form
 
