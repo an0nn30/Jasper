@@ -33,7 +33,8 @@ final class ThemeSelection extends Editors.ThemePick {
         boolean duplicate=themes.sources().get().stream().filter(other->other.name().equalsIgnoreCase(source.name())).count()>1;
         return source.name()+(duplicate?(source.origin()==ThemeSource.BUNDLED?" (bundled)":" (installed)"):"");
     }
-    @Override public Nodes.Node node(String id,ControlState state) {
+    @Override public Nodes.Node node(String id, ControlState state) { return node(id, state, false); }
+    @Override public Nodes.Node node(String id, ControlState state, boolean highlighted) {
         var plain=new ControlState(state.visible(),state.enabled(),state.busy(),"");
         var parts=new ArrayList<Nodes.Node>();
         var previews=new ArrayList<Option>();
@@ -58,7 +59,7 @@ final class ThemeSelection extends Editors.ThemePick {
             new MenuItem(id+":import",Editors.IMPORT_THEME,"",id+":import",true,false),
             new MenuItem(id+":reset-menu","Reset to defaults","refresh",id+":reset",modified,false)),"Theme actions");
         var controls=new Nodes.Stack(id+":controls",plain,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(line.children().getFirst(),gear));
-        parts.add(new Nodes.SettingRow("row:"+id,plain,label,draft.value(UI_THEME_FOLLOW_SYSTEM)?themes.systemDark().get().map(dark->"System uses "+(dark?"Jasper Dark":"Jasper Light")+"; manual theme remembered").orElse("System unavailable; using remembered manual theme"): "",controls,false,false));
+        parts.add(new Nodes.SettingRow("row:"+id,plain,label,draft.value(UI_THEME_FOLLOW_SYSTEM)?themes.systemDark().get().map(dark->"System uses "+(dark?"Jasper Dark":"Jasper Light")+"; manual theme remembered").orElse("System unavailable; using remembered manual theme"): "",controls,false,highlighted));
         return new Nodes.Stack(id+":selection",plain,Nodes.LayoutRole.VERTICAL,parts);
     }
     @Override public boolean event(String id,UiEvent event) {

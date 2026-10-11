@@ -17,6 +17,12 @@ public interface ValueEditor<T> {
      */
     Nodes.Node node(String id, ControlState state);
 
+    /** Supplies search state to compound editors without reconstructing their retained controls. */
+    default Nodes.Node node(String id, ControlState state, boolean highlighted) { return node(id, state); }
+
+    /** The mounted node to reveal when this full-span setting matches a search. */
+    default String revealTarget(String id) { return "row:" + id; }
+
     /** The control's current value; throws IllegalArgumentException when it cannot be read as one. */
     T value();
 

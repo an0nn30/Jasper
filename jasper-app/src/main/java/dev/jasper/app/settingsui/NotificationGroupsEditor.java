@@ -49,11 +49,12 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
         return token != null && MODES.containsKey(token) ? token : group.defaultMode();
     }
 
-    @Override public Nodes.Node node(String id, ControlState state) {
+    @Override public Nodes.Node node(String id, ControlState state) { return node(id, state, false); }
+    @Override public Nodes.Node node(String id, ControlState state, boolean highlighted) {
         var plain = new ControlState(state.visible(), state.enabled(), state.busy(), "");
         if (groups.isEmpty())
             return new Nodes.Stack(id, plain, Nodes.LayoutRole.VERTICAL, List.of(
-                new Nodes.Text(id + ":empty", ControlState.READY, "No notification groups yet.", Nodes.TextRole.DESCRIPTION)));
+                new Nodes.SettingRow(id + ":empty-row", plain, "No notification groups yet.", "", new Nodes.Stack(id + ":empty", plain, Nodes.LayoutRole.INLINE, List.of()), false, highlighted)));
         Map<String,String> value=value();
         var owners=new LinkedHashMap<String,List<Integer>>();
         for(int i=0;i<groups.size();i++)owners.computeIfAbsent(groups.get(i).ownerId(),ignored->new ArrayList<>()).add(i);
@@ -73,7 +74,7 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
                 var choice=new Nodes.Choice(modeId(id,i),plain,Nodes.ChoiceKind.DROPDOWN,options,mode(group.id()),group.name()+": how its notifications appear; "+group.owner()+" · "+group.id(),"");
                 var reset=new Nodes.Button(resetId(id,i),new ControlState(plain.visible()&&value.containsKey(group.id()),plain.enabled()&&value.containsKey(group.id()),plain.busy(),""),"","refresh",Nodes.ButtonKind.GHOST,resetId(id,i),"Reset "+group.name()+" to its default");
                 var control=new Nodes.Stack(modeId(id,i)+":controls",plain,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(choice,reset));
-                lines.add(new Nodes.SettingRow(id+":row-"+i,plain,group.name(),"",control,false,false));
+                lines.add(new Nodes.SettingRow(id+":row-"+i,plain,group.name(),"",control,false,highlighted));
             }
             sections.add(new Nodes.Card(id+":owner-card-"+section++,plain,Nodes.CardKind.SETTINGS,lines));
         }
@@ -81,6 +82,7 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
     }
     private static String modeIcon(String mode) {return switch(mode){case "card"->"notification.card";case "sticky"->"notification.sticky";case "history"->"notification.history";default->"notification.off";};}
     @Override public boolean fullSpan(){return true;}
+    @Override public String revealTarget(String id) { return id + (groups.isEmpty() ? ":empty-row" : ":row-0"); }
 
     @Override public Map<String, String> value() {
         var value = new LinkedHashMap<>(shown);

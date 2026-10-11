@@ -1,6 +1,18 @@
 # Theme-engine calibration
 
 
+## Settings Task9a review corrections
+
+The shared segmented choice now measures full labels and adds rows only where needed. Its normal
+one-row allocation keeps the original GridLayout geometry; retained buttons, selection and arrow
+keys survive narrow/enlarged and scale recovery. Actual640×681logical Window at20pt displays all
+three toolbar meanings. This corrects functional readability, not the deferred exact-font optics.
+Full-span search highlights use existing SettingRow paint; the empty notification registry now has
+a stable standard setting row so search can reveal it. Populated card geometry is unchanged.
+Fix-round evidence compares actual Settings and all affected families against immutable Task9a
+final44; generated Vault data is classified separately. Source comparisons retain the same crop,
+ICC conversion and2×scale. All pixel/native acceptance and the Task10/11 residuals below stay open.
+
 ## Settings Task9a — source comparison and bounded shared changes
 
 Actual SettingsDialog/SchemaPage renders use980×681logical at2×. Untouched Desktop references are

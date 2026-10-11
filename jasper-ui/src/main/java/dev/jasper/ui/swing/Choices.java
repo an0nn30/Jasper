@@ -64,7 +64,9 @@ final class Choices {
             } else { input = new SegmentTrack(context()); own(this::closeOptions); }
             input.putClientProperty("html.disable", true); KitOwnership.mark(input, node.id() + ".input");
             if (input instanceof ChoiceCombo combo) { combo.focus = new ThemePainting.Focus(combo, combo, view); own(combo.focus); }
-            var container = (JPanel)component; container.setOpaque(false); container.add(label, BorderLayout.NORTH); container.add(input, BorderLayout.CENTER); container.add(error, BorderLayout.SOUTH);
+            var container = (JPanel)component;
+            if (input instanceof SegmentTrack) container.setLayout(new SegmentColumn());
+            container.setOpaque(false); container.add(label, BorderLayout.NORTH); container.add(input, BorderLayout.CENTER); container.add(error, BorderLayout.SOUTH);
             label.setLabelFor(input); refresh();
         }
         private JComponent optionLabel(Option option, boolean selected, boolean popup) {
@@ -106,7 +108,7 @@ final class Choices {
                     picker.setBorder(new EmptyBorder(ring, pad, ring, pad + com.formdev.flatlaf.util.UIScale.scale(context().icons().size(Nodes.IconSize.CAPTION)) + ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP)));
                 } else {
                     if (!options.equals(choice.options())) {
-                        closeOptions(); input.removeAll(); options = choice.options(); input.setLayout(new GridLayout(1, Math.max(1, options.size()), 0, 0));
+                        closeOptions(); input.removeAll(); options = choice.options(); input.setLayout(new SegmentLayout());
                         for (int i = 0; i < options.size(); i++) {
                             Option option = options.get(i); var button = new SegmentButton(context()); button.setText(option.label());
                             KitOwnership.mark(button, choice.id() + ".option." + option.id()); button.setOpaque(false); button.setContentAreaFilled(false); button.setBorderPainted(false); button.setFocusPainted(false);
@@ -115,6 +117,8 @@ final class Choices {
                             ActionListener listener = event -> select(option.id()); button.addActionListener(listener); optionLifetimes.add(() -> button.removeActionListener(listener));
                             int index = i;
                             bind(button, "LEFT", () -> navigate(index - 1)); bind(button, "RIGHT", () -> navigate(index + 1));
+                            bind(button, "UP", () -> navigate(index - ((SegmentLayout)input.getLayout()).columns(input, input.getWidth())));
+                            bind(button, "DOWN", () -> navigate(index + ((SegmentLayout)input.getLayout()).columns(input, input.getWidth())));
                             bind(button, "HOME", () -> navigate(0)); bind(button, "END", () -> navigate(options.size() - 1));
                             input.add(button);
                         }
@@ -269,6 +273,60 @@ final class Choices {
             var g = (Graphics2D)graphics.create(); try { ThemePainting.rounded(g, this, context, ThemePainting.color(context, SemanticColor.SURFACE_CONTROL), ThemePainting.color(context, SemanticColor.BORDER_CONTROL), focus != null && focus.visible(), false); super.paintComponent(g); } finally { g.dispose(); }
         }
     }
+    /** Propagates the segmented track's width-dependent height through its labelled control wrapper. */
+    static final class SegmentColumn extends BorderLayout implements Composition.WidthLayout {
+        @Override public int height(Container parent, int width) {
+            Insets insets = parent.getInsets();
+            int height = insets.top + insets.bottom, count = 0;
+            for (Component child : parent.getComponents()) if (child.isVisible()) {
+                height += Composition.height(child, Math.max(0, width - insets.left - insets.right));
+                if (count++ > 0) height += getVgap();
+            }
+            return height;
+        }
+    }
+
+    /** Equal-width segments use another row before any option's distinguishing label is clipped. */
+    static final class SegmentLayout implements Composition.WidthLayout {
+        private Dimension cell(Container parent) {
+            int width = 0, height = 0;
+            for (Component child : parent.getComponents()) {
+                Dimension size = child.getPreferredSize();
+                width = Math.max(width, size.width); height = Math.max(height, size.height);
+            }
+            return new Dimension(width, height);
+        }
+        int columns(Container parent, int width) {
+            Insets insets = parent.getInsets();
+            return Math.max(1, Math.min(parent.getComponentCount(), Math.max(0, width - insets.left - insets.right) / Math.max(1, cell(parent).width)));
+        }
+        @Override public int height(Container parent, int width) {
+            Insets insets = parent.getInsets();
+            int columns = columns(parent, width);
+            return insets.top + insets.bottom + ((parent.getComponentCount() + columns - 1) / columns) * cell(parent).height;
+        }
+        @Override public Dimension preferredLayoutSize(Container parent) {
+            Insets insets = parent.getInsets(); Dimension cell = cell(parent);
+            return new Dimension(insets.left + insets.right + parent.getComponentCount() * cell.width, insets.top + insets.bottom + cell.height);
+        }
+        @Override public void layoutContainer(Container parent) {
+            Insets insets = parent.getInsets(); int columns = columns(parent, parent.getWidth());
+            if (columns == parent.getComponentCount()) {
+                new GridLayout(1, columns, 0, 0).layoutContainer(parent);
+                return;
+            }
+            int rows = Math.max(1, (parent.getComponentCount() + columns - 1) / columns);
+            int width = Math.max(0, parent.getWidth() - insets.left - insets.right);
+            int height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);
+            for (int index = 0; index < parent.getComponentCount(); index++) {
+                int column = index % columns, row = index / columns;
+                int left = column * width / columns, right = (column + 1) * width / columns;
+                int top = row * height / rows, bottom = (row + 1) * height / rows;
+                parent.getComponent(index).setBounds(insets.left + left, insets.top + top, right - left, bottom - top);
+            }
+        }
+    }
+
     static final class SegmentTrack extends JPanel {
         final KitContext context;
         SegmentTrack(KitContext context) { this.context = context; setOpaque(false); int pad = ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_PADDING); setBorder(new EmptyBorder(pad, pad, pad, pad)); }

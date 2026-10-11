@@ -13,12 +13,13 @@ final class PlatformFontSize implements ValueEditor<Float> {
     PlatformFontSize(){var kind=(SettingKind.NumberRange)UI_FONT_SIZE.kind();number=new Editors.NumberField<>("Font size",new Nodes.Numeric(kind.min(),kind.max(),.5,2),"pt",Float::valueOf,Nodes.FieldPresentation.STEPPER);number.show(UI_FONT_SIZE.example().orElse(13f));}
     @Override public boolean fullSpan(){return true;}
     @Override public boolean cardRows(){return true;}
-    @Override public Nodes.Node node(String id,ControlState state){
+    @Override public Nodes.Node node(String id, ControlState state) { return node(id, state, false); }
+    @Override public Nodes.Node node(String id, ControlState state, boolean highlighted) {
         var toggle=new Nodes.Toggle(id+":default",state,"Use platform size",inherited,id+":default",true);
         var reset=new Nodes.Button(id+":reset",new ControlState(!inherited,state.enabled(),false,""),"","refresh",Nodes.ButtonKind.GHOST,id+":reset","Reset interface font size to platform default");
         var control=new Nodes.Stack(id+":toggle-controls",state,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(toggle,reset));
         var manual=new ControlState(!inherited,state.enabled(),state.busy(),state.error());
-        return new Nodes.Stack(id+":optional",state,Nodes.LayoutRole.VERTICAL,List.of(new Nodes.SettingRow("row:"+id,state,"Use platform font size","",control,false,false),new Nodes.SettingRow(id+":manual-row",manual,"Font size","",number.node(id,manual),true,false)));
+        return new Nodes.Stack(id+":optional",state,Nodes.LayoutRole.VERTICAL,List.of(new Nodes.SettingRow("row:"+id,state,"Use platform font size","",control,false,highlighted),new Nodes.SettingRow(id+":manual-row",manual,"Font size","",number.node(id,manual),true,highlighted)));
     }
     @Override public Float value(){return inherited?UI_FONT_SIZE.defaultValue():number.value();}
     @Override public void show(Float value){inherited=value.equals(UI_FONT_SIZE.defaultValue());if(!inherited)number.show(value);}

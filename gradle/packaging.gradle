@@ -302,6 +302,9 @@ def packageApp = tasks.register('packageApp') {
                 Files.copy(new File(inputDirectory.get().asFile, 'libjasper-glass.dylib').toPath(),
                     new File(image, 'Contents/app/libjasper-glass.dylib').toPath(),
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                Files.copy(new File(inputDirectory.get().asFile, 'libjasper-appearance.dylib').toPath(),
+                    new File(image, 'Contents/app/libjasper-appearance.dylib').toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING)
                 resignImage(image)
             } else if (context.host.os == 'linux') {
                 removePluginClasspath(new File(imageDir, 'Jasper/lib/app/Jasper.cfg'))
@@ -456,7 +459,7 @@ def verifyPackage = tasks.register('verifyPackage') {
         }
         if (context.host.os == 'macos') {
             // Jasper's own signed bridges, staged and restored byte for byte by packageApp: the macOS bridge
-            // (notifications and the Dock presence) and the workspace glass blur.
+            // (notifications and the Dock presence), workspace glass blur and system appearance observation.
             String expectedBridgeArchitecture = context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64'
             [
                 [label: 'native', name: 'libjasper-macos.dylib', symbols: ['Java_dev_jasper_app_platform_MacNotifications_bind',
@@ -464,6 +467,8 @@ def verifyPackage = tasks.register('verifyPackage') {
                     'Java_dev_jasper_app_platform_MacNotifications_removeAll', 'Java_dev_jasper_app_platform_MacDock_setRegular',
                     'Java_dev_jasper_app_platform_MacDock_watchPowerOff', 'Java_dev_jasper_app_platform_MacDock_poweringOffNow']],
                 [label: 'glass', name: 'libjasper-glass.dylib', symbols: ['Java_dev_jasper_app_platform_MacGlass_setEffect']],
+                [label: 'appearance', name: 'libjasper-appearance.dylib', symbols: ['Java_dev_jasper_app_platform_MacAppearance_watch',
+                    'Java_dev_jasper_app_platform_MacAppearance_unwatch']],
             ].each { Map bridge ->
                 File library = new File(appDir, bridge.name as String)
                 if (!library.isFile()) throw new GradleException("Package verification failed: ${bridge.label} bridge missing")

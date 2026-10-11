@@ -71,6 +71,50 @@ class SettingsControlsTest {
             assertThat(renderer.labelWidth(148)).isGreaterThanOrEqualTo(renderer.getFontMetrics(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.BODY)).stringWidth(option.label()));
         }finally{context.binding().close();context.icons().close();}
     }); }
+    @Test void segmentedChoicesReflowWithoutReplacingButtonsOrLosingKeyboardSelection() { Edt.run(() -> {
+        var options = List.of(new Option("both", "Icons & Labels", Optional.empty()), new Option("icons", "Icons Only", Optional.empty()), new Option("none", "Hidden", Optional.empty()));
+        var choice = new Nodes.Choice("toolbar", ControlState.READY, Nodes.ChoiceKind.SEGMENTED, options, "both", "Toolbar", "");
+        var events = new ArrayList<UiEvent>();
+        try (var view = new KitView(dev.jasper.ui.testsupport.KitFixtures.context(), new ViewSpec(choice), events::add)) {
+            var first = find(view, "toolbar.option.both", JButton.class);
+            view.setSize(600, 200); layout(view); int wideY = first.getY();
+            assertThat(find(view, "toolbar.option.none", JButton.class).getY()).isEqualTo(wideY);
+            view.setSize(180, 250); layout(view);
+            for (String id : List.of("both", "icons", "none")) {
+                var button = find(view, "toolbar.option." + id, JButton.class);
+                assertThat(button.getWidth()).as(id + " complete visible label").isGreaterThanOrEqualTo(button.getPreferredSize().width);
+            }
+            var key = first.getInputMap().get(KeyStroke.getKeyStroke("RIGHT"));
+            first.getActionMap().get(key).actionPerformed(new java.awt.event.ActionEvent(first, 0, ""));
+            assertThat(events).contains(new UiEvent.Selected("toolbar", Set.of("icons")));
+            view.update(new ViewSpec(new Nodes.Choice("toolbar", ControlState.READY, Nodes.ChoiceKind.SEGMENTED, options, "icons", "Toolbar", "")));
+            assertThat(find(view, "toolbar.option.both", JButton.class)).isSameAs(first);
+            assertThat(find(view, "toolbar.option.icons", JButton.class).isSelected()).isTrue();
+            float priorScale = com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
+            try {
+                for (float scale : new float[]{1.5f, 1f}) {
+                    var setter = com.formdev.flatlaf.util.UIScale.class.getDeclaredMethod("setUserScaleFactor", float.class, boolean.class);
+                    setter.setAccessible(true); setter.invoke(null, scale, false);
+                    view.update(new ViewSpec(choice));
+                    view.setSize(com.formdev.flatlaf.util.UIScale.scale(180), 400); layout(view);
+                    assertThat(find(view, "toolbar.option.both", JButton.class)).isSameAs(first);
+                    for (String id : List.of("both", "icons", "none")) {
+                        var button = find(view, "toolbar.option." + id, JButton.class);
+                        assertThat(button.getWidth()).isGreaterThanOrEqualTo(button.getPreferredSize().width);
+                    }
+                }
+            } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+            finally {
+                try {
+                    var setter = com.formdev.flatlaf.util.UIScale.class.getDeclaredMethod("setUserScaleFactor", float.class, boolean.class);
+                    setter.setAccessible(true); setter.invoke(null, priorScale, false);
+                } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+            }
+            view.update(new ViewSpec(choice)); view.setSize(600, 200); layout(view);
+            assertThat(find(view, "toolbar.option.none", JButton.class).getY()).isEqualTo(first.getY());
+        }
+    }); }
+
     private static void layout(java.awt.Container parent){parent.doLayout();for(var child:parent.getComponents())if(child instanceof java.awt.Container container)layout(container);}
     static <T extends java.awt.Component> T find(java.awt.Component c, String name, Class<T> type) {
         if (name.equals(c.getName()) && type.isInstance(c)) return type.cast(c);

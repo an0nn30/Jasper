@@ -225,9 +225,14 @@ public final class SettingsDialog {
         view.breadcrumb(breadcrumb(page));
         view.tree.select(page.id());
         view.tree();
-        page.highlight(query);
+        highlight(page);
         page.selected();
         refreshNow();
+    }
+
+    private void highlight(SettingsPage page) {
+        String search = query;
+        view.highlight(() -> page.highlight(search), !search.isBlank());
     }
 
     private String breadcrumb(SettingsPage page) {
@@ -260,7 +265,7 @@ public final class SettingsDialog {
             if (current != null) view.tree.select(current);
             view.tree();
         }
-        page(current).ifPresent(page -> page.highlight(query));
+        page(current).ifPresent(this::highlight);
     }
 
     private boolean modified() { return draft.modified() || pages.stream().anyMatch(SettingsPage::modified); }

@@ -174,15 +174,29 @@ final class SettingsView extends JPanel implements AutoCloseable {
     String query() { return query; }
 
     private final java.util.Map<Component,java.awt.Point> scrollPositions = new java.util.IdentityHashMap<>();
-    private long pageGeneration;
+    private long pageGeneration, revealGeneration;
     void page(JComponent content) {
         Component before=body.getViewport().getView();if(before==content)return;
         if(before!=null)scrollPositions.put(before,body.getViewport().getViewPosition());
+        ++revealGeneration;
         long generation=++pageGeneration;
         body.setViewportView(content);body.getViewport().setOpaque(false);
         var position=scrollPositions.getOrDefault(content,new java.awt.Point());
         body.getViewport().setViewPosition(position);
         SwingUtilities.invokeLater(()->{if(generation==pageGeneration&&body.getViewport().getView()==content)body.getViewport().setViewPosition(position);});
+    }
+
+    /** Search owns the final scroll position; ordinary page navigation keeps its remembered position. */
+    void highlight(Runnable action, boolean revealing) {
+        long generation = ++revealGeneration;
+        if (revealing) ++pageGeneration;
+        action.run();
+        if (revealing) {
+            Component content = body.getViewport().getView();
+            SwingUtilities.invokeLater(() -> {
+                if (generation == revealGeneration && body.getViewport().getView() == content) action.run();
+            });
+        }
     }
 
     /** The mounted kit control named {@code id} in any of the shell's views; for tests and previews. */
@@ -204,7 +218,7 @@ final class SettingsView extends JPanel implements AutoCloseable {
     }
 
     @Override public void close() {
-        pageGeneration++;scrollPositions.clear();
+        ++pageGeneration; ++revealGeneration; scrollPositions.clear();
         shell.close();
         for (var view : List.of(search, navigation, header, banner, footer)) view.close();
     }

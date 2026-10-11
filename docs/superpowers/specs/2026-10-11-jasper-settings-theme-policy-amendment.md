@@ -25,3 +25,11 @@ Packaged and development/installDist routes must support observation without wea
 ## Verification
 
 Use real SettingsDialog/page owners and synthetic registries/config. Compare the three untouched reference crops at equal device scale with ICC treatment retained; capture default/light/custom/enlarged/narrow/short/popup/error states. Check affected established families after shared changes. Preserve raw full-gate XML and frozen input hashes immediately after check/installDist/themeSurfacePreview/gallery2x; record independent review and remaining native debt separately.
+
+## Task9a review corrections
+
+A modified theme selection retains its complete name/origin/follow-system tuple through external rebase and save expectations, including companions that originally matched the baseline. The tuple becomes clean only when all requested saved values match; an unchanged selection stays clean. Coupled reset protects absent values in the same way. Other settings retain independent per-key semantics. Import remains install/reload only.
+
+Full-span editors expose stable reveal targets and propagate search highlighting to their actual rows, including empty notification registries. Explicit search reveal supersedes pending page-position restoration after layout, while ordinary Back/Forward preserves remembered positions and retained editors. Shared segmented choices add rows when their full labels cannot fit the available width, preserving button identity and keyboard selection; ordinary single-row allocation remains unchanged.
+
+The package restores the signed appearance bridge from staging after jpackage, then verifies byte equality, architecture, signature and both JNI entry points alongside the existing bridges. Headless package verification does not establish live observation.

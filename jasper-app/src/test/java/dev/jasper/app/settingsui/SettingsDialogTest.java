@@ -75,6 +75,96 @@ class SettingsDialogTest {
         }, hooks());
     }
 
+    @Test void fullSpanNotificationSearchRevealsAndHighlightsPopulatedAndEmptyGroups() throws Exception {
+        for (boolean populated : List.of(false, true)) {
+            var groups = new NotificationGroupChoices(() -> populated
+                ? List.of(new NotificationGroupChoices.Group("configuration", "Configuration", "Jasper", "sticky")) : List.of());
+            var dialog = new SettingsDialog(windows, context -> CorePages.pages(ThemeChoices.of(List::of),
+                new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false), ShellChoices.NONE,
+                groups, new CorePages.Pages(page -> fake, page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page), page -> List.of())).apply(context), hooks());
+            try {
+                edt(() -> {
+                    dialog.open(null, "window");
+                    dialog.search("notification groups");
+                    assertThat(dialog.currentPage()).isEqualTo("notifications");
+                    assertThat(button(dialog, "back").isEnabled()).isTrue();
+                    assertThat(button(dialog, "ok").isEnabled()).isTrue();
+                    String target = populated ? "notifications.groups:row-0" : "notifications.groups:empty-row";
+                    var row = KitTestSupport.require(page(dialog), target, javax.swing.JComponent.class);
+                    assertThat(row.getAccessibleContext().getAccessibleDescription()).isEqualTo("Matches search");
+                    dialog.search("sticky");
+                    assertThat(row.getAccessibleContext().getAccessibleDescription()).isEqualTo("Matches search");
+                    dialog.search("");
+                    assertThat(row.getAccessibleContext().getAccessibleDescription()).isNotEqualTo("Matches search");
+                });
+            } finally { edt(dialog::cancel); }
+        }
+    }
+
+    @Test void fullSpanAppearanceSearchHighlightsTheRetainedCompoundRows() throws Exception {
+        var dialog = dialog();
+        try {
+            edt(() -> {
+                dialog.open(null, "appearance");
+                for (var entry : java.util.Map.of("opacity", "row:ui.workspace.opacity", "platform font size", "row:ui.font.size", "theme", "row:ui.theme.name").entrySet()) {
+                    var row = KitTestSupport.require(page(dialog), entry.getValue(), javax.swing.JComponent.class);
+                    dialog.search(entry.getKey());
+                    assertThat(KitTestSupport.require(page(dialog), entry.getValue(), javax.swing.JComponent.class)).isSameAs(row);
+                    assertThat(row.getAccessibleContext().getAccessibleDescription()).isEqualTo("Matches search");
+                    dialog.search("");
+                    assertThat(row.getAccessibleContext().getAccessibleDescription()).isNotEqualTo("Matches search");
+                }
+            });
+        } finally { edt(dialog::cancel); }
+    }
+
+    @Test void explicitSearchRevealWinsOverDeferredRememberedPageScroll() throws Exception {
+        var dialog = dialog();
+        try {
+            edt(() -> {
+                dialog.open(null, "appearance"); dialog.view().setSize(980, 330); KitTestSupport.layout(dialog.view());
+                dialog.view().body.getViewport().setViewPosition(new java.awt.Point(0, 0));
+                dialog.select("window"); KitTestSupport.layout(dialog.view());
+                dialog.search("opacity"); KitTestSupport.layout(dialog.view());
+            });
+            edt(() -> {});
+            edt(() -> {
+                var row = KitTestSupport.require(page(dialog), "row:ui.workspace.opacity", javax.swing.JComponent.class);
+                var bounds = javax.swing.SwingUtilities.convertRectangle(row.getParent(), row.getBounds(), page(dialog));
+                assertThat(dialog.view().body.getViewport().getViewRect().intersects(bounds)).as("search target remains visible after pending page restoration").isTrue();
+                assertThat(dialog.view().body.getViewport().getViewPosition().y).isGreaterThan(0);
+            });
+        } finally { edt(dialog::cancel); }
+    }
+
+    @Test void narrowEnlargedToolbarModesKeepTheirFullVisibleMeaning() throws Exception {
+        edt(() -> {
+            try (var themes = new dev.jasper.app.appearance.ThemeController()) {
+                themes.configure(dev.jasper.app.appearance.Theme.DARK, new dev.jasper.app.config.UiFontConfig("system", 20));
+                var dialog = new SettingsDialog(windows, CorePages.pages(ThemeChoices.of(List::of),
+                    new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false), page -> fake,
+                    page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)),
+                    new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> {}),
+                        () -> {}, () -> {}, uri -> {}, (parent, count) -> true, () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME)));
+                try {
+                    dialog.open(null, "window"); dialog.view().setSize(640, 681);
+                    for (int i = 0; i < 4; i++) KitTestSupport.layout(dialog.view());
+                    for (String id : List.of("icons_and_labels", "icons", "hidden")) {
+                        var button = KitTestSupport.require(page(dialog), "window.toolbar.option." + id, javax.swing.JButton.class);
+                        var inset = button.getInsets();
+                        String painted = javax.swing.SwingUtilities.layoutCompoundLabel(button, button.getFontMetrics(button.getFont()), button.getText(), button.getIcon(),
+                            javax.swing.SwingConstants.CENTER, button.getHorizontalAlignment(), javax.swing.SwingConstants.CENTER, javax.swing.SwingConstants.RIGHT,
+                            new Rectangle(inset.left, inset.top, button.getWidth() - inset.left - inset.right, button.getHeight() - inset.top - inset.bottom), new Rectangle(), new Rectangle(), button.getIconTextGap());
+                        assertThat(painted).as(id + " painted meaning").isEqualTo(button.getText());
+                    }
+                } finally {
+                    dialog.cancel();
+                    themes.configure(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults());
+                }
+            }
+        });
+    }
+
     @Test void returningToAPageRestoresScrollAndRetainsTheEditedDocument() throws Exception {
         var dialog=dialog();final Object[] document={null};final java.awt.Point[] position={null};
         try{
@@ -538,6 +628,57 @@ class SettingsDialogTest {
                 dialog.cancel();
             } finally { bindings[0].close(); }
         });
+    }
+
+    @Test void retainedThemeSelectionsApplyAndReopenAfterExternalTupleChanges(@org.junit.jupiter.api.io.TempDir Path home) throws Exception {
+        var palette = new dev.jasper.ui.model.Option.Palette(1, 2, 3, 4, 5);
+        var sources = List.of(
+            new ThemeChoices.Source("Custom Night", dev.jasper.app.config.ThemeSource.CATALOG, true, palette, 90, true),
+            new ThemeChoices.Source("Nord", dev.jasper.app.config.ThemeSource.CATALOG, false, palette, 90, true),
+            new ThemeChoices.Source("Jasper Dark", dev.jasper.app.config.ThemeSource.BUNDLED, true, palette, 90, true),
+            new ThemeChoices.Source("Jasper Light", dev.jasper.app.config.ThemeSource.BUNDLED, false, palette, 100, false));
+        var themes = new ThemeChoices(() -> sources.stream().map(ThemeChoices.Source::name).toList(), ignored -> new ThemeChoices.Import(() -> {}, () -> {}), () -> sources, () -> Optional.of(false), ignored -> new Subscription(() -> {}));
+        for (String action : List.of("named", "dark", "light", "reset")) {
+            Path file = home.resolve(action + ".toml");
+            java.nio.file.Files.writeString(file, "[ui.theme]\nname='Nord'\nsource='catalog'\nfollow_system=true");
+            try (var service = new ConfigService(file, false)) {
+                var current = new ConfigService.State[]{service.initialState()};
+                var external = new ArrayList<Consumer<ConfigService.State>>();
+                var dialog = new SettingsDialog(windows, CorePages.pages(themes,
+                    new CorePages.SystemActions(() -> file, () -> {}, () -> {}, () -> {}, () -> {}, () -> false), page -> fake,
+                    page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)),
+                    new SettingsDialog.Hooks(edit -> service.save(edit).thenApply(next -> current[0] = next), () -> current[0], listener -> { external.add(listener); return new Subscription(() -> external.remove(listener)); },
+                        () -> {}, () -> {}, uri -> {}, (parent, count) -> true, KitTestSupport::context));
+                var wanted = new Object[3];
+                var pending = new SettingsEdit[1];
+                try {
+                    edt(() -> {
+                        dialog.open(null, "appearance");
+                        if (action.equals("named")) KitTestSupport.require(page(dialog), "ui.theme.name.input", javax.swing.JComboBox.class).setSelectedIndex(0);
+                        else if (!action.equals("reset")) KitTestSupport.require(page(dialog), "ui.theme.name:policy.option." + action, javax.swing.JButton.class).doClick(0);
+                        else {
+                            var menu = KitTestSupport.require(page(dialog), "ui.theme.name:actions", javax.swing.JComponent.class).getComponentPopupMenu();
+                            java.util.Arrays.stream(menu.getComponents()).filter(javax.swing.JMenuItem.class::isInstance).map(javax.swing.JMenuItem.class::cast).filter(item -> item.getText().equals("Reset to defaults")).findFirst().orElseThrow().doClick(0);
+                        }
+                        wanted[0] = dialog.draft().value(CoreSettings.UI_THEME_NAME); wanted[1] = dialog.draft().value(CoreSettings.UI_THEME_SOURCE); wanted[2] = dialog.draft().value(CoreSettings.UI_THEME_FOLLOW_SYSTEM);
+                        assertThat(dialog.draft().modified()).isTrue();
+                        pending[0] = dialog.draft().edit();
+                    });
+                    java.nio.file.Files.writeString(file, "[ui.theme]\nname='Nord'\nsource='bundled'\nfollow_system=true");
+                    assertThatThrownBy(() -> service.save(pending[0]).get(5, java.util.concurrent.TimeUnit.SECONDS)).hasRootCauseMessage("ui.theme.source changed on disk. Review the new value and try again.");
+                    java.nio.file.Files.writeString(file, "[ui.theme]\nname='Jasper Dark'\nsource='bundled'\nfollow_system=true");
+                    current[0] = service.reload().get(5, java.util.concurrent.TimeUnit.SECONDS);
+                    edt(() -> { List.copyOf(external).forEach(listener -> listener.accept(current[0])); dialog.apply(); });
+                    until(() -> !dialog.draft().modified());
+                    edt(() -> {
+                        dialog.cancel(); dialog.open(null, "appearance");
+                        assertThat(dialog.draft().value(CoreSettings.UI_THEME_NAME)).as(action).isEqualTo(wanted[0]);
+                        assertThat(dialog.draft().value(CoreSettings.UI_THEME_SOURCE)).as(action).isEqualTo(wanted[1]);
+                        assertThat(dialog.draft().value(CoreSettings.UI_THEME_FOLLOW_SYSTEM)).as(action).isEqualTo(wanted[2]);
+                    });
+                } finally { edt(dialog::cancel); }
+            }
+        }
     }
 
     @Test void cancelLeavesConfigBytesUntouchedWhileApplyWritesThem(@org.junit.jupiter.api.io.TempDir Path home) throws Exception {

@@ -254,7 +254,7 @@ public final class SchemaPage implements SettingsPage {
         var state = new ControlState(true, enabled, false, row.error);
         var reset = new Nodes.Button(row.resetId(), new ControlState(row.resettable, true, false, ""), "", "refresh",
             Nodes.ButtonKind.GHOST, row.resetId(), "Reset " + row.setting.label() + " to default");
-        if (row.editor.fullSpan()) return row.editor.node(row.id(), state);
+        if (row.editor.fullSpan()) return row.editor.node(row.id(), state, row.highlighted);
         var control = new Nodes.Stack(row.id() + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(row.editor.node(row.id(), state), reset));
         return new Nodes.SettingRow(row.rowId(), ControlState.READY, row.editor.rowLabel(row.setting.label()), row.comment, control, row.editor.dependent(), row.highlighted);
     }
@@ -380,7 +380,7 @@ public final class SchemaPage implements SettingsPage {
             if (row.highlighted && first == null) first = row;
         }
         render();
-        if (first != null && view != null && !view.isClosed()) view.reveal(first.rowId());
+        if (first != null && view != null && !view.isClosed()) view.reveal(first.editor.fullSpan() ? first.editor.revealTarget(first.id()) : first.rowId());
     }
 
     @Override public void refresh() {

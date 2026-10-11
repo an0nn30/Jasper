@@ -22,15 +22,16 @@ final class WorkspaceEditors {
         private float effective(){return value==UI_WORKSPACE_OPACITY.defaultValue()?source(choices,draft).map(ThemeChoices.Source::opacity).orElse(100f):value;}
         @Override public boolean fullSpan(){return true;}
         @Override public boolean cardRows(){return true;}
-        @Override public Nodes.Node node(String id,ControlState state){
+        @Override public Nodes.Node node(String id, ControlState state) { return node(id, state, false); }
+        @Override public Nodes.Node node(String id, ControlState state, boolean highlighted) {
             boolean inherited=value==UI_WORKSPACE_OPACITY.defaultValue();
             var toggle=new Nodes.Toggle(id+":default",state,"Use theme's opacity",inherited,id+":default",true);
             var slider=new Nodes.Field(id,new ControlState(state.visible(),state.enabled()&&!inherited,state.busy(),state.error()),Nodes.FieldKind.NUMBER,Editors.NumberField.format(effective(),0),"%","Workspace opacity","",Optional.of(new Nodes.Numeric(10,100,1,0)),Nodes.FieldPresentation.SLIDER);
             var reset=new Nodes.Button(id+":reset",new ControlState(!inherited,state.enabled(),false,""),"","refresh",Nodes.ButtonKind.GHOST,id+":reset","Reset workspace opacity to theme value");
             var blank=new Nodes.Button(id+":reserved",new ControlState(false,false,false,""),"","refresh",Nodes.ButtonKind.GHOST,id+":reserved","Reserved reset space");
             return new Nodes.Stack(id+":optional",state,Nodes.LayoutRole.VERTICAL,List.of(
-                new Nodes.SettingRow(id+":inheritance-row",state,"Use theme's opacity","",new Nodes.Stack(id+":inheritance-controls",state,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(toggle,blank)),false,false),
-                new Nodes.SettingRow("row:"+id,state,"Opacity","",new Nodes.Stack(id+":slider-controls",state,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(slider,reset)),true,false)));
+                new Nodes.SettingRow(id+":inheritance-row",state,"Use theme's opacity","",new Nodes.Stack(id+":inheritance-controls",state,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(toggle,blank)),false,highlighted),
+                new Nodes.SettingRow("row:"+id,state,"Opacity","",new Nodes.Stack(id+":slider-controls",state,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(slider,reset)),true,highlighted)));
         }
         @Override public Float value(){return value;}
         @Override public void show(Float value){this.value=value;}
