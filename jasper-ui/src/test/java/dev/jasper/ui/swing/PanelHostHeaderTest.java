@@ -69,6 +69,82 @@ class PanelHostHeaderTest {
         return new Color(image.getRGB(icon.getIconWidth() / 2, icon.getIconHeight() / 2), true);
     }
 
+    @Test void rejectedArtworkKeepsEveryPriorActionUsableAndAcceptsLaterReplacement() {
+        Edt.run(() -> {
+            var ctx = KitFixtures.context(); var calls = new ArrayList<String>();
+            try (var view = new KitView(ctx, spec("panel", 6), e -> {})) {
+                var top = new PanelHostHeader.Artwork("owner:glyph", "M2 2 L14 2");
+                var bottom = new PanelHostHeader.Artwork("owner:glyph", "M2 14 L14 14");
+                var invalid = new PanelHostHeader.Artwork("owner:glyph", "invalid path");
+                var original = new PanelHostHeader("Original", false, List.of(
+                    new PanelHostHeader.Action("First", ARTWORK, () -> calls.add("first"), top),
+                    new PanelHostHeader.Action("Second", ARTWORK, () -> calls.add("second"), bottom)));
+                view.setPanelHostHeader("panel", original);
+                var control = (PanelHeaders.HeaderControl)view.control("panel-header");
+                var firstRegistry = control.contributed.get(0).hostArtwork.icons;
+                var secondRegistry = control.contributed.get(1).hostArtwork.icons;
+                var first = named(view, "First"); var second = named(view, "Second");
+                var firstIcon = first.getIcon(); var secondIcon = second.getIcon();
+                for (int rejectedIndex : new int[] {1, 0}) {
+                    var rejected = new PanelHostHeader("Rejected", true, List.of(
+                        new PanelHostHeader.Action("Changed first", ARTWORK, () -> calls.add("bad-first"), rejectedIndex == 0 ? invalid : bottom),
+                        new PanelHostHeader.Action("Changed second", ARTWORK, () -> calls.add("bad-second"), rejectedIndex == 1 ? invalid : top)));
+                    assertThatIllegalArgumentException().isThrownBy(() -> view.setPanelHostHeader("panel", rejected));
+                    assertThat(named(view, "First")).as("a rejected later action cannot update a prefix").isSameAs(first);
+                    assertThat(named(view, "Second")).isSameAs(second);
+                    assertThat(first.getIcon()).isSameAs(firstIcon); assertThat(second.getIcon()).isSameAs(secondIcon);
+                    assertThat(detail(view, "panel").getText()).isEqualTo("Original");
+                    assertThat(firstRegistry.names()).contains("owner:glyph");
+                    assertThat(secondRegistry.names()).contains("owner:glyph");
+                    first.doClick(0); second.doClick(0);
+                }
+                assertThat(calls).containsExactly("first", "second", "first", "second");
+                view.setPanelHostHeader("panel", new PanelHostHeader("Recovered", false, List.of(
+                    new PanelHostHeader.Action("First", ARTWORK, () -> calls.add("replacement"), bottom),
+                    new PanelHostHeader.Action("Raw", ARTWORK, () -> calls.add("raw")))));
+                assertThat(named(view, "First")).isSameAs(first); assertThat(named(view, "Raw")).isSameAs(second);
+                assertThatIllegalStateException().isThrownBy(firstRegistry::names);
+                assertThatIllegalStateException().isThrownBy(secondRegistry::names);
+                var recoveredRegistry = control.contributed.get(0).hostArtwork.icons;
+                ctx.binding().publish(new ThemePair(KitFixtures.light(), KitFixtures.light()));
+                assertThat(iconImage(first.getIcon()).getRGB(s(8), s(2)) >>> 24).isZero();
+                assertThat(iconImage(first.getIcon()).getRGB(s(8), s(16)) >>> 24).isPositive();
+                assertThat(second.getIcon()).isSameAs(ARTWORK);
+                first.doClick(0); second.doClick(0);
+                assertThat(calls).containsExactly("first", "second", "first", "second", "replacement", "raw");
+                view.setPanelHostHeader("panel", PanelHostHeader.EMPTY);
+                assertThatIllegalStateException().isThrownBy(recoveredRegistry::names);
+                assertThat(first.getActionListeners()).isEmpty(); assertThat(second.getActionListeners()).isEmpty();
+                first.doClick(0); assertThat(calls).hasSize(6);
+            } finally { release(ctx); }
+        });
+    }
+
+    @Test void rejectedInitialArtworkDoesNotRetainUnmountedControlsAndCanRecover() {
+        Edt.run(() -> {
+            var ctx = KitFixtures.context(); var calls = new ArrayList<String>();
+            var view = new KitView(ctx, spec("panel", 6), e -> {});
+            try {
+                var header = (PanelHeaders.HeaderControl)view.control("panel-header");
+                for (var invalid : List.of(new PanelHostHeader.Artwork("owner:glyph", "invalid path"),
+                        new PanelHostHeader.Artwork("missing-canonical", null))) {
+                    assertThatIllegalArgumentException().isThrownBy(() -> view.setPanelHostHeader("panel", new PanelHostHeader("Bad", false,
+                        List.of(new PanelHostHeader.Action("Bad", ARTWORK, () -> calls.add("bad"), invalid)))));
+                    assertThat(header.contributed).as("rejection cannot publish or retain an unmounted control").isEmpty();
+                    assertThat(header.hostHeader).isEqualTo(PanelHostHeader.EMPTY);
+                }
+                view.setPanelHostHeader("panel", new PanelHostHeader("Valid", false, List.of(
+                    new PanelHostHeader.Action("Valid", ARTWORK, () -> calls.add("valid"), new PanelHostHeader.Artwork("owner:glyph", "M2 2 L14 2")))));
+                var button = named(view, "Valid"); button.doClick(0); assertThat(calls).containsExactly("valid");
+                var registry = header.contributed.getFirst().hostArtwork.icons;
+                ctx.binding().publish(new ThemePair(KitFixtures.light(), KitFixtures.light()));
+                assertThat(named(view, "Valid")).isSameAs(button);
+                view.close(); assertThat(button.getActionListeners()).isEmpty();
+                assertThatIllegalStateException().isThrownBy(registry::names);
+            } finally { view.close(); release(ctx); }
+        });
+    }
+
     @Test void semanticArtworkRefreshesTintAndPathWhileRawMulticolorArtworkStaysUntouched() {
         Edt.run(() -> {
             var ctx=KitFixtures.context();var calls=new ArrayList<String>();

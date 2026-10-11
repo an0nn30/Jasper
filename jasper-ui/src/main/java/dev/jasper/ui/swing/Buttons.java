@@ -13,21 +13,43 @@ import javax.swing.border.EmptyBorder;
 /** Five button treatments sharing semantics, content fitting and owned action/focus listeners. */
 final class Buttons {
     private Buttons() {}
+    /** One fully validated host-artwork snapshot; its registry is retired only after a successful header commit. */
+    static final class HostArtwork implements AutoCloseable {
+        final javax.swing.Icon raw;
+        final PanelHostHeader.Artwork semantic;
+        final dev.jasper.ui.icons.IconRegistry icons;
+        private boolean closed;
+        private HostArtwork(javax.swing.Icon raw, PanelHostHeader.Artwork semantic, dev.jasper.ui.icons.IconRegistry icons) {
+            this.raw = raw; this.semantic = semantic; this.icons = icons;
+        }
+        static HostArtwork prepare(KitContext context, PanelHostHeader.Action action) {
+            if (action.artwork() == null) return new HostArtwork(action.icon(), null, null);
+            var icons = new dev.jasper.ui.icons.IconRegistry();
+            var snapshot = new HostArtwork(action.icon(), action.artwork(), icons);
+            try {
+                if (action.artwork().pathData() != null) icons.register(action.artwork().name(), action.artwork().pathData());
+                snapshot.icon(context, SemanticColor.HUE_NEUTRAL);
+                return snapshot;
+            } catch (Throwable failure) { snapshot.close(); throw failure; }
+        }
+        javax.swing.Icon icon(KitContext context, SemanticColor tint) {
+            return semantic == null ? raw : icons.panel(semantic.name(), context.theme().semantic(), tint,
+                ThemePainting.metric(context, DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH));
+        }
+        @Override public void close() { if (!closed) { closed = true; if (icons != null) icons.close(); } }
+    }
     static final class ButtonControl extends ControlRegistry.Control {
         final KitButton button;
-        /** Host-supplied artwork shown instead of the node's named icon (borrowed panel headers only); null for named icons. */
-        javax.swing.Icon artwork;
-        PanelHostHeader.Artwork semanticArtwork;
-        private final dev.jasper.ui.icons.IconRegistry contributedIcons = new dev.jasper.ui.icons.IconRegistry();
-        private dev.jasper.ui.icons.IconRegistration contributedRegistration;
-        private PanelHostHeader.Artwork registeredArtwork;
+        /** Validated borrowed host artwork; null for ordinary named icons. */
+        HostArtwork hostArtwork;
         ButtonControl(KitView view, Nodes.Button node) {
             this(view, node, view::dispatch);
         }
         ButtonControl(KitView view, Nodes.Button node, java.util.function.Consumer<UiEvent> events) { this(view, node, events, null); }
         ButtonControl(KitView view, Nodes.Button node, java.util.function.Consumer<UiEvent> events, javax.swing.Icon artwork) {
-            super(view, node, new KitButton(view.context())); button = (KitButton)component; this.artwork = artwork;
-            own(contributedIcons::close);
+            super(view, node, new KitButton(view.context())); button = (KitButton)component;
+            hostArtwork = artwork == null ? null : new HostArtwork(artwork, null, null);
+            own(() -> { if (hostArtwork != null) hostArtwork.close(); });
             button.putClientProperty("html.disable", true);
             button.setOpaque(false); button.setContentAreaFilled(false); button.setBorderPainted(false); button.setFocusPainted(false);
             button.setRolloverEnabled(true); button.setHorizontalAlignment(SwingConstants.CENTER);
@@ -47,15 +69,7 @@ final class Buttons {
             boolean embedded = value.presentation() != Nodes.ButtonPresentation.STANDARD;
             button.contextual = value.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
             button.embedded = embedded;
-            if (semanticArtwork != null) {
-                if (!semanticArtwork.equals(registeredArtwork)) {
-                    if (contributedRegistration != null) contributedRegistration.close();
-                    contributedRegistration = semanticArtwork.pathData() == null ? null : contributedIcons.register(semanticArtwork.name(), semanticArtwork.pathData());
-                    registeredArtwork = semanticArtwork;
-                }
-                button.setIcon(contributedIcons.panel(semanticArtwork.name(), context().theme().semantic(), button.iconRole(false), ThemePainting.metric(context(), DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH)));
-                button.putClientProperty("Jasper.button.icon", null);
-            } else if (artwork != null) { button.setIcon(artwork); button.putClientProperty("Jasper.button.icon", null); }
+            if (hostArtwork != null) { button.setIcon(hostArtwork.icon(context(), button.iconRole(false))); button.putClientProperty("Jasper.button.icon", null); }
             else {
                 button.setIcon(value.icon().isEmpty() ? null : context().icons().icon(value.icon(), context().theme().semantic(), button.iconRole(false),
                     UIScale.scale(button.panelDetail && value.label().isEmpty() ? context().metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_GLYPH) : context().icons().size((embedded || button.panel) && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL))));
@@ -165,7 +179,12 @@ final class Buttons {
                     fill = new Color(darkened.getRed(), darkened.getGreen(), darkened.getBlue(), fill.getAlpha());
                 }
                 Color border = toggle && isSelected() ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : embedded ? null : border();
-                ThemePainting.rounded(g, this, context, fill, border, !embedded && focus != null && focus.visible(), false, DesignMetrics.Role.CONTROL_RADIUS, panelDetail ? ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING) : 0);
+                boolean focused = !embedded && focus != null && focus.visible();
+                if (panelDetail) ThemePainting.rounded(g, this, context, fill, border, focused, false,
+                    UIScale.scale((float)context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_ARC)) / 2.0,
+                    ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING),
+                    UIScale.scale((float)context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_BOTTOM_TRIM)));
+                else ThemePainting.rounded(g, this, context, fill, border, focused, false);
                 g.setFont(getFont()); g.setColor(textColor(hover));
                 Insets insets = getInsets(); Rectangle icon = new Rectangle(), text = new Rectangle();
                 String clipped = SwingUtilities.layoutCompoundLabel(this, g.getFontMetrics(), getText(), getIcon(), CENTER, getHorizontalAlignment(), CENTER, RIGHT,

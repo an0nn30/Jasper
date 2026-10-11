@@ -15,7 +15,8 @@ import static org.assertj.core.api.Assertions.*;
 class SessionsCompositionTest {
     @TempDir Path home;
     @Test void actualLockedVaultAndSavedHostsComposeOneHeaderCountAndPersistentIdentity() throws Exception {
-        try(var fixture=new SessionsSurfaceFixture(home,SurfaceFixtures.theme("sessions-calibration"))) {
+        var calibration=SurfaceFixtures.theme("sessions-calibration");
+        try(var fixture=new SessionsSurfaceFixture(home,calibration)) {
             fixture.size(260,395);
             onEdt(()->{
                 assertThat(fixture.component("sessions.search").isVisible()).isFalse();
@@ -29,6 +30,15 @@ class SessionsCompositionTest {
                 assertThat(labels(fixture.view())).contains("Vault locked","amp","ubuntu@100.110.65.45:22");
                 assertThat(bounds(fixture.component("card.identity"),fixture.view()).x).isEqualTo(12);
                 var before=bounds(fixture.component("sessions.footer-surface"),fixture.view());
+                assertThat(before).isEqualTo(new Rectangle(0,308,260,87));
+                assertThat(bounds(fixture.component("card.connect"),fixture.view())).isEqualTo(new Rectangle(174,358,74,28));
+                var shot=fixture.capture(2);
+                int accent=calibration.workspace().semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT).getRGB();
+                int left=500,right=0,top=772,bottom=0;
+                for(int y=720;y<772;y++)for(int x=350;x<500;x++)if(shot.getRGB(x,y)==accent){left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);}
+                assertThat(new Rectangle(left,top,right-left+1,bottom-top+1)).as("exact source2x Connect face; hit/text allocation remains unchanged").isEqualTo(new Rectangle(354,722,136,42));
+                assertThat(shot.getRGB(422,763)).isEqualTo(accent);
+                assertThat(shot.getRGB(422,764)).isNotEqualTo(accent);
                 var list=(JScrollPane)fixture.component("sessions.rows");
                 list.getViewport().setViewPosition(new Point(0,84));
                 assertThat(bounds(fixture.component("sessions.footer-surface"),fixture.view())).isEqualTo(before);

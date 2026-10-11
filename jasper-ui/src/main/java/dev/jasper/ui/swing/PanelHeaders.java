@@ -104,25 +104,46 @@ final class PanelHeaders {
         void hostHeader(PanelHostHeader header) {
             Objects.requireNonNull(header);
             var actions = header.actions();
-            while (contributed.size() > actions.size()) contributed.removeLast().close();
-            for (int i = 0; i < actions.size(); i++) {
-                var action = actions.get(i);
-                var button = new Nodes.Button(node.id() + ".host-header-action-" + i, ControlState.READY, "",
-                        // The node's glyph name is never resolved: the control shows the host's artwork.
+            var snapshots = new ArrayList<Buttons.HostArtwork>();
+            var next = new ArrayList<Buttons.ButtonControl>();
+            var nodes = new ArrayList<Nodes.Button>();
+            var created = new ArrayList<Buttons.ButtonControl>();
+            var previousNodes = contributed.stream().map(c -> c.node).toList();
+            var previousArtwork = contributed.stream().map(c -> c.hostArtwork).toList();
+            try {
+                // Validate every action before changing even the first retained node, artwork or callback.
+                for (var action : actions) snapshots.add(Buttons.HostArtwork.prepare(context(), action));
+                for (int i = 0; i < actions.size(); i++) {
+                    var action = actions.get(i);
+                    var button = new Nodes.Button(node.id() + ".host-header-action-" + i, ControlState.READY, "",
                         "more", Nodes.ButtonKind.GHOST, "host-header-action-" + i, action.label());
-                if (i == contributed.size()) {
-                    int index = i;
-                    contributed.add(new Buttons.ButtonControl(view, button, e -> {
-                        if (interactive() && index < hostHeader.actions().size()) hostHeader.actions().get(index).invoke().run();
-                    }, action.icon()));
-                } else {
-                    var control = contributed.get(i);
-                    control.artwork = action.icon();
-                    control.update(button);
+                    nodes.add(button);
+                    if (i < contributed.size()) next.add(contributed.get(i));
+                    else {
+                        int index = i;
+                        var control = new Buttons.ButtonControl(view, button, e -> {
+                            if (interactive() && index < hostHeader.actions().size()) hostHeader.actions().get(index).invoke().run();
+                        });
+                        created.add(control); next.add(control);
+                    }
                 }
-                contributed.get(i).semanticArtwork = action.artwork();
-                contributed.get(i).refresh();
+                for (int i = 0; i < next.size(); i++) {
+                    next.get(i).hostArtwork = snapshots.get(i);
+                    next.get(i).update(nodes.get(i));
+                }
+            } catch (Throwable failure) {
+                for (int i = 0; i < Math.min(next.size(), contributed.size()); i++) {
+                    var control = contributed.get(i); control.hostArtwork = previousArtwork.get(i);
+                    try { control.update(previousNodes.get(i)); } catch (Throwable rollback) { failure.addSuppressed(rollback); }
+                }
+                created.forEach(ControlRegistry.Control::close);
+                snapshots.forEach(Buttons.HostArtwork::close);
+                throw failure;
             }
+            for (int i = 0; i < Math.min(next.size(), contributed.size()); i++)
+                if (previousArtwork.get(i) != null) previousArtwork.get(i).close();
+            for (int i = next.size(); i < contributed.size(); i++) contributed.get(i).close();
+            contributed.clear(); contributed.addAll(next);
             hostHeader = header;
             mountHost();
             refresh();
