@@ -42,6 +42,43 @@ class TablesTest {
         finally{javax.swing.UIManager.put("defaultFont",old);release(context);}
     });}
 
+    @Test void usableMinimumPreservesLongNumericCellsAcrossTheFeasibilityBoundary() {Edt.run(()->{
+        var context=KitFixtures.context();Object old=javax.swing.UIManager.get("defaultFont");
+        float oldScale=com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
+        try {
+            javax.swing.UIManager.put("defaultFont",new java.awt.Font("Serif",java.awt.Font.PLAIN,13));
+            var scaleMethod=com.formdev.flatlaf.util.UIScale.class.getDeclaredMethod("setUserScaleFactor",float.class,boolean.class);scaleMethod.setAccessible(true);
+            try {
+                for(boolean icon:new boolean[]{false,true})for(var selection:SelectionMode.values())for(float scale:new float[]{1f,2.5f}) {
+                    scaleMethod.invoke(null,scale,false);
+                    var columns=List.of(new Column("name","Name",TextRole.BODY,false,1,Optional.empty()),new Column("size","Size",TextRole.BODY,true,1,Optional.empty()));
+                    var rows=List.of(new TableRow("a",Map.of("name","MMMMMMMMMMMM","size","123456789012345678901234567890 GB"),icon?Optional.of("file"):Optional.empty()));
+                    try(var view=new KitView(context,new ViewSpec(new Table("files",ControlState.READY,columns,rows,Set.of(),"open",List.of(),selection,ScrollPolicy.STANDARD)),e->{})) {
+                        var owner=(Tables.TableControl)view.control("files");
+                        int minimum=owner.component.getMinimumSize().width;
+                        view.setSize(minimum,300);InteractiveRowsTest.layout(view);
+                        var retained=owner.mounted.get("a");
+                        var name=(javax.swing.JLabel)retained.title.getComponent(0);
+                        var number=(javax.swing.JLabel)retained.title.getComponent(1);
+                        var ellipsis=Labels.literal();ellipsis.setFont(name.getFont());ellipsis.setText("…");
+                        int padding=minimum-retained.title.getWidth();
+                        int boundary=padding+ellipsis.getPreferredSize().width+number.getPreferredSize().width;
+                        // Include the old infeasible→feasible boundary if the advertised minimum falls below it.
+                        for(int width:new int[]{minimum,minimum+1,Math.max(minimum,boundary-1),Math.max(minimum,boundary),Math.max(minimum,boundary+1),minimum+boundary,minimum+500}) {
+                            view.setSize(width,300);InteractiveRowsTest.layout(view);
+                            int adornment=name.getIcon()==null?0:name.getIcon().getIconWidth()+name.getIconTextGap();
+                            assertThat(name.getWidth()-adornment).as("useful name at width %s, minimum %s, boundary %s",width,minimum,boundary).isGreaterThanOrEqualTo(NativeChromePainting.measureText(name.getFont(),"MMMM"));
+                            assertThat(number.getWidth()).as("numeric minimum at width %s, minimum %s, boundary %s",width,minimum,boundary).isGreaterThanOrEqualTo(number.getPreferredSize().width);
+                            assertThat(owner.mounted.get("a")).isSameAs(retained);
+                        }
+                        assertThat(minimum).isGreaterThanOrEqualTo(boundary);
+                    }
+                }
+            }finally{scaleMethod.invoke(null,oldScale,false);}
+        }catch(ReflectiveOperationException failure){throw new AssertionError(failure);}
+        finally{javax.swing.UIManager.put("defaultFont",old);release(context);}
+    });}
+
     @Test void numericContentMinimumRedistributesOnlyTheDeficitAndStaysBounded(){Edt.run(()->{
         var context=KitFixtures.context();
         var columns=List.of(new Column("name","Name",TextRole.BODY,false,2.4,Optional.empty()),new Column("size","Size",TextRole.DESCRIPTION,true,1,Optional.empty()));

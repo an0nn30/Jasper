@@ -54,7 +54,9 @@ final class Tables {
             var icon=value().rows().stream().flatMap(row->row.icon().stream()).findFirst();
             if(icon.isPresent())target+=context().icons().icon(icon.get(),context().theme().semantic(),Nodes.Hue.NONE,
                 com.formdev.flatlaf.util.UIScale.scale(14)).getIconWidth()+new JLabel().getIconTextGap();
-            var layout=weights();int low=0,high=Math.max(1,target);
+            // Allocation is monotonic only after existing column minima fit. Below that
+            // boundary proportional fallback can give the first column a misleading usable width.
+            var layout=weights();int low=java.util.Arrays.stream(minimums).sum(),high=Math.max(low,Math.max(1,target));
             while(layout.allocation(high)[0]<target && high<Integer.MAX_VALUE/2)high*=2;
             while(low<high){int middle=low+(high-low)/2;if(layout.allocation(middle)[0]<target)low=middle+1;else high=middle;}
             return padding+high;
