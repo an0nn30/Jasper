@@ -1,5 +1,7 @@
 # Theme Engine Plan 3 — Surface Composition and Visual Matching Implementation Plan
 
+**Task2b independent review — 2026-10-10:** implementation behavior and code quality approved through `02eb78e4`, with no new actionable code findings;824 affected XML tests independently confirmed, zero failures/errors/skips. Full visual spec remains incomplete. V1 retains measured FULL/card/ordered-list/settings geometry and picker artwork corrections; native ink and fresh native teardown/keyboard checks remain required. The isolated committed Host-a package verifies headlessly with AOT disabled; the locked desktop prevents native execution. Continue Task3 with the reviewed shared contracts, comparing common form geometry against both families and rerendering affected owners after central corrections. No page is accepted by this review.
+
 **Task2b implementation handoff — 2026-10-10:** grouped Add Host/default picker, real readiness/persistence, ordered UUID selection and lifetime handling implemented. Additive shared FormSubmission.NONE retains older constructor defaults; TECHNICAL fields and MONO_CAPTION are controller-approved reusable roles. Additional bounded deviation fixes native-discovered retained closed Form traversal with a faithful removal RED and actual staged Vault Cancel/Import Close regressions. Density-specific face roles follow exact source measurements. Affected checks and real mounted comparisons pass their behavioral assertions; visual reference residuals, native ink and fresh native teardown/keyboard acceptance remain open. Task2a cf8 fix1 independently approved, with four creation returns and six compact native captures; older pending-review text below is historical. Zero page acceptances.
 
 
@@ -24,7 +26,7 @@
 **Spec:** [Approved design, especially panel composition §6.1](../specs/2026-10-04-jasper-theme-engine-design.md).
 **Prerequisites:** [Plan 1](2026-10-04-theme-engine-1-engine-and-kit.md) and [Plan 2](2026-10-04-theme-engine-2-consumer-migration.md) implemented, reviewed and verified.
 **Shared contracts:** [Types, paths and test conventions](2026-10-04-theme-engine-contracts.md).
-**Status:** In execution. Task1 implementation gate is complete; its measured pixel residuals remain owned by final cross-family calibration/native chrome checks. Task2a cf8 fix1 is independently approved. Task2b implementation awaits independent review and fresh native checks. Deviations are recorded in the amendments above; controller native validation is explicitly authorized.
+**Status:** In execution. Task1 implementation gate is complete; its measured pixel residuals remain owned by final cross-family calibration/native chrome checks. Task2a cf8 fix1 and Task2b implementation through02eb78e4 are independently approved. Task2b visual completion and fresh native checks remain open; Task3 is next. Deviations are recorded in the amendments above; controller native validation is explicitly authorized.
 
 ## Global Constraints
 
