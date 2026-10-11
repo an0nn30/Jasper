@@ -108,79 +108,138 @@ public final class NativeShells {
             (title, initial) -> chooseFile(owner, title, initial, Optional.empty()));
     }
 
-    private AuxiliarySurface.Shell frame(AuxiliarySurface surface) {
-        var frame = new JFrame(surface.title());
-        frame.setIconImages(ApplicationIcon.images());
-        MacTitleBar bar = installTitleBar(frame.getRootPane(), surface, MacTitleBar.isSupported());
-        if (bar != null) bar.setMenuBar(menuBar(surface));
-        else frame.setJMenuBar(menuBar(surface));
-        frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-        frame.addWindowListener(new WindowAdapter() {
-            @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }
-            @Override public void windowActivated(WindowEvent event) { if (bar != null) bar.setActive(true); surface.notifyActivated(); }
-            @Override public void windowDeactivated(WindowEvent event) { if (bar != null) bar.setActive(false); }
-        });
-        if (bar != null) bar.attach(frame);
-        frame.pack();
-        frame.setSize(surface.preferredSize());
-        frame.setLocationByPlatform(true);
-        state.window(surface.id()).map(saved -> new Rectangle(saved.x(), saved.y(), saved.width(), saved.height()))
-            .filter(NativeShells::onSomeScreen).ifPresent(frame::setBounds);
-        Subscription theme = themes.subscribe((resolved, chromeChanged) -> {
-            if (chromeChanged) SwingUtilities.updateComponentTreeUI(frame);
-            if (bar != null) bar.setLight(!resolved.chrome().dark());
-        });
-        natives.put(surface, frame);
-        return new AuxiliarySurface.Shell(() -> frame.setVisible(true), () -> {
-            if ((frame.getExtendedState() & java.awt.Frame.ICONIFIED) != 0) frame.setExtendedState(frame.getExtendedState() & ~java.awt.Frame.ICONIFIED);
-            frame.toFront(); frame.requestFocus();
-        }, () -> {
-            theme.close();
-            if (bar != null) bar.close();
-            natives.remove(surface);
-            frame.dispose();
-        }, title -> { frame.setTitle(title); if (bar != null) bar.setTitle(title); }, frame::getBounds, (title, initial) -> chooseFile(frame, title, initial, Optional.empty()));
+    /** Bounded shell resources exist before any native show can reenter plugin callbacks. */
+    private final class ShellResources implements AutoCloseable {
+        final AuxiliarySurface surface; final Window window;
+        ShellLayout layout; Subscription theme; FloatWhileActive floating; AttachedSheet attachment;
+        Runnable unwatch = () -> {}; boolean closed;
+        ShellResources(AuxiliarySurface surface, Window window) { this.surface = surface; this.window = window; natives.put(surface, window); }
+        @Override public void close() {
+            if (closed) return; closed = true;
+            unwatch.run();
+            if (attachment != null) attachment.close();
+            if (floating != null) floating.close();
+            if (theme != null) theme.close();
+            if (layout != null) layout.close();
+            natives.remove(surface, window); window.dispose();
+        }
     }
 
+    private AuxiliarySurface.Shell frame(AuxiliarySurface surface) {
+        var frame = new JFrame(surface.title());
+        var resources = new ShellResources(surface, frame);
+        try {
+            frame.setIconImages(ApplicationIcon.images());
+            resources.layout = installChrome(frame.getRootPane(), surface, MacTitleBar.isSupported());
+            MacTitleBar bar = resources.layout.bar();
+            if (bar != null) bar.setMenuBar(menuBar(surface)); else frame.setJMenuBar(menuBar(surface));
+            frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+            frame.addWindowListener(new WindowAdapter() {
+                @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }
+                @Override public void windowActivated(WindowEvent event) { if (bar != null) bar.setActive(true); surface.notifyActivated(); }
+                @Override public void windowDeactivated(WindowEvent event) { if (bar != null) bar.setActive(false); }
+            });
+            if (bar != null) bar.attach(frame);
+            frame.pack();
+            var saved = state.window(surface.id()).map(value -> new Rectangle(value.x(), value.y(), value.width(), value.height())).filter(NativeShells::onSomeScreen);
+            if (saved.isPresent()) frame.setBounds(saved.get());
+            else { frame.setSize(initialSize(surface, frame.getSize(), surface.holder().getSize(), usableBounds(frame))); frame.setLocationByPlatform(true); }
+            resources.theme = themes.subscribe((resolved, chromeChanged) -> {
+                if (chromeChanged) SwingUtilities.updateComponentTreeUI(frame);
+                if (bar != null) bar.setLight(!resolved.chrome().dark());
+                resources.layout.body().changed();
+            });
+            return new AuxiliarySurface.Shell(() -> { if (!surface.closed()) frame.setVisible(true); }, () -> {
+                if ((frame.getExtendedState() & java.awt.Frame.ICONIFIED) != 0) frame.setExtendedState(frame.getExtendedState() & ~java.awt.Frame.ICONIFIED);
+                frame.toFront(); frame.requestFocus();
+            }, resources::close, title -> { frame.setTitle(title); if (bar != null) bar.setTitle(title); }, frame::getBounds,
+                (title, initial) -> chooseFile(TopModal.over(frame), title, initial, Optional.empty()));
+        } catch (RuntimeException | Error failure) { resources.close(); throw failure; }
+    }
+
+    /** Content default adds the measured actual chrome delta once; remembered bounds bypass this path. */
+    static java.awt.Dimension initialSize(AuxiliarySurface surface, java.awt.Dimension packed, java.awt.Dimension body, Rectangle usable) {
+        var requested = surface.preferredSize();
+        if (surface.contentSize()) {
+            requested.width += Math.max(0, packed.width - body.width);
+            requested.height += Math.max(0, packed.height - body.height);
+        }
+        return new java.awt.Dimension(Math.min(requested.width, usable.width), Math.min(requested.height, usable.height));
+    }
+
+    private Window owner(AuxiliarySurface surface) {
+        if (surface.ownerSurface().isPresent()) {
+            var parent = surface.ownerSurface().orElseThrow();
+            if (parent.kind() == AuxiliarySurface.Kind.OVERLAY) return parent.ownerWindow().map(terminalWindows).orElse(null);
+            return natives.get(parent);
+        }
+        return surface.anchorOwner().map(SwingUtilities::getWindowAncestor).orElseGet(() -> surface.ownerWindow().map(terminalWindows).orElse(null));
+    }
+    private boolean liveOwner(AuxiliarySurface surface, Window expected) {
+        return !surface.closed() && expected != null && expected.isShowing() && owner(surface) == expected
+            && surface.ownerSurface().map(AuxiliarySurface::shown).orElse(true)
+            && surface.anchorOwner().map(javax.swing.JComponent::isShowing).orElse(true);
+    }
+    private static dev.jasper.app.platform.WindowBody body(Window owner) {
+        if (!(owner instanceof javax.swing.RootPaneContainer container)) throw new IllegalArgumentException("Attached sheet needs a native root");
+        return dev.jasper.app.platform.WindowBody.find(container.getRootPane()).filter(value -> value.boundsInRoot().isPresent())
+            .orElseThrow(() -> new IllegalArgumentException("Attached sheet needs a registered measured owner body"));
+    }
     private AuxiliarySurface.Shell dialog(AuxiliarySurface surface) {
-        Window owner = surface.ownerSurface().map(natives::get)
-            .orElseGet(() -> surface.anchorOwner().map(javax.swing.SwingUtilities::getWindowAncestor).orElseGet(() -> surface.ownerWindow().map(terminalWindows).orElse(null)));
-        boolean remembered = !surface.id().isEmpty();
+        Window owner = owner(surface);
+        boolean attached = surface.attachedSheet(), remembered = !surface.id().isEmpty();
+        if (attached && !liveOwner(surface, owner)) throw new IllegalArgumentException("Attached sheet needs a live shown owner");
+        var ownerBody = attached ? body(owner) : null;
         Dialog.ModalityType modality = !surface.modal() ? Dialog.ModalityType.MODELESS
             : owner == null ? Dialog.ModalityType.APPLICATION_MODAL : Dialog.ModalityType.DOCUMENT_MODAL;
         var dialog = new JDialog(owner, surface.title(), modality);
-        dialog.setIconImages(ApplicationIcon.images());
-        MacTitleBar bar = installTitleBar(dialog.getRootPane(), surface, MacTitleBar.isSupported());
-        dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-        dialog.addWindowListener(new WindowAdapter() {
-            @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }
-            @Override public void windowActivated(WindowEvent event) { if (bar != null) bar.setActive(true); surface.notifyActivated(); }
-            @Override public void windowDeactivated(WindowEvent event) { if (bar != null) bar.setActive(false); }
-        });
-        if (bar != null) bar.attach(dialog);
-        dialog.pack();
-        if (remembered) {
-            dialog.setSize(surface.preferredSize());
-            dialog.setLocationRelativeTo(owner);
-            state.window(surface.id()).map(saved -> new Rectangle(saved.x(), saved.y(), saved.width(), saved.height()))
-                .filter(NativeShells::onSomeScreen).ifPresent(dialog::setBounds);
-        } else dialog.setLocationRelativeTo(owner);
-        Subscription theme = themes.subscribe((resolved, chromeChanged) -> {
-            if (chromeChanged) SwingUtilities.updateComponentTreeUI(dialog);
-            if (bar != null) bar.setLight(!resolved.chrome().dark());
-        });
-        FloatWhileActive floating = surface.modal() ? FloatWhileActive.attach(dialog) : null;
-        natives.put(surface, dialog);
-        // A dialog the host packs itself follows its kit content's size, as plugin dialogs did with pack(), until the
-        // user resizes it; remembered bounds are the user's and stay.
-        DialogFit fit = remembered ? null : new DialogFit(surface.holder(), fitTarget(dialog));
-        if (fit != null) surface.fitWith(fit);
-        boolean[] watching = {false};
-        return new AuxiliarySurface.Shell(() -> {
-                if (!remembered) {
-                    dialog.pack(); dialog.setLocationRelativeTo(owner);
-                    fit.packed();
-                    // Added after the show-time pack, so only later resizes are reported.
+        var resources = new ShellResources(surface, dialog);
+        try {
+            if (attached) {
+                dialog.setUndecorated(true); dialog.setResizable(false);
+                if (dialog.getGraphicsConfiguration().getDevice().isWindowTranslucencySupported(java.awt.GraphicsDevice.WindowTranslucency.PERPIXEL_TRANSLUCENT)) {
+                    dialog.setBackground(new java.awt.Color(0, 0, 0, 0)); dialog.getRootPane().setOpaque(false);
+                    dialog.getLayeredPane().setOpaque(false); surface.holder().setOpaque(false);
+                }
+            }
+            dialog.getAccessibleContext().setAccessibleName(surface.title());
+            dialog.setIconImages(ApplicationIcon.images());
+            resources.layout = installChrome(dialog.getRootPane(), surface, MacTitleBar.isSupported());
+            MacTitleBar bar = resources.layout.bar();
+            dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+            dialog.addWindowListener(new WindowAdapter() {
+                @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }
+                @Override public void windowActivated(WindowEvent event) { if (bar != null) bar.setActive(true); surface.notifyActivated(); }
+                @Override public void windowDeactivated(WindowEvent event) { if (bar != null) bar.setActive(false); }
+            });
+            if (bar != null) bar.attach(dialog);
+            dialog.pack();
+            if (remembered) {
+                dialog.setSize(surface.preferredSize()); dialog.setLocationRelativeTo(owner);
+                state.window(surface.id()).map(saved -> new Rectangle(saved.x(), saved.y(), saved.width(), saved.height())).filter(NativeShells::onSomeScreen).ifPresent(dialog::setBounds);
+            } else if (!attached) dialog.setLocationRelativeTo(owner);
+            resources.theme = themes.subscribe((resolved, chromeChanged) -> {
+                if (chromeChanged) SwingUtilities.updateComponentTreeUI(dialog);
+                if (bar != null) bar.setLight(!resolved.chrome().dark());
+                if (resources.attachment != null) resources.attachment.changed();
+            });
+            resources.floating = surface.modal() ? FloatWhileActive.attach(dialog) : null;
+            DialogFit fit = remembered || attached ? null : new DialogFit(surface.holder(), fitTarget(dialog));
+            if (fit != null) surface.fitWith(fit);
+            boolean[] watching = {false};
+            if (attached && (!liveOwner(surface, owner) || body(owner) != ownerBody)) throw new IllegalArgumentException("Sheet owner changed during construction");
+            return new AuxiliarySurface.Shell(() -> {
+                if (surface.closed()) return;
+                if (attached) {
+                    if (!liveOwner(surface, owner) || body(owner) != ownerBody) throw new IllegalArgumentException("Sheet owner is no longer live");
+                    if (resources.attachment == null) {
+                        resources.attachment = attachSheet(surface, ownerBody, new AttachedSheet.Target(
+                            () -> liveOwner(surface, owner), () -> ownerBody.root().getLocationOnScreen(), () -> usableBounds(owner), dialog::setBounds));
+                        resources.unwatch = watchOwner(owner, resources.attachment);
+                    }
+                    resources.attachment.fitNow();
+                } else if (!remembered) {
+                    dialog.pack(); dialog.setLocationRelativeTo(owner); fit.packed();
                     if (!watching[0]) {
                         watching[0] = true;
                         dialog.addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -188,15 +247,48 @@ public final class NativeShells {
                         });
                     }
                 }
-                if (floating != null) floating.update();
+                if (surface.closed()) return;
+                if (resources.floating != null) resources.floating.update();
                 dialog.setVisible(true);
-            },
-            dialog::toFront, () -> {
-                if (floating != null) floating.close();
-                theme.close();
-                if (bar != null) bar.close();
-                natives.remove(surface); dialog.dispose();
-            }, title -> { dialog.setTitle(title); if (bar != null) bar.setTitle(title); }, dialog::getBounds, (title, initial) -> chooseFile(dialog, title, initial, Optional.empty()));
+            }, dialog::toFront, resources::close,
+                title -> { dialog.setTitle(title); dialog.getAccessibleContext().setAccessibleName(title); if (bar != null) bar.setTitle(title); }, dialog::getBounds,
+                (title, initial) -> chooseFile(TopModal.over(dialog), title, initial, Optional.empty()));
+        } catch (RuntimeException | Error failure) { resources.close(); throw failure; }
+    }
+    private static Runnable watchOwner(Window owner, AttachedSheet attachment) {
+        var geometry = new java.awt.event.ComponentAdapter() {
+            @Override public void componentMoved(java.awt.event.ComponentEvent event) { attachment.changed(); }
+            @Override public void componentResized(java.awt.event.ComponentEvent event) { attachment.changed(); }
+            @Override public void componentHidden(java.awt.event.ComponentEvent event) { attachment.changed(); }
+        };
+        java.beans.PropertyChangeListener display = event -> attachment.changed();
+        owner.addComponentListener(geometry); owner.addPropertyChangeListener("graphicsConfiguration", display);
+        return () -> { owner.removeComponentListener(geometry); owner.removePropertyChangeListener("graphicsConfiguration", display); };
+    }
+    private static Rectangle usableBounds(Window window) {
+        var configuration = window.getGraphicsConfiguration(); Rectangle screen = configuration.getBounds();
+        var insets = Toolkit.getDefaultToolkit().getScreenInsets(configuration);
+        return new Rectangle(screen.x + insets.left, screen.y + insets.top, screen.width - insets.left - insets.right, screen.height - insets.top - insets.bottom);
+    }
+
+    /** Used by the native shell and headless integration tests with the same registered owner boundary. */
+    static AttachedSheet attachSheet(AuxiliarySurface surface, dev.jasper.app.platform.WindowBody body, AttachedSheet.Target target) {
+        var attachment = new AttachedSheet(surface, body, target);
+        surface.attachWith(attachment);
+        return attachment;
+    }
+
+    record ShellLayout(MacTitleBar bar, dev.jasper.app.platform.WindowBody body, AuxiliarySurface surface) implements AutoCloseable {
+        @Override public void close() { surface.onTitleActionsChanged(() -> {}); body.close(); if (bar != null) bar.close(); }
+    }
+    /** The one production chrome/body registration path for auxiliary windows and immediate dialog owners. */
+    static ShellLayout installChrome(JRootPane root, AuxiliarySurface surface, boolean supported) {
+        MacTitleBar bar;
+        if (surface.attachedSheet()) { root.setContentPane(surface.holder()); bar = null; }
+        else bar = installTitleBar(root, surface, supported);
+        var body = dev.jasper.app.platform.WindowBody.install(root, surface.holder(),
+            () -> new Rectangle(0, 0, surface.holder().getWidth(), surface.holder().getHeight()));
+        return new ShellLayout(bar, body, surface);
     }
 
     /** The native side of {@link DialogFit}: the dialog's own size, pack size and its screen's usable bounds. */
@@ -219,7 +311,21 @@ public final class NativeShells {
     /** Shared, headless-testable title setup for both kinds of SDK/application auxiliary surface. */
     static MacTitleBar installTitleBar(JRootPane root, AuxiliarySurface surface, boolean supported) {
         MacTitleBar bar = MacTitleBar.install(root, surface.holder(), () -> { }, supported);
+        surface.titleActions().setOpaque(false);
+        surface.titleActions().setVisible(surface.titleActions().getComponentCount() > 0);
+        if (bar == null && surface.kind() == AuxiliarySurface.Kind.WINDOW) {
+            var content = new JPanel(new java.awt.BorderLayout());
+            var toolbar = new JPanel(new java.awt.BorderLayout());
+            toolbar.add(surface.titleActions(), java.awt.BorderLayout.EAST);
+            toolbar.setVisible(surface.titleActions().isVisible());
+            content.add(toolbar, java.awt.BorderLayout.NORTH); content.add(surface.holder(), java.awt.BorderLayout.CENTER);
+            root.setContentPane(content);
+            surface.onTitleActionsChanged(() -> { toolbar.setVisible(surface.titleActions().isVisible()); content.revalidate(); content.repaint(); });
+        }
         if (bar != null) {
+            if (surface.kind() == AuxiliarySurface.Kind.WINDOW) {
+                bar.setAccessory(surface.titleActions()); surface.onTitleActionsChanged(bar::accessoryChanged);
+            }
             bar.setTitle(surface.title());
             for (var child : surface.holder().getComponents()) {
                 if (child instanceof dev.jasper.ui.swing.KitView view

@@ -36,11 +36,11 @@ class ManagerPanelTest {
             var panel = panel(new AtomicReference<>());
             panel.refresh(List.of(), List.of(), "status", true);
             var view = panel.view();
-            assertThat(node(view, ManagerPanel.ADD, Nodes.MenuButton.class).icon()).isEqualTo("add");
+            assertThat(node(panel.titleActions(), ManagerPanel.ADD, Nodes.MenuButton.class).icon()).isEqualTo("add");
             assertThat(button(view, ManagerPanel.EDIT).icon()).isEqualTo("edit");
             assertThat(button(view, ManagerPanel.EDIT).tooltip()).isEqualTo("Edit entry");
             assertThat(node(view, ManagerPanel.MORE, Nodes.MenuButton.class).icon()).isEqualTo("more");
-            assertThat(button(view, ManagerPanel.LOCK).icon()).isEqualTo("lock");
+            assertThat(button(panel.titleActions(), ManagerPanel.LOCK).icon()).isEqualTo("lock");
             assertThat(node(view, ManagerPanel.SEARCH, Nodes.Field.class).kind()).isEqualTo(Nodes.FieldKind.SEARCH);
             panel.refresh(List.of(), List.of(), "status", false);
             assertThat(button(view, ManagerPanel.UNLOCK).icon()).isEqualTo("unlock");
@@ -99,14 +99,14 @@ class ManagerPanelTest {
                 () -> generated[0] = true, () -> password[0] = true, () -> { }, () -> { }, () -> { });
             panel.refresh(List.of(), List.of(), "status", true);
             var view = panel.view();
-            var items = node(view, ManagerPanel.ADD, Nodes.MenuButton.class).items();
+            var items = node(panel.titleActions(), ManagerPanel.ADD, Nodes.MenuButton.class).items();
             for (var type : VaultManager.Type.values()) {
                 var item = items.stream().filter(i -> i.label().equals(type.toString())).findFirst().orElseThrow();
-                press(view, item.action());
+                press(panel.titleActions(), item.action());
                 assertThat(added.get()).isEqualTo(type);
             }
             assertThat(items).anyMatch(i -> i.separator());
-            press(view, items.getLast().action()); assertThat(generated[0]).isTrue();
+            press(panel.titleActions(), items.getLast().action()); assertThat(generated[0]).isTrue();
             var more = node(view, ManagerPanel.MORE, Nodes.MenuButton.class).items();
             assertThat(more).hasSize(2);
             press(view, more.getLast().action()); assertThat(password[0]).isTrue();

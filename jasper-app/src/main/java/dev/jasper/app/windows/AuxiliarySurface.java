@@ -49,6 +49,19 @@ public final class AuxiliarySurface {
     private final List<BooleanSupplier> closeCommands = new ArrayList<>();
     private final List<Runnable> closedListeners = new ArrayList<>();
     private final List<Runnable> activatedListeners = new ArrayList<>();
+    private final JPanel titleActions = new JPanel(new BorderLayout());
+    private Runnable titleActionsChanged = () -> { };
+    /** Stable title slot, always outside the body holder. */
+    public JComponent titleActions() { return titleActions; }
+    public void setTitleActions(JComponent content) {
+        if (closed) return;
+        titleActions.removeAll();
+        if (closed) return;
+        if (content != null) titleActions.add(content, BorderLayout.CENTER);
+        titleActions.setVisible(content != null); titleActionsChanged();
+    }
+    public void titleActionsChanged() { titleActions.revalidate(); titleActions.repaint(); titleActionsChanged.run(); }
+    void onTitleActionsChanged(Runnable handler) { titleActionsChanged = handler; }
     private String title;
     private Shell shell;
     private JComponent anchorOwner;
@@ -57,8 +70,18 @@ public final class AuxiliarySurface {
     private boolean shown;
     private boolean closed;
     private Rectangle lastBounds;
+    private boolean contentSize, attachedSheet;
+    public boolean contentSize() { return contentSize; }
+    public void contentSize(boolean value) { contentSize = value; }
+    public boolean attachedSheet() { return attachedSheet; }
+    public void attachedSheet(boolean value) {
+        if (value && !modal) throw new IllegalArgumentException("Attached sheets must be modal");
+        attachedSheet = value;
+    }
     private boolean fitContent;
     private DialogFit fit;
+    private AttachedSheet attachment;
+    void attachWith(AttachedSheet value) { attachment = value; if (closed) value.close(); }
 
     AuxiliarySurface(String id, String title, Kind kind, boolean modal, Dimension preferredSize, UUID ownerWindow,
                      AuxiliarySurface ownerSurface, Function<AuxiliarySurface, Shell> shells) {
@@ -86,8 +109,12 @@ public final class AuxiliarySurface {
     Optional<Rectangle> lastBounds() { return Optional.ofNullable(lastBounds); }
 
     public void setContent(JComponent content) {
+        if (closed) return;
         holder.removeAll();
-        if (content != null) holder.add(content, BorderLayout.CENTER);
+        if (!closed && content != null) {
+            if (attachedSheet && content instanceof dev.jasper.ui.swing.KitView view) view.paintsSurface(false);
+            holder.add(content, BorderLayout.CENTER);
+        }
         holder.revalidate(); holder.repaint();
     }
 
@@ -104,7 +131,7 @@ public final class AuxiliarySurface {
      * The mounted kit view changed (its descriptor was updated, or its layout was invalidated); a fitted dialog re-packs
      * when the preferred size changed.
      */
-    public void contentChanged() { if (fitContent && fit != null && !closed) fit.contentChanged(); }
+    public void contentChanged() { if (closed) return; if (attachment != null) attachment.changed(); else if (fitContent && fit != null) fit.contentChanged(); }
 
     /** Whether the content is a mounted kit view (see {@link #fitContent}). */
     public boolean fitsContent() { return fitContent; }
@@ -123,9 +150,22 @@ public final class AuxiliarySurface {
     /** Creates the native shell on first use. For a modal dialog this returns after the dialog closed. */
     public void show() {
         if (closed) return;
-        if (shell == null) shell = shells.apply(this);
-        shown = true;
-        shell.show().run();
+        try {
+            if (attachedSheet && ownerSurface != null && !ownerSurface.shown())
+                throw new IllegalArgumentException("Attached sheet needs a shown owner");
+            if (shell == null) {
+                Shell created = Objects.requireNonNull(shells.apply(this));
+                if (closed) { created.dispose().run(); return; }
+                shell = created;
+            }
+            if (ownerSurface != null && (ownerSurface.closed() || attachedSheet && !ownerSurface.shown())) { close(); return; }
+            shown = true;
+            shell.show().run();
+        } catch (RuntimeException | Error failure) {
+            shown = false;
+            try { close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+            throw failure;
+        }
     }
 
     /** Opens a native existing-file picker owned by this shown surface. */
@@ -191,6 +231,7 @@ public final class AuxiliarySurface {
         if (closed) return;
         closed = true;
         if (fit != null) fit.close();
+        if (attachment != null) attachment.close();
         if (shell != null) {
             try { lastBounds = shell.bounds().get(); } catch (RuntimeException ignored) { lastBounds = null; }
             shell.dispose().run();
@@ -211,7 +252,9 @@ public final class AuxiliarySurface {
     }
 
     public Subscription onClosed(Runnable listener) {
-        closedListeners.add(java.util.Objects.requireNonNull(listener));
+        java.util.Objects.requireNonNull(listener);
+        if (closed) { listener.run(); return new Subscription(() -> { }); }
+        closedListeners.add(listener);
         return new Subscription(() -> closedListeners.remove(listener));
     }
 

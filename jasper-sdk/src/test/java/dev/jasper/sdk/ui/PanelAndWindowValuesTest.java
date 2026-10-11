@@ -56,4 +56,19 @@ class PanelAndWindowValuesTest {
         assertThatNullPointerException().isThrownBy(() -> new DialogSpec("Trust host?", null, true));
         assertThatIllegalArgumentException().isThrownBy(() -> new DialogSpec(" ", owner, true));
     }
+    @Test void oldNativeConstructorsPreserveCenteredAndOuterDefaults() throws Exception {
+        WindowOwner owner = new WindowOwner() { };
+        assertThat(new DialogSpec("Old", owner, true).presentation().toString()).isEqualTo("CENTERED");
+        var old = new WindowSpec("dev.x.window", "Old", new Dimension(300, 200), true);
+        assertThat(old.sizeBasis().toString()).isEqualTo("OUTER");
+        old.preferredSize().width = 1;
+        assertThat(old.preferredSize()).isEqualTo(new Dimension(300, 200));
+    }
+    @Test void explicitNativeValuesRejectInvalidCombinationsBeforeUse() {
+        WindowOwner owner = new WindowOwner() {};
+        assertThatIllegalArgumentException().isThrownBy(() -> new DialogSpec("Sheet", owner, false, DialogSpec.Presentation.ATTACHED_SHEET));
+        assertThatNullPointerException().isThrownBy(() -> new DialogSpec("Sheet", owner, true, null));
+        assertThatNullPointerException().isThrownBy(() -> new WindowSpec("dev.x.window", "Window", new Dimension(1,1), false, null));
+        assertThat(new DialogSpec("Sheet", owner, true, DialogSpec.Presentation.ATTACHED_SHEET).presentation()).isEqualTo(DialogSpec.Presentation.ATTACHED_SHEET);
+    }
 }

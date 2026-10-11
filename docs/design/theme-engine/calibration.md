@@ -395,3 +395,21 @@ Final V1 anatomy resolves the previously isolated envelope differences through r
 Source diagnostic flat-fill vertical runs (raw original RGB; not ICC-normalized color claims): FileServer x70 has Security fill999..1081, separator1082..1083, fill1084..1211, separator1212..1213, fill1214..1296. AddHost x90 has Options fill1099..1181, separator1182..1183, fill1184..1267, separator1268..1269, fill1270..1396. Rounded-card fringes extend beyond these flat-fill runs. They support row/stroke accounting; the crop-origin and half-device-pixel component residuals are still explicitly unaccepted. Final source-matched envelopes are natural measured results, not allocated screenshot dimensions used as acceptance.
 
 Final deliverable gate `./gradlew check :jasper-app:installDist :jasper-app:themeSurfacePreview :jasper-ui:gallery -Pjasper.galleryScale=2` passed in5m34s:9,769 tests, zero failures/errors, six existing skips;109tasks23executed86up-to-date;61 gallery fixtures. Source-depicted Add Host additionally clears real Name/Host controls, keeps genuine imported order and disables Add Host. Real SINGLE-list last-imported selection cannot be cleared by its user interaction and remains visible/qualified; no fake unselected descriptor is injected. The behavioral filled/reordered captures remain separate. Manifest retains paired pre/post actual-owner overall/component crops, unchanged-context hero/compact/settings coverage and original source hashes; independent/native acceptance remains pending.
+
+
+## Plan3 Task4a host integration — 2026-10-11
+
+Actual staged Vault title actions, menu, Login and SSH-key sheets are captured through the production NativeShells chrome/attachment helpers at device2 in dark/light/custom/system20 and short-owner45 states. Manager body is exactly900×555 excluding measured headless28px title; enlarged fixture owner is1350×833. Native transparency/shadow branch is not instantiated by this harness, so its opaque root/holder backing does not establish the bottom-corner native seam. Shared SHEET path is square-top/rounded-bottom; native verification remains required.
+
+Original references retain their SHA256/ICC metadata; derived crops are converted to sRGB, never resampled. `task-4a-comparison/manifest.json` records original/candidate hashes, crop origins, original-scale overlays/diffs, top-left-aligned padded comparisons and named-control bounds/font/baselines. No page is accepted. Source independent2× anchors remain56px fields,36px menu tiles/58px row steps and1800×1110 manager body.
+
+| State | Source logical body/crop | Actual logical body/crop | Open composition residual |
+|---|---|---|---|
+|Manager|900×555|900×555|Existing single-list body/footer, three-column detail design remains4b|
+|Add menu|222×137|200×131|Existing text menu lacks source category tiles;22px narrower and6px shorter|
+|Login sheet|480×363.5|480×471|Existing stacked inputs/auth dropdown and all fields retained;107.5px taller with body scrolling|
+|SSH-key sheet|480×306|480×363|Existing above-field labels, no identity tile/card;57px taller|
+
+For default key sheet, real title24,20 with15pt/15baseline; Name24,53,432×50, Name text input34,81,412×16; footer0,295,480×68; Cancel318,315,69×28 and Save395,315,61×28 with19baseline. These component rectangles are not source ink bounds. Colors remain theme roles; sample source colors are not requirements. No fixture fills in absent domain metadata or fake accounts.
+
+Shared footer viewport did not alter retained default anatomy: actual Create, standalone Unlock, grouped Add Host and File Server calibration/light renders are each pixel-identical to Task3 originals (8 equal-size pixel comparisons). Real32pt controller test proves100px usable-screen overflow with focus-listener/scrollbar reveal and recovery retaining draft document/action ancestry; it is programmatic headless evidence, not physical keyboard proof. Actual enlarged-family renders and native controller checks remain recorded in the Task4a report. Task4b retains all body/auth/menu/card obligations; Task10 retains genuine title/control/shadow calibration.

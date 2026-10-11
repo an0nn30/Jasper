@@ -19,16 +19,34 @@ final class Forms {
 
     static final class FormControl extends ControlRegistry.Control {
         final Body body = new Body();
-        final JPanel footer = new JPanel(),
-                actions = new JPanel(),
+        final Footer footer = new Footer();
+        final JPanel actions = new JPanel(),
                 preview = new JPanel(new BorderLayout());
         final JScrollPane scroll = new JScrollPane(body);
+        final JScrollPane footerScroll = new JScrollPane(footer, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER) {
+            @Override public Dimension getPreferredSize() { return footer.getPreferredSize(); }
+            @Override public Dimension getMinimumSize() { return footer.getMinimumSize(); }
+        };
+        final java.util.Map<Buttons.ButtonControl, java.awt.event.FocusListener> focusReveal = new java.util.IdentityHashMap<>();
         List<ControlRegistry.Control> controls = List.of();
         final JLabel title = Labels.literal();
 
         FormControl(KitView view, Nodes.Form node) {
             super(view, node, new Surface(view));
-            component.setLayout(new BorderLayout());
+            component.setLayout(new BorderLayout() {
+                @Override public void layoutContainer(Container parent) {
+                    Insets insets = parent.getInsets();
+                    int width = Math.max(0, parent.getWidth() - insets.left - insets.right);
+                    int height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);
+                    int footerHeight = Math.min(height, Composition.height(footer, width));
+                    scroll.setBounds(insets.left, insets.top, width, height - footerHeight);
+                    footerScroll.setBounds(insets.left, insets.top + height - footerHeight, width, footerHeight);
+                }
+            });
+            own(() -> {
+                focusReveal.forEach((button, listener) -> button.button.removeFocusListener(listener));
+                focusReveal.clear();
+            });
             KitOwnership.mark(title, node.id() + ".title");
             body.add(title);
             body.setOpaque(false);
@@ -40,7 +58,10 @@ final class Forms {
             scroll.setBorder(new EmptyBorder(0, 0, 0, 0));
             KitOwnership.mark(scroll, node.id() + ".scroll");
             component.add(scroll, BorderLayout.CENTER);
-            component.add(footer, BorderLayout.SOUTH);
+            footerScroll.setOpaque(false); footerScroll.getViewport().setOpaque(false);
+            footerScroll.setBorder(new EmptyBorder(0, 0, 0, 0)); footerScroll.setViewportBorder(new EmptyBorder(0, 0, 0, 0));
+            KitOwnership.mark(footerScroll, node.id() + ".footerScroll");
+            component.add(footerScroll, BorderLayout.SOUTH);
             footer.add(preview);
             footer.add(actions);
             bind(
@@ -187,6 +208,10 @@ final class Forms {
                     .setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_DIALOG));
             scroll.getVerticalScrollBar()
                     .setForeground(ThemePainting.color(context(), SemanticColor.BORDER_SUBTLE));
+            footerScroll.setBorder(new EmptyBorder(0, 0, 0, 0));
+            footerScroll.getVerticalScrollBar().setUnitIncrement(ThemePainting.metric(context(), DesignMetrics.Role.ROW_GAP));
+            footerScroll.getVerticalScrollBar().setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_DIALOG));
+            footerScroll.getVerticalScrollBar().setForeground(ThemePainting.color(context(), SemanticColor.BORDER_SUBTLE));
             component.revalidate();
             component.repaint();
         }
@@ -203,7 +228,23 @@ final class Forms {
         void children(List<ControlRegistry.Control> controls) {
             this.controls = controls;
             var f = (Nodes.Form) node;
-            for(var control:controls)if(control instanceof Buttons.ButtonControl button && f.actions().contains(control.node))button.button.fullFooter=f.kind()==Nodes.FormKind.FULL;
+            focusReveal.entrySet().removeIf(entry -> {
+                if (controls.contains(entry.getKey()) && f.actions().contains(entry.getKey().node)) return false;
+                entry.getKey().button.removeFocusListener(entry.getValue());
+                return true;
+            });
+            for(var control:controls)if(control instanceof Buttons.ButtonControl button && f.actions().contains(control.node)) {
+                button.button.fullFooter=f.kind()==Nodes.FormKind.FULL;
+                if (!focusReveal.containsKey(button)) {
+                    var reveal = new java.awt.event.FocusAdapter() {
+                        @Override public void focusGained(java.awt.event.FocusEvent event) {
+                            if (!closed && !view.isClosed()) button.button.scrollRectToVisible(new Rectangle(0,0,button.button.getWidth(),button.button.getHeight()));
+                        }
+                    };
+                    button.button.addFocusListener(reveal);
+                    focusReveal.put(button, reveal);
+                }
+            }
             Stacks.mount(
                     body,
                     java.util.stream.Stream.concat(
@@ -243,6 +284,15 @@ final class Forms {
                 return;
             }
         }
+    }
+
+    /** Stable footer ancestry; only its viewport overflows on screens shorter than the fixed actions. */
+    static final class Footer extends JPanel implements Scrollable {
+        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public int getScrollableUnitIncrement(Rectangle bounds, int orientation, int direction) { return 16; }
+        @Override public int getScrollableBlockIncrement(Rectangle bounds, int orientation, int direction) { return Math.max(16, bounds.height - 16); }
+        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() { return getParent() != null && getPreferredSize().height <= getParent().getHeight(); }
     }
 
     static final class Body extends JPanel implements Scrollable {

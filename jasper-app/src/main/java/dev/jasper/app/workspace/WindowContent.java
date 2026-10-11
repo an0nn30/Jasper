@@ -250,7 +250,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         area.setHeaderVisible(true);
         leftStripe.setVisible(false);
         rightStripe.setVisible(false);
-        var body = new JPanel(new BorderLayout());
+
         body.add(leftStripe, BorderLayout.WEST); body.add(area, BorderLayout.CENTER); body.add(rightStripe, BorderLayout.EAST);
         dockDrag = new DockDrag(this, dock, area, leftStripe, rightStripe);
         leftStripe.dragSource = dockDrag::install;
@@ -271,6 +271,21 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         themeRegistration = themes.subscribe(this::applyTheme);
         if (!detached) newTab(directory);
         else setPreferredSize(new Dimension(900, 650));
+    }
+
+    private final JPanel body = new JPanel(new BorderLayout());
+    private dev.jasper.app.platform.WindowBody bodyLease;
+
+    java.awt.Rectangle bodyRegion() {
+        var region = javax.swing.SwingUtilities.convertRectangle(body.getParent(), body.getBounds(), this);
+        var status = chrome.status();
+        if (status.isVisible() && status.getWidth() > 0 && status.getHeight() > 0)
+            region = region.union(javax.swing.SwingUtilities.convertRectangle(status.getParent(), status.getBounds(), this));
+        return region;
+    }
+    @Override public void doLayout() {
+        super.doLayout();
+        if (bodyLease != null) bodyLease.changed();
     }
 
     /** Workspace adapter: wires title/theme values to the platform-only title bar. */
@@ -306,6 +321,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 theme.chrome().dark() ? "NSAppearanceNameDarkAqua" : "NSAppearanceNameAqua");
             content.onThemeChanged.accept(content.theme());
         }
+        if (content.bodyLease != null) content.bodyLease.close();
+        content.bodyLease = dev.jasper.app.platform.WindowBody.install(root, content, content::bodyRegion);
         content.update();
         return bar;
     }
@@ -1371,6 +1388,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     @Override public void close() {
         if (closed) return;
+        if (bodyLease != null) { bodyLease.close(); bodyLease = null; }
         dockDrag.cancel();
         paletteKeys.close();
         if (contributed != null) { contributed.close(rememberLayout); contributed = null; }

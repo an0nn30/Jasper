@@ -45,7 +45,7 @@ final class ManagerPanel implements AutoCloseable {
     private final Consumer<UUID> onEdit, onDelete, onCopy;
     private final Consumer<Grant> onRevoke;
     private final Runnable onGenerate, onChangePassword, onLock, onUnlock, onClose;
-    private final UiView view;
+    private final UiView view, titleActions;
     private List<VaultManager.Row> allRows = List.of(), visible = List.of();
     private List<Grant> grants = List.of();
     private boolean unlocked, closed;
@@ -63,9 +63,11 @@ final class ManagerPanel implements AutoCloseable {
         this.onRevoke = onRevoke; this.onGenerate = onGenerate; this.onChangePassword = onChangePassword;
         this.onLock = onLock; this.onUnlock = onUnlock; this.onClose = onClose;
         view = kit.create(new ViewSpec(node()), this::handle);
+        titleActions = kit.create(new ViewSpec(actions()), this::handle);
     }
 
     UiView view() { return view; }
+    UiView titleActions() { return titleActions; }
     Optional<UUID> selected() { return Optional.ofNullable(selection); }
     List<VaultManager.Row> visibleRows() { return visible; }
     PasswordPanel unlockForm() { return unlock; }
@@ -164,7 +166,7 @@ final class ManagerPanel implements AutoCloseable {
         if (selection != null && visible.stream().noneMatch(row -> row.id().equals(selection))) selection = null;
     }
 
-    private void render() { if (!closed) view.update(new ViewSpec(node())); }
+    private void render() { if (!closed) { view.update(new ViewSpec(node())); titleActions.update(new ViewSpec(actions())); } }
 
     private String subtitle(VaultManager.Row row) {
         return entry.apply(row.id()).map(value -> switch (value) {
@@ -181,23 +183,28 @@ final class ManagerPanel implements AutoCloseable {
 
     private static MenuItem item(String id, String label) { return new MenuItem(id, label, "", id, true, false); }
 
+    private Nodes.Stack actions() {
+        var adds = new ArrayList<MenuItem>();
+        for (var type : VaultManager.Type.values()) adds.add(item("add." + type.name(), type.toString()));
+        adds.add(new MenuItem("add.separator", "", "", "", true, true));
+        adds.add(item(ADD_GENERATE, "Generate SSH Key..."));
+        var state = new ControlState(true, unlocked, false, "");
+        return new Nodes.Stack("title-actions", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.Button(LOCK, state, "Lock", "lock", Nodes.ButtonKind.GHOST, LOCK, "Lock vault"),
+            new Nodes.MenuButton(ADD, state, "Add", "add", Nodes.ButtonKind.GHOST, "", adds, "Add entry")));
+    }
+
     private List<Nodes.Node> entries() {
         var selectedRow = visible.stream().filter(row -> row.id().equals(selection)).findFirst().orElse(null);
         var options = new ArrayList<Option>();
         options.add(new Option(ALL_TYPES, "All Types", Optional.empty()));
         for (var type : VaultManager.Type.values()) options.add(new Option(type.name(), type.toString(), Optional.empty()));
-        var adds = new ArrayList<MenuItem>();
-        for (var type : VaultManager.Type.values()) adds.add(item("add." + type.name(), type.toString()));
-        adds.add(new MenuItem("add.separator", "", "", "", true, true));
-        adds.add(item(ADD_GENERATE, "Generate SSH Key..."));
         var toolbar = new Nodes.Stack("toolbar", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
             new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Search names, usernames and key fingerprints", "Search vault", ""),
             new Nodes.Choice(KIND, ControlState.READY, Nodes.ChoiceKind.DROPDOWN, options, kind, "Filter credential type", ""),
-            new Nodes.MenuButton(ADD, ControlState.READY, "", "add", Nodes.ButtonKind.GHOST, "", adds, "Add entry"),
             tool(EDIT, "edit", "Edit entry", selectedRow != null),
             tool(DELETE, "delete", "Delete entry", selectedRow != null),
             tool(COPY_PUBLIC, "copy", "Copy public key", selectedRow != null && selectedRow.type() == VaultManager.Type.SSH_KEY),
-            tool(LOCK, "lock", "Lock vault", true),
             new Nodes.MenuButton(MORE, ControlState.READY, "", "more", Nodes.ButtonKind.GHOST, "",
                 List.of(item(MORE_GRANTS, "Saved plugin grants..."), item(MORE_PASSWORD, "Change Master Password...")), "More vault actions")));
         if (visible.isEmpty()) {
@@ -257,6 +264,6 @@ final class ManagerPanel implements AutoCloseable {
         closed = true;
         allRows = List.of(); visible = List.of(); grants = List.of(); selection = null;
         if (unlock != null) { unlock.close(); unlock = null; }
-        view.close();
+        view.close(); titleActions.close();
     }
 }

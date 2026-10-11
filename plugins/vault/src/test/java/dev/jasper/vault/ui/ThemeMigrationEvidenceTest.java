@@ -58,7 +58,7 @@ class ThemeMigrationEvidenceTest {
                 emit(manager.view(), new UiEvent.Edited(ManagerPanel.SEARCH, "no matches"));
                 save("manager-filtered-empty", manager.view());
                 assertThat(node(manager.view(), ManagerPanel.EMPTY, Nodes.Empty.class).title()).isEqualTo("No matching entries");
-                assertThat(node(manager.view(), ManagerPanel.ADD, Nodes.MenuButton.class).items()).hasSize(5);
+                assertThat(node(manager.titleActions(), ManagerPanel.ADD, Nodes.MenuButton.class).items()).hasSize(5);
                 save("add-menu", manager.view());
                 manager.refresh(List.of(), List.of(), "Locked", false);
                 save("manager-locked", manager.view());

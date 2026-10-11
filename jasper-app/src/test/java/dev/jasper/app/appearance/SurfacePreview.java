@@ -19,6 +19,12 @@ public final class SurfacePreview {
             controller.configure(Theme.DARK, new dev.jasper.app.config.UiFontConfig("system",Float.parseFloat(args[4])));
             return controller;
         }) : null;
+        Object priorCaps = SurfaceFixtures.edt(() -> {
+            Object prior = javax.swing.UIManager.get("PasswordField.showCapsLock");
+            // As in KitGallery: native keyboard-lock queries are unavailable during synthetic headless focus.
+            javax.swing.UIManager.put("PasswordField.showCapsLock", false);
+            return prior;
+        });
         try {
         for (String theme : args.length > 2 ? List.of(args[2]) : List.of("calibration", "dark", "light", "custom")) {
             for (String id : List.of("vault-create", "vault-unlock", "host-add", "fileserver-add")) {
@@ -41,7 +47,10 @@ public final class SurfacePreview {
                 }
             }
         }
-        } finally { if (fonts != null) SurfaceFixtures.edt(() -> { fonts.configure(Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults()); fonts.close(); return null; }); }
+        } finally {
+            try { if (fonts != null) SurfaceFixtures.edt(() -> { fonts.configure(Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults()); fonts.close(); return null; }); }
+            finally { SurfaceFixtures.edt(() -> { javax.swing.UIManager.put("PasswordField.showCapsLock", priorCaps); return null; }); }
+        }
     }
 
     private static Capture capture(SurfaceFixtures.Opened opened, String id) {

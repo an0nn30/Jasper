@@ -52,12 +52,13 @@ public final class VaultManagerWindow implements AutoCloseable {
     public void show(WindowHandle owner, Optional<UUID> selection) {
         this.owner = owner;
         if (window == null) {
-            window = context.windows().create(new WindowSpec(ID, "Credential Vault", new Dimension(800, 600), true));
+            window = context.windows().create(new WindowSpec(ID, "Credential Vault", new Dimension(900, 555), true, WindowSpec.SizeBasis.CONTENT));
             var shown = new ManagerPanel(context.kit(), manager::entry, this::add, this::edit, this::delete, this::copyPublic,
                 grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, this::changePassword, lock::lock,
                 () -> service.requestUnlock(this.owner), this::close);
             panel = shown;
             window.setContent(shown.view());
+            window.setTitleActions(Optional.of(shown.titleActions()));
             window.onClosed(() -> {
                 // The surface has already disposed the view and erased its storage; nothing touches it from here.
                 window = null; shown.close(); closeDialogs();

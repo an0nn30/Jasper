@@ -30,9 +30,10 @@ final class HostedAnchor implements UiAnchor {
         return anchor;
     }
     private List<Component> ancestry(){var out=new ArrayList<Component>();for(Component c=target;c!=null;c=c.getParent())out.add(c);return out;}
+    AuxiliarySurface ownerSurface(){return mount instanceof SurfaceMount slot ? slot.surface() : mount instanceof AuxiliarySurface surface ? surface : null;}
     private boolean valid() {
         if(!source.owner.live() || source.mount!=mount || !ancestry.equals(ancestry()))return false;
-        if(mount instanceof AuxiliarySurface surface && !surface.shown())return false;
+        if(ownerSurface()!=null && !ownerSurface().shown())return false;
         if(!GraphicsEnvironment.isHeadless() && !target.isShowing())return false;
         try{return source.component().anchorTarget(id)==target;}catch(IllegalArgumentException|IllegalStateException stale){return false;}
     }

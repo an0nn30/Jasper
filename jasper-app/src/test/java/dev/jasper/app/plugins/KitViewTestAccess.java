@@ -17,7 +17,7 @@ public final class KitViewTestAccess implements AutoCloseable {
     private dev.jasper.sdk.plugin.Plugin remote;
     private final String surfaceId;
     StagedVaultHost vault() { return vault; }
-    AuxiliarySurface surface() { return surface; }
+    public AuxiliarySurface surface() { return surface; }
 
     public KitViewTestAccess(Path home, String id, ResolvedTheme theme) throws Exception {
         surfaceId = id;
@@ -64,6 +64,18 @@ public final class KitViewTestAccess implements AutoCloseable {
                 });
                 surface=vault.awaitSurface("Add Host");
                 return;
+            }
+            if (java.util.Set.of("vault-manager", "vault-login", "vault-key").contains(id)) {
+                vault.createVault("synthetic-preview-password");
+                var manager = vault.awaitSurface("Credential Vault");
+                if (id.equals("vault-manager")) { surface = manager; return; }
+                onEdt(() -> {
+                    var menu = ((javax.swing.JComponent)StagedVaultHost.named(manager.titleActions(), "add")).getComponentPopupMenu();
+                    String label = id.equals("vault-login") ? "Login" : "SSH Key";
+                    java.util.Arrays.stream(menu.getComponents()).filter(c -> c instanceof AbstractButton b && b.getText().equals(label))
+                        .map(AbstractButton.class::cast).findFirst().orElseThrow().doClick(0);
+                });
+                surface = vault.awaitSurface(id.equals("vault-login") ? "Add Login" : "Add SSH Key");return;
             }
             if (id.equals("vault-unlock")) {
                 vault.createVault("synthetic-preview-password");

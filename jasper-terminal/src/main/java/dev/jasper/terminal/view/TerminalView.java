@@ -638,13 +638,20 @@ public final class TerminalView extends JComponent {
     }
 
     /** Finds matches synchronously on EDT; prefer findAsync for long histories. Matches do not span soft wraps. */
-    public FindResult find(SearchQuery query) { return search.find(query); }
+    public FindResult find(SearchQuery query) {
+        reconcileAbsoluteRows();
+        return search.find(query);
+    }
     /**
      * Starts a search on EDT, matches captured rows on the bounded worker, and publishes on EDT.
      * Only the latest query in the same row epoch may publish; clearing, hiding or detaching
      * cancels pending callbacks. A null callback is allowed. Matches do not span soft wraps.
      */
-    public void findAsync(SearchQuery query, Consumer<FindResult> callback) { search.findAsync(query, callback); }
+    public void findAsync(SearchQuery query, Consumer<FindResult> callback) {
+        // A completed reflow may still await frame reconciliation; retire its old state before admitting this search.
+        reconcileAbsoluteRows();
+        search.findAsync(query, callback);
+    }
 
     /** Selects the next newer match, wrapping around; call on EDT. */
     public FindResult findNext() { return search.next(); }

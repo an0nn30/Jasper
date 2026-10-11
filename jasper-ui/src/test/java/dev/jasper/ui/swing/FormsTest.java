@@ -45,6 +45,57 @@ class FormsTest {
             if (c instanceof Container child) layout(child);
     }
 
+
+    @Test void retainedActionMovesBetweenFormsWithoutAccumulatingRevealHooks() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();var action=button("retained",ButtonKind.PRIMARY);
+            java.util.function.Function<String,Form> footer=id->new Form(id,ControlState.READY,FormKind.SHEET,"Entry",Optional.empty(),List.of(),Optional.empty(),List.of(action));
+            var view=new KitView(context,new ViewSpec(footer.apply("first")),e->{});
+            try {
+                var button=find(view,"retained",JButton.class);int withHook=button.getFocusListeners().length;
+                Forms.FormControl old=(Forms.FormControl)view.control("first");
+                for(int i=0;i<4;i++) {
+                    String id="next"+i;view.update(new ViewSpec(footer.apply(id)));
+                    assertThat(find(view,"retained",JButton.class)).isSameAs(button);
+                    assertThat(old.closed).isTrue();assertThat(old.focusReveal).isEmpty();
+                    assertThat(button.getFocusListeners()).hasSize(withHook);
+                    old=(Forms.FormControl)view.control(id);view.setSize(s(300),s(40));layout(view);
+                    for(var listener:button.getFocusListeners())listener.focusGained(new java.awt.event.FocusEvent(button,java.awt.event.FocusEvent.FOCUS_GAINED));
+                    var scroll=(JScrollPane)SwingUtilities.getAncestorOfClass(JScrollPane.class,button);
+                    assertThat(scroll.getViewport().getViewRect().contains(SwingUtilities.convertRectangle(button.getParent(),button.getBounds(),scroll.getViewport().getView()))).isTrue();
+                }
+                view.update(new ViewSpec(new Form("next3",ControlState.READY,FormKind.SHEET,"Entry",Optional.empty(),List.of(action),Optional.empty(),List.of())));
+                assertThat(view.control("next3")).isSameAs(old);assertThat(old.focusReveal).isEmpty();
+                assertThat(button.getFocusListeners()).hasSize(withHook-1);
+                view.update(new ViewSpec(footer.apply("next3")));assertThat(button.getFocusListeners()).hasSize(withHook);
+                var reveal=old.focusReveal;view.close();assertThat(reveal).isEmpty();
+            } finally {view.close();release(context);}
+        });
+    }
+    @Test void extremeShortSheetKeepsAllFooterActionsScrollReachableWithoutReparenting() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, new ViewSpec(form(FormKind.SHEET, List.of(field("input", FieldKind.TEXT, "draft")))), e -> {})) {
+                view.setSize(s(300), s(300));layout(view);
+                var save = find(view, "save", JButton.class); var parent = save.getParent();
+                view.setSize(s(300), s(40));layout(view);
+                var scroll = (JScrollPane) SwingUtilities.getAncestorOfClass(JScrollPane.class, save);
+                assertThat(scroll).as("fixed footer becomes scroll-reachable when even screen height cannot hold it").isNotNull();
+                assertThat(scroll.getHeight()).isLessThanOrEqualTo(s(40));
+                assertThat(scroll.getVerticalScrollBar().isVisible()).isTrue();
+                for (String id : List.of("save", "cancel")) {
+                    var action = find(view, id, JButton.class);
+                    for (var listener : action.getFocusListeners()) listener.focusGained(new java.awt.event.FocusEvent(action, java.awt.event.FocusEvent.FOCUS_GAINED));
+                    var bounds = SwingUtilities.convertRectangle(action.getParent(), action.getBounds(), scroll.getViewport().getView());
+                    assertThat(scroll.getViewport().getViewRect().contains(bounds)).as("keyboard focus reveals " + id).isTrue();
+                }
+                view.setSize(s(300), s(300));layout(view);
+                assertThat(save.getParent()).isSameAs(parent);assertThat(scroll.getVerticalScrollBar().isVisible()).isFalse();
+                assertThat(find(view,"input.input",JTextField.class).getText()).isEqualTo("draft");
+            } finally { release(context); }
+        });
+    }
+
     @Test void visualPrimaryMayOptOutOfEnterWithoutLosingClickOrEscape() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new java.util.ArrayList<UiEvent>();

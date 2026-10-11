@@ -255,17 +255,44 @@ final class FakeUi {
 
     static final class Panel { final PanelSpec spec; final PanelFactory factory; final Map<UUID, PanelInstance> instances = new LinkedHashMap<>(); Panel(PanelSpec spec, PanelFactory factory) { this.spec = spec; this.factory = factory; } }
 
+    private static dev.jasper.sdk.ui.ViewSpec titleSpec(dev.jasper.sdk.ui.ViewSpec value) {
+        if (!(value.root() instanceof dev.jasper.sdk.ui.Nodes.Stack stack)
+                || stack.role() != dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE
+                || stack.children().stream().anyMatch(node -> !(node instanceof dev.jasper.sdk.ui.Nodes.Button)
+                    && !(node instanceof dev.jasper.sdk.ui.Nodes.MenuButton)))
+            throw new IllegalArgumentException("Title actions require an INLINE Stack of Buttons and MenuButtons");
+        return value;
+    }
+    record SurfaceMount(FakeWindow surface, boolean title) { }
+
     final class FakeWindow implements PluginWindow, PluginDialog {
         final String id; final FakeWindow owner; String title; boolean shown; boolean closed; JComponent content;
         final List<BooleanSupplier> guards = new ArrayList<>(); final List<Runnable> closedHandlers = new ArrayList<>();
         FakeWindow(String id, String title, FakeWindow owner) { this.id = id; this.title = title; this.owner = owner; }
-        FakeKitView mounted;
+        final SurfaceMount bodyMount = new SurfaceMount(this, false), titleMount = new SurfaceMount(this, true);
+        FakeKitView mounted, titleActions;
+        boolean attachedSheet;
+        java.util.function.BooleanSupplier ownerLive = () -> true;
+        @Override public void setTitleActions(Optional<dev.jasper.sdk.ui.UiView> actions) {
+            context.requireOpen(); java.util.Objects.requireNonNull(actions, "actions");
+            if (closed) throw new IllegalStateException("Surface is closed");
+            var next = actions.map(context.kit()::requireOwned).orElse(null);
+            if (next == titleActions) return;
+            if (next != null) { titleSpec(next.spec()); next.mount(titleMount); }
+            var previous = titleActions; titleActions = next;
+            if (next != null) next.hostSpec = FakeUi::titleSpec;
+            if (previous != null) previous.close();
+        }
         @Override public void setContent(dev.jasper.sdk.ui.UiView content) {
             context.requireOpen();var next=context.kit().requireOwned(content);
-            if(closed)throw new IllegalStateException("Surface is closed");next.mount(this);
+            if(closed)throw new IllegalStateException("Surface is closed");next.mount(bodyMount);
             if(mounted==next)return;var old=mounted;this.content=next.component;mounted=next;if(old!=null)old.close();
         }
-        @Override public void show() { if (!closed) shown = true; }
+        @Override public void show() {
+            if (closed) return;
+            if (attachedSheet && !ownerLive.getAsBoolean()) { close(); throw new IllegalArgumentException("Attached sheets need a shown owner"); }
+            shown = true;
+        }
         @Override public Optional<Path> chooseFile(String title, Optional<Path> initialPath) {
             context.requireOpen();
             if (title == null || title.isBlank()) throw new IllegalArgumentException("A file chooser needs a title");
@@ -279,7 +306,7 @@ final class FakeUi {
             if (!closed) title = value;
         }
         @Override public Subscription onClosing(BooleanSupplier guard) { guards.add(guard); return () -> guards.remove(guard); }
-        @Override public Subscription onClosed(Runnable handler) { closedHandlers.add(handler); return () -> closedHandlers.remove(handler); }
+        @Override public Subscription onClosed(Runnable handler) { if (closed) { handler.run(); return () -> {}; } closedHandlers.add(handler); return () -> closedHandlers.remove(handler); }
         final List<BooleanSupplier> closeCommands = new ArrayList<>();
         @Override public Subscription onCloseCommand(BooleanSupplier handler) {
             closeCommands.add(java.util.Objects.requireNonNull(handler));
@@ -312,6 +339,7 @@ final class FakeUi {
             if (closed) return;
             closed = true;
             if(mounted!=null){mounted.close();mounted=null;}
+            if(titleActions!=null){titleActions.close();titleActions=null;}
             windows.remove(this);
             for (FakeWindow other : List.copyOf(windows)) if (other.owner == this) other.close();
             for (Runnable handler : List.copyOf(closedHandlers)) {
@@ -525,13 +553,15 @@ final class FakeUi {
                 context.requireOpen();
                 WindowOwner owner = spec.owner();
                 FakeWindow parent = null;
-                if(owner instanceof dev.jasper.sdk.ui.UiAnchor value){var anchor=requireAnchor(value);if(anchor.mounted instanceof FakeWindow window)parent=window;
+                if(owner instanceof dev.jasper.sdk.ui.UiAnchor value){var anchor=requireAnchor(value);parent=anchor.ownerSurface();
                 } else if (owner instanceof FakeWindow window) {
                     if (window.closed || !windows.contains(window)) throw new IllegalArgumentException("A dialog needs an open owner window");
                     parent = window;
                 } else if (!(owner instanceof WindowHandle) && !(owner instanceof FakeContent content && contents.contains(content)))
                     throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
                 var dialog = new FakeWindow("dialog", spec.title(), parent);
+                dialog.attachedSheet = spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET;
+                dialog.ownerLive = () -> owner instanceof dev.jasper.sdk.ui.UiAnchor anchor ? anchor.isOpen() : liveChooserOwner(owner);
                 if(owner instanceof dev.jasper.sdk.ui.UiAnchor value){var registration=value.onClosed(dialog::close);dialog.onClosed(registration::close);}
                 if (owner instanceof FakeContent content) {
                     if (spec.modal()) content.pins++;

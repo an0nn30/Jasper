@@ -192,4 +192,38 @@ class AuxiliaryWindowsTest {
         assertThat(asked).containsExactly("first", "second");
         assertThat(windows.open()).hasSize(4).noneMatch(AuxiliarySurface::closed);
     }
+    @Test void reentrantCloseDuringConstructionNeverShowsAndDisposesReturnedShellOnce() {
+        var events = new ArrayList<String>();
+        var host = new AuxiliaryWindows(UiState.inMemory(), surface -> {
+            surface.close();
+            return new AuxiliarySurface.Shell(() -> events.add("show"), () -> {}, () -> events.add("dispose"),
+                title -> {}, Rectangle::new, (title, initial) -> java.util.Optional.empty());
+        });
+        var surface = host.window("test", "Reentrant", new Dimension(200, 100), false);
+        surface.show(); surface.close();
+        assertThat(events).containsExactly("dispose"); assertThat(host.open()).isEmpty();
+    }
+    @Test void failedShowClosesTheSurfaceAndItsChildrenAndDoesNotRemainShown() {
+        var disposed = new java.util.concurrent.atomic.AtomicInteger();
+        var host = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(
+            () -> { throw new IllegalStateException("native show failed"); }, () -> {}, disposed::incrementAndGet,
+            title -> {}, Rectangle::new, (title, initial) -> java.util.Optional.empty()));
+        var surface = host.window("test", "Failed", new Dimension(200, 100), false);
+        var child = host.dialog("Child", true, surface);
+        assertThatThrownBy(surface::show).isInstanceOf(IllegalStateException.class);
+        assertThat(surface.shown()).isFalse(); assertThat(child.closed()).isTrue(); assertThat(disposed).hasValue(1); assertThat(host.open()).isEmpty();
+    }
+    @Test void reentrantCloseDuringBodyRemovalNeverMountsTheReplacement() {
+        var host = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(
+            () -> {}, () -> {}, () -> {}, title -> {}, Rectangle::new, (title, initial) -> java.util.Optional.empty()));
+        var surface = host.window("test", "Reentrant", new Dimension(200, 100), false);
+        var old = new javax.swing.JPanel(); surface.setContent(old);
+        surface.holder().addContainerListener(new java.awt.event.ContainerAdapter() {
+            @Override public void componentRemoved(java.awt.event.ContainerEvent event) { surface.close(); }
+        });
+        var next = new javax.swing.JPanel(); surface.setContent(next);
+        assertThat(surface.closed()).isTrue(); assertThat(surface.holder().getComponents()).isEmpty();
+        assertThat(next.getParent()).isNull(); assertThat(host.open()).isEmpty();
+    }
+
 }

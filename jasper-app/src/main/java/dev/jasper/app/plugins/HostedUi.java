@@ -428,16 +428,20 @@ final class HostedUi {
     private class Surface implements WindowSurface {
         final AuxiliarySurface surface;
         HostedKitView mounted;
-        Surface(AuxiliarySurface surface) { this.surface = surface; surface.onClosed(() -> { if(mounted!=null){mounted.close();mounted=null;} }); }
+        final SurfaceMount bodyMount;
+        Surface(AuxiliarySurface surface) { this.surface = surface; bodyMount = new SurfaceMount(surface, false); surface.onClosed(() -> { if(mounted!=null){mounted.close();mounted=null;} }); }
         @Override public void setContent(dev.jasper.sdk.ui.UiView content) {
             guard("setContent");
             var next = kit.requireOwned(content);
             if(surface.closed())throw new IllegalStateException("Surface is closed");
-            next.mount(surface);
+            next.mount(bodyMount);
             if(mounted==next)return;
             var previous=mounted;
             // A host-packed dialog follows its kit view's size (DialogFit), as plugin dialogs did with pack().
-            surface.setContent(next.component());mounted=next;next.updated=surface::contentChanged;surface.fitContent(true);
+            var component = next.component();
+            // Removing an old anchor may synchronously close this surface through an owned child.
+            mounted = next; next.updated = surface::contentChanged;
+            surface.setContent(component); surface.fitContent(true);
             if(previous!=null)previous.close();
         }
         @Override public void show() { requireUi("show"); surface.show(); }
@@ -462,8 +466,36 @@ final class HostedUi {
         @Override public void close() { subscription(surface::close).close(); }
     }
 
+    private static dev.jasper.sdk.ui.ViewSpec titleSpec(dev.jasper.sdk.ui.ViewSpec value) {
+        if (!(value.root() instanceof dev.jasper.sdk.ui.Nodes.Stack stack)
+                || stack.role() != dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE
+                || stack.children().stream().anyMatch(node -> !(node instanceof dev.jasper.sdk.ui.Nodes.Button)
+                    && !(node instanceof dev.jasper.sdk.ui.Nodes.MenuButton)))
+            throw new IllegalArgumentException("Title actions require an INLINE Stack of Buttons and MenuButtons");
+        return value;
+    }
+
     private final class OwnedWindow extends Surface implements PluginWindow {
-        OwnedWindow(AuxiliarySurface surface) { super(surface); }
+        private final SurfaceMount titleMount;
+        private HostedKitView titleActions;
+        OwnedWindow(AuxiliarySurface surface) {
+            super(surface); titleMount = new SurfaceMount(surface, true);
+            surface.onClosed(() -> { if (titleActions != null) { titleActions.close(); titleActions = null; } });
+        }
+        @Override public void setTitleActions(Optional<dev.jasper.sdk.ui.UiView> actions) {
+            guard("setTitleActions"); java.util.Objects.requireNonNull(actions, "actions");
+            if (surface.closed()) throw new IllegalStateException("Surface is closed");
+            var next = actions.map(kit::requireOwned).orElse(null);
+            if (next == titleActions) return;
+            if (next != null) { titleSpec(next.spec()); next.mount(titleMount); }
+            var previous = titleActions;
+            var component = next == null ? null : next.component();
+            titleActions = next;
+            if (next != null) { next.hostSpec = HostedUi::titleSpec; next.updated = surface::titleActionsChanged; }
+            // Removing the previous anchor can synchronously close an owned child and this window.
+            surface.setTitleActions(component);
+            if (previous != null) previous.close();
+        }
         @Override public Subscription onCloseCommand(BooleanSupplier handler) {
             requireUi("onCloseCommand");
             return wrap(surface.onCloseCommand(() -> {
@@ -665,6 +697,7 @@ final class HostedUi {
                 AuxiliarySurface surface = windows.window(spec.id(), spec.title(), spec.preferredSize(), spec.singleton());
                 OwnedWindow existing = ownedWindows.get(surface);
                 if (existing != null) return existing;
+                surface.contentSize(spec.sizeBasis() == WindowSpec.SizeBasis.CONTENT);
                 var window = new OwnedWindow(surface);
                 ownedWindows.put(surface, window);
                 surface.onClosed(() -> ownedWindows.remove(surface));
@@ -691,12 +724,13 @@ final class HostedUi {
                 AuxiliarySurface surface;
                 if (owner instanceof dev.jasper.sdk.ui.UiAnchor value) {
                     var anchor=HostedAnchor.require(value,windows);
-                    surface=windows.dialog(spec.title(),spec.modal(),anchor.target);
+                    surface=anchor.ownerSurface()!=null ? windows.dialog(spec.title(),spec.modal(),anchor.ownerSurface()) : windows.dialog(spec.title(),spec.modal(),anchor.target);
                     var registration=anchor.onClosed(surface::close);surface.onClosed(registration::close);
                 } else if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window)
                     surface = windows.dialog(spec.title(), spec.modal(), window.surface);
                 else if (owner instanceof WindowHandle terminalWindow && terminals.ownsOpenWindow(terminalWindow)) surface = windows.dialog(spec.title(), spec.modal(), terminalWindow.id());
                 else throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
+                surface.attachedSheet(spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET);
                 if (spec.owner() instanceof OwnedContent content) {
                     var pin = spec.modal() ? content.entry.pin() : null;
                     var registration = content.entry.onClosed(surface::close);

@@ -273,6 +273,73 @@ class TerminalAppIntegrationTest {
         } finally { onEdt(view::removeNotify); }
     }
 
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void currentEpochSearchSurvivesDeferredReflowReconciliation(boolean reconcileBeforeAdmission) throws Exception {
+        show("alpha", 0, "alpha");
+        var result = new AtomicReference<FindResult>();
+        long[] epochs = new long[2], generations = new long[2];
+        onEdt(view::addNotify);
+        try {
+            onEdt(() -> {
+                try {
+                    ((javax.swing.Timer) SessionInspection.field(view, "resizeTimer")).stop();
+                    var rendering = (RenderScheduler) SessionInspection.field(view, "rendering");
+                    rendering.showing(true);
+                    rendering.frameTimerFinished();
+                    long prior = session.internalAccess().absoluteRowEpoch();
+                    session.resize(18, 4);
+                    Await.until(() -> session.internalAccess().absoluteRowEpoch() != prior, "diagnostic reflow epoch");
+                    connector.feed("\033[Hcurrent\033]0;diagnostic-ready\007");
+                    Await.until(() -> session.title().equals("diagnostic-ready"), "diagnostic current output");
+                    rendering.markDirty(rendering.generation());
+                    if (reconcileBeforeAdmission) rendering.frameTimerFinished();
+                    view.findAsync(new SearchQuery("current", false, false), result::set);
+                    var search = SessionInspection.field(view, "search");
+                    ((java.util.concurrent.Future<?>) SessionInspection.field(search, "pendingSearch")).get(5, java.util.concurrent.TimeUnit.SECONDS);
+                    epochs[0] = session.internalAccess().absoluteRowEpoch();
+                    generations[0] = (Long) SessionInspection.field(search, "searchGeneration");
+                    rendering.frameTimerFinished();
+                    epochs[1] = session.internalAccess().absoluteRowEpoch();
+                    generations[1] = (Long) SessionInspection.field(search, "searchGeneration");
+                } catch (Exception failure) { throw new AssertionError(failure); }
+            });
+            drainEventQueue();
+            System.out.println("reconcileBeforeAdmission=" + reconcileBeforeAdmission + " epochs=" + java.util.Arrays.toString(epochs)
+                + " searchGenerations=" + java.util.Arrays.toString(generations) + " callback=" + result.get());
+            assertThat(epochs[1]).isEqualTo(epochs[0]);
+            assertThat(result.get()).as("current-epoch callback after deferred reconciliation").isEqualTo(new FindResult(1, 1, null));
+        } finally { onEdt(view::removeNotify); }
+    }
+
+
+    @Test
+    void currentEpochSynchronousSearchSurvivesDeferredReflowReconciliation() throws Exception {
+        show("alpha", 0, "alpha");
+        var admitted = new AtomicReference<FindResult>();var retained = new AtomicReference<FindResult>();
+        long[] epochs = new long[2];onEdt(view::addNotify);
+        try {
+            onEdt(() -> {
+                try {
+                ((javax.swing.Timer) SessionInspection.field(view, "resizeTimer")).stop();
+                var rendering = (RenderScheduler) SessionInspection.field(view, "rendering");
+                rendering.showing(true);rendering.frameTimerFinished();
+                long prior = session.internalAccess().absoluteRowEpoch();session.resize(18, 4);
+                Await.until(() -> session.internalAccess().absoluteRowEpoch() != prior, "diagnostic sync reflow");
+                connector.feed("\033[Hcurrent\033]0;diagnostic-sync-ready\007");
+                Await.until(() -> session.title().equals("diagnostic-sync-ready"), "diagnostic sync output");
+                rendering.markDirty(rendering.generation());
+                epochs[0]=session.internalAccess().absoluteRowEpoch();
+                admitted.set(view.find(new SearchQuery("current", false, false)));
+                rendering.frameTimerFinished();epochs[1]=session.internalAccess().absoluteRowEpoch();retained.set(view.findNext());
+                } catch (Exception failure) {throw new AssertionError(failure);}
+            });
+            assertThat(epochs[1]).isEqualTo(epochs[0]);assertThat(admitted.get()).isEqualTo(new FindResult(1,1,null));
+            assertThat(retained.get()).as("current epoch synchronous result survives deferred reconciliation").isEqualTo(admitted.get());
+        } finally {onEdt(view::removeNotify);}
+    }
+
     @Test
     void aClearedAsyncFindCannotRestoreStaleResults() throws Exception {
         show("alpha alpha", 0, "alpha alpha");

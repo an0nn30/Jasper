@@ -603,3 +603,8 @@ and editing previously saved Vault references when Vault is absent.
 ## Plan3 Task3 — 2026-10-10
 
 No temporary production renderer or compatibility bridge was added. File Server uses existing SDK descriptors and the real Vault producer. Its legacy Java constructor remains a source-compatible test/consumer adapter to the same lifetime owner. SUPPORTING text mirrors SDK/module projection; filled-folder metadata is internal to the central built-in catalog, with public outline registrations unchanged. Test-only `desktop-server.toml` is a complete source-calibration theme, never a production fallback. Actual-owner harnesses and SDD PNG/metadata/manifests remain evidence; final native and cross-family pixel acceptance is deferred explicitly, not waived.
+
+
+## Plan3 Task4a — 2026-10-11
+
+No temporary production renderer, fixture-only ownership path or SDK generation bump. WindowBody, AttachedSheet, BodyScrim and separate title/body mount tokens are concrete production lifetime owners; NativeShells installs the exact helpers exercised headlessly. VaultSheetRenderTest and KitViewTestAccess expose only test-owned actual staged views, never a second Vault renderer. Original body/auth composition stays live until4b. Shared footer overflow is permanent bounded engine behavior for an extreme usable screen; native acceptance is still required.

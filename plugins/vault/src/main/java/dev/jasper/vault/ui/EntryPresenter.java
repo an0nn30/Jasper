@@ -13,17 +13,17 @@ final class EntryPresenter implements AutoCloseable {
     private final List<PluginDialog> selectors=new ArrayList<>();
     EntryPresenter(PluginContext context){this.context=context;}
     void show(WindowOwner owner,String title,Function<Runnable,? extends EditorForm> factory,Runnable finished){
-        var dialog=context.windows().dialog(new DialogSpec(title,owner,true));
+        var dialog=context.windows().dialog(new DialogSpec(title,owner,true,DialogSpec.Presentation.ATTACHED_SHEET));
         EditorForm form;
         try{form=factory.apply(dialog::close);}
         catch(RuntimeException failure){dialog.close();finished.run();throw failure;}
-        try{form.setFileChooser(dialog::chooseFile);dialog.setContent(form.view());}
+        try{form.setTitle(title);form.setFileChooser(dialog::chooseFile);dialog.setContent(form.view());}
         catch(RuntimeException failure){form.close();dialog.close();context.notifications().group().error("Could not open the form",title+": "+EditorForm.message(failure),failure);finished.run();return;}
         forms.put(dialog,form);
         dialog.onClosed(()->{form.close();forms.remove(dialog);finished.run();});dialog.show();
     }
     void create(WindowOwner owner,VaultManager manager,Runnable finished){
-        var dialog=context.windows().dialog(new DialogSpec("New Credential",owner,true));selectors.add(dialog);String[] selected={""};
+        var dialog=context.windows().dialog(new DialogSpec("New Credential",owner,true,DialogSpec.Presentation.ATTACHED_SHEET));selectors.add(dialog);String[] selected={""};
         var actions=List.of(new Nodes.Button("create.login",ControlState.READY,"Login","login",Nodes.ButtonKind.SECONDARY,"create.login",""),
             new Nodes.Button("create.key",ControlState.READY,"SSH path key","key",Nodes.ButtonKind.SECONDARY,"create.key",""),
             new Nodes.Button("create.cancel",ControlState.READY,"Cancel","",Nodes.ButtonKind.SECONDARY,"create.cancel",""));

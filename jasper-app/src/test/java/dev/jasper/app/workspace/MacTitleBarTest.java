@@ -114,6 +114,31 @@ class MacTitleBarTest {
         });
     }
 
+    @Test void actualWorkspaceChromeRegistersMeasuredBodyIncludingStatus() throws Exception {
+        edt(() -> {
+            for (boolean supported : java.util.List.of(true, false)) for (var mode : dev.jasper.app.config.ViewMode.values()) {
+                var owner = content(launcher(new ArrayDeque<>())); owner.initializeViewMode(mode); var root = new JRootPane();
+                try (var bar = WindowContent.installTitleBar(root, owner, supported, title -> {})) {
+                    root.setSize(900, 650); layoutTree(root);
+                    var lease = dev.jasper.app.platform.WindowBody.find(root).orElseThrow();
+                    var region = lease.boundsInRoot().orElseThrow();
+                    assertThat(region.y + region.height).as("footer belongs to the body").isEqualTo(650);
+                    var footer = SwingUtilities.convertRectangle(owner.status().getParent(), owner.status().getBounds(), root);
+                    assertThat(region.contains(footer)).isTrue();
+                    int oldTop = region.y;
+                    owner.setToolbarHeight(64);layoutTree(root);region = lease.boundsInRoot().orElseThrow();
+                    if (mode == dev.jasper.app.config.ViewMode.NORMAL) assertThat(region.y).isGreaterThan(oldTop);
+                    else assertThat(region.y).isZero();
+                    owner.status().setVisible(false); layoutTree(root);
+                    assertThat(lease.boundsInRoot().orElseThrow().y + lease.boundsInRoot().orElseThrow().height).isEqualTo(650);
+                    var copy=lease.boundsInRoot().orElseThrow();copy.width=1;assertThat(lease.boundsInRoot().orElseThrow().width).isEqualTo(900);
+                    root.setContentPane(new JPanel());assertThat(lease.boundsInRoot()).isEmpty();
+                    owner.close();assertThat(dev.jasper.app.platform.WindowBody.find(root)).isEmpty();
+                }
+            }
+        });
+    }
+
     @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> new dev.jasper.app.appearance.ThemeController()); }
 
     @Test void supportedRootHidesOnlyNativeDrawingAndRetainsTitleMetadata() throws Exception {

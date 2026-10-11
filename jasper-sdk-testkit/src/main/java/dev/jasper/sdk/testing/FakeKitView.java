@@ -40,7 +40,8 @@ public final class FakeKitView implements UiView {
   Attachment(String id){this.id=id;kind=kind(index(spec.root()).get(id));ancestry=path(spec.root(),id);}
   private Object kind(Nodes.Node node){return node instanceof Nodes.Button ? Nodes.Button.class : node instanceof Nodes.Choice c && c.kind()==Nodes.ChoiceKind.PICKER ? c.kind() : null;}
   private boolean eligible(Nodes.Node node,boolean parent){boolean live=parent&&node.state().visible()&&node.state().enabled()&&!node.state().busy();if(node.id().equals(id))return live;for(var child:children(node))if(eligible(child,live))return true;return false;}
-  @Override public boolean isOpen(){if(!done&&(closed.get()||mounted==null||mount!=mounted||host==null||kind==null||!kind.equals(kind(index(spec.root()).get(id)))||!ancestry.equals(path(spec.root(),id))||!eligible(spec.root(),true)||mounted instanceof FakeUi.FakeWindow w&&(!w.shown||w.closed)))close();return !done;}
+  FakeUi.FakeWindow ownerSurface(){return mounted instanceof FakeUi.SurfaceMount slot ? slot.surface() : mounted instanceof FakeUi.FakeWindow window ? window : null;}
+  @Override public boolean isOpen(){if(!done&&(closed.get()||mounted==null||mount!=mounted||host==null||kind==null||!kind.equals(kind(index(spec.root()).get(id)))||!ancestry.equals(path(spec.root(),id))||!eligible(spec.root(),true)||ownerSurface()!=null&&(!ownerSurface().shown||ownerSurface().closed)))close();return !done;}
   @Override public dev.jasper.sdk.Subscription onClosed(Runnable listener){Objects.requireNonNull(listener);if(!isOpen()){listener.run();return () -> {}; }listeners.add(listener);return () -> listeners.remove(listener);}
   @Override public void close(){if(done)return;done=true;anchors.remove(this);for(var listener:List.copyOf(listeners))listener.run();listeners.clear();}
  }

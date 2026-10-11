@@ -48,12 +48,14 @@ public class EditorForm implements AutoCloseable {
     private final Map<String, String> values = new HashMap<>(), choices = new HashMap<>(), errors = new LinkedHashMap<>();
     private final Map<String, Boolean> toggles = new HashMap<>();
     private Supplier<CompletableFuture<Void>> action = () -> CompletableFuture.completedFuture(null);
-    private String message = "", saveLabel = "Save", cancelLabel = "Cancel";
+    private String title = "Vault entry", message = "", saveLabel = "Save", cancelLabel = "Cancel";
     private boolean closed, busy, cancelEnabled = true;
     private UiView view;
     private BiFunction<String, Optional<Path>, Optional<Path>> fileChooser = (title, initial) -> Optional.empty();
 
     protected EditorForm(UiKit kit, Runnable dismiss) { this.kit = Objects.requireNonNull(kit); this.dismiss = Objects.requireNonNull(dismiss); }
+
+    final void setTitle(String title) { this.title = Objects.requireNonNull(title); render(); }
 
     final void setFileChooser(BiFunction<String, Optional<Path>, Optional<Path>> chooser) { fileChooser = Objects.requireNonNull(chooser); }
 
@@ -203,7 +205,7 @@ public class EditorForm implements AutoCloseable {
         var actions = List.of(
             new Nodes.Button(CANCEL, new ControlState(true, cancelEnabled, false, ""), cancelLabel, "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
             new Nodes.Button(SAVE, new ControlState(true, true, busy, ""), saveLabel, "", Nodes.ButtonKind.PRIMARY, SAVE, ""));
-        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, "Vault entry", Optional.empty(), sections, Optional.empty(), actions,
+        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.SHEET, title, Optional.empty(), sections, Optional.empty(), actions,
             cancelEnabled ? CANCEL : "");
     }
 
