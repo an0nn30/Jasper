@@ -65,6 +65,21 @@ final class ShortcutEditPanel extends JPanel {
         int mask=java.awt.event.InputEvent.CTRL_DOWN_MASK|java.awt.event.InputEvent.ALT_DOWN_MASK|java.awt.event.InputEvent.SHIFT_DOWN_MASK|java.awt.event.InputEvent.META_DOWN_MASK|java.awt.event.InputEvent.ALT_GRAPH_DOWN_MASK;
         return visibleEdit() && !literal && (stroke.getModifiers()&mask)==0 && (stroke.getKeyCode()==java.awt.event.KeyEvent.VK_ENTER || stroke.getKeyCode()==java.awt.event.KeyEvent.VK_ESCAPE);
     }
+    /** Ordinary capture leaves traversal and real auxiliary-control activation to Swing. */
+    boolean auxiliaryKey(java.awt.Component source, KeyStroke stroke) {
+        if (!visibleEdit() || literal) return false;
+        int modifiers=stroke.getModifiers() & (java.awt.event.InputEvent.CTRL_DOWN_MASK
+                |java.awt.event.InputEvent.ALT_DOWN_MASK|java.awt.event.InputEvent.META_DOWN_MASK
+                |java.awt.event.InputEvent.ALT_GRAPH_DOWN_MASK|java.awt.event.InputEvent.SHIFT_DOWN_MASK);
+        if (stroke.getKeyCode()==java.awt.event.KeyEvent.VK_TAB
+                && (modifiers & ~java.awt.event.InputEvent.SHIFT_DOWN_MASK)==0) return true;
+        // These are the actual owned descriptor controls; the receiving value still records Space.
+        return modifiers==0 && stroke.getKeyCode()==java.awt.event.KeyEvent.VK_SPACE
+                && source instanceof javax.swing.AbstractButton && host!=null
+                && SwingUtilities.isDescendingFrom(source,host) && source.getName()!=null
+                && java.util.Set.of("editor.cancel","editor.set","editor.record","editor.options.main",
+                        "editor.options.arrow","editor.reassign").contains(source.getName());
+    }
     boolean gesture(KeyStroke stroke) {
         if(!special(stroke))return false;
         if(stroke.getKeyCode()==java.awt.event.KeyEvent.VK_ENTER)set();

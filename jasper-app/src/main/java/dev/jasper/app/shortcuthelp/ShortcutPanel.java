@@ -47,6 +47,8 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
     private boolean installed;
     private boolean swallowTyped;
     private final Set<Integer> held = new HashSet<>();
+    private final Map<Integer,javax.swing.MenuElement> popupHeld = new java.util.HashMap<>();
+    private javax.swing.MenuElement popupTypedOwner;
     private final KeyEventDispatcher dispatcher = this::dispatch;
     private final java.beans.PropertyChangeListener focusListener = event -> {
         if (SwingUtilities.getWindowAncestor(this) != event.getNewValue()) focusLeftWindow();
@@ -208,13 +210,29 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
 
     boolean dispatch(KeyEvent event) {
         int type = event.getID(), code = event.getKeyCode();
+        var popupPath=javax.swing.MenuSelectionManager.defaultManager().getSelectedPath();
+        var popupOwner=type==KeyEvent.KEY_TYPED ? popupTypedOwner
+                : type==KeyEvent.KEY_RELEASED ? popupHeld.remove(code) : popupHeld.get(code);
+        if (popupOwner!=null) {
+            if (type==KeyEvent.KEY_PRESSED) {popupTypedOwner=popupOwner;swallowTyped=false;}
+            if (type==KeyEvent.KEY_RELEASED && popupHeld.isEmpty()) popupTypedOwner=null;
+            // Repeats still navigate their original open menu; after it closes, drain without reinterpreting.
+            if (java.util.Arrays.asList(popupPath).contains(popupOwner)) return false;
+            event.consume();return true;
+        }
         boolean tail = type == KeyEvent.KEY_RELEASED ? held.remove(code)
             : type == KeyEvent.KEY_TYPED ? swallowTyped && !held.isEmpty()
             : type == KeyEvent.KEY_PRESSED && held.contains(code);
-        if (type == KeyEvent.KEY_PRESSED) swallowTyped = tail;
-        if (tail) { event.consume(); return true; }
+        if (tail) {
+            if(type==KeyEvent.KEY_PRESSED) {swallowTyped=true;popupTypedOwner=null;}
+            event.consume(); return true;
+        }
         if (closed || type != KeyEvent.KEY_PRESSED || !belongs(event.getComponent())) return false;
-        if(javax.swing.MenuSelectionManager.defaultManager().getSelectedPath().length>0)return false;
+        swallowTyped=false;popupTypedOwner=null;
+        if(popupPath.length>0) {
+            popupHeld.put(code,popupPath[0]);popupTypedOwner=popupPath[0];return false;
+        }
+        if(!recording && editor.auxiliaryKey(event.getComponent(),KeyStroke.getKeyStrokeForEvent(event)))return false;
         if(!(recording || editor.recording() || editor.special(KeyStroke.getKeyStrokeForEvent(event))))return false;
         held.add(code); swallowTyped = true;
         if (!modifier(code)) capture(KeyStroke.getKeyStrokeForEvent(event));
@@ -223,7 +241,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
 
     /** Losing focus can hide key releases from AWT; never retain physical keys across that boundary. */
     void focusLeftWindow() {
-        held.clear(); swallowTyped = false;
+        held.clear(); swallowTyped = false; popupHeld.clear(); popupTypedOwner=null;
         editor.stopRecording();
         recording = false;
         filter();
@@ -258,7 +276,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         installed = false;
         if (mountedRoot != null && mountedRoot.getClientProperty(WindowInput.SHORTCUT_RECORDER) == nativeRecorder)
             mountedRoot.putClientProperty(WindowInput.SHORTCUT_RECORDER, null);
-        mountedRoot = null; held.clear(); swallowTyped = false;
+        mountedRoot = null; held.clear(); swallowTyped = false; popupHeld.clear(); popupTypedOwner=null;
     }
 
     @Override public void close() {

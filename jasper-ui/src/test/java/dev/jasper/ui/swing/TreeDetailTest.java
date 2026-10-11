@@ -10,6 +10,59 @@ import static org.assertj.core.api.Assertions.*;
 class TreeDetailTest {
     private static ViewSpec tree(boolean open) {return new ViewSpec(new Tree("tree",ControlState.READY,List.of(new TreeItem("group","Group",Optional.empty(),false,List.of(new TreeItem("a","First",Optional.empty(),true,List.of()),new TreeItem("b","Second",Optional.empty(),true,List.of())))),open?Set.of("group"):Set.of(),Set.of(),""));}
     private static ViewSpec body(String label) {return new ViewSpec(new Button("edit",ControlState.READY,label,"",ButtonKind.SECONDARY,"edit",""));}
+    @Test void rejectedSameIdIconUpdateRetainsPriorActionDocumentAndRecovery() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();var events=new ArrayList<UiEvent>();
+            var priorFocus=java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            var focus=new SettingsKitTest.Focus();
+            java.util.function.BiFunction<String,String,ViewSpec> spec=(label,icon)->new ViewSpec(new Nodes.Stack("body",ControlState.READY,LayoutRole.VERTICAL,List.of(
+                    new Field("input",ControlState.READY,FieldKind.TEXT,label,"","Input",""),
+                    new Button("edit",ControlState.READY,label,icon,ButtonKind.SECONDARY,label,""))));
+            try(var view=new KitView(context,tree(true),events::add)) {
+                var detail=view.attachTreeDetail("tree","a",spec.apply("Original",""),events::add,()->{});
+                var button=KitViewTest.find(view,"edit",javax.swing.JButton.class);
+                var input=KitViewTest.find(view,"input.input",javax.swing.text.JTextComponent.class);
+                var document=input.getDocument();input.select(1,4);
+                java.awt.KeyboardFocusManager.setCurrentKeyboardFocusManager(focus);focus.focus(input);
+                assertThatThrownBy(()->detail.update(spec.apply("Rejected","missing:icon"))).isInstanceOf(IllegalArgumentException.class);
+                assertThat(button.getText()).isEqualTo("Original");
+                button.doClick(0);assertThat(events).containsExactly(new UiEvent.Action("Original"));
+                assertThat(input.getDocument()).isSameAs(document);assertThat(input.getText()).isEqualTo("Original");
+                assertThat(focus.getFocusOwner()).isSameAs(input);
+                assertThat(input.getSelectionStart()).isEqualTo(1);assertThat(input.getSelectionEnd()).isEqualTo(4);
+                detail.update(spec.apply("Accepted","add"));
+                assertThat(KitViewTest.find(view,"edit",javax.swing.JButton.class)).isSameAs(button);
+                assertThat(input.getDocument()).isSameAs(document);button.doClick(0);
+                assertThat(events).containsExactly(new UiEvent.Action("Original"),new UiEvent.Action("Accepted"));
+            } finally {java.awt.KeyboardFocusManager.setCurrentKeyboardFocusManager(priorFocus);KitViewTest.release(context);}
+        });
+    }
+
+    @Test void detailPreflightsLazyArtworkBeforePublishingAnyControlChanges() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();var bad=new MenuItem("bad","Bad","missing:icon","bad",true,false);
+            List<Nodes.Node> lazy=List.of(
+                new MenuButton("lazy",ControlState.READY,"Menu","",ButtonKind.GHOST,"",List.of(bad),""),
+                new Choice("lazy",ControlState.READY,ChoiceKind.DROPDOWN,List.of(new Option("bad","Bad","missing:icon","")),"","Choice",""),
+                new Header("lazy",ControlState.READY,"Header",OptionalInt.empty(),Optional.empty(),Optional.empty(),List.of(bad)),
+                new ItemList("lazy",ControlState.READY,ListKind.SINGLE,List.of(),Set.of(),"",List.of(bad)),
+                new Table("lazy",ControlState.READY,List.of(),List.of(new TableRow("row",Map.of(),Optional.of("missing:icon"))),Set.of(),"",List.of()),
+                new Tree("lazy",ControlState.READY,List.of(new TreeItem("closed","Closed",Optional.empty(),false,
+                    List.of(new TreeItem("hidden","Hidden",Optional.of("missing:icon"),true,List.of())))),Set.of(),Set.of(),""),
+                new Breadcrumbs("lazy",ControlState.READY,List.of(new Crumb("crumb","Crumb",List.of(bad))),"Path",false,"","","",""));
+            try(var view=new KitView(context,tree(true),e->{})) {
+                var detail=view.attachTreeDetail("tree","a",body("Original"),e->{},()->{});
+                var button=KitViewTest.find(view,"edit",javax.swing.JButton.class);
+                for(var rejected:lazy) {
+                    var spec=new ViewSpec(new Nodes.Stack("body",ControlState.READY,LayoutRole.VERTICAL,List.of(body("Rejected").root(),rejected)));
+                    assertThatThrownBy(()->detail.update(spec)).as(rejected.getClass().getSimpleName()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("missing:icon");
+                    assertThat(button.getText()).isEqualTo("Original");assertThat(detail.isAttached()).isTrue();
+                }
+                detail.update(body("Accepted"));assertThat(button.getText()).isEqualTo("Accepted");
+            } finally {KitViewTest.release(context);}
+        });
+    }
+
     @Test void keycapsArePassiveOnRowsAndPreserveCandidateButtonAction() {
         Edt.run(()->{
             var context=KitFixtures.context();var events=new java.util.ArrayList<UiEvent>();

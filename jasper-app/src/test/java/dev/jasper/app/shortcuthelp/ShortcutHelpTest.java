@@ -107,7 +107,7 @@ class ShortcutHelpTest {
             var panel = panel(true, changes -> { throw new AssertionError("Unexpected save"); });
             var root = new JRootPane(); root.setContentPane(panel);
             button(panel, "record").doClick(0);
-            for (int code : new int[]{KeyEvent.VK_ESCAPE, KeyEvent.VK_TAB, KeyEvent.VK_W, KeyEvent.VK_Q}) {
+            for (int code : new int[]{KeyEvent.VK_ESCAPE, KeyEvent.VK_TAB, KeyEvent.VK_SPACE, KeyEvent.VK_W, KeyEvent.VK_Q}) {
                 var event = key(search(panel), KeyEvent.KEY_PRESSED, code, 0);
                 assertThat(panel.dispatch(event)).isTrue();
                 assertThat(search(panel).getText()).isEqualTo(ShortcutText.format(KeyStroke.getKeyStroke(code, 0)));

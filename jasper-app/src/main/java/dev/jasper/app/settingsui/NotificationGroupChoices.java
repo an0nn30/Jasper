@@ -24,6 +24,7 @@ public record NotificationGroupChoices(Supplier<List<Group>> groups) {
      * @param name the name it is listed with
      * @param owner who declared it, as shown: "Jasper" or a plugin's name
      * @param defaultMode how its notifications appear by default: "card", "sticky", "history" or "off"
+     * @param artwork immutable declared owner artwork; empty or invalid artwork uses the generic owner fallback
      */
     public record Group(String id, String name, String owner, String defaultMode, String ownerId, String ownerIcon, java.util.Optional<dev.jasper.ui.icons.EncodedArtwork> artwork) {
         public Group(String id,String name,String owner,String defaultMode,String ownerId,String ownerIcon) {this(id,name,owner,defaultMode,ownerId,ownerIcon,java.util.Optional.empty());}

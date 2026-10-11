@@ -10,12 +10,54 @@ import java.util.List;
 final class Trees {
     private Trees() {}
 
-    static void validateDetail(Nodes.Node node) {
+    static void validateDetail(Nodes.Node node, java.util.Set<String> icons) {
         if(node instanceof Nodes.Custom)throw new IllegalArgumentException("Tree detail requires standard descriptors");
-        if(node instanceof Nodes.ItemList list)for(var item:list.items()) {
-            item.leading().ifPresent(Trees::validateDetail);item.title().forEach(Trees::validateDetail);item.subtitle().forEach(Trees::validateDetail);item.trailing().forEach(Trees::validateDetail);
+        switch(node) {
+            case Nodes.Icon icon -> requireIcon(icon.name(),icons);
+            case Nodes.Button button -> optionalIcon(button.icon(),icons);
+            case Nodes.MenuButton menu -> {optionalIcon(menu.icon(),icons);validateMenus(menu.items(),icons);}
+            case Nodes.Choice choice -> {
+                optionalIcon(choice.icon(),icons);choice.face().ifPresent(face->optionalIcon(face.icon(),icons));
+                choice.options().forEach(option->optionalIcon(option.icon(),icons));
+            }
+            case Nodes.PickerMenu menu -> menu.items().forEach(item->optionalIcon(item.icon(),icons));
+            case Nodes.Header header -> validateMenus(header.overflow(),icons);
+            case Nodes.ItemList list -> {
+                validateMenus(list.contextActions(),icons);
+                for(var item:list.items()) {
+                    item.contextActions().ifPresent(menu->validateMenus(menu,icons));
+                    item.leading().ifPresent(child->validateDetail(child,icons));
+                    item.title().forEach(child->validateDetail(child,icons));
+                    item.subtitle().forEach(child->validateDetail(child,icons));
+                    item.trailing().forEach(child->validateDetail(child,icons));
+                }
+            }
+            case Nodes.Table table -> {
+                validateMenus(table.contextActions(),icons);
+                for(var row:table.rows()) {
+                    row.icon().ifPresent(name->requireIcon(name,icons));
+                    row.contextActions().ifPresent(menu->validateMenus(menu,icons));
+                }
+            }
+            case Nodes.Tree tree -> tree.roots().forEach(item->validateTreeItem(item,icons));
+            case Nodes.Breadcrumbs crumbs -> crumbs.crumbs().forEach(crumb->validateMenus(crumb.contextActions(),icons));
+            default -> {}
         }
-        ControlRegistry.children(node).forEach(Trees::validateDetail);
+        ControlRegistry.children(node).forEach(child->validateDetail(child,icons));
+    }
+    private static void requireIcon(String name,java.util.Set<String> icons) {
+        if(!icons.contains(name))throw new IllegalArgumentException("Unknown icon: "+name);
+    }
+    private static void optionalIcon(String name,java.util.Set<String> icons) {
+        if(!name.isEmpty())requireIcon(name,icons);
+    }
+    private static void validateMenus(java.util.List<dev.jasper.ui.model.MenuItem> items,java.util.Set<String> icons) {
+        items.stream().filter(item->!item.icon().isBlank()).forEach(item->requireIcon(item.icon(),icons));
+    }
+    private static void validateTreeItem(dev.jasper.ui.model.TreeItem item,java.util.Set<String> icons) {
+        item.icon().ifPresent(name->requireIcon(name,icons));
+        item.contextActions().ifPresent(menu->validateMenus(menu,icons));
+        item.children().forEach(child->validateTreeItem(child,icons));
     }
     static final class TreePane extends javax.swing.JScrollPane {
         final KitContext context; TreeControl owner;
@@ -54,7 +96,7 @@ final class Trees {
             if(detail!=null)throw new IllegalStateException("Tree already has a detail");
             var item=items.get(itemId);
             if(item==null || !item.leaf() || indexOf(itemId)<0)throw new IllegalArgumentException("Detail requires a visible leaf");
-            validateDetail(spec.root());
+            validateDetail(spec.root(),context().icons().names());
             var body=new KitView(context(),spec,events);
             detail=new TreeDetailHandle(this,itemId,body,detached);
             body.inheritedEnabled(interactive());canvas.add(body);detailChanged();return detail;

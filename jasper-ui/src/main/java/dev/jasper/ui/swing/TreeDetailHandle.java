@@ -11,7 +11,7 @@ public final class TreeDetailHandle implements AutoCloseable {
     final Runnable detached;
     boolean attached=true;
     TreeDetailHandle(Trees.TreeControl owner,String itemId,KitView body,Runnable detached){this.owner=owner;this.itemId=itemId;this.body=body;this.detached=detached;}
-    public void update(ViewSpec spec){requireAttached();Trees.validateDetail(Objects.requireNonNull(spec).root());body.update(spec);owner.detailChanged();}
+    public void update(ViewSpec spec){requireAttached();Trees.validateDetail(Objects.requireNonNull(spec).root(),body.context().icons().names());body.update(spec);owner.detailChanged();}
     public void focus(String nodeId){requireAttached();reveal();body.focus(nodeId);}
     public void reveal(){requireAttached();int index=owner.indexOf(itemId);owner.canvas.scrollRectToVisible(new java.awt.Rectangle(0,owner.top(index),owner.canvas.getWidth(),owner.heightAt(index)));}
     public boolean isAttached(){return attached;}
