@@ -32,7 +32,7 @@
 **Spec:** [Approved design, especially panel composition §6.1](../specs/2026-10-04-jasper-theme-engine-design.md).
 **Prerequisites:** [Plan 1](2026-10-04-theme-engine-1-engine-and-kit.md) and [Plan 2](2026-10-04-theme-engine-2-consumer-migration.md) implemented, reviewed and verified.
 **Shared contracts:** [Types, paths and test conventions](2026-10-04-theme-engine-contracts.md).
-**Status:** In execution. Task1 implementation gate is complete; its measured pixel residuals remain owned by final cross-family calibration/native chrome checks. Task2a cf8 fix1 and Task2b implementation through02eb78e4 are independently approved. Task2b visual completion and fresh native checks remain open; Task3 implementation is independently approved through50b744c9; its native/pixel checks remain open. Task4a implementation is ready for independent review under the binding native composition amendment; Task4b follows that review. Deviations are recorded in the amendments above; controller native validation is explicitly authorized.
+**Status:** In execution. Task1 implementation gate is complete; its measured pixel residuals remain owned by final cross-family calibration/native chrome checks. Task2a cf8 fix1 and Task2b implementation through02eb78e4 are independently approved. Task2b visual completion and fresh native checks remain open; Task3 implementation is independently approved through50b744c9; its native/pixel checks remain open. Task4a implementation is independently approved through6d069879 under the binding native composition amendment; Task4b follows with the minor shared sizing finding explicitly assigned. Deviations are recorded in the amendments above; controller native validation is explicitly authorized.
 
 ## Global Constraints
 
@@ -154,7 +154,8 @@ preview, resize the candidate arbitrarily, or overwrite source images.
 - [x] Implement registered live owner-body geometry, attached modal sheet controller, nested scrim/chooser/focus cleanup, actual native title accessory/fallback toolbar and measured initial CONTENT sizing.
 - [x] Integrate actual Vault manager Lock/Add and fresh900×555 content default, and explicit EntryPresenter/selector attached presentation; retain current body composition.
 - [x] Verify actual production wiring, lifecycle/rollback/slot independence and staged Vault/picker routes; render affected owners and archive full-gate raw XML (Task4a report).
-- [ ] Independent implementation review and controller native/pixel acceptance.
+- [x] Independent scoped implementation/spec and quality review approved through6d069879; P3 replacement-body height-cache finding carried explicitly into4b.
+- [ ] Controller native/pixel acceptance; no page accepted.
 
 ### Task 4b — Complete Vault manager and item composition
 
