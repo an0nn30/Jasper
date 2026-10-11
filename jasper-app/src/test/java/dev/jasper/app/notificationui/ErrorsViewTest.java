@@ -48,6 +48,60 @@ class ErrorsViewTest {
         return incidents.record(source, operation, "AWT-EventQueue-0", Capture.of(failure));
     }
 
+    @Test void enlargedNarrowFooterKeepsAllActionsSeparateAndListUsable() {
+        var themes = new dev.jasper.app.appearance.ThemeController();
+        themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
+        var view = new ErrorsView(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),incidents,
+            new ErrorsView.Hooks(id->"Plugin",id->"",HERE,copied::add,disabled::add,()->{}),ZoneOffset.UTC);
+        try {
+            var incident=record("dev.fixture","operation",new IllegalStateException("failure"));
+            var originalTrace=view.traceArea();var document=originalTrace.getDocument();originalTrace.select(1,4);
+            view.setSize(900,560);for(int i=0;i<5;i++)dev.jasper.app.testsupport.KitTestSupport.layout(view);
+            themes.configure(dev.jasper.app.appearance.Theme.DARK,new dev.jasper.app.config.UiFontConfig("system",32));
+            view.setSize(600,320);for(int i=0;i<5;i++)dev.jasper.app.testsupport.KitTestSupport.layout(view);
+            var actions=List.of(view.copyButton(),view.disableButton(),view.logFolderButton(),view.clearButton());
+            for(int i=0;i<actions.size();i++) {
+                var box=bounds(actions.get(i),view);
+                assertThat(box.width).isGreaterThanOrEqualTo(actions.get(i).getPreferredSize().width);
+                assertThat(box.x+box.width).isLessThanOrEqualTo(view.getWidth());
+                for(int j=i+1;j<actions.size();j++)assertThat(box.intersects(bounds(actions.get(j),view))).isFalse();
+            }
+            assertThat(view.listView().getWidth()).isGreaterThanOrEqualTo(140);
+            var trace=view.traceArea();var viewport=(javax.swing.JViewport)trace.getParent();
+            assertThat(viewport.getHeight()).as("two trace lines survive short height").isGreaterThanOrEqualTo(2*trace.getFontMetrics(trace.getFont()).getHeight());
+            trace.scrollRectToVisible(new java.awt.Rectangle(0,0,1,trace.getFontMetrics(trace.getFont()).getHeight()));
+            assertThat(trace.getVisibleRect().height).as("trace %s viewport %s visible %s outer %s",trace.getBounds(),viewport.getBounds(),trace.getVisibleRect(),dev.jasper.app.testsupport.KitTestSupport.require(view,"native.surface.scroll",javax.swing.JScrollPane.class).getViewport().getViewRect()).isGreaterThanOrEqualTo(trace.getFontMetrics(trace.getFont()).getHeight());
+            for(var action:actions) {
+                action.scrollRectToVisible(new java.awt.Rectangle(0,0,action.getWidth(),action.getHeight()));
+                assertThat(action.getVisibleRect().height).isEqualTo(action.getHeight());
+            }
+            themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
+            view.setSize(900,560);for(int i=0;i<5;i++)dev.jasper.app.testsupport.KitTestSupport.layout(view);
+            assertThat(view.selected()).map(Incident::id).contains(incident.id());assertThat(view.traceArea()).isSameAs(originalTrace);
+            assertThat(originalTrace.getDocument()).isSameAs(document);assertThat(originalTrace.getSelectionStart()).isEqualTo(1);
+            assertThat(dev.jasper.app.testsupport.KitTestSupport.require(view,"native.surface.scroll",javax.swing.JScrollPane.class).getVerticalScrollBar().isVisible()).isFalse();
+        } finally {view.close();themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());themes.close();}
+    }
+
+    @Test void freshEnlargedSplitLeavesTraceViewportReachable() {
+        var themes=new dev.jasper.app.appearance.ThemeController();
+        themes.configure(dev.jasper.app.appearance.Theme.DARK,new dev.jasper.app.config.UiFontConfig("system",32));
+        var view=new ErrorsView(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),incidents,
+            new ErrorsView.Hooks(id->"Plugin",id->"",HERE,copied::add,disabled::add,()->{}),ZoneOffset.UTC);
+        try {
+            record("dev.fixture","operation",new IllegalStateException("failure"));
+            view.setSize(600,320);for(int i=0;i<6;i++)dev.jasper.app.testsupport.KitTestSupport.layout(view);
+            var trace=view.traceArea();var viewport=(javax.swing.JViewport)trace.getParent();
+            assertThat(view.messageArea().getFont().getSize2D()).as("native body uses kit font exactly once").isEqualTo(view.headerLabel().getFont().getSize2D());
+            assertThat(viewport.getWidth()).as("fresh enlarged trace lane").isGreaterThanOrEqualTo(100);
+            var outer=dev.jasper.app.testsupport.KitTestSupport.require(view,"native.surface.scroll",javax.swing.JScrollPane.class);
+            var top=javax.swing.SwingUtilities.convertPoint(viewport,0,0,outer.getViewport().getView());
+            outer.getVerticalScrollBar().setValue(top.y);
+            trace.scrollRectToVisible(new java.awt.Rectangle(0,0,30,trace.getFontMetrics(trace.getFont()).getHeight()));
+            assertThat(trace.getVisibleRect().height).as("trace %s viewport %s visible %s outer %s",trace.getBounds(),viewport.getBounds(),trace.getVisibleRect(),dev.jasper.app.testsupport.KitTestSupport.require(view,"native.surface.scroll",javax.swing.JScrollPane.class).getViewport().getViewRect()).isGreaterThanOrEqualTo(trace.getFontMetrics(trace.getFont()).getHeight());
+        } finally {view.close();themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());themes.close();}
+    }
+
     @Test void incidentsAreListedNewestFirstWithSummarySourceAndTime() {
         var view = view();
         record("jasper", "thread main", new IllegalStateException("first broke\nmore detail"));

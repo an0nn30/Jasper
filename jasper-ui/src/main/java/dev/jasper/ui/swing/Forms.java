@@ -39,7 +39,7 @@ final class Forms {
                     int width = Math.max(0, parent.getWidth() - insets.left - insets.right);
                     int height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);
                     int footerHeight = Math.min(height, Composition.height(footer, width));
-                    if (((Nodes.Form)FormControl.this.node).kind()==Nodes.FormKind.WINDOW && height < footerHeight + ThemePainting.metric(context(),DesignMetrics.Role.FIELD_HEIGHT)) {
+                    if (height < footerHeight + ThemePainting.metric(context(),DesignMetrics.Role.FIELD_HEIGHT)) {
                         int actionHeight=java.util.Arrays.stream(actions.getComponents()).filter(Component::isVisible).mapToInt(c->c.getPreferredSize().height).max().orElse(0);
                         // Keep one full action reachable whenever possible; below that retain a bounded body viewport.
                         footerHeight=Math.min(footerHeight,Math.min(Math.max(0,height-1),Math.max(actionHeight,height/2)));
@@ -106,7 +106,7 @@ final class Forms {
         }
 
         void revealFocusedBody(JComponent focused) {
-            if(!closed && !view.isClosed() && ((Nodes.Form)node).kind()==Nodes.FormKind.WINDOW && SwingUtilities.isDescendingFrom(focused,body))
+            if(!closed && !view.isClosed() && SwingUtilities.isDescendingFrom(focused,body))
                 for (Container ancestor=focused.getParent(); ancestor!=null; ancestor=ancestor.getParent()) {
                     if (ancestor instanceof JViewport viewport && viewport.getView() instanceof JComponent content)
                         content.scrollRectToVisible(SwingUtilities.convertRectangle(focused,new Rectangle(0,0,focused.getWidth(),focused.getHeight()),content));

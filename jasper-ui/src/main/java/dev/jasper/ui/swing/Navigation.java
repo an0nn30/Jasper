@@ -10,7 +10,7 @@ import javax.swing.*;
 final class Navigation {
     private Navigation() {}
 
-    static final class InlineLayout implements Composition.WidthLayout {
+    static class InlineLayout implements Composition.WidthLayout {
         final KitContext context;
         final DesignMetrics.Role gapRole;
         final Stacks.StackLayout wrapped;

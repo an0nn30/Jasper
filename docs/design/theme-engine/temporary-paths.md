@@ -1,5 +1,9 @@
 # Plan 1 temporary theme paths and Plan 2 removal ownership
 
+## Task9c disposition — 2026-10-11
+
+Shared native SurfacePanel is permanent module composition, not an SDK descriptor or temporary adapter. Local palette FixedHeightPanel/StepRow/HintBar/CardOutline and chooser RoundedPane/card paint are retired into measured shared rows/surfaces; NotificationCard card paint moves there with its original hit policy. Specialized split, preview and literal clamped TextBlock remain actual owner content; TextBlock receives shared text hints/measurement. CardLayer shadow is separately retained specialized native overlay paint, not silently retired. All child/subscription lifetimes remain with existing owners. Source typography/artwork/corner and native obligations remain in calibration and Task11; no page acceptance.
+
 
 ## Task9a disposition — 2026-10-11
 
@@ -641,3 +645,5 @@ No feature paint/geometry overrides or production fixture hooks were added. Shar
 
 
 Task5 fix1 adds no temporary path or public SDK surface. Immutable concrete HostArtwork snapshots/independent registries are permanent internal receiving ownership: prepare all candidates before retained control mutation, preserve old usable state on rejection, retire snapshots on successful replacement/removal/teardown, and leave borrowed raw Icon untouched. Shared panel DETAIL face trim/arc is permanent paint policy independent of outer focus/hit/content layout; ordinary buttons/Choices keep prior geometry. Test-only rejection/face/profile evidence remains outside production.
+
+Task9c constrained-scale shared paths are permanent engine composition: NativeSplit automatic/default negotiation, table usable minimum, retained sidecar, all-form short-height overflow and narrow FormRows. NativeControlStyles owns exactly-once context fonts and typography invalidation; each native lifetime owner closes its subscription, and constructor registration has no callback. This does not add a theme publisher or global font snapshot cache. The only additional Plugins change is the approved PluginDetails native text font path.

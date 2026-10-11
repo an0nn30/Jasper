@@ -47,6 +47,8 @@ class ThemeImportViewTest {
         commit.doClick();
         assertThat(result.get()).containsEntry("old",ThemeImporter.ConflictChoice.REPLACE).containsEntry("fresh",ThemeImporter.ConflictChoice.SKIP);
         assertThat(commit.isEnabled()).as("one commit").isFalse();
+        assertThat(decision(view,"old").isEnabled()).as("pending commit preserves its frozen decision").isFalse();
+        assertThat(decision(view,"fresh").isEnabled()).isFalse();
         var details=KitTestSupport.require(view.view,"details",JLabel.class);
         assertThat(details.getText()).contains("<html>console fallback", "bad", "broken");
         assertThat(details.getClientProperty("html")).isNull();

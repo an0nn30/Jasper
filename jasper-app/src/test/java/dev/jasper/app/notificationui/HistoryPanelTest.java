@@ -48,6 +48,24 @@ class HistoryPanelTest {
         return center.post(NotificationRequest.of(GENERAL.id(), Severity.INFO, title)).orElseThrow();
     }
 
+    @Test void longActionsWrapWithoutClippingOrTakingKeyboardFocus() {
+        var panel=panel(false);show();
+        var id=center.post(NotificationRequest.of(GENERAL.id(),Severity.WARNING,"Review fixture")
+            .withAction(NotificationAction.of("Review the selected operation",()->{}))
+            .withAction(NotificationAction.of("Open the detailed explanation",()->{}))).orElseThrow();
+        try {
+            panel.setSize(300,400);for(int pass=0;pass<5;pass++)LayoutTestSupport.layoutTree(panel);
+            var row=panel.row(id);
+            for(String name:java.util.List.of("action:0","action:1")) {
+                var button=dev.jasper.app.testsupport.KitTestSupport.require(row,name,javax.swing.AbstractButton.class);
+                assertThat(button.getWidth()).as(name+" is fully reachable").isGreaterThanOrEqualTo(button.getPreferredSize().width);
+                assertThat(button.isFocusable()).isFalse();
+                var bounds=SwingUtilities.convertRectangle(button.getParent(),button.getBounds(),row);
+                assertThat(bounds.y+bounds.height).isLessThanOrEqualTo(row.getHeight());
+            }
+        } finally {site.notifyClosed();}
+    }
+
     @Test void anEmptyHistorySaysSo() {
         var panel = panel(true);
         show();

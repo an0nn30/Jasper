@@ -56,6 +56,7 @@ public final class HistoryPanel extends JPanel {
     private final Map<UUID, HistoryRow> shown = new LinkedHashMap<>();
     private final Subscription subscription;
     private final AutoCloseable theme;
+    private final AutoCloseable typography;
     private final Runnable stopTracking;
     private boolean focused;
     private boolean visible;
@@ -102,6 +103,7 @@ public final class HistoryPanel extends JPanel {
         visible = site.visible();
         rebuild();
         readIfLooking();
+        typography=dev.jasper.ui.swing.NativeControlStyles.observeTypography(this::restyle);
     }
 
     private KitView heading(String name) {
@@ -262,6 +264,7 @@ public final class HistoryPanel extends JPanel {
         closed = true;
         subscription.close();
         stopTracking.run();
+        try { typography.close(); } catch (Exception ignored) { /* idempotent module subscription */ }
         try { theme.close(); } catch (Exception ignored) { /* the binding outlives the panel */ }
         shown.values().forEach(HistoryRow::close);
         shown.clear();

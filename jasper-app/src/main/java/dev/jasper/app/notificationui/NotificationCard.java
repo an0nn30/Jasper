@@ -17,10 +17,7 @@ import java.awt.Component;
 import java.awt.Container;
 import java.awt.Cursor;
 import java.awt.Dimension;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
 import java.awt.HeadlessException;
-import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
@@ -37,7 +34,7 @@ import javax.swing.SwingUtilities;
  * painted from module roles, hosting pointer-only kit views (ruling G5): nothing in it takes the keyboard from the
  * terminal. Plain text only. EDT only; close it when it leaves its layer.
  */
-final class NotificationCard extends JPanel implements AutoCloseable {
+final class NotificationCard extends dev.jasper.ui.swing.SurfacePanel implements AutoCloseable {
     static final int CONTENT_LINES = 5;
     static final int VISIBLE_ACTIONS = 3;
     static final String ACTION = "action:", MORE = "more", CLOSE = "close", ICON = "severity";
@@ -56,11 +53,13 @@ final class NotificationCard extends JPanel implements AutoCloseable {
     private final TextBlock title, count, content;
     private final MouseAdapter hover;
     private final AutoCloseable theme;
+    private final AutoCloseable typography;
     private boolean hovered, closed;
     /** Told when the pointer enters or leaves the card, so its countdown pauses. */
     Consumer<Boolean> onHover = value -> {};
 
     NotificationCard(KitContext kit, NotificationCenter center, Notification notification, boolean sticky) {
+        super(kit, dev.jasper.ui.swing.SurfacePanel.Kind.NOTICE);
         this.kit = presentationIcons.context(kit);
         kit = this.kit;
         this.center = center;
@@ -93,6 +92,7 @@ final class NotificationCard extends JPanel implements AutoCloseable {
         add(icon); add(title); add(count); add(content); links.forEach(this::add); add(more); add(close);
         theme = kit.binding().subscribe(pair -> restyle());
         update(notification);
+        typography=dev.jasper.ui.swing.NativeControlStyles.observeTypography(this::restyle);
     }
 
     Notification notification() { return notification; }
@@ -314,18 +314,6 @@ final class NotificationCard extends JPanel implements AutoCloseable {
     @Override public Dimension getMinimumSize() { return getPreferredSize(); }
     @Override public Dimension getMaximumSize() { return getPreferredSize(); }
 
-    @Override protected void paintComponent(Graphics graphics) {
-        var g = (Graphics2D) graphics.create();
-        try {
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            int arc = metric(DesignMetrics.Role.NOTIFICATION_ARC);
-            g.setColor(NotificationStyle.color(kit, SemanticColor.SURFACE_CARD));
-            g.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, arc, arc);
-            g.setColor(NotificationStyle.color(kit, SemanticColor.BORDER_SUBTLE));
-            g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, arc, arc);
-        } finally { g.dispose(); }
-    }
-
     /** The theme changed: the texts take the new roles, the links refit, the card repaints. Content and state stay. */
     private void restyle() {
         if (closed) return;
@@ -339,6 +327,7 @@ final class NotificationCard extends JPanel implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true;
+        try { typography.close(); } catch (Exception ignored) { /* idempotent module subscription */ }
         try { theme.close(); } catch (Exception ignored) { /* the binding outlives the card */ }
         icon.close(); links.forEach(KitView::close); more.close(); close.close();
         presentationIcons.close();

@@ -39,6 +39,23 @@ public final class NativeControlStyles {
     public static Font font(Typography.Role role) {
         return SwingTypography.effective(SwingTypography.typography().font(role));
     }
+    /** Context role font with the same exactly-once host/user scaling policy as descriptor controls. */
+    public static Font font(KitContext context,Typography.Role role) { return ThemePainting.font(context,role); }
+    /** Observes the engine's supported font defaults and user scale for one native lifetime owner.
+     * Registration has no callback. Delivery is on the EDT; closing is idempotent and suppresses queued delivery. */
+    public static AutoCloseable observeTypography(Runnable refresh) {
+        java.util.Objects.requireNonNull(refresh);
+        var closed=new java.util.concurrent.atomic.AtomicBoolean();
+        Runnable deliver=()->{if(!closed.get())refresh.run();};
+        Runnable dispatch=()->{if(EventQueue.isDispatchThread())deliver.run();else EventQueue.invokeLater(deliver);};
+        java.beans.PropertyChangeListener fonts=event->{if(SwingTypography.fontProperty(event.getPropertyName()))dispatch.run();};
+        java.beans.PropertyChangeListener scale=event->{if("userScaleFactor".equals(event.getPropertyName()))dispatch.run();};
+        var defaults=UIManager.getDefaults();
+        defaults.addPropertyChangeListener(fonts);
+        try {UIScale.addPropertyChangeListener(scale);}
+        catch(RuntimeException|Error failure){closed.set(true);defaults.removePropertyChangeListener(fonts);throw failure;}
+        return ()->{if(closed.compareAndSet(false,true)){defaults.removePropertyChangeListener(fonts);UIScale.removePropertyChangeListener(scale);}};
+    }
     /** Scaled spacing from the fixed module catalog. */
     public static int metric(DesignMetrics.Role role) { return UIScale.scale(DesignMetrics.DEFAULT.value(role)); }
     /** Borderless native command; host retains focusability and Action ownership. */

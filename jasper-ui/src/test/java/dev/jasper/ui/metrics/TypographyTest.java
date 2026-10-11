@@ -4,6 +4,17 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class TypographyTest {
+    @Test void selectedResultsKeepEveryRoleFamilyAndSizeAndRestoreDeclaredWeight() {
+        for (var typography : java.util.List.of(new Typography(), new Typography(java.awt.Font.MONOSPACED, 32)))
+            for (var role : Typography.Role.values()) {
+                var base = typography.font(role); var selected = typography.resultFont(role, true);
+                assertThat(selected.getFamily()).isEqualTo(base.getFamily());
+                assertThat(selected.getSize2D()).isEqualTo(base.getSize2D());
+                assertThat(selected.isBold()).isTrue();
+                assertThat(typography.resultFont(role, false)).isEqualTo(base);
+            }
+    }
+
     @Test void measuredMediumPolicyPreservesUserFamiliesAndProportionalSizes() {
         var user = new Typography(java.awt.Font.MONOSPACED, 26);
         assertThat(user.font(Typography.Role.HERO_TITLE).getFamily()).isEqualTo(java.awt.Font.MONOSPACED);

@@ -8,6 +8,9 @@ import javax.swing.UIManager;
 /** Shared bridge from host font provenance to logical roles and effective Swing point sizes. */
 final class SwingTypography {
     private SwingTypography() {}
+    static boolean fontProperty(String name) {
+        return "defaultFont".equals(name)||"Label.font".equals(name)||"Jasper.uiFontFamilyOverride".equals(name);
+    }
     private static Font[] overrides() {
         Font[] result = {null, null};
         // Enumerate only developer defaults: the LAF's inherited fonts are already scaled.

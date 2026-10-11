@@ -432,7 +432,7 @@ class CommandPaletteTest {
                         assertThat(KitTestSupport.require(palette.hintView(), CommandPalette.VERB + verb, AbstractButton.class).getForeground())
                             .as(name + " verb " + verb).isEqualTo(semantic.color(SemanticColor.TEXT_LINK));
                     layoutTree(palette);
-                    assertThat(label(row(palette, 4), "a detail").getForeground()).as(name).isEqualTo(semantic.color(SemanticColor.TEXT_SECONDARY));
+                    assertThat(label(row(palette, 4), "a detail").getForeground()).as(name).isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(semantic, SemanticColor.TEXT_ONACCENT_SECONDARY, SemanticColor.SELECTION_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT));
                     assertThat(label(row(palette, 3), "History").getForeground()).as(name).isEqualTo(semantic.color(SemanticColor.TEXT_SECONDARY));
                     palette.close();
                 } finally { bindings.close(); }
@@ -645,7 +645,62 @@ class CommandPaletteTest {
         });
     }
 
-    @Test void liveTypographyKeepsRowAndHeaderHeights() throws Exception {
+    @Test void selectedResultDetailUsesReadableReceivingSelectionText() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            for(boolean dark:new boolean[]{false,true})try(var bindings=KitTestSupport.bindings(dark);var palette=palette(bindings.context(ThemeRoute.CHROME),true,new ArrayList<>())) {
+                palette.setEntries(List.of(new PaletteEntry.Item(HISTORY,new PaletteRow("one","Selected title","selected detail",null,null,true,null))),null,null);
+                palette.setSize(palette.getPreferredSize());layoutTree(palette);
+                var detail=label(row(palette,0),"selected detail");
+                assertThat(detail.getForeground()).isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(palette.kit().theme().semantic(),SemanticColor.TEXT_ONACCENT_SECONDARY,SemanticColor.SELECTION_BG,dev.jasper.ui.theme.SurfaceContrast.TEXT));
+            }
+        });
+    }
+
+    @Test void narrowStepRetainsAUsableFieldBelowItsLiteralLabel() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var palette = palette(new ArrayList<>())) {
+                palette.showStep("Destination", List.of(new PaletteStep.Field("host", "A long literal destination label", "example.test")));
+                palette.setSize(230, 240); layoutTree(palette);
+                var input = palette.stepInput(0);
+                var label = palette.stepLabelView(0);
+                assertThat(input.getWidth()).as("narrow field keeps at least its entered text width")
+                    .isGreaterThanOrEqualTo(input.getFontMetrics(input.getFont()).stringWidth(input.getText()));
+                assertThat(SwingUtilities.convertPoint(input, 0, 0, palette).y)
+                    .isGreaterThanOrEqualTo(SwingUtilities.convertPoint(label, 0, label.getHeight(), palette).y);
+                assertThat(input.getAccessibleContext().getAccessibleName()).isEqualTo("A long literal destination label");
+            }
+        });
+    }
+
+    @Test void enlargedQueryAndResultInkFitsItsActualMountedAllocation() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var themes = new ThemeController();
+            var palette = palette(themes.appearance().context(ThemeRoute.CHROME), true, new ArrayList<>());
+            try {
+                palette.setEntries(List.of(new PaletteEntry.Header("Recently used"), item(COMMANDS, "AgjyÉ")), null, null);
+                var query = PaletteTestSupport.query(palette);
+                query.setText("AgjyÉ"); query.select(1, 3);
+                var document = query.getDocument();
+                themes.configure(Theme.DARK, new UiFontConfig("system", 32f));
+                palette.refreshTheme();
+                palette.setSize(palette.getPreferredSize()); layoutTree(palette);
+                var frc = new java.awt.font.FontRenderContext(null, true, true);
+                for (var target : List.of(query, label(row(palette, 0), "Recently used"), label(row(palette, 1), "Row AgjyÉ"))) {
+                    var ink = new java.awt.font.TextLayout("AgjyÉ", target.getFont(), frc).getBounds();
+                    var insets = target.getInsets();
+                    assertThat(target.getHeight() - insets.top - insets.bottom)
+                        .as("actual ink fits %s at %s", target.getClass().getSimpleName(), target.getFont())
+                        .isGreaterThanOrEqualTo((int) Math.ceil(ink.getHeight()));
+                }
+                assertThat(query.getDocument()).isSameAs(document);
+                assertThat(query.getSelectionStart()).isEqualTo(1);
+                assertThat(query.getSelectionEnd()).isEqualTo(3);
+                assertThat(palette.selectedKey()).isEqualTo(COMMANDS.id() + "/AgjyÉ");
+            } finally { themes.configure(Theme.DARK, UiFontConfig.defaults()); palette.close(); themes.close(); }
+        });
+    }
+
+    @Test void liveTypographyKeepsNominalMinimumsAndGrowsForRealContent() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var themes = new ThemeController();
             var palette = palette(themes.appearance().context(ThemeRoute.CHROME), true, new ArrayList<>());
@@ -656,10 +711,10 @@ class CommandPaletteTest {
                     palette.refreshTheme();
                     palette.setSize(palette.getPreferredSize());
                     layoutTree(palette);
-                    assertThat(row(palette, 0).getHeight()).as("heading at %s pt", size).isEqualTo(UIScale.scale(22));
-                    assertThat(row(palette, 1).getHeight()).as("row at %s pt", size).isEqualTo(UIScale.scale(24));
-                    assertThat(palette.hintBar().getHeight()).isEqualTo(UIScale.scale(26));
-                    assertThat(PaletteTestSupport.fieldRow(palette).getHeight()).isEqualTo(UIScale.scale(44));
+                    assertThat(row(palette, 0).getHeight()).as("heading at %s pt", size).isEqualTo(dev.jasper.ui.swing.ResultMetrics.height(palette.kit(), true));
+                    assertThat(row(palette, 1).getHeight()).as("row at %s pt", size).isEqualTo(dev.jasper.ui.swing.ResultMetrics.height(palette.kit(), false));
+                    assertThat(palette.hintBar().getHeight()).isGreaterThanOrEqualTo(UIScale.scale(26));
+                    assertThat(PaletteTestSupport.fieldRow(palette).getHeight()).isGreaterThanOrEqualTo(UIScale.scale(44));
                 }
             } finally { themes.configure(Theme.DARK, UiFontConfig.defaults()); palette.close(); }
         });

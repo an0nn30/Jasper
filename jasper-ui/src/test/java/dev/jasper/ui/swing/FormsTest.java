@@ -189,6 +189,53 @@ class FormsTest {
         });
     }
 
+    @Test void constrainedFormRowStacksRetainedControlsAndIgnoresInvisibleTrailing() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            var row=new FormRow("row",ControlState.READY,"Literal long label","Caption wraps below label",
+                field("input",FieldKind.TEXT,"draft"),Optional.of(field("port",FieldKind.PORT,"22")));
+            try(var view=new KitView(context,new ViewSpec(row),e->{})) {
+                view.setSize(s(150),s(300));for(int i=0;i<5;i++)layout(view);
+                var owner=(FormRows.RowControl)view.control("row");var input=find(view,"input",JComponent.class);
+                var trailing=find(view,"port",JComponent.class);
+                assertThat(input.getWidth()).isEqualTo(s(150));
+                assertThat(input.getY()).isGreaterThanOrEqualTo(owner.caption.getY()+owner.caption.getHeight());
+                assertThat(trailing.getY()).isGreaterThanOrEqualTo(input.getY()+input.getHeight());
+                var editor=find(view,"input.input",JTextField.class);var document=editor.getDocument();
+                assertThat(owner.label.getLabelFor()).isSameAs(editor);
+                view.setSize(s(650),s(300));for(int i=0;i<5;i++)layout(view);
+                assertThat(input.getX()).isEqualTo(s(108));assertThat(input.getY()).isZero();
+                assertThat(editor.getDocument()).isSameAs(document);
+                view.update(new ViewSpec(new FormRow("row",ControlState.READY,row.label(),row.caption(),row.control(),
+                    Optional.of(new Field("port",new ControlState(false,true,false,""),FieldKind.PORT,"22","","Port","")))));
+                view.setSize(s(150),s(300));for(int i=0;i<5;i++)layout(view);
+                assertThat(trailing.isVisible()).isFalse();assertThat(input.getWidth()).isEqualTo(s(150));
+                int measured=((Composition.WidthLayout)owner.component.getLayout()).height(owner.component,s(150));
+                view.setSize(s(650),s(300));layout(view);
+                assertThat(((Composition.WidthLayout)owner.component.getLayout()).height(owner.component,s(150))).isEqualTo(measured);
+            }finally{release(context);}
+        });
+    }
+
+    @Test void everyShortFormKeepsBodyControlsAndFooterReachable() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            try {
+                for(var kind:FormKind.values())try(var view=new KitView(context,new ViewSpec(form(kind,List.of(field("input",FieldKind.TEXT,"draft")))),e->{})) {
+                    view.setSize(s(320),s(45));for(int i=0;i<5;i++)layout(view);
+                    var owner=(Forms.FormControl)view.control("form");
+                    assertThat(owner.scroll.getViewport().getHeight()).as("%s body",kind).isPositive();
+                    var input=find(view,"input.input",JTextField.class);
+                    owner.revealFocusedBody(input);
+                    assertThat(input.getVisibleRect().height).as("%s input scroll reveal",kind).isPositive();
+                    var action=find(view,"save",JButton.class);
+                    for(var listener:action.getFocusListeners())listener.focusGained(new java.awt.event.FocusEvent(action,java.awt.event.FocusEvent.FOCUS_GAINED));
+                    assertThat(action.getVisibleRect().height).as("%s action scroll reveal",kind).isPositive();
+                }
+            } finally {release(context);}
+        });
+    }
+
     @Test void sheetEnvelopeAddsItsBorderOutsideTheUnchanged480Fill() {
         Edt.run(()->{
             var context=KitFixtures.context();

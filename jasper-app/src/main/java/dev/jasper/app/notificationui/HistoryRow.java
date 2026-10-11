@@ -140,7 +140,7 @@ final class HistoryRow extends JPanel implements AutoCloseable {
             var state = new ControlState(true, !notification.expired(), false, "");
             for (int i = 0; i < all.size(); i++)
                 links.add(new Nodes.Button(ACTION + i, state, all.get(i).label(), "", Nodes.ButtonKind.LINK, ACTION + i, "", Nodes.ButtonPresentation.EMBEDDED));
-            nodes.add(new Nodes.Stack("actions", ControlState.READY, Nodes.LayoutRole.INLINE, links));
+            nodes.add(new Nodes.Stack("actions", ControlState.READY, Nodes.LayoutRole.ACTIONS, links));
         }
         return new ViewSpec(new Nodes.Stack("entry", ControlState.READY, Nodes.LayoutRole.VERTICAL, nodes));
     }

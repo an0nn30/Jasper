@@ -51,6 +51,69 @@ class FileChooserPanelTest {
 
     private Location here(String name) { return Location.local(dir.resolve(name)); }
 
+    @Test void enlargedNarrowToolbarNeverAllocatesANegativePathOrOverlapsNavigation() {
+        var themes = new dev.jasper.app.appearance.ThemeController();
+        themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
+        var panel = panel(themes.appearance().context(ThemeRoute.CHROME),SAVE,Optional.of("example.txt"),List.of());
+        try {
+            var input=panel.nameInput().orElseThrow();var document=input.getDocument();input.select(1,4);
+            panel.setSize(920,560);for(int i=0;i<5;i++)KitTestSupport.layout(panel);
+            themes.configure(dev.jasper.app.appearance.Theme.DARK,new dev.jasper.app.config.UiFontConfig("system",32));
+            panel.setSize(600,320); for(int i=0;i<5;i++)KitTestSupport.layout(panel);
+            var path = KitTestSupport.require(panel,"path",javax.swing.JComponent.class);
+            var back = KitTestSupport.require(panel,"back",javax.swing.JComponent.class);
+            var pathBounds = javax.swing.SwingUtilities.convertRectangle(path.getParent(),path.getBounds(),panel);
+            var backBounds = javax.swing.SwingUtilities.convertRectangle(back.getParent(),back.getBounds(),panel);
+            assertThat(path.getWidth()).as("path remains usable").isPositive();
+            assertThat(pathBounds.intersects(backBounds)).isFalse();
+            var listing=KitTestSupport.require(panel,"files",javax.swing.JScrollPane.class);
+            var table=(JComponent)listing.getViewport().getView();
+            int row=((javax.swing.Scrollable)table).getScrollableUnitIncrement(new java.awt.Rectangle(),javax.swing.SwingConstants.VERTICAL,1);
+            assertThat(listing.getViewport().getHeight()).as("two browse rows survive short height").isGreaterThanOrEqualTo(2*row);
+            table.scrollRectToVisible(new java.awt.Rectangle(0,0,1,row));
+            assertThat(table.getVisibleRect().height).isGreaterThanOrEqualTo(row);
+            for(String id:List.of("primary","cancel")) {
+                var action=KitTestSupport.require(panel,id,JComponent.class);action.scrollRectToVisible(new java.awt.Rectangle(0,0,action.getWidth(),action.getHeight()));
+                assertThat(action.getVisibleRect().height).isEqualTo(action.getHeight());
+            }
+            themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
+            panel.setSize(920,560);for(int i=0;i<5;i++)KitTestSupport.layout(panel);
+            assertThat(panel.nameInput().orElseThrow()).isSameAs(input);assertThat(input.getDocument()).isSameAs(document);
+            assertThat(input.getSelectedText()).isEqualTo("xam");
+            assertThat(KitTestSupport.require(panel,"native.surface.scroll",javax.swing.JScrollPane.class).getVerticalScrollBar().isVisible()).isFalse();
+        } finally {panel.close();themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());themes.close();}
+    }
+
+    @Test void freshEnlargedSplitAndPreviewKeepBrowseContentReachable() {
+        var themes=new dev.jasper.app.appearance.ThemeController();
+        themes.configure(dev.jasper.app.appearance.Theme.DARK,new dev.jasper.app.config.UiFontConfig("system",32));
+        var request=new ChooserRequest("Choose",OPEN,true,Location.local(dir),Optional.empty(),Optional.empty(),Optional.empty(),Optional.empty());
+        var model=new ChooserModel(request,List.of(new LocalSource(new LocalBrowser(dir))),Runnable::run,Runnable::run,prefs.showHidden());
+        var panel=new FileChooserPanel(themes.appearance().context(ThemeRoute.CHROME),model,prefs,dir,finished::add,file->false,Optional::empty);
+        model.start();
+        try {
+            panel.setSize(600,320);for(int i=0;i<6;i++)KitTestSupport.layout(panel);
+            var listing=KitTestSupport.require(panel,"files",javax.swing.JScrollPane.class);
+            assertThat(listing.getViewport().getWidth()).as("fresh enlarged receiving lane").isGreaterThanOrEqualTo(140);
+            if(!previewToggle(panel).isSelected())previewToggle(panel).doClick(0);
+            selectRow(panel,rows(panel).indexOf("notes.txt"));
+            for(int i=0;i<6;i++)KitTestSupport.layout(panel);
+            assertThat(listing.getViewport().getWidth()).as("visible preview cannot consume listing").isGreaterThanOrEqualTo(140);
+            var nameCell=KitTestSupport.require(panel,"@table/files/"+dir.resolve("notes.txt")+"/name",JLabel.class);
+            int inkWidth=nameCell.getWidth()-nameCell.getIcon().getIconWidth()-nameCell.getIconTextGap();
+            assertThat(inkWidth).as("filename has meaningful ink beyond its icon and ellipsis").isGreaterThanOrEqualTo(nameCell.getFontMetrics(nameCell.getFont()).stringWidth("no…"));
+            var table=(JComponent)listing.getViewport().getView();
+            table.scrollRectToVisible(new java.awt.Rectangle(0,0,1,40));
+            assertThat(table.getVisibleRect().height).isGreaterThanOrEqualTo(40);
+            assertThat(panel.previewText()).isEqualTo("hello\n");
+            panel.setSize(2400,900);for(int i=0;i<6;i++)KitTestSupport.layout(panel);
+            panel.split().setDividerLocation(410);for(int i=0;i<6;i++)KitTestSupport.layout(panel);
+            themes.configure(dev.jasper.app.appearance.Theme.JASPER_LIGHT,new dev.jasper.app.config.UiFontConfig("system",32));
+            for(int i=0;i<6;i++)KitTestSupport.layout(panel);
+            assertThat(panel.split().getDividerLocation()).as("explicit drag survives refresh").isEqualTo(410);
+        } finally {panel.close();themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());themes.close();}
+    }
+
     private ChooserSource hosts() {
         return new ChooserSource() {
             @Override public String id() { return "dev.x.hosts"; }

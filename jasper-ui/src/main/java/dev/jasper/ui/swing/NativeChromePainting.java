@@ -9,6 +9,12 @@ import com.formdev.flatlaf.util.UIScale;
 /** Kit-owned painters for temporary native chrome control adapters; native input/layout remain host-owned. */
 public final class NativeChromePainting {
     private NativeChromePainting() {}
+    private static final java.awt.font.FontRenderContext TEXT_CONTEXT = new java.awt.font.FontRenderContext(null,true,true);
+    /** Applies the engine's text coverage to a caller-owned graphics clone. */
+    public static void prepareText(Graphics2D graphics) { ThemePainting.antialias(graphics); }
+    /** Literal advance measured with the same fractional context used by engine labels and native text. */
+    public static int measureText(Font font, String text) { return (int)Math.ceil(font.getStringBounds(text,TEXT_CONTEXT).getWidth()); }
+
     public static void action(AbstractButton button, Graphics graphics, GeneratedTheme theme, boolean labels, Icon arrow) {
         var g = (Graphics2D) graphics.create();
         try {

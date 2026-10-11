@@ -12,6 +12,39 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Native adapter recipes consume module colors without changing the host's existing geometry or button kind. */
 class NativeControlStylesTest {
+    @Test void typographySubscriptionIsOwnedAndSuppressesQueuedDeliveryAfterClose() throws Exception {
+        var calls=new java.util.concurrent.atomic.AtomicInteger();var handle=new java.util.concurrent.atomic.AtomicReference<AutoCloseable>();
+        Object previous=UIManager.get("defaultFont");
+        com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
+        int listeners=UIManager.getDefaults().getPropertyChangeListeners().length;
+        try {
+            Edt.run(()->{
+                handle.set(NativeControlStyles.observeTypography(()->{assertThat(EventQueue.isDispatchThread()).isTrue();calls.incrementAndGet();}));
+                assertThat(calls.get()).as("registration never calls a partly constructed owner").isZero();
+                UIManager.put("defaultFont",new Font(Font.DIALOG,Font.PLAIN,20));
+                assertThat(calls.get()).isPositive();calls.set(0);
+                var worker=new Thread(()->UIManager.put("defaultFont",new Font(Font.DIALOG,Font.PLAIN,32)));
+                worker.start();try{worker.join();handle.get().close();handle.get().close();}catch(Exception failure){throw new RuntimeException(failure);}
+            });
+            Edt.run(()->assertThat(calls.get()).as("queued callback is suppressed after close").isZero());
+            assertThat(UIManager.getDefaults().getPropertyChangeListeners().length).isEqualTo(listeners);
+        }finally{Edt.run(()->UIManager.put("defaultFont",previous));if(handle.get()!=null)handle.get().close();}
+    }
+
+    @Test void contextFontUsesTheSameHostOverrideAndCustomScalePolicyAsKitLabels() {
+        Edt.run(()->{
+            Object previous=UIManager.get("defaultFont");var context=KitFixtures.context();
+            try {
+                for(float size:new float[]{20,32}) {
+                    UIManager.put("defaultFont",new Font(Font.DIALOG,Font.PLAIN,1).deriveFont(size));
+                    for(var role:dev.jasper.ui.metrics.Typography.Role.values())
+                        assertThat(NativeControlStyles.font(context,role)).isEqualTo(ThemePainting.font(context,role));
+                    assertThat(NativeControlStyles.font(context,dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(size);
+                }
+            }finally{UIManager.put("defaultFont",previous);KitViewTest.release(context);}
+        });
+    }
+
     @Test void ghostToolbarRecipeAddsRoleColorsButKeepsTheHostsArcAndMargin() {
         Edt.run(() -> {
             var theme = KitFixtures.dark();

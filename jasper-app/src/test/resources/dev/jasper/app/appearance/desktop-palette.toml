@@ -1,0 +1,22 @@
+# Test-only actual palette source family, Display ICC converted to sRGB without resampling.
+# Screenshot 2026-10-06 at 11.16.31 AM: card #191c20, selected #5e7293,
+# primary #d5dee5, secondary #a7b2bf, focus/link #8eb8d2, border #343a42.
+name = "Desktop Palette"
+extends = "Jasper Dark"
+[semantic]
+"surface.card" = "#191c20"
+"surface.input" = "#191c20"
+"surface.app" = "#222629"
+"surface.panel" = "#222629"
+"border.menu" = "#343a42"
+"border.input" = "#343a42"
+"border.subtle" = "#343a42"
+"border.focus" = "#8eb8d2"
+"selection.bg" = "#5e7293"
+"text.primary" = "#d5dee5"
+"text.secondary" = "#a7b2bf"
+"text.tertiary" = "#a7b2bf"
+"text.placeholder" = "#a7b2bf"
+"text.link" = "#8eb8d2"
+"text.onAccent" = "#ffffff"
+"text.onAccent.secondary" = "#ffffff"

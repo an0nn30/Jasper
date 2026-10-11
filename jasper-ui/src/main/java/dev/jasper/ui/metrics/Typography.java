@@ -54,6 +54,11 @@ public final class Typography {
             TextAttribute.WEIGHT, weight == 600 ? TextAttribute.WEIGHT_SEMIBOLD
                 : weight == 500 ? TextAttribute.WEIGHT_MEDIUM : TextAttribute.WEIGHT_REGULAR));
     }
+    /** Selected results retain their declared role family and size, with strong title/detail emphasis. */
+    public Font resultFont(Role role, boolean selected) {
+        Font base = font(role);
+        return selected ? base.deriveFont(Map.of(TextAttribute.WEIGHT, TextAttribute.WEIGHT_BOLD)) : base;
+    }
     private static final class AppleText {
         static final boolean AVAILABLE = !new Font(".AppleSystemUIFont", Font.PLAIN, 1).getFamily(Locale.ROOT).equals(Font.DIALOG);
     }

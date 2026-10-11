@@ -51,7 +51,9 @@ public final class CommandPalettePreview {
         Files.createDirectories(output);
         Integer expectedScale = expectedUiScale(args);
         try (var fixture = Fixture.create()) {
-            if (expectedScale == null) {
+            if (java.util.Arrays.asList(args).contains("--task9c")) {
+                fixture.renderTask9c(output);
+            } else if (expectedScale == null) {
                 fixture.renderMatrix(output);
             } else {
                 fixture.verifyUiScale(output, expectedScale);
@@ -207,6 +209,80 @@ public final class CommandPalettePreview {
             Files.writeString(output.resolve("render-manifest.txt"), manifest.toString());
         }
 
+        void renderTask9c(Path output) throws Exception {
+            Path home=Files.createTempDirectory("jasper-palette9c-");
+            try {
+                Files.createDirectories(home.resolve("themes"));
+                try(var in=CommandPalettePreview.class.getResourceAsStream("/dev/jasper/app/appearance/desktop-palette.toml")) {
+                    Files.copy(in,home.resolve("themes/palette.toml"));
+                }
+                var catalog=dev.jasper.app.appearance.ThemeCatalog.beside(home.resolve("config.toml"));catalog.scan();
+                var calibration=catalog.latest().find("Desktop Palette").orElseThrow();
+                SwingUtilities.invokeAndWait(() -> {
+                    // Every execution hook is inert. These source labels never run commands or contact hosts.
+                    var rows=List.of(
+                        new PaletteRow("package","package jasper","cd ~/projects/moray && ./gradlew :jasper-app:packageDist",null,null,true,null),
+                        new PaletteRow("main","Main.java","jasper-app/src/main/java/dev/jasper/app/Main.java","moray",null,true,null),
+                        new PaletteRow("amp","amp-amp (amp@100.110.65.45:22)",null,null,dev.jasper.app.platform.AppIcons.semantic("network"),true,null),
+                        PaletteRow.of("new","New Editor File"),
+                        new PaletteRow("minecraft","minecraft-local (dustin@192.168.1.124:22)",null,null,dev.jasper.app.platform.AppIcons.semantic("network"),true,null),
+                        new PaletteRow("vm","dustin-vm (dustin@100.83.72.100:22)",null,null,dev.jasper.app.platform.AppIcons.semantic("network"),true,null),
+                        new PaletteRow("open","Open in Editor…",null,"⌘O",dev.jasper.app.platform.AppIcons.named("FILE"),true,null),
+                        new PaletteRow("builddir","open jasper build dir","cd ~/projects/moray && open ./jasper-app/build/packaging/dist/",null,null,true,null),
+                        new PaletteRow("build","build jasper","cd ~/projects/moray && ./gradlew :jasper-app:run",null,null,true,null),
+                        new PaletteRow("run","./gradlew :jasper-app:run","./gradlew :jasper-app:run",null,null,true,null));
+                    var scopes=new java.util.LinkedHashMap<String,List<PaletteRow>>();
+                    scopes.put("fixture.snippets",List.of(rows.get(0),rows.get(7),rows.get(8),rows.get(9)));
+                    scopes.put("fixture.editor",List.of(rows.get(1),rows.get(3),rows.get(6)));
+                    scopes.put("fixture.remote",List.of(rows.get(2),rows.get(4),rows.get(5)));
+                    scopes.forEach((id,values)->owner.scopes().register(new PaletteScope(){
+                        public String id(){return id;}public String label(){return id.substring(id.indexOf('.')+1);}
+                        public String placeholder(){return "Search "+label();}
+                        public List<PaletteVerb> verbs(){return List.of(new PaletteVerb("paste","Paste"),new PaletteVerb("run","Paste and run"),new PaletteVerb("edit","Edit file"));}
+                        public PaletteResults search(String query,PaletteContext context){return new PaletteResults(values.stream().filter(row->query.isBlank()||row.title().toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT))).toList(),null,null);}
+                        public void execute(PaletteRow row,PaletteVerb verb,PaletteContext context){throw new AssertionError("Visual fixture must never execute");}
+                        public dev.jasper.app.lifecycle.Subscription onChanged(Runnable listener){return new dev.jasper.app.lifecycle.Subscription(()->{});}
+                    }));
+                    for(int i=rows.size()-1;i>=0;i--) {
+                        var row=rows.get(i);String scope=scopes.entrySet().stream().filter(entry->entry.getValue().contains(row)).findFirst().orElseThrow().getKey();
+                        for(int count=0;count<rows.size()-i;count++)history.recordUse(scope,row.id(),row.title(),1_800_000_000_000L+i);
+                    }
+                    owner.commandPalette().controller().setVisibleRows(10);
+                    owner.commandPalette().refresh();
+                    if(PaletteTestSupport.rowCount(owner.commandPalette().component())!=10)throw new AssertionError("Missing source rows");
+                    var entries=PaletteTestSupport.entries(owner.commandPalette().component());
+                    if(!entries.get(0).equals("# Recently used")||!entries.get(3).equals("# Most used"))throw new AssertionError(entries);
+                });
+                for(var theme:List.of(calibration,Theme.DARK,Theme.JASPER_LIGHT))for(float font:List.of(13f,32f)) {
+                    for(var size:List.of(new Dimension(791,712),new Dimension(400,520),new Dimension(791,260))) for(int deviceScale:List.of(1,2)) {
+                        SwingUtilities.invokeAndWait(()->{
+                            themes.configure(theme,new dev.jasper.app.config.UiFontConfig("system",font));
+                            owner.commandPalette().refreshTheme();
+                        });
+                        Path file=output.resolve(theme.id().replaceAll("[^a-zA-Z0-9.-]","_")+"-"+font+"-"+size.width+"x"+size.height+(deviceScale==1?"-1x":"")+".png");
+                        capture(root,file,size.width,size.height,deviceScale);
+                        SwingUtilities.invokeAndWait(()->{
+                            var palette=owner.commandPalette().component();var query=PaletteTestSupport.query(palette);
+                            var previous=java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager();
+                            try {
+                                java.awt.KeyboardFocusManager.setCurrentKeyboardFocusManager(new java.awt.DefaultKeyboardFocusManager(){@Override public java.awt.Component getFocusOwner(){return query;}});
+                                var event=new java.awt.event.FocusEvent(query,java.awt.event.FocusEvent.FOCUS_GAINED);
+                                for(var listener:query.getFocusListeners())listener.focusGained(event);
+                                dev.jasper.app.testsupport.SurfaceEvidence.save(file,root,size.width,size.height,deviceScale);
+                                dev.jasper.app.testsupport.SurfaceEvidence.save(file.resolveSibling(file.getFileName()+"-palette.png"),palette,palette.getWidth(),palette.getHeight(),deviceScale);
+                                try{Files.writeString(file.resolveSibling(file.getFileName()+"-owner.txt"),"actual WindowContent/WindowCommandPalette/PaletteController; synthetic focus; inert source labels; no native acceptance\nroot="+root.getSize()+"; palette="+palette.getBounds()+"; titleAnchor="+owner.paletteAnchor(root)+"; entries="+PaletteTestSupport.entries(palette)+"; selected="+PaletteTestSupport.selectedRow(palette).id()+"\n");}catch(IOException ex){throw new UncheckedIOException(ex);}
+                            }finally {
+                                java.awt.KeyboardFocusManager.setCurrentKeyboardFocusManager(previous);
+                                var lost = new java.awt.event.FocusEvent(query,java.awt.event.FocusEvent.FOCUS_LOST);
+                                for(var listener:query.getFocusListeners())listener.focusLost(lost);
+                                query.getCaret().setVisible(false);
+                            }
+                        });
+                    }
+                }
+            } finally {try(var paths=Files.walk(home)){for(var path:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(path);}}
+        }
+
         private void configure(Scenario scenario, Theme theme) throws Exception {
             SwingUtilities.invokeAndWait(() -> {
                 themes.configure(theme);
@@ -295,6 +371,7 @@ public final class CommandPalettePreview {
                     if (titleBar != null) titleBar.close();
                     owner.close();
                     history.close();
+                    themes.close();
                 });
                 for (TerminalSession session : sessions) session.exitFuture().get(5, TimeUnit.SECONDS);
             } catch (InterruptedException interrupted) {

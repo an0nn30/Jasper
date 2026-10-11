@@ -13,6 +13,35 @@ import org.junit.jupiter.api.Test;
 import java.util.*;
 
 class TablesTest {
+    @Test void usableMinimumMeasuresAdornmentsAndTracksScaleWithoutChangingFontOverride() {Edt.run(()->{
+        var context=KitFixtures.context();Object old=javax.swing.UIManager.get("defaultFont");
+        float oldScale=com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
+        try {
+            javax.swing.UIManager.put("defaultFont",new java.awt.Font("Serif",java.awt.Font.PLAIN,32));
+            var scaleMethod=com.formdev.flatlaf.util.UIScale.class.getDeclaredMethod("setUserScaleFactor",float.class,boolean.class);scaleMethod.setAccessible(true);
+            try {
+                for(boolean icon:new boolean[]{false,true})for(var selection:SelectionMode.values()) {
+                    var columns=List.of(new Column("name","Name",TextRole.BODY,false,3,Optional.empty()),new Column("size","Size",TextRole.MONO_SMALL,true,1,Optional.empty()));
+                    var rows=List.of(new TableRow("a",Map.of("name","MMMMMMMMMMMM","size","123 GB"),icon?Optional.of("file"):Optional.empty()));
+                    try(var view=new KitView(context,new ViewSpec(new Table("files",ControlState.READY,columns,rows,Set.of(),"open",List.of(),selection,ScrollPolicy.STANDARD)),e->{})) {
+                        var owner=(Tables.TableControl)view.control("files");
+                        int prior=0;
+                        for(float scale:new float[]{1f,2.5f}) {
+                            scaleMethod.invoke(null,scale,false);view.update(new ViewSpec(new Table("files",ControlState.READY,columns,rows,Set.of(),"open",List.of(),selection,ScrollPolicy.STANDARD)));
+                            int width=owner.component.getMinimumSize().width;view.setSize(width,300);InteractiveRowsTest.layout(view);
+                            var cell=(javax.swing.JLabel)owner.mounted.get("a").title.getComponent(0);
+                            int textWidth=cell.getWidth()-(cell.getIcon()==null?0:cell.getIcon().getIconWidth()+cell.getIconTextGap());
+                            assertThat(textWidth).isGreaterThanOrEqualTo(NativeChromePainting.measureText(cell.getFont(),"MMMM"));
+                            assertThat(cell.getFont().getSize2D()).isEqualTo(32f);
+                            if(prior>0)assertThat(width).isGreaterThan(prior);prior=width;
+                        }
+                    }
+                }
+            }finally{scaleMethod.invoke(null,oldScale,false);}
+        }catch(ReflectiveOperationException failure){throw new AssertionError(failure);}
+        finally{javax.swing.UIManager.put("defaultFont",old);release(context);}
+    });}
+
     @Test void numericContentMinimumRedistributesOnlyTheDeficitAndStaysBounded(){Edt.run(()->{
         var context=KitFixtures.context();
         var columns=List.of(new Column("name","Name",TextRole.BODY,false,2.4,Optional.empty()),new Column("size","Size",TextRole.DESCRIPTION,true,1,Optional.empty()));

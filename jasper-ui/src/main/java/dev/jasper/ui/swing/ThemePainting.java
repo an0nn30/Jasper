@@ -21,6 +21,7 @@ final class ThemePainting {
             case PANEL_DETAIL_ACTION -> DesignMetrics.Role.PANEL_DETAIL_ACTION_VERTICAL;
             case PANEL_SEARCH_HEIGHT -> DesignMetrics.Role.PANEL_SEARCH_VERTICAL_PADDING;
             case PANEL_HEADER_ACTION -> DesignMetrics.Role.PANEL_HEADER_ACTION_VERTICAL;
+            case RESULTS_ROW_HEIGHT, RESULTS_HEADING_HEIGHT -> DesignMetrics.Role.RESULTS_VERTICAL_PADDING;
             case FIELD_HEIGHT, HERO_FIELD_HEIGHT -> DesignMetrics.Role.FIELD_VERTICAL_PADDING;
             case KEYCAP_TREE_ROW_HEIGHT, IDENTITY_ROW_HEIGHT, IDENTITY_HEADING_HEIGHT, MENU_ITEM_HEIGHT, BUTTON_HEIGHT, HERO_BUTTON_HEIGHT, FULL_FOOTER_BUTTON_HEIGHT, ORDERED_ADD_HEIGHT, PANEL_ACTION, INLINE_ACTION -> DesignMetrics.Role.BUTTON_VERTICAL_PADDING;
             default -> throw new IllegalArgumentException("Not a content height role: " + role);
@@ -56,6 +57,21 @@ final class ThemePainting {
             g.draw(new RoundRectangle2D.Double(inset+.5, inset+.5, w - 2*inset - 1, h - 2*inset - 1, radius * 2.0, radius * 2.0));
         }
     }
+    /** A transparent field reserves no outer halo; its receiving focus ring stays inside its existing allocation. */
+    static void transparentFocus(Graphics2D g, JComponent component, KitContext context, DesignMetrics.Role radiusRole) {
+        antialias(g);
+        component.putClientProperty("Jasper.kit.halo", null);
+        double width = component.getWidth(), height = component.getHeight();
+        double radius = metric(context, radiusRole);
+        double stroke = UIScale.scale(DesignMetrics.TRANSPARENT_FIELD_FOCUS_WIDTH);
+        var ring = new java.awt.geom.Area(new RoundRectangle2D.Double(0, 0, width, height, 2*radius, 2*radius));
+        double inner = Math.max(0, radius-stroke);
+        ring.subtract(new java.awt.geom.Area(new RoundRectangle2D.Double(stroke, stroke,
+            Math.max(0,width-2*stroke), Math.max(0,height-2*stroke), 2*inner, 2*inner)));
+        g.setColor(color(context, SemanticColor.BORDER_FOCUS));
+        g.fill(ring);
+    }
+
     private record Halo(KitContext context, boolean error,double radius,int inset,double bottomTrim) {}
     /** View-owned final overlay: ring lies outside nominal bounds, clipped only by viewports/root. */
     static void halos(KitView root, Graphics graphics) { halos(root, root, graphics); }

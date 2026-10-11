@@ -15,21 +15,18 @@ import dev.jasper.ui.model.TreeItem;
 import dev.jasper.ui.model.UiEvent;
 import dev.jasper.ui.model.ViewSpec;
 import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.swing.SurfacePanel;
 import dev.jasper.ui.swing.KitView;
 import dev.jasper.ui.theme.SemanticColor;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Graphics;
-import java.awt.Graphics2D;
 import java.awt.Rectangle;
-import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
-import java.awt.geom.Area;
-import java.awt.geom.RoundRectangle2D;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -101,8 +98,9 @@ public final class FileChooserPanel extends JPanel {
     private final JPanel previewPane = new JPanel(new BorderLayout());
     private final JTextArea previewText = new JTextArea();
     private final JSplitPane split;
-    private final List<RoundedPane> panes = new ArrayList<>();
+    private final List<dev.jasper.ui.swing.SurfacePanel> panes = new ArrayList<>();
     private final AutoCloseable themeSubscription;
+    private final AutoCloseable typography;
     private final Timer loadingDelay;
     private final Map<String, Places.Place> placeIds = new LinkedHashMap<>();
     private final List<Object> navigationItems = new ArrayList<>();
@@ -166,10 +164,17 @@ public final class FileChooserPanel extends JPanel {
         buttonsView = view(buttonsSpec());
         nameView = request.mode() == ChooserRequest.Mode.OPEN ? null : view(nameSpec());
 
-        add(toolbar(), BorderLayout.NORTH);
+        var content = new JPanel(new BorderLayout()); content.setOpaque(false);
+        var toolbar = toolbar(); var bottom = bottom();
+        content.add(toolbar, BorderLayout.NORTH);
         split = body();
-        add(split, BorderLayout.CENTER);
-        add(bottom(), BorderLayout.SOUTH);
+        content.add(split, BorderLayout.CENTER);
+        content.add(bottom, BorderLayout.SOUTH);
+        add(SurfacePanel.scrolling(kit,content,width -> {
+            int bodyWidth=((SurfacePanel.NativeSplit)split).receivingWidth(width);
+            return SurfacePanel.measuredHeight(toolbar,width)+SurfacePanel.measuredHeight(bottom,width)
+                +SurfacePanel.measuredHeight(split.getRightComponent(),bodyWidth);
+        }));
         bindKeys();
         if (request.mode() == ChooserRequest.Mode.SAVE)
             request.suggestedName().ifPresent(suggested -> {
@@ -186,6 +191,7 @@ public final class FileChooserPanel extends JPanel {
         applySurfaces();
         model.addListener(this::sync);
         sync();
+        typography=dev.jasper.ui.swing.NativeControlStyles.observeTypography(this::applySurfaces);
     }
 
     private KitView view(ViewSpec spec) {
@@ -224,6 +230,7 @@ public final class FileChooserPanel extends JPanel {
         loadingDelay.stop();
         sourceRemovals.forEach(Runnable::run);
         sourceRemovals.clear();
+        try { typography.close(); } catch (Exception ignored) { /* idempotent module subscription */ }
         try { themeSubscription.close(); } catch (Exception ignored) { /* closing a subscription has nothing to report */ }
         views.forEach(KitView::close);
     }
@@ -246,17 +253,14 @@ public final class FileChooserPanel extends JPanel {
     void pressCenterAction() { centerAction.run(); }
     String previewText() { return previewText.getText(); }
     String pathText() { return String.join(" › ", crumbLabels); }
-    List<RoundedPane> roundedPanes() { return List.copyOf(panes); }
+    List<dev.jasper.ui.swing.SurfacePanel> roundedPanes() { return List.copyOf(panes); }
     JSplitPane split() { return split; }
 
     private JComponent toolbar() {
-        var bar = new JPanel(new BorderLayout(metric(DesignMetrics.Role.CHOOSER_TOOLBAR_GAP), 0));
+        var bar = dev.jasper.ui.swing.SurfacePanel.toolbar(kit, navigationView, pathView, toolsView);
         bar.setOpaque(false);
         int vertical = metric(DesignMetrics.Role.CHOOSER_TOOLBAR_VERTICAL_PADDING), side = metric(DesignMetrics.Role.CHOOSER_TOOLBAR_SIDE_PADDING);
         bar.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
-        bar.add(navigationView, BorderLayout.WEST);
-        bar.add(pathView, BorderLayout.CENTER);
-        bar.add(toolsView, BorderLayout.EAST);
         return bar;
     }
 
@@ -281,11 +285,18 @@ public final class FileChooserPanel extends JPanel {
         previewPane.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
         previewPane.setPreferredSize(new java.awt.Dimension(metric(DesignMetrics.Role.CHOOSER_PREVIEW_WIDTH), 0));
 
-        var main = new JPanel(new BorderLayout());
-        main.setOpaque(false);
-        main.add(center, BorderLayout.CENTER);
-        main.add(previewPane, BorderLayout.EAST);
-        var pane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, navigationPane, main) {
+        var main = SurfacePanel.sidecar(kit,center,previewPane,width -> {
+            var listing=find(filesView,FILES,JScrollPane.class);
+            int row=((javax.swing.Scrollable)listing.getViewport().getView()).getScrollableUnitIncrement(new Rectangle(),javax.swing.SwingConstants.VERTICAL,1);
+            return listing.getColumnHeader().getPreferredSize().height+DesignMetrics.NATIVE_BODY_VISIBLE_UNITS*row;
+        },width -> previewPane.getInsets().top+previewPane.getInsets().bottom
+            +SurfacePanel.measuredHeight(previewHeaderView,Math.max(0,width-previewPane.getInsets().left-previewPane.getInsets().right))
+            +((BorderLayout)previewPane.getLayout()).getVgap()
+            +DesignMetrics.NATIVE_BODY_VISIBLE_UNITS*previewText.getFontMetrics(previewText.getFont()).getHeight()
+            +((JScrollPane)previewText.getParent().getParent()).getHorizontalScrollBar().getPreferredSize().height);
+        var pane = new SurfacePanel.NativeSplit(kit,navigationPane, main,() -> metric(DesignMetrics.Role.CHOOSER_NAVIGATION_WIDTH),
+            () -> Math.max(SurfacePanel.bodyLaneWidth(kit),filesView.getMinimumSize().width)
+                +find(filesView,FILES,JScrollPane.class).getVerticalScrollBar().getPreferredSize().width) {
             @Override public void updateUI() {
                 // The divider is an unpainted resize gutter. Keep Swing's keyboard and drag handling.
                 setUI(new BasicSplitPaneUI() {
@@ -305,7 +316,6 @@ public final class FileChooserPanel extends JPanel {
             }
         };
         pane.setContinuousLayout(true);
-        pane.setDividerLocation(metric(DesignMetrics.Role.CHOOSER_NAVIGATION_WIDTH));
         return pane;
     }
 
@@ -316,8 +326,9 @@ public final class FileChooserPanel extends JPanel {
         return SwingUtilities.convertPoint(scroll.getViewport(), 0, 0, filesView).y;
     }
 
-    private RoundedPane rounded(JComponent content, IntSupplier top) {
-        var pane = new RoundedPane(content, top);
+    private dev.jasper.ui.swing.SurfacePanel rounded(JComponent content, IntSupplier top) {
+        var pane = new dev.jasper.ui.swing.SurfacePanel(kit, dev.jasper.ui.swing.SurfacePanel.Kind.CONTENT, top);
+        pane.add(content, BorderLayout.CENTER);
         panes.add(pane);
         return pane;
     }
@@ -343,8 +354,7 @@ public final class FileChooserPanel extends JPanel {
         setBackground(color(SemanticColor.SURFACE_DIALOG));
         if (split != null) split.setBackground(getBackground());
         for (var pane : panes) pane.setBackground(getBackground());
-        var mono = kit.typography().font(Typography.Role.MONO);
-        previewText.setFont(mono.deriveFont(UIScale.scale(mono.getSize2D())));
+        previewText.setFont(dev.jasper.ui.swing.NativeControlStyles.font(kit,Typography.Role.MONO));
         previewText.setForeground(color(SemanticColor.TEXT_PRIMARY));
         previewText.setCaretColor(previewText.getForeground());
         previewText.setSelectionColor(color(SemanticColor.SELECTION_BG));
@@ -587,7 +597,7 @@ public final class FileChooserPanel extends JPanel {
             children.add(new Nodes.Button("newFolder", ControlState.READY, "New folder", "folder.add", Nodes.ButtonKind.SECONDARY, "newFolder", ""));
         children.add(new Nodes.Icon("preview.icon", ControlState.READY, "preview", Nodes.Hue.NONE, Nodes.IconSize.CONTROL, "Preview pane"));
         children.add(new Nodes.Toggle(PREVIEW_TOGGLE, ControlState.READY, "Preview pane", previewVisible, PREVIEW_TOGGLE, true));
-        return new ViewSpec(new Nodes.Stack("tools", ControlState.READY, Nodes.LayoutRole.INLINE, children));
+        return new ViewSpec(new Nodes.Stack("tools", ControlState.READY, Nodes.LayoutRole.NAVIGATION, children));
     }
 
     private ViewSpec placesSpec() {
@@ -882,57 +892,4 @@ public final class FileChooserPanel extends JPanel {
 
     static String modifiedText(long millis) { return MODIFIED.format(Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())); }
 
-    /**
-     * Layout-only rounding with the workspace's surface arc: the listing below its headings is filled with the theme's
-     * card surface and its corners are masked to the dialog surface, including during an opaque child's repaint.
-     */
-    final class RoundedPane extends JPanel {
-        private final IntSupplier top;
-
-        RoundedPane(JComponent content, IntSupplier top) {
-            super(new BorderLayout());
-            this.top = top;
-            setOpaque(false);
-            add(content, BorderLayout.CENTER);
-        }
-
-        /** Where the rounded surface starts; the headings above it sit on the chrome. */
-        int surfaceTop() { return Math.max(0, Math.min(getHeight(), top.getAsInt())); }
-
-        private Shape surface() {
-            int arc = metric(DesignMetrics.Role.WORKSPACE_SURFACE_ARC);
-            int surfaceTop = surfaceTop();
-            return new RoundRectangle2D.Double(0, surfaceTop, getWidth(), Math.max(0, getHeight() - surfaceTop), arc, arc);
-        }
-
-        @Override protected boolean isPaintingOrigin() { return true; }
-        @Override public boolean contains(int x, int y) {
-            return y < surfaceTop() ? super.contains(x, y) : surface().contains(x, y);
-        }
-
-        @Override protected void paintComponent(Graphics graphics) {
-            var g = (Graphics2D) graphics.create();
-            try {
-                g.setColor(getBackground());
-                g.fillRect(0, 0, getWidth(), getHeight());
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setColor(color(SemanticColor.SURFACE_CARD));
-                g.fill(surface());
-            } finally { g.dispose(); }
-        }
-
-        @Override protected void paintChildren(Graphics graphics) {
-            super.paintChildren(graphics);
-            var g = (Graphics2D) graphics.create();
-            try {
-                // Mask after the children: Swing can skip paintComponent during an opaque child's repaint.
-                int surfaceTop = surfaceTop();
-                var corners = new Area(new Rectangle(0, surfaceTop, getWidth(), Math.max(0, getHeight() - surfaceTop)));
-                corners.subtract(new Area(surface()));
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setColor(getBackground());
-                g.fill(corners);
-            } finally { g.dispose(); }
-        }
-    }
 }

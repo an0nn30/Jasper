@@ -82,14 +82,13 @@ public final class ErrorsView extends JPanel {
     private final KitView listView, headerView, sightingsView, messageView, traceView, emptyView, copyView, disableView, logView, clearView;
     /** The former heading column: header, a 2 px gap, sightings, an 8 px gap, the message. */
     private final JPanel heading = new JPanel();
-    private final JPanel leadingButtons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING, 0, 0));
-    private final JPanel trailingButtons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.TRAILING, 0, 0));
     private final CardLayout cards = new CardLayout();
-    private final JPanel detail = new JPanel(cards), details = new JPanel(new BorderLayout()), buttons = new JPanel(new BorderLayout());
+    private final JPanel detail = new JPanel(cards), details = new JPanel(new BorderLayout()), buttons;
     private final JSplitPane split;
     private final JTextArea message = new JTextArea(), trace = new JTextArea();
     private final Subscription listening;
     private final AutoCloseable theme;
+    private final AutoCloseable typography;
     private List<Incident> listed = List.of();
     private UUID selectedId, shown;
     private boolean closed, showingEmpty = true;
@@ -121,7 +120,8 @@ public final class ErrorsView extends JPanel {
         heading.setLayout(new javax.swing.BoxLayout(heading, javax.swing.BoxLayout.Y_AXIS));
         heading.setOpaque(false);
         traceView = new KitView(kit, new ViewSpec(new Nodes.Custom("trace", ControlState.READY, TRACE, Nodes.CustomKind.EDITOR, "Stack trace")), this::event);
-        traceView.registerContent(TRACE, scroll(trace), () -> { });
+        var traceScroll=scroll(trace);
+        traceView.registerContent(TRACE, traceScroll, () -> { });
         emptyView = new KitView(kit, new ViewSpec(new Nodes.Empty("no-errors", ControlState.READY,
             new Nodes.Icon("no-errors-icon", ControlState.READY, "check", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "No errors"), "No errors", "", List.of())), this::event);
         copyView = new KitView(kit, buttonSpec(COPY, "Copy", new ControlState(true, false, false, "")), this::event);
@@ -129,12 +129,8 @@ public final class ErrorsView extends JPanel {
         logView = new KitView(kit, buttonSpec(LOG_FOLDER, "Open Log Folder", ControlState.READY), this::event);
         clearView = new KitView(kit, buttonSpec(CLEAR, "Clear", new ControlState(true, false, false, "")), this::event);
         disableView.setVisible(false);
-        leadingButtons.setOpaque(false);
-        leadingButtons.add(copyView);
-        leadingButtons.add(disableView);
-        trailingButtons.setOpaque(false);
-        trailingButtons.add(logView);
-        trailingButtons.add(clearView);
+        buttons = dev.jasper.ui.swing.SurfacePanel.actionGroups(kit,List.of(copyView,disableView),
+            List.of(logView,clearView),DesignMetrics.Role.ERRORS_BUTTON_GAP);
 
         details.setOpaque(false);
         details.add(heading, BorderLayout.NORTH);
@@ -142,7 +138,10 @@ public final class ErrorsView extends JPanel {
         detail.setOpaque(false);
         detail.add(emptyView, EMPTY);
         detail.add(details, DETAIL);
-        split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listView, detail) {
+        split = new dev.jasper.ui.swing.SurfacePanel.NativeSplit(kit,listView, detail,
+            () -> metric(DesignMetrics.Role.ERRORS_LIST_WIDTH),
+            () -> dev.jasper.ui.swing.SurfacePanel.bodyLaneWidth(kit)+details.getInsets().left+details.getInsets().right
+                +traceScroll.getVerticalScrollBar().getPreferredSize().width) {
             @Override public void updateUI() {
                 // An unpainted resize gutter, as in the chooser; Swing keeps its keyboard and drag handling.
                 setUI(new BasicSplitPaneUI() {
@@ -156,16 +155,20 @@ public final class ErrorsView extends JPanel {
         split.setResizeWeight(LIST_SHARE);
         split.setBorder(BorderFactory.createEmptyBorder());
         split.setContinuousLayout(true);
-        split.setDividerLocation(metric(DesignMetrics.Role.ERRORS_LIST_WIDTH));
-        add(split, BorderLayout.CENTER);
+        var content=new JPanel(new BorderLayout());content.setOpaque(false);
+        content.add(split, BorderLayout.CENTER);
         buttons.setOpaque(false);
-        buttons.add(leadingButtons, BorderLayout.WEST);
-        buttons.add(trailingButtons, BorderLayout.EAST);
-        add(buttons, BorderLayout.SOUTH);
+        content.add(buttons, BorderLayout.SOUTH);
+        add(dev.jasper.ui.swing.SurfacePanel.scrolling(kit,content,width ->
+            dev.jasper.ui.swing.SurfacePanel.measuredHeight(buttons,width)+heading.getPreferredSize().height
+                +DesignMetrics.NATIVE_BODY_VISIBLE_UNITS*trace.getFontMetrics(trace.getFont()).getHeight()
+                +details.getInsets().top+details.getInsets().bottom+metric(DesignMetrics.Role.ERRORS_DETAIL_GAP)
+                +traceScroll.getHorizontalScrollBar().getPreferredSize().height));
         theme = kit.binding().subscribe(pair -> restyle());
         restyle();
         listening = incidents.onChange(change -> refresh());
         refresh();
+        typography=dev.jasper.ui.swing.NativeControlStyles.observeTypography(this::restyle);
     }
 
     private static JScrollPane scroll(JTextArea area) {
@@ -185,10 +188,8 @@ public final class ErrorsView extends JPanel {
         ((BorderLayout) details.getLayout()).setVgap(metric(DesignMetrics.Role.ERRORS_DETAIL_GAP));
         int buttonsVertical = metric(DesignMetrics.Role.ERRORS_BUTTONS_VERTICAL_PADDING), buttonsSide = metric(DesignMetrics.Role.ERRORS_BUTTONS_SIDE_PADDING);
         buttons.setBorder(BorderFactory.createEmptyBorder(buttonsVertical, buttonsSide, buttonsVertical, buttonsSide));
-        // The former FlowLayout gap between the buttons of each group.
-        int buttonGap = metric(DesignMetrics.Role.ERRORS_BUTTON_GAP);
-        ((java.awt.FlowLayout) leadingButtons.getLayout()).setHgap(buttonGap);
-        ((java.awt.FlowLayout) trailingButtons.getLayout()).setHgap(buttonGap);
+        listView.setMinimumSize(new java.awt.Dimension(metric(DesignMetrics.Role.ERRORS_LIST_MIN_WIDTH),0));
+        detail.setMinimumSize(new java.awt.Dimension(0,0));
         // The former heading struts: 2 px under the header, 8 px above the message.
         heading.removeAll();
         for (java.awt.Component part : List.of(headerView, javax.swing.Box.createVerticalStrut(metric(DesignMetrics.Role.ERRORS_SIGHTINGS_GAP)), sightingsView,
@@ -250,6 +251,7 @@ public final class ErrorsView extends JPanel {
         if (closed) return;
         closed = true;
         listening.close();
+        try { typography.close(); } catch (Exception ignored) { /* idempotent module subscription */ }
         try { theme.close(); } catch (Exception ignored) { /* the binding outlives the view */ }
         for (var view : List.of(listView, headerView, sightingsView, messageView, traceView, emptyView, copyView, disableView, logView, clearView)) view.close();
     }

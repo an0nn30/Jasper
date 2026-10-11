@@ -160,7 +160,7 @@ final class ItemLists {
             return index < 0 || index >= size() || !value().items().get(index).heading();
         }
 
-        /** RESULTS rows and headings keep fixed heights; headings elsewhere are as tall as the rows. */
+        /** RESULTS rows and headings keep measured minimum heights; headings elsewhere are as tall as the rows. */
         @Override
         boolean uniformRows() {
             return !results() && !identityRows();
@@ -169,8 +169,7 @@ final class ItemLists {
         @Override
         int rowHeightAt(int index) {
             if(identityRows())return value().items().get(index).heading()?ThemePainting.height(context(),DesignMetrics.Role.IDENTITY_HEADING_HEIGHT,Typography.Role.CAPTION):rowHeight;
-            return ThemePainting.metric(context(), value().items().get(index).heading()
-                    ? DesignMetrics.Role.RESULTS_HEADING_HEIGHT : DesignMetrics.Role.RESULTS_ROW_HEIGHT);
+            return ResultMetrics.height(context(), value().items().get(index).heading());
         }
 
         @Override
@@ -190,7 +189,7 @@ final class ItemLists {
 
         @Override
         int reservedRowHeight() {
-            return results() ? ThemePainting.metric(context(), DesignMetrics.Role.RESULTS_ROW_HEIGHT) : rowHeight;
+            return results() ? ResultMetrics.height(context(), false) : rowHeight;
         }
 
         @Override
@@ -414,6 +413,11 @@ final class ItemLists {
             }
             row.slot(row.subtitle, item.subtitle());
             row.slot(row.trailing, trailing);
+            if (results() && !item.heading() && selected.contains(item.id())) {
+                resultSelection(row, item.title(), SemanticColor.TEXT_ONACCENT, true);
+                resultSelection(row, item.subtitle(), SemanticColor.TEXT_ONACCENT_SECONDARY, true);
+                resultSelection(row, item.trailing(), SemanticColor.TEXT_ONACCENT_SECONDARY, false);
+            }
             for(var control:row.controls.values())if(control instanceof Buttons.ButtonControl button)button.button.panelRow=panelSingle;
             row.tooltip(item.tooltip());
             row.name(item.title());
@@ -429,6 +433,16 @@ final class ItemLists {
                         index < size() - 1,
                         () -> emit(new UiEvent.Reordered(node.id(), row.id, row.index + 1)));
                 command(row, "remove", true, () -> emit(new UiEvent.Removed(node.id(), row.id)));
+            }
+        }
+
+        private void resultSelection(InteractiveRows.Row row, List<Nodes.Node> nodes, SemanticColor ink, boolean strong) {
+            for (var node : nodes) if (node instanceof Nodes.Text text
+                    && row.controls.get(text.id()).component instanceof JLabel label) {
+                label.setForeground(SurfaceContrast.on(context().theme().semantic(), ink,
+                    SemanticColor.SELECTION_BG, SurfaceContrast.TEXT));
+                label.setFont(SwingTypography.effective(context().typography().resultFont(
+                    Typography.Role.valueOf(text.role().name()), strong)));
             }
         }
 

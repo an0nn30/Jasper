@@ -18,13 +18,9 @@ import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.FocusTraversalPolicy;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
-import java.awt.geom.RoundRectangle2D;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,18 +36,17 @@ import java.util.function.ObjIntConsumer;
 import javax.swing.Icon;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
-import javax.swing.border.AbstractBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.text.JTextComponent;
 
 /**
  * Jasper's palette: a query row with an optional scope chip, a one-line result list with section headings (or the
  * empty line, or a step's small form), and a hint bar with the selected row's detail and its scope's other verbs.
- * The card is a layout-only shell (Plan 3 recomposes it) on the chrome {@link KitContext}: every control in it is a kit
- * view, and the card paints only module roles (its surface, outline and the hint bar's rule) with named geometry. The
+ * The module supplies its shared surface, outline and measured rows on the chrome {@link KitContext}. Every control
+ * remains a retained kit view. The
  * query field keeps focus; the host moves the selection and routes the keys. EDT only.
  */
-public final class CommandPalette extends JPanel implements AutoCloseable {
+public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel implements AutoCloseable {
     static final String QUERY = "query", CHIP = "chip", RESULTS = "results", HINT = "hint", EMPTY = "empty", STEP = "step",
         RUN = "run", VERB = "verb:";
     private static final String STEP_FIELD = "step.field.";
@@ -86,7 +81,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
 
     CommandPalette(KitContext kit, boolean macOs, Consumer<String> queryChanged, ObjIntConsumer<PaletteEntry> execute,
                    Function<String, Optional<ScopePrefix>> prefixes, Consumer<PaletteScope> chipTyped) {
-        super(new BorderLayout());
+        super(kit, dev.jasper.ui.swing.SurfacePanel.Kind.POPUP);
         this.kit = presentationIcons.context(Objects.requireNonNull(kit));
         kit = this.kit;
         this.macOs = macOs;
@@ -114,7 +109,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         chipView = view(chipSpec());
         chipView.setVisible(false);
         queryView = view(querySpec());
-        fieldRow = new FixedHeightPanel(DesignMetrics.Role.PALETTE_FIELD_HEIGHT);
+        fieldRow = dev.jasper.ui.swing.SurfacePanel.row(kit, DesignMetrics.Role.PALETTE_FIELD_HEIGHT, false);
         fieldRow.setLayout(new BorderLayout());
         fieldRow.setOpaque(false);
         fieldRow.add(chipView, BorderLayout.WEST);
@@ -128,11 +123,11 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         empty.add(emptyView);
         stepTitleView = view(stepTitleSpec());
         stepErrorView = view(stepErrorSpec());
-        stepTitleRow = new FixedHeightPanel(DesignMetrics.Role.PALETTE_STEP_TITLE_HEIGHT);
+        stepTitleRow = dev.jasper.ui.swing.SurfacePanel.row(kit, DesignMetrics.Role.PALETTE_STEP_TITLE_HEIGHT, false);
         stepTitleRow.setLayout(new BorderLayout());
         stepTitleRow.setOpaque(false);
         stepTitleRow.add(stepTitleView, BorderLayout.CENTER);
-        stepErrorRow = new FixedHeightPanel(DesignMetrics.Role.PALETTE_STEP_TITLE_HEIGHT);
+        stepErrorRow = dev.jasper.ui.swing.SurfacePanel.row(kit, DesignMetrics.Role.PALETTE_STEP_TITLE_HEIGHT, false);
         stepErrorRow.setLayout(new BorderLayout());
         stepErrorRow.setOpaque(false);
         stepErrorRow.add(stepErrorView, BorderLayout.CENTER);
@@ -149,11 +144,10 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         add(cards, BorderLayout.CENTER);
 
         hintView = view(hintSpec());
-        hintBar = new HintBar();
+        hintBar = dev.jasper.ui.swing.SurfacePanel.row(kit, DesignMetrics.Role.PALETTE_HINT_HEIGHT, true);
         hintBar.add(hintView, BorderLayout.CENTER);
         add(hintBar, BorderLayout.SOUTH);
 
-        setBorder(new CardOutline());
         themeSubscription = kit.binding().subscribe(pair -> refreshTheme());
         refreshTheme();
         setChip(null, null);
@@ -234,7 +228,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
             List<PaletteVerb> verbs = item.scope().verbs();
             for (int verb = 1; verb < Math.min(3, verbs.size()); verb++)
                 children.add(new Nodes.Button(VERB + verb, ControlState.READY, verbs.get(verb).label() + " " + keys(verb), "",
-                    Nodes.ButtonKind.LINK, VERB + verb, ""));
+                    Nodes.ButtonKind.LINK, VERB + verb, "", Nodes.ButtonPresentation.EMBEDDED));
         }
         return new ViewSpec(new Nodes.Stack(HINT, ControlState.READY, Nodes.LayoutRole.NAVIGATION, children));
     }
@@ -265,7 +259,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         for (int i = 0; i < stepFields.size(); i++) {
             var row = new StepRow(view(new ViewSpec(text(STEP + ".label." + i, stepLabel(stepFields.get(i)), Nodes.TextRole.CAPTION))), view(stepFieldSpec(i)));
             stepRows.add(row);
-            stepPanel.add(row);
+            stepPanel.add(row.panel);
         }
         stepPanel.add(stepErrorRow);
         stepPanel.add(javax.swing.Box.createVerticalGlue());
@@ -283,13 +277,9 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
 
     /** The former step geometry: 4/12 row padding, a fixed label column and a gap before the field. */
     private void applyStepGeometry() {
-        int side = scaled(DesignMetrics.Role.PALETTE_STEP_SIDE_PADDING), vertical = scaled(DesignMetrics.Role.PALETTE_STEP_ROW_PADDING);
+        int side = scaled(DesignMetrics.Role.PALETTE_STEP_SIDE_PADDING);
         stepTitleRow.setBorder(new EmptyBorder(0, side, 0, side));
         stepErrorRow.setBorder(new EmptyBorder(0, side, 0, side));
-        for (StepRow row : stepRows) {
-            row.setBorder(new EmptyBorder(vertical, side, vertical, side));
-            ((BorderLayout) row.getLayout()).setHgap(scaled(DesignMetrics.Role.PALETTE_STEP_LABEL_GAP));
-        }
         stepPanel.revalidate();
     }
 
@@ -458,7 +448,7 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         if (entry != null) execute.accept(entry, verb);
     }
 
-    int itemHeight() { return scaled(DesignMetrics.Role.RESULTS_ROW_HEIGHT); }
+    int itemHeight() { return dev.jasper.ui.swing.ResultMetrics.height(kit, false); }
 
     /** How many result rows the list shows before it scrolls; section headings among them add their own height. */
     void setVisibleRows(int rows) { visibleRows = rows; renderResults(); revalidate(); }
@@ -591,47 +581,18 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         repaint();
     }
 
-    // Repaint through this component so opaque header/footer children never square off its corners.
-    @Override protected boolean isPaintingOrigin() { return true; }
-
-    @Override protected void paintComponent(Graphics graphics) {
-        var g = (Graphics2D) graphics.create();
-        try {
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            int arc = scaled(DesignMetrics.Role.PALETTE_CORNER_ARC);
-            g.setColor(color(SemanticColor.SURFACE_CARD));
-            g.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), arc, arc));
-        } finally { g.dispose(); }
-    }
-
-    @Override protected void paintChildren(Graphics graphics) {
-        var clipped = (Graphics2D) graphics.create();
-        try {
-            int inset = scaled(DesignMetrics.Role.HAIRLINE);
-            int arc = UIScale.scale(metric(DesignMetrics.Role.PALETTE_CORNER_ARC) - 2 * metric(DesignMetrics.Role.HAIRLINE));
-            clipped.clip(new RoundRectangle2D.Double(inset, inset,
-                Math.max(0, getWidth() - 2 * inset), Math.max(0, getHeight() - 2 * inset), arc, arc));
-            super.paintChildren(clipped);
-        } finally { clipped.dispose(); }
-    }
-
-    @Override public boolean contains(int x, int y) {
-        int arc = scaled(DesignMetrics.Role.PALETTE_CORNER_ARC);
-        return new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), arc, arc).contains(x, y);
-    }
-
     @Override public Dimension getPreferredSize() {
         Insets insets = getInsets();
-        int height = metric(DesignMetrics.Role.PALETTE_FIELD_HEIGHT) + (stepShowing()
-            ? metric(DesignMetrics.Role.PALETTE_STEP_TITLE_HEIGHT) + stepFields.size() * metric(DesignMetrics.Role.PALETTE_STEP_ROW_HEIGHT)
-                + (stepError != null ? metric(DesignMetrics.Role.PALETTE_STEP_TITLE_HEIGHT) : 0)
-            : listHeight() + metric(DesignMetrics.Role.PALETTE_HINT_HEIGHT));
-        return new Dimension(scaled(DesignMetrics.Role.PALETTE_WIDTH), UIScale.scale(height) + insets.top + insets.bottom);
+        int height = fieldRow.getPreferredSize().height + (stepShowing()
+            ? stepTitleRow.getPreferredSize().height + stepRows.stream().mapToInt(row -> row.panel.getPreferredSize().height).sum()
+                + (stepError != null ? stepErrorRow.getPreferredSize().height : 0)
+            : listHeight() + hintBar.getPreferredSize().height);
+        return new Dimension(scaled(DesignMetrics.Role.PALETTE_WIDTH), height + insets.top + insets.bottom);
     }
 
     /** Tall enough for the first {@link #visibleRows} rows and the headings above them; the rest scroll. */
     private int listHeight() {
-        int row = metric(DesignMetrics.Role.RESULTS_ROW_HEIGHT), heading = metric(DesignMetrics.Role.RESULTS_HEADING_HEIGHT);
+        int row = itemHeight(), heading = dev.jasper.ui.swing.ResultMetrics.height(kit, true);
         if (EMPTY.equals(listCard)) return row;
         int height = 0;
         for (int i = 0, rows = 0; i < entries.size() && rows < visibleRows; i++) {
@@ -659,8 +620,8 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
     JPanel stepPanel() { return stepPanel; }
     JPanel stepTitleRow() { return stepTitleRow; }
     JPanel stepErrorRow() { return stepErrorRow; }
-    JPanel stepRow(int index) { return stepRows.get(index); }
-    JComponent stepLabelView(int index) { return stepRows.get(index).labelColumn; }
+    JPanel stepRow(int index) { return stepRows.get(index).panel; }
+    JComponent stepLabelView(int index) { return stepRows.get(index).label; }
     KitView stepFieldView(int index) { return stepRows.get(index).field; }
     KitView emptyView() { return emptyView; }
     JPanel fieldRow() { return fieldRow; }
@@ -680,77 +641,13 @@ public final class CommandPalette extends JPanel implements AutoCloseable {
         return null;
     }
 
-    /** A panel whose height is fixed in logical pixels, so the query row and hint bar stay put under any font. */
-    private class FixedHeightPanel extends JPanel {
-        private final DesignMetrics.Role height;
-
-        FixedHeightPanel(DesignMetrics.Role height) { this.height = height; }
-
-        @Override public Dimension getMinimumSize() { return new Dimension(0, scaled(height)); }
-        @Override public Dimension getPreferredSize() { return new Dimension(super.getPreferredSize().width, scaled(height)); }
-        @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, scaled(height)); }
-    }
-
-    /** A step field's row: fixed height, the label column at a fixed width, the field filling the rest. */
-    private final class StepRow extends FixedHeightPanel {
+    /** Retained views, laid out by the module's responsive native label/control composition. */
+    private final class StepRow {
         final KitView label, field;
-        final JPanel labelColumn = new JPanel(new BorderLayout()) {
-            @Override public Dimension getPreferredSize() {
-                return new Dimension(scaled(DesignMetrics.Role.PALETTE_STEP_LABEL_WIDTH), super.getPreferredSize().height);
-            }
-        };
-
+        final JPanel panel;
         StepRow(KitView label, KitView field) {
-            super(DesignMetrics.Role.PALETTE_STEP_ROW_HEIGHT);
-            this.label = label; this.field = field;
-            setLayout(new BorderLayout());
-            setOpaque(false);
-            labelColumn.setOpaque(false);
-            labelColumn.add(label, BorderLayout.CENTER);
-            add(labelColumn, BorderLayout.LINE_START);
-            add(field, BorderLayout.CENTER);
-        }
-    }
-
-    /** The hint bar: a hairline rule in {@code border.subtle} above the detail and verb links. */
-    private final class HintBar extends JPanel {
-        HintBar() { super(new BorderLayout()); setOpaque(false); }
-
-        @Override public Dimension getMinimumSize() { return new Dimension(0, scaled(DesignMetrics.Role.PALETTE_HINT_HEIGHT)); }
-        @Override public Dimension getPreferredSize() {
-            return new Dimension(super.getPreferredSize().width, scaled(DesignMetrics.Role.PALETTE_HINT_HEIGHT));
-        }
-        @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, scaled(DesignMetrics.Role.PALETTE_HINT_HEIGHT)); }
-        @Override protected void paintComponent(Graphics graphics) {
-            graphics.setColor(color(SemanticColor.BORDER_SUBTLE));
-            graphics.fillRect(0, 0, getWidth(), scaled(DesignMetrics.Role.HAIRLINE));
-        }
-    }
-
-    /** The card's rounded outline in the menu border role, one hairline wide. */
-    private final class CardOutline extends AbstractBorder {
-        @Override public Insets getBorderInsets(Component component) {
-            int line = scaled(DesignMetrics.Role.HAIRLINE);
-            return new Insets(line, line, line, line);
-        }
-        @Override public Insets getBorderInsets(Component component, Insets insets) {
-            int line = scaled(DesignMetrics.Role.HAIRLINE);
-            insets.set(line, line, line, line);
-            return insets;
-        }
-        @Override public void paintBorder(Component component, Graphics graphics, int x, int y, int width, int height) {
-            var g = (Graphics2D) graphics.create();
-            try {
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                int line = scaled(DesignMetrics.Role.HAIRLINE), arc = scaled(DesignMetrics.Role.PALETTE_CORNER_ARC);
-                var outer = new RoundRectangle2D.Double(x, y, width, height, arc, arc);
-                var inner = new RoundRectangle2D.Double(x + line, y + line, width - 2.0 * line, height - 2.0 * line,
-                    Math.max(0, arc - 2 * line), Math.max(0, arc - 2 * line));
-                var ring = new java.awt.geom.Area(outer);
-                ring.subtract(new java.awt.geom.Area(inner));
-                g.setColor(color(SemanticColor.BORDER_MENU));
-                g.fill(ring);
-            } finally { g.dispose(); }
+            this.label=label; this.field=field;
+            panel=dev.jasper.ui.swing.SurfacePanel.labelledRow(kit,label,field);
         }
     }
 }

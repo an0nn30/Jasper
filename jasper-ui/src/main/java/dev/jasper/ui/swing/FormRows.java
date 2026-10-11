@@ -79,17 +79,31 @@ final class FormRows {
             return ThemePainting.metric(owner.context(), DesignMetrics.Role.COLUMN_GAP);
         }
 
-        int trailing(Container p) {
+        int trailing(Container p,int width) {
             return p.getComponentCount() > 3 && p.getComponent(3).isVisible()
                     ? Math.min(
                             p.getComponent(3).getPreferredSize().width,
-                            Math.max(0, (p.getWidth() - labelWidth() - 2 * gap()) / 2))
+                            Math.max(0, (width - labelWidth() - 2 * gap()) / 2))
                     : 0;
         }
 
+        boolean trailingVisible(Container p) { return p.getComponentCount()>3 && p.getComponent(3).isVisible(); }
+        boolean stacked(Container p,int width) {
+            int lane=p.getComponentCount()>2?Math.min(p.getComponent(2).getPreferredSize().width,SurfacePanel.bodyLaneWidth(owner.context())):0;
+            return width<labelWidth()+gap()+lane+(trailingVisible(p)?gap()+Math.min(p.getComponent(3).getPreferredSize().width,SurfacePanel.bodyLaneWidth(owner.context())):0);
+        }
+        int textHeight(int width) {
+            return Composition.height(owner.label,width)+(owner.caption.isVisible()?owner.caption.height(width)
+                +ThemePainting.metric(owner.context(),DesignMetrics.Role.CAPTION_TOP_OFFSET):0);
+        }
         @Override
         public int height(Container p, int width) {
-            int trailing = trailing(p),
+            if(stacked(p,width)) {
+                int height=textHeight(width);
+                for(int i=2;i<p.getComponentCount();i++)if(p.getComponent(i).isVisible())height+=gap()+Composition.height(p.getComponent(i),width);
+                return height;
+            }
+            int trailing = trailing(p,width),
                     w =
                             Math.max(
                                     0,
@@ -122,8 +136,19 @@ final class FormRows {
 
         @Override
         public void layoutContainer(Container p) {
+            if(stacked(p,p.getWidth())) {
+                int width=p.getWidth(),labelHeight=Composition.height(owner.label,width);
+                owner.label.setBounds(0,0,width,labelHeight);
+                owner.caption.setBounds(0,labelHeight+ThemePainting.metric(owner.context(),DesignMetrics.Role.CAPTION_TOP_OFFSET),width,owner.caption.height(width));
+                int y=textHeight(width);
+                for(int i=2;i<p.getComponentCount();i++)if(p.getComponent(i).isVisible()) {
+                    int height=Composition.height(p.getComponent(i),width);y+=gap();
+                    p.getComponent(i).setBounds(0,y,width,height);y+=height;
+                }
+                return;
+            }
             int lw = Math.min(labelWidth(), p.getWidth()),
-                    trailing = trailing(p),
+                    trailing = trailing(p,p.getWidth()),
                     x = lw + gap(),
                     w = Math.max(0, p.getWidth() - x - (trailing > 0 ? trailing + gap() : 0));
             int lh = Composition.height(owner.label, lw),

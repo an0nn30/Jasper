@@ -41,6 +41,22 @@ class PluginManagerPanelTest {
 
     private JButton primary() { return PluginKit.button(panel.detailsPane().header(), PluginDetails.PRIMARY); }
 
+    @Test void nativeDescriptionUsesExactlyOnceKitFontAndRetainsItsDocument() {
+        var themes=new dev.jasper.app.appearance.ThemeController();
+        themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
+        var actual=new PluginManagerPanel(themes.appearance().context(ThemeRoute.CHROME),handlers);
+        try {
+            actual.show(snapshot(TestRows.plugin("a.font","Font fixture").description("Literal plugin overview").row()));
+            var text=actual.detailsPane().textArea();var document=text.getDocument();text.select(1,4);
+            for(float size:List.of(20f,32f,13f)) {
+                themes.configure(dev.jasper.app.appearance.Theme.DARK,new dev.jasper.app.config.UiFontConfig(size==32?"Serif":"system",size));
+                if(size==32)assertThat(text.getFont().getFamily()).isEqualTo(java.awt.Font.SERIF);
+                assertThat(text.getFont().getSize2D()).isEqualTo(size);
+                assertThat(text.getDocument()).isSameAs(document);assertThat(text.getSelectedText()).isEqualTo("ite");
+            }
+        }finally{actual.close();themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());themes.close();}
+    }
+
     @Test void narrowViewportPreservesReadableDetailAndRevealsFocusedActionsBothWays() {
         panel.show(snapshot(TestRows.plugin("a.art","Authored").row()));
         panel.setSize(com.formdev.flatlaf.util.UIScale.scale(744),600);KitTestSupport.layout(panel);

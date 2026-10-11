@@ -43,6 +43,7 @@ final class PluginDetails {
     private String artName="plugin";
     private final JTextArea text = new JTextArea();
     private final AutoCloseable theme;
+    private final AutoCloseable typography;
     private PluginRuntime.Row row;
     private boolean busy;
     private String section = OVERVIEW;
@@ -75,6 +76,7 @@ final class PluginDetails {
         theme = kit.binding().subscribe(pair -> restyle());
         restyle();
         show(null, false);
+        typography=dev.jasper.ui.swing.NativeControlStyles.observeTypography(this::restyle);
     }
 
     JComponent component() { return component; }
@@ -90,8 +92,7 @@ final class PluginDetails {
         ((BorderLayout) component.getLayout()).setVgap(metric(DesignMetrics.Role.PLUGIN_DETAILS_GAP));
         int vertical = metric(DesignMetrics.Role.PLUGIN_TEXT_VERTICAL_PADDING), side = metric(DesignMetrics.Role.PLUGIN_TEXT_SIDE_PADDING);
         text.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
-        var font = kit.typography().font(Typography.Role.BODY);
-        text.setFont(font.deriveFont(UIScale.scale(font.getSize2D())));
+        text.setFont(dev.jasper.ui.swing.NativeControlStyles.font(kit,Typography.Role.BODY));
         var palette = kit.theme().semantic();
         text.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));
         text.setCaretColor(text.getForeground());
@@ -192,6 +193,7 @@ final class PluginDetails {
     boolean homepageShown() { return row != null && homepage(row).isPresent(); }
 
     void close() {
+        try { typography.close(); } catch (Exception ignored) { /* idempotent module subscription */ }
         try { theme.close(); } catch (Exception ignored) { /* the binding outlives nothing that needs this */ }
         try { header.close(); } finally { try {body.close();} finally {artwork.close();} }
     }

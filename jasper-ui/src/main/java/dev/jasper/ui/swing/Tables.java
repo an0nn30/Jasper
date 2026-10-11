@@ -32,14 +32,32 @@ final class Tables {
         private List<TableRow> measuredRows=List.of();
         private List<Font> measuredFonts=List.of();
         private int[] minimums=new int[0];
+        private float measuredScale=-1;
         private void measureColumns(){
             var columns=value().columns();var fonts=columns.stream().map(c->ThemePainting.font(context(),Typography.Role.valueOf(c.role().name()))).toList();
-            if(measuredColumns.equals(columns)&&measuredRows.equals(value().rows())&&measuredFonts.equals(fonts))return;
-            measuredColumns=columns;measuredRows=value().rows();measuredFonts=fonts;minimums=new int[columns.size()];
+            float scale=com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
+            if(measuredColumns.equals(columns)&&measuredRows.equals(value().rows())&&measuredFonts.equals(fonts)&&measuredScale==scale)return;
+            measuredScale=scale;measuredColumns=columns;measuredRows=value().rows();measuredFonts=fonts;minimums=new int[columns.size()];
             for(int i=0;i<columns.size();i++){
                 var column=columns.get(i);var probe=Labels.literal();probe.setFont(fonts.get(i));probe.setText("…");minimums[i]=probe.getPreferredSize().width;
                 if(column.numeric())for(var row:measuredRows){probe.setText(row.cells().getOrDefault(column.id(),""));minimums[i]=Math.max(minimums[i],probe.getPreferredSize().width);}
             }
+        }
+
+        /** Minimum negotiation only: rendering still uses the existing weighted allocation and literal cells. */
+        int usableWidth() {
+            int padding=2*ThemePainting.metric(context(),DesignMetrics.Role.ICON_GAP)+(multiple()?new JCheckBox().getPreferredSize().width:0);
+            if(value().columns().isEmpty())return padding;
+            var first=value().columns().getFirst();
+            var font=ThemePainting.font(context(),Typography.Role.valueOf(first.role().name()));
+            int target=NativeChromePainting.measureText(font,"M".repeat(DesignMetrics.TABLE_MIN_VISIBLE_GLYPHS));
+            var icon=value().rows().stream().flatMap(row->row.icon().stream()).findFirst();
+            if(icon.isPresent())target+=context().icons().icon(icon.get(),context().theme().semantic(),Nodes.Hue.NONE,
+                com.formdev.flatlaf.util.UIScale.scale(14)).getIconWidth()+new JLabel().getIconTextGap();
+            var layout=weights();int low=0,high=Math.max(1,target);
+            while(layout.allocation(high)[0]<target && high<Integer.MAX_VALUE/2)high*=2;
+            while(low<high){int middle=low+(high-low)/2;if(layout.allocation(middle)[0]<target)low=middle+1;else high=middle;}
+            return padding+high;
         }
 
         TableControl(KitView view, Nodes.Table node) {
@@ -125,6 +143,7 @@ final class Tables {
         @Override
         void data() {
             measureColumns();
+            scroll.setMinimumSize(new Dimension(usableWidth(),0));
             header.removeAll();
             header.setLayout(weights());
             for (var column : value().columns()) {

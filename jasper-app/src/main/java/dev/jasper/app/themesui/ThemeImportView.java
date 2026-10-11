@@ -40,7 +40,7 @@ final class ThemeImportView {
         details = text.toString().strip();
         view = new KitView(context, spec(), event -> {
             switch (event) {
-                case UiEvent.Selected picked when picked.id().startsWith("decision:") -> {
+                case UiEvent.Selected picked when !committing && picked.id().startsWith("decision:") -> {
                     picked.ids().stream().findFirst().ifPresent(choice -> decisions.put(picked.id().substring("decision:".length()),
                         ThemeImporter.ConflictChoice.valueOf(choice)));
                     render();
@@ -69,7 +69,7 @@ final class ThemeImportView {
             var options = offered.stream().map(choice -> new Option(choice.name(), label(choice), Optional.<Nodes.Hue>empty())).toList();
             String name = item.conversion().document().name();
             sections.add(new Nodes.FormRow("row:" + item.id(), ControlState.READY, name, item.conversion().sourceEntry(),
-                new Nodes.Choice("decision:" + item.id(), ControlState.READY, Nodes.ChoiceKind.DROPDOWN, options,
+                new Nodes.Choice("decision:" + item.id(), new ControlState(true, !committing, false, ""), Nodes.ChoiceKind.DROPDOWN, options,
                     decisions.get(item.id()).name(), name + " conflict choice", ""), Optional.empty()));
         }
         if (!details.isEmpty()) sections.add(new Nodes.Text(DETAILS, ControlState.READY, details, Nodes.TextRole.DESCRIPTION));

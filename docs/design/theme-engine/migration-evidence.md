@@ -1,5 +1,9 @@
 # Consumer inventory and before evidence
 
+## Task9c evidence — 2026-10-11
+
+The released owner matrix and scratch report retain actual controller palette source composition, chooser OPEN/SAVE/DIRECTORY and asynchronous states, actual ThemeDialogs/import sheets, all three real notification severities, history and selectable Errors content. Synthetic actions are inert; no OS notifications, external commands or GUI launch are involved. Existing RestartFlow/Command/PluginManager Task9b evidence remains authoritative. Causal checks reproduce enlarged input clipping, selected-result treatment, clipped focus halo, negative chooser path allocation, overlapping Errors actions, missing short-height body content and absent TextBlock antialiasing. Actual import owning callback verifies install-only policy followed by explicit selection. Physical focus/popup/IME/display/appearance and pixel acceptance remain controller-owned. Final report distinguishes captured states from behavior-only tests and contains immutable before/after/source images, companions, input and direct active XML hashes.
+
 Task 1 began 2026-10-05 against production revision `f16ae32f`. The [exact consumer ledger](migration.csv)
 records 971 Java paths found among 1,652 app, SDK, testkit and bundled-plugin Java sources enumerated
 with `rg --files`. The scan includes Swing/AWT/FlatLaf imports, UIManager/appearance, control
@@ -108,3 +112,5 @@ using synthetic paths with save/I/O forbidden. These authorized corrections repl
 pre-migration titlebar assets and append key/tab images; manifest provenance and all 572 asset
 checksums are refreshed. Five coverage tests include a distinct-context/tab-state guard. Normal
 checks still never replace the frozen baseline.
+
+Task9c final01 passed9,950/0/0/6 but later image inspection exposed fresh automatic2.5 construction failures. Transition checks are not evidence against those failures. The replacement candidate has causal REDs for chooser60px receiving lane, Errors−60px trace viewport, sheet zero body, FormRow zero choice width, native80pt versus kit32pt, retained same-theme13pt versus requested20pt, and filename14px versus required53px ink. Focused fixes retain actual owners and scroll to controls/actions; settled chooser captures explicitly disable animation. Raw logs/checkpoints distinguish each stage and the replacement frozen report supplies final counts/hashes.

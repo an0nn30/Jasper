@@ -268,6 +268,7 @@ final class TextFields {
             label.setText(field.label()); label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
             label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY)); label.setEnabled(component.isEnabled());
             surface.transparent = field.presentation() == Nodes.FieldPresentation.TRANSPARENT;
+            surface.radiusRole = surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_RADIUS : DesignMetrics.Role.CONTROL_RADIUS;
             error.setText(field.state().error()); error.setVisible(!field.state().error().isEmpty());
             error.setEnabled(component.isEnabled());
             error.setFont(ThemePainting.font(context(), Typography.Role.CAPTION)); error.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ERROR));
@@ -284,7 +285,7 @@ final class TextFields {
             leading.setVisible(field.presentation() != Nodes.FieldPresentation.PLAIN_PATH);
             leading.setBorder(new EmptyBorder(0, 0, 0, gap));
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
-            int padding = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_PADDING : field.kind() == Nodes.FieldKind.TEXTAREA ? DesignMetrics.Role.TEXTAREA_PADDING : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
+            int padding = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_PADDING : surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_PADDING : field.kind() == Nodes.FieldKind.TEXTAREA ? DesignMetrics.Role.TEXTAREA_PADDING : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
             surface.setBorder(new EmptyBorder(ring * 2, padding, ring * 2, padding));
             if (trailing != null) { trailing.parentEnabled = interactive(); trailing.refresh(); }
             if (browse != null) {
@@ -413,7 +414,8 @@ final class TextFields {
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create();
             try {
-                ThemePainting.rounded(g, this, context, transparent ? null : ThemePainting.color(context, SemanticColor.SURFACE_INPUT),
+                if (transparent && focus.visible() && !error) ThemePainting.transparentFocus(g, this, context, DesignMetrics.Role.TRANSPARENT_FIELD_FOCUS_RADIUS);
+                else ThemePainting.rounded(g, this, context, transparent ? null : ThemePainting.color(context, SemanticColor.SURFACE_INPUT),
                     ThemePainting.color(context, error ? SemanticColor.BORDER_ERROR : focus.visible() ? SemanticColor.BORDER_FOCUS : SemanticColor.BORDER_INPUT),
                     focus.visible(), error,radiusRole);
             } finally { g.dispose(); }

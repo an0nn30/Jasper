@@ -14,7 +14,6 @@ import java.util.function.ToIntFunction;
 import javax.accessibility.AccessibleContext;
 import javax.accessibility.AccessibleRole;
 import javax.swing.JComponent;
-import javax.swing.plaf.basic.BasicGraphicsUtils;
 
 /**
  * Plain text word-wrapped to a fixed width and, with a line limit, cut with an ellipsis: the notification card's clamp
@@ -96,7 +95,7 @@ final class TextBlock extends JComponent {
     }
 
     private int measure(String value) {
-        return (int) Math.ceil(BasicGraphicsUtils.getStringWidth(this, getFontMetrics(getFont()), value));
+        return dev.jasper.ui.swing.NativeChromePainting.measureText(getFont(), value);
     }
 
     private void relayout() {
@@ -111,12 +110,13 @@ final class TextBlock extends JComponent {
     @Override protected void paintComponent(Graphics graphics) {
         var g = (Graphics2D) graphics.create();
         try {
+            dev.jasper.ui.swing.NativeChromePainting.prepareText(g);
             g.setFont(getFont());
             g.setColor(getForeground());
             FontMetrics metrics = g.getFontMetrics();
             int y = metrics.getAscent();
             for (String line : lines) {
-                BasicGraphicsUtils.drawString(this, g, line, 0, y);
+                g.drawString(line, 0, y);
                 y += metrics.getHeight();
             }
         } finally { g.dispose(); }

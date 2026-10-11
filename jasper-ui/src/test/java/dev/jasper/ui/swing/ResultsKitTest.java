@@ -28,6 +28,22 @@ import org.junit.jupiter.api.Test;
  * selection kept in view), field composition state and unlabelled search fields.
  */
 class ResultsKitTest {
+    @Test void selectionEmphasizesTitleAndDetailAndDeselectionRestoresTheirRoles() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var items = List.of(heading("section", "Heading"), row("a", "First", "detail", "tag"), row("b", "Second", "other", null));
+            try (var view = new KitView(context, new ViewSpec(results(items, Set.of("a"), OptionalInt.empty())), event -> {})) {
+                var title = find(view,"a.title",JLabel.class); var detail = find(view,"a.detail",JLabel.class);
+                assertThat(title.getFont().isBold()).isTrue(); assertThat(detail.getFont().isBold()).isTrue();
+                assertThat(find(view,"section.title",JLabel.class).getFont().isBold()).isFalse();
+                assertThat(find(view,"a.tag",JLabel.class).getFont().isBold()).isFalse();
+                view.update(new ViewSpec(results(items,Set.of("b"),OptionalInt.empty())));
+                assertThat(title.getFont()).isEqualTo(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.BODY));
+                assertThat(detail.getForeground()).isEqualTo(context.theme().semantic().color(SemanticColor.TEXT_SECONDARY));
+            } finally { release(context); }
+        });
+    }
+
     static final ControlState READY = ControlState.READY;
 
     static ListItem heading(String id, String title) {
