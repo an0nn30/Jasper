@@ -1,12 +1,14 @@
 # Plan 1 temporary theme paths and Plan 2 removal ownership
 
 
-## Native Vault diagnostic checkpoint — 2026-10-11
+## Native Vault diagnostic retirement — 2026-10-11
 
-Temporary `jasper.nativeTitleTrace` observations in MacTitleBar and Menus are exclusively for the
-controller's synthetic native QA. They log event/geometry/state only and add no component mouse
-listeners. The native Vault repair owns removal before its final frozen gate; this checkpoint is
-not eligible for native or pixel acceptance. Task5 fix1 is independently approved at94ea1e52.
+Temporary `jasper.nativeTitleTrace` code is removed from current MacTitleBar and Menus before the
+final repair gate. The immutable signed67691575 bundle retains it for controller-owned synthetic
+native QA; the desktop lock prevented launch. The two causal sheet allocation/WINDOW focus fixes
+remain. Title pointer failure is unresolved, native verification and all pixel acceptance stay open.
+This is a controller-approved ordering deviation: full gate precedes native closure so work can
+continue to Settings9; no acceptance obligation is waived. Task5 fix1 is approved at94ea1e52.
 
 ## Task 11b disposition — 2026-10-10 (independently approved through 2fc3bea8)
 

@@ -30,7 +30,6 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     private JComponent header, accessory;
     private java.util.List<JComponent> dragSurfaces = java.util.List.of();
     private MouseAdapter nativeDrag;
-    private AWTEventListener diagnosticEvents;
     private final PropertyChangeListener headerChanged = event -> {
         headerGeometryChanged();
     };
@@ -112,22 +111,6 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         if (closed || header != null || accessory != null) throw new IllegalStateException("Title accessory already installed");
         accessory = java.util.Objects.requireNonNull(value); add(value);
         value.addPropertyChangeListener(headerChanged);
-        // Temporary observation only: component mouse listeners would change JBR hit classification.
-        if (Boolean.getBoolean("jasper.nativeTitleTrace")) {
-            diagnosticEvents = event -> {
-                if (!(event instanceof MouseEvent mouse) || !(mouse.getSource() instanceof Component source)
-                    || SwingUtilities.getRootPane(source) != root || mouse.getID() == MouseEvent.MOUSE_MOVED
-                    || mouse.getID() == MouseEvent.MOUSE_DRAGGED) return;
-                Point point = SwingUtilities.convertPoint(source, mouse.getPoint(), root);
-                if (point.y > getHeight() && !"more.main".equals(source.getName())) return;
-                String name = java.util.Set.of("add.main", "add.arrow", "lock", "more.main").contains(source.getName() == null ? "" : source.getName()) ? source.getName() : "other";
-                System.getLogger("jasper.native-title-trace").log(System.Logger.Level.INFO,
-                    "mouse=" + mouse.getID() + " source=" + source.getClass().getName() + " control=" + name
-                        + " point=" + point + " enabled=" + source.isEnabled() + " showing=" + source.isShowing()
-                        + " bounds=" + source.getBounds() + " consumed=" + mouse.isConsumed());
-            };
-            Toolkit.getDefaultToolkit().addAWTEventListener(diagnosticEvents, AWTEvent.MOUSE_EVENT_MASK);
-        }
         headerGeometryChanged();
     }
     /** Action updates change layout within existing outer bounds. */
@@ -269,7 +252,6 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
             for (JComponent surface : dragSurfaces) { surface.removeMouseListener(nativeDrag); surface.removeMouseMotionListener(nativeDrag); }
         }
         if (accessory != null) accessory.removePropertyChangeListener(headerChanged);
-        if (diagnosticEvents != null) Toolkit.getDefaultToolkit().removeAWTEventListener(diagnosticEvents);
         root.removePropertyChangeListener(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, boundsChanged);
         if (window != null) {
             window.removeComponentListener(frameBounds);

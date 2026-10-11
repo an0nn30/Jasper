@@ -5,8 +5,15 @@ Native Vault repair (2026-10-11) follows Task5 fix1 approval at94ea1e52. A causa
 regression exposes a482×555 measured holder inside a482×172 final root. The shared fitter now
 restores final allocation; actual Vault capture targets emulate unchanged native bounds instead
 of repairing parent layout every time. WINDOW body focus shares the enclosing window cycle;
-SHEET remains contained. Native Add menu delivery is still under bounded diagnostic observation.
+SHEET remains contained. Native Add menu delivery remains unresolved; its frozen67691575 diagnostic bundle awaits desktop unlock.
+Temporary tracing was removed from current source. Controller moved the full gate ahead of native
+closure because the desktop lock prevents CUA and the user requested continuous progress; no native
+acceptance requirement is waived.
 No pixel measurements or acceptance claims change; native/title/font calibration remains open.
+Final headless gate passes9,853tests with zero failures/errors and six skips. Against approved Task5,
+all12 Login/path-key sheet PNGs,44 normalized actual Vault geometry metadata,8FileServer,36Remote,
+24Sessions and75gallery images remain identical. The39changed Vault images differ only in
+generated synthetic fingerprints or temporary-home path text; every other pixel is unchanged.
 
 The nine [original references](reference/README.md) are unchanged. Measurements below use original
 pixels, excluding shadow/native title bars, never the resized chat preview. Crop tuples are
