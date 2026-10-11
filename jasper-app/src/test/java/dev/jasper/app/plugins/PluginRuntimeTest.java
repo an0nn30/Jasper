@@ -108,16 +108,38 @@ class PluginRuntimeTest {
 
     @Test void manifestArtworkIsCachedBeforeSettingsAndClearedAtStop() throws Exception {
         Path bundled=root.resolve("art-bundled");
-        Path jar=PluginJars.build(bundled.resolve("dev.example.art"),"art.jar",PluginJars.descriptor("dev.example.art","1.0.0","fix.probe.Main")+"icon = \"art.svg\"\n",Map.of("fix.probe.Main",FIXTURE),List.of());
+        Path jar=PluginJars.build(bundled.resolve("dev.example.art"),"art.jar",PluginJars.descriptor("dev.example.art","1.0.0","fix.probe.Main")+"icon = \"art.svg\"\nicon_hue = \"blue\"\n",Map.of("fix.probe.Main",FIXTURE),List.of());
         String svg="<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><rect width='16' height='16' fill='red'/></svg>";
         PluginJars.addResource(jar,"art.svg",svg);
-        Path bad=PluginJars.build(bundled.resolve("dev.example.badart"),"art.jar",PluginJars.descriptor("dev.example.badart","1.0.0","fix.probe.Main")+"icon = \"art.svg\"\n",Map.of("fix.probe.Main",FIXTURE),List.of());
+        Path bad=PluginJars.build(bundled.resolve("dev.example.badart"),"art.jar",PluginJars.descriptor("dev.example.badart","1.0.0","fix.probe.Main")+"icon = \"art.svg\"\nicon_hue = \"blue\"\n",Map.of("fix.probe.Main",FIXTURE),List.of());
         PluginJars.addResource(bad,"art.svg","<svg><image href='data:image/png;base64,AAAA'/></svg>");
+        for (String format : List.of("svg", "png")) {
+            Path empty = PluginJars.build(bundled.resolve("dev.example.empty." + format), "art.jar",
+                PluginJars.descriptor("dev.example.empty." + format, "1.0.0", "fix.probe.Main")
+                    + "icon = \"empty." + format + "\"\nicon_hue = \"purple\"\n", Map.of("fix.probe.Main", FIXTURE), List.of());
+            PluginJars.addResource(empty, "empty." + format, "");
+        }
+        Path badPng = PluginJars.build(bundled.resolve("dev.example.badpng"), "art.jar",
+            PluginJars.descriptor("dev.example.badpng", "1.0.0", "fix.probe.Main")
+                + "icon = \"art.png\"\nicon_hue = \"green\"\n", Map.of("fix.probe.Main", FIXTURE), List.of());
+        PluginJars.addResource(badPng, "art.png", "not a PNG");
         var runtime=runtime(bundled,root.resolve("art-user"),null,false,new ArrayList<>());
         onEdt(()->runtime.start(Map.of(),true));
         try {
             assertThat(runtime.pluginIcons().get("dev.example.art").data()).isEqualTo(svg.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             assertThat(runtime.pluginIcons()).containsKeys("dev.example.art","dev.example.badart");
+            assertThat(runtime.pluginIcons()).doesNotContainKeys("dev.example.empty.svg", "dev.example.empty.png");
+            var complete = new CompletableFuture<PluginRuntime.Outcome>();
+            onEdt(() -> runtime.snapshot(complete::complete));
+            var outcome = complete.get(5, TimeUnit.SECONDS);
+            assertThat(outcome.ok()).isTrue();
+            assertThat(outcome.snapshot().rows()).hasSize(5);
+            assertThat(outcome.snapshot().rows().stream().filter(row -> row.id().startsWith("dev.example.empty.")))
+                .allSatisfy(row -> assertThat(row.icon()).isEmpty());
+            assertThat(runtime.pluginIcons().get("dev.example.art").identityArtwork().tileHue())
+                .isEqualTo(dev.jasper.ui.model.Nodes.Hue.BLUE);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> runtime.pluginIcons().get("dev.example.badpng").identityArtwork().artwork().prepare())
+                .isInstanceOf(IllegalArgumentException.class);
             var retained=runtime.pluginIcons().get("dev.example.art").artwork();
             assertThat(runtime.pluginIcons().get("dev.example.art").artwork()).isSameAs(retained);
             org.assertj.core.api.Assertions.assertThatThrownBy(()->runtime.pluginIcons().get("dev.example.badart").artwork().prepare()).isInstanceOf(IllegalArgumentException.class);

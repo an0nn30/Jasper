@@ -35,7 +35,9 @@ class PluginIconsTest {
     @Test void declaredSvgPngAndBrokenImagesUseTheSameSharedReceivingRoute() throws Exception {
         var svg = TestRows.plugin("a.svg", "Svg").icon(new PluginRuntime.PluginIcon("icons/a.svg", SVG.getBytes(StandardCharsets.UTF_8))).row();
         var png = TestRows.plugin("a.png", "Png").icon(new PluginRuntime.PluginIcon("icons/a.png", png())).row();
-        var broken = TestRows.plugin("a.bad", "Bad").icon(new PluginRuntime.PluginIcon("icons/a.svg", "not an image".getBytes(StandardCharsets.UTF_8))).row();
+        var broken = TestRows.plugin("a.bad", "Bad").icon(new PluginRuntime.PluginIcon("icons/a.svg", "not an image".getBytes(StandardCharsets.UTF_8), dev.jasper.ui.model.Nodes.Hue.BLUE)).row();
+        var brokenPng = TestRows.plugin("a.badpng", "Bad PNG").icon(new PluginRuntime.PluginIcon("icons/a.png",
+            "not a PNG".getBytes(StandardCharsets.UTF_8), dev.jasper.ui.model.Nodes.Hue.GREEN)).row();
         var none = TestRows.plugin("a.none", "None").row();
         var context=dev.jasper.app.testsupport.KitTestSupport.context();
         try(var registry=new dev.jasper.ui.icons.IconRegistry();var receiver=new dev.jasper.ui.icons.ReceivingArtwork(registry)) {
@@ -45,6 +47,7 @@ class PluginIconsTest {
                 assertThat(icon.getIconWidth()).isEqualTo(40);
             }
             assertThat(PluginIcons.name(receiver,broken)).isEqualTo("plugin");
+            assertThat(PluginIcons.name(receiver,brokenPng)).isEqualTo("plugin");
             assertThat(PluginIcons.name(receiver,none)).isEqualTo("plugin");
         }
     }

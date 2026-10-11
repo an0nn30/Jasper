@@ -22,10 +22,60 @@ class PluginIconFilesTest {
     @TempDir Path root;
 
     private PluginCandidate candidate(String id, String extraToml) throws Exception {
-        String toml = PluginJars.descriptor(id, "1.0.0", "fix.Main") + extraToml;
+        String toml = PluginJars.descriptor(id, "1.0.0", "fix.Main")
+            .replace("sdk = \">=0.1\"", "sdk = \">=0.15.1, <0.16\"") + extraToml;
         Path directory = root.resolve(id);
         Path jar = PluginJars.build(directory, "main.jar", toml, Map.of(), List.of());
         return new PluginCandidate(DescriptorParser.parse(toml), directory, List.of(jar), PluginCandidate.Origin.USER);
+    }
+
+    @Test void zeroByteSvgCannotAbortTheCatalogOrItsHealthyNeighbor() throws Exception {
+        assertEmptyArtCatalog("svg");
+    }
+
+    @Test void zeroBytePngCannotAbortTheCatalogOrItsHealthyNeighbor() throws Exception {
+        assertEmptyArtCatalog("png");
+    }
+
+    private void assertEmptyArtCatalog(String format) throws Exception {
+        var empty = candidate("dev.example.empty." + format, "icon = \"icons/empty." + format + "\"\nicon_hue = \"blue\"\n");
+        PluginJars.addResource(empty.jars().getFirst(), "icons/empty." + format, "");
+        var healthy = candidate("dev.example.healthy." + format, "icon = \"icons/healthy.svg\"\nicon_hue = \"green\"\n");
+        PluginJars.addResource(healthy.jars().getFirst(), "icons/healthy.svg", SVG);
+        var candidates = List.of(empty, healthy);
+        var snapshot = PluginCatalog.compute(new PluginCatalog.Launch(candidates, List.of(), Map.of(), false),
+            new PluginCatalog.Disk(candidates, Map.of(), Map.of()), Version.parse(dev.jasper.sdk.JasperSdk.VERSION), id -> 0, root);
+        assertThat(snapshot.rows()).extracting(PluginRuntime.Row::id).containsExactly(empty.id(), healthy.id());
+        assertThat(snapshot.rows().getFirst().icon()).as("empty decoration uses the generic fallback").isEmpty();
+        assertThat(snapshot.rows().getLast().icon()).hasValueSatisfying(icon -> {
+            assertThat(icon.identityArtwork().tileHue()).isEqualTo(dev.jasper.ui.model.Nodes.Hue.GREEN);
+            assertThat(icon.artwork()).isSameAs(PluginIconFiles.read(healthy).orElseThrow().artwork());
+            icon.artwork().prepare();
+        });
+        assertThat(PluginIconFiles.read(empty)).isEmpty();
+    }
+
+    @Test void cachedEmptySvgStaysAbsentAcrossNeutralToBlueMetadata() throws Exception {
+        assertCachedEmptyArt("svg");
+    }
+
+    @Test void cachedEmptyPngStaysAbsentAcrossNeutralToBlueMetadata() throws Exception {
+        assertCachedEmptyArt("png");
+    }
+
+    private void assertCachedEmptyArt(String format) throws Exception {
+        var neutral = candidate("dev.example.cached.empty." + format, "icon = \"icons/empty." + format + "\"\n");
+        PluginJars.addResource(neutral.jars().getFirst(), "icons/empty." + format, "");
+        var blueDescriptor = DescriptorParser.parse(PluginJars.descriptor(neutral.id(), "1.0.0", "fix.Main")
+            .replace("sdk = \">=0.1\"", "sdk = \">=0.15.1, <0.16\"")
+            + "icon = \"icons/empty." + format + "\"\nicon_hue = \"blue\"\n");
+        var blue = new PluginCandidate(blueDescriptor, neutral.directory(), neutral.jars(), neutral.origin());
+        int before = PluginIconFiles.reads();
+        var first = PluginIconFiles.read(neutral);
+        var second = PluginIconFiles.read(blue);
+        assertThat(first).isEmpty();
+        assertThat(second).isEmpty();
+        assertThat(PluginIconFiles.reads() - before).as("same key retains the raw absence").isEqualTo(1);
     }
 
     @Test void sameByteSameVersionReplacementUsesTheShownDescriptorsHueOutsideTheByteCache() throws Exception {

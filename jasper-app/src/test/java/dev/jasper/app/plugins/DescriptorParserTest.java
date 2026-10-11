@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.*;
 
 class DescriptorParserTest {
     @Test void acceptsDeclaredIdentityHueAsOptionalDecoration() {
-        for(String hue : List.of("neutral", "blue", "green", "amber", "purple", "NONE", "#ffffff", "", "Blue", "auto")) {
+        for(String hue : List.of("neutral", "blue", "green", "amber", "purple")) {
             assertThatCode(() -> DescriptorParser.parse("icon_hue = \"" + hue + "\"\n" + FULL))
                 .as("declared decoration %s", hue).doesNotThrowAnyException();
         }
@@ -18,7 +18,37 @@ class DescriptorParserTest {
             assertThat(DescriptorParser.parse("icon_hue = \""+hue.name().toLowerCase(java.util.Locale.ROOT)+"\"\n"+FULL).iconHue()).isEqualTo(hue);
         }
         assertThat(DescriptorParser.parse(FULL).iconHue()).isEqualTo(dev.jasper.ui.model.Nodes.Hue.NEUTRAL);
-        for(String bad:List.of("none","RGB","auto","Blue",""))assertThat(DescriptorParser.parse("icon_hue = \""+bad+"\"\n"+FULL).iconHue()).isEqualTo(dev.jasper.ui.model.Nodes.Hue.NEUTRAL);
+        var logger = java.util.logging.Logger.getLogger(DescriptorParser.class.getName());
+        var previousLevel = logger.getLevel();
+        boolean previousParents = logger.getUseParentHandlers();
+        var records = new java.util.ArrayList<java.util.logging.LogRecord>();
+        var handler = new java.util.logging.Handler() {
+            @Override public void publish(java.util.logging.LogRecord record) { records.add(record); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        handler.setLevel(java.util.logging.Level.ALL);
+        logger.addHandler(handler);
+        logger.setLevel(java.util.logging.Level.ALL);
+        logger.setUseParentHandlers(false);
+        try {
+            var invalid = List.of("none", "RGB", "auto", "Blue", "");
+            for (String bad : invalid) {
+                assertThat(DescriptorParser.parse("icon_hue = \"" + bad + "\"\n" + FULL).iconHue())
+                    .isEqualTo(dev.jasper.ui.model.Nodes.Hue.NEUTRAL);
+            }
+            assertThat(records).extracting(java.util.logging.LogRecord::getMessage)
+                .containsExactlyElementsOf(invalid.stream()
+                    .map(value -> "Plugin dev.jasper.ssh: invalid icon_hue; using neutral: " + value).toList());
+            assertThat(records).allSatisfy(record -> {
+                assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
+                assertThat(record.getLoggerName()).isEqualTo(DescriptorParser.class.getName());
+            });
+        } finally {
+            logger.removeHandler(handler);
+            logger.setLevel(previousLevel);
+            logger.setUseParentHandlers(previousParents);
+        }
         assertThatThrownBy(()->DescriptorParser.parse("icon_hue = 12\n"+FULL)).hasMessageContaining("icon_hue must be a string");
         assertThatThrownBy(()->DescriptorParser.parse("arbitrary_hue = \"blue\"\n"+FULL)).hasMessageContaining("Unknown key");
     }
