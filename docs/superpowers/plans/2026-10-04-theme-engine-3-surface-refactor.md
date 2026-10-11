@@ -1,5 +1,7 @@
 # Theme Engine Plan 3 — Surface Composition and Visual Matching Implementation Plan
 
+**2026-10-11 continuation:** Task3 scoped behavior/spec and quality independently approved through `50b744c9`, no actionable new findings. Native/pixel acceptance remains open; no page accepted. Both isolated FileServer-a and Host-b bundles at this commit passed package verification with AOT disabled and unchanged production inputs, but have not launched while the desktop is locked. Task4 is split into4a shared native support with actual Vault integration and4b complete manager/item composition under the [binding native composition amendment](../specs/2026-10-11-jasper-vault-native-composition-amendment.md). Each receives independent review; the split removes no visual or native obligations.
+
 **Task3 implementation handoff — 2026-10-10:** actual grouped File Server, lifetime/security readiness and staged captures implemented; independent review and native/pixel acceptance pending. Authorized amendments replace mock RSYNC with real TFTP; use cheap draft checks plus final filesystem/domain validation; retain immediate plaintext warnings omitted by the older mock. Shared SUPPORTING11.5/18 text, FULL-only setting content description64/inset15 plus1 separator (compact13/48 and hero54 unchanged), Card padding plus hairline, FULL top17, MIXED gap12, dependent indent16, narrower segmented padding and fractional button content measurement are central reusable policies measured across File Server/Add Host. Explicit engine-owned filled built-ins are allowed for source-matched PATH folder artwork; public custom registrations remain validated outlines. Final source-backed corrections include FULL30px actions/22px footer gap, ordered35px rows/32px add action, MIXED internal content padding without duplicate border, and Add Host MIXED authentication plus single-line Group with accessible default guidance and unchanged persistence. Natural File Server540×690 and two-key Add Host540×732 match both envelopes without scrollbars. Selected segment labels now use primary text with the established surface-contrast floor on their neutral fill, fixing invisible light-theme labels; fake built-in admission mirrors filled-folder artwork. Notification fit assertions exercise actual fractional painting; font-only restyle fixture pins/restores geometry scale. No feature-local paint or geometry. Final headless deliverable gate passes9,769 XML tests, zero failures/errors, six existing skips;61 gallery fixtures and actual-owner renders retained. Source-depicted Add Host and natural light/enlarged File Server capture-only follow-up passes4 tests. Final independent/native review remains parent-owned.
 
 **Task2b independent review — 2026-10-10:** implementation behavior and code quality approved through `02eb78e4`, with no new actionable code findings;824 affected XML tests independently confirmed, zero failures/errors/skips. Full visual spec remains incomplete. V1 retains measured FULL/card/ordered-list/settings geometry and picker artwork corrections; native ink and fresh native teardown/keyboard checks remain required. The isolated committed Host-a package verifies headlessly with AOT disabled; the locked desktop prevents native execution. Continue Task3 with the reviewed shared contracts, comparing common form geometry against both families and rerendering affected owners after central corrections. No page is accepted by this review.
@@ -28,7 +30,7 @@
 **Spec:** [Approved design, especially panel composition §6.1](../specs/2026-10-04-jasper-theme-engine-design.md).
 **Prerequisites:** [Plan 1](2026-10-04-theme-engine-1-engine-and-kit.md) and [Plan 2](2026-10-04-theme-engine-2-consumer-migration.md) implemented, reviewed and verified.
 **Shared contracts:** [Types, paths and test conventions](2026-10-04-theme-engine-contracts.md).
-**Status:** In execution. Task1 implementation gate is complete; its measured pixel residuals remain owned by final cross-family calibration/native chrome checks. Task2a cf8 fix1 and Task2b implementation through02eb78e4 are independently approved. Task2b visual completion and fresh native checks remain open; Task3 implementation is handed off for independent review. Deviations are recorded in the amendments above; controller native validation is explicitly authorized.
+**Status:** In execution. Task1 implementation gate is complete; its measured pixel residuals remain owned by final cross-family calibration/native chrome checks. Task2a cf8 fix1 and Task2b implementation through02eb78e4 are independently approved. Task2b visual completion and fresh native checks remain open; Task3 implementation is independently approved through50b744c9; its native/pixel checks remain open. Task4a is next under the binding native composition amendment. Deviations are recorded in the amendments above; controller native validation is explicitly authorized.
 
 ## Global Constraints
 
@@ -137,9 +139,21 @@ preview, resize the candidate arbitrarily, or overwrite source images.
 - [x] Run `./gradlew :jasper-plugin-fileserver:test --tests '*Server*Test'`; confirm composition/visibility expectations fail first.
 - [x] Implement cards and mixed form/settings sections matching new-file-server.png. Arrange trailing switches consistently and disable dependent settings with the source's visual indentation. Show only applicable credentials/TLS/startup controls, using real capability/model state. Bind primary enabled state to cheap draft/domain validation and retain final authoritative filesystem checks on Save.
 - [x] Render each protocol and login choice; test browse cancellation, a long path, invalid port, failed start/save, parent close while picker is open, short-screen scrolling and same-variant theme switch. Inspect reference overlay and run File Server tests.
-- [ ] Independent review and controller native/pixel acceptance; implementation commit `Compose New File Server with protocol-aware grouped controls`.
+- [x] Independent scoped implementation review through `50b744c9`: behavior/spec and quality approved, no actionable new defects.
+- [ ] Controller native/pixel acceptance; all recorded residuals remain open.
 
 ## Task 4 — Vault manager, menu and attached item sheets
+
+**Execution amendment:** [Native composition contract](../specs/2026-10-11-jasper-vault-native-composition-amendment.md) governs compatible SDK presentation/size/title actions, concrete body registration and lifecycle checks.
+
+### Task 4a — Shared native support and actual Vault integration
+
+- [ ] Implement compatible DialogSpec presentation, WindowSpec size basis and checked title-action slot in SDK/app/fake; preserve old constructors and unreleased SDK0.15 admission.
+- [ ] Implement registered live owner-body geometry, attached modal sheet controller, nested scrim/chooser/focus cleanup, actual native title accessory/fallback toolbar and measured initial CONTENT sizing.
+- [ ] Integrate actual Vault manager Lock/Add and fresh900×555 content default, and explicit EntryPresenter/selector attached presentation; retain current body composition.
+- [ ] Verify actual production wiring, lifecycle/rollback/slot independence and staged Vault/picker routes, render affected owners, archive full-gate raw XML, commit and independently review.
+
+### Task 4b — Complete Vault manager and item composition
 
 Reuse Task2a's Vault-private creation presenter and anchored picker contracts; finish sheet appearance and canonical legacy modal picker, then recheck both compact Import and default Add Host picker→creation→picker. No duplicate ownership implementation.
 
