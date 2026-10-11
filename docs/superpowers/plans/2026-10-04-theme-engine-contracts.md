@@ -59,7 +59,7 @@ The complete standard color set is:
 ```text
 surface.app surface.status surface.panel surface.panel.raised surface.dialog surface.card surface.sidebar
 surface.input surface.control surface.control.hover surface.menu surface.terminal surface.scrim
-border.window border.subtle border.input border.control border.menu border.focus border.error
+border.window border.subtle border.input border.control border.identity border.menu border.focus border.error
 text.primary text.secondary text.tertiary text.placeholder text.onAccent text.onAccent.secondary
 text.link text.link.hover text.error text.success
 accent accent.hover selection.bg hover.overlay segment.selected.bg toggle.track.off toggle.knob

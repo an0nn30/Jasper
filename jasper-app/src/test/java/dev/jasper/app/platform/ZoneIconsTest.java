@@ -61,7 +61,8 @@ class ZoneIconsTest {
             root.putClientProperty("Jasper.zone", "workspace");
             root.putClientProperty("Jasper.workspace.dark", true);
             root.putClientProperty("Jasper.workspaceTheme", dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
-            var icon = AppIcons.semantic("search");
+            // A tinted path glyph; original-art meanings (settings, search) select a theme sibling instead.
+            var icon = AppIcons.semantic("home");
             var light = fixed(false);
             var dark = fixed(true);
             assertThat(pixels(icon, label)).isEqualTo(pixels(light, label));
@@ -127,7 +128,7 @@ class ZoneIconsTest {
 
     private static Icon fixed(boolean dark) {
         var theme = dev.jasper.app.appearance.ThemeManager.generated(dark ? Theme.DARK : dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-        return AppIcons.forSurface(AppIcons.semantic("search"), theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL),
+        return AppIcons.forSurface(AppIcons.semantic("home"), theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL),
             theme.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
     }
 
