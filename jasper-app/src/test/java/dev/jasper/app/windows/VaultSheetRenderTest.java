@@ -127,8 +127,19 @@ class VaultSheetRenderTest {
             try(var sheetChrome=NativeShells.installChrome(child,surface,true)) {
                 var bounds = new java.util.concurrent.atomic.AtomicReference<Rectangle>();
                 try(var sheet=NativeShells.attachSheet(surface,chrome.body(),new AttachedSheet.Target(()->true,Point::new,
-                        ()->new Rectangle(0,0,width,Math.max(900,height+100)),value->{bounds.set(value);child.setSize(value.getSize());layout(child);}))) {
-                    sheet.fitNow();layout(child);
+                        ()->new Rectangle(0,0,width,Math.max(900,height+100)),value->{
+                            bounds.set(value);
+                            if (!child.getSize().equals(value.getSize())) { child.setSize(value.getSize()); layout(child); }
+                        }))) {
+                    sheet.fitNow(); sheet.fitNow();
+                    assertThat(surface.holder().getSize()).isEqualTo(child.getSize());
+                    for (String action : List.of("cancel", "save")) {
+                        var button = find(surface.holder(), action);
+                        assertThat(button).as("actual footer action %s", action).isNotNull();
+                        if (!state.equals("short"))
+                            assertThat(new Rectangle(child.getSize()).contains(SwingUtilities.convertRectangle(button.getParent(), button.getBounds(), child)))
+                                .as("native final allocation contains %s", action).isTrue();
+                    }
                     assertThat(sheet.fallback()).isEqualTo(state.equals("short"));
                     if (id.equals("vault-login")) {
                         int segmentHeight = state.equals("enlarged") ? 38 : 25;

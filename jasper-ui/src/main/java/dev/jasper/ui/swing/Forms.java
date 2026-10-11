@@ -77,7 +77,6 @@ final class Forms {
                                     KeyboardFocusManager.getCurrentKeyboardFocusManager()
                                             .getFocusOwner()));
             bind("ESCAPE", "cancel", this::cancel);
-            component.setFocusCycleRoot(true);
             component.setFocusTraversalPolicy(
                     new LayoutFocusTraversalPolicy() {
                         @Override
@@ -198,6 +197,10 @@ final class Forms {
             boolean hero = form.kind() == Nodes.FormKind.HERO || form.kind() == Nodes.FormKind.HERO_COMPACT;
             boolean compact = form.kind() == Nodes.FormKind.HERO_COMPACT;
             boolean window = form.kind() == Nodes.FormKind.WINDOW;
+            // A window body shares traversal with native title accessories. Dialog forms
+            // retain their own cycle; a provider preserves our default input within a window.
+            component.setFocusCycleRoot(!window);
+            component.setFocusTraversalPolicyProvider(window);
             body.fill = window; footer.window = window; footer.context = context();
             int side = window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_SIDE) : ThemePainting.metric(context(), hero ? DesignMetrics.Role.HERO_SIDES : DesignMetrics.Role.FORM_SIDES);
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.FOOTER_PADDING);

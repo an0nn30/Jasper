@@ -1,5 +1,13 @@
 # Theme-engine calibration
 
+
+Native Vault repair (2026-10-11) follows Task5 fix1 approval at94ea1e52. A causal repeated-fit
+regression exposes a482×555 measured holder inside a482×172 final root. The shared fitter now
+restores final allocation; actual Vault capture targets emulate unchanged native bounds instead
+of repairing parent layout every time. WINDOW body focus shares the enclosing window cycle;
+SHEET remains contained. Native Add menu delivery is still under bounded diagnostic observation.
+No pixel measurements or acceptance claims change; native/title/font calibration remains open.
+
 The nine [original references](reference/README.md) are unchanged. Measurements below use original
 pixels, excluding shadow/native title bars, never the resized chat preview. Crop tuples are
 `x,y,width,height` in source pixels. Divide by the established 2× source scale for logical geometry.

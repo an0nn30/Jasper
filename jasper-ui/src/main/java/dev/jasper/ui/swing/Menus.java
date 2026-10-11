@@ -53,11 +53,12 @@ final class Menus {
             component.add(arrow, BorderLayout.EAST);
             ActionListener left =
                     e -> {
+                        trace("main-action");
                         String action = ((Nodes.MenuButton) this.node).action();
                         if (action.isBlank()) open();
                         else emit(new UiEvent.Action(action));
                     };
-            ActionListener right = e -> open();
+            ActionListener right = e -> { trace("arrow-action"); open(); };
             main.addActionListener(left);
             arrow.addActionListener(right);
             own(() -> main.removeActionListener(left));
@@ -72,17 +73,17 @@ final class Menus {
                     new PopupMenuListener() {
                         @Override
                         public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
-                            installOutside();
+                            trace("popup-will-show"); installOutside();
                         }
 
                         @Override
                         public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
-                            removeOutside();
+                            trace("popup-will-hide"); removeOutside();
                         }
 
                         @Override
                         public void popupMenuCanceled(PopupMenuEvent e) {
-                            removeOutside();
+                            trace("popup-canceled"); removeOutside();
                         }
                     };
             popup.addPopupMenuListener(lifetime);
@@ -146,6 +147,7 @@ final class Menus {
         }
 
         boolean dismiss() {
+            trace("dismiss");
             boolean visible = popup.isVisible();
             popup.setVisible(false);
             removeOutside();
@@ -154,6 +156,7 @@ final class Menus {
         }
 
         void open() {
+            trace("open-entry");
             if (!interactive()) return;
             if (popup.isVisible()) {
                 dismiss();
@@ -173,9 +176,23 @@ final class Menus {
                                 popup.getPreferredSize(),
                                 new Rectangle(0, 0, host.getWidth(), host.getHeight()));
                 Point local = SwingUtilities.convertPoint(host, point, component);
+                trace("before-show anchor=" + anchor + " local=" + local + " host=" + host.getSize());
                 popup.show(component, local.x, local.y);
             } else popup.setVisible(true);
+            trace("open-exit");
             installOutside();
+        }
+
+        // Temporary native QA diagnostics. Removed before the final repair gate.
+        void trace(String phase) {
+            if (!Boolean.getBoolean("jasper.nativeTitleTrace") || !(node.id().equals("add") || node.id().equals("more"))) return;
+            System.getLogger("jasper.native-title-trace").log(System.Logger.Level.INFO,
+                "menu=" + node.id() + " phase=" + phase + " interactive=" + interactive()
+                    + " enabled=" + main.isEnabled() + " showing=" + component.isShowing()
+                    + " bounds=" + component.getBounds() + " main=" + main.getBounds()
+                    + " armed=" + main.getModel().isArmed() + " pressed=" + main.getModel().isPressed()
+                    + " selected=" + main.isSelected() + " popupVisible=" + popup.isVisible()
+                    + " popupBounds=" + popup.getBounds());
         }
 
         @Override

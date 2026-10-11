@@ -318,6 +318,31 @@ class FormsTest {
         });
     }
 
+    @Test void windowFormTraversalCanReachNativeTitleActionsWhileSheetRemainsContained() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var shell = new JPanel(new BorderLayout());
+            shell.setFocusCycleRoot(true); shell.setFocusTraversalPolicy(new LayoutFocusTraversalPolicy());
+            var titleAction = new JButton("Add entry"); shell.add(titleAction, BorderLayout.NORTH);
+            try (var view = new KitView(context, new ViewSpec(form(FormKind.WINDOW, List.of(field("input", FieldKind.TEXT, "draft")))), e -> {})) {
+                shell.add(view, BorderLayout.CENTER); shell.setSize(700, 500); shell.addNotify(); shell.validate(); layout(shell);
+                var input = find(view, "input.input", JTextField.class); var document = input.getDocument();
+                assertThat(input.getFocusCycleRootAncestor()).as("native shell owns the window focus cycle").isSameAs(shell);
+                assertThat(input.getFocusCycleRootAncestor()).isSameAs(titleAction.getFocusCycleRootAncestor());
+                var formRoot = (Container) view.getComponent(0);
+                assertThat(formRoot.getFocusTraversalPolicy().getDefaultComponent(formRoot)).isSameAs(input);
+                view.update(new ViewSpec(form(FormKind.SHEET, List.of(field("input", FieldKind.TEXT, "draft")))));
+                assertThat(input.getFocusCycleRootAncestor()).isSameAs(view.getComponent(0));
+                view.update(new ViewSpec(form(FormKind.WINDOW, List.of(field("input", FieldKind.TEXT, "draft")))));
+                layout(shell);
+                assertThat(input.getFocusCycleRootAncestor()).isSameAs(shell);
+                assertThat(input.getFocusCycleRootAncestor()).isSameAs(titleAction.getFocusCycleRootAncestor());
+                assertThat(find(view, "input.input", JTextField.class)).isSameAs(input);
+                assertThat(input.getDocument()).isSameAs(document);
+            } finally { shell.removeNotify(); release(context); }
+        });
+    }
+
     @Test void nativeRemovalMayTraverseEveryClosingFormFocusPolicyWithoutDisposedLookup() {
         Edt.run(() -> {
             var context=KitFixtures.context();

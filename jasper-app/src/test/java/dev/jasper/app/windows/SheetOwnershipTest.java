@@ -128,6 +128,49 @@ class SheetOwnershipTest {
             }
         } finally {binding.close();icons.close();controller.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());controller.close();}
     }
+    @Test void unchangedNativeBoundsDoNotLeaveTheFooterAtMeasurementHeight() {
+        var controller = new dev.jasper.app.appearance.ThemeController();
+        var binding = new dev.jasper.ui.theme.ThemeBinding(controller.current().pair(), failure -> { throw new AssertionError(failure); });
+        var icons = new dev.jasper.ui.icons.IconRegistry();
+        var context = new dev.jasper.ui.swing.KitContext(binding, dev.jasper.ui.theme.ThemeRoute.CHROME,
+            dev.jasper.ui.metrics.DesignMetrics.DEFAULT, icons, () -> false);
+        var node = new dev.jasper.ui.model.Nodes.Form("sheet", dev.jasper.ui.model.ControlState.READY,
+            dev.jasper.ui.model.Nodes.FormKind.SHEET, "Edit item", Optional.empty(), java.util.List.of(
+                new dev.jasper.ui.model.Nodes.Field("draft", dev.jasper.ui.model.ControlState.READY,
+                    dev.jasper.ui.model.Nodes.FieldKind.TEXT, "retained draft", "", "Name", "")), Optional.empty(), java.util.List.of(
+                new dev.jasper.ui.model.Nodes.Button("cancel", dev.jasper.ui.model.ControlState.READY, "Cancel", "", dev.jasper.ui.model.Nodes.ButtonKind.SECONDARY, "cancel", ""),
+                new dev.jasper.ui.model.Nodes.Button("save", dev.jasper.ui.model.ControlState.READY, "Save", "", dev.jasper.ui.model.Nodes.ButtonKind.PRIMARY, "save", "")));
+        var root = new JRootPane(); var body = new JPanel(); root.setContentPane(body); root.setSize(900, 555); layout(root);
+        var child = new JRootPane(); var surface = surface(); var origin = new Point();
+        try (var view = new dev.jasper.ui.swing.KitView(context, new dev.jasper.ui.model.ViewSpec(node), e -> {});
+             var owner = WindowBody.install(root, body, () -> new Rectangle(0, 0, body.getWidth(), body.getHeight()))) {
+            surface.setContent(view);
+            try (var chrome = NativeShells.installChrome(child, surface, true);
+                 var sheet = NativeShells.attachSheet(surface, owner, new AttachedSheet.Target(() -> true, () -> new Point(origin),
+                     () -> new Rectangle(0, 0, 1200, 900), bounds -> {
+                         // Native setBounds does not validate the parent again for an unchanged size.
+                         if (!child.getSize().equals(bounds.getSize())) { child.setSize(bounds.getSize()); layout(child); }
+                     }))) {
+                sheet.fitNow();
+                assertThat(child.getHeight()).isLessThan(555);
+                var field = (JTextField) find(view, "draft.input"); var document = field.getDocument();
+                var save = find(view, "save"); var cancel = find(view, "cancel");
+                for (int pass = 0; pass < 4; pass++) {
+                    if (pass == 2) origin.setLocation(20, 30);
+                    sheet.fitNow();
+                    assertThat(surface.holder().getSize()).as("final allocation after repeated fit %s", pass).isEqualTo(child.getSize());
+                    for (var action : java.util.List.of(cancel, save)) {
+                        var bounds = SwingUtilities.convertRectangle(action.getParent(), action.getBounds(), child);
+                        assertThat(new Rectangle(child.getSize()).contains(bounds)).as("visible footer action %s", action.getName()).isTrue();
+                    }
+                    assertThat(find(view, "draft.input")).isSameAs(field);
+                    assertThat(field.getDocument()).isSameAs(document); assertThat(field.getText()).isEqualTo("retained draft");
+                    assertThat(find(view, "save")).isSameAs(save);
+                }
+            }
+        } finally { binding.close(); icons.close(); controller.close(); }
+    }
+
     private static Component find(Container root,String name){if(name.equals(root.getName()))return root;for(var child:root.getComponents()){if(name.equals(child.getName()))return child;if(child instanceof Container c){var found=find(c,name);if(found!=null)return found;}}return null;}
 
     static AuxiliarySurface surface() {

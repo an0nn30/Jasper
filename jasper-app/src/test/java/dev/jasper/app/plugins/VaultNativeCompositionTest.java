@@ -21,6 +21,10 @@ class VaultNativeCompositionTest {
                 assertThat(named(manager.titleActions(), "lock")).isInstanceOf(AbstractButton.class);
                 var menu = ((JComponent) named(manager.titleActions(), "add")).getComponentPopupMenu();
                 for (String label : java.util.List.of("Login", "SSH Key", "Secure Note", "Generate SSH Key...")) {
+                    var add = (AbstractButton) named(manager.titleActions(), "add.main");
+                    assertThat(add.isEnabled()).isTrue(); assertThat(add.isVisible()).isTrue();
+                    add.doClick(0);
+                    assertThat(menu.isVisible()).as("actual title Add opens its menu").isTrue();
                     java.util.Arrays.stream(menu.getComponents()).filter(c -> c instanceof AbstractButton b && b.getText().equals(label))
                         .map(AbstractButton.class::cast).findFirst().orElseThrow().doClick(0);
                     var editor = vault.auxiliary.open().stream().filter(s -> s != manager).findFirst().orElseThrow();

@@ -1,5 +1,13 @@
 # Plan 1 temporary theme paths and Plan 2 removal ownership
 
+
+## Native Vault diagnostic checkpoint — 2026-10-11
+
+Temporary `jasper.nativeTitleTrace` observations in MacTitleBar and Menus are exclusively for the
+controller's synthetic native QA. They log event/geometry/state only and add no component mouse
+listeners. The native Vault repair owns removal before its final frozen gate; this checkpoint is
+not eligible for native or pixel acceptance. Task5 fix1 is independently approved at94ea1e52.
+
 ## Task 11b disposition — 2026-10-10 (independently approved through 2fc3bea8)
 
 Removed LegacyAppearanceDefaults, WorkspaceDefaults, AppListUI, WorkspaceStyler/Styles/StyleLayer/ComboPopup,

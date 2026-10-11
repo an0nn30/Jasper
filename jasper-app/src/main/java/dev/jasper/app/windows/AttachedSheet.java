@@ -61,6 +61,9 @@ final class AttachedSheet implements AutoCloseable {
             int x = Math.max(usable.x, Math.min(body.x + (body.width - width) / 2, usable.x + usable.width - width));
             int y = fallback ? Math.max(usable.y, Math.min(body.y, usable.y + usable.height - height)) : Math.max(body.y, usable.y);
             target.bounds().accept(new Rectangle(x, y, width, height));
+            // Measurement borrows the live holder. A same-size native setBounds does not
+            // relayout its root, so always restore the final content allocation ourselves.
+            holder.setSize(width, height);
             layout(holder); scrim.layout();
         } finally { fitting = false; }
     }
