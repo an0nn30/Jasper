@@ -39,6 +39,18 @@ import static org.assertj.core.api.Assertions.assertThat;
  * build/theme-migration-evidence/remote-hosted; the frozen before images are untouched.
  */
 class RemoteRenderEvidenceTest {
+    @Test void capturesOriginalIconOwnersAtCalibratedAllocations() throws Exception {
+        for(String theme:List.of("dark","light")) {
+            var controller=onEdtValue(dev.jasper.app.appearance.ThemeController::new);
+            onEdt(()->controller.configure(theme.equals("dark")?dev.jasper.app.appearance.Theme.DARK:dev.jasper.app.appearance.Theme.JASPER_LIGHT));
+            try(var remote=new StagedRemoteHost(root.resolve("icon-owners-"+theme),theme.equals("dark"))) {
+                remote.openTunnels();
+                for(int[] allocation:new int[][]{{903,824},{1454,970},{500,824}}) {
+                    onEdt(()->dev.jasper.app.workspace.DesktopTestSupport.captureIconOwners(remote.window,theme,allocation[0],allocation[1]));
+                }
+            }finally{onEdt(()->{controller.close();new dev.jasper.app.appearance.ThemeController();});}
+        }
+    }
     static final String FAMILY = "remote-hosted";
     static final String FINGERPRINT = "SHA256:q7Lx3mY0f9Vt2bQkR8sNcW1eZpH4uJdA6gTo5iKyXvE";
     @TempDir Path root;

@@ -150,7 +150,7 @@ public class RemotePlugin implements Plugin {
         connections = new Connections(settings::connection, trust, agentFactory.apply(context), store::host,
             credentialSource, this::askHostKey, context.background(), ui, schedule);
         connections.onChanged(this::refreshStatus);
-        icon = "server";
+        icon = "network";
         serverIcon = "server";
         // Before the panels: each names its toggle action, which must already be registered.
         registerNavigation();

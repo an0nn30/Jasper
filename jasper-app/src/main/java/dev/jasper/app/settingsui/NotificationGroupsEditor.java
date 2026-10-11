@@ -70,9 +70,9 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
             var first=groups.get(indices.getFirst());var lines=new ArrayList<Nodes.Node>();
             var heading=new ArrayList<Nodes.Node>();
             String ownerIcon=first.ownerIcon();
-            if(first.artwork().isPresent() && kit!=null) {
+            if(first.identityArtwork().isPresent() && kit!=null) {
                 if(artwork==null)artwork=new dev.jasper.ui.icons.ReceivingArtwork(kit.get().icons());
-                try {ownerIcon=artwork.name(first.artwork().get());}catch(IllegalArgumentException rejected){ownerIcon="plugin";}
+                try {ownerIcon=artwork.name(first.identityArtwork().get());}catch(IllegalArgumentException rejected){ownerIcon="plugin";}
             }
             if(!ownerIcon.isBlank())heading.add(new Nodes.Icon(id+":owner-"+section+":icon",plain,ownerIcon,first.ownerId().equals("jasper")?Nodes.Hue.BLUE:Nodes.Hue.NEUTRAL,Nodes.IconSize.CONTROL,first.owner()));
             heading.add(new Nodes.Text(id+":owner-"+section+":title",plain,first.owner(),Nodes.TextRole.PANEL_TITLE));

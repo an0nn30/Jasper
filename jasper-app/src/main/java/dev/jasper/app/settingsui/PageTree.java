@@ -25,7 +25,7 @@ final class PageTree {
         if(artwork==null){render.run();return;}
         artwork.reconcile(()->{
             artNames.clear();
-            for(var page:pages)page.artwork().ifPresent(value->{
+            for(var page:pages)page.identityArtwork().ifPresent(value->{
                 try { artNames.put(page.id(),artwork.name(value)); }
                 catch(IllegalArgumentException rejected){artNames.put(page.id(),"plugin");}
             });

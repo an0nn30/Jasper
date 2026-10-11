@@ -24,9 +24,12 @@ public record NotificationGroupChoices(Supplier<List<Group>> groups) {
      * @param name the name it is listed with
      * @param owner who declared it, as shown: "Jasper" or a plugin's name
      * @param defaultMode how its notifications appear by default: "card", "sticky", "history" or "off"
+     * @param tileHue semantic tile backdrop declared by the owner
      * @param artwork immutable declared owner artwork; empty or invalid artwork uses the generic owner fallback
      */
-    public record Group(String id, String name, String owner, String defaultMode, String ownerId, String ownerIcon, java.util.Optional<dev.jasper.ui.icons.EncodedArtwork> artwork) {
+    public record Group(String id, String name, String owner, String defaultMode, String ownerId, String ownerIcon, java.util.Optional<dev.jasper.ui.icons.EncodedArtwork> artwork, dev.jasper.ui.model.Nodes.Hue tileHue) {
+        public Group(String id,String name,String owner,String defaultMode,String ownerId,String ownerIcon, java.util.Optional<dev.jasper.ui.icons.EncodedArtwork> artwork) {this(id,name,owner,defaultMode,ownerId,ownerIcon,artwork,dev.jasper.ui.model.Nodes.Hue.NEUTRAL);}
+        public java.util.Optional<dev.jasper.ui.icons.IdentityArtwork> identityArtwork(){return artwork.map(value -> new dev.jasper.ui.icons.IdentityArtwork(value,tileHue));}
         public Group(String id,String name,String owner,String defaultMode,String ownerId,String ownerIcon) {this(id,name,owner,defaultMode,ownerId,ownerIcon,java.util.Optional.empty());}
         public Group(String id,String name,String owner,String defaultMode) { this(id,name,owner,defaultMode,owner,""); }
         public Group {
@@ -34,7 +37,7 @@ public record NotificationGroupChoices(Supplier<List<Group>> groups) {
             Objects.requireNonNull(name, "name");
             Objects.requireNonNull(owner, "owner");
             Objects.requireNonNull(defaultMode, "defaultMode");
-            Objects.requireNonNull(artwork);Objects.requireNonNull(ownerId);Objects.requireNonNull(ownerIcon);
+            Objects.requireNonNull(tileHue);Objects.requireNonNull(artwork);Objects.requireNonNull(ownerId);Objects.requireNonNull(ownerIcon);
         }
     }
 }

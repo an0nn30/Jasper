@@ -13,15 +13,23 @@ public final class ReceivingArtwork implements AutoCloseable {
     private record Entry(String name,IconRegistration registration) { }
     private final IconRegistry registry;
     private final String namespace="received"+OWNERS.incrementAndGet();
-    private final LinkedHashMap<EncodedArtwork,Entry> entries=new LinkedHashMap<>();
-    private Set<EncodedArtwork> requested;
+    private final LinkedHashMap<Object,Entry> entries=new LinkedHashMap<>();
+    private Set<Object> requested;
     private long sequence;
     private boolean closed;
     public ReceivingArtwork(IconRegistry registry){this.registry=Objects.requireNonNull(registry);}
     public String name(EncodedArtwork artwork) {
+        return name(artwork, () -> registry.register(nextAlias(), artwork));
+    }
+    /** Registers bytes and declared tile hue as one scoped receiving identity. */
+    public String name(IdentityArtwork artwork) {
+        return name(artwork, () -> registry.register(nextAlias(), artwork));
+    }
+    private String nextAlias() { return namespace+":art"+(++sequence); }
+    private String name(Object artwork, java.util.function.Supplier<IconRegistration> register) {
         requireOpen();Objects.requireNonNull(artwork);
         var entry=entries.get(artwork);
-        if(entry==null){String alias=namespace+":art"+(++sequence);var registration=registry.register(alias,artwork);entry=new Entry(alias,registration);entries.put(artwork,entry);}
+        if(entry==null){var registration=register.get();String alias=namespace+":art"+sequence;entry=new Entry(alias,registration);entries.put(artwork,entry);}
         if(requested!=null)requested.add(artwork);
         return entry.name();
     }

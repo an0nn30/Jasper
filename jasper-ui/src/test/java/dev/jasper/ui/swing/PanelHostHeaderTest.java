@@ -178,6 +178,21 @@ class PanelHostHeaderTest {
             } finally {release(ctx);}
         });
     }
+    @Test void builtinHostArtworkUsesTheReceivingAppearanceEvenWithAnIdenticalPalette() {
+        Edt.run(() -> {
+            var ctx=KitFixtures.context();var light=KitFixtures.light();
+            var dark=new dev.jasper.ui.theme.GeneratedTheme(light.name(),true,light.author(),light.tokens(),light.syntax(),light.terminal(),light.uiKeys(),light.icons(),light.glass(),light.semantic());
+            try(var view=new KitView(ctx,spec("panel",6),e->{})) {
+                view.setPanelHostHeader("panel",new PanelHostHeader("",false,List.of(new PanelHostHeader.Action("Network",ARTWORK,()->{},new PanelHostHeader.Artwork("network",null)))));
+                ctx.binding().publish(new ThemePair(light,light));
+                var button=named(view,"Network");var before=iconImage(button.getIcon());
+                ctx.binding().publish(new ThemePair(dark,dark));
+                var after=iconImage(button.getIcon());
+                assertThat(after.getRGB(0,0,after.getWidth(),after.getHeight(),null,0,after.getWidth()))
+                    .isNotEqualTo(before.getRGB(0,0,before.getWidth(),before.getHeight(),null,0,before.getWidth()));
+            } finally {release(ctx);}
+        });
+    }
     private static BufferedImage iconImage(javax.swing.Icon icon) {
         var image=new BufferedImage(icon.getIconWidth(),icon.getIconHeight(),BufferedImage.TYPE_INT_ARGB);
         var graphics=image.createGraphics();try{icon.paintIcon(null,graphics,0,0);}finally{graphics.dispose();}return image;

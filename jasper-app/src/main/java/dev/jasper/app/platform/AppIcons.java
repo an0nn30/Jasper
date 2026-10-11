@@ -25,7 +25,6 @@ public final class AppIcons {
         Map.entry("command", "EXECUTE"), Map.entry("history", "HISTORY"), Map.entry("bookmark", "BOOKMARK"),
         Map.entry("close", "CLOSE"), Map.entry("exit", "EXIT"));
     private static final dev.jasper.ui.icons.IconRegistry NAMED = new dev.jasper.ui.icons.IconRegistry();
-    private static final Icon DROPDOWN = new SemanticIcon("chevron.down", 8, false);
     private AppIcons() { }
 
     /** Compact dropdown affordance for existing toolbar spacing. */
@@ -82,18 +81,47 @@ public final class AppIcons {
         return icon;
     }
 
-    /** Paint-time module tint follows live chrome/workspace routing; only immutable glyph paths are cached. */
-    private record SemanticIcon(String name, int size, boolean disabled) implements Icon, DisabledIconProvider {
-        @Override public Icon getDisabledIcon() { return new SemanticIcon(name, size, true); }
-        @Override public int getIconWidth() { return UIScale.scale(size); }
-        @Override public int getIconHeight() { return UIScale.scale(size); }
+    private record PreparationKey(String name, int size) { }
+    private record NativeSnapshot(int size, dev.jasper.ui.icons.IconRegistry.PreparedIcon artwork) { }
+    /** One process-lifetime preparation owner, shared with builtin PresentationIcons. No receiving theme is cached. */
+    static final class NativePreparation {
+        final String name; final int baseSize;
+        volatile NativeSnapshot snapshot;
+        NativePreparation(String name,int size) { this.name=name;this.baseSize=size;prepare(); }
+        void prepare() { int size=UIScale.scale(baseSize);snapshot=new NativeSnapshot(size,NAMED.themedIcon(name,size)); }
+        int size(){return snapshot.size();}
+        void paint(Component c,Graphics g,int x,int y,SemanticColor tint) {
+            var current=snapshot;current.artwork().icon(ThemeZone.theme(c),tint).paintIcon(c,g,x,y);
+        }
+    }
+    private static final Map<PreparationKey,NativePreparation> PREPARED = new java.util.HashMap<>();
+    static {
+        UIScale.addPropertyChangeListener(event -> {
+            if("userScaleFactor".equals(event.getPropertyName())) synchronized(PREPARED) { PREPARED.values().forEach(NativePreparation::prepare); }
+        });
+    }
+    private static final Icon DROPDOWN = new SemanticIcon("chevron.down", 8, false);
+    static NativePreparation prepare(String name,int size) {
+        if(size!=8 && size!=16)throw new IllegalArgumentException("Unsupported native icon base size: "+size);
+        synchronized(PREPARED) { return PREPARED.computeIfAbsent(new PreparationKey(name,size),key -> new NativePreparation(name,size)); }
+    }
+    /** Value identity excludes the shared process-lifetime scale preparation. */
+    private static final class SemanticIcon implements Icon, DisabledIconProvider {
+        private final String name; private final int size; private final boolean disabled;
+        private final NativePreparation preparation;
+        SemanticIcon(String name,int size,boolean disabled){this.name=name;this.size=size;this.disabled=disabled;this.preparation=prepare(name,size);}
+        String name(){return name;} boolean disabled(){return disabled;}
+        @Override public boolean equals(Object other){return other instanceof SemanticIcon icon && name.equals(icon.name) && size==icon.size && disabled==icon.disabled;}
+        @Override public int hashCode(){return Objects.hash(name,size,disabled);}
+        @Override public Icon getDisabledIcon() { return new SemanticIcon(name,size,true); }
+        @Override public int getIconWidth() { return preparation.size(); }
+        @Override public int getIconHeight() { return preparation.size(); }
         @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
-            var g = (Graphics2D) graphics.create();
+            var g=(Graphics2D)graphics.create();
             try {
-                if (disabled) g.setComposite(java.awt.AlphaComposite.SrcOver.derive(.42f));
-                NAMED.icon(name, ThemeZone.theme(component).semantic(), SemanticColor.TEXT_PRIMARY,
-                    getIconWidth()).paintIcon(component, g, x, y);
-            } finally { g.dispose(); }
+                if(disabled)g.setComposite(java.awt.AlphaComposite.SrcOver.derive(.42f));
+                preparation.paint(component,g,x,y,SemanticColor.TEXT_PRIMARY);
+            } finally {g.dispose();}
         }
     }
 

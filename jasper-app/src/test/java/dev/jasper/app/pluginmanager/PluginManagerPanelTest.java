@@ -100,6 +100,16 @@ class PluginManagerPanelTest {
         assertThat(point.x).isLessThanOrEqualTo(detail.x);
     }
 
+    @Test void sameByteHueRefreshChangesTheActualHeaderWithoutRecoloringItsGlyph() {
+        var bytes=PluginIconsTest.SVG.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        java.util.function.Function<Nodes.Hue,int[]> render=hue->{
+            panel.show(snapshot(TestRows.plugin("external.art","Authored").icon(new PluginRuntime.PluginIcon("art.svg",bytes,hue)).row()));
+            panel.setSize(744,600);KitTestSupport.layout(panel);
+            return PluginIconsTest.pixels(KitTestSupport.find(panel,"icon",JLabel.class).getIcon());
+        };
+        var blue=render.apply(Nodes.Hue.BLUE);var purple=render.apply(Nodes.Hue.PURPLE);
+        assertThat(blue).isNotEqualTo(purple);assertThat(blue[blue.length/2+(int)Math.sqrt(blue.length)/2]).isEqualTo(purple[purple.length/2+(int)Math.sqrt(purple.length)/2]);
+    }
     @Test void thePrimaryButtonAndTheMenuFollowTheSelectedPlugin() {
         panel.show(snapshot(
             TestRows.plugin("dev.example.active", "Active").errors(2).capabilities(List.of("terminal.inject", "made.up"))

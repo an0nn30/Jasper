@@ -128,9 +128,21 @@ public final class PluginRuntime {
         private final String name;
         private final byte[] data;
         private dev.jasper.ui.icons.EncodedArtwork artwork;
+        private dev.jasper.ui.icons.IdentityArtwork identity;
+        private final dev.jasper.ui.model.Nodes.Hue tileHue;
         /** Copies the declared jar path and bytes. */
         public PluginIcon(String name, byte[] data) {
+            this(name, data, dev.jasper.ui.model.Nodes.Hue.NEUTRAL);
+        }
+        /** Copies bytes and declared hue from the same shown candidate. */
+        public PluginIcon(String name, byte[] data, dev.jasper.ui.model.Nodes.Hue tileHue) {
             this.name=Objects.requireNonNull(name,"name");this.data=data.clone();
+            this.tileHue=Objects.requireNonNull(tileHue);
+            if(tileHue==dev.jasper.ui.model.Nodes.Hue.NONE) throw new IllegalArgumentException("Invalid identity hue");
+        }
+        PluginIcon withHue(dev.jasper.ui.model.Nodes.Hue hue) {
+            if(tileHue==hue)return this;
+            var result=new PluginIcon(name,data,hue);result.artwork=artwork();return result;
         }
         public String name(){return name;}
 
@@ -141,17 +153,22 @@ public final class PluginRuntime {
         public boolean svg() { return name.toLowerCase(java.util.Locale.ROOT).endsWith(".svg"); }
 
         @Override public boolean equals(Object other) {
-            return other instanceof PluginIcon icon && icon.name.equals(name) && java.util.Arrays.equals(icon.data, data);
+            return other instanceof PluginIcon icon && icon.name.equals(name) && icon.tileHue==tileHue && java.util.Arrays.equals(icon.data, data);
         }
 
-        @Override public int hashCode() { return 31 * name.hashCode() + java.util.Arrays.hashCode(data); }
+        @Override public int hashCode() { return 31 * (31 * name.hashCode() + java.util.Arrays.hashCode(data)) + tileHue.hashCode(); }
 
         /** Shared receiving value, retaining the declared format and authored bytes. */
         public synchronized dev.jasper.ui.icons.EncodedArtwork artwork() {
             if(artwork==null)artwork=new dev.jasper.ui.icons.EncodedArtwork(svg() ? dev.jasper.ui.icons.EncodedArtwork.Format.SVG : dev.jasper.ui.icons.EncodedArtwork.Format.PNG, data);
             return artwork;
         }
-        @Override public String toString() { return "PluginIcon[" + name + ", " + data.length + " bytes]"; }
+        /** Shared receiving identity; bytes and hue have one immutable owner. */
+        public synchronized dev.jasper.ui.icons.IdentityArtwork identityArtwork() {
+            if(identity==null) identity=new dev.jasper.ui.icons.IdentityArtwork(artwork(),tileHue);
+            return identity;
+        }
+        @Override public String toString() { return "PluginIcon[" + name + ", " + data.length + " bytes, " + tileHue + "]"; }
     }
 
     /**
@@ -863,7 +880,7 @@ public final class PluginRuntime {
         PluginCatalog.Launch started = launch;
         if (current == null || started == null) return List.of();
         return withStubs(current.settingsPages(context, pluginIcons), started.statuses(),
-            status -> new PluginStubPage(status.id(), status.name(), status.reason(), () -> openSettingsFile(status.id()), context.kit(), Optional.ofNullable(pluginIcons.get(status.id())).map(PluginIcon::artwork)));
+            status -> new PluginStubPage(status.id(), status.name(), status.reason(), () -> openSettingsFile(status.id()), context.kit(), Optional.ofNullable(pluginIcons.get(status.id())).map(PluginIcon::identityArtwork)));
     }
 
     /**

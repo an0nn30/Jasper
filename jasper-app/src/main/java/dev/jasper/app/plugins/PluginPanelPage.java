@@ -45,13 +45,13 @@ final class PluginPanelPage implements SettingsPage {
     private void refreshRows(){if(view!=null && !disposed)view.update(view.sourceSpec());}
 
 
-    private final Optional<dev.jasper.ui.icons.EncodedArtwork> artwork;
-    @Override public Optional<dev.jasper.ui.icons.EncodedArtwork> artwork(){return artwork;}
+    private final Optional<dev.jasper.ui.icons.IdentityArtwork> artwork;
+    @Override public Optional<dev.jasper.ui.icons.IdentityArtwork> identityArtwork(){return artwork;}
     @Override public Optional<String> icon(){return Optional.of("plugin");}
     PluginPanelPage(String pluginId, String title, DeclaredSettings declared, SettingsPanel panel, Containment containment,
                     PageContext context) { this(pluginId, title, declared, panel, containment, context, Optional.empty()); }
     PluginPanelPage(String pluginId, String title, DeclaredSettings declared, SettingsPanel panel, Containment containment,
-                    PageContext context, Optional<dev.jasper.ui.icons.EncodedArtwork> artwork) {
+                    PageContext context, Optional<dev.jasper.ui.icons.IdentityArtwork> artwork) {
         this.artwork=java.util.Objects.requireNonNull(artwork);
         this.pluginId = pluginId; this.title = title; this.declared = declared; this.panel = panel;
         this.containment = containment; this.context = context;

@@ -24,7 +24,9 @@ final class PluginIconFiles {
         String name = candidate.descriptor().icon();
         if (name.isEmpty()) return Optional.empty();
         String key = candidate.id() + "@" + candidate.descriptor().version() + "@" + candidate.directory() + "@" + name;
-        return CACHE.computeIfAbsent(key, ignored -> load(candidate, name));
+        // The cache owns raw content only. Presentation belongs to this descriptor, including same-version replacements.
+        return CACHE.computeIfAbsent(key, ignored -> load(candidate, name))
+            .map(bytes -> bytes.withHue(candidate.descriptor().iconHue()));
     }
 
     /** Test seam: how many icons have been read from jars. */

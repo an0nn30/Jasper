@@ -20,7 +20,7 @@ import javax.swing.*;
  * into a live overflow menu behind a vertical ellipsis. */
 final class WindowToolbar extends JToolBar {
     private static final String MENU = "Jasper.overflowMenu", PRIORITY = "Jasper.toolbarPriority";
-    private final JButton overflow = new JButton(AppIcons.named("MORE"));
+    private final JButton overflow = new JButton(AppIcons.semantic("more.vertical"));
     private final Runnable refreshActions;
     private int barHeight = ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT;
 

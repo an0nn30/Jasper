@@ -33,7 +33,7 @@ final class Buttons {
             } catch (Throwable failure) { snapshot.close(); throw failure; }
         }
         javax.swing.Icon icon(KitContext context, SemanticColor tint) {
-            return semantic == null ? raw : icons.panel(semantic.name(), context.theme().semantic(), tint,
+            return semantic == null ? raw : icons.panel(semantic.name(), context.theme(), tint,
                 ThemePainting.metric(context, DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH));
         }
         @Override public void close() { if (!closed) { closed = true; if (icons != null) icons.close(); } }
@@ -78,8 +78,10 @@ final class Buttons {
             button.embedded = embedded;
             if (hostArtwork != null) { button.setIcon(hostArtwork.icon(context(), button.iconRole(false))); button.putClientProperty("Jasper.button.icon", null); }
             else {
-                button.setIcon(value.icon().isEmpty() ? null : context().icons().icon(value.icon(), context().theme().semantic(), button.iconRole(false),
-                    UIScale.scale(button.panelDetail && value.label().isEmpty() ? context().metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_GLYPH) : context().icons().size((embedded || button.panel) && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL))));
+                int extent=UIScale.scale(button.panelDetail && value.label().isEmpty() ? context().metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_GLYPH) : context().icons().size((embedded || button.panel) && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
+                button.setIcon(value.icon().isEmpty() ? null : button.panel || button.panelDetail || button.panelRow
+                    ? context().icons().panel(value.icon(),context().theme(),button.iconRole(false),extent)
+                    : context().icons().icon(value.icon(), context().theme(), button.iconRole(false),extent));
                 button.putClientProperty("Jasper.button.icon", value.icon().isEmpty() ? null : value.icon());
             }
             if(keycaps!=null){button.setText("");button.setIcon(new Keycaps(context(),keycaps));button.putClientProperty("Jasper.button.icon",null);}
@@ -240,9 +242,9 @@ final class Buttons {
                     // Re-tint the same named icon for hover without altering component identity.
                     String name = null;
                     if (getClientProperty("Jasper.button.icon") instanceof String value) name = value;
-                    javax.swing.Icon artwork = name == null || context.icons().authored(name) ? getIcon() : panel || panelDetail || panelRow
+                    javax.swing.Icon artwork = name == null || context.icons().authored(name,panel || panelDetail || panelRow) ? getIcon() : panel || panelDetail || panelRow
                         ? context.icons().panel(name, context.theme().semantic(), iconRole(hover), panelRow ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_ACTION_GLYPH) : getIcon().getIconWidth())
-                        : context.icons().icon(name, context.theme().semantic(), iconRole(hover), getIcon().getIconWidth());
+                        : context.icons().icon(name, context.theme(), iconRole(hover), getIcon().getIconWidth());
                     int opticalOffset=panelDetail ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_DETAIL_ACTION_OPTICAL_OFFSET) : panelRow ? -ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_OPTICAL_OFFSET) : 0;
                     artwork.paintIcon(this, g, icon.x-opticalOffset+(getIcon().getIconWidth()-artwork.getIconWidth())/2, icon.y-opticalOffset+(getIcon().getIconHeight()-artwork.getIconHeight())/2);
                 }

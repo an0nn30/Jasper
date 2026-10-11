@@ -22,11 +22,14 @@ public final class IconRegistry implements AutoCloseable {
     // Original compact-panel sources establish lighter plus/search/pencil outlines. Other built-ins
     // retain the common optical stroke; custom registrations never enter this catalog.
     private static final Set<String> FINE_PANEL_BUILT_INS = Set.of("add", "search", "edit");
-    private final Map<String, DecodedArtwork> encoded = new LinkedHashMap<>();
+    private final Map<String, Received> encoded = new LinkedHashMap<>();
     private final Map<String, IconArtwork> artworks = new LinkedHashMap<>();
+    private record Received(DecodedArtwork artwork, Nodes.Hue tileHue) { }
     private boolean closed;
-    public IconRegistry() { artworks.putAll(BUILT_INS); }
-    public synchronized Set<String> names() { requireOpen(); var names = new java.util.HashSet<>(artworks.keySet()); names.addAll(encoded.keySet()); return Set.copyOf(names); }
+    public IconRegistry() { prepareBuiltIns(); artworks.putAll(BUILT_INS); }
+    /** Optional off-EDT production prewarm; standalone construction remains self-contained. */
+    public static void prepareBuiltIns() { BuiltInArtwork.catalog(); }
+    public synchronized Set<String> names() { requireOpen(); var names = new java.util.HashSet<>(artworks.keySet()); names.addAll(encoded.keySet()); names.addAll(BuiltInArtwork.catalog().keySet()); return Set.copyOf(names); }
     public synchronized IconRegistration register(String name, String pathData) {
         requireOpen(); Objects.requireNonNull(name);
         if (!name.matches("[a-z][a-z0-9.-]*:[a-z][a-z0-9.-]*")) throw new IllegalArgumentException("Icon name must be namespace:name");
@@ -36,37 +39,114 @@ public final class IconRegistry implements AutoCloseable {
     }
     /** Registers authored color artwork atomically; decoding occurs before publication. */
     public synchronized IconRegistration register(String name, EncodedArtwork artwork) {
+        return register(name, artwork, null);
+    }
+    /** Registers immutable identity metadata; declared hue takes precedence only in tiles. */
+    public synchronized IconRegistration register(String name, IdentityArtwork identity) {
+        Objects.requireNonNull(identity);
+        return register(name, identity.artwork(), identity.tileHue());
+    }
+    private IconRegistration register(String name, EncodedArtwork artwork, Nodes.Hue hue) {
         requireOpen(); Objects.requireNonNull(name); Objects.requireNonNull(artwork);
         if (!name.matches("[a-z][a-z0-9.-]*:[a-z][a-z0-9.-]*")) throw new IllegalArgumentException("Icon name must be namespace:name");
         if (artworks.containsKey(name) || encoded.containsKey(name)) throw new IllegalArgumentException("Icon already registered: " + name);
-        var decoded = artwork.decoded(); encoded.put(name, decoded);
+        var decoded = new Received(artwork.decoded(), hue); encoded.put(name, decoded);
         return new IconRegistration(() -> { synchronized (this) { encoded.remove(name, decoded); } });
     }
     /** Authored artwork ignores tint; callers may reuse its prepared Icon on hover. */
-    public synchronized boolean authored(String name) { return encoded.containsKey(name); }
+    public synchronized boolean authored(String name) { return authored(name,false); }
+    /** Whether this ordinary/compact context retains authored ink instead of re-tinting on hover. */
+    public synchronized boolean authored(String name, boolean compact) {
+        return encoded.containsKey(name) || (compact ? BuiltInArtwork.IDENTITIES.contains(name) : BuiltInArtwork.catalog().containsKey(name));
+    }
     public Icon icon(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize) {
-        return painted(name, tint(palette, hue), null, logicalSize, false);
+        return ordinary(name, null, palette, tint(palette,hue), logicalSize);
+    }
+    /** Ordinary authored builtins select their sibling from the actual receiving theme. */
+    public Icon icon(String name, GeneratedTheme theme, Nodes.Hue hue, int logicalSize) {
+        return ordinary(name, theme, theme.semantic(), tint(theme.semantic(),hue), logicalSize);
+    }
+    /** Explicit receiving theme and semantic ink; authored pixels retain their own colors. */
+    public Icon icon(String name, GeneratedTheme theme, SemanticColor tint, int logicalSize) {
+        return ordinary(name, theme, theme.semantic(), theme.semantic().color(tint), logicalSize);
+    }
+    private Icon ordinary(String name, GeneratedTheme theme, SemanticPalette palette, Color foreground, int size) {
+        return painted(name,foreground,null,size,size,false,false,0,false,select(name,theme,palette,true),null);
+    }
+    private DecodedArtwork select(String name, GeneratedTheme theme, SemanticPalette palette, boolean ordinary) {
+        var pair=BuiltInArtwork.catalog().get(name);
+        // Palette-only compatibility admits identity meanings, preserving the legacy settings/chevron contexts.
+        if(pair==null || (!BuiltInArtwork.IDENTITIES.contains(name) && (!ordinary || theme==null)))return null;
+        boolean dark=theme!=null ? theme.dark() : ColorMath.luminance(palette.color(SemanticColor.SURFACE_PANEL))<.5;
+        return pair.select(dark);
+    }
+    /** Prepared native receiving snapshot. Both siblings are retained independently of the decoder size cache. */
+    public PreparedIcon themedIcon(String name, int logicalSize) {
+        synchronized(this) {
+            requireOpen();
+            if(!names().contains(name))throw new IllegalArgumentException("Unknown icon: "+name);
+            var pair=BuiltInArtwork.catalog().get(name);
+            var path=artworks.get(name);
+            var registration=encoded.get(name);
+            var received=registration==null?null:registration.artwork();
+            Icon light=pair==null && received==null?null:painted(name,Color.BLACK,null,logicalSize,logicalSize,false,false,0,false,pair==null?received:pair.light(),null);
+            Icon dark=pair==null?light:painted(name,Color.BLACK,null,logicalSize,logicalSize,false,false,0,false,pair.dark(),null);
+            return new PreparedIcon(name,logicalSize,path,light,dark);
+        }
+    }
+    /** Immutable native preparation; resolving live ink and appearance never builds a raster or cache. */
+    public static final class PreparedIcon {
+        private final Icon light, dark;
+        private final IconArtwork path;
+        private final java.awt.Shape preparedPath;
+        private final String name;
+        private final int size;
+        private PreparedIcon(String name,int size,IconArtwork path,Icon light,Icon dark) {
+            if(size<1 || size>512)throw new IllegalArgumentException("Invalid logical icon size");
+            this.name=name;this.path=path;this.size=size;this.preparedPath=path==null?null:path.path();
+            this.light=light;this.dark=dark;
+        }
+        /** Resolves the actual receiving theme. Does no lookup, decoding, size caching or raster allocation. */
+        public Icon icon(GeneratedTheme theme, SemanticColor tint) {
+            Objects.requireNonNull(theme);Objects.requireNonNull(tint);
+            if(light!=null)return theme.dark()?dark:light;
+            // Custom/native paths remain color-free; paint the already-parsed immutable path with live semantic ink.
+            Color color=theme.semantic().color(tint);
+            return new Icon() {
+                public int getIconWidth(){return size;} public int getIconHeight(){return size;}
+                public void paintIcon(Component c,Graphics graphics,int x,int y){
+                    var g=(Graphics2D)graphics.create();
+                    try{g.translate(x,y);g.scale(size/16.0,size/16.0);g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+                        g.setColor(color);g.setStroke(new BasicStroke(path.stroke(),BasicStroke.CAP_ROUND,BasicStroke.JOIN_ROUND));
+                        if(FILLED_BUILT_INS.contains(name))g.fill(preparedPath);else g.draw(preparedPath);
+                    }finally{g.dispose();}
+                }
+            };
+        }
     }
     /** Hero glyphs retain a 1.75-logical-pixel optical stroke at the canonical 24px size. */
     public Icon hero(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize) {
-        return painted(name, tint(palette, hue), null, logicalSize, false, true);
+        return painted(name,tint(palette,hue),null,logicalSize,logicalSize,false,true,0,false,select(name,null,palette,false),null);
     }
     /** Compact panel artwork uses a lighter optical stroke for canonical built-ins only.
      * Custom registrations retain their validated authored stroke.
      */
     public synchronized Icon panel(String name, SemanticPalette palette, SemanticColor tint, int logicalSize) {
-        return painted(name, palette.color(tint), null, logicalSize, logicalSize, false, false, 0, artworks.get(name) == BUILT_INS.get(name));
+        return painted(name, palette.color(tint), null, logicalSize, logicalSize, false, false, 0, artworks.get(name) == BUILT_INS.get(name),select(name,null,palette,false),null);
     }
     /** Explicit semantic text tint for hover, accent fills and status indications. */
     public Icon icon(String name, SemanticPalette palette, SemanticColor tint, int logicalSize) {
-        return painted(name, palette.color(tint), null, logicalSize, false);
+        return ordinary(name, null, palette, palette.color(tint), logicalSize);
     }
     /**
      * Artwork on a surface outside the semantic palette (for example an independently coloured terminal surface):
      * the surface's own foreground, moved toward black or white until it reaches the 3:1 non-text contrast floor.
      */
     public Icon icon(String name, Color surface, Color foreground, int logicalSize) {
-        return painted(name, surfaceTint(surface, foreground), null, logicalSize, false);
+        // Existing explicit surface routes retain their path/tint contract. New catalog-only meanings remain usable.
+        var pair=artworks.containsKey(name)?null:BuiltInArtwork.catalog().get(name);
+        return painted(name,surfaceTint(surface,foreground),null,logicalSize,logicalSize,false,false,0,false,
+            pair==null?null:pair.select(ColorMath.luminance(surface)<.5),null);
     }
     /** The tint {@link #icon(String, Color, Color, int)} paints; one module rule for surface-tinted artwork. */
     public static Color surfaceTint(Color surface, Color foreground) {
@@ -85,14 +165,33 @@ public final class IconRegistry implements AutoCloseable {
     }
     /** Category tile with explicit glyph extent; zero retains the standard optical sizing policy. */
     public Icon tile(String name, SemanticPalette palette, Nodes.Hue hue, int width, int height, int glyphSize, boolean selected) {
+        return tile(name,palette,null,hue,width,height,glyphSize,selected);
+    }
+    /** Identity tiles select the actual receiving-theme sibling; legacy settings/group geometry is preserved. */
+    public Icon tile(String name, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, boolean selected) {
+        return tile(name,theme.semantic(),theme,hue,width,height,glyphSize,selected);
+    }
+    private Icon tile(String name, SemanticPalette palette, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, boolean selected) {
         if (glyphSize < 0 || glyphSize > Math.min(width, height)) throw new IllegalArgumentException("Invalid tile glyph size");
+        synchronized (this) {
+            var identity = encoded.get(name);
+            if (identity != null && identity.tileHue() != null) hue = identity.tileHue();
+        }
         Color foreground = selected ? palette.color(SemanticColor.TEXT_ONACCENT) : tint(palette, hue);
         Color fill = selected ? foreground : palette.color(switch(hue) {
             case BLUE -> SemanticColor.HUE_BLUE_SURFACE; case GREEN -> SemanticColor.HUE_GREEN_SURFACE;
             case AMBER -> SemanticColor.HUE_AMBER_SURFACE; case PURPLE -> SemanticColor.HUE_PURPLE_SURFACE;
             case NEUTRAL -> SemanticColor.HUE_NEUTRAL_SURFACE; case NONE -> SemanticColor.TEXT_SECONDARY;
         });
-        return painted(name, foreground, ColorMath.opacity(fill, .18), width, height, true, false, glyphSize);
+        return painted(name, foreground, ColorMath.opacity(fill, .18), width, height, true, false, glyphSize,false,select(name,theme,palette,false),null);
+    }
+    /** Compact context preserves calibrated legacy settings/chevron optics. */
+    public Icon panel(String name,GeneratedTheme theme,SemanticColor tint,int size) {
+        return painted(name,theme.semantic().color(tint),null,size,size,false,false,0,artworks.get(name)==BUILT_INS.get(name),select(name,theme,theme.semantic(),false),null);
+    }
+    /** Hero context retains legacy geometry except explicitly admitted identity meanings. */
+    public Icon hero(String name,GeneratedTheme theme,Nodes.Hue hue,int size) {
+        return painted(name,tint(theme.semantic(),hue),null,size,size,false,true,0,false,select(name,theme,theme.semantic(),false),null);
     }
     public int size(Nodes.IconSize size) {
         return DesignMetrics.DEFAULT.value(switch (size) {
@@ -116,18 +215,22 @@ public final class IconRegistry implements AutoCloseable {
         return painted(name, foreground, background, width, height, tile, hero, glyphSize, false);
     }
     private synchronized Icon painted(String name, Color foreground, Color background, int width, int height, boolean tile, boolean hero, int glyphSize, boolean panel) {
+        return painted(name,foreground,background,width,height,tile,hero,glyphSize,panel,null,null);
+    }
+    private synchronized Icon painted(String name,Color foreground,Color background,int width,int height,boolean tile,boolean hero,int glyphSize,boolean panel,DecodedArtwork override,java.awt.Image prepared) {
         requireOpen(); Objects.requireNonNull(name);
         int size = Math.min(width, height);
         if (size < 1 || Math.max(width, height) > 512) throw new IllegalArgumentException("Invalid logical icon size");
         var artwork = artworks.get(name);
-        var authored = encoded.get(name);
+        var receivedEntry = encoded.get(name);
+        var authored = override!=null?override:receivedEntry == null ? null : receivedEntry.artwork();
         if (artwork == null && authored == null) throw new IllegalArgumentException("Unknown icon: " + name);
         var path = artwork == null ? null : artwork.path();
         boolean filled = FILLED_BUILT_INS.contains(name);
         // Callers supply user-scaled tile extents; optical limits are logical metrics.
         double tileGlyph = glyphSize > 0 ? glyphSize : Math.min(size, Math.min(com.formdev.flatlaf.util.UIScale.scale(16.5f),
             Math.max(com.formdev.flatlaf.util.UIScale.scale(10f), size * .4)));
-        var received=authored==null?null:authored.snapshot(Math.max(1,(int)Math.round(tile?tileGlyph:size)));
+        var received=authored==null?null:prepared!=null?prepared:authored.snapshot(Math.max(1,(int)Math.round(tile?tileGlyph:size)));
         return new Icon() {
             @Override public int getIconWidth() { return width; }
             @Override public int getIconHeight() { return height; }

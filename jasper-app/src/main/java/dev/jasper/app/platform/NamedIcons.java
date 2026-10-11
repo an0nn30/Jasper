@@ -18,7 +18,7 @@ final class NamedIcons {
             case "PREVIOUS_MATCH", "UP" -> "chevron.up";
             case "NEXT" -> "forward";
             case "PREVIOUS" -> "back";
-            case "NETWORK" -> "server";
+            case "NETWORK" -> "network";
             case "NEW_FOLDER" -> "folder.add";
             case "NEW_WINDOW" -> "window.add";
             case "SEARCH_HISTORY" -> "history";

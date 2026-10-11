@@ -21,11 +21,11 @@ final class PluginStubPage implements SettingsPage {
     private KitView view;
     private boolean disposed;
 
-    private final Optional<dev.jasper.ui.icons.EncodedArtwork> artwork;
-    @Override public Optional<dev.jasper.ui.icons.EncodedArtwork> artwork(){return artwork;}
+    private final Optional<dev.jasper.ui.icons.IdentityArtwork> artwork;
+    @Override public Optional<dev.jasper.ui.icons.IdentityArtwork> identityArtwork(){return artwork;}
     @Override public Optional<String> icon(){return Optional.of("plugin");}
     PluginStubPage(String pluginId, String title, String why, Runnable openFile, Supplier<KitContext> kit) { this(pluginId, title, why, openFile, kit, Optional.empty()); }
-    PluginStubPage(String pluginId, String title, String why, Runnable openFile, Supplier<KitContext> kit, Optional<dev.jasper.ui.icons.EncodedArtwork> artwork) {
+    PluginStubPage(String pluginId, String title, String why, Runnable openFile, Supplier<KitContext> kit, Optional<dev.jasper.ui.icons.IdentityArtwork> artwork) {
         this.artwork=java.util.Objects.requireNonNull(artwork);
         this.pluginId = pluginId; this.title = title; this.openFile = openFile; this.kit = kit;
         text = "Start " + title + " to edit its settings.";

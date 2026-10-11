@@ -20,6 +20,10 @@ class PluginIconsTest {
     static final String SVG = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 16 16\">"
         + "<rect width=\"16\" height=\"16\" rx=\"3\" fill=\"#3574F0\"/></svg>";
 
+    static int[] pixels(Icon icon) {
+        var image=new BufferedImage(icon.getIconWidth(),icon.getIconHeight(),BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();
+        try{icon.paintIcon(null,g,0,0);}finally{g.dispose();}return image.getRGB(0,0,image.getWidth(),image.getHeight(),null,0,image.getWidth());
+    }
     static byte[] png() throws Exception {
         var image = new BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB);
         for (int x = 0; x < 8; x++) for (int y = 0; y < 8; y++) image.setRGB(x, y, 0xFF3574F0);

@@ -81,7 +81,7 @@ final class PathBreadcrumbs extends JPanel {
             label.getAccessibleContext().setAccessibleName(crumb.path());
             label.setIcon(crumb.icon() == null ? null : AppIcons.named(crumb.icon()));
             label.setIconTextGap(NativeControlStyles.metric(DesignMetrics.Role.BREADCRUMB_ICON_GAP)); labels.add(label); add(label);
-            var separator = new JLabel(AppIcons.named("NEXT")); separators.add(separator); add(separator);
+            var separator = new JLabel(AppIcons.semantic("chevron.right")); separators.add(separator); add(separator);
         }
         add(ellipsis); ellipsis.setToolTipText(next.path()); setToolTipText(next.path());
         getAccessibleContext().setAccessibleDescription(next.path());

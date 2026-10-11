@@ -6,6 +6,22 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class DescriptorParserTest {
+    @Test void acceptsDeclaredIdentityHueAsOptionalDecoration() {
+        for(String hue : List.of("neutral", "blue", "green", "amber", "purple", "NONE", "#ffffff", "", "Blue", "auto")) {
+            assertThatCode(() -> DescriptorParser.parse("icon_hue = \"" + hue + "\"\n" + FULL))
+                .as("declared decoration %s", hue).doesNotThrowAnyException();
+        }
+    }
+
+    @Test void hueTokensDefaultsAndStructuralErrorsHaveDistinctPolicies() throws Exception {
+        for(var hue:dev.jasper.ui.model.Nodes.Hue.values())if(hue!=dev.jasper.ui.model.Nodes.Hue.NONE) {
+            assertThat(DescriptorParser.parse("icon_hue = \""+hue.name().toLowerCase(java.util.Locale.ROOT)+"\"\n"+FULL).iconHue()).isEqualTo(hue);
+        }
+        assertThat(DescriptorParser.parse(FULL).iconHue()).isEqualTo(dev.jasper.ui.model.Nodes.Hue.NEUTRAL);
+        for(String bad:List.of("none","RGB","auto","Blue",""))assertThat(DescriptorParser.parse("icon_hue = \""+bad+"\"\n"+FULL).iconHue()).isEqualTo(dev.jasper.ui.model.Nodes.Hue.NEUTRAL);
+        assertThatThrownBy(()->DescriptorParser.parse("icon_hue = 12\n"+FULL)).hasMessageContaining("icon_hue must be a string");
+        assertThatThrownBy(()->DescriptorParser.parse("arbitrary_hue = \"blue\"\n"+FULL)).hasMessageContaining("Unknown key");
+    }
     private static final String FULL = """
         id = "dev.jasper.ssh"
         name = "SSH"

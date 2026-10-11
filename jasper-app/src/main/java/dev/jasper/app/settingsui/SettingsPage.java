@@ -23,6 +23,10 @@ public interface SettingsPage {
     default Optional<String> icon() { return Optional.empty(); }
 
     /** Immutable manifest artwork supplied by the page owner. */
+    default Optional<dev.jasper.ui.icons.IdentityArtwork> identityArtwork() {
+        return artwork().map(value -> new dev.jasper.ui.icons.IdentityArtwork(value, dev.jasper.ui.model.Nodes.Hue.NEUTRAL));
+    }
+    /** Legacy plain artwork receives a neutral identity backdrop. */
     default Optional<dev.jasper.ui.icons.EncodedArtwork> artwork() { return Optional.empty(); }
 
     /** Text the tree search matches: labels, descriptions, keywords and choice names. */

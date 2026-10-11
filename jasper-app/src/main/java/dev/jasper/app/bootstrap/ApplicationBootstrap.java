@@ -63,6 +63,7 @@ public final class ApplicationBootstrap {
                 service.initialState().snapshot().nativeDecorations(),
                 service.initialState().snapshot().viewMode() == dev.jasper.app.config.ViewMode.COMPACT).configure();
             // Before any plugin is discovered, and here rather than on the EDT: it may wait for the state lock.
+            dev.jasper.ui.icons.IconRegistry.prepareBuiltIns();
             JasperApplication.preparePlugins(dirs);
             SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint));
             // The posted EDT composition owns service; the process hook owns logging and the endpoint.

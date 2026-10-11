@@ -139,16 +139,16 @@ class BundledSamplePluginTest {
                 var icon = contributions.action("dev.jasper.remote.hosts").orElseThrow().icon();
                 assertThat(icon.getIconWidth()).isEqualTo(16);
                 assertThat(icon).isInstanceOfSatisfying(dev.jasper.app.platform.PresentationIcon.class,
-                    named -> assertThat(named.name()).isEqualTo("server"));
+                    named -> assertThat(named.name()).isEqualTo("network"));
                 assertThat(dev.jasper.app.testsupport.IconPixels.of(icon)).isEqualTo(
-                    dev.jasper.app.testsupport.IconPixels.of(new dev.jasper.ui.icons.IconRegistry().icon("server",
-                        dev.jasper.app.platform.ThemeZone.theme(null).semantic(), dev.jasper.ui.model.Nodes.Hue.NONE, 16)));
+                    dev.jasper.app.testsupport.IconPixels.of(new dev.jasper.ui.icons.IconRegistry().icon("network",
+                        dev.jasper.app.platform.ThemeZone.theme(null), dev.jasper.ui.model.Nodes.Hue.NONE, 16)));
                 assertThat(dev.jasper.app.testsupport.IconPixels.of(contributions.action("dev.jasper.remote.connect").orElseThrow().icon())).isEqualTo(dev.jasper.app.testsupport.IconPixels.of(icon));
                 assertThat(dev.jasper.app.testsupport.IconPixels.of(contributions.action("dev.jasper.remote.sessions.manage").orElseThrow().icon())).isEqualTo(dev.jasper.app.testsupport.IconPixels.of(icon));
                 assertThat(contributions.panels()).hasSize(3).allSatisfy(panel -> {
                     assertThat(panel.icon()).isNotNull();
                     assertThat(panel.icon()).isInstanceOfSatisfying(dev.jasper.app.platform.PresentationIcon.class,
-                        named -> assertThat(named.name()).isIn("folder", "server", "tunnel"));
+                        named -> assertThat(named.name()).isIn("folder", "network", "tunnel"));
                 });
                 assertThat(contributions.status()).hasSize(3).anySatisfy(status -> assertThat(dev.jasper.app.testsupport.IconPixels.of(status.icon())).isEqualTo(dev.jasper.app.testsupport.IconPixels.of(icon)));
                 assertThat(contributions.toolbar()).singleElement().isInstanceOfSatisfying(

@@ -71,4 +71,34 @@ public final class DesktopTestSupport {
     public static void closeOwners() throws Exception {
         edt(() -> { OWNERS.forEach(WindowContent::close); OWNERS.clear(); });
     }
+    /** Real title/status owners at source allocations, mounted around the actual staged Remote content. */
+    public static void captureIconOwners(WindowContent owner,String theme,int width,int height) {
+        owner.selectTheme(theme.equals("dark")?dev.jasper.app.appearance.Theme.DARK:dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+        // Standalone owners may already hold this theme while another fixture changed the installed chrome.
+        dev.jasper.ui.swing.FlatLafInstaller.install(owner.theme().chrome());
+        owner.connectConfiguration(() -> {}, () -> {}, () -> {});
+        var root=new javax.swing.JRootPane();
+        try(var title=WindowContent.installTitleBar(root,owner,true,ignored->{})) {
+            var status=owner.status();
+            status.setMetadata(new dev.jasper.app.terminals.PaneSnapshot("Fixture",java.util.Optional.of(java.nio.file.Path.of("/Users/example/projects/jasper/src")),80,24,true,dev.jasper.app.terminals.PaneSnapshot.State.RUNNING,java.util.OptionalInt.empty(),java.util.Optional.empty(),java.util.Optional.empty(),"zsh"),"80 × 24",true);
+            root.setSize(width,height);for(int n=0;n<3;n++)dev.jasper.app.testsupport.KitTestSupport.layout(root);
+            var image=new java.awt.image.BufferedImage(width*2,height*2,java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();
+            try{g.scale(2,2);root.printAll(g);}finally{g.dispose();}
+            var output=java.nio.file.Path.of("build/theme-migration-evidence/icon-owners",theme);java.nio.file.Files.createDirectories(output);
+            javax.imageio.ImageIO.write(image,"png",output.resolve(width+"x"+height+".png").toFile());
+            var icons=new java.util.ArrayList<String>();captureIconBounds(root,root,icons);
+            java.nio.file.Files.writeString(output.resolve(width+"x"+height+".json"),"{\"owner\":\"WindowContent+stagedRemote+WindowStatusBar\",\"deviceScale\":2,\"logicalWidth\":"+width+",\"logicalHeight\":"+height+",\"nativeWindow\":false,\"icons\":["+String.join(",",icons)+"]}");
+        }catch(java.io.IOException failure){throw new java.io.UncheckedIOException(failure);}
+    }
+
+    private static void captureIconBounds(java.awt.Component component,javax.swing.JComponent root,java.util.List<String> result) {
+        javax.swing.Icon icon=component instanceof javax.swing.JLabel label?label.getIcon():component instanceof javax.swing.AbstractButton button?button.getIcon():null;
+        if(icon!=null && component.isVisible() && component.getWidth()>0) {
+            var point=javax.swing.SwingUtilities.convertPoint(component,0,0,root);
+            String semantic=dev.jasper.app.platform.AppIcons.kitName(icon).orElse("");
+            result.add("{\"name\":\""+String.valueOf(component.getName())+"\",\"semantic\":\""+semantic+"\",\"component\":["+point.x+","+point.y+","+component.getWidth()+","+component.getHeight()+"],\"icon\":["+icon.getIconWidth()+","+icon.getIconHeight()+"]}");
+        }
+        if(component instanceof java.awt.Container container)for(var child:container.getComponents())captureIconBounds(child,root,result);
+    }
+
 }

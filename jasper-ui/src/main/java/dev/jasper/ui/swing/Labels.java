@@ -141,11 +141,11 @@ final class Labels {
                 tileSize=tileHeight=context().metrics().value(receiving==ArtworkPresentation.IDENTITY_ROW ? dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_ROW_TILE : dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_HEADER_TILE);
                 tileGlyph=context().metrics().value(receiving==ArtworkPresentation.IDENTITY_ROW ? dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_ROW_GLYPH : dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_HEADER_GLYPH);
             }
-            label.setIcon(tileSize > 0 ? context().icons().tile(icon.name(), context().theme().semantic(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(tileSize), com.formdev.flatlaf.util.UIScale.scale(tileHeight), com.formdev.flatlaf.util.UIScale.scale(tileGlyph), selected)
-                : panelDetail ? context().icons().panel(icon.name(), context().theme().semantic(), icon.severity().isPresent() ? tint(icon.severity().get()) : SemanticColor.HUE_NEUTRAL, size)
-                : icon.size() == Nodes.IconSize.HERO && icon.severity().isEmpty() ? context().icons().hero(icon.name(), context().theme().semantic(), icon.hue(), size)
-                : icon.severity().isPresent() ? context().icons().icon(icon.name(), context().theme().semantic(), tint(icon.severity().get()), size)
-                : context().icons().icon(icon.name(), context().theme().semantic(), icon.hue(), size));
+            label.setIcon(tileSize > 0 ? context().icons().tile(icon.name(), context().theme(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(tileSize), com.formdev.flatlaf.util.UIScale.scale(tileHeight), com.formdev.flatlaf.util.UIScale.scale(tileGlyph), selected)
+                : panelDetail ? context().icons().panel(icon.name(), context().theme(), icon.severity().isPresent() ? tint(icon.severity().get()) : SemanticColor.HUE_NEUTRAL, size)
+                : icon.size() == Nodes.IconSize.HERO && icon.severity().isEmpty() ? context().icons().hero(icon.name(), context().theme(), icon.hue(), size)
+                : icon.severity().isPresent() ? context().icons().icon(icon.name(), context().theme(), tint(icon.severity().get()), size)
+                : context().icons().icon(icon.name(), context().theme(), icon.hue(), size));
             tileSize=savedSize;tileHeight=savedHeight;tileGlyph=savedGlyph;
             label.setDisabledIcon(label.getIcon());
             label.getAccessibleContext().setAccessibleName(icon.accessibleName());

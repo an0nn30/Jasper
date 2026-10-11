@@ -35,6 +35,17 @@ class PluginCardListTest {
         assertThat(image.getRGB(image.getWidth()/2,image.getHeight()/2)&0xffffff).isEqualTo(0x3574f0);
     }
 
+    @Test void sameByteHueRefreshChangesTheRealUnselectedRowBackdropOnly() {
+        var bytes=PluginIconsTest.SVG.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var plain=TestRows.plugin("a.first","First").row();
+        java.util.function.Function<dev.jasper.ui.model.Nodes.Hue,int[]> render=hue->{
+            list.show(List.of(plain,TestRows.plugin("b.art","Z Authored").icon(new dev.jasper.app.plugins.PluginRuntime.PluginIcon("art.svg",bytes,hue)).row()));
+            PluginKit.laidOut(list.view());var label=KitTestSupport.find(list.view(),"icon:b.art",JLabel.class);
+            return PluginIconsTest.pixels(label.getIcon());
+        };
+        var blue=render.apply(dev.jasper.ui.model.Nodes.Hue.BLUE);var purple=render.apply(dev.jasper.ui.model.Nodes.Hue.PURPLE);
+        assertThat(blue).isNotEqualTo(purple);assertThat(blue[blue.length/2+(int)Math.sqrt(blue.length)/2]).isEqualTo(purple[purple.length/2+(int)Math.sqrt(purple.length)/2]);
+    }
     @Test void cardsAreGroupedSortedAndCounted() {
         list.show(List.of(
             TestRows.plugin("dev.jasper.remote", "Remote").origin("Bundled").row(),

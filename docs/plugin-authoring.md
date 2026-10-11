@@ -817,3 +817,16 @@ pre-0.15 raw UI factories and raw presentation icons; all eight bundled manifest
 The [completion audit](design/theme-engine/completion.md) records exact gate scope, owner tests, headless
 rendering, distribution checks and the named Plan 3 composition owners. App host Settings error/stub
 content uses the dialog kit context and closes with its page; it is not covered by the plugin-only compiled gate.
+
+### Declared identity tile hue (SDK 0.15.1)
+
+`icon_hue = "neutral"` is optional. Its exact tokens are `neutral`, `blue`, `green`, `amber`, and `purple`;
+omission uses neutral. It chooses the receiving theme's identity tile backdrop in Plugins rows/headers,
+Settings Tools and notification owner headers. It never recolors SVG/PNG pixels or changes their opacity or size.
+An opaque authored background can cover that tile. Missing or invalid artwork keeps the generic fallback.
+Invalid decorative strings warn and fall back to neutral; nonstring values and unrelated unknown keys are rejected.
+
+Manifests using this key must declare `sdk = ">=0.15.1, <0.16"`. Older hosts reject `icon_hue` as an unknown key
+before checking the SDK range; excluding those hosts does not change that parser ordering. To support older hosts,
+omit the key in that release's manifest. Existing manifests without the key continue to use their admitted ranges.
+The runtime checks whether the current host is admitted; it does not parse per-feature comparator policies.

@@ -7,7 +7,7 @@ import dev.jasper.ui.icons.ReceivingArtwork;
 final class PluginIcons {
     private PluginIcons() { }
     static String name(ReceivingArtwork receiver, PluginRuntime.Row row) {
-        try { return row.icon().map(icon -> receiver.name(icon.artwork())).orElse("plugin"); }
+        try { return row.icon().map(icon -> receiver.name(icon.identityArtwork())).orElse("plugin"); }
         catch(IllegalArgumentException rejected) { return "plugin"; }
     }
 }

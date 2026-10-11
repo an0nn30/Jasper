@@ -108,7 +108,7 @@ public final class Settings9bPreview {
         }
     }
     private static NotificationGroupChoices.Group group(PluginRuntime runtime,String id,String name,String owner,String ownerId) {
-        return new NotificationGroupChoices.Group(id,name,owner,"card",ownerId,"plugin",Optional.ofNullable(runtime.pluginIcons().get(ownerId)).map(PluginRuntime.PluginIcon::artwork));
+        return new NotificationGroupChoices.Group(id,name,owner,"card",ownerId,"plugin",Optional.ofNullable(runtime.pluginIcons().get(ownerId)).map(PluginRuntime.PluginIcon::artwork),Optional.ofNullable(runtime.pluginIcons().get(ownerId)).map(icon->icon.identityArtwork().tileHue()).orElse(dev.jasper.ui.model.Nodes.Hue.NEUTRAL));
     }
     private static void click(JComponent component) {
         component.dispatchEvent(new MouseEvent(component,MouseEvent.MOUSE_CLICKED,0,0,Math.max(1,component.getWidth()/2),Math.max(1,component.getHeight()/2),1,false,MouseEvent.BUTTON1));

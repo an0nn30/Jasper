@@ -14,6 +14,45 @@ import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
 class ZoneIconsTest {
+    @Test void authoredNativeIconsPrepareAtFirstConstructionAndActualScaleChangeBeforePaint() throws Exception {
+        var themes=new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+        float scale=com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
+        var setter=com.formdev.flatlaf.util.UIScale.class.getDeclaredMethod("setUserScaleFactor",float.class,boolean.class);setter.setAccessible(true);
+        try {
+            var icon=AppIcons.semantic("settings");var presentation=new PresentationIcon("settings",null);
+            var disabled=((com.formdev.flatlaf.FlatLaf.DisabledIconProvider)icon).getDisabledIcon();
+            var label=new JLabel();var workspace=new JPanel();workspace.putClientProperty("Jasper.zone","workspace");workspace.add(label);
+            try(var registry=new dev.jasper.ui.icons.IconRegistry()) {
+                for(float next:new float[]{1f,1.5f,2.5f,1f}) {
+                    setter.invoke(null,next,false);
+                    var catalogClass=Class.forName("dev.jasper.ui.icons.BuiltInArtwork");var catalogMethod=catalogClass.getDeclaredMethod("catalog");catalogMethod.setAccessible(true);
+                    var pair=((java.util.Map<?,?>)catalogMethod.invoke(null)).get("settings");
+                    for(String sibling:java.util.List.of("light","dark")) {
+                        var accessor=pair.getClass().getDeclaredMethod(sibling);accessor.setAccessible(true);var decoded=accessor.invoke(pair);
+                        var snapshot=decoded.getClass().getDeclaredMethod("snapshot",int.class);snapshot.setAccessible(true);
+                        for(int extent=60;extent<72;extent++)snapshot.invoke(decoded,extent);
+                        var sizes=decoded.getClass().getDeclaredField("snapshots");sizes.setAccessible(true);
+                        var cache=(java.util.Map<?,?>)sizes.get(decoded);var before=new java.util.LinkedHashMap<>(cache);
+                        var canvas=new BufferedImage(64,64,BufferedImage.TYPE_INT_ARGB);var paint=canvas.createGraphics();
+                        try{icon.paintIcon(label,paint,0,0);presentation.paintIcon(label,paint,0,0);}finally{paint.dispose();}
+                        assertThat(cache).as("native paint after unrelated size churn").isEqualTo(before);
+                    }
+                    // Paint directly, before a layout/dimension query could prepare missing rasters.
+                    var image=new BufferedImage(64,64,BufferedImage.TYPE_INT_ARGB);var graphics=image.createGraphics();
+                    try{icon.paintIcon(label,graphics,0,0);}finally{graphics.dispose();}
+                    assertThat(icon.getIconWidth()).isEqualTo(Math.round(16*next));
+                    for(var theme:java.util.List.of(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK),dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT))) {
+                        workspace.putClientProperty("Jasper.workspaceTheme",theme);
+                        var expected=registry.icon("settings",theme,dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY,icon.getIconWidth());
+                        assertThat(pixels(icon,label)).isEqualTo(pixels(expected,label));
+                        assertThat(pixels(presentation,label)).isEqualTo(pixels(expected,label));
+                        int[] enabled=pixels(icon,label),dimmed=pixels(disabled,label);
+                        for(int i=0;i<enabled.length;i++)assertThat(dimmed[i]>>>24).isCloseTo(Math.round((enabled[i]>>>24)*.42f),within(1));
+                    }
+                }
+            }
+        } finally {setter.invoke(null,scale,false);themes.close();new ThemeController();}
+    }
     @Test void retainedArtworkFollowsReparentingBoundariesAndMatch() {
         var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
         try {

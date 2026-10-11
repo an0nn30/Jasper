@@ -28,6 +28,24 @@ class PluginIconFilesTest {
         return new PluginCandidate(DescriptorParser.parse(toml), directory, List.of(jar), PluginCandidate.Origin.USER);
     }
 
+    @Test void sameByteSameVersionReplacementUsesTheShownDescriptorsHueOutsideTheByteCache() throws Exception {
+        var blue=candidate("dev.example.hue", "icon = \"icons/tool.svg\"\nicon_hue = \"blue\"\n");
+        PluginJars.addResource(blue.jars().getFirst(),"icons/tool.svg",SVG);
+        var greenDescriptor=DescriptorParser.parse(PluginJars.descriptor("dev.example.hue","1.0.0","fix.Main")+"icon = \"icons/tool.svg\"\nicon_hue = \"green\"\n");
+        var green=new PluginCandidate(greenDescriptor,blue.directory(),blue.jars(),blue.origin());
+        int before=PluginIconFiles.reads();var a=PluginIconFiles.read(blue).orElseThrow();var b=PluginIconFiles.read(green).orElseThrow();
+        assertThat(a.artwork()).isSameAs(b.artwork());assertThat(a.data()).isEqualTo(b.data());assertThat(a).isNotEqualTo(b);
+        assertThat(a.identityArtwork().tileHue()).isEqualTo(dev.jasper.ui.model.Nodes.Hue.BLUE);
+        assertThat(b.identityArtwork().tileHue()).isEqualTo(dev.jasper.ui.model.Nodes.Hue.GREEN);
+        assertThat(PluginIconFiles.reads()-before).isEqualTo(1);
+        assertThat(a.identityArtwork()).isSameAs(a.identityArtwork());
+        var launch=new PluginCatalog.Launch(List.of(blue),List.of(PluginStatus.of(blue,PluginStatus.State.ACTIVE,"")),PluginCatalog.versions(List.of(blue)),false);
+        var state=Map.of(blue.id(),new PluginStateStore.Entry(true,java.util.Set.of(),false));
+        var snapshot=PluginCatalog.compute(launch,new PluginCatalog.Disk(List.of(blue),Map.of(blue.id(),green),state),Version.parse(dev.jasper.sdk.JasperSdk.VERSION),id->0,root);
+        var row=snapshot.rows().getFirst();assertThat(row.pendingInstall()).isTrue();
+        assertThat(row.icon().orElseThrow().identityArtwork().tileHue()).isEqualTo(dev.jasper.ui.model.Nodes.Hue.GREEN);
+        assertThat(row.icon().orElseThrow().data()).isEqualTo(a.data());
+    }
     @Test void readsTheNamedIconOnceAndGivesNoneWhenMissingOrTooLarge() throws Exception {
         var withIcon = candidate("dev.example.icon", "icon = \"icons/tool.svg\"\n");
         PluginJars.addResource(withIcon.jars().get(0), "icons/tool.svg", SVG);
