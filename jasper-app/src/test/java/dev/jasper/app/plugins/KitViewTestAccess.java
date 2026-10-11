@@ -24,6 +24,23 @@ public final class KitViewTestAccess implements AutoCloseable {
         appearance = onEdtValue(() -> new WorkspaceAppearanceFixture(theme));
         vault = new StagedVaultHost(home, theme.chrome().dark(), appearance);
         try {
+            if (id.equals("fileserver-add")) {
+                vault.createVault("synthetic-preview-password");
+                onEdt(() -> vault.surface("Credential Vault").close());
+                var staged=Path.of(System.getProperty("jasper.stagedPlugins")).resolve("dev.jasper.fileserver");
+                remoteLoader=new PluginClassLoader("dev.jasper.fileserver",ManagedVaultLoadingTest.jars(staged),getClass().getClassLoader(),java.util.Map.of("dev.jasper.vault.api",vault.loader));
+                var pluginClass=remoteLoader.loadClass("dev.jasper.fileserver.FileServerPlugin");
+                var environmentClass=remoteLoader.loadClass("dev.jasper.fileserver.FileServerPlugin$Environment");
+                var environment=environmentClass.getDeclaredConstructor(java.util.concurrent.Executor.class,java.util.function.Supplier.class,java.util.function.IntPredicate.class,
+                    java.util.function.Consumer.class,java.util.function.Consumer.class,Path.class,String.class,java.time.ZoneId.class,java.util.function.BiFunction.class);environment.setAccessible(true);
+                Object settings=environment.newInstance((java.util.concurrent.Executor)javax.swing.SwingUtilities::invokeLater,(java.util.function.Supplier<java.util.List<?>>)java.util.List::of,
+                    (java.util.function.IntPredicate)port->true,(java.util.function.Consumer<String>)text->{},(java.util.function.Consumer<Path>)path->{},home,"Mac OS X",java.time.ZoneOffset.UTC,
+                    (java.util.function.BiFunction<java.time.Duration,Runnable,Runnable>)(delay,task)->()->{});
+                var constructor=pluginClass.getDeclaredConstructor(environmentClass);constructor.setAccessible(true);
+                remote=(dev.jasper.sdk.plugin.Plugin)constructor.newInstance(settings);
+                onEdt(()->vault.host.start(new HostedPlugin(FileServerRenderEvidenceTest.INFO,java.util.Set.of(),java.util.Set.of("dev.jasper.vault"),java.util.Set.of(),remoteLoader,()->remote)));
+                StagedVaultHost.settle();vault.invoke("dev.jasper.fileserver.new");surface=vault.awaitSurface("New File Server");return;
+            }
             if (id.equals("host-add")) {
                 vault.createVault("synthetic-preview-password");
                 onEdt(() -> vault.surface("Credential Vault").close());
@@ -96,12 +113,13 @@ public final class KitViewTestAccess implements AutoCloseable {
     public void click(String id) { onEdt(() -> StagedVaultHost.click(surface, id)); }
     public void theme(ResolvedTheme theme) { onEdt(() -> appearance.setPair(theme)); }
     public void error() throws InterruptedException {
-        if (surfaceId.equals("host-add")) {
+        if (surfaceId.equals("host-add") || surfaceId.equals("fileserver-add")) {
             try {
                 var storeField=remote.getClass().getDeclaredField("store");storeField.setAccessible(true);var store=storeField.get(remote);
                 Path file=(Path)store.getClass().getMethod("file").invoke(store);java.nio.file.Files.createDirectories(file);
             } catch(ReflectiveOperationException | java.io.IOException failure){throw new AssertionError(failure);}
-            click("host.save");StagedVaultHost.await(()->StagedVaultHost.named(surface.holder(),"host.message")!=null,"host persistence error");return;
+            String prefix=surfaceId.equals("host-add")?"host":"server";
+            click(prefix+".save");StagedVaultHost.await(()->StagedVaultHost.named(surface.holder(),prefix+".message")!=null,"persistence error");return;
         }
         type("password", "synthetic-wrong-password"); click("submit");
         StagedVaultHost.await(() -> StagedVaultHost.node(surface, "message").state().visible()

@@ -168,7 +168,8 @@ class HostEditorTest {
             assertThat(form(editor.view()).actions()).extracting(Nodes.Button::label).containsExactly("Cancel", "Add Host");
             assertThat(all(editor.view())).filteredOn(n -> n instanceof Nodes.Field).allSatisfy(n -> assertThat(((Nodes.Field) n).trailingAction()).isEmpty());
             editor.setDefaultGroupName("Servers");
-            assertThat(node(editor.view(),"row."+HostEditor.GROUP,Nodes.SettingRow.class).description()).contains("Servers (default)");
+            assertThat(node(editor.view(),"row."+HostEditor.GROUP,Nodes.SettingRow.class).description()).isEmpty();
+            assertThat(choice(editor,HostEditor.GROUP).label()).contains("Servers (default)");
             assertThat(choice(editor, HostEditor.GROUP).options()).extracting(dev.jasper.sdk.ui.Option::label).containsExactly("Homelab");
             press(editor.view(), form(editor.view()).cancelAction());
             assertThat(cancelled[0]).isEqualTo(1);

@@ -599,3 +599,7 @@ HostEditor Supplier constructor remains a compatibility/test adapter; production
 and its modal producer is not evidence of anchored visual acceptance. No new feature renderer, color literal or
 local theme bridge was introduced. Optional Vault classloading guards remain necessary for Agent-only operation
 and editing previously saved Vault references when Vault is absent.
+
+## Plan3 Task3 — 2026-10-10
+
+No temporary production renderer or compatibility bridge was added. File Server uses existing SDK descriptors and the real Vault producer. Its legacy Java constructor remains a source-compatible test/consumer adapter to the same lifetime owner. SUPPORTING text mirrors SDK/module projection; filled-folder metadata is internal to the central built-in catalog, with public outline registrations unchanged. Test-only `desktop-server.toml` is a complete source-calibration theme, never a production fallback. Actual-owner harnesses and SDD PNG/metadata/manifests remain evidence; final native and cross-family pixel acceptance is deferred explicitly, not waived.

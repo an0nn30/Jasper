@@ -14,6 +14,26 @@ class ChoicesTest {
     static Choice choice(ChoiceKind kind, String selected, ControlState state) {
         return new Choice("choice", state, kind, List.of(new Option("a", "<html>Alpha", Optional.of(Hue.BLUE)), new Option("b", "Beta", Optional.empty())), selected, "Protocol", "choose-protocol");
     }
+    @Test void selectedSegmentTextRemainsReadableOnLightDarkAndAuthoredControlSurfaces() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();
+            try(var view=new KitView(context,stack(choice(ChoiceKind.SEGMENTED,"b",ControlState.READY)),e -> {})) {
+                var custom=KitFixtures.custom();var colors=new EnumMap<dev.jasper.ui.theme.SemanticColor,java.awt.Color>(dev.jasper.ui.theme.SemanticColor.class);
+                for(var role:dev.jasper.ui.theme.SemanticColor.values())colors.put(role,custom.semantic().color(role));
+                colors.put(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY,new java.awt.Color(100,100,100));
+                colors.put(dev.jasper.ui.theme.SemanticColor.SEGMENT_SELECTED_BG,new java.awt.Color(100,100,100));
+                custom=new dev.jasper.ui.theme.GeneratedTheme(custom.name(),custom.dark(),custom.author(),custom.tokens(),custom.syntax(),custom.terminal(),custom.uiKeys(),custom.icons(),custom.glass(),new dev.jasper.ui.theme.SemanticPalette(colors));
+                for(var theme:List.of(KitFixtures.dark(),KitFixtures.light(),custom)) {
+                    context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme,theme));KitFixtures.render(view,400,80,2);
+                    var button=find(view,"choice.option.b",JButton.class);var fill=theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SEGMENT_SELECTED_BG);
+                    assertThat(dev.jasper.ui.theme.ColorMath.contrast(button.getForeground(),fill)).as("%s selected label",theme.name()).isGreaterThanOrEqualTo(4.5);
+                    var painted=ButtonsTest.paint(button);double maximum=1;
+                    for(int y=3;y<painted.getHeight()-3;y++)for(int x=3;x<painted.getWidth()-3;x++)maximum=Math.max(maximum,dev.jasper.ui.theme.ColorMath.contrast(new java.awt.Color(painted.getRGB(x,y)),fill));
+                    assertThat(maximum).as("actual text ink against selected fill").isGreaterThanOrEqualTo(4.5);
+                }
+            }finally{release(context);}
+        });
+    }
     @Test void dropdownRetainsKitDelegateSelectionAndPopupStyleAcrossSwingUpdates() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();

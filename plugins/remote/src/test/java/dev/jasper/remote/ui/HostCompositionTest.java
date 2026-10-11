@@ -21,6 +21,21 @@ class HostCompositionTest {
    type(editor.view(),HostEditor.PORT,"65536");assertThat(button(editor.view(),HostEditor.SAVE).state().enabled()).isFalse();
   }
  }); }
+ @Test void blankAndTypedGroupsPersistWithRenamedDefaultGuidanceOnTheAccessibleControl() throws Exception { edt(() -> {
+  var saved=new ArrayList<dev.jasper.remote.hosts.RemoteHost>();
+  try(var editor=new HostEditor(new FakeKit("remote"),UI,List.of(),Optional.empty(),false,id->Optional.empty(),()->CompletableFuture.completedFuture(Optional.empty()),saved::add,()->{})) {
+   type(editor.view(),HostEditor.NAME,"test");type(editor.view(),HostEditor.HOSTNAME,"test.invalid");type(editor.view(),HostEditor.USERNAME,"user");
+   editor.setDefaultGroupName("Servers");
+   assertThat(node(editor.view(),"row."+HostEditor.GROUP,Nodes.SettingRow.class).description()).isEmpty();
+   assertThat(node(editor.view(),HostEditor.GROUP,Nodes.Choice.class).label()).contains("Blank", "Servers", "default");
+   emit(editor.view(),new UiEvent.Action(HostEditor.SAVE));assertThat(saved.getLast().group()).isEmpty();
+   type(editor.view(),HostEditor.GROUP,"Custom group");editor.setDefaultGroupName("Renamed");
+   assertThat(node(editor.view(),HostEditor.GROUP,Nodes.Choice.class).search().orElseThrow().entry()).contains("Custom group");
+   emit(editor.view(),new UiEvent.Action(HostEditor.SAVE));assertThat(saved.getLast().group()).isEqualTo("Custom group");
+   type(editor.view(),HostEditor.GROUP,"");emit(editor.view(),new UiEvent.Action(HostEditor.SAVE));assertThat(saved.getLast().group()).isEmpty();
+   assertThat(node(editor.view(),HostEditor.GROUP,Nodes.Choice.class).label()).contains("Renamed");
+  }
+ }); }
  @Test void replacingPickerAndChangingAuthCancelThePreviousRequest() throws Exception { edt(() -> {
   var futures = new ArrayList<CompletableFuture<Optional<dev.jasper.vault.api.CredentialDescriptor>>>();
   try(var editor = new HostEditor(new FakeKit("remote"), UI, List.of(), Optional.empty(), true, id -> Optional.empty(), () -> {var f=new CompletableFuture<Optional<dev.jasper.vault.api.CredentialDescriptor>>();futures.add(f);return f;}, host -> {}, () -> {})) {

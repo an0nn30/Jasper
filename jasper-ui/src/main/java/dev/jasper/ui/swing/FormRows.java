@@ -50,7 +50,7 @@ final class FormRows {
                 Composition.label(c, true);
                 if (c instanceof Labels.TextControl && c.component instanceof Labels.LiteralLabel label
                         && c.node instanceof Nodes.Text text) {
-                    label.wrap = text.role() == Nodes.TextRole.CAPTION || text.role() == Nodes.TextRole.DESCRIPTION;
+                    label.wrap = text.role() == Nodes.TextRole.CAPTION || text.role() == Nodes.TextRole.DESCRIPTION || text.role() == Nodes.TextRole.SUPPORTING;
                 }
             }
             Stacks.mount(

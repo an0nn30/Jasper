@@ -165,11 +165,11 @@ class FormsTest {
                         assertThat(label.getWidth()).isEqualTo(s(96));
                         assertThat(host.getX()).isEqualTo(s(108));
                         assertThat(port.getX() - host.getX() - host.getWidth()).isEqualTo(s(12));
-                        assertThat(find(view, "row", JComponent.class).getX()).isEqualTo(s(14));
+                        assertThat(find(view, "row", JComponent.class).getX()).isEqualTo(s(15));
                         assertThat(find(view, "hint", JComponent.class).getX()).isEqualTo(s(108));
                         assertThat(find(view, "host.label", JComponent.class).isVisible())
                                 .isFalse();
-                        assertThat(card.getInsets().left).isEqualTo(s(14));
+                        assertThat(card.getInsets().left).isEqualTo(s(15));
                     } finally {
                         release(ctx);
                     }
@@ -768,7 +768,7 @@ class FormsTest {
                         layout(view);
                         var row = find(view, "row", JComponent.class);
                         var settings = find(view, "setting", JComponent.class);
-                        assertThat(row.getX()).isEqualTo(s(14));
+                        assertThat(row.getX()).isEqualTo(s(15));
                         assertThat(settings.getX()).isZero();
                         assertThat(settings.getWidth()).isEqualTo(s(440));
                         find(view, "toggle", JButton.class).doClick(0);

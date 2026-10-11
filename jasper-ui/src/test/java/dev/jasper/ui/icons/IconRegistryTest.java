@@ -38,6 +38,20 @@ class IconRegistryTest {
             assertThat(after.getRGB(0,0,16,16,null,0,16)).containsExactly(before.getRGB(0,0,16,16,null,0,16));
         }
     }
+    @Test void filledFolderUsesExplicitBuiltinPaintWithoutChangingOutlineRegistrations() {
+        try(var registry=new IconRegistry()) {
+            registry.register("test:folder","M 2 4 H 6 L 8 6 H 14 V 13 H 2 Z");
+            for(var theme:java.util.List.of(KitFixtures.dark(),KitFixtures.light())) for(int scale:new int[]{1,2}) {
+                var filled=paint(registry.icon("folder.filled",theme.semantic(),SemanticColor.TEXT_PLACEHOLDER,16*scale));
+                var outline=paint(registry.icon("folder",theme.semantic(),SemanticColor.TEXT_PLACEHOLDER,16*scale));
+                var custom=paint(registry.icon("test:folder",theme.semantic(),SemanticColor.TEXT_PLACEHOLDER,16*scale));
+                assertThat(filled.getRGB(8*scale,9*scale)).isEqualTo(theme.semantic().color(SemanticColor.TEXT_PLACEHOLDER).getRGB());
+                assertThat(filled.getRGB(0,0)>>>24).isZero();
+                assertThat(outline.getRGB(8*scale,9*scale)>>>24).isZero();
+                assertThat(custom.getRGB(0,0,16*scale,16*scale,null,0,16*scale)).containsExactly(outline.getRGB(0,0,16*scale,16*scale,null,0,16*scale));
+            }
+        }
+    }
     @Test void everySourceNameRendersInEverySizeThemeAndSelection() {
         try (var registry = new IconRegistry()) {
             assertThat(registry.names()).contains("none", "add", "more", "collapse", "search", "lock", "edit", "delete", "copy", "reveal",

@@ -122,9 +122,9 @@ final class Choices {
                         button.setEnabled(input.isEnabled()); button.setSelected(option.id().equals(choice.selectedId()));
                         var font = context().typography().font(Typography.Role.LABEL, button.isSelected());
                         button.setFont(SwingTypography.effective(font));
-                        button.setForeground(ThemePainting.color(context(), button.isSelected() ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_SECONDARY));
+                        button.setForeground(button.textColor(false));
                         button.setIcon(option.hue().map(h -> (javax.swing.Icon)new HueDot(context(), h)).orElse(null)); button.setDisabledIcon(button.getIcon());
-                        int pad = ThemePainting.metric(context(), DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
+                        int pad = ThemePainting.metric(context(), DesignMetrics.Role.SEGMENT_HORIZONTAL_PADDING);
                         button.setBorder(new EmptyBorder(0, pad, 0, pad));
                     }
                 }
@@ -272,7 +272,11 @@ final class Choices {
     static final class SegmentButton extends Buttons.KitButton {
         final KitContext context;
         SegmentButton(KitContext context) { super(context); this.context = context; kind = Nodes.ButtonKind.GHOST; }
-        @Override SemanticColor textRole(boolean hover) { return isSelected() ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_SECONDARY; }
+        @Override SemanticColor textRole(boolean hover) { return isSelected() ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_SECONDARY; }
+        @Override Color textColor(boolean hover) {
+            return isSelected() ? dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(), SemanticColor.TEXT_PRIMARY,
+                SemanticColor.SEGMENT_SELECTED_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT) : super.textColor(hover);
+        }
         @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); return new Dimension(size.width, ThemePainting.height(context, DesignMetrics.Role.PANEL_ACTION, Typography.Role.LABEL)); }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create();

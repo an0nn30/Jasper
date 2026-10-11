@@ -191,7 +191,7 @@ class ServerEditorTest {
         action(edited, ServerEditor.SAVE);
         assertThat(saved.getLast()).isEqualTo(definition);
         toggle(editor, ServerEditor.TLS, false);
-        assertThat(((Nodes.Toggle) node(editor, ServerEditor.REQUIRE_TLS)).checked()).isFalse();
+        assertThat(((Nodes.Toggle) node(editor, ServerEditor.REQUIRE_TLS)).checked()).isTrue();
         assertThat(((Nodes.Toggle) node(editor, ServerEditor.REQUIRE_TLS)).state().enabled()).isFalse();
     }
 

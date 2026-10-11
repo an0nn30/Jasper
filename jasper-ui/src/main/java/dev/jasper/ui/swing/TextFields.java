@@ -51,7 +51,7 @@ final class TextFields {
                 scroll = new JScrollPane(input); scroll.setBorder(new EmptyBorder(0, 0, 0, 0));
                 scroll.setOpaque(false); scroll.getViewport().setOpaque(false); surface.add(scroll, BorderLayout.CENTER);
             } else { scroll = null; surface.add(input, BorderLayout.CENTER); }
-            if (node.kind() == Nodes.FieldKind.SEARCH || node.kind() == Nodes.FieldKind.PORT) surface.add(leading, BorderLayout.WEST);
+            if (node.kind() == Nodes.FieldKind.SEARCH || node.kind() == Nodes.FieldKind.PORT || node.kind() == Nodes.FieldKind.PATH) surface.add(leading, BorderLayout.WEST);
             KitOwnership.mark(label, node.id() + ".label"); KitOwnership.mark(error, node.id() + ".error"); KitOwnership.mark(leading, node.id() + ".leading");
             label.setLabelFor(input); label.setText(node.label());
             line.setOpaque(false); line.add(surface, BorderLayout.CENTER);
@@ -250,7 +250,7 @@ final class TextFields {
             surface.error = !field.state().error().isEmpty();
             leading.setFont(ThemePainting.font(context(), Typography.Role.MONO)); leading.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PLACEHOLDER));
             leading.setText(field.kind() == Nodes.FieldKind.PORT ? ":" : "");
-            if (field.kind() == Nodes.FieldKind.SEARCH) leading.setIcon(context().icons().icon("search", context().theme().semantic(), SemanticColor.TEXT_PLACEHOLDER,
+            if (field.kind() == Nodes.FieldKind.SEARCH || field.kind() == Nodes.FieldKind.PATH) leading.setIcon(context().icons().icon(field.kind() == Nodes.FieldKind.PATH ? "folder.filled" : "search", context().theme().semantic(), SemanticColor.TEXT_PLACEHOLDER,
                 com.formdev.flatlaf.util.UIScale.scale(context().icons().size(Nodes.IconSize.CONTROL))));
             int gap = ThemePainting.metric(context(), field.kind() == Nodes.FieldKind.PORT ? DesignMetrics.Role.PORT_PREFIX_GAP : DesignMetrics.Role.ICON_GAP);
             leading.setBorder(new EmptyBorder(0, 0, 0, gap));

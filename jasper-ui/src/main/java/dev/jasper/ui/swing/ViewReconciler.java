@@ -28,9 +28,10 @@ final class ViewReconciler implements AutoCloseable {
             String group = ((Nodes.Secret)secret.node).revealGroup();
             if (!group.isEmpty()) revealGroups.put(group, secret.revealed);
         }
-        next.values().forEach(control -> { if(control instanceof SettingRows.RowControl row)row.panelFooter=false; if(control instanceof Buttons.ButtonControl button)button.button.panel=false; if(control instanceof Menus.MenuControl menu){menu.main.panel=false;menu.arrow.panel=false;} if (control instanceof Labels.IconControl icon) icon.tile(0, false); if (control instanceof Labels.TextControl && control.component instanceof Labels.LiteralLabel text) { text.wrap = false; text.flow = false; } control.embeddedLabel(false); control.hero(false); });
+        next.values().forEach(control -> { if(control instanceof SettingRows.RowControl row)row.panelFooter=false; if(control instanceof Buttons.ButtonControl button){button.button.panel=false;button.button.fullFooter=false;button.button.orderedAction=false;} if(control instanceof Menus.MenuControl menu){menu.main.panel=false;menu.arrow.panel=false;} if (control instanceof Labels.IconControl icon) icon.tile(0, false); if (control instanceof Labels.TextControl && control.component instanceof Labels.LiteralLabel text) { text.wrap = false; text.flow = false; } control.embeddedLabel(false); control.hero(false); });
         inherit(spec.root(), next, true);
         applyFlow(spec.root(), next);
+        applyFullForm(spec.root(), next, false);
         for (var node : nodes.values()) next.get(node.id()).update(node);
         applyHero(spec.root(), next, false);
         applyTiles(spec.root(), next, 0);
@@ -71,6 +72,11 @@ final class ViewReconciler implements AutoCloseable {
         next.get(node.id()).hero(hero);
         ControlRegistry.children(node).forEach(child -> applyHero(child, next, hero));
     }
+    private void applyFullForm(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
+        boolean full = node instanceof Nodes.Form form ? form.kind() == Nodes.FormKind.FULL : inherited;
+        if (next.get(node.id()) instanceof SettingRows.RowControl row) row.fullForm = full;
+        ControlRegistry.children(node).forEach(child -> applyFullForm(child, next, full));
+    }
     private void applyTiles(Nodes.Node node, Map<String, ControlRegistry.Control> next, int inherited) {
         int size = node instanceof Nodes.Form form && form.kind() == Nodes.FormKind.SHEET
                 ? view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.CATEGORY_SHEET_TILE)
@@ -88,7 +94,7 @@ final class ViewReconciler implements AutoCloseable {
                 || node instanceof Nodes.Stack stack && (stack.role() == Nodes.LayoutRole.VERTICAL || stack.role() == Nodes.LayoutRole.DETAIL || stack.role() == Nodes.LayoutRole.HERO || stack.role() == Nodes.LayoutRole.SUPPORTING);
         for (var child : ControlRegistry.children(node)) {
             if (vertical && child instanceof Nodes.Text text && switch (text.role()) {
-                        case BODY, DESCRIPTION, CAPTION -> true;
+                        case BODY, DESCRIPTION, SUPPORTING, CAPTION -> true;
                         default -> false;
                     } && next.get(child.id()).component instanceof Labels.LiteralLabel label) {
                 label.flow = true;

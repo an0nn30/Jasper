@@ -276,19 +276,20 @@ public final class FileServerPlugin implements Plugin {
         PluginDialog dialog = context.windows().dialog(new DialogSpec(title, window, true));
         boolean[] closed = {false};
         ServerEditor[] editor = new ServerEditor[1];
+        ServerDefinition[] saved = new ServerDefinition[1];
         editor[0] = new ServerEditor(context.kit(), store.definitions(), initial, existing, Engines.AVAILABLE, environment.nics().get(), vault.isPresent(),
-            this::accountName, () -> pickAccount(window),
+            this::accountDescriptor, vault.isPresent() ? request -> vault.get().pick(window, request) : null,
             () -> context.windows().chooseDirectory(window, "Folder to share", initial.map(ServerDefinition::folder)),
             new ServerEditor.KeySources(() -> keyFiles(window), FileServerPlugin::pasted),
             environment.linux(),
-            definition -> store.put(definition).whenComplete((ignored, failure) -> environment.ui().execute(() -> {
+            definition -> { saved[0] = definition; return store.put(definition); },
+            () -> {
                 if (stopped) return;
-                if (failure != null) { if (!closed[0]) editor[0].showError(message(failure)); return; }
                 boolean dismissed = closed[0] || !window.isOpen();
                 dialog.close();
                 if (dismissed) return;
-                registry.server(definition.id()).filter(ServerRegistry.View::restartNeeded).ifPresent(view -> confirmRestart(window, view));
-            })),
+                registry.server(saved[0].id()).filter(ServerRegistry.View::restartNeeded).ifPresent(view -> confirmRestart(window, view));
+            },
             dialog::close);
         currentEditor = editor[0];
         dialog.setContent(editor[0].view());
@@ -569,14 +570,9 @@ public final class FileServerPlugin implements Plugin {
             }), () -> { });
     }
 
-    private Optional<String> accountName(UUID id) {
+    private Optional<CredentialDescriptor> accountDescriptor(UUID id) {
         if (vault.isEmpty()) return Optional.empty();
-        return vault.get().credentials().stream().filter(d -> d.id().equals(id)).findFirst().map(CredentialDescriptor::name);
-    }
-
-    private CompletableFuture<Optional<ServerEditor.Account>> pickAccount(WindowHandle window) {
-        if (vault.isEmpty()) return CompletableFuture.completedFuture(Optional.empty());
-        return vault.get().pick(window).thenApply(chosen -> chosen.map(d -> new ServerEditor.Account(d.id(), d.name())));
+        return vault.get().credentials().stream().filter(d -> d.id().equals(id)).findFirst();
     }
 
     private String uniqueName(String base) {

@@ -19,8 +19,15 @@ public final class SurfaceFixtures {
         Path home = Files.createTempDirectory("jasper-surface-");
         KitViewTestAccess owner = null;
         try {
-            owner = new KitViewTestAccess(home, surfaceId, theme(surfaceId.equals("host-add") && theme.equals("calibration") ? "host-calibration" : theme));
+            owner = new KitViewTestAccess(home, surfaceId, theme(theme.equals("calibration") ? surfaceId.equals("host-add") ? "host-calibration" : surfaceId.equals("fileserver-add") ? "server-calibration" : theme : theme));
             var opened = new Opened(home, owner, surfaceId, state);
+            if (surfaceId.equals("fileserver-add")) {
+                if (state.equals("vault")) { owner.click("server.login.option.vault"); owner.click("server.writable"); }
+                else if (!java.util.Set.of("empty", "disabled", "focus").contains(state)) {
+                    owner.type("server.name", "synthetic-preview-server");owner.type("server.folder",home.toString());
+                }
+                if(state.equals("error"))owner.error();opened.layout();return opened;
+            }
             if (surfaceId.equals("host-add")) {
                 if (!java.util.Set.of("empty", "disabled", "focus").contains(state)) {
                     owner.type("host.name","synthetic-preview-host");owner.type("host.hostname","synthetic-preview-host.invalid");owner.type("host.username","fixture");owner.click("host.auth.option.agent");
@@ -51,8 +58,8 @@ public final class SurfaceFixtures {
         var generated = switch (name) {
             case "dark" -> ThemeGenerator.generate(Theme.DARK.source().document());
             case "light" -> ThemeGenerator.generate(Theme.JASPER_LIGHT.source().document());
-            case "calibration", "host-calibration", "custom" -> {
-                String file = name.equals("host-calibration") ? "desktop-host.toml" : name.equals("calibration") ? "desktop-hero.toml" : "custom-hero.toml";
+            case "calibration", "host-calibration", "server-calibration", "custom" -> {
+                String file = name.equals("server-calibration") ? "desktop-server.toml" : name.equals("host-calibration") ? "desktop-host.toml" : name.equals("calibration") ? "desktop-hero.toml" : "custom-hero.toml";
                 try (var input = SurfaceFixtures.class.getResourceAsStream("/dev/jasper/app/appearance/" + file)) {
                     if (input == null) throw new IllegalStateException(file);
                     yield ThemeGenerator.generate(ThemeToml.parse(new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8), file));
@@ -73,7 +80,7 @@ public final class SurfaceFixtures {
         private boolean closed;
         Opened(Path home, KitViewTestAccess owner, String id, String state) {
             this.home=home; this.owner=owner; this.id=id; this.state=state;
-            width=com.formdev.flatlaf.util.UIScale.scale(id.equals("host-add") ? 540 : id.equals("vault-create") ? 400 : 380); minimumHeight=com.formdev.flatlaf.util.UIScale.scale(id.equals("host-add") ? 732 : id.equals("vault-create") ? 428 : 264);
+            width=com.formdev.flatlaf.util.UIScale.scale((id.equals("host-add") || id.equals("fileserver-add")) ? 540 : id.equals("vault-create") ? 400 : 380); minimumHeight=com.formdev.flatlaf.util.UIScale.scale(id.equals("fileserver-add") ? (state.equals("vault") ? 730 : 690) : id.equals("host-add") ? 732 : id.equals("vault-create") ? 428 : 264);
         }
         public KitView view() { return owner.view(); }
         public ViewSpec snapshot() { return edt(() -> view().spec()); }
@@ -91,10 +98,10 @@ public final class SurfaceFixtures {
         /** Device scale2 is an actual Java2D transform. Synthetic focus is explicitly headless, never native proof. */
         public BufferedImage capture(int scale) {
             return edt(() -> {
-                if (state.equals("busy")) owner.click(id.equals("host-add") ? "host.save" : "submit");
+                if (state.equals("busy")) owner.click(id.equals("fileserver-add") ? "server.save" : id.equals("host-add") ? "host.save" : "submit");
                 layout();
                 var previous=KeyboardFocusManager.getCurrentKeyboardFocusManager();
-                var focused=owner.component(id.equals("host-add") ? "host.name.input" : "password.input");
+                var focused=owner.component(id.equals("fileserver-add") ? "server.name.input" : id.equals("host-add") ? "host.name.input" : "password.input");
                 boolean focus=state.equals("focus") || id.equals("vault-unlock") && state.equals("empty");
                 try {
                     if (focus) {

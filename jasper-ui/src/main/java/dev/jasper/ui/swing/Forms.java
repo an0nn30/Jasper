@@ -157,7 +157,7 @@ final class Forms {
             int side = ThemePainting.metric(context(), hero ? DesignMetrics.Role.HERO_SIDES : DesignMetrics.Role.FORM_SIDES);
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.FOOTER_PADDING);
             int focusClearance = hero ? ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING) : 0;
-            body.setBorder(new EmptyBorder(hero ? ThemePainting.metric(context(), DesignMetrics.Role.HERO_TOP) : pad,
+            body.setBorder(new EmptyBorder(hero ? ThemePainting.metric(context(), DesignMetrics.Role.HERO_TOP) : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FORM_TOP) : pad,
                     side, focusClearance, side));
             body.setLayout(hero ? new Composition.Vertical(ThemePainting.metric(context(), DesignMetrics.Role.HERO_SECTION_GAP)) {
                 @Override int gap(Component previous, Component next) {
@@ -169,7 +169,7 @@ final class Forms {
             } : new Composition.Vertical(ThemePainting.metric(context(), form.kind() == Nodes.FormKind.SHEET
                     ? DesignMetrics.Role.SHEET_SECTION_GAP : DesignMetrics.Role.SECTION_GAP)));
             int footerTop = hero ? ThemePainting.metric(context(), compact
-                    ? DesignMetrics.Role.HERO_COMPACT_FOOTER_TOP : DesignMetrics.Role.HERO_FOOTER_TOP) - focusClearance : pad;
+                    ? DesignMetrics.Role.HERO_COMPACT_FOOTER_TOP : DesignMetrics.Role.HERO_FOOTER_TOP) - focusClearance : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FULL_FOOTER_TOP) : pad;
             footer.setBorder(new EmptyBorder(footerTop, side,
                     hero ? ThemePainting.metric(context(), DesignMetrics.Role.HERO_FOOTER_BOTTOM) : pad, side));
             footer.setLayout(new FooterLayout(this));
@@ -203,6 +203,7 @@ final class Forms {
         void children(List<ControlRegistry.Control> controls) {
             this.controls = controls;
             var f = (Nodes.Form) node;
+            for(var control:controls)if(control instanceof Buttons.ButtonControl button && f.actions().contains(control.node))button.button.fullFooter=f.kind()==Nodes.FormKind.FULL;
             Stacks.mount(
                     body,
                     java.util.stream.Stream.concat(

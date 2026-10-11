@@ -21,9 +21,11 @@ public final class SurfacePreview {
         }) : null;
         try {
         for (String theme : args.length > 2 ? List.of(args[2]) : List.of("calibration", "dark", "light", "custom")) {
-            for (String id : List.of("vault-create", "vault-unlock")) {
+            for (String id : List.of("vault-create", "vault-unlock", "host-add", "fileserver-add")) {
                 if (!filter.isEmpty() && !id.contains(filter)) continue;
-                var states = id.equals("vault-create")
+                var states = id.equals("fileserver-add") ? List.of("empty", "focus", "vault", "entered", "busy", "error")
+                    : id.equals("host-add") ? List.of("empty", "focus", "entered", "busy", "error")
+                    : id.equals("vault-create")
                     ? List.of("empty", "focus", "entered", "revealed", "mismatch", "busy")
                     : List.of("empty", "entered", "revealed", "busy", "error");
                 for (String state : states) {
@@ -46,6 +48,15 @@ public final class SurfacePreview {
         var image = opened.capture(2);
         var metadata = new StringBuilder("provenance=real staged plugin/headless Java2D\ndeviceScale=2\nlogicalUiScale="
             + com.formdev.flatlaf.util.UIScale.getUserScaleFactor() + "\npreferred=" + opened.preferred() + "\n");
+        if (id.equals("fileserver-add") || id.equals("host-add")) {
+            var anchors=id.equals("fileserver-add") ? List.of("server.general.card","server.name","server.protocol","server.folder","server.port","server.access.card","server.login","server.security.card","server.preview","server.cancel","server.save")
+                : List.of("host.connection.card","host.name","host.hostname","host.port","host.authentication.card","host.choose","host.options.card","host.preview","host.cancel","host.save");
+            for(String anchor:anchors) {
+                try {metadata.append(anchor).append('=').append(opened.bounds(anchor)).append('\n');}
+                catch(AssertionError absent) {if(!anchor.endsWith(".preview"))throw absent;}
+            }
+            return new Capture(image,metadata.toString());
+        }
         for (String anchor : List.of("form.hero.tile", "form.heading", "intro", "password", "password.input", "cancel", "submit"))
             metadata.append(anchor).append('=').append(opened.bounds(anchor)).append('\n');
         if (id.equals("vault-create")) {

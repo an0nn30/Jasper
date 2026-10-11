@@ -76,6 +76,17 @@ class StagedAddHostTest {
                 var list=(Nodes.ItemList)node(form,"host.keys");assertThat(list.items()).hasSize(2);
                 assertThat(((Nodes.Choice)node(form,"host.choose")).face().orElseThrow().primary()).isEmpty();
                 captureHost("ordered-keys",kitView(form),540,732);
+                captureHost("ordered-keys-natural",kitView(form),0,0);
+                // Source-depicted empty fields, through real editor events and genuine imported key order.
+                assertThat(list.items().stream().map(dev.jasper.ui.model.ListItem::id).toList()).containsExactlyElementsOf(keys);
+                type(form,"host.name.input","");type(form,"host.hostname.input","");
+                assertThat(((AbstractButton)require(form,"host.save")).isEnabled()).isFalse();
+                assertThat(((Nodes.ItemList)node(form,"host.keys")).selectedIds()).isEqualTo(list.selectedIds());
+                // SINGLE rows have no user clear-selection action; retain the real last-imported selection.
+                captureHost("source-depicted-keys",kitView(form),540,732);
+                captureHost("source-depicted-keys-natural",kitView(form),0,0);
+                assertThat(((JScrollPane)require(form,"host.scroll")).getVerticalScrollBar().isVisible()).isFalse();
+                type(form,"host.name.input","synthetic-preview-host");type(form,"host.hostname.input","synthetic-preview-host.invalid");
                 var firstUp=(AbstractButton)require(form,"@ordered/host.keys/"+list.items().getFirst().id()+"/up");
                 var lastDown=(AbstractButton)require(form,"@ordered/host.keys/"+list.items().getLast().id()+"/down");
                 assertThat(firstUp.isEnabled()).isFalse();assertThat(lastDown.isEnabled()).isFalse();

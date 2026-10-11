@@ -27,7 +27,7 @@ final class Cards {
             int pad =
                     ((Nodes.Card) node).kind() != Nodes.CardKind.FORM
                             ? 0
-                            : ThemePainting.metric(context(), DesignMetrics.Role.CARD_PADDING);
+                            : ThemePainting.metric(context(), DesignMetrics.Role.CARD_PADDING) + ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE);
             component.setBorder(new EmptyBorder(pad, pad, pad, pad));
             component.setLayout(
                     ((Nodes.Card) node).kind() == Nodes.CardKind.MIXED
@@ -59,7 +59,7 @@ final class Cards {
         }
 
         int pad() {
-            return ThemePainting.metric(owner.context(), DesignMetrics.Role.CARD_PADDING);
+            return ThemePainting.metric(owner.context(), DesignMetrics.Role.CARD_PADDING) + ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE);
         }
 
         boolean setting(Component c) {
@@ -72,10 +72,13 @@ final class Cards {
             for (Component c : p.getComponents())
                 if (c.isVisible()) {
                     boolean setting = setting(c), before = previous != null && setting(previous);
-                    if (previous == null && !setting || previous != null && setting != before)
-                        y += pad();
+                    if (previous == null && !setting) y += pad();
+                    else if (previous != null && setting != before)
+                        // The outer card owns a stroke; an internal content/setting transition
+                        // owns only its content padding. The setting row accounts for its divider.
+                        y += ThemePainting.metric(owner.context(), DesignMetrics.Role.CARD_PADDING);
                     else if (previous != null && !setting)
-                        y += ThemePainting.metric(owner.context(), DesignMetrics.Role.ROW_GAP);
+                        y += ThemePainting.metric(owner.context(), DesignMetrics.Role.MIXED_ROW_GAP);
                     int inset = setting ? 0 : pad(),
                             w = Math.max(0, width - 2 * inset),
                             h = Composition.height(c, w);
@@ -126,15 +129,12 @@ final class Cards {
                 g.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), r * 2, r * 2));
                 g.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE));
                 g.draw(new RoundRectangle2D.Double(.5, .5, getWidth() - 1, getHeight() - 1, r * 2, r * 2));
-                Component[] children = getComponents();
-                for (int i = 1; i < children.length; i++)
-                    if (children[i].isVisible()
-                            && children[i - 1].isVisible()
-                            && (children[i].getName() != null)) {
-                        int y = children[i].getY();
-                        if (settings.contains(children[i]) || settings.contains(children[i - 1]))
-                            g.drawLine(1, y, getWidth() - 2, y);
-                    }
+                Component previous = null;
+                for (Component child : getComponents()) if (child.isVisible()) {
+                    if (previous != null && (settings.contains(child) || settings.contains(previous)))
+                        g.drawLine(1, child.getY(), getWidth() - 2, child.getY());
+                    previous = child;
+                }
             } finally {
                 g.dispose();
             }

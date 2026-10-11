@@ -38,7 +38,7 @@ final class Buttons {
             var value = (Nodes.Button)node; state(); button.kind = value.kind(); button.iconSeverity = value.iconSeverity().orElse(null);
             button.toggle = value.selected().isPresent(); button.getModel().setSelected(value.selected().orElse(false));
             button.setText(value.label()); button.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
-            button.setForeground(ThemePainting.color(context(), button.textRole(false)));
+            button.setForeground(button.textColor(false));
             boolean embedded = value.presentation() == Nodes.ButtonPresentation.EMBEDDED;
             button.embedded = embedded;
             if (artwork != null) { button.setIcon(artwork); button.putClientProperty("Jasper.button.icon", null); }
@@ -63,7 +63,7 @@ final class Buttons {
     static class KitButton extends JButton {
         private final KitContext context;
         Nodes.ButtonKind kind;
-        boolean hero, panel;
+        boolean hero, panel, fullFooter, orderedAction;
         /** Content-sized for a host arrangement (ButtonPresentation.EMBEDDED): no minimum height and no resting or hover fill. */
         boolean embedded;
         float disabledOpacity=.42f;
@@ -97,14 +97,24 @@ final class Buttons {
                 case LINK -> hover ? SemanticColor.TEXT_LINK_HOVER : SemanticColor.TEXT_LINK;
             };
         }
+        /** Final paint color; specialized shared controls may apply a surface-specific readability floor. */
+        Color textColor(boolean hover) { return ThemePainting.color(context, textRole(hover)); }
         /** The glyph's colour: the severity's (as on a kit Icon) when present, otherwise the text colour. */
         SemanticColor iconRole(boolean hover) {
             return iconSeverity == null ? textRole(hover) : Labels.tint(iconSeverity);
         }
         @Override public Dimension getPreferredSize() {
             Dimension size = super.getPreferredSize();
+            // The shared painter uses fractional metrics; Swing's integer preferred width can
+            // truncate even an unconstrained content-sized label (for example “Choose…”).
+            if (getText() != null && !getText().isEmpty()) {
+                var insets = getInsets();
+                int textWidth = (int)Math.ceil(getFont().getStringBounds(getText(), new java.awt.font.FontRenderContext(null, true, true)).getWidth());
+                int iconWidth = getIcon() == null ? 0 : getIcon().getIconWidth() + getIconTextGap();
+                size.width = Math.max(size.width, textWidth + iconWidth + insets.left + insets.right);
+            }
             if (embedded) return size;
-            int height = ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_BUTTON_HEIGHT : panel ? DesignMetrics.Role.PANEL_ACTION : DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.LABEL);
+            int height = ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_BUTTON_HEIGHT : fullFooter ? DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT : orderedAction ? DesignMetrics.Role.ORDERED_ADD_HEIGHT : panel ? DesignMetrics.Role.PANEL_ACTION : DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.LABEL);
             return new Dimension(getText() == null || getText().isEmpty() ? height : size.width, Math.max(height, size.height));
         }
         /** Shared painter permits a real specialized owner to select its semantic surface. */
@@ -132,7 +142,7 @@ final class Buttons {
                 }
                 Color border = toggle && isSelected() ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : embedded ? null : border();
                 ThemePainting.rounded(g, this, context, fill, border, !embedded && focus != null && focus.visible(), false);
-                g.setFont(getFont()); g.setColor(ThemePainting.color(context, textRole(hover)));
+                g.setFont(getFont()); g.setColor(textColor(hover));
                 Insets insets = getInsets(); Rectangle icon = new Rectangle(), text = new Rectangle();
                 String clipped = SwingUtilities.layoutCompoundLabel(this, g.getFontMetrics(), getText(), getIcon(), CENTER, getHorizontalAlignment(), CENTER, RIGHT,
                     new Rectangle(insets.left, insets.top, getWidth() - insets.left - insets.right, getHeight() - insets.top - insets.bottom), icon, text, getIconTextGap());

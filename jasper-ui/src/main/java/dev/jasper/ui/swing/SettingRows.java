@@ -16,7 +16,7 @@ final class SettingRows {
 
     static final class RowControl extends ControlRegistry.Control {
         final Composition.WrappedText title, description;
-        boolean panelFooter, hero;
+        boolean panelFooter, hero, fullForm;
         @Override void hero(boolean value) { hero=value; }
 
         RowControl(KitView view, Nodes.SettingRow node) {
@@ -43,11 +43,11 @@ final class SettingRows {
                     description, context(), Typography.Role.SETTING_DESCRIPTION, SemanticColor.TEXT_TERTIARY);
             title.setEnabled(component.isEnabled());
             description.setEnabled(component.isEnabled());
-            int side = ThemePainting.metric(context(), DesignMetrics.Role.SETTING_SIDE_PADDING),
+            int side = ThemePainting.metric(context(), fullForm ? DesignMetrics.Role.FULL_SETTING_SIDE_PADDING : DesignMetrics.Role.SETTING_SIDE_PADDING),
                     vertical =
                             ThemePainting.metric(
                                     context(), DesignMetrics.Role.SETTING_VERTICAL_PADDING);
-            component.setBorder(panelFooter ? new EmptyBorder(0,0,0,0) : new EmptyBorder(vertical, side, vertical, side));
+            component.setBorder(panelFooter ? new EmptyBorder(0,0,0,0) : new EmptyBorder(vertical, side + (row.dependent() ? ThemePainting.metric(context(), DesignMetrics.Role.SETTING_DEPENDENT_INDENT) : 0), vertical, side));
             component.setLayout(new RowLayout(this));
             ((SearchHighlight) component).highlight(row.highlighted());
         }
@@ -130,8 +130,8 @@ final class SettingRows {
                     owner.panelFooter ? 0 : ThemePainting.metric(
                             owner.context(),
                             owner.hero && owner.description.isVisible() ? DesignMetrics.Role.HERO_SETTING_HEIGHT : owner.description.isVisible()
-                                    ? DesignMetrics.Role.SETTING_DESCRIPTION_HEIGHT
-                                    : DesignMetrics.Role.SETTING_HEIGHT),
+                                    ? owner.fullForm ? DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT : DesignMetrics.Role.SETTING_DESCRIPTION_HEIGHT
+                                    : DesignMetrics.Role.SETTING_HEIGHT) + (owner.fullForm && !owner.hero ? ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE) : 0),
                     i.top + i.bottom + Math.max(text, control));
         }
 

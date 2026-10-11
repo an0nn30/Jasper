@@ -220,7 +220,7 @@ class NotificationCardTest {
     }
 
     /**
-     * The former link row: each link exactly as wide as its label (no padding), as tall as the text line plus the former
+     * The link row: each link fits its fractionally painted label (no padding), as tall as the text line plus the former
      * 2 px above and below, 12 px before every link but the first, starting at the text column. Close keeps its 16 px
      * glyph in the 16 px slot at the top right.
      */
@@ -241,7 +241,21 @@ class NotificationCardTest {
             var metrics = button.getFontMetrics(button.getFont());
             if (i > 0) x += gap;
             assertThat(view.getX()).as("link %d starts after the former gap", i).isEqualTo(x);
-            assertThat(view.getWidth()).as("link %d is as wide as its label", i).isEqualTo(metrics.stringWidth(button.getText()));
+            var image = new BufferedImage(view.getWidth(), view.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            var graphics = image.createGraphics();
+            try {
+                graphics.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                graphics.setRenderingHint(java.awt.RenderingHints.KEY_FRACTIONALMETRICS, java.awt.RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+                graphics.setFont(button.getFont());
+                var insets = button.getInsets();
+                String painted = javax.swing.SwingUtilities.layoutCompoundLabel(button, graphics.getFontMetrics(), button.getText(), button.getIcon(),
+                    javax.swing.SwingConstants.CENTER, button.getHorizontalAlignment(), javax.swing.SwingConstants.CENTER, javax.swing.SwingConstants.RIGHT,
+                    new java.awt.Rectangle(insets.left, insets.top, button.getWidth()-insets.left-insets.right, button.getHeight()-insets.top-insets.bottom),
+                    new java.awt.Rectangle(), new java.awt.Rectangle(), button.getIconTextGap());
+                assertThat(painted).as("link %d paints its complete actionable label", i).isEqualTo(button.getText());
+                assertThat(view.getWidth()).as("link %d has no extra layout padding", i).isEqualTo(button.getWidth());
+                assertThat(view.getWidth()).isGreaterThanOrEqualTo(graphics.getFontMetrics().stringWidth(button.getText()));
+            } finally { graphics.dispose(); }
             assertThat(view.getHeight()).as("link %d is a text line plus the padding", i).isEqualTo(metrics.getHeight() + 2 * padding);
             assertThat(button.getInsets().left + button.getInsets().right).isZero();
             x += view.getWidth();
@@ -256,14 +270,20 @@ class NotificationCardTest {
     }
 
     /** Links that a theme or font change shows anew still count the pointer over them as hovering the card. */
-    @Test void linksShownAfterARestyleKeepTheCardHovered() {
+    @Test void linksShownAfterARestyleKeepTheCardHovered() throws Exception {
         var bindings = KitTestSupport.bindings(true);
         var defaults=new java.util.HashMap<Object,Object>();javax.swing.UIManager.getDefaults().forEach(defaults::put);
         NotificationCard shown=null;
+        float priorScale=UIScale.getUserScaleFactor();
+        var scaleOverride=UIScale.class.getDeclaredMethod("setUserScaleFactor",float.class,boolean.class);
+        scaleOverride.setAccessible(true);
         try {
             // Keep geometry at 13pt while the explicit label override changes the amount of text that fits.
             javax.swing.UIManager.put("defaultFont", new java.awt.Font(java.awt.Font.DIALOG,java.awt.Font.PLAIN,13));
             javax.swing.UIManager.put("Label.font", new java.awt.Font(java.awt.Font.DIALOG,java.awt.Font.PLAIN,40));
+            // FlatLaf derives geometry from Label.font in an isolated JVM. Pin it for this
+            // font-only fitting transition, independently of the test suite's initialization order.
+            scaleOverride.invoke(null,1f,false);
             var card = card(bindings.context(ThemeRoute.CHROME), posted(withActions(titled("Restyle"), List.of("One", "Two", "Three", "Four"))), false);shown=card;
             int before = card.actionLabels().size();
             javax.swing.UIManager.put("Label.font",new java.awt.Font(java.awt.Font.DIALOG,java.awt.Font.PLAIN,13));
@@ -279,7 +299,7 @@ class NotificationCardTest {
         } finally {
             if(shown!=null)shown.close();
             javax.swing.UIManager.put("Label.font",defaults.get("Label.font"));
-            javax.swing.UIManager.put("defaultFont",defaults.get("defaultFont"));bindings.close();
+            javax.swing.UIManager.put("defaultFont",defaults.get("defaultFont"));scaleOverride.invoke(null,priorScale,false);bindings.close();
         }
     }
 

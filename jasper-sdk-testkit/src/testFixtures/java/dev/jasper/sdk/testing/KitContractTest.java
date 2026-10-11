@@ -31,6 +31,19 @@ public abstract class KitContractTest {
             view.update(new ViewSpec(form));assertThat(((Nodes.Form)view.spec().root()).submission()).isEqualTo(policy);
         }}finally{view.close();stop(kit);}
     }); }
+    @Test void filledFolderBuiltinIsAdmittedByHostAndFakeWithoutARegistration() throws Exception { edt(() -> {
+        var kit=kit("owner");
+        var spec=new ViewSpec(new Nodes.Icon("folder",ControlState.READY,"folder.filled",Nodes.Hue.NONE,Nodes.IconSize.CONTROL,"Folder"));
+        var view=kit.create(spec,e -> {});
+        try {view.update(spec);assertThat(view.spec()).isEqualTo(spec);}finally{view.close();stop(kit);}
+    }); }
+    @Test void supportingTextRoleSurvivesHostProjectionAndRefresh() throws Exception { edt(() -> {
+        var kit=kit("owner");
+        var text=new Nodes.Text("help",ControlState.READY,"Clients use this account",Nodes.TextRole.SUPPORTING);
+        var spec=new ViewSpec(new Nodes.FormRow("row",ControlState.READY,"Account","",new Nodes.Stack("stack",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(text)),Optional.empty()));
+        var view=kit.create(spec,e -> {});
+        try { view.update(spec);assertThat(view.spec()).isEqualTo(spec); }finally{view.close();stop(kit);}
+    }); }
     @Test void numericShapeUpdatePublishesTheNewLiveValue() throws Exception { edt(() -> {
         var kit = kit("owner"); var events = new ArrayList<UiEvent>();
         var view = kit.create(number("1", 0, 0), events::add);

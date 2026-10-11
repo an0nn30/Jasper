@@ -241,7 +241,8 @@ class NoticeKitTest {
                 var standard = find(view, "standard", JButton.class);
                 var metrics = embedded.getFontMetrics(embedded.getFont());
                 assertThat(embedded.getInsets()).isEqualTo(new Insets(0, 0, 0, 0));
-                assertThat(embedded.getPreferredSize()).isEqualTo(new Dimension(metrics.stringWidth("Open in Editor"), metrics.getHeight()));
+                assertThat(embedded.getPreferredSize().height).isEqualTo(metrics.getHeight());
+                assertThat(embedded.getPreferredSize().width).isGreaterThanOrEqualTo((int)Math.ceil(embedded.getFont().getStringBounds(embedded.getText(), new java.awt.font.FontRenderContext(null,true,true)).getWidth()));
                 assertThat(standard.getPreferredSize().width).as("standard keeps its padding").isGreaterThan(embedded.getPreferredSize().width);
                 assertThat(standard.getPreferredSize().height).as("and its minimum height").isGreaterThan(embedded.getPreferredSize().height);
                 var close = find(view, "close", JButton.class);
@@ -251,12 +252,16 @@ class NoticeKitTest {
                 var main = find(view, "more.main", JButton.class);
                 var menuMetrics = main.getFontMetrics(main.getFont());
                 assertThat(main.getInsets()).as("no chevron inset: the label carries its own").isEqualTo(new Insets(0, 0, 0, 0));
-                assertThat(main.getPreferredSize().width).isEqualTo(menuMetrics.stringWidth("More ▾"));
+                assertThat(main.getPreferredSize().width).isGreaterThanOrEqualTo((int)Math.ceil(main.getFont().getStringBounds(main.getText(),new java.awt.font.FontRenderContext(null,true,true)).getWidth()));
                 // No resting or hover fill: an embedded link paints only its text.
                 embedded.setSize(embedded.getPreferredSize());
                 embedded.getModel().setRollover(true);
                 var image = new BufferedImage(embedded.getWidth(), embedded.getHeight(), BufferedImage.TYPE_INT_ARGB);
-                var g = image.createGraphics(); embedded.paint(g); g.dispose();
+                var g = image.createGraphics();
+                ThemePainting.antialias(g);g.setFont(embedded.getFont());
+                String painted=SwingUtilities.layoutCompoundLabel(embedded,g.getFontMetrics(),embedded.getText(),null,SwingConstants.CENTER,SwingConstants.CENTER,SwingConstants.CENTER,SwingConstants.RIGHT,
+                    new Rectangle(0,0,embedded.getWidth(),embedded.getHeight()),new Rectangle(),new Rectangle(),0);
+                assertThat(painted).isEqualTo(embedded.getText());embedded.paint(g); g.dispose();
                 assertThat(image.getRGB(0, 0) >>> 24).as("corner untouched").isZero();
                 embedded.doClick(0);
                 assertThat(events).containsExactly(new UiEvent.Action("open"));

@@ -7,6 +7,13 @@ import dev.jasper.fileserver.definition.PortRange;
 import dev.jasper.fileserver.definition.Protocol;
 import dev.jasper.fileserver.definition.ServerDefinition;
 import dev.jasper.fileserver.engine.ServerAddresses;
+import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.ui.UiAnchor;
+import dev.jasper.vault.api.CredentialDescriptor;
+import dev.jasper.vault.api.CredentialPickRequest;
+import dev.jasper.vault.api.CredentialPickResult;
+import dev.jasper.vault.api.CredentialPresentation;
+import dev.jasper.vault.api.Kind;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.ListItem;
 import dev.jasper.sdk.ui.Nodes;
@@ -54,11 +61,24 @@ public final class ServerEditor implements AutoCloseable {
     private final boolean existing, vaultPresent, linux;
     private final List<Protocol> protocols;
     private final List<BindChoice> binds;
-    private final Function<UUID, Optional<String>> accountName;
     private final Supplier<CompletableFuture<Optional<Account>>> accountPicker;
     private final Supplier<Optional<Path>> folderChooser;
     private final KeySources keySources;
-    private final Consumer<ServerDefinition> onSave;
+    private final Function<ServerDefinition, CompletableFuture<Void>> persist;
+    private final Runnable onSaved;
+    private final Function<UUID, Optional<CredentialDescriptor>> metadata;
+    private final Function<CredentialPickRequest, CompletableFuture<CredentialPickResult>> anchoredPicker;
+    private CredentialDescriptor chosenMetadata;
+    private PickOperation pending;
+    private long pickerRevision;
+    private Object saving;
+    private static final class PickOperation {
+        final long revision;
+        UiAnchor anchor;
+        Subscription invalidation;
+        CompletableFuture<?> future;
+        PickOperation(long revision) { this.revision = revision; }
+    }
     private final Runnable onCancel;
     private final List<String> keyLines = new ArrayList<>();
     private final Set<String> selectedKeys = new HashSet<>();
@@ -74,10 +94,32 @@ public final class ServerEditor implements AutoCloseable {
                         Function<UUID, Optional<String>> accountName,
                         Supplier<CompletableFuture<Optional<Account>>> accountPicker, Supplier<Optional<Path>> folderChooser,
                         KeySources keySources, boolean linux, Consumer<ServerDefinition> onSave, Runnable onCancel) {
+        this(kit, others, initial, existing, supported, interfaces, vaultPresent, accountName, id -> Optional.empty(), null,
+            accountPicker, folderChooser, keySources, linux, definition -> { onSave.accept(definition); return CompletableFuture.completedFuture(null); }, () -> {}, onCancel);
+    }
+
+    /** Real mounted picker and asynchronous persistence; returned futures may complete on any thread. */
+    public ServerEditor(UiKit kit, List<ServerDefinition> others, Optional<ServerDefinition> initial, boolean existing,
+                        Set<Protocol> supported, List<ServerAddresses.Nic> interfaces, boolean vaultPresent,
+                        Function<UUID, Optional<CredentialDescriptor>> metadata,
+                        Function<CredentialPickRequest, CompletableFuture<CredentialPickResult>> picker, Supplier<Optional<Path>> folderChooser,
+                        KeySources keySources, boolean linux, Function<ServerDefinition, CompletableFuture<Void>> persist, Runnable onSaved, Runnable onCancel) {
+        this(kit, others, initial, existing, supported, interfaces, vaultPresent,
+            vaultPresent ? id -> metadata.apply(id).map(CredentialDescriptor::name) : id -> Optional.empty(), metadata,
+            picker, null, folderChooser, keySources, linux, persist, onSaved, onCancel);
+    }
+
+    private ServerEditor(UiKit kit, List<ServerDefinition> others, Optional<ServerDefinition> initial, boolean existing,
+                         Set<Protocol> supported, List<ServerAddresses.Nic> interfaces, boolean vaultPresent,
+                         Function<UUID, Optional<String>> accountName, Function<UUID, Optional<CredentialDescriptor>> metadata,
+                         Function<CredentialPickRequest, CompletableFuture<CredentialPickResult>> anchoredPicker,
+                         Supplier<CompletableFuture<Optional<Account>>> accountPicker, Supplier<Optional<Path>> folderChooser,
+                         KeySources keySources, boolean linux, Function<ServerDefinition, CompletableFuture<Void>> persist, Runnable onSaved, Runnable onCancel) {
         this.others = List.copyOf(others); this.initial = initial; this.existing = existing;
-        this.vaultPresent = vaultPresent; this.linux = linux; this.accountName = accountName;
+        this.vaultPresent = vaultPresent; this.linux = linux;
         this.accountPicker = accountPicker; this.folderChooser = folderChooser; this.keySources = keySources;
-        this.onSave = onSave; this.onCancel = onCancel;
+        this.persist = persist; this.onSaved = onSaved; this.onCancel = onCancel;
+        this.metadata = metadata; this.anchoredPicker = anchoredPicker;
         var offered = new ArrayList<Protocol>();
         for (Protocol each : Protocol.values())
             if (supported.contains(each) || initial.map(definition -> definition.protocol() == each).orElse(false)) offered.add(each);
@@ -117,10 +159,11 @@ public final class ServerEditor implements AutoCloseable {
 
     public UiView view() { return view; }
     public void showError(String error) { if (!closed) { message = error; render(); } }
-    @Override public void close() { if (closed) return; closed = true; view.close(); }
+    @Override public void close() { if (closed) return; closed = true; saving = null; cancelPick(); view.close(); }
 
     private void event(UiEvent event) {
         if (closed) return;
+        if (saving != null && !(event instanceof UiEvent.Action action && action.id().equals(CANCEL))) return;
         switch (event) {
             case UiEvent.Edited edit -> {
                 switch (edit.id()) {
@@ -145,7 +188,7 @@ public final class ServerEditor implements AutoCloseable {
                     case LOGIN -> {
                         if (id.equals("vault") && !vaultPresent && accountId == null) return;
                         if (!Set.of("anon", "session", "vault").contains(id)) return;
-                        login = id;
+                        if (!id.equals(login)) { login = id; cancelPick(); }
                     }
                     case KEYS -> { selectedKeys.clear(); selectedKeys.addAll(selected.ids()); }
                     default -> { return; }
@@ -170,16 +213,7 @@ public final class ServerEditor implements AutoCloseable {
     private void act(String id) {
         switch (id) {
             case CHOOSE_FOLDER -> folderChooser.get().ifPresent(path -> { if (!closed) { folder = path.toString(); render(); } });
-            case CHOOSE_ACCOUNT -> { if (!vaultPresent || !protocol.hasLogin()) return; accountPicker.get().whenComplete((chosen, failure) -> {
-                Runnable apply = () -> {
-                    if (closed) return;
-                    if (failure != null) { message = "Could not choose a Vault account"; render(); return; }
-                    if (chosen != null) chosen.ifPresent(account -> {
-                        accountId = account.id(); accountLabel = account.name(); login = "vault"; render();
-                    });
-                };
-                if (SwingUtilities.isEventDispatchThread()) apply.run(); else SwingUtilities.invokeLater(apply);
-            }); }
+            case CHOOSE_ACCOUNT -> pick();
             case ADD_KEY -> { if (protocol == Protocol.SFTP) addKeys(keySources.fromFile().get()); }
             case PASTE_KEY -> { if (protocol == Protocol.SFTP) addKeys(keySources.fromClipboard().get()); }
             case REMOVE_KEY -> {
@@ -188,16 +222,94 @@ public final class ServerEditor implements AutoCloseable {
                 selectedKeys.clear(); render();
             }
             case CANCEL -> onCancel.run();
-            case SAVE -> {
-                try { onSave.accept(build()); }
-                catch (IllegalArgumentException invalid) { message = invalid.getMessage(); render(); }
-            }
+            case SAVE -> save();
             default -> { }
         }
     }
 
+    private static void onUi(Runnable action) {
+        if (SwingUtilities.isEventDispatchThread()) action.run(); else SwingUtilities.invokeLater(action);
+    }
+
+    private void pick() {
+        if (closed || saving != null || !vaultPresent || !protocol.hasLogin() || !login.equals("vault")) return;
+        var operation = new PickOperation(++pickerRevision);
+        var predecessor = pending; pending = operation; release(predecessor, true);
+        if (closed || pending != operation) return;
+        message = "";
+        try {
+            if (accountPicker != null) {
+                var result = java.util.Objects.requireNonNull(accountPicker.get());
+                if (closed || pending != operation) { result.cancel(false); return; }
+                operation.future = result;
+                result.whenComplete((value, failure) -> onUi(() -> finishPick(operation,
+                    value == null ? null : value.orElse(null), null, false, failure)));
+            } else {
+                operation.anchor = view.anchor(CHOOSE_ACCOUNT);
+                operation.invalidation = operation.anchor.onClosed(() -> { if (pending == operation) cancelPick(); });
+                if (closed || pending != operation) { release(operation, true); return; }
+                var result = java.util.Objects.requireNonNull(anchoredPicker.apply(new CredentialPickRequest(operation.anchor, Optional.ofNullable(accountId), true)));
+                if (closed || pending != operation) { result.cancel(false); return; }
+                operation.future = result;
+                result.whenComplete((value, failure) -> onUi(() -> finishPick(operation, null,
+                    value instanceof CredentialPickResult.Chosen chosen ? chosen.credential() : null,
+                    value instanceof CredentialPickResult.Cleared, failure)));
+            }
+        } catch (RuntimeException failure) { finishPick(operation, null, null, false, failure); }
+    }
+
+    private void finishPick(PickOperation operation, Account legacy, CredentialDescriptor chosen, boolean clear, Throwable failure) {
+        if (closed || pending != operation) return;
+        pending = null; release(operation, false);
+        if (closed || pickerRevision != operation.revision) return;
+        if (failure != null) {
+            if (!(failure instanceof java.util.concurrent.CancellationException)) showError(failureMessage(failure));
+        } else if (chosen != null) {
+            if ((chosen.kind() != Kind.ACCOUNT_PASSWORD && chosen.kind() != Kind.ACCOUNT_KEY_AND_PASSWORD) || chosen.subtitle().isBlank()) {
+                showError("Choose an account with a username and password"); return;
+            }
+            chosenMetadata = chosen; accountId = chosen.id(); accountLabel = chosen.name(); render();
+        } else if (legacy != null) { accountId = legacy.id(); accountLabel = legacy.name(); render(); }
+        else if (clear) { accountId = null; chosenMetadata = null; accountLabel = "none chosen"; render(); }
+    }
+
+    private void cancelPick() { pickerRevision++; var operation = pending; pending = null; release(operation, true); }
+    private static void release(PickOperation operation, boolean cancel) {
+        if (operation == null) return;
+        if (operation.invalidation != null) operation.invalidation.close();
+        if (cancel && operation.future != null) operation.future.cancel(false);
+        if (operation.anchor != null) operation.anchor.close();
+    }
+
+    private void save() {
+        if (closed || saving != null) return;
+        final ServerDefinition definition;
+        try { definition = build(); } catch (IllegalArgumentException invalid) { showError(invalid.getMessage()); return; }
+        Object operation = new Object(); saving = operation; cancelPick();
+        if (closed || saving != operation) return;
+        message = ""; render();
+        try {
+            java.util.Objects.requireNonNull(persist.apply(definition)).whenComplete((ignored, failure) -> onUi(() -> {
+                if (closed || saving != operation) return;
+                saving = null;
+                if (failure != null) showError(failureMessage(failure));
+                else { render(); onSaved.run(); }
+            }));
+        } catch (RuntimeException failure) {
+            if (!closed && saving == operation) { saving = null; showError(failureMessage(failure)); }
+        }
+    }
+    private static String failureMessage(Throwable failure) {
+        while ((failure instanceof java.util.concurrent.CompletionException || failure instanceof java.util.concurrent.ExecutionException) && failure.getCause() != null) failure = failure.getCause();
+        return failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+    }
+
     /** Domain validation is deliberately last: opening the editor never probes the shared folder. */
-    ServerDefinition build() {
+    ServerDefinition build() { return draft(true); }
+
+    private boolean ready() { try { draft(false); return true; } catch (IllegalArgumentException invalid) { return false; } }
+
+    private ServerDefinition draft(boolean inspectFolder) {
         String nameText = name.strip();
         if (nameText.isEmpty()) throw new IllegalArgumentException("A server needs a name");
         for (ServerDefinition other : others)
@@ -208,7 +320,7 @@ public final class ServerEditor implements AutoCloseable {
         Path folderPath;
         try { folderPath = Path.of(folderText).toAbsolutePath().normalize(); }
         catch (InvalidPathException bad) { throw new IllegalArgumentException("The folder is not a valid path"); }
-        if (!Files.isDirectory(folderPath)) throw new IllegalArgumentException("The folder " + folderText + " does not exist");
+        if (inspectFolder && !Files.isDirectory(folderPath)) throw new IllegalArgumentException("The folder " + folderText + " does not exist");
         int portValue = parsedPort();
         if (portValue < 1) throw new IllegalArgumentException("The port must be a number from 1 to 65535");
         Login selectedLogin;
@@ -218,7 +330,7 @@ public final class ServerEditor implements AutoCloseable {
             selectedLogin = new Login.Vault(accountId);
         } else selectedLogin = Login.SESSION;
         boolean tlsOn = protocol.allowsTls() && useTls;
-        boolean requireOn = protocol == Protocol.FTP && tlsOn && requireTls;
+        boolean requireOn = protocol == Protocol.FTP && requireTls;
         String range = passive.strip();
         Optional<PortRange> passiveRange = protocol == Protocol.FTP && !range.isEmpty() ? Optional.of(PortRange.parse(range)) : Optional.empty();
         return new ServerDefinition(existing ? initial.orElseThrow().id() : UUID.randomUUID(), nameText, protocol, folderPath, bind, portValue,
@@ -241,7 +353,7 @@ public final class ServerEditor implements AutoCloseable {
 
     private void protocolChanged(Protocol chosen) {
         if (port.strip().equals(String.valueOf(previous.defaultPort()))) port = String.valueOf(chosen.defaultPort());
-        protocol = chosen; previous = chosen; defaultLogin(chosen);
+        protocol = chosen; previous = chosen; defaultLogin(chosen); cancelPick();
     }
 
     private void defaultLogin(Protocol chosen) {
@@ -262,14 +374,15 @@ public final class ServerEditor implements AutoCloseable {
 
     private Nodes.Form form() {
         boolean ftp = protocol == Protocol.FTP, sftp = protocol == Protocol.SFTP;
+        boolean editable = saving == null;
         boolean tls = protocol.allowsTls() && useTls;
         String loginLabel = !protocol.hasLogin() ? "No login (TFTP has none)" : sftp ? "Keys only (no password)" : "Anonymous";
         var loginOptions = new ArrayList<Option>();
         if (!protocol.hasLogin() || protocol.allowsAnonymous() || sftp) loginOptions.add(new Option("anon", loginLabel, Optional.empty()));
         if (protocol.hasLogin()) {
             if (vaultPresent || (initial.isPresent() && initial.get().login() instanceof Login.Vault))
-                loginOptions.add(new Option("vault", vaultPresent ? "Vault account" : "Vault account (needs the Credential Vault)", Optional.empty()));
-            loginOptions.add(new Option("session", "Session password", Optional.empty()));
+                loginOptions.add(new Option("vault", vaultPresent ? "Vault Account" : "Vault account (needs the Credential Vault)", Optional.empty()));
+            loginOptions.add(new Option("session", "Session Password", Optional.empty()));
         }
         String shownLogin = loginOptions.stream().anyMatch(option -> option.id().equals(login)) ? login : loginOptions.getFirst().id();
         Login warningLogin = shownLogin.equals("anon") ? Login.ANONYMOUS : shownLogin.equals("vault")
@@ -277,33 +390,44 @@ public final class ServerEditor implements AutoCloseable {
         var warnings = ServerRows.warnings(protocol, tls, warningLogin, writable, bind);
         String portHint = linux && parsedPort() > 0 && parsedPort() < 1024
             ? "Ports below 1024 need root or CAP_NET_BIND_SERVICE on Linux — try " + protocol.suggestedPort(parsedPort()) : "";
-        var sections = new ArrayList<Nodes.Node>();
-        sections.add(new Nodes.Field(NAME, ControlState.READY, Nodes.FieldKind.TEXT, name, "", "Name", ""));
-        sections.add(new Nodes.Choice(PROTOCOL, state(true, !existing && protocols.size() > 1), Nodes.ChoiceKind.DROPDOWN,
-            protocols.stream().map(value -> new Option(value.name(), value.label(), Optional.empty())).toList(), protocol.name(), "Protocol", ""));
-        sections.add(new Nodes.FormRow("server.folder.row", ControlState.READY, "Folder", "",
-            new Nodes.Field(FOLDER, ControlState.READY, Nodes.FieldKind.PATH, folder, "", "Folder", ""),
-            Optional.of(new Nodes.Button(CHOOSE_FOLDER, ControlState.READY, "Choose…", "folder", Nodes.ButtonKind.SECONDARY, CHOOSE_FOLDER, ""))));
-        sections.add(new Nodes.SettingRow("server.autostart.row", ControlState.READY, "Start when Jasper starts", "",
-            new Nodes.Toggle(AUTOSTART, ControlState.READY, "Start when Jasper starts", autostart, AUTOSTART, false), false));
-        sections.add(new Nodes.Choice(REACHABLE, ControlState.READY, Nodes.ChoiceKind.DROPDOWN,
-            java.util.stream.IntStream.range(0, binds.size()).mapToObj(i -> new Option("bind." + i, binds.get(i).label(), Optional.empty())).toList(),
-            "bind." + java.util.stream.IntStream.range(0, binds.size()).filter(i -> binds.get(i).bind().equals(bind)).findFirst().orElse(0),
-            "Reachable from", ""));
-        sections.add(new Nodes.Field(PORT, ControlState.READY, Nodes.FieldKind.TEXT, port, "", "Port", ""));
-        sections.add(text("server.port.hint", portHint, Nodes.TextRole.DESCRIPTION));
-        sections.add(new Nodes.Field(PASSIVE, state(ftp, ftp), Nodes.FieldKind.TEXT, passive, "FTP only; empty uses the range in Settings", "Passive ports", ""));
-        sections.add(new Nodes.SettingRow("server.writable.row", ControlState.READY, "Allow changes (upload, rename, delete)", "",
-            new Nodes.Toggle(WRITABLE, ControlState.READY, "Allow changes", writable, WRITABLE, false), false));
-        sections.add(new Nodes.Choice(LOGIN, state(true, protocol.hasLogin()), Nodes.ChoiceKind.DROPDOWN, loginOptions, shownLogin, "Login", ""));
-        sections.add(new Nodes.FormRow("server.account.row", state(protocol.hasLogin(), true), "Vault account", accountLabel,
-            new Nodes.Text("server.account.name", ControlState.READY, accountLabel, Nodes.TextRole.BODY),
-            Optional.of(new Nodes.Button(CHOOSE_ACCOUNT, state(true, vaultPresent), "Choose…", "key", Nodes.ButtonKind.SECONDARY, CHOOSE_ACCOUNT, ""))));
+        var server = new ArrayList<Nodes.Node>();
+        server.add(row("server.name.row", "Name", new Nodes.Field(NAME, ControlState.READY, Nodes.FieldKind.TEXT, name, "e.g. Downloads", "Name", "")));
+        server.add(row("server.protocol.row", "Protocol", new Nodes.Choice(PROTOCOL, state(true, !existing && protocols.size() > 1), Nodes.ChoiceKind.SEGMENTED,
+            protocols.stream().map(value -> new Option(value.name(), value.label(), Optional.of(switch(value) {
+                case HTTP -> Nodes.Hue.BLUE; case FTP -> Nodes.Hue.AMBER; case SFTP -> Nodes.Hue.GREEN; case TFTP -> Nodes.Hue.PURPLE;
+            }))).toList(), protocol.name(), "Protocol", "")));
+        server.add(new Nodes.FormRow("server.folder.row", ControlState.READY, "Folder", "",
+            new Nodes.Field(FOLDER, ControlState.READY, Nodes.FieldKind.PATH, folder, "No folder selected", "Folder", ""),
+            Optional.of(new Nodes.Button(CHOOSE_FOLDER, ControlState.READY, "Choose…", "", Nodes.ButtonKind.SECONDARY, CHOOSE_FOLDER, ""))));
+        server.add(new Nodes.FormRow("server.reachable.row", ControlState.READY, "Reachable From", "",
+            new Nodes.Choice(REACHABLE, ControlState.READY, Nodes.ChoiceKind.DROPDOWN,
+                java.util.stream.IntStream.range(0, binds.size()).mapToObj(i -> new Option("bind." + i, binds.get(i).label(), Optional.empty())).toList(),
+                "bind." + java.util.stream.IntStream.range(0, binds.size()).filter(i -> binds.get(i).bind().equals(bind)).findFirst().orElse(0), "Reachable From", ""),
+            Optional.of(new Nodes.Field(PORT, ControlState.READY, Nodes.FieldKind.PORT, port, "", "Port", ""))));
+        server.add(text("server.port.hint", portHint, Nodes.TextRole.DESCRIPTION));
+        server.add(new Nodes.FormRow("server.passive.row", state(ftp, true), "Passive ports", "",
+            new Nodes.Field(PASSIVE, state(ftp, ftp), Nodes.FieldKind.TEXT, passive, "Empty uses the range in Settings", "Passive ports", "", Optional.empty(), Nodes.FieldPresentation.TECHNICAL), Optional.empty()));
+        var access = new ArrayList<Nodes.Node>();
+        var selected = accountId == null || !vaultPresent ? null
+            : chosenMetadata != null && chosenMetadata.id().equals(accountId) ? chosenMetadata : metadata.apply(accountId).orElse(null);
+        var face = vaultPresent ? CredentialPresentation.face(selected, Nodes.PickerDensity.DEFAULT)
+            : new Nodes.PickerFace("", "", "lock", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT);
+        if (accountId != null && face.primary().isEmpty()) face = new Nodes.PickerFace(accountLabel, "", "lock", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT);
+        access.add(row("server.login.row", "Login", new Nodes.Choice(LOGIN, state(true, protocol.hasLogin()), Nodes.ChoiceKind.SEGMENTED, loginOptions, shownLogin, "Login", "")));
+        access.add(new Nodes.FormRow("server.account.row", state(protocol.hasLogin() && shownLogin.equals("vault"), true), "Account", "",
+            new Nodes.Choice(CHOOSE_ACCOUNT, state(true, vaultPresent), Nodes.ChoiceKind.PICKER, List.of(), "", "Choose…", CHOOSE_ACCOUNT, "lock", Optional.empty(),
+                Optional.of(face)), Optional.empty()));
+        String explanation = !protocol.hasLogin() ? "TFTP has no login. Anyone who can reach the server can connect."
+            : shownLogin.equals("vault") ? "Clients sign in with the username and password stored in this Vault account."
+            : shownLogin.equals("session") ? "Jasper generates a temporary password when the server starts."
+            : sftp ? "Clients sign in with an authorized SSH key."
+            : "Anyone who can reach the server can connect without a password.";
+        access.add(row("server.login.help.row", "", text("server.login.help", explanation, Nodes.TextRole.SUPPORTING)));
         var keys = new ArrayList<ListItem>();
         for (int i = 0; i < keyLines.size(); i++) keys.add(new ListItem("key." + i, Optional.empty(),
             List.of(new Nodes.Text("server.key." + i + ".summary", ControlState.READY, keySummary(keyLines.get(i)), Nodes.TextRole.MONO_SMALL)),
             List.of(), List.of()));
-        sections.add(new Nodes.Stack("server.keys.section", state(sftp, true), Nodes.LayoutRole.VERTICAL, List.of(
+        access.add(new Nodes.Stack("server.keys.section", state(sftp, true), Nodes.LayoutRole.VERTICAL, List.of(
             new Nodes.Text("server.keys.label", ControlState.READY, "Authorized keys", Nodes.TextRole.LABEL),
             new Nodes.ItemList(KEYS, ControlState.READY, Nodes.ListKind.COMPACT, keys, selectedKeys, "", List.of(),
                 Nodes.SelectionMode.MULTIPLE, Optional.empty(), OptionalInt.of(3)),
@@ -311,17 +435,36 @@ public final class ServerEditor implements AutoCloseable {
                 new Nodes.Button(ADD_KEY, ControlState.READY, "Add from File…", "add", Nodes.ButtonKind.SECONDARY, ADD_KEY, ""),
                 new Nodes.Button(PASTE_KEY, ControlState.READY, "Paste", "paste", Nodes.ButtonKind.SECONDARY, PASTE_KEY, ""),
                 new Nodes.Button(REMOVE_KEY, state(true, !selectedKeys.isEmpty()), "Remove", "remove", Nodes.ButtonKind.SECONDARY, REMOVE_KEY, ""))))));
-        sections.add(new Nodes.SettingRow("server.tls.row", state(protocol.allowsTls(), true), "Use TLS", "",
-            new Nodes.Toggle(TLS, ControlState.READY, "Use TLS", useTls, TLS, false), false));
-        sections.add(new Nodes.SettingRow("server.require-tls.row", state(ftp, true), "Require TLS (refuse logins and transfers without it)", "",
-            new Nodes.Toggle(REQUIRE_TLS, state(true, ftp && tls), "Require TLS", requireTls && tls, REQUIRE_TLS, false), true));
-        sections.add(text("server.warning", warnings.isEmpty() ? "" : "Warning · " + String.join(" · ", warnings), Nodes.TextRole.DESCRIPTION));
+        access.add(new Nodes.SettingRow("server.writable.row", ControlState.READY, "Allow changes", "Clients can upload, rename and delete files",
+            new Nodes.Toggle(WRITABLE, ControlState.READY, "Allow changes", writable, WRITABLE, false), false));
+        var security = List.<Nodes.Node>of(
+            new Nodes.SettingRow("server.tls.row", state(protocol.allowsTls(), true), "Use TLS", "",
+                new Nodes.Toggle(TLS, ControlState.READY, "Use TLS", useTls, TLS, false), false),
+            new Nodes.SettingRow("server.require-tls.row", state(protocol.allowsTls(), ftp && tls), "Require TLS", "Refuse logins and transfers without it",
+                new Nodes.Toggle(REQUIRE_TLS, state(true, ftp && tls), "Require TLS", ftp && requireTls, REQUIRE_TLS, false), true),
+            new Nodes.SettingRow("server.autostart.row", ControlState.READY, "Start when Jasper starts", "",
+                new Nodes.Toggle(AUTOSTART, ControlState.READY, "Start when Jasper starts", autostart, AUTOSTART, false), false));
+        var sections = List.<Nodes.Node>of(section("server.general", "Server", Nodes.CardKind.FORM, server),
+            section("server.access", "Access", Nodes.CardKind.MIXED, access),
+            section("server.security", "Security & Startup", Nodes.CardKind.SETTINGS, security),
+            text("server.warning", warnings.isEmpty() ? "" : "Warning · " + String.join(" · ", warnings), Nodes.TextRole.DESCRIPTION),
+            text("server.tls.dependency", ftp && requireTls && !tls ? "Require TLS needs Use TLS. Turn Use TLS on to change this requirement." : "", Nodes.TextRole.DESCRIPTION));
         var actions = List.of(
             new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
-            new Nodes.Button(SAVE, ControlState.READY, existing ? "Save" : "Add Server", "", Nodes.ButtonKind.SECONDARY, SAVE, ""));
+            new Nodes.Button(SAVE, new ControlState(true, editable && ready(), !editable, ""), !editable ? "Saving…" : existing ? "Save" : "Add Server", "", Nodes.ButtonKind.PRIMARY, SAVE, ""));
+        String address = bind instanceof Bind.Loopback ? "127.0.0.1" : bind instanceof Bind.All ? "0.0.0.0" : ((Bind.Interface)bind).name();
+        String scheme = protocol == Protocol.HTTP && tls ? "https" : protocol.scheme();
+        Nodes.Node preview = message.isEmpty() ? text("server.preview", scheme + "://" + address + ":" + port, Nodes.TextRole.MONO_CAPTION)
+            : new Nodes.Text(MESSAGE, ControlState.READY, message, Nodes.TextRole.BODY, Optional.of(Nodes.Severity.DANGER), OptionalInt.empty());
         return new Nodes.Form("server.editor", ControlState.READY, Nodes.FormKind.FULL,
             initial.isEmpty() ? "New File Server" : existing ? "Edit File Server" : "Save File Server", Optional.empty(),
-            sections, Optional.of(new Nodes.Text(MESSAGE, state(!message.isBlank(), true), message, Nodes.TextRole.BODY,
-                Optional.of(Nodes.Severity.DANGER), OptionalInt.empty())), actions, CANCEL);
+            sections, Optional.of(preview), actions, CANCEL, Nodes.FormSubmission.NONE);
+    }
+
+    private static Nodes.FormRow row(String id, String label, Nodes.Node control) {
+        return new Nodes.FormRow(id, ControlState.READY, label, "", control, Optional.empty());
+    }
+    private Nodes.Section section(String id, String title, Nodes.CardKind kind, List<Nodes.Node> children) {
+        return new Nodes.Section(id, state(true, saving == null), title, new Nodes.Card(id + ".card", ControlState.READY, kind, children));
     }
 }

@@ -343,7 +343,7 @@ public final class HostEditor implements AutoCloseable {
         var face = vaultPresent ? CredentialPresentation.face(descriptor(credentialId).orElse(null), Nodes.PickerDensity.DEFAULT)
             : new Nodes.PickerFace("", "", "lock", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT);
         if (credentialId != null && face.primary().isEmpty()) face = new Nodes.PickerFace(credentialName.apply(credentialId).orElse("credential missing"), "", "lock", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT);
-        var authentication = section("host.authentication", "Authentication", Nodes.CardKind.FORM, List.of(
+        var authentication = section("host.authentication", "Authentication", Nodes.CardKind.MIXED, List.of(
             new Nodes.Choice(AUTH, state(true, editable), Nodes.ChoiceKind.SEGMENTED, List.of(
                 new Option(VAULT, vaultPresent ? "Vault Credential" : "Vault credential (needs Credential Vault)", Optional.empty()),
                 new Option(AGENT, "SSH Agent", Optional.empty())), vaultAuth ? VAULT : AGENT, "Authentication", ""),
@@ -352,9 +352,9 @@ public final class HostEditor implements AutoCloseable {
                 selectedKey == null ? Set.of() : Set.of(selectedKey.toString()), "", List.of(), Nodes.SelectionMode.SINGLE,
                 Optional.of(new Nodes.Button(ADD_KEY, state(true, keysEnabled), "Add Stored Key…", "add", Nodes.ButtonKind.LINK, ADD_KEY, "")), OptionalInt.of(Math.max(2, Math.min(3, keys.size())))))));
         var options = section("host.options", "Options", Nodes.CardKind.SETTINGS, List.of(
-            new Nodes.SettingRow("row." + GROUP, ControlState.READY, "Group", "Blank: " + defaultGroup + " (default)",
+            new Nodes.SettingRow("row." + GROUP, ControlState.READY, "Group", "",
                 new Nodes.Choice(GROUP, state(true, editable), Nodes.ChoiceKind.SEARCHABLE,
-                    groups.stream().map(g -> new Option("group." + g, g, Optional.empty())).toList(), "", "Group", "", "",
+                    groups.stream().map(g -> new Option("group." + g, g, Optional.empty())).toList(), "", "Group. Blank: " + defaultGroup + " (default)", "", "",
                     Optional.of(new Nodes.ChoiceSearch(0, "No other groups", Optional.of(group)))), false),
             new Nodes.SettingRow("row." + FAVORITE, ControlState.READY, "Add to Favorites", "",
                 new Nodes.Toggle(FAVORITE, state(true, editable), "Favorite", favorite, FAVORITE, false), false),

@@ -16,6 +16,9 @@ public final class IconRegistry implements AutoCloseable {
     // Fixed immutable engine artwork is parsed once; each receiving view still owns its custom registrations.
     private static final Map<String, IconArtwork> BUILT_INS = builtIns().entrySet().stream().collect(
         java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> new IconArtwork(entry.getValue())));
+    // Only explicitly authored built-ins opt into silhouette fill. Public registrations retain
+    // the validated outline stroke contract; a name suffix does not grant filled painting.
+    private static final Set<String> FILLED_BUILT_INS = Set.of("folder.filled");
     private final Map<String, IconArtwork> artworks = new LinkedHashMap<>();
     private boolean closed;
     public IconRegistry() { artworks.putAll(BUILT_INS); }
@@ -75,6 +78,7 @@ public final class IconRegistry implements AutoCloseable {
         var artwork = artworks.get(name);
         if (artwork == null) throw new IllegalArgumentException("Unknown icon: " + name);
         var path = artwork.path();
+        boolean filled = FILLED_BUILT_INS.contains(name);
         return new Icon() {
             @Override public int getIconWidth() { return size; }
             @Override public int getIconHeight() { return size; }
@@ -88,7 +92,7 @@ public final class IconRegistry implements AutoCloseable {
                         double inset = size * .2; g.translate(inset, inset); g.scale(size * .6 / 16, size * .6 / 16);
                     } else g.scale(size / 16.0, size / 16.0);
                     g.setColor(foreground); g.setStroke(new BasicStroke(hero ? 7f / 6f : artwork.stroke(), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                    g.draw(path);
+                    if (filled) g.fill(path); else g.draw(path);
                 } finally { g.dispose(); }
             }
         };
@@ -103,7 +107,7 @@ public final class IconRegistry implements AutoCloseable {
     private void requireOpen() { if (closed) throw new IllegalStateException("Icon registry is closed"); }
     @Override public synchronized void close() { if (!closed) { closed = true; artworks.clear(); } }
 
-    /** Original Jasper outline paths, authored for this kit; no third-party artwork is copied. */
+    /** Original Jasper vector paths; explicit built-in fill metadata is above. No third-party artwork is copied. */
     private static Map<String, String> builtIns() {
         return Map.ofEntries(
             Map.entry("bookmark", "M 4 2 H 12 V 14 L 8 11 L 4 14 Z"),
@@ -146,6 +150,7 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("upload", "M 8 11 V 2 M 4 6 L 8 2 L 12 6 M 2 10 V 14 H 14 V 10"),
             Map.entry("back", "M 10 3 L 5 8 L 10 13 M 5 8 H 14"),
             Map.entry("forward", "M 6 3 L 11 8 L 6 13 M 2 8 H 11"),
+            Map.entry("folder.filled", "M 2.5 3 H 6.2 L 8.1 5 H 13.5 Q 14.5 5 14.5 6 V 12.5 Q 14.5 13.5 13.5 13.5 H 2.5 Q 1.5 13.5 1.5 12.5 V 4 Q 1.5 3 2.5 3 Z"),
             Map.entry("folder", "M 2 4 H 6 L 8 6 H 14 V 13 H 2 Z"),
             Map.entry("file", "M 4 2 H 9 L 13 6 V 14 H 4 Z M 9 2 V 6 H 13"),
             Map.entry("server", "M 2 2 H 14 V 7 H 2 Z M 2 9 H 14 V 14 H 2 Z M 5 4.5 H 5.1 M 5 11.5 H 5.1 M 9 4.5 H 11 M 9 11.5 H 11"),

@@ -367,7 +367,7 @@ final class ItemLists {
             JComponent next = controls.isEmpty() ? null : controls.getFirst().component;
             if (footer != next && footer != null) canvas.remove(footer);
             footer = next;
-            if (footer instanceof Buttons.KitButton button && value().kind() == Nodes.ListKind.ORDERED) button.setHorizontalAlignment(SwingConstants.LEADING);
+            if (footer instanceof Buttons.KitButton button && value().kind() == Nodes.ListKind.ORDERED) {button.setHorizontalAlignment(SwingConstants.LEADING);button.orderedAction=true;}
             if (footer != null && footer.getParent() != canvas) canvas.add(footer);
             canvas.revalidate();
             sync();
