@@ -41,6 +41,68 @@ class VaultSheetRenderTest {
             }
         } finally { SurfaceFixtures.edt(() -> {controller.configure(Theme.DARK,UiFontConfig.defaults());controller.close();return null;}); }
     }
+    @Test void populatedManagerKeepsFullActionsReachableAtNarrowAndEnlargedWidths() throws Exception {
+        var controller=SurfaceFixtures.edt(ThemeController::new);
+        try {
+            for(boolean enlarged:new boolean[]{false,true}) {
+                SurfaceFixtures.edt(()->{controller.configure(Theme.DARK,enlarged?new UiFontConfig("system",20f):UiFontConfig.defaults());return null;});
+                try(var fixture=new KitViewTestAccess(home.resolve("narrow-"+enlarged),"vault-manager",SurfaceFixtures.edt(controller::current))) {
+                    SurfaceFixtures.edt(()->{
+                        var surface=fixture.surface();var root=new JRootPane();
+                        try(var chrome=NativeShells.installChrome(root,surface,true)) {
+                            var edit=(JButton)find(surface.holder(),"edit");var delete=(JButton)find(surface.holder(),"delete");
+                            var search=(JTextField)find(surface.holder(),"search.input");search.setText(" ");var document=search.getDocument();
+                            Rectangle originalHeading=null;
+                            for(int width:new int[]{com.formdev.flatlaf.util.UIScale.scale(900),com.formdev.flatlaf.util.UIScale.scale(540),com.formdev.flatlaf.util.UIScale.scale(400),400,com.formdev.flatlaf.util.UIScale.scale(900)}) {
+                                int logical=com.formdev.flatlaf.util.UIScale.unscale(width),height=com.formdev.flatlaf.util.UIScale.scale(555);
+                                root.setSize(width,height+chrome.bar().getPreferredSize().height);layout(root);
+                                assertThat(find(surface.holder(),"search.input")).isSameAs(search);assertThat(search.getDocument()).isSameAs(document);assertThat(search.getText()).isEqualTo(" ");
+                                if(logical==900) {
+                                    var bounds=find(surface.holder(),"detail.heading").getBounds();
+                                    if(originalHeading==null)originalHeading=new Rectangle(bounds);else assertThat(bounds).isEqualTo(originalHeading);
+                                }
+                                for(var button:List.of(delete,edit)) {
+                                    assertThat(find(surface.holder(),button.getName())).isSameAs(button);
+                                    assertThat(button.getWidth()).as("%s at %s enlarged=%s",button.getName(),logical,enlarged).isGreaterThanOrEqualTo(button.getPreferredSize().width);
+                                    assertThat(button.isFocusable()).isTrue();
+                                    assertThat(button.getInputMap(JComponent.WHEN_FOCUSED).get(KeyStroke.getKeyStroke("pressed SPACE"))).isNotNull();
+                                    var focus=KeyboardFocusManager.getCurrentKeyboardFocusManager();
+                                    for(var listener:focus.getPropertyChangeListeners("focusOwner"))listener.propertyChange(new java.beans.PropertyChangeEvent(focus,"focusOwner",null,button));
+                                    layout(root);assertThat(button.getVisibleRect()).isEqualTo(new Rectangle(0,0,button.getWidth(),button.getHeight()));
+                                }
+                                for(String rowId:List.of("detail.username","detail.password")) {
+                                    var row=find(surface.holder(),rowId);var title=find(row,rowId+".title");
+                                    var value=rowId.endsWith("password")?ending(row,".value"):find(row,rowId+".description");
+                                    assertThat(value.getWidth()).as("visible detail value %s at %s",rowId,width).isGreaterThan(value.getFontMetrics(value.getFont()).charWidth('W'));
+                                    var valueBounds=SwingUtilities.convertRectangle(value.getParent(),value.getBounds(),row);
+                                    var titleInkBounds=new Rectangle(title.getBounds());titleInkBounds.width=Math.min(titleInkBounds.width,title.getPreferredSize().width);
+                                    assertThat(titleInkBounds.intersects(valueBounds)).as("label/value separation %s at %s",rowId,width).isFalse();
+                                    for(var action:List.of(ending(row,".copy"),rowId.endsWith("password")?ending(row,".reveal"):ending(row,".copy"))) {
+                                        assertThat(action.getWidth()).as("full detail action %s at %s",action.getName(),width).isGreaterThanOrEqualTo(action.getPreferredSize().width);
+                                        var actionBounds=SwingUtilities.convertRectangle(action.getParent(),action.getBounds(),row);
+                                        assertThat(new Rectangle(0,0,row.getWidth(),row.getHeight()).contains(actionBounds)).isTrue();
+                                        assertThat(actionBounds.intersects(titleInkBounds)).as("label/action separation %s at %s",action.getName(),width).isFalse();assertThat(actionBounds.intersects(valueBounds)).as("value/action separation %s at %s",action.getName(),width).isFalse();
+                                        var focus=KeyboardFocusManager.getCurrentKeyboardFocusManager();
+                                        for(var listener:focus.getPropertyChangeListeners("focusOwner"))listener.propertyChange(new java.beans.PropertyChangeEvent(focus,"focusOwner",null,action));
+                                        layout(root);assertThat(action.getVisibleRect()).isEqualTo(new Rectangle(0,0,action.getWidth(),action.getHeight()));
+                                    }
+                                }
+                                capture("fix1-"+(enlarged?"enlarged":"normal"),"manager-width-"+width,root,null,null,"actual populated manager; Delete/Edit full bounds, focusability, keyboard activation binding and focus-owner scroll reveal asserted; no native traversal peer");
+                            }
+                            controller.configure(Theme.JASPER_LIGHT,UiFontConfig.defaults());fixture.theme(controller.current());
+                            root.setSize(900,555+chrome.bar().getPreferredSize().height);layout(root);
+                            assertThat(find(surface.holder(),"edit")).isSameAs(edit);assertThat(find(surface.holder(),"delete")).isSameAs(delete);
+                            assertThat(search.getDocument()).isSameAs(document);assertThat(search.getText()).isEqualTo(" ");
+                            assertThat(edit.getWidth()).isEqualTo(edit.getPreferredSize().width);
+                            assertThat(delete.getWidth()).isEqualTo(delete.getPreferredSize().width);
+                            assertThat(find(surface.holder(),"detail.heading").getHeight()).isEqualTo(44);
+                        }
+                        return null;
+                    });
+                }
+            }
+        }finally{SurfaceFixtures.edt(()->{controller.configure(Theme.DARK,UiFontConfig.defaults());controller.close();return null;});}
+    }
     private static void render(AuxiliarySurface surface,String state,String id) {
         boolean editor = surface.attachedSheet();var manager = editor ? surface.ownerSurface().orElseThrow() : surface;
         var root = new JRootPane();var child = new JRootPane();
@@ -85,6 +147,11 @@ class VaultSheetRenderTest {
     private static void describe(Container component,JComponent root,StringBuilder text){
         if(component instanceof JComponent c && c.getName()!=null) text.append(c.getName()).append(" bounds=").append(SwingUtilities.convertRectangle(c.getParent(),c.getBounds(),root)).append(" font=").append(c.getFont()).append(" baseline=").append(c.getWidth() < 0 || c.getHeight() < 0 ? -1 : c.getBaseline(c.getWidth(),c.getHeight())).append('\n');
         for(var child:component.getComponents())if(child instanceof Container c)describe(c,root,text);
+    }
+    private static JComponent ending(Container root,String suffix) {
+        if(root.getName()!=null&&root.getName().endsWith(suffix))return (JComponent)root;
+        for(var child:root.getComponents())if(child instanceof Container nested){var result=ending(nested,suffix);if(result!=null)return result;}
+        return null;
     }
     private static JComponent find(Container root,String name){if(name.equals(root.getName()))return (JComponent)root;for(var child:root.getComponents())if(child instanceof Container c){var found=find(c,name);if(found!=null)return found;}return null;}
     private static void layout(Container root){root.doLayout();for(var child:root.getComponents())if(child instanceof Container c)layout(c);}

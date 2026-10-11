@@ -119,6 +119,12 @@ final class Cards {
             setOpaque(false);
         }
 
+        @Override public Dimension getMinimumSize() {
+            var minimum=super.getMinimumSize();
+            int fixed=settings.stream().filter(Component::isVisible).mapToInt(c->c.getMinimumSize().width).max().orElse(0);
+            return new Dimension(Math.max(minimum.width,fixed+getInsets().left+getInsets().right),minimum.height);
+        }
+
         @Override
         protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D) graphics.create();

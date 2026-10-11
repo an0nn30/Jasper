@@ -11,6 +11,29 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class IconRegistryTest {
+    @Test void categoryOpticalFloorAndCapFollowUserScaleExactlyOnce() {
+        dev.jasper.ui.testsupport.Edt.run(() -> {
+            float previous = com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
+            try (var registry = new IconRegistry()) {
+                var setter = com.formdev.flatlaf.util.UIScale.class.getDeclaredMethod("setUserScaleFactor", float.class, boolean.class);
+                setter.setAccessible(true);
+                try {
+                    for (int logical : new int[]{18, 44}) {
+                        int baseline = 0;
+                        for (float scale : new float[]{1f, 1.5f}) {
+                            setter.invoke(null, scale, false);
+                            var icon = registry.tile("user", KitFixtures.dark().semantic(), Nodes.Hue.BLUE, com.formdev.flatlaf.util.UIScale.scale(logical), false);
+                            var image = paint(icon); int left=image.getWidth(), right=-1;
+                            for(int y=0;y<image.getHeight();y++)for(int x=0;x<image.getWidth();x++)if((image.getRGB(x,y)>>>24)>200){left=Math.min(left,x);right=Math.max(right,x);}
+                            int ink=right-left+1;
+                            if(scale==1)baseline=ink;
+                            else assertThat(ink).as("%s logical tile at UI scale %s",logical,scale).isBetween(Math.round(baseline*scale)-1,Math.round(baseline*scale)+1);
+                        }
+                    }
+                } finally { setter.invoke(null, previous, false); }
+            } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+        });
+    }
     @Test void categoryGlyphInkMatchesItsMeasuredInsetWithinTheTile() {
         try(var registry=new IconRegistry()) {
             for(int size:new int[]{18,20,28,32,44}) {

@@ -14,6 +14,33 @@ import static dev.jasper.ui.swing.KitViewTest.*;
 @SuppressWarnings("try")
 class SecretFieldsTest {
     static Secret secret(String id, String group) { return new Secret(id, ControlState.READY, "Password", "Password", group); }
+    @Test void revealedDetailSecretMovesBetweenRowPlainContainersAndRootWithoutStaleOffset() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();var events=new ArrayList<UiEvent>();
+            var secret=new Secret("moving",ControlState.READY,"","Password","",SecretKind.DETAIL,"copy");
+            var row=new SettingRow("row",ControlState.READY,"Password","",secret,false);
+            var detail=stack(new Stack("detail",ControlState.READY,LayoutRole.DETAIL,java.util.List.of(new Card("detail-card",ControlState.READY,CardKind.SETTINGS,java.util.List.of(row)))));
+            try(var view=new KitView(context,detail,events::add)) {
+                view.replaceSecret("moving",new char[]{'x','y'});
+                var control=(SecretFields.SecretControl)view.control("moving");var document=control.input.getDocument();var value=control.detailValue;
+                control.reveal.doClick(0);KitFixtures.render(view,100,240,1);
+                assertThat(control.detailValueTop).isPositive();assertThat(control.detailActionsBelow).isTrue();
+                for(var target:java.util.List.of(stack(new Card("plain",ControlState.READY,CardKind.SETTINGS,java.util.List.of(secret))),stack(secret),new ViewSpec(secret),detail)) {
+                    view.update(target);KitFixtures.render(view,400,200,1);
+                    assertThat(control.detailActionsBelow).isFalse();
+                    assertThat(view.control("moving")).isSameAs(control);assertThat(control.input.getDocument()).isSameAs(document);
+                    assertThat(control.detailValue).isSameAs(value);assertThat(control.revealed).isTrue();
+                    view.withSecret("moving",chars->assertThat(chars).containsExactly('x','y'));
+                    var parent=control.detailDisplay.getParent();
+                    assertThat(new java.awt.Rectangle(0,0,parent.getWidth(),parent.getHeight()).contains(control.detailDisplay.getBounds())).as("visible value in %s",target.root().id()).isTrue();
+                    control.copy.doClick(0);assertThat(events.getLast()).isEqualTo(new UiEvent.Action("copy"));
+                    control.reveal.doClick(0);assertThat(control.revealed).isFalse();control.reveal.doClick(0);
+                }
+                view.close();assertThat(value).containsOnly((char)0);assertThat(control.buffer.snapshot()).isEmpty();
+            }finally{release(context);}
+        });
+    }
+
     @Test void discreetInputKeepsGeometryDraftSubmissionAndRevealFocusAcrossEmptyTransitions() {
         Edt.run(() -> {
             var context=KitFixtures.context();var events=new ArrayList<UiEvent>();

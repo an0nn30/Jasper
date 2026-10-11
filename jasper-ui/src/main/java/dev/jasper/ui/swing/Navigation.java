@@ -13,9 +13,30 @@ final class Navigation {
     static final class InlineLayout implements Composition.WidthLayout {
         final KitContext context;
         final DesignMetrics.Role gapRole;
+        final Stacks.StackLayout wrapped;
 
         InlineLayout(KitContext context) { this(context, DesignMetrics.Role.ICON_GAP); }
-        InlineLayout(KitContext context, DesignMetrics.Role gapRole) { this.context=context; this.gapRole=gapRole; }
+        InlineLayout(KitContext context, DesignMetrics.Role gapRole) {
+            this.context=context; this.gapRole=gapRole;
+            wrapped=new Stacks.StackLayout(context, dev.jasper.ui.model.Nodes.LayoutRole.ACTIONS) {
+                @Override int gap() { return InlineLayout.this.gap(); }
+            };
+        }
+
+        boolean wraps(Container parent, int width) {
+            int fixed=0, count=0;
+            for(var child:parent.getComponents())if(child.isVisible()) {
+                if(!flexible(child))fixed+=child.getPreferredSize().width;
+                count++;
+            }
+            return fixed+Math.max(0,count-1)*gap()>width;
+        }
+
+        @Override public Dimension minimumLayoutSize(Container parent) {
+            int width=0;
+            for(var child:parent.getComponents())if(child.isVisible()&&!flexible(child))width=Math.max(width,child.getPreferredSize().width);
+            return new Dimension(width,height(parent,Math.max(width,parent.getWidth())));
+        }
 
         int gap() {
             return ThemePainting.metric(context, gapRole);
@@ -23,6 +44,7 @@ final class Navigation {
 
         @Override
         public int height(Container parent, int width) {
+            if(wraps(parent,width))return wrapped.height(parent,width);
             int h = 0;
             for (var c : parent.getComponents())
                 if (c.isVisible()) h = Math.max(h, c.getPreferredSize().height);
@@ -42,6 +64,7 @@ final class Navigation {
 
         @Override
         public void layoutContainer(Container parent) {
+            if(wraps(parent,parent.getWidth())) {wrapped.layoutContainer(parent);return;}
             var children =
                     java.util.Arrays.stream(parent.getComponents())
                             .filter(Component::isVisible)

@@ -41,6 +41,9 @@ final class SecretFields {
         final char masked;
         boolean revealed, focusWithin;
         int detailValueTop = -1;
+        boolean detailActionsBelow;
+        int detailActionWidth() { return reveal.getPreferredSize().width + copy.getPreferredSize().width; }
+        int detailActionHeight() { return Math.max(reveal.getPreferredSize().height, copy.getPreferredSize().height); }
         int detailTextHeight() { return component.getFontMetrics(ThemePainting.font(context(), Typography.Role.BODY)).getHeight(); }
 
         SecretControl(KitView view, Nodes.Secret node) {
@@ -190,8 +193,9 @@ final class SecretFields {
                         if (detailValueTop >= 0) {
                             var actions = getComponent(1);
                             int height = actions.getPreferredSize().height;
-                            actions.setBounds(getWidth()-actions.getPreferredSize().width, (getHeight()-height)/2, actions.getPreferredSize().width, height);
-                            detailDisplay.setBounds(0, detailValueTop, Math.max(0, actions.getX()), detailTextHeight());
+                            int actionY=detailActionsBelow ? detailValueTop+detailTextHeight()+ThemePainting.metric(context(),DesignMetrics.Role.DETAIL_VALUE_GAP) : (getHeight()-height)/2;
+                            actions.setBounds(detailActionsBelow ? 0 : getWidth()-actions.getPreferredSize().width, actionY, actions.getPreferredSize().width, height);
+                            detailDisplay.setBounds(0, detailValueTop, detailActionsBelow ? getWidth() : Math.max(0, actions.getX()), detailTextHeight());
                         }
                     }
                 };

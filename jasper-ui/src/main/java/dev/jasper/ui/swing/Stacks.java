@@ -244,7 +244,7 @@ final class Stacks {
         }
     }
 
-    static final class StackLayout implements Composition.WidthLayout {
+    static class StackLayout implements Composition.WidthLayout {
         final KitContext context;
         final Nodes.LayoutRole role;
         final boolean titlePair;
@@ -339,9 +339,21 @@ final class Stacks {
                     : natural;
         }
 
+        /** Preserve fixed navigation controls before spending space on detail side padding. */
+        Insets insets(Container parent, int width) {
+            Insets padding=parent.getInsets();
+            if(role!=Nodes.LayoutRole.DETAIL)return padding;
+            int minimum=0;
+            for(var child:parent.getComponents())
+                if(child.isVisible() && child instanceof JPanel panel && (panel.getLayout() instanceof Navigation.InlineLayout || panel instanceof Cards.CardSurface))
+                    minimum=Math.max(minimum,child.getMinimumSize().width);
+            int side=Math.max(0,(width-minimum)/2);
+            return new Insets(padding.top,Math.min(padding.left,side),padding.bottom,Math.min(padding.right,side));
+        }
+
         @Override
         public int height(Container parent, int width) {
-            Insets insets = parent.getInsets();
+            Insets insets = insets(parent,width);
             int available = Math.max(0, width - insets.left - insets.right), height = 0;
             var children =
                     java.util.Arrays.stream(parent.getComponents())
@@ -372,7 +384,7 @@ final class Stacks {
 
         @Override
         public void layoutContainer(Container parent) {
-            Insets insets = parent.getInsets();
+            Insets insets = insets(parent,parent.getWidth());
             int x = insets.left, y = insets.top;
             int width = Math.max(0, parent.getWidth() - insets.left - insets.right),
                     height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);

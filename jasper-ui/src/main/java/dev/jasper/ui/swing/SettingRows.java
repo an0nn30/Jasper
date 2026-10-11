@@ -57,7 +57,6 @@ final class SettingRows {
         void children(List<ControlRegistry.Control> controls) {
             controls.forEach(c -> Composition.label(c, true));
             secret = controls.getFirst() instanceof SecretFields.SecretControl value && value.detail ? value : null;
-            if (secret != null) secret.detailValueTop = -1;
             Stacks.mount(component, List.of(title, description, controls.getFirst().component));
         }
     }
@@ -107,6 +106,23 @@ final class SettingRows {
 
         boolean secretDetail() { return owner.detail && ((Nodes.SettingRow)owner.node).control() instanceof Nodes.Secret secret && secret.kind()==Nodes.SecretKind.DETAIL; }
 
+        int actionWidth(Container parent) {
+            return secretDetail() ? owner.secret.detailActionWidth() : parent.getComponentCount()>2 ? parent.getComponent(2).getPreferredSize().width : 0;
+        }
+        int actionHeight(Container parent) {
+            return secretDetail() ? owner.secret.detailActionHeight() : parent.getComponentCount()>2 ? parent.getComponent(2).getPreferredSize().height : 0;
+        }
+        Insets detailInsets(Container parent,int width) {
+            Insets padding=parent.getInsets();int side=Math.max(0,(width-actionWidth(parent))/2);
+            return new Insets(padding.top,Math.min(padding.left,side),padding.bottom,Math.min(padding.right,side));
+        }
+        boolean stackedDetail(Container parent,int content) {
+            return content<owner.title.getPreferredSize().width+gap()+actionWidth(parent);
+        }
+        @Override public Dimension minimumLayoutSize(Container parent) {
+            return owner.detail ? new Dimension(actionWidth(parent),height(parent,Math.max(actionWidth(parent),parent.getWidth()))) : Composition.WidthLayout.super.minimumLayoutSize(parent);
+        }
+
         int trailing(Container p, int width) {
             return p.getComponentCount() > 2
                     ? Math.min(
@@ -127,7 +143,9 @@ final class SettingRows {
         public int height(Container p, int width) {
             Insets i = p.getInsets();
             if (owner.detail) {
+                i=detailInsets(p,width);
                 int content=Math.max(0,width-i.left-i.right), gap=ThemePainting.metric(owner.context(),DesignMetrics.Role.DETAIL_VALUE_GAP);
+                if(stackedDetail(p,content))return Math.max(ThemePainting.metric(owner.context(),DesignMetrics.Role.DETAIL_ROW_HEIGHT),i.top+i.bottom+owner.title.height(content)+gap+(secretDetail()?owner.secret.detailTextHeight():owner.description.height(content))+gap+actionHeight(p));
                 int textWidth=secretDetail()?content:Math.max(0,content-trailing(p,width)-gap());
                 int below=secretDetail()?owner.secret.detailTextHeight():owner.description.height(textWidth);
                 return Math.max(ThemePainting.metric(owner.context(),DesignMetrics.Role.DETAIL_ROW_HEIGHT),i.top+i.bottom+owner.title.height(textWidth)+gap+below);
@@ -161,7 +179,19 @@ final class SettingRows {
         public void layoutContainer(Container p) {
             Insets i = p.getInsets();
             if (owner.detail) {
+                i=detailInsets(p,p.getWidth());
                 int content=Math.max(0,p.getWidth()-i.left-i.right), gap=ThemePainting.metric(owner.context(),DesignMetrics.Role.DETAIL_VALUE_GAP);
+                if(stackedDetail(p,content)) {
+                    int titleHeight=owner.title.height(content),below=secretDetail()?owner.secret.detailTextHeight():owner.description.height(content);
+                    owner.title.setBounds(i.left,i.top,content,titleHeight);
+                    owner.description.setBounds(i.left,i.top+titleHeight+gap,content,below);
+                    if(secretDetail()) {
+                        owner.secret.detailValueTop=i.top+titleHeight+gap;owner.secret.detailActionsBelow=true;
+                        p.getComponent(2).setBounds(i.left,0,content,p.getHeight());
+                    } else if(p.getComponentCount()>2)p.getComponent(2).setBounds(i.left,i.top+titleHeight+gap+below+gap,actionWidth(p),actionHeight(p));
+                    return;
+                }
+                if(secretDetail())owner.secret.detailActionsBelow=false;
                 int tw=secretDetail()?content:trailing(p,p.getWidth()), textWidth=secretDetail()?content:Math.max(0,content-tw-gap());
                 int titleHeight=owner.title.height(textWidth), below=secretDetail()?owner.secret.detailTextHeight():owner.description.height(textWidth);
                 int y=Math.max(i.top,(p.getHeight()-titleHeight-gap-below)/2);

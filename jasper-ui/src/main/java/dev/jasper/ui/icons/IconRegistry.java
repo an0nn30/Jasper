@@ -84,6 +84,9 @@ public final class IconRegistry implements AutoCloseable {
         if (artwork == null) throw new IllegalArgumentException("Unknown icon: " + name);
         var path = artwork.path();
         boolean filled = FILLED_BUILT_INS.contains(name);
+        // Callers supply user-scaled tile extents; optical limits are logical metrics.
+        double tileGlyph = Math.min(size, Math.min(com.formdev.flatlaf.util.UIScale.scale(16.5f),
+            Math.max(com.formdev.flatlaf.util.UIScale.scale(10f), size * .4)));
         return new Icon() {
             @Override public int getIconWidth() { return size; }
             @Override public int getIconHeight() { return size; }
@@ -94,7 +97,7 @@ public final class IconRegistry implements AutoCloseable {
                     if (tile) {
                         g.setColor(background); double radius = size * .25 * 2; // RoundRectangle2D accepts an arc diameter
                         g.fill(new RoundRectangle2D.Double(0, 0, size, size, radius, radius));
-                        double glyph = Math.min(size, Math.min(16.5, Math.max(10, size * .4)));
+                        double glyph = tileGlyph;
                         double inset = (size - glyph) / 2; g.translate(inset, inset); g.scale(glyph / 16, glyph / 16);
                     } else g.scale(size / 16.0, size / 16.0);
                     g.setColor(foreground); g.setStroke(new BasicStroke(hero ? 7f / 6f : artwork.stroke(), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
