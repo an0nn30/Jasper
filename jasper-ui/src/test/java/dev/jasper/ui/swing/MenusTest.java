@@ -228,4 +228,18 @@ class MenusTest {
                     }
                 });
     }
+    @Test void contextualSplitMenuKeepsItsArrowUnpaintedUntilItsRowIsActive() {
+        Edt.run(() -> {
+            var ctx=KitFixtures.context();
+            var action=new MenuButton("menu",ControlState.READY,"Add","",ButtonKind.GHOST,"add",menu("add").items(),"Add",ButtonPresentation.CONTEXTUAL_EMBEDDED);
+            var item=new ListItem("item",Optional.empty(),List.of(new Text("title",ControlState.READY,"Row",TextRole.BODY)),List.of(),List.of(action));
+            try(var view=new KitView(ctx,new ViewSpec(new ItemList("list",ControlState.READY,ListKind.SINGLE,List.of(item),Set.of(),"",List.of())),e->{})) {
+                view.setSize(260,100);InteractiveRowsTest.layout(view);
+                var rows=(ItemLists.ListControl)view.control("list");var row=rows.mounted.get("item");var menu=(Menus.MenuControl)row.controls.get("menu");
+                assertThat(RemoteKitTest.ink(menu.main)).isZero();assertThat(RemoteKitTest.ink(menu.arrow)).isZero();
+                row.hover=true;assertThat(RemoteKitTest.ink(menu.main)).isPositive();assertThat(RemoteKitTest.ink(menu.arrow)).isPositive();
+            }finally{release(ctx);}
+        });
+    }
+
 }

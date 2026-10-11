@@ -4,6 +4,8 @@ import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.model.*;
 import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.SurfaceContrast;
 
 import java.awt.Container;
 import java.util.*;
@@ -395,9 +397,19 @@ final class ItemLists {
             if (item.leading().orElse(null) instanceof Nodes.Icon icon && (icon.size() == Nodes.IconSize.RAIL || icon.size() == Nodes.IconSize.HERO) && icon.hue() != Nodes.Hue.NONE) {
                 ((Labels.IconControl)row.controls.get(icon.id())).tile(context().metrics().value(value().kind() == Nodes.ListKind.DOUBLE ? DesignMetrics.Role.CATEGORY_ROW_TILE : DesignMetrics.Role.CATEGORY_RAIL_TILE), column != 0 && selected.contains(item.id()));
             }
+            for(var control:row.controls.values()) if(control instanceof Indicators.DotControl dot) ((Indicators.Dot)dot.component).panelRow=panelSingle;
             row.slot(row.title, item.title());
+            if(panelSingle)for(int i=1;i<item.title().size();i++)if(item.title().get(i) instanceof Nodes.Text text && text.role()==Nodes.TextRole.BODY && row.controls.get(text.id()).component instanceof javax.swing.JLabel label)label.setFont(ThemePainting.font(context(),Typography.Role.PANEL_ROW_SECONDARY));
+            if (panelSingle && selected.contains(item.id())) {
+                for(int i=0;i<item.title().size();i++) if(item.title().get(i) instanceof Nodes.Text text && row.controls.get(text.id()).component instanceof javax.swing.JLabel label) {
+                    label.setForeground(SurfaceContrast.on(context().theme().semantic(),
+                        i==0 ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_ONACCENT_SECONDARY,SemanticColor.SELECTION_BG,SurfaceContrast.TEXT));
+                    if(i==0 && text.role()==Nodes.TextRole.BODY)label.setFont(ThemePainting.font(context(),Typography.Role.PANEL_ROW_SELECTED));
+                }
+            }
             row.slot(row.subtitle, item.subtitle());
             row.slot(row.trailing, trailing);
+            for(var control:row.controls.values())if(control instanceof Buttons.ButtonControl button)button.button.panelRow=panelSingle;
             row.tooltip(item.tooltip());
             row.name(item.title());
             if (value().kind() == Nodes.ListKind.ORDERED) {

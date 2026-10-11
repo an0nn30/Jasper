@@ -59,7 +59,8 @@ final class Navigation {
                     w += c.getPreferredSize().width;
                     n++;
                 }
-            return new Dimension(w + Math.max(0, n - 1) * gap(), height(parent, w));
+            int width = w + Math.max(0, n - 1) * gap();
+            return new Dimension(width, height(parent, width));
         }
 
         @Override

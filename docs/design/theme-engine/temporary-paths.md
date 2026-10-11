@@ -613,3 +613,8 @@ No temporary production renderer, fixture-only ownership path or SDK generation 
 ## Plan3 Task4b composition
 
 Vault's manager, sheets and companion forms use SDK descriptors and real model/service ownership. No feature RGB, renderer, custom layout or temporary production adapter was added. WINDOW/PLAIN_PATH/DISCREET_INPUT and hue surface roles are permanent shared contracts. Test-only StagedVaultHost seeds actual records via manager saves, disk key generation/import and exported managed import review; generated keys/data remain disposable. Source calibration TOML is test-only. Native acceptance remains controller-owned and pending.
+
+
+## Plan3 Task5 — Sessions
+
+No feature paint/geometry overrides or production fixture hooks were added. Shared panel context supplies SINGLE row and DETAIL footer geometry; ordinary manager DETAIL remains24. CONTEXTUAL_EMBEDDED is a permanent compatible shared presentation with full mounted/a11y/focus/action behavior. PanelHostHeader.Artwork is optional module/app immutable monochrome metadata; raw Icon remains unchanged and custom paths retain validated stroke. Actual staged Remote/Vault Sessions fixtures and desktop-sessions.toml are test-only calibration owners. Dedicated PANEL_HEADER_ACTION isolates compact header padding from existing nonheader PANEL_ACTION/Choice sizing; actual Login recovery is byte-identical to approved Task4b fix1. Native/pixel acceptance and app Expand routing remain controller/Task10 obligations.

@@ -11,6 +11,17 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class IconRegistryTest {
+    @Test void serverArtworkHasTwoOutlinedRacksAndOnlyLeftIndicators() {
+        try(var registry=new IconRegistry()) {
+            for(int scale:new int[]{1,2}) {
+                var image=paint(registry.icon("server",KitFixtures.dark().semantic(),Nodes.Hue.NEUTRAL,16*scale));
+                assertThat(image.getRGB(10*scale,4*scale)>>>24).as("upper rack right interior is clear").isZero();
+                assertThat(image.getRGB(10*scale,11*scale)>>>24).as("lower rack right interior is clear").isZero();
+                assertThat(image.getRGB(5*scale,4*scale)>>>24).isPositive();
+                assertThat(image.getRGB(2*scale,4*scale)>>>24).isPositive();
+            }
+        }
+    }
     @Test void categoryOpticalFloorAndCapFollowUserScaleExactlyOnce() {
         dev.jasper.ui.testsupport.Edt.run(() -> {
             float previous = com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
@@ -149,6 +160,20 @@ class IconRegistryTest {
         try (var registry = new IconRegistry()) {
             assertThat(new Color(paint(registry.tile("add", new SemanticPalette(colors), Nodes.Hue.BLUE, 24, false)).getRGB(4, 4), true).getAlpha())
                 .isEqualTo(23); // 128 * 18%, once
+        }
+    }
+    @Test void panelOpticsPreserveAuthoredCustomStrokeAndRectangularTileGeometryAtEveryScale() {
+        try(var registry=new IconRegistry()) {
+            registry.register("owner:line","M2 8 L14 8");
+            var palette=KitFixtures.dark().semantic();
+            for(int scale:java.util.List.of(1,2,3)) {
+                var ordinary=paint(registry.icon("owner:line",palette,SemanticColor.HUE_NEUTRAL,16*scale));
+                var panel=paint(registry.panel("owner:line",palette,SemanticColor.HUE_NEUTRAL,16*scale));
+                assertThat(panel.getRGB(0,0,16*scale,16*scale,null,0,16*scale)).containsExactly(ordinary.getRGB(0,0,16*scale,16*scale,null,0,16*scale));
+                var tile=registry.tile("server",palette,Nodes.Hue.NEUTRAL,28*scale,30*scale,14*scale,false);
+                assertThat(tile.getIconWidth()).isEqualTo(28*scale);assertThat(tile.getIconHeight()).isEqualTo(30*scale);
+            }
+            assertThat(pixels(registry.panel("add",palette,SemanticColor.HUE_NEUTRAL,18))).isLessThan(pixels(registry.icon("add",palette,SemanticColor.HUE_NEUTRAL,18)));
         }
     }
     private static BufferedImage paint(Icon icon) {

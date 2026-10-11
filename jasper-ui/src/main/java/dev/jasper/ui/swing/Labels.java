@@ -15,6 +15,7 @@ final class Labels {
             new java.awt.font.FontRenderContext(null, true, true);
         /** Wraps to the width a FormRow gives it. */
         boolean wrap;
+        int baselineOffset, iconOffset;
         /**
          * Flows in a vertical container: wraps to the width it is given, keeps explicit line breaks, and asks for no
          * more than {@code flowColumns} widths of 'm' (the former text areas' column rule).
@@ -67,8 +68,8 @@ final class Labels {
                 String clipped = SwingUtilities.layoutCompoundLabel(this, g.getFontMetrics(), display, getIcon(),
                     getVerticalAlignment(), getHorizontalAlignment(), getVerticalTextPosition(), getHorizontalTextPosition(), bounds, icon, text, getIconTextGap());
                 if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
-                if (getIcon() != null) getIcon().paintIcon(this, g, icon.x, icon.y);
-                if (clipped != null) g.drawString(clipped, text.x, text.y + g.getFontMetrics().getAscent());
+                if (getIcon() != null) getIcon().paintIcon(this, g, icon.x + iconOffset, icon.y - iconOffset);
+                if (clipped != null) g.drawString(clipped, text.x, text.y + g.getFontMetrics().getAscent() - baselineOffset);
                 if (caret >= 0 && display != null && clipped != null) paintCaret(g, display, clipped, text, bounds);
             } finally { g.dispose(); }
         }
@@ -89,15 +90,17 @@ final class Labels {
         }
     }
     static final class TextControl extends ControlRegistry.Control {
+        boolean panelDetail;
         TextControl(KitView view, Nodes.Text node) { super(view, node, literal()); refresh(); }
         @Override void refresh() {
             var text = (Nodes.Text)node; var label = (JLabel)component; state();
             label.putClientProperty("Jasper.leadingEllipsis",text.role()==Nodes.TextRole.MONO || text.role()==Nodes.TextRole.MONO_SMALL || text.role()==Nodes.TextRole.MONO_CAPTION);
+            ((LiteralLabel)label).baselineOffset=panelDetail && (text.role()==Nodes.TextRole.PANEL_TITLE || text.role()==Nodes.TextRole.MONO_CAPTION) ? ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_TEXT_BASELINE) : 0;
             label.setText(text.text());
             label.setToolTipText(text.text());
             label.getAccessibleContext().setAccessibleName(text.text());
-            label.setFont(ThemePainting.font(context(), Typography.Role.valueOf(text.role().name())));
-            label.setForeground(ThemePainting.color(context(), text.severity().isPresent() ? tint(text.severity().get()) : switch (text.role()) {
+            label.setFont(ThemePainting.font(context(), panelDetail && text.role() == Nodes.TextRole.MONO_CAPTION ? Typography.Role.PANEL_DETAIL_MONO : panelDetail && text.role() == Nodes.TextRole.PANEL_TITLE ? Typography.Role.PANEL_DETAIL_TITLE : panelDetail && text.role() == Nodes.TextRole.CAPTION ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.valueOf(text.role().name())));
+            label.setForeground(ThemePainting.color(context(), text.severity().isPresent() ? tint(text.severity().get()) : panelDetail && text.role()==Nodes.TextRole.MONO_CAPTION ? SemanticColor.TEXT_SECONDARY : switch (text.role()) {
                 case LABEL, DESCRIPTION, CAPTION, COUNT -> SemanticColor.TEXT_SECONDARY;
                 case SECTION_LABEL, MONO_CAPTION, SUPPORTING -> SemanticColor.TEXT_TERTIARY;
                 default -> SemanticColor.TEXT_PRIMARY;
@@ -118,13 +121,16 @@ final class Labels {
         };
     }
     static final class IconControl extends ControlRegistry.Control {
-        int tileSize; boolean selected;
-        void tile(int logicalSize, boolean value) { tileSize = logicalSize; selected = value; refresh(); }
+        int tileSize, tileHeight, tileGlyph; boolean selected, panelDetail;
+        void tile(int logicalSize, boolean value) { tile(logicalSize, logicalSize, 0, value); }
+        void tile(int width, int height, int glyph, boolean value) { tileSize = width; tileHeight = height; tileGlyph = glyph; selected = value; refresh(); }
         IconControl(KitView view, Nodes.Icon node) { super(view, node, literal()); refresh(); }
         @Override void refresh() {
             var icon = (Nodes.Icon)node; var label = (JLabel)component; state();
             int size = com.formdev.flatlaf.util.UIScale.scale(context().icons().size(icon.size()));
-            label.setIcon(tileSize > 0 ? context().icons().tile(icon.name(), context().theme().semantic(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(tileSize), selected)
+            ((LiteralLabel)label).iconOffset=panelDetail && tileSize == 0 ? ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_TEXT_BASELINE) : 0;
+            label.setIcon(tileSize > 0 ? context().icons().tile(icon.name(), context().theme().semantic(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(tileSize), com.formdev.flatlaf.util.UIScale.scale(tileHeight), com.formdev.flatlaf.util.UIScale.scale(tileGlyph), selected)
+                : panelDetail ? context().icons().panel(icon.name(), context().theme().semantic(), icon.severity().isPresent() ? tint(icon.severity().get()) : SemanticColor.HUE_NEUTRAL, size)
                 : icon.size() == Nodes.IconSize.HERO && icon.severity().isEmpty() ? context().icons().hero(icon.name(), context().theme().semantic(), icon.hue(), size)
                 : icon.severity().isPresent() ? context().icons().icon(icon.name(), context().theme().semantic(), tint(icon.severity().get()), size)
                 : context().icons().icon(icon.name(), context().theme().semantic(), icon.hue(), size));

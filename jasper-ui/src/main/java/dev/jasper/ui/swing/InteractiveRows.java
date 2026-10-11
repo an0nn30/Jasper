@@ -27,6 +27,7 @@ final class InteractiveRows {
         String focusItem, focusControl;
         int rowHeight;
         int column = -1;
+        boolean panelSingle;
         boolean syncing;
         JComponent footer;
         final Menus.Popup popup;
@@ -49,6 +50,12 @@ final class InteractiveRows {
             scroll = (JScrollPane) component;
             if (pane instanceof OverlayScrollPane overlay) own(overlay::stop);
             canvas = new Canvas(this);
+            FocusListener focusPaint=new FocusAdapter() {
+                @Override public void focusGained(FocusEvent e){canvas.repaint();}
+                @Override public void focusLost(FocusEvent e){canvas.repaint();}
+            };
+            canvas.addFocusListener(focusPaint);
+            own(() -> canvas.removeFocusListener(focusPaint));
             scroll.setViewportView(canvas);
             scroll.setBorder(BorderFactory.createEmptyBorder());
             scroll.setOpaque(false);
@@ -873,7 +880,9 @@ final class InteractiveRows {
                             public void focusGained(FocusEvent e) {
                                 owner.focusItem = id;
                                 owner.focusControl = controlId;
+                                Row.this.repaint();
                             }
+                            @Override public void focusLost(FocusEvent e){Row.this.repaint();}
                         };
                 target.addFocusListener(listener);
                 c.own(() -> target.removeFocusListener(listener));
@@ -957,7 +966,7 @@ final class InteractiveRows {
         }
 
         void slot(JPanel panel, List<Nodes.Node> nodes) {
-            panel.setLayout(new Navigation.InlineLayout(owner.context()));
+            panel.setLayout(new Navigation.InlineLayout(owner.context(), owner.panelSingle && panel == title ? DesignMetrics.Role.PANEL_ROW_TITLE_GAP : DesignMetrics.Role.ICON_GAP));
             Stacks.mount(panel, nodes.stream().map(n -> control(n).component).toList());
         }
 
@@ -1012,7 +1021,7 @@ final class InteractiveRows {
         public void doLayout() {
             if (!owner.dataRow(index)) { headingLayout(); return; }
             if (owner.resultsLayout()) { resultLayout(); return; }
-            int pad = ThemePainting.metric(owner.context(), owner.column >= 0 ? DesignMetrics.Role.COLUMN_LIST_SIDE : DesignMetrics.Role.ICON_GAP),
+            int pad = ThemePainting.metric(owner.context(), owner.column >= 0 ? DesignMetrics.Role.COLUMN_LIST_SIDE : owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_PADDING : DesignMetrics.Role.ICON_GAP),
                     x = pad + indent,
                     width = Math.max(0, getWidth() - pad),
                     h = getHeight();
@@ -1023,11 +1032,12 @@ final class InteractiveRows {
             check.setBounds(x, 0, checkWidth, h);
             x += checkWidth;
             int tw = Math.min(trailing.getPreferredSize().width, Math.max(0, width - x));
-            trailing.setBounds(width - tw, 0, tw, h);
+            int actionInset=owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_ACTION_INSET) : 0;
+            trailing.setBounds(Math.max(x,width - tw - actionInset), 0, tw, h);
             width = Math.max(x, width - tw - (tw > 0 ? pad : 0));
             int lw = Math.min(leading.getPreferredSize().width, Math.max(0, width - x));
             leading.setBounds(x, 0, lw, h);
-            x += lw + (lw > 0 ? pad : 0);
+            x += lw + (lw > 0 ? owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_TEXT_GAP) : pad : 0);
             int content = Math.max(0, width - x);
             if (!cells.isEmpty()) {
                 title.setBounds(x, 0, content, h);
@@ -1122,14 +1132,15 @@ final class InteractiveRows {
                 }
                 return;
             }
-            if (owner.column == 0 || owner.column == 1) {
+            if (owner.column == 0 || owner.column == 1 || owner.panelSingle) {
                 Color fill = owner.selected.contains(id) ? ThemePainting.color(owner.context(), owner.column == 0 ? SemanticColor.SURFACE_CONTROL : SemanticColor.SELECTION_BG)
                     : hover ? ColorMath.opacity(ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY), .05) : null;
                 if (fill != null) {
                     var rounded=(Graphics2D)g.create();
                     try { ThemePainting.antialias(rounded); rounded.setColor(fill);
-                        int arc=ThemePainting.metric(owner.context(), DesignMetrics.Role.CONTROL_RADIUS)*2;
-                        rounded.fillRoundRect(0,0,getWidth(),getHeight(),arc,arc);
+                        int arc=ThemePainting.metric(owner.context(), owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_RADIUS : DesignMetrics.Role.CONTROL_RADIUS)*2;
+                        int inset=owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.HAIRLINE) : 0;
+                        rounded.fillRoundRect(0,inset,getWidth(),getHeight()-2*inset,arc,arc);
                     } finally {rounded.dispose();}
                 }
                 if (Objects.equals(id, owner.focusItem) && owner.canvas.isFocusOwner()) {

@@ -28,10 +28,11 @@ final class ViewReconciler implements AutoCloseable {
             String group = ((Nodes.Secret)secret.node).revealGroup();
             if (!group.isEmpty()) revealGroups.put(group, secret.revealed);
         }
-        next.values().forEach(control -> { if(control instanceof SecretFields.SecretControl secret){secret.detailValueTop=-1;secret.detailActionsBelow=false;} if(control instanceof SettingRows.RowControl row)row.panelFooter=false; if(control instanceof Buttons.ButtonControl button){button.button.panel=false;button.button.fullFooter=false;button.button.orderedAction=false;} if(control instanceof Menus.MenuControl menu){menu.main.panel=false;menu.arrow.panel=false;} if (control instanceof Labels.IconControl icon) icon.tile(0, false); if (control instanceof Labels.TextControl && control.component instanceof Labels.LiteralLabel text) { text.wrap = false; text.flow = false; } if(control instanceof Stacks.StackControl stack)stack.sheetHeading=false; control.embeddedLabel(false); control.hero(false); });
+        next.values().forEach(this::resetComposition);
         inherit(spec.root(), next, true);
         applyFlow(spec.root(), next);
         applyColumns(spec.root(), next, -1, false);
+        applyPanelDetail(spec.root(), next, false);
         applyFullForm(spec.root(), next, false);
         for (var node : nodes.values()) next.get(node.id()).update(node);
         applyHero(spec.root(), next, false);
@@ -48,6 +49,33 @@ final class ViewReconciler implements AutoCloseable {
         var previous = mounted; mounted = next;
         for (var old : previous.values()) if (next.get(old.node.id()) != old) old.close();
         view.revalidate(); view.repaint();
+    }
+    private void resetComposition(ControlRegistry.Control control) {
+        if (control instanceof TextFields.FieldControl field) field.panelSearch = false;
+        if (control instanceof SecretFields.SecretControl secret) {
+            secret.detailValueTop = -1;
+            secret.detailActionsBelow = false;
+        }
+        if (control instanceof SettingRows.RowControl row) row.panelFooter = false;
+        if (control instanceof InteractiveRows.RowsControl rows) rows.panelSingle = false;
+        if (control instanceof Buttons.ButtonControl button) {
+            button.button.panel = false;
+            button.button.panelRow = false;
+            button.button.fullFooter = false;
+            button.button.orderedAction = false;
+        }
+        if (control instanceof Menus.MenuControl menu) {
+            menu.main.panel = false;
+            menu.arrow.panel = false;
+        }
+        if (control instanceof Labels.IconControl icon) icon.tile(0, false);
+        if (control instanceof Labels.TextControl && control.component instanceof Labels.LiteralLabel text) {
+            text.wrap = false;
+            text.flow = false;
+        }
+        if (control instanceof Stacks.StackControl stack) stack.sheetHeading = false;
+        control.embeddedLabel(false);
+        control.hero(false);
     }
     private void detachMoves(Nodes.Node root, Map<String, Nodes.Node> nodes, Map<String, ControlRegistry.Control> next) {
         var parents = new LinkedHashMap<JComponent, java.awt.Container>();
@@ -91,12 +119,32 @@ final class ViewReconciler implements AutoCloseable {
         for (int i = 0; i < children.size(); i++) applyColumns(children.get(i), next,
             node instanceof Nodes.Split split && split.kind() == Nodes.SplitKind.THREE_COLUMN ? i : column, detail);
     }
+    /** Compact details are a panel-footer context; ordinary manager details retain their own scale. */
+    private void applyPanelDetail(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
+        var control = next.get(node.id());
+        if (control instanceof Stacks.StackControl stack) stack.panelDetail = inherited;
+        if (control instanceof Buttons.ButtonControl button) button.button.panelDetail = inherited;
+        if (control instanceof Labels.TextControl text) text.panelDetail = inherited;
+        if (control instanceof Labels.IconControl icon) icon.panelDetail = inherited;
+        if (node instanceof Nodes.Panel panel) panel.searchOrNavigation()
+            .filter(n -> n instanceof Nodes.Field field && field.kind() == Nodes.FieldKind.SEARCH)
+            .ifPresent(n -> { if (next.get(n.id()) instanceof TextFields.FieldControl field) field.panelSearch = true; });
+        if (node instanceof Nodes.Panel panel && panel.body() instanceof Nodes.ItemList list && list.kind()==Nodes.ListKind.SINGLE
+            && next.get(list.id()) instanceof InteractiveRows.RowsControl rows) rows.panelSingle=true;
+        for (var child : ControlRegistry.children(node)) {
+            boolean compact = inherited || node instanceof Nodes.Panel panel && panel.footer().filter(n -> n == child).isPresent()
+                && child instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.DETAIL;
+            applyPanelDetail(child, next, compact);
+        }
+    }
     private void applyTiles(Nodes.Node node, Map<String, ControlRegistry.Control> next, int inherited) {
         int size = node instanceof Nodes.Form form && form.kind() == Nodes.FormKind.SHEET
                 ? view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.CATEGORY_SHEET_TILE)
                 : node instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.DETAIL
-                ? view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.CATEGORY_DETAIL_TILE) : inherited;
-        if (size > 0 && node instanceof Nodes.Icon icon && icon.size() == Nodes.IconSize.HERO && next.get(icon.id()) instanceof Labels.IconControl control) control.tile(size, false);
+                ? view.context().metrics().value(next.get(node.id()) instanceof Stacks.StackControl control && control.panelDetail ? dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_TILE : dev.jasper.ui.metrics.DesignMetrics.Role.CATEGORY_DETAIL_TILE) : inherited;
+        if (size > 0 && node instanceof Nodes.Icon icon && icon.size() == Nodes.IconSize.HERO && next.get(icon.id()) instanceof Labels.IconControl control)
+            control.tile(size, control.panelDetail ? view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_TILE_HEIGHT) : size,
+                control.panelDetail ? view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_GLYPH) : 0, false);
         ControlRegistry.children(node).forEach(child -> applyTiles(child, next, size));
     }
     /**

@@ -47,3 +47,7 @@ records original crop/scale anchors and the inspected capture matrix.
 ./gradlew :jasper-ui:gallery -Pjasper.galleryScale=2 -Pjasper.galleryTheme=calibration
 ./gradlew :jasper-ui:verifyUiDistribution
 ```
+
+Panel `SINGLE` lists use inset rounded selection. A `DETAIL` stack in a panel footer uses compact identity and action metrics; a manager detail retains its own inset and category scale. `CONTEXTUAL_EMBEDDED` buttons reserve their full interactive geometry while painting only for selected, hovered, keyboard-active rows or direct control focus. Ordinary `EMBEDDED` remains persistently painted.
+
+Borrowed panel headers may explicitly provide immutable `PanelHostHeader.Artwork(name, pathData)` for monochrome semantic tint and canonical panel optics. Custom paths retain their authored stroke; receiving controls own validated snapshots and replacement lifetimes. The compatible three-argument `Action` preserves arbitrary host `Icon` identity, colors, alpha and dimensions.

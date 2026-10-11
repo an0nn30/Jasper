@@ -11,6 +11,23 @@ import static dev.jasper.ui.swing.KitViewTest.*;
 
 @SuppressWarnings("unchecked")
 class ChoicesTest {
+    @Test void segmentedChoicesRetainOrdinaryActionPaddingAcrossFontSizes() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var previous = UIManager.get("defaultFont");
+            try (var view = new KitView(context, stack(choice(ChoiceKind.SEGMENTED, "b", ControlState.READY)), e -> {})) {
+                for (int size : new int[] {13, 20}) {
+                    UIManager.put("defaultFont", new java.awt.Font(java.awt.Font.DIALOG, java.awt.Font.PLAIN, size));
+                    KitFixtures.render(view, 400, 100, 2);
+                    var font = ThemePainting.font(context, dev.jasper.ui.metrics.Typography.Role.LABEL);
+                    int line = (int)Math.ceil(font.getLineMetrics("Ag", new java.awt.font.FontRenderContext(null, true, true)).getHeight());
+                    int expected = Math.max(com.formdev.flatlaf.util.UIScale.scale(24), line + com.formdev.flatlaf.util.UIScale.scale(10));
+                    assertThat(find(view, "choice.option.b", JButton.class).getPreferredSize().height)
+                        .as("nonheader segments retain ordinary action padding at font %s", size).isEqualTo(expected);
+                }
+            } finally { UIManager.put("defaultFont", previous); release(context); }
+        });
+    }
     static Choice choice(ChoiceKind kind, String selected, ControlState state) {
         return new Choice("choice", state, kind, List.of(new Option("a", "<html>Alpha", Optional.of(Hue.BLUE)), new Option("b", "Beta", Optional.empty())), selected, "Protocol", "choose-protocol");
     }

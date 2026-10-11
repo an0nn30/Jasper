@@ -120,6 +120,8 @@ final class PanelHeaders {
                     control.artwork = action.icon();
                     control.update(button);
                 }
+                contributed.get(i).semanticArtwork = action.artwork();
+                contributed.get(i).refresh();
             }
             hostHeader = header;
             mountHost();
@@ -160,9 +162,9 @@ final class PanelHeaders {
             count.setText(h.count().isPresent() ? Integer.toString(h.count().getAsInt()) : "");
             count.setVisible(h.count().isPresent() && h.count().getAsInt() > 0);
             Composition.style(
-                    title, context(), Typography.Role.PANEL_TITLE, SemanticColor.TEXT_PRIMARY);
+                    title, context(), Typography.Role.PANEL_HEADER_TITLE, SemanticColor.TEXT_PRIMARY);
             Composition.style(
-                    count, context(), Typography.Role.COUNT, SemanticColor.TEXT_SECONDARY);
+                    count, context(), Typography.Role.PANEL_HEADER_COUNT, SemanticColor.TEXT_TERTIARY);
             title.setEnabled(component.isEnabled());
             count.setEnabled(component.isEnabled());
             detail.setText(hostHeader.detail());
@@ -171,13 +173,13 @@ final class PanelHeaders {
             detail.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
             detail.setVisible(!hostHeader.detail().isEmpty() || hostHeader.active());
             Composition.style(
-                    detail, context(), Typography.Role.COUNT, SemanticColor.TEXT_SECONDARY);
+                    detail, context(), Typography.Role.PANEL_HEADER_COUNT, SemanticColor.TEXT_SECONDARY);
             detail.setEnabled(component.isEnabled());
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
-            component.setBorder(new EmptyBorder(0, pad, 0, pad));
+            component.setBorder(new EmptyBorder(0, pad, 0, ThemePainting.metric(context(),DesignMetrics.Role.PANEL_HEADER_TRAILING_PADDING)));
             component.setLayout(new HeaderLayout(this));
             descriptor.setLayout(new Navigation.InlineLayout(context()));
-            host.setLayout(new Navigation.InlineLayout(context()));
+            host.setLayout(new Navigation.InlineLayout(context(),DesignMetrics.Role.PANEL_HEADER_ACTION_GAP));
             for (var control : contributed) {
                 control.parentEnabled = interactive();
                 control.button.panel = true;
@@ -259,12 +261,29 @@ final class PanelHeaders {
             return ThemePainting.metric(owner.context(), DesignMetrics.Role.ICON_GAP);
         }
 
+        private List<Component> trailing() {
+            var controls = new ArrayList<Component>();
+            if (owner.host.getComponentCount() > 0) controls.add(owner.host);
+            if (owner.overflow != null) controls.add(owner.overflow.component);
+            if (owner.descriptor.getComponentCount() > 0) controls.add(owner.descriptor);
+            return controls;
+        }
+
         @Override
         public int height(Container p, int width) {
-            int h = ThemePainting.metric(owner.context(), DesignMetrics.Role.PANEL_HEADER);
-            for (var c : p.getComponents())
-                if (c.isVisible()) h = Math.max(h, c.getPreferredSize().height + 2 * gap());
-            return h;
+            int height = ThemePainting.metric(owner.context(), DesignMetrics.Role.PANEL_HEADER);
+            int bottom = ThemePainting.metric(owner.context(), DesignMetrics.Role.PANEL_HEADER_BOTTOM_GAP);
+            int available = Math.max(0, width - p.getInsets().left - p.getInsets().right);
+            // Use the same allocated widths as placement. A host action strip can wrap at enlarged
+            // fonts even though its unconstrained preferred height still describes a single row.
+            for (var control : trailing()) {
+                int allocated = Math.min(control.getPreferredSize().width, available);
+                height = Math.max(height, Composition.height(control, allocated) + bottom + 2 * ThemePainting.metric(owner.context(), DesignMetrics.Role.FOCUS_RING));
+                available = Math.max(0, available - allocated - gap());
+            }
+            for (var label : List.of(owner.title, owner.count, owner.detail))
+                if (label.isVisible()) height = Math.max(height, label.getPreferredSize().height + bottom);
+            return height;
         }
 
         @Override
@@ -279,15 +298,12 @@ final class PanelHeaders {
         public void layoutContainer(Container p) {
             Insets i = p.getInsets();
             int left = i.left, right = Math.max(left, p.getWidth() - i.right), g = gap();
+            int contentHeight = Math.max(0, p.getHeight() - ThemePainting.metric(owner.context(), DesignMetrics.Role.PANEL_HEADER_BOTTOM_GAP));
             // Reserve trailing controls first. Only the title's text lane may compress.
-            var trailing = new ArrayList<Component>();
-            if (owner.host.getComponentCount() > 0) trailing.add(owner.host);
-            if (owner.overflow != null) trailing.add(owner.overflow.component);
-            if (owner.descriptor.getComponentCount() > 0) trailing.add(owner.descriptor);
-            for (var c : trailing) {
+            for (var c : trailing()) {
                 int w = Math.min(c.getPreferredSize().width, Math.max(0, right - left));
                 right -= w;
-                place(c, right, w, p.getHeight());
+                place(c, right, w, contentHeight);
                 right = Math.max(left, right - g);
             }
             int cw =
@@ -299,19 +315,19 @@ final class PanelHeaders {
                     Math.min(
                             owner.title.getPreferredSize().width,
                             Math.max(0, right - left - cw - (cw > 0 ? g : 0)));
-            place(owner.title, left, tw, p.getHeight());
+            place(owner.title, left, tw, contentHeight);
             left += tw + g;
             if (cw > 0) {
-                place(owner.count, left, cw, p.getHeight());
+                place(owner.count, left, cw, contentHeight);
                 left += cw + g;
             }
             // Host detail takes what the title and count leave, as the native header's detail does.
             if (owner.detail.isVisible())
-                place(owner.detail, left, Math.min(owner.detail.getPreferredSize().width, Math.max(0, right - left)), p.getHeight());
+                place(owner.detail, left, Math.min(owner.detail.getPreferredSize().width, Math.max(0, right - left)), contentHeight);
         }
 
         void place(Component c, int x, int w, int height) {
-            int h = Math.min(height, c.getPreferredSize().height);
+            int h = Math.min(height, Composition.height(c, w));
             c.setBounds(x, height / 2 - h / 2, w, h);
         }
     }

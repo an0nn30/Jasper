@@ -58,8 +58,8 @@ public final class SurfaceFixtures {
         var generated = switch (name) {
             case "dark" -> ThemeGenerator.generate(Theme.DARK.source().document());
             case "light" -> ThemeGenerator.generate(Theme.JASPER_LIGHT.source().document());
-            case "calibration", "host-calibration", "server-calibration", "custom" -> {
-                String file = name.equals("server-calibration") ? "desktop-server.toml" : name.equals("host-calibration") ? "desktop-host.toml" : name.equals("calibration") ? "desktop-hero.toml" : "custom-hero.toml";
+            case "calibration", "host-calibration", "server-calibration", "sessions-calibration", "custom" -> {
+                String file = name.equals("sessions-calibration") ? "desktop-sessions.toml" : name.equals("server-calibration") ? "desktop-server.toml" : name.equals("host-calibration") ? "desktop-host.toml" : name.equals("calibration") ? "desktop-hero.toml" : "custom-hero.toml";
                 try (var input = SurfaceFixtures.class.getResourceAsStream("/dev/jasper/app/appearance/" + file)) {
                     if (input == null) throw new IllegalStateException(file);
                     yield ThemeGenerator.generate(ThemeToml.parse(new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8), file));

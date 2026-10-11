@@ -187,7 +187,7 @@ final class Menus {
         void refresh() {
             state();
             var menu = (Nodes.MenuButton) node;
-            boolean embedded = menu.presentation() == Nodes.ButtonPresentation.EMBEDDED;
+            boolean embedded = menu.presentation() != Nodes.ButtonPresentation.STANDARD;
             for (var button : java.util.List.of(main, arrow)) {
                 button.kind = menu.kind();
                 button.setEnabled(component.isEnabled());
@@ -195,6 +195,7 @@ final class Menus {
                 int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING),
                         pad = ThemePainting.metric(context(), DesignMetrics.Role.MENU_ITEM_PADDING);
                 button.embedded = embedded;
+                button.contextual = menu.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
                 button.setBorder(embedded ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(ring, pad, ring, pad));
             }
             ((MenuSurface) component).background.embedded = embedded;
@@ -404,6 +405,7 @@ final class Menus {
 
         @Override
         protected void paintComponent(Graphics graphics) {
+            if (!contextualVisible()) return;
             super.paintComponent(graphics);
             chevron(graphics, this, context, getWidth() / 2);
         }

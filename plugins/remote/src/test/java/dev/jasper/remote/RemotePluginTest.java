@@ -476,7 +476,8 @@ class RemotePluginTest {
                 assertThat(host.windows()).isEmpty();
                 assertThat(plugin.store().hosts()).extracting(RemoteHost::name).containsExactly("new");
                 assertThat(rows(panel)).as("ungrouped host without a redundant header").hasSize(1);
-                assertThat(host.panelHeader(RemotePlugin.PANEL, window).detail()).isEqualTo("1");
+                assertThat(host.panelHeader(RemotePlugin.PANEL, window).detail()).isEmpty();
+                assertThat(((dev.jasper.sdk.ui.Nodes.Panel)panel.view().spec().root()).header().count()).hasValue(1);
                 panel.select(plugin.store().hosts().getFirst().id());
                 assertThat(cardCredential(panel)).isEqualTo("SSH agent");
                 assertThat(host.invoke(RemotePlugin.IMPORT, window, null)).isTrue();

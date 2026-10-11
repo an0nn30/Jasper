@@ -101,6 +101,11 @@ public final class PanelFixtures {
                     && selected.id().equals("sessions-body")) {
                 if (!selected.ids().isEmpty()) state.selected = selected.ids().iterator().next();
             } else if (e instanceof UiEvent.Action action) {
+                if(action.id().startsWith("session-favorite:")) {
+                    String id=action.id().substring("session-favorite:".length());
+                    if(!state.favorites.add(id))state.favorites.remove(id);
+                    refresh();return;
+                }
                 switch (action.id()) {
                     case "sessions-add" ->
                             state.sessions.add(
@@ -157,6 +162,7 @@ public final class PanelFixtures {
                                 new Session("pve", "pve", "100.73.226.91"),
                                 new Session("pve-root", "pve-root", "100.73.226.91")));
         String query = "", selected = "amp", sftpSession = "";
+        final Set<String> favorites = new HashSet<>();
         int tunnels;
         final Map<String, ServerState> servers = new LinkedHashMap<>();
         final Deque<String> pendingServers = new ArrayDeque<>();
@@ -267,7 +273,7 @@ public final class PanelFixtures {
                                                                                                     .id(),
                                                                                     s.title(),
                                                                                     TextRole
-                                                                                            .BODY_STRONG),
+                                                                                            .BODY),
                                                                             text(
                                                                                     "session-address-"
                                                                                             + s
@@ -275,7 +281,7 @@ public final class PanelFixtures {
                                                                                     s.address(),
                                                                                     TextRole.BODY)),
                                                                     List.of(),
-                                                                    List.of()))
+                                                                    List.of(new Nodes.Button("session-star-"+s.id(),READY,"",favorites.contains(s.id())?"star.filled":"star",ButtonKind.GHOST,"session-favorite:"+s.id(),favorites.contains(s.id())?"Remove from favorites":"Add to favorites",favorites.contains(s.id())?ButtonPresentation.EMBEDDED:ButtonPresentation.CONTEXTUAL_EMBEDDED,favorites.contains(s.id())?Optional.of(Severity.WARNING):Optional.empty()))))
                                             .toList(),
                                     filtered.stream().anyMatch(s -> s.id().equals(selected))
                                             ? Set.of(selected)
@@ -291,14 +297,14 @@ public final class PanelFixtures {
                     new Nodes.Stack(
                             "sessions-footer",
                             READY,
-                            LayoutRole.VERTICAL,
+                            LayoutRole.DETAIL,
                             List.of(
                                     new Nodes.Stack(
                                             "session-detail",
                                             READY,
-                                            LayoutRole.INLINE,
+                                            LayoutRole.NAVIGATION,
                                             List.of(
-                                                    icon("session-detail-icon", "server"),
+                                                    new Nodes.Icon("session-detail-icon",READY,"server",Hue.NEUTRAL,IconSize.HERO,"SSH host"),
                                                     new Nodes.Stack(
                                                             "session-detail-text",
                                                             READY,
@@ -307,7 +313,7 @@ public final class PanelFixtures {
                                                                     text(
                                                                             "session-detail-title",
                                                                             detail.title(),
-                                                                            TextRole.BODY_STRONG),
+                                                                            TextRole.PANEL_TITLE),
                                                                     text(
                                                                             "session-detail-address",
                                                                             "ubuntu@"
@@ -315,17 +321,18 @@ public final class PanelFixtures {
                                                                                             .address()
                                                                                     + ":22",
                                                                             TextRole
-                                                                                    .MONO_SMALL))))),
+                                                                                    .MONO_CAPTION))))),
                                     new Nodes.Stack(
                                             "session-footer-actions",
                                             READY,
                                             LayoutRole.NAVIGATION,
                                             List.of(
-                                                    icon("session-lock", "lock"),
+                                                    new Nodes.Icon("session-lock",READY,"lock",Hue.NONE,IconSize.CONTROL,"Vault locked"),
                                                     text(
                                                             "session-vault",
                                                             "Vault locked",
                                                             TextRole.CAPTION),
+                                                    new Nodes.Button("session-edit",READY,"","edit",ButtonKind.GHOST,"session-edit","Edit session"),
                                                     new Nodes.Button(
                                                             "session-connect",
                                                             READY,

@@ -14,6 +14,7 @@ import javax.swing.text.*;
 final class TextFields {
     private TextFields() {}
     static final class FieldControl extends ControlRegistry.Control {
+        boolean panelSearch;
         final JTextComponent input;
         final JLabel label = Labels.literal(), error = Labels.literal(), leading = Labels.literal();
         final FieldSurface surface;
@@ -229,8 +230,9 @@ final class TextFields {
                 scroll.getVerticalScrollBar().setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_INPUT));
                 scroll.getVerticalScrollBar().setForeground(ThemePainting.color(context(), SemanticColor.BORDER_INPUT));
             }
-            var role = field.kind() == Nodes.FieldKind.PORT || field.kind() == Nodes.FieldKind.PATH || field.presentation() == Nodes.FieldPresentation.TECHNICAL ? Typography.Role.MONO : Typography.Role.BODY;
+            var role = panelSearch ? Typography.Role.PANEL_SEARCH : field.kind() == Nodes.FieldKind.PORT || field.kind() == Nodes.FieldKind.PATH || field.presentation() == Nodes.FieldPresentation.TECHNICAL ? Typography.Role.MONO : Typography.Role.BODY;
             input.setFont(ThemePainting.font(context(), role));
+            surface.panelSearch=panelSearch; surface.role=role; surface.heightRole=panelSearch ? DesignMetrics.Role.PANEL_SEARCH_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT;
             input.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
             input.setDisabledTextColor(input.getForeground()); input.setCaretColor(input.getForeground());
             input.setSelectionColor(ThemePainting.color(context(), SemanticColor.SELECTION_BG));
@@ -250,13 +252,17 @@ final class TextFields {
             surface.error = !field.state().error().isEmpty();
             leading.setFont(ThemePainting.font(context(), Typography.Role.MONO)); leading.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PLACEHOLDER));
             leading.setText(field.kind() == Nodes.FieldKind.PORT ? ":" : "");
-            if (field.kind() == Nodes.FieldKind.SEARCH || field.kind() == Nodes.FieldKind.PATH) leading.setIcon(context().icons().icon(field.kind() == Nodes.FieldKind.PATH ? "folder.filled" : "search", context().theme().semantic(), SemanticColor.TEXT_PLACEHOLDER,
-                com.formdev.flatlaf.util.UIScale.scale(context().icons().size(Nodes.IconSize.CONTROL))));
-            int gap = ThemePainting.metric(context(), field.kind() == Nodes.FieldKind.PORT ? DesignMetrics.Role.PORT_PREFIX_GAP : DesignMetrics.Role.ICON_GAP);
+            if (field.kind() == Nodes.FieldKind.SEARCH || field.kind() == Nodes.FieldKind.PATH) {
+                String name=field.kind() == Nodes.FieldKind.PATH ? "folder.filled" : "search";
+                int extent=com.formdev.flatlaf.util.UIScale.scale(context().icons().size(panelSearch ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
+                leading.setIcon(panelSearch ? context().icons().panel(name, context().theme().semantic(), SemanticColor.HUE_NEUTRAL,extent)
+                    : context().icons().icon(name,context().theme().semantic(),SemanticColor.TEXT_PLACEHOLDER,extent));
+            }
+            int gap = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_GAP : field.kind() == Nodes.FieldKind.PORT ? DesignMetrics.Role.PORT_PREFIX_GAP : DesignMetrics.Role.ICON_GAP);
             leading.setVisible(field.presentation() != Nodes.FieldPresentation.PLAIN_PATH);
             leading.setBorder(new EmptyBorder(0, 0, 0, gap));
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
-            int padding = ThemePainting.metric(context(), field.kind() == Nodes.FieldKind.TEXTAREA ? DesignMetrics.Role.TEXTAREA_PADDING : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
+            int padding = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_PADDING : field.kind() == Nodes.FieldKind.TEXTAREA ? DesignMetrics.Role.TEXTAREA_PADDING : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
             surface.setBorder(new EmptyBorder(ring * 2, padding, ring * 2, padding));
             if (browse != null) {
                 browse.parentEnabled = parentEnabled; browse.update(browseNode(field)); browse.component.setVisible(!field.trailingAction().isBlank());
@@ -324,7 +330,7 @@ final class TextFields {
         }
     }
     static final class FieldSurface extends JPanel {
-        boolean hero;
+        boolean hero, panelSearch;
         DesignMetrics.Role heightRole=DesignMetrics.Role.FIELD_HEIGHT,radiusRole=DesignMetrics.Role.CONTROL_RADIUS;
         final KitContext context; final JTextComponent input; final boolean multiline;
         Typography.Role role = Typography.Role.BODY; String hint = ""; boolean error;
@@ -354,6 +360,15 @@ final class TextFields {
             if (multiline || input == null || getHeight() <= 0) return base;
             int room = Math.max(0, (getHeight() - input.getPreferredSize().height) / 2);
             return new Insets(Math.min(base.top, room), base.left, Math.min(base.bottom, room), base.right);
+        }
+        @Override public void doLayout() {
+            super.doLayout();
+            // The compact panel text baseline sits below the centered search glyph. Keep native input,
+            // selection, caret and module placeholder on that same baseline without moving the icon slot.
+            if(panelSearch && !multiline && input != null) {
+                int offset=Math.min(Math.max(0,getHeight()-input.getY()-input.getHeight()),ThemePainting.metric(context,DesignMetrics.Role.PANEL_SEARCH_TEXT_BASELINE));
+                input.setLocation(input.getX(),input.getY()+offset);
+            }
         }
         @Override public void paint(Graphics graphics) {
             var g = (Graphics2D)graphics.create();

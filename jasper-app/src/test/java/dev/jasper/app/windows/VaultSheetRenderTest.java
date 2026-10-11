@@ -130,6 +130,13 @@ class VaultSheetRenderTest {
                         ()->new Rectangle(0,0,width,Math.max(900,height+100)),value->{bounds.set(value);child.setSize(value.getSize());layout(child);}))) {
                     sheet.fitNow();layout(child);
                     assertThat(sheet.fallback()).isEqualTo(state.equals("short"));
+                    if (id.equals("vault-login")) {
+                        int segmentHeight = state.equals("enlarged") ? 38 : 25;
+                        assertThat(find(surface.holder(), "auth.option.password").getHeight())
+                            .as("actual Login segment preserves its nonheader height in %s", state).isEqualTo(segmentHeight);
+                        assertThat(find(surface.holder(), "auth.input").getHeight())
+                            .isEqualTo(segmentHeight + (state.equals("enlarged") ? 6 : 4));
+                    }
                     capture(state,id,root,child,bounds.get(),"body="+chrome.body().boundsInRoot().orElseThrow()+"\nsheet="+bounds.get()+"\nfallback="+sheet.fallback());
                     capture(state,id+"-sheet",child,null,null,"same actual mounted attached sheet; no native shadow/peer");
                 }

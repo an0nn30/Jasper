@@ -116,26 +116,28 @@ class HostsPanelTest {
             var panel = panel();
             var headers = new ArrayList<dev.jasper.sdk.ui.PanelHeader>();
             panel.onHeaderChanged(headers::add);
-            assertThat(headers.getLast().detail()).isEqualTo("0");
+            assertThat(headers.getLast().detail()).isEmpty();
+            assertThat(((Nodes.Panel)panel.view().spec().root()).header().count()).hasValue(0);
             panel.setHosts(List.of(nas, prod), Optional.empty());
             panel.setDistros(List.of(ubuntu, pwsh), profile -> 0);
             search(panel, "no match");
             var header = headers.getLast();
-            assertThat(header.detail()).as("filtering doesn't change the saved-session count").isEqualTo("3");
+            assertThat(header.detail()).isEmpty();
+            assertThat(((Nodes.Panel)panel.view().spec().root()).header().count()).as("filtering does not change the collection count").hasValue(3);
             assertThat(header.active()).isFalse();
             assertThat(header.actions()).extracting(dev.jasper.sdk.ui.PanelHeader.Action::label).containsExactly("New session", "Import sessions");
             header.actions().forEach(action -> action.invoke().run());
             assertThat(events).containsExactly("edit new", "import");
             panel.setHosts(List.of(nas), Optional.empty());
-            assertThat(headers.getLast().detail()).isEqualTo("2");
+            assertThat(((Nodes.Panel)panel.view().spec().root()).header().count()).hasValue(2);
             int published = headers.size();
             panel.setHosts(List.of(nas), Optional.empty());
             assertThat(headers).as("an unchanged count publishes nothing").hasSize(published);
         });
     }
 
-    /** G4 (controller ruling): the outline star is always shown (visual-only); a favourite's is filled and amber. */
-    @Test void rowsShowAnOutlineStarAndFavouritesAFilledWarningStar() throws Exception {
+    /** Task5 supersedes visual G4: contextual nonfavorite ink; favorites stay filled and amber. */
+    @Test void rowsChooseContextualOutlineAndAlwaysVisibleFilledFavorite() throws Exception {
         edt(() -> {
             var panel = panel();
             panel.setHosts(List.of(nas, prod.withFavorite(true)), Optional.empty());
@@ -145,7 +147,7 @@ class HostsPanelTest {
             assertThat(plain.iconSeverity()).isEmpty();
             assertThat(plain.tooltip()).isEqualTo("Add to favorites");
             assertThat(plain.kind()).isEqualTo(Nodes.ButtonKind.GHOST);
-            assertThat(plain.presentation()).isEqualTo(Nodes.ButtonPresentation.EMBEDDED);
+            assertThat(plain.presentation()).isEqualTo(Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED);
             assertThat(plain.label()).isEmpty();
             var favourite = star(panel, prodRow);
             assertThat(favourite.icon()).isEqualTo("star.filled");
@@ -222,7 +224,7 @@ class HostsPanelTest {
             assertThat(edit.state().visible() && edit.state().enabled()).isTrue();
             assertThat(button(panel.view(), HostsPanel.CONNECT).state().visible()).isTrue();
             assertThat(node(panel.view(), "card.actions", Nodes.Stack.class).role())
-                .as("a narrow panel wraps the card's controls at full width (real-host geometry: StagedRemoteSessionsTest)").isEqualTo(Nodes.LayoutRole.ACTIONS);
+                .as("a narrow panel wraps the card's controls at full width (real-host geometry: StagedRemoteSessionsTest)").isEqualTo(Nodes.LayoutRole.NAVIGATION);
         });
     }
 
@@ -451,8 +453,8 @@ class HostsPanelTest {
         edt(() -> {
             var panel = panel();
             panel.setHosts(List.of(prod), Optional.empty()); panel.select(prod.id());
-            assertThat(node(panel.view(), HostsPanel.CARD_NAME, Nodes.Text.class).role()).isEqualTo(Nodes.TextRole.BODY_STRONG);
-            assertThat(node(panel.view(), HostsPanel.CARD_ADDRESS, Nodes.Text.class).role()).isEqualTo(Nodes.TextRole.MONO);
+            assertThat(node(panel.view(), HostsPanel.CARD_NAME, Nodes.Text.class).role()).isEqualTo(Nodes.TextRole.PANEL_TITLE);
+            assertThat(node(panel.view(), HostsPanel.CARD_ADDRESS, Nodes.Text.class).role()).isEqualTo(Nodes.TextRole.MONO_CAPTION);
             assertThat(node(panel.view(), HostsPanel.CARD_TILE, Nodes.Icon.class).name()).isEqualTo("server");
         });
     }

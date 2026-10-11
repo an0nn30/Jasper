@@ -291,7 +291,7 @@ public final class HostsPanel implements AutoCloseable {
         int count = hosts.size() + distros.size();
         if (count == headerCount) return;
         headerCount = count;
-        headerChanged.accept(new PanelHeader(String.valueOf(count), false, List.of(
+        headerChanged.accept(new PanelHeader("", false, List.of(
             new PanelHeader.Action("New session", "add", () -> { if (!closed) actions.edit().accept(Optional.empty()); }),
             new PanelHeader.Action("Import sessions", "download", () -> { if (!closed) actions.importConfig().run(); }))));
     }
@@ -299,10 +299,10 @@ public final class HostsPanel implements AutoCloseable {
     private static ControlState state(boolean visible) { return new ControlState(visible, true, false, ""); }
 
     private Nodes.Panel node() {
-        var header = new Nodes.Header(HEADER, ControlState.READY, "Sessions", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
+        var header = new Nodes.Header(HEADER, ControlState.READY, "Sessions", OptionalInt.of(hosts.size() + distros.size()), Optional.empty(), Optional.empty(), List.of());
         var search = new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Search sessions", "Search sessions", "");
         var items = rows.stream().map(this::item).toList();
-        var list = new Nodes.ItemList(ROWS, ControlState.READY, Nodes.ListKind.COMPACT, items,
+        var list = new Nodes.ItemList(ROWS, ControlState.READY, Nodes.ListKind.SINGLE, items,
             selectedRow == null ? Set.of() : Set.of(selectedRow), ACTIVATE, List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.empty(), "", "");
         var footer = new ArrayList<Nodes.Node>();
         boolean searching = !query.strip().isEmpty();
@@ -314,7 +314,7 @@ public final class HostsPanel implements AutoCloseable {
         }
         card().ifPresent(footer::add);
         Optional<Nodes.Node> bottom = footer.isEmpty() ? Optional.empty()
-            : Optional.of(new Nodes.Stack(FOOTER, ControlState.READY, Nodes.LayoutRole.VERTICAL, footer));
+            : Optional.of(new Nodes.Stack(FOOTER, ControlState.READY, Nodes.LayoutRole.DETAIL, footer));
         return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.of(search), list, bottom);
     }
 
@@ -360,7 +360,7 @@ public final class HostsPanel implements AutoCloseable {
                 if (host.group().isEmpty() && defaultGroup.equals(HostRows.OTHER) && hosts.stream().allMatch(h -> h.group().isEmpty()))
                     menu.add(menu("rename", id, "Rename group…"));
                 var star = new Nodes.Button("row." + id + ".star", ControlState.READY, "", host.favorite() ? "star.filled" : "star", Nodes.ButtonKind.GHOST,
-                    FAVORITE + host.id(), host.favorite() ? "Remove from favorites" : "Add to favorites", Nodes.ButtonPresentation.EMBEDDED,
+                    FAVORITE + host.id(), host.favorite() ? "Remove from favorites" : "Add to favorites", host.favorite() ? Nodes.ButtonPresentation.EMBEDDED : Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED,
                     host.favorite() ? Optional.of(Nodes.Severity.WARNING) : Optional.empty());
                 yield new ListItem(id,
                     Optional.of(new Nodes.StatusDot("row." + id + ".dot", ControlState.READY, sessions > 0 ? Nodes.StatusKind.SUCCESS : Nodes.StatusKind.IDLE)),
@@ -381,7 +381,7 @@ public final class HostsPanel implements AutoCloseable {
         return host.jump().flatMap(id -> hosts.stream().filter(other -> other.id().equals(id)).findFirst()).map(RemoteHost::name).orElse(null);
     }
 
-    /** The selected host's or distribution's card, kit composition until Plan 3. */
+    /** The selected host's or distribution's persistent detail, keyed by identity. */
     private Optional<Nodes.Node> card() {
         Optional<ShellProfileInfo> distro = selectedDistro();
         Optional<RemoteHost> host = selectedHost();
@@ -403,23 +403,22 @@ public final class HostsPanel implements AutoCloseable {
         }
         boolean isHost = host.isPresent();
         var details = new Nodes.Stack("card.details", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
-            new Nodes.Text(CARD_NAME, ControlState.READY, name, Nodes.TextRole.BODY_STRONG),
-            new Nodes.Text(CARD_ADDRESS, ControlState.READY, address, Nodes.TextRole.MONO),
+            new Nodes.Text(CARD_NAME, ControlState.READY, name, Nodes.TextRole.PANEL_TITLE),
+            new Nodes.Text(CARD_ADDRESS, ControlState.READY, address, Nodes.TextRole.MONO_CAPTION),
             // A host's OS and address facts stay in its row tooltip, as the old card kept them in a tooltip.
             new Nodes.Text(CARD_INFO, state(!isHost), info, Nodes.TextRole.DESCRIPTION),
             new Nodes.Text(CARD_JUMP, state(false), jump, Nodes.TextRole.DESCRIPTION)));
-        var identity = new Nodes.Stack("card.identity", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
-            new Nodes.Icon(CARD_TILE, ControlState.READY, "server", Nodes.Hue.BLUE, Nodes.IconSize.RAIL, isHost ? "SSH host" : "WSL distribution"), details));
+        var identity = new Nodes.Stack("card.identity", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
+            new Nodes.Icon(CARD_TILE, ControlState.READY, "server", Nodes.Hue.NEUTRAL, Nodes.IconSize.HERO, isHost ? "SSH host" : "WSL distribution"), details));
         var status = new ArrayList<Nodes.Node>();
         if (isHost && connected) status.add(new Nodes.StatusDot(CARD_CONNECTED, ControlState.READY, Nodes.StatusKind.SUCCESS));
-        else if (isHost && credential.equals("Vault locked")) status.add(new Nodes.Icon(CARD_LOCKED, ControlState.READY, "lock", Nodes.Hue.NONE, Nodes.IconSize.CAPTION, "Vault locked"));
+        else if (isHost && credential.equals("Vault locked")) status.add(new Nodes.Icon(CARD_LOCKED, ControlState.READY, "lock", Nodes.Hue.NONE, Nodes.IconSize.CONTROL, "Vault locked"));
         status.add(new Nodes.Text(CARD_CREDENTIAL, state(isHost), credential, Nodes.TextRole.CAPTION));
         status.add(new Nodes.Button(EDIT, state(isHost), "", "edit", Nodes.ButtonKind.GHOST, EDIT, "Edit session"));
         status.add(new Nodes.Button(CONNECT, ControlState.READY, button, terminal ? "terminal" : "", Nodes.ButtonKind.PRIMARY, CONNECT, ""));
-        // ACTIONS wraps at natural widths instead of cutting controls short, so a narrow panel keeps Edit and Connect whole
-        // (the former footer kept its buttons at full size and let the caption shrink).
-        var actionsRow = new Nodes.Stack("card.actions", ControlState.READY, Nodes.LayoutRole.ACTIONS, status);
-        return Optional.of(new Nodes.Card(CARD, ControlState.READY, Nodes.CardKind.MIXED, List.of(identity, actionsRow)));
+        // NAVIGATION reserves fixed actions, lets the credential caption elide and wraps at genuinely narrow widths.
+        var actionsRow = new Nodes.Stack("card.actions", ControlState.READY, Nodes.LayoutRole.NAVIGATION, status);
+        return Optional.of(new Nodes.Stack(CARD, ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(identity, actionsRow)));
     }
 
     @Override public void close() {

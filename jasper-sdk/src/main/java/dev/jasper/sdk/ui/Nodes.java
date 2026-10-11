@@ -90,8 +90,11 @@ public final class Nodes {
      * for a host arrangement that supplies the spacing (for example a row of inline links): no padding, focus-ring inset,
      * minimum height or resting fill, and an icon-only embedded button draws its glyph at the row-glyph size. Keyboard
      * focus still shows, as a hairline in the focus colour inside the button's bounds.
+     * CONTEXTUAL_EMBEDDED reserves the same mounted, focusable and accessible control, but paints it only while its
+     * containing item row is selected, hovered or keyboard-active, or while the button itself is hovered/focused.
+     * Outside an item row it behaves like EMBEDDED. It never changes action dispatch or selection.
      */
-    public enum ButtonPresentation { STANDARD, EMBEDDED }
+    public enum ButtonPresentation { STANDARD, EMBEDDED, CONTEXTUAL_EMBEDDED }
 
     /**
      * A present {@code iconSeverity} tints the button's glyph with that severity's colour (as {@link Icon#severity()}

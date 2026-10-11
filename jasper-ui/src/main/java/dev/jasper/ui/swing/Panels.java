@@ -15,7 +15,7 @@ final class Panels {
     private Panels() {}
 
     static final class PanelControl extends ControlRegistry.Control {
-        final JScrollPane scroll = new JScrollPane();
+        final JScrollPane scroll = new JScrollPane(), footerScroll = new JScrollPane();
         final Body body = new Body();
         final JPanel content = new JPanel(new BorderLayout());
         ControlRegistry.Control queryControl, footerControl;
@@ -27,6 +27,18 @@ final class Panels {
         PanelControl(KitView view, Nodes.Panel node) {
             super(view, node, new Surface(view.context()));
             footer = new PanelFooters.Footer(context(), node.id() + ".footer-surface");
+            footerScroll.setViewportView(footer);
+            footerScroll.setBorder(new EmptyBorder(0,0,0,0));
+            footerScroll.setOpaque(false);footerScroll.getViewport().setOpaque(false);
+            footerScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+            KitOwnership.mark(footerScroll,node.id()+".footer-scroll");
+            var focusManager=KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            java.beans.PropertyChangeListener focusChanged=event -> {
+                if(!closed && !view.isClosed() && event.getNewValue() instanceof JComponent focused && SwingUtilities.isDescendingFrom(focused,footer))
+                    focused.scrollRectToVisible(new Rectangle(0,0,focused.getWidth(),focused.getHeight()));
+            };
+            focusManager.addPropertyChangeListener("focusOwner",focusChanged);
+            own(() -> focusManager.removePropertyChangeListener("focusOwner",focusChanged));
             KitOwnership.mark(scroll, node.id() + ".body-scroll");
             scroll.setViewportView(body);
             scroll.setBorder(new EmptyBorder(0, 0, 0, 0));
@@ -50,14 +62,16 @@ final class Panels {
             state();
             footer.refresh();
             ((Surface)component).column = column;
-            int side = column == 0 || column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_LIST_SIDE) : 0;
+            boolean single = ((Nodes.Panel)node).body() instanceof Nodes.ItemList list && list.kind()==Nodes.ListKind.SINGLE;
+            int side = column == 0 || column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_LIST_SIDE) : single ? ThemePainting.metric(context(),DesignMetrics.Role.PANEL_ROW_SIDE) : 0;
             content.setBorder(new EmptyBorder(column == 0 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP) : 0, side, 0, side));
-            int pad = ThemePainting.metric(context(), DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
+            boolean search=((Nodes.Panel)node).searchOrNavigation().filter(n -> n instanceof Nodes.Field f && f.kind()==Nodes.FieldKind.SEARCH).isPresent();
+            int pad = ThemePainting.metric(context(), search && column<0 ? DesignMetrics.Role.PANEL_SEARCH_SIDE : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
             navigation.setBorder(
                     new EmptyBorder(
                             column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_TOP) : 0,
                             column == 1 ? side : pad,
-                            ThemePainting.metric(context(), column == 1 ? DesignMetrics.Role.COLUMN_SEARCH_BOTTOM : DesignMetrics.Role.ICON_GAP),
+                            ThemePainting.metric(context(), column == 1 ? DesignMetrics.Role.COLUMN_SEARCH_BOTTOM : search ? DesignMetrics.Role.PANEL_SEARCH_BOTTOM : DesignMetrics.Role.ICON_GAP),
                             column == 1 ? side : pad));
             component.revalidate();
             component.repaint();
@@ -87,6 +101,8 @@ final class Panels {
                     Stacks.mount(navigation, List.of(c.component));
                 } else if (childParent(c.node) == footer) {
                     footerControl = c;
+                    footer.detail = c.node instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.DETAIL;
+                    footer.refresh();
                     footer.mount(c.component);
                 } else if (childParent(c.node) == content) {
                     body.control = c;
@@ -94,7 +110,7 @@ final class Panels {
                 }
             }
             presentation();
-            Stacks.mount(component, List.of(header.component, scroll, footer));
+            Stacks.mount(component, List.of(header.component, scroll, footerScroll));
         }
 
         void presentation() {
@@ -109,6 +125,7 @@ final class Panels {
                             && queryControl != null
                             && queryControl.component.isVisible());
             footer.setVisible(p.footer().isPresent());
+            footerScroll.setVisible(p.footer().isPresent());
             if (footerControl instanceof SettingRows.RowControl row) {
                 row.panelFooter = true;
                 row.refresh();
@@ -227,11 +244,12 @@ final class Panels {
         public void layoutContainer(Container p) {
             if (owner.header == null) return;
             int w = p.getWidth(), h = p.getHeight();
-            int fh = owner.footer.isVisible() ? Math.min(h, owner.footer.height(w)) : 0;
-            int hh = Math.min(Math.max(0, h - fh), (owner.header.component.isVisible() ? Composition.height(owner.header.component, w) : 0));
+            int footerMinimum=owner.footer.isVisible() ? owner.footer.interactiveHeight(owner.footer) : 0;
+            int hh = Math.min(Math.max(0,h-footerMinimum), owner.header.component.isVisible() ? Composition.height(owner.header.component,w) : 0);
+            int fh = owner.footer.isVisible() ? Math.min(Math.max(0,h-hh),owner.footer.height(w)) : 0;
             owner.header.component.setBounds(0, 0, w, hh);
             owner.scroll.setBounds(0, hh, w, Math.max(0, h - fh - hh));
-            owner.footer.setBounds(0, h - fh, w, fh);
+            owner.footerScroll.setBounds(0, h - fh, w, fh);
         }
     }
 

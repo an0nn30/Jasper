@@ -12,7 +12,7 @@ import java.util.Set;
 /** Platform family and user size resolved once, then applied consistently to named text roles. */
 public final class Typography {
     public enum Role {
-        HERO_TITLE(15, 600), DETAIL_TITLE(16, 600), WINDOW_TITLE(13, 600), PANEL_TITLE(13, 600),
+        HERO_TITLE(15, 600), DETAIL_TITLE(16, 600), WINDOW_TITLE(13, 600), PANEL_TITLE(13, 600), PANEL_DETAIL_TITLE(12.5f, 600), PANEL_DETAIL_LABEL(12, 400), PANEL_HEADER_TITLE(12.5f, 600), PANEL_HEADER_COUNT(11.5f, 400), PANEL_SEARCH(12,400), PANEL_ROW_SELECTED(12,500), PANEL_ROW_SECONDARY(13.25f,400), PANEL_DETAIL_MONO(11.65f,400),
         PICKER_COMPACT(10, 400), PICKER_CAPTION(9, 400),
         BODY(13, 400), BODY_STRONG(13, 500), LABEL(12.5f, 400), DESCRIPTION(12.5f, 400),
         SUPPORTING(11.5f, 400), CAPTION(11.5f, 400), SETTING_DESCRIPTION(11, 400), SECTION_LABEL(11, 600), COUNT(11, 400), CHIP(9.5f, 400), MONO(12, 400), MONO_SMALL(11.5f, 400), MONO_CAPTION(11.5f, 400);
@@ -39,7 +39,7 @@ public final class Typography {
     /** Selected labels use medium weight. Size settings enlarge every role proportionally. */
     public Font font(Role role, boolean selected) {
         Objects.requireNonNull(role);
-        String resolved = role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION ? Font.MONOSPACED : family;
+        String resolved = role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION || role == Role.PANEL_DETAIL_MONO ? Font.MONOSPACED : family;
         int weight = selected && role == Role.LABEL ? 500 : role.weight;
         // The native macOS text face best matches regular desktop roles. Explicit user families bypass this policy.
         if (platformDefault && weight < 600 && resolved.equals("Helvetica Neue") && AppleText.AVAILABLE)

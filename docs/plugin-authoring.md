@@ -810,6 +810,8 @@ The exact member-owner allowlist is in the checker; FlatLaf style writers remain
 
 ## Consumer migration completion
 
+`ButtonPresentation.CONTEXTUAL_EMBEDDED` reserves the same content geometry as `EMBEDDED` and keeps the control mounted, focusable, accessible and independently actionable. In an interactive row, its ink appears while the row is selected, hovered or actually keyboard-active, or while the button itself owns focus. Outside a row it paints normally. Use `EMBEDDED` for persistent actions such as a confirmed favorite; the default `STANDARD` remains unchanged. The host maps this enum directly and the testkit retains it in the descriptor.
+
 Plan 2 uses the kit as the only standard-control presentation authority. SDK 0.15 is incompatible with
 pre-0.15 raw UI factories and raw presentation icons; all eight bundled manifests cut over together.
 The [completion audit](design/theme-engine/completion.md) records exact gate scope, owner tests, headless

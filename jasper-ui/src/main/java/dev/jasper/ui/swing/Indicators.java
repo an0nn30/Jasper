@@ -46,14 +46,15 @@ final class Indicators {
     }
     static final class Dot extends JPanel {
         final KitContext context;
+        boolean panelRow;
         Dot(KitContext context) { this.context = context; setOpaque(false); }
         /** Tooltips are literal text: row tooltips carry user data, and Swing HTML could load remote resources. */
         @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
-        @Override public Dimension getPreferredSize() { int size = ThemePainting.metric(context, DesignMetrics.Role.STATUS_DOT); return new Dimension(size, size); }
+        @Override public Dimension getPreferredSize() { int size = ThemePainting.metric(context, panelRow ? DesignMetrics.Role.PANEL_ROW_DOT : DesignMetrics.Role.STATUS_DOT); return new Dimension(size, size + (panelRow ? 2*ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_OPTICAL_OFFSET) : 0)); }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create(); try {
                 ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
-                int size = ThemePainting.metric(context, DesignMetrics.Role.STATUS_DOT); g.setColor(getForeground()); g.fillOval((getWidth()-size)/2, (getHeight()-size)/2, size, size);
+                int size = ThemePainting.metric(context, panelRow ? DesignMetrics.Role.PANEL_ROW_DOT : DesignMetrics.Role.STATUS_DOT); g.setColor(getForeground()); g.fillOval((getWidth()-size)/2, (getHeight()-size)/2 + (panelRow ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_OPTICAL_OFFSET) : 0), size, size);
             } finally { g.dispose(); }
         }
     }

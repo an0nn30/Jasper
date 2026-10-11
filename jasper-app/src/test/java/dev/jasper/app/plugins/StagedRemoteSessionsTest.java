@@ -46,7 +46,7 @@ class StagedRemoteSessionsTest {
             remote.openSessions();
             onEdt(() -> {
                 var header = remote.header();
-                assertThat(labels(header)).as("the title, then the count from PanelHost.setHeader").contains("Sessions", "0");
+                assertThat(labels(header)).as("the title, then the count from PanelHost.setHeader").contains("Sessions").doesNotContain("0");
                 assertThat(names(header)).as("contributed actions before the window's own").containsExactly("New session", "Import sessions", "Options", "Hide");
                 assertThat(labels(remote.window).stream().filter("Sessions"::equals).count()).as("one title row").isEqualTo(1);
                 assertThat(names(remote.window).stream().filter(name -> name.equals("New session") || name.equals("Import sessions")).toList())
@@ -65,13 +65,13 @@ class StagedRemoteSessionsTest {
             StagedVaultHost.settle();
             onEdt(() -> {
                 assertThat(editor.closed()).as("Enter saves nothing: the old dialog had no default button").isFalse();
-                assertThat(labels(remote.header())).contains("0");
+                assertThat(labels(remote.header())).doesNotContain("0");
                 press(require(editor, "host.name.input"), KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED);
             });
             StagedVaultHost.await(editor::closed, "Escape cancels the Add Host dialog");
             StagedVaultHost.settle();
             onEdt(() -> {
-                assertThat(labels(remote.header())).as("cancelling saved nothing").contains("0");
+                assertThat(labels(remote.header())).as("empty collection count is hidden").doesNotContain("0");
                 button(remote.header(), "New session").doClick(0);
             });
             var again = remote.awaitSurface("Add Host");

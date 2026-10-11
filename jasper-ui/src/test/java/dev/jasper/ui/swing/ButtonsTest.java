@@ -62,6 +62,34 @@ class ButtonsTest {
             } finally { release(context); }
         });
     }
+    @Test void compactFooterActionReservesItsFaceFocusAndHitAreaAcrossThemesAndFontOverrides() {
+        Edt.run(() -> {
+            var ctx=KitFixtures.context();var events=new ArrayList<UiEvent>();var old=UIManager.get("defaultFont");
+            var action=new Nodes.Button("connect",ControlState.READY,"Connect","",ButtonKind.PRIMARY,"connect","Connect");
+            var detail=new Nodes.Stack("detail",ControlState.READY,LayoutRole.DETAIL,List.of(action));
+            var panel=new Nodes.Panel("panel",ControlState.READY,new Header("header",ControlState.READY,"Panel",java.util.OptionalInt.empty(),java.util.Optional.empty(),java.util.Optional.empty(),List.of()),java.util.Optional.empty(),new Text("body",ControlState.READY,"Body",TextRole.BODY),java.util.Optional.of(detail));
+            try(var view=new KitView(ctx,new ViewSpec(panel),events::add)) {
+                var button=((Buttons.ButtonControl)view.control("connect")).button;
+                for(var theme:List.of(KitFixtures.dark(),KitFixtures.light(),KitFixtures.custom())) {
+                    ctx.binding().publish(new ThemePair(theme,theme));
+                    view.setSize(260,160);InteractiveRowsTest.layout(view);
+                    assertThat(button.getPreferredSize().height).isEqualTo(28);
+                    button.setSize(button.getPreferredSize());var before=paint(button);
+                    assertThat(before.getRGB(button.getWidth()/2,2)>>>24).isZero();
+                    assertThat(before.getRGB(button.getWidth()/2,3)).isEqualTo(theme.semantic().color(SemanticColor.ACCENT).getRGB());
+                    button.getModel().setRollover(true);var hover=paint(button);
+                    assertThat(hover.getRGB(button.getWidth()/2,3)).isEqualTo(theme.semantic().color(SemanticColor.ACCENT_HOVER).getRGB());
+                    button.getModel().setRollover(false);button.setEnabled(false);var disabled=paint(button);button.getModel().setRollover(true);
+                    assertThat(paint(button).getRGB(0,0,button.getWidth(),button.getHeight(),null,0,button.getWidth())).containsExactly(disabled.getRGB(0,0,button.getWidth(),button.getHeight(),null,0,button.getWidth()));
+                    button.doClick(0);assertThat(events).isEmpty();button.setEnabled(true);button.getModel().setRollover(false);
+                }
+                UIManager.put("defaultFont",new Font(Font.MONOSPACED,Font.PLAIN,24));view.update(new ViewSpec(panel));InteractiveRowsTest.layout(view);
+                assertThat(button.getFont().getFamily()).isEqualTo(Font.MONOSPACED);assertThat(button.getPreferredSize().height).isGreaterThan(28);
+                assertThat(((Buttons.ButtonControl)view.control("connect")).button).isSameAs(button);
+                button.doClick(0);assertThat(events).containsExactly(new UiEvent.Action("connect"));
+            } finally {if(old==null)UIManager.getDefaults().remove("defaultFont");else UIManager.put("defaultFont",old);release(ctx);}
+        });
+    }
     static BufferedImage paint(JComponent c) {
         var image = new BufferedImage(c.getWidth(), c.getHeight(), BufferedImage.TYPE_INT_ARGB); var g = image.createGraphics();
         try { c.paint(g); } finally { g.dispose(); } return image;

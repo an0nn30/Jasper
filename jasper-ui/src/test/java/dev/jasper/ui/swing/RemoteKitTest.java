@@ -728,4 +728,90 @@ class RemoteKitTest {
             } finally { release(context); }
         });
     }
+    static ListItem contextual(String id) {
+        return new ListItem(id,Optional.empty(),List.of(new Text(id+".title",READY,id,TextRole.BODY)),List.of(),
+            List.of(new Nodes.Button(id+".action",READY,"","star",ButtonKind.GHOST,id,"Independent action",ButtonPresentation.CONTEXTUAL_EMBEDDED)));
+    }
+    static int ink(Buttons.KitButton button) {
+        var image=ButtonsTest.paint(button);int result=0;
+        for(int y=0;y<image.getHeight();y++)for(int x=0;x<image.getWidth();x++)if((image.getRGB(x,y)>>>24)>0)result++;
+        return result;
+    }
+    @Test void contextualActionsReserveGeometryAndDispatchWhileInkTracksRealRowContext() {
+        Edt.run(() -> {
+            var ctx=KitFixtures.context();var events=new ArrayList<UiEvent>();
+            var spec=new ViewSpec(new ItemList("list",READY,ListKind.SINGLE,List.of(contextual("first"),contextual("second")),Set.of("first"),"",List.of()));
+            try(var view=new KitView(ctx,spec,events::add)) {
+                view.setSize(260,100);InteractiveRowsTest.layout(view);
+                var rows=(ItemLists.ListControl)view.control("list");var row=rows.mounted.get("second");
+                var button=((Buttons.ButtonControl)row.controls.get("second.action")).button;
+                var size=button.getPreferredSize();
+                assertThat(button.isVisible()).isTrue();assertThat(button.isFocusable()).isTrue();
+                assertThat(button.getAccessibleContext().getAccessibleName()).isEqualTo("Independent action");
+                assertThat(ink(button)).as("inactive nonselected row reserves an unpainted action").isZero();
+                var entered=new MouseEvent(row,MouseEvent.MOUSE_ENTERED,1,0,0,0,0,false);
+                for(var listener:row.getMouseListeners())listener.mouseEntered(entered);
+                assertThat(ink(button)).isPositive();
+                for(var listener:row.getMouseListeners())listener.mouseExited(new MouseEvent(row,MouseEvent.MOUSE_EXITED,2,0,0,0,0,false));
+                assertThat(ink(button)).isZero();
+                rows.focusItem="second";
+                assertThat(ink(button)).as("logical focus alone is insufficient").isZero();
+                var manager=RepaintManager.currentManager(view);
+                var dirty=new java.util.ArrayList<JComponent>();
+                RepaintManager.setCurrentManager(new RepaintManager(){@Override public void addDirtyRegion(JComponent c,int x,int y,int w,int h){dirty.add(c);}});
+                try {
+                    for(var listener:rows.canvas.getFocusListeners())listener.focusGained(new java.awt.event.FocusEvent(rows.canvas,java.awt.event.FocusEvent.FOCUS_GAINED));
+                    assertThat(dirty).contains(rows.canvas);dirty.clear();
+                    for(var listener:rows.canvas.getFocusListeners())listener.focusLost(new java.awt.event.FocusEvent(rows.canvas,java.awt.event.FocusEvent.FOCUS_LOST));
+                    assertThat(dirty).contains(rows.canvas);dirty.clear();
+                    for(var listener:button.getFocusListeners())listener.focusGained(new java.awt.event.FocusEvent(button,java.awt.event.FocusEvent.FOCUS_GAINED));
+                    assertThat(dirty).contains(row);dirty.clear();
+                    for(var listener:button.getFocusListeners())listener.focusLost(new java.awt.event.FocusEvent(button,java.awt.event.FocusEvent.FOCUS_LOST));
+                    assertThat(dirty).contains(row);
+                }finally{RepaintManager.setCurrentManager(manager);}
+                var previous=KeyboardFocusManager.getCurrentKeyboardFocusManager();
+                try {
+                    KeyboardFocusManager.setCurrentKeyboardFocusManager(new DefaultKeyboardFocusManager(){@Override public Component getFocusOwner(){return rows.canvas;}});
+                    assertThat(ink(button)).as("actual keyboard-active row").isPositive();
+                    KeyboardFocusManager.setCurrentKeyboardFocusManager(new DefaultKeyboardFocusManager(){@Override public Component getFocusOwner(){return button;}});
+                    assertThat(ink(button)).as("direct button focus").isPositive();
+                }finally{KeyboardFocusManager.setCurrentKeyboardFocusManager(previous);}
+                assertThat(button.getPreferredSize()).isEqualTo(size);
+                button.doClick(0);
+                assertThat(events).containsExactly(new UiEvent.Action("second"));
+                assertThat(rows.selected).containsExactly("first");
+                view.update(spec);InteractiveRowsTest.layout(view);
+                assertThat(((Buttons.ButtonControl)rows.mounted.get("second").controls.get("second.action")).button).isSameAs(button);
+                assertThat(ink(button)).isZero();
+            }finally{release(ctx);}
+        });
+    }
+
+    @Test void contextualActionHoverAndFocusDoNotLeakAcrossRecycledRowsOrThemeRefresh() {
+        Edt.run(() -> {
+            var ctx=KitFixtures.context();var events=new ArrayList<UiEvent>();
+            var items=java.util.stream.IntStream.range(0,200).mapToObj(i->contextual("item"+i)).toList();
+            var spec=new ViewSpec(new ItemList("list",READY,ListKind.SINGLE,items,Set.of(),"",List.of()));
+            try(var view=new KitView(ctx,spec,events::add)) {
+                view.setSize(260,100);InteractiveRowsTest.layout(view);
+                var rows=(ItemLists.ListControl)view.control("list");var oldRow=rows.mounted.get("item0");
+                var old=((Buttons.ButtonControl)oldRow.controls.get("item0.action")).button;
+                oldRow.hover=true;assertThat(ink(old)).isPositive();
+                rows.scroll.getViewport().setViewPosition(new Point(0,4000));InteractiveRowsTest.layout(view);
+                assertThat(rows.mounted).doesNotContainKey("item0");
+                assertThat(old.getActionListeners()).isEmpty();old.doClick(0);assertThat(events).isEmpty();
+                for(var row:rows.mounted.values()) {
+                    assertThat(row.hover).isFalse();
+                    for(var control:row.controls.values())if(control instanceof Buttons.ButtonControl b)assertThat(ink(b.button)).isZero();
+                }
+                rows.scroll.getViewport().setViewPosition(new Point());InteractiveRowsTest.layout(view);
+                var current=((Buttons.ButtonControl)rows.mounted.get("item0").controls.get("item0.action")).button;
+                assertThat(current).isNotSameAs(old);assertThat(ink(current)).isZero();
+                ctx.binding().publish(new dev.jasper.ui.theme.ThemePair(KitFixtures.light(),KitFixtures.light()));InteractiveRowsTest.layout(view);
+                assertThat(((Buttons.ButtonControl)rows.mounted.get("item0").controls.get("item0.action")).button).isSameAs(current);
+                assertThat(ink(current)).isZero();current.doClick(0);assertThat(events).containsExactly(new UiEvent.Action("item0"));
+            }finally{release(ctx);}
+        });
+    }
+
 }

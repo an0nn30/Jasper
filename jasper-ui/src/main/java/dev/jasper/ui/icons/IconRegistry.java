@@ -19,6 +19,9 @@ public final class IconRegistry implements AutoCloseable {
     // Only explicitly authored built-ins opt into silhouette fill. Public registrations retain
     // the validated outline stroke contract; a name suffix does not grant filled painting.
     private static final Set<String> FILLED_BUILT_INS = Set.of("folder.filled");
+    // Original compact-panel sources establish lighter plus/search/pencil outlines. Other built-ins
+    // retain the common optical stroke; custom registrations never enter this catalog.
+    private static final Set<String> FINE_PANEL_BUILT_INS = Set.of("add", "search", "edit");
     private final Map<String, IconArtwork> artworks = new LinkedHashMap<>();
     private boolean closed;
     public IconRegistry() { artworks.putAll(BUILT_INS); }
@@ -36,6 +39,12 @@ public final class IconRegistry implements AutoCloseable {
     /** Hero glyphs retain a 1.75-logical-pixel optical stroke at the canonical 24px size. */
     public Icon hero(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize) {
         return painted(name, tint(palette, hue), null, logicalSize, false, true);
+    }
+    /** Compact panel artwork uses a lighter optical stroke for canonical built-ins only.
+     * Custom registrations retain their validated authored stroke.
+     */
+    public synchronized Icon panel(String name, SemanticPalette palette, SemanticColor tint, int logicalSize) {
+        return painted(name, palette.color(tint), null, logicalSize, logicalSize, false, false, 0, artworks.get(name) == BUILT_INS.get(name));
     }
     /** Explicit semantic text tint for hover, accent fills and status indications. */
     public Icon icon(String name, SemanticPalette palette, SemanticColor tint, int logicalSize) {
@@ -57,13 +66,22 @@ public final class IconRegistry implements AutoCloseable {
     }
     /** Category tile. Selected treatment is shared across list/menu renderers, applied to base alpha exactly once. */
     public Icon tile(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize, boolean selected) {
+        return tile(name, palette, hue, logicalSize, logicalSize, selected);
+    }
+    /** Rectangular category tile; glyph remains optically centered and unstretched. */
+    public Icon tile(String name, SemanticPalette palette, Nodes.Hue hue, int width, int height, boolean selected) {
+        return tile(name, palette, hue, width, height, 0, selected);
+    }
+    /** Category tile with explicit glyph extent; zero retains the standard optical sizing policy. */
+    public Icon tile(String name, SemanticPalette palette, Nodes.Hue hue, int width, int height, int glyphSize, boolean selected) {
+        if (glyphSize < 0 || glyphSize > Math.min(width, height)) throw new IllegalArgumentException("Invalid tile glyph size");
         Color foreground = selected ? palette.color(SemanticColor.TEXT_ONACCENT) : tint(palette, hue);
         Color fill = selected ? foreground : palette.color(switch(hue) {
             case BLUE -> SemanticColor.HUE_BLUE_SURFACE; case GREEN -> SemanticColor.HUE_GREEN_SURFACE;
             case AMBER -> SemanticColor.HUE_AMBER_SURFACE; case PURPLE -> SemanticColor.HUE_PURPLE_SURFACE;
             case NEUTRAL -> SemanticColor.HUE_NEUTRAL_SURFACE; case NONE -> SemanticColor.TEXT_SECONDARY;
         });
-        return painted(name, foreground, ColorMath.opacity(fill, .18), logicalSize, true);
+        return painted(name, foreground, ColorMath.opacity(fill, .18), width, height, true, false, glyphSize);
     }
     public int size(Nodes.IconSize size) {
         return DesignMetrics.DEFAULT.value(switch (size) {
@@ -78,29 +96,45 @@ public final class IconRegistry implements AutoCloseable {
         return painted(name, foreground, background, size, tile, false);
     }
     private synchronized Icon painted(String name, Color foreground, Color background, int size, boolean tile, boolean hero) {
+        return painted(name, foreground, background, size, size, tile, hero);
+    }
+    private synchronized Icon painted(String name, Color foreground, Color background, int width, int height, boolean tile, boolean hero) {
+        return painted(name, foreground, background, width, height, tile, hero, 0);
+    }
+    private synchronized Icon painted(String name, Color foreground, Color background, int width, int height, boolean tile, boolean hero, int glyphSize) {
+        return painted(name, foreground, background, width, height, tile, hero, glyphSize, false);
+    }
+    private synchronized Icon painted(String name, Color foreground, Color background, int width, int height, boolean tile, boolean hero, int glyphSize, boolean panel) {
         requireOpen(); Objects.requireNonNull(name);
-        if (size < 1 || size > 512) throw new IllegalArgumentException("Invalid logical icon size");
+        int size = Math.min(width, height);
+        if (size < 1 || Math.max(width, height) > 512) throw new IllegalArgumentException("Invalid logical icon size");
         var artwork = artworks.get(name);
         if (artwork == null) throw new IllegalArgumentException("Unknown icon: " + name);
         var path = artwork.path();
         boolean filled = FILLED_BUILT_INS.contains(name);
         // Callers supply user-scaled tile extents; optical limits are logical metrics.
-        double tileGlyph = Math.min(size, Math.min(com.formdev.flatlaf.util.UIScale.scale(16.5f),
+        double tileGlyph = glyphSize > 0 ? glyphSize : Math.min(size, Math.min(com.formdev.flatlaf.util.UIScale.scale(16.5f),
             Math.max(com.formdev.flatlaf.util.UIScale.scale(10f), size * .4)));
         return new Icon() {
-            @Override public int getIconWidth() { return size; }
-            @Override public int getIconHeight() { return size; }
+            @Override public int getIconWidth() { return width; }
+            @Override public int getIconHeight() { return height; }
             @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
                 var g = (Graphics2D)graphics.create();
                 try {
                     g.translate(x, y); g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                     if (tile) {
                         g.setColor(background); double radius = size * .25 * 2; // RoundRectangle2D accepts an arc diameter
-                        g.fill(new RoundRectangle2D.Double(0, 0, size, size, radius, radius));
+                        g.fill(new RoundRectangle2D.Double(0, 0, width, height, radius, radius));
                         double glyph = tileGlyph;
-                        double inset = (size - glyph) / 2; g.translate(inset, inset); g.scale(glyph / 16, glyph / 16);
+                        g.translate((width - glyph) / 2, (height - glyph) / 2); g.scale(glyph / 16, glyph / 16);
                     } else g.scale(size / 16.0, size / 16.0);
-                    g.setColor(foreground); g.setStroke(new BasicStroke(hero ? 7f / 6f : artwork.stroke(), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    float stroke = panel ? FINE_PANEL_BUILT_INS.contains(name) ? 1f : 7f / 6f
+                        : hero ? 7f / 6f
+                        : tile && glyphSize > 0 && artwork == BUILT_INS.get(name) ? 7f / 6f : artwork.stroke();
+                    g.setColor(foreground); g.setStroke(new BasicStroke(stroke, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    // The canonical search artwork has a right/down optical bias in the compact slot.
+                    // Custom artwork and ordinary field/manager contexts retain their exact path origin.
+                    if(panel && name.equals("search")) g.translate(-1, -.5);
                     if (filled) g.fill(path); else g.draw(path);
                 } finally { g.dispose(); }
             }
@@ -162,7 +196,7 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("folder.filled", "M 2.5 3 H 6.2 L 8.1 5 H 13.5 Q 14.5 5 14.5 6 V 12.5 Q 14.5 13.5 13.5 13.5 H 2.5 Q 1.5 13.5 1.5 12.5 V 4 Q 1.5 3 2.5 3 Z"),
             Map.entry("folder", "M 2 4 H 6 L 8 6 H 14 V 13 H 2 Z"),
             Map.entry("file", "M 4 2 H 9 L 13 6 V 14 H 4 Z M 9 2 V 6 H 13"),
-            Map.entry("server", "M 2 2 H 14 V 7 H 2 Z M 2 9 H 14 V 14 H 2 Z M 5 4.5 H 5.1 M 5 11.5 H 5.1 M 9 4.5 H 11 M 9 11.5 H 11"),
+            Map.entry("server", "M 2 2 H 14 V 7 H 2 Z M 2 9 H 14 V 14 H 2 Z M 5 4.5 H 5.1 M 5 11.5 H 5.1"),
             Map.entry("key", "M 8 11 A 3 3 0 1 1 2 11 A 3 3 0 1 1 8 11 M 7 9 L 13 3 M 11 5 L 13 7 M 13 3 L 15 5"),
             Map.entry("user", "M 11 5 A 3 3 0 1 1 5 5 A 3 3 0 1 1 11 5 M 2 14 Q 2 9 8 9 Q 14 9 14 14"),
             Map.entry("login", "M 10 2 H 14 V 14 H 10 M 2 8 H 10 M 7 5 L 10 8 L 7 11"),

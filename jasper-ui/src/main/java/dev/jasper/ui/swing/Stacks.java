@@ -19,7 +19,7 @@ final class Stacks {
 
     static final class StackControl extends ControlRegistry.Control {
         final Tile tile;
-        boolean detail, sheetHeading;
+        boolean detail, sheetHeading, panelDetail;
         java.util.Set<Component> captions = java.util.Set.of();
 
         StackControl(KitView view, Nodes.Stack node) {
@@ -54,12 +54,17 @@ final class Stacks {
         void refresh() {
             state();
             var stack = (Nodes.Stack) node;
-            int detailPadding = stack.role() == Nodes.LayoutRole.DETAIL ? ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_PADDING) : 0;
-            component.setBorder(new javax.swing.border.EmptyBorder(detailPadding, detailPadding, detailPadding, detailPadding));
+            int detailPadding = stack.role() == Nodes.LayoutRole.DETAIL ? ThemePainting.metric(context(), panelDetail ? DesignMetrics.Role.PANEL_DETAIL_PADDING : DesignMetrics.Role.DETAIL_PADDING) : 0;
+            component.setBorder(new javax.swing.border.EmptyBorder(detailPadding, detailPadding, panelDetail && stack.role()==Nodes.LayoutRole.DETAIL ? Math.max(0,detailPadding-ThemePainting.metric(context(),DesignMetrics.Role.FOCUS_RING)) : detailPadding, detailPadding));
             component.setLayout(
                     sheetHeading ? new Navigation.InlineLayout(context(),DesignMetrics.Role.COLUMN_GAP) : stack.role() == Nodes.LayoutRole.HERO
                             ? new HeroLayout(this)
-                            : stack.role() == Nodes.LayoutRole.FOOTER ? new FooterStatusLayout(context()) : stack.role() == Nodes.LayoutRole.SUPPORTING ? new SupportingLayout(context()) : stack.role() == Nodes.LayoutRole.NAVIGATION ? new Navigation.InlineLayout(context(), detail ? DesignMetrics.Role.DETAIL_HEADING_GAP : DesignMetrics.Role.ICON_GAP) : new StackLayout(context(), stack.role(), stack.children().size()==2 && stack.children().getFirst() instanceof Nodes.Text text && text.role()==Nodes.TextRole.DETAIL_TITLE, captions));
+                            : stack.role() == Nodes.LayoutRole.FOOTER ? new FooterStatusLayout(context()) : stack.role() == Nodes.LayoutRole.SUPPORTING ? new SupportingLayout(context()) : stack.role() == Nodes.LayoutRole.NAVIGATION ? new Navigation.InlineLayout(context(), panelDetail && stack.children().stream().anyMatch(n -> n instanceof Nodes.Icon icon && icon.size() == Nodes.IconSize.HERO) ? DesignMetrics.Role.PANEL_DETAIL_IDENTITY_GAP : detail && !panelDetail ? DesignMetrics.Role.DETAIL_HEADING_GAP : DesignMetrics.Role.ICON_GAP) : new StackLayout(context(), stack.role(), stack.children().size()==2 && stack.children().getFirst() instanceof Nodes.Text text && text.role()==Nodes.TextRole.DETAIL_TITLE, captions) {
+                                @Override int gap() { return panelDetail ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_DETAIL_GAP) : super.gap(); }
+                                @Override int verticalGap(Component previous, Component child) {
+                                    return panelDetail && stack.role() == Nodes.LayoutRole.VERTICAL && stack.children().stream().allMatch(n -> n instanceof Nodes.Text) ? 0 : super.verticalGap(previous, child);
+                                }
+                            });
             component.revalidate();
             component.repaint();
         }
@@ -429,7 +434,7 @@ final class Stacks {
                 previous = child;
             }
         }
-        private int verticalGap(Component previous, Component child) {
+        int verticalGap(Component previous, Component child) {
             if (role == Nodes.LayoutRole.DETAIL && previous instanceof Cards.CardSurface && captions.contains(child)) return ThemePainting.metric(context, DesignMetrics.Role.DETAIL_METADATA_GAP);
             return titlePair ? ThemePainting.metric(context, DesignMetrics.Role.DETAIL_VALUE_GAP) : child instanceof Indicators.StrengthMeter
                 ? ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_TOP_GAP) : gap();

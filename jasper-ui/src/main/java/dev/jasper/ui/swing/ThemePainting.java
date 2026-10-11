@@ -18,6 +18,9 @@ final class ThemePainting {
     static int height(KitContext context, DesignMetrics.Role role, Typography.Role text) {
         DesignMetrics.Role padding = switch (role) {
             case PICKER_COMPACT_HEIGHT,PICKER_DEFAULT_HEIGHT,PICKER_SEARCH_HEIGHT,PICKER_ROW_HEIGHT,PICKER_UTILITY_HEIGHT -> DesignMetrics.Role.PICKER_VERTICAL_PADDING;
+            case PANEL_DETAIL_ACTION -> DesignMetrics.Role.PANEL_DETAIL_ACTION_VERTICAL;
+            case PANEL_SEARCH_HEIGHT -> DesignMetrics.Role.PANEL_SEARCH_VERTICAL_PADDING;
+            case PANEL_HEADER_ACTION -> DesignMetrics.Role.PANEL_HEADER_ACTION_VERTICAL;
             case FIELD_HEIGHT, HERO_FIELD_HEIGHT -> DesignMetrics.Role.FIELD_VERTICAL_PADDING;
             case MENU_ITEM_HEIGHT, BUTTON_HEIGHT, HERO_BUTTON_HEIGHT, FULL_FOOTER_BUTTON_HEIGHT, ORDERED_ADD_HEIGHT, PANEL_ACTION, INLINE_ACTION -> DesignMetrics.Role.BUTTON_VERTICAL_PADDING;
             default -> throw new IllegalArgumentException("Not a content height role: " + role);
@@ -35,19 +38,22 @@ final class ThemePainting {
         rounded(g,component,context,fill,border,focus,error,DesignMetrics.Role.CONTROL_RADIUS);
     }
     static void rounded(Graphics2D g,JComponent component,KitContext context,Color fill,Color border,boolean focus,boolean error,DesignMetrics.Role radiusRole) {
+        rounded(g, component, context, fill, border, focus, error, radiusRole, 0);
+    }
+    static void rounded(Graphics2D g,JComponent component,KitContext context,Color fill,Color border,boolean focus,boolean error,DesignMetrics.Role radiusRole,int inset) {
         antialias(g);
         int radius = metric(context, radiusRole);
         double w = component.getWidth(), h = component.getHeight();
-        component.putClientProperty("Jasper.kit.halo", focus || error ? new Halo(context, error,radiusRole) : null);
+        component.putClientProperty("Jasper.kit.halo", focus || error ? new Halo(context, error,radiusRole,inset) : null);
         if (w <= 0 || h <= 0) return;
-        var shape = new RoundRectangle2D.Double(0, 0, w, h, radius * 2.0, radius * 2.0);
+        var shape = new RoundRectangle2D.Double(inset, inset, w-2*inset, h-2*inset, radius * 2.0, radius * 2.0);
         if (fill != null) { g.setColor(fill); g.fill(shape); }
         if (border != null) {
             g.setColor(border); g.setStroke(new BasicStroke(UIScale.scale(1f)));
-            g.draw(new RoundRectangle2D.Double(.5, .5, w - 1, h - 1, radius * 2.0, radius * 2.0));
+            g.draw(new RoundRectangle2D.Double(inset+.5, inset+.5, w - 2*inset - 1, h - 2*inset - 1, radius * 2.0, radius * 2.0));
         }
     }
-    private record Halo(KitContext context, boolean error,DesignMetrics.Role radiusRole) {}
+    private record Halo(KitContext context, boolean error,DesignMetrics.Role radiusRole,int inset) {}
     /** View-owned final overlay: ring lies outside nominal bounds, clipped only by viewports/root. */
     static void halos(KitView root, Graphics graphics) { halos(root, root, graphics); }
     private static void halos(KitView root, Container container, Graphics graphics) {
@@ -61,6 +67,7 @@ final class ThemePainting {
                         if (ancestor instanceof JViewport) g.clip(SwingUtilities.convertRectangle(ancestor, new Rectangle(0, 0, ancestor.getWidth(), ancestor.getHeight()), root));
                     }
                     var bounds = SwingUtilities.convertRectangle(component.getParent(), component.getBounds(), root);
+                    bounds.grow(-halo.inset(),-halo.inset());
                     int ring = metric(halo.context(), DesignMetrics.Role.FOCUS_RING), radius = metric(halo.context(), halo.radiusRole());
                     var outer = new java.awt.geom.Area(new RoundRectangle2D.Double(bounds.x - ring, bounds.y - ring, bounds.width + 2.0 * ring, bounds.height + 2.0 * ring, 2.0 * (radius + ring), 2.0 * (radius + ring)));
                     outer.subtract(new java.awt.geom.Area(new RoundRectangle2D.Double(bounds.x, bounds.y, bounds.width, bounds.height, 2.0 * radius, 2.0 * radius)));

@@ -103,7 +103,7 @@ public final class StateFixtures {
                 List.of(text("remote-" + id + "-name", id, TextRole.BODY), text("remote-" + id + "-via", "via build-box", TextRole.DESCRIPTION)),
                 List.of(text("remote-" + id + "-map", "8080 → localhost:80", TextRole.MONO_SMALL)),
                 List.of(new Nodes.Button("remote-" + id + "-star", READY, "", favourite ? "star.filled" : "star", ButtonKind.GHOST, "favorite", favourite ? "Remove from favorites" : "Add to favorites",
-                        ButtonPresentation.EMBEDDED, favourite ? Optional.of(Severity.WARNING) : Optional.empty()),
+                        favourite ? ButtonPresentation.EMBEDDED : ButtonPresentation.CONTEXTUAL_EMBEDDED, favourite ? Optional.of(Severity.WARNING) : Optional.empty()),
                     new Toggle("remote-" + id + "-run", READY, pending ? "Stop tunnel" : "Start tunnel", favourite || pending, "toggle", true, "", pending)),
                 false, Optional.empty(), id + ", 8080 → localhost:80, via build-box"));
         }

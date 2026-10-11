@@ -69,6 +69,44 @@ class PanelHostHeaderTest {
         return new Color(image.getRGB(icon.getIconWidth() / 2, icon.getIconHeight() / 2), true);
     }
 
+    @Test void semanticArtworkRefreshesTintAndPathWhileRawMulticolorArtworkStaysUntouched() {
+        Edt.run(() -> {
+            var ctx=KitFixtures.context();var calls=new ArrayList<String>();
+            javax.swing.Icon multicolor=new javax.swing.Icon(){
+                public int getIconWidth(){return 16;} public int getIconHeight(){return 16;}
+                public void paintIcon(Component c,Graphics g,int x,int y){g.setColor(Color.RED);g.fillRect(x,y,8,16);g.setColor(new Color(0,0,255,128));g.fillRect(x+8,y,8,16);}
+            };
+            try(var view=new KitView(ctx,spec("panel",6),e->{})) {
+                var first=new PanelHostHeader.Artwork("owner:glyph","M2 2 L14 2");
+                view.setPanelHostHeader("panel",new PanelHostHeader("",false,List.of(
+                    new PanelHostHeader.Action("Semantic",ARTWORK,()->calls.add("first"),first),
+                    new PanelHostHeader.Action("Raw",multicolor,()->calls.add("raw")))));
+                var semantic=named(view,"Semantic");var raw=named(view,"Raw");
+                assertThat(raw.getIcon()).isSameAs(multicolor);
+                assertThat(raw.getIcon().getIconWidth()).isEqualTo(16);
+                assertThat(iconImage(raw.getIcon()).getRGB(2,2)).isEqualTo(Color.RED.getRGB());
+                assertThat(iconImage(raw.getIcon()).getRGB(10,2)).isEqualTo(new Color(0,0,255,128).getRGB());
+                assertThat(semantic.getIcon().getIconWidth()).isEqualTo(s(18));
+                var before=iconImage(semantic.getIcon());
+                ctx.binding().publish(new ThemePair(KitFixtures.light(),KitFixtures.light()));
+                assertThat(named(view,"Semantic")).isSameAs(semantic);
+                assertThat(iconImage(semantic.getIcon()).getRGB(0,0,before.getWidth(),before.getHeight(),null,0,before.getWidth())).isNotEqualTo(before.getRGB(0,0,before.getWidth(),before.getHeight(),null,0,before.getWidth()));
+                assertThat(raw.getIcon()).isSameAs(multicolor);
+                var second=new PanelHostHeader.Artwork("owner:glyph","M2 14 L14 14");
+                view.setPanelHostHeader("panel",new PanelHostHeader("",false,List.of(new PanelHostHeader.Action("Semantic",ARTWORK,()->calls.add("second"),second))));
+                assertThat(named(view,"Semantic")).isSameAs(semantic);
+                var replaced=iconImage(semantic.getIcon());
+                assertThat(replaced.getRGB(s(8),s(2))>>>24).isZero();
+                assertThat(replaced.getRGB(s(8),s(16))>>>24).isPositive();
+                semantic.doClick(0);assertThat(calls).containsExactly("second");
+            } finally {release(ctx);}
+        });
+    }
+    private static BufferedImage iconImage(javax.swing.Icon icon) {
+        var image=new BufferedImage(icon.getIconWidth(),icon.getIconHeight(),BufferedImage.TYPE_INT_ARGB);
+        var graphics=image.createGraphics();try{icon.paintIcon(null,graphics,0,0);}finally{graphics.dispose();}return image;
+    }
+
     @Test
     void detailDotAndContributedActionsShareTheOneHeaderRowBeforeTheHostActions() {
         Edt.run(() -> {
@@ -93,7 +131,7 @@ class PanelHostHeaderTest {
                 assertThat(detail.getToolTipText()).isEqualTo("prod");
                 assertThat(detail.getClientProperty("html.disable")).isEqualTo(Boolean.TRUE);
                 assertThat(detail.getForeground()).as("the count role's colour").isEqualTo(palette.color(SemanticColor.TEXT_SECONDARY));
-                assertThat(detail.getFont()).isEqualTo(ThemePainting.font(ctx, Typography.Role.COUNT));
+                assertThat(detail.getFont()).isEqualTo(ThemePainting.font(ctx, Typography.Role.PANEL_HEADER_COUNT));
                 assertThat(detail.getIcon().getIconWidth()).isEqualTo(ThemePainting.metric(ctx, DesignMetrics.Role.STATUS_DOT));
                 var dot = dotColour(detail);
                 assertThat(dot).isEqualTo(SurfaceContrast.on(palette, SemanticColor.STATUS_SUCCESS, SemanticColor.SURFACE_PANEL,

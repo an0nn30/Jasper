@@ -1,0 +1,53 @@
+# Test-only Desktop Sessions family. Original byte hashes/provenance are in calibration.md.
+name = "Desktop Sessions Calibration"
+dark = true
+[colors]
+background = "#1f232b"
+foreground = "#e6e8ec"
+accent = "#3373f6"
+[semantic]
+"surface.dialog" = "#1f232b"
+"surface.panel" = "#191c20"
+"surface.card" = "#1b1d22"
+"surface.input" = "#191c20"
+"surface.control" = "#2d3238"
+"border.input" = "#343a42"
+"border.control" = "#3b414d"
+"border.subtle" = "#2a2d34"
+"border.focus" = "#3373f6"
+"text.primary" = "#d5dee5"
+"text.secondary" = "#a7b2bf"
+"text.tertiary" = "#7e8491"
+"text.placeholder" = "#8b929f"
+"text.onAccent" = "#ffffff"
+"text.onAccent.secondary" = "#c1cad6"
+"hue.blue" = "#9fc5ff"
+"status.warning" = "#f5be3e"
+"toggle.knob" = "#ffffff"
+"button.secondary.bg" = "#2d323c"
+
+"surface.panel.raised" = "#21252a"
+"selection.bg" = "#304e77"
+"status.idle" = "#4a515c"
+"hue.neutral" = "#ced0d6"
+"hue.neutral.surface" = "#69737d"
+
+[colors.normal]
+black = "#21222c"
+red = "#ff5555"
+green = "#50fa7b"
+yellow = "#f1fa8c"
+blue = "#bd93f9"
+magenta = "#ff79c6"
+cyan = "#8be9fd"
+white = "#f8f8f2"
+
+[colors.bright]
+black = "#6272a4"
+red = "#ff6e6e"
+green = "#69ff94"
+yellow = "#ffffa5"
+blue = "#d6acff"
+magenta = "#ff92df"
+cyan = "#a4ffff"
+white = "#ffffff"

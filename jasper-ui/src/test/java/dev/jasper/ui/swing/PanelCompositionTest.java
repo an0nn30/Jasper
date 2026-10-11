@@ -522,7 +522,7 @@ class PanelCompositionTest {
                                                                 view,
                                                                 root.footer().get().id(),
                                                                 JComponent.class);
-                                                var b = bounds(footer, view);
+                                                var b = bounds((Component)SwingUtilities.getAncestorOfClass(JScrollPane.class,footer), view);
                                                 assertThat(b.height).isPositive();
                                                 assertThat(b.y + b.height)
                                                         .isLessThanOrEqualTo(view.getHeight());
@@ -625,7 +625,7 @@ class PanelCompositionTest {
     }
 
     @Test
-    void headerButtonsUsePanelActionRoleAndOverflowHasOneGlyph() {
+    void headerButtonsUseHeaderActionRoleAndOverflowHasOneGlyph() {
         Edt.run(
                 () -> {
                     var ctx = KitFixtures.context();
@@ -650,15 +650,15 @@ class PanelCompositionTest {
                                         ThemePainting.height(
                                                 ctx,
                                                 dev.jasper.ui.metrics.DesignMetrics.Role
-                                                        .PANEL_ACTION,
-                                                dev.jasper.ui.metrics.Typography.Role.LABEL));
+                                                        .PANEL_HEADER_ACTION,
+                                                dev.jasper.ui.metrics.Typography.Role.PANEL_DETAIL_LABEL));
                         assertThat(find(view, "host", JButton.class).getPreferredSize().height)
                                 .isEqualTo(
                                         ThemePainting.height(
                                                 ctx,
                                                 dev.jasper.ui.metrics.DesignMetrics.Role
-                                                        .PANEL_ACTION,
-                                                dev.jasper.ui.metrics.Typography.Role.LABEL));
+                                                        .PANEL_HEADER_ACTION,
+                                                dev.jasper.ui.metrics.Typography.Role.PANEL_DETAIL_LABEL));
                         var header = (PanelHeaders.HeaderControl) view.control("sessions-header");
                         assertThat(((Menus.Main) header.overflow.main).menuOnly).isFalse();
                     } finally {
@@ -829,4 +829,75 @@ class PanelCompositionTest {
                     }
                 });
     }
+    @Test void detailFooterUsesCompactContextWhileManagerDetailKeepsItsPadding() {
+        Edt.run(() -> {
+            var ctx = KitFixtures.context();
+            var detail = new Nodes.Stack("detail", READY, LayoutRole.DETAIL, List.of(
+                new Nodes.Stack("identity", READY, LayoutRole.NAVIGATION, List.of(
+                    new Nodes.Icon("identity-icon", READY, "server", Hue.NEUTRAL, IconSize.HERO, "Host"),
+                    new Nodes.Stack("identity-text", READY, LayoutRole.VERTICAL, List.of(
+                        new Text("identity-title", READY, "amp", TextRole.BODY_STRONG),
+                        new Text("identity-address", READY, "fixture@example.invalid:22", TextRole.MONO))))),
+                new Nodes.Stack("detail-actions", READY, LayoutRole.NAVIGATION, List.of(
+                    new Text("status", READY, "Vault locked", TextRole.CAPTION), button("edit", "Edit"), button("connect", "Connect")))));
+            try (var view = new KitView(ctx, new ViewSpec(new Nodes.Panel("panel", READY, header(6), Optional.empty(), empty(), Optional.of(detail))), e -> {})) {
+                view.setSize(s(260), s(395)); layout(view);
+                var mounted = view.control("detail").component;
+                assertThat(bounds(mounted, view).x + mounted.getInsets().left).as("one 12px inset, no outer duplicate").isEqualTo(s(12));
+                assertThat(mounted.getInsets().top).isEqualTo(s(12));
+                assertThat(view.control("identity-icon").component.getPreferredSize().width).isEqualTo(s(28));
+                assertThat(view.control("identity-icon").component.getPreferredSize().height).isEqualTo(s(30));
+                view.update(new ViewSpec(detail)); layout(view);
+                assertThat(view.control("detail").component).isSameAs(mounted);
+                assertThat(mounted.getInsets().left).as("manager DETAIL recovers its normal24 inset").isEqualTo(s(24));
+                assertThat(view.control("identity-icon").component.getPreferredSize().width).isEqualTo(s(44));
+            } finally { release(ctx); }
+        });
+    }
+
+    @Test void normalHostActionsDoNotMakeTheHeaderWrapDuringPreferredMeasurement() {
+        Edt.run(() -> {
+            var ctx=KitFixtures.context();
+            try(var view=new KitView(ctx,new ViewSpec(panel(6,empty())),e -> {})) {
+                view.setPanelHostActions("panel",List.of(button("options","Options"),button("hide","Hide")),e -> {});
+                view.setSize(s(400),s(395));layout(view);
+                assertThat(view.panelHeader("panel").getHeight()).as("normal action row stays the panel header height").isEqualTo(s(38));
+                var title=find(view,"header.title",JLabel.class);
+                assertThat(title.getY()).as("32px content lane leaves6px below it").isEqualTo(s(32)/2-title.getHeight()/2);
+            }finally{release(ctx);}
+        });
+    }
+
+    @Test void footerDividerIsOneDevicePixelAtEachCaptureScale() {
+        Edt.run(() -> {
+            var ctx=KitFixtures.context();
+            try {
+                var footer=new PanelFooters.Footer(ctx,"footer");footer.setSize(40,20);
+                for(int scale:new int[]{1,2}) {
+                    var image=new java.awt.image.BufferedImage(40*scale,20*scale,java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                    var g=image.createGraphics();try{g.scale(scale,scale);footer.paint(g);}finally{g.dispose();}
+                    int border=ctx.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE).getRGB();
+                    int fill=ctx.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL_RAISED).getRGB();
+                    assertThat(image.getRGB(20*scale,0)).as("opaque divider at device scale %s",scale).isEqualTo(border);
+                    assertThat(image.getRGB(20*scale,1)).as("fill immediately after one-device divider at scale %s",scale).isEqualTo(fill);
+                }
+            } finally {release(ctx);}
+        });
+    }
+
+    @Test void virtualizedFooterReservesOneRowRatherThanTheWholeCollection() {
+        Edt.run(() -> {
+            var ctx=KitFixtures.context();
+            var rows=new ItemList("transfers",READY,ListKind.SINGLE,java.util.stream.IntStream.range(0,200).mapToObj(i->RemoteKitTest.contextual("transfer"+i)).toList(),java.util.Set.of(),"",List.of());
+            try(var view=new KitView(ctx,new ViewSpec(new Nodes.Panel("panel",READY,header(1),Optional.empty(),empty(),Optional.of(rows))),e->{})) {
+                view.setSize(s(260),s(90));layout(view);
+                assertThat(view.panelHeader("panel").getHeight()).isEqualTo(s(38));
+                var footer=(Panels.PanelControl)view.control("panel");
+                var list=(ItemLists.ListControl)view.control("transfers");
+                assertThat(footer.footer.interactiveHeight(footer.footer)).isLessThanOrEqualTo(list.rowHeight);
+                assertThat(footer.footerScroll.getHeight()).isGreaterThanOrEqualTo(list.rowHeight);
+            }finally{release(ctx);}
+        });
+    }
+
 }

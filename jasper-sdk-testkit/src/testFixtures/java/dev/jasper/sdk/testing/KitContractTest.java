@@ -277,7 +277,7 @@ public abstract class KitContractTest {
     static ViewSpec tunnels(String tooltip, boolean pending) {
         var row=new ListItem("web",Optional.of(new Nodes.StatusDot("web.dot",ControlState.READY,Nodes.StatusKind.WARNING)),
             List.of(new Nodes.Text("web.name",ControlState.READY,"web",Nodes.TextRole.BODY)),List.of(new Nodes.Text("web.map",ControlState.READY,"8080 → :80",Nodes.TextRole.MONO_SMALL)),
-            List.of(pending ? new Nodes.Button("web.star",ControlState.READY,"","star",Nodes.ButtonKind.GHOST,"favorite:web","Add to favorites",Nodes.ButtonPresentation.EMBEDDED)
+            List.of(pending ? new Nodes.Button("web.star",ControlState.READY,"","star",Nodes.ButtonKind.GHOST,"favorite:web","Add to favorites",Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED)
                     : new Nodes.Button("web.star",ControlState.READY,"","star.filled",Nodes.ButtonKind.GHOST,"favorite:web","Remove from favorites",Nodes.ButtonPresentation.EMBEDDED,Optional.of(Nodes.Severity.WARNING)),
                 new Nodes.Toggle("web.run",ControlState.READY,"Stop tunnel",true,"toggle:web",true,"",pending)),false,Optional.empty(),tooltip);
         return new ViewSpec(new Nodes.Stack("root",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(

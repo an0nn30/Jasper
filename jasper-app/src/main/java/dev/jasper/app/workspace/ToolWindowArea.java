@@ -398,7 +398,8 @@ final class ToolWindowArea extends JPanel {
     /** The module's description of the same metadata; callbacks stay the plugin boundary's guarded, contained ones. */
     private static dev.jasper.ui.swing.PanelHostHeader hostHeader(dev.jasper.app.contributions.PanelHeaderState state) {
         return new dev.jasper.ui.swing.PanelHostHeader(state.detail(), state.active(), state.actions().stream()
-            .map(action -> new dev.jasper.ui.swing.PanelHostHeader.Action(action.label(), action.icon(), action.invoke())).toList());
+            .map(action -> new dev.jasper.ui.swing.PanelHostHeader.Action(action.label(), action.icon(), action.invoke(), action.icon() instanceof dev.jasper.app.platform.PresentationIcon named
+                ? new dev.jasper.ui.swing.PanelHostHeader.Artwork(named.name(), named.pathData()) : null)).toList());
     }
 
     /** The host Options button inside a borrowed header, so the menu opens under it; the header itself otherwise. */

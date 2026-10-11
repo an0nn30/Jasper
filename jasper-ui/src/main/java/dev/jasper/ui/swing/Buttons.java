@@ -17,12 +17,17 @@ final class Buttons {
         final KitButton button;
         /** Host-supplied artwork shown instead of the node's named icon (borrowed panel headers only); null for named icons. */
         javax.swing.Icon artwork;
+        PanelHostHeader.Artwork semanticArtwork;
+        private final dev.jasper.ui.icons.IconRegistry contributedIcons = new dev.jasper.ui.icons.IconRegistry();
+        private dev.jasper.ui.icons.IconRegistration contributedRegistration;
+        private PanelHostHeader.Artwork registeredArtwork;
         ButtonControl(KitView view, Nodes.Button node) {
             this(view, node, view::dispatch);
         }
         ButtonControl(KitView view, Nodes.Button node, java.util.function.Consumer<UiEvent> events) { this(view, node, events, null); }
         ButtonControl(KitView view, Nodes.Button node, java.util.function.Consumer<UiEvent> events, javax.swing.Icon artwork) {
             super(view, node, new KitButton(view.context())); button = (KitButton)component; this.artwork = artwork;
+            own(contributedIcons::close);
             button.putClientProperty("html.disable", true);
             button.setOpaque(false); button.setContentAreaFilled(false); button.setBorderPainted(false); button.setFocusPainted(false);
             button.setRolloverEnabled(true); button.setHorizontalAlignment(SwingConstants.CENTER);
@@ -37,14 +42,23 @@ final class Buttons {
         @Override void refresh() {
             var value = (Nodes.Button)node; state(); button.kind = value.kind(); button.iconSeverity = value.iconSeverity().orElse(null);
             button.toggle = value.selected().isPresent(); button.getModel().setSelected(value.selected().orElse(false));
-            button.setText(value.label()); button.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
+            button.setText(value.label()); button.setFont(ThemePainting.font(context(), button.panelDetail || button.panel ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.LABEL));
             button.setForeground(button.textColor(false));
-            boolean embedded = value.presentation() == Nodes.ButtonPresentation.EMBEDDED;
+            boolean embedded = value.presentation() != Nodes.ButtonPresentation.STANDARD;
+            button.contextual = value.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
             button.embedded = embedded;
-            if (artwork != null) { button.setIcon(artwork); button.putClientProperty("Jasper.button.icon", null); }
+            if (semanticArtwork != null) {
+                if (!semanticArtwork.equals(registeredArtwork)) {
+                    if (contributedRegistration != null) contributedRegistration.close();
+                    contributedRegistration = semanticArtwork.pathData() == null ? null : contributedIcons.register(semanticArtwork.name(), semanticArtwork.pathData());
+                    registeredArtwork = semanticArtwork;
+                }
+                button.setIcon(contributedIcons.panel(semanticArtwork.name(), context().theme().semantic(), button.iconRole(false), ThemePainting.metric(context(), DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH)));
+                button.putClientProperty("Jasper.button.icon", null);
+            } else if (artwork != null) { button.setIcon(artwork); button.putClientProperty("Jasper.button.icon", null); }
             else {
                 button.setIcon(value.icon().isEmpty() ? null : context().icons().icon(value.icon(), context().theme().semantic(), button.iconRole(false),
-                    UIScale.scale(context().icons().size(embedded && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL))));
+                    UIScale.scale(button.panelDetail && value.label().isEmpty() ? context().metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_GLYPH) : context().icons().size((embedded || button.panel) && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL))));
                 button.putClientProperty("Jasper.button.icon", value.icon().isEmpty() ? null : value.icon());
             }
             button.setDisabledIcon(button.getIcon());
@@ -52,7 +66,7 @@ final class Buttons {
             button.getAccessibleContext().setAccessibleName(value.label().isEmpty() ? value.tooltip() : value.label());
             button.getAccessibleContext().setAccessibleDescription(value.state().error());
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
-            int horizontal = ThemePainting.metric(context(), value.kind() == Nodes.ButtonKind.PRIMARY ? DesignMetrics.Role.PRIMARY_BUTTON_HORIZONTAL_PADDING : DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
+            int horizontal = ThemePainting.metric(context(), button.panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION_PADDING : value.kind() == Nodes.ButtonKind.PRIMARY ? DesignMetrics.Role.PRIMARY_BUTTON_HORIZONTAL_PADDING : DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
             button.setBorder(embedded ? new EmptyBorder(0, 0, 0, 0)
                 : new EmptyBorder(ring, value.label().isEmpty() ? ring : horizontal, ring, value.label().isEmpty() ? ring : horizontal));
             button.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
@@ -63,9 +77,9 @@ final class Buttons {
     static class KitButton extends JButton {
         private final KitContext context;
         Nodes.ButtonKind kind;
-        boolean hero, panel, fullFooter, orderedAction;
+        boolean hero, panel, fullFooter, orderedAction, panelDetail;
         /** Content-sized for a host arrangement (ButtonPresentation.EMBEDDED): no minimum height and no resting or hover fill. */
-        boolean embedded;
+        boolean embedded, contextual, panelRow;
         float disabledOpacity=.42f;
         /** A severity tinting the glyph at rest and on hover (a favourite's warning star); null takes the kind's text colour. */
         Nodes.Severity iconSeverity;
@@ -101,7 +115,7 @@ final class Buttons {
         Color textColor(boolean hover) { return ThemePainting.color(context, textRole(hover)); }
         /** The glyph's colour: the severity's (as on a kit Icon) when present, otherwise the text colour. */
         SemanticColor iconRole(boolean hover) {
-            return iconSeverity == null ? textRole(hover) : Labels.tint(iconSeverity);
+            return iconSeverity == null ? panel || panelDetail ? SemanticColor.HUE_NEUTRAL : textRole(hover) : Labels.tint(iconSeverity);
         }
         @Override public Dimension getPreferredSize() {
             Dimension size = super.getPreferredSize();
@@ -114,7 +128,10 @@ final class Buttons {
                 size.width = Math.max(size.width, textWidth + iconWidth + insets.left + insets.right);
             }
             if (embedded) return size;
-            int height = ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_BUTTON_HEIGHT : fullFooter ? DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT : orderedAction ? DesignMetrics.Role.ORDERED_ADD_HEIGHT : panel ? DesignMetrics.Role.PANEL_ACTION : DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.LABEL);
+            int height = ThemePainting.height(context, panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION : hero ? DesignMetrics.Role.HERO_BUTTON_HEIGHT : fullFooter ? DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT : orderedAction ? DesignMetrics.Role.ORDERED_ADD_HEIGHT : panel ? DesignMetrics.Role.PANEL_HEADER_ACTION : DesignMetrics.Role.BUTTON_HEIGHT, panelDetail || panel ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.LABEL);
+            int reservation = panelDetail ? 2*ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING) : 0;
+            height += reservation;
+            size.width += reservation;
             return new Dimension(getText() == null || getText().isEmpty() ? height : size.width, Math.max(height, size.height));
         }
         /** Shared painter permits a real specialized owner to select its semantic surface. */
@@ -128,8 +145,15 @@ final class Buttons {
             };
         }
         Color border() { return kind == Nodes.ButtonKind.SECONDARY ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : null; }
+        boolean contextualVisible() {
+            if (!contextual || isFocusOwner() || getModel().isRollover()) return true;
+            for (Container parent=getParent();parent!=null;parent=parent.getParent())
+                if (parent instanceof InteractiveRows.Row row) return row.hover || row.owner.selected.contains(row.id)
+                    || row.id.equals(row.owner.focusItem) && row.owner.canvas.isFocusOwner();
+            return true;
+        }
         @Override protected void paintComponent(Graphics graphics) {
-            if (kind == null) return;
+            if (kind == null || !contextualVisible()) return;
             var g = (Graphics2D)graphics.create();
             try {
                 if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(disabledOpacity));
@@ -141,7 +165,7 @@ final class Buttons {
                     fill = new Color(darkened.getRed(), darkened.getGreen(), darkened.getBlue(), fill.getAlpha());
                 }
                 Color border = toggle && isSelected() ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : embedded ? null : border();
-                ThemePainting.rounded(g, this, context, fill, border, !embedded && focus != null && focus.visible(), false);
+                ThemePainting.rounded(g, this, context, fill, border, !embedded && focus != null && focus.visible(), false, DesignMetrics.Role.CONTROL_RADIUS, panelDetail ? ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING) : 0);
                 g.setFont(getFont()); g.setColor(textColor(hover));
                 Insets insets = getInsets(); Rectangle icon = new Rectangle(), text = new Rectangle();
                 String clipped = SwingUtilities.layoutCompoundLabel(this, g.getFontMetrics(), getText(), getIcon(), CENTER, getHorizontalAlignment(), CENTER, RIGHT,
@@ -150,10 +174,13 @@ final class Buttons {
                     // Re-tint the same named icon for hover without altering component identity.
                     String name = null;
                     if (getClientProperty("Jasper.button.icon") instanceof String value) name = value;
-                    javax.swing.Icon artwork = name == null ? getIcon() : context.icons().icon(name, context.theme().semantic(), iconRole(hover), getIcon().getIconWidth());
-                    artwork.paintIcon(this, g, icon.x, icon.y);
+                    javax.swing.Icon artwork = name == null ? getIcon() : panel || panelDetail || panelRow
+                        ? context.icons().panel(name, context.theme().semantic(), iconRole(hover), panelRow ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_ACTION_GLYPH) : getIcon().getIconWidth())
+                        : context.icons().icon(name, context.theme().semantic(), iconRole(hover), getIcon().getIconWidth());
+                    int opticalOffset=panelDetail ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_DETAIL_ACTION_OPTICAL_OFFSET) : panelRow ? -ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_OPTICAL_OFFSET) : 0;
+                    artwork.paintIcon(this, g, icon.x-opticalOffset+(getIcon().getIconWidth()-artwork.getIconWidth())/2, icon.y-opticalOffset+(getIcon().getIconHeight()-artwork.getIconHeight())/2);
                 }
-                if (clipped != null) g.drawString(clipped, text.x, text.y + g.getFontMetrics().getAscent());
+                if (clipped != null) g.drawString(clipped, text.x, text.y + g.getFontMetrics().getAscent() - (panelDetail ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_DETAIL_TEXT_BASELINE) : 0));
                 if (embedded && isEnabled() && focus != null && focus.visible()) {
                     // An embedded button has no outer ring room: its keyboard focus cue is a hairline inside its bounds.
                     int radius = ThemePainting.metric(context, DesignMetrics.Role.CONTROL_RADIUS);
