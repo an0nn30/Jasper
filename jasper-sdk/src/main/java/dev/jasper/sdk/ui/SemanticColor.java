@@ -50,6 +50,11 @@ public enum SemanticColor {
     HUE_AMBER("hue.amber"),
     HUE_PURPLE("hue.purple"),
     HUE_NEUTRAL("hue.neutral"),
+    HUE_BLUE_SURFACE("hue.blue.surface"),
+    HUE_GREEN_SURFACE("hue.green.surface"),
+    HUE_AMBER_SURFACE("hue.amber.surface"),
+    HUE_PURPLE_SURFACE("hue.purple.surface"),
+    HUE_NEUTRAL_SURFACE("hue.neutral.surface"),
     BUTTON_SECONDARY_BG("button.secondary.bg"),
     BUTTON_SECONDARY_BG_HOVER("button.secondary.bg.hover");
 

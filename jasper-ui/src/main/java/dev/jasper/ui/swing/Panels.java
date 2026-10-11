@@ -22,6 +22,7 @@ final class Panels {
         final JPanel navigation = new JPanel();
         final PanelFooters.Footer footer;
         PanelHeaders.HeaderControl header;
+        int column = -1;
 
         PanelControl(KitView view, Nodes.Panel node) {
             super(view, node, new Surface(view.context()));
@@ -48,13 +49,16 @@ final class Panels {
         void refresh() {
             state();
             footer.refresh();
+            ((Surface)component).column = column;
+            int side = column == 0 || column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_LIST_SIDE) : 0;
+            content.setBorder(new EmptyBorder(column == 0 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP) : 0, side, 0, side));
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
             navigation.setBorder(
                     new EmptyBorder(
-                            0,
-                            pad,
-                            ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP),
-                            pad));
+                            column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_TOP) : 0,
+                            column == 1 ? side : pad,
+                            ThemePainting.metric(context(), column == 1 ? DesignMetrics.Role.COLUMN_SEARCH_BOTTOM : DesignMetrics.Role.ICON_GAP),
+                            column == 1 ? side : pad));
             component.revalidate();
             component.repaint();
         }
@@ -233,6 +237,7 @@ final class Panels {
 
     static final class Surface extends JPanel {
         final KitContext context;
+        int column = -1;
 
         Surface(KitContext context) {
             this.context = context;
@@ -244,7 +249,16 @@ final class Panels {
             var g = (Graphics2D) graphics.create();
             try {
                 ThemePainting.antialias(g);
-                g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_PANEL));
+                g.setColor(ThemePainting.color(context, column == 0 ? SemanticColor.SURFACE_SIDEBAR : SemanticColor.SURFACE_PANEL));
+                if (column >= 0) {
+                    g.fillRect(0,0,getWidth(),getHeight());
+                    if (column < 2) {
+                        g.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE));
+                        int stroke=ThemePainting.metric(context,DesignMetrics.Role.HAIRLINE);
+                        g.fillRect(getWidth()-stroke,0,stroke,getHeight());
+                    }
+                    return;
+                }
                 int r = ThemePainting.metric(context, DesignMetrics.Role.CARD_RADIUS);
                 g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2);
             } finally {

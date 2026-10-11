@@ -19,7 +19,7 @@ final class ThemePainting {
         DesignMetrics.Role padding = switch (role) {
             case PICKER_COMPACT_HEIGHT,PICKER_DEFAULT_HEIGHT,PICKER_SEARCH_HEIGHT,PICKER_ROW_HEIGHT,PICKER_UTILITY_HEIGHT -> DesignMetrics.Role.PICKER_VERTICAL_PADDING;
             case FIELD_HEIGHT, HERO_FIELD_HEIGHT -> DesignMetrics.Role.FIELD_VERTICAL_PADDING;
-            case BUTTON_HEIGHT, HERO_BUTTON_HEIGHT, FULL_FOOTER_BUTTON_HEIGHT, ORDERED_ADD_HEIGHT, PANEL_ACTION, INLINE_ACTION -> DesignMetrics.Role.BUTTON_VERTICAL_PADDING;
+            case MENU_ITEM_HEIGHT, BUTTON_HEIGHT, HERO_BUTTON_HEIGHT, FULL_FOOTER_BUTTON_HEIGHT, ORDERED_ADD_HEIGHT, PANEL_ACTION, INLINE_ACTION -> DesignMetrics.Role.BUTTON_VERTICAL_PADDING;
             default -> throw new IllegalArgumentException("Not a content height role: " + role);
         };
         int line = (int)Math.ceil(font(context, text).getLineMetrics("Ag", new FontRenderContext(null, true, true)).getHeight());

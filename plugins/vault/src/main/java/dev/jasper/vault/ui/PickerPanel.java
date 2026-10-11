@@ -58,13 +58,13 @@ public final class PickerPanel implements AutoCloseable {
      * presses Choose (the default button) once a row is selected.
      */
     private Nodes.Form node() {
-        var items = choices.stream().map(d -> new ListItem(d.id().toString(), Optional.empty(),
-            List.<Nodes.Node>of(new Nodes.Text("title." + d.id(), ControlState.READY, label(d), Nodes.TextRole.BODY)), List.of(), List.of())).toList();
-        var list = new Nodes.ItemList(LIST, ControlState.READY, Nodes.ListKind.SINGLE, items, selected.isEmpty() ? Set.of() : Set.of(selected), "",
+        var items = choices.stream().map(d -> new ListItem(d.id().toString(), Optional.of(new Nodes.Icon("icon."+d.id(),ControlState.READY,d.kind()==dev.jasper.vault.api.Kind.SSH_KEY?"key":"user",d.kind()==dev.jasper.vault.api.Kind.SSH_KEY?Nodes.Hue.GREEN:Nodes.Hue.BLUE,Nodes.IconSize.RAIL,d.kind().toString())),
+            List.<Nodes.Node>of(new Nodes.Text("title." + d.id(), ControlState.READY, d.name(), Nodes.TextRole.BODY)), List.of(new Nodes.Text("subtitle."+d.id(),ControlState.READY,d.subtitle(),Nodes.TextRole.DESCRIPTION)), List.of())).toList();
+        var list = new Nodes.ItemList(LIST, ControlState.READY, Nodes.ListKind.DOUBLE, items, selected.isEmpty() ? Set.of() : Set.of(selected), "",
             List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(VISIBLE_ROWS));
         var actions = List.of(new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
             new Nodes.Button(CHOOSE, new ControlState(true, !selected.isEmpty(), false, ""), "Choose", "", Nodes.ButtonKind.PRIMARY, CHOOSE, ""));
-        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, "Choose a credential", Optional.empty(), List.of(list), Optional.empty(), actions, CANCEL);
+        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.SHEET, "Choose a credential", Optional.empty(), List.of(list), Optional.empty(), actions, CANCEL);
     }
 
     String selected() { return selected; }

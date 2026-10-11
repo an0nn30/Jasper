@@ -28,9 +28,10 @@ final class ViewReconciler implements AutoCloseable {
             String group = ((Nodes.Secret)secret.node).revealGroup();
             if (!group.isEmpty()) revealGroups.put(group, secret.revealed);
         }
-        next.values().forEach(control -> { if(control instanceof SettingRows.RowControl row)row.panelFooter=false; if(control instanceof Buttons.ButtonControl button){button.button.panel=false;button.button.fullFooter=false;button.button.orderedAction=false;} if(control instanceof Menus.MenuControl menu){menu.main.panel=false;menu.arrow.panel=false;} if (control instanceof Labels.IconControl icon) icon.tile(0, false); if (control instanceof Labels.TextControl && control.component instanceof Labels.LiteralLabel text) { text.wrap = false; text.flow = false; } control.embeddedLabel(false); control.hero(false); });
+        next.values().forEach(control -> { if(control instanceof SettingRows.RowControl row)row.panelFooter=false; if(control instanceof Buttons.ButtonControl button){button.button.panel=false;button.button.fullFooter=false;button.button.orderedAction=false;} if(control instanceof Menus.MenuControl menu){menu.main.panel=false;menu.arrow.panel=false;} if (control instanceof Labels.IconControl icon) icon.tile(0, false); if (control instanceof Labels.TextControl && control.component instanceof Labels.LiteralLabel text) { text.wrap = false; text.flow = false; } if(control instanceof Stacks.StackControl stack)stack.sheetHeading=false; control.embeddedLabel(false); control.hero(false); });
         inherit(spec.root(), next, true);
         applyFlow(spec.root(), next);
+        applyColumns(spec.root(), next, -1, false);
         applyFullForm(spec.root(), next, false);
         for (var node : nodes.values()) next.get(node.id()).update(node);
         applyHero(spec.root(), next, false);
@@ -64,6 +65,7 @@ final class ViewReconciler implements AutoCloseable {
     }
     private void inherit(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean enabled) {
         next.get(node.id()).parentEnabled = enabled;
+        if(node instanceof Nodes.Form form && form.kind()==Nodes.FormKind.SHEET)form.hero().ifPresent(hero->{if(next.get(hero.id()) instanceof Stacks.StackControl stack)stack.sheetHeading=true;});
         boolean childrenEnabled = enabled && node.state().enabled() && !node.state().busy() && node.state().visible();
         ControlRegistry.children(node).forEach(child -> inherit(child, next, childrenEnabled));
     }
@@ -76,6 +78,18 @@ final class ViewReconciler implements AutoCloseable {
         boolean full = node instanceof Nodes.Form form ? form.kind() == Nodes.FormKind.FULL : inherited;
         if (next.get(node.id()) instanceof SettingRows.RowControl row) row.fullForm = full;
         ControlRegistry.children(node).forEach(child -> applyFullForm(child, next, full));
+    }
+    /** THREE_COLUMN assigns reusable rail/list/detail presentation; identities remain producer data. */
+    private void applyColumns(Nodes.Node node, Map<String, ControlRegistry.Control> next, int column, boolean inheritedDetail) {
+        boolean detail = inheritedDetail || node instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.DETAIL;
+        var control = next.get(node.id());
+        if (control instanceof Panels.PanelControl panel) panel.column = column;
+        if (control instanceof InteractiveRows.RowsControl rows) rows.column = column;
+        if (control instanceof SettingRows.RowControl row) row.detail = detail;
+        if (control instanceof Stacks.StackControl stack) stack.detail = detail;
+        var children = ControlRegistry.children(node);
+        for (int i = 0; i < children.size(); i++) applyColumns(children.get(i), next,
+            node instanceof Nodes.Split split && split.kind() == Nodes.SplitKind.THREE_COLUMN ? i : column, detail);
     }
     private void applyTiles(Nodes.Node node, Map<String, ControlRegistry.Control> next, int inherited) {
         int size = node instanceof Nodes.Form form && form.kind() == Nodes.FormKind.SHEET

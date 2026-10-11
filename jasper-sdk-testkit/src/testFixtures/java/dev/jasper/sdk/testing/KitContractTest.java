@@ -20,6 +20,25 @@ public abstract class KitContractTest {
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
         new Nodes.Secret("secret",ControlState.READY,"","Password","")))); }
+    @Test void windowPlainPathAndDiscreetInputRetainTheAdditiveContract() throws Exception { edt(()->{
+        var path=new Nodes.Field("path",ControlState.READY,Nodes.FieldKind.PATH,"/synthetic/key","Hint","Path","browse",Optional.empty(),Nodes.FieldPresentation.PLAIN_PATH);
+        assertThatThrownBy(()->new Nodes.Field("bad",ControlState.READY,Nodes.FieldKind.TEXT,"","","Bad","",Optional.empty(),Nodes.FieldPresentation.PLAIN_PATH)).isInstanceOf(IllegalArgumentException.class);
+        var secret=new Nodes.Secret("secret",ControlState.READY,"","Password","group",Nodes.SecretKind.DISCREET_INPUT,"","submit");
+        var content=new Nodes.Stack("content",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(path,secret));
+        var action=new Nodes.Button("save",ControlState.READY,"Save","",Nodes.ButtonKind.PRIMARY,"save","");
+        assertThatThrownBy(()->new Nodes.Form("bad",ControlState.READY,Nodes.FormKind.WINDOW,"Window",Optional.empty(),List.of(),Optional.empty(),List.of(action))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->new Nodes.Form("bad",ControlState.READY,Nodes.FormKind.WINDOW,"Window",Optional.of(content),List.of(content),Optional.empty(),List.of(action))).isInstanceOf(IllegalArgumentException.class);
+        var kit=kit("owner");var view=kit.create(new ViewSpec(new Nodes.Form("window",ControlState.READY,Nodes.FormKind.WINDOW,"Window",Optional.empty(),List.of(content),Optional.empty(),List.of(action))),e->{});
+        try {
+            secret(view,"secret","draft".toCharArray());
+            for(var policy:Nodes.FormSubmission.values()) {
+                var form=new Nodes.Form("window",ControlState.READY,Nodes.FormKind.WINDOW,"Window",Optional.empty(),List.of(content),Optional.empty(),List.of(action),"cancel",policy);
+                view.update(new ViewSpec(form));assertThat(view.spec().root()).isEqualTo(form);
+                view.withSecret("secret",value->assertThat(value).isEqualTo("draft".toCharArray()));
+            }
+        }finally{view.close();stop(kit);}
+    }); }
+
     @Test void formSubmissionPolicySurvivesHostProjectionAndUpdates() throws Exception { edt(() -> {
         var kit=kit("owner");
         var action=new Nodes.Button("save",ControlState.READY,"Save","",Nodes.ButtonKind.PRIMARY,"save","");

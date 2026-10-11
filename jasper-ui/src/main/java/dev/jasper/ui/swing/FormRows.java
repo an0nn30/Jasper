@@ -32,6 +32,7 @@ final class FormRows {
             state();
             var row = (Nodes.FormRow) node;
             label.setText(row.label());
+            ((Labels.LiteralLabel)label).wrap = true;
             caption.text(row.caption());
             caption.setVisible(!row.caption().isEmpty());
             Composition.style(
@@ -97,7 +98,7 @@ final class FormRows {
                                             - gap()
                                             - (trailing > 0 ? trailing + gap() : 0));
             int h =
-                    owner.label.getPreferredSize().height
+                    Composition.height(owner.label, Math.min(labelWidth(), width))
                             + (owner.caption.isVisible()
                                     ? owner.caption.height(labelWidth())
                                             + ThemePainting.metric(
@@ -125,7 +126,7 @@ final class FormRows {
                     trailing = trailing(p),
                     x = lw + gap(),
                     w = Math.max(0, p.getWidth() - x - (trailing > 0 ? trailing + gap() : 0));
-            int lh = owner.label.getPreferredSize().height,
+            int lh = Composition.height(owner.label, lw),
                     y =
                             owner.caption.isVisible()
                                     ? ThemePainting.metric(

@@ -58,7 +58,12 @@ public final class IconRegistry implements AutoCloseable {
     /** Category tile. Selected treatment is shared across list/menu renderers, applied to base alpha exactly once. */
     public Icon tile(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize, boolean selected) {
         Color foreground = selected ? palette.color(SemanticColor.TEXT_ONACCENT) : tint(palette, hue);
-        return painted(name, foreground, ColorMath.opacity(foreground, selected ? .18 : .16), logicalSize, true);
+        Color fill = selected ? foreground : palette.color(switch(hue) {
+            case BLUE -> SemanticColor.HUE_BLUE_SURFACE; case GREEN -> SemanticColor.HUE_GREEN_SURFACE;
+            case AMBER -> SemanticColor.HUE_AMBER_SURFACE; case PURPLE -> SemanticColor.HUE_PURPLE_SURFACE;
+            case NEUTRAL -> SemanticColor.HUE_NEUTRAL_SURFACE; case NONE -> SemanticColor.TEXT_SECONDARY;
+        });
+        return painted(name, foreground, ColorMath.opacity(fill, .18), logicalSize, true);
     }
     public int size(Nodes.IconSize size) {
         return DesignMetrics.DEFAULT.value(switch (size) {
@@ -89,7 +94,8 @@ public final class IconRegistry implements AutoCloseable {
                     if (tile) {
                         g.setColor(background); double radius = size * .25 * 2; // RoundRectangle2D accepts an arc diameter
                         g.fill(new RoundRectangle2D.Double(0, 0, size, size, radius, radius));
-                        double inset = size * .2; g.translate(inset, inset); g.scale(size * .6 / 16, size * .6 / 16);
+                        double glyph = Math.min(size, Math.min(16.5, Math.max(10, size * .4)));
+                        double inset = (size - glyph) / 2; g.translate(inset, inset); g.scale(glyph / 16, glyph / 16);
                     } else g.scale(size / 16.0, size / 16.0);
                     g.setColor(foreground); g.setStroke(new BasicStroke(hero ? 7f / 6f : artwork.stroke(), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                     if (filled) g.fill(path); else g.draw(path);
@@ -154,10 +160,10 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("folder", "M 2 4 H 6 L 8 6 H 14 V 13 H 2 Z"),
             Map.entry("file", "M 4 2 H 9 L 13 6 V 14 H 4 Z M 9 2 V 6 H 13"),
             Map.entry("server", "M 2 2 H 14 V 7 H 2 Z M 2 9 H 14 V 14 H 2 Z M 5 4.5 H 5.1 M 5 11.5 H 5.1 M 9 4.5 H 11 M 9 11.5 H 11"),
-            Map.entry("key", "M 8 5 A 3 3 0 1 1 2 5 A 3 3 0 1 1 8 5 M 7 7 L 13 13 M 11 11 L 13 9 M 13 13 L 15 11"),
+            Map.entry("key", "M 8 11 A 3 3 0 1 1 2 11 A 3 3 0 1 1 8 11 M 7 9 L 13 3 M 11 5 L 13 7 M 13 3 L 15 5"),
             Map.entry("user", "M 11 5 A 3 3 0 1 1 5 5 A 3 3 0 1 1 11 5 M 2 14 Q 2 9 8 9 Q 14 9 14 14"),
             Map.entry("login", "M 10 2 H 14 V 14 H 10 M 2 8 H 10 M 7 5 L 10 8 L 7 11"),
-            Map.entry("note", "M 3 2 H 13 V 11 L 10 14 H 3 Z M 10 14 V 11 H 13 M 6 5 H 10 M 6 8 H 10"),
+            Map.entry("note", "M 4 1 H 9 L 13 5 V 15 H 4 Z M 9 1 V 5 H 13 M 7 8 H 10 M 7 11 H 10"),
             Map.entry("tunnel", "M 2 13 V 8 A 6 6 0 0 1 14 8 V 13 M 5 13 V 8 A 3 3 0 0 1 11 8 V 13 M 8 10 V 14"),
             Map.entry("terminal", "M 2 3 H 14 V 13 H 2 Z M 4 6 L 7 8 L 4 10 M 9 10 H 12"),
             Map.entry("play", "M 5 2 L 14 8 L 5 14 Z"),
@@ -168,7 +174,7 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("plugin", "M 6 2 V 5 M 10 2 V 5 M 4 5 H 12 V 8 A 4 4 0 0 1 4 8 Z M 8 12 V 14"),
             Map.entry("check", "M 3 8 L 6 11 L 13 4"),
             Map.entry("close", "M 4 4 L 12 12 M 12 4 L 4 12"),
-            Map.entry("sparkle", "M 8 1 L 10 6 L 15 8 L 10 10 L 8 15 L 6 10 L 1 8 L 6 6 Z"),
+            Map.entry("sparkle", "M 8 1 V 5 M 8 11 V 15 M 1 8 H 5 M 11 8 H 15 M 3 3 L 5.2 5.2 M 10.8 10.8 L 13 13 M 3 13 L 5.2 10.8 M 10.8 5.2 L 13 3"),
             // A favourite: the outline star, and the filled star (outline, an inner star and spokes to the tips) for a chosen one.
             Map.entry("star", "M 8 2 L 9.6 6.3 L 14.3 6.6 L 10.7 9.5 L 11.9 13.9 L 8 11.4 L 4.1 13.9 L 5.3 9.5 L 1.7 6.6 L 6.4 6.3 Z"),
             Map.entry("star.filled", "M 8 2 L 9.6 6.3 L 14.3 6.6 L 10.7 9.5 L 11.9 13.9 L 8 11.4 L 4.1 13.9 L 5.3 9.5 L 1.7 6.6 L 6.4 6.3 Z "

@@ -467,7 +467,7 @@ final class Menus {
                             s.height,
                             ThemePainting.height(
                                     context,
-                                    DesignMetrics.Role.BUTTON_HEIGHT,
+                                    DesignMetrics.Role.MENU_ITEM_HEIGHT,
                                     Typography.Role.BODY)));
         }
 

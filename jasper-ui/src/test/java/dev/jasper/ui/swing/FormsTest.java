@@ -46,6 +46,177 @@ class FormsTest {
     }
 
 
+    @Test void windowBodyFillsTheNativeContentWithoutInsetsAndPinsItsFooter() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var content = new Split("columns", ControlState.READY, SplitKind.THREE_COLUMN, List.of(
+                field("left", FieldKind.TEXT, "draft"), field("middle", FieldKind.TEXT, ""), field("right", FieldKind.TEXT, "")));
+            var spec = form(FormKind.valueOf("WINDOW"), List.of(content));
+            try (var view = new KitView(context, new ViewSpec(spec), e -> {})) {
+                view.setSize(s(900), s(555)); layout(view);
+                var columns = find(view, "columns", JPanel.class);
+                assertThat(SwingUtilities.convertRectangle(columns.getParent(), columns.getBounds(), view)).isEqualTo(new Rectangle(0, 0, s(900), s(511)));
+                assertThat(find(view, "left", JPanel.class).getWidth()).isEqualTo(s(192));
+                assertThat(find(view, "middle", JPanel.class).getWidth()).isEqualTo(s(272));
+                var input = find(view, "left.input", JTextField.class); var document = input.getDocument();
+                view.setSize(s(640), s(400)); layout(view); view.update(new ViewSpec(spec)); layout(view);
+                assertThat(input.getDocument()).isSameAs(document); assertThat(input.getText()).isEqualTo("draft");
+                var owner = (Forms.FormControl)view.control("form");
+                assertThat(owner.title.isVisible()).isFalse();
+                assertThat(owner.footerScroll.getY() + owner.footerScroll.getHeight()).isEqualTo(s(400));
+            } finally { release(context); }
+        });
+    }
+
+    @Test void windowFooterElidesItsLongStatusAndKeepsTheSharedActionHeight() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();
+            var status=new Text("path",ControlState.READY,"/synthetic/".repeat(30),TextRole.MONO_CAPTION);
+            var spec=new Form("form",ControlState.READY,FormKind.WINDOW,"Window",Optional.empty(),
+                List.of(field("input",FieldKind.TEXT,"draft")),Optional.of(status),List.of(button("done",ButtonKind.PRIMARY)));
+            try(var view=new KitView(context,new ViewSpec(spec),e->{})) {
+                view.setSize(s(900),s(555));layout(view);
+                var owner=(Forms.FormControl)view.control("form");
+                assertThat(owner.footerScroll.getHeight()).isEqualTo(s(44));
+                assertThat(find(view,"path",JLabel.class).getToolTipText()).isEqualTo(status.text());
+                assertThat(find(view,"path",JLabel.class).getAccessibleContext().getAccessibleName()).isEqualTo(status.text());
+            }finally{release(context);}
+        });
+    }
+
+    @Test void threeColumnPanelsUseInsetRailAndListRowsAndAFullBleedDivider() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();
+            java.util.function.BiFunction<String,ListKind,Nodes.Panel> panel=(id,kind)->new Nodes.Panel(id,ControlState.READY,
+                new Header(id+".header",new ControlState(false,true,false,""),"Column",java.util.OptionalInt.empty(),Optional.empty(),Optional.empty(),List.of()),
+                Optional.empty(),new ItemList(id+".rows",ControlState.READY,kind,List.of(new ListItem("one",Optional.empty(),
+                    List.of(new Text(id+".label",ControlState.READY,"Row",TextRole.BODY)),List.of(),List.of())),java.util.Set.of("one"),"",List.of()),Optional.empty());
+            var spec=form(FormKind.WINDOW,List.of(new Split("columns",ControlState.READY,SplitKind.THREE_COLUMN,
+                List.of(panel.apply("rail",ListKind.SINGLE),panel.apply("list",ListKind.DOUBLE),field("detail",FieldKind.TEXT,"")))));
+            try(var view=new KitView(context,new ViewSpec(spec),e->{})) {
+                view.setSize(s(900),s(555));layout(view);
+                var rail=(Panels.PanelControl)view.control("rail");var list=(Panels.PanelControl)view.control("list");
+                assertThat(rail.content.getInsets().left).isEqualTo(s(8));
+                assertThat(rail.content.getInsets().top).isEqualTo(s(12));
+                assertThat(list.content.getInsets().left).isEqualTo(s(8));
+                assertThat(((InteractiveRows.RowsControl)view.control("rail.rows")).rowHeight).isEqualTo(s(30));
+                assertThat(((InteractiveRows.RowsControl)view.control("list.rows")).rowHeight).isEqualTo(s(45));
+            }finally{release(context);}
+        });
+    }
+
+    @Test void plainPathOmitsOnlyTheAdornmentAndRetainsItsChooserAndMonospace() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();var events=new java.util.ArrayList<UiEvent>();
+            var path=new Field("path",ControlState.READY,FieldKind.PATH,"/synthetic/key","Path","Private key","browse",Optional.empty(),FieldPresentation.valueOf("PLAIN_PATH"));
+            try(var view=new KitView(context,new ViewSpec(path),events::add)) {
+                var owner=(TextFields.FieldControl)view.control("path");
+                assertThat(owner.leading.isVisible()).isFalse();
+                assertThat(owner.input.getText()).isEqualTo(path.value());
+                assertThat(owner.input.getFont()).isEqualTo(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.MONO));
+                assertThat(owner.input.getActionMap().get("field.submit")).isNull();
+                ((JButton)owner.browse.component).doClick(0);
+                assertThat(events).containsExactly(new UiEvent.Action("browse"));
+                assertThatThrownBy(()->new Field("bad",ControlState.READY,FieldKind.TEXT,"","","Bad","",Optional.empty(),path.presentation())).isInstanceOf(IllegalArgumentException.class);
+            }finally{release(context);}
+        });
+    }
+
+    @Test void formLabelsWrapWithoutElisionAndDetailMetadataUsesItsOwnGap() {
+        Edt.run(()->{
+            var old=UIManager.get("defaultFont");
+            try {for(int points:new int[]{13,20}) {
+                UIManager.put("defaultFont",new Font("Dialog",Font.PLAIN,points));var context=KitFixtures.context();
+                var row=new FormRow("row",ControlState.READY,"Confirm new master password","",field("input",FieldKind.TEXT,"draft"),Optional.empty());
+                var card=new Card("card",ControlState.READY,CardKind.FORM,List.of(row));
+                var metadata=new Text("metadata",ControlState.READY,"Modified Oct 2, 2026",TextRole.CAPTION);
+                try(var view=new KitView(context,new ViewSpec(new Stack("detail",ControlState.READY,LayoutRole.DETAIL,List.of(card,metadata))),e->{})) {
+                    KitFixtures.render(view,482,400,1);var label=find(view,"row.label",Labels.LiteralLabel.class);
+                    assertThat(label.wraps()).isTrue();assertThat(label.getHeight()).isGreaterThan(label.getFontMetrics(label.getFont()).getHeight());
+                    assertThat(label.getHeight()).isEqualTo(label.wrappedHeight(label.getWidth()));
+                    var c=find(view,"card",JComponent.class);var m=find(view,"metadata",JComponent.class);
+                    assertThat(m.getY()-c.getY()-c.getHeight()).isEqualTo(s(14));
+                    assertThat(find(view,"input.input",javax.swing.text.JTextComponent.class).getText()).isEqualTo("draft");
+                }finally{release(context);}
+            }} finally {UIManager.put("defaultFont",old);}
+        });
+    }
+
+    @Test void detailSettingRowsPlaceASecretBelowItsCaptionAcrossTheCardWidth() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            var row=new SettingRow("row",ControlState.READY,"Password","",new Secret("secret",ControlState.READY,"","Password","",SecretKind.DETAIL,"copy"),false);
+            try(var view=new KitView(context,stack(new Stack("detail",ControlState.READY,LayoutRole.DETAIL,List.of(new Card("card",ControlState.READY,CardKind.SETTINGS,List.of(row))))),e->{})) {
+                KitFixtures.render(view,436,300,1);
+                var owner=(SettingRows.RowControl)view.control("row");var secret=find(view,"secret",JComponent.class);
+                assertThat(owner.component.getHeight()).isEqualTo(s(67));
+                assertThat(secret.getX()).isEqualTo(owner.title.getX());
+                assertThat(owner.title.getY()).isEqualTo(s(16));
+                var reveal=find(view,"secret.reveal",JButton.class);
+                var value=find(view,"secret.value",JComponent.class);
+                var revealBounds=SwingUtilities.convertRectangle(reveal.getParent(),reveal.getBounds(),owner.component);
+                var valueBounds=SwingUtilities.convertRectangle(value.getParent(),value.getBounds(),owner.component);
+                assertThat(revealBounds.y+revealBounds.height/2).isEqualTo(owner.component.getHeight()/2);
+                assertThat(valueBounds.y).isEqualTo(owner.title.getY()+owner.title.getHeight()+s(4));
+                assertThat(secret.getWidth()).isGreaterThan(s(300));
+                assertThat(owner.title.getFont()).isEqualTo(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.SETTING_DESCRIPTION));
+            }finally{release(context);}
+        });
+    }
+
+    @Test void shortWindowKeepsBothBodyAndFooterScrollableAndKeyboardReachable() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            try(var view=new KitView(context,new ViewSpec(form(FormKind.WINDOW,List.of(field("input",FieldKind.TEXT,"draft")))),e->{})) {
+                view.setSize(s(320),s(45));layout(view);
+                var owner=(Forms.FormControl)view.control("form");
+                assertThat(owner.scroll.getHeight()).isGreaterThan(0);
+                assertThat(owner.footerScroll.getHeight()).isGreaterThan(0);
+                var input=find(view,"input.input",JTextField.class);
+                assertThat(owner.component.getFocusTraversalPolicy().getDefaultComponent(owner.component)).isSameAs(input);
+                assertThat(owner.body.getHeight()).isGreaterThan(owner.scroll.getHeight());
+                owner.revealFocusedBody(input);
+                assertThat(owner.scroll.getViewport().getViewRect().intersects(SwingUtilities.convertRectangle(input.getParent(),input.getBounds(),owner.body))).as("viewport %s; input %s; body %s",owner.scroll.getViewport().getViewRect(),SwingUtilities.convertRectangle(input.getParent(),input.getBounds(),owner.body),owner.body.getBounds()).isTrue();
+                var done=find(view,"save",JButton.class);
+                assertThat(owner.footerScroll.getViewport().getExtentSize().height).isGreaterThanOrEqualTo(done.getHeight());
+                for(var listener:done.getFocusListeners())listener.focusGained(new java.awt.event.FocusEvent(done,java.awt.event.FocusEvent.FOCUS_GAINED));
+                assertThat(owner.footerScroll.getViewport().getViewPosition().y).isGreaterThan(0);
+                assertThat(owner.footerScroll.getViewport().getViewRect().contains(SwingUtilities.convertRectangle(done.getParent(),done.getBounds(),owner.footer))).isTrue();
+                view.setSize(s(320),s(20));layout(view);
+                assertThat(owner.scroll.getHeight()).isPositive();
+                assertThat(owner.footerScroll.getHeight()).isLessThan(done.getHeight());
+            }finally{release(context);}
+        });
+    }
+
+    @Test void sheetEnvelopeAddsItsBorderOutsideTheUnchanged480Fill() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            try(var view=new KitView(context,new ViewSpec(form(FormKind.SHEET,List.of(new Card("card",ControlState.READY,CardKind.FORM,List.of(new FormRow("row",ControlState.READY,"Name","",field("input",FieldKind.TEXT,""),Optional.empty())))))),e->{})) {
+                assertThat(view.getPreferredSize().width).isEqualTo(s(482));
+                view.setSize(view.getPreferredSize());layout(view);
+                var card=find(view,"card",JComponent.class);
+                assertThat(card.getWidth()).isEqualTo(s(432));
+                assertThat(find(view,"input",JComponent.class).getWidth()).isEqualTo(s(294));
+                var owner=(Forms.FormControl)view.control("form");
+                assertThat(owner.scroll.getX()).isEqualTo(s(1));assertThat(owner.scroll.getWidth()).isEqualTo(s(480));
+            }finally{release(context);}
+        });
+    }
+
+    @Test void sheetIdentityUsesTheMeasuredTwelvePixelTitleGap() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            var heading=new Stack("heading",ControlState.READY,LayoutRole.INLINE,List.of(new Nodes.Icon("icon",ControlState.READY,"user",Hue.BLUE,IconSize.HERO,"Login"),new Text("title",ControlState.READY,"Add Login",TextRole.HERO_TITLE)));
+            var spec=new Form("form",ControlState.READY,FormKind.SHEET,"Add Login",Optional.of(heading),List.of(),Optional.empty(),List.of(button("save",ButtonKind.PRIMARY)));
+            try(var view=new KitView(context,new ViewSpec(spec),e->{})) {
+                view.setSize(view.getPreferredSize());layout(view);
+                var icon=find(view,"icon",JComponent.class);var title=find(view,"title",JComponent.class);
+                assertThat(title.getX()-icon.getX()-icon.getWidth()).isEqualTo(s(12));
+            }finally{release(context);}
+        });
+    }
+
     @Test void retainedActionMovesBetweenFormsWithoutAccumulatingRevealHooks() {
         Edt.run(() -> {
             var context=KitFixtures.context();var action=button("retained",ButtonKind.PRIMARY);
@@ -251,7 +422,7 @@ class FormsTest {
                                                 s(
                                                         switch (kind) {
                                                             case HERO -> 400;
-                                                            case SHEET -> 480;
+                                                            case SHEET -> 482;
                                                             default -> 540;
                                                         }));
                                 view.setSize(view.getPreferredSize());

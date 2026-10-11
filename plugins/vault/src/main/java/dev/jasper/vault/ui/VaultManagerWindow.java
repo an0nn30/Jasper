@@ -32,7 +32,9 @@ public final class VaultManagerWindow implements AutoCloseable {
     private final VaultManager manager;
     private final VaultService service;
     private final SecretClipboard clipboard;
-    private final Supplier<String> status;
+    /** Presentation of the configured provider, auto-lock policy and actual vault path. */
+    public record Status(String deviceSecret, String autoLock, String path) { }
+    private final Supplier<Status> status;
     private final Runnable generate;
     private final EntryPresenter editors;
     private PluginWindow window;
@@ -42,7 +44,7 @@ public final class VaultManagerWindow implements AutoCloseable {
     PasswordPanel passwordPanel;
 
     public VaultManagerWindow(PluginContext context, LockManager lock, VaultManager manager,
-                              VaultService service, SecretClipboard clipboard, Supplier<String> status, Runnable generate) {
+                              VaultService service, SecretClipboard clipboard, Supplier<Status> status, Runnable generate) {
         this.context = context; this.lock = lock; this.manager = manager; this.service = service;
         this.clipboard = clipboard; this.status = status; this.generate = generate;this.editors=new EntryPresenter(context);
     }
@@ -56,6 +58,7 @@ public final class VaultManagerWindow implements AutoCloseable {
             var shown = new ManagerPanel(context.kit(), manager::entry, this::add, this::edit, this::delete, this::copyPublic,
                 grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, this::changePassword, lock::lock,
                 () -> service.requestUnlock(this.owner), this::close);
+            shown.secretClipboard(clipboard::copySecret);
             panel = shown;
             window.setContent(shown.view());
             window.setTitleActions(Optional.of(shown.titleActions()));
@@ -81,9 +84,18 @@ public final class VaultManagerWindow implements AutoCloseable {
         if (window == null) return false;
         unlockPrompt = prompt; passwordPanel = panel.showUnlock(prompt);
         PasswordPanel shown = passwordPanel;
+        boolean[] active = {true};
+        prompt.onPresentationRetired(() -> {
+            active[0] = false;
+            if (unlockPrompt == prompt && passwordPanel == shown) {
+                unlockPrompt = null; passwordPanel = null;
+                panel.passiveUnlock();
+            } else shown.close();
+        });
         prompt.onDismiss(() -> {
+            if (!active[0]) return;
             shown.clear();
-            if (unlockPrompt == prompt) { unlockPrompt = null; passwordPanel = null; changed(); }
+            if (unlockPrompt == prompt && passwordPanel == shown) { unlockPrompt = null; passwordPanel = null; changed(); }
         });
         window.toFront(); return true;
     }
@@ -123,7 +135,7 @@ public final class VaultManagerWindow implements AutoCloseable {
         UiKit kit = context.kit();
         manager.entry(id).ifPresent(value -> dialog("Delete entry", close -> {
             var form = new EditorForm(kit, close);
-            form.display("entry", "Remove this entry?", manager.rows().stream().filter(r -> r.id().equals(id)).findFirst().orElseThrow().name());
+            form.description("entry", "", "Remove this entry? " + manager.rows().stream().filter(r -> r.id().equals(id)).findFirst().orElseThrow().name());
             if (value instanceof SshKey key) {
                 form.toggle(DELETE_FILES, "Delete private and public key files too", false);
                 form.display("private-file", "Private file", key.privatePath().toString());

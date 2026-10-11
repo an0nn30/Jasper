@@ -67,6 +67,7 @@ public final class KitViewTestAccess implements AutoCloseable {
             }
             if (java.util.Set.of("vault-manager", "vault-login", "vault-key").contains(id)) {
                 vault.createVault("synthetic-preview-password");
+                vault.seedReferenceItems(home.resolve("synthetic-keys"));
                 var manager = vault.awaitSurface("Credential Vault");
                 if (id.equals("vault-manager")) { surface = manager; return; }
                 onEdt(() -> {

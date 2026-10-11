@@ -19,6 +19,8 @@ final class Stacks {
 
     static final class StackControl extends ControlRegistry.Control {
         final Tile tile;
+        boolean detail, sheetHeading;
+        java.util.Set<Component> captions = java.util.Set.of();
 
         StackControl(KitView view, Nodes.Stack node) {
             super(view, node, new JPanel());
@@ -55,9 +57,9 @@ final class Stacks {
             int detailPadding = stack.role() == Nodes.LayoutRole.DETAIL ? ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_PADDING) : 0;
             component.setBorder(new javax.swing.border.EmptyBorder(detailPadding, detailPadding, detailPadding, detailPadding));
             component.setLayout(
-                    stack.role() == Nodes.LayoutRole.HERO
+                    sheetHeading ? new Navigation.InlineLayout(context(),DesignMetrics.Role.COLUMN_GAP) : stack.role() == Nodes.LayoutRole.HERO
                             ? new HeroLayout(this)
-                            : stack.role() == Nodes.LayoutRole.SUPPORTING ? new SupportingLayout(context()) : stack.role() == Nodes.LayoutRole.NAVIGATION ? new Navigation.InlineLayout(context()) : new StackLayout(context(), stack.role()));
+                            : stack.role() == Nodes.LayoutRole.FOOTER ? new FooterStatusLayout(context()) : stack.role() == Nodes.LayoutRole.SUPPORTING ? new SupportingLayout(context()) : stack.role() == Nodes.LayoutRole.NAVIGATION ? new Navigation.InlineLayout(context(), detail ? DesignMetrics.Role.DETAIL_HEADING_GAP : DesignMetrics.Role.ICON_GAP) : new StackLayout(context(), stack.role(), stack.children().size()==2 && stack.children().getFirst() instanceof Nodes.Text text && text.role()==Nodes.TextRole.DETAIL_TITLE, captions));
             component.revalidate();
             component.repaint();
         }
@@ -79,6 +81,8 @@ final class Stacks {
                     wanted.add(tile);
                 } else wanted.add(c.component);
             mount(component, wanted);
+            captions = controls.stream().filter(c -> c.node instanceof Nodes.Text text && text.role() == Nodes.TextRole.CAPTION).map(c -> (Component)c.component).collect(java.util.stream.Collectors.toSet());
+            if (component.getLayout() instanceof StackLayout layout) layout.captions = captions;
         }
     }
 
@@ -183,6 +187,22 @@ final class Stacks {
         }
     }
 
+    /** Footer status groups retain leading facts; the final path elides. Narrow footers stack those same groups. */
+    static final class FooterStatusLayout implements Composition.WidthLayout {
+        final KitContext context;
+        final SupportingLayout inline;
+        final Composition.Vertical vertical;
+        FooterStatusLayout(KitContext context) {this.context=context;inline=new SupportingLayout(context);vertical=new Composition.Vertical(ThemePainting.metric(context,DesignMetrics.Role.ICON_GAP));}
+        Composition.WidthLayout layout(Container parent,int width) {
+            var children=java.util.Arrays.stream(parent.getComponents()).filter(Component::isVisible).toList();
+            int prefix=children.stream().limit(Math.max(0,children.size()-1)).mapToInt(c->c.getPreferredSize().width+ThemePainting.metric(context,DesignMetrics.Role.INLINE_GAP)).sum();
+            return width<prefix+ThemePainting.metric(context,DesignMetrics.Role.FORM_LABEL_WIDTH)?vertical:inline;
+        }
+        @Override public int height(Container parent,int width){return layout(parent,width).height(parent,width);}
+        @Override public Dimension preferredLayoutSize(Container parent){return inline.preferredLayoutSize(parent);}
+        @Override public void layoutContainer(Container parent){layout(parent,parent.getWidth()).layoutContainer(parent);}
+    }
+
     /** Natural leading adornments beside a flexible final body, aligned to its first line. */
     static final class SupportingLayout implements Composition.WidthLayout {
         private final KitContext context;
@@ -227,8 +247,14 @@ final class Stacks {
     static final class StackLayout implements Composition.WidthLayout {
         final KitContext context;
         final Nodes.LayoutRole role;
+        final boolean titlePair;
+        java.util.Set<Component> captions = java.util.Set.of();
 
-        StackLayout(KitContext context, Nodes.LayoutRole role) {
+        StackLayout(KitContext context, Nodes.LayoutRole role) { this(context, role, false); }
+        StackLayout(KitContext context, Nodes.LayoutRole role, boolean titlePair) { this(context,role,titlePair,java.util.Set.of()); }
+        StackLayout(KitContext context, Nodes.LayoutRole role, boolean titlePair, java.util.Set<Component> captions) {
+            this.captions=captions;
+            this.titlePair=titlePair;
             this.context = context;
             this.role = role;
         }
@@ -243,7 +269,7 @@ final class Stacks {
         int gap() {
             return ThemePainting.metric(
                     context,
-                    role == Nodes.LayoutRole.INLINE ? DesignMetrics.Role.INLINE_GAP
+                    role == Nodes.LayoutRole.DETAIL ? DesignMetrics.Role.SECTION_GAP : role == Nodes.LayoutRole.INLINE ? DesignMetrics.Role.INLINE_GAP
                             : role == Nodes.LayoutRole.ACTIONS
                             ? DesignMetrics.Role.BUTTON_GAP
                             : horizontal()
@@ -332,7 +358,7 @@ final class Stacks {
                             : 0;
             Component previous = null;
             for (Component child : children) {
-                if (!horizontal() && previous != null) height += verticalGap(child);
+                if (!horizontal() && previous != null) height += verticalGap(previous, child);
                 int childWidth =
                         horizontal()
                                 ? fittedWidth(child, available, children.size(), total)
@@ -373,7 +399,7 @@ final class Stacks {
                             : 0;
             Component previous = null;
             for (Component child : children) {
-                if (!horizontal() && previous != null) y += verticalGap(child);
+                if (!horizontal() && previous != null) y += verticalGap(previous, child);
                 int childWidth =
                         horizontal() ? fittedWidth(child, width, children.size(), total) : child instanceof Indicators.StrengthMeter ? Math.min(width, child.getPreferredSize().width) : width;
                 int childHeight = Composition.height(child, childWidth);
@@ -391,8 +417,9 @@ final class Stacks {
                 previous = child;
             }
         }
-        private int verticalGap(Component child) {
-            return child instanceof Indicators.StrengthMeter
+        private int verticalGap(Component previous, Component child) {
+            if (role == Nodes.LayoutRole.DETAIL && previous instanceof Cards.CardSurface && captions.contains(child)) return ThemePainting.metric(context, DesignMetrics.Role.DETAIL_METADATA_GAP);
+            return titlePair ? ThemePainting.metric(context, DesignMetrics.Role.DETAIL_VALUE_GAP) : child instanceof Indicators.StrengthMeter
                 ? ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_TOP_GAP) : gap();
         }
     }

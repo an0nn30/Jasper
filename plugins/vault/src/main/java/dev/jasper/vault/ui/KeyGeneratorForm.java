@@ -20,6 +20,7 @@ public final class KeyGeneratorForm extends EditorForm {
 
     public KeyGeneratorForm(UiKit kit, Function<Request, CompletableFuture<Void>> generate, Runnable close) {
         super(kit, close);
+        identity("sparkle", dev.jasper.sdk.ui.Nodes.Hue.PURPLE);
         setSaveLabel("Generate Key");
         text(NAME, "Name", "");
         choice(ALGORITHM, "Algorithm", Arrays.stream(KeyAlgorithm.values()).map(a -> new Option(a.name(), a.toString(), Optional.empty())).toList(),
@@ -30,6 +31,12 @@ public final class KeyGeneratorForm extends EditorForm {
         description(KEY_FILES, "Key files", DESCRIPTION);
         toggle(ACCOUNT, "Also add a login account", false);
         text(USERNAME, "Account username", "");
+        visibleWhen(USERNAME, () -> checked(ACCOUNT));
+        readyWhen(() -> {
+            if (value(NAME).isBlank() || checked(ACCOUNT) && value(USERNAME).isBlank() || value(COMMENT).indexOf('\n') >= 0 || value(COMMENT).indexOf('\r') >= 0) return false;
+            char[] phrase=copySecret(PASSPHRASE), again=copySecret(CONFIRM);
+            try { return Arrays.equals(phrase,again); } finally { SecureBytes.zero(phrase);SecureBytes.zero(again); }
+        });
         submit(() -> {
             EntryEditor.requireName(value(NAME));
             String user = value(USERNAME).strip();

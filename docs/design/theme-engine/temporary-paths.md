@@ -608,3 +608,8 @@ No temporary production renderer or compatibility bridge was added. File Server 
 ## Plan3 Task4a — 2026-10-11
 
 No temporary production renderer, fixture-only ownership path or SDK generation bump. WindowBody, AttachedSheet, BodyScrim and separate title/body mount tokens are concrete production lifetime owners; NativeShells installs the exact helpers exercised headlessly. VaultSheetRenderTest and KitViewTestAccess expose only test-owned actual staged views, never a second Vault renderer. Original body/auth composition stays live until4b. Shared footer overflow is permanent bounded engine behavior for an extreme usable screen; native acceptance is still required.
+
+
+## Plan3 Task4b composition
+
+Vault's manager, sheets and companion forms use SDK descriptors and real model/service ownership. No feature RGB, renderer, custom layout or temporary production adapter was added. WINDOW/PLAIN_PATH/DISCREET_INPUT and hue surface roles are permanent shared contracts. Test-only StagedVaultHost seeds actual records via manager saves, disk key generation/import and exported managed import review; generated keys/data remain disposable. Source calibration TOML is test-only. Native acceptance remains controller-owned and pending.

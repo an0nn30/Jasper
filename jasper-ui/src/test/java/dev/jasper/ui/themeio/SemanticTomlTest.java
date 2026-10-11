@@ -42,6 +42,14 @@ class SemanticTomlTest {
         assertThat(ThemeTomlWriter.write(ThemeToml.parse("name='Legacy'", "legacy.toml"))).doesNotContain("[semantic]");
     }
 
+    @Test void categorySurfaceBasesRoundTripIndependentlyOfGlyphHues() {
+        for(String hue:new String[]{"blue","green","amber","purple","neutral"}) {
+            var source=ThemeToml.parse("name='Tiles'\n[semantic]\n\"hue."+hue+".surface\"='#12345680'\n\"hue."+hue+"\"='#abcdef'","tiles.toml");
+            var output=ThemeTomlWriter.write(source);assertThat(ThemeToml.parse(output,"tiles.toml")).isEqualTo(source);
+            assertThat(source.semanticOverrides()).containsEntry(SemanticColor.valueOf("HUE_"+hue.toUpperCase(java.util.Locale.ROOT)+"_SURFACE"),new Color(0x12,0x34,0x56,0x80));
+        }
+    }
+
     @Test void invalidSemanticAndBaseValuesIncludeOriginAndLine() {
         for (String key : new String[] {"surface.unknown", "surface.card"}) {
             String value = key.endsWith("unknown") ? "#000000" : "invalid";

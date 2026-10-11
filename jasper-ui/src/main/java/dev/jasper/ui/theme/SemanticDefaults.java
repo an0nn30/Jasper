@@ -14,7 +14,7 @@ import static dev.jasper.ui.theme.SemanticColor.*;
  */
 public final class SemanticDefaults {
     private static final List<SemanticColor> DEPENDENT = List.of(TEXT_ONACCENT_SECONDARY, BORDER_FOCUS,
-        BORDER_ERROR, ACCENT_HOVER, TEXT_LINK_HOVER, HOVER_OVERLAY);
+        BORDER_ERROR, ACCENT_HOVER, TEXT_LINK_HOVER, HOVER_OVERLAY, HUE_BLUE_SURFACE, HUE_GREEN_SURFACE, HUE_AMBER_SURFACE, HUE_PURPLE_SURFACE, HUE_NEUTRAL_SURFACE);
 
     private SemanticDefaults() {}
 
@@ -34,6 +34,12 @@ public final class SemanticDefaults {
                 case ACCENT_HOVER -> ColorMath.mix(colors.get(TEXT_PRIMARY), colors.get(ACCENT), .08);
                 case TEXT_LINK_HOVER -> ColorMath.mix(colors.get(TEXT_PRIMARY), colors.get(TEXT_LINK), .08);
                 case HOVER_OVERLAY -> colors.get(TEXT_PRIMARY);
+                case HUE_BLUE_SURFACE -> colors.get(HUE_BLUE);
+                case HUE_GREEN_SURFACE -> colors.get(HUE_GREEN);
+                case HUE_AMBER_SURFACE -> colors.get(HUE_AMBER);
+                case HUE_PURPLE_SURFACE -> colors.get(HUE_PURPLE);
+                case HUE_NEUTRAL_SURFACE -> colors.get(HUE_NEUTRAL);
+
                 default -> throw new IllegalStateException("Unexpected dependent role: " + role);
             };
             colors.put(role, overrides.getOrDefault(role, derived));
@@ -78,7 +84,7 @@ public final class SemanticDefaults {
             case HUE_GREEN -> terminal.ansi().get(2);
             case HUE_AMBER -> terminal.ansi().get(3);
             case HUE_PURPLE -> terminal.ansi().get(5);
-            case TEXT_ONACCENT_SECONDARY, BORDER_FOCUS, BORDER_ERROR, ACCENT_HOVER, TEXT_LINK_HOVER, HOVER_OVERLAY ->
+            case HUE_BLUE_SURFACE, HUE_GREEN_SURFACE, HUE_AMBER_SURFACE, HUE_PURPLE_SURFACE, HUE_NEUTRAL_SURFACE, TEXT_ONACCENT_SECONDARY, BORDER_FOCUS, BORDER_ERROR, ACCENT_HOVER, TEXT_LINK_HOVER, HOVER_OVERLAY ->
                 throw new IllegalStateException("Dependent role cannot resolve before parents: " + role);
         };
     }

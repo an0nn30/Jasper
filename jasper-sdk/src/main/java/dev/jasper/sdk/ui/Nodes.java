@@ -29,7 +29,8 @@ public final class Nodes {
      * moves its selection, a left press activates a row, and fixed row and heading heights keep it steady.
      */
     public enum ListKind { SINGLE, DOUBLE, COMPACT, ORDERED, RESULTS }
-    public enum FormKind { HERO, HERO_COMPACT, SHEET, FULL, SETTINGS }
+    /** WINDOW has exactly one full-bleed content section, no hero, and a shared pinned footer. */
+    public enum FormKind { HERO, HERO_COMPACT, SHEET, FULL, SETTINGS, WINDOW }
     /** SUPPORTING keeps leading adornments natural-sized beside a wrapping final text/body child. */
     public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION, SUPPORTING }
     /**
@@ -171,8 +172,9 @@ public final class Nodes {
      * EMBEDDED leaves the visible label to the host's own arrangement (the label stays the accessible name). TRANSPARENT
      * is EMBEDDED on a host surface that is the field's backdrop: no input fill, the outline and focus ring kept.
      * TECHNICAL uses standard geometry with the monospaced technical-value font.
+     * PLAIN_PATH keeps PATH semantics and Browse with no leading folder; other kinds reject it.
      */
-    public enum FieldPresentation { STANDARD, EMBEDDED, TRANSPARENT, TECHNICAL }
+    public enum FieldPresentation { STANDARD, EMBEDDED, TRANSPARENT, TECHNICAL, PLAIN_PATH }
 
     /**
      * A NUMBER field states its {@link Numeric} shape; other kinds have none. {@code alternateAction} is what Shift+Enter
@@ -194,6 +196,7 @@ public final class Nodes {
             Objects.requireNonNull(numeric);
             Objects.requireNonNull(presentation);
             if ((kind == FieldKind.NUMBER) != numeric.isPresent()) throw new IllegalArgumentException("Numeric bounds belong to NUMBER fields only, which require them");
+            if (presentation == FieldPresentation.PLAIN_PATH && kind != FieldKind.PATH) throw new IllegalArgumentException("PLAIN_PATH requires PATH");
             Objects.requireNonNull(alternateAction); Objects.requireNonNull(cancelAction); Objects.requireNonNull(listId);
             if (!listId.isBlank()) ModelChecks.id(listId);
             if (kind == FieldKind.TEXTAREA && (!alternateAction.isBlank() || !listId.isBlank()))
@@ -217,8 +220,9 @@ public final class Nodes {
      * reveal control, following its reveal group. DETAIL a read-only stored value with reveal and optional
      * copy. MULTILINE is an editable, wrapping secure-note area over the same wipeable storage, shown in clear, with no
      * reveal or copy control, so it takes neither a reveal group nor a copy action.
+     * DISCREET_INPUT reserves reveal geometry and shows the control when nonempty or focused within.
      */
-    public enum SecretKind { INPUT, CONFIRMATION, DETAIL, MULTILINE }
+    public enum SecretKind { INPUT, DISCREET_INPUT, CONFIRMATION, DETAIL, MULTILINE }
 
     /**
      * A present {@code submitAction} (INPUT or CONFIRMATION) is what Enter in the field runs: the field keeps the key, as a single-line
@@ -232,7 +236,7 @@ public final class Nodes {
             Objects.requireNonNull(revealGroup); Objects.requireNonNull(kind); Objects.requireNonNull(copyAction); Objects.requireNonNull(submitAction);
             if (kind == SecretKind.MULTILINE && (!revealGroup.isEmpty() || !copyAction.isEmpty()))
                 throw new IllegalArgumentException("A multiline secret has no reveal group or copy action");
-            if (kind != SecretKind.INPUT && kind != SecretKind.CONFIRMATION && !submitAction.isEmpty())
+            if (kind != SecretKind.INPUT && kind != SecretKind.DISCREET_INPUT && kind != SecretKind.CONFIRMATION && !submitAction.isEmpty())
                 throw new IllegalArgumentException("Only an input secret takes a submit action");
         }
         public Secret(String id, ControlState state, String hint, String label, String revealGroup, SecretKind kind, String copyAction) {
@@ -535,6 +539,8 @@ public final class Nodes {
             actions = List.copyOf(actions);
             Objects.requireNonNull(cancelAction);
             Objects.requireNonNull(submission);
+            if (kind == FormKind.WINDOW && (hero.isPresent() || sections.size() != 1))
+                throw new IllegalArgumentException("WINDOW requires one body section and no hero");
             if (actions.stream().filter(button -> button.kind() == ButtonKind.PRIMARY).count() > 1)
                 throw new IllegalArgumentException("Form supports at most one primary action");
         }

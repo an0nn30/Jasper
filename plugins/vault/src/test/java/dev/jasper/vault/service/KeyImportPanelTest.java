@@ -61,6 +61,7 @@ class KeyImportPanelTest {
             assertThat(prompt.phase()).isEqualTo(KeyImportPrompt.Phase.PASSPHRASE);
             var kit = new FakeKit("dev.jasper.vault");
             var panel = new KeyImportPanel(kit, prompt); var view = panel.view();
+            assertThat(form(view).kind()).isEqualTo(Nodes.FormKind.SHEET);
             assertThat(form(view).actions()).as("no default: Enter outside the passphrase field does nothing, as at baseline")
                 .noneMatch(b -> b.kind() == Nodes.ButtonKind.PRIMARY);
             assertThat(button(view, "unlock-key").label()).isEqualTo("Unlock key");

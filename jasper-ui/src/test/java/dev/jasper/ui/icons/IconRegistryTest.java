@@ -11,6 +11,26 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class IconRegistryTest {
+    @Test void categoryGlyphInkMatchesItsMeasuredInsetWithinTheTile() {
+        try(var registry=new IconRegistry()) {
+            for(int size:new int[]{18,20,28,32,44}) {
+                var image=paint(registry.tile("user",KitFixtures.dark().semantic(),Nodes.Hue.BLUE,size,false));
+                int left=size,right=-1;
+                for(int y=0;y<size;y++)for(int x=0;x<size;x++)if((image.getRGB(x,y)>>>24)>200){left=Math.min(left,x);right=Math.max(right,x);}
+                assertThat(right-left+1).isBetween(size<=20?7:size==28?9:size==32?10:13,size<=20?9:size==28?11:size==32?12:16);
+            }
+        }
+    }
+    @Test void largeCategoryGlyphUsesMeasuredOpticalCapAtDeviceScaleTwo() {
+        try(var registry=new IconRegistry()) {
+            var colors=new EnumMap<SemanticColor,Color>(SemanticColor.class);for(var role:SemanticColor.values())colors.put(role,KitFixtures.dark().semantic().color(role));
+            colors.put(SemanticColor.HUE_BLUE,new Color(127,178,255));colors.put(SemanticColor.HUE_BLUE_SURFACE,new Color(48,124,243));
+            var icon=registry.tile("user",new SemanticPalette(colors),Nodes.Hue.BLUE,44,false);
+            var image=new BufferedImage(88,88,BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();g.setColor(new Color(31,35,43));g.fillRect(0,0,88,88);g.scale(2,2);icon.paintIcon(null,g,0,0);g.dispose();
+            int left=88,right=-1;for(int y=0;y<88;y++)for(int x=0;x<88;x++){var color=new Color(image.getRGB(x,y));if(color.getGreen()>105&&color.getBlue()>155&&color.getBlue()-color.getRed()>35){left=Math.min(left,x);right=Math.max(right,x);}}
+            assertThat(right-left+1).isEqualTo(28);
+        }
+    }
     @Test void heroOpticalStrokeIsExplicitAndControlArtworkKeepsItsRegisteredStroke() {
         try (var registry = new IconRegistry()) {
             registry.register("test:line", "M 2 8 H 14");
@@ -102,10 +122,10 @@ class IconRegistryTest {
             .doesNotThrowAnyException();
         var colors = new EnumMap<SemanticColor, Color>(SemanticColor.class);
         for (var role : SemanticColor.values()) colors.put(role, KitFixtures.dark().semantic().color(role));
-        colors.put(SemanticColor.HUE_BLUE, new Color(10, 20, 30, 128));
+        colors.put(SemanticColor.HUE_BLUE_SURFACE, new Color(10, 20, 30, 128));
         try (var registry = new IconRegistry()) {
             assertThat(new Color(paint(registry.tile("add", new SemanticPalette(colors), Nodes.Hue.BLUE, 24, false)).getRGB(4, 4), true).getAlpha())
-                .isEqualTo(20); // 128 * 16%, once
+                .isEqualTo(23); // 128 * 18%, once
         }
     }
     private static BufferedImage paint(Icon icon) {

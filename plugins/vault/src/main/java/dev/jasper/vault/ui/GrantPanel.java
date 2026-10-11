@@ -27,7 +27,7 @@ public final class GrantPanel implements AutoCloseable {
             new Nodes.Button(DENY, ControlState.READY, "Deny", "", Nodes.ButtonKind.SECONDARY, DENY, ""),
             new Nodes.Button(ALWAYS, ControlState.READY, "Always allow for " + prompt.consumerName(), "", Nodes.ButtonKind.SECONDARY, ALWAYS, ""),
             new Nodes.Button(ONCE, ControlState.READY, "Allow once", "", Nodes.ButtonKind.SECONDARY, ONCE, ""));
-        var form = new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, "Allow access", Optional.empty(), List.of(question), Optional.empty(), actions, DENY);
+        var form = new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.SHEET, "Allow access", Optional.empty(), List.of(question), Optional.empty(), actions, DENY, Nodes.FormSubmission.NONE);
         view = kit.create(new ViewSpec(form), event -> {
             if (closed || !(event instanceof UiEvent.Action action)) return;
             switch (action.id()) {

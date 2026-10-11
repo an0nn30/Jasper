@@ -9,6 +9,16 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class SemanticPaletteTest {
+    @Test void tileSurfaceDefaultsUseTheFinalHueAndExplicitBasesKeepTheirAlpha() {
+        for(boolean dark:new boolean[]{true,false}) {
+            var theme=ThemeGeneratorTest.generate((dark ? ThemeGeneratorTest.SEEDS : ThemeGeneratorTest.SEEDS.replace("#1e1e2e", "#fafafa").replace("#cdd6f4", "#383a42"))+"\n[semantic]\n\"hue.blue\" = \"#12345680\"\n");
+            var role=SemanticColor.valueOf("HUE_BLUE_SURFACE");
+            assertThat(theme.semantic().color(role)).isEqualTo(theme.semantic().color(SemanticColor.HUE_BLUE));
+            var explicit=ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS+"\n[semantic]\n\"hue.blue\" = \"#123456\"\n\"hue.blue.surface\" = \"#abcdef80\"\n");
+            assertThat(explicit.semantic().color(role)).isEqualTo(new Color(0xab,0xcd,0xef,0x80));
+        }
+    }
+
     @Test void explicitSwitchColorsKeepPrecedenceAndFallbackUsesFinalAuthoredKnob() {
         var explicit = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS + """
             [semantic]
@@ -47,7 +57,7 @@ class SemanticPaletteTest {
     }
 
     @Test void everySemanticNameRoundTrips() {
-        assertThat(SemanticColor.values()).hasSize(48);
+        assertThat(SemanticColor.values()).hasSize(53);
         assertThat(SemanticColor.of("surface.status")).contains(SemanticColor.SURFACE_STATUS);
         for (var role : SemanticColor.values()) assertThat(SemanticColor.of(role.key())).contains(role);
         assertThat(SemanticColor.of("unknown")).isEmpty();

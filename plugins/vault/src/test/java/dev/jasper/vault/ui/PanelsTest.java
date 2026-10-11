@@ -122,6 +122,7 @@ class PanelsTest {
             press(view, PickerPanel.CHOOSE);
             assertThat(chosen).containsExactly(choices.get(1).id());
             assertThat(node(view, PickerPanel.FORM, Nodes.Form.class).cancelAction()).isEqualTo(PickerPanel.CANCEL);
+            assertThat(node(view, PickerPanel.FORM, Nodes.Form.class).kind()).isEqualTo(Nodes.FormKind.SHEET);
             press(view, PickerPanel.CANCEL);
             assertThat(cancelled[0]).isTrue();
             assertThat(PickerPanel.label(choices.getFirst())).isEqualTo("prod  —  deploy");

@@ -393,7 +393,7 @@ final class ItemLists {
             }
             row.slot(row.leading, leading);
             if (item.leading().orElse(null) instanceof Nodes.Icon icon && (icon.size() == Nodes.IconSize.RAIL || icon.size() == Nodes.IconSize.HERO) && icon.hue() != Nodes.Hue.NONE) {
-                ((Labels.IconControl)row.controls.get(icon.id())).tile(context().metrics().value(value().kind() == Nodes.ListKind.DOUBLE ? DesignMetrics.Role.CATEGORY_ROW_TILE : DesignMetrics.Role.CATEGORY_RAIL_TILE), selected.contains(item.id()));
+                ((Labels.IconControl)row.controls.get(icon.id())).tile(context().metrics().value(value().kind() == Nodes.ListKind.DOUBLE ? DesignMetrics.Role.CATEGORY_ROW_TILE : DesignMetrics.Role.CATEGORY_RAIL_TILE), column != 0 && selected.contains(item.id()));
             }
             row.slot(row.title, item.title());
             row.slot(row.subtitle, item.subtitle());

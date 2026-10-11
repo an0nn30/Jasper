@@ -15,10 +15,16 @@ public final class ChangePasswordForm extends EditorForm {
     }
     public ChangePasswordForm(UiKit kit, LockManager lock, Runnable close, Consumer<Throwable> detachedCompletion) {
         super(kit, close);
+        identity("lock", dev.jasper.sdk.ui.Nodes.Hue.BLUE);
         secret(CURRENT, "Current master password", "current");
         secret(REPLACEMENT, "New master password", "replacement");
         secret(CONFIRM, "Confirm new master password", "replacement");
         setSaveLabel("Change Password");
+        readyWhen(() -> {
+            char[] old=copySecret(CURRENT), next=copySecret(REPLACEMENT), again=copySecret(CONFIRM);
+            try { return old.length>0 && next.length>=PasswordPanel.MIN_LENGTH && Arrays.equals(next,again); }
+            finally { SecureBytes.zero(old);SecureBytes.zero(next);SecureBytes.zero(again); }
+        });
         submit(() -> {
             char[] old = copySecret(CURRENT), next = copySecret(REPLACEMENT), again = copySecret(CONFIRM);
             try {

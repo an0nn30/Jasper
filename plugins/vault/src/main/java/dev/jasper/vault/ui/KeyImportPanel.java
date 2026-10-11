@@ -68,7 +68,7 @@ public final class KeyImportPanel implements AutoCloseable {
         int index = 0;
         for (var row : prompt.rows()) {
             String id = "key-" + index++;
-            items.add(new ListItem(id, Optional.empty(),
+            items.add(new ListItem(id, Optional.of(new Nodes.Icon(id+".icon",ControlState.READY,"key",Nodes.Hue.GREEN,Nodes.IconSize.RAIL,"SSH key")),
                 List.<Nodes.Node>of(new Nodes.Text(id + ".name", ControlState.READY, row.name(), Nodes.TextRole.BODY)),
                 List.<Nodes.Node>of(new Nodes.Text(id + ".fingerprint", ControlState.READY, row.fingerprint(), Nodes.TextRole.MONO_SMALL)),
                 List.<Nodes.Node>of(new Nodes.Chip(id + ".use", ControlState.READY, row.reused() ? "reuse" : "new", row.reused() ? Nodes.Hue.NEUTRAL : Nodes.Hue.GREEN))));
@@ -76,15 +76,16 @@ public final class KeyImportPanel implements AutoCloseable {
         var sections = List.<Nodes.Node>of(
             new Nodes.Text(STATUS, ControlState.READY, prompt.status(), Nodes.TextRole.BODY),
             new Nodes.ItemList(KEYS, ControlState.READY, Nodes.ListKind.DOUBLE, items, Set.of(), "", List.of()),
-            new Nodes.Secret(PASSPHRASE, new ControlState(wanted, true, false, ""), "", "Key passphrase", "", Nodes.SecretKind.INPUT, "", UNLOCK));
+            new Nodes.Card("passphrase.card",new ControlState(wanted,true,false,""),Nodes.CardKind.FORM,List.of(
+                new Nodes.FormRow("passphrase.row",ControlState.READY,"Passphrase","",new Nodes.Secret(PASSPHRASE, new ControlState(wanted, true, false, ""), "", "Key passphrase", "", Nodes.SecretKind.INPUT, "", UNLOCK),Optional.empty()))));
         var actions = new ArrayList<Nodes.Button>();
         actions.add(new Nodes.Button(CANCEL, new ControlState(true, phase != KeyImportPrompt.Phase.COMMITTING, false, ""), "Cancel", "",
             Nodes.ButtonKind.SECONDARY, CANCEL, ""));
         actions.add(new Nodes.Button(COMMIT, new ControlState(true, phase == KeyImportPrompt.Phase.REVIEW, phase == KeyImportPrompt.Phase.COMMITTING, ""),
             "Import and use", "", Nodes.ButtonKind.SECONDARY, COMMIT, ""));
         if (wanted) actions.add(new Nodes.Button(UNLOCK, ControlState.READY, "Unlock key", "", Nodes.ButtonKind.SECONDARY, UNLOCK, ""));
-        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, "Import SSH keys", Optional.empty(), sections, Optional.empty(), actions,
-            phase == KeyImportPrompt.Phase.COMMITTING ? "" : CANCEL);
+        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.SHEET, "Import SSH keys", Optional.empty(), sections, Optional.empty(), actions,
+            phase == KeyImportPrompt.Phase.COMMITTING ? "" : CANCEL, Nodes.FormSubmission.NONE);
     }
 
     @Override public void close() {

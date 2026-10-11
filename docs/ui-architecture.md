@@ -218,3 +218,6 @@ colors surface guidance through ConversionResult warnings. These are nonfatal: c
 source bytes remain intact. Generated UiTemplate defaults are never passed to the warning classifier.
 FlatLaf still receives color-only data for retained vendor delegates and identity previews; Jasper's native
 controls and kit use canonical roles. SnapshotLaf reapplies that exact policy whenever defaults are rebuilt.
+
+
+Task4b shared composition: `FormKind.WINDOW` requires one content section and no hero; it fills the owner above the shared scrollable footer. `PLAIN_PATH` retains PATH/Browse without a leading icon; `DISCREET_INPUT` retains secret behavior with a stable, focus-aware reveal slot. All are mirrored in SDK/host/fake. Category fill bases `hue.{blue,green,amber,purple,neutral}.surface` resolve from final glyph hue unless explicitly authored. Tile paint multiplies base alpha by18% once; selected tiles use onAccent independently. These native `[semantic]` colors round-trip authored values unchanged. See the Task4b native-composition amendment for measured source calibration and compatibility costs.

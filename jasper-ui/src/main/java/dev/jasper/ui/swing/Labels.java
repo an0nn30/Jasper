@@ -93,7 +93,10 @@ final class Labels {
         @Override void refresh() {
             var text = (Nodes.Text)node; var label = (JLabel)component; state();
             label.putClientProperty("Jasper.leadingEllipsis",text.role()==Nodes.TextRole.MONO || text.role()==Nodes.TextRole.MONO_SMALL || text.role()==Nodes.TextRole.MONO_CAPTION);
-            label.setText(text.text()); label.setFont(ThemePainting.font(context(), Typography.Role.valueOf(text.role().name())));
+            label.setText(text.text());
+            label.setToolTipText(text.text());
+            label.getAccessibleContext().setAccessibleName(text.text());
+            label.setFont(ThemePainting.font(context(), Typography.Role.valueOf(text.role().name())));
             label.setForeground(ThemePainting.color(context(), text.severity().isPresent() ? tint(text.severity().get()) : switch (text.role()) {
                 case LABEL, DESCRIPTION, CAPTION, COUNT -> SemanticColor.TEXT_SECONDARY;
                 case SECTION_LABEL, MONO_CAPTION, SUPPORTING -> SemanticColor.TEXT_TERTIARY;

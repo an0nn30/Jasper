@@ -68,6 +68,30 @@ class SheetOwnershipTest {
         } finally {binding.close();icons.close();controller.close();}
     }
 
+    @Test void replacementFormReceivesTheUnchangedOwnerHeightConstraint() {
+        var controller = new dev.jasper.app.appearance.ThemeController();
+        var binding = new dev.jasper.ui.theme.ThemeBinding(controller.current().pair(), failure -> { throw new AssertionError(failure); });
+        var icons = new dev.jasper.ui.icons.IconRegistry();
+        var context = new dev.jasper.ui.swing.KitContext(binding, dev.jasper.ui.theme.ThemeRoute.CHROME, dev.jasper.ui.metrics.DesignMetrics.DEFAULT, icons, () -> false);
+        var node = new dev.jasper.ui.model.Nodes.Form("sheet", dev.jasper.ui.model.ControlState.READY, dev.jasper.ui.model.Nodes.FormKind.SHEET,
+            "Tall form", Optional.empty(), java.util.List.of(new dev.jasper.ui.model.Nodes.Text("text", dev.jasper.ui.model.ControlState.READY,
+            "A paragraph that requires substantial vertical space. ".repeat(200), dev.jasper.ui.model.Nodes.TextRole.DESCRIPTION)), Optional.empty(), java.util.List.of());
+        var root = new JRootPane(); var body = new JPanel(); root.setContentPane(body); root.setSize(800, 600); layout(root);
+        var surface = surface(); var bounds = new AtomicReference<Rectangle>();
+        try (var first = new dev.jasper.ui.swing.KitView(context, new dev.jasper.ui.model.ViewSpec(node), e -> {});
+             var second = new dev.jasper.ui.swing.KitView(context, new dev.jasper.ui.model.ViewSpec(node), e -> {});
+             var lease = WindowBody.install(root, body, () -> new Rectangle(0, 0, body.getWidth(), body.getHeight()))) {
+            surface.setContent(first);
+            try (var sheet = NativeShells.attachSheet(surface, lease, new AttachedSheet.Target(() -> true, Point::new,
+                () -> new Rectangle(0, 0, 1200, 1200), value -> { bounds.set(value); surface.holder().setSize(value.getSize()); }))) {
+                sheet.fitNow(); int initialHeight = bounds.get().height;
+                assertThat(initialHeight).isLessThan(600);
+                surface.setContent(second); sheet.fitNow();
+                assertThat(bounds.get().height).isEqualTo(initialHeight);
+            }
+        } finally { binding.close(); icons.close(); controller.close(); }
+    }
+
     @Test void maximumFontOnAScreenShorterThanFooterRevealsEveryActionAndRecovers() {
         var controller = new dev.jasper.app.appearance.ThemeController();
         controller.configure(dev.jasper.app.appearance.Theme.DARK, new dev.jasper.app.config.UiFontConfig("system", 32f));

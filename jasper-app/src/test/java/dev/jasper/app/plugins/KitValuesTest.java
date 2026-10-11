@@ -118,7 +118,7 @@ class KitValuesTest {
   assertThat(module.kind()).isEqualTo(dev.jasper.ui.model.Nodes.ListKind.RESULTS);
   assertThat(Arrays.stream(ListKind.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.ListKind.values()).map(Enum::name).toArray(String[]::new));
   for(var presentation:FieldPresentation.values()){
-   var field=new ViewSpec(new Field("q",READY,FieldKind.SEARCH,"tab","Search","Search all","",Optional.empty(),presentation));
+   var field=new ViewSpec(new Field("q",READY,presentation == FieldPresentation.PLAIN_PATH ? FieldKind.PATH : FieldKind.SEARCH,"tab","Search","Search all","",Optional.empty(),presentation));
    assertThat(KitValues.toModule(field).toString()).isEqualTo(field.toString());
    assertThat(((dev.jasper.ui.model.Nodes.Field)KitValues.toModule(field).root()).presentation().name()).isEqualTo(presentation.name());
   }

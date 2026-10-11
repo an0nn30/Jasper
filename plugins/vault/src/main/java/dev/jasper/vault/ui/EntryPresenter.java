@@ -24,7 +24,7 @@ final class EntryPresenter implements AutoCloseable {
     }
     void create(WindowOwner owner,VaultManager manager,Runnable finished){
         var dialog=context.windows().dialog(new DialogSpec("New Credential",owner,true,DialogSpec.Presentation.ATTACHED_SHEET));selectors.add(dialog);String[] selected={""};
-        var actions=List.of(new Nodes.Button("create.login",ControlState.READY,"Login","login",Nodes.ButtonKind.SECONDARY,"create.login",""),
+        var actions=List.of(new Nodes.Button("create.login",ControlState.READY,"Login","user",Nodes.ButtonKind.SECONDARY,"create.login",""),
             new Nodes.Button("create.key",ControlState.READY,"SSH path key","key",Nodes.ButtonKind.SECONDARY,"create.key",""),
             new Nodes.Button("create.cancel",ControlState.READY,"Cancel","",Nodes.ButtonKind.SECONDARY,"create.cancel",""));
         var view=context.kit().create(new ViewSpec(new Nodes.Form("create",ControlState.READY,Nodes.FormKind.SHEET,"New Credential",Optional.empty(),List.of(

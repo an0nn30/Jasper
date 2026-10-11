@@ -32,7 +32,7 @@ public final class StateFixtures {
         controls.add(new Toggle("switch", READY, "Switch", true, "switch", false));
         controls.add(new Chip("chip", READY, "HTTP", Hue.BLUE));
         for (FieldPresentation presentation : FieldPresentation.values())
-            controls.add(new Field("field-" + presentation, READY, FieldKind.TEXT, presentation.name(), "", "Presentation " + presentation, "", Optional.empty(), presentation));
+            controls.add(new Field("field-" + presentation, READY, presentation == FieldPresentation.PLAIN_PATH ? FieldKind.PATH : FieldKind.TEXT, presentation.name(), "", "Presentation " + presentation, "", Optional.empty(), presentation));
         controls.add(new Progress("progress", READY, .65, "Progress"));
         controls.add(new Progress("indeterminate", READY, -1, "Working"));
         controls.add(new Strength("strength", READY, 3, "Strong"));

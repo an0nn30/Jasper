@@ -21,8 +21,12 @@ class VaultSheetRenderTest {
     @Test void mountedTitleMenuAndAttachedFormsRenderAcrossThemesFontsAndShortOwners() throws Exception {
         var controller = SurfaceFixtures.edt(ThemeController::new);
         try {
-            for (String state : List.of("dark", "light", "custom", "enlarged", "short")) {
+            for (String state : List.of("calibration", "dark", "light", "custom", "enlarged", "short")) {
                 Theme selected = state.equals("light") ? Theme.JASPER_LIGHT : Theme.DARK;
+                if (state.equals("calibration")) {
+                    Path file = Path.of("src/test/resources/dev/jasper/app/appearance/desktop-vault.toml");
+                    selected = Theme.of("task4-vault", new Theme.UserFile(file, dev.jasper.ui.themeio.ThemeToml.parse(Files.readString(file), file.toString())));
+                }
                 if (state.equals("custom")) {
                     Path file = Path.of("src/test/resources/dev/jasper/app/appearance/custom-hero.toml");
                     selected = Theme.of("task4-custom", new Theme.UserFile(file, dev.jasper.ui.themeio.ThemeToml.parse(Files.readString(file), file.toString())));
@@ -49,6 +53,13 @@ class VaultSheetRenderTest {
                 capture(state,id,root,null,null,"body="+chrome.body().boundsInRoot().orElseThrow());
                 var menu = find(manager.titleActions(),"add").getComponentPopupMenu();menu.setSize(menu.getPreferredSize());layout(menu);
                 capture(state,"vault-menu",menu,null,null,"actual title MenuButton descriptor; headless menu rendering");
+                if(state.equals("short")) {
+                    var done=(JButton)find(manager.holder(),"okay");
+                    for(var listener:done.getFocusListeners())listener.focusGained(new java.awt.event.FocusEvent(done,java.awt.event.FocusEvent.FOCUS_GAINED));
+                    layout(root);
+                    assertThat(done.getVisibleRect().height).isEqualTo(done.getHeight());
+                    capture(state,"vault-manager-footer-focused",root,null,null,"actual mounted WINDOW after footer focus listener; full action visible at45logical; below-action viewport remains explicitly constrained");
+                }
                 return;
             }
             try(var sheetChrome=NativeShells.installChrome(child,surface,true)) {
@@ -69,10 +80,10 @@ class VaultSheetRenderTest {
         try {g.scale(2,2);root.printAll(g);if(child!=null){g.translate(at.x,at.y);child.printAll(g);}} finally {g.dispose();}
         var text=new StringBuilder("provenance=real staged Vault + production NativeShells chrome/attachment; headless only\ndeviceScale=2\nuiScale="+com.formdev.flatlaf.util.UIScale.getUserScaleFactor()+"\nlogicalSize="+width+"x"+height+"\n"+metadata+"\n");
         describe(root,root,text);if(child!=null)describe(child,child,text);
-        try {var output=Files.createDirectories(Path.of("build/task-4a-captures",state));ImageIO.write(image,"png",output.resolve(id+".png").toFile());Files.writeString(output.resolve(id+".txt"),text);}catch(java.io.IOException failure){throw new java.io.UncheckedIOException(failure);}
+        try {var output=Files.createDirectories(Path.of("build/task-4b-captures",state));ImageIO.write(image,"png",output.resolve(id+".png").toFile());Files.writeString(output.resolve(id+".txt"),text);}catch(java.io.IOException failure){throw new java.io.UncheckedIOException(failure);}
     }
     private static void describe(Container component,JComponent root,StringBuilder text){
-        if(component instanceof JComponent c && c.getName()!=null) text.append(c.getName()).append(" bounds=").append(SwingUtilities.convertRectangle(c.getParent(),c.getBounds(),root)).append(" font=").append(c.getFont()).append(" baseline=").append(c.getBaseline(c.getWidth(),c.getHeight())).append('\n');
+        if(component instanceof JComponent c && c.getName()!=null) text.append(c.getName()).append(" bounds=").append(SwingUtilities.convertRectangle(c.getParent(),c.getBounds(),root)).append(" font=").append(c.getFont()).append(" baseline=").append(c.getWidth() < 0 || c.getHeight() < 0 ? -1 : c.getBaseline(c.getWidth(),c.getHeight())).append('\n');
         for(var child:component.getComponents())if(child instanceof Container c)describe(c,root,text);
     }
     private static JComponent find(Container root,String name){if(name.equals(root.getName()))return (JComponent)root;for(var child:root.getComponents())if(child instanceof Container c){var found=find(c,name);if(found!=null)return found;}return null;}

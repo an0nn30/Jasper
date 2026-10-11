@@ -14,6 +14,7 @@ class GrantPanelTest {
             var panel = new GrantPanel(new FakeKit("dev.jasper.vault"), prompt);
             var view = panel.view();
             var form = node(view, GrantPanel.FORM, Nodes.Form.class);
+            assertThat(form.kind()).isEqualTo(Nodes.FormKind.SHEET);
             assertThat(form.actions()).as("no default action: Enter grants nothing").noneMatch(b -> b.kind() == Nodes.ButtonKind.PRIMARY);
             assertThat(form.actions()).extracting(Nodes.Button::label).containsExactly("Deny", "Always allow for <b>SSH</b>", "Allow once");
             assertThat(form.cancelAction()).isEqualTo(GrantPanel.DENY);

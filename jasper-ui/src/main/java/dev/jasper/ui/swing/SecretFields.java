@@ -39,7 +39,9 @@ final class SecretFields {
         char[] detailValue = new char[0];
         final TextFields.FieldSurface surface;
         final char masked;
-        boolean revealed;
+        boolean revealed, focusWithin;
+        int detailValueTop = -1;
+        int detailTextHeight() { return component.getFontMetrics(ThemePainting.font(context(), Typography.Role.BODY)).getHeight(); }
 
         SecretControl(KitView view, Nodes.Secret node) {
             super(view, node, new JPanel(new BorderLayout()));
@@ -94,7 +96,21 @@ final class SecretFields {
                     };
             reveal.addActionListener(action);
             own(() -> reveal.removeActionListener(action));
-            if (!multiline && node.kind() != Nodes.SecretKind.CONFIRMATION) surface.add(reveal, BorderLayout.EAST);
+            if (node.kind() == Nodes.SecretKind.DISCREET_INPUT) {
+                var slot=new JPanel(new BorderLayout()) {
+                    @Override public Dimension getPreferredSize() { return reveal.getPreferredSize(); }
+                };
+                slot.setOpaque(false);slot.add(reveal);surface.add(slot,BorderLayout.EAST);
+            } else if (!multiline && node.kind() != Nodes.SecretKind.CONFIRMATION) surface.add(reveal, BorderLayout.EAST);
+            var focusListener=new java.awt.event.FocusAdapter() {
+                @Override public void focusGained(java.awt.event.FocusEvent e) { focusWithin=true; revealVisibility(); }
+                @Override public void focusLost(java.awt.event.FocusEvent e) {
+                    focusWithin=e.getOppositeComponent()!=null && SwingUtilities.isDescendingFrom(e.getOppositeComponent(),component);
+                    revealVisibility();
+                }
+            };
+            input.addFocusListener(focusListener);reveal.addFocusListener(focusListener);
+            own(()->{input.removeFocusListener(focusListener);reveal.removeFocusListener(focusListener);});
             copy = new Buttons.KitButton(context());
             copy.kind = Nodes.ButtonKind.GHOST;
             KitOwnership.mark(copy, node.id() + ".copy");
@@ -168,7 +184,17 @@ final class SecretFields {
             container.add(label, BorderLayout.NORTH);
             container.add(error, BorderLayout.SOUTH);
             if (detail) {
-                var row = new JPanel(new BorderLayout());
+                var row = new JPanel(new BorderLayout()) {
+                    @Override public void doLayout() {
+                        super.doLayout();
+                        if (detailValueTop >= 0) {
+                            var actions = getComponent(1);
+                            int height = actions.getPreferredSize().height;
+                            actions.setBounds(getWidth()-actions.getPreferredSize().width, (getHeight()-height)/2, actions.getPreferredSize().width, height);
+                            detailDisplay.setBounds(0, detailValueTop, Math.max(0, actions.getX()), detailTextHeight());
+                        }
+                    }
+                };
                 row.setOpaque(false);
                 var actions = new JPanel(new GridLayout(1, 0));
                 actions.setOpaque(false);
@@ -199,6 +225,7 @@ final class SecretFields {
                         }
 
                         private void changed() {
+                            revealVisibility();
                             if (!buffer.clearing())
                                 emit(new UiEvent.SecretChanged(SecretControl.this.node.id()));
                         }
@@ -224,7 +251,7 @@ final class SecretFields {
                                 public boolean isEnabled() {
                                     var secret = (Nodes.Secret) node;
                                     return !closed
-                                            && (secret.kind() == Nodes.SecretKind.INPUT || secret.kind() == Nodes.SecretKind.CONFIRMATION)
+                                            && (secret.kind() == Nodes.SecretKind.INPUT || secret.kind() == Nodes.SecretKind.DISCREET_INPUT || secret.kind() == Nodes.SecretKind.CONFIRMATION)
                                             && !secret.submitAction().isBlank();
                                 }
 
@@ -273,6 +300,12 @@ final class SecretFields {
                                 revealed ? "Stored secret visible" : "Stored secret hidden");
                 detailDisplay.repaint();
             }
+        }
+
+        private void revealVisibility() {
+            var kind=((Nodes.Secret)node).kind();
+            reveal.setVisible(!multiline && kind!=Nodes.SecretKind.CONFIRMATION
+                && (kind!=Nodes.SecretKind.DISCREET_INPUT || focusWithin || buffer.getLength()>0));
         }
 
         private void refreshReveal() {
@@ -355,7 +388,7 @@ final class SecretFields {
             if (multiline) refreshArea(secret, enabled);
             surface.setEnabled(enabled);
             reveal.setEnabled(enabled);
-            reveal.setVisible(!multiline && secret.kind() != Nodes.SecretKind.CONFIRMATION);
+            revealVisibility();
             detailDisplay.setEnabled(enabled);
             detailDisplay.getAccessibleContext().setAccessibleName(secret.label());
             detailDisplay

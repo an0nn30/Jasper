@@ -40,6 +40,7 @@ final class StagedVaultHost implements AutoCloseable {
     final TerminalFixture terminals;
     final PluginHost host;
     final PluginClassLoader loader;
+    final Plugin plugin;
     final List<String> problems = new CopyOnWriteArrayList<>();
     final UUID window;
 
@@ -55,7 +56,7 @@ final class StagedVaultHost implements AutoCloseable {
             new NotificationsFixture(problems), new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>(),
             PluginRuntime.ShellProfiles.NONE, new CopyOnWriteArrayList<>(), appearance, GlassSource.NONE);
         loader = new PluginClassLoader(UnboundVault.ID, ManagedVaultLoadingTest.jars(staged), getClass().getClassLoader(), Map.of());
-        Plugin plugin = (Plugin) loader.loadClass("dev.jasper.vault.VaultPlugin").getConstructor().newInstance();
+        plugin = (Plugin) loader.loadClass("dev.jasper.vault.VaultPlugin").getConstructor().newInstance();
         var opened = new AtomicReference<UUID>();
         onEdt(() -> {
             host.start(new HostedPlugin(VAULT, Set.of(), Set.of(), Set.of("dev.jasper.vault.api"), loader, () -> plugin));
@@ -112,6 +113,67 @@ final class StagedVaultHost implements AutoCloseable {
             click(create, "submit");
         });
         awaitSurface("Credential Vault");
+    }
+
+    /** Real synthetic domain writes and a reviewed managed-key import, never descriptor-only sample rows. */
+    void seedReferenceItems(Path keys) throws Exception { seedReferenceItems(keys, ignored -> {}); }
+    void seedReferenceItems(Path keys, java.util.function.Consumer<AuxiliarySurface> readyImport) throws Exception {
+        Class<?> algorithm = loader.loadClass("dev.jasper.vault.keygen.KeyAlgorithm");
+        Class<?> generator = loader.loadClass("dev.jasper.vault.keygen.KeyGenerator");
+        Object gen = generator.getConstructor(Path.class).newInstance(keys);
+        var generate = generator.getMethod("generate", algorithm, String.class, String.class, char[].class);
+        Object diskKey = generate.invoke(gen, algorithm.getField("ED25519").get(null), "id_ed25519", "synthetic@fixture", new char[0]);
+        Object storedKey = generate.invoke(gen, algorithm.getField("RSA_4096").get(null), "work_rsa", "synthetic-deploy", new char[0]);
+        var managerField = plugin.getClass().getDeclaredField("manager"); managerField.setAccessible(true);
+        Object manager = onEdtValue(() -> { try { return managerField.get(plugin); } catch (ReflectiveOperationException e) { throw new AssertionError(e); } });
+        Class<?> account = loader.loadClass("dev.jasper.vault.model.Account"), auth = loader.loadClass("dev.jasper.vault.model.Auth");
+        Class<?> password = loader.loadClass("dev.jasper.vault.model.Auth$Password"), keyAuth = loader.loadClass("dev.jasper.vault.model.Auth$Key");
+        var epoch = java.time.Instant.parse("2026-10-02T12:00:00Z");
+        UUID selected = UUID.randomUUID();
+        Object login = account.getConstructor(UUID.class,String.class,String.class,auth,java.time.Instant.class,java.time.Instant.class)
+            .newInstance(selected,"amp","ubuntu",password.getConstructor(char[].class).newInstance((Object)"synthetic-password".toCharArray()),epoch,epoch);
+        Object other = account.getConstructor(UUID.class,String.class,String.class,auth,java.time.Instant.class,java.time.Instant.class)
+            .newInstance(UUID.randomUUID(),"Proxmox","root",keyAuth.getConstructor(Path.class,char[].class).newInstance(diskKey.getClass().getMethod("privatePath").invoke(diskKey),null),epoch,epoch);
+        invokeSave(manager,"saveAccount",account,login); invokeSave(manager,"saveAccount",account,other);
+        invokeSave(manager,"importKey",diskKey.getClass(),diskKey);
+        Class<?> note = loader.loadClass("dev.jasper.vault.model.Note");
+        invokeSave(manager,"saveNote",note,note.getConstructor(UUID.class,String.class,char[].class,java.time.Instant.class)
+            .newInstance(UUID.randomUUID(),"Router recovery codes","synthetic recovery codes".toCharArray(),epoch));
+        Class<?> apiType = loader.loadClass("dev.jasper.vault.api.VaultApi");
+        var consumer = new AtomicReference<dev.jasper.sdk.plugin.PluginContext>();
+        var api = new AtomicReference<Object>();
+        start(new PluginInfo("dev.jasper.fixture","Fixture", "0.1.0",Set.of()), Set.of(UnboundVault.ID), context -> { consumer.set(context); api.set(context.services().require(apiType)); });
+        Class<?> source = loader.loadClass("dev.jasper.vault.api.SshKeySource");
+        Object request = source.getConstructor(UUID.class,String.class,Path.class).newInstance(UUID.randomUUID(),"work_rsa",storedKey.getClass().getMethod("privatePath").invoke(storedKey));
+        var pending = onEdtValue(() -> {
+            try { return (CompletableFuture<?>)apiType.getMethod("importSshKeys",dev.jasper.sdk.terminal.WindowHandle.class,List.class,List.class)
+                .invoke(api.get(),consumer.get().terminals().window(window).orElseThrow(),List.of(request),List.of()); }
+            catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+        });
+        var review = awaitSurface("Import SSH keys");
+        await(() -> node(review,"commit").state().enabled(),"synthetic managed key ready");
+        readyImport.accept(review);
+        onEdt(() -> click(review,"commit")); pending.get(20, java.util.concurrent.TimeUnit.SECONDS);
+        await(() -> review.closed(),"managed import closed");
+        var managerWindowField = plugin.getClass().getDeclaredField("managerWindow"); managerWindowField.setAccessible(true);
+        onEdt(() -> {
+            try {
+                Object windowOwner = managerWindowField.get(plugin);
+                windowOwner.getClass().getMethod("show",dev.jasper.sdk.terminal.WindowHandle.class,Optional.class)
+                    .invoke(windowOwner,consumer.get().terminals().window(window).orElseThrow(),Optional.of(selected));
+            } catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+            var rows = (dev.jasper.ui.model.Nodes.ItemList)node(surface("Credential Vault"),"rows");
+            assertThat(rows.items()).hasSize(5);
+            assertThat(rows.selectedIds()).containsExactly(selected.toString());
+        });
+    }
+
+    private static void invokeSave(Object manager, String method, Class<?> type, Object value) throws Exception {
+        var result = onEdtValue(() -> {
+            try { return (CompletableFuture<?>)manager.getClass().getMethod(method,type).invoke(manager,value); }
+            catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+        });
+        result.get(20,java.util.concurrent.TimeUnit.SECONDS);
     }
 
     static Component named(Container root, String name) {
@@ -179,6 +241,10 @@ final class StagedVaultHost implements AutoCloseable {
                 var all = new java.util.ArrayList<dev.jasper.ui.model.Nodes.Node>(n.sections()); n.hero().ifPresent(all::add); n.preview().ifPresent(all::add); all.addAll(n.actions()); yield all;
             }
             case dev.jasper.ui.model.Nodes.Stack n -> n.children();
+            case dev.jasper.ui.model.Nodes.Split n -> n.children();
+            case dev.jasper.ui.model.Nodes.Panel n -> {
+                var all = new java.util.ArrayList<dev.jasper.ui.model.Nodes.Node>(); all.add(n.header()); n.searchOrNavigation().ifPresent(all::add); all.add(n.body()); n.footer().ifPresent(all::add); yield all;
+            }
             case dev.jasper.ui.model.Nodes.Card n -> n.children();
             case dev.jasper.ui.model.Nodes.Section n -> List.of(n.body());
             case dev.jasper.ui.model.Nodes.SettingRow n -> List.of(n.control());

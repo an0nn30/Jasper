@@ -20,6 +20,7 @@ final class AttachedSheet implements AutoCloseable {
     private final Runnable unsubscribe;
     private boolean queued, closed, fitting, fallback;
     private int availableHeight = -1;
+    private KitView constrainedView;
     AttachedSheet(AuxiliarySurface surface, WindowBody owner, Target target) {
         this.surface = Objects.requireNonNull(surface); this.owner = Objects.requireNonNull(owner); this.target = Objects.requireNonNull(target);
         if (!live() || owner.boundsInRoot().isEmpty()) throw new IllegalArgumentException("Attached sheet needs a live measured owner body");
@@ -65,9 +66,11 @@ final class AttachedSheet implements AutoCloseable {
     }
     private void measure(int width, int height) {
         int logical = Math.max(1, UIScale.unscale(height));
-        if (logical != availableHeight) {
-            availableHeight = logical;
-            for (var child : surface.holder().getComponents()) if (child instanceof KitView view && !view.isClosed()) view.setAvailableHeight(logical);
+        for (var child : surface.holder().getComponents()) {
+            if (child instanceof KitView view && !view.isClosed() && (logical != availableHeight || view != constrainedView)) {
+                availableHeight = logical; constrainedView = view;
+                view.setAvailableHeight(logical);
+            }
         }
         surface.holder().setSize(width, height);
         layout(surface.holder());

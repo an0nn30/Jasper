@@ -17,6 +17,19 @@ import static org.assertj.core.api.Assertions.*;
 
 class KeyGeneratorFormTest {
     @TempDir Path directory;
+    @Test void cheapReadinessRetainsOptionalAccountDraftAndMatchingPassphrase() throws Exception {
+        edt(()->{
+            var form=new KeyGeneratorForm(new FakeKit("dev.jasper.vault"),value->{throw new AssertionError("No generation on edits");},()->{});var view=form.view();
+            assertThat(button(view,EditorForm.SAVE).state().enabled()).isFalse();
+            emit(view,new UiEvent.Edited(KeyGeneratorForm.NAME,"Laptop"));assertThat(button(view,EditorForm.SAVE).state().enabled()).isTrue();
+            emit(view,new UiEvent.Toggled(KeyGeneratorForm.ACCOUNT,true));assertThat(button(view,EditorForm.SAVE).state().enabled()).isFalse();
+            emit(view,new UiEvent.Edited(KeyGeneratorForm.USERNAME,"deploy"));emit(view,new UiEvent.Toggled(KeyGeneratorForm.ACCOUNT,false));
+            assertThat(node(view,KeyGeneratorForm.USERNAME,Nodes.Field.class).value()).isEqualTo("deploy");
+            type(view,KeyGeneratorForm.PASSPHRASE,"phrase");assertThat(button(view,EditorForm.SAVE).state().enabled()).isFalse();
+            type(view,KeyGeneratorForm.CONFIRM,"phrase");assertThat(button(view,EditorForm.SAVE).state().enabled()).isTrue();
+            emit(view,new UiEvent.Edited(KeyGeneratorForm.COMMENT,"line one\nline two"));assertThat(button(view,EditorForm.SAVE).state().enabled()).isFalse();form.close();
+        });
+    }
     @Test void formDefaultsToEd25519AndRequiresAUsernameOnlyWhenAddingAnAccount() throws Exception {
         edt(() -> {
             var request = new AtomicReference<KeyGeneratorForm.Request>();
@@ -25,7 +38,7 @@ class KeyGeneratorFormTest {
             assertThat(button(view, EditorForm.SAVE).label()).isEqualTo("Generate Key");
             emit(view, new UiEvent.Edited(KeyGeneratorForm.NAME, "Laptop")); emit(view, new UiEvent.Toggled(KeyGeneratorForm.ACCOUNT, true));
             press(view, EditorForm.SAVE);
-            assertThat(request.get()).isNull(); assertThat(error(view, KeyGeneratorForm.USERNAME)).contains("username");
+            assertThat(request.get()).isNull(); assertThat(button(view,EditorForm.SAVE).state().enabled()).isFalse();
             emit(view, new UiEvent.Edited(KeyGeneratorForm.USERNAME, "deploy")); press(view, EditorForm.SAVE);
             assertThat(request.get().algorithm()).isEqualTo(KeyAlgorithm.ED25519);
             assertThat(request.get().username()).contains("deploy");
@@ -101,7 +114,7 @@ class KeyGeneratorFormTest {
             emit(view, new UiEvent.Edited(KeyGeneratorForm.NAME, "Encrypted"));
             type(view, KeyGeneratorForm.PASSPHRASE, " phrase "); type(view, KeyGeneratorForm.CONFIRM, "different");
             press(view, EditorForm.SAVE);
-            assertThat(held.get()).isNull(); assertThat(error(view, KeyGeneratorForm.CONFIRM)).contains("do not match");
+            assertThat(held.get()).isNull(); assertThat(button(view,EditorForm.SAVE).state().enabled()).isFalse();
             type(view, KeyGeneratorForm.CONFIRM, " phrase "); press(view, EditorForm.SAVE);
             assertThat(held.get()).containsOnly((char) 0);
             assertThat(button(view, EditorForm.CANCEL).state().enabled()).as("generation cannot be cancelled midway").isFalse();

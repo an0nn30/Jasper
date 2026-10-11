@@ -16,7 +16,8 @@ final class SettingRows {
 
     static final class RowControl extends ControlRegistry.Control {
         final Composition.WrappedText title, description;
-        boolean panelFooter, hero, fullForm;
+        boolean panelFooter, hero, fullForm, detail;
+        SecretFields.SecretControl secret;
         @Override void hero(boolean value) { hero=value; }
 
         RowControl(KitView view, Nodes.SettingRow node) {
@@ -38,12 +39,12 @@ final class SettingRows {
             title.noteColor = ThemePainting.color(context(), SemanticColor.TEXT_TERTIARY);
             description.text(row.description());
             description.setVisible(!row.description().isEmpty());
-            Composition.style(title, context(), Typography.Role.LABEL, SemanticColor.TEXT_PRIMARY);
+            Composition.style(title, context(), detail ? Typography.Role.SETTING_DESCRIPTION : Typography.Role.LABEL, detail ? SemanticColor.TEXT_SECONDARY : SemanticColor.TEXT_PRIMARY);
             Composition.style(
-                    description, context(), Typography.Role.SETTING_DESCRIPTION, SemanticColor.TEXT_TERTIARY);
+                    description, context(), detail ? Typography.Role.BODY : Typography.Role.SETTING_DESCRIPTION, detail ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_TERTIARY);
             title.setEnabled(component.isEnabled());
             description.setEnabled(component.isEnabled());
-            int side = ThemePainting.metric(context(), fullForm ? DesignMetrics.Role.FULL_SETTING_SIDE_PADDING : DesignMetrics.Role.SETTING_SIDE_PADDING),
+            int side = ThemePainting.metric(context(), detail ? DesignMetrics.Role.CARD_PADDING : fullForm ? DesignMetrics.Role.FULL_SETTING_SIDE_PADDING : DesignMetrics.Role.SETTING_SIDE_PADDING),
                     vertical =
                             ThemePainting.metric(
                                     context(), DesignMetrics.Role.SETTING_VERTICAL_PADDING);
@@ -55,6 +56,8 @@ final class SettingRows {
         @Override
         void children(List<ControlRegistry.Control> controls) {
             controls.forEach(c -> Composition.label(c, true));
+            secret = controls.getFirst() instanceof SecretFields.SecretControl value && value.detail ? value : null;
+            if (secret != null) secret.detailValueTop = -1;
             Stacks.mount(component, List.of(title, description, controls.getFirst().component));
         }
     }
@@ -102,6 +105,8 @@ final class SettingRows {
             return ThemePainting.metric(owner.context(), DesignMetrics.Role.COLUMN_GAP);
         }
 
+        boolean secretDetail() { return owner.detail && ((Nodes.SettingRow)owner.node).control() instanceof Nodes.Secret secret && secret.kind()==Nodes.SecretKind.DETAIL; }
+
         int trailing(Container p, int width) {
             return p.getComponentCount() > 2
                     ? Math.min(
@@ -121,6 +126,12 @@ final class SettingRows {
         @Override
         public int height(Container p, int width) {
             Insets i = p.getInsets();
+            if (owner.detail) {
+                int content=Math.max(0,width-i.left-i.right), gap=ThemePainting.metric(owner.context(),DesignMetrics.Role.DETAIL_VALUE_GAP);
+                int textWidth=secretDetail()?content:Math.max(0,content-trailing(p,width)-gap());
+                int below=secretDetail()?owner.secret.detailTextHeight():owner.description.height(textWidth);
+                return Math.max(ThemePainting.metric(owner.context(),DesignMetrics.Role.DETAIL_ROW_HEIGHT),i.top+i.bottom+owner.title.height(textWidth)+gap+below);
+            }
             int tw = trailing(p, width), w = Math.max(0, width - i.left - i.right - tw + 2 * paintInset(p) - gap());
             int text =
                     owner.title.height(w)
@@ -149,6 +160,22 @@ final class SettingRows {
         @Override
         public void layoutContainer(Container p) {
             Insets i = p.getInsets();
+            if (owner.detail) {
+                int content=Math.max(0,p.getWidth()-i.left-i.right), gap=ThemePainting.metric(owner.context(),DesignMetrics.Role.DETAIL_VALUE_GAP);
+                int tw=secretDetail()?content:trailing(p,p.getWidth()), textWidth=secretDetail()?content:Math.max(0,content-tw-gap());
+                int titleHeight=owner.title.height(textWidth), below=secretDetail()?owner.secret.detailTextHeight():owner.description.height(textWidth);
+                int y=Math.max(i.top,(p.getHeight()-titleHeight-gap-below)/2);
+                owner.title.setBounds(i.left,y,textWidth,titleHeight);
+                owner.description.setBounds(i.left,y+titleHeight+gap,textWidth,below);
+                if(p.getComponentCount()>2) {
+                    Component c=p.getComponent(2);int h=Composition.height(c,tw);
+                    if (secretDetail()) {
+                        owner.secret.detailValueTop=y+titleHeight+gap;
+                        c.setBounds(i.left,0,tw,p.getHeight());
+                    } else c.setBounds(p.getWidth()-i.right-tw,(p.getHeight()-h)/2,tw,h);
+                }
+                return;
+            }
             int tw = trailing(p, p.getWidth()),
                     w = Math.max(0, p.getWidth() - i.left - i.right - tw + 2 * paintInset(p) - gap()),
                     th = owner.title.height(w),

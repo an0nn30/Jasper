@@ -14,6 +14,38 @@ import static dev.jasper.ui.swing.KitViewTest.*;
 @SuppressWarnings("try")
 class SecretFieldsTest {
     static Secret secret(String id, String group) { return new Secret(id, ControlState.READY, "Password", "Password", group); }
+    @Test void discreetInputKeepsGeometryDraftSubmissionAndRevealFocusAcrossEmptyTransitions() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();var events=new ArrayList<UiEvent>();
+            var descriptor=new Secret("p",ControlState.READY,"","Password","",SecretKind.valueOf("DISCREET_INPUT"),"","submit");
+            try(var view=new KitView(context,stack(descriptor),events::add)) {
+                var control=(SecretFields.SecretControl)view.control("p");var document=control.input.getDocument();
+                KitFixtures.render(view,320,80,1);var inputBounds=control.input.getBounds();
+                assertThat(control.reveal.isVisible()).isFalse();
+                var gained=new java.awt.event.FocusEvent(control.input,java.awt.event.FocusEvent.FOCUS_GAINED);
+                for(var listener:control.input.getFocusListeners())listener.focusGained(gained);
+                assertThat(control.reveal.isVisible()).isTrue();
+                var transfer=new java.awt.event.FocusEvent(control.input,java.awt.event.FocusEvent.FOCUS_LOST,false,control.reveal);
+                for(var listener:control.input.getFocusListeners())listener.focusLost(transfer);
+                assertThat(control.reveal.isVisible()).isTrue();
+                control.reveal.doClick(0);assertThat(control.revealed).isTrue();
+                var left=new java.awt.event.FocusEvent(control.reveal,java.awt.event.FocusEvent.FOCUS_LOST,false,new JButton());
+                for(var listener:control.reveal.getFocusListeners())listener.focusLost(left);
+                assertThat(control.reveal.isVisible()).isFalse();
+                control.input.setText("draft");assertThat(control.reveal.isVisible()).isTrue();
+                view.update(stack(descriptor));KitFixtures.render(view,320,80,1);
+                assertThat(control.input.getDocument()).isSameAs(document);assertThat(control.input.getBounds()).isEqualTo(inputBounds);
+                view.withSecret("p",value->assertThat(value).isEqualTo("draft".toCharArray()));
+                control.input.getActionMap().get("secret.submit").actionPerformed(null);
+                assertThat(events).contains(new UiEvent.Action("submit"));
+                control.input.setText("");assertThat(control.reveal.isVisible()).isFalse();
+                view.replaceSecret("p","retained".toCharArray());assertThat(control.reveal.isVisible()).isTrue();
+                view.close();assertThat(control.buffer.snapshot()).isEmpty();
+                assertThat(control.input.getActionMap().get("secret.submit")).isNull();
+            }finally{release(context);}
+        });
+    }
+
     @Test void storedDetailTransfersCopiesRevealsAndCopiesWithoutImmutableValues() {
         Edt.run(() -> {
             var context=KitFixtures.context(); var events=new ArrayList<UiEvent>(); char[][] copied={null}; var holder=new KitView[1];

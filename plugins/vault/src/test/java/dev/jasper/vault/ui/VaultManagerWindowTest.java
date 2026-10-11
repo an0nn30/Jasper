@@ -25,6 +25,81 @@ class VaultManagerWindowTest {
     @TempDir Path directory;
     static final PluginInfo INFO = new PluginInfo("dev.jasper.vault", "Vault", "0.1.0", Set.of());
 
+    @Test void retiredInlineUnlockClearsItsSecretWithoutCancellingTheSurvivingRequest() throws Exception {
+        edt(() -> {
+            try (var f = new VaultUiFixture(directory); var host = new FakePluginHost()) {
+                var context = host.start(INFO, Set.of(), Set.of(), c -> {});
+                host.addTerminalWindow(); var terminal = context.terminals().windows().getFirst();
+                boolean[] open = {true};
+                var owner = new WindowHandle() {
+                    public UUID id() { return terminal.id(); }
+                    public java.util.List<dev.jasper.sdk.terminal.TabHandle> tabs() { return terminal.tabs(); }
+                    public Optional<dev.jasper.sdk.terminal.TabHandle> activeTab() { return terminal.activeTab(); }
+                    public boolean isActive() { return true; }
+                    public boolean isOpen() { return open[0]; }
+                    public void toFront() {}
+                };
+                var windowRef = new AtomicReference<VaultManagerWindow>();
+                var represented = new AtomicReference<dev.jasper.vault.service.UnlockPrompt>();
+                var service = new VaultService(f.lock, () -> Optional.of(owner), prompt -> {
+                    if (prompt.owner() == owner) windowRef.get().showUnlock(prompt);
+                    else represented.set(prompt);
+                }, p -> {}, p -> {}, new FakeNotifications().group("dev.jasper.vault"));
+                var window = new VaultManagerWindow(context, f.lock, f.manager, service,
+                    new SecretClipboard(text -> {}, Optional::empty, clear -> {}), () -> new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), () -> {});
+                windowRef.set(window); window.show(owner, Optional.empty()); f.lock.lock(); window.changed();
+                var first = service.requestUnlock(owner); var shown = window.passwordPanel;
+                type(window.panel.view(), shown.password, "retired-secret");
+                var second = service.requestUnlock(terminal);
+                open[0] = false; first.cancel(false);
+                assertThat(represented.get()).isNotNull();
+                assertThat(window.passwordPanel).isNull();
+                assertThat(find(window.panel.view(), shown.password)).isEmpty();
+                window.close();
+                assertThat(second).isNotDone();
+                represented.get().submit("test-password".toCharArray()); f.drain();
+                assertThat(second).isCompletedWithValue(true);
+                assertThat(host.failures()).isEmpty();
+            }
+        });
+    }
+
+    @Test void anchoredAndInlineJoinOrdersPreserveTheLiveWaiterEvenDuringUnlock() throws Exception {
+        for(boolean anchoredFirst:new boolean[]{false,true})for(boolean pending:new boolean[]{false,true}) edt(()->{
+            try(var f=new VaultUiFixture(directory.resolve(anchoredFirst+"-"+pending));var host=new FakePluginHost()) {
+                var context=host.start(INFO,Set.of(),Set.of(),c->{});host.addTerminalWindow();var terminal=context.terminals().windows().getFirst();
+                class Anchor implements dev.jasper.sdk.ui.UiAnchor {
+                    boolean open=true;final java.util.List<Runnable> listeners=new java.util.ArrayList<>();
+                    public boolean isOpen(){return open;} public dev.jasper.sdk.Subscription onClosed(Runnable action){listeners.add(action);return ()->listeners.remove(action);}
+                    public void close(){open=false;java.util.List.copyOf(listeners).forEach(Runnable::run);}
+                }
+                var anchor=new Anchor();var windowRef=new AtomicReference<VaultManagerWindow>();
+                var displayed=new AtomicReference<PasswordPanel>();var promptRef=new AtomicReference<dev.jasper.vault.service.UnlockPrompt>();
+                var service=new VaultService(f.lock,()->Optional.of(terminal),prompt->{
+                    promptRef.set(prompt);
+                    if(!prompt.anchored()) {windowRef.get().showUnlock(prompt);displayed.set(windowRef.get().passwordPanel);}
+                    else {var panel=PasswordPanel.unlock(context.kit(),prompt);displayed.set(panel);prompt.onPresentationRetired(panel::close);}
+                },p->{},p->{},new FakeNotifications().group("dev.jasper.vault"));
+                service.anchoredPicker(p->{throw new AssertionError("retired picker reopened");},a->{});
+                var window=new VaultManagerWindow(context,f.lock,f.manager,service,new SecretClipboard(t->{},Optional::empty,c->{}),()->new VaultManagerWindow.Status("test","off","/synthetic/vault.jv"),()->{});
+                windowRef.set(window);window.show(terminal,Optional.empty());f.lock.lock();window.changed();
+                var consumer=service.forConsumer(new PluginInfo("test.consumer","Consumer","1",Set.of()));
+                java.util.concurrent.CompletableFuture<Boolean> survivor;
+                java.util.concurrent.CompletableFuture<dev.jasper.vault.api.CredentialPickResult> picked;
+                if(anchoredFirst) {picked=consumer.pick(terminal,new dev.jasper.vault.api.CredentialPickRequest(anchor,Optional.empty(),true));survivor=service.requestUnlock(terminal);}
+                else {survivor=service.requestUnlock(terminal);picked=consumer.pick(terminal,new dev.jasper.vault.api.CredentialPickRequest(anchor,Optional.empty(),true));}
+                var old=displayed.get();var oldView=anchoredFirst?old.view():window.panel.view();type(oldView,old.password,"test-password");
+                if(pending) {press(oldView,old.submit);assertThat(promptRef.get().busy()).isTrue();}
+                anchor.close();assertThat(picked.join()).isInstanceOf(dev.jasper.vault.api.CredentialPickResult.Cancelled.class);assertThat(survivor).isNotDone();
+                assertThat(window.passwordPanel).isNotNull();
+                if(anchoredFirst) assertThat(closed(oldView)).isTrue();
+                else if(!pending) assertThat(secret(window.panel.view(),old.password)).isEqualTo("test-password");
+                if(!pending) promptRef.get().submit("test-password".toCharArray());
+                f.drain();assertThat(survivor).isCompletedWithValue(true);window.close();assertThat(host.failures()).isEmpty();
+            }
+        });
+    }
+
     @Test void editorBrowseUsesTheSdkDialogChooser() throws Exception {
         edt(() -> {
             try (var f = new VaultUiFixture(directory); var host = new FakePluginHost()) {
@@ -33,7 +108,7 @@ class VaultManagerWindowTest {
                 var owner = context.terminals().windows().getFirst();
                 var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
                 var window = new VaultManagerWindow(context, f.lock, f.manager, service,
-                    new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> "test", () -> { });
+                    new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
                 window.show(owner, Optional.empty());
                 var editor = new AtomicReference<EntryEditor>();
                 window.dialog("Add SSH Key", dismiss -> {
@@ -59,7 +134,7 @@ class VaultManagerWindowTest {
                 WindowHandle owner = context.terminals().windows().getFirst();
                 var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
                 var window = new VaultManagerWindow(context, f.lock, f.manager, service,
-                    new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> "Device secret: test", () -> { });
+                    new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
                 UUID id = UUID.randomUUID();
                 f.manager.saveNote(new Note(id, "Recovery", "line one\nline two".toCharArray(), Instant.EPOCH)); f.drain();
                 window.show(owner, Optional.of(id)); window.show(owner, Optional.of(id));
@@ -89,7 +164,7 @@ class VaultManagerWindowTest {
                     prompts[0]++; assertThat(controller.get().showUnlock(prompt)).isTrue();
                 }, p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
                 var window = new VaultManagerWindow(context, f.lock, f.manager, service,
-                    new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> "status", () -> { });
+                    new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
                 controller.set(window);
                 UUID id = UUID.randomUUID();
                 f.manager.saveNote(new Note(id, "Recovery", "secret".toCharArray(), Instant.EPOCH)); f.drain();
@@ -137,7 +212,7 @@ class VaultManagerWindowTest {
                 var service = new VaultService(f.lock, () -> Optional.of(owner), prompt -> controller.get().showUnlock(prompt),
                     p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
                 var window = new VaultManagerWindow(context, f.lock, f.manager, service,
-                    new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> "status", () -> { });
+                    new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
                 controller.set(window);
                 window.show(owner, Optional.empty()); f.manager.invalidate(); f.lock.lock(); window.changed();
                 var view = window.panel.view();
@@ -167,7 +242,7 @@ class VaultManagerWindowTest {
                 host.addTerminalWindow(); WindowHandle owner = context.terminals().windows().getFirst();
                 var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
                 var window = new VaultManagerWindow(context, f.lock, f.manager, service,
-                    new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> "status", () -> { });
+                    new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
                 UUID id = UUID.randomUUID();
                 f.manager.saveAccount(VaultManagerTest.account(id, "secret".toCharArray())); f.drain();
                 Grant grant = new Grant("dev.jasper.ssh", id); f.lock.vault().grants().add(grant);

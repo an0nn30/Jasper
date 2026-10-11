@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 
 /**
  * Shared modal form behavior on a host-rendered kit view: labelled rows, Save/Cancel, failure recovery and
@@ -38,7 +39,7 @@ public class EditorForm implements AutoCloseable {
     private sealed interface Row permits TextRow, SecretRow, ChoiceRow, ToggleRow, DisplayRow { String id(); String label(); }
     private record TextRow(String id, String label, Nodes.FieldKind kind) implements Row { }
     private record SecretRow(String id, String label, String revealGroup, boolean multiline) implements Row { }
-    private record ChoiceRow(String id, String label, List<Option> options) implements Row { }
+    private record ChoiceRow(String id, String label, List<Option> options, Nodes.ChoiceKind kind) implements Row { }
     private record ToggleRow(String id, String label) implements Row { }
     private record DisplayRow(String id, String label, String text, Nodes.TextRole role) implements Row { }
 
@@ -46,7 +47,16 @@ public class EditorForm implements AutoCloseable {
     private final Runnable dismiss;
     private final List<Row> rows = new ArrayList<>();
     private final Map<String, String> values = new HashMap<>(), choices = new HashMap<>(), errors = new LinkedHashMap<>();
+    private final Map<String, String> hints = new HashMap<>();
     private final Map<String, Boolean> toggles = new HashMap<>();
+    private final Map<String, BooleanSupplier> visibility = new HashMap<>();
+    private record Group(String id, String title, List<String> rows) { }
+    private final List<Group> groups = new ArrayList<>();
+    private boolean discreet;
+    protected final void discreetInputs() { discreet=true; }
+    private BooleanSupplier ready = () -> true;
+    private String icon = "";
+    private Nodes.Hue hue = Nodes.Hue.NEUTRAL;
     private Supplier<CompletableFuture<Void>> action = () -> CompletableFuture.completedFuture(null);
     private String title = "Vault entry", message = "", saveLabel = "Save", cancelLabel = "Cancel";
     private boolean closed, busy, cancelEnabled = true;
@@ -65,11 +75,17 @@ public class EditorForm implements AutoCloseable {
         return view;
     }
 
+    protected final void hint(String id, String hint) { hints.put(id, hint); }
     protected final void text(String id, String label, String initial) { rows.add(new TextRow(id, label, Nodes.FieldKind.TEXT)); values.put(id, initial); }
     protected final void path(String id, String label, String initial) { rows.add(new TextRow(id, label, Nodes.FieldKind.PATH)); values.put(id, initial); }
     protected final void secret(String id, String label, String revealGroup) { rows.add(new SecretRow(id, label, revealGroup, false)); }
     protected final void note(String id, String label) { rows.add(new SecretRow(id, label, "", true)); }
-    protected final void choice(String id, String label, List<Option> options, String selected) { rows.add(new ChoiceRow(id, label, List.copyOf(options))); choices.put(id, selected); }
+    protected final void choice(String id, String label, List<Option> options, String selected) { rows.add(new ChoiceRow(id, label, List.copyOf(options), Nodes.ChoiceKind.DROPDOWN)); choices.put(id, selected); }
+    protected final void segmented(String id, String label, List<Option> options, String selected) { rows.add(new ChoiceRow(id, label, List.copyOf(options), Nodes.ChoiceKind.SEGMENTED)); choices.put(id, selected); }
+    protected final void visibleWhen(String id, BooleanSupplier visible) { visibility.put(id, visible); }
+    protected final void readyWhen(BooleanSupplier condition) { ready = condition; }
+    protected final void identity(String icon, Nodes.Hue hue) { this.icon = icon; this.hue = hue; }
+    protected final void group(String id, String title, String... members) { groups.add(new Group(id, title, List.of(members))); }
     protected final void toggle(String id, String label, boolean checked) { rows.add(new ToggleRow(id, label)); toggles.put(id, checked); }
     protected final void display(String id, String label, String text) { rows.add(new DisplayRow(id, label, text, Nodes.TextRole.BODY)); }
     protected final void description(String id, String label, String text) { rows.add(new DisplayRow(id, label, text, Nodes.TextRole.DESCRIPTION)); }
@@ -80,7 +96,7 @@ public class EditorForm implements AutoCloseable {
     /** A copy of a secret that the caller owns and must erase. */
     protected final char[] copySecret(String id) {
         char[][] copy = {new char[0]};
-        if (!closed) view().withSecret(id, chars -> copy[0] = chars.clone());
+        if (!closed && view != null) view.withSecret(id, chars -> copy[0] = chars.clone());
         return copy[0];
     }
 
@@ -102,7 +118,7 @@ public class EditorForm implements AutoCloseable {
     protected final void submit(Supplier<CompletableFuture<Void>> operation) { action = Objects.requireNonNull(operation); }
 
     private void save() {
-        if (closed || busy) return;
+        if (closed || busy || !ready.getAsBoolean()) return;
         errors.clear();
         busy = true; message = "Saving..."; render();
         CompletableFuture<Void> pending;
@@ -154,7 +170,7 @@ public class EditorForm implements AutoCloseable {
                 choices.put(selected.id(), selected.ids().iterator().next()); edited(true);
             }
             case UiEvent.Toggled toggled when toggles.containsKey(toggled.id()) -> { toggles.put(toggled.id(), toggled.checked()); edited(true); }
-            case UiEvent.SecretChanged ignored -> edited();
+            case UiEvent.SecretChanged ignored -> edited(true);
             default -> { }
         }
     }
@@ -169,15 +185,16 @@ public class EditorForm implements AutoCloseable {
 
     private void render() { if (view != null && !closed) view.update(new ViewSpec(form())); }
 
-    private ControlState state(String id) { return new ControlState(true, !busy, false, errors.getOrDefault(id, "")); }
+    private ControlState state(String id) { return new ControlState(visibility.getOrDefault(id, () -> true).getAsBoolean(), !busy, false, errors.getOrDefault(id, "")); }
 
     private Nodes.Node control(Row row) {
         return switch (row) {
-            case TextRow text -> new Nodes.Field(text.id(), state(text.id()), text.kind(), value(text.id()), "", text.label(),
-                text.kind() == Nodes.FieldKind.PATH ? BROWSE + text.id() : "");
+            case TextRow text -> new Nodes.Field(text.id(), state(text.id()), text.kind(), value(text.id()), hints.getOrDefault(text.id(), ""), text.label(),
+                text.kind() == Nodes.FieldKind.PATH ? BROWSE + text.id() : "", Optional.empty(),
+                discreet && text.kind() == Nodes.FieldKind.PATH ? Nodes.FieldPresentation.PLAIN_PATH : Nodes.FieldPresentation.STANDARD);
             case SecretRow secret -> new Nodes.Secret(secret.id(), state(secret.id()), "", secret.label(), secret.revealGroup(),
-                secret.multiline() ? Nodes.SecretKind.MULTILINE : Nodes.SecretKind.INPUT, "");
-            case ChoiceRow choice -> new Nodes.Choice(choice.id(), state(choice.id()), Nodes.ChoiceKind.DROPDOWN, choice.options(),
+                secret.multiline() ? Nodes.SecretKind.MULTILINE : discreet ? Nodes.SecretKind.DISCREET_INPUT : Nodes.SecretKind.INPUT, "");
+            case ChoiceRow choice -> new Nodes.Choice(choice.id(), state(choice.id()), choice.kind(), choice.options(),
                 selected(choice.id()), choice.label(), "");
             case ToggleRow toggle -> new Nodes.Toggle(toggle.id(), state(toggle.id()), toggle.label(), checked(toggle.id()),
                 "toggle." + toggle.id(), false);
@@ -185,27 +202,31 @@ public class EditorForm implements AutoCloseable {
         };
     }
 
-    /**
-     * Inputs carry their own kit label above them (the former labels are too long for a fixed label column), a
-     * switch sits in a setting row with its title, and read-only values show their label above the value.
-     */
     private Nodes.Node section(Row row) {
         return switch (row) {
-            case ToggleRow toggle -> new Nodes.SettingRow("row." + toggle.id(), ControlState.READY, toggle.label(), "", control(toggle), false);
-            case DisplayRow display -> new Nodes.Stack("row." + display.id(), ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
-                new Nodes.Text(display.id() + ".label", ControlState.READY, display.label(), Nodes.TextRole.LABEL), control(display)));
-            default -> control(row);
+            case DisplayRow display when display.label().isBlank() -> control(display);
+            case ChoiceRow choice when choice.kind() == Nodes.ChoiceKind.SEGMENTED -> control(row);
+            case ToggleRow toggle -> new Nodes.SettingRow("row." + toggle.id(), state(toggle.id()), toggle.label(), "", control(toggle), false);
+            default -> new Nodes.FormRow("row." + row.id(), state(row.id()), row.label(), "", control(row), Optional.empty(), false);
         };
     }
 
     private Nodes.Form form() {
         var sections = new ArrayList<Nodes.Node>();
-        for (Row row : rows) sections.add(section(row));
+        if (groups.isEmpty()) sections.add(new Nodes.Card("fields", ControlState.READY, Nodes.CardKind.FORM, rows.stream().map(this::section).toList()));
+        else for (Group group : groups) {
+            Nodes.Node card = new Nodes.Card(group.id(), ControlState.READY, Nodes.CardKind.FORM,
+                group.rows().stream().map(id -> rows.stream().filter(row -> row.id().equals(id)).findFirst().orElseThrow()).map(this::section).toList());
+            sections.add(group.title().isEmpty() ? card : new Nodes.Section(group.id() + ".section", ControlState.READY, group.title(), card));
+        }
         sections.add(new Nodes.Text(MESSAGE, new ControlState(!message.isEmpty(), true, false, ""), message, Nodes.TextRole.BODY));
         var actions = List.of(
             new Nodes.Button(CANCEL, new ControlState(true, cancelEnabled, false, ""), cancelLabel, "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
-            new Nodes.Button(SAVE, new ControlState(true, true, busy, ""), saveLabel, "", Nodes.ButtonKind.PRIMARY, SAVE, ""));
-        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.SHEET, title, Optional.empty(), sections, Optional.empty(), actions,
+            new Nodes.Button(SAVE, new ControlState(true, !busy && ready.getAsBoolean(), busy, ""), saveLabel, "", Nodes.ButtonKind.PRIMARY, SAVE, ""));
+        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.SHEET, title, icon.isEmpty() ? Optional.empty() : Optional.of(
+            new Nodes.Stack("identity", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+                new Nodes.Icon("identity.icon", ControlState.READY, icon, hue, Nodes.IconSize.HERO, title),
+                new Nodes.Text("identity.title", ControlState.READY, title, Nodes.TextRole.HERO_TITLE)))), sections, Optional.empty(), actions,
             cancelEnabled ? CANCEL : "");
     }
 

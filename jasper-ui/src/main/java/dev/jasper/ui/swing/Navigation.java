@@ -12,13 +12,13 @@ final class Navigation {
 
     static final class InlineLayout implements Composition.WidthLayout {
         final KitContext context;
+        final DesignMetrics.Role gapRole;
 
-        InlineLayout(KitContext context) {
-            this.context = context;
-        }
+        InlineLayout(KitContext context) { this(context, DesignMetrics.Role.ICON_GAP); }
+        InlineLayout(KitContext context, DesignMetrics.Role gapRole) { this.context=context; this.gapRole=gapRole; }
 
         int gap() {
-            return ThemePainting.metric(context, DesignMetrics.Role.ICON_GAP);
+            return ThemePainting.metric(context, gapRole);
         }
 
         @Override

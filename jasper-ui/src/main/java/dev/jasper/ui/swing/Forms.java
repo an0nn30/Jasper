@@ -39,6 +39,11 @@ final class Forms {
                     int width = Math.max(0, parent.getWidth() - insets.left - insets.right);
                     int height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);
                     int footerHeight = Math.min(height, Composition.height(footer, width));
+                    if (((Nodes.Form)FormControl.this.node).kind()==Nodes.FormKind.WINDOW && height < footerHeight + ThemePainting.metric(context(),DesignMetrics.Role.FIELD_HEIGHT)) {
+                        int actionHeight=java.util.Arrays.stream(actions.getComponents()).filter(Component::isVisible).mapToInt(c->c.getPreferredSize().height).max().orElse(0);
+                        // Keep one full action reachable whenever possible; below that retain a bounded body viewport.
+                        footerHeight=Math.min(footerHeight,Math.min(Math.max(0,height-1),Math.max(actionHeight,height/2)));
+                    }
                     scroll.setBounds(insets.left, insets.top, width, height - footerHeight);
                     footerScroll.setBounds(insets.left, insets.top + height - footerHeight, width, footerHeight);
                 }
@@ -92,7 +97,22 @@ final class Forms {
                             return view.isClosed() ? null : super.getComponentBefore(root, child);
                         }
                     });
+            var focusManager=KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            java.beans.PropertyChangeListener focusChanged=event->{
+                if(event.getNewValue() instanceof JComponent focused) revealFocusedBody(focused);
+            };
+            focusManager.addPropertyChangeListener("focusOwner",focusChanged);
+            own(()->focusManager.removePropertyChangeListener("focusOwner",focusChanged));
             refresh();
+        }
+
+        void revealFocusedBody(JComponent focused) {
+            if(!closed && !view.isClosed() && ((Nodes.Form)node).kind()==Nodes.FormKind.WINDOW && SwingUtilities.isDescendingFrom(focused,body))
+                for (Container ancestor=focused.getParent(); ancestor!=null; ancestor=ancestor.getParent()) {
+                    if (ancestor instanceof JViewport viewport && viewport.getView() instanceof JComponent content)
+                        content.scrollRectToVisible(SwingUtilities.convertRectangle(focused,new Rectangle(0,0,focused.getWidth(),focused.getHeight()),content));
+                    if (ancestor==scroll) break;
+                }
         }
 
         void cancel() {
@@ -173,14 +193,22 @@ final class Forms {
             Composition.style(
                     title, context(), Typography.Role.HERO_TITLE, SemanticColor.TEXT_PRIMARY);
             ((Surface) component).sheet = form.kind() == Nodes.FormKind.SHEET;
+            int stroke=ThemePainting.metric(context(),DesignMetrics.Role.HAIRLINE);
+            component.setBorder(form.kind()==Nodes.FormKind.SHEET ? new EmptyBorder(0,stroke,stroke,stroke) : new EmptyBorder(0,0,0,0));
             boolean hero = form.kind() == Nodes.FormKind.HERO || form.kind() == Nodes.FormKind.HERO_COMPACT;
             boolean compact = form.kind() == Nodes.FormKind.HERO_COMPACT;
-            int side = ThemePainting.metric(context(), hero ? DesignMetrics.Role.HERO_SIDES : DesignMetrics.Role.FORM_SIDES);
+            boolean window = form.kind() == Nodes.FormKind.WINDOW;
+            body.fill = window; footer.window = window; footer.context = context();
+            int side = window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_SIDE) : ThemePainting.metric(context(), hero ? DesignMetrics.Role.HERO_SIDES : DesignMetrics.Role.FORM_SIDES);
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.FOOTER_PADDING);
             int focusClearance = hero ? ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING) : 0;
-            body.setBorder(new EmptyBorder(hero ? ThemePainting.metric(context(), DesignMetrics.Role.HERO_TOP) : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FORM_TOP) : pad,
+            body.setBorder(window ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(hero ? ThemePainting.metric(context(), DesignMetrics.Role.HERO_TOP) : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FORM_TOP) : pad,
                     side, focusClearance, side));
-            body.setLayout(hero ? new Composition.Vertical(ThemePainting.metric(context(), DesignMetrics.Role.HERO_SECTION_GAP)) {
+            body.setLayout(window ? new Composition.Vertical(0) {
+                @Override public void layoutContainer(Container parent) {
+                    for (var child : parent.getComponents()) if (child.isVisible()) child.setBounds(0, 0, parent.getWidth(), parent.getHeight());
+                }
+            } : hero ? new Composition.Vertical(ThemePainting.metric(context(), DesignMetrics.Role.HERO_SECTION_GAP)) {
                 @Override int gap(Component previous, Component next) {
                     if (form.hero().isPresent() && previous == view.control(form.hero().get().id()).component)
                         return ThemePainting.metric(context(), compact ? DesignMetrics.Role.HERO_COMPACT_INTRO_GAP : DesignMetrics.Role.HERO_INTRO_GAP);
@@ -189,10 +217,10 @@ final class Forms {
                 }
             } : new Composition.Vertical(ThemePainting.metric(context(), form.kind() == Nodes.FormKind.SHEET
                     ? DesignMetrics.Role.SHEET_SECTION_GAP : DesignMetrics.Role.SECTION_GAP)));
-            int footerTop = hero ? ThemePainting.metric(context(), compact
+            int footerTop = window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_VERTICAL) : hero ? ThemePainting.metric(context(), compact
                     ? DesignMetrics.Role.HERO_COMPACT_FOOTER_TOP : DesignMetrics.Role.HERO_FOOTER_TOP) - focusClearance : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FULL_FOOTER_TOP) : pad;
             footer.setBorder(new EmptyBorder(footerTop, side,
-                    hero ? ThemePainting.metric(context(), DesignMetrics.Role.HERO_FOOTER_BOTTOM) : pad, side));
+                    window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_VERTICAL) : hero ? ThemePainting.metric(context(), DesignMetrics.Role.HERO_FOOTER_BOTTOM) : pad, side));
             footer.setLayout(new FooterLayout(this));
             actions.setLayout(
                     hero
@@ -288,6 +316,15 @@ final class Forms {
 
     /** Stable footer ancestry; only its viewport overflows on screens shorter than the fixed actions. */
     static final class Footer extends JPanel implements Scrollable {
+        boolean window;
+        KitContext context;
+        @Override protected void paintComponent(Graphics graphics) {
+            super.paintComponent(graphics);
+            if (window) {
+                graphics.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE));
+                graphics.drawLine(0, 0, getWidth() - 1, 0);
+            }
+        }
         @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
         @Override public int getScrollableUnitIncrement(Rectangle bounds, int orientation, int direction) { return 16; }
         @Override public int getScrollableBlockIncrement(Rectangle bounds, int orientation, int direction) { return Math.max(16, bounds.height - 16); }
@@ -296,6 +333,7 @@ final class Forms {
     }
 
     static final class Body extends JPanel implements Scrollable {
+        boolean fill;
         @Override public Dimension getPreferredSize() {
             if (getLayout() instanceof Composition.WidthLayout layout && getParent() instanceof JViewport viewport
                     && viewport.getParent() instanceof JScrollPane scroll && scroll.getWidth() > 0) {
@@ -336,7 +374,7 @@ final class Forms {
 
         @Override
         public boolean getScrollableTracksViewportHeight() {
-            return false;
+            return fill && getParent()!=null && getPreferredSize().height<=getParent().getHeight();
         }
     }
 
@@ -358,15 +396,19 @@ final class Forms {
                     ThemePainting.metric(
                             view.context(),
                             switch (f.kind()) {
+                                case WINDOW -> DesignMetrics.Role.FORM_WIDTH;
                                 case HERO -> DesignMetrics.Role.HERO_WIDTH;
                                 case HERO_COMPACT -> DesignMetrics.Role.HERO_COMPACT_WIDTH;
                                 case SHEET -> DesignMetrics.Role.SHEET_WIDTH;
                                 default -> DesignMetrics.Role.FORM_WIDTH;
                             });
-            int measuredWidth = getWidth() > 0 ? getWidth() : width;
+            if (f.kind() == Nodes.FormKind.WINDOW) width = owner.body.getPreferredSize().width;
+            Insets insets=getInsets();
+            width += insets.left+insets.right;
+            int measuredWidth = Math.max(0,(getWidth() > 0 ? getWidth() : width)-insets.left-insets.right);
             int height =
                     Composition.height(owner.body, measuredWidth)
-                            + Composition.height(owner.footer, measuredWidth);
+                            + Composition.height(owner.footer, measuredWidth)+insets.top+insets.bottom;
             int available = view.availableHeight();
             return new Dimension(
                     width,
@@ -384,16 +426,15 @@ final class Forms {
                 g.setColor(ThemePainting.color(view.context(), SemanticColor.SURFACE_DIALOG));
                 if (!sheet) g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2);
                 else {
-                    double radius = r;
+                    double stroke=ThemePainting.metric(view.context(),DesignMetrics.Role.HAIRLINE), half=stroke/2, radius=r;
                     var path = new Path2D.Double();
-                    path.moveTo(0, 0);
-                    path.lineTo(getWidth(), 0);
-                    path.lineTo(getWidth(), getHeight() - radius);
-                    path.quadTo(getWidth(), getHeight(), getWidth() - radius, getHeight());
-                    path.lineTo(radius, getHeight());
-                    path.quadTo(0, getHeight(), 0, getHeight() - radius);
-                    path.closePath();
-                    g.fill(path);
+                    path.moveTo(half,half);path.lineTo(getWidth()-half,half);
+                    path.lineTo(getWidth()-half,getHeight()-radius);
+                    path.quadTo(getWidth()-half,getHeight()-half,getWidth()-radius,getHeight()-half);
+                    path.lineTo(radius,getHeight()-half);
+                    path.quadTo(half,getHeight()-half,half,getHeight()-radius);path.closePath();
+                    g.fill(path);g.setColor(ThemePainting.color(view.context(),SemanticColor.BORDER_WINDOW));
+                    g.setStroke(new BasicStroke((float)stroke));g.draw(path);
                 }
             } finally {
                 g.dispose();
@@ -431,7 +472,9 @@ final class Forms {
             int sharedPreviewWidth = Math.max(0, contentWidth - actionWidth - gap());
             boolean stacked =
                     owner.preview.isVisible()
-                            && owner.preview.getPreferredSize().width > sharedPreviewWidth;
+                            && (((Nodes.Form) owner.node).kind() == Nodes.FormKind.WINDOW
+                                ? sharedPreviewWidth < ThemePainting.metric(owner.context(), DesignMetrics.Role.FORM_LABEL_WIDTH)
+                                : owner.preview.getPreferredSize().width > sharedPreviewWidth);
             int previewWidth = stacked ? contentWidth : sharedPreviewWidth;
             int previewHeight =
                     owner.preview.isVisible() ? Composition.height(owner.preview, previewWidth) : 0;

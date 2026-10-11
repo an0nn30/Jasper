@@ -210,7 +210,7 @@ final class TextFields {
         /** A search field is labelled by its glyph and hint; its label stays its accessible name only. */
         boolean labelShown() {
             var field = (Nodes.Field)node;
-            return !embedded && !surface.hero && field.kind() != Nodes.FieldKind.SEARCH && (field.presentation() == Nodes.FieldPresentation.STANDARD || field.presentation() == Nodes.FieldPresentation.TECHNICAL);
+            return !embedded && !surface.hero && field.kind() != Nodes.FieldKind.SEARCH && (field.presentation() == Nodes.FieldPresentation.STANDARD || field.presentation() == Nodes.FieldPresentation.TECHNICAL || field.presentation() == Nodes.FieldPresentation.PLAIN_PATH);
         }
         static int uncommitted(java.awt.event.InputMethodEvent event) {
             var text = event.getText();
@@ -253,6 +253,7 @@ final class TextFields {
             if (field.kind() == Nodes.FieldKind.SEARCH || field.kind() == Nodes.FieldKind.PATH) leading.setIcon(context().icons().icon(field.kind() == Nodes.FieldKind.PATH ? "folder.filled" : "search", context().theme().semantic(), SemanticColor.TEXT_PLACEHOLDER,
                 com.formdev.flatlaf.util.UIScale.scale(context().icons().size(Nodes.IconSize.CONTROL))));
             int gap = ThemePainting.metric(context(), field.kind() == Nodes.FieldKind.PORT ? DesignMetrics.Role.PORT_PREFIX_GAP : DesignMetrics.Role.ICON_GAP);
+            leading.setVisible(field.presentation() != Nodes.FieldPresentation.PLAIN_PATH);
             leading.setBorder(new EmptyBorder(0, 0, 0, gap));
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
             int padding = ThemePainting.metric(context(), field.kind() == Nodes.FieldKind.TEXTAREA ? DesignMetrics.Role.TEXTAREA_PADDING : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);

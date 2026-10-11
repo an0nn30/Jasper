@@ -41,6 +41,27 @@ class GalleryCoverageTest {
             }finally{context.icons().close();context.binding().close();}
         });
     }
+    @Test void discreetFixturesExerciseEmptyPopulatedAndFocusedRevealPolicy() {
+        dev.jasper.ui.testsupport.Edt.run(() -> {
+            var prior = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            var focus = new KitGallery.GalleryFocus();
+            var context = dev.jasper.ui.testsupport.KitFixtures.context();
+            java.awt.KeyboardFocusManager.setCurrentKeyboardFocusManager(focus);
+            try {
+                for (var fixture : KitGallery.fixtures().stream().filter(f -> f.name().startsWith("discreet-secret-")).toList()) {
+                    try (var view = new dev.jasper.ui.swing.KitView(context, fixture.spec(), e -> {})) {
+                        KitGallery.applyState(view, fixture, focus);
+                        assertThat(KitGallery.find(view, "discreet-secret.reveal").isVisible())
+                            .as(fixture.name()).isEqualTo(!fixture.state().equals("empty"));
+                    } finally { focus.target = null; }
+                }
+            } finally {
+                java.awt.KeyboardFocusManager.setCurrentKeyboardFocusManager(prior);
+                context.icons().close(); context.binding().close();
+            }
+        });
+    }
+
     @Test void missingCoverageDiagnosticNamesTheNode() {
         var values = new HashSet<String>();
         KitGallery.fixtures().forEach(f -> collect(f.spec().root(), values));

@@ -65,6 +65,7 @@ text.link text.link.hover text.error text.success
 accent accent.hover selection.bg hover.overlay segment.selected.bg toggle.track.off toggle.knob
 status.success status.warning status.danger status.idle
 hue.blue hue.green hue.amber hue.purple hue.neutral
+hue.blue.surface hue.green.surface hue.amber.surface hue.purple.surface hue.neutral.surface
 button.secondary.bg button.secondary.bg.hover
 ```
 
@@ -101,7 +102,7 @@ only if needed to reach 3:1 against final `toggle.knob`. Explicit canonical `tog
 Dependent defaults resolve from the final canonical parent: `border.focus` from `accent`,
 `border.error` from `status.danger`; `accent.hover` and `text.link.hover` mix their final base with
 `text.primary` at 8%; `hover.overlay` uses `text.primary`. `surface.scrim` uses the darkest terminal
-ANSI color by luminance as its base. The kit applies scrim 55%, tile 16%, focus 25%, error ring 22%,
+ANSI color by luminance as its base. The kit applies scrim 55%, category tile 18%, focus 25%, error ring 22%,
 row hover 5%, ghost hover 8%, disabled 42%, and impossible reorder action 30% exactly once.
 Validate topological order, including explicit overrides of dependent parents. Source Appendix A
 values belong only in the calibration theme fixture, not into component fallback code.
@@ -159,7 +160,7 @@ other grids and stroke outside 1.4–1.6. Paths are fully validated before the t
 with no markup, resources or colors and bounded size/commands/geometry. `IconRegistry.names()` returns
 an immutable name snapshot; `register` returns idempotent `IconRegistration` (an `AutoCloseable`).
 The required hue-based `icon` method is joined by an explicit `SemanticColor` tint overload, `size(IconSize)`,
-and `tile(name,palette,hue,logicalSize,selected)` for shared 16% category/18% selected tile treatment.
+and `tile(name,palette,hue,logicalSize,selected)` for shared18% category/18% selected tile treatment.
 Built-in paths are original Jasper artwork. JSVG 2.0.0 (already FlatLaf Extras' runtime dependency) is
 explicitly declared for its vector path parser; no vendor types appear in public signatures.
 
@@ -958,3 +959,8 @@ uninstall detaches its children and Swing transfers editor focus. Editable Searc
 kit-owned delegate/editor attachment on `updateUI`, refreshing live editor/popup module styles and allowing
 normal child UI refresh. Noneditable Choice and replacement of a foreign delegate still reinstall the kit UI.
 No synthetic focus restoration or delayed focus request is used, so an unfocused or closed view cannot steal focus.
+
+
+### Plan3 Task4b additive window/sheet/category contracts
+
+The [Vault native composition amendment](../specs/2026-10-11-jasper-vault-native-composition-amendment.md#task4b-approved-additive-shared-contracts-2026-10-11) adds WINDOW (one section/no hero), PATH-only PLAIN_PATH and DISCREET_INPUT in module/SDK/host/fake. Existing constructors retain defaults. WINDOW uses shared PRIMARY/NONE, popup-first Escape and closed focus policy. Category fill-base defaults use final authored hue; base alpha survives and18% is multiplied once in tile paint. Explicit fill bases are independent of glyph hue; selected fill remains onAccent. No opacity is baked into defaults. SHEET adds outside strokes to480fill→482envelope; default card/control widths remain432/294. FOOTER status groups retain leading values and elide the final path, stacking at narrow widths.

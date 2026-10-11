@@ -114,6 +114,9 @@ class ManagedVaultLoadingTest {
         switch (root) {
             case dev.jasper.sdk.ui.Nodes.Form n -> { children.addAll(n.sections()); n.preview().ifPresent(children::add); children.addAll(n.actions()); }
             case dev.jasper.sdk.ui.Nodes.Stack n -> children.addAll(n.children());
+            case dev.jasper.sdk.ui.Nodes.Card n -> children.addAll(n.children());
+            case dev.jasper.sdk.ui.Nodes.Split n -> children.addAll(n.children());
+            case dev.jasper.sdk.ui.Nodes.Panel n -> { children.add(n.header()); n.searchOrNavigation().ifPresent(children::add); children.add(n.body()); n.footer().ifPresent(children::add); }
             case dev.jasper.sdk.ui.Nodes.FormRow n -> children.add(n.control());
             case dev.jasper.sdk.ui.Nodes.Empty n -> children.addAll(n.actions());
             default -> { }

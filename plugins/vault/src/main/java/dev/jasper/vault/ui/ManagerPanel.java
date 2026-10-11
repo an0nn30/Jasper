@@ -13,6 +13,8 @@ import dev.jasper.vault.model.Account;
 import dev.jasper.vault.model.Auth;
 import dev.jasper.vault.model.Grant;
 import dev.jasper.vault.model.SshKey;
+import dev.jasper.vault.model.Note;
+import dev.jasper.vault.model.ManagedSshKey;
 import dev.jasper.vault.service.UnlockPrompt;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -26,9 +28,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * Searchable, single-list manager on one host-rendered kit view. Rows are keyed by entry id; only non-secret row
- * metadata is retained. Enter in the list edits the selected entry; elsewhere it presses Okay (the former default
- * button), and while an unlock prompt shows, Enter in its field unlocks. UI thread only.
+ * Searchable category/list/detail manager on one host-rendered kit view. Rows are keyed by entry id; only non-secret row
+ * metadata is retained. Enter in the list edits the selected entry; elsewhere it presses Done, and while an unlock prompt shows, Enter in its field unlocks. UI thread only.
  */
 final class ManagerPanel implements AutoCloseable {
     static final String ROOT = "manager", SEARCH = "search", KIND = "kind", ADD = "add", EDIT = "edit", DELETE = "delete",
@@ -50,10 +51,14 @@ final class ManagerPanel implements AutoCloseable {
     private List<Grant> grants = List.of();
     private boolean unlocked, closed;
     private Card card = Card.ENTRIES;
-    private String query = "", kind = ALL_TYPES, status = "";
-    private UUID selection;
+    private String query = "", kind = ALL_TYPES;
+    private VaultManagerWindow.Status status = new VaultManagerWindow.Status("", "", "");
+    private UUID selection, shownSecret;
+    private java.time.Instant shownSecretVersion;
     private int grantSelection = -1;
     private PasswordPanel unlock;
+    private Consumer<String> copySecret = text -> {};
+    void secretClipboard(Consumer<String> copy) { copySecret = copy; }
 
     ManagerPanel(UiKit kit, Function<UUID, Optional<Object>> entry, Consumer<VaultManager.Type> onAdd,
                  Consumer<UUID> onEdit, Consumer<UUID> onDelete, Consumer<UUID> onCopy,
@@ -72,7 +77,7 @@ final class ManagerPanel implements AutoCloseable {
     List<VaultManager.Row> visibleRows() { return visible; }
     PasswordPanel unlockForm() { return unlock; }
 
-    void refresh(List<VaultManager.Row> nextRows, List<Grant> nextGrants, String text, boolean unlocked) {
+    void refresh(List<VaultManager.Row> nextRows, List<Grant> nextGrants, VaultManagerWindow.Status text, boolean unlocked) {
         if (closed) return;
         boolean stateChanged = this.unlocked != unlocked; this.unlocked = unlocked;
         allRows = unlocked ? List.copyOf(nextRows) : List.of();
@@ -144,6 +149,7 @@ final class ManagerPanel implements AutoCloseable {
             case EDIT -> selected().ifPresent(onEdit);
             case DELETE -> selected().ifPresent(onDelete);
             case COPY_PUBLIC -> selected().ifPresent(onCopy);
+            case "detail.username.copy", "detail.password.copy", "detail.note.copy" -> copyDetail(id);
             case LOCK -> onLock.run();
             case UNLOCK -> onUnlock.run();
             case ADD_GENERATE -> onGenerate.run();
@@ -158,21 +164,49 @@ final class ManagerPanel implements AutoCloseable {
         }
     }
 
+    private void copyDetail(String action) {
+        if (!unlocked || selection == null) return;
+        entry.apply(selection).ifPresent(value -> {
+            if (value instanceof Account account) {
+                if (action.equals("detail.username.copy")) copySecret.accept(account.username());
+                else if (action.equals("detail.password.copy")) {
+                    char[] secret = password(account.auth());
+                    if (secret != null) copySecret.accept(new String(secret));
+                }
+            } else if (value instanceof Note note && action.equals("detail.note.copy")) copySecret.accept(new String(note.text()));
+        });
+    }
+
+    private static char[] password(Auth auth) {
+        return switch (auth) { case Auth.Password p -> p.password(); case Auth.KeyAndPassword p -> p.password(); default -> null; };
+    }
+    private String secretId() { return "detail.secret." + selection; }
+
     private void filter() {
         String needle = query.strip().toLowerCase(Locale.ROOT);
         visible = allRows.stream().filter(row -> kind.equals(ALL_TYPES) || row.type().name().equals(kind))
             .filter(row -> (row.name() + " " + row.subtitle()).toLowerCase(Locale.ROOT).contains(needle))
-            .sorted(Comparator.comparing(VaultManager.Row::name, String.CASE_INSENSITIVE_ORDER)).toList();
+            .sorted(Comparator.comparing(VaultManager.Row::type).thenComparing(VaultManager.Row::name, String.CASE_INSENSITIVE_ORDER)).toList();
         if (selection != null && visible.stream().noneMatch(row -> row.id().equals(selection))) selection = null;
     }
 
-    private void render() { if (!closed) { view.update(new ViewSpec(node())); titleActions.update(new ViewSpec(actions())); } }
+    private void render() {
+        if (closed) return;
+        if (!unlocked || card != Card.ENTRIES || selection == null || !selection.equals(shownSecret)) { shownSecret=null; shownSecretVersion=null; }
+        view.update(new ViewSpec(node())); titleActions.update(new ViewSpec(actions()));
+        if (unlocked && card == Card.ENTRIES && selection != null) entry.apply(selection).ifPresent(value -> {
+            char[] secret = value instanceof Account account ? password(account.auth()) : value instanceof Note note ? note.text() : null;
+            java.time.Instant version = value instanceof Account account ? account.updated() : value instanceof Note note ? note.updated() : null;
+            if (secret != null && (!selection.equals(shownSecret) || !java.util.Objects.equals(version, shownSecretVersion))) view.replaceSecret(secretId(), secret);
+            shownSecret = secret == null ? null : selection; shownSecretVersion = version;
+        });
+    }
 
     private String subtitle(VaultManager.Row row) {
         return entry.apply(row.id()).map(value -> switch (value) {
-            case Account a -> a.username() + " · " + (a.auth() instanceof Auth.Password ? "password" : a.auth() instanceof Auth.Key ? "SSH key" : "SSH key and password");
+            case Account a -> a.username() + " · " + (a.auth() instanceof Auth.Password ? "Password" : a.auth() instanceof Auth.Key ? "Private key" : "Private key and password");
             case dev.jasper.vault.model.ManagedSshKey k -> "Stored in Vault · " + k.fingerprint();
-            case SshKey k -> k.algorithm() + " · " + k.fingerprint();
+            case SshKey k -> k.algorithm() + " · " + (k.comment().isBlank() ? k.fingerprint() : k.comment());
             default -> row.subtitle();
         }).orElse(row.subtitle());
     }
@@ -185,43 +219,110 @@ final class ManagerPanel implements AutoCloseable {
 
     private Nodes.Stack actions() {
         var adds = new ArrayList<MenuItem>();
-        for (var type : VaultManager.Type.values()) adds.add(item("add." + type.name(), type.toString()));
+        for (var type : VaultManager.Type.values()) adds.add(new MenuItem("add." + type.name(), type.toString(), icon(type), "add." + type.name(), true, false, hue(type)));
         adds.add(new MenuItem("add.separator", "", "", "", true, true));
-        adds.add(item(ADD_GENERATE, "Generate SSH Key..."));
+        adds.add(new MenuItem(ADD_GENERATE, "Generate SSH Key...", "sparkle", ADD_GENERATE, true, false, Nodes.Hue.PURPLE));
         var state = new ControlState(true, unlocked, false, "");
         return new Nodes.Stack("title-actions", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
-            new Nodes.Button(LOCK, state, "Lock", "lock", Nodes.ButtonKind.GHOST, LOCK, "Lock vault"),
-            new Nodes.MenuButton(ADD, state, "Add", "add", Nodes.ButtonKind.GHOST, "", adds, "Add entry")));
+            new Nodes.Button(LOCK, state, "", "lock", Nodes.ButtonKind.GHOST, LOCK, "Lock vault"),
+            new Nodes.MenuButton(ADD, state, "", "add", Nodes.ButtonKind.GHOST, "", adds, "Add entry")));
     }
 
-    private List<Nodes.Node> entries() {
-        var selectedRow = visible.stream().filter(row -> row.id().equals(selection)).findFirst().orElse(null);
-        var options = new ArrayList<Option>();
-        options.add(new Option(ALL_TYPES, "All Types", Optional.empty()));
-        for (var type : VaultManager.Type.values()) options.add(new Option(type.name(), type.toString(), Optional.empty()));
-        var toolbar = new Nodes.Stack("toolbar", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
-            new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Search names, usernames and key fingerprints", "Search vault", ""),
-            new Nodes.Choice(KIND, ControlState.READY, Nodes.ChoiceKind.DROPDOWN, options, kind, "Filter credential type", ""),
-            tool(EDIT, "edit", "Edit entry", selectedRow != null),
-            tool(DELETE, "delete", "Delete entry", selectedRow != null),
-            tool(COPY_PUBLIC, "copy", "Copy public key", selectedRow != null && selectedRow.type() == VaultManager.Type.SSH_KEY),
-            new Nodes.MenuButton(MORE, ControlState.READY, "", "more", Nodes.ButtonKind.GHOST, "",
-                List.of(item(MORE_GRANTS, "Saved plugin grants..."), item(MORE_PASSWORD, "Change Master Password...")), "More vault actions")));
+    private static String icon(VaultManager.Type type) { return switch (type) { case LOGIN -> "user"; case SSH_KEY -> "key"; case NOTE -> "note"; }; }
+    private static Nodes.Hue hue(VaultManager.Type type) { return switch (type) { case LOGIN -> Nodes.Hue.BLUE; case SSH_KEY -> Nodes.Hue.GREEN; case NOTE -> Nodes.Hue.AMBER; }; }
+    private static Nodes.Text text(String id, String value, Nodes.TextRole role) { return new Nodes.Text(id, ControlState.READY, value, role); }
+    private static Nodes.Header hiddenHeader(String id, String title) {
+        return new Nodes.Header(id, new ControlState(false, true, false, ""), title, OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
+    }
+    private Nodes.Node entries() {
+        var categories = new ArrayList<ListItem>();
+        categories.add(category(ALL_TYPES, "All Items", "menu", Nodes.Hue.NEUTRAL, allRows.size()));
+        for (var type : VaultManager.Type.values()) categories.add(category(type.name(), switch(type) {
+            case LOGIN -> "Logins"; case SSH_KEY -> "SSH Keys"; case NOTE -> "Secure Notes";
+        }, icon(type), hue(type), (int)allRows.stream().filter(row -> row.type() == type).count()));
+        var rail = new Nodes.Panel("categories", ControlState.READY, hiddenHeader("categories.header", "Categories"), Optional.empty(),
+            new Nodes.ItemList(KIND, ControlState.READY, Nodes.ListKind.SINGLE, categories, Set.of(kind), "", List.of()), Optional.of(
+                new Nodes.MenuButton(MORE, ControlState.READY, "More", "more", Nodes.ButtonKind.GHOST, "",
+                    List.of(item(MORE_GRANTS, "Saved plugin grants..."), item(MORE_PASSWORD, "Change Master Password...")), "More vault actions")));
+        Nodes.Node list;
         if (visible.isEmpty()) {
             String title = allRows.isEmpty() ? "Nothing to show" : "No matching entries";
-            return List.of(toolbar, new Nodes.Empty(EMPTY, ControlState.READY,
-                new Nodes.Icon(EMPTY + ".icon", ControlState.READY, "search", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, title), title, "", List.of()));
+            list = new Nodes.Empty(EMPTY, ControlState.READY,
+                new Nodes.Icon(EMPTY + ".icon", ControlState.READY, "search", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, title), title, "", List.of());
+        } else {
+            var items = visible.stream().map(row -> {
+                String id = row.id().toString();
+                return new ListItem(id, Optional.of(new Nodes.Icon("row." + id + ".icon", ControlState.READY, icon(row.type()), hue(row.type()), Nodes.IconSize.RAIL, row.type().toString())),
+                    List.<Nodes.Node>of(text("row." + id + ".name", row.name(), Nodes.TextRole.BODY)),
+                    List.<Nodes.Node>of(text("row." + id + ".detail", subtitle(row), Nodes.TextRole.CAPTION)), List.of());
+            }).toList();
+            list = new Nodes.ItemList(ROWS, ControlState.READY, Nodes.ListKind.DOUBLE, items,
+                selected().map(id -> Set.of(id.toString())).orElse(Set.of()), EDIT, List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(VISIBLE_ROWS));
         }
-        var items = visible.stream().map(row -> {
-            String id = row.id().toString();
-            return new ListItem(id, Optional.empty(),
-                List.<Nodes.Node>of(new Nodes.Text("row." + id + ".name", ControlState.READY, row.name(), Nodes.TextRole.BODY)),
-                List.<Nodes.Node>of(new Nodes.Text("row." + id + ".detail", ControlState.READY, subtitle(row), Nodes.TextRole.DESCRIPTION)),
-                List.<Nodes.Node>of(new Nodes.Text("row." + id + ".type", ControlState.READY, row.type().toString(), Nodes.TextRole.CAPTION)));
-        }).toList();
-        return List.of(toolbar, new Nodes.ItemList(ROWS, ControlState.READY, Nodes.ListKind.DOUBLE, items,
-            selectedRow == null ? Set.of() : Set.of(selectedRow.id().toString()), EDIT, List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(),
-            OptionalInt.of(VISIBLE_ROWS)));
+        var browser = new Nodes.Panel("browser", ControlState.READY, hiddenHeader("browser.header", "Items"), Optional.of(
+            new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Search vault", "Search vault", "")), list, Optional.empty());
+        return new Nodes.Split("columns", ControlState.READY, Nodes.SplitKind.THREE_COLUMN, List.of(rail, browser, detail()));
+    }
+
+    private ListItem category(String id, String label, String icon, Nodes.Hue hue, int count) {
+        return new ListItem(id, Optional.of(new Nodes.Icon("category." + id + ".icon", ControlState.READY, icon, hue, Nodes.IconSize.RAIL, label)),
+            List.of(text("category." + id + ".label", label, Nodes.TextRole.BODY)), List.of(), List.of(text("category." + id + ".count", Integer.toString(count), Nodes.TextRole.COUNT)));
+    }
+
+    private Nodes.Node detail() {
+        var row = visible.stream().filter(item -> item.id().equals(selection)).findFirst().orElse(null);
+        var content = new ArrayList<Nodes.Node>();
+        if (row == null) {
+            content.add(new Nodes.Empty("detail.empty", ControlState.READY, new Nodes.Icon("detail.empty.icon", ControlState.READY, "shield", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Select an item"), "Select an item", "", List.of()));
+            // Retained actions remain disabled for keyboard/event callers while there is no selection.
+            content.add(new Nodes.Stack("detail.actions", new ControlState(false, false, false, ""), Nodes.LayoutRole.INLINE,
+                List.of(tool(EDIT, "edit", "Edit entry", false), tool(DELETE, "delete", "Delete entry", false), tool(COPY_PUBLIC, "copy", "Copy public key", false))));
+        } else {
+            content.add(new Nodes.Stack("detail.heading", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
+                new Nodes.Icon("detail.icon", ControlState.READY, icon(row.type()), hue(row.type()), Nodes.IconSize.HERO, row.type().toString()),
+                new Nodes.Stack("detail.identity", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(text("detail.name", row.name(), Nodes.TextRole.DETAIL_TITLE), text("detail.type", row.type().toString(), Nodes.TextRole.DESCRIPTION))),
+                tool(DELETE, "delete", "Delete entry", true), new Nodes.Button(EDIT, ControlState.READY, "Edit", "", Nodes.ButtonKind.SECONDARY, EDIT, "Edit entry"))));
+            entry.apply(row.id()).ifPresent(value -> {
+                var fields = new ArrayList<Nodes.Node>();
+                switch (value) {
+                    case Account account -> {
+                        fields.add(new Nodes.SettingRow("detail.username", ControlState.READY, "Username", account.username(), tool("detail.username.copy", "copy", "Copy username", true), false));
+                        if (password(account.auth()) != null) fields.add(new Nodes.SettingRow("detail.password", ControlState.READY, "Password", "",
+                            new Nodes.Secret(secretId(), ControlState.READY, "", "Password", "", Nodes.SecretKind.DETAIL, "detail.password.copy"), false));
+                        if (account.auth() instanceof Auth.Key key) fields.add(detailValue("private", "Private Key", key.keyPath().toString()));
+                        if (account.auth() instanceof Auth.KeyAndPassword key) fields.add(detailValue("private", "Private Key", key.keyPath().toString()));
+                        content.add(new Nodes.Card("detail.fields", ControlState.READY, Nodes.CardKind.SETTINGS, fields));
+                        content.add(text("detail.modified", "Modified " + date(account.updated()), Nodes.TextRole.CAPTION));
+                    }
+                    case SshKey key -> {
+                        fields.add(detailValue("algorithm", "Algorithm", key.algorithm())); fields.add(detailValue("fingerprint", "Fingerprint", key.fingerprint()));
+                        fields.add(detailValue("private", "Private Key", key.privatePath().toString())); fields.add(detailValue("public", "Public Key", key.publicPath().toString()));
+                        if (!key.comment().isBlank()) fields.add(detailValue("comment", "Comment", key.comment()));
+                        content.add(new Nodes.Card("detail.fields", ControlState.READY, Nodes.CardKind.FORM, fields));
+                        content.add(text("detail.created", "Created " + date(key.created()), Nodes.TextRole.CAPTION));
+                    }
+                    case ManagedSshKey key -> {
+                        fields.add(detailValue("storage", "Storage", "Stored in Vault")); fields.add(detailValue("fingerprint", "Fingerprint", key.fingerprint()));
+                        content.add(new Nodes.Card("detail.fields", ControlState.READY, Nodes.CardKind.FORM, fields));
+                        content.add(text("detail.created", "Created " + date(key.created()), Nodes.TextRole.CAPTION));
+                    }
+                    case Note note -> {
+                        content.add(new Nodes.Card("detail.fields", ControlState.READY, Nodes.CardKind.FORM, List.of(
+                            new Nodes.Secret(secretId(), ControlState.READY, "", "Secure note", "", Nodes.SecretKind.DETAIL, "detail.note.copy"))));
+                        content.add(text("detail.modified", "Modified " + date(note.updated()), Nodes.TextRole.CAPTION));
+                    }
+                    default -> { }
+                }
+            });
+            if (row.type() == VaultManager.Type.SSH_KEY) content.add(new Nodes.Button(COPY_PUBLIC, ControlState.READY, "Copy Public Key", "copy", Nodes.ButtonKind.SECONDARY, COPY_PUBLIC, "Copy public key"));
+        }
+        return new Nodes.Panel("detail", ControlState.READY, hiddenHeader("detail.header", "Details"), Optional.empty(),
+            new Nodes.Stack("detail.content", ControlState.READY, Nodes.LayoutRole.DETAIL, content), Optional.empty());
+    }
+
+    private Nodes.Node detailValue(String id, String label, String value) {
+        return new Nodes.Stack("detail." + id + ".row", ControlState.READY, Nodes.LayoutRole.VERTICAL,
+            List.of(text("detail." + id + ".label", label, Nodes.TextRole.CAPTION), text("detail." + id, value, Nodes.TextRole.MONO_SMALL)));
     }
 
     private List<Nodes.Node> grantsCard() {
@@ -246,16 +347,28 @@ final class ManagerPanel implements AutoCloseable {
     }
 
     private Nodes.Form node() {
-        List<Nodes.Node> sections = !unlocked ? lockedCard() : card == Card.GRANTS ? grantsCard() : entries();
+        Nodes.Node body = !unlocked ? new Nodes.Stack("locked.body", ControlState.READY, Nodes.LayoutRole.DETAIL, lockedCard())
+            : card == Card.GRANTS ? new Nodes.Stack("grants.body", ControlState.READY, Nodes.LayoutRole.DETAIL, grantsCard()) : entries();
         boolean prompting = unlock != null && !unlocked;
-        var actions = new ArrayList<Nodes.Button>(List.of(
-            new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CLOSE, ""),
-            new Nodes.Button(OKAY, ControlState.READY, "Okay", "", prompting ? Nodes.ButtonKind.SECONDARY : Nodes.ButtonKind.PRIMARY, CLOSE, "")));
-        // While the unlock form shows, its Unlock is the window's one primary, as it was the default button: Enter
-        // anywhere in the window (a footer button included) unlocks, and Escape cancels the prompt first.
+        var actions = new ArrayList<Nodes.Button>(List.of(new Nodes.Button(OKAY, ControlState.READY, "Done", "", prompting ? Nodes.ButtonKind.SECONDARY : Nodes.ButtonKind.PRIMARY, CLOSE, "")));
         if (prompting) actions.add(unlock.submitButton());
-        return new Nodes.Form(ROOT, ControlState.READY, Nodes.FormKind.FULL, "Credential Vault", Optional.empty(), sections,
-            Optional.of(new Nodes.Text(STATUS, ControlState.READY, status, Nodes.TextRole.CAPTION)), actions, prompting ? unlock.cancel : CLOSE);
+        return new Nodes.Form(ROOT, ControlState.READY, Nodes.FormKind.WINDOW, "Credential Vault", Optional.empty(), List.of(body),
+            Optional.of(status()), actions, prompting ? unlock.cancel : CLOSE);
+    }
+
+    private static String date(java.time.Instant timestamp) {
+        return java.time.format.DateTimeFormatter.ofPattern("MMM d, uuuu", Locale.ENGLISH).withZone(java.time.ZoneId.systemDefault()).format(timestamp);
+    }
+    private Nodes.Node status() {
+        return new Nodes.Stack(STATUS, ControlState.READY, Nodes.LayoutRole.FOOTER, List.of(
+            statusGroup("provider", "key", status.deviceSecret(), Nodes.TextRole.CAPTION),
+            statusGroup("autolock", "history", "Auto-lock: " + status.autoLock(), Nodes.TextRole.CAPTION),
+            statusGroup("path", "folder", status.path(), Nodes.TextRole.MONO_CAPTION)));
+    }
+    private Nodes.Node statusGroup(String id,String icon,String value,Nodes.TextRole role) {
+        return new Nodes.Stack("status."+id+".group",ControlState.READY,Nodes.LayoutRole.NAVIGATION,List.of(
+            new Nodes.Icon("status."+id+".icon",ControlState.READY,icon,Nodes.Hue.NEUTRAL,Nodes.IconSize.CONTROL,id),
+            text("status."+id,value,role)));
     }
 
     /** The window closed (its surface already disposed the view and erased its storage) or is closing. */

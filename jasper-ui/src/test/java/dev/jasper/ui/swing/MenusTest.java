@@ -31,6 +31,18 @@ class MenusTest {
                 "");
     }
 
+    @Test void categoryMenuUsesTheMeasuredPopupEnvelope() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            var items=List.of(new MenuItem("a","Login","user","a",true,false,Hue.BLUE),new MenuItem("b","SSH Key","key","b",true,false,Hue.GREEN),
+                new MenuItem("c","Secure Note","note","c",true,false,Hue.AMBER),new MenuItem("sep","","","",true,true),new MenuItem("d","Generate SSH Key...","sparkle","d",true,false,Hue.PURPLE));
+            try(var view=new KitView(context,stack(new MenuButton("menu",ControlState.READY,"Add","",ButtonKind.GHOST,"",items,"")),e->{})) {
+                var popup=find(view,"menu",JComponent.class).getComponentPopupMenu();
+                assertThat(popup.getPreferredSize()).isEqualTo(new java.awt.Dimension(s(222),s(137)));
+            }finally{release(context);}
+        });
+    }
+
     @Test
     void menuOnlyOpensPopupAndSplitMainDispatchesSeparately() {
         Edt.run(

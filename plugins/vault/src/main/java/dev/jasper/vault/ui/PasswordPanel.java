@@ -181,7 +181,8 @@ public final class PasswordPanel implements AutoCloseable {
      */
     Nodes.Node embedded() {
         return new Nodes.Stack(form, ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
-            new Nodes.Text(intro, ControlState.READY, introText, Nodes.TextRole.BODY), secret(password, "Master password:"), statusLine(),
+            new Nodes.Text(intro, ControlState.READY, introText, Nodes.TextRole.BODY),
+            new Nodes.Card(form+".card",ControlState.READY,Nodes.CardKind.FORM,List.of(new Nodes.FormRow(form+".row",ControlState.READY,"Password","",secret(password,"Master password"),Optional.empty()))), statusLine(),
             new Nodes.Stack(form + ".actions", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(cancelButton()))));
     }
 

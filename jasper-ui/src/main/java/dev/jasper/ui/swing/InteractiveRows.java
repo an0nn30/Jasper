@@ -26,6 +26,7 @@ final class InteractiveRows {
         boolean declaredMultiple, declaredPassive;
         String focusItem, focusControl;
         int rowHeight;
+        int column = -1;
         boolean syncing;
         JComponent footer;
         final Menus.Popup popup;
@@ -339,11 +340,13 @@ final class InteractiveRows {
                                     Typography.Role.LABEL),
                             line * lines()
                                     + ThemePainting.metric(context(), DesignMetrics.Role.ROW_GAP));
+            if (column == 0 || column == 1) rowHeight = Math.max(rowHeight,
+                ThemePainting.metric(context(), column == 0 ? DesignMetrics.Role.COLUMN_RAIL_ROW : DesignMetrics.Role.COLUMN_ITEM_ROW));
             rowHeight = Math.max(rowHeight, minimumRowHeight());
             measureRows();
             canvas.setFocusable(!externallyDriven() && !passive());
             if (passive()) { focusItem = null; focusControl = null; anchor = null; }
-            canvas.setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_APP));
+            canvas.setBackground(ThemePainting.color(context(), column == 0 ? SemanticColor.SURFACE_SIDEBAR : SemanticColor.SURFACE_APP));
             scroll.getVerticalScrollBar().setUnitIncrement(rowHeight);
             canvas.revalidate();
             sync();
@@ -1009,7 +1012,7 @@ final class InteractiveRows {
         public void doLayout() {
             if (!owner.dataRow(index)) { headingLayout(); return; }
             if (owner.resultsLayout()) { resultLayout(); return; }
-            int pad = ThemePainting.metric(owner.context(), DesignMetrics.Role.ICON_GAP),
+            int pad = ThemePainting.metric(owner.context(), owner.column >= 0 ? DesignMetrics.Role.COLUMN_LIST_SIDE : DesignMetrics.Role.ICON_GAP),
                     x = pad + indent,
                     width = Math.max(0, getWidth() - pad),
                     h = getHeight();
@@ -1032,10 +1035,16 @@ final class InteractiveRows {
             } else if (subtitle.getComponentCount() > 0) {
                 int titleHeight = title.getPreferredSize().height,
                         subtitleHeight = subtitle.getPreferredSize().height;
+                if (owner.column == 1) {
+                    int top = Math.max(0, (h - titleHeight - subtitleHeight) / 2);
+                    title.setBounds(x, top, content, titleHeight);
+                    subtitle.setBounds(x, top + titleHeight, content, subtitleHeight);
+                } else {
                 int extra = Math.max(0, h - titleHeight - subtitleHeight);
                 int split = Math.min(h, titleHeight + extra / 2);
                 title.setBounds(x, 0, content, split);
                 subtitle.setBounds(x, split, content, h - split);
+                }
             } else {
                 title.setBounds(x, 0, content, h);
                 subtitle.setBounds(0, 0, 0, 0);
@@ -1110,6 +1119,21 @@ final class InteractiveRows {
                         rounded.setColor(fill);
                         rounded.fillRoundRect(inset, 0, Math.max(0, getWidth() - 2 * inset), getHeight(), arc, arc);
                     } finally { rounded.dispose(); }
+                }
+                return;
+            }
+            if (owner.column == 0 || owner.column == 1) {
+                Color fill = owner.selected.contains(id) ? ThemePainting.color(owner.context(), owner.column == 0 ? SemanticColor.SURFACE_CONTROL : SemanticColor.SELECTION_BG)
+                    : hover ? ColorMath.opacity(ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY), .05) : null;
+                if (fill != null) {
+                    var rounded=(Graphics2D)g.create();
+                    try { ThemePainting.antialias(rounded); rounded.setColor(fill);
+                        int arc=ThemePainting.metric(owner.context(), DesignMetrics.Role.CONTROL_RADIUS)*2;
+                        rounded.fillRoundRect(0,0,getWidth(),getHeight(),arc,arc);
+                    } finally {rounded.dispose();}
+                }
+                if (Objects.equals(id, owner.focusItem) && owner.canvas.isFocusOwner()) {
+                    g.setColor(ThemePainting.color(owner.context(), SemanticColor.BORDER_FOCUS));g.drawRect(0,0,getWidth()-1,getHeight()-1);
                 }
                 return;
             }

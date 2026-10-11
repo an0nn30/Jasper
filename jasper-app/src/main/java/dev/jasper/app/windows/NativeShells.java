@@ -284,7 +284,7 @@ public final class NativeShells {
     /** The one production chrome/body registration path for auxiliary windows and immediate dialog owners. */
     static ShellLayout installChrome(JRootPane root, AuxiliarySurface surface, boolean supported) {
         MacTitleBar bar;
-        if (surface.attachedSheet()) { root.setContentPane(surface.holder()); bar = null; }
+        if (surface.attachedSheet()) { root.setOpaque(false);root.getLayeredPane().setOpaque(false);surface.holder().setOpaque(false);root.setContentPane(surface.holder()); bar = null; }
         else bar = installTitleBar(root, surface, supported);
         var body = dev.jasper.app.platform.WindowBody.install(root, surface.holder(),
             () -> new Rectangle(0, 0, surface.holder().getWidth(), surface.holder().getHeight()));

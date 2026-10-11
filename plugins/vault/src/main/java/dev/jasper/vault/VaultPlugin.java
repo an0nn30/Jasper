@@ -335,10 +335,10 @@ public class VaultPlugin implements Plugin {
         if (!stopped && managerWindow != null) managerWindow.changed();
     }
 
-    private String managerStatus() {
-        return "Device secret: " + lock.deviceSecretSource()
-            + " | Auto-lock: " + (settings.autoLock().isZero() ? "off" : settings.autoLock().toMinutes() + " min")
-            + " | " + context.dataDirectory().resolve("vault.jv");
+    private VaultManagerWindow.Status managerStatus() {
+        return new VaultManagerWindow.Status(lock.deviceSecretSource(),
+            settings.autoLock().isZero() ? "off" : settings.autoLock().toMinutes() + " min",
+            context.dataDirectory().resolve("vault.jv").toString());
     }
 
     private void showGenerator() {

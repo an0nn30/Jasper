@@ -17,16 +17,16 @@ class ManagerPanelTest {
         edt(() -> {
             var panel = panel(new AtomicReference<>());
             var view = panel.view();
-            assertThat(node(view, ManagerPanel.STATUS, Nodes.Text.class).role()).isEqualTo(Nodes.TextRole.CAPTION);
+            assertThat(node(view, "status.provider", Nodes.Text.class).role()).isEqualTo(Nodes.TextRole.CAPTION);
             var empty = node(view, ManagerPanel.LOCKED, Nodes.Empty.class);
             assertThat(empty.title()).isEqualTo("Vault locked");
-            panel.refresh(List.of(), List.of(), "status", true);
+            panel.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
             assertThat(node(view, ManagerPanel.EMPTY, Nodes.Empty.class).title()).isEqualTo("Nothing to show");
             var row = new VaultManager.Row(UUID.randomUUID(), "Name", "Detail", VaultManager.Type.LOGIN);
-            panel.refresh(List.of(row), List.of(), "status", true);
+            panel.refresh(List.of(row), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
             var item = node(view, ManagerPanel.ROWS, Nodes.ItemList.class).items().getFirst();
-            assertThat(((Nodes.Text) item.subtitle().getFirst()).role()).isEqualTo(Nodes.TextRole.DESCRIPTION);
-            assertThat(((Nodes.Text) item.trailing().getFirst()).role()).isEqualTo(Nodes.TextRole.CAPTION);
+            assertThat(((Nodes.Text) item.subtitle().getFirst()).role()).isEqualTo(Nodes.TextRole.CAPTION);
+            assertThat(item.leading()).hasValueSatisfying(n -> assertThat(n).isInstanceOf(Nodes.Icon.class));
             panel.close();
         });
     }
@@ -34,7 +34,7 @@ class ManagerPanelTest {
     @Test void controlsUseKitSemanticIcons() throws Exception {
         edt(() -> {
             var panel = panel(new AtomicReference<>());
-            panel.refresh(List.of(), List.of(), "status", true);
+            panel.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
             var view = panel.view();
             assertThat(node(panel.titleActions(), ManagerPanel.ADD, Nodes.MenuButton.class).icon()).isEqualTo("add");
             assertThat(button(view, ManagerPanel.EDIT).icon()).isEqualTo("edit");
@@ -42,7 +42,7 @@ class ManagerPanelTest {
             assertThat(node(view, ManagerPanel.MORE, Nodes.MenuButton.class).icon()).isEqualTo("more");
             assertThat(button(panel.titleActions(), ManagerPanel.LOCK).icon()).isEqualTo("lock");
             assertThat(node(view, ManagerPanel.SEARCH, Nodes.Field.class).kind()).isEqualTo(Nodes.FieldKind.SEARCH);
-            panel.refresh(List.of(), List.of(), "status", false);
+            panel.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), false);
             assertThat(button(view, ManagerPanel.UNLOCK).icon()).isEqualTo("unlock");
             panel.close();
         });
@@ -54,16 +54,16 @@ class ManagerPanelTest {
             var view = panel.view();
             var key = new VaultManager.Row(UUID.randomUUID(), "Zulu", "SHA256:fingerprint", VaultManager.Type.SSH_KEY);
             var login = new VaultManager.Row(UUID.randomUUID(), "Alpha", "deploy", VaultManager.Type.LOGIN);
-            panel.refresh(List.of(key, login), List.of(), "device status", true);
+            panel.refresh(List.of(key, login), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
             assertThat(panel.visibleRows().getFirst()).isEqualTo(login);
-            assertThat(node(view, ManagerPanel.STATUS, Nodes.Text.class).text()).isEqualTo("device status");
+            assertThat(node(view, "status.provider", Nodes.Text.class).text()).isEqualTo("test");
             var rows = node(view, ManagerPanel.ROWS, Nodes.ItemList.class);
             assertThat(rows.items()).extracting(i -> i.id()).containsExactly(login.id().toString(), key.id().toString());
             assertThat(rows.visibleRows()).hasValue(ManagerPanel.VISIBLE_ROWS);
             assertThat(rows.activateAction()).as("Enter and double click edit").isEqualTo(ManagerPanel.EDIT);
             var first = rows.items().getFirst();
             assertThat(java.util.stream.Stream.of(first.title(), first.subtitle(), first.trailing()).flatMap(List::stream)
-                .map(n -> ((Nodes.Text) n).text()).toList()).containsExactly("Alpha", "deploy", "Login");
+                .map(n -> ((Nodes.Text) n).text()).toList()).containsExactly("Alpha", "deploy");
             panel.select(key.id()); emit(view, new UiEvent.Edited(ManagerPanel.SEARCH, "DEPLOY"));
             assertThat(panel.visibleRows()).hasSize(1);
             assertThat(panel.selected()).isEmpty(); assertThat(button(view, ManagerPanel.EDIT).state().enabled()).isFalse();
@@ -72,9 +72,9 @@ class ManagerPanelTest {
             assertThat(node(view, ManagerPanel.ROWS, Nodes.ItemList.class).selectedIds()).containsExactly(key.id().toString());
             assertThat(button(view, ManagerPanel.COPY_PUBLIC).state().enabled()).isTrue();
             emit(view, new UiEvent.Selected(ManagerPanel.KIND, Set.of(VaultManager.Type.LOGIN.name()))); assertThat(panel.selected()).isEmpty();
-            panel.refresh(List.of(key, login), List.of(), "device status", true);
+            panel.refresh(List.of(key, login), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
             assertThat(panel.visibleRows()).hasSize(1);
-            panel.refresh(List.of(key, login), List.of(), "locked", false);
+            panel.refresh(List.of(key, login), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), false);
             assertThat(panel.visibleRows()).isEmpty(); assertThat(find(view, ManagerPanel.COPY_PUBLIC)).isEmpty();
             panel.close();
         });
@@ -84,7 +84,7 @@ class ManagerPanelTest {
         edt(() -> {
             var panel = panel(new AtomicReference<>());
             var view = panel.view();
-            panel.refresh(List.of(new VaultManager.Row(UUID.randomUUID(), "Alpha", "deploy", VaultManager.Type.LOGIN)), List.of(), "status", true);
+            panel.refresh(List.of(new VaultManager.Row(UUID.randomUUID(), "Alpha", "deploy", VaultManager.Type.LOGIN)), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
             emit(view, new UiEvent.Edited(ManagerPanel.SEARCH, "no matches"));
             assertThat(node(view, ManagerPanel.EMPTY, Nodes.Empty.class).title()).isEqualTo("No matching entries");
             assertThat(node(view, ManagerPanel.SEARCH, Nodes.Field.class).value()).isEqualTo("no matches");
@@ -97,7 +97,7 @@ class ManagerPanelTest {
             var added = new AtomicReference<VaultManager.Type>(); boolean[] generated = {false}, password = {false};
             var panel = new ManagerPanel(new FakeKit("dev.jasper.vault"), id -> Optional.empty(), added::set, id -> { }, id -> { }, id -> { }, grant -> { },
                 () -> generated[0] = true, () -> password[0] = true, () -> { }, () -> { }, () -> { });
-            panel.refresh(List.of(), List.of(), "status", true);
+            panel.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
             var view = panel.view();
             var items = node(panel.titleActions(), ManagerPanel.ADD, Nodes.MenuButton.class).items();
             for (var type : VaultManager.Type.values()) {
@@ -123,8 +123,8 @@ class ManagerPanelTest {
             var form = node(view, ManagerPanel.ROOT, Nodes.Form.class);
             assertThat(form.actions()).filteredOn(b -> b.kind() == Nodes.ButtonKind.PRIMARY).singleElement()
                 .satisfies(b -> assertThat(b.id()).isEqualTo(ManagerPanel.OKAY));
-            press(view, button(view, ManagerPanel.OKAY).action()); press(view, button(view, ManagerPanel.CANCEL).action()); press(view, form.cancelAction());
-            assertThat(closes[0]).isEqualTo(3);
+            press(view, button(view, ManagerPanel.OKAY).action()); press(view, form.cancelAction());
+            assertThat(closes[0]).isEqualTo(2);
             panel.close();
         });
     }

@@ -24,6 +24,71 @@ import static org.assertj.core.api.Assertions.*;
 class EntryEditorTest {
     static FakeKit kit() { return new FakeKit("dev.jasper.vault"); }
 
+    @Test void companionReadinessTracksSecretEditsAndFullWidthInstructions(@TempDir Path directory) throws Exception {
+        edt(()->{
+            try(var f=new VaultUiFixture(directory)) {
+                var form=new ChangePasswordForm(kit(),f.lock,()->{});var view=form.view();
+                assertThat(button(view,EditorForm.SAVE).state().enabled()).isFalse();
+                type(view,ChangePasswordForm.CURRENT,"current");type(view,ChangePasswordForm.REPLACEMENT,"replacement");type(view,ChangePasswordForm.CONFIRM,"replacement");
+                assertThat(button(view,EditorForm.SAVE).state().enabled()).isTrue();
+                type(view,ChangePasswordForm.CONFIRM,"different");assertThat(button(view,EditorForm.SAVE).state().enabled()).isFalse();
+                assertThat(f.queue).isEmpty();form.close();
+                var prompt=new EditorForm(kit(),()->{});prompt.description("instruction","","Remove this entry? A long literal item name");
+                assertThat(node(prompt.view(),"fields",Nodes.Card.class).children().getFirst()).isInstanceOf(Nodes.Text.class);prompt.close();
+            }
+        });
+    }
+
+    @Test void twoAuthenticationSegmentsKeepHiddenDraftsAndSubmitCombinedOnlyWhenChosen() throws Exception {
+        edt(() -> {
+            var received = new AtomicReference<Account>();
+            var form = EntryEditor.login(kit(), null, value -> { received.set(value); return CompletableFuture.completedFuture(null); }, () -> {});
+            var view = form.view();
+            assertThat(node(view, EntryEditor.AUTH, Nodes.Choice.class).kind()).isEqualTo(Nodes.ChoiceKind.SEGMENTED);
+            assertThat(node(view, EntryEditor.AUTH, Nodes.Choice.class).options()).extracting(o -> o.label()).containsExactly("Password", "Private Key");
+            assertThat(node(view, EntryEditor.NAME, Nodes.Field.class).hint()).isNotBlank();
+            assertThat(node(view, EntryEditor.NAME, Nodes.Field.class).value()).isEmpty();
+            assertThat(button(view, EditorForm.SAVE).state().enabled()).isFalse();
+            assertThat(node(view, EntryEditor.PRIVATE_PATH, Nodes.Field.class).state().visible()).isFalse();
+            emit(view, new UiEvent.Edited(EntryEditor.NAME, "Draft")); type(view, EntryEditor.PASSWORD, "retained-password");
+            assertThat(button(view, EditorForm.SAVE).state().enabled()).isTrue();
+            emit(view, new UiEvent.Selected(EntryEditor.AUTH, Set.of(EntryEditor.AUTH_KEY)));
+            assertThat(node(view, EntryEditor.PASSWORD, Nodes.Secret.class).state().visible()).isFalse();
+            assertThat(button(view, EditorForm.SAVE).state().enabled()).isFalse();
+            emit(view, new UiEvent.Edited(EntryEditor.PRIVATE_PATH, "/synthetic/nonexistent-key")); type(view, EntryEditor.PASSPHRASE, "retained-phrase");
+            assertThat(button(view, EditorForm.SAVE).state().enabled()).isTrue();
+            emit(view, new UiEvent.Toggled("also-password", true));
+            assertThat(node(view, EntryEditor.PASSWORD, Nodes.Secret.class).state().visible()).isTrue();
+            emit(view, new UiEvent.Selected(EntryEditor.AUTH, Set.of(EntryEditor.AUTH_PASSWORD)));
+            emit(view, new UiEvent.Selected(EntryEditor.AUTH, Set.of(EntryEditor.AUTH_KEY)));
+            assertThat(secret(view, EntryEditor.PASSWORD)).isEqualTo("retained-password");
+            assertThat(secret(view, EntryEditor.PASSPHRASE)).isEqualTo("retained-phrase");
+            assertThat(node(view, "also-password", Nodes.Toggle.class).checked()).isTrue();
+            press(view, EditorForm.SAVE);
+            assertThat(received.get().auth()).isInstanceOfSatisfying(Auth.KeyAndPassword.class, auth -> {
+                assertThat(auth.password()).isEqualTo("retained-password".toCharArray());
+                assertThat(auth.passphrase()).isEqualTo("retained-phrase".toCharArray());
+            });
+            assertThat(closed(view)).isTrue(); received.get().auth().zero();
+        });
+    }
+
+    @Test void pathReadinessIsCheapAndTheKeyUsesCanonicalLabelledCardRows() throws Exception {
+        edt(() -> {
+            var form = EntryEditor.key(kit(), null, value -> CompletableFuture.completedFuture(null), () -> {});
+            var view = form.view();
+            assertThat(button(view, EditorForm.SAVE).state().enabled()).isFalse();
+            assertThat(node(view, "row.name", Nodes.FormRow.class).label()).isEqualTo("Name");
+            emit(view, new UiEvent.Edited(EntryEditor.NAME, "Key"));
+            emit(view, new UiEvent.Edited(EntryEditor.PRIVATE_PATH, "/synthetic/absent"));
+            emit(view, new UiEvent.Edited(EntryEditor.PUBLIC_PATH, "/synthetic/absent.pub"));
+            assertThat(button(view, EditorForm.SAVE).state().enabled()).isTrue();
+            emit(view, new UiEvent.Edited(EntryEditor.PUBLIC_PATH, "bad\0path"));
+            assertThat(button(view, EditorForm.SAVE).state().enabled()).isFalse();
+            form.close();
+        });
+    }
+
     @Test void workerSaveCompletionReturnsToUiAndClosedDraftIgnoresLateCompletion() throws Exception {
         for(boolean cancel: new boolean[]{false,true}){
             var pending=new CompletableFuture<Void>();var form=new AtomicReference<EntryEditor>();var dismissed=new java.util.concurrent.atomic.AtomicInteger();var offUi=new java.util.concurrent.atomic.AtomicBoolean();
@@ -142,7 +207,8 @@ class EntryEditorTest {
             var account = new Account(UUID.randomUUID(), "Production", "deploy", new Auth.KeyAndPassword(Path.of("/keys/deploy"), phrase, password), Instant.EPOCH, Instant.EPOCH);
             var form = EntryEditor.login(kit(), account, value -> CompletableFuture.completedFuture(null), () -> { });
             var view = form.view();
-            assertThat(node(view, EntryEditor.AUTH, Nodes.Choice.class).selectedId()).isEqualTo(EntryEditor.AUTH_BOTH);
+            assertThat(node(view, EntryEditor.AUTH, Nodes.Choice.class).selectedId()).isEqualTo(EntryEditor.AUTH_KEY);
+            assertThat(node(view, EntryEditor.ALSO_PASSWORD, Nodes.Toggle.class).checked()).isTrue();
             assertThat(secret(view, EntryEditor.PASSWORD)).isEqualTo("stored-password");
             assertThat(secret(view, EntryEditor.PASSPHRASE)).isEqualTo("stored-phrase");
             assertThat(view.spec().toString()).doesNotContain("stored-password").doesNotContain("stored-phrase");
@@ -170,14 +236,15 @@ class EntryEditorTest {
         });
     }
 
-    @Test void validationMarksTheFieldKeepsEveryValueAndTheNextEditClearsIt() throws Exception {
+    @Test void readinessKeepsEveryValueUntilTheRequiredNameIsSupplied() throws Exception {
         edt(() -> {
             var saved = new AtomicReference<Account>();
             var form = EntryEditor.login(kit(), null, value -> { saved.set(value); return CompletableFuture.completedFuture(null); }, () -> { });
             var view = form.view();
             emit(view, new UiEvent.Edited(EntryEditor.USERNAME, "deploy")); type(view, EntryEditor.PASSWORD, "kept-password");
             press(view, EditorForm.SAVE);
-            assertThat(error(view, EntryEditor.NAME)).isEqualTo("Enter a name");
+            assertThat(button(view, EditorForm.SAVE).state().enabled()).isFalse();
+            assertThat(saved.get()).isNull();
             assertThat(form.busy()).isFalse();
             assertThat(secret(view, EntryEditor.PASSWORD)).as("a rejected save keeps unrelated fields").isEqualTo("kept-password");
             assertThat(node(view, EntryEditor.USERNAME, Nodes.Field.class).value()).isEqualTo("deploy");
@@ -238,7 +305,7 @@ class EntryEditorTest {
                 type(view, ChangePasswordForm.REPLACEMENT, "new-password");
                 type(view, ChangePasswordForm.CONFIRM, "different");
                 press(view, EditorForm.SAVE);
-                assertThat(error(view, ChangePasswordForm.CONFIRM)).contains("do not match");
+                assertThat(button(view,EditorForm.SAVE).state().enabled()).isFalse();
                 assertThat(f.queue).isEmpty();
                 assertThat(secret(view, ChangePasswordForm.CURRENT)).isEqualTo("test-password");
                 form.close();

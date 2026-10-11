@@ -55,6 +55,13 @@ public final class KitGallery {
         result.addAll(StateFixtures.create());
         result.add(new Fixture("stored-secret-masked","","stored-secret-masked",320,88,new ViewSpec(new Secret("stored-secret",ControlState.READY,"","Passphrase","",SecretKind.DETAIL,"copy-secret"))));
         result.add(new Fixture("stored-secret-revealed","","stored-secret-revealed",320,88,new ViewSpec(new Secret("stored-secret",ControlState.READY,"","Passphrase","",SecretKind.DETAIL,"copy-secret"))));
+        for (String state : List.of("empty", "populated", "focus"))
+            result.add(new Fixture("discreet-secret-" + state, "", state, 320, 40,
+                new ViewSpec(new Secret("discreet-secret", ControlState.READY, "Password", "Password", "", SecretKind.DISCREET_INPUT, ""))));
+        result.add(new Fixture("window-form", "", "normal", 640, 320,
+            new ViewSpec(new Form("window", ControlState.READY, FormKind.WINDOW, "Library", Optional.empty(),
+                List.of(new Text("window-content", ControlState.READY, "Window content", TextRole.BODY)), Optional.empty(),
+                List.of(new Nodes.Button("done", ControlState.READY, "Done", "", ButtonKind.PRIMARY, "done", "")), "done", FormSubmission.PRIMARY))));
         result.add(new Fixture("secure-note","","normal",360,220,new ViewSpec(new Secret("secure-note",ControlState.READY,"Write a note","Secure note","",SecretKind.MULTILINE,""))));
         result.add(new Fixture("dropdown-open","","dropdown-open",240,130,new ViewSpec(new Nodes.Choice("dropdown",ControlState.READY,ChoiceKind.DROPDOWN,List.of(new Option("ssh","SSH",Optional.of(Hue.GREEN)),new Option("local","Local",Optional.of(Hue.BLUE)),new Option("sftp","SFTP",Optional.of(Hue.PURPLE))),"ssh","Protocol","protocol"))));
         for(var density:PickerDensity.values())result.add(new Fixture("rich-picker-"+density,"","selected",220,50,new ViewSpec(new Nodes.Choice("picker",ControlState.READY,ChoiceKind.PICKER,List.of(),"","Credential","pick","lock",Optional.empty(),Optional.of(new PickerFace("root","Stored key · fixture","key",Hue.GREEN,density))))));
@@ -170,15 +177,20 @@ public final class KitGallery {
         @Override public Component getFocusOwner() { return target; }
         @Override public Component getPermanentFocusOwner() { return target; }
     }
-    private static void applyState(KitView view, Fixture fixture, GalleryFocus focus) {
+    static void applyState(KitView view, Fixture fixture, GalleryFocus focus) {
         if(fixture.name().equals("credential-vault") || fixture.name().startsWith("stored-secret")) {
             String id=fixture.name().equals("credential-vault")?"passphrase":"stored-secret";
             char[] value={'e','x','a','m','p','l','e','-','o','n','l','y'};
             try{view.replaceSecret(id,value);}finally{java.util.Arrays.fill(value,(char)0);}
             if(fixture.state().equals("stored-secret-revealed"))((JButton)find(view,id+".reveal")).doClick(0);
         }
+        if (fixture.name().equals("discreet-secret-populated")) {
+            char[] value = {'e', 'x', 'a', 'm', 'p', 'l', 'e'};
+            try { view.replaceSecret("discreet-secret", value); }
+            finally { Arrays.fill(value, (char) 0); }
+        }
         if (fixture.state().equals("focus")) {
-            JComponent root = find(view, fixture.name().equals("unlock-vault") ? "password" : "state-field");
+            JComponent root = find(view, fixture.name().equals("unlock-vault") ? "password" : fixture.name().startsWith("discreet-secret-") ? "discreet-secret" : "state-field");
             Component target = descendants(root).stream().filter(c -> c instanceof JTextField).findFirst().orElse(root);
             focus.target = target;
             var gained = new FocusEvent(target, FocusEvent.FOCUS_GAINED, false, null, FocusEvent.Cause.TRAVERSAL_FORWARD);

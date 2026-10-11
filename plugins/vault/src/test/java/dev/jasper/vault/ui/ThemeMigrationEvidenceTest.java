@@ -50,24 +50,25 @@ class ThemeMigrationEvidenceTest {
             var manager = new ManagerPanel(kit, id -> Optional.empty(), type -> { }, id -> { }, id -> { }, id -> { }, grant -> { },
                 () -> { }, () -> { }, () -> { }, () -> { }, () -> { });
             try {
-                manager.refresh(List.of(), List.of(), "Unlocked", true);
+                manager.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
                 save("manager-empty", manager.view());
                 assertThat(node(manager.view(), ManagerPanel.EMPTY, Nodes.Empty.class).title()).isEqualTo("Nothing to show");
-                manager.refresh(List.of(new VaultManager.Row(UUID.fromString("00000000-0000-0000-0000-000000000001"), "Example login", "fixture-user", VaultManager.Type.LOGIN)), List.of(), "Unlocked", true);
+                manager.refresh(List.of(new VaultManager.Row(UUID.fromString("00000000-0000-0000-0000-000000000001"), "Example login", "fixture-user", VaultManager.Type.LOGIN)), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
                 save("manager-populated", manager.view());
                 emit(manager.view(), new UiEvent.Edited(ManagerPanel.SEARCH, "no matches"));
                 save("manager-filtered-empty", manager.view());
                 assertThat(node(manager.view(), ManagerPanel.EMPTY, Nodes.Empty.class).title()).isEqualTo("No matching entries");
                 assertThat(node(manager.titleActions(), ManagerPanel.ADD, Nodes.MenuButton.class).items()).hasSize(5);
                 save("add-menu", manager.view());
-                manager.refresh(List.of(), List.of(), "Locked", false);
+                manager.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), false);
                 save("manager-locked", manager.view());
                 assertThat(find(manager.view(), ManagerPanel.LOCKED)).isPresent();
             } finally { manager.close(); }
             var login = EntryEditor.login(kit, null, value -> { value.auth().zero(); return CompletableFuture.completedFuture(null); }, () -> { });
             try {
                 save("login-password", login.view());
-                emit(login.view(), new UiEvent.Selected(EntryEditor.AUTH, Set.of(EntryEditor.AUTH_BOTH)));
+                emit(login.view(), new UiEvent.Selected(EntryEditor.AUTH, Set.of(EntryEditor.AUTH_KEY)));
+                emit(login.view(), new UiEvent.Toggled(EntryEditor.ALSO_PASSWORD, true));
                 type(login.view(), EntryEditor.PASSWORD, SYNTHETIC);
                 save("login-key-and-password", login.view());
             } finally { login.close(); }
@@ -75,7 +76,8 @@ class ThemeMigrationEvidenceTest {
             try {
                 save("ssh-key-empty", key.view());
                 emit(key.view(), new UiEvent.Edited(EntryEditor.NAME, "Fixture SSH key")); press(key.view(), EditorForm.SAVE);
-                assertThat(error(key.view(), EntryEditor.PRIVATE_PATH)).isEqualTo("Choose a key file path");
+                assertThat(button(key.view(), EditorForm.SAVE).state().enabled()).isFalse();
+                assertThat(error(key.view(), EntryEditor.PRIVATE_PATH)).isEmpty();
                 assertThat(button(key.view(), EditorForm.SAVE).state().busy()).isFalse();
                 save("ssh-key-invalid-path", key.view());
             } finally { key.close(); }
