@@ -60,7 +60,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         tree = new ShortcutTree(macOs);
         editor = new ShortcutEditPanel(context, macOs, writer, this::stopSearchRecording);
         int side = scaled(context, DesignMetrics.Role.KEYMAP_PAGE_PADDING);
-        setBorder(BorderFactory.createEmptyBorder(side, side, scaled(context, DesignMetrics.Role.KEYMAP_PAGE_BOTTOM_PADDING), side));
+        setBorder(BorderFactory.createEmptyBorder(scaled(context, DesignMetrics.Role.KEYMAP_PAGE_TOP_PADDING), side, scaled(context, DesignMetrics.Role.KEYMAP_PAGE_BOTTOM_PADDING), side));
         top = new KitView(context, topSpec(), this::event);
         tools = new KitView(context, toolsSpec(), this::event);
         list = new KitView(context, new ViewSpec(tree.descriptor()), this::event);
@@ -72,18 +72,26 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
             @Override public void actionPerformed(java.awt.event.ActionEvent event) { if (!closed) activate(tree.selected()); }
         });
         footer.getAccessibleContext().setAccessibleName("Shortcut search status");
-        add(top, BorderLayout.NORTH);
+        var searchBar = new JPanel(new BorderLayout(0,0)); searchBar.setOpaque(false);
+        searchBar.add(top,BorderLayout.CENTER); searchBar.add(tools,BorderLayout.EAST);
+        add(searchBar, BorderLayout.NORTH);
         var sections = new JPanel(new BorderLayout(0, scaled(context, DesignMetrics.Role.KEYMAP_TOOLS_GAP)));
         sections.setOpaque(false);
-        sections.add(tools, BorderLayout.NORTH);
         sections.add(list, BorderLayout.CENTER);
         add(sections, BorderLayout.CENTER);
         var bottom = new JPanel(new BorderLayout(0, scaled(context, DesignMetrics.Role.KEYMAP_STATUS_GAP)));
         bottom.setOpaque(false);
-        bottom.add(editor, BorderLayout.CENTER);
+
         bottom.add(footer, BorderLayout.SOUTH);
         add(bottom, BorderLayout.SOUTH);
         filter();
+    }
+
+    /** Rows, recorder and search actions wrap to the page; the status label is not a width constraint. */
+    @Override public java.awt.Dimension getMinimumSize() {
+        var minimum=super.getMinimumSize();var insets=getInsets();
+        minimum.width=insets.left+insets.right;
+        return minimum;
     }
 
     private static int scaled(KitContext context, DesignMetrics.Role role) { return UIScale.scale(context.metrics().value(role)); }
@@ -143,6 +151,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
     private void editRow(ShortcutEntry entry) {
         stopSearchRecording();
         editor.begin(entry); filter();
+        if(tree.visibleIds().contains(ShortcutTree.actionId(entry)))editor.attach(list,ShortcutTree.actionId(entry));
     }
 
     private void stopSearchRecording() { recording = false; filter(); }
@@ -156,20 +165,21 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
     private void render() {
         if (closed) return;
         top.update(topSpec());
+        top.setFieldTrailing(SEARCH, Optional.of(new Nodes.Button("record", ControlState.READY, recording ? "Stop recording" : "Record", "keyboard", Nodes.ButtonKind.GHOST, "record", "Record shortcut")));
+        top.setFieldReadOnly(SEARCH,recording);
         tools.update(toolsSpec());
         list.update(new ViewSpec(tree.descriptor()));
+        list.setTreeRowPresentation(ShortcutTree.ID,tree.presentation());
         footer.update(statusSpec());
         revalidate();
         repaint();
     }
 
     private ViewSpec topSpec() {
-        var field = new Nodes.Field(SEARCH, new ControlState(true, !recording, false, ""), Nodes.FieldKind.SEARCH, query,
+        var field = new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query,
             "Search actions, plugins, or Cmd+Shift+H", "Search keyboard shortcuts", "");
-        var buttons = new Nodes.Stack("search.actions", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
-            new Nodes.Button("record", ControlState.READY, recording ? "Stop recording" : "Record shortcut", "", Nodes.ButtonKind.SECONDARY, "record", ""),
-            new Nodes.Button("clear", ControlState.READY, "Clear", "", Nodes.ButtonKind.SECONDARY, "clear", "")));
-        return new ViewSpec(new Nodes.FormRow("find", ControlState.READY, "Find a shortcut", "", field, Optional.of(buttons)));
+        var clear=new Nodes.Button("clear", ControlState.READY, "Clear", "", Nodes.ButtonKind.SECONDARY, "clear", "");
+        return new ViewSpec(new Nodes.Stack("find",ControlState.READY,Nodes.LayoutRole.NAVIGATION,List.of(field,clear)));
     }
 
     private static ViewSpec toolsSpec() {
@@ -187,6 +197,8 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
 
     boolean capture(KeyStroke stroke) {
         if (closed) return false;
+        if (javax.swing.MenuSelectionManager.defaultManager().getSelectedPath().length>0) return false;
+        if (!recording && editor.gesture(stroke)) return true;
         if (editor.capture(stroke)) return true;
         if (!recording) return false;
         captured = stroke;
@@ -201,7 +213,9 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
             : type == KeyEvent.KEY_PRESSED && held.contains(code);
         if (type == KeyEvent.KEY_PRESSED) swallowTyped = tail;
         if (tail) { event.consume(); return true; }
-        if (closed || !(recording || editor.recording()) || type != KeyEvent.KEY_PRESSED || !belongs(event.getComponent())) return false;
+        if (closed || type != KeyEvent.KEY_PRESSED || !belongs(event.getComponent())) return false;
+        if(javax.swing.MenuSelectionManager.defaultManager().getSelectedPath().length>0)return false;
+        if(!(recording || editor.recording() || editor.special(KeyStroke.getKeyStrokeForEvent(event))))return false;
         held.add(code); swallowTyped = true;
         if (!modifier(code)) capture(KeyStroke.getKeyStrokeForEvent(event));
         event.consume(); return true;
@@ -236,7 +250,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         if (mountedRoot != null) mountedRoot.putClientProperty(WindowInput.SHORTCUT_RECORDER, nativeRecorder);
     }
 
-    @Override public void removeNotify() { uninstall(); super.removeNotify(); }
+    @Override public void removeNotify() { recording=false; editor.dismiss(); uninstall(); super.removeNotify(); }
 
     private void uninstall() {
         if (installed) KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(dispatcher);

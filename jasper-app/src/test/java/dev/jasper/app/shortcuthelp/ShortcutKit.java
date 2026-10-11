@@ -33,6 +33,13 @@ final class ShortcutKit {
 
     static JButton button(ShortcutPanel panel, String id) { return KitTestSupport.require(panel, id, JButton.class); }
 
+    static void editorAction(ShortcutPanel panel,String label) {
+        var component=KitTestSupport.require(panel,"editor.options",JComponent.class);
+        var menu=component.getComponentPopupMenu();
+        java.util.Arrays.stream(menu.getComponents()).filter(c->c instanceof AbstractButton button && button.getText().equals(label))
+            .map(AbstractButton.class::cast).findFirst().orElseThrow().doClick(0);
+    }
+
     static String message(ShortcutPanel panel) { return KitTestSupport.require(panel, "editor.message", JLabel.class).getText(); }
 
     static AbstractButton reassign(ShortcutPanel panel) { return KitTestSupport.require(panel, "editor.reassign", AbstractButton.class); }

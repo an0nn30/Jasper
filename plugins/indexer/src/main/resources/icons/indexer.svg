@@ -1,6 +1,4 @@
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M8 14.5H3.5V1.5H9.5L12.5 4.5V7" stroke="#6C707E" stroke-linejoin="round"/>
-<path d="M9.5 1.5V4.5H12.5" stroke="#6C707E" stroke-linejoin="round"/>
-<circle cx="11" cy="11" r="2.5" stroke="#6C707E"/>
-<path d="M12.8 12.8L14.5 14.5" stroke="#6C707E" stroke-linecap="round"/>
+<!-- Jasper artwork, authored from the user-supplied Settings reference; no third-party artwork imported. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#ced1d8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="7" cy="7" r="4.3"/><path d="m10.2 10.2 3.5 3.5"/>
 </svg>

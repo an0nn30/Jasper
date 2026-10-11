@@ -55,17 +55,30 @@ public final class KitView extends JPanel implements AutoCloseable {
             update(spec); defaults.addPropertyChangeListener(fontChanges);
             appearance = context.binding().subscribe(pair -> refresh());
         } catch (Throwable failure) {
-            defaults.removePropertyChangeListener(fontChanges); reconciler.close(); motion.close(); throw failure;
+            defaults.removePropertyChangeListener(fontChanges); artworkPresentations.clear(); reconciler.close(); motion.close(); throw failure;
         }
     }
     /** Reconcile by stable id/kind; unchanged descriptor values preserve pending input. */
     public void update(ViewSpec spec) { requireOpen(); Objects.requireNonNull(spec);
         if (updating) throw new IllegalStateException("Reentrant view update");
+        reconciler.validateFieldTrailing(spec, null, null);
         ViewSpec previous = this.spec;
         updating = true; try { reconciler.update(spec); this.spec = spec; } finally { updating = false; }
+        artworkPresentations.keySet().removeIf(id -> !hasIcon(spec.root(),id));
         if (pointerOnly) unfocusable(this);
         // Native panel hosts reborrow a replacement header after reconciliation, never during it.
         try { firePropertyChange("viewSpec", previous, spec); } catch (Throwable failure) { report(failure); }
+    }
+    private static boolean hasIcon(Nodes.Node node,String id) {
+        if(node.id().equals(id))return node instanceof Nodes.Icon;
+        if(node instanceof Nodes.ItemList list)for(var item:list.items()) {
+            if(item.leading().filter(child->hasIcon(child,id)).isPresent())return true;
+            for(var child:item.title())if(hasIcon(child,id))return true;
+            for(var child:item.subtitle())if(hasIcon(child,id))return true;
+            for(var child:item.trailing())if(hasIcon(child,id))return true;
+        }
+        for(var child:ControlRegistry.children(node))if(hasIcon(child,id))return true;
+        return false;
     }
     /** Whether a field of the current descriptor names {@code listId} as the list its keys move ({@code Field.listId}). */
     boolean namesList(String listId) { return spec != null && namesList(spec.root(), listId); }
@@ -87,6 +100,67 @@ public final class KitView extends JPanel implements AutoCloseable {
         if (node.id().equals(id)) return live;
         for (var child : ControlRegistry.children(node)) if (eligible(child, id, live)) return true;
         return false;
+    }
+    private final java.util.Map<String,ArtworkPresentation> artworkPresentations=new java.util.HashMap<>();
+    /** Named receiving treatment, retained across theme and same-id model changes. */
+    public void setArtworkPresentation(String iconId,ArtworkPresentation presentation) {
+        requireOpen();Objects.requireNonNull(presentation);
+        if(!hasIcon(spec.root(),Objects.requireNonNull(iconId)))throw new IllegalArgumentException("Unknown icon");
+        if(presentation==ArtworkPresentation.DEFAULT)artworkPresentations.remove(iconId);else artworkPresentations.put(iconId,presentation);
+        reconciler.refreshArtwork(iconId);
+    }
+    ArtworkPresentation artworkPresentation(String id){return artworkPresentations.getOrDefault(id,ArtworkPresentation.DEFAULT);}
+    /**
+     * App-only owned action inside a mounted TEXT or SEARCH field. The action has this view's normal
+     * event, focus and accessibility routing. Validation is transactional, including ids in unmounted rows.
+     * Same-id/kind field updates retain it; removal, replacement and close release its listeners.
+     */
+    public void setFieldTrailing(String fieldId, java.util.Optional<Nodes.Button> action) {
+        requireOpen(); Objects.requireNonNull(action);
+        var field = textField(fieldId);
+        var kind = ((Nodes.Field)field.node).kind();
+        if (kind != Nodes.FieldKind.TEXT && kind != Nodes.FieldKind.SEARCH) throw new IllegalArgumentException("Trailing action requires TEXT or SEARCH");
+        reconciler.validateFieldTrailing(spec, field, action.orElse(null));
+        action.ifPresent(button -> {
+            if (!button.icon().isEmpty() && !context.icons().names().contains(button.icon())) throw new IllegalArgumentException("Unknown action icon");
+        });
+        field.trailing(action.orElse(null));
+        if (pointerOnly) unfocusable(this);
+    }
+    /** App-only native read-only input, retaining focus, selection, copy, document and undo history. */
+    public void setFieldReadOnly(String fieldId, boolean readOnly) {
+        requireOpen(); var field = textField(fieldId); field.readOnly = readOnly; field.refresh();
+    }
+    private TextFields.FieldControl textField(String id) {
+        var control = reconciler.mounted(Objects.requireNonNull(id));
+        if (!(control instanceof TextFields.FieldControl field)) throw new IllegalArgumentException("Not a mounted ordinary field: " + id);
+        return field;
+    }
+    /** Stable tree-row contexts and passive keycaps; unknown ids reject before publication. */
+    public void setTreeRowPresentation(String treeId,java.util.Map<String,TreeRowPresentation> rows) {
+        requireOpen();
+        if(!(reconciler.control(treeId) instanceof Trees.TreeControl tree))throw new IllegalArgumentException("Not a tree");
+        var copy=java.util.Map.copyOf(rows);
+        if(!tree.itemIds.containsAll(copy.keySet()))throw new IllegalArgumentException("Unknown tree item");
+        tree.presentation=copy;tree.refresh();
+    }
+    /** Select the app-only value receiver face. Same-id updates retain it; removal/replacement/close retire it. */
+    public void setButtonValuePresentation(String buttonId, ButtonValuePresentation presentation) {
+        requireOpen(); Objects.requireNonNull(presentation);
+        if (!(reconciler.control(buttonId) instanceof Buttons.ButtonControl button)) throw new IllegalArgumentException("Not a button");
+        button.button.valuePresentation = presentation; button.refresh();
+    }
+    /** Replace only the visual value of one actionable button, including a tree-owned detail. */
+    public void setButtonKeycaps(String buttonId,java.util.Optional<KeycapSequence> sequence) {
+        requireOpen();Objects.requireNonNull(sequence);
+        if(!(reconciler.control(buttonId) instanceof Buttons.ButtonControl button))throw new IllegalArgumentException("Not a button");
+        button.keycaps=sequence.orElse(null);button.refresh();
+    }
+    /** Attach one standard-descriptor detail below a visible leaf, owned by the tree rather than a recycled row. */
+    public TreeDetailHandle attachTreeDetail(String treeId, String itemId, ViewSpec body, Consumer<UiEvent> events, Runnable detached) {
+        requireOpen();
+        if (!(reconciler.control(Objects.requireNonNull(treeId)) instanceof Trees.TreeControl tree)) throw new IllegalArgumentException("Not a tree");
+        return tree.attach(Objects.requireNonNull(itemId),Objects.requireNonNull(body),Objects.requireNonNull(events),Objects.requireNonNull(detached));
     }
     /** Current immutable descriptor; it never contains mutable input or secret content. */
     public ViewSpec spec() { requireOpen(); return spec; }
@@ -194,6 +268,7 @@ public final class KitView extends JPanel implements AutoCloseable {
     ControlRegistry.Control control(String id) { return reconciler.control(id); }
     /** The control mounted for a node id, or null; never moves a row's keyboard focus. */
     ControlRegistry.Control controlOrNull(String id) { return reconciler.mounted(id); }
+    void inheritedEnabled(boolean enabled) { reconciler.inheritedEnabled(enabled); }
     KitContext context() { return context; }
     MotionPolicy motion() { return motion; }
     void dispatch(UiEvent event) {
@@ -226,7 +301,7 @@ public final class KitView extends JPanel implements AutoCloseable {
             for (Component child : container.getComponents()) unfocusable(child);
         }
     }
-    private static void requireEdt() { if (!EventQueue.isDispatchThread()) throw new IllegalStateException("KitView requires EDT"); }
+    static void requireEdt() { if (!EventQueue.isDispatchThread()) throw new IllegalStateException("KitView requires EDT"); }
     private void requireOpen() { requireEdt(); if (closeRequested.get()) throw new IllegalStateException("KitView is closed"); }
     /** Whether close has been requested; host teardown may outlive plugin disposal. */
     public boolean isClosed() { return closeRequested.get(); }
@@ -236,6 +311,7 @@ public final class KitView extends JPanel implements AutoCloseable {
         if (EventQueue.isDispatchThread()) dispose(); else EventQueue.invokeLater(this::dispose);
     }
     private void dispose() {
+        artworkPresentations.clear();
         defaults.removePropertyChangeListener(fontChanges);
         if (appearance != null) try { appearance.close(); } catch (Throwable failure) { report(failure); }
         reconciler.close(); try { motion.close(); } catch (Throwable failure) { report(failure); }

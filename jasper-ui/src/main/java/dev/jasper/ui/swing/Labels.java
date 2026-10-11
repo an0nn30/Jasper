@@ -61,6 +61,10 @@ final class Labels {
                     wrappedHeight(getWidth()); wrapped.setForeground(getForeground()); wrapped.setEnabled(isEnabled());
                     wrapped.setSize(getSize()); wrapped.paintComponent(g); return;
                 }
+                if (getIcon() instanceof Keycaps caps) {
+                    if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
+                    caps.paintWithin(this,g,0,Math.max(0,(getHeight()-caps.heightAt(getWidth()))/2),getWidth()); return;
+                }
                 Insets insets = getInsets(); Rectangle icon = new Rectangle(), text = new Rectangle();
                 Rectangle bounds = new Rectangle(insets.left, insets.top, getWidth() - insets.left - insets.right, getHeight() - insets.top - insets.bottom);
                 String display=getText();
@@ -91,16 +95,18 @@ final class Labels {
     }
     static final class TextControl extends ControlRegistry.Control {
         boolean panelDetail;
+        SemanticColor identityStatus;
         TextControl(KitView view, Nodes.Text node) { super(view, node, literal()); refresh(); }
         @Override void refresh() {
             var text = (Nodes.Text)node; var label = (JLabel)component; state();
             label.putClientProperty("Jasper.leadingEllipsis",text.role()==Nodes.TextRole.MONO || text.role()==Nodes.TextRole.MONO_SMALL || text.role()==Nodes.TextRole.MONO_CAPTION);
             ((LiteralLabel)label).baselineOffset=panelDetail && (text.role()==Nodes.TextRole.PANEL_TITLE || text.role()==Nodes.TextRole.MONO_CAPTION) ? ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_TEXT_BASELINE) : 0;
+            label.setIcon(null); label.setDisabledIcon(null); label.setPreferredSize(null);
             label.setText(text.text());
             label.setToolTipText(text.text());
             label.getAccessibleContext().setAccessibleName(text.text());
             label.setFont(ThemePainting.font(context(), panelDetail && text.role() == Nodes.TextRole.MONO_CAPTION ? Typography.Role.PANEL_DETAIL_MONO : panelDetail && text.role() == Nodes.TextRole.PANEL_TITLE ? Typography.Role.PANEL_DETAIL_TITLE : panelDetail && text.role() == Nodes.TextRole.CAPTION ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.valueOf(text.role().name())));
-            label.setForeground(ThemePainting.color(context(), text.severity().isPresent() ? tint(text.severity().get()) : panelDetail && text.role()==Nodes.TextRole.MONO_CAPTION ? SemanticColor.TEXT_SECONDARY : switch (text.role()) {
+            label.setForeground(ThemePainting.color(context(), identityStatus != null ? identityStatus : text.severity().isPresent() ? tint(text.severity().get()) : panelDetail && text.role()==Nodes.TextRole.MONO_CAPTION ? SemanticColor.TEXT_SECONDARY : switch (text.role()) {
                 case LABEL, DESCRIPTION, CAPTION, COUNT -> SemanticColor.TEXT_SECONDARY;
                 case SECTION_LABEL, MONO_CAPTION, SUPPORTING -> SemanticColor.TEXT_TERTIARY;
                 default -> SemanticColor.TEXT_PRIMARY;
@@ -129,11 +135,19 @@ final class Labels {
             var icon = (Nodes.Icon)node; var label = (JLabel)component; state();
             int size = com.formdev.flatlaf.util.UIScale.scale(context().icons().size(icon.size()));
             ((LiteralLabel)label).iconOffset=panelDetail && tileSize == 0 ? ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_TEXT_BASELINE) : 0;
+            var receiving=view.artworkPresentation(node.id());
+            int savedSize=tileSize, savedHeight=tileHeight, savedGlyph=tileGlyph;
+            if(receiving!=ArtworkPresentation.DEFAULT) {
+                tileSize=tileHeight=context().metrics().value(receiving==ArtworkPresentation.IDENTITY_ROW ? dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_ROW_TILE : dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_HEADER_TILE);
+                tileGlyph=context().metrics().value(receiving==ArtworkPresentation.IDENTITY_ROW ? dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_ROW_GLYPH : dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_HEADER_GLYPH);
+            }
             label.setIcon(tileSize > 0 ? context().icons().tile(icon.name(), context().theme().semantic(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(tileSize), com.formdev.flatlaf.util.UIScale.scale(tileHeight), com.formdev.flatlaf.util.UIScale.scale(tileGlyph), selected)
                 : panelDetail ? context().icons().panel(icon.name(), context().theme().semantic(), icon.severity().isPresent() ? tint(icon.severity().get()) : SemanticColor.HUE_NEUTRAL, size)
                 : icon.size() == Nodes.IconSize.HERO && icon.severity().isEmpty() ? context().icons().hero(icon.name(), context().theme().semantic(), icon.hue(), size)
                 : icon.severity().isPresent() ? context().icons().icon(icon.name(), context().theme().semantic(), tint(icon.severity().get()), size)
                 : context().icons().icon(icon.name(), context().theme().semantic(), icon.hue(), size));
+            tileSize=savedSize;tileHeight=savedHeight;tileGlyph=savedGlyph;
+            label.setDisabledIcon(label.getIcon());
             label.getAccessibleContext().setAccessibleName(icon.accessibleName());
             label.setToolTipText(icon.accessibleName());
         }

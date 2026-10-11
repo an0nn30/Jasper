@@ -39,7 +39,8 @@ final class PluginDetails {
     private final KitContext kit;
     private final JPanel component = new JPanel(new BorderLayout());
     private final KitView header, body;
-    private final IconCanvas icon = new IconCanvas();
+    private final dev.jasper.ui.icons.ReceivingArtwork artwork;
+    private String artName="plugin";
     private final JTextArea text = new JTextArea();
     private final AutoCloseable theme;
     private PluginRuntime.Row row;
@@ -48,6 +49,7 @@ final class PluginDetails {
 
     PluginDetails(KitContext kit, Consumer<UiEvent> events) {
         this.kit = kit;
+        artwork=new dev.jasper.ui.icons.ReceivingArtwork(kit.icons());
         header = new KitView(kit, headerSpec(), event -> {
             if (event instanceof UiEvent.Selected chosen && chosen.id().equals(SECTION)) {
                 chosen.ids().stream().findFirst().ifPresent(this::section);
@@ -55,7 +57,6 @@ final class PluginDetails {
             }
             events.accept(event);
         });
-        header.registerContent(ICON, icon, () -> { });
         body = new KitView(kit, new ViewSpec(new Nodes.Custom("plugin-text", ControlState.READY, TEXT, Nodes.CustomKind.EDITOR, "Overview")), events);
         text.setEditable(false);
         text.setLineWrap(true);
@@ -81,7 +82,11 @@ final class PluginDetails {
     /** Geometry and colours from the module: the former gaps and paddings as named metrics. */
     private void restyle() {
         int edge = metric(DesignMetrics.Role.PLUGIN_DETAILS_EDGE_PADDING);
-        component.setBorder(BorderFactory.createEmptyBorder(edge, metric(DesignMetrics.Role.PLUGIN_DETAILS_LEADING_PADDING), edge, edge));
+        int leading=metric(DesignMetrics.Role.PLUGIN_DETAILS_LEADING_PADDING);
+        component.setBorder(BorderFactory.createEmptyBorder(edge, leading, edge, edge));
+        // The source-sized identity section is also the readable minimum for this split receiver.
+        // FillingPage lets Settings' existing horizontal viewport reveal it at constrained widths.
+        component.setMinimumSize(new Dimension(leading+metric(DesignMetrics.Role.IDENTITY_SECTION_WIDTH)+edge,0));
         ((BorderLayout) component.getLayout()).setVgap(metric(DesignMetrics.Role.PLUGIN_DETAILS_GAP));
         int vertical = metric(DesignMetrics.Role.PLUGIN_TEXT_VERTICAL_PADDING), side = metric(DesignMetrics.Role.PLUGIN_TEXT_SIDE_PADDING);
         text.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
@@ -92,8 +97,6 @@ final class PluginDetails {
         text.setCaretColor(text.getForeground());
         text.setSelectionColor(palette.color(SemanticColor.SELECTION_BG));
         text.setSelectedTextColor(palette.color(SemanticColor.TEXT_PRIMARY));
-        icon.revalidate();
-        icon.repaint();
         component.revalidate();
         component.repaint();
     }
@@ -105,18 +108,24 @@ final class PluginDetails {
         this.row = shown;
         this.busy = busy;
         component.setVisible(shown != null);
-        icon.icon = shown == null ? null : PluginIcons.of(shown, kit.metrics().value(DesignMetrics.Role.PLUGIN_DETAIL_ICON), PluginCard.greyed(shown));
-        icon.revalidate();
-        icon.repaint();
-        if (!header.isClosed()) header.update(headerSpec());
+        renderHeader();
         fill();
+    }
+
+    private void renderHeader() {
+        if(header.isClosed())return;
+        artwork.reconcile(()->{
+            artName=row==null?"plugin":PluginIcons.name(artwork,row);
+            header.update(headerSpec());
+            header.setArtworkPresentation("icon",dev.jasper.ui.swing.ArtworkPresentation.IDENTITY_HEADER);
+        });
     }
 
     /** Overview or Details: the chosen text replaces the other in the one text area. */
     void section(String value) {
         if (!value.equals(OVERVIEW) && !value.equals(DETAILS) || value.equals(section)) return;
         section = value;
-        if (!header.isClosed()) header.update(headerSpec());
+        renderHeader();
         fill();
     }
 
@@ -142,19 +151,22 @@ final class PluginDetails {
         var primary = new Nodes.Button(PRIMARY, present && PluginCard.toggleable(shown) ? actionsState : hidden,
             present && shown.needsConsent() ? "Review…" : present && shown.enabled() ? "Disable" : "Enable", "", Nodes.ButtonKind.SECONDARY, PRIMARY, "");
         var more = new Nodes.MenuButton(MORE, present ? actionsState : hidden, "", "chevron.down", Nodes.ButtonKind.SECONDARY, "", items, "More actions");
-        var actions = new Nodes.Stack("actions", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(primary, more,
-            new Nodes.Text("version", ControlState.READY, present ? shown.version() : " ", Nodes.TextRole.CAPTION)));
+        String status=!present?"":!PluginCard.badge(shown).isEmpty()?PluginCard.badge(shown):shown.state().equals("ACTIVE") && shown.enabled()?"Enabled":stateLabel(shown.state());
+        var metadata=new Nodes.Stack("metadata",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(
+            new Nodes.Text("vendor",ControlState.READY,present?(shown.vendor().isBlank()?shown.origin():shown.vendor()):" ",Nodes.TextRole.CAPTION),
+            new Nodes.Text("version",ControlState.READY,present?"·  Version "+shown.version()+"  ·":" ",Nodes.TextRole.CAPTION),
+            new Nodes.StatusDot("state-dot",new ControlState(present,true,false,""),present && shown.enabled() && shown.state().equals("ACTIVE") ? Nodes.StatusKind.SUCCESS : Nodes.StatusKind.WARNING),
+            new Nodes.Text("state",ControlState.READY,status,Nodes.TextRole.CAPTION)));
         var identity = new Nodes.Stack("identity", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
-            new Nodes.Text("name", ControlState.READY, present ? shown.name() : " ", Nodes.TextRole.DETAIL_TITLE),
-            new Nodes.Text("vendor", ControlState.READY, present ? (shown.vendor().isBlank() ? shown.origin() : shown.vendor()) : " ", Nodes.TextRole.DESCRIPTION),
-            new Nodes.Button(HOMEPAGE, present && homepage(shown).isPresent() ? ControlState.READY : hidden, "Plugin homepage ↗", "", Nodes.ButtonKind.LINK, HOMEPAGE, ""),
-            actions));
-        var head = new Nodes.Stack("head", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
-            new Nodes.Custom("icon", ControlState.READY, ICON, Nodes.CustomKind.PREVIEW, present ? shown.name() + " icon" : "Plugin icon"), identity));
+            new Nodes.Text("name", ControlState.READY, present ? shown.name() : " ", Nodes.TextRole.DETAIL_TITLE),metadata));
+        var head = new Nodes.Stack("head", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
+            new Nodes.Icon("icon",new ControlState(true,!present || !PluginCard.greyed(shown),false,""),artName,Nodes.Hue.NEUTRAL,Nodes.IconSize.HERO,present?shown.name():"Plugin"),identity,primary));
+        var ancillary=new Nodes.Stack("ancillary",new ControlState(section.equals(DETAILS),true,false,""),Nodes.LayoutRole.NAVIGATION,List.of(
+            new Nodes.Button(HOMEPAGE, present && homepage(shown).isPresent() ? ControlState.READY : hidden, "Plugin homepage ↗", "", Nodes.ButtonKind.LINK, HOMEPAGE, ""),more));
         var choice = new Nodes.Choice(SECTION, ControlState.READY, Nodes.ChoiceKind.SEGMENTED,
             List.of(new Option(OVERVIEW, "Overview", Optional.empty()), new Option(DETAILS, "Details", Optional.empty())), section,
             "Plugin information", "");
-        return new ViewSpec(new Nodes.Stack("details-header", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(head, choice)));
+        return new ViewSpec(new Nodes.Stack("details-header", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(head, new Nodes.Stack("section-lane",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(new Nodes.Card("section-card",ControlState.READY,Nodes.CardKind.SETTINGS,List.of(choice)))), ancillary)));
     }
 
     /** Everything the pane shows as text, for tests and search: the header, the overview and the details. */
@@ -181,18 +193,7 @@ final class PluginDetails {
 
     void close() {
         try { theme.close(); } catch (Exception ignored) { /* the binding outlives nothing that needs this */ }
-        header.close();
-        body.close();
-    }
-
-    /** The plugin's manifest icon (or Jasper's plugin logo) at its named size: specialized artwork, not a control. */
-    private final class IconCanvas extends JComponent {
-        Icon icon;
-        @Override public Dimension getPreferredSize() {
-            int size = metric(DesignMetrics.Role.PLUGIN_DETAIL_ICON);
-            return new Dimension(size, size);
-        }
-        @Override protected void paintComponent(Graphics graphics) { if (icon != null) icon.paintIcon(this, graphics, 0, 0); }
+        try { header.close(); } finally { try {body.close();} finally {artwork.close();} }
     }
 
     static String removal(PluginRuntime.Row row) {

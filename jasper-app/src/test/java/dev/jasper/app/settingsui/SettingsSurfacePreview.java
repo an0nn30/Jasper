@@ -100,10 +100,10 @@ public final class SettingsSurfacePreview {
         } finally {try(var paths=Files.walk(home)){for(var path:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(path);}}
     }
     private static NotificationGroupChoices.Group group(String id,String name,String mode,String owner,String ownerId,String icon){return new NotificationGroupChoices.Group(id,name,owner,mode,ownerId,icon);}
-    private static void save(SettingsDialog dialog,JComponent view,Path file,int width,int height){
+    static void save(SettingsDialog dialog,JComponent view,Path file,int width,int height){
         view.setSize(width,height);for(int i=0;i<4;i++)KitTestSupport.layout(view);
         write(view,file,width,height);
-        var text=new StringBuilder("actual SettingsDialog and SchemaPage; deviceScale=2; uiScale="+com.formdev.flatlaf.util.UIScale.getUserScaleFactor()+"\n");
+        var text=new StringBuilder("actual SettingsDialog and page owner; deviceScale=2; uiScale="+com.formdev.flatlaf.util.UIScale.getUserScaleFactor()+"\n");
         describe(view,view,text);text.append("viewport=").append(dialog.view().body.getViewport().getExtentSize()).append("; view=").append(dialog.view().body.getViewport().getViewSize()).append('\n');
         try{Files.writeString(file.resolveSibling(file.getFileName()+".txt"),text);}catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}
     }

@@ -10,6 +10,26 @@ import java.util.List;
 final class Trees {
     private Trees() {}
 
+    static void validateDetail(Nodes.Node node) {
+        if(node instanceof Nodes.Custom)throw new IllegalArgumentException("Tree detail requires standard descriptors");
+        if(node instanceof Nodes.ItemList list)for(var item:list.items()) {
+            item.leading().ifPresent(Trees::validateDetail);item.title().forEach(Trees::validateDetail);item.subtitle().forEach(Trees::validateDetail);item.trailing().forEach(Trees::validateDetail);
+        }
+        ControlRegistry.children(node).forEach(Trees::validateDetail);
+    }
+    static final class TreePane extends javax.swing.JScrollPane {
+        final KitContext context; TreeControl owner;
+        TreePane(KitContext context){this.context=context;}
+        @Override protected void paintComponent(java.awt.Graphics graphics) {
+            if(owner==null || owner.presentation.isEmpty()){super.paintComponent(graphics);return;}
+            var g=(java.awt.Graphics2D)graphics.create();
+            try {
+                ThemePainting.antialias(g);int radius=ThemePainting.metric(context,dev.jasper.ui.metrics.DesignMetrics.Role.CARD_RADIUS)*2;
+                g.setColor(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.SURFACE_CARD));g.fillRoundRect(0,0,getWidth(),getHeight(),radius,radius);
+                g.setColor(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE));g.drawRoundRect(0,0,getWidth()-1,getHeight()-1,radius,radius);
+            }finally{g.dispose();}
+        }
+    }
     record Visible(TreeItem item, int depth) {}
 
     static final class TreeControl extends InteractiveRows.RowsControl {
@@ -21,11 +41,86 @@ final class Trees {
         int[] trailingWidths = new int[0];
 
         TreeControl(KitView view, Nodes.Tree node) {
-            super(view, node);
+            super(view, node, new TreePane(view.context()));
+            ((TreePane)scroll).owner=this;
             refresh();
             InteractiveRows.bind(canvas, "RIGHT", () -> expandFocused(true));
             InteractiveRows.bind(canvas, "LEFT", () -> expandFocused(false));
         }
+
+        Map<String,TreeRowPresentation> presentation=Map.of();
+        TreeDetailHandle detail;
+        TreeDetailHandle attach(String itemId,ViewSpec spec,java.util.function.Consumer<UiEvent> events,Runnable detached) {
+            if(detail!=null)throw new IllegalStateException("Tree already has a detail");
+            var item=items.get(itemId);
+            if(item==null || !item.leaf() || indexOf(itemId)<0)throw new IllegalArgumentException("Detail requires a visible leaf");
+            validateDetail(spec.root());
+            var body=new KitView(context(),spec,events);
+            detail=new TreeDetailHandle(this,itemId,body,detached);
+            body.inheritedEnabled(interactive());canvas.add(body);detailChanged();return detail;
+        }
+        void detailChanged(){measureRows();canvas.revalidate();sync();canvas.repaint();}
+        void detach(TreeDetailHandle handle) {
+            if(!handle.attached)return;
+            handle.attached=false;
+            if(detail==handle)detail=null;
+            var focused=java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+            boolean returnFocus=focused!=null && javax.swing.SwingUtilities.isDescendingFrom(focused,handle.body);
+            canvas.remove(handle.body);
+            if(returnFocus)canvas.requestFocusInWindow();
+            try {handle.body.close();} finally {try {handle.detached.run();}finally{if(!closed)detailChanged();}}
+        }
+        private int detailInset(){return ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_INSET);}
+        private int detailTrailing(){return presentation.isEmpty()?detailInset():ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_CONTENT_TRAILING);}
+        private int detailLeading(){return presentation.isEmpty()?detailInset():ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_LEADING);}
+        private int detailHeight() {
+            if(detail==null)return 0;
+            int width=Math.max(1,scroll.getViewport().getExtentSize().width-detailLeading()-detailTrailing());
+            return detail.body.getComponentCount()==0?0:Composition.height(detail.body.getComponent(0),width)+2*detailInset();
+        }
+        @Override int minimumRowHeight(){return presentation.isEmpty()?0:ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_ROW_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY);}
+        @Override boolean uniformRows(){return detail==null && presentation.isEmpty();}
+        private int keyWidth(int index,int width) {
+            var value=presentation.get(itemId(index));
+            if(value==null || value.keycaps().isEmpty())return 0;
+            var caps=new Keycaps(context(),value.keycaps().get());
+            int available=Math.max(0,width-ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_LEAF_INDENT)-2*ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP));
+            return Math.min(available,Math.min(caps.getIconWidth(),Math.max(caps.minimumWidth(),available/2)));
+        }
+        boolean layoutPresented(InteractiveRows.Row row) {
+            var value=presentation.get(itemId(row.index));if(value==null)return false;
+            int pad=ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP);
+            int start=Math.min(row.getWidth(),pad+row.indent),end=Math.max(start,row.getWidth()-detailTrailing()),height=row.getHeight();
+            row.leading.setBounds(0,0,0,0);
+            int keys=keyWidth(row.index,row.getWidth());
+            if(value.keycaps().isEmpty())keys=Math.min(row.trailing.getComponent(row.trailing.getComponentCount()-1).getPreferredSize().width,Math.max(0,(end-start)/2));
+            var children=row.trailing.getComponents();
+            int natural=java.util.Arrays.stream(children).limit(children.length-1).mapToInt(c->c.getPreferredSize().width+pad).sum();
+            int contextWidth=Math.min(natural,Math.max(0,(end-start-keys)/2));
+            int trailing=keys+contextWidth;
+            row.trailing.setBounds(end-trailing,0,trailing,height);
+            int x=0;
+            for(int i=0;i<children.length;i++) {
+                int w=i==children.length-1?keys:Math.min(children[i].getPreferredSize().width,Math.max(0,contextWidth-x-pad));
+                children[i].setBounds(i==children.length-1?contextWidth:x,0,w,height);x+=w+pad;
+            }
+            row.title.setBounds(start,0,Math.max(0,end-trailing-pad-start),height);row.title.doLayout();
+            row.subtitle.setBounds(0,0,0,0);return true;
+        }
+        @Override int rowHeightAt(int index){return rowShellHeight(index)+(detail!=null && itemId(index).equals(detail.itemId)?detailHeight():0);}
+        @Override int rowShellHeight(int index){
+            var value=presentation.get(itemId(index));
+            return value==null || value.keycaps().isEmpty()?rowHeight:Math.max(rowHeight,new Keycaps(context(),value.keycaps().get()).heightAt(keyWidth(index,scroll.getViewport().getExtentSize().width))+2*detailInset());
+        }
+        @Override void layoutAccessories(int width) {
+            if(detail==null)return;
+            int index=indexOf(detail.itemId);if(index<0)return;
+            int inset=detailInset();
+            detail.body.setBounds(detailLeading(),top(index)+rowShellHeight(index)+inset,Math.max(0,width-detailLeading()-inset),Math.max(0,detailHeight()-2*inset));
+            detail.body.doLayout();
+        }
+        @Override void refresh(){super.refresh();if(detail!=null)detail.body.inheritedEnabled(interactive());}
+        @Override public void close(){try {if(detail!=null)detach(detail);}finally{super.close();}}
 
         Nodes.Tree value() {
             return (Nodes.Tree) node;
@@ -89,6 +184,8 @@ final class Trees {
             itemIds.clear();
             items.clear();
             value().roots().forEach(root -> flatten(root, 0, true));
+            if(detail!=null && indexOf(detail.itemId)<0)detach(detail);
+            presentation=presentation.entrySet().stream().filter(e->itemIds.contains(e.getKey())).collect(java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey,Map.Entry::getValue));
             var metrics = canvas.getFontMetrics(ThemePainting.font(context(), dev.jasper.ui.metrics.Typography.Role.CAPTION));
             int columns = items.values().stream().mapToInt(item -> item.trailing().size()).max().orElse(0);
             trailingWidths = new int[columns];
@@ -128,7 +225,7 @@ final class Trees {
             row.begin();
             var entry = visible.get(index);
             var item = entry.item();
-            row.indent = settingsNavigation?0:entry.depth() * com.formdev.flatlaf.util.UIScale.scale(16);
+            row.indent = settingsNavigation?0:!presentation.isEmpty() && item.leaf()?ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_LEAF_INDENT):entry.depth() * com.formdev.flatlaf.util.UIScale.scale(16);
             var leading = new ArrayList<Nodes.Node>();
             if (!item.leaf() && !settingsNavigation)
                 leading.add(
@@ -141,7 +238,7 @@ final class Trees {
                                         : "chevron.right",
                                 Nodes.ButtonKind.GHOST,
                                 "expand",
-                                "Expand or collapse " + item.title()));
+                                "Expand or collapse " + item.title(),presentation.isEmpty()?Nodes.ButtonPresentation.STANDARD:Nodes.ButtonPresentation.EMBEDDED));
             item.icon()
                     .ifPresent(
                             icon ->
@@ -151,13 +248,14 @@ final class Trees {
                                                             + "/icon",
                                                     ControlState.READY,
                                                     icon,
-                                                    settingsNavigation ? settingsHue(icon) : Nodes.Hue.NONE,
+                                                    settingsNavigation || !presentation.isEmpty() ? settingsHue(icon) : Nodes.Hue.NONE,
                                                     Nodes.IconSize.CONTROL,
                                                     item.title())));
             item.status().ifPresent(status -> leading.add(new Nodes.StatusDot(
                     "@tree/" + node.id() + "/" + item.id() + "/status", ControlState.READY, status)));
             row.slot(row.leading, leading);
-            if(settingsNavigation)for(var control:row.controls.values())if(control instanceof Labels.IconControl icon)icon.tile(context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE),context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE),context().icons().size(Nodes.IconSize.CONTROL),selected.contains(item.id()));
+            for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon") && !settingsNavigation && presentation.isEmpty())icon.tile(0,false);
+            if(settingsNavigation || !presentation.isEmpty())for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon"))icon.tile(context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE),context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE),context().icons().size(Nodes.IconSize.CONTROL),selected.contains(item.id()));
             String titleId = "@tree/" + node.id() + "/" + item.id() + "/title";
             row.slot(
                     row.title,
@@ -166,20 +264,38 @@ final class Trees {
                                     titleId,
                                     ControlState.READY,
                                     item.title(),
-                                    settingsNavigation && !item.leaf()?Nodes.TextRole.SECTION_LABEL:item.emphasized() ? Nodes.TextRole.BODY_STRONG : Nodes.TextRole.BODY)));
+                                    settingsNavigation && !item.leaf()?Nodes.TextRole.SECTION_LABEL:!presentation.isEmpty()&&!item.leaf()?Nodes.TextRole.BODY_STRONG:item.emphasized() ? Nodes.TextRole.BODY_STRONG : Nodes.TextRole.BODY)));
             // Emphasis is strong text in the link color; the text control's own refresh picks its role color first.
             if (item.emphasized())
                 row.controls.get(titleId).component.setForeground(ThemePainting.color(context(), dev.jasper.ui.theme.SemanticColor.TEXT_LINK));
             row.slot(row.subtitle, List.of());
             var trailing = new ArrayList<Nodes.Node>();
             if(settingsNavigation&&!item.leaf())trailing.add(new Nodes.Button("@tree/"+node.id()+"/"+item.id()+"/expand",ControlState.READY,"",value().expandedIds().contains(item.id())?"chevron.down":"chevron.right",Nodes.ButtonKind.GHOST,"expand","Expand or collapse "+item.title(),Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED));
-            for (int i = 0; i < item.trailing().size(); i++)
+            var presented=presentation.get(item.id());
+            for (int i = 0; presented==null && i < item.trailing().size(); i++)
                 trailing.add(new Nodes.Text("@tree/" + node.id() + "/" + item.id() + "/trailing/" + i,
                         ControlState.READY, item.trailing().get(i), Nodes.TextRole.CAPTION));
+            if(presented!=null) {
+                if(presented.locked())trailing.add(new Nodes.Icon("@tree/"+node.id()+"/"+item.id()+"/lock",ControlState.READY,"lock",Nodes.Hue.NEUTRAL,Nodes.IconSize.CAPTION,"Read-only contextual key"));
+                trailing.add(new Nodes.Text("@tree/"+node.id()+"/"+item.id()+"/context",ControlState.READY,presented.context(),Nodes.TextRole.CAPTION));
+                trailing.add(new Nodes.Text("@tree/"+node.id()+"/"+item.id()+"/keys",ControlState.READY,presented.keycaps().map(KeycapSequence::accessibleName).orElse(item.trailing().isEmpty()?"":item.trailing().getLast()),Nodes.TextRole.CAPTION));
+            }
+            String modifiedId="@tree/"+node.id()+"/"+item.id()+"/modified";
+            if(!presentation.isEmpty() && !item.leaf() && item.emphasized())trailing.add(new Nodes.StatusDot(modifiedId,ControlState.READY,Nodes.StatusKind.IDLE));
             item.count().ifPresent(count -> trailing.add(new Nodes.Text(
                     "@tree/" + node.id() + "/" + item.id() + "/count", ControlState.READY, Integer.toString(count), Nodes.TextRole.COUNT)));
             row.slot(row.trailing, trailing);
-            for (int i = 0; i < item.trailing().size(); i++) {
+            if(presented!=null)row.trailing.setLayout(null);
+            if(row.controls.get(modifiedId) instanceof Indicators.DotControl dot){dot.modified=true;dot.refresh();}
+            if(presented!=null) {
+                var label=(javax.swing.JLabel)row.controls.get("@tree/"+node.id()+"/"+item.id()+"/context").component;
+                label.setPreferredSize(new java.awt.Dimension(Math.max(label.getPreferredSize().width, ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.TREE_DETAIL_COLUMN)),label.getPreferredSize().height));
+            }
+            if(presented!=null && presented.keycaps().isPresent()) {
+                var label=(javax.swing.JLabel)row.controls.get("@tree/"+node.id()+"/"+item.id()+"/keys").component;
+                label.getAccessibleContext().setAccessibleName(presented.keycaps().get().accessibleName());label.setText("");label.setIcon(new Keycaps(context(),presented.keycaps().get()));label.setDisabledIcon(label.getIcon());
+            }
+            for (int i = 0; presented==null && i < item.trailing().size(); i++) {
                 var label = (javax.swing.JLabel) row.controls.get(trailing.get(i).id()).component;
                 label.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
                 label.setPreferredSize(null);

@@ -246,3 +246,24 @@ tasks.register<JavaExec>("settingsSurfacePreview") {
     args(layout.buildDirectory.dir("theme-surfaces").get().asFile.absolutePath)
     jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
 }
+
+// Actual Task 9b Settings owners; separate output preserves the approved 9a archive.
+tasks.register<JavaExec>("settings9bPreview") {
+    group = "verification"
+    dependsOn(tasks.testClasses, stagePlugins)
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "dev.jasper.app.settingsui.Settings9bPreview"
+    systemProperty("jasper.stagedPlugins", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
+    args(layout.buildDirectory.dir("theme-surfaces9b").get().asFile.absolutePath)
+    jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
+}
+
+// Mounted management dialogs and the Settings-owned restart conversation, with inert native/process boundaries.
+tasks.register<JavaExec>("pluginManagerStatesPreview") {
+    group = "verification"
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "dev.jasper.app.pluginmanager.PluginManagerStatesPreview"
+    args(layout.buildDirectory.dir("theme-surfaces9b/plugin-states").get().asFile.absolutePath)
+    jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
+}

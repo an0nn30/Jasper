@@ -41,6 +41,65 @@ class PluginManagerPanelTest {
 
     private JButton primary() { return PluginKit.button(panel.detailsPane().header(), PluginDetails.PRIMARY); }
 
+    @Test void narrowViewportPreservesReadableDetailAndRevealsFocusedActionsBothWays() {
+        panel.show(snapshot(TestRows.plugin("a.art","Authored").row()));
+        panel.setSize(com.formdev.flatlaf.util.UIScale.scale(744),600);KitTestSupport.layout(panel);
+        var page=new dev.jasper.app.settingsui.FillingPage(panel);
+        var scroller=new javax.swing.JScrollPane(page);scroller.setSize(427,534);
+        for(int i=0;i<3;i++)KitTestSupport.layout(scroller);
+        var header=panel.detailsPane().header();var primary=primary();
+        var overview=KitTestSupport.require(header,"section.option.overview",AbstractButton.class);
+        for(String id:List.of("name","vendor","version","state")) {
+            var label=KitTestSupport.require(header,id,JLabel.class);
+            assertThat(label.getWidth()).as("readable identity "+id).isGreaterThan(0);
+        }
+        assertThat(overview.getWidth()).as("unelided section label at constrained viewport")
+            .isGreaterThanOrEqualTo(overview.getFontMetrics(overview.getFont()).stringWidth(overview.getText()));
+        assertThat(primary.getWidth()).isGreaterThanOrEqualTo(primary.getPreferredSize().width);
+        var document=panel.detailsPane().textArea().getDocument();
+        header.reveal(PluginDetails.PRIMARY);
+        var bounds=javax.swing.SwingUtilities.convertRectangle(primary.getParent(),primary.getBounds(),page);
+        assertThat(scroller.getViewport().getViewRect().contains(bounds)).isTrue();
+        var search=PluginKit.field(panel.searchView(),PluginManagerPanel.SEARCH);
+        panel.searchView().reveal(PluginManagerPanel.SEARCH);
+        assertThat(scroller.getViewport().getViewRect().contains(javax.swing.SwingUtilities.convertRectangle(search.getParent(),search.getBounds(),page))).isTrue();
+        var focus=new java.awt.event.FocusEvent(primary,java.awt.event.FocusEvent.FOCUS_GAINED,false,null,java.awt.event.FocusEvent.Cause.TRAVERSAL_FORWARD);
+        for(var listener:primary.getFocusListeners())listener.focusGained(focus);
+        assertThat(scroller.getViewport().getViewRect().contains(bounds)).as("Tab focus reveals detail action").isTrue();
+        panel.show(snapshot(TestRows.plugin("a.art","Authored").row()));
+        assertThat(panel.detailsPane().textArea().getDocument()).isSameAs(document);
+        panel.searchView().reveal(PluginManagerPanel.SEARCH);
+        assertThat(scroller.getViewport().getViewRect().contains(javax.swing.SwingUtilities.convertRectangle(search.getParent(),search.getBounds(),page))).isTrue();
+    }
+    @Test void actualSplitDividerPaintsAtItsAllocatedBoundary() {
+        panel.show(snapshot(TestRows.plugin("a.art","Authored").row()));
+        panel.setSize(744,600);KitTestSupport.layout(panel);
+        var split=panel.split();var ui=(javax.swing.plaf.basic.BasicSplitPaneUI)split.getUI();var divider=ui.getDivider();
+        assertThat(divider.getWidth()).isGreaterThan(0);
+        assertThat(divider.getX()).isEqualTo(split.getLeftComponent().getWidth());
+        for(boolean print:new boolean[]{false,true})for(int orientation:new int[]{javax.swing.JSplitPane.HORIZONTAL_SPLIT,javax.swing.JSplitPane.VERTICAL_SPLIT}) {
+            split.setOrientation(orientation);split.setDividerLocation(200);split.doLayout();
+            var image=new java.awt.image.BufferedImage(split.getWidth(),split.getHeight(),java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            var graphics=image.createGraphics();if(print)split.printAll(graphics);else split.paint(graphics);graphics.dispose();
+            int x=orientation==javax.swing.JSplitPane.HORIZONTAL_SPLIT?divider.getX():split.getWidth()-20;
+            int y=orientation==javax.swing.JSplitPane.VERTICAL_SPLIT?divider.getY():split.getHeight()-20;
+            int dx=orientation==javax.swing.JSplitPane.HORIZONTAL_SPLIT?3:0,dy=orientation==javax.swing.JSplitPane.VERTICAL_SPLIT?3:0;
+            assertThat(image.getRGB(x,y)).as("allocated divider; print="+print+"; bounds="+divider.getBounds()).isNotEqualTo(image.getRGB(x+dx,y+dy));
+        }
+    }
+    @Test void actualHeroReceivesManifestArtworkAndSearchStaysInListLane() {
+        var art=new PluginRuntime.PluginIcon("art.svg",PluginIconsTest.SVG.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        panel.show(snapshot(TestRows.plugin("a.art","Authored").icon(art).row()));
+        panel.setSize(744,600);KitTestSupport.layout(panel);
+        var icon=KitTestSupport.find(panel,"icon",JLabel.class);
+        assertThat(icon).as("shared receiving icon replaces private canvas").isNotNull();
+        assertThat(icon.getWidth()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(52));
+        var search=PluginKit.field(panel.searchView(),PluginManagerPanel.SEARCH);
+        var point=javax.swing.SwingUtilities.convertPoint(search,search.getWidth(),0,panel);
+        var detail=javax.swing.SwingUtilities.convertPoint(panel.detailsPane().component(),0,0,panel);
+        assertThat(point.x).isLessThanOrEqualTo(detail.x);
+    }
+
     @Test void thePrimaryButtonAndTheMenuFollowTheSelectedPlugin() {
         panel.show(snapshot(
             TestRows.plugin("dev.example.active", "Active").errors(2).capabilities(List.of("terminal.inject", "made.up"))
@@ -115,6 +174,7 @@ class PluginManagerPanelTest {
         panel.show(snapshot(TestRows.plugin("a.web", "Web").homepage("https://example.dev/web").row(),
             TestRows.plugin("a.ftp", "Ftp").homepage("ftp://example.dev").row(), TestRows.plugin("a.none", "None").row()));
         panel.select("a.web");
+        KitTestSupport.require(panel.detailsPane().header(),"section.option.details",javax.swing.AbstractButton.class).doClick(0);
         assertThat(panel.homepageShown()).isTrue();
         assertThat(PluginKit.button(panel.detailsPane().header(), PluginDetails.HOMEPAGE).isVisible()).isTrue();
         PluginKit.press(panel.detailsPane().header(), PluginDetails.HOMEPAGE);
@@ -144,7 +204,7 @@ class PluginManagerPanelTest {
 
     static Nodes.Node find(Nodes.Node node, String id) {
         if (node.id().equals(id)) return node;
-        for (var child : switch (node) { case Nodes.Stack stack -> stack.children(); default -> List.<Nodes.Node>of(); }) {
+        for (var child : switch (node) { case Nodes.Stack stack -> stack.children(); case Nodes.Card card -> card.children(); default -> List.<Nodes.Node>of(); }) {
             var found = find(child, id);
             if (found != null) return found;
         }

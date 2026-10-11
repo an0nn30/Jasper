@@ -18,6 +18,22 @@ import javax.swing.*;
 import org.junit.jupiter.api.Test;
 
 class ShortcutSectionsTest {
+    @Test void actualFillingPageKeepsKeymapFlexibleInsteadOfUsingStatusTextMinimum() throws Exception {
+        edt(() -> {
+            var panel=panel(changes -> java.util.concurrent.CompletableFuture.completedFuture(null));
+            try {
+                panel.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true),List.of(),Map.of(),true));
+                var body=new dev.jasper.app.settingsui.FillingPage(panel);var scroll=new JScrollPane(body);scroll.setSize(427,534);
+                for(int i=0;i<4;i++)KitTestSupport.layout(scroll);
+                assertThat(body.getWidth()).as("width-aware Keymap owns wrapping, not the status label's intrinsic width").isEqualTo(scroll.getViewport().getExtentSize().width);
+                var clear=button(panel,"clear");
+                var bounds=SwingUtilities.convertRectangle(clear.getParent(),clear.getBounds(),body);
+                assertThat(scroll.getViewport().getViewRect().contains(bounds)).as("Clear remains inside visible page").isTrue();
+                assertThat(scroll.getHorizontalScrollBar().isVisible()).isFalse();
+            } finally {panel.close();}
+        });
+    }
+
     @Test void sectionsAreExpandableAndShareThePanelsThemeSurface() throws Exception {
         edt(() -> {
             var bindings = KitTestSupport.bindings(true);
@@ -127,7 +143,7 @@ class ShortcutSectionsTest {
                     "Terminal window", "", true, "cmd+c")));
                 button(panel, "expand").doClick(0);
                 panel.setSize(900, 500); layout(panel);
-                var binding = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/action/copy/trailing/1", JLabel.class);
+                var binding = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/action/copy/keys", JLabel.class);
                 assertThat(SwingUtilities.convertPoint(binding, binding.getWidth(), 0, canvas(panel)).x)
                     .as("the chord sits at the right").isGreaterThan(canvas(panel).getWidth() * 3 / 4);
                 click(binding, 1);
@@ -177,11 +193,12 @@ class ShortcutSectionsTest {
                 var row = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/action/clear_scrollback/title", JLabel.class).getParent().getParent();
                 var texts = new ArrayList<String>();
                 collect((Container) row, texts);
-                assertThat(texts).contains("Clear Scrollback", "Terminal", ShortcutText.format(KeyStroke.getKeyStroke("meta K")));
-                var where = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/action/clear_scrollback/trailing/0", JLabel.class);
-                var binding = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/action/clear_scrollback/trailing/1", JLabel.class);
+                assertThat(texts).contains("Clear Scrollback", "Terminal");
+                var where = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/action/clear_scrollback/context", JLabel.class);
+                var binding = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/action/clear_scrollback/keys", JLabel.class);
                 assertThat(where.getWidth()).as("the Where column keeps its 88 px minimum").isGreaterThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(88));
-                assertThat(binding.getWidth()).as("the binding column keeps its 96 px minimum").isGreaterThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(96));
+                assertThat(binding.getIcon()).as("binding renders passive keycaps").isNotNull();
+                assertThat(binding.getAccessibleContext().getAccessibleName()).isEqualTo(ShortcutText.format(KeyStroke.getKeyStroke("meta K")));
             } finally { panel.close(); }
         });
     }

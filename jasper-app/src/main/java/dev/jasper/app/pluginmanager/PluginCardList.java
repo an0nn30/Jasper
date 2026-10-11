@@ -31,6 +31,8 @@ final class PluginCardList {
 
     static final String LIST = "plugins";
     private final KitView view;
+    private final dev.jasper.ui.icons.ReceivingArtwork artwork;
+    private final java.util.Map<String,String> artNames = new java.util.HashMap<>();
     private final Runnable selectionChanged;
     private List<PluginRuntime.Row> rows = List.of();
     private List<PluginRuntime.Row> shown = List.of();
@@ -41,6 +43,7 @@ final class PluginCardList {
 
     PluginCardList(KitContext kit, Consumer<UiEvent> events, Runnable selectionChanged) {
         this.selectionChanged = selectionChanged;
+        artwork = new dev.jasper.ui.icons.ReceivingArtwork(kit.icons());
         view = new KitView(kit, spec(), event -> {
             if (event instanceof UiEvent.Selected chosen && chosen.id().equals(LIST)) {
                 // The user's choice becomes the declared selection too, so a later host selection (for example of the
@@ -98,7 +101,7 @@ final class PluginCardList {
 
     private String empty() { return rows.isEmpty() ? "No plugins installed" : "No plugins match"; }
 
-    void close() { view.close(); }
+    void close() { try { view.close(); } finally { artwork.close(); } }
 
     private void rebuild() {
         var visible = new ArrayList<PluginRuntime.Row>();
@@ -116,7 +119,15 @@ final class PluginCardList {
         selectionChanged.run();
     }
 
-    private void render() { if (!view.isClosed()) view.update(spec()); }
+    private void render() {
+        if (view.isClosed()) return;
+        artwork.reconcile(() -> {
+            artNames.clear();
+            for(var row:rows) artNames.put(row.id(), PluginIcons.name(artwork,row));
+            view.update(spec());
+            for(var row:shown)view.setArtworkPresentation("icon:"+row.id(),dev.jasper.ui.swing.ArtworkPresentation.IDENTITY_ROW);
+        });
+    }
 
     private ViewSpec spec() {
         if (shown.isEmpty()) return new ViewSpec(new Nodes.Empty("plugins-empty", ControlState.READY,
@@ -129,7 +140,7 @@ final class PluginCardList {
             String heading = "group:" + group.origin();
             items.add(new ListItem(heading, Optional.empty(), List.of(new Nodes.Text(heading + ":title", ControlState.READY, group.title(),
                 Nodes.TextRole.CAPTION)), List.of(), List.of(), true));
-            for (PluginRuntime.Row row : matching) items.add(PluginCard.item(row, busy));
+            for (PluginRuntime.Row row : matching) items.add(PluginCard.item(row, busy, artNames.getOrDefault(row.id(), "plugin")));
         }
         return new ViewSpec(new Nodes.ItemList(LIST, ControlState.READY, Nodes.ListKind.DOUBLE, items,
             selected == null ? Set.of() : Set.of(selected), "", List.of(), Nodes.SelectionMode.SINGLE, Optional.empty()));

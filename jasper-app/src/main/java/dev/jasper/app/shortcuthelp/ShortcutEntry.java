@@ -6,7 +6,11 @@ import javax.swing.KeyStroke;
 
 /** One reference row; a null stroke means the action is currently unassigned. {@code where} names the context. */
 record ShortcutEntry(String id, String group, String name, KeyStroke stroke, String context, String keywords,
-                     boolean editable, String defaultBinding, String where) {
+                     boolean editable, String defaultBinding, String where, String groupIcon) {
+    ShortcutEntry(String id, String group, String name, KeyStroke stroke, String context, String keywords,
+                  boolean editable, String defaultBinding, String where) {
+        this(id,group,name,stroke,context,keywords,editable,defaultBinding,where,"plugin");
+    }
     ShortcutEntry(String id, String group, String name, KeyStroke stroke, String context, String keywords,
                   boolean editable, String defaultBinding) {
         this(id, group, name, stroke, context, keywords, editable, defaultBinding, "Global");

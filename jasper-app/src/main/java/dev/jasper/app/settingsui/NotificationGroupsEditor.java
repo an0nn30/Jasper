@@ -25,13 +25,18 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
     static final Map<String, String> MODES = modes();
 
     private final NotificationGroupChoices choices;
+    private final java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit;
+    private dev.jasper.ui.icons.ReceivingArtwork artwork;
+    @Override public void dispose(){if(artwork!=null)artwork.close();}
     private List<NotificationGroupChoices.Group> groups;
     /** The table as last shown. */
     private Map<String, String> shown = Map.of();
     /** The user's choices since then, by group id; a null choice means "back to the default". */
     private final Map<String, String> chosen = new HashMap<>();
 
-    NotificationGroupsEditor(NotificationGroupChoices choices) {
+    NotificationGroupsEditor(NotificationGroupChoices choices) {this(choices,null);}
+    NotificationGroupsEditor(NotificationGroupChoices choices, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit) {
+        this.kit=kit;
         this.choices = Objects.requireNonNull(choices, "choices");
         groups = List.copyOf(choices.groups().get());
     }
@@ -64,7 +69,12 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
         for(var indices:owners.values()) {
             var first=groups.get(indices.getFirst());var lines=new ArrayList<Nodes.Node>();
             var heading=new ArrayList<Nodes.Node>();
-            if(!first.ownerIcon().isBlank())heading.add(new Nodes.Icon(id+":owner-"+section+":icon",plain,first.ownerIcon(),first.ownerId().equals("jasper")?Nodes.Hue.BLUE:Nodes.Hue.NEUTRAL,Nodes.IconSize.CONTROL,first.owner()));
+            String ownerIcon=first.ownerIcon();
+            if(first.artwork().isPresent() && kit!=null) {
+                if(artwork==null)artwork=new dev.jasper.ui.icons.ReceivingArtwork(kit.get().icons());
+                try {ownerIcon=artwork.name(first.artwork().get());}catch(IllegalArgumentException rejected){ownerIcon="plugin";}
+            }
+            if(!ownerIcon.isBlank())heading.add(new Nodes.Icon(id+":owner-"+section+":icon",plain,ownerIcon,first.ownerId().equals("jasper")?Nodes.Hue.BLUE:Nodes.Hue.NEUTRAL,Nodes.IconSize.CONTROL,first.owner()));
             heading.add(new Nodes.Text(id+":owner-"+section+":title",plain,first.owner(),Nodes.TextRole.PANEL_TITLE));
             heading.add(new Nodes.Text(id+":owner-"+section+":count",plain,indices.size()+" groups",Nodes.TextRole.CAPTION));
             lines.add(new Nodes.Stack(id+":owner-"+section,plain,Nodes.LayoutRole.SETTINGS_GROUP_HEADER,heading));

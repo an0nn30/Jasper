@@ -391,8 +391,12 @@ public final class SchemaPage implements SettingsPage {
     @Override public void dispose() {
         if (disposed) return;
         disposed = true;
-        if (listening != null) listening.close();
-        for (Row<?> row : rows) row.editor.dispose();
-        if (view != null) view.close();
+        RuntimeException failure=null;
+        var cleanup=new java.util.ArrayList<Runnable>();
+        if(listening!=null)cleanup.add(listening::close);
+        if(view!=null)cleanup.add(view::close);
+        for(Row<?> row:rows)cleanup.add(row.editor::dispose);
+        for(var action:cleanup)try{action.run();}catch(RuntimeException problem){if(failure==null)failure=problem;else failure.addSuppressed(problem);}
+        if(failure!=null)throw failure;
     }
 }

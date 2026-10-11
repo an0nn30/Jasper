@@ -10,6 +10,7 @@ import javax.swing.JComponent;
 /** Stable node ids select mounted instances; incompatible kinds and removed nodes dispose once. */
 final class ViewReconciler implements AutoCloseable {
     private final KitView view;
+    private boolean inheritedEnabled=true;
     private Map<String, ControlRegistry.Control> mounted = new LinkedHashMap<>();
     ViewReconciler(KitView view) { this.view = view; }
     void update(ViewSpec spec) {
@@ -29,13 +30,14 @@ final class ViewReconciler implements AutoCloseable {
             if (!group.isEmpty()) revealGroups.put(group, secret.revealed);
         }
         next.values().forEach(this::resetComposition);
-        inherit(spec.root(), next, true);
+        inherit(spec.root(), next, inheritedEnabled);
         applyFlow(spec.root(), next);
         applyColumns(spec.root(), next, -1, false);
         applyPanelDetail(spec.root(), next, false);
         applyFullForm(spec.root(), next, false);
         applySettings(spec.root(), next, false);
         applySettingsNavigation(spec.root(),next,false);
+        applyArtworkComposition(spec.root(),next,false);
         for (var node : nodes.values()) next.get(node.id()).update(node);
         applyHero(spec.root(), next, false);
         applyTiles(spec.root(), next, 0);
@@ -51,6 +53,30 @@ final class ViewReconciler implements AutoCloseable {
         var previous = mounted; mounted = next;
         for (var old : previous.values()) if (next.get(old.node.id()) != old) old.close();
         view.revalidate(); view.repaint();
+    }
+    /** Validate retained adjuncts against the complete source, including unrealized list rows. */
+    void validateFieldTrailing(ViewSpec spec, TextFields.FieldControl replacing, Nodes.Button replacement) {
+        var children = new ArrayList<Nodes.Node>(); children.add(spec.root());
+        for (var control : mounted.values()) if (control instanceof TextFields.FieldControl field) {
+            var next = find(spec.root(), field.node.id());
+            if (next == null || !ControlRegistry.kind(next).equals(ControlRegistry.kind(field.node))) continue;
+            Nodes.Button action = field == replacing ? replacement : field.trailing == null ? null : (Nodes.Button)field.trailing.node;
+            if (action != null) children.add(action);
+        }
+        if (children.size() > 1) {
+            String id = "@field-adjunct-validation";
+            while (find(spec.root(), id) != null || children.stream().map(Nodes.Node::id).toList().contains(id)) id += "/";
+            new ViewSpec(new Nodes.Stack(id, dev.jasper.ui.model.ControlState.READY, Nodes.LayoutRole.INLINE, children));
+        }
+    }
+    private static Nodes.Node find(Nodes.Node node, String id) {
+        if (node.id().equals(id)) return node;
+        if (node instanceof Nodes.ItemList list) for (var item : list.items()) {
+            var children = new ArrayList<Nodes.Node>(); item.leading().ifPresent(children::add); children.addAll(item.title()); children.addAll(item.subtitle()); children.addAll(item.trailing());
+            for (var child : children) { var found = find(child,id); if (found != null) return found; }
+        }
+        for (var child : ControlRegistry.children(node)) { var found = find(child,id); if (found != null) return found; }
+        return null;
     }
     private void resetComposition(ControlRegistry.Control control) {
         if (control instanceof TextFields.FieldControl field) field.panelSearch = false;
@@ -183,6 +209,10 @@ final class ViewReconciler implements AutoCloseable {
     private void collect(Nodes.Node node, Map<String, Nodes.Node> nodes) {
         nodes.put(node.id(), node); ControlRegistry.children(node).forEach(child -> collect(child, nodes));
     }
+    void inheritedEnabled(boolean enabled) {
+        if(inheritedEnabled==enabled)return;
+        inheritedEnabled=enabled;inherit(view.spec().root(),mounted,enabled);refresh();
+    }
     void registerContent(String id, JComponent component, AutoCloseable lifetime) {
         for(var control:mounted.values()) if(control instanceof CustomContents.CustomControl custom && ((Nodes.Custom)custom.node).contentId().equals(id)) {custom.register(component,lifetime);return;}
         throw new IllegalArgumentException("No matching Custom content");
@@ -205,6 +235,32 @@ final class ViewReconciler implements AutoCloseable {
         return mounted.values().stream().anyMatch(owner -> owner instanceof Menus.MenuControl menu && menu.popup.isVisible()
             || owner instanceof Choices.ChoiceControl choice && choice.input instanceof javax.swing.JComboBox<?> combo && combo.isPopupVisible());
     }
+    private boolean identityHead(Nodes.Node node) {
+        return node instanceof Nodes.Stack stack && stack.role()==Nodes.LayoutRole.NAVIGATION && stack.children().stream().anyMatch(child->child instanceof Nodes.Icon && view.artworkPresentation(child.id())==ArtworkPresentation.IDENTITY_HEADER);
+    }
+    private void applyArtworkComposition(Nodes.Node node,Map<String,ControlRegistry.Control> controls,boolean identity) {
+        boolean group=node instanceof Nodes.Stack stack && stack.role()==Nodes.LayoutRole.VERTICAL && !stack.children().isEmpty() && identityHead(stack.children().getFirst());
+        var control=controls.get(node.id());
+        if(control instanceof Stacks.StackControl stack){stack.identityHeader=identityHead(node);stack.identityGroup=group;}
+        if(control instanceof Choices.ChoiceControl choice)choice.identitySection=identity && ((Nodes.Choice)node).kind()==Nodes.ChoiceKind.SEGMENTED;
+        var children=ControlRegistry.children(node);
+        children.forEach(child->applyArtworkComposition(child,controls,identity||group));
+        for(int i=0;i<children.size();i++)if(controls.get(children.get(i).id()) instanceof Labels.TextControl text) {
+            text.identityStatus=null;
+            if((identity||group) && i>0 && children.get(i-1) instanceof Nodes.StatusDot dot && children.get(i) instanceof Nodes.Text label && label.role()==Nodes.TextRole.CAPTION)
+                text.identityStatus=switch(dot.kind()){case SUCCESS->dev.jasper.ui.theme.SemanticColor.TEXT_SUCCESS;case WARNING->dev.jasper.ui.theme.SemanticColor.STATUS_WARNING;case DANGER->dev.jasper.ui.theme.SemanticColor.STATUS_DANGER;case IDLE->dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY;};
+        }
+    }
+    void refreshArtwork(String id) {
+        applyArtworkComposition(view.spec().root(),mounted,false);
+        for(var control:mounted.values())if(control instanceof Stacks.StackControl || control instanceof Choices.ChoiceControl || control instanceof Labels.TextControl)control.refresh();
+        var control=mounted.get(id);
+        if(control!=null)control.refresh();
+        for(var owner:mounted.values())if(owner instanceof InteractiveRows.RowsControl rows)
+            { for(var row:rows.mounted.values()){var child=row.controls.get(id);if(child!=null){child.refresh();row.revalidate();}}
+                if(rows instanceof ItemLists.ListControl list && list.nodeRows.containsKey(id))list.refresh(); }
+        view.revalidate();view.repaint();
+    }
     ControlRegistry.Control mounted(String id) { return mounted.get(id); }
     boolean revealInline(String id) {
         for (var owner : mounted.values())
@@ -213,7 +269,11 @@ final class ViewReconciler implements AutoCloseable {
     }
     ControlRegistry.Control control(String id) {
         var control = mounted.get(id);
+        if(control == null) for(var owner:mounted.values()) if(owner instanceof TextFields.FieldControl field && field.trailing != null && field.trailing.node.id().equals(id)) { control=field.trailing; break; }
         if(control == null) for(var owner:mounted.values()) if(owner instanceof InteractiveRows.RowsControl rows) { control=rows.inline(id); if(control!=null)break; }
+        if(control==null)for(var owner:mounted.values())if(owner instanceof Trees.TreeControl tree && tree.detail!=null) {
+            try{control=tree.detail.body.control(id);break;}catch(IllegalArgumentException absent){ /* another detail may own it */ }
+        }
         if (control == null) throw new IllegalArgumentException("Unknown node: " + id); return control;
     }
     void revealSecrets(SecretFields.SecretControl source, boolean revealed) {
@@ -221,6 +281,6 @@ final class ViewReconciler implements AutoCloseable {
         for (var control : mounted.values()) if (control instanceof SecretFields.SecretControl secret
                 && (secret == source || !group.isEmpty() && group.equals(((Nodes.Secret)secret.node).revealGroup()))) secret.reveal(revealed);
     }
-    void refresh() { mounted.values().forEach(ControlRegistry.Control::refresh); mounted.values().forEach(c -> {if(c instanceof Panels.PanelControl panel)panel.presentation();}); view.revalidate(); view.repaint(); }
+    void refresh() { applyArtworkComposition(view.spec().root(),mounted,false); mounted.values().forEach(ControlRegistry.Control::refresh); mounted.values().forEach(c -> {if(c instanceof Panels.PanelControl panel)panel.presentation();}); view.revalidate(); view.repaint(); }
     @Override public void close() { mounted.values().forEach(ControlRegistry.Control::close); mounted.clear(); view.removeAll(); }
 }

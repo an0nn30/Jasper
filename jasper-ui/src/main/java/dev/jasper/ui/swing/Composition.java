@@ -15,6 +15,7 @@ final class Composition {
 
     static int height(Component c, int width) {
         if (c instanceof Labels.LiteralLabel label && label.wraps()) return label.wrappedHeight(width);
+        if (c instanceof Buttons.KitButton button && button.recorder()) return button.heightAt(width);
         if (c instanceof WrappedText text) return text.height(width);
         if (c instanceof JPanel panel && panel.getLayout() instanceof WidthLayout layout)
             return layout.height(panel, width);

@@ -26,12 +26,24 @@ final class Navigation {
         boolean wraps(Container parent, int width) {
             int fixed=0, count=0;
             for(var child:parent.getComponents())if(child.isVisible()) {
-                if(!flexible(child))fixed+=child.getPreferredSize().width;
+                fixed+=!flexible(child)?child.getPreferredSize().width:receiverMinimum(child);
                 count++;
             }
             return fixed+Math.max(0,count-1)*gap()>width;
         }
 
+        /** A value receiver needs usable content, so its action lane wraps before the value disappears. */
+        int receiverMinimum(Component component) {
+            if(gapRole==DesignMetrics.Role.IDENTITY_HEADER_GAP && component instanceof JPanel)
+                return Math.min(component.getPreferredSize().width,ThemePainting.metric(context,DesignMetrics.Role.IDENTITY_SECTION_WIDTH));
+            if(component instanceof Buttons.KitButton button && button.recorder())return button.getPreferredSize().width;
+            if(component instanceof TextFields.FieldSurface field && field.trailing!=null)
+                return field.trailing.getPreferredSize().width+ThemePainting.metric(context,DesignMetrics.Role.FIELD_HEIGHT)+4*ThemePainting.metric(context,DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
+            if(component instanceof Container container) {
+                int minimum=0;for(var child:container.getComponents())minimum=Math.max(minimum,receiverMinimum(child));return minimum;
+            }
+            return 0;
+        }
         @Override public Dimension minimumLayoutSize(Container parent) {
             int width=0;
             for(var child:parent.getComponents())if(child.isVisible()&&!flexible(child))width=Math.max(width,child.getPreferredSize().width);
@@ -60,7 +72,7 @@ final class Navigation {
                     n++;
                 }
             int width = w + Math.max(0, n - 1) * gap();
-            return new Dimension(width, height(parent, width));
+            return new Dimension(width, height(parent, parent.getWidth()>0?parent.getWidth():width));
         }
 
         @Override

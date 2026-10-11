@@ -50,6 +50,9 @@ final class ItemLists {
             });
         }
 
+        @Override boolean identityRows() {
+            return value().items().stream().anyMatch(item->item.leading().filter(n->n instanceof Nodes.Icon && view.artworkPresentation(n.id())==ArtworkPresentation.IDENTITY_ROW).isPresent());
+        }
         Nodes.ItemList value() {
             return (Nodes.ItemList) node;
         }
@@ -120,7 +123,7 @@ final class ItemLists {
         /** List rows report a plain left click as {@link UiEvent.Clicked}, as tables and trees do; RESULTS rows do not. */
         @Override
         boolean reportsClicks() {
-            return !results();
+            return !results() && !identityRows();
         }
 
         @Override
@@ -160,11 +163,12 @@ final class ItemLists {
         /** RESULTS rows and headings keep fixed heights; headings elsewhere are as tall as the rows. */
         @Override
         boolean uniformRows() {
-            return !results();
+            return !results() && !identityRows();
         }
 
         @Override
         int rowHeightAt(int index) {
+            if(identityRows())return value().items().get(index).heading()?ThemePainting.height(context(),DesignMetrics.Role.IDENTITY_HEADING_HEIGHT,Typography.Role.CAPTION):rowHeight;
             return ThemePainting.metric(context(), value().items().get(index).heading()
                     ? DesignMetrics.Role.RESULTS_HEADING_HEIGHT : DesignMetrics.Role.RESULTS_ROW_HEIGHT);
         }
@@ -235,7 +239,7 @@ final class ItemLists {
         int minimumRowHeight() {
             measuredFonts.clear();
             measuredInputs.clear();
-            int height = 0;
+            int height = identityRows()?ThemePainting.height(context(),DesignMetrics.Role.IDENTITY_ROW_HEIGHT,Typography.Role.BODY):0;
             for (var item : value().items()) {
                 int middle = slotHeight(item.title()) + slotHeight(item.subtitle());
                 if (middle > 0)

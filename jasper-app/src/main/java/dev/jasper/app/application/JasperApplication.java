@@ -830,7 +830,7 @@ public final class JasperApplication {
             }, listener -> new dev.jasper.app.lifecycle.Subscription(systemAppearance.subscribe(ignored -> listener.run())));
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
                 dev.jasper.app.settingsui.CorePages.pages(themeChoices, system, shells,
-                    new dev.jasper.app.settingsui.NotificationGroupChoices(() -> groupChoices(notificationCenter.groups(), this::pluginName)),
+                    new dev.jasper.app.settingsui.NotificationGroupChoices(() -> groupChoices(notificationCenter.groups(), this::pluginName, plugins == null ? Map.of() : plugins.pluginIcons())),
                     new dev.jasper.app.settingsui.CorePages.Pages(
                         context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context),
                         context -> plugins.settingsPages(context))),
@@ -941,9 +941,14 @@ public final class JasperApplication {
     /** What Settings › Notifications lists: every group declared so far, with who declared it as people know them. */
     static List<dev.jasper.app.settingsui.NotificationGroupChoices.Group> groupChoices(
             List<dev.jasper.app.notifications.NotificationGroup> groups, java.util.function.Function<String, String> pluginName) {
+        return groupChoices(groups,pluginName,Map.of());
+    }
+    static List<dev.jasper.app.settingsui.NotificationGroupChoices.Group> groupChoices(
+            List<dev.jasper.app.notifications.NotificationGroup> groups, java.util.function.Function<String,String> pluginName,
+            Map<String,PluginRuntime.PluginIcon> artwork) {
         return groups.stream().map(group -> new dev.jasper.app.settingsui.NotificationGroupChoices.Group(group.id(), group.name(),
             group.owner().equals(dev.jasper.app.notifications.NotificationRequest.JASPER) ? "Jasper" : pluginName.apply(group.owner()),
-            group.defaultMode().token(), group.owner(), group.owner().equals(dev.jasper.app.notifications.NotificationRequest.JASPER) ? "appearance" : "plugin")).toList();
+            group.defaultMode().token(), group.owner(), group.owner().equals(dev.jasper.app.notifications.NotificationRequest.JASPER) ? "appearance" : "plugin", Optional.ofNullable(artwork.get(group.owner())).map(PluginRuntime.PluginIcon::artwork))).toList();
     }
 
     private String pluginName(String id) {

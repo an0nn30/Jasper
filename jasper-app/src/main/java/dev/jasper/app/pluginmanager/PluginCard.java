@@ -21,6 +21,10 @@ final class PluginCard {
 
     /** The row; kit text is literal, so plugin text is never markup. {@code busy} disables the switch and the menu. */
     static ListItem item(PluginRuntime.Row row, boolean busy) {
+        return item(row, busy, "plugin");
+    }
+
+    static ListItem item(PluginRuntime.Row row, boolean busy, String artwork) {
         String id = row.id();
         var subtitle = new ArrayList<Nodes.Node>();
         subtitle.add(new Nodes.Text("meta:" + id, ControlState.READY, meta(row), Nodes.TextRole.CAPTION));
@@ -33,7 +37,7 @@ final class PluginCard {
         }
         var toggle = new Nodes.Toggle(TOGGLE + id, new ControlState(true, !busy && toggleable(row), false, ""), "Enable " + row.name(),
             checked(row), TOGGLE + id, true, toggleable(row) ? "" : why(row));
-        var icon = new Nodes.Icon("icon:" + id, new ControlState(true, !greyed(row), false, ""), "plugin", Nodes.Hue.NEUTRAL,
+        var icon = new Nodes.Icon("icon:" + id, new ControlState(true, !greyed(row), false, ""), artwork, Nodes.Hue.NEUTRAL,
             Nodes.IconSize.RAIL, row.name());
         return new ListItem(id, Optional.of(icon), List.of(new Nodes.Text("name:" + id, ControlState.READY, row.name(), Nodes.TextRole.BODY_STRONG)),
             List.of(new Nodes.Stack("second:" + id, ControlState.READY, Nodes.LayoutRole.INLINE, subtitle)), List.of(toggle), false,
@@ -41,7 +45,7 @@ final class PluginCard {
     }
 
     /** The version, and the vendor when there is one. */
-    static String meta(PluginRuntime.Row row) { return row.vendor().isBlank() ? row.version() : row.version() + "  " + row.vendor(); }
+    static String meta(PluginRuntime.Row row) { return row.vendor().isBlank() ? row.version() : row.version() + " · " + row.vendor(); }
 
     /** Why the switch cannot act: what is pending, the reason, or a plain explanation. */
     static String why(PluginRuntime.Row row) {

@@ -89,6 +89,12 @@ final class ShortcutTree {
         return row < 0 || row >= ids.size() ? null : entry(ids.get(row)).orElse(null);
     }
 
+    java.util.Map<String,dev.jasper.ui.swing.TreeRowPresentation> presentation() {
+        var result=new java.util.LinkedHashMap<String,dev.jasper.ui.swing.TreeRowPresentation>();
+        groups.values().forEach(rows->rows.forEach(row->result.put(actionId(row),new dev.jasper.ui.swing.TreeRowPresentation(row.where(),!row.editable(),ShortcutText.keycaps(row.stroke(),macOs)))));
+        return java.util.Map.copyOf(result);
+    }
+
     Nodes.Tree descriptor() {
         var roots = new ArrayList<TreeItem>();
         var open = new HashSet<String>();
@@ -104,7 +110,7 @@ final class ShortcutTree {
             boolean shown = isOpen(group);
             if (shown) open.add(groupId(group));
             // A section holding a shortcut that differs from its default is emphasized, as IntelliJ shows it.
-            roots.add(new TreeItem(groupId(group), group, Optional.of("folder"), false, children, OptionalInt.of(rows.size()),
+            roots.add(new TreeItem(groupId(group), group, Optional.of(rows.stream().map(ShortcutEntry::groupIcon).filter(icon->!icon.equals("plugin")).findFirst().orElse("plugin")), false, children, OptionalInt.of(rows.size()),
                 customized, shown ? "Collapse section" : "Expand section", Optional.empty(), List.of(), Optional.empty()));
         });
         // No activate action: a click reports Clicked, so a double click acts once; the panel owns Enter.

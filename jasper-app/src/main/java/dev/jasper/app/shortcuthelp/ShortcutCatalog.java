@@ -28,7 +28,7 @@ final class ShortcutCatalog {
         var rows = new ArrayList<ShortcutEntry>();
         for (ActionId id : ActionId.values()) rows.add(new ShortcutEntry(id.id(), category(id), id.label(),
             resolved.bindings().strokeFor(id).orElse(null), description(id.context(), plugins, panels), id.id().replace('_', ' '),
-            true, KeyBindings.effectiveDefaultBinding(id, macOs), where(id.context(), plugins, panels)));
+            true, KeyBindings.effectiveDefaultBinding(id, macOs), where(id.context(), plugins, panels),coreIcon(category(id))));
         for (ActionEntry action : actions) {
             String context = resolved.problems().stream().filter(problem -> problem.actionId().equals(action.id()))
                 .map(KeyBindings.Problem::message).findFirst().orElseGet(() -> description(action.context(), plugins, panels));
@@ -74,6 +74,11 @@ final class ShortcutCatalog {
             .orElseGet(() -> id.contains(".") ? id.substring(0, id.lastIndexOf('.')) : "Application");
     }
 
+    /** Only authored core category metadata enters this mapping, never a plugin display name. */
+    private static String coreIcon(String category) { return switch(category) {
+        case "Appearance"->"appearance";case "Application"->"window";case "Terminal"->"terminal";
+        case "Clipboard"->"copy";case "Search"->"search";case "Tabs"->"window";case "Panes"->"split";default->"terminal";
+    }; }
     private static String category(ActionId id) {
         return switch (id) {
             case NEW_TAB, CLOSE_TAB, NEXT_TAB, PREVIOUS_TAB, RENAME_TAB, SELECT_TAB_1, SELECT_TAB_2,
@@ -122,6 +127,6 @@ final class ShortcutCatalog {
     }
 
     private static void add(List<ShortcutEntry> rows, String id, String group, String title, int key, int modifiers, String context) {
-        rows.add(new ShortcutEntry(id, group, title, KeyStroke.getKeyStroke(key, modifiers), context, ""));
+        rows.add(new ShortcutEntry(id, group, title, KeyStroke.getKeyStroke(key, modifiers), context, "", false, "none", context, id.startsWith("remote.") || id.startsWith("vault.") ? "plugin" : coreIcon(group)));
     }
 }

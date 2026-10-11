@@ -25,6 +25,16 @@ class PluginCardListTest {
 
     @AfterEach void close() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> list.close()); }
 
+    @Test void declaredArtworkIsReceivedByTheRealRowAndRetiredOnlyAfterReplacement() {
+        var icon=new dev.jasper.app.plugins.PluginRuntime.PluginIcon("art.svg",PluginIconsTest.SVG.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        list.show(List.of(TestRows.plugin("a.art", "Authored").icon(icon).row()));
+        PluginKit.laidOut(list.view());
+        var label=KitTestSupport.find(list.view(),"icon:a.art",JLabel.class);
+        var image=new java.awt.image.BufferedImage(label.getWidth(),label.getHeight(),java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var g=image.createGraphics();try{label.paint(g);}finally{g.dispose();}
+        assertThat(image.getRGB(image.getWidth()/2,image.getHeight()/2)&0xffffff).isEqualTo(0x3574f0);
+    }
+
     @Test void cardsAreGroupedSortedAndCounted() {
         list.show(List.of(
             TestRows.plugin("dev.jasper.remote", "Remote").origin("Bundled").row(),

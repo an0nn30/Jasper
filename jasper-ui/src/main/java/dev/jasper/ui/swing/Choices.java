@@ -23,7 +23,7 @@ final class Choices {
         final JComponent input;
         final ArrayList<AutoCloseable> optionLifetimes = new ArrayList<>();
         List<Option> options = List.of();
-        boolean embedded, settings;
+        boolean embedded, settings, identitySection;
         @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(!value); }
         boolean applying;
         ChoiceControl(KitView view, Nodes.Choice node) {
@@ -131,6 +131,7 @@ final class Choices {
                         button.setForeground(button.textColor(false));
                         button.setIcon(option.hue().map(h -> (javax.swing.Icon)new HueDot(context(), h)).orElse(null)); button.setDisabledIcon(button.getIcon());
                         int pad = ThemePainting.metric(context(), DesignMetrics.Role.SEGMENT_HORIZONTAL_PADDING);
+                        if(identitySection)pad=Math.max(pad,(ThemePainting.metric(context(),DesignMetrics.Role.IDENTITY_SECTION_WIDTH)/Math.max(1,choice.options().size())-button.getFontMetrics(button.getFont()).stringWidth(option.label()))/2);
                         button.setBorder(new EmptyBorder(0, pad, 0, pad));
                     }
                 }

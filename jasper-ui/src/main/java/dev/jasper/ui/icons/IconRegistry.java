@@ -11,7 +11,7 @@ import java.util.Objects;
 import java.util.Set;
 import javax.swing.Icon;
 
-/** Named, monochrome vector art. Registrations are scoped; returned icons are immutable theme snapshots. */
+/** Named vectors and authored RGBA artwork. Registrations are scoped; returned icons are immutable snapshots. */
 public final class IconRegistry implements AutoCloseable {
     // Fixed immutable engine artwork is parsed once; each receiving view still owns its custom registrations.
     private static final Map<String, IconArtwork> BUILT_INS = builtIns().entrySet().stream().collect(
@@ -22,17 +22,28 @@ public final class IconRegistry implements AutoCloseable {
     // Original compact-panel sources establish lighter plus/search/pencil outlines. Other built-ins
     // retain the common optical stroke; custom registrations never enter this catalog.
     private static final Set<String> FINE_PANEL_BUILT_INS = Set.of("add", "search", "edit");
+    private final Map<String, DecodedArtwork> encoded = new LinkedHashMap<>();
     private final Map<String, IconArtwork> artworks = new LinkedHashMap<>();
     private boolean closed;
     public IconRegistry() { artworks.putAll(BUILT_INS); }
-    public synchronized Set<String> names() { requireOpen(); return Set.copyOf(artworks.keySet()); }
+    public synchronized Set<String> names() { requireOpen(); var names = new java.util.HashSet<>(artworks.keySet()); names.addAll(encoded.keySet()); return Set.copyOf(names); }
     public synchronized IconRegistration register(String name, String pathData) {
         requireOpen(); Objects.requireNonNull(name);
         if (!name.matches("[a-z][a-z0-9.-]*:[a-z][a-z0-9.-]*")) throw new IllegalArgumentException("Icon name must be namespace:name");
-        if (artworks.containsKey(name)) throw new IllegalArgumentException("Icon already registered: " + name);
+        if (artworks.containsKey(name) || encoded.containsKey(name)) throw new IllegalArgumentException("Icon already registered: " + name);
         var artwork = new IconArtwork(pathData); artworks.put(name, artwork);
         return new IconRegistration(() -> { synchronized (this) { artworks.remove(name, artwork); } });
     }
+    /** Registers authored color artwork atomically; decoding occurs before publication. */
+    public synchronized IconRegistration register(String name, EncodedArtwork artwork) {
+        requireOpen(); Objects.requireNonNull(name); Objects.requireNonNull(artwork);
+        if (!name.matches("[a-z][a-z0-9.-]*:[a-z][a-z0-9.-]*")) throw new IllegalArgumentException("Icon name must be namespace:name");
+        if (artworks.containsKey(name) || encoded.containsKey(name)) throw new IllegalArgumentException("Icon already registered: " + name);
+        var decoded = artwork.decoded(); encoded.put(name, decoded);
+        return new IconRegistration(() -> { synchronized (this) { encoded.remove(name, decoded); } });
+    }
+    /** Authored artwork ignores tint; callers may reuse its prepared Icon on hover. */
+    public synchronized boolean authored(String name) { return encoded.containsKey(name); }
     public Icon icon(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize) {
         return painted(name, tint(palette, hue), null, logicalSize, false);
     }
@@ -109,12 +120,14 @@ public final class IconRegistry implements AutoCloseable {
         int size = Math.min(width, height);
         if (size < 1 || Math.max(width, height) > 512) throw new IllegalArgumentException("Invalid logical icon size");
         var artwork = artworks.get(name);
-        if (artwork == null) throw new IllegalArgumentException("Unknown icon: " + name);
-        var path = artwork.path();
+        var authored = encoded.get(name);
+        if (artwork == null && authored == null) throw new IllegalArgumentException("Unknown icon: " + name);
+        var path = artwork == null ? null : artwork.path();
         boolean filled = FILLED_BUILT_INS.contains(name);
         // Callers supply user-scaled tile extents; optical limits are logical metrics.
         double tileGlyph = glyphSize > 0 ? glyphSize : Math.min(size, Math.min(com.formdev.flatlaf.util.UIScale.scale(16.5f),
             Math.max(com.formdev.flatlaf.util.UIScale.scale(10f), size * .4)));
+        var received=authored==null?null:authored.snapshot(Math.max(1,(int)Math.round(tile?tileGlyph:size)));
         return new Icon() {
             @Override public int getIconWidth() { return width; }
             @Override public int getIconHeight() { return height; }
@@ -126,8 +139,14 @@ public final class IconRegistry implements AutoCloseable {
                         g.setColor(background); double radius = size * .25 * 2; // RoundRectangle2D accepts an arc diameter
                         g.fill(new RoundRectangle2D.Double(0, 0, width, height, radius, radius));
                         double glyph = tileGlyph;
-                        g.translate((width - glyph) / 2, (height - glyph) / 2); g.scale(glyph / 16, glyph / 16);
-                    } else g.scale(size / 16.0, size / 16.0);
+                        if (authored == null) { g.translate((width - glyph) / 2, (height - glyph) / 2); g.scale(glyph / 16, glyph / 16); }
+                    } else if (authored == null) g.scale(size / 16.0, size / 16.0);
+                    if (authored != null) {
+                        int w=received.getWidth(null),h=received.getHeight(null);
+                        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                        g.drawImage(received, (width-w)/2, (height-h)/2, w, h, null);
+                        return;
+                    }
                     float stroke = panel ? FINE_PANEL_BUILT_INS.contains(name) ? 1f : 7f / 6f
                         : hero ? 7f / 6f
                         : tile && glyphSize > 0 && artwork == BUILT_INS.get(name) ? 7f / 6f : artwork.stroke();
@@ -148,7 +167,7 @@ public final class IconRegistry implements AutoCloseable {
         });
     }
     private void requireOpen() { if (closed) throw new IllegalStateException("Icon registry is closed"); }
-    @Override public synchronized void close() { if (!closed) { closed = true; artworks.clear(); } }
+    @Override public synchronized void close() { if (!closed) { closed = true; artworks.clear(); encoded.clear(); } }
 
     /** Original Jasper vector paths; explicit built-in fill metadata is above. No third-party artwork is copied. */
     private static Map<String, String> builtIns() {

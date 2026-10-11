@@ -1,0 +1,58 @@
+{
+  "reference_sha256": {
+    "docs/design/theme-engine/reference/desktop-2026-10-10/settings_plugins_mock.png": "c0532db82f5fba7f5d442540aaba833160d6931e825883d575e1d927576ef180",
+    "docs/design/theme-engine/reference/desktop-2026-10-10/settings_keymap_mock.png": "d86e8ebbb0c24ae350dbce2a92f3348aa86a5d1fd30f2e92134fc3c374e10667"
+  },
+  "assets": [
+    {
+      "path": "plugins/remote/src/main/resources/icons/remote.svg",
+      "before_sha256": "177a61c8575baee4ef3bd3ffe1ec8563a96d1ef02feab17f5baabb94649b080e",
+      "after_sha256": "874f99ac7893adb0eec6544e9159f3fccf1f17ae52347c8aa24b67e498bad3a9",
+      "provenance": "Authored in repository from user-supplied Settings reference; existing Sample flask geometry retained. No third-party asset import."
+    },
+    {
+      "path": "plugins/vault/src/main/resources/icons/vault.svg",
+      "before_sha256": "dd64364ffa15f9debea8b08ed1fc96c9171266e103796b2b1ecd32cc830440ba",
+      "after_sha256": "60d6948a3b96cc2d069c1312ccaac0296294ddc9c436c1df47a124e650446867",
+      "provenance": "Authored in repository from user-supplied Settings reference; existing Sample flask geometry retained. No third-party asset import."
+    },
+    {
+      "path": "plugins/editor/src/main/resources/icons/editor.svg",
+      "before_sha256": "d71666166da544ad42b13bb5af976eb6f0afb60cbaa636676d238c98383ee296",
+      "after_sha256": "33fc8a950a755882433ff38d2f346920a05e966847f10ec30020d0546ddeb8f5",
+      "provenance": "Authored in repository from user-supplied Settings reference; existing Sample flask geometry retained. No third-party asset import."
+    },
+    {
+      "path": "plugins/indexer/src/main/resources/icons/indexer.svg",
+      "before_sha256": "d82bf02747d9d3957f97ac7cb1ffc637f0f559419e8acd7f66e6f7bdcbc4ae9e",
+      "after_sha256": "e8ad4017af91a02f8a344153a7030c28ea2f851e321f7e9fbb59cf6ee60348a9",
+      "provenance": "Authored in repository from user-supplied Settings reference; existing Sample flask geometry retained. No third-party asset import."
+    },
+    {
+      "path": "plugins/sample/src/main/resources/dev/jasper/sample/flask.svg",
+      "before_sha256": "a8096d1b2379b86d13edb19b4a4ec86892f6312369f24be4275639d1c036da08",
+      "after_sha256": "fa40605b61979f97af4ccfbb42d1933f78012836f3fa54b08c4083d2db283cff",
+      "provenance": "Authored in repository from user-supplied Settings reference; existing Sample flask geometry retained. No third-party asset import."
+    },
+    {
+      "path": "plugins/history/src/main/resources/icons/history.svg",
+      "before_sha256": "3687db5c7bc3938f72cbe387259ec26e6ce5de05b86ab5e2c57f2361bea59e0d",
+      "after_sha256": "2081f6c94c84fb8ecafb4ab6a2f947401cb4be62ccf8016fb46cf4680c95d1f7",
+      "provenance": "Authored in repository from user-supplied Settings reference; existing Sample flask geometry retained. No third-party asset import."
+    },
+    {
+      "path": "plugins/fileserver/src/main/resources/icons/fileserver.svg",
+      "before_sha256": "44fbf2d4dd21fd065a55c06c41a3e4326970741404f76a47d1e2eafe794668c8",
+      "after_sha256": "ad6d85e2aa6ece24fba531ccf0c946e1d3d82c3e001ae04e5a8fb82cbfd92c81",
+      "provenance": "Authored in repository from user-supplied Settings reference; existing Sample flask geometry retained. No third-party asset import."
+    },
+    {
+      "path": "plugins/snippets/src/main/resources/icons/snippets.svg",
+      "before_sha256": "c8c2efb2538a482878bb469fdc6d0861c4d8cc8b77016964593bec88efea317c",
+      "after_sha256": "03b0abb5e47c3d512b1949a51874c7109f39b1487dff261bdb6d890e86f6a894",
+      "provenance": "Authored in repository from user-supplied Settings reference; existing Sample flask geometry retained. No third-party asset import."
+    }
+  ],
+  "external_art": "unchanged declared RGBA/aspect; neutral tile backdrop until approved earlyTask10 declared metadata",
+  "license_provenance": "No third-party artwork imported. No root repository license is asserted by this change."
+}

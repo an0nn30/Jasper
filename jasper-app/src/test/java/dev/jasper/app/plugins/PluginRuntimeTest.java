@@ -106,6 +106,32 @@ class PluginRuntimeTest {
         return directory;
     }
 
+    @Test void manifestArtworkIsCachedBeforeSettingsAndClearedAtStop() throws Exception {
+        Path bundled=root.resolve("art-bundled");
+        Path jar=PluginJars.build(bundled.resolve("dev.example.art"),"art.jar",PluginJars.descriptor("dev.example.art","1.0.0","fix.probe.Main")+"icon = \"art.svg\"\n",Map.of("fix.probe.Main",FIXTURE),List.of());
+        String svg="<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><rect width='16' height='16' fill='red'/></svg>";
+        PluginJars.addResource(jar,"art.svg",svg);
+        Path bad=PluginJars.build(bundled.resolve("dev.example.badart"),"art.jar",PluginJars.descriptor("dev.example.badart","1.0.0","fix.probe.Main")+"icon = \"art.svg\"\n",Map.of("fix.probe.Main",FIXTURE),List.of());
+        PluginJars.addResource(bad,"art.svg","<svg><image href='data:image/png;base64,AAAA'/></svg>");
+        var runtime=runtime(bundled,root.resolve("art-user"),null,false,new ArrayList<>());
+        onEdt(()->runtime.start(Map.of(),true));
+        try {
+            assertThat(runtime.pluginIcons().get("dev.example.art").data()).isEqualTo(svg.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            assertThat(runtime.pluginIcons()).containsKeys("dev.example.art","dev.example.badart");
+            var retained=runtime.pluginIcons().get("dev.example.art").artwork();
+            assertThat(runtime.pluginIcons().get("dev.example.art").artwork()).isSameAs(retained);
+            org.assertj.core.api.Assertions.assertThatThrownBy(()->runtime.pluginIcons().get("dev.example.badart").artwork().prepare()).isInstanceOf(IllegalArgumentException.class);
+            var failed=new CompletableFuture<PluginRuntime.Outcome>();onEdt(()->runtime.setEnabled("absent.id",false,failed::complete));assertThat(failed.get(5,TimeUnit.SECONDS).ok()).isFalse();
+            assertThat(runtime.pluginIcons().get("dev.example.art").artwork()).isSameAs(retained);
+            byte[] changed=runtime.pluginIcons().get("dev.example.art").data();changed[0]=0;
+            assertThat(runtime.pluginIcons().get("dev.example.art").data()[0]).isEqualTo((byte)'<');
+            var late=new CompletableFuture<PluginRuntime.Outcome>();
+            onEdt(()->{runtime.snapshot(late::complete);runtime.stop();});
+            assertThat(late.get(5,TimeUnit.SECONDS).ok()).isTrue();
+        } finally {onEdt(runtime::stop);}
+        assertThat(runtime.pluginIcons()).isEmpty();
+    }
+
     @Test void aPluginFailureIsReportedWithThePluginAndWhatItWasDoing() throws Exception {
         Path bundled = root.resolve("bundled");
         PluginJars.build(bundled.resolve("dev.example.boom"), "boom.jar", PluginJars.descriptor("dev.example.boom", "1.2.3", "fix.boom.Main"),

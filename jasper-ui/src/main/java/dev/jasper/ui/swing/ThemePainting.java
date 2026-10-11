@@ -22,7 +22,7 @@ final class ThemePainting {
             case PANEL_SEARCH_HEIGHT -> DesignMetrics.Role.PANEL_SEARCH_VERTICAL_PADDING;
             case PANEL_HEADER_ACTION -> DesignMetrics.Role.PANEL_HEADER_ACTION_VERTICAL;
             case FIELD_HEIGHT, HERO_FIELD_HEIGHT -> DesignMetrics.Role.FIELD_VERTICAL_PADDING;
-            case MENU_ITEM_HEIGHT, BUTTON_HEIGHT, HERO_BUTTON_HEIGHT, FULL_FOOTER_BUTTON_HEIGHT, ORDERED_ADD_HEIGHT, PANEL_ACTION, INLINE_ACTION -> DesignMetrics.Role.BUTTON_VERTICAL_PADDING;
+            case KEYCAP_TREE_ROW_HEIGHT, IDENTITY_ROW_HEIGHT, IDENTITY_HEADING_HEIGHT, MENU_ITEM_HEIGHT, BUTTON_HEIGHT, HERO_BUTTON_HEIGHT, FULL_FOOTER_BUTTON_HEIGHT, ORDERED_ADD_HEIGHT, PANEL_ACTION, INLINE_ACTION -> DesignMetrics.Role.BUTTON_VERTICAL_PADDING;
             default -> throw new IllegalArgumentException("Not a content height role: " + role);
         };
         int line = (int)Math.ceil(font(context, text).getLineMetrics("Ag", new FontRenderContext(null, true, true)).getHeight());
@@ -99,6 +99,8 @@ final class ThemePainting {
         private final FocusListener focus = new FocusAdapter() {
             @Override public void focusGained(FocusEvent e) {
                 keyboard = switch (e.getCause()) { case MOUSE_EVENT -> false; default -> true; };
+                // Native traversal must reveal the same retained control in any enclosing viewport.
+                target.scrollRectToVisible(new Rectangle(0,0,target.getWidth(),target.getHeight()));
                 target.repaint(); repaintHalo();
             }
             @Override public void focusLost(FocusEvent e) { target.repaint(); repaintHalo(); }

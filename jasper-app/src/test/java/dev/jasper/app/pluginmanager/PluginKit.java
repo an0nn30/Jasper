@@ -54,6 +54,7 @@ final class PluginKit {
 
     /** The details pane's More actions item. */
     static void clickMenu(PluginManagerPanel panel, String label) {
+        KitTestSupport.require(panel.detailsPane().header(),"section.option.details",AbstractButton.class).doClick(0);
         chooseFromMenuButton(panel.detailsPane().header(), PluginDetails.MORE, label);
     }
 

@@ -22,7 +22,8 @@ final class TextFields {
         final Buttons.ButtonControl browse;
         final JScrollPane scroll;
         final DocumentListener listener;
-        boolean embedded;
+        boolean embedded, readOnly;
+        Buttons.ButtonControl trailing;
         boolean applying;
         boolean notifying;
         /** An input method holds uncommitted (composed) text in the field. */
@@ -78,6 +79,27 @@ final class TextFields {
             };
             input.addInputMethodListener(composition); own(() -> input.removeInputMethodListener(composition));
             setValue(node.value());
+            own(() -> { clearTrailing(); readOnly=false; });
+            refresh();
+        }
+        private void clearTrailing() {
+            if(trailing==null)return;
+            boolean focused=trailing.component.isFocusOwner();
+            surface.remove(trailing.component);trailing.close();
+            trailing.component.putClientProperty("Jasper.button.icon",null);
+            KitOwnership.clear(trailing.component);trailing=null;surface.trailing=null;
+            if(focused && !closed)input.requestFocusInWindow();
+        }
+        void trailing(Nodes.Button action) {
+            Buttons.ButtonControl previous = trailing;
+            if (action != null && previous != null && ControlRegistry.kind(action).equals(ControlRegistry.kind(previous.node)) && action.id().equals(previous.node.id())) previous.update(action);
+            else {
+                var next = action == null ? null : new Buttons.ButtonControl(view, action);
+                if (previous != null) clearTrailing();
+                trailing = next;
+                if (next != null) surface.add(next.component, BorderLayout.EAST);
+            }
+            surface.trailing = trailing == null ? null : trailing.component;
             refresh();
         }
         /**
@@ -222,7 +244,7 @@ final class TextFields {
         @Override void refresh() {
             var field = (Nodes.Field)node; state(); label.setVisible(labelShown()); input.setEnabled(component.isEnabled());
             listKeys(!field.listId().isBlank() && field.kind() != Nodes.FieldKind.TEXTAREA && field.kind() != Nodes.FieldKind.NUMBER);
-            input.setEditable(component.isEnabled()); surface.setEnabled(component.isEnabled());
+            input.setEditable(component.isEnabled() && !readOnly); surface.setEnabled(component.isEnabled());
             input.setCursor(Cursor.getPredefinedCursor(component.isEnabled() ? Cursor.TEXT_CURSOR : Cursor.DEFAULT_CURSOR));
             if (scroll != null) {
                 scroll.setEnabled(component.isEnabled());
@@ -264,6 +286,7 @@ final class TextFields {
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
             int padding = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_PADDING : field.kind() == Nodes.FieldKind.TEXTAREA ? DesignMetrics.Role.TEXTAREA_PADDING : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
             surface.setBorder(new EmptyBorder(ring * 2, padding, ring * 2, padding));
+            if (trailing != null) { trailing.parentEnabled = interactive(); trailing.refresh(); }
             if (browse != null) {
                 browse.parentEnabled = parentEnabled; browse.update(browseNode(field)); browse.component.setVisible(!field.trailingAction().isBlank());
                 // The visible label stays "Browse…"; the accessible name says which field it fills.
@@ -331,6 +354,7 @@ final class TextFields {
     }
     static final class FieldSurface extends JPanel {
         boolean hero, panelSearch;
+        JComponent trailing;
         DesignMetrics.Role heightRole=DesignMetrics.Role.FIELD_HEIGHT,radiusRole=DesignMetrics.Role.CONTROL_RADIUS;
         final KitContext context; final JTextComponent input; final boolean multiline;
         Typography.Role role = Typography.Role.BODY; String hint = ""; boolean error;
@@ -362,7 +386,18 @@ final class TextFields {
             return new Insets(Math.min(base.top, room), base.left, Math.min(base.bottom, room), base.right);
         }
         @Override public void doLayout() {
-            super.doLayout();
+            if (trailing == null || !trailing.isVisible()) super.doLayout();
+            else {
+                var insets = getInsets();
+                int width = Math.max(0,getWidth()-insets.left-insets.right), height = Math.max(0,getHeight()-insets.top-insets.bottom);
+                var west = ((BorderLayout)getLayout()).getLayoutComponent(BorderLayout.WEST);
+                int leadingWidth = west == null || !west.isVisible() ? 0 : Math.min(width,west.getPreferredSize().width);
+                int gap = Math.min(Math.max(0,width-leadingWidth),ThemePainting.metric(context,DesignMetrics.Role.ICON_GAP));
+                int actionWidth = Math.min(trailing.getPreferredSize().width, Math.max(0,width-leadingWidth-gap));
+                if (west != null) west.setBounds(insets.left,insets.top,leadingWidth,height);
+                input.setBounds(insets.left+leadingWidth,insets.top,Math.max(0,width-leadingWidth-gap-actionWidth),height);
+                trailing.setBounds(insets.left+width-actionWidth,insets.top,actionWidth,height);
+            }
             // The compact panel text baseline sits below the centered search glyph. Keep native input,
             // selection, caret and module placeholder on that same baseline without moving the icon slot.
             if(panelSearch && !multiline && input != null) {

@@ -14,6 +14,27 @@ import javax.swing.*;
  */
 public final class NativeControlStyles {
     private NativeControlStyles() {}
+    /** Native split interaction with an engine-owned separator; no feature paints or geometry. */
+    public static javax.swing.plaf.basic.BasicSplitPaneUI splitPaneUI(Supplier<GeneratedTheme> theme) {
+        return new javax.swing.plaf.basic.BasicSplitPaneUI() {
+            @Override public void paint(Graphics graphics,JComponent component) {
+                super.paint(graphics,component);
+                var divider=getDivider();
+                if(divider==null)return;
+                graphics.setColor(theme.get().semantic().color(SemanticColor.BORDER_SUBTLE));
+                int line=metric(DesignMetrics.Role.HAIRLINE);
+                // Paint in the lightweight owner. BasicSplitPaneDivider is an AWT Container and
+                // is omitted by headless print traversal even though it has valid allocated bounds.
+                if(splitPane.getOrientation()==JSplitPane.HORIZONTAL_SPLIT)graphics.fillRect(divider.getX(),divider.getY(),line,divider.getHeight());
+                else graphics.fillRect(divider.getX(),divider.getY(),divider.getWidth(),line);
+            }
+            @Override public javax.swing.plaf.basic.BasicSplitPaneDivider createDefaultDivider() {
+                return new javax.swing.plaf.basic.BasicSplitPaneDivider(this) {
+                    @Override public void paint(Graphics graphics) { }
+                };
+            }
+        };
+    }
     /** Exact host point-size overrides, or catalog roles with user scaling applied once. */
     public static Font font(Typography.Role role) {
         return SwingTypography.effective(SwingTypography.typography().font(role));

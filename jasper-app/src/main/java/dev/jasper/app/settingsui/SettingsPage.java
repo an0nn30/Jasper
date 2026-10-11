@@ -22,6 +22,9 @@ public interface SettingsPage {
     /** Optional registered artwork key for this page; custom/plugin identity remains supplied by its owner. */
     default Optional<String> icon() { return Optional.empty(); }
 
+    /** Immutable manifest artwork supplied by the page owner. */
+    default Optional<dev.jasper.ui.icons.EncodedArtwork> artwork() { return Optional.empty(); }
+
     /** Text the tree search matches: labels, descriptions, keywords and choice names. */
     List<String> searchTerms();
 

@@ -39,6 +39,18 @@ class SchemaPageTest {
 
     private static boolean checked(SchemaPage page, String id) { return ((Nodes.Toggle) node(page, id)).checked(); }
 
+    @Test void cleanupClosesViewBeforeEditorsAndContinuesAfterFailureExactlyOnce() {
+        var calls=new ArrayList<String>();var mounted=new dev.jasper.ui.swing.KitView[1];
+        var factory=new Editors.Factory<String>((setting,ctx)->new ValueEditor<>() {
+            public Nodes.Node node(String id,dev.jasper.ui.model.ControlState state){return new Nodes.Text(id,state,"Value",Nodes.TextRole.BODY);}
+            public String value(){return "system";}public void show(String value){}public boolean event(String id,dev.jasper.ui.model.UiEvent event){return false;}
+            public void dispose(){assertThat(mounted[0].isClosed()).isTrue();calls.add(setting.name());throw new IllegalStateException(setting.name());}
+        },List.of());
+        var page=SchemaPage.page("cleanup","Cleanup").row(CoreSettings.TERMINAL_FONT_FAMILY,factory).row(CoreSettings.UI_FONT_FAMILY,factory).build(context);
+        page.component();mounted[0]=page.view();
+        assertThatThrownBy(page::dispose).isInstanceOf(IllegalStateException.class).satisfies(failure->assertThat(failure.getSuppressed()).hasSize(1));
+        page.dispose();assertThat(calls).containsExactly(CoreSettings.TERMINAL_FONT_FAMILY.name(),CoreSettings.UI_FONT_FAMILY.name());
+    }
     @Test void rowsShowTheDraftAndStageEdits() {
         var page = page();
         page.component();

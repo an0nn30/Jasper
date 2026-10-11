@@ -31,7 +31,12 @@ final class PluginSettingsPage implements SettingsPage {
     private final PageContext context;
     private JComponent body;
 
-    PluginSettingsPage(String pluginId, String title, DeclaredSettings declared, PageContext context) {
+    private final Optional<dev.jasper.ui.icons.EncodedArtwork> artwork;
+    @Override public Optional<dev.jasper.ui.icons.EncodedArtwork> artwork(){return artwork;}
+    @Override public Optional<String> icon(){return Optional.of("plugin");}
+    PluginSettingsPage(String pluginId, String title, DeclaredSettings declared, PageContext context) { this(pluginId, title, declared, context, Optional.empty()); }
+    PluginSettingsPage(String pluginId, String title, DeclaredSettings declared, PageContext context, Optional<dev.jasper.ui.icons.EncodedArtwork> artwork) {
+        this.artwork=java.util.Objects.requireNonNull(artwork);
         this.title = title;
         this.context = context;
         this.declared = declared;

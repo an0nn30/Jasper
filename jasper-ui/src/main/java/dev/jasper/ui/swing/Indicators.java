@@ -36,12 +36,13 @@ final class Indicators {
         }
     }
     static final class DotControl extends ControlRegistry.Control {
+        boolean modified;
         DotControl(KitView view, Nodes.StatusDot node) { super(view, node, new Dot(view.context())); refresh(); }
         @Override void refresh() {
-            var dot = (Nodes.StatusDot)node; state(); component.setForeground(ThemePainting.color(context(), switch (dot.kind()) {
+            var dot = (Nodes.StatusDot)node; state(); component.setForeground(ThemePainting.color(context(), modified ? SemanticColor.ACCENT : switch (dot.kind()) {
                 case SUCCESS -> SemanticColor.STATUS_SUCCESS; case WARNING -> SemanticColor.STATUS_WARNING;
                 case DANGER -> SemanticColor.STATUS_DANGER; case IDLE -> SemanticColor.STATUS_IDLE;
-            })); component.getAccessibleContext().setAccessibleName(dot.kind().name()); component.repaint();
+            })); component.getAccessibleContext().setAccessibleName(modified ? "Modified" : dot.kind().name()); component.repaint();
         }
     }
     static final class Dot extends JPanel {

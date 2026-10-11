@@ -11,7 +11,6 @@ import dev.jasper.ui.model.ViewSpec;
 import dev.jasper.ui.swing.KitContext;
 import dev.jasper.ui.swing.KitView;
 import java.awt.BorderLayout;
-import java.awt.Graphics;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,8 +18,6 @@ import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.JPanel;
 import javax.swing.JSplitPane;
-import javax.swing.plaf.basic.BasicSplitPaneDivider;
-import javax.swing.plaf.basic.BasicSplitPaneUI;
 
 /**
  * The Plugins page's passive view: a search field and gear menu, the restart banner and notice, the plugin rows and the
@@ -70,19 +67,13 @@ final class PluginManagerPanel extends JPanel {
         bar.add(searchView, BorderLayout.CENTER);
         bar.add(gearView, BorderLayout.EAST);
         top.setOpaque(false);
-        top.add(bar, BorderLayout.NORTH);
+
         top.add(headerView, BorderLayout.CENTER);
         add(top, BorderLayout.NORTH);
-        split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, list.view(), details.component()) {
+        var listLane=new JPanel(new BorderLayout());listLane.setOpaque(false);listLane.add(bar,BorderLayout.NORTH);listLane.add(list.view(),BorderLayout.CENTER);
+        split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listLane, details.component()) {
             @Override public void updateUI() {
-                // The divider is an unpainted resize gutter, as in the chooser; Swing keeps its keyboard and drag handling.
-                setUI(new BasicSplitPaneUI() {
-                    @Override public BasicSplitPaneDivider createDefaultDivider() {
-                        return new BasicSplitPaneDivider(this) {
-                            @Override public void paint(Graphics graphics) { }
-                        };
-                    }
-                });
+                setUI(dev.jasper.ui.swing.NativeControlStyles.splitPaneUI(kit::theme));
                 setOpaque(false);
             }
         };
@@ -97,6 +88,17 @@ final class PluginManagerPanel extends JPanel {
         details.show(list.selectedRow(), false);
     }
 
+    @Override public java.awt.Dimension getMinimumSize() {
+        var minimum=super.getMinimumSize();
+        if(split!=null && split.getOrientation()==JSplitPane.HORIZONTAL_SPLIT) {
+            var insets=getInsets();
+            // Preserve the user's allocated list lane while keeping the detail receiver readable.
+            // The Settings viewport scrolls this minimum instead of silently compressing the right pane.
+            minimum.width=Math.max(minimum.width,insets.left+insets.right+Math.max(split.getLeftComponent().getMinimumSize().width,split.getDividerLocation())+split.getDividerSize()+split.getRightComponent().getMinimumSize().width);
+        }
+        return minimum;
+    }
+
     private PluginCardList cardList() { return list; }
 
     private int metric(DesignMetrics.Role role) { return UIScale.scale(kit.metrics().value(role)); }
@@ -107,6 +109,7 @@ final class PluginManagerPanel extends JPanel {
         setBorder(BorderFactory.createEmptyBorder(pad, pad, pad, pad));
         ((BorderLayout) getLayout()).setVgap(gap);
         ((BorderLayout) bar.getLayout()).setHgap(gap);
+        top.setVisible(!bannerText.isEmpty() || !notice.isEmpty());
         headerView.setBorder(BorderFactory.createEmptyBorder(bannerText.isEmpty() && notice.isEmpty() ? 0 : gap, 0, 0, 0));
         split.setDividerSize(metric(DesignMetrics.Role.WORKSPACE_GUTTER));
         revalidate();
@@ -153,7 +156,7 @@ final class PluginManagerPanel extends JPanel {
     }
 
     private ViewSpec gearSpec() {
-        return new ViewSpec(new Nodes.MenuButton(GEAR, ControlState.READY, "", "settings", Nodes.ButtonKind.GHOST, "",
+        return new ViewSpec(new Nodes.MenuButton(GEAR, ControlState.READY, "", "more", Nodes.ButtonKind.GHOST, "",
             List.of(new MenuItem(INSTALL, "Install from Zip…", "", INSTALL, !busy, false)), "Plugin options"));
     }
 

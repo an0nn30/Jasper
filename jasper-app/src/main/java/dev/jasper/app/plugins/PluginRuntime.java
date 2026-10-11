@@ -121,20 +121,21 @@ public final class PluginRuntime {
     }
 
     /**
-     * A plugin's icon as its jar holds it; the Plugins page decodes it.
+     * A plugin's immutable declared bytes and shared prepared receiving artwork.
      *
-     * @param name the path in the jar, ending in {@code .svg} or {@code .png}
-     * @param data the file's bytes
      */
-    public record PluginIcon(String name, byte[] data) {
-        /** Copies the bytes. */
-        public PluginIcon {
-            Objects.requireNonNull(name, "name");
-            data = data.clone();
+    public static final class PluginIcon {
+        private final String name;
+        private final byte[] data;
+        private dev.jasper.ui.icons.EncodedArtwork artwork;
+        /** Copies the declared jar path and bytes. */
+        public PluginIcon(String name, byte[] data) {
+            this.name=Objects.requireNonNull(name,"name");this.data=data.clone();
         }
+        public String name(){return name;}
 
         /** @return a copy of the bytes */
-        @Override public byte[] data() { return data.clone(); }
+        public byte[] data() { return data.clone(); }
 
         /** @return whether the icon is an SVG rather than a PNG */
         public boolean svg() { return name.toLowerCase(java.util.Locale.ROOT).endsWith(".svg"); }
@@ -145,6 +146,11 @@ public final class PluginRuntime {
 
         @Override public int hashCode() { return 31 * name.hashCode() + java.util.Arrays.hashCode(data); }
 
+        /** Shared receiving value, retaining the declared format and authored bytes. */
+        public synchronized dev.jasper.ui.icons.EncodedArtwork artwork() {
+            if(artwork==null)artwork=new dev.jasper.ui.icons.EncodedArtwork(svg() ? dev.jasper.ui.icons.EncodedArtwork.Format.SVG : dev.jasper.ui.icons.EncodedArtwork.Format.PNG, data);
+            return artwork;
+        }
         @Override public String toString() { return "PluginIcon[" + name + ", " + data.length + " bytes]"; }
     }
 
@@ -470,6 +476,21 @@ public final class PluginRuntime {
      * @param pluginTables the {@code [plugins."<id>"]} tables of the configuration, used only to seed a missing settings file
      * @param dark whether the current look is dark
      */
+    private volatile Map<String,PluginIcon> pluginIcons=Map.of();
+    private final Object artworkLock=new Object();
+    private long artworkEpoch;
+    private boolean artworkStopped;
+    /** Cached catalog-subject identity; no jar access occurs in this accessor. */
+    public Map<String,PluginIcon> pluginIcons(){return pluginIcons;}
+    private void publishIcons(Snapshot snapshot,long epoch) {
+        var next=new LinkedHashMap<String,PluginIcon>();
+        for(var row:snapshot.rows())row.icon().ifPresent(icon->{
+            try {icon.artwork().prepare();}catch(IllegalArgumentException malformed){/* Receiving owners use the truthful generic fallback. */}
+            next.put(row.id(),icon);
+        });
+        synchronized(artworkLock){if(!artworkStopped && epoch==artworkEpoch)pluginIcons=Map.copyOf(next);}
+    }
+
     public void start(Map<String, Map<String, Object>> pluginTables, boolean dark) {
         if (host != null) throw new IllegalStateException("Plugins already started");
         this.dark = dark;
@@ -541,6 +562,11 @@ public final class PluginRuntime {
         launch = new PluginCatalog.Launch(candidates, statuses, PluginCatalog.versions(resolution.load()), options.safeMode());
         admin = new PluginAdmin(options, Version.parse(JasperSdk.VERSION), () -> launch, created.containment::failures, LOCK_WAIT);
         adminWorker = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("jasper-plugin-admin").factory());
+        // Startup already discovers plugins before the first window. Perform catalog artwork I/O
+        // on the same serial admin worker used by later management snapshots.
+        try { adminWorker.submit(() -> { publishIcons(admin.snapshot(), artworkEpoch); return null; }).get(); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); LOG.log(System.Logger.Level.DEBUG, "Plugin artwork startup interrupted", interrupted); }
+        catch (java.util.concurrent.ExecutionException failure) { LOG.log(System.Logger.Level.DEBUG, "Plugin artwork unavailable at startup", failure); }
         problems.forEach(problem -> LOG.log(System.Logger.Level.WARNING, "Plugin discovery: " + problem));
         statusLines().forEach(line -> LOG.log(System.Logger.Level.INFO, "Plugin " + line));
         LOG.log(System.Logger.Level.INFO, "Plugins started in " + (System.nanoTime() - began) / 1_000_000 + " ms");
@@ -630,6 +656,7 @@ public final class PluginRuntime {
      * @return asynchronous remainders of the shutdown
      */
     public List<CompletableFuture<?>> stop() {
+        synchronized(artworkLock){artworkStopped=true;artworkEpoch++;pluginIcons=Map.of();}
         if (settingsPoller != null) settingsPoller.shutdownNow();
         PluginHost current = host;
         if (current == null) return List.of();
@@ -650,9 +677,10 @@ public final class PluginRuntime {
     private void manage(Callable<Snapshot> work, Consumer<Outcome> done) {
         Objects.requireNonNull(done, "done");
         if (adminWorker == null || adminWorker.isShutdown()) { done.accept(new Outcome(false, "Plugins are not running", null)); return; }
+        final long epoch; synchronized(artworkLock){epoch=artworkEpoch;}
         adminWorker.execute(() -> {
             Outcome outcome;
-            try { outcome = new Outcome(true, "", work.call()); }
+            try { var snapshot=work.call(); publishIcons(snapshot,epoch); outcome = new Outcome(true, "", snapshot); }
             catch (Exception failure) {
                 LOG.log(System.Logger.Level.WARNING, "A plugin manager operation failed", failure);
                 outcome = new Outcome(false, failure.getMessage() == null ? failure.toString() : failure.getMessage(), null);
@@ -834,8 +862,8 @@ public final class PluginRuntime {
         PluginHost current = host;
         PluginCatalog.Launch started = launch;
         if (current == null || started == null) return List.of();
-        return withStubs(current.settingsPages(context), started.statuses(),
-            status -> new PluginStubPage(status.id(), status.name(), status.reason(), () -> openSettingsFile(status.id()), context.kit()));
+        return withStubs(current.settingsPages(context, pluginIcons), started.statuses(),
+            status -> new PluginStubPage(status.id(), status.name(), status.reason(), () -> openSettingsFile(status.id()), context.kit(), Optional.ofNullable(pluginIcons.get(status.id())).map(PluginIcon::artwork)));
     }
 
     /**

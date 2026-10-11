@@ -12,6 +12,7 @@ public final class KitOwnership {
     public static final String CONTEXT_MENU = "Jasper.kit.contextMenu";
     private KitOwnership() {}
     static void mark(JComponent component, String id) { component.putClientProperty(KEY, id); component.setName(id); }
+    static void clear(JComponent component) { component.putClientProperty(KEY,null); component.setName(null); }
     /** True for a component created and owned by the kit. */
     public static boolean owns(JComponent component) { return component.getClientProperty(KEY) instanceof String; }
 }

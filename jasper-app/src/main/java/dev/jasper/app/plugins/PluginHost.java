@@ -212,7 +212,8 @@ final class PluginHost {
     }
 
     /** Settings pages for running plugins that declared settings or gave a page of their own, in start order. UI thread. */
-    List<SettingsPage> settingsPages(PageContext context) {
+    List<SettingsPage> settingsPages(PageContext context) {return settingsPages(context,Map.of());}
+    List<SettingsPage> settingsPages(PageContext context, Map<String,PluginRuntime.PluginIcon> artwork) {
         requireUi();
         var pages = new ArrayList<SettingsPage>();
         for (HostedContext hosted : contexts.values()) {
@@ -220,11 +221,11 @@ final class PluginHost {
             var info = hosted.hosted.info();
             var panel = hosted.declared.panel();
             if (panel.isPresent()) {
-                var page=new PluginPanelPage(info.id(), info.name(), hosted.declared, panel.get(), containment, context);
+                var page=new PluginPanelPage(info.id(), info.name(), hosted.declared, panel.get(), containment, context, Optional.ofNullable(artwork.get(info.id())).map(PluginRuntime.PluginIcon::artwork));
                 page.kit((HostedKit)hosted.kit());hosted.ownPage(page);pages.add(page);
             }
             else if (hosted.declared.declaresAnything())
-                pages.add(new PluginSettingsPage(info.id(), info.name(), hosted.declared, context));
+                pages.add(new PluginSettingsPage(info.id(), info.name(), hosted.declared, context, Optional.ofNullable(artwork.get(info.id())).map(PluginRuntime.PluginIcon::artwork)));
         }
         return pages;
     }

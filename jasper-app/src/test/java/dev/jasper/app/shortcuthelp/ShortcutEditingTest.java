@@ -1,6 +1,7 @@
 package dev.jasper.app.shortcuthelp;
 
 import dev.jasper.app.config.KeyBindings;
+import dev.jasper.app.testsupport.KitTestSupport;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
@@ -17,6 +18,56 @@ import static dev.jasper.app.shortcuthelp.ShortcutKit.*;
 import static org.assertj.core.api.Assertions.*;
 
 class ShortcutEditingTest {
+    @Test void ordinaryReturnStagesAndEscapeDismissesWithoutCapturingTheirOwnedTails() throws Exception {
+        SwingUtilities.invokeAndWait(()->{
+            var saved=new ArrayList<Map<String,Optional<String>>>();
+            var panel=panel(true,changes->{saved.add(changes);return new CompletableFuture<>();});
+            panel.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true),List.of(),Map.of(),true));
+            search(panel).setText("Copy");clickShortcut(panel);
+            assertThat(panel.dispatch(key(panel,KeyEvent.KEY_PRESSED,KeyEvent.VK_ENTER,0))).isTrue();
+            panel.dispatch(key(panel,KeyEvent.KEY_RELEASED,KeyEvent.VK_ENTER,0));
+            assertThat(saved).isEmpty();
+            panel.capture(KeyStroke.getKeyStroke("ctrl H"));
+            panel.dispatch(key(panel,KeyEvent.KEY_PRESSED,KeyEvent.VK_ENTER,0));
+            assertThat(saved).containsExactly(Map.of("copy",Optional.of("ctrl+h")));
+            assertThat(panel.dispatch(key(panel,KeyEvent.KEY_PRESSED,KeyEvent.VK_ENTER,0))).isTrue();
+            panel.dispatch(key(panel,KeyEvent.KEY_RELEASED,KeyEvent.VK_ENTER,0));
+            assertThat(saved).hasSize(1);
+            panel.close();
+            var cancel=panel(true,changes->{throw new AssertionError("cancel saved");});
+            cancel.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true),List.of(),Map.of(),true));
+            search(cancel).setText("Copy");clickShortcut(cancel);
+            cancel.dispatch(key(cancel,KeyEvent.KEY_PRESSED,KeyEvent.VK_ESCAPE,0));
+            assertThat(cancel.editor.isVisible()).isFalse();
+            assertThat(cancel.dispatch(key(cancel,KeyEvent.KEY_RELEASED,KeyEvent.VK_ESCAPE,0))).isTrue();
+            cancel.close();
+        });
+    }
+
+    @Test void literalReturnAndEscapeAreOneShotAndPopupKeysDoNotReachTheRecorder() throws Exception {
+        SwingUtilities.invokeAndWait(()->{
+            for(int key:new int[]{KeyEvent.VK_ENTER,KeyEvent.VK_ESCAPE}) {
+                var saved=new ArrayList<Map<String,Optional<String>>>();var panel=panel(true,changes->{saved.add(changes);return new CompletableFuture<>();});
+                try {
+                    panel.setRows(ShortcutCatalog.rows(KeyBindings.withOverrides(true,Map.of("copy","none")),List.of(),Map.of(),true));
+                    search(panel).setText("Copy");clickShortcut(panel);
+                    var options=KitTestSupport.require(panel,"editor.options",javax.swing.JComponent.class).getComponentPopupMenu();
+                    javax.swing.MenuSelectionManager.defaultManager().setSelectedPath(new javax.swing.MenuElement[]{options});
+                    assertThat(panel.dispatch(key(panel,KeyEvent.KEY_PRESSED,key,0))).isFalse();assertThat(panel.editor.isVisible()).isTrue();
+                    javax.swing.MenuSelectionManager.defaultManager().clearSelectedPath();
+                    editorAction(panel,"Record any key…");assertThat(message(panel)).contains("literally");
+                    assertThat(panel.dispatch(key(panel,KeyEvent.KEY_PRESSED,key,0))).isTrue();panel.dispatch(key(panel,KeyEvent.KEY_RELEASED,key,0));
+                    assertThat(panel.editor.isVisible()).isTrue();assertThat(saved).isEmpty();
+                    assertThat(button(panel,"editor.value").getAccessibleContext().getAccessibleName()).isEqualTo(ShortcutText.format(KeyStroke.getKeyStroke(key,0)));
+                    panel.dispatch(key(panel,KeyEvent.KEY_PRESSED,KeyEvent.VK_ENTER,0));panel.dispatch(key(panel,KeyEvent.KEY_RELEASED,KeyEvent.VK_ENTER,0));
+                    assertThat(saved).hasSize(1);
+                    panel.dispatch(key(panel,KeyEvent.KEY_PRESSED,KeyEvent.VK_ESCAPE,0));panel.dispatch(key(panel,KeyEvent.KEY_RELEASED,KeyEvent.VK_ESCAPE,0));
+                    assertThat(panel.editor.isVisible()).as("busy staging cannot be dismissed").isTrue();
+                }finally{javax.swing.MenuSelectionManager.defaultManager().clearSelectedPath();panel.close();}
+            }
+        });
+    }
+
     @Test void clickingBindingCapturesWithoutExecutingAndRequiresExplicitReassignment() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var saved = new ArrayList<Map<String, Optional<String>>>();
@@ -51,12 +102,12 @@ class ShortcutEditingTest {
             panel.close();
             var remove = panel(true, changes -> { saved.add(changes); return new CompletableFuture<>(); });
             remove.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true));
-            search(remove).setText("Copy"); clickShortcut(remove); button(remove, "editor.remove").doClick(0); button(remove, "editor.set").doClick(0);
+            search(remove).setText("Copy"); clickShortcut(remove); editorAction(remove,"Remove shortcut"); button(remove, "editor.set").doClick(0);
             assertThat(saved.getLast()).isEqualTo(Map.of("copy", Optional.of("none")));
             remove.close();
             var reset = panel(true, changes -> { saved.add(changes); return new CompletableFuture<>(); });
             reset.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true));
-            search(reset).setText("Copy"); clickShortcut(reset); button(reset, "editor.restore").doClick(0); button(reset, "editor.set").doClick(0);
+            search(reset).setText("Copy"); clickShortcut(reset); editorAction(reset,"Restore default"); button(reset, "editor.set").doClick(0);
             assertThat(saved.getLast()).isEqualTo(Map.of("copy", Optional.empty()));
             reset.close();
             var fixed = panel(true, changes -> { throw new AssertionError("contextual binding saved"); });
@@ -127,7 +178,9 @@ class ShortcutEditingTest {
             search(panel).setText("Copy"); clickShortcut(panel);
             button(panel, "record").doClick(0);
             assertThat(search(panel).isEditable()).isFalse();
-            button(panel, "editor.record").doClick(0);
+            assertThat(panel.editor.isVisible()).as("clearing the search hides the action's collapsed row and detaches its editor").isFalse();
+            button(panel,"record").doClick(0);
+            search(panel).setText("Copy");clickShortcut(panel);
             assertThat(search(panel).isEditable()).isTrue();
             assertThat(panel.capture(KeyStroke.getKeyStroke("ctrl H"))).isTrue();
             button(panel, "editor.cancel").doClick(0);
@@ -143,7 +196,7 @@ class ShortcutEditingTest {
             search(panel).setText("Copy");
             clickShortcut(panel);
             assertThat(button(panel, "editor.set").getText()).isEqualTo("Set");
-            assertThat(message(panel)).contains("click Set");
+            assertThat(message(panel)).contains("Return to set", "Esc to cancel");
             button(panel, "editor.record").doClick(0);
             assertThat(message(panel)).contains("Apply or OK");
             panel.close();
@@ -169,7 +222,7 @@ class ShortcutEditingTest {
         });
     }
 
-    /** In a narrow Settings window the four edit buttons take two rows, and the card grows to show both. */
+    /** A narrow inline edit retains reachable actions and its overflow menu without clipping. */
     @Test void theEditButtonsWrapInsteadOfBeingCutOff() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var panel = panel(true, changes -> new CompletableFuture<>());
@@ -178,10 +231,13 @@ class ShortcutEditingTest {
             layoutAll(panel);
             search(panel).setText("Copy"); clickShortcut(panel);
             layoutAll(panel);
-            var restore = button(panel, "editor.restore");
-            var row = restore.getParent();
-            assertThat(restore.getY()).as("Restore default wrapped to a second row").isGreaterThan(0);
-            assertThat(restore.getY() + restore.getHeight()).as("and that row is inside the card").isLessThanOrEqualTo(row.getHeight());
+            var set = button(panel, "editor.set");
+            assertThat(set.getWidth()).isGreaterThan(0);
+            assertThat(set.getX()+set.getWidth()).isLessThanOrEqualTo(set.getParent().getWidth());
+            var options=KitTestSupport.require(panel,"editor.options",javax.swing.JComponent.class);
+            assertThat(options.getWidth()).isGreaterThan(0);
+            editorAction(panel,"Restore default");
+            assertThat(set.isEnabled()).isTrue();
             panel.close();
         });
     }
@@ -198,7 +254,7 @@ class ShortcutEditingTest {
             button(panel, "editor.value").doClick(0);
             assertThat(message(panel)).as("clicking the value records").contains("Press the new shortcut");
             assertThat(panel.capture(KeyStroke.getKeyStroke("ctrl H"))).isTrue();
-            assertThat(button(panel, "editor.value").getText()).isEqualTo(ShortcutText.format(KeyStroke.getKeyStroke("ctrl H")));
+            assertThat(button(panel, "editor.value").getAccessibleContext().getAccessibleName()).isEqualTo(ShortcutText.format(KeyStroke.getKeyStroke("ctrl H")));
             button(panel, "editor.set").doClick(0);
             assertThat(saved).containsExactly(Map.of("copy", Optional.of("ctrl+h")));
             panel.close();

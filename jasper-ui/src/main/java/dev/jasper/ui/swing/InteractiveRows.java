@@ -308,6 +308,8 @@ final class InteractiveRows {
             return indexOf(id) >= 0;
         }
 
+        boolean identityRows() { return false; }
+
         int minimumRowHeight() {
             return 0;
         }
@@ -371,6 +373,9 @@ final class InteractiveRows {
             return footer == null || !footer.isVisible() ? 0 : footer.getPreferredSize().height;
         }
 
+        int rowShellHeight(int index) {return heightAt(index);}
+        void layoutAccessories(int width) { }
+
         void sync() {
             if (closed || syncing || rowHeight <= 0) return;
             if (pendingReveal != null && scroll.getViewport().getExtentSize().height > 0) {
@@ -380,6 +385,7 @@ final class InteractiveRows {
             }
             syncing = true;
             try {
+                measureRows();
                 int extent = scroll.getViewport().getExtentSize().height;
                 int y = scroll.getViewport().getViewPosition().y;
                 int first, last;
@@ -414,12 +420,13 @@ final class InteractiveRows {
                     row.index = i;
                     populate(row, i);
                     row.finish();
-                    row.setBounds(0, top(i), Math.max(0, width), heightAt(i));
+                    row.setBounds(0, top(i), Math.max(0, width), rowShellHeight(i));
                     row.doLayout();
                 }
                 for (var row : spare) canvas.remove(row);
                 if (footer != null)
                     footer.setBounds(0, rowsHeight(), Math.max(0, width), footerHeight());
+                layoutAccessories(width);
                 canvas.repaint();
             } finally {
                 syncing = false;
@@ -719,6 +726,20 @@ final class InteractiveRows {
         }
 
         @Override protected void paintComponent(Graphics graphics) {
+            if(owner instanceof Trees.TreeControl tree && tree.detail!=null) {
+                int index=tree.indexOf(tree.detail.itemId);
+                if(index>=0) {
+                    var g=(Graphics2D)graphics.create();
+                    try {
+                        ThemePainting.antialias(g);
+                        int inset=ThemePainting.metric(owner.context(),DesignMetrics.Role.KEYCAP_DETAIL_INSET),radius=ThemePainting.metric(owner.context(),DesignMetrics.Role.CONTROL_RADIUS)*2;
+                        g.setColor(ThemePainting.color(owner.context(),SemanticColor.SURFACE_CONTROL));
+                        g.fillRoundRect(inset,tree.top(index),Math.max(0,getWidth()-2*inset),tree.heightAt(index),radius,radius);
+                        g.setColor(ThemePainting.color(owner.context(),SemanticColor.BORDER_FOCUS));
+                        g.drawRoundRect(inset,tree.top(index),Math.max(0,getWidth()-2*inset-1),Math.max(0,tree.heightAt(index)-1),radius,radius);
+                    }finally{g.dispose();}
+                }
+            }
             if (owner.node instanceof Nodes.ItemList list && list.kind() == Nodes.ListKind.ORDERED) {
                 var g = (Graphics2D)graphics.create();
                 try {
@@ -1021,6 +1042,7 @@ final class InteractiveRows {
         public void doLayout() {
             if (!owner.dataRow(index)) { headingLayout(); return; }
             if (owner.resultsLayout()) { resultLayout(); return; }
+            if (owner instanceof Trees.TreeControl tree && tree.layoutPresented(this)) return;
             int pad = ThemePainting.metric(owner.context(), owner.column >= 0 ? DesignMetrics.Role.COLUMN_LIST_SIDE : owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_PADDING : DesignMetrics.Role.ICON_GAP),
                     x = pad + indent,
                     width = Math.max(0, getWidth() - pad),
@@ -1117,6 +1139,7 @@ final class InteractiveRows {
                 return;
             }
             if (owner.passive()) return;
+            if(owner instanceof Trees.TreeControl tree && tree.detail!=null && tree.detail.itemId.equals(id))return;
             if (owner.resultsLayout()) {
                 Color fill = owner.selected.contains(id) ? ThemePainting.color(owner.context(), SemanticColor.SELECTION_BG)
                         : hover ? ColorMath.opacity(ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY), .05) : null;
@@ -1132,7 +1155,7 @@ final class InteractiveRows {
                 }
                 return;
             }
-            if (owner.column == 0 || owner.column == 1 || owner.panelSingle || owner instanceof Trees.TreeControl tree && tree.settingsNavigation) {
+            if (owner.identityRows() || owner.column == 0 || owner.column == 1 || owner.panelSingle || owner instanceof Trees.TreeControl tree && tree.settingsNavigation) {
                 Color fill = owner.selected.contains(id) ? ThemePainting.color(owner.context(), owner.column == 0 ? SemanticColor.SURFACE_CONTROL : SemanticColor.SELECTION_BG)
                     : hover ? ColorMath.opacity(ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY), .05) : null;
                 if (fill != null) {

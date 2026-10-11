@@ -1,5 +1,4 @@
-<!-- Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="#EBECF0" stroke="#6C707E"/>
-<path d="M4.5 10.5L7 8L4.4799 5.5201" stroke="#6C707E" stroke-linecap="round"/>
+<!-- Jasper artwork, authored from the user-supplied Settings reference; no third-party artwork imported. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#65d78a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M1.5 3h13v10h-13Z"/><path d="m4.2 6 2.5 2-2.5 2M8 10h3"/>
 </svg>

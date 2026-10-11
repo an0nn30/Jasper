@@ -18,6 +18,21 @@ import java.util.function.Predicate;
  * pages holding unsaved changes emphasized. Remembers which branches the user opened. EDT only.
  */
 final class PageTree {
+    private dev.jasper.ui.icons.ReceivingArtwork artwork;
+    private final Map<String,String> artNames=new LinkedHashMap<>();
+    void artwork(dev.jasper.ui.icons.IconRegistry registry){artwork=new dev.jasper.ui.icons.ReceivingArtwork(registry);}
+    void publish(Runnable render) {
+        if(artwork==null){render.run();return;}
+        artwork.reconcile(()->{
+            artNames.clear();
+            for(var page:pages)page.artwork().ifPresent(value->{
+                try { artNames.put(page.id(),artwork.name(value)); }
+                catch(IllegalArgumentException rejected){artNames.put(page.id(),"plugin");}
+            });
+            render.run();
+        });
+    }
+    void close(){if(artwork!=null)artwork.close();}
     static final String ID = "pages";
     private final Set<String> expanded = new HashSet<>();
     private final Map<String, SettingsPage> shown = new LinkedHashMap<>();
@@ -88,7 +103,7 @@ final class PageTree {
     private TreeItem item(SettingsPage page) {
         var children = children(page.id()).stream().map(this::item).toList();
         int matches = count(page.id());
-        return new TreeItem(page.id(), page.title(), page.icon().or(() -> coreIcon(page.id())), children.isEmpty(), children,
+        return new TreeItem(page.id(), page.title(), Optional.ofNullable(artNames.get(page.id())).or(page::icon).or(() -> coreIcon(page.id())), children.isEmpty(), children,
             matches > 0 ? OptionalInt.of(matches) : OptionalInt.empty(), isModified(page.id()));
     }
 
