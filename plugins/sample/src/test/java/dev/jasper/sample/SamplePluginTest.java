@@ -84,7 +84,7 @@ class SamplePluginTest {
             var step = (dev.jasper.sdk.ui.Nodes.Field) controls.children().getFirst();
             var reset = (dev.jasper.sdk.ui.Nodes.Button) controls.children().getLast();
             assertThat(reset.label()).as("an icon-only Reset").isEmpty();
-            assertThat(reset.icon()).isEqualTo("refresh");
+            assertThat(reset.icon()).as("the Settings reset glyph").isEqualTo("reset");
             assertThat(reset.state().visible()).as("nothing to reset at the default").isFalse();
             assertThat(step.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldKind.NUMBER);
             assertThat(step.value()).isEqualTo("300");
