@@ -266,6 +266,7 @@ final class Forms {
             });
             for(var control:controls)if(control instanceof Buttons.ButtonControl button && f.actions().contains(control.node)) {
                 button.button.fullFooter=f.kind()==Nodes.FormKind.FULL;
+                button.button.windowFooter=f.kind()==Nodes.FormKind.WINDOW;
                 if (!focusReveal.containsKey(button)) {
                     var reveal = new java.awt.event.FocusAdapter() {
                         @Override public void focusGained(java.awt.event.FocusEvent event) {
@@ -324,8 +325,11 @@ final class Forms {
         @Override protected void paintComponent(Graphics graphics) {
             super.paintComponent(graphics);
             if (window) {
+                // The window footer band shares the sidebar surface below one full-width hairline.
+                graphics.setColor(ThemePainting.color(context, SemanticColor.SURFACE_SIDEBAR));
+                graphics.fillRect(0, 0, getWidth(), getHeight());
                 graphics.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE));
-                graphics.drawLine(0, 0, getWidth() - 1, 0);
+                graphics.fillRect(0, 0, getWidth(), ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE));
             }
         }
         @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
@@ -430,14 +434,18 @@ final class Forms {
                 if (!sheet) g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2);
                 else {
                     double stroke=ThemePainting.metric(view.context(),DesignMetrics.Role.HAIRLINE), half=stroke/2, radius=r;
-                    var path = new Path2D.Double();
-                    path.moveTo(half,half);path.lineTo(getWidth()-half,half);
-                    path.lineTo(getWidth()-half,getHeight()-radius);
-                    path.quadTo(getWidth()-half,getHeight()-half,getWidth()-radius,getHeight()-half);
-                    path.lineTo(radius,getHeight()-half);
-                    path.quadTo(half,getHeight()-half,half,getHeight()-radius);path.closePath();
+                    // The sheet hangs from the owner's title edge: its fill reaches the top, its outline is sides and bottom only.
+                    g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+                    var outline = new Path2D.Double();
+                    outline.moveTo(half,0);
+                    outline.lineTo(half,getHeight()-radius);
+                    outline.quadTo(half,getHeight()-half,radius,getHeight()-half);
+                    outline.lineTo(getWidth()-radius,getHeight()-half);
+                    outline.quadTo(getWidth()-half,getHeight()-half,getWidth()-half,getHeight()-radius);
+                    outline.lineTo(getWidth()-half,0);
+                    var path = new Path2D.Double(outline);path.closePath();
                     g.fill(path);g.setColor(ThemePainting.color(view.context(),SemanticColor.BORDER_WINDOW));
-                    g.setStroke(new BasicStroke((float)stroke));g.draw(path);
+                    g.setStroke(new BasicStroke((float)stroke));g.draw(outline);
                 }
             } finally {
                 g.dispose();

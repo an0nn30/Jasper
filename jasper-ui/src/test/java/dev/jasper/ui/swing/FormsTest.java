@@ -97,9 +97,10 @@ class FormsTest {
                 view.setSize(s(900),s(555));layout(view);
                 var rail=(Panels.PanelControl)view.control("rail");var list=(Panels.PanelControl)view.control("list");
                 assertThat(rail.content.getInsets().left).isEqualTo(s(8));
-                assertThat(rail.content.getInsets().top).isEqualTo(s(12));
+                // Source 2x: rail fill top 10.5 logical, 31 pitch; list rows 45 below a 30-logical search.
+                assertThat(rail.content.getInsets().top).isEqualTo(s(10));
                 assertThat(list.content.getInsets().left).isEqualTo(s(8));
-                assertThat(((InteractiveRows.RowsControl)view.control("rail.rows")).rowHeight).isEqualTo(s(30));
+                assertThat(((InteractiveRows.RowsControl)view.control("rail.rows")).rowHeight).isEqualTo(s(31));
                 assertThat(((InteractiveRows.RowsControl)view.control("list.rows")).rowHeight).isEqualTo(s(45));
             }finally{release(context);}
         });
@@ -135,7 +136,7 @@ class FormsTest {
                     assertThat(label.wraps()).isTrue();assertThat(label.getHeight()).isGreaterThan(label.getFontMetrics(label.getFont()).getHeight());
                     assertThat(label.getHeight()).isEqualTo(label.wrappedHeight(label.getWidth()));
                     var c=find(view,"card",JComponent.class);var m=find(view,"metadata",JComponent.class);
-                    assertThat(m.getY()-c.getY()-c.getHeight()).isEqualTo(s(14));
+                    assertThat(m.getY()-c.getY()-c.getHeight()).isEqualTo(s(15));
                     assertThat(find(view,"input.input",javax.swing.text.JTextComponent.class).getText()).isEqualTo("draft");
                 }finally{release(context);}
             }} finally {UIManager.put("defaultFont",old);}
@@ -151,13 +152,14 @@ class FormsTest {
                 var owner=(SettingRows.RowControl)view.control("row");var secret=find(view,"secret",JComponent.class);
                 assertThat(owner.component.getHeight()).isEqualTo(s(67));
                 assertThat(secret.getX()).isEqualTo(owner.title.getX());
-                assertThat(owner.title.getY()).isEqualTo(s(16));
+                // Centred below the row's top stroke with the measured 2-logical caption/value gap.
+                assertThat(owner.title.getY()).isEqualTo(s(18));
                 var reveal=find(view,"secret.reveal",JButton.class);
                 var value=find(view,"secret.value",JComponent.class);
                 var revealBounds=SwingUtilities.convertRectangle(reveal.getParent(),reveal.getBounds(),owner.component);
                 var valueBounds=SwingUtilities.convertRectangle(value.getParent(),value.getBounds(),owner.component);
                 assertThat(revealBounds.y+revealBounds.height/2).isEqualTo(owner.component.getHeight()/2);
-                assertThat(valueBounds.y).isEqualTo(owner.title.getY()+owner.title.getHeight()+s(4));
+                assertThat(valueBounds.y).isEqualTo(owner.title.getY()+owner.title.getHeight()+s(2));
                 assertThat(secret.getWidth()).isGreaterThan(s(300));
                 assertThat(owner.title.getFont()).isEqualTo(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.SETTING_DESCRIPTION));
             }finally{release(context);}

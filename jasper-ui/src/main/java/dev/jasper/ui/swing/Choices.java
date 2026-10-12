@@ -24,7 +24,10 @@ final class Choices {
         final ArrayList<AutoCloseable> optionLifetimes = new ArrayList<>();
         List<Option> options = List.of();
         boolean embedded, settings, identitySection;
+        /** A FULL-form setting row's trailing dropdown uses the compact setting-control height. */
+        boolean fullSetting;
         @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(!value); }
+        @Override int firstLineHeight() { return input.getHeight() > 0 ? input.getY() + input.getHeight() : input.getPreferredSize().height; }
         boolean applying;
         ChoiceControl(KitView view, Nodes.Choice node) {
             super(view, node, new JPanel(new BorderLayout()));
@@ -88,6 +91,7 @@ final class Choices {
                 input.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY)); input.setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_CONTROL));
                 if (input instanceof JComboBox<?> raw) {
                     var combo = (JComboBox<Option>)raw;
+                    ((ChoiceCombo)combo).compactHeight=fullSetting;
                     ((ChoiceCombo)combo).settingsWidth=settings?ThemePainting.metric(context(),choice.options().stream().anyMatch(option->!option.icon().isBlank()||!option.description().isBlank())?DesignMetrics.Role.SETTINGS_RICH_CHOICE_WIDTH:DesignMetrics.Role.SETTINGS_CHOICE_WIDTH):0;
                     if (combo instanceof SearchChoices.Combo searchable) choice.search().ifPresent(searchable::configure);
                     if (!options.equals(choice.options())) {
@@ -123,8 +127,13 @@ final class Choices {
                             input.add(button);
                         }
                     }
+                    // Form and sheet segments follow the measured form track; settings and identity sections keep theirs.
+                    boolean form = !settings && !identitySection;
+                    int track = ThemePainting.metric(context(), form ? DesignMetrics.Role.FORM_SEGMENT_PADDING : DesignMetrics.Role.SEGMENT_PADDING);
+                    input.setBorder(new EmptyBorder(track, track, track, track));
                     for (int i = 0; i < input.getComponentCount(); i++) {
                         var button = (SegmentButton)input.getComponent(i); Option option = options.get(i);
+                        button.form = form; if (form) button.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
                         button.setEnabled(input.isEnabled()); button.setSelected(option.id().equals(choice.selectedId()));
                         var font = context().typography().font(settings?Typography.Role.BODY:Typography.Role.LABEL, !settings && button.isSelected());
                         button.setFont(SwingTypography.effective(font));
@@ -213,7 +222,7 @@ final class Choices {
         }
     }
     static class ChoiceCombo extends JComboBox<Option> {
-        final KitContext context; ThemePainting.Focus focus; BasicComboPopup popup; int settingsWidth;
+        final KitContext context; ThemePainting.Focus focus; BasicComboPopup popup; int settingsWidth; boolean compactHeight;
         ChoiceCombo(KitContext context) {
             this.context = context; setOpaque(false);
             setBorder(new EmptyBorder(ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0, ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0));
@@ -245,9 +254,11 @@ final class Choices {
                 @Override protected JButton createArrowButton() { return new JButton() {
                     { setBorder(new EmptyBorder(0, 0, 0, 0)); setContentAreaFilled(false); setOpaque(false); setFocusable(false); }
                     @Override protected void paintComponent(Graphics graphics) {
+                        // The dropdown chevron shares the picker face's measured glyph and trailing inset.
                         var icon = context.icons().icon("chevron.down", context.theme().semantic(), SemanticColor.TEXT_SECONDARY,
-                            com.formdev.flatlaf.util.UIScale.scale(context.icons().size(Nodes.IconSize.CAPTION)));
-                        icon.paintIcon(this, graphics, (getWidth()-icon.getIconWidth())/2, (getHeight()-icon.getIconHeight())/2);
+                            ThemePainting.metric(context, DesignMetrics.Role.CHOICE_CHEVRON));
+                        int beyond = comboBox.getWidth() - getX() - getWidth();
+                        icon.paintIcon(this, graphics, getWidth() + beyond - ThemePainting.metric(context, DesignMetrics.Role.CHOICE_CHEVRON_INSET) - icon.getIconWidth(), (getHeight()-icon.getIconHeight())/2);
                     }
                 }; }
                 @Override public void paintCurrentValueBackground(Graphics graphics, Rectangle bounds, boolean hasFocus) {}
@@ -266,7 +277,7 @@ final class Choices {
             list.setFont(ThemePainting.font(context, Typography.Role.BODY));
             popup.revalidate(); popup.repaint(); list.repaint();
         }
-        @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); return new Dimension(settingsWidth>0?settingsWidth:size.width, Math.max(size.height, ThemePainting.height(context, DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY))); }
+        @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); int nominal = ThemePainting.height(context, compactHeight ? DesignMetrics.Role.FULL_SETTING_CHOICE_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY); return new Dimension(settingsWidth>0?settingsWidth:size.width, compactHeight ? nominal : Math.max(size.height, nominal)); }
         @Override public void paint(Graphics graphics) {
             var g = (Graphics2D)graphics.create(); try { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); super.paint(g); } finally { g.dispose(); }
         }
@@ -332,22 +343,23 @@ final class Choices {
         final KitContext context;
         SegmentTrack(KitContext context) { this.context = context; setOpaque(false); int pad = ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_PADDING); setBorder(new EmptyBorder(pad, pad, pad, pad)); }
         @Override protected void paintComponent(Graphics graphics) {
-            var g = (Graphics2D)graphics.create(); try { ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_INPUT)); int r = ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_TRACK_RADIUS); g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2); g.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE)); g.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, r * 2, r * 2); } finally { g.dispose(); }
+            var g = (Graphics2D)graphics.create(); try { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); ThemePainting.rounded(g, this, context, ThemePainting.color(context, SemanticColor.SURFACE_INPUT), ThemePainting.color(context, SemanticColor.BORDER_SUBTLE), false, false, DesignMetrics.Role.SEGMENT_TRACK_RADIUS); } finally { g.dispose(); }
         }
     }
     static final class SegmentButton extends Buttons.KitButton {
         final KitContext context;
+        boolean form;
         SegmentButton(KitContext context) { super(context); this.context = context; kind = Nodes.ButtonKind.GHOST; }
         @Override SemanticColor textRole(boolean hover) { return isSelected() ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_SECONDARY; }
         @Override Color textColor(boolean hover) {
             return isSelected() ? dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(), SemanticColor.TEXT_ONACCENT,
                 SemanticColor.SEGMENT_SELECTED_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT) : super.textColor(hover);
         }
-        @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); return new Dimension(size.width, ThemePainting.height(context, DesignMetrics.Role.PANEL_ACTION, Typography.Role.LABEL)); }
+        @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); return new Dimension(size.width, ThemePainting.height(context, form ? DesignMetrics.Role.FORM_SEGMENT_HEIGHT : DesignMetrics.Role.PANEL_ACTION, Typography.Role.LABEL)); }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create();
             try {
-                if (isSelected()) { ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); g.setColor(ThemePainting.color(context, SemanticColor.SEGMENT_SELECTED_BG)); int r = ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_ITEM_RADIUS); g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2); }
+                if (isSelected()) { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); ThemePainting.rounded(g, this, context, ThemePainting.color(context, SemanticColor.SEGMENT_SELECTED_BG), null, false, false, DesignMetrics.Role.SEGMENT_ITEM_RADIUS); }
                 super.paintComponent(graphics);
             } finally { g.dispose(); }
         }

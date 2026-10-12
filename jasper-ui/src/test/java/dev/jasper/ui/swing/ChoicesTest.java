@@ -11,7 +11,7 @@ import static dev.jasper.ui.swing.KitViewTest.*;
 
 @SuppressWarnings("unchecked")
 class ChoicesTest {
-    @Test void segmentedChoicesRetainOrdinaryActionPaddingAcrossFontSizes() {
+    @Test void formSegmentsKeepMeasuredItemHeightAcrossFontSizes() {
         Edt.run(() -> {
             var context = KitFixtures.context();
             var previous = UIManager.get("defaultFont");
@@ -21,9 +21,10 @@ class ChoicesTest {
                     KitFixtures.render(view, 400, 100, 2);
                     var font = ThemePainting.font(context, dev.jasper.ui.metrics.Typography.Role.LABEL);
                     int line = (int)Math.ceil(font.getLineMetrics("Ag", new java.awt.font.FontRenderContext(null, true, true)).getHeight());
-                    int expected = Math.max(com.formdev.flatlaf.util.UIScale.scale(24), line + com.formdev.flatlaf.util.UIScale.scale(10));
+                    // Form segments use the measured 24-logical item, growing with the label line at larger fonts.
+                    int expected = Math.max(com.formdev.flatlaf.util.UIScale.scale(24), line + com.formdev.flatlaf.util.UIScale.scale(4));
                     assertThat(find(view, "choice.option.b", JButton.class).getPreferredSize().height)
-                        .as("nonheader segments retain ordinary action padding at font %s", size).isEqualTo(expected);
+                        .as("nonheader form segments keep the measured item height at font %s", size).isEqualTo(expected);
                 }
             } finally { UIManager.put("defaultFont", previous); release(context); }
         });

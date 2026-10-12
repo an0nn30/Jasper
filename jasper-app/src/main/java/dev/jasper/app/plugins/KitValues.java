@@ -46,7 +46,7 @@ final class KitValues {
  static dev.jasper.ui.model.Nodes.Numeric toModule(dev.jasper.sdk.ui.Nodes.Numeric n) { return new dev.jasper.ui.model.Nodes.Numeric(n.min(), n.max(), n.step(), n.decimals()); }
  static dev.jasper.ui.model.Nodes.PickerFace toModule(dev.jasper.sdk.ui.Nodes.PickerFace n){return new dev.jasper.ui.model.Nodes.PickerFace(n.primary(),n.caption(),n.icon(),dev.jasper.ui.model.Nodes.Hue.valueOf(n.hue().name()),dev.jasper.ui.model.Nodes.PickerDensity.valueOf(n.density().name()));}
  static dev.jasper.ui.model.Nodes.PickerItem toModule(dev.jasper.sdk.ui.Nodes.PickerItem n){return new dev.jasper.ui.model.Nodes.PickerItem(n.id(),n.label(),n.caption(),n.icon(),dev.jasper.ui.model.Nodes.Hue.valueOf(n.hue().name()),dev.jasper.ui.model.Nodes.PickerItemKind.valueOf(n.kind().name()));}
- static dev.jasper.ui.model.Nodes.ChoiceSearch toModule(dev.jasper.sdk.ui.Nodes.ChoiceSearch n) { return new dev.jasper.ui.model.Nodes.ChoiceSearch(n.pinned(), n.noMatches(), n.entry()); }
+ static dev.jasper.ui.model.Nodes.ChoiceSearch toModule(dev.jasper.sdk.ui.Nodes.ChoiceSearch n) { return new dev.jasper.ui.model.Nodes.ChoiceSearch(n.pinned(), n.noMatches(), n.entry(), n.placeholder()); }
  static dev.jasper.ui.model.Nodes.FieldKind toModule(dev.jasper.sdk.ui.Nodes.FieldKind n) { return dev.jasper.ui.model.Nodes.FieldKind.valueOf(n.name()); }
  static dev.jasper.ui.model.Nodes.ChoiceKind toModule(dev.jasper.sdk.ui.Nodes.ChoiceKind n) { return dev.jasper.ui.model.Nodes.ChoiceKind.valueOf(n.name()); }
  static dev.jasper.ui.model.Nodes.ListKind toModule(dev.jasper.sdk.ui.Nodes.ListKind n) { return dev.jasper.ui.model.Nodes.ListKind.valueOf(n.name()); }

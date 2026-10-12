@@ -20,7 +20,8 @@ final class PickerMenus {
             ThemePainting.antialias(g);
             if(!button.isEnabled())g.setComposite(AlphaComposite.SrcOver.derive(c.metrics().value(DesignMetrics.Role.PICKER_DISABLED_PERCENT)/100f));
             boolean expanded=Boolean.TRUE.equals(button.getClientProperty("Jasper.pickerExpanded"));
-            ThemePainting.rounded(g,button,c,ThemePainting.color(c,button.isEnabled()&&button.getModel().isRollover()?SemanticColor.SURFACE_CONTROL_HOVER:SemanticColor.SURFACE_CONTROL),ThemePainting.color(c,SemanticColor.BORDER_CONTROL),focus||expanded,false);
+            // Focused or open faces take the focus border inside their halo, as text fields do.
+            ThemePainting.rounded(g,button,c,ThemePainting.color(c,button.isEnabled()&&button.getModel().isRollover()?SemanticColor.SURFACE_CONTROL_HOVER:SemanticColor.SURFACE_CONTROL),ThemePainting.color(c,focus||expanded?SemanticColor.BORDER_FOCUS:SemanticColor.BORDER_CONTROL),focus||expanded,false);
             boolean compact=face.density()==Nodes.PickerDensity.COMPACT;
             int pad=metric(c,DesignMetrics.Role.PICKER_PADDING),gap=metric(c,compact?DesignMetrics.Role.PICKER_GAP:DesignMetrics.Role.PICKER_DEFAULT_FACE_GAP),tile=metric(c,compact?DesignMetrics.Role.PICKER_FACE_TILE:DesignMetrics.Role.PICKER_DEFAULT_FACE_TILE);
             int x=metric(c,compact?DesignMetrics.Role.PICKER_COMPACT_FACE_INSET:DesignMetrics.Role.PICKER_DEFAULT_FACE_INSET);
@@ -60,7 +61,9 @@ final class PickerMenus {
             if(model.isEmpty())return;
             var cell=list.getCellBounds(model.size()-1,model.size()-1);if(cell==null)return;
             int y=SwingUtilities.convertPoint(list,0,cell.y,this).y;
-            if(y>=0&&y<getHeight()){graphics.setColor(ThemePainting.color(context(),SemanticColor.BORDER_SUBTLE));graphics.drawLine(0,y,getWidth(),y);}
+            // The footer divider is one full-width hairline in the menu border role, just above the footer gap.
+            int stroke=metric(context(),DesignMetrics.Role.HAIRLINE);
+            if(y>=stroke&&y<=getHeight()){graphics.setColor(ThemePainting.color(context(),SemanticColor.BORDER_MENU));graphics.fillRect(0,y-stroke,getWidth(),stroke);}
         }};
         final JLabel empty=Labels.literal();
         final JPanel body=new JPanel(new BorderLayout());

@@ -103,6 +103,8 @@ final class Composition {
         String text = "";
         boolean centered;
         int lineHeight;
+        /** Distribute a taller line box's extra leading evenly above and below each line. */
+        boolean centeredLeading;
         int noteStart = -1;
         Color noteColor;
 
@@ -169,14 +171,15 @@ final class Composition {
                 g.setColor(getForeground());
                 if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
                 var fm = g.getFontMetrics();
-                int y = fm.getAscent(), consumed = 0;
+                float y = fm.getAscent() + (centeredLeading ? Math.max(0, lineHeight - fm.getHeight()) / 2f : 0);
+                int consumed = 0;
                 for (String line : lines(getWidth())) {
                     int x = centered ? Math.max(0, (getWidth() - fm.stringWidth(line)) / 2) : 0;
                     int start = text.indexOf(line, consumed);
                     int split = noteStart < 0 ? line.length() : Math.max(0, Math.min(line.length(), noteStart - start));
                     String leading = line.substring(0, split);
                     g.setColor(getForeground()); g.drawString(leading, x, y);
-                    if (split < line.length()) { g.setColor(noteColor); g.drawString(line.substring(split), x + fm.stringWidth(leading), y); }
+                    if (split < line.length()) { g.setColor(noteColor); g.drawString(line.substring(split), (float)(x + fm.stringWidth(leading)), y); }
                     consumed = start + line.length();
                     y += Math.max(lineHeight, fm.getHeight());
                 }

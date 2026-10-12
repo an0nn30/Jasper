@@ -101,6 +101,11 @@ final class ControlRegistry {
         void embeddedLabel(boolean embedded) {}
         void hero(boolean hero) {}
         JComponent focusTarget() { return component; }
+        /**
+         * Height of this control's first line (a field's face, a list's first row), which a FormRow label and trailing
+         * text centre on so that a later error or caption below the control does not move them; -1 when unknown.
+         */
+        int firstLineHeight() { return -1; }
         final boolean interactive() { return !closed && parentEnabled && node.state().enabled() && !node.state().busy() && node.state().visible(); }
         final void emit(UiEvent event) { if (interactive()) view.dispatch(event); }
         final void state() { component.setVisible(node.state().visible()); component.setEnabled(parentEnabled && node.state().enabled() && !node.state().busy()); }

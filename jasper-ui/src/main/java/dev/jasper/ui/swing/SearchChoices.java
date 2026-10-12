@@ -9,6 +9,8 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Insets;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
@@ -49,6 +51,8 @@ final class SearchChoices {
         private Popup searchPopup;
         int pinned;
         String noMatches = "";
+        /** Shown in the placeholder role while a free entry is empty; never a value. */
+        String placeholder = "";
         boolean freeEntry;
         /** Receives free-entry text the user typed or picked; descriptor updates are quiet. */
         Consumer<String> entered = text -> {};
@@ -71,7 +75,26 @@ final class SearchChoices {
             super(context);
             // A non-UIResource editor belongs to this control, not to each installed delegate.
             // Keeping the component also keeps its document, caret, IME and focus identity.
-            setEditor(new javax.swing.plaf.basic.BasicComboBoxEditor());
+            setEditor(new javax.swing.plaf.basic.BasicComboBoxEditor() {
+                // An empty free entry shows the descriptor's placeholder; the kit paints it once, in the placeholder role.
+                @Override protected JTextField createEditorComponent() {
+                    var field = new JTextField("", 9) {
+                        @Override protected void paintComponent(Graphics graphics) {
+                            super.paintComponent(graphics);
+                            if (placeholder.isEmpty() || getDocument().getLength() > 0 || Combo.this.context == null) return;
+                            var g = (Graphics2D) graphics.create();
+                            try {
+                                ThemePainting.antialias(g); g.setFont(getFont());
+                                g.setColor(ThemePainting.color(Combo.this.context, SemanticColor.TEXT_PLACEHOLDER));
+                                Insets insets = getInsets(); var metrics = g.getFontMetrics();
+                                g.drawString(placeholder, insets.left, insets.top + (getHeight() - insets.top - insets.bottom - metrics.getHeight()) / 2 + metrics.getAscent());
+                            } finally { g.dispose(); }
+                        }
+                    };
+                    field.setBorder(null);
+                    return field;
+                }
+            });
             addPropertyChangeListener("editor", editorChange);
         }
 
@@ -112,6 +135,7 @@ final class SearchChoices {
         void configure(Nodes.ChoiceSearch search) {
             pinned = search.pinned();
             noMatches = search.noMatches();
+            if (!placeholder.equals(search.placeholder())) { placeholder = search.placeholder(); editorField().repaint(); }
             boolean free = search.entry().isPresent();
             if (free != freeEntry) { freeEntry = free; setEditable(free); observeEditor(); }
             if (!free) declaredEntry = null;

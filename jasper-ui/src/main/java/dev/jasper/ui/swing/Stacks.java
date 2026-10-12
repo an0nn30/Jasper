@@ -79,7 +79,10 @@ final class Stacks {
                             : stack.role() == Nodes.LayoutRole.FOOTER ? new FooterStatusLayout(context()) : stack.role() == Nodes.LayoutRole.SUPPORTING ? new SupportingLayout(context()) : stack.role() == Nodes.LayoutRole.NAVIGATION ? new Navigation.InlineLayout(context(), hint ? DesignMetrics.Role.PALETTE_HINT_ACTION_GAP : identityHeader ? DesignMetrics.Role.IDENTITY_HEADER_GAP : panelDetail && stack.children().stream().anyMatch(n -> n instanceof Nodes.Icon icon && icon.size() == Nodes.IconSize.HERO) ? DesignMetrics.Role.PANEL_DETAIL_IDENTITY_GAP : detail && !panelDetail ? DesignMetrics.Role.DETAIL_HEADING_GAP : DesignMetrics.Role.ICON_GAP) : new StackLayout(context(), stack.role(), stack.children().size()==2 && stack.children().getFirst() instanceof Nodes.Text text && text.role()==Nodes.TextRole.DETAIL_TITLE, captions) {
                                 @Override int gap() { return identityGroup ? ThemePainting.metric(context(),DesignMetrics.Role.IDENTITY_HEADER_AFTER) : panelDetail ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_DETAIL_GAP) : super.gap(); }
                                 @Override int verticalGap(Component previous, Component child) {
-                                    return panelDetail && stack.role() == Nodes.LayoutRole.VERTICAL && stack.children().stream().allMatch(n -> n instanceof Nodes.Text) ? 0 : super.verticalGap(previous, child);
+                                    if (panelDetail && stack.role() == Nodes.LayoutRole.VERTICAL && stack.children().stream().allMatch(n -> n instanceof Nodes.Text)) return 0;
+                                    // A manager detail heading's name and type sit as one tight block centred on the tile.
+                                    if (detail && titlePair) return ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_TITLE_GAP);
+                                    return super.verticalGap(previous, child);
                                 }
                             });
             if (documentBar && stack.role() == Nodes.LayoutRole.INLINE) component.setLayout(new DocumentBarLayout(this));
@@ -224,10 +227,10 @@ final class Stacks {
         final KitContext context;
         final SupportingLayout inline;
         final Composition.Vertical vertical;
-        FooterStatusLayout(KitContext context) {this.context=context;inline=new SupportingLayout(context);vertical=new Composition.Vertical(ThemePainting.metric(context,DesignMetrics.Role.ICON_GAP));}
+        FooterStatusLayout(KitContext context) {this.context=context;inline=new SupportingLayout(context,DesignMetrics.Role.FOOTER_STATUS_GAP);vertical=new Composition.Vertical(ThemePainting.metric(context,DesignMetrics.Role.ICON_GAP));}
         Composition.WidthLayout layout(Container parent,int width) {
             var children=java.util.Arrays.stream(parent.getComponents()).filter(Component::isVisible).toList();
-            int prefix=children.stream().limit(Math.max(0,children.size()-1)).mapToInt(c->c.getPreferredSize().width+ThemePainting.metric(context,DesignMetrics.Role.INLINE_GAP)).sum();
+            int prefix=children.stream().limit(Math.max(0,children.size()-1)).mapToInt(c->c.getPreferredSize().width+ThemePainting.metric(context,DesignMetrics.Role.FOOTER_STATUS_GAP)).sum();
             return width<prefix+ThemePainting.metric(context,DesignMetrics.Role.FORM_LABEL_WIDTH)?vertical:inline;
         }
         @Override public int height(Container parent,int width){return layout(parent,width).height(parent,width);}
@@ -238,8 +241,10 @@ final class Stacks {
     /** Natural leading adornments beside a flexible final body, aligned to its first line. */
     static final class SupportingLayout implements Composition.WidthLayout {
         private final KitContext context;
-        SupportingLayout(KitContext context) { this.context = context; }
-        private int gap() { return ThemePainting.metric(context, DesignMetrics.Role.INLINE_GAP); }
+        private final DesignMetrics.Role gapRole;
+        SupportingLayout(KitContext context) { this(context, DesignMetrics.Role.INLINE_GAP); }
+        SupportingLayout(KitContext context, DesignMetrics.Role gapRole) { this.context = context; this.gapRole = gapRole; }
+        private int gap() { return ThemePainting.metric(context, gapRole); }
         private List<Component> visible(Container parent) {
             return java.util.Arrays.stream(parent.getComponents()).filter(Component::isVisible).toList();
         }
@@ -391,7 +396,7 @@ final class Stacks {
             if(role==Nodes.LayoutRole.JOINED_ACTIONS)return 0;
             return ThemePainting.metric(
                     context,
-                    role == Nodes.LayoutRole.DETAIL ? DesignMetrics.Role.SECTION_GAP : role == Nodes.LayoutRole.INLINE ? DesignMetrics.Role.INLINE_GAP
+                    role == Nodes.LayoutRole.DETAIL ? DesignMetrics.Role.DETAIL_SECTION_GAP : role == Nodes.LayoutRole.INLINE ? DesignMetrics.Role.INLINE_GAP
                             : role == Nodes.LayoutRole.ACTIONS
                             ? DesignMetrics.Role.BUTTON_GAP
                             : horizontal()
@@ -553,7 +558,7 @@ final class Stacks {
         }
         int verticalGap(Component previous, Component child) {
             if (role == Nodes.LayoutRole.DETAIL && previous instanceof Cards.CardSurface && captions.contains(child)) return ThemePainting.metric(context, DesignMetrics.Role.DETAIL_METADATA_GAP);
-            return titlePair ? ThemePainting.metric(context, DesignMetrics.Role.DETAIL_VALUE_GAP) : child instanceof Indicators.StrengthMeter
+            return titlePair ? ThemePainting.metric(context, DesignMetrics.Role.TITLE_PAIR_GAP) : child instanceof Indicators.StrengthMeter
                 ? ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_TOP_GAP) : gap();
         }
     }

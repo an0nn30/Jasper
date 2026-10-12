@@ -16,6 +16,8 @@ final class Labels {
         /** Wraps to the width a FormRow gives it. */
         boolean wrap;
         int baselineOffset, iconOffset;
+        /** A fixed column width (an ordered row's index), or zero for the text's own width. */
+        int columnWidth;
         /**
          * Flows in a vertical container: wraps to the width it is given, keeps explicit line breaks, and asks for no
          * more than {@code flowColumns} widths of 'm' (the former text areas' column rule).
@@ -40,6 +42,7 @@ final class Labels {
                         PAINT_CONTEXT).getWidth());
                     size.width += Math.max(0, painted - getFontMetrics(getFont()).stringWidth(getText()));
                 }
+                if (columnWidth > 0 && !isPreferredSizeSet()) size.width = Math.max(columnWidth, size.width);
                 return size;
             }
             var metrics = getFontMetrics(getFont()); Insets insets = getInsets();
@@ -112,9 +115,12 @@ final class Labels {
                 default -> SemanticColor.TEXT_PRIMARY;
             }));
             ((LiteralLabel)label).caret = text.caret().orElse(-1);
-            ((LiteralLabel)label).wrapped.lineHeight = (text.role() == Nodes.TextRole.DESCRIPTION || text.role() == Nodes.TextRole.SUPPORTING)
-                ? Math.round(context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.DESCRIPTION_LINE_HEIGHT)
+            boolean supporting = text.role() == Nodes.TextRole.SUPPORTING;
+            ((LiteralLabel)label).wrapped.lineHeight = (text.role() == Nodes.TextRole.DESCRIPTION || supporting)
+                ? Math.round(context().metrics().value(supporting ? dev.jasper.ui.metrics.DesignMetrics.Role.SUPPORTING_LINE_HEIGHT : dev.jasper.ui.metrics.DesignMetrics.Role.DESCRIPTION_LINE_HEIGHT)
                     * ThemePainting.font(context(), Typography.Role.BODY).getSize2D() / 13f) : 0;
+            // Supporting paragraphs sit centred in their measured line box rather than on its top.
+            ((LiteralLabel)label).wrapped.centeredLeading = supporting;
             label.repaint();
         }
     }

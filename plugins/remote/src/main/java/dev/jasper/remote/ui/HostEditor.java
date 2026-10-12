@@ -300,7 +300,7 @@ public final class HostEditor implements AutoCloseable {
     }
 
     private Nodes.Field field(String id, Nodes.FieldKind kind, String value, String hint, String label) {
-        return new Nodes.Field(id, state(true, saving == null), kind, value, hint, label, "", Optional.empty(), id.equals(HOSTNAME) || id.equals(USERNAME) ? Nodes.FieldPresentation.TECHNICAL : Nodes.FieldPresentation.STANDARD);
+        return new Nodes.Field(id, state(true, saving == null), kind, value, hint, label, "", Optional.empty(), id.equals(HOSTNAME) ? Nodes.FieldPresentation.TECHNICAL : Nodes.FieldPresentation.STANDARD);
     }
     private Nodes.FormRow row(String id, String label, String caption, Nodes.Node control) {
         return new Nodes.FormRow(id, ControlState.READY, label, caption, control, Optional.empty());
@@ -322,7 +322,7 @@ public final class HostEditor implements AutoCloseable {
         var title = new ArrayList<Nodes.Node>();
         title.add(new Nodes.Text("key." + id, ControlState.READY, label, Nodes.TextRole.MONO));
         if (!caption.isEmpty()) title.add(new Nodes.Text("key.caption." + id, ControlState.READY, caption, Nodes.TextRole.CAPTION));
-        return new ListItem(id.toString(), Optional.of(new Nodes.Icon("key.icon." + id, ControlState.READY, "key", Nodes.Hue.NONE, Nodes.IconSize.CONTROL, "SSH key")),
+        return new ListItem(id.toString(), Optional.of(new Nodes.Icon("key.icon." + id, ControlState.READY, "key", Nodes.Hue.NONE, Nodes.IconSize.CAPTION, "SSH key")),
             title, List.of(), List.of(), false, Optional.empty(), tooltip);
     }
 
@@ -355,7 +355,7 @@ public final class HostEditor implements AutoCloseable {
             new Nodes.SettingRow("row." + GROUP, ControlState.READY, "Group", "",
                 new Nodes.Choice(GROUP, state(true, editable), Nodes.ChoiceKind.SEARCHABLE,
                     groups.stream().map(g -> new Option("group." + g, g, Optional.empty())).toList(), "", "Group. Blank: " + defaultGroup + " (default)", "", "",
-                    Optional.of(new Nodes.ChoiceSearch(0, "No other groups", Optional.of(group)))), false),
+                    Optional.of(new Nodes.ChoiceSearch(0, "No other groups", Optional.of(group), defaultGroup))), false),
             new Nodes.SettingRow("row." + FAVORITE, ControlState.READY, "Add to Favorites", "",
                 new Nodes.Toggle(FAVORITE, state(true, editable), "Favorite", favorite, FAVORITE, false), false),
             new Nodes.SettingRow("row." + FOLLOW, ControlState.READY, "Track shell folder", "SFTP follows the terminal's current directory",

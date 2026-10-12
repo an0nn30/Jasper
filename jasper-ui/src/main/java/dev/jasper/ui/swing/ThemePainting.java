@@ -17,12 +17,12 @@ final class ThemePainting {
     static Font font(KitContext context, Typography.Role role) { return SwingTypography.effective(context.typography().font(role)); }
     static int height(KitContext context, DesignMetrics.Role role, Typography.Role text) {
         DesignMetrics.Role padding = switch (role) {
-            case PICKER_COMPACT_HEIGHT,PICKER_DEFAULT_HEIGHT,PICKER_SEARCH_HEIGHT,PICKER_ROW_HEIGHT,PICKER_UTILITY_HEIGHT -> DesignMetrics.Role.PICKER_VERTICAL_PADDING;
+            case PICKER_COMPACT_HEIGHT,PICKER_DEFAULT_HEIGHT,PICKER_SEARCH_HEIGHT,PICKER_ROW_HEIGHT,PICKER_UTILITY_HEIGHT,FORM_SEGMENT_HEIGHT,FULL_SETTING_CHOICE_HEIGHT -> DesignMetrics.Role.PICKER_VERTICAL_PADDING;
             case PANEL_DETAIL_ACTION -> DesignMetrics.Role.PANEL_DETAIL_ACTION_VERTICAL;
             case PANEL_SEARCH_HEIGHT -> DesignMetrics.Role.PANEL_SEARCH_VERTICAL_PADDING;
             case PANEL_HEADER_ACTION -> DesignMetrics.Role.PANEL_HEADER_ACTION_VERTICAL;
             case RESULTS_ROW_HEIGHT, RESULTS_HEADING_HEIGHT -> DesignMetrics.Role.RESULTS_VERTICAL_PADDING;
-            case FIELD_HEIGHT, HERO_FIELD_HEIGHT -> DesignMetrics.Role.FIELD_VERTICAL_PADDING;
+            case FIELD_HEIGHT, HERO_FIELD_HEIGHT, COLUMN_SEARCH_HEIGHT -> DesignMetrics.Role.FIELD_VERTICAL_PADDING;
             case SETTINGS_NAV_HEADING, SETTINGS_NAV_ROW, KEYCAP_TREE_ROW_HEIGHT, IDENTITY_ROW_HEIGHT, IDENTITY_HEADING_HEIGHT, MENU_ITEM_HEIGHT, BUTTON_HEIGHT, HERO_BUTTON_HEIGHT, FULL_FOOTER_BUTTON_HEIGHT, ORDERED_ADD_HEIGHT, PANEL_ACTION, INLINE_ACTION -> DesignMetrics.Role.BUTTON_VERTICAL_PADDING;
             default -> throw new IllegalArgumentException("Not a content height role: " + role);
         };
@@ -50,11 +50,19 @@ final class ThemePainting {
         double w = component.getWidth(), h = component.getHeight() - bottomTrim;
         component.putClientProperty("Jasper.kit.halo", focus || error ? new Halo(context, error,radius,inset,bottomTrim) : null);
         if (w <= 0 || h <= 0) return;
-        var shape = new RoundRectangle2D.Double(inset, inset, w-2*inset, h-2*inset, radius * 2.0, radius * 2.0);
-        if (fill != null) { g.setColor(fill); g.fill(shape); }
-        if (border != null) {
-            g.setColor(border); g.setStroke(new BasicStroke(UIScale.scale(1f)));
-            g.draw(new RoundRectangle2D.Double(inset+.5, inset+.5, w - 2*inset - 1, h - 2*inset - 1, radius * 2.0, radius * 2.0));
+        // Control faces are exact logical geometry: normalization would move a hairline half a device
+        // pixel and blur it over three rows at 2x. Later artwork keeps the caller's stroke policy.
+        Object control = g.getRenderingHint(RenderingHints.KEY_STROKE_CONTROL);
+        g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+        try {
+            var shape = new RoundRectangle2D.Double(inset, inset, w-2*inset, h-2*inset, radius * 2.0, radius * 2.0);
+            if (fill != null) { g.setColor(fill); g.fill(shape); }
+            if (border != null) {
+                g.setColor(border); g.setStroke(new BasicStroke(UIScale.scale(1f)));
+                g.draw(new RoundRectangle2D.Double(inset+.5, inset+.5, w - 2*inset - 1, h - 2*inset - 1, radius * 2.0, radius * 2.0));
+            }
+        } finally {
+            g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, control == null ? RenderingHints.VALUE_STROKE_DEFAULT : control);
         }
     }
     /** A transparent field reserves no outer halo; its receiving focus ring stays inside its existing allocation. */

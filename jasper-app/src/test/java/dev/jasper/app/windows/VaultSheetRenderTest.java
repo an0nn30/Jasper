@@ -142,11 +142,12 @@ class VaultSheetRenderTest {
                     }
                     assertThat(sheet.fallback()).isEqualTo(state.equals("short"));
                     if (id.equals("vault-login")) {
-                        int segmentHeight = state.equals("enlarged") ? 38 : 25;
+                        // Measured form segment: 24 logical item inside a 3-logical track inset (30 outer at default).
+                        int segmentHeight = com.formdev.flatlaf.util.UIScale.scale(24);
                         assertThat(find(surface.holder(), "auth.option.password").getHeight())
                             .as("actual Login segment preserves its nonheader height in %s", state).isEqualTo(segmentHeight);
                         assertThat(find(surface.holder(), "auth.input").getHeight())
-                            .isEqualTo(segmentHeight + (state.equals("enlarged") ? 6 : 4));
+                            .isEqualTo(segmentHeight + 2 * com.formdev.flatlaf.util.UIScale.scale(3));
                     }
                     capture(state,id,root,child,bounds.get(),"body="+chrome.body().boundsInRoot().orElseThrow()+"\nsheet="+bounds.get()+"\nfallback="+sheet.fallback());
                     capture(state,id+"-sheet",child,null,null,"same actual mounted attached sheet; no native shadow/peer");

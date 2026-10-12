@@ -70,9 +70,9 @@ final class Panels {
             navigation.setBorder(
                     new EmptyBorder(
                             column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_TOP) : 0,
-                            column == 1 ? side : pad,
+                            column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_SIDE) : pad,
                             ThemePainting.metric(context(), column == 1 ? DesignMetrics.Role.COLUMN_SEARCH_BOTTOM : search ? DesignMetrics.Role.PANEL_SEARCH_BOTTOM : DesignMetrics.Role.ICON_GAP),
-                            column == 1 ? side : pad));
+                            column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_SIDE) : pad));
             component.revalidate();
             component.repaint();
         }

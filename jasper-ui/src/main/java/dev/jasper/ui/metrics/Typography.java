@@ -16,7 +16,8 @@ public final class Typography {
         PICKER_COMPACT(10, 400), PICKER_CAPTION(9, 400),
         TITLE_CONTEXT(12, 400), TOOLBAR_LABEL(11.5f, 400), STATUS_TEXT(10, 400), STATUS_PATH(12, 400), RESULTS_HEADING(11, 400), PALETTE_HINT(11, 400),
         BODY(13, 400), BODY_STRONG(13, 500), LABEL(12.5f, 400), DESCRIPTION(12.5f, 400),
-        SUPPORTING(11.5f, 400), CAPTION(11.5f, 400), SETTING_DESCRIPTION(11, 400), SECTION_LABEL(11, 600), COUNT(11, 400), CHIP(9.5f, 400), MONO(12, 400), MONO_SMALL(11.5f, 400), MONO_CAPTION(11, 400);
+        SUPPORTING(11.5f, 400), CAPTION(11.5f, 400), SETTING_DESCRIPTION(11, 400), SECTION_LABEL(11, 600), COUNT(11, 400), CHIP(9.5f, 400), MONO(12, 400), MONO_SMALL(11.5f, 400), MONO_CAPTION(11, 400),
+        ORDERED_ACTION(12, 400);
         private final float size;
         private final int weight;
         Role(float size, int weight) { this.size = size; this.weight = weight; }

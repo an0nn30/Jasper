@@ -44,7 +44,7 @@ final class SettingRows {
                     description, context(), detail ? Typography.Role.BODY : Typography.Role.SETTING_DESCRIPTION, detail ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_TERTIARY);
             title.setEnabled(component.isEnabled());
             description.setEnabled(component.isEnabled());
-            int side = ThemePainting.metric(context(), detail ? DesignMetrics.Role.CARD_PADDING : fullForm ? DesignMetrics.Role.FULL_SETTING_SIDE_PADDING : DesignMetrics.Role.SETTING_SIDE_PADDING),
+            int side = ThemePainting.metric(context(), detail ? DesignMetrics.Role.DETAIL_ROW_SIDE : fullForm ? DesignMetrics.Role.FULL_SETTING_SIDE_PADDING : DesignMetrics.Role.SETTING_SIDE_PADDING),
                     vertical =
                             ThemePainting.metric(
                                     context(), DesignMetrics.Role.SETTING_VERTICAL_PADDING);
@@ -213,15 +213,18 @@ final class SettingRows {
                 if(secretDetail())owner.secret.detailActionsBelow=false;
                 int tw=secretDetail()?content:trailing(p,p.getWidth()), textWidth=secretDetail()?content:Math.max(0,content-tw-gap());
                 int titleHeight=owner.title.height(textWidth), below=secretDetail()?owner.secret.detailTextHeight():owner.description.height(textWidth);
-                int y=Math.max(i.top,(p.getHeight()-titleHeight-gap-below)/2);
+                // Centre the label/value block in the row below its top stroke (rounding down the remaining space).
+                int stroke=ThemePainting.metric(owner.context(),DesignMetrics.Role.HAIRLINE);
+                int y=Math.max(i.top,stroke+(p.getHeight()-stroke-titleHeight-gap-below+1)/2);
+                int actionInset=Math.min(i.right,ThemePainting.metric(owner.context(),DesignMetrics.Role.DETAIL_ACTION_INSET));
                 owner.title.setBounds(i.left,y,textWidth,titleHeight);
                 owner.description.setBounds(i.left,y+titleHeight+gap,textWidth,below);
                 if(p.getComponentCount()>2) {
                     Component c=p.getComponent(2);int h=Composition.height(c,tw);
                     if (secretDetail()) {
                         owner.secret.detailValueTop=y+titleHeight+gap;
-                        c.setBounds(i.left,0,tw,p.getHeight());
-                    } else c.setBounds(p.getWidth()-i.right-tw,(p.getHeight()-h)/2,tw,h);
+                        c.setBounds(i.left,0,Math.max(0,p.getWidth()-i.left-actionInset),p.getHeight());
+                    } else c.setBounds(p.getWidth()-actionInset-tw,(p.getHeight()-h)/2,tw,h);
                 }
                 return;
             }
