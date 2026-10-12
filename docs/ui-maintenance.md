@@ -177,3 +177,11 @@ pre-0.15 raw UI factories and raw presentation icons; all eight bundled manifest
 The [completion audit](design/theme-engine/completion.md) records exact gate scope, owner tests, headless
 rendering, distribution checks and the named Plan 3 composition owners. App host Settings error/stub
 content uses the dialog kit context and closes with its page; it is not covered by the plugin-only compiled gate.
+
+## Checking a surface against its reference
+
+After changing a kit metric, painter or a surface's composition, regenerate the actual-owner renders and compare
+them with the preserved references using [`tools/visual`](../tools/visual/README.md): `compare_all.py` runs the
+recorded pairs and `region.py` cuts the same region from a mock and a render at original pixels. The
+[acceptance record](design/theme-engine/acceptance.md) lists the regeneration commands, the agreed differences and the
+per-family notes; a shared metric change must keep every family's pairs where they are, not only the one being tuned.

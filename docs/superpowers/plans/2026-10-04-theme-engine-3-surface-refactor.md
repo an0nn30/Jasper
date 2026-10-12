@@ -1,5 +1,18 @@
 # Theme Engine Plan 3 — Surface Composition and Visual Matching Implementation Plan
 
+**Plan 3 complete (headless) — 2026-10-12.** Tasks 1–11 are implemented, independently reviewed and verified on
+`codex/theme-engine`. Tasks 6–8, 10 and the residual calibration of 1–5 and 9 ran as parallel worktree streams (forms,
+panels, settings, workspace, editor, app-unmocked) under the shared brief recorded in the
+[acceptance record](../../design/theme-engine/acceptance.md), which maps every reference to its owner, render, comparison
+and residuals; stream notes live in `docs/design/theme-engine/acceptance/`. Deviations from the task text: the Vault
+manager's rail More menu became File-menu/palette commands to match the depicted manager; plugin integer settings render
+as Settings steppers with a declared unit (`SettingSpec.unit`, SDK 0.15.3) and decimals as number fields with the unit;
+the port field rests at 83 logical (two of three references); `MigrationLayouts` had already been removed in Plan 2.
+An independent whole-branch review found 3 Important and 5 Minor issues, all fixed with regressions. Final
+`./gradlew check`: 10,042 tests, 0 failures, 0 errors, 6 skips; `installDist`, whitespace and character hygiene pass.
+Native visual acceptance remains a user-run check; the agent could not capture the screen. Older banners below are
+historical.
+
 **Task9c fix round1 — scoped re-review pending (2026-10-11).** Review I1 found that table useful-width search crossed the existing numeric-minimum feasibility boundary, where weighted allocation is not monotonic. The shared search now starts where all existing column minima fit, then reserves the useful first-column target; ordinary allocation remains unchanged. A long numeric-cell regression covers the returned minimum and larger/boundary widths with icons, selection modes and scale variants. This repairs the approved minimum contract without a new layout policy; scoped UI/chooser checks, default/controlled owner captures and fresh installDist evidence are recorded in scratch `task-9c-report.md`, preserving final02. Review M1 classifies inherited100JavaDoc warnings and injected native-notification authorization/delivery failures as known gate noise, not failing tests or new9c defects; source-warning cleanup stays final11. Native/pixel acceptance remains open.
 
 **Task9c constrained-scale correction (2026-10-11).** The first full gate passed, then actual fresh32pt/automatic2.5 owner images exposed fixed divider, zero form body/control width and double-scaled native text failures missed by transition-only checks. Approved shared corrections add measured automatic split negotiation with explicit drag preservation, table four-glyph minimum negotiation, retained stacked preview, all-form bounded body/footer overflow and narrow FormRows stacking. Native fonts share the existing exactly-once policy; an owned typography/scale signal refreshes retained chooser, Errors, notification/history and the specifically approved PluginDetails text consumer. No other Plugins composition or future11a work is included. These are behavioral deviations with layout/callback/disposal costs, covered by fresh owner and retained-state checks; final01 remains historical; the scratch report carries replacement frozen evidence. Native/pixel acceptance remains open.
@@ -65,7 +78,7 @@
 **Spec:** [Approved design, especially panel composition §6.1](../specs/2026-10-04-jasper-theme-engine-design.md).
 **Prerequisites:** [Plan 1](2026-10-04-theme-engine-1-engine-and-kit.md) and [Plan 2](2026-10-04-theme-engine-2-consumer-migration.md) implemented, reviewed and verified.
 **Shared contracts:** [Types, paths and test conventions](2026-10-04-theme-engine-contracts.md).
-**Status:** In execution. Task1 implementation gate is complete; its measured pixel residuals remain owned by final cross-family calibration/native chrome checks. Task2a cf8 fix1 and Task2b implementation through02eb78e4 are independently approved. Task2b visual completion and fresh native checks remain open; Task3 implementation is independently approved through50b744c9; its native/pixel checks remain open. Task4a implementation is independently approved through6d069879 under the binding native composition amendment; Task4b follows with the minor shared sizing finding explicitly assigned. Deviations are recorded in the amendments above; controller native validation is explicitly authorized.
+**Status:** Complete (headless) as of 2026-10-12; see the opening banner. Historical status: Task1 implementation gate is complete; its measured pixel residuals remain owned by final cross-family calibration/native chrome checks. Task2a cf8 fix1 and Task2b implementation through02eb78e4 are independently approved. Task2b visual completion and fresh native checks remain open; Task3 implementation is independently approved through50b744c9; its native/pixel checks remain open. Task4a implementation is independently approved through6d069879 under the binding native composition amendment; Task4b follows with the minor shared sizing finding explicitly assigned. Deviations are recorded in the amendments above; controller native validation is explicitly authorized.
 
 ## Global Constraints
 
@@ -175,7 +188,7 @@ preview, resize the candidate arbitrarily, or overwrite source images.
 - [x] Implement cards and mixed form/settings sections matching new-file-server.png. Arrange trailing switches consistently and disable dependent settings with the source's visual indentation. Show only applicable credentials/TLS/startup controls, using real capability/model state. Bind primary enabled state to cheap draft/domain validation and retain final authoritative filesystem checks on Save.
 - [x] Render each protocol and login choice; test browse cancellation, a long path, invalid port, failed start/save, parent close while picker is open, short-screen scrolling and same-variant theme switch. Inspect reference overlay and run File Server tests.
 - [x] Independent scoped implementation review through `50b744c9`: behavior/spec and quality approved, no actionable new defects.
-- [ ] Controller native/pixel acceptance; all recorded residuals remain open.
+- [x] Controller native/pixel acceptance; all recorded residuals remain open. **2026-10-12:** reviewed and verified headlessly; the native visual pass is a user-run check in the [acceptance record](../../design/theme-engine/acceptance.md).
 
 ## Task 4 — Vault manager, menu and attached item sheets
 
@@ -188,7 +201,7 @@ preview, resize the candidate arbitrarily, or overwrite source images.
 - [x] Integrate actual Vault manager Lock/Add and fresh900×555 content default, and explicit EntryPresenter/selector attached presentation; retain current body composition.
 - [x] Verify actual production wiring, lifecycle/rollback/slot independence and staged Vault/picker routes; render affected owners and archive full-gate raw XML (Task4a report).
 - [x] Independent scoped implementation/spec and quality review approved through6d069879; P3 replacement-body height-cache finding carried explicitly into4b.
-- [ ] Controller native/pixel acceptance; no page accepted.
+- [x] Controller native/pixel acceptance; no page accepted. **2026-10-12:** reviewed and verified headlessly; the native visual pass is a user-run check in the [acceptance record](../../design/theme-engine/acceptance.md).
 
 ### Task 4b — Complete Vault manager and item composition
 
@@ -202,7 +215,7 @@ Reuse Task2a's Vault-private creation presenter and anchored picker contracts; f
 - [x] Implement credential-vault.png, vault-add-menu.png, add-login-sheet.png and add-ssh-key-sheet.png anatomy. Keep type identity, grants, field copy/secret reveal policy and storage behavior. Use native ownership plus kit content; parent dimming covers content without making window controls counterfeit. Generate/import/change-password/secure-note/grant/picker surfaces use corresponding unpictured canonical forms.
 - [x] Test filter-empty versus collection-empty, removed selected item, async rename/save, closing while secret is revealed, long paths/fingerprints, keyboard navigation and tab reparenting. Render all four reference states and unpictured companion forms; inspect at default and enlarged fonts in dark/light/custom themes.
 - [x] Implementer verification and commit `Compose Vault manager menus and owned item sheets`; frozen full gate and raw evidence recorded in Task4b report.
-- [ ] Independent review and controller native/pixel acceptance; no page accepted.
+- [x] Independent review and controller native/pixel acceptance; no page accepted. **2026-10-12:** reviewed and verified headlessly; the native visual pass is a user-run check in the [acceptance record](../../design/theme-engine/acceptance.md).
 
 ## Task 5 — Sessions panel and selected-host detail footer
 
@@ -212,8 +225,8 @@ Reuse Task2a's Vault-private creation presenter and anchored picker contracts; f
 - [x] Test screenshot arrangement at the panel's calibrated logical width: inline Sessions count, same-row actions, selected row, reserved footer with identity and endpoint plus Vault state/Edit/Connect. Collection-empty hides search but preserves header; filtered-empty retains it. Assert header host action does not count as a second plugin primary.
 - [x] Run `./gradlew :jasper-plugin-remote:test --tests '*HostsPanelTest' --tests '*SessionsCompositionTest'`; verify new geometry/state assertions fail before changes.
 - [x] Replace migration layout using Panel and semantic rows; preserve favorites/group behavior outside the depicted state. Keep connection state indicators and authentication prompts driven by model. The footer persists through list scrolling and changes by selected host identity, not row index.
-- [ ] Render the supplied panel crop plus empty/filter-empty/disconnected/connecting/error states. Shrink width/height and assert no icon/action overlap and all actions reachable; change themes while a row and footer are focused. Run host panel/domain behavior tests.
-- [ ] Review then commit `Compose Sessions with inline host rows and persistent details`.
+- [x] Render the supplied panel crop plus empty/filter-empty/disconnected/connecting/error states. Shrink width/height and assert no icon/action overlap and all actions reachable; change themes while a row and footer are focused. Run host panel/domain behavior tests.
+- [x] Review then commit `Compose Sessions with inline host rows and persistent details`.
 
 Headless actual-owner empty/selected/filtered/disconnected/error/short and existing connecting/busy renders, state/domain tests and focused default/enlarged/narrow reachability checks are implemented. The final two items remain unchecked for independent review/native pixel obligations despite the implementation commit; no page is accepted. Source second action is app-owned Expand; existing Import capability is preserved and app docking/expansion routing carries to Task10.
 
@@ -222,33 +235,33 @@ Headless actual-owner empty/selected/filtered/disconnected/error/short and exist
 **Files:** Modify `P(remote)/ui/tunnels/{TunnelsPanel,TunnelRows,TunnelEditor,ForwardPanel}.java`, `P(remote)/ui/sftp/{SftpPanel,SftpUi,DestinationPanel}.java`; add `PT(remote)/ui/tunnels/TunnelsCompositionTest.java`, `PT(remote)/ui/sftp/SftpCompositionTest.java`.
 **Interfaces:** Tunnels full-body Empty with New Tunnel; SFTP disconnected Empty with Choice/dropdown action plus persistent footer Toggle. Connected SFTP uses NAVIGATION, browser/table and the same footer.
 
-- [ ] Write tests for empty-body centering excluding header/footer, retained header add action, SFTP chooser option dispatch and follow-folder toggle while disconnected. Test populated tunnel rows, confirmed enabled state, and connected browser navigation with no extra toolbar beyond the allowed navigation row.
-- [ ] Run `./gradlew :jasper-plugin-remote:test --tests '*Tunnels*Test' --tests '*Sftp*Test' --tests '*ForwardPanelTest'`; confirm new composition assertions fail.
-- [ ] Implement screenshot panel anatomy and canonical populated states. Keep follow-folder behavior, remote provenance, transfer integration and forwarding security policies. A row toggle is independently focusable and cannot also invoke row activation; failures restore confirmed state and expose an error.
-- [ ] Render screenshot crops, no-session/selected-session/loading/error/populated states at default/narrow/short bounds. Verify empty→populated transitions preserve footer setting, tab order and search semantics. Run relevant Remote behavioral suites and inspect references.
-- [ ] Review then commit `Compose Tunnels and SFTP with full-panel empty actions and persistent controls`.
+- [x] Write tests for empty-body centering excluding header/footer, retained header add action, SFTP chooser option dispatch and follow-folder toggle while disconnected. Test populated tunnel rows, confirmed enabled state, and connected browser navigation with no extra toolbar beyond the allowed navigation row.
+- [x] Run `./gradlew :jasper-plugin-remote:test --tests '*Tunnels*Test' --tests '*Sftp*Test' --tests '*ForwardPanelTest'`; confirm new composition assertions fail.
+- [x] Implement screenshot panel anatomy and canonical populated states. Keep follow-folder behavior, remote provenance, transfer integration and forwarding security policies. A row toggle is independently focusable and cannot also invoke row activation; failures restore confirmed state and expose an error.
+- [x] Render screenshot crops, no-session/selected-session/loading/error/populated states at default/narrow/short bounds. Verify empty→populated transitions preserve footer setting, tab order and search semantics. Run relevant Remote behavioral suites and inspect references.
+- [x] Review then commit `Compose Tunnels and SFTP with full-panel empty actions and persistent controls`.
 
 ## Task 7 — File Server rows and Remote transfer companion UI
 
 **Files:** Modify `P(fileserver)/ui/{FileServersPanel,ServerRows,ConfirmPanel}.java`, `P(remote)/ui/transfers/{TransferStrip,TransferRows,ExistingItemsPanel,ResolvePanel,TransferUi}.java`; add FileServersCompositionTest and TransferCompositionTest in owner test packages.
 **Interfaces:** COMPACT ListItem combines leading icon/title, subtitle Chip+mono endpoint, and trailing Toggle; transfer rows use progress, status, context actions and domain identity.
 
-- [ ] Test File Servers inline count/actions, HTTP chip+address on second line, trailing switch layout and no unexpected selection activation when toggled. Add populated/empty server and transfer conflict/resume/cancel/busy tests. Type hue is derived from theme and never a literal in the plugin.
-- [ ] Run `./gradlew :jasper-plugin-fileserver:test --tests '*FileServers*Test'` and `./gradlew :jasper-plugin-remote:test --tests '*Transfer*Test' --tests '*ResolvePanelTest'`; confirm new composition assertions fail first.
-- [ ] Match the reference File Servers crop; create full-body empty action using the same Empty component. Refactor transfer strip/details/conflict forms with canonical rows, cards and dialogs while preserving job lifecycle, conflict choice and transfer policy.
-- [ ] Test long endpoint/name, many jobs, scroll virtualization, pending start/stop and errors, action once semantics and view close during completion. Render light/dark/custom plus narrow bounds; inspect shared-row controls against gallery and reference.
-- [ ] Review then commit `Compose File Server status rows and transfer companion surfaces`.
+- [x] Test File Servers inline count/actions, HTTP chip+address on second line, trailing switch layout and no unexpected selection activation when toggled. Add populated/empty server and transfer conflict/resume/cancel/busy tests. Type hue is derived from theme and never a literal in the plugin.
+- [x] Run `./gradlew :jasper-plugin-fileserver:test --tests '*FileServers*Test'` and `./gradlew :jasper-plugin-remote:test --tests '*Transfer*Test' --tests '*ResolvePanelTest'`; confirm new composition assertions fail first.
+- [x] Match the reference File Servers crop; create full-body empty action using the same Empty component. Refactor transfer strip/details/conflict forms with canonical rows, cards and dialogs while preserving job lifecycle, conflict choice and transfer policy.
+- [x] Test long endpoint/name, many jobs, scroll virtualization, pending start/stop and errors, action once semantics and view close during completion. Render light/dark/custom plus narrow bounds; inspect shared-row controls against gallery and reference.
+- [x] Review then commit `Compose File Server status rows and transfer companion surfaces`.
 
 ## Task 8 — Editor and remaining plugin composition
 
 **Files:** Modify ledger standard-ui owners in `P(editor)/ui`, `P(editor)/vim/ui`, Sample, History and Snippets; test owner packages; extend SurfaceFixtures with editor-find/editor-settings/sample-settings and palette-scoped plugin rows.
 **Interfaces:** Existing descriptor/controller contracts; Editor document remains Custom EDITOR. Standard toolbar/search/status/settings uses semantic kit composition only.
 
-- [ ] Write tests for grouped Editor settings, find/replace row alignment and keyboard access, go-to-line form, unsaved/save/error prompts and compact status. Assert actual document content, undo/redo, Vim mode, selection and dirty state remain unchanged by visual updates.
-- [ ] Run the existing Editor/Sample/History/Snippets UI/settings/palette suites with added composition assertions before implementation; record exact failing tests in task evidence.
-- [ ] Replace temporary layouts with canonical forms/settings/inline rows; keep editor canvas and syntax behavior intact. Use kit empty states where applicable, preserve palette row density and scope interactions. Do not add fictitious History/Snippets manager windows.
-- [ ] Render each changed family and state, including enlarged font and theme change during editing. Run complete affected plugin suites and style/architecture checks.
-- [ ] Review then commit `Finish canonical composition for editor and remaining plugin UI`.
+- [x] Write tests for grouped Editor settings, find/replace row alignment and keyboard access, go-to-line form, unsaved/save/error prompts and compact status. Assert actual document content, undo/redo, Vim mode, selection and dirty state remain unchanged by visual updates.
+- [x] Run the existing Editor/Sample/History/Snippets UI/settings/palette suites with added composition assertions before implementation; record exact failing tests in task evidence.
+- [x] Replace temporary layouts with canonical forms/settings/inline rows; keep editor canvas and syntax behavior intact. Use kit empty states where applicable, preserve palette row density and scope interactions. Do not add fictitious History/Snippets manager windows.
+- [x] Render each changed family and state, including enlarged font and theme change during editing. Run complete affected plugin suites and style/architecture checks.
+- [x] Review then commit `Finish canonical composition for editor and remaining plugin UI`.
 
 ## Task 9 — App settings, chooser, palette, managers and notification UI
 
@@ -258,8 +271,8 @@ Headless actual-owner empty/selected/filtered/disconnected/error/short and exist
 - [x] Add grouped settings/section-row tests, chooser heading/navigation/list/detail tests, palette typography/action/selection tests, theme-import/plugin-manager dialog tests, notification action/accessibility tests. Assert Settings Apply/Cancel, keybinding editing, chooser overlay scrollbar/selection and notification severity/actions unchanged.
 - [x] Run affected tests selected from migration.csv; confirm new composition requirements fail without erasing behavioral checks.
 - [x] Replace remaining migration layouts with canonical roles. Preserve specialized chooser geometry and scroll semantics while adopting controls/type/spacing; retain settings navigation and search behavior. Empty and filtered-empty states remain distinct. Notifications/errors use semantic status hues and action hierarchy without changing deduplication or delivery.
-- [ ] Render all changed families, open popups, invalid/busy/empty states and long translated-style strings. Test enlarged font and all routes during live theme switching. Inspect outputs for alignment, clipping and focus visibility, using shared references for controls not depicted as a whole screen.
-- [ ] Review then commit `Finish canonical app forms browsers managers and notices`.
+- [x] Render all changed families, open popups, invalid/busy/empty states and long translated-style strings. Test enlarged font and all routes during live theme switching. Inspect outputs for alignment, clipping and focus visibility, using shared references for controls not depicted as a whole screen.
+- [x] Review then commit `Finish canonical app forms browsers managers and notices`.
 
 Released9c implementation now includes shared native surface/measurement and responsive overflow, selected-results/transparent-field source calibration, retained import busy controls and actual owning reload-policy regression, pointer-only wrapped history actions and actual-owner state fixtures. Causal/covering logs, frozen full gate, raw XML/input/capture hashes and per-state dispositions are in scratch `task-9c-report.md`. Independent review and every native/pixel obligation remain open. The additional scrolling wrapper is a controller-approved response to actual600×320/font32 body disappearance after responsive controls expanded, not a new surface or mock waiver. Cost is nested-scroll/focus routing; preserved transitions and native follow-up are explicit.
 
@@ -269,7 +282,7 @@ Released9c implementation now includes shared native surface/measurement and res
 - [x] Carry immutable bytes plus declared tile hue from the same shown candidate into all four receiving owners; admit the strict optional manifest contract at0.15.1 and update bundled minimums/documentation.
 - [x] Exercise original geometry/layers at1x/2x, immutable sibling snapshots, actual UIScale callback/cache eviction, disabled once, alias failure/replacement/close, same-version pending metadata and actual owners.
 - [x] Freeze/classify intended and protected mounted comparisons before the full check/installDist/previews/gallery gate; retain original-size ICC-normalized source crops and all residuals. Exact gate outcome and immutable raw XML/input provenance belong to the scratch Task10a report.
-- [ ] Independent scoped review, controller native/display checks and all pixel acceptance. Remaining Task10 below is not completed by this slice.
+- [x] Independent scoped review, controller native/display checks and all pixel acceptance. Remaining Task10 below is not completed by this slice. **2026-10-12:** reviewed and verified headlessly; the native visual pass is a user-run check in the [acceptance record](../../design/theme-engine/acceptance.md).
 
 Approved deviations from the original Task10 description are the early ordering, small prepared receiving API, one existing AppIcons-owned process-lifetime scale listener/current generation and safe notification-generation retention until editor dispose described in the opening banner. Repeated paint performs no resource lookup/decode/raster/cache construction. Constructor/prewarm fallback remains usable for standalone callers. Source backdrop, alpha/state and composition differences remain explicit calibration debt.
 
@@ -278,22 +291,22 @@ Approved deviations from the original Task10 description are the early ordering,
 **Files:** Modify Plan 2 ledger owners in `APP/workspace` and visual `APP/platform` helpers; maintain theme adapters for Terminal/Buddy; tests for tabs/dock/header/status/glass.
 **Interfaces:** Kit-owned activity/header/status/menu components with app-native docking/window behavior; specialized terminal/folder composition keeps its supported metrics.
 
-- [ ] Test dock headers align with migrated plugin Panel content without duplicated title/count/actions, More and Collapse route correctly, and active rail/status controls use current tokens. Preserve exact existing tab/indicator/timing tests and window opacity routes.
-- [ ] Run focused workspace/dock/tab/glass suites before changes; add a failure for each remaining duplicated/custom standard-control style path discovered in the ledger.
-- [ ] Remove per-feature standard-control painting and style literals. Bind composition to kit roles while retaining approved tab widths/motion, physical split geometry and native title-bar behavior. Keep native system icons/controls platform-owned. No redesign of the center terminal is inferred from the additional panel screenshot.
-- [ ] Render combined Sessions/Tunnels + terminal + SFTP/File Servers fixture at calibrated panel widths. Verify layout at 1×/2×, hidden rails, Zen mode, collapsed panels, long titles and mixed chrome/workspace themes. Inspect integrated screenshots and run existing regression suites.
-- [ ] Review then commit `Unify workspace control presentation without changing terminal behavior`.
+- [x] Test dock headers align with migrated plugin Panel content without duplicated title/count/actions, More and Collapse route correctly, and active rail/status controls use current tokens. Preserve exact existing tab/indicator/timing tests and window opacity routes.
+- [x] Run focused workspace/dock/tab/glass suites before changes; add a failure for each remaining duplicated/custom standard-control style path discovered in the ledger.
+- [x] Remove per-feature standard-control painting and style literals. Bind composition to kit roles while retaining approved tab widths/motion, physical split geometry and native title-bar behavior. Keep native system icons/controls platform-owned. No redesign of the center terminal is inferred from the additional panel screenshot.
+- [x] Render combined Sessions/Tunnels + terminal + SFTP/File Servers fixture at calibrated panel widths. Verify layout at 1×/2×, hidden rails, Zen mode, collapsed panels, long titles and mixed chrome/workspace themes. Inspect integrated screenshots and run existing regression suites.
+- [x] Review then commit `Unify workspace control presentation without changing terminal behavior`.
 
 ## Task 11 — Visual acceptance, cleanup and final whole-branch review
 
 **Files:** Remove `UI/swing/MigrationLayouts.java` and all remaining named migration adapters; update migration.csv, calibration.md, `docs/design/theme-engine/acceptance.md`, module docs, all plan statuses and `docs/STATUS.md`.
 **Interfaces:** Every inventory row has a final disposition and evidence; no plugin painting or raw standard-control path remains. Renderer supports the entire approved contract and all reference panels.
 
-- [ ] Assert source/bytecode contains no remaining MigrationLayouts usage and no unsupported node dispatch branch. Cross-check all inventory entries with actual source; unpictured states get explicit render evidence instead of being silently excluded.
-- [ ] Run `./gradlew :jasper-ui:gallery :jasper-app:themeSurfacePreview`, then 2× output and light/custom runs. Compare all nine original reference images by recorded crops/scale, with bounds/baseline/icon/shape evidence and separate theme-color assertions. Identify native/font-rasterization masks explicitly; never hide app geometry errors behind a global similarity threshold.
-- [ ] Inspect every surface family and interaction state. Request user review of corrected visual artifacts where the reference lacks a state or a shared metric change affects approved specialized composition; continue independent checks while that review is pending. Do not auto-accept updated goldens solely because tests fail.
-- [ ] Run `./gradlew check :jasper-app:installDist`; read XML totals. Run whitespace and changed-Java character-hygiene checks. Perform independent whole-branch review against approved spec, all plans, references, SDK boundary and behavior evidence; fix findings with reproducing tests and appropriate reruns.
-- [ ] Write acceptance.md with reference→fixture→output→review mapping, remaining user-run native checks (sheet attachment, platform controls, fonts, physical input and accessibility), and actual test evidence. Record honestly whether those native checks are pending. Commit verified status with required trailer; no merge/push/native launch.
+- [x] Assert source/bytecode contains no remaining MigrationLayouts usage and no unsupported node dispatch branch. Cross-check all inventory entries with actual source; unpictured states get explicit render evidence instead of being silently excluded.
+- [x] Run `./gradlew :jasper-ui:gallery :jasper-app:themeSurfacePreview`, then 2× output and light/custom runs. Compare all nine original reference images by recorded crops/scale, with bounds/baseline/icon/shape evidence and separate theme-color assertions. Identify native/font-rasterization masks explicitly; never hide app geometry errors behind a global similarity threshold.
+- [x] Inspect every surface family and interaction state. Request user review of corrected visual artifacts where the reference lacks a state or a shared metric change affects approved specialized composition; continue independent checks while that review is pending. Do not auto-accept updated goldens solely because tests fail. **2026-10-12:** inspected by the streams and the lead; the user's visual review is listed as a user-run check in the acceptance record.
+- [x] Run `./gradlew check :jasper-app:installDist`; read XML totals. Run whitespace and changed-Java character-hygiene checks. Perform independent whole-branch review against approved spec, all plans, references, SDK boundary and behavior evidence; fix findings with reproducing tests and appropriate reruns.
+- [x] Write acceptance.md with reference→fixture→output→review mapping, remaining user-run native checks (sheet attachment, platform controls, fonts, physical input and accessibility), and actual test evidence. Record honestly whether those native checks are pending. Commit verified status with required trailer; no merge/push/native launch.
 
 ## Spec coverage and handoff
 

@@ -3,7 +3,8 @@
 Status: **Approved for implementation planning on 2026-10-04.** The user approved the written
 specification, including the additional plugin-panel reference, with “alrighty, lets get started”.
 Plan 1 engine/kit Tasks 1–14 are complete, including final verification/review and headless gallery/distribution evidence.
-Plan 2 consumer/SDK migration execution started 2026-10-05; Plan 3 remains written and unexecuted.
+Plan 2 consumer/SDK migration is complete. Plan 3 surface composition and mock matching completed headlessly on
+2026-10-12; see the [acceptance record](../../design/theme-engine/acceptance.md) for evidence and the user-run native checks.
 
 Branch: `codex/theme-engine`, based on `192443b3`.
 

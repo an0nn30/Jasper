@@ -1,5 +1,23 @@
 # Jasper — Status and Handoff
 
+**Theme engine Plan 3 complete (headless) — 2026-10-12.** Claude finished the surface refactor and mock matching on
+`codex/theme-engine` (not pushed, not merged to `main`). Six parallel workstreams in their own worktrees were merged after
+review: forms (Vault hero dialogs, Add Host, New File Server, the anchored picker, the Vault manager, add menu and sheets),
+panels (Tasks 6–7: Tunnels, SFTP, File Servers, New Tunnel, transfers; Sessions residuals), settings (Task 9 residuals and
+early 11a: all five Settings pages), workspace (Task 10: title bar, command centre, toolbar, tabs, rails, status bar,
+integrated docking; palette residuals), editor (Task 8: Editor, Sample, Project Index, Shell History, Snippets) and
+app-unmocked (chooser, Errors, notifications, theme import). Every mocked surface is mapped, measured and recorded in the
+[acceptance record](design/theme-engine/acceptance.md) with per-stream notes under `design/theme-engine/acceptance/`;
+`tools/visual` holds the comparison tools and the 33 reference/render pairs. Component looks stay in `jasper-ui`;
+plugins reach them through SDK descriptors, now **SDK 0.15.3** (ROUTE strips, DROPDOWN picker faces, free-entry
+placeholders, `SettingSpec.unit`, `border.identity`, new icon names; every bundled manifest requires it), documented in
+[building plugin UI](plugin-ui.md) with compiled examples. The Vault manager's rail More menu became File-menu/palette
+commands (`dev.jasper.vault.change_password`, `dev.jasper.vault.grants`). An independent whole-branch review found 3
+Important and 5 Minor issues (no Critical); all are fixed with regressions. Final `./gradlew check`: 10,042 tests,
+0 failures, 0 errors, 6 skips. A native smoke launch started cleanly (all eight plugins active, no errors). Screen capture
+was unavailable to the agent, so the native visual pass, native focus/popup/sheet behavior, VoiceOver and Windows/Linux
+remain user-run checks listed in the acceptance record. Older entries below are historical.
+
 **Task9c fix round1 — scoped re-review pending (2026-10-11).** Review I1 found that table useful-width search crossed the existing numeric-minimum feasibility boundary, where weighted allocation is not monotonic. The shared search now starts where all existing column minima fit, then reserves the useful first-column target; ordinary allocation remains unchanged. A long numeric-cell regression covers the returned minimum and larger/boundary widths with icons, selection modes and scale variants. This repairs the approved minimum contract without a new layout policy; scoped UI/chooser checks, default/controlled owner captures and fresh installDist evidence are recorded in scratch `task-9c-report.md`, preserving final02. Review M1 classifies inherited100JavaDoc warnings and injected native-notification authorization/delivery failures as known gate noise, not failing tests or new9c defects; source-warning cleanup stays final11. Native/pixel acceptance remains open.
 
 **Task9c constrained-scale correction (2026-10-11).** The first full gate passed, then actual fresh32pt/automatic2.5 owner images exposed fixed divider, zero form body/control width and double-scaled native text failures missed by transition-only checks. Approved shared corrections add measured automatic split negotiation with explicit drag preservation, table four-glyph minimum negotiation, retained stacked preview, all-form bounded body/footer overflow and narrow FormRows stacking. Native fonts share the existing exactly-once policy; an owned typography/scale signal refreshes retained chooser, Errors, notification/history and the specifically approved PluginDetails text consumer. No other Plugins composition or future11a work is included. These are behavioral deviations with layout/callback/disposal costs, covered by fresh owner and retained-state checks; final01 remains historical; the scratch report carries replacement frozen evidence. Native/pixel acceptance remains open.
