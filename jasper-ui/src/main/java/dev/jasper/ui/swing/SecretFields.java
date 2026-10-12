@@ -42,7 +42,7 @@ final class SecretFields {
         boolean revealed, focusWithin;
         int detailValueTop = -1;
         boolean detailActionsBelow;
-        int detailActionWidth() { return reveal.getPreferredSize().width + copy.getPreferredSize().width; }
+        int detailActionWidth() { return reveal.getPreferredSize().width + copy.getPreferredSize().width + ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_ACTION_GAP); }
         int detailActionHeight() { return Math.max(reveal.getPreferredSize().height, copy.getPreferredSize().height); }
         int detailTextHeight() { return component.getFontMetrics(ThemePainting.font(context(), Typography.Role.BODY)).getHeight(); }
 
@@ -167,14 +167,16 @@ final class SecretFields {
                                 g.setFont(ThemePainting.font(context(), Typography.Role.BODY));
                                 g.setColor(
                                         ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
-                                if (!revealed) java.util.Arrays.fill(chars, (char) 0x2022);
                                 var fm = g.getFontMetrics();
-                                g.drawChars(
-                                        chars,
-                                        0,
-                                        chars.length,
-                                        0,
-                                        (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
+                                int baseline = (getHeight() - fm.getHeight()) / 2 + fm.getAscent();
+                                if (!revealed) {
+                                    // A masked stored secret shows a fixed, spaced row of dots: its length is not disclosed.
+                                    ThemePainting.antialias(g);
+                                    int pitch = ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_MASK_PITCH);
+                                    char[] dot = {(char) 0x2022};
+                                    for (int i = 0; i < context().metrics().value(DesignMetrics.Role.DETAIL_MASK_COUNT); i++)
+                                        g.drawChars(dot, 0, 1, i * pitch, baseline);
+                                } else g.drawChars(chars, 0, chars.length, 0, baseline);
                             } finally {
                                 java.util.Arrays.fill(chars, (char) 0);
                                 g.dispose();
@@ -200,7 +202,11 @@ final class SecretFields {
                     }
                 };
                 row.setOpaque(false);
-                var actions = new JPanel(new GridLayout(1, 0));
+                var actions = new JPanel(new GridLayout(1, 0)) {
+                    // Reveal and copy keep the detail references' measured spacing at every theme/font refresh.
+                    @Override public void doLayout() { ((GridLayout) getLayout()).setHgap(ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_ACTION_GAP)); super.doLayout(); }
+                    @Override public Dimension getPreferredSize() { ((GridLayout) getLayout()).setHgap(ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_ACTION_GAP)); return super.getPreferredSize(); }
+                };
                 actions.setOpaque(false);
                 actions.add(reveal);
                 actions.add(copy);

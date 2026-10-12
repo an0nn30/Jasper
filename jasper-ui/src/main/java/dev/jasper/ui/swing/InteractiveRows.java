@@ -1057,12 +1057,12 @@ final class InteractiveRows {
             check.setBounds(x, 0, checkWidth, h);
             x += checkWidth;
             int tw = Math.min(trailing.getPreferredSize().width, Math.max(0, width - x));
-            int actionInset=owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_ACTION_INSET) : 0;
+            int actionInset=owner.panelSingle && owner.column < 0 ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_ACTION_INSET) : 0;
             trailing.setBounds(Math.max(x,width - tw - actionInset), 0, tw, h);
             width = Math.max(x, width - tw - (tw > 0 ? pad : 0));
             int lw = Math.min(leading.getPreferredSize().width, Math.max(0, width - x));
             leading.setBounds(x, 0, lw, h);
-            x += lw + (lw > 0 ? ordered ? ThemePainting.metric(owner.context(),DesignMetrics.Role.ORDERED_TEXT_GAP) : settingsNavigation ? ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTINGS_NAV_TEXT_GAP) : owner.identityRows() ? ThemePainting.metric(owner.context(),DesignMetrics.Role.IDENTITY_ROW_TEXT_GAP) : owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_TEXT_GAP) : pad : 0);
+            x += lw + (lw > 0 ? ordered ? ThemePainting.metric(owner.context(),DesignMetrics.Role.ORDERED_TEXT_GAP) : owner.column == 0 || owner.column == 1 ? ThemePainting.metric(owner.context(),DesignMetrics.Role.COLUMN_TEXT_GAP) : settingsNavigation ? ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTINGS_NAV_TEXT_GAP) : owner.identityRows() ? ThemePainting.metric(owner.context(),DesignMetrics.Role.IDENTITY_ROW_TEXT_GAP) : owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_TEXT_GAP) : pad : 0);
             int content = Math.max(0, width - x);
             if (!cells.isEmpty()) {
                 title.setBounds(x, 0, content, h);
@@ -1165,8 +1165,10 @@ final class InteractiveRows {
                     var rounded=(Graphics2D)g.create();
                     try { ThemePainting.antialias(rounded); rounded.setColor(fill);
                         int arc=ThemePainting.metric(owner.context(), owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_RADIUS : DesignMetrics.Role.CONTROL_RADIUS)*2;
-                        int inset=owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.HAIRLINE) : 0;
-                        rounded.fillRoundRect(0,inset,getWidth(),getHeight()-2*inset,arc,arc);
+                        int stroke=ThemePainting.metric(owner.context(),DesignMetrics.Role.HAIRLINE);
+                        // Manager rail/list rows keep a one-stroke gap below each fill; panel rows inset both edges.
+                        if(owner.column == 0 || owner.column == 1) rounded.fillRoundRect(0,0,getWidth(),getHeight()-stroke,arc,arc);
+                        else { int inset=owner.panelSingle ? stroke : 0; rounded.fillRoundRect(0,inset,getWidth(),getHeight()-2*inset,arc,arc); }
                     } finally {rounded.dispose();}
                 }
                 if (Objects.equals(id, owner.focusItem) && owner.canvas.isFocusOwner()) {

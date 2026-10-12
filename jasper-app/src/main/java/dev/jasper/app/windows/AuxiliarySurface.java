@@ -57,6 +57,8 @@ public final class AuxiliarySurface {
         if (closed) return;
         titleActions.removeAll();
         if (closed) return;
+        // Kit content in the title slot takes the shared title-strip presentation (menu indicators, control surface).
+        if (content instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()) view.titleStrip(true);
         if (content != null) titleActions.add(content, BorderLayout.CENTER);
         titleActions.setVisible(content != null); titleActionsChanged();
     }

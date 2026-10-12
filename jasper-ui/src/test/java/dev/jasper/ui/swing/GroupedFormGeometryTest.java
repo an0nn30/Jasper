@@ -180,6 +180,27 @@ class GroupedFormGeometryTest {
             }finally{release(context);}
         });
     }
+    @Test void formRowLabelsAndTrailingTextFollowTheControlsFirstLineWhenAnErrorAppears() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            java.util.function.Function<String,Node> row=error->new FormRow("row",ControlState.READY,"Port","",
+                new Field("port",new ControlState(true,true,false,error),FieldKind.TEXT,"70000","","Port","",Optional.empty()),
+                Optional.of(new Text("unit",ControlState.READY,"seconds",TextRole.CAPTION)));
+            try(var view=new KitView(context,new ViewSpec(new Card("card",ControlState.READY,CardKind.FORM,List.of(row.apply("")))),e->{})) {
+                KitFixtures.render(view,492,200,1);
+                var label=find(view,"row.label",javax.swing.JComponent.class);var unit=find(view,"unit",javax.swing.JComponent.class);
+                var face=(javax.swing.JComponent)find(view,"port.input",javax.swing.JComponent.class).getParent();
+                int labelY=label.getY(),unitY=unit.getY(),faceHeight=face.getHeight();
+                assertThat(2*labelY+label.getHeight()).isCloseTo(faceHeight,within(1));
+                assertThat(2*unitY+unit.getHeight()).isCloseTo(faceHeight,within(1));
+                view.update(new ViewSpec(new Card("card",ControlState.READY,CardKind.FORM,List.of(row.apply("Use a port from 1 to 65535")))));
+                KitFixtures.render(view,492,200,1);
+                assertThat(find(view,"row",javax.swing.JComponent.class).getHeight()).isGreaterThan(faceHeight);
+                assertThat(label.getY()).as("an inline error below the control does not move its label").isEqualTo(labelY);
+                assertThat(unit.getY()).isEqualTo(unitY);
+            }finally{release(context);}
+        });
+    }
     private static ListItem itemWithId(String id){return new ListItem(id,Optional.empty(),List.of(new Text(id+".name",ControlState.READY,id,TextRole.MONO)),List.of(),List.of());}
 
     @Test void descriptionDensityFollowsCurrentFormKindWithoutChangingCompactAndHeroRows() {

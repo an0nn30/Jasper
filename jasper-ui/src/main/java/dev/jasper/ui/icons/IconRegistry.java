@@ -304,6 +304,7 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("question", "M 6 5 Q 10 3 10 6 L 8 8 V 9 M 8 12 H 8.1"),
             Map.entry("help", "M 14 8 A 6 6 0 1 1 2 8 A 6 6 0 1 1 14 8 M 6 5 Q 10 3 10 6 L 8 8 V 9 M 8 12 H 8.1"),
             Map.entry("history", "M 3 4 A 6 6 0 1 1 2 9 M 3 1 V 5 H 7 M 8 4 V 8 L 11 10"),
+            Map.entry("clock", "M 14 8 A 6 6 0 1 1 2 8 A 6 6 0 1 1 14 8 M 8 4.75 V 8 L 10.25 9.5"),
             Map.entry("link", "M 6 10 L 10 6 M 5 8 L 3 10 A 2 2 0 0 0 6 13 L 8 11 M 8 5 L 10 3 A 2 2 0 0 1 13 6 L 11 8"),
             Map.entry("match.case", "M 2 12 L 5 3 L 8 12 M 3 9 H 7 M 14 8 Q 10 6 10 10 Q 10 13 14 11 V 7"),
             Map.entry("folder.add", "M 2 4 H 6 L 8 6 H 14 V 13 H 2 Z M 8 8 V 12 M 6 10 H 10"),
@@ -336,7 +337,9 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("chevron.up", "M 4 10 L 8 6 L 12 10"),
             Map.entry("search", "M 11 7 A 4 4 0 1 1 3 7 A 4 4 0 1 1 11 7 M 10 10 L 14 14"),
             Map.entry("shield", "M 8 1.333 L 12.85 3.667 V 7.5 C 12.85 11 11 13.333 8 14.333 C 5 13.333 3.15 11 3.15 7.5 V 3.667 Z M 6.5 7 H 9.5 Q 10 7 10 7.5 V 10.5 Q 10 11 9.5 11 H 6.5 Q 6 11 6 10.5 V 7.5 Q 6 7 6.5 7 M 7 7 V 6 A 1 1 0 0 1 9 6 V 7"),
-            Map.entry("lock", "M 5 7 V 5 A 3 3 0 0 1 11 5 V 7 M 4.25 7 H 11.75 Q 12.85 7 12.85 8.25 V 12.75 Q 12.85 14 11.75 14 H 4.25 Q 3.15 14 3.15 12.75 V 8.25 Q 3.15 7 4.25 7 M 8 10.5 H 8.05"),
+            // Control-sized locks are a plain padlock; the hero padlock carries a solid 2.67-unit keyhole (source 4 logical at 24px).
+            Map.entry("lock", "M 5 7 V 5 A 3 3 0 0 1 11 5 V 7 M 4.25 7 H 11.75 Q 12.85 7 12.85 8.25 V 12.75 Q 12.85 14 11.75 14 H 4.25 Q 3.15 14 3.15 12.75 V 8.25 Q 3.15 7 4.25 7"),
+            Map.entry("lock.keyhole", "M 5 7 V 5 A 3 3 0 0 1 11 5 V 7 M 4.25 7 H 11.75 Q 12.85 7 12.85 8.25 V 12.75 Q 12.85 14 11.75 14 H 4.25 Q 3.15 14 3.15 12.75 V 8.25 Q 3.15 7 4.25 7 M 8.75 10.5 A 0.75 0.75 0 1 1 7.25 10.5 A 0.75 0.75 0 1 1 8.75 10.5"),
             Map.entry("edit", "M 3 10 L 10 3 L 13 6 L 6 13 L 2 14 Z M 9 4 L 12 7"),
             Map.entry("delete", "M 2 4 H 14 M 6 4 V 2 H 10 V 4 M 4 4 L 5 14 H 11 L 12 4 M 7 7 V 11 M 9 7 V 11"),
             Map.entry("copy", "M 6 5 H 14 V 14 H 6 Z M 10 5 V 2 H 2 V 11 H 6"),

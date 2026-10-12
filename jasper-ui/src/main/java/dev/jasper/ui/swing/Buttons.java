@@ -118,6 +118,10 @@ final class Buttons {
         boolean hero, panel, fullFooter, orderedAction, panelDetail, circular;
         /** An ORDERED row's compact up/down/remove command. */
         boolean orderedCommand;
+        /** A WINDOW form footer action keeps the window footer's measured minimum width. */
+        boolean windowFooter;
+        /** Paints its kind's fill without the kind's outline (a title-strip menu surface). */
+        boolean borderless;
         /** Content-sized for a host arrangement (ButtonPresentation.EMBEDDED): no minimum height and no resting or hover fill. */
         boolean embedded, contextual, panelRow;
         float disabledOpacity=.42f;
@@ -183,6 +187,7 @@ final class Buttons {
             int reservation = panelDetail ? 2*ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING) : 0;
             height += reservation;
             size.width += reservation;
+            if (windowFooter) size.width = Math.max(size.width, ThemePainting.metric(context, DesignMetrics.Role.WINDOW_ACTION_MIN_WIDTH));
             return new Dimension(getText() == null || getText().isEmpty() ? height : size.width, Math.max(height, size.height));
         }
         /** Shared painter permits a real specialized owner to select its semantic surface. */
@@ -196,7 +201,7 @@ final class Buttons {
                 case LINK -> hover ? ColorMath.opacity(ThemePainting.color(context, SemanticColor.ACCENT), .08) : null;
             };
         }
-        Color border() { if(recorder()) return ThemePainting.color(context,getAccessibleContext().getAccessibleDescription()!=null && !getAccessibleContext().getAccessibleDescription().isEmpty()?SemanticColor.BORDER_ERROR:SemanticColor.BORDER_INPUT); return kind == Nodes.ButtonKind.SECONDARY ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : null; }
+        Color border() { if(borderless) return null; if(recorder()) return ThemePainting.color(context,getAccessibleContext().getAccessibleDescription()!=null && !getAccessibleContext().getAccessibleDescription().isEmpty()?SemanticColor.BORDER_ERROR:SemanticColor.BORDER_INPUT); return kind == Nodes.ButtonKind.SECONDARY ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : null; }
         boolean contextualVisible() {
             if (!contextual || isFocusOwner() || getModel().isRollover()) return true;
             for (Container parent=getParent();parent!=null;parent=parent.getParent())

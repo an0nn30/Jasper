@@ -79,7 +79,7 @@ final class ViewReconciler implements AutoCloseable {
         return null;
     }
     private void resetComposition(ControlRegistry.Control control) {
-        if (control instanceof TextFields.FieldControl field) field.panelSearch = false;
+        if (control instanceof TextFields.FieldControl field) { field.panelSearch = false; field.columnSearch = false; }
         if (control instanceof SecretFields.SecretControl secret) {
             secret.detailValueTop = -1;
             secret.detailActionsBelow = false;
@@ -90,6 +90,7 @@ final class ViewReconciler implements AutoCloseable {
             button.button.panel = false;
             button.button.panelRow = false;
             button.button.fullFooter = false;
+            button.button.windowFooter = false;
             button.button.orderedAction = false;
         }
         if (control instanceof Menus.MenuControl menu) {
@@ -160,6 +161,7 @@ final class ViewReconciler implements AutoCloseable {
         if (control instanceof InteractiveRows.RowsControl rows) rows.column = column;
         if (control instanceof SettingRows.RowControl row) row.detail = detail;
         if (control instanceof Stacks.StackControl stack) stack.detail = detail;
+        if (control instanceof Cards.CardControl card) card.detail = detail;
         var children = ControlRegistry.children(node);
         for (int i = 0; i < children.size(); i++) applyColumns(children.get(i), next,
             node instanceof Nodes.Split split && split.kind() == Nodes.SplitKind.THREE_COLUMN ? i : column, detail);
@@ -171,9 +173,15 @@ final class ViewReconciler implements AutoCloseable {
         if (control instanceof Buttons.ButtonControl button) button.button.panelDetail = inherited;
         if (control instanceof Labels.TextControl text) text.panelDetail = inherited;
         if (control instanceof Labels.IconControl icon) icon.panelDetail = inherited;
+        // Compact panel details keep their own card geometry; only manager details close their settings cards.
+        if (control instanceof Cards.CardControl card && inherited) card.detail = false;
         if (node instanceof Nodes.Panel panel) panel.searchOrNavigation()
             .filter(n -> n instanceof Nodes.Field field && field.kind() == Nodes.FieldKind.SEARCH)
-            .ifPresent(n -> { if (next.get(n.id()) instanceof TextFields.FieldControl field) field.panelSearch = true; });
+            .ifPresent(n -> { if (next.get(n.id()) instanceof TextFields.FieldControl field) {
+                // A three-column list column searches with a full-size field; other panels keep the compact header search.
+                boolean column = control instanceof Panels.PanelControl owner && owner.column == 1;
+                field.panelSearch = !column; field.columnSearch = column;
+            } });
         if (node instanceof Nodes.Panel panel && panel.body() instanceof Nodes.ItemList list && list.kind()==Nodes.ListKind.SINGLE
             && next.get(list.id()) instanceof InteractiveRows.RowsControl rows) rows.panelSingle=true;
         for (var child : ControlRegistry.children(node)) {

@@ -252,6 +252,18 @@ public final class KitView extends JPanel implements AutoCloseable {
         surface = value; setOpaque(value); repaint();
     }
     private boolean surface;
+    /**
+     * App-only: this view is a native window's title action strip. Its icon-only menu buttons show their menu
+     * indicator on the borderless control surface, as the window title references paint them. EDT confined.
+     */
+    public void titleStrip(boolean value) {
+        requireOpen();
+        if (titleStrip == value) return;
+        titleStrip = value; refresh(); repaint();
+    }
+    /** Whether this view is presented as a window title action strip. */
+    public boolean titleStrip() { return titleStrip; }
+    private boolean titleStrip;
     @Override protected void paintComponent(Graphics graphics) {
         if (!surface) { super.paintComponent(graphics); return; }
         graphics.setColor(context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));

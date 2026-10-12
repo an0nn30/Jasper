@@ -362,12 +362,12 @@ final class ManagerPanel implements AutoCloseable {
     private Nodes.Node status() {
         return new Nodes.Stack(STATUS, ControlState.READY, Nodes.LayoutRole.FOOTER, List.of(
             statusGroup("provider", "key", status.deviceSecret(), Nodes.TextRole.CAPTION),
-            statusGroup("autolock", "history", "Auto-lock: " + status.autoLock(), Nodes.TextRole.CAPTION),
+            statusGroup("autolock", "clock", "Auto-lock " + status.autoLock(), Nodes.TextRole.CAPTION),
             statusGroup("path", "folder", status.path(), Nodes.TextRole.MONO_CAPTION)));
     }
     private Nodes.Node statusGroup(String id,String icon,String value,Nodes.TextRole role) {
         return new Nodes.Stack("status."+id+".group",ControlState.READY,Nodes.LayoutRole.NAVIGATION,List.of(
-            new Nodes.Icon("status."+id+".icon",ControlState.READY,icon,Nodes.Hue.NEUTRAL,Nodes.IconSize.CONTROL,id),
+            new Nodes.Icon("status."+id+".icon",ControlState.READY,icon,Nodes.Hue.NEUTRAL,Nodes.IconSize.CAPTION,id),
             text("status."+id,value,role)));
     }
 

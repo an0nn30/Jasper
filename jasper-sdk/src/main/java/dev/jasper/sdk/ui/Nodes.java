@@ -255,13 +255,18 @@ public final class Nodes {
      * Type-to-filter configuration of a SEARCHABLE choice. The first {@code pinned} options always show; {@code noMatches}
      * is the line shown when typing matches nothing. A present {@code entry} makes the value free text (options become
      * suggestions): the kit reports typed or picked text as {@link UiEvent.Edited}, and the choice has no selected id.
+     * A nonempty {@code placeholder} is shown, in the placeholder role, while a free entry is empty (for example what a
+     * blank value means); it is never a value. It requires free entry.
      */
-    public record ChoiceSearch(int pinned, String noMatches, Optional<String> entry) {
+    public record ChoiceSearch(int pinned, String noMatches, Optional<String> entry, String placeholder) {
         public ChoiceSearch {
             if (pinned < 0) throw new IllegalArgumentException("Negative pinned count");
             ModelChecks.label(noMatches, "noMatches");
             Objects.requireNonNull(entry);
+            Objects.requireNonNull(placeholder);
+            if (!placeholder.isEmpty() && entry.isEmpty()) throw new IllegalArgumentException("A placeholder requires free entry");
         }
+        public ChoiceSearch(int pinned, String noMatches, Optional<String> entry) { this(pinned, noMatches, entry, ""); }
     }
 
     /** The full form and inline picker share one renderer at two explicit densities. */

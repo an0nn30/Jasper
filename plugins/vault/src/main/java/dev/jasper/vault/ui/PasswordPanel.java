@@ -151,7 +151,7 @@ public final class PasswordPanel implements AutoCloseable {
     /** The standalone hero; domain policy remains in the submit handler. */
     Nodes.Form node() {
         var hero = new Nodes.Stack(form + ".hero", ControlState.READY, Nodes.LayoutRole.HERO, List.of(
-            new Nodes.Icon(form + ".icon", ControlState.READY, creating ? "shield" : "lock", Nodes.Hue.BLUE, Nodes.IconSize.HERO, creating ? "Protect credentials" : "Locked vault"),
+            new Nodes.Icon(form + ".icon", ControlState.READY, creating ? "shield" : "lock.keyhole", Nodes.Hue.BLUE, Nodes.IconSize.HERO, creating ? "Protect credentials" : "Locked vault"),
             new Nodes.Text(form + ".heading", ControlState.READY, creating ? "Create Vault" : "Unlock Vault", Nodes.TextRole.HERO_TITLE),
             new Nodes.Text(intro, ControlState.READY, introText, Nodes.TextRole.DESCRIPTION)));
         var fields = new ArrayList<Nodes.Node>();

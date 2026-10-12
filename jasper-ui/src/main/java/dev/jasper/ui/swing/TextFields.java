@@ -15,6 +15,8 @@ final class TextFields {
     private TextFields() {}
     static class FieldControl extends ControlRegistry.Control {
         boolean panelSearch;
+        /** A three-column manager's list search: a full-size field with the measured column glyph and gap. */
+        boolean columnSearch;
         final JTextComponent input;
         final JLabel label = Labels.literal(), error = Labels.literal(), leading = Labels.literal();
         final FieldSurface surface;
@@ -29,6 +31,10 @@ final class TextFields {
         /** An input method holds uncommitted (composed) text in the field. */
         boolean composing;
         long valueRevision;
+        @Override int firstLineHeight() {
+            if (((Nodes.Field) node).kind() == Nodes.FieldKind.TEXTAREA) return ThemePainting.height(context(), DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY);
+            return line.getHeight() > 0 ? line.getY() + line.getHeight() : line.getPreferredSize().height;
+        }
         FieldControl(KitView view, Nodes.Field node) {
             super(view, node, new JPanel(new BorderLayout())); container = (JPanel)component;
             input = node.kind() == Nodes.FieldKind.TEXTAREA ? new JTextArea(3, 16) : new JTextField(node.kind() == Nodes.FieldKind.PORT ? 6 : 16);
@@ -254,7 +260,7 @@ final class TextFields {
             }
             var role = panelSearch ? Typography.Role.PANEL_SEARCH : field.kind() == Nodes.FieldKind.PORT || field.kind() == Nodes.FieldKind.PATH || field.presentation() == Nodes.FieldPresentation.TECHNICAL ? Typography.Role.MONO : Typography.Role.BODY;
             input.setFont(ThemePainting.font(context(), role));
-            surface.panelSearch=panelSearch; surface.role=role; surface.heightRole=panelSearch ? DesignMetrics.Role.PANEL_SEARCH_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT;
+            surface.panelSearch=panelSearch; surface.role=role; surface.heightRole=panelSearch ? DesignMetrics.Role.PANEL_SEARCH_HEIGHT : columnSearch ? DesignMetrics.Role.COLUMN_SEARCH_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT;
             input.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
             input.setDisabledTextColor(input.getForeground()); input.setCaretColor(input.getForeground());
             input.setSelectionColor(ThemePainting.color(context(), SemanticColor.SELECTION_BG));
@@ -277,11 +283,11 @@ final class TextFields {
             leading.setText(field.kind() == Nodes.FieldKind.PORT ? ":" : "");
             if (field.kind() == Nodes.FieldKind.SEARCH || field.kind() == Nodes.FieldKind.PATH) {
                 String name=field.kind() == Nodes.FieldKind.PATH ? "folder.filled" : "search";
-                int extent=com.formdev.flatlaf.util.UIScale.scale(context().icons().size(panelSearch ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
+                int extent=columnSearch ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_GLYPH) : com.formdev.flatlaf.util.UIScale.scale(context().icons().size(panelSearch ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
                 leading.setIcon(panelSearch ? context().icons().panel(name, context().theme().semantic(), SemanticColor.HUE_NEUTRAL,extent)
                     : context().icons().icon(name,context().theme(),SemanticColor.TEXT_PLACEHOLDER,extent));
             }
-            int gap = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_GAP : field.kind() == Nodes.FieldKind.PORT ? DesignMetrics.Role.PORT_PREFIX_GAP : DesignMetrics.Role.ICON_GAP);
+            int gap = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_GAP : columnSearch ? DesignMetrics.Role.COLUMN_SEARCH_GAP : field.kind() == Nodes.FieldKind.PORT ? DesignMetrics.Role.PORT_PREFIX_GAP : DesignMetrics.Role.ICON_GAP);
             leading.setVisible(field.presentation() != Nodes.FieldPresentation.PLAIN_PATH);
             leading.setBorder(new EmptyBorder(0, 0, 0, gap));
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
@@ -293,7 +299,8 @@ final class TextFields {
                 // The visible label stays "Browse…"; the accessible name says which field it fills.
                 browse.component.getAccessibleContext().setAccessibleName("Browse for " + field.label());
             }
-            ((BorderLayout)line.getLayout()).setHgap(ThemePainting.metric(context(), DesignMetrics.Role.BUTTON_GAP));
+            // A path's Browse sits on the form's column gap, as a FormRow trailing control does.
+            ((BorderLayout)line.getLayout()).setHgap(ThemePainting.metric(context(), browse != null && browse.component.isVisible() ? DesignMetrics.Role.COLUMN_GAP : DesignMetrics.Role.BUTTON_GAP));
             ((BorderLayout)container.getLayout()).setVgap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
             container.revalidate(); container.repaint();
         }

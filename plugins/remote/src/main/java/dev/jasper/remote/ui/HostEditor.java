@@ -355,7 +355,7 @@ public final class HostEditor implements AutoCloseable {
             new Nodes.SettingRow("row." + GROUP, ControlState.READY, "Group", "",
                 new Nodes.Choice(GROUP, state(true, editable), Nodes.ChoiceKind.SEARCHABLE,
                     groups.stream().map(g -> new Option("group." + g, g, Optional.empty())).toList(), "", "Group. Blank: " + defaultGroup + " (default)", "", "",
-                    Optional.of(new Nodes.ChoiceSearch(0, "No other groups", Optional.of(group)))), false),
+                    Optional.of(new Nodes.ChoiceSearch(0, "No other groups", Optional.of(group), defaultGroup))), false),
             new Nodes.SettingRow("row." + FAVORITE, ControlState.READY, "Add to Favorites", "",
                 new Nodes.Toggle(FAVORITE, state(true, editable), "Favorite", favorite, FAVORITE, false), false),
             new Nodes.SettingRow("row." + FOLLOW, ControlState.READY, "Track shell folder", "SFTP follows the terminal's current directory",

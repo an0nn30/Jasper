@@ -847,3 +847,11 @@ key before SDK compatibility resolution; a version floor does not make an old pa
 The host's immutable identity value includes this policy in equality and receiver aliases; same-byte
 metadata updates therefore refresh selected presentation without replacing the plugin's authored art.
 This is manifest metadata, not a new SDK UI descriptor or general icon-state API.
+
+### Free-entry placeholders (unreleased SDK 0.15 generation)
+
+`Nodes.ChoiceSearch` gains a fourth component, `placeholder`. A SEARCHABLE choice with free entry
+(`entry` present) shows a nonempty placeholder in the placeholder role while its text is empty, for
+example the group a blank value files a host under. It is display text only: it is never reported as an
+`Edited` value and never becomes the entry. A placeholder without free entry is rejected. The original
+three-argument constructor remains and supplies an empty placeholder.

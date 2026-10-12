@@ -8,7 +8,6 @@ import dev.jasper.ui.theme.SemanticColor;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.geom.RoundRectangle2D;
 import java.util.ArrayList;
 
 import javax.swing.*;
@@ -232,8 +231,17 @@ final class Menus {
             arrow.setToolTipText("Open menu");
             arrow.getAccessibleContext().setAccessibleName("Open menu");
             arrow.setVisible(!menu.action().isBlank());
-            ((Main) main).menuOnly = menu.action().isBlank() && !embedded && !menu.label().isBlank();
-            ((MenuSurface) component).background.kind = menu.kind();
+            // A title strip's icon-only menu shows its indicator on the borderless control surface.
+            boolean strip = view.titleStrip() && menu.action().isBlank() && !embedded && menu.label().isBlank() && !menu.icon().isEmpty();
+            ((Main) main).menuOnly = menu.action().isBlank() && !embedded && (!menu.label().isBlank() || strip);
+            if (strip) {
+                int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
+                main.setBorder(new EmptyBorder(ring, ThemePainting.metric(context(), DesignMetrics.Role.MENU_ITEM_PADDING), ring,
+                    ThemePainting.metric(context(), DesignMetrics.Role.MENU_ICON_ARROW_WIDTH)));
+            }
+            ((Main) main).iconMenu = strip;
+            ((MenuSurface) component).background.kind = strip ? Nodes.ButtonKind.SECONDARY : menu.kind();
+            ((MenuSurface) component).background.borderless = strip;
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.MENU_PADDING);
             popup.setBorder(new EmptyBorder(pad, pad, pad, pad));
             if (!prior.equals(menu.items())) {
@@ -270,6 +278,7 @@ final class Menus {
                     int inset =
                             ThemePainting.metric(context(), DesignMetrics.Role.MENU_ITEM_PADDING);
                     item.setBorder(new EmptyBorder(0, inset, 0, inset));
+                    item.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.MENU_TILE_GAP));
                     item.setIcon(
                             descriptor.icon().isBlank()
                                     ? null
@@ -321,7 +330,15 @@ final class Menus {
 
     static final class Main extends Part {
         final KitContext context;
-        boolean menuOnly;
+        boolean menuOnly, iconMenu;
+
+        @Override
+        public Dimension getPreferredSize() {
+            var size = super.getPreferredSize();
+            if (!iconMenu || getIcon() == null) return size;
+            Insets insets = getInsets();
+            return new Dimension(insets.left + getIcon().getIconWidth() + insets.right, size.height);
+        }
 
         Main(KitContext context) {
             super(context);
@@ -438,12 +455,9 @@ final class Menus {
     static void paintSurface(JComponent component, Graphics graphics, KitContext context) {
             var g = (Graphics2D) graphics.create();
             try {
-                ThemePainting.antialias(g);
-                int r = ThemePainting.metric(context, DesignMetrics.Role.CARD_RADIUS);
-                g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_MENU));
-                g.fillRoundRect(0, 0, component.getWidth(), component.getHeight(), r * 2, r * 2);
-                g.setColor(ThemePainting.color(context, SemanticColor.BORDER_MENU));
-                g.draw(new RoundRectangle2D.Double(.5, .5, component.getWidth() - 1, component.getHeight() - 1, r * 2, r * 2));
+                // One crisp hairline at the surface edge, as every popup reference paints it.
+                ThemePainting.rounded(g, component, context, ThemePainting.color(context, SemanticColor.SURFACE_MENU),
+                    ThemePainting.color(context, SemanticColor.BORDER_MENU), false, false, DesignMetrics.Role.CARD_RADIUS);
             } finally {
                 g.dispose();
             }
@@ -494,9 +508,10 @@ final class Menus {
                 int x = i.left;
                 if (getIcon() != null) {
                     getIcon().paintIcon(this, g, x, (getHeight() - getIcon().getIconHeight()) / 2);
+                    // Category tiles take the measured wider tile-to-label gap of the add-menu reference.
                     x +=
                             getIcon().getIconWidth()
-                                    + ThemePainting.metric(context, DesignMetrics.Role.ICON_GAP);
+                                    + ThemePainting.metric(context, DesignMetrics.Role.MENU_TILE_GAP);
                 }
                 g.drawString(
                         getText(),

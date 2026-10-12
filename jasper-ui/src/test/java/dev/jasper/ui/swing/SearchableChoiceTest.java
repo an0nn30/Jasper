@@ -234,6 +234,36 @@ class SearchableChoiceTest {
             "", "Font", "", "", Optional.of(new ChoiceSearch(0, "No installed font matches", Optional.of(entry))));
     }
 
+    @Test void anEmptyFreeEntryPaintsItsPlaceholderWithoutMakingItTheValue() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            var group = new Choice("group", ControlState.READY, ChoiceKind.SEARCHABLE, List.of(new Option("work", "Work", Optional.empty())),
+                "", "Group", "", "", Optional.of(new ChoiceSearch(0, "No other groups", Optional.of(""), "Other")));
+            try (var view = new KitView(context, stack(group), events::add)) {
+                var editor = find(view, "group.input", SearchChoices.Combo.class).editorField();
+                editor.setSize(160, 22);
+                java.util.function.IntSupplier ink = () -> {
+                    var image = new java.awt.image.BufferedImage(160, 22, java.awt.image.BufferedImage.TYPE_INT_ARGB); var g = image.createGraphics();
+                    try { editor.paint(g); } finally { g.dispose(); }
+                    var placeholder = ThemePainting.color(context, dev.jasper.ui.theme.SemanticColor.TEXT_PLACEHOLDER);
+                    int count = 0;
+                    for (int x = 0; x < 160; x++) for (int y = 0; y < 22; y++) {
+                        int rgb = image.getRGB(x, y);
+                        if ((rgb >>> 24) > 200 && Math.abs(((rgb >> 16) & 255) - placeholder.getRed()) < 40 && Math.abs((rgb & 255) - placeholder.getBlue()) < 40) count++;
+                    }
+                    return count;
+                };
+                assertThat(editor.getText()).isEmpty();
+                assertThat(ink.getAsInt()).as("placeholder ink while empty").isPositive();
+                editor.setText("Lab");
+                assertThat(ink.getAsInt()).as("typed text replaces the placeholder").isZero();
+                assertThat(events).last().isEqualTo(new UiEvent.Edited("group", "Lab"));
+            } finally { release(context); }
+            assertThatThrownBy(() -> new ChoiceSearch(0, "No matches", Optional.empty(), "Other")).isInstanceOf(IllegalArgumentException.class);
+            assertThat(new ChoiceSearch(0, "No matches", Optional.of("x")).placeholder()).isEmpty();
+        });
+    }
+
     @Test void freeEntryEditsTheTextAndOffersMatchingSuggestions() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();

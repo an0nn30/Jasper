@@ -16,6 +16,7 @@ final class FormRows {
     static final class RowControl extends ControlRegistry.Control {
         final JLabel label = Labels.literal();
         final Composition.WrappedText caption;
+        java.util.List<ControlRegistry.Control> controls = java.util.List.of();
 
         RowControl(KitView view, Nodes.FormRow node) {
             super(view, node, new SettingRows.SearchHighlight(view.context()));
@@ -47,6 +48,7 @@ final class FormRows {
 
         @Override
         void children(List<ControlRegistry.Control> controls) {
+            this.controls = List.copyOf(controls);
             for (var c : controls) {
                 Composition.label(c, true);
                 if (c instanceof Labels.TextControl && c.component instanceof Labels.LiteralLabel label
@@ -134,6 +136,13 @@ final class FormRows {
             return new Dimension(w, height(p, p.getWidth() > 0 ? p.getWidth() : w));
         }
 
+        /** The control's first line: labels and trailing text centre on it, not on the whole (error-grown) row. */
+        int firstLine(int index, int height) {
+            int line = owner.controls.size() > index - 2 ? owner.controls.get(index - 2).firstLineHeight() : -1;
+            if (line <= 0) line = Math.min(height, ThemePainting.height(owner.context(), DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY));
+            return Math.min(height, line);
+        }
+
         @Override
         public void layoutContainer(Container p) {
             if(stacked(p,p.getWidth())) {
@@ -151,23 +160,22 @@ final class FormRows {
                     trailing = trailing(p,p.getWidth()),
                     x = lw + gap(),
                     w = Math.max(0, p.getWidth() - x - (trailing > 0 ? trailing + gap() : 0));
+            int controlHeight = p.getComponentCount() > 2 ? Composition.height(p.getComponent(2), w) : p.getHeight();
+            if (p.getComponentCount() > 2) p.getComponent(2).setBounds(x, 0, w, controlHeight);
+            int line = p.getComponentCount() > 2 ? firstLine(2, controlHeight) : p.getHeight();
             int lh = Composition.height(owner.label, lw),
                     y =
                             owner.caption.isVisible()
                                     ? ThemePainting.metric(
                                             owner.context(), DesignMetrics.Role.CAPTION_TOP_OFFSET)
-                                    : Math.max(0, (p.getHeight() - lh) / 2);
+                                    : Math.max(0, (line - lh) / 2);
             owner.label.setBounds(0, y, lw, lh);
             owner.caption.setBounds(0, y + lh, lw, owner.caption.height(lw));
-            if (p.getComponentCount() > 2)
-                p.getComponent(2).setBounds(x, 0, w, Composition.height(p.getComponent(2), w));
-            if (p.getComponentCount() > 3)
-                p.getComponent(3)
-                        .setBounds(
-                                x + w + gap(),
-                                0,
-                                trailing,
-                                Composition.height(p.getComponent(3), trailing));
+            if (p.getComponentCount() > 3) {
+                int th = Composition.height(p.getComponent(3), trailing);
+                // Shorter trailing content (a unit or note) centres on the control's first line as the label does.
+                p.getComponent(3).setBounds(x + w + gap(), th < line ? (line - th) / 2 : 0, trailing, th);
+            }
         }
     }
 }

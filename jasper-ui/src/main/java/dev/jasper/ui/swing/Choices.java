@@ -27,6 +27,7 @@ final class Choices {
         /** A FULL-form setting row's trailing dropdown uses the compact setting-control height. */
         boolean fullSetting;
         @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(!value); }
+        @Override int firstLineHeight() { return input.getHeight() > 0 ? input.getY() + input.getHeight() : input.getPreferredSize().height; }
         boolean applying;
         ChoiceControl(KitView view, Nodes.Choice node) {
             super(view, node, new JPanel(new BorderLayout()));
