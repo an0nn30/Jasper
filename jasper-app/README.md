@@ -86,11 +86,12 @@ updating reflective class names in `.properties` files.
 
 ## Native theme engine
 
-The app ships five native TOML themes and reads user TOMLs from `themes/` beside the selected config. Appearance
-and Terminal > Font & Colors share the catalog. `themeimport` owns offline conversion, locked generation, safe
-import operations and legacy-file recovery; `application.ThemeUpgrade` runs before ConfigService. The old stores
-are retired. See [themes](../docs/themes.md), [maintenance](../docs/app-maintenance.md#themes) and
-[third-party notices](../THIRD-PARTY-THEMES.md). Theme files reload live; Settings › Appearance imports them.
+The app runs on Slate Steel only. `ui.appearance` (system, dark, light) picks Slate Steel Dark or Light and
+`terminal.scheme` the terminal panes' colours; `application.ConfigurationController` applies both through
+`appearance.ThemeController`, with `application.AppearancePolicy` resolving `system` against the operating system.
+No themes folder is read and nothing is converted or upgraded at start-up. The native TOML themes, `themeimport` and
+`themesui` remain only as test seams until Slate Steel Plan 3 removes them. See [themes](../docs/themes.md) and
+[maintenance](../docs/app-maintenance.md#themes).
 
 The [Plan 2 completion audit](../docs/design/theme-engine/completion.md) records SDK 0.15 migration,
 headless validation and distribution visibility. Final screen composition is owned by Plan 3.

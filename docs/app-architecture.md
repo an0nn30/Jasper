@@ -173,8 +173,8 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `plugins` | The plugin runtime: descriptors, locked consent state, resolution, per-plugin classloaders, the queued EDT event bus, activities, the service registry and plugin lifetimes. Application owns and stops PluginRuntime; it is the only package that may reference the SDK. Declared plugin settings (DeclaredSettings) are read with the plugin's own schema and saved through PluginSettingsFiles. PluginRuntime.settingsPages gives Settings a page per plugin under Tools. |
 | `shortcuthelp` | The Settings dialog's Keymap page: effective shortcut catalog, expandable searchable sections, staged binding edits saved on Apply and a window-scoped key recorder. SettingsDialog owns each KeymapPage; disposing it closes its subscription and capture. |
 | `pluginmanager` | The Settings dialog's Plugins page: passive view, consent view and an EDT controller over PluginRuntime's public records. Application owns the PluginManager; SettingsDialog owns each PluginsPage, whose consent and confirm dialogs open over Settings. |
-| `themeimport` | Offline bounded conversion, deterministic vendoring, frozen import plans and locked file operations. Startup owns resumable legacy migration; no config/application dependency. |
-| `themesui` | The Appearance page's Import theme…: a serial import worker and its dialogs over Settings. The Appearance page owns each ThemeImport and closes it when disposed. |
+| `themeimport` | Offline bounded conversion, deterministic vendoring, frozen import plans and locked file operations; no config/application dependency. No production caller since Slate Steel Plan 2 (nothing converts or migrates themes at start-up); Plan 3 removes it. |
+| `themesui` | The former Import theme…: a serial import worker and its dialogs. Nothing wires it since Slate Steel Plan 2; Plan 3 removes it. |
 | `restart` | Pure restart planning, the ResidentControl seam and the RestartFlow state machine. No owner; worker threads are daemons. |
 | `lifecycle` | Owner-thread-confined once-only cancellation. The subscriber closes the handle; no background worker or global state. |
 | `startup` | Start-up timing (`StartupTrace`, `WindowTrace`, `StartupTraceFile`); JDK-only, depended on by bootstrap, application, plugins and benchmark. Safe from any thread; `mark` and `phase` are non-blocking and run on the caller's thread; settling, logging and file writes run on virtual threads, never on the EDT. |
@@ -243,26 +243,17 @@ keys install through the IntelliJ path above. The four classic singleton built-i
 vendored IntelliJ files by `IntellijConversion` as `ui_complete` documents (their own keys install unchanged).
 Tool windows paint `surface.panel` (theme.md's tool-window body) through `ToolWindowSurface`, their headers included; the stripes stay chrome.
 
-Native themes come from `ThemeCatalog`: user TOML files beside the actual config, then the indexed offline
-collection. `Theme.Source` permits only `Bundled` and `UserFile`. The index loads lazily and reuses the four classic
-singletons. Native inheritance, filename precedence, per-file diagnostics and unchanged-instance reuse remain.
+The installed theme is Slate Steel. `SlateSteel.bundled()` (jasper-ui) supplies one `GeneratedTheme` per variant and
+the terminal schemes. `ThemeController.configure(dark, scheme, font)` installs the variant for chrome and workspace and
+resolves the scheme's palette for terminal panes (`ResolvedTheme.slateSteel`); `ResolvedTheme.surface()`, the
+workspace's `surface.terminal`, is what the window behind panes, tab backgrounds and the tab strip use, so a scheme
+colours only the text area. `ConfigurationController` resolves `ui.appearance` with `AppearancePolicy` against the
+live `SystemAppearance` observation; an installation failure keeps the current appearance and is a warning on
+`ui.appearance`.
 
-`themeimport` owns the shared bounded converters (`ThemeConverter`, `ThemeArchive`, `ThemeLoader`, `EditorScheme`,
-`SafeXml`), deterministic offline generation, safe file/import operations and resumable migration. It depends on
-appearance, never config/application. JSON/XML parent resources live under `themeimport/intellij/`; XML forbids
-DOCTYPE/external entities. `ThemeTomlWriter` preserves ordered UI and icon data and syntax styles without choosing
-an OS or installing a LAF. Only the in-memory FlatLaf adapter supplies JSON at runtime.
-
-`application.ThemeUpgrade` joins `themeimport.ThemeMigration` and `config.ThemeSelectionMigration` before
-`ConfigService` construction, after help and resident handoff. A bounded journal persists original identity/hash,
-output intent/progress, old-slot owners and exact config before/after values. All output is staged before originals
-move, preserving local-parent dependencies across crashes. Atomic no-clobber publication and identity checks retain
-foreign/edited files. Config intent prevents repeated chained renames after a post-write crash; completion follows
-successful config handling. Recoverable source failures remain diagnostics after the completion marker.
-
-The configuration worker rescans the native catalog and refreshes migration diagnostics without conversion.
-`ConfigurationController` retains those separately from transient warnings; chrome and workspace both resolve in
-the same native catalog. Settings › Appearance offers both as dropdowns, with `match` as Same as UI theme.
+`ThemeCatalog`, the native TOML themes and `themeimport` (converters, offline generation, import operations and the
+migration journal) remain only as test seams: no production code reads a themes folder or converts, imports or
+migrates a theme, and nothing runs before `ConfigService` construction for themes. Slate Steel Plan 3 removes them.
 
 ## Hosted workspace styling
 

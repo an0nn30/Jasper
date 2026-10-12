@@ -322,6 +322,10 @@ boundaries; this refactor promises no plugin loading, binary compatibility or pe
 
 ## Themes
 
+Since Slate Steel Plan 2 the app installs only Slate Steel (`slate-steel.json` in jasper-ui, read by `SlateSteel`;
+see [the Slate Steel record](design/theme-engine/slate-steel.md)). The native TOMLs, converters and offline collection
+below are no longer loaded at runtime; Slate Steel Plan 3 removes them.
+
 Edit the hand-written Jasper Light/Dark and Clear Dark/Light TOMLs under
 `jasper-app/src/main/resources/dev/jasper/app/themes/` (`ConvertThemes` copies these four unchanged);
 change shared mappings in `UiTemplate` and derivations in `ThemeGenerator`. The 256 KiB native cap remains.
@@ -335,12 +339,12 @@ Run `BundledThemeConversionTest` for drift/provenance and `BundledWorkspaceParit
 colors; preserve golden converter tests for UI ordering, OS tables, syntax styles and icon palettes.
 
 Converters/security fixtures live in `themeimport`; native catalog/installation tests live in `appearance`.
-`ThemeMigrationTest`, `MigrationJournalTest`, `ThemeSelectionMigrationTest`, `ThemeUpgradeTest` and
-`NativeThemeUpgradeTest` cover recovery/ownership and startup ordering. Never fix recovery by overwriting a changed
-file or deleting an equal-byte foreign backup. Keep original data and report the conflict. Config migration must
-stay ahead of ConfigService construction and use its actual override directory.
+`ThemeMigrationTest` and `MigrationJournalTest` cover the recovery code, which nothing runs since Slate Steel Plan 2:
+start-up neither migrates themes nor rewrites theme settings. Never fix recovery by overwriting a changed file or
+deleting an equal-byte foreign backup. Keep original data and report the conflict.
 
-Import theme… (`themesui.ThemeImport`) consumes `ThemeImporter`, which writes through `ThemeFiles` and `ThemeTomlWriter`.
+The former Import theme… (`themesui.ThemeImport`, over `ThemeImporter`, `ThemeFiles` and `ThemeTomlWriter`) is not
+wired into Settings.
 Run `./gradlew check` and all architecture guards; hand native visual acceptance to the user ([themes](themes.md)).
 
 ## Maintaining SDK icons
@@ -643,38 +647,21 @@ and icons use the active theme and bundled catalog. `shortcutHelpPreview` render
 expanded and editing states in both themes and larger UI type without opening a window.
 
 
-### Maintaining the theme dropdowns and Import theme…
+### Maintaining the Appearance section
 
-The Appearance page's Theme and Workspace scheme rows are ordinary schema rows (`Editors.theme` and
-`Editors.workspaceScheme`, one `Editors.ThemePick` each). `settingsui.ThemeChoices` carries the catalog's names and a
-per-page import factory from application wiring, so settingsui has no dependency on themesui. A pick re-reads the
-names on each page refresh (`ValueEditor.refresh`); a saved name the catalog lacks stays listed as "(not found)" and
-keeps its spelling. Only the Theme row has the gear; its page disposes the row, which closes the import.
+The Appearance page's Theme section is `Editors.appearance(AppearanceChoices)`: `settingsui.AppearanceSelection` edits
+`ui.appearance` with the Dark / Light / Match System tiles, a read-only Theme row whose one entry is "Slate Steel", and
+a Reset button shown when the value is not `system`; `terminal.scheme` is an ordinary `Editors.choice` row noted
+"Colors for terminal panes". `AppearanceChoices` carries the two tile previews, the workspace glass defaults and the
+system-appearance observation from application wiring (`application.SettingsAppearance`), so settingsui reads jasper-ui
+only through `ui.model` and `ui.swing`. The Match System tile names the observed appearance, or says it is unavailable
+and Dark is used. Terminal › Font & Colors links to the section.
 
-Both picks use `settingsui.SearchCombo`, a `JComboBox` whose look-and-feel UI (a `FlatComboBoxUI` subclass, or Basic
-without FlatLaf) creates its own `ComboPopup`: a non-focusable `JPopupMenu` with a search bar over a filtered list.
-Focus stays on the combo; the popup's key listener, which the UI installs on the combo, routes typed characters into
-the search and handles Up/Down (keypad too), Page Up/Down, Home/End, Enter, Escape and Backspace while the list is
-open or a search runs; every key the combo's own bindings would answer with a pick behind the list must stay handled
-there. `selectWithKeyChar` always returns false, because each look and feel installs a fresh key selection manager.
-The popup's size is fixed when it opens; only the bar's first appearance repacks. Its rows have their own renderer,
-padded as FlatLaf pads its own combo popup (`ComboBox.padding` plus the combo's focus width at each side, read at paint
-time), with the combo's `selectionInsets`/`selectionArc` and `popupInsets`; `SearchComboTest` compares the padding
-with a stock FlatLaf combo.
-FlatLaf touches its own popup type only behind an `instanceof` check; recheck that when upgrading FlatLaf.
+The command palette's `view.terminal_scheme.<name>` commands save `terminal.scheme` for every window
+(`WindowContent.selectTerminalScheme`); "Themes…" opens Appearance.
 
-`themesui.ThemeImport` runs every conversion and write on its serial worker. Dialogs and reload requests run on EDT;
-completion waits for the catalog refresh before reporting. A closed import suppresses UI callbacks while a running
-confirmed write still refreshes application state. Copying, editing and removing themes are file edits in the
-`themes` folder; there is no UI for them.
-
-The configuration worker's companion scan hashes native content every second and publishes catalog-only changes.
-`WindowContent` receives the latest snapshot supplier from `ConfigurationController`; menu models rebuild on opening
-only when names or requested choices change. Menu listeners and catalogs are released with the window. Keep the three
-legacy terminal-color command IDs mapped to explicit Jasper names; canonical Light/Dark user names are literal.
-
-Headless checks: AppearancePageTest, ThemeImportTest, ThemeImportViewTest, WindowThemeMenuTest and
-JasperApplicationThemesTest. Do not launch the GUI from an unattended agent.
+Headless checks: AppearancePageTest, AppearanceSelectionTest, SettingsDialogTest, TerminalSchemeCommandsTest,
+TerminalSchemeSurfaceTest and JasperApplicationThemesTest. Do not launch the GUI from an unattended agent.
 
 ## Consumer migration completion
 
