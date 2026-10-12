@@ -129,7 +129,7 @@ closing clears model closures and all presentation resources.
 validation. `WorkspaceConfiguration` applies the saved window chrome (sizes, toolbar mode,
 status bar) on every reload: the View menu saves those choices through `WindowContent.choose`
 instead of keeping them per window, and a window without a configuration applies them directly.
-`ConfigurationController` sends appearance, including `terminal.colors`, to `ThemeController`.
+`ConfigurationController` sends the appearance (`ui.appearance`, resolved against the operating system's) and `terminal.scheme` to `ThemeController`.
 
 Existing terminal views copy current options before replacing configured fields, preserving
 unrelated options and temporary font size when the saved size is unchanged. Live fields

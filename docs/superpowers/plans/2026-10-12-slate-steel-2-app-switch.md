@@ -2,6 +2,22 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status: complete on 2026-10-12** on `claude/slate-steel`, executed inline. Deviations from the text below:
+> - Task 5 also moved three palette reads the plan missed onto UI roles: the window tab strip's background, the active
+>   tab's title and a new tab's background (spec: tabs and the strip keep UI roles); `TerminalSchemeSurfaceTest` pins
+>   them. The two new scheme tests wait for the queued launch before reading a pane's view.
+> - Task 5 deleted `ThemeControllerStartupTest` whole (both cases used the removed start-up), the bootstrap's theme-upgrade
+>   case and the report's catalog-problem case; `ConfigurationControllerTest`'s seven saved-theme cases moved to
+>   `ui.appearance`/`terminal.scheme` rather than being deleted (test helper `ThemeTestSupport.slateSteel`). Deleting the
+>   start-up test exposed `ThemeCompletionSmokeTest`'s 24-point interface-font leak, now reset after it.
+> - Task 6: `ViewModeTest`'s constructor cases went with the constructors; the migration golden files lost their
+>   `[ui.theme]` table (6 → 5 changes); `SettingsSaveTest`'s alias case moved to `terminal.font.family`. The guide keeps its
+>   `## Theme` heading (linked as `configuration.md#theme`) and also lost the stale Alacritty-themes subsection and tab
+>   sentence.
+> - Task 7: `docs/themes.md` gained a note that its theme-file sections no longer apply until Plan 3 rewrites it.
+> - The inventory (`docs/design/theme-engine/migration.csv`) got rows for every new matching file, and removed files'
+>   rows use "Removed in Slate Steel Plan 2; authority=…".
+
 **Goal:** Run the app on Slate Steel only: `ui.appearance` and `terminal.scheme` replace the four theme settings, the terminal scheme colours only the terminal text area (bold text included), and the Appearance page offers Dark / Light / Match System, the one "Slate Steel" theme and the terminal scheme.
 
 **Architecture:** Parallel change, so every task leaves `./gradlew check` green. Tasks 1–3 add the terminal bold colour, the two settings and a Slate Steel path through `ThemeController` beside the legacy one. Task 4 moves the Appearance page onto the new settings. Task 5 switches the runtime (start-up, configuration, OS appearance, View commands, terminal surroundings) and drops the catalog scan, theme upgrade and import wiring. Task 6 removes the four old settings and their plumbing. The legacy theme classes stay only as test seams for Plan 3's test migration; no production code uses them after Task 5.

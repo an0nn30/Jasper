@@ -10,21 +10,24 @@ Jasper uses its existing safe fallback until you select an available theme or im
 
 ## Choosing a theme
 
-Name the theme in `config.toml`:
+> Slate Steel is Jasper's only theme. The theme files, imports and workspace themes described after this section are
+> no longer loaded; Slate Steel Plan 3 rewrites this page.
+
+Choose the appearance and the terminal scheme in `config.toml`:
 
 ```toml
-[ui.theme]
-name = "Nord"
-workspace = "match" # or "Jasper Dark", another native theme
+[ui]
+appearance = "system" # or "dark", "light"
+
+[terminal]
+scheme = "match" # or "slate-steel-dark", "slate-steel-light", "high-contrast"
 ```
 
-The name is the theme's own name, matched ignoring case and surrounding spaces. Changing it applies the theme to
-every window at once, keeping shells, scrollback and splits. Settings › Appearance & Behavior › Appearance has two
-dropdowns: **Theme** (the UI theme) and **Workspace scheme**, whose first entry, **Same as UI theme**, is `match`.
-Terminal › Font & Colors links to them. The workspace scheme switches independently, including between two dark
-themes. The pane tab strip, find controls,
-split dividers, terminal palette, zone-aware icons and Editor syntax follow it. Menus, sidebars and dialogs follow
-the UI theme. Standard plugin controls and their dropdowns are kit-owned and resolve the mounted
+`ui.appearance` (`system`, `dark`, `light`) chooses Slate Steel Dark or Light, or follows the operating system; `terminal.scheme` (`match`, `slate-steel-dark`, `slate-steel-light`, `high-contrast`) colours the terminal panes. Changes apply to every window at once, keeping shells,
+scrollback and splits. Settings › Appearance & Behavior › Appearance has the Dark, Light and Match System tiles, the
+Theme row (Slate Steel) and the **Terminal scheme** dropdown, whose first entry, **Same as UI theme**, is `match`.
+Terminal › Font & Colors links to them. Only the terminal text area follows the scheme; tabs, the tab strip, find
+controls, menus, sidebars, dialogs and the editor follow the appearance. Standard plugin controls and their dropdowns are kit-owned and resolve the mounted
 chrome/workspace route. Moving a view updates its route while preserving document edits, selection and undo.
 Remote SFTP/Tunnels, File Server and Vault rail panels remain chrome. Vim errors and bell feedback follow the
 mounted Editor route. Specialized document content consumes explicit palettes; the native host publishes a
@@ -58,13 +61,12 @@ finish and refresh the app without reopening Settings.
 To copy, change or remove a theme, edit its file in the `themes` folder beside `config.toml`; see
 [Writing a theme](#writing-a-theme). Jasper notices the change within a second.
 
-Choose UI and workspace themes in Settings › Appearance. The command palette’s **Themes…** command opens that
+Choose the appearance and terminal scheme in Settings › Appearance. The command palette’s **Themes…** command opens that
 page. Settings choices stay staged until Apply/OK.
 
 ## Writing a theme
 
-Put a `.toml` file in the `themes` folder beside `config.toml` (`~/.config/jasper/themes/` on macOS) and name it in
-`ui.theme.name`. Jasper checks the folder every second, independently of config edits, and also on explicit reload. Content hashes detect equal-size edits even when timestamps are preserved; parent edits refresh inherited themes. The smallest theme names its seed colours:
+Put a `.toml` file in the `themes` folder beside `config.toml` (`~/.config/jasper/themes/` on macOS). Jasper checks the folder every second, independently of config edits, and also on explicit reload. Content hashes detect equal-size edits even when timestamps are preserved; parent edits refresh inherited themes. The smallest theme names its seed colours:
 
 ```toml
 name = "Mocha"
@@ -157,15 +159,11 @@ resources are not supported. Archive/XML limits and disabled external entities a
 
 ## Workspace and terminal colours
 
-With `ui.theme.workspace = "match"` (the default), workspace surfaces, Editor syntax and terminal colours
-follow `ui.theme.name`. A named workspace theme supplies its own effective surface, text, syntax and terminal
+`ui.appearance` (`system`, `dark`, `light`) chooses Slate Steel Dark or Light, or follows the operating system; `terminal.scheme` (`match`, `slate-steel-dark`, `slate-steel-light`, `high-contrast`) colours the terminal panes. With `match` (the default) the panes use the appearance's own scheme. A named workspace theme supplies its own effective surface, text, syntax and terminal
 values without installing a second look and feel. A converted IntelliJ theme with an editor colour scheme
 supplies the terminal's console background, text, cursor, selection and 16 ANSI colours.
 - **Missing colours:** colours the scheme leaves out come from its parent schemes, as in IntelliJ's console. A theme's `editorScheme` or a scheme's `parent_scheme` may name any scheme IntelliJ bundles: `Default`, `Darcula`, `IntelliJ Light`, `Light`, `Dark`, `Darcula Contrast`, `High contrast` and `Islands Dark`.
 - **No scheme:** Jasper theme files, Jasper Dark and Jasper Light included, take their terminal palette from their own `[colors]`, and converted IntelliJ themes take it from their editor scheme. Only an installed plugin theme without a scheme uses Jasper Dark's or Jasper Light's palette by the theme's darkness.
-- **Choosing Jasper's palettes:** `"Jasper Light"` and `"Jasper Dark"` select the complete native themes.
-  Legacy `terminal.colors = "light"` or `"dark"` maps to these names when read. Jasper Dark's native terminal
-  background is `#191c20`.
 
 Scheme colours are used exactly as the theme author chose them.
 
@@ -186,7 +184,7 @@ An unknown workspace name warns and temporarily follows chrome. The requested na
 ## When something is wrong
 
 Problems appear under the status bar's **Config warnings**, naming the file:
-- An unknown `ui.theme.name` lists the themes available. At start-up Jasper uses Jasper Dark; on reload it uses the safe built-in for the last successfully applied chrome darkness. The requested name remains saved for a later retry.
+- An unknown `ui.appearance` or `terminal.scheme` value is reported ("Use …; using the default.") and uses the default (`system`, `match`). If Slate Steel cannot be installed, start-up uses Dark and a reload keeps the current appearance; Reload config retries.
 - A failed legacy conversion is reported from the migration journal.
 - A theme that fails to load, or names a parent theme Jasper doesn't have, is reported.
 - Two installed themes with the same name are reported, and the file that sorts first wins.

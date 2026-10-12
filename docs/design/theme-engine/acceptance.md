@@ -168,6 +168,38 @@ Decisions the plan recorded for review:
    calibrated face tests showed that moved the visible bottom edge). A primary button outside a kit view has the inset
    line only.
 
+## Slate Steel Plan 2: app switch (2026-10-12)
+
+Plan [`2026-10-12-slate-steel-2-app-switch.md`](../../superpowers/plans/2026-10-12-slate-steel-2-app-switch.md) of the
+[Slate Steel specification](../../superpowers/specs/2026-10-12-jasper-slate-steel-themes-design.md). The app now starts
+and runs on Slate Steel only; Plan 3 removes the legacy themes and their test seams.
+
+- Settings: `ui.appearance` (`system`, `dark`, `light`) and `terminal.scheme` (`match`, `slate-steel-dark`,
+  `slate-steel-light`, `high-contrast`) replace `ui.theme.name`, `ui.theme.source`, `ui.theme.follow_system` and
+  `ui.theme.workspace` (with the aliases `ui.theme.variant`, `ui.theme.terminal` and `terminal.colors`); a file that
+  still sets them starts Slate Steel and reports them as unknown settings.
+- Runtime: start-up and every reload apply the appearance (`system` follows the operating system live, Dark when it is
+  unknown) and the scheme through `ThemeController`; no themes folder is scanned and no theme is upgraded at start-up.
+- Terminal surroundings: a scheme colours only the terminal text area. The window behind panes, a tab's background, the
+  inset below the cell grid, the window tab strip and the active tab's title stay on the UI variant's roles
+  (`surface.terminal`, `text.primary`), so High Contrast under Light is a black text area in a Light window.
+- Bold colour: bold text in the default foreground takes the scheme's bold foreground (`terminal.fg.bold`).
+- The Appearance page: Dark / Light / Match System tiles, a read-only Theme row with the one entry "Slate Steel", and the
+  Terminal scheme dropdown ("Colors for terminal panes"); Terminal › Font & Colors links there.
+- The command palette: "Terminal: Same as UI theme / Slate Steel Dark / Slate Steel Light / High Contrast"
+  (`view.terminal_scheme.<name>`) choose a scheme for every window; "Themes…" opens Appearance.
+
+Decisions the plan recorded for review:
+
+1. An unknown `ui.appearance` or `terminal.scheme` value is reported like every other enumerated setting's: "Use …; using the default.", which titles the existing notice "config.toml has errors". The spec says "warnings"; the plan keeps one convention for all enumerated settings.
+2. A removed `ui.theme.*` key left in a file is reported once for its table (`ui.theme`: "Unknown setting or table; ignored."), as any unknown table is; `terminal.colors` is reported as its own key.
+3. The Theme dropdown is enabled with its one entry, so it opens and shows "Slate Steel" and nothing else can be chosen; it is not greyed out, matching the mock.
+4. The Match System tile says "System appearance: Dark/Light", or "System appearance unavailable; using Dark".
+5. The command palette's "Terminal: Match UI / Light / Dark" become "Terminal: Same as UI theme / Slate Steel Dark / Slate Steel Light / High Contrast" (`view.terminal_scheme.<name>`); "Themes…" stays and opens Appearance.
+6. Bold text in the default foreground takes the bold colour; an explicit SGR colour stays; the bold colour is chosen before inverse, so inverse bold text has it as its background (as xterm's bold colour does).
+7. `new ThemeController()` and the other legacy seams keep Jasper Dark for existing tests until Plan 3 migrates them; production starts with `ThemeController.startup(dark, scheme, …)` and configures only Slate Steel.
+8. The app's `themeimport` and `themesui` packages lose their wiring here (no Import theme…, no start-up theme upgrade) and are deleted with the rest in Plan 3.
+
 ## User-run checks still open
 
 Screen capture and UI scripting are unavailable to the agent session, so these need a person at the Mac:
