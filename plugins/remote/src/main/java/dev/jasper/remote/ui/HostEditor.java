@@ -300,7 +300,7 @@ public final class HostEditor implements AutoCloseable {
     }
 
     private Nodes.Field field(String id, Nodes.FieldKind kind, String value, String hint, String label) {
-        return new Nodes.Field(id, state(true, saving == null), kind, value, hint, label, "", Optional.empty(), id.equals(HOSTNAME) || id.equals(USERNAME) ? Nodes.FieldPresentation.TECHNICAL : Nodes.FieldPresentation.STANDARD);
+        return new Nodes.Field(id, state(true, saving == null), kind, value, hint, label, "", Optional.empty(), id.equals(HOSTNAME) ? Nodes.FieldPresentation.TECHNICAL : Nodes.FieldPresentation.STANDARD);
     }
     private Nodes.FormRow row(String id, String label, String caption, Nodes.Node control) {
         return new Nodes.FormRow(id, ControlState.READY, label, caption, control, Optional.empty());
@@ -322,7 +322,7 @@ public final class HostEditor implements AutoCloseable {
         var title = new ArrayList<Nodes.Node>();
         title.add(new Nodes.Text("key." + id, ControlState.READY, label, Nodes.TextRole.MONO));
         if (!caption.isEmpty()) title.add(new Nodes.Text("key.caption." + id, ControlState.READY, caption, Nodes.TextRole.CAPTION));
-        return new ListItem(id.toString(), Optional.of(new Nodes.Icon("key.icon." + id, ControlState.READY, "key", Nodes.Hue.NONE, Nodes.IconSize.CONTROL, "SSH key")),
+        return new ListItem(id.toString(), Optional.of(new Nodes.Icon("key.icon." + id, ControlState.READY, "key", Nodes.Hue.NONE, Nodes.IconSize.CAPTION, "SSH key")),
             title, List.of(), List.of(), false, Optional.empty(), tooltip);
     }
 

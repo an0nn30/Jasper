@@ -21,7 +21,7 @@ class GroupedFormGeometryTest {
             try(var view=new KitView(context,new ViewSpec(FormsTest.form(FormKind.FULL,sections)),e->{})) {
                 KitFixtures.render(view,540,690,2);
                 var name=find(view,"name",javax.swing.JComponent.class);var bounds=javax.swing.SwingUtilities.convertRectangle(name.getParent(),name.getBounds(),view);
-                assertThat(bounds).isEqualTo(new Rectangle(147,54,354,28));
+                assertThat(bounds).isEqualTo(new Rectangle(147,53,354,28));
                 var normal=find(view,"plain.title",javax.swing.JComponent.class);var child=find(view,"dependent.title",javax.swing.JComponent.class);
                 assertThat(child.getX()-normal.getX()).isEqualTo(16);
                 assertThat(find(view,"dependent",javax.swing.JComponent.class).getHeight()).isEqualTo(65);
@@ -52,7 +52,7 @@ class GroupedFormGeometryTest {
                 KitFixtures.render(view,492,160,2);var text=find(view,"help",javax.swing.JLabel.class);
                 assertThat(text.getFont().getSize2D()).isEqualTo(11.5f);
                 assertThat(text.getForeground()).isEqualTo(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
-                assertThat(text.getHeight()).isGreaterThanOrEqualTo(36);
+                assertThat(text.getHeight()).isGreaterThanOrEqualTo(2*17);
             }finally{release(context);}
         });
     }
@@ -109,6 +109,74 @@ class GroupedFormGeometryTest {
             try(var view=new KitView(context,new ViewSpec(list),e->{})) {
                 assertThat(view.getPreferredSize().height).isEqualTo(102);
                 KitFixtures.render(view,354,102,1);assertThat(find(view,"add",javax.swing.JButton.class).getHeight()).isEqualTo(32);
+            }finally{release(context);}
+        });
+    }
+    @Test void orderedRowsAlignIndexGlyphNameAndCompactCommandsToSourceColumns() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            var key=new ListItem("key",Optional.of(new Icon("key.icon",ControlState.READY,"key",Hue.NONE,IconSize.CAPTION,"SSH key")),
+                List.of(new Text("key.name",ControlState.READY,"id_ed25519",TextRole.MONO),new Text("key.caption",ControlState.READY,"Stored key",TextRole.CAPTION)),List.of(),List.of());
+            var list=new ItemList("keys",ControlState.READY,ListKind.ORDERED,List.of(key,itemWithId("key2")),java.util.Set.of("key2"),"",List.of(),SelectionMode.SINGLE,
+                Optional.of(new Nodes.Button("add",ControlState.READY,"Add Stored Key…","add",ButtonKind.LINK,"add","")),java.util.OptionalInt.of(2));
+            try(var view=new KitView(context,new ViewSpec(list),e->{})) {
+                var image=KitFixtures.render(view,354,102,2);
+                java.util.function.Function<String,Rectangle> at=id->{var c=find(view,id,javax.swing.JComponent.class);return javax.swing.SwingUtilities.convertRectangle(c.getParent(),c.getBounds(),view);};
+                // Source 2x columns: index ink 12.5, glyph 35.5, name 57 logical; commands 31 apart, the last centred 18 from the edge.
+                assertThat(at.apply("@ordered/keys/key/index").x).isEqualTo(12);
+                assertThat(at.apply("@ordered/keys/key/index").width).isEqualTo(16);
+                assertThat(at.apply("key.icon").x).isEqualTo(34);
+                assertThat(at.apply("key.name").x).isEqualTo(56);
+                assertThat(at.apply("key.caption").x-at.apply("key.name").x-at.apply("key.name").width).isEqualTo(9);
+                var up=at.apply("@ordered/keys/key/up");var down=at.apply("@ordered/keys/key/down");var remove=at.apply("@ordered/keys/key/remove");
+                assertThat(java.util.List.of(up.getSize(),down.getSize(),remove.getSize())).containsOnly(new Dimension(24,24));
+                assertThat(down.x-up.x).isEqualTo(31);assertThat(remove.x-down.x).isEqualTo(31);
+                assertThat(354-(remove.x+remove.width/2)).isEqualTo(18);
+                var add=find(view,"add",javax.swing.JButton.class);
+                assertThat(add.getInsets().left).isEqualTo(12);assertThat(add.getFont().getSize2D()).isEqualTo(12f);
+                // An unfocused ordered list keeps its selection identity without painting a selected fill.
+                var row=at.apply("@ordered/keys/key2/index");
+                assertThat(new Color(image.getRGB(2*200,2*(row.y+row.height/2)),true))
+                    .isEqualTo(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT));
+            }finally{release(context);}
+        });
+    }
+    @Test void fullSettingRowsUseCompactChoicesAndCloseTheirCardWithoutChangingSettingsForms() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            var group=new SettingRow("group",ControlState.READY,"Group","",new Nodes.Choice("group.choice",ControlState.READY,ChoiceKind.DROPDOWN,List.of(new Option("none","None",Optional.empty())),"none","Group",""),false);
+            var favorite=new SettingRow("favorite",ControlState.READY,"Add to Favorites","",new Toggle("favorite.toggle",ControlState.READY,"Favorite",false,"favorite",false),false);
+            var card=new Section("options",ControlState.READY,"Options",new Card("options.card",ControlState.READY,CardKind.SETTINGS,List.of(group,favorite)));
+            try(var view=new KitView(context,new ViewSpec(FormsTest.form(FormKind.FULL,List.of(card))),e->{})) {
+                for(var kind:List.of(FormKind.FULL,FormKind.SETTINGS,FormKind.FULL)) {
+                    view.update(new ViewSpec(FormsTest.form(kind,List.of(card))));KitFixtures.render(view,540,400,1);
+                    boolean full=kind==FormKind.FULL;
+                    assertThat(find(view,"group.choice.input",javax.swing.JComponent.class).getHeight()).as("%s choice",kind).isEqualTo(full?26:28);
+                    assertThat(find(view,"group",javax.swing.JComponent.class).getHeight()).as("%s row",kind).isEqualTo(full?43:44);
+                    assertThat(find(view,"options.card",javax.swing.JComponent.class).getHeight()).as("%s card",kind).isEqualTo(full?43+43+1:44+42);
+                }
+            }finally{release(context);}
+        });
+    }
+    @Test void controlFacesPaintCrispHairlinesAndDropdownChevronsShareThePickerInset() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            var choice=new Nodes.Choice("jump",ControlState.READY,ChoiceKind.DROPDOWN,List.of(new Option("none","None",Optional.empty())),"none","Jump Host","");
+            try(var view=new KitView(context,new ViewSpec(new Nodes.Stack("stack",ControlState.READY,LayoutRole.VERTICAL,List.of(field("name",FieldKind.TEXT,""),choice))),e->{})) {
+                var image=KitFixtures.render(view,200,200,2);
+                var name=(javax.swing.JComponent)find(view,"name.input",javax.swing.JComponent.class).getParent();var top=javax.swing.SwingUtilities.convertPoint(name.getParent(),name.getLocation(),view);
+                int x=2*(top.x+100),y=2*top.y;
+                var border=ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.BORDER_INPUT).getRGB();
+                assertThat(image.getRGB(x,y)).as("first device row of the 1-logical border").isEqualTo(border);
+                assertThat(image.getRGB(x,y+1)).as("second device row of the 1-logical border").isEqualTo(border);
+                assertThat(image.getRGB(x,y+2)).isEqualTo(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT).getRGB());
+                var input=find(view,"jump.input",javax.swing.JComponent.class);var origin=javax.swing.SwingUtilities.convertPoint(input.getParent(),input.getLocation(),view);
+                int right=-1,fill=ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL).getRGB();
+                for(int px=2*(origin.x+input.getWidth())-1;px>2*(origin.x+input.getWidth()-30)&&right<0;px--)
+                    for(int py=2*(origin.y+8);py<2*(origin.y+input.getHeight()-8);py++)
+                        if(image.getRGB(px,py)!=fill&&px<2*(origin.x+input.getWidth())-4){right=px;break;}
+                // Source chevron ink ends 12 logical before the face edge, as on the picker face.
+                assertThat(2*(origin.x+input.getWidth())-right).isBetween(2*10,2*13);
             }finally{release(context);}
         });
     }

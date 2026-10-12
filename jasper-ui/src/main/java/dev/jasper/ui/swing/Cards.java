@@ -16,6 +16,8 @@ final class Cards {
     private Cards() {}
 
     static final class CardControl extends ControlRegistry.Control {
+        /** Inside a FULL form; its settings rows each own a top stroke, so the card adds its closing one. */
+        boolean fullForm;
         CardControl(KitView view, Nodes.Card node) {
             super(view, node, new CardSurface(view.context()));
             refresh();
@@ -28,7 +30,8 @@ final class Cards {
                     ((Nodes.Card) node).kind() != Nodes.CardKind.FORM
                             ? 0
                             : ThemePainting.metric(context(), DesignMetrics.Role.CARD_PADDING) + ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE);
-            component.setBorder(new EmptyBorder(pad, pad, pad, pad));
+            int closing = fullForm && ((Nodes.Card) node).kind() == Nodes.CardKind.SETTINGS ? ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE) : 0;
+            component.setBorder(new EmptyBorder(pad, pad, pad + closing, pad));
             component.setLayout(
                     ((Nodes.Card) node).kind() == Nodes.CardKind.MIXED
                             ? new MixedLayout(this)

@@ -284,12 +284,12 @@ final class ItemLists {
                                 case PREVIEWS -> ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_HEIGHT)+2*ThemePainting.metric(context(),DesignMetrics.Role.CARD_PADDING);
                                 case SEGMENTED ->
                                         inputHeight(
-                                                        DesignMetrics.Role.PANEL_ACTION,
+                                                        DesignMetrics.Role.FORM_SEGMENT_HEIGHT,
                                                         Typography.Role.LABEL)
                                                 + 2
                                                         * ThemePainting.metric(
                                                                 context(),
-                                                                DesignMetrics.Role.SEGMENT_PADDING);
+                                                                DesignMetrics.Role.FORM_SEGMENT_PADDING);
                             };
                     yield input
                             + (choice.state().error().isEmpty()
@@ -373,7 +373,7 @@ final class ItemLists {
             JComponent next = controls.isEmpty() ? null : controls.getFirst().component;
             if (footer != next && footer != null) canvas.remove(footer);
             footer = next;
-            if (footer instanceof Buttons.KitButton button && value().kind() == Nodes.ListKind.ORDERED) {button.setHorizontalAlignment(SwingConstants.LEADING);button.orderedAction=true;}
+            if (footer instanceof Buttons.KitButton button && value().kind() == Nodes.ListKind.ORDERED) {button.orderedAction=true;controls.getFirst().refresh();button.setHorizontalAlignment(SwingConstants.LEADING);}
             if (footer != null && footer.getParent() != canvas) canvas.add(footer);
             canvas.revalidate();
             sync();
@@ -398,6 +398,10 @@ final class ItemLists {
                 trailing.add(commandNode(row, "remove", "close", "Remove", true));
             }
             row.slot(row.leading, leading);
+            if (value().kind() == Nodes.ListKind.ORDERED && row.controls.get(internalId(row.id, "index")) instanceof Labels.TextControl number) {
+                // A fixed index column keeps every key glyph and name on one vertical line.
+                ((Labels.LiteralLabel) number.component).columnWidth = ThemePainting.metric(context(), DesignMetrics.Role.ORDERED_INDEX_WIDTH);
+            }
             if (item.leading().orElse(null) instanceof Nodes.Icon icon && (icon.size() == Nodes.IconSize.RAIL || icon.size() == Nodes.IconSize.HERO) && icon.hue() != Nodes.Hue.NONE) {
                 ((Labels.IconControl)row.controls.get(icon.id())).tile(context().metrics().value(value().kind() == Nodes.ListKind.DOUBLE ? DesignMetrics.Role.CATEGORY_ROW_TILE : DesignMetrics.Role.CATEGORY_RAIL_TILE), column != 0 && selected.contains(item.id()));
             }
@@ -475,6 +479,7 @@ final class ItemLists {
         void command(InteractiveRows.Row row, String suffix, boolean possible, Runnable action) {
             var c = (Buttons.ButtonControl) row.controls.get(internalId(row.id, suffix));
             c.button.disabledOpacity = possible ? .42f : .30f;
+            if (!c.button.orderedCommand) { c.button.orderedCommand = true; c.refresh(); }
             if (c.button.getClientProperty("Jasper.rowCommand") == null) {
                 for (var listener : c.button.getActionListeners())
                     c.button.removeActionListener(listener);

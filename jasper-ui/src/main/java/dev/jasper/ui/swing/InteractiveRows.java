@@ -743,14 +743,11 @@ final class InteractiveRows {
             if (owner.node instanceof Nodes.ItemList list && list.kind() == Nodes.ListKind.ORDERED) {
                 var g = (Graphics2D)graphics.create();
                 try {
-                    ThemePainting.antialias(g);
-                    int radius = ThemePainting.metric(owner.context(), DesignMetrics.Role.ORDERED_RADIUS);
-                    g.setColor(ThemePainting.color(owner.context(), SemanticColor.SURFACE_INPUT));
-                    g.fillRoundRect(0, 0, getWidth(), getHeight(), radius * 2, radius * 2);
-                    g.setColor(ThemePainting.color(owner.context(), SemanticColor.BORDER_INPUT));
-                    g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, radius * 2, radius * 2);
+                    ThemePainting.rounded(g, this, owner.context(), ThemePainting.color(owner.context(), SemanticColor.SURFACE_INPUT),
+                        ThemePainting.color(owner.context(), SemanticColor.BORDER_INPUT), false, false, DesignMetrics.Role.ORDERED_RADIUS);
                     g.setColor(ThemePainting.color(owner.context(), SemanticColor.BORDER_SUBTLE));
-                    for (int i = 1; i <= owner.size(); i++) g.drawLine(1, i * owner.rowHeight, getWidth() - 2, i * owner.rowHeight);
+                    int stroke = ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE);
+                    for (int i = 1; i <= owner.size(); i++) g.fillRect(stroke, i * owner.rowHeight, Math.max(0, getWidth() - 2 * stroke), stroke);
                 } finally { g.dispose(); }
             }
         }
@@ -986,8 +983,11 @@ final class InteractiveRows {
             }
         }
 
+        boolean ordered() { return owner.node instanceof Nodes.ItemList list && list.kind() == Nodes.ListKind.ORDERED; }
+
         void slot(JPanel panel, List<Nodes.Node> nodes) {
-            panel.setLayout(new Navigation.InlineLayout(owner.context(), owner.panelSingle && panel == title ? DesignMetrics.Role.PANEL_ROW_TITLE_GAP : DesignMetrics.Role.ICON_GAP));
+            panel.setLayout(new Navigation.InlineLayout(owner.context(), owner.panelSingle && panel == title ? DesignMetrics.Role.PANEL_ROW_TITLE_GAP
+                : ordered() && panel == title ? DesignMetrics.Role.INLINE_GAP : ordered() && panel == trailing ? DesignMetrics.Role.ORDERED_ACTION_GAP : DesignMetrics.Role.ICON_GAP));
             Stacks.mount(panel, nodes.stream().map(n -> control(n).component).toList());
         }
 
@@ -1044,8 +1044,10 @@ final class InteractiveRows {
             if (owner.resultsLayout()) { resultLayout(); return; }
             if (owner instanceof Trees.TreeControl tree && tree.layoutPresented(this)) return;
             boolean settingsNavigation=owner instanceof Trees.TreeControl tree && tree.settingsNavigation;
+            boolean ordered = ordered();
             int pad = ThemePainting.metric(owner.context(), settingsNavigation ? DesignMetrics.Role.SETTINGS_NAV_ROW_SIDE : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : owner.column >= 0 ? DesignMetrics.Role.COLUMN_LIST_SIDE : owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_PADDING : DesignMetrics.Role.ICON_GAP),
-                    x = pad + indent,
+                    // An ordered row's index column starts at the row inset; its commands keep the narrower trailing pad.
+                    x = (ordered ? ThemePainting.metric(owner.context(), DesignMetrics.Role.ORDERED_ROW_SIDE) : pad) + indent,
                     width = Math.max(0, getWidth() - pad),
                     h = getHeight();
             int checkWidth =
@@ -1060,7 +1062,7 @@ final class InteractiveRows {
             width = Math.max(x, width - tw - (tw > 0 ? pad : 0));
             int lw = Math.min(leading.getPreferredSize().width, Math.max(0, width - x));
             leading.setBounds(x, 0, lw, h);
-            x += lw + (lw > 0 ? settingsNavigation ? ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTINGS_NAV_TEXT_GAP) : owner.identityRows() ? ThemePainting.metric(owner.context(),DesignMetrics.Role.IDENTITY_ROW_TEXT_GAP) : owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_TEXT_GAP) : pad : 0);
+            x += lw + (lw > 0 ? ordered ? ThemePainting.metric(owner.context(),DesignMetrics.Role.ORDERED_TEXT_GAP) : settingsNavigation ? ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTINGS_NAV_TEXT_GAP) : owner.identityRows() ? ThemePainting.metric(owner.context(),DesignMetrics.Role.IDENTITY_ROW_TEXT_GAP) : owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_TEXT_GAP) : pad : 0);
             int content = Math.max(0, width - x);
             if (!cells.isEmpty()) {
                 title.setBounds(x, 0, content, h);
@@ -1172,7 +1174,8 @@ final class InteractiveRows {
                 }
                 return;
             }
-            if (owner.selected.contains(id)) {
+            // An ordered list's selection only drives keyboard reordering: it shows while the list has focus.
+            if (owner.selected.contains(id) && (!ordered() || owner.canvas.isFocusOwner())) {
                 g.setColor(ThemePainting.color(owner.context(), SemanticColor.SELECTION_BG));
                 g.fillRect(0, 0, getWidth(), getHeight());
             } else if (hover) {

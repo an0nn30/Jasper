@@ -70,7 +70,7 @@ final class Buttons {
         @Override void refresh() {
             var value = (Nodes.Button)node; state(); button.kind = value.kind(); button.iconSeverity = value.iconSeverity().orElse(null);
             button.toggle = value.selected().isPresent(); button.getModel().setSelected(value.selected().orElse(false));
-            button.setText(value.label()); button.setFont(ThemePainting.font(context(), button.panelDetail || button.panel ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.LABEL));
+            button.setText(value.label()); button.setFont(ThemePainting.font(context(), button.panelDetail || button.panel ? Typography.Role.PANEL_DETAIL_LABEL : button.orderedAction ? Typography.Role.ORDERED_ACTION : Typography.Role.LABEL));
             button.setForeground(button.textColor(false));
             boolean embedded = value.presentation() == Nodes.ButtonPresentation.EMBEDDED || value.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
             button.circular=value.presentation()==Nodes.ButtonPresentation.CIRCULAR;
@@ -78,7 +78,7 @@ final class Buttons {
             button.embedded = embedded;
             if (hostArtwork != null) { button.setIcon(hostArtwork.icon(context(), button.iconRole(false))); button.putClientProperty("Jasper.button.icon", null); }
             else {
-                int extent=UIScale.scale(button.panelDetail && value.label().isEmpty() ? context().metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_GLYPH) : context().icons().size((embedded || button.panel) && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
+                int extent=UIScale.scale(button.orderedAction || button.orderedCommand ? context().metrics().value(DesignMetrics.Role.ORDERED_GLYPH) : button.panelDetail && value.label().isEmpty() ? context().metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_GLYPH) : context().icons().size((embedded || button.panel) && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
                 button.setIcon(value.icon().isEmpty() ? null : button.panel || button.panelDetail || button.panelRow
                     ? context().icons().panel(value.icon(),context().theme(),button.iconRole(false),extent)
                     : context().icons().icon(value.icon(), context().theme(), button.iconRole(false),extent));
@@ -92,7 +92,7 @@ final class Buttons {
             button.getAccessibleContext().setAccessibleName(keycaps!=null?keycaps.accessibleName():value.label().isEmpty() ? value.tooltip() : value.label());
             button.getAccessibleContext().setAccessibleDescription(value.state().error());
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
-            int horizontal = ThemePainting.metric(context(), button.recorder() ? DesignMetrics.Role.FIELD_HORIZONTAL_PADDING : button.panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION_PADDING : value.kind() == Nodes.ButtonKind.PRIMARY ? DesignMetrics.Role.PRIMARY_BUTTON_HORIZONTAL_PADDING : DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
+            int horizontal = ThemePainting.metric(context(), button.orderedAction ? DesignMetrics.Role.ORDERED_ROW_SIDE : button.recorder() ? DesignMetrics.Role.FIELD_HORIZONTAL_PADDING : button.panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION_PADDING : value.kind() == Nodes.ButtonKind.PRIMARY ? DesignMetrics.Role.PRIMARY_BUTTON_HORIZONTAL_PADDING : DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
             button.setBorder(embedded ? new EmptyBorder(0, 0, 0, 0)
                 : new EmptyBorder(ring, value.label().isEmpty() ? ring : horizontal, ring, value.label().isEmpty() ? ring : horizontal));
             button.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
@@ -116,6 +116,8 @@ final class Buttons {
             return Math.max(getPreferredSize().height,content+insets.top+insets.bottom);
         }
         boolean hero, panel, fullFooter, orderedAction, panelDetail, circular;
+        /** An ORDERED row's compact up/down/remove command. */
+        boolean orderedCommand;
         /** Content-sized for a host arrangement (ButtonPresentation.EMBEDDED): no minimum height and no resting or hover fill. */
         boolean embedded, contextual, panelRow;
         float disabledOpacity=.42f;
@@ -159,6 +161,7 @@ final class Buttons {
         @Override public Dimension getPreferredSize() {
             Dimension size = super.getPreferredSize();
             if(getText()==null || getText().isEmpty()) {
+                if(orderedCommand) {int extent=ThemePainting.metric(context,DesignMetrics.Role.ORDERED_ACTION);return new Dimension(extent,extent);}
                 if(circular) {int extent=ThemePainting.metric(context,DesignMetrics.Role.CIRCULAR_ACTION_SIZE);return new Dimension(extent,extent);}
                 if(getParent() instanceof Stacks.StackSurface surface && surface.joined)
                     return new Dimension(ThemePainting.metric(context,DesignMetrics.Role.JOINED_ACTION_WIDTH),ThemePainting.metric(context,DesignMetrics.Role.JOINED_ACTION_HEIGHT));

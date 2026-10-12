@@ -132,8 +132,13 @@ final class ViewReconciler implements AutoCloseable {
     }
     private void applyFullForm(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
         boolean full = node instanceof Nodes.Form form ? form.kind() == Nodes.FormKind.FULL : inherited;
-        if (next.get(node.id()) instanceof SettingRows.RowControl row) row.fullForm = full;
+        var control = next.get(node.id());
+        if (control instanceof SettingRows.RowControl row) row.fullForm = full;
+        if (control instanceof Cards.CardControl card) card.fullForm = full;
+        if (control instanceof Choices.ChoiceControl choice) choice.fullSetting = false;
         ControlRegistry.children(node).forEach(child -> applyFullForm(child, next, full));
+        // A FULL setting row's own trailing dropdown takes the compact setting-control height.
+        if (full && node instanceof Nodes.SettingRow row && next.get(row.control().id()) instanceof Choices.ChoiceControl choice) choice.fullSetting = true;
     }
     private void applySettings(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
         boolean settings = node instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.SETTINGS_PAGE || inherited;
