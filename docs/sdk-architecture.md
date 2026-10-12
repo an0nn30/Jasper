@@ -425,7 +425,7 @@ mount plumbing, never an SDK raw-control path. Manifest identity previews retain
 ### Declared settings (plan C1; SDK 0.9 completes them)
 
 `PluginContext.settings()` returns `PluginSettings`. A plugin declares each setting during `start` with a
-`SettingSpec` (dotted key, `SettingKind`, default, label, description, keywords, section, applies-when, editor hint)
+`SettingSpec` (dotted key, `SettingKind`, default, label, description, keywords, section, applies-when, editor hint, unit)
 and gets a typed `Setting` handle: `get()` is the file's value when its kind allows it, else the default; `set(value)`
 saves through the same comment-preserving, atomic write as `config.toml`; `onChanged` runs on the UI thread. The
 application translates declarations into its own settings schema inside `dev.jasper.app.plugins`, reads the plugin's

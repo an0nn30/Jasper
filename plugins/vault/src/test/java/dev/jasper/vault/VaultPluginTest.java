@@ -229,6 +229,12 @@ class VaultPluginTest {
             host.requestClose("dialog");
             host.invoke(VaultPlugin.GRANTS, window, null);
             assertThat(host.windows()).containsExactly("dev.jasper.vault.manager|Credential Vault|true");
+            var manager = host.windowView("dev.jasper.vault", "Credential Vault").orElseThrow();
+            assertThat(dev.jasper.vault.testsupport.KitViews.find(manager, "grants")).as("the grants card is shown").isPresent();
+            plugin.lockManager().lock();
+            host.invoke(VaultPlugin.CHANGE_PASSWORD, window, null);
+            assertThat(plugin.currentUnlock()).as("a locked vault asks to unlock before the form").isNotNull();
+            assertThat(host.windows()).doesNotContain("dialog|Change Master Password|true");
             assertThat(host.failures()).isEmpty();
         }
     }); }

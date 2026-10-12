@@ -10,8 +10,9 @@ and type. Double-click a row or press Enter to edit it. The icon actions add, ed
 public key and lock the vault; each has a tooltip and accessible name.
 
 The **+** menu adds a login, imports an SSH key, adds a secure note, or generates a new SSH key.
-The **More (...)** menu opens saved plugin grants or changes the master password. Grant revocation
-has a **Back to entries** button. **Cancel** and **Okay** both close the manager; changes made in
+**File → Vault Plugin Grants...** (or the palette) opens the manager on the saved plugin grants, and **File → Change
+Vault Master Password...** asks for a new master password over it; both unlock first. Grant revocation has a **Back to
+entries** button. **Cancel** and **Okay** both close the manager; changes made in
 individual editors are saved immediately and are not rolled back by closing the manager.
 The footer retains device-secret source, auto-lock setting and vault path, with full text in its
 tooltip when the window is narrow.
@@ -31,7 +32,7 @@ vault. For a standalone key, keep the passphrase yourself; the key entry stores 
 metadata. Key files remain separate, and locking the vault does not change their encryption. **Copy public key** copies the selected public key. Deleting a key
 entry offers a separate choice to delete its two files; the default keeps them.
 
-**Change Master Password...** in the More menu requires the old password and matching new passwords. Cancel or close
+**Change Vault Master Password...** requires the old password and matching new passwords. Cancel or close
 during password derivation to abandon the change. Once writing starts, the button becomes
 **Close** and the form says closing will not cancel. A failed write keeps the old password and
 can be retried; failures are reported even if the form was closed. **Lock** removes
@@ -47,7 +48,7 @@ is left alone. The vault never types clipboard contents into a terminal.
 
 Other plugins request credentials through `dev.jasper.vault.api.VaultApi`. The first use asks
 whether to allow the named plugin once, always for that credential, or deny access. Choosing a
-credential through the picker grants one use. Saved grants appear under **More (...) → Saved plugin grants...**;
+credential through the picker grants one use. Saved grants appear under **File → Vault Plugin Grants...**;
 **Revoke** removes one. Deleting an entry removes all its saved grants. Notes are not exposed
 through the consumer API.
 
@@ -62,8 +63,8 @@ keys_directory = ""              # empty uses this plugin's data/keys directory
 bind_new_vaults_to_device = true  # initial state of the create checkbox
 ```
 
-The three actions are `dev.jasper.vault.open` (F8), `dev.jasper.vault.lock` and
-`dev.jasper.vault.generate_key`. Configure their shortcuts like other contributed actions.
+The five actions are `dev.jasper.vault.open` (F8), `dev.jasper.vault.lock`, `dev.jasper.vault.generate_key`,
+`dev.jasper.vault.change_password` and `dev.jasper.vault.grants`. Configure their shortcuts like other contributed actions.
 
 ## Native acceptance
 
@@ -90,5 +91,5 @@ clipboard timing. The following checks need a user-run Jasper window:
    old password; verify a completed change unlocks with the new password after locking.
 
 8. Search and filter the manager; verify two-line rows, empty results, double-click/Enter editing,
-   and palette navigation revealing a row hidden by a prior filter. Open each + and More action.
+   and palette navigation revealing a row hidden by a prior filter. Open each + action and both Vault File-menu commands.
    Compare buttons, inputs and list colors with IntelliJ Light and Jasper Dark.

@@ -24,18 +24,21 @@ final class KitSettingRows {
             }
             input = new Nodes.Choice(id, state, Nodes.ChoiceKind.DROPDOWN, options, selected, spec.label(), id);
         } else {
-            var kind = spec.kind() instanceof SettingKind.IntegerRange ? Nodes.FieldKind.NUMBER : value instanceof List<?> ? Nodes.FieldKind.TEXTAREA
+            var numeric = spec.kind() instanceof SettingKind.IntegerRange range ? Optional.of(new Nodes.Numeric(range.min(), range.max(), 1, 0))
+                : spec.kind() instanceof SettingKind.NumberRange range ? Optional.of(new Nodes.Numeric(range.min(), range.max(), 0.1, 2)) : Optional.<Nodes.Numeric>empty();
+            var kind = numeric.isPresent() ? Nodes.FieldKind.NUMBER : value instanceof List<?> ? Nodes.FieldKind.TEXTAREA
                 : spec.editor().orElse(null) instanceof EditorHint.File ? Nodes.FieldKind.PATH : Nodes.FieldKind.TEXT;
             String text = invalidText != null ? invalidText : value instanceof List<?> items
                 ? String.join("\n", items.stream().map(Object::toString).toList()) : String.valueOf(value);
-            var numeric = spec.kind() instanceof SettingKind.IntegerRange range
-                ? Optional.of(new Nodes.Numeric(range.min(), range.max(), 1, 0)) : Optional.<Nodes.Numeric>empty();
-            // As the host: a bounded integer is the Settings stepper, its declared unit after the value.
+            // As the host: a bounded integer is the Settings stepper, a bounded decimal a number field, both with the unit.
             input = new Nodes.Field(id, state, kind, text, numeric.isPresent() ? spec.unit() : "", spec.label(), "", numeric,
-                numeric.isPresent() ? Nodes.FieldPresentation.STEPPER : Nodes.FieldPresentation.STANDARD);
+                spec.kind() instanceof SettingKind.IntegerRange ? Nodes.FieldPresentation.STEPPER : Nodes.FieldPresentation.STANDARD);
         }
         // As the host: the settings control slot, then the icon-only Reset, shown while the value differs from the default.
-        var reset = new Nodes.Button(id + ":reset", new ControlState(!Objects.equals(value, spec.defaultValue()), true, false, ""), "", "reset",
+        // As the host: Reset also shows while an unparsed edit or its error is pending; decimals compare at float precision.
+        boolean differs = value instanceof Number a && spec.defaultValue() instanceof Number b && !(a instanceof Integer && b instanceof Integer)
+            ? a.floatValue() != b.floatValue() : !Objects.equals(value, spec.defaultValue());
+        var reset = new Nodes.Button(id + ":reset", new ControlState(differs || invalidText != null || !error.isEmpty(), true, false, ""), "", "reset",
             Nodes.ButtonKind.GHOST, id + ":reset", "Reset " + spec.label() + " to default");
         return new Nodes.SettingRow(id + ":row", state, spec.label(), spec.description(),
             new Nodes.Stack(id + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(input, reset)), false);

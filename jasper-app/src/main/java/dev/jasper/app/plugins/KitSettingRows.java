@@ -29,20 +29,37 @@ final class KitSettingRows {
             String selected=choices.choices().stream().filter(c -> c.value().equals(value)).findFirst().orElseThrow().token();
             control=new Nodes.Choice(id,state,Nodes.ChoiceKind.DROPDOWN,options,selected,spec.label(),id);
         }else {
-            String text=value instanceof List<?> list?String.join("\n",list.stream().map(Object::toString).toList()):value.toString();
-            var kind=spec.kind() instanceof SettingKind.IntegerRange?Nodes.FieldKind.NUMBER:spec.kind() instanceof SettingKind.StringList?Nodes.FieldKind.TEXTAREA:spec.editor().orElse(null) instanceof EditorHint.File?Nodes.FieldKind.PATH:Nodes.FieldKind.TEXT;
-            var numeric=spec.kind() instanceof SettingKind.IntegerRange range?Optional.of(new Nodes.Numeric(range.min(),range.max(),1,0)):Optional.<Nodes.Numeric>empty();
-            // A bounded integer is the Settings stepper, its declared unit after the value.
-            control=new Nodes.Field(id,state,kind,edits.getOrDefault(id,text),numeric.isPresent()?spec.unit():"",spec.label(),"",numeric,numeric.isPresent()?Nodes.FieldPresentation.STEPPER:Nodes.FieldPresentation.STANDARD);
+            // A decimal is stored as a float: show it at that precision, not its widened double digits.
+            String text=value instanceof List<?> list?String.join("\n",list.stream().map(Object::toString).toList())
+                :spec.kind() instanceof SettingKind.NumberRange && value instanceof Number number?Float.toString(number.floatValue()):value.toString();
+            var numeric=numeric(spec);
+            var kind=numeric.isPresent()?Nodes.FieldKind.NUMBER:spec.kind() instanceof SettingKind.StringList?Nodes.FieldKind.TEXTAREA:spec.editor().orElse(null) instanceof EditorHint.File?Nodes.FieldKind.PATH:Nodes.FieldKind.TEXT;
+            // As the generated pages: a bounded integer is the Settings stepper, a bounded decimal a number field;
+            // both show the declared unit after the value.
+            control=new Nodes.Field(id,state,kind,edits.getOrDefault(id,text),numeric.isPresent()?spec.unit():"",spec.label(),"",numeric,
+                spec.kind() instanceof SettingKind.IntegerRange?Nodes.FieldPresentation.STEPPER:Nodes.FieldPresentation.STANDARD);
         }
-        return new Nodes.SettingRow(id+":row",state,spec.label(),spec.description(),trailing(id,spec,value,control),false);
+        boolean resettable=!sameValue(value,spec.defaultValue())||edits.containsKey(id)||errors.containsKey(id);
+        return new Nodes.SettingRow(id+":row",state,spec.label(),spec.description(),trailing(id,spec,resettable,control),false);
+    }
+    /** The bounds of a numeric setting; decimals show two places and step by a tenth, as the generated pages do. */
+    static Optional<Nodes.Numeric> numeric(SettingSpec<?> spec){
+        if(spec.kind() instanceof SettingKind.IntegerRange range)return Optional.of(new Nodes.Numeric(range.min(),range.max(),1,0));
+        if(spec.kind() instanceof SettingKind.NumberRange range)return Optional.of(new Nodes.Numeric(range.min(),range.max(),0.1,2));
+        return Optional.empty();
+    }
+    /** Pending values come back in the app's storage type: a decimal stored as a float compares at float precision. */
+    static boolean sameValue(Object value,Object defaultValue){
+        if(value instanceof Number a && defaultValue instanceof Number b && !(a instanceof Integer && b instanceof Integer))return a.floatValue()==b.floatValue();
+        return Objects.equals(value,defaultValue);
     }
     /**
      * The generated Settings pages' trailing arrangement: the control in the settings control slot, then the icon-only
-     * Reset, shown while the pending value differs from the default; its slot stays reserved so controls never move.
+     * Reset, shown while the pending value differs from the default or an unparsed edit is pending; its slot stays
+     * reserved so controls never move.
      */
-    static Nodes.Stack trailing(String id,SettingSpec<?> spec,Object value,Nodes.Node control){
-        var reset=new Nodes.Button(id+":reset",new ControlState(!Objects.equals(value,spec.defaultValue()),true,false,""),"","reset",
+    static Nodes.Stack trailing(String id,SettingSpec<?> spec,boolean resettable,Nodes.Node control){
+        var reset=new Nodes.Button(id+":reset",new ControlState(resettable,true,false,""),"","reset",
             Nodes.ButtonKind.GHOST,id+":reset","Reset "+spec.label()+" to default");
         return new Nodes.Stack(id+":controls",ControlState.READY,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(control,reset));
     }

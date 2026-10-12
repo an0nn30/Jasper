@@ -93,6 +93,20 @@ class SecretFieldsTest {
             }finally{release(context);}
         });
     }
+    @Test void aMaskedStoredSecretLooksTheSameWhateverItsLength() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();
+            var descriptor=new Secret("detail",ControlState.READY,"","Password","",SecretKind.DETAIL,"copy-detail");
+            try(var view=new KitView(context,stack(descriptor),event -> {})) {
+                view.replaceSecret("detail",new char[]{'a','b'});
+                var shortSecret=KitFixtures.render(view,320,70,2).getRGB(0,0,640,140,null,0,640);
+                view.replaceSecret("detail","a-much-longer-stored-secret-of-forty-ch".toCharArray());
+                var longSecret=KitFixtures.render(view,320,70,2).getRGB(0,0,640,140,null,0,640);
+                assertThat(longSecret).as("the mask does not disclose the secret's length").isEqualTo(shortSecret);
+            }finally{release(context);}
+        });
+    }
+
     @Test void programmaticInputTransferPreservesCallerOwnershipAndEmitsNoEdit() {
         Edt.run(() -> {
             var context=KitFixtures.context();var events=new ArrayList<UiEvent>();

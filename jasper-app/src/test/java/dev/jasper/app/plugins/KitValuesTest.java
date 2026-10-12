@@ -63,6 +63,9 @@ class KitValuesTest {
    new Field("number",READY,FieldKind.NUMBER,"1.5","","Size","",Optional.of(new Numeric(0.5,3,0.05,2))),
    new Choice("pick",READY,ChoiceKind.SEARCHABLE,options,"nord","Theme","","",Optional.of(new ChoiceSearch(1,"No matching themes",Optional.empty()))),
    new Choice("free",READY,ChoiceKind.SEARCHABLE,options,"","Font","","",Optional.of(new ChoiceSearch(0,"No matches",Optional.of("Iosevka")))),
+   new Choice("group",READY,ChoiceKind.SEARCHABLE,options,"","Group","","",Optional.of(new ChoiceSearch(0,"No matches",Optional.of(""),"Other"))),
+   new Choice("via",READY,ChoiceKind.DROPDOWN,options,"nord","Via Host","","",Optional.empty(),
+    Optional.of(new PickerFace("nord","deploy@db.example:22 · Work","server",Hue.BLUE,PickerDensity.DEFAULT))),
    new SettingRow("setting",READY,"Title","",toggle,false,true),
    new FormRow("row",READY,"Label","",new Text("c",READY,"x",TextRole.BODY),Optional.empty(),true),
    new Tree("tree",READY,List.of(new TreeItem("a","A",Optional.empty(),false,List.of(new TreeItem("b","B",Optional.empty(),true,List.of(),OptionalInt.of(4),true)),OptionalInt.of(0),false)),Set.of("a"),Set.of("b"),""));

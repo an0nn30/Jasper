@@ -134,6 +134,35 @@ class PluginPanelPageTest {
         assertThat(org.tomlj.Toml.parse(Files.readString(host.environment.settingsFiles().file(ID))).getLong("delay")).isEqualTo(1234);
         onEdt(page::dispose);
     }
+    @Test void decimalHostRowShowsItsUnitAndResetFollowsTheStoredValueAndPendingEdits() throws Exception {
+        var view = new AtomicReference<HostedKitView>();
+        onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID, "Panel", "1.0.0", Set.of()), Set.of(), Set.of(), Set.of(),
+            getClass().getClassLoader(), () -> plugin -> {
+                var ratio = plugin.settings().declare(SettingSpec.of("ratio", SettingKind.number(0, 1), 0.1).label("Ratio").unit("x"));
+                plugin.settings().page((SettingsPanel) rows -> {
+                    var made = (HostedKitView) plugin.kit().create(new dev.jasper.sdk.ui.ViewSpec(rows.row(ratio)), event -> { });
+                    view.set(made);
+                    return made;
+                });
+            })));
+        var page = onEdtValue(() -> (PluginPanelPage) host.settingsPages(context).getFirst());
+        onEdt(() -> {
+            page.component();
+            java.util.function.Supplier<dev.jasper.sdk.ui.Nodes.Stack> controls = () -> (dev.jasper.sdk.ui.Nodes.Stack) ((dev.jasper.sdk.ui.Nodes.SettingRow) view.get().spec().root()).control();
+            var field = (dev.jasper.sdk.ui.Nodes.Field) controls.get().children().getFirst();
+            assertThat(field.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldKind.NUMBER);
+            assertThat(field.hint()).as("a decimal shows its unit, as the generated pages do").isEqualTo("x");
+            assertThat(field.value()).as("the stored float, not its widened double digits").isEqualTo("0.1");
+            var reset = (dev.jasper.sdk.ui.Nodes.Button) controls.get().children().getLast();
+            assertThat(reset.state().visible()).as("the default read back at float precision is still the default").isFalse();
+            var input = dev.jasper.app.testsupport.KitTestSupport.require(view.get().component(), "settings:ratio.input", javax.swing.JTextField.class);
+            input.setText("5");
+            assertThat(((dev.jasper.sdk.ui.Nodes.Button) controls.get().children().getLast()).state().visible())
+                .as("a rejected edit can still be reset").isTrue();
+        });
+        onEdt(page::dispose);
+    }
+
     @Test void kitPanelRowsKeepTheirSearchHighlightThroughTheHostsRowRewriting() throws Exception {
         var view=new AtomicReference<HostedKitView>();var size=new AtomicReference<Setting<Integer>>();var rows=new AtomicReference<SettingsPanelHost>();
         java.util.function.Function<SettingsPanelHost,dev.jasper.sdk.ui.ViewSpec> spec=h -> {

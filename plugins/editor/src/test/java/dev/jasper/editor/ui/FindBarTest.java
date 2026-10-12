@@ -35,6 +35,31 @@ class FindBarTest {
         assertThat(bar.status()).as("whole words only").isEqualTo("No matches");
     }
 
+    @Test void theBarIsOneCompactRowOfIconTogglesAndIconActionsOverAnAlignedReplaceRow() {
+        bar.open(true);
+        var root = bar.node();
+        var row = (dev.jasper.sdk.ui.Nodes.Stack) root.children().getFirst();
+        var replace = (dev.jasper.sdk.ui.Nodes.Stack) root.children().getLast();
+        assertThat(row.role()).isEqualTo(dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE);
+        assertThat(row.children()).extracting(dev.jasper.sdk.ui.Nodes.Node::id).containsExactly(FindBar.FIND, FindBar.CASE, FindBar.WORD,
+            FindBar.REGEX, FindBar.STATUS, FindBar.PREVIOUS, FindBar.NEXT, FindBar.CLOSE);
+        assertThat(((dev.jasper.sdk.ui.Nodes.Field) row.children().getFirst()).kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldKind.SEARCH);
+        for (var child : row.children()) if (child instanceof dev.jasper.sdk.ui.Nodes.Button button) {
+            assertThat(button.label()).as("%s is icon-only", button.id()).isEmpty();
+            assertThat(button.icon()).isNotEmpty();
+            assertThat(button.tooltip()).as("%s names its action for assistive technology", button.id()).isNotBlank();
+        }
+        java.util.function.Function<String, dev.jasper.sdk.ui.Nodes.Button> option = id -> (dev.jasper.sdk.ui.Nodes.Button)
+            ((dev.jasper.sdk.ui.Nodes.Stack) bar.node().children().getFirst()).children().stream().filter(n -> n.id().equals(id)).findFirst().orElseThrow();
+        assertThat(option.apply(FindBar.CASE).selected()).as("a match option is a toggle").contains(false);
+        press(FindBar.CASE);
+        assertThat(option.apply(FindBar.CASE).selected()).contains(true);
+        assertThat(replace.state().visible()).isTrue();
+        assertThat(replace.children()).extracting(dev.jasper.sdk.ui.Nodes.Node::id).containsExactly(FindBar.REPLACE, FindBar.ONE, FindBar.ALL);
+        assertThat(((dev.jasper.sdk.ui.Nodes.Field) replace.children().getFirst()).kind()).as("the replacement is plain text, not a search").isEqualTo(dev.jasper.sdk.ui.Nodes.FieldKind.TEXT);
+        assertThat(root.cancelAction()).as("Escape anywhere closes the bar").isEqualTo(FindBar.CLOSE);
+    }
+
     @Test void wholeWordRegexValidatesThePatternSearchEngineActuallyCompiles() {
         bar.open(false);
         press(FindBar.REGEX);
