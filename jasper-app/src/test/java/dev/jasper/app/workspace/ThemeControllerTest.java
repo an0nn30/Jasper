@@ -48,7 +48,7 @@ class ThemeControllerTest {
     @Test void failedInstallerRestoresBothRawDefaultsLayers() throws Exception {
         edt(() -> {
             var controller = new ThemeController(theme -> {
-                if (theme == Theme.JASPER_LIGHT) {
+                if (theme.name().equals(Theme.JASPER_LIGHT.name())) {
                     UIManager.put("migration.override", Color.RED);
                     UIManager.getLookAndFeelDefaults().put("migration.laf", Color.BLUE);
                     throw new IllegalStateException("partial install");
@@ -70,7 +70,7 @@ class ThemeControllerTest {
 
     @Test void sameDarknessWorkspacePublishesWithoutChromeInstallAndRepeatsAreQuiet() throws Exception {
         edt(() -> {
-            var installs = new ArrayList<Theme>();
+            var installs = new ArrayList<dev.jasper.ui.theme.GeneratedTheme>();
             var controller = new ThemeController(theme -> { installs.add(theme); return ThemeTestSupport.install(theme); });
             var notifications = new ArrayList<Map.Entry<ResolvedTheme, Boolean>>();
             controller.subscribe((value, refresh) -> notifications.add(Map.entry(value, refresh)));
@@ -90,7 +90,7 @@ class ThemeControllerTest {
         edt(() -> {
             var controller = new ThemeController(theme -> {
                 ThemeTestSupport.install(theme);
-                return theme != Theme.JASPER_LIGHT;
+                return !theme.name().equals(Theme.JASPER_LIGHT.name());
             });
             var old = controller.current();
             var laf = UIManager.getLookAndFeel();
@@ -290,7 +290,7 @@ class ThemeControllerTest {
         edt(() -> {
             var themes = new ThemeController(theme -> {
                 ThemeTestSupport.install(theme);
-                return theme != dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT;
+                return !theme.name().equals(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.name());
             });
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var changed = new ArrayList<ResolvedTheme>(); owner.onThemeChanged = changed::add;
@@ -330,7 +330,7 @@ class ThemeControllerTest {
 
     @Test void failedInstallationKeepsThePreviousThemeAndReportsTheError() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(theme -> theme != dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT && ThemeTestSupport.install(theme));
+            var themes = new ThemeController(theme -> !theme.name().equals(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.name()) && ThemeTestSupport.install(theme));
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var errors = new ArrayList<String>(); owner.onError = (title, message) -> errors.add(message);
             var before = UIManager.getLookAndFeel();

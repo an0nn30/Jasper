@@ -152,7 +152,7 @@ class HostedUiTest {
         assertThat(HostedPalettes.workspace(themes.current().workspace())).isEqualTo(workspace);
         assertThat(HostedPalettes.editor(themes.current().workspace())).isEqualTo(editor);
         assertThat(HostedPalettes.syntax(themes.current().workspace())).isEqualTo(syntax);
-        var rejected = new dev.jasper.app.appearance.ThemeController(value -> value == dev.jasper.app.appearance.Theme.DARK);
+        var rejected = new dev.jasper.app.appearance.ThemeController(value -> value.name().equals(dev.jasper.app.appearance.Theme.DARK.name()));
         var before = HostedPalettes.workspace(themes.current().workspace());
         assertThatThrownBy(() -> rejected.configure(dev.jasper.app.appearance.Theme.JASPER_LIGHT))
             .isInstanceOf(dev.jasper.app.appearance.ThemeController.InstallationFailure.class);

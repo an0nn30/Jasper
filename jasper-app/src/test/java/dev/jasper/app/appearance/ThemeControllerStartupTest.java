@@ -24,19 +24,19 @@ class ThemeControllerStartupTest {
         UIManager.setLookAndFeel(new MetalLookAndFeel());
         assertThatIllegalStateException().as("a fresh process has no snapshot yet").isThrownBy(FlatLafInstaller::installedTheme);
         var broken = Theme.JASPER_LIGHT;
-        var attempts = new ArrayList<Theme>();
+        var attempts = new ArrayList<String>();
         var reported = new ArrayList<ThemeController.InstallationFailure>();
         var themes = ThemeController.startup(broken, theme -> {
-            attempts.add(theme);
+            attempts.add(theme.name());
             boolean installed = ThemeManager.install(theme);
-            if (theme == broken) throw new IllegalStateException("corrupt selected theme");
+            if (theme.name().equals(broken.name())) throw new IllegalStateException("corrupt selected theme");
             return installed;
         }, failure -> {
             reported.add(failure);
             assertThatIllegalStateException().as("the partial install of the broken theme was rolled back")
                 .isThrownBy(FlatLafInstaller::installedTheme);
         });
-        assertThat(attempts).containsExactly(broken, Theme.DARK);
+        assertThat(attempts).containsExactly(broken.name(), Theme.DARK.name());
         assertThat(reported).singleElement().satisfies(failure -> assertThat(failure).hasMessageContaining(broken.name()));
         assertThat(themes.choice()).isEqualTo(Theme.DARK);
         assertThat(FlatLafInstaller.installedTheme()).isSameAs(ThemeManager.generated(Theme.DARK));

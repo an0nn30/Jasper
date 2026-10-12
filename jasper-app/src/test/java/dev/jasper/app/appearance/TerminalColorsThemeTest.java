@@ -20,7 +20,7 @@ class TerminalColorsThemeTest {
     }
 
     @Test void aTerminalOnlyChangeNotifiesOnceWithoutReinstallingTheLookAndFeel() {
-        var installs = new ArrayList<Theme>();
+        var installs = new ArrayList<dev.jasper.ui.theme.GeneratedTheme>();
         var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, theme -> { installs.add(theme); return ThemeTestSupport.install(theme); });
         try {
             var chromeFlags = new ArrayList<Boolean>();

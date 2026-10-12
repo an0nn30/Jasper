@@ -229,7 +229,7 @@ class ConfigurationControllerTest {
         service = new ConfigService(directory.resolve("config.toml"), false);
         var errors = new ArrayList<String>();
         edt(() -> {
-            themes = new ThemeController(theme -> theme != Theme.JASPER_LIGHT && ThemeTestSupport.install(theme));
+            themes = new ThemeController(theme -> !theme.name().equals(Theme.JASPER_LIGHT.name()) && ThemeTestSupport.install(theme));
             controller = new ConfigurationTestSupport(themes, service);
             owner().onError = (title, message) -> errors.add(message);
             var state = new ConfigService.State(new ConfigSnapshot(53, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(18), Theme.JASPER_LIGHT.name(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
@@ -524,15 +524,15 @@ class ConfigurationControllerTest {
             }
         };
         var broken = new java.util.concurrent.atomic.AtomicBoolean(false);
-        var attempts = new ArrayList<Theme>();
+        var attempts = new ArrayList<String>();
         var errors = new ArrayList<String>();
         service = new ConfigService(file, false, configWorker, SwingUtilities::invokeLater);
         edt(() -> {
-            themes = new ThemeController(theme -> { attempts.add(theme); return !broken.get() && ThemeTestSupport.install(theme); });
+            themes = new ThemeController(theme -> { attempts.add(theme.name()); return !broken.get() && ThemeTestSupport.install(theme); });
             controller = new ConfigurationTestSupport(themes, service);
             owner().onError = (title, message) -> errors.add(message);
             assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
-            assertThat(attempts).containsExactly(Theme.DARK);
+            assertThat(attempts).containsExactly(Theme.DARK.name());
             broken.set(true);
         });
         Files.writeString(file, "ui.theme.name='Jasper Light'");
@@ -541,7 +541,7 @@ class ConfigurationControllerTest {
         edt(() -> {
             assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
             assertThat(themes.choice()).isEqualTo(Theme.DARK);
-            assertThat(attempts).containsExactly(Theme.DARK, Theme.JASPER_LIGHT);
+            assertThat(attempts).containsExactly(Theme.DARK.name(), Theme.JASPER_LIGHT.name());
             assertThat(errors).hasSize(1);
             broken.set(false);
         });
@@ -554,7 +554,7 @@ class ConfigurationControllerTest {
             assertThat(owners.getFirst().theme()).isEqualTo(themes.current());
             assertThat(themes.choice()).isEqualTo(Theme.JASPER_LIGHT);
             assertThat(themes.current().palette()).isEqualTo(Theme.JASPER_LIGHT.palette());
-            assertThat(attempts).containsExactly(Theme.DARK, Theme.JASPER_LIGHT, Theme.JASPER_LIGHT);
+            assertThat(attempts).containsExactly(Theme.DARK.name(), Theme.JASPER_LIGHT.name(), Theme.JASPER_LIGHT.name());
             assertThat(errors).hasSize(1);
             owners.getFirst().selectTheme(Theme.DARK);
             owners.getFirst().invoke(ActionId.RELOAD_CONFIG);
@@ -566,8 +566,8 @@ class ConfigurationControllerTest {
             // A reload re-applies the configured theme over a window's own choice.
             assertThat(themes.choice()).isEqualTo(Theme.JASPER_LIGHT);
             assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.JASPER_LIGHT));
-            assertThat(attempts).containsExactly(Theme.DARK, Theme.JASPER_LIGHT,
-                Theme.JASPER_LIGHT, Theme.DARK, Theme.JASPER_LIGHT);
+            assertThat(attempts).containsExactly(Theme.DARK.name(), Theme.JASPER_LIGHT.name(),
+                Theme.JASPER_LIGHT.name(), Theme.DARK.name(), Theme.JASPER_LIGHT.name());
         });
     }
 

@@ -7,6 +7,8 @@ public final class ThemeTestSupport {
         return new dev.jasper.ui.theme.ThemePair(theme, theme);
     }
     public static boolean install(Theme theme) { return ThemeManager.install(theme); }
+    /** Installs a generated theme, as ThemeController's installer does. */
+    public static boolean install(dev.jasper.ui.theme.GeneratedTheme theme) { return ThemeManager.install(theme); }
 
     /** A built-in theme by name, or Jasper Dark: what start-up picks for a name no theme has. */
     public static Theme named(String name) { return ThemeCatalog.builtIn().latest().find(name).orElse(Theme.DARK); }
