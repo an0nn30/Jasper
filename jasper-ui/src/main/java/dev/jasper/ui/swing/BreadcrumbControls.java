@@ -168,6 +168,7 @@ final class BreadcrumbControls {
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.BREADCRUMB_CRUMB_PADDING);
             int separatorPad = ThemePainting.metric(context(), DesignMetrics.Role.BREADCRUMB_SEPARATOR_PADDING);
             boolean first = true;
+            String currentId = value().crumbs().isEmpty() ? "" : value().crumbs().getLast().id();
             for (Crumb crumb : value().crumbs()) {
                 if (!first) {
                     var separator = Labels.literal();
@@ -179,7 +180,11 @@ final class BreadcrumbControls {
                     crumbs.add(separator);
                 }
                 first = false;
-                var button = new Buttons.KitButton(context());
+                boolean current = crumb.id().equals(currentId);
+                var button = new Buttons.KitButton(context()) {
+                    // The current crumb reads strong secondary; the others are ghost buttons.
+                    @Override SemanticColor textRole(boolean hover) { return current && !hover ? SemanticColor.TEXT_STRONG_SECONDARY : super.textRole(hover); }
+                };
                 KitOwnership.mark(button, "@crumbs/" + node.id() + "/" + crumb.id());
                 button.kind = Nodes.ButtonKind.GHOST;
                 button.putClientProperty("html.disable", true);

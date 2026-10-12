@@ -164,7 +164,7 @@ class ChoicesTest {
             var context = KitFixtures.context();
             try (var view = new KitView(context, stack(choice(ChoiceKind.PICKER, "", ControlState.READY)), e -> {})) {
                 var picker = find(view, "choice.input", JButton.class); assertThat(picker.getText()).isEqualTo("Choose…");
-                assertThat(picker.getForeground()).isEqualTo(context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
+                assertThat(picker.getForeground()).isEqualTo(context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PLACEHOLDER));
                 picker.setSize(180, 34); var image = ButtonsTest.paint(picker); int right = picker.getWidth()-com.formdev.flatlaf.util.UIScale.scale(16);
                 int count=0; int color=context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL).getRGB();
                 for (int x=right-5; x<right+5; x++) for (int y=10; y<24; y++) if (image.getRGB(x,y)!=color) count++;

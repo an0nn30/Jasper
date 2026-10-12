@@ -158,13 +158,13 @@ public final class NativeChromePainting {
         } finally { g.dispose(); }
     }
 
-    /** The status bar's running dot at its leading gap: success while a shell runs, secondary text otherwise. */
+    /** The status bar's running dot at its leading gap: success while a shell runs, the idle status otherwise. */
     public static void statusDot(JComponent bar, Graphics graphics, GeneratedTheme theme, boolean running) {
         var g = (Graphics2D) graphics.create();
         try {
             var palette = theme.semantic();
             g.setColor(running ? SurfaceContrast.on(palette, SemanticColor.STATUS_SUCCESS, SemanticColor.SURFACE_STATUS, SurfaceContrast.TEXT)
-                : palette.color(SemanticColor.TEXT_SECONDARY));
+                : palette.color(SemanticColor.STATUS_IDLE));
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             int size = NativeControlStyles.metric(DesignMetrics.Role.STATUS_RUNNING_DOT);
             g.fillOval(NativeControlStyles.metric(DesignMetrics.Role.STATUS_GAP), (bar.getHeight() - size) / 2, size, size);

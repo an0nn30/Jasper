@@ -49,7 +49,7 @@ final class PickerMenus {
     private static String clipped(FontMetrics fm,String text,int width){if(fm.stringWidth(text)<=width)return text;String ellipsis="…";if(fm.stringWidth(ellipsis)>width)return "";int end=text.length();while(end>0&&fm.stringWidth(text.substring(0,end)+ellipsis)>width)end=text.offsetByCodePoints(end,-1);return text.substring(0,end)+ellipsis;}
     private static void line(Graphics2D g,KitContext c,String label,String caption,int x,int y,int width,int height,boolean active,boolean empty,boolean compact,boolean link){
         g.setFont(ThemePainting.font(c,compact?Typography.Role.PICKER_COMPACT:Typography.Role.BODY));var fm=g.getFontMetrics();int baseline=y+(height-fm.getHeight())/2+fm.getAscent();
-        g.setColor(ThemePainting.color(c,active?SemanticColor.TEXT_ONACCENT:link?SemanticColor.TEXT_LINK:empty?SemanticColor.TEXT_TERTIARY:SemanticColor.TEXT_PRIMARY));
+        g.setColor(ThemePainting.color(c,active?SemanticColor.TEXT_ONACCENT:link?SemanticColor.TEXT_LINK:empty?SemanticColor.TEXT_PLACEHOLDER:SemanticColor.TEXT_PRIMARY));
         String primary=clipped(fm,label,width);g.drawString(primary,x,baseline);int used=fm.stringWidth(primary)+metric(c,DesignMetrics.Role.PICKER_GAP);
         if(!caption.isEmpty()&&used<width){g.setFont(ThemePainting.font(c,compact?Typography.Role.PICKER_CAPTION:Typography.Role.CAPTION));g.setColor(ThemePainting.color(c,active?SemanticColor.TEXT_ONACCENT:SemanticColor.TEXT_TERTIARY));g.drawString(clipped(g.getFontMetrics(),caption,width-used),x+used,baseline);}
     }

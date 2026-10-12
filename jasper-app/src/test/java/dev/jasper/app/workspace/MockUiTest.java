@@ -89,7 +89,8 @@ class MockUiTest {
             assertThat(status.getPreferredSize().width).isZero();
             // A local directory is shown as the platform renders it absolute (D:\very-long-directory\... on Windows).
             assertThat(status.getText()).contains(java.nio.file.Path.of(longDirectory).toAbsolutePath().normalize().toString()).contains("91 \u00d7 35");
-            assertThat(after.getRGB(32, 30) & 0xffffff).isEqualTo(0xa7b2bf);
+            assertThat(after.getRGB(32, 30) & 0xffffff).as("the idle dot is status.idle")
+                .isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.STATUS_IDLE).getRGB() & 0xffffff);
             for (int y = 0; y < 60; y++) for (int x = 900; x < 1200; x++)
                 assertThat(after.getRGB(x, y)).as("right segment remains visible").isEqualTo(before.getRGB(x, y));
             // The slash remains subdued independently of the metadata text color.

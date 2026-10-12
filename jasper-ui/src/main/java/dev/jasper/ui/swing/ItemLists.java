@@ -439,7 +439,7 @@ final class ItemLists {
             if(results() && !item.heading() && !selected.contains(item.id()))
                 for(var node:item.subtitle())if(node instanceof Nodes.Text text && text.severity().isEmpty()
                         && row.controls.get(text.id()).component instanceof JLabel label)
-                    label.setForeground(ThemePainting.color(context(),SemanticColor.TEXT_SECONDARY));
+                    label.setForeground(ThemePainting.color(context(),SemanticColor.TEXT_TERTIARY));
             if (results() && !item.heading() && selected.contains(item.id())) {
                 resultSelection(row, item.title(), SemanticColor.TEXT_ONACCENT, true);
                 resultSelection(row, item.subtitle(), SemanticColor.TEXT_ONACCENT_SECONDARY, true);

@@ -44,7 +44,7 @@ final class ToolWindowHeader extends JPanel {
     /** Count or connection name beside the title: the kit panel header's count typography and colour. */
     private final JLabel detail = new JLabel() {
         @Override public void updateUI() { super.updateUI(); setFont(ThemeZone.font(Typography.Role.COUNT)); }
-        @Override public java.awt.Color getForeground() { return ThemeZone.color(this, SemanticColor.TEXT_SECONDARY); }
+        @Override public java.awt.Color getForeground() { return ThemeZone.color(this, SemanticColor.TEXT_TERTIARY); }
     };
     private final JPanel labels;
     private final JPanel contributed = new JPanel();

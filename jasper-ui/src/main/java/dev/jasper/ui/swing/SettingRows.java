@@ -39,9 +39,9 @@ final class SettingRows {
             title.noteColor = ThemePainting.color(context(), SemanticColor.TEXT_TERTIARY);
             description.text(row.description());
             description.setVisible(!row.description().isEmpty());
-            Composition.style(title, context(), detail ? Typography.Role.SETTING_DESCRIPTION : Typography.Role.LABEL, detail ? SemanticColor.TEXT_SECONDARY : SemanticColor.TEXT_PRIMARY);
+            Composition.style(title, context(), detail ? Typography.Role.SETTING_DESCRIPTION : Typography.Role.LABEL, detail ? SemanticColor.TEXT_SECONDARY : SemanticColor.TEXT_STRONG_SECONDARY);
             Composition.style(
-                    description, context(), detail ? Typography.Role.BODY : Typography.Role.SETTING_DESCRIPTION, detail ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_TERTIARY);
+                    description, context(), detail ? Typography.Role.BODY : Typography.Role.SETTING_DESCRIPTION, detail ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_SECONDARY);
             title.setEnabled(component.isEnabled());
             description.setEnabled(component.isEnabled());
             int side = ThemePainting.metric(context(), detail ? DesignMetrics.Role.DETAIL_ROW_SIDE : settings ? DesignMetrics.Role.SETTINGS_ROW_SIDE : fullForm ? DesignMetrics.Role.FULL_SETTING_SIDE_PADDING : DesignMetrics.Role.SETTING_SIDE_PADDING),

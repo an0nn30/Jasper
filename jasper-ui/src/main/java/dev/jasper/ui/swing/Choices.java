@@ -78,7 +78,7 @@ final class Choices {
             int base=input.getWidth()>0?input.getWidth():input instanceof ChoiceCombo fixed?fixed.settingsWidth:0;
             if(option!=null&&(!option.icon().isBlank()||!option.description().isBlank()))return new RichOptions(context(),option,selected,popup,option.id().equals(((Nodes.Choice)node).selectedId()),base-(input instanceof ChoiceCombo combo?popup?2*combo.popupPadding():combo.arrowWidth():ThemePainting.metric(context(),DesignMetrics.Role.CHOICE_ARROW_WIDTH)),settings);
             var label = Choices.optionLabel(context(), option == null ? "Choose…" : option.label(), option == null ? Optional.empty() : option.hue(), selected,
-                option == null ? SemanticColor.TEXT_TERTIARY : null);
+                option == null ? SemanticColor.TEXT_PLACEHOLDER : null);
             // A Settings dropdown shows its value at label size, as its row title.
             if (settings && !popup) label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
             return label;
@@ -224,7 +224,7 @@ final class Choices {
         @Override Color fill(boolean hover) {
             return ThemePainting.color(context, hover ? SemanticColor.SURFACE_CONTROL_HOVER : SemanticColor.SURFACE_CONTROL);
         }
-        @Override SemanticColor textRole(boolean hover) { return empty ? SemanticColor.TEXT_TERTIARY : SemanticColor.TEXT_PRIMARY; }
+        @Override SemanticColor textRole(boolean hover) { return empty ? SemanticColor.TEXT_PLACEHOLDER : SemanticColor.TEXT_PRIMARY; }
         @Override protected void paintComponent(Graphics graphics) {
             if(face!=null){PickerMenus.paintFace(this,graphics,context,face,empty,focus!=null&&focus.visible());return;}
             super.paintComponent(graphics);

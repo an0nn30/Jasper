@@ -155,7 +155,7 @@ final class Tables {
                 KitOwnership.mark(label, "@table/" + node.id() + "/header/" + column.id());
                 label.setText(column.title());
                 label.setFont(ThemePainting.font(context(), Typography.Role.CAPTION));
-                label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY));
+                label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_TERTIARY));
                 label.setHorizontalAlignment(
                         column.numeric() ? SwingConstants.RIGHT : SwingConstants.LEFT);
                 label.setHorizontalTextPosition(SwingConstants.LEADING);
