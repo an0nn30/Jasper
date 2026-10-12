@@ -353,8 +353,9 @@ final class InteractiveRows {
                                     Typography.Role.LABEL),
                             line * lines()
                                     + ThemePainting.metric(context(), DesignMetrics.Role.ROW_GAP));
+            // Manager columns: one-line rows (the rail's, a list column's single-line rows) take the rail row, two-line list rows the item row.
             if (column == 0 || column == 1) rowHeight = Math.max(rowHeight,
-                ThemePainting.metric(context(), column == 0 ? DesignMetrics.Role.COLUMN_RAIL_ROW : DesignMetrics.Role.COLUMN_ITEM_ROW));
+                ThemePainting.metric(context(), column == 0 || lines() < 2 ? DesignMetrics.Role.COLUMN_RAIL_ROW : DesignMetrics.Role.COLUMN_ITEM_ROW));
             rowHeight = Math.max(rowHeight, minimumRowHeight());
             if (documentLines) rowHeight = Math.max(line, canvas.getFontMetrics(ThemePainting.font(context(), Typography.Role.MONO)).getHeight())
                 + ThemePainting.metric(context(), DesignMetrics.Role.DOCUMENT_BAR_LINE_GAP);

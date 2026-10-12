@@ -69,7 +69,8 @@ final class Panels {
             Nodes.Node first = panel.body() instanceof Nodes.Stack stack && stack.role()==Nodes.LayoutRole.VERTICAL && !stack.children().isEmpty() ? stack.children().getFirst() : panel.body();
             boolean compact = column < 0 && first instanceof Nodes.ItemList list && list.kind()==Nodes.ListKind.DOUBLE;
             int side = column == 0 || column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_LIST_SIDE) : single || compact ? ThemePainting.metric(context(),DesignMetrics.Role.PANEL_ROW_SIDE) : 0;
-            int top = column == 0 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP)
+            // A rail, and a list column without its search row, start their rows at the rail's top inset.
+            int top = column == 0 || column == 1 && panel.searchOrNavigation().isEmpty() ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP)
                 : compact && panel.searchOrNavigation().isEmpty() ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_COMPACT_LIST_TOP) : 0;
             content.setBorder(new EmptyBorder(top, side, 0, side));
             boolean search=((Nodes.Panel)node).searchOrNavigation().filter(n -> n instanceof Nodes.Field f && f.kind()==Nodes.FieldKind.SEARCH).isPresent();

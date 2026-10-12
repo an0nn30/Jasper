@@ -56,18 +56,18 @@ class Task9cNoticeEvidenceTest {
                     } finally {site.notifyClosed();}
                     var incidents=new Incidents(clock);
                     var errors=new ErrorsView(kit,incidents,new ErrorsView.Hooks(id->"Example plugin",id->"1.0.0",
-                        new IncidentReport.Environment("task9c","Headless","JBR25"),text->{},id->{},()->{}),ZoneOffset.UTC);
+                        new IncidentReport.Environment("task9c","Headless","JBR25"),text->{},id->{},()->{}),ZoneOffset.UTC,()->{});
                     try {
                         save(errors,family,"errors-empty",900,540);
                         var failure=new IllegalStateException("Literal <html> problem\nA second line remains selectable");
                         var incident=incidents.record("dev.fixture.plugin","Fixture operation","FixtureThread",Capture.of(failure));
                         incidents.record("dev.fixture.plugin","Fixture operation","FixtureThread",Capture.of(failure));
                         errors.select(incident.id());save(errors,family,"errors-plugin-repeated",900,540);save(errors,family,"errors-plugin-narrow-short",600,320);
-                        KitTestSupport.require(errors,"native.surface.scroll",JScrollPane.class).getVerticalScrollBar().setValue(Integer.MAX_VALUE);
+                        var detail=KitTestSupport.require(errors,"errors.detail.body-scroll",JScrollPane.class);
+                        detail.getVerticalScrollBar().setValue(Integer.MAX_VALUE);
                         save(errors,family,"errors-plugin-narrow-short-scrolled",600,320);
                         var traceViewport=(JViewport)errors.traceArea().getParent();
-                        var outer=KitTestSupport.require(errors,"native.surface.scroll",JScrollPane.class);
-                        outer.getVerticalScrollBar().setValue(SwingUtilities.convertPoint(traceViewport,0,0,outer.getViewport().getView()).y);
+                        detail.getVerticalScrollBar().setValue(SwingUtilities.convertPoint(traceViewport,0,0,detail.getViewport().getView()).y);
                         save(errors,family,"errors-plugin-narrow-trace",600,320);
                         var core=incidents.record("jasper","Core fixture","FixtureThread",Capture.of(new IllegalArgumentException("Core incident")));
                         errors.select(core.id());save(errors,family,"errors-core",900,540);

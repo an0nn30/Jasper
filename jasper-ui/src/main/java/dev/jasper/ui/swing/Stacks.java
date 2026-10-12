@@ -107,6 +107,10 @@ final class Stacks {
                                     if (panelDetail && stack.role() == Nodes.LayoutRole.VERTICAL && stack.children().stream().allMatch(n -> n instanceof Nodes.Text)) return 0;
                                     // A manager detail heading's name and type sit as one tight block centred on the tile.
                                     if (detail && titlePair) return ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_TITLE_GAP);
+                                    // A manager detail's captioned value (a caption over its value) keeps the detail rows' value gap.
+                                    if (detail && stack.role() == Nodes.LayoutRole.VERTICAL && stack.children().size() == 2
+                                        && stack.children().getFirst() instanceof Nodes.Text caption && caption.role() == Nodes.TextRole.CAPTION)
+                                        return ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_VALUE_GAP);
                                     return super.verticalGap(previous, child);
                                 }
                             });
