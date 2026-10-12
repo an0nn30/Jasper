@@ -70,6 +70,44 @@ class SwitchesTest {
             } finally { release(context); }
         });
     }
+    /**
+     * The indeterminate segment enters past the left end, crosses the track and leaves past the right end, so the loop
+     * restarts out of sight; it used to stop at the right end and jump back to the left.
+     */
+    @Test void theIndeterminateSegmentCrossesTheWholeTrackSoItsLoopRestartsOutOfSight() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, stack(new Progress("progress", ControlState.READY, -1, "")), e -> {})) {
+                var bar = find(view, "progress", Indicators.ProgressBar.class);
+                bar.setSize(300, bar.getPreferredSize().height);
+                Color accent = context.theme().semantic().color(SemanticColor.ACCENT);
+                assertThat(accentColumns(bar, accent, 0)).as("at rest the segment waits at the start").isBetween(95, 100);
+                bar.animation.start();
+                assertThat(accentColumns(bar, accent, 0)).as("where the loop restarts").isZero();
+                assertThat(accentColumns(bar, accent, .999)).as("just before it restarts").isZero();
+                assertThat(accentColumns(bar, accent, .5)).as("midway, the whole segment but its antialiased ends").isBetween(95, 100);
+                bar.animation.stop();
+                int previous = Indicators.ProgressBar.indeterminateX(300, 100, 0);
+                for (int step = 1; step < 100; step++) {
+                    int x = Indicators.ProgressBar.indeterminateX(300, 100, step / 100.0);
+                    assertThat(x - previous).as("moves forward smoothly within a pass").isBetween(0, 5);
+                    previous = x;
+                }
+            } finally { release(context); }
+        });
+    }
+
+    /** How many columns of the bar's track row the segment paints in the accent color at {@code phase}. */
+    static int accentColumns(Indicators.ProgressBar bar, Color accent, double phase) {
+        bar.phase = phase;
+        var image = new java.awt.image.BufferedImage(bar.getWidth(), bar.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { bar.paint(g); } finally { g.dispose(); }
+        int row = ThemePainting.metric(bar.context, dev.jasper.ui.metrics.DesignMetrics.Role.PROGRESS_HEIGHT) / 2, columns = 0;
+        for (int x = 0; x < image.getWidth(); x++) if ((image.getRGB(x, row) & 0xFFFFFF) == (accent.getRGB() & 0xFFFFFF)) columns++;
+        return columns;
+    }
+
     @Test void translucentTrackKeepsAuthoredAlphaWithSingleDisabledTreatment() {
         Edt.run(() -> {
             var base = KitFixtures.dark(); var values = new java.util.EnumMap<SemanticColor,Color>(SemanticColor.class); for (var role : SemanticColor.values()) values.put(role, base.semantic().color(role));

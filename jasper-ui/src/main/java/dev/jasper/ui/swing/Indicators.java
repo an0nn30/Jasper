@@ -70,9 +70,9 @@ final class Indicators {
         AutoCloseable effect;
         ProgressControl(KitView view, Nodes.Progress node) {
             super(view, node, new ProgressBar(view.context())); progress = (ProgressBar)component;
-            animation = new Timer(32, event -> {
+            animation = new Timer(16, event -> {
                 if (!view.motion().enabled()) { settle(); return; }
-                progress.phase = (progress.phase + .035) % 1; progress.repaint();
+                progress.phase = (progress.phase + .01) % 1; progress.repaint();
             }); progress.animation = animation;
             // Animate only while actually showing: not before the view is mounted, under a hidden ancestor or once removed.
             java.awt.event.HierarchyListener showing = event -> {
@@ -111,12 +111,20 @@ final class Indicators {
         /** Tooltips are literal text: row tooltips carry user data, and Swing HTML could load remote resources. */
         @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
         @Override public Dimension getPreferredSize() { return new Dimension(getFontMetrics(getFont()).stringWidth(getString()) + 2*ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING), ThemePainting.height(context, DesignMetrics.Role.INLINE_ACTION, Typography.Role.CAPTION)); }
+        /**
+         * Where the indeterminate segment starts at {@code phase}: from wholly before the track to wholly past it, so a
+         * pass ends out of sight and the next begins out of sight, and the loop never jumps.
+         */
+        static int indeterminateX(int width, int segment, double phase) { return (int)Math.round(-segment + (width + segment)*phase); }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create(); try {
                 ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
                 int h = ThemePainting.metric(context, DesignMetrics.Role.PROGRESS_HEIGHT); g.setColor(getBackground()); g.fillRoundRect(0, 0, getWidth(), h, h, h);
                 g.setColor(getForeground()); int width = isIndeterminate() ? getWidth()/3 : (int)Math.round(getWidth()*getPercentComplete());
-                int x = isIndeterminate() ? (int)Math.round((getWidth()-width)*phase) : 0; g.fillRoundRect(x, 0, width, h, h, h);
+                // At rest (motion off, or not showing) the segment waits at the start of the track.
+                int x = isIndeterminate() && animation != null && animation.isRunning() ? indeterminateX(getWidth(), width, phase) : 0;
+                Shape clip = g.getClip(); g.clip(new java.awt.geom.RoundRectangle2D.Float(0, 0, getWidth(), h, h, h));
+                g.fillRoundRect(x, 0, width, h, h, h); g.setClip(clip);
                 g.setFont(getFont()); g.setColor(ThemePainting.color(context, SemanticColor.TEXT_SECONDARY));
                 String clipped = SwingUtilities.layoutCompoundLabel(this, g.getFontMetrics(), getString(), null, CENTER, RIGHT, CENTER, RIGHT,
                     new Rectangle(0, h, getWidth(), Math.max(0, getHeight()-h)), new Rectangle(), new Rectangle(), 0);
