@@ -19,8 +19,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The modal overlay's motion, as the user specified it: the card fades from transparent to opaque while rising 16
- * logical into place over 220 ms with an ease-out cubic, the scrim dimming with it; closing reverses both over 170 ms
- * with an ease-in. Never a slide across the window; instant with motion off. Frames are driven by a test clock.
+ * logical into place over 220 ms with an ease-out cubic, the scrim dimming with it; closing is the opposite, the card
+ * rising on another 16 as it fades out and the scrim lifting, over 170 ms with an ease-in. Never a slide across the
+ * window; instant with motion off. Frames are driven by a test clock.
  */
 class ModalOverlayTest {
     static final long MS = 1_000_000;
@@ -94,7 +95,8 @@ class ModalOverlayTest {
         } });
     }
 
-    @Test void closingReversesFasterAndRemovesTheOverlayWhenDone() {
+    /** The exit is the entrance's opposite: the card keeps rising as it fades out, never sinking back down. */
+    @Test void closingKeepsRisingAsItFadesOutFasterAndRemovesTheOverlayWhenDone() {
         Edt.run(() -> { try (var f = new Fixture()) {
             f.overlay.open(); f.at(220);
             assertThat(f.context.metrics().value(DesignMetrics.Role.OVERLAY_EXIT_MILLIS)).isBetween(150, 200);
@@ -104,11 +106,13 @@ class ModalOverlayTest {
             assertThat(f.overlay.card().isVisible()).as("the leaving card takes no input").isFalse();
             f.at(85);
             assertThat(f.overlay.shown()).isEqualTo(.875);
-            assertThat(f.overlay.cardBounds().y).as("sinks back as it fades").isEqualTo(f.restingY() + 2);
+            assertThat(f.overlay.cardBounds().y).as("an eighth of the way up and out").isEqualTo(f.restingY() - 2);
             // Its picture at .875 over the scrim and shadow, themselves at .875 of their strength.
             assertThat(f.paint().getRGB(400, 300) >>> 24).as("its picture fades").isBetween(232, 244);
+            f.at(68);
+            assertThat(f.overlay.cardBounds().y).as("near the end, most of a rise above its place").isLessThan(f.restingY() - 10);
             assertThat(removed[0]).isZero();
-            f.at(85);
+            f.at(17);
             assertThat(removed[0]).isEqualTo(1);
             assertThat(f.overlay.getParent()).isNull();
             assertThat(f.overlay.phase()).isEqualTo(ModalOverlay.Phase.CLOSED);
@@ -137,12 +141,22 @@ class ModalOverlayTest {
         } });
     }
 
-    @Test void closingDuringTheEntranceReversesFromWhereItWas() {
+    /** Dismissed while still rising in, it carries on upward from where it was as it fades out. */
+    @Test void closingDuringTheEntranceCarriesOnUpwardFromWhereItWas() {
         Edt.run(() -> { try (var f = new Fixture()) {
             f.overlay.open(); f.at(110);
             f.overlay.dismiss(() -> { });
             assertThat(f.overlay.shown()).isEqualTo(.875);
-            f.at(170);
+            int previous = f.overlay.cardBounds().y;
+            assertThat(previous).isEqualTo(f.restingY() + 2);
+            for (int frame = 0; frame < 9; frame++) {
+                f.at(17);
+                int y = f.overlay.cardBounds().y;
+                assertThat(y).as("frame %s never moves down", frame).isLessThanOrEqualTo(previous);
+                previous = y;
+            }
+            assertThat(previous).as("above its resting place by the end").isLessThan(f.restingY() - 10);
+            f.at(17);
             assertThat(f.overlay.getParent()).isNull();
         } });
     }

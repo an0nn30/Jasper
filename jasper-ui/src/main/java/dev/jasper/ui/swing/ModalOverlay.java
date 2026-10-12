@@ -28,7 +28,8 @@ import javax.swing.border.EmptyBorder;
 /**
  * The kit's modal overlay: a scrim that dims a window's whole content and, above it, a centred card holding the host's
  * content. Opening fades the scrim in while the card fades up into place from {@code OVERLAY_RISE} below, easing out
- * over {@code OVERLAY_ENTER_MILLIS}; closing reverses both, easing in over the shorter {@code OVERLAY_EXIT_MILLIS}.
+ * over {@code OVERLAY_ENTER_MILLIS}; closing is its opposite, easing in over the shorter {@code OVERLAY_EXIT_MILLIS}:
+ * the card rises on another {@code OVERLAY_RISE} as it fades out and the scrim lifts.
  * With motion off both are instant. While it moves the card paints a snapshot of its content, so the card fades as one
  * surface; at rest its content paints live. The scrim takes every pointer event outside the card.
  * <p>The host adds the overlay to a layered pane, keeps it the pane's size, calls {@link #open()}, and owns keyboard
@@ -49,8 +50,12 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
     private long started;
     /** How far in the card is, 0 (gone) to 1 (in place): the eased share of the running transition. */
     private double shown;
-    /** Where the exit started from, so a close during the entrance reverses from there. */
+    /** Where the exit started from, so a close during the entrance fades out from there. */
     private double from;
+    /** Where the card is against its place, in rises: 1 a rise below, 0 in place, -1 a rise above. */
+    private double offset = 1;
+    /** Where the exit started moving from, so a close during the entrance carries on upward from there. */
+    private double fromOffset;
     /** The closing card's last picture; the card itself is hidden while it leaves. */
     private BufferedImage leaving;
     private Runnable removed = () -> { };
@@ -99,6 +104,7 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
         if (phase != Phase.NEW) return;
         phase = Phase.OPENING;
         shown = 0;
+        offset = 1;
         begin(context.metrics().value(DesignMetrics.Role.OVERLAY_ENTER_MILLIS));
     }
 
@@ -111,6 +117,7 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
         if (phase == Phase.CLOSING || phase == Phase.CLOSED) return;
         this.removed = removed;
         from = phase == Phase.NEW ? 0 : shown;
+        fromOffset = offset;
         phase = Phase.CLOSING;
         leaving = from > 0 && motion.enabled() ? card.picture() : null;
         card.setVisible(false);
@@ -133,7 +140,8 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
         if (!motion.enabled()) return;
         int millis = context.metrics().value(phase == Phase.OPENING ? DesignMetrics.Role.OVERLAY_ENTER_MILLIS : DesignMetrics.Role.OVERLAY_EXIT_MILLIS);
         double t = Math.min(1, Math.max(0, (clock.getAsLong() - started) / 1e6 / millis));
-        shown = phase == Phase.OPENING ? easeOutCubic(t) : from * (1 - easeInCubic(t));
+        if (phase == Phase.OPENING) { shown = easeOutCubic(t); offset = 1 - shown; }
+        else { double eased = easeInCubic(t); shown = from * (1 - eased); offset = fromOffset + (-1 - fromOffset) * eased; }
         if (t >= 1) { finish(); return; }
         placeCard();
         repaint();
@@ -144,12 +152,14 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
         if (phase == Phase.OPENING) {
             phase = Phase.OPEN;
             shown = 1;
+            offset = 0;
             card.forget();
             placeCard();
             repaint();
         } else if (phase == Phase.CLOSING) {
             phase = Phase.CLOSED;
             shown = 0;
+            offset = -1;
             leaving = null;
             remove();
             Runnable after = removed;
@@ -202,13 +212,13 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
 
     @Override public void doLayout() { placeCard(); }
 
-    /** Centred within the margin, lowered by the share of the rise still to go. */
+    /** Centred within the margin, moved by its offset: lowered while it rises in, raised as it rises out. */
     private void placeCard() {
         int margin = Math.min(ThemePainting.metric(context, DesignMetrics.Role.OVERLAY_MARGIN), Math.min(getWidth(), getHeight()) / 2);
         Dimension preferred = card.getPreferredSize();
         int width = Math.min(Math.max(0, preferred.width), Math.max(0, getWidth() - 2 * margin));
         int height = Math.min(Math.max(0, preferred.height), Math.max(0, getHeight() - 2 * margin));
-        int lower = (int) Math.round(ThemePainting.metric(context, DesignMetrics.Role.OVERLAY_RISE) * (1 - shown));
+        int lower = (int) Math.round(ThemePainting.metric(context, DesignMetrics.Role.OVERLAY_RISE) * offset);
         var bounds = new Rectangle(margin + (getWidth() - 2 * margin - width) / 2, margin + (getHeight() - 2 * margin - height) / 2 + lower, width, height);
         if (!bounds.equals(card.getBounds())) { card.setBounds(bounds); card.doLayout(); }
     }

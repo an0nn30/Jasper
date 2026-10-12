@@ -891,8 +891,8 @@ bounded integer's Settings stepper); the `border.identity` semantic color; and t
 
 `DialogSpec.Presentation.OVERLAY` presents a modal dialog inside its owner's window instead of as a native window:
 the rest of the window dims under a scrim, and the dialog, centred above it, fades from transparent while rising
-16 logical pixels into place (about 220 ms, easing out); closing reverses it a little faster (about 170 ms, easing
-in). Both follow the motion setting and are instant with animations off. The owner may be a terminal window, one of
+16 logical pixels into place (about 220 ms, easing out); closing is its opposite, a little faster (about 170 ms,
+easing in): the dialog rises on as it fades out. Both follow the motion setting and are instant with animations off. The owner may be a terminal window, one of
 your windows or a `UiAnchor`; an overlay may open over the window's progress overlay. It must be modal: `show()`
 returns once it closes, its form's Escape runs the form's cancel action, and the window takes no other input
 meanwhile. The Vault's Create Vault and Unlock Vault prompts use it:

@@ -21,7 +21,8 @@ public record DialogSpec(String title, WindowOwner owner, boolean modal, Present
         ATTACHED_SHEET,
         /**
          * Inside the owner's window, with no native window: the rest of the window dims under a scrim and the dialog,
-         * centred above it, fades up into place, and fades back out as it closes (both instant with motion off).
+         * centred above it, fades up into place, and rises on as it fades out when it closes (both instant with motion
+         * off).
          * Modal only.
          *
          * @since 0.15.4
