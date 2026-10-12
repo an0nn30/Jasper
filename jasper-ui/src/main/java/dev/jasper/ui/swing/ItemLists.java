@@ -411,6 +411,10 @@ final class ItemLists {
                     if(i==0 && text.role()==Nodes.TextRole.BODY)label.setFont(ThemePainting.font(context(),Typography.Role.PANEL_ROW_SELECTED));
                 }
             }
+            // RESULTS section headings use their own caption size, smaller than the rows they introduce.
+            if (results() && item.heading())
+                for (var node : item.title()) if (node instanceof Nodes.Text && row.controls.get(node.id()).component instanceof JLabel label)
+                    label.setFont(ThemePainting.font(context(), Typography.Role.RESULTS_HEADING));
             row.slot(row.subtitle, item.subtitle());
             row.slot(row.trailing, trailing);
             if(results() && !item.heading() && !selected.contains(item.id()))

@@ -5,7 +5,6 @@ import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.swing.NativeControlStyles;
 import dev.jasper.ui.theme.SemanticColor;
-import dev.jasper.ui.theme.SurfaceContrast;
 
 import com.formdev.flatlaf.ui.FlatEmptyBorder;
 import com.formdev.flatlaf.util.UIScale;
@@ -114,14 +113,8 @@ final class ToolWindowHeader extends JPanel {
             @Override public int getIconWidth() { return NativeControlStyles.metric(DesignMetrics.Role.TOOL_HEADER_ACTIVE_DOT); }
             @Override public int getIconHeight() { return getIconWidth(); }
             @Override public void paintIcon(java.awt.Component c, java.awt.Graphics graphics, int x, int y) {
-                var g = (java.awt.Graphics2D) graphics.create();
-                try {
-                    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-                    // The connected dot is the success status, held readable on the tool window surface it sits on.
-                    g.setColor(SurfaceContrast.on(ThemeZone.theme(ToolWindowHeader.this).semantic(), SemanticColor.STATUS_SUCCESS,
-                        SemanticColor.SURFACE_SIDEBAR, SurfaceContrast.INDICATOR));
-                    g.fillOval(x, y, getIconWidth(), getIconHeight());
-                } finally { g.dispose(); }
+                // The connected dot is the success status, held readable on the tool window surface it sits on.
+                dev.jasper.ui.swing.NativeChromePainting.connectedDot(graphics, x, y, getIconWidth(), ThemeZone.theme(ToolWindowHeader.this));
             }
         } : null);
         while (actionButtons.size() > state.actions().size()) {

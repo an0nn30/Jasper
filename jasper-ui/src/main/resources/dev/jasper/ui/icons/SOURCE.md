@@ -6,6 +6,14 @@ whose upstream revision and original complete-catalog provenance follow below. T
 its generated SDK BundledIcon API and refresh script described below are historical provenance;
 they are not part of this selected engine catalog. No automatic sibling/size discovery is performed.
 
+The native workspace chrome context (`IconRegistry.chromeIcon`: title bar, toolbar, tool window stripes and
+status bar) admits twenty further byte-identical SVG files listed in assets-chrome.tsv (add, moveToWindow,
+splitVertically, expand, chevronDown, nodes/folder, webReferences/server, toolwindows/notifications, locked
+and the terminal tool window icon, each with its dark sibling). They were recovered from Jasper `main`
+revision c2b6283a4e814e2aaac2a375a52acd96ce5f8e89 (`jasper-app/.../icons/intellij`, whose assets.tsv
+records the same source paths and SHA-256 values) for Plan 3 Task 10; the Desktop workspace references
+depict exactly this artwork. Descriptor views, panels, tiles and plugin registrations never receive it.
+
 # IntelliJ New UI artwork
 
 Byte-identical SVGs from JetBrains/intellij-community commit `60b8fbadc2f08ef18a6ecab0c138a849e14f13fb`.

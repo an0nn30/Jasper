@@ -73,7 +73,7 @@ final class StatusProgressView extends JPanel {
         bar.setForeground(ThemeZone.color(this, SemanticColor.ACCENT));
         bar.setBackground(ThemeZone.color(this, SemanticColor.SURFACE_CONTROL));
         for (var button : new JButton[]{main, secondary}) {
-            button.setFont(ThemeZone.font(Typography.Role.LABEL));
+            button.setFont(ThemeZone.font(Typography.Role.STATUS_TEXT));
             button.setForeground(ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
         }
     }

@@ -20,7 +20,6 @@ import dev.jasper.app.config.ToolbarMode;
 import dev.jasper.app.config.ViewMode;
 
 import java.awt.*;
-import com.formdev.flatlaf.util.UIScale;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -350,7 +349,7 @@ final class WindowChrome {
         }
 
         private Font chromeFont() {
-            return ThemeZone.font(Typography.Role.LABEL);
+            return ThemeZone.font(Typography.Role.TOOLBAR_LABEL);
         }
 
         /** The toolbar's button height; icon-only buttons are square. */
@@ -360,10 +359,8 @@ final class WindowChrome {
 
         @Override public Dimension getPreferredSize() {
             int side = side();
-            // A labelled button keeps its 4 px padding however tall the toolbar is.
-            int width = labels() ? UIScale.scale(24) + UIScale.scale(4) + getFontMetrics(chromeFont()).stringWidth(getText()) : side;
-            if (menu()) width += UIScale.scale(10);
-            return new Dimension(width, side);
+            // A labelled button keeps its padding however tall the toolbar is; icon-only buttons are square.
+            return new Dimension(NativeChromePainting.actionWidth(this, side, labels(), menu()), side);
         }
 
         @Override protected void paintComponent(Graphics graphics) {
@@ -373,10 +370,7 @@ final class WindowChrome {
 
     private static final class ToolbarSeparator extends JSeparator {
         ToolbarSeparator() { super(SwingConstants.VERTICAL); }
-        @Override protected void paintComponent(Graphics g) {
-            g.setColor(ThemeZone.color(null, SemanticColor.BORDER_SUBTLE));
-            g.fillRect(0, 0, getWidth(), getHeight());
-        }
+        @Override protected void paintComponent(Graphics g) { NativeChromePainting.rule(this, g, ThemeZone.theme(null)); }
     }
 
     JPopupMenu contextMenu() {

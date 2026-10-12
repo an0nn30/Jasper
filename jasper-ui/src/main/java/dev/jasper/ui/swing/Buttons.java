@@ -70,7 +70,7 @@ final class Buttons {
         @Override void refresh() {
             var value = (Nodes.Button)node; state(); button.kind = value.kind(); button.iconSeverity = value.iconSeverity().orElse(null);
             button.toggle = value.selected().isPresent(); button.getModel().setSelected(value.selected().orElse(false));
-            button.setText(value.label()); button.setFont(ThemePainting.font(context(), button.panelDetail || button.panel ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.LABEL));
+            button.setText(value.label()); button.setFont(ThemePainting.font(context(), button.hint ? Typography.Role.PALETTE_HINT : button.panelDetail || button.panel ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.LABEL));
             button.setForeground(button.textColor(false));
             boolean embedded = value.presentation() == Nodes.ButtonPresentation.EMBEDDED || value.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
             button.circular=value.presentation()==Nodes.ButtonPresentation.CIRCULAR;
@@ -115,7 +115,7 @@ final class Buttons {
             int content=getIcon() instanceof Keycaps caps?caps.heightAt(available):recorderText.height(available);
             return Math.max(getPreferredSize().height,content+insets.top+insets.bottom);
         }
-        boolean hero, panel, fullFooter, orderedAction, panelDetail, circular;
+        boolean hero, panel, fullFooter, orderedAction, panelDetail, circular, hint;
         /** Content-sized for a host arrangement (ButtonPresentation.EMBEDDED): no minimum height and no resting or hover fill. */
         boolean embedded, contextual, panelRow;
         float disabledOpacity=.42f;

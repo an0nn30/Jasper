@@ -645,6 +645,34 @@ class CommandPaletteTest {
         });
     }
 
+    @Test void headingsFooterAndQueryGlyphUseTheirReferenceRoles() throws Exception {
+        SwingUtilities.invokeAndWait(()->{
+            try(var palette=palette(new ArrayList<>())) {
+                palette.setEntries(List.of(new PaletteEntry.Header("Recently used"),
+                    new PaletteEntry.Item(HISTORY,new PaletteRow("ls","ls -la","in ~/src",null,null,true,null))),null,null);
+                palette.setSize(palette.getPreferredSize());layoutTree(palette);
+                var hint=dev.jasper.ui.swing.NativeControlStyles.font(palette.kit(),dev.jasper.ui.metrics.Typography.Role.PALETTE_HINT);
+                assertThat(label(PaletteTestSupport.entryComponent(palette,0),"Recently used").getFont())
+                    .isEqualTo(dev.jasper.ui.swing.NativeControlStyles.font(palette.kit(),dev.jasper.ui.metrics.Typography.Role.RESULTS_HEADING));
+                assertThat(label(palette.hintView(),"in ~/src").getFont()).as("footer detail").isEqualTo(hint);
+                for(int verb=1;verb<3;verb++)
+                    assertThat(KitTestSupport.require(palette.hintView(),CommandPalette.VERB+verb,AbstractButton.class).getFont()).as("footer verb").isEqualTo(hint);
+                // The transparent query shows the rail-size search glyph its reference depicts.
+                assertThat(icons(PaletteTestSupport.fieldRow(palette))).anySatisfy(icon -> assertThat(icon.getIconWidth())
+                    .isEqualTo(com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.ICON_RAIL))));
+            }
+        });
+    }
+
+    private static List<javax.swing.Icon> icons(java.awt.Container root) {
+        var found=new ArrayList<javax.swing.Icon>();
+        for(var child:root.getComponents()) {
+            if(child instanceof JLabel label && label.getIcon()!=null)found.add(label.getIcon());
+            if(child instanceof java.awt.Container nested)found.addAll(icons(nested));
+        }
+        return found;
+    }
+
     @Test void detailsUseOrdinaryBodyEvenWhenTheScopeTitleIsMonospace() throws Exception {
         SwingUtilities.invokeAndWait(()->{
             try(var palette=palette(new ArrayList<>())) {

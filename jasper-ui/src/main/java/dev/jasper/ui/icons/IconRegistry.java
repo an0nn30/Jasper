@@ -28,7 +28,7 @@ public final class IconRegistry implements AutoCloseable {
     private boolean closed;
     public IconRegistry() { prepareBuiltIns(); artworks.putAll(BUILT_INS); }
     /** Optional off-EDT production prewarm; standalone construction remains self-contained. */
-    public static void prepareBuiltIns() { BuiltInArtwork.catalog(); }
+    public static void prepareBuiltIns() { BuiltInArtwork.catalog(); BuiltInArtwork.chrome(); }
     public synchronized Set<String> names() { requireOpen(); var names = new java.util.HashSet<>(artworks.keySet()); names.addAll(encoded.keySet()); names.addAll(BuiltInArtwork.catalog().keySet()); return Set.copyOf(names); }
     public synchronized IconRegistration register(String name, String pathData) {
         requireOpen(); Objects.requireNonNull(name);
@@ -81,11 +81,19 @@ public final class IconRegistry implements AutoCloseable {
         return pair.select(dark);
     }
     /** Prepared native receiving snapshot. Both siblings are retained independently of the decoder size cache. */
-    public PreparedIcon themedIcon(String name, int logicalSize) {
+    public PreparedIcon themedIcon(String name, int logicalSize) { return prepared(name, logicalSize, false); }
+    /**
+     * As {@link #themedIcon}, for the native workspace chrome's own receiving contexts (title bar, toolbar, tool window
+     * stripes and status bar): the meanings that chrome depicts use their original desktop artwork. Every other name, and
+     * every descriptor, panel, tile or plugin-registered context, is unchanged.
+     */
+    public PreparedIcon chromeIcon(String name, int logicalSize) { return prepared(name, logicalSize, true); }
+    private PreparedIcon prepared(String name, int logicalSize, boolean chrome) {
         synchronized(this) {
             requireOpen();
             if(!names().contains(name))throw new IllegalArgumentException("Unknown icon: "+name);
-            var pair=BuiltInArtwork.catalog().get(name);
+            // Chrome originals are keyed by built-in meanings; namespaced registrations can never collide with them.
+            var pair=chrome && BuiltInArtwork.chrome().containsKey(name) ? BuiltInArtwork.chrome().get(name) : BuiltInArtwork.catalog().get(name);
             var path=artworks.get(name);
             var registration=encoded.get(name);
             var received=registration==null?null:registration.artwork();

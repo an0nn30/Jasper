@@ -132,6 +132,36 @@ class ZoneIconsTest {
             theme.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
     }
 
+    @Test void chromeReceiversAloneShowOriginalArtworkWithoutChangingIconValues() {
+        var themes = new ThemeController(Theme.DARK);
+        try (var registry = new dev.jasper.ui.icons.IconRegistry()) {
+            var theme = dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK);
+            var chrome = new JPanel(); AppIcons.chromeReceiver(chrome);
+            var chromeGroup = new JPanel(); chrome.add(chromeGroup);
+            var inside = new JLabel(); chromeGroup.add(inside);
+            var plainGroup = new JPanel();
+            var outside = new JLabel(); plainGroup.add(outside);
+            for (var group : java.util.List.of(chromeGroup, plainGroup)) {
+                group.putClientProperty("Jasper.zone", "workspace");
+                group.putClientProperty("Jasper.workspaceTheme", theme);
+            }
+            for (var icon : java.util.List.<Icon>of(AppIcons.icon("square-plus"), AppIcons.named("FOLDER"), AppIcons.semantic("bell"),
+                    new PresentationIcon("server", null), AppIcons.dropdown())) {
+                int size = icon.getIconWidth();
+                String name = icon instanceof PresentationIcon p ? p.name() : AppIcons.kitName(icon).orElseThrow();
+                var tint = icon instanceof PresentationIcon ? dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY : dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY;
+                assertThat(pixels(icon, inside)).as("chrome %s", name)
+                    .isEqualTo(pixels(registry.chromeIcon(name, size).icon(theme, tint), inside))
+                    .isNotEqualTo(pixels(icon, outside));
+                assertThat(pixels(icon, outside)).as("ordinary %s", name)
+                    .isEqualTo(pixels(registry.themedIcon(name, size).icon(theme, tint), outside));
+            }
+            // Meanings the chrome does not depict paint identically inside and outside a receiver.
+            var settings = AppIcons.semantic("settings");
+            assertThat(pixels(settings, inside)).isEqualTo(pixels(settings, outside));
+        } finally { themes.close(); new ThemeController(); }
+    }
+
     private static int[] pixels(Icon icon, Component component) {
         var image = new BufferedImage(icon.getIconWidth(), icon.getIconHeight(), BufferedImage.TYPE_INT_ARGB);
         var graphics = image.createGraphics();

@@ -234,14 +234,8 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
 
     @Override protected void paintChildren(Graphics g) {
         super.paintChildren(g);
-        if (header != null) {
-            Color highlight = dev.jasper.ui.theme.ColorMath.opacity(ThemeZone.color(this, SemanticColor.HOVER_OVERLAY), .08);
-            if (highlight != null) { g.setColor(highlight); g.fillRect(0, 0, getWidth(), UIScale.scale(1)); }
-        }
-        if (header == null && !dialogHero) {
-            g.setColor(ThemeZone.color(null, SemanticColor.BORDER_SUBTLE));
-            g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
-        }
+        // A header row's top highlight follows its own zone; a dialog title's lower rule follows the chrome.
+        dev.jasper.ui.swing.NativeChromePainting.titleBarEdges(this, g, ThemeZone.theme(header != null ? this : null), header != null, dialogHero);
     }
 
     @Override public void close() {

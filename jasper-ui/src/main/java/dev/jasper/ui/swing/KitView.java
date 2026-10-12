@@ -69,6 +69,11 @@ public final class KitView extends JPanel implements AutoCloseable {
         // Native panel hosts reborrow a replacement header after reconciliation, never during it.
         try { firePropertyChange("viewSpec", previous, spec); } catch (Throwable failure) { report(failure); }
     }
+    private static boolean hasStack(Nodes.Node node,String id) {
+        if(node.id().equals(id))return node instanceof Nodes.Stack;
+        for(var child:ControlRegistry.children(node))if(hasStack(child,id))return true;
+        return false;
+    }
     private static boolean hasIcon(Nodes.Node node,String id) {
         if(node.id().equals(id))return node instanceof Nodes.Icon;
         if(node instanceof Nodes.ItemList list)for(var item:list.items()) {
@@ -110,6 +115,18 @@ public final class KitView extends JPanel implements AutoCloseable {
         reconciler.refreshArtwork(iconId);
     }
     ArtworkPresentation artworkPresentation(String id){return artworkPresentations.getOrDefault(id,ArtworkPresentation.DEFAULT);}
+    private final java.util.Set<String> hintStacks=new java.util.HashSet<>();
+    /**
+     * App-only compact hint face for one stack (the command palette's footer): its caption text and embedded link actions
+     * use the hint typography and its children the hint gap. Same-id updates retain it; the view's close retires it.
+     * Not part of the plugin SDK.
+     */
+    public void setHintPresentation(String stackId, boolean hint) {
+        requireOpen();
+        if(!hasStack(spec.root(),Objects.requireNonNull(stackId)))throw new IllegalArgumentException("Not a stack");
+        if(hint ? hintStacks.add(stackId) : hintStacks.remove(stackId)) update(spec);
+    }
+    boolean hintStack(String id){return hintStacks.contains(id);}
     /**
      * App-only owned action inside a mounted TEXT or SEARCH field. The action has this view's normal
      * event, focus and accessibility routing. Validation is transactional, including ids in unmounted rows.

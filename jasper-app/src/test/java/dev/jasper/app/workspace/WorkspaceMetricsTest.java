@@ -58,10 +58,13 @@ class WorkspaceMetricsTest {
             for (String role : generic)
                 assertThat(text).as(root.relativize(file) + " borrows " + role).doesNotContain("DesignMetrics.Role." + role + ")");
         }
-        var required = Map.of("WindowStatusBar.java", List.of("STATUS_RUNNING_DOT"),
+        // Plan 3 Task 10: the running dot, tab strip and toolbar painting live in the kit's native chrome painters.
+        assertThat(Files.readString(swing.resolve("NativeChromePainting.java"))).contains("STATUS_RUNNING_DOT", "TAB_DIVIDER",
+            "TAB_SELECTED_LIFT_DARK", "TAB_IDLE_SHADE_DARK", "TOOLBAR_ACTION_ICON", "NATIVE_HOVER_OVERLAY_PERCENT", "PALETTE_SHADOW_SPREAD");
+        var required = Map.of("WindowStatusBar.java", List.of("NativeChromePainting.statusDot"),
             "StatusProgressView.java", List.of("STATUS_PROGRESS_BAR_HEIGHT", "STATUS_PROGRESS_MIN_HEIGHT"),
             "WindowTabs.java", List.of("TAB_REVEAL_INSET", "TAB_CLOSE_FIT_WIDTH", "TAB_CLOSE_GUTTER", "TAB_COMPACT_GUTTER",
-                "TAB_CLOSE_WIDTH", "TAB_CLOSE_TRAILING", "TAB_DIVIDER", "TAB_REORDER_THRESHOLD"),
+                "TAB_CLOSE_WIDTH", "TAB_CLOSE_TRAILING", "NativeChromePainting.tabStrip", "TAB_REORDER_THRESHOLD"),
             "ToolWindowHeader.java", List.of("TOOL_HEADER_LEADING_PADDING", "TOOL_HEADER_TRAILING_PADDING",
                 "TOOL_HEADER_DETAIL_GAP", "TOOL_HEADER_ACTIVE_DOT"));
         for (var entry : required.entrySet())

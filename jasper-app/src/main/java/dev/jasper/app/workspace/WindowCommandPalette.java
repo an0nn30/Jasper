@@ -1,7 +1,9 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.platform.ThemeZone;
-import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.swing.NativeChromePainting;
+import dev.jasper.ui.swing.NativeControlStyles;
 
 import dev.jasper.app.config.ViewMode;
 import dev.jasper.app.palette.CommandPalette;
@@ -189,7 +191,7 @@ final class WindowCommandPalette implements AutoCloseable {
             Rectangle field = owner.paletteAnchor(this);
             if (field != null) {
                 palette.setBounds(anchored(field, new Rectangle(0, 0, getWidth(), getHeight()), palette.getPreferredSize(),
-                    UIScale.scale(ANCHORED_MINIMUM_WIDTH), UIScale.scale(16)));
+                    UIScale.scale(ANCHORED_MINIMUM_WIDTH), NativeControlStyles.metric(DesignMetrics.Role.PALETTE_WINDOW_MARGIN)));
                 return;
             }
             // No usable field: centre across the workspace, which spans the window including its rail and
@@ -198,21 +200,11 @@ final class WindowCommandPalette implements AutoCloseable {
             Dimension preferred = palette.getPreferredSize();
             // Compact changes placement while retaining the title-anchored card's activated width.
             if (owner.viewMode() == ViewMode.COMPACT) preferred.width = UIScale.scale(ANCHORED_MINIMUM_WIDTH);
-            palette.setBounds(positioned(window, preferred, UIScale.scale(16)));
+            palette.setBounds(positioned(window, preferred, NativeControlStyles.metric(DesignMetrics.Role.PALETTE_WINDOW_MARGIN)));
         }
         @Override protected void paintComponent(Graphics graphics) {
             if (!controller.isOpen()) return;
-            var g = (Graphics2D) graphics.create();
-            try {
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                Rectangle card = palette.getBounds();
-                Color shadow = ThemeZone.color(null, SemanticColor.SURFACE_SCRIM);
-                g.setColor(new Color(shadow.getRed(), shadow.getGreen(), shadow.getBlue(), owner.theme().chrome().dark() ? 4 : 2));
-                for (int i = 12; i >= 1; i--) {
-                    int expansion = UIScale.scale(i);
-                    g.fillRect(card.x - expansion, card.y - expansion, card.width + expansion * 2, card.height + expansion * 2);
-                }
-            } finally { g.dispose(); }
+            NativeChromePainting.popupShadow(graphics, palette.getBounds(), ThemeZone.theme(null), owner.theme().chrome().dark());
         }
     }
 }

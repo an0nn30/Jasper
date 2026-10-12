@@ -61,4 +61,30 @@ class BuiltInArtworkTest {
         }
         assertThat(lightCache).isEqualTo(beforeLight);assertThat(darkCache).isEqualTo(beforeDark);
     }
+    @Test void nativeChromeContextAloneReceivesOriginalDesktopArtworkForItsDepictedMeanings() throws Exception {
+        var files=Map.of("add","general/add","window.add","actions/moveToWindow","split","general/splitVertically","zoom","inline/expand",
+            "chevron.down","general/chevronDown","folder","nodes/folder","server","webReferences/server","bell","toolwindows/notifications",
+            "lock","general/locked","terminal","terminal/toolwindow/terminal");
+        assertThat(BuiltInArtwork.chrome()).hasSize(files.size()).containsOnlyKeys(files.keySet());
+        try(var registry=new IconRegistry()) {
+            for(var entry:files.entrySet())for(var theme:List.of(KitFixtures.light(),KitFixtures.dark())) {
+                String file=entry.getValue()+(theme.dark()?"_dark.svg":".svg");
+                byte[] bytes;try(var in=getClass().getResourceAsStream(file)){bytes=in.readAllBytes();}
+                var direct=new com.github.weisj.jsvg.parser.SVGLoader().load(new java.io.ByteArrayInputStream(bytes),null,com.github.weisj.jsvg.parser.LoaderContext.builder().build());
+                for(int size:new int[]{8,16})for(int scale:new int[]{1,2}) {
+                    var chrome=pixels(registry.chromeIcon(entry.getKey(),size).icon(theme,SemanticColor.TEXT_PRIMARY),scale);
+                    var source=new BufferedImage(size*scale,size*scale,BufferedImage.TYPE_INT_ARGB);var g=source.createGraphics();
+                    try {g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,java.awt.RenderingHints.VALUE_ANTIALIAS_ON);direct.render(null,g,new com.github.weisj.jsvg.view.ViewBox(0,0,size*scale,size*scale));}finally{g.dispose();}
+                    assertThat(chrome).as("%s at %s x %s",file,size,scale).isEqualTo(source.getRGB(0,0,source.getWidth(),source.getHeight(),null,0,source.getWidth()));
+                    // Ordinary native, descriptor and panel contexts keep the engine glyph for the same meaning.
+                    assertThat(pixels(registry.themedIcon(entry.getKey(),size).icon(theme,SemanticColor.TEXT_PRIMARY),scale)).as("ordinary %s",file).isNotEqualTo(chrome);
+                    assertThat(pixels(registry.icon(entry.getKey(),theme,SemanticColor.TEXT_PRIMARY,size),scale)).as("descriptor %s",file).isNotEqualTo(chrome);
+                }
+            }
+            // Meanings the chrome does not depict, including already-original catalog artwork, are exactly the ordinary preparation.
+            for(String name:List.of("settings","search","more.vertical","copy"))
+                assertThat(pixels(registry.chromeIcon(name,16).icon(KitFixtures.dark(),SemanticColor.TEXT_PRIMARY),2))
+                    .as(name).isEqualTo(pixels(registry.themedIcon(name,16).icon(KitFixtures.dark(),SemanticColor.TEXT_PRIMARY),2));
+        }
+    }
 }

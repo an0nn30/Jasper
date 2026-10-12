@@ -6,6 +6,7 @@ import dev.jasper.app.config.AnimationSettings;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.swing.FlatLafInstaller;
+import dev.jasper.ui.swing.NativeChromePainting;
 import dev.jasper.ui.swing.NativeControlStyles;
 import dev.jasper.ui.theme.SemanticColor;
 import com.formdev.flatlaf.util.UIScale;
@@ -137,33 +138,17 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     // Repaint the translucent surface exactly once, even for child hover repaints.
     @Override protected boolean isPaintingOrigin() { return true; }
     @Override protected void paintComponent(Graphics graphics) {
-        var g = (Graphics2D) graphics.create();
-        try {
-            g.setComposite(AlphaComposite.Src);
-            g.setColor(surface(true)); g.fillRect(0, 0, getWidth(), getHeight());
-            for (Slot slot : slots) {
-                g.setColor(surface(slot.entry != null && slot.entry.tab == selected));
-                g.fill(slot.bounds);
-            }
-            g.setComposite(AlphaComposite.SrcOver);
-            g.setColor(owner.theme().workspace().semantic().color(SemanticColor.BORDER_WINDOW));
-            int line = NativeControlStyles.metric(DesignMetrics.Role.TAB_DIVIDER);
-            for (int i = 0; i < slots.size() - 1; i++) {
-                Rectangle bounds = slots.get(i).bounds;
-                if (bounds.width > 0) g.fillRect(bounds.x + bounds.width - line, 0, line, getHeight());
-            }
-            g.fillRect(0, getHeight() - line, getWidth(), line);
-        } finally { g.dispose(); }
+        var bounds = new ArrayList<Rectangle>(slots.size());
+        int chosen = -1;
+        for (Slot slot : slots) {
+            if (slot.entry != null && slot.entry.tab == selected) chosen = bounds.size();
+            bounds.add(slot.bounds);
+        }
+        NativeChromePainting.tabStrip(this, graphics, owner.theme().workspace(), owner.workspaceSurface(), bounds, chosen);
     }
 
     private Color surface(boolean selected) {
-        Color base = owner.workspaceSurface();
-        boolean dark = owner.theme().workspace().dark();
-        double blend = selected ? (dark ? .035 : .12) : (dark ? .3 : .06);
-        int target = selected ? 255 : 0;
-        return new Color((int) Math.round(base.getRed() * (1 - blend) + target * blend),
-            (int) Math.round(base.getGreen() * (1 - blend) + target * blend),
-            (int) Math.round(base.getBlue() * (1 - blend) + target * blend), base.getAlpha());
+        return NativeChromePainting.tabSurface(owner.workspaceSurface(), owner.theme().workspace().dark(), selected);
     }
 
     private static String capped(String title) {

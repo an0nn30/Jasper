@@ -30,6 +30,8 @@ final class WindowHeader extends JPanel {
         this.field = field;
         this.toolbar = toolbar;
         setName("windowHeader");
+        // The title bar is a native chrome receiver: its toolbar and command centre show the original chrome artwork.
+        dev.jasper.app.platform.AppIcons.chromeReceiver(this);
         add(field);
         add(toolbar);
         toolbar.addPropertyChangeListener("barHeight", event -> {

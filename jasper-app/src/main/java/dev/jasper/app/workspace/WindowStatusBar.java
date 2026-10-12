@@ -49,6 +49,7 @@ final class WindowStatusBar extends JPanel {
         configButton.addActionListener(event -> onConfigurationDetails.run());
         add(left); add(leftItems); add(rightItems); add(right); add(contentItems); refreshTheme();
         getAccessibleContext().setAccessibleName("Terminal status");
+        dev.jasper.app.platform.AppIcons.chromeReceiver(this);
     }
 
     /** Sets the height in logical pixels; the caller validates the range. */
@@ -190,7 +191,7 @@ final class WindowStatusBar extends JPanel {
     String getText() { return text; }
     void applyPalette(Palette next) { palette = java.util.Objects.requireNonNull(next); refreshTheme(); }
     private static java.awt.Font statusFont() {
-        return ThemeZone.font(Typography.Role.CAPTION);
+        return ThemeZone.font(Typography.Role.STATUS_TEXT);
     }
 
     /** A status color as painted on the status surface: held to the text floor there, shared role untouched. */
@@ -279,12 +280,6 @@ final class WindowStatusBar extends JPanel {
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         if (showingContent) return;
-        g.setColor(running ? onStatus(SemanticColor.STATUS_SUCCESS) : muted());
-        var copy = (Graphics2D) g.create();
-        try {
-            copy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            int size = NativeControlStyles.metric(DesignMetrics.Role.STATUS_RUNNING_DOT);
-            copy.fillOval(NativeControlStyles.metric(DesignMetrics.Role.STATUS_GAP), (getHeight() - size) / 2, size, size);
-        } finally { copy.dispose(); }
+        dev.jasper.ui.swing.NativeChromePainting.statusDot(this, g, ThemeZone.theme(null), running);
     }
 }

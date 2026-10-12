@@ -9,7 +9,6 @@ import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.platform.AppIcons;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Graphics;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -46,7 +45,7 @@ final class WindowToolbar extends JToolBar {
         firePropertyChange("barHeight", old, height);
         revalidate(); repaint();
     }
-    static int buttonSide(int height) { return UIScale.scale(height - 6); }
+    static int buttonSide(int height) { return UIScale.scale(height - DesignMetrics.DEFAULT.value(DesignMetrics.Role.TOOLBAR_BUTTON_TRIM)); }
     int buttonSide() { return buttonSide(barHeight); }
     JButton overflowButton() { return overflow; }
 

@@ -94,7 +94,7 @@ final class Labels {
         }
     }
     static final class TextControl extends ControlRegistry.Control {
-        boolean panelDetail;
+        boolean panelDetail, hint;
         SemanticColor identityStatus;
         TextControl(KitView view, Nodes.Text node) { super(view, node, literal()); refresh(); }
         @Override void refresh() {
@@ -105,7 +105,7 @@ final class Labels {
             label.setText(text.text());
             label.setToolTipText(text.text());
             label.getAccessibleContext().setAccessibleName(text.text());
-            label.setFont(ThemePainting.font(context(), panelDetail && text.role() == Nodes.TextRole.MONO_CAPTION ? Typography.Role.PANEL_DETAIL_MONO : panelDetail && text.role() == Nodes.TextRole.PANEL_TITLE ? Typography.Role.PANEL_DETAIL_TITLE : panelDetail && text.role() == Nodes.TextRole.CAPTION ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.valueOf(text.role().name())));
+            label.setFont(ThemePainting.font(context(), hint && text.role() == Nodes.TextRole.CAPTION ? Typography.Role.PALETTE_HINT : panelDetail && text.role() == Nodes.TextRole.MONO_CAPTION ? Typography.Role.PANEL_DETAIL_MONO : panelDetail && text.role() == Nodes.TextRole.PANEL_TITLE ? Typography.Role.PANEL_DETAIL_TITLE : panelDetail && text.role() == Nodes.TextRole.CAPTION ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.valueOf(text.role().name())));
             label.setForeground(ThemePainting.color(context(), identityStatus != null ? identityStatus : text.severity().isPresent() ? tint(text.severity().get()) : panelDetail && text.role()==Nodes.TextRole.MONO_CAPTION ? SemanticColor.TEXT_SECONDARY : switch (text.role()) {
                 case LABEL, DESCRIPTION, CAPTION, COUNT -> SemanticColor.TEXT_SECONDARY;
                 case SECTION_LABEL, MONO_CAPTION, SUPPORTING -> SemanticColor.TEXT_TERTIARY;

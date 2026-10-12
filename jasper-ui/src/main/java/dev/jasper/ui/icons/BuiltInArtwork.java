@@ -12,30 +12,47 @@ final class BuiltInArtwork {
     static final Set<String> IDENTITIES = Set.of("network", "tunnel", "more.vertical");
     private static final class Holder {
         static final Map<String, Pair> CATALOG = Map.of(
-            "settings", pair("general/settings"), "network", pair("toolwindows/web"),
-            "tunnel", pair("actions/swapPanels"), "more.vertical", pair("general/moreVertical"),
-            "chevron.right", pair("general/chevronRight"),
-            "search", pair("general/search"), "file", pair("fileTypes/text"));
+            "settings", pair("general/settings", Hashes.SELECTED), "network", pair("toolwindows/web", Hashes.SELECTED),
+            "tunnel", pair("actions/swapPanels", Hashes.SELECTED), "more.vertical", pair("general/moreVertical", Hashes.SELECTED),
+            "chevron.right", pair("general/chevronRight", Hashes.SELECTED),
+            "search", pair("general/search", Hashes.SELECTED), "file", pair("fileTypes/text", Hashes.SELECTED));
+    }
+    /**
+     * Original desktop artwork for the meanings the native workspace chrome depicts (title bar, toolbar, tool window
+     * stripes and status bar). Admitted only by {@link IconRegistry#chromeIcon}; descriptor views, panels, tiles and
+     * plugin-registered artwork never receive it, so these meanings keep their ordinary engine glyphs everywhere else.
+     */
+    private static final class ChromeHolder {
+        static final Map<String, Pair> CHROME = Map.of(
+            "add", pair("general/add", Hashes.CHROME), "window.add", pair("actions/moveToWindow", Hashes.CHROME),
+            "split", pair("general/splitVertically", Hashes.CHROME), "zoom", pair("inline/expand", Hashes.CHROME),
+            "chevron.down", pair("general/chevronDown", Hashes.CHROME), "folder", pair("nodes/folder", Hashes.CHROME),
+            "server", pair("webReferences/server", Hashes.CHROME), "bell", pair("toolwindows/notifications", Hashes.CHROME),
+            "lock", pair("general/locked", Hashes.CHROME), "terminal", pair("terminal/toolwindow/terminal", Hashes.CHROME));
     }
     static Map<String, Pair> catalog() { return Holder.CATALOG; }
-    private static Pair pair(String stem) { return new Pair(read(stem + ".svg"), read(stem + "_dark.svg")); }
+    static Map<String, Pair> chrome() { return ChromeHolder.CHROME; }
+    private static Pair pair(String stem, Map<String, String> hashes) {
+        return new Pair(read(stem + ".svg", hashes), read(stem + "_dark.svg", hashes));
+    }
     private static final class Hashes {
-        static final Map<String,String> EXPECTED = hashes();
-        private static Map<String,String> hashes() {
-            try(var input=BuiltInArtwork.class.getResourceAsStream("assets-selected.tsv")) {
-                if(input==null)throw new IOException("Missing selected hash manifest");
+        static final Map<String,String> SELECTED = hashes("assets-selected.tsv", 14);
+        static final Map<String,String> CHROME = hashes("assets-chrome.tsv", 20);
+        private static Map<String,String> hashes(String manifest, int count) {
+            try(var input=BuiltInArtwork.class.getResourceAsStream(manifest)) {
+                if(input==null)throw new IOException("Missing hash manifest " + manifest);
                 var result=new java.util.LinkedHashMap<String,String>();
                 for(String line:new String(input.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8).lines().toList()) {
                     var columns=line.split("\\t");
-                    if(columns.length!=3 || result.put(columns[0],columns[2])!=null)throw new IOException("Invalid selected hash manifest");
+                    if(columns.length!=3 || result.put(columns[0],columns[2])!=null)throw new IOException("Invalid hash manifest " + manifest);
                 }
-                if(result.size()!=14)throw new IOException("Expected fourteen original resources");
+                if(result.size()!=count)throw new IOException("Expected " + count + " original resources in " + manifest);
                 return Map.copyOf(result);
-            }catch(IOException failure){throw new IllegalStateException("Required bundled artwork: assets-selected.tsv",failure);}
+            }catch(IOException failure){throw new IllegalStateException("Required bundled artwork: " + manifest,failure);}
         }
     }
-    private static DecodedArtwork read(String file) {
-        String expected=Hashes.EXPECTED.get(file);
+    private static DecodedArtwork read(String file, Map<String, String> hashes) {
+        String expected=hashes.get(file);
         try (var stream = BuiltInArtwork.class.getResourceAsStream(file)) {
             return decodeRequired(file,stream==null?null:stream.readAllBytes(),expected);
         } catch (IOException failure) {

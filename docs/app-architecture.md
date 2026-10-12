@@ -215,6 +215,9 @@ to content with a 3 px selection underline, wheel scrolling and a ▾ list of al
 `FindBar` is IntelliJ's single-line find row. App icons resolve from bundled assets. Since SDK
 0.7.6, plugin-supplied SVGs draw as authored and are no longer recoloured to the chrome
 foreground (see [SDK architecture](sdk-architecture.md)).
+The header, both stripes and the status bar are the native chrome's receiving contexts (`AppIcons.chromeReceiver`):
+named glyphs painted inside them use the kit's original chrome artwork (`IconRegistry.chromeIcon`) without changing
+icon values or identities, and their painting and text sizes come from `NativeChromePainting` and named kit roles.
 
 ## Themes
 
