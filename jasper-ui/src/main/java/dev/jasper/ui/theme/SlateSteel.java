@@ -6,6 +6,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,6 +32,8 @@ public final class SlateSteel {
     private final Map<String, Object> ui, terminal, editor;
     private final SemanticPalette dark, light;
     private final Map<TerminalScheme, SchemeColors> schemes;
+    private final EditorColors darkEditor, lightEditor;
+    private final Map<SyntaxRole, SyntaxStyle> darkSyntax, lightSyntax;
 
     private SlateSteel(Map<String, Object> root, String origin) {
         this.origin = origin;
@@ -43,6 +46,12 @@ public final class SlateSteel {
         editor = objects(root.get("editor"), "editor", List.of(DARK, LIGHT));
         dark = palette(DARK);
         light = palette(LIGHT);
+        var darkStyles = new EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);
+        darkEditor = editor(true, darkStyles);
+        darkSyntax = Map.copyOf(darkStyles);
+        var lightStyles = new EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);
+        lightEditor = editor(false, lightStyles);
+        lightSyntax = Map.copyOf(lightStyles);
     }
 
     /** The bundled theme, read once. */
@@ -114,6 +123,84 @@ public final class SlateSteel {
         for (String name : ANSI) ansi.add(get.apply("bright." + name));
         return new SchemeColors(new TerminalColors(get.apply("bg"), get.apply("fg"), get.apply("cursor"), get.apply("selection"), ansi),
             get.apply("fg.bold"));
+    }
+
+    static final List<String> EDITOR_SURFACES = List.of("background", "foreground", "caret", "selection", "currentLine", "gutter", "lineNumbers");
+
+    /** The Dark or Light editor scheme's surfaces. */
+    public EditorColors editor(boolean dark) { return dark ? darkEditor : lightEditor; }
+
+    /** The Dark or Light editor scheme's syntax styles, one for every role. */
+    public Map<SyntaxRole, SyntaxStyle> syntax(boolean dark) { return dark ? darkSyntax : lightSyntax; }
+
+    private EditorColors editor(boolean dark, Map<SyntaxRole, SyntaxStyle> syntax) {
+        String variant = dark ? DARK : LIGHT, where = "editor." + variant;
+        @SuppressWarnings("unchecked") var values = (Map<String, Object>) editor.get(variant);
+        var expected = new HashSet<>(EDITOR_SURFACES);
+        for (var role : SyntaxRole.values()) expected.add(role.key());
+        if (!values.keySet().equals(expected)) throw error(where + ": Expected the entries " + EDITOR_SURFACES + " and every syntax role");
+        Function<String, String> text = key -> {
+            if (!(values.get(key) instanceof String value)) throw error(where + "." + key + ": Expected a reference");
+            return value;
+        };
+        Color background = reference(text.apply("background"), dark, null, where + ".background").color();
+        Function<String, Color> surface = key -> {
+            var resolved = reference(text.apply(key), dark, background, where + "." + key);
+            if (resolved.bold() || resolved.italic()) throw error(where + "." + key + ": A surface takes no style");
+            return resolved.color();
+        };
+        for (var role : SyntaxRole.values()) syntax.put(role, reference(text.apply(role.key()), dark, background, where + "." + role.key()));
+        return new EditorColors(background, surface.apply("foreground"), surface.apply("caret"), surface.apply("selection"),
+            surface.apply("currentLine"), surface.apply("gutter"), surface.apply("lineNumbers"));
+    }
+
+    /**
+     * {@code <reference>[ @ <N>%][, italic][, bold]} resolved for a variant ({@link SyntaxStyle} doubles as the resolved
+     * reference: a colour and style flags); a share lays the reference over {@code background}.
+     */
+    private SyntaxStyle reference(String value, boolean dark, Color background, String where) {
+        String[] parts = value.split(",");
+        boolean bold = false, italic = false;
+        for (int i = 1; i < parts.length; i++) {
+            switch (parts[i].strip()) {
+                case "italic" -> italic = true;
+                case "bold" -> bold = true;
+                default -> throw error(where + ": Unknown style \"" + parts[i].strip() + "\"");
+            }
+        }
+        String[] shared = parts[0].split("@", -1);
+        if (shared.length > 2) throw error(where + ": Expected one share, got \"" + value + "\"");
+        String key = shared[0].strip();
+        Color base = key.startsWith("terminal.") ? terminalReference(key, dark, where)
+            : SemanticColor.of(key).map(role -> palette(dark).color(role))
+                .orElseThrow(() -> error(where + ": Unknown reference \"" + key + "\""));
+        if (shared.length == 2) {
+            String share = shared[1].strip();
+            if (background == null) throw error(where + ": The background cannot be laid over itself");
+            if (!share.matches("\\d{1,3}%")) throw error(where + ": Expected a share such as 5%, got \"" + share + "\"");
+            int percent = Integer.parseInt(share.substring(0, share.length() - 1));
+            if (percent < 1 || percent > 100) throw error(where + ": A share is from 1% to 100%, got " + share);
+            base = ColorMath.mix(base, background, percent / 100.0);
+        }
+        return new SyntaxStyle(base, bold, italic);
+    }
+
+    private Color terminalReference(String key, boolean dark, String where) {
+        var colors = terminal(TerminalScheme.matching(dark));
+        String name = key.substring("terminal.".length());
+        switch (name) {
+            case "bg": return colors.colors().background();
+            case "fg": return colors.colors().foreground();
+            case "fg.bold": return colors.boldForeground();
+            case "cursor": return colors.colors().cursor();
+            case "selection": return colors.colors().selection();
+            default:
+        }
+        if (name.startsWith("ansi.bright.") && ANSI.contains(name.substring("ansi.bright.".length())))
+            return colors.colors().ansi().get(8 + ANSI.indexOf(name.substring("ansi.bright.".length())));
+        if (name.startsWith("ansi.") && ANSI.contains(name.substring("ansi.".length())))
+            return colors.colors().ansi().get(ANSI.indexOf(name.substring("ansi.".length())));
+        throw error(where + ": Unknown reference \"" + key + "\"");
     }
 
     /** {@code #RRGGBB}, or {@code #RRGGBBAA} with alpha; {@code where} names the entry in errors. */
