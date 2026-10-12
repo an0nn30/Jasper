@@ -248,6 +248,19 @@ public final class CoreSettings {
         .label("Theme origin").keywords("theme", "bundled")
         .description("catalog (default) resolves name with installed themes taking precedence; bundled uses only bundled authored sources.\n"
             + "For an external custom-theme selection, remove source or use catalog and set follow_system=false.").build();
+    public static final Setting<AppearanceMode> UI_APPEARANCE = Setting.of("ui.appearance", SettingKind.choice(List.of(
+            Map.entry("system", AppearanceMode.SYSTEM), Map.entry("dark", AppearanceMode.DARK), Map.entry("light", AppearanceMode.LIGHT))),
+            AppearanceMode.SYSTEM)
+        .label("Appearance").keywords("appearance", "theme", "dark", "light", "system", "slate steel", "look")
+        .description("The UI appearance: \"system\" (the default) follows the operating system's light or dark setting;\n"
+            + "\"dark\" or \"light\" chooses Slate Steel Dark or Light. Switches live across windows.").build();
+    public static final Setting<TerminalSchemeChoice> TERMINAL_SCHEME = Setting.of("terminal.scheme", SettingKind.choice(List.of(
+            Map.entry("match", TerminalSchemeChoice.MATCH), Map.entry("slate-steel-dark", TerminalSchemeChoice.SLATE_STEEL_DARK),
+            Map.entry("slate-steel-light", TerminalSchemeChoice.SLATE_STEEL_LIGHT), Map.entry("high-contrast", TerminalSchemeChoice.HIGH_CONTRAST))),
+            TerminalSchemeChoice.MATCH)
+        .label("Terminal scheme").keywords("terminal", "scheme", "colors", "colours", "palette", "high contrast", "slate steel")
+        .description("Colors for terminal panes: \"match\" (the default) follows the UI appearance; \"slate-steel-dark\",\n"
+            + "\"slate-steel-light\" or \"high-contrast\" chooses one. Only the terminal text area changes; updates live.").build();
     public static final Setting<Boolean> UI_ANIMATIONS_ENABLED = Setting.of("ui.animations.enabled", SettingKind.bool(), true)
         .label("Enable animations").keywords("animations", "motion", "transitions", "reduce motion")
         .description("Enable animations throughout the app. Disabling finishes running transitions immediately. Updates live in every window.").build();
@@ -265,9 +278,9 @@ public final class CoreSettings {
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT,
             WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, WINDOW_VIEW_MODE, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, NOTIFICATIONS_GROUPS, SYSTEM_RUN_IN_BACKGROUND,
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
-            TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
+            TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_SCHEME, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
-            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_FONT_FAMILY, UI_FONT_SIZE, UI_THEME_NAME, UI_THEME_SOURCE, UI_THEME_FOLLOW_SYSTEM, UI_THEME_WORKSPACE,
+            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_APPEARANCE, UI_FONT_FAMILY, UI_FONT_SIZE, UI_THEME_NAME, UI_THEME_SOURCE, UI_THEME_FOLLOW_SYSTEM, UI_THEME_WORKSPACE,
             UI_WORKSPACE_OPACITY, UI_WORKSPACE_BLUR, UI_ANIMATIONS_ENABLED),
         Set.of(List.of("keybindings"), List.of("plugins"), List.of("palette", "scopes")),
         Map.ofEntries(
@@ -280,6 +293,7 @@ public final class CoreSettings {
             Map.entry(List.of("terminal", "font"), "The terminal font; the interface font is [ui.font]."),
             Map.entry(List.of("terminal", "shell"), "The shell new panes start."),
             Map.entry(List.of("terminal", "cursor"), "The cursor a program sees until it chooses its own."),
+            Map.entry(List.of("ui"), "The interface: its appearance, fonts, workspace glass and animations."),
             Map.entry(List.of("ui", "font"), "Interface typography, independent of the terminal font."),
             Map.entry(List.of("ui", "theme"), "The UI theme and workspace scheme."),
             Map.entry(List.of("ui", "workspace"), "Translucent terminal and editor backgrounds on macOS; omitted values follow the workspace theme."),

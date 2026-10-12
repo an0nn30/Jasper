@@ -91,6 +91,8 @@ on_exit = "keep_open"
 # New panes only. "auto" loads Jasper's shell integration script (zsh, bash, fish) after your startup files;
 # "manual" only exports JASPER_SHELL_INTEGRATION for you to source; "off" does neither.
 shell_integration = "auto"
+# Colors for terminal panes, live: "match" follows the UI appearance; or "slate-steel-dark", "slate-steel-light", "high-contrast".
+scheme = "match"
 
 [terminal.shell]
 # New panes only. The shell new tabs start: "powershell", "pwsh" (PowerShell 7) or "cmd" on Windows,
@@ -119,6 +121,11 @@ blink = true
 # TMUX_PANE, and ITERM_* variables before applying this overlay; configured values override them.
 # On macOS, LANG defaults to en_US.UTF-8 only when absent or blank; LC_* values are preserved.
 # MY_VARIABLE = "a value with spaces"
+
+[ui]
+# The UI appearance, live across windows: "system" follows the operating system's light or dark setting;
+# "dark" or "light" chooses Slate Steel Dark or Light.
+appearance = "system"
 
 [ui.font]
 # Live UI font for app chrome and plugin controls, independent of [terminal.font].

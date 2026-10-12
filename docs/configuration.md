@@ -172,9 +172,11 @@ workspace = "match"
 | `terminal.dim_inactive_panes` | `0.3` | Finite number 0–1; 0 disables dimming, 1 fully dims | Live |
 | `terminal.copy_on_select` | `false` | Boolean | Live |
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
+| `terminal.scheme` | `"match"` | `"match"`, `"slate-steel-dark"`, `"slate-steel-light"`, `"high-contrast"`: the terminal panes' colors ([Themes](themes.md)) | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately | Live |
+| `ui.appearance` | `"system"` | `"system"` (the operating system's light or dark), `"dark"`, `"light"` | Live |
 | `ui.theme.source` | `"catalog"` | Source of the remembered manual theme: `catalog` or `bundled`; Settings changes this together with the name | Live |
 | `ui.theme.follow_system` | `false` | Follow ongoing OS appearance using the actual bundled dark/light themes, while remembering the manual source | Live |
 | `ui.theme.name` | `"Jasper Dark"` | A built-in theme, or a theme file or plugin in the `themes` folder ([Themes](themes.md)) | Live |

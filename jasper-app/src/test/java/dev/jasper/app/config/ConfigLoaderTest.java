@@ -520,4 +520,24 @@ class ConfigLoaderTest {
             assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
         });
     }
+
+    @Test void appearanceAndTerminalSchemeReadTheirChoicesAndDefault() {
+        var chosen = parse("[ui]\nappearance = \"light\"\n[terminal]\nscheme = \"high-contrast\"\n");
+        assertThat(chosen.diagnostics()).isEmpty();
+        assertThat(chosen.snapshot().appearance()).isEqualTo(AppearanceMode.LIGHT);
+        assertThat(chosen.snapshot().terminalScheme()).isEqualTo(TerminalSchemeChoice.HIGH_CONTRAST);
+        var defaults = parse("");
+        assertThat(defaults.snapshot().appearance()).isEqualTo(AppearanceMode.SYSTEM);
+        assertThat(defaults.snapshot().terminalScheme()).isEqualTo(TerminalSchemeChoice.MATCH);
+        for (var scheme : TerminalSchemeChoice.values())
+            assertThat(parse("[terminal]\nscheme = \"" + scheme.key() + "\"\n").snapshot().terminalScheme()).isEqualTo(scheme);
+    }
+
+    @Test void anUnknownAppearanceOrSchemeUsesTheDefaultAndSaysSo() {
+        var result = parse("[ui]\nappearance = \"sepia\"\n[terminal]\nscheme = \"nord\"\n");
+        assertThat(result.snapshot().appearance()).isEqualTo(AppearanceMode.SYSTEM);
+        assertThat(result.snapshot().terminalScheme()).isEqualTo(TerminalSchemeChoice.MATCH);
+        assertDiagnostic(result, "ui.appearance", 2, 1, ConfigDiagnostic.Severity.ERROR);
+        assertDiagnostic(result, "terminal.scheme", 4, 1, ConfigDiagnostic.Severity.ERROR);
+    }
 }

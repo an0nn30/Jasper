@@ -80,6 +80,8 @@ public final class CorePages {
                 .row(UI_THEME_WORKSPACE, Editors.workspaceScheme(themes)).note("Colors for terminal and editor panes")
                 .row(UI_THEME_SOURCE).shownWhen(false)
                 .row(UI_THEME_FOLLOW_SYSTEM).shownWhen(false)
+                .row(UI_APPEARANCE).shownWhen(false)
+                .row(TERMINAL_SCHEME).shownWhen(false)
                 .section("Workspace")
                 .row(UI_WORKSPACE_OPACITY, WorkspaceEditors.opacity(themes)).shownWhen(glass)
                 .row(UI_WORKSPACE_BLUR, WorkspaceEditors.blur(themes)).shownWhen(glass)
