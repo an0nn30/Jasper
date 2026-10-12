@@ -216,6 +216,23 @@ class VaultPluginTest {
         }
     }); }
 
+    @Test void passwordAndGrantsAreVaultCommandsInTheFileMenu() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
+        VaultPlugin plugin = plugin();
+        try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            UUID window = host.addTerminalWindow();
+            assertThat(host.menu("FILE")).contains("item:" + VaultPlugin.OPEN, "item:" + VaultPlugin.CHANGE_PASSWORD, "item:" + VaultPlugin.GRANTS);
+            plugin.lockManager().create("test-password".toCharArray(), false);
+            host.runBackground();
+            host.invoke(VaultPlugin.CHANGE_PASSWORD, window, null);
+            assertThat(host.windows()).contains("dev.jasper.vault.manager|Credential Vault|true", "dialog|Change Master Password|true");
+            host.requestClose("dialog");
+            host.invoke(VaultPlugin.GRANTS, window, null);
+            assertThat(host.windows()).containsExactly("dev.jasper.vault.manager|Credential Vault|true");
+            assertThat(host.failures()).isEmpty();
+        }
+    }); }
+
     @Test void openingTheVaultAndGeneratorUsesOneManagerAndInlineUnlock() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {

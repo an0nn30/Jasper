@@ -48,7 +48,7 @@ class ThemeMigrationEvidenceTest {
             save("unlock", unlock.view());
             unlock.close();
             var manager = new ManagerPanel(kit, id -> Optional.empty(), type -> { }, id -> { }, id -> { }, id -> { }, grant -> { },
-                () -> { }, () -> { }, () -> { }, () -> { }, () -> { });
+                () -> { }, () -> { }, () -> { }, () -> { });
             try {
                 manager.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
                 save("manager-empty", manager.view());

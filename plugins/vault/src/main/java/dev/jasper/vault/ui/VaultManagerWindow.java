@@ -56,7 +56,7 @@ public final class VaultManagerWindow implements AutoCloseable {
         if (window == null) {
             window = context.windows().create(new WindowSpec(ID, "Credential Vault", new Dimension(900, 555), true, WindowSpec.SizeBasis.CONTENT));
             var shown = new ManagerPanel(context.kit(), manager::entry, this::add, this::edit, this::delete, this::copyPublic,
-                grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, this::changePassword, lock::lock,
+                grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, lock::lock,
                 () -> service.requestUnlock(this.owner), this::close);
             shown.secretClipboard(clipboard::copySecret);
             panel = shown;
@@ -145,7 +145,10 @@ public final class VaultManagerWindow implements AutoCloseable {
             form.setSaveLabel("Delete"); form.submit(() -> manager.delete(id, form.checked(DELETE_FILES))); return form;
         }));
     }
-    private void changePassword() {
+    /** Shows the saved plugin grants in the open window; does nothing when it is closed or locked. */
+    public void showGrants() { if (window != null) { panel.showGrants(); window.toFront(); } }
+    /** Asks for a new master password over the open window; does nothing when it is closed or locked. */
+    public void changePassword() {
         dialog("Change Master Password", close -> new ChangePasswordForm(context.kit(), lock, close, failure -> {
             if (failure != null) context.notifications().group().error("Master password was not changed", EditorForm.message(failure), failure);
         }));

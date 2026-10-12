@@ -249,7 +249,7 @@ class VaultManagerWindowTest {
                 window.show(owner, Optional.empty());
                 var view = window.panel.view();
                 assertThat(window.panel.grantLabel(grant)).isEqualTo("dev.jasper.ssh — Production");
-                press(view, ManagerPanel.MORE_GRANTS);
+                window.showGrants();
                 assertThat(node(view, "grant-0.label", Nodes.Text.class).text()).isEqualTo("dev.jasper.ssh — Production");
                 assertThat(button(view, ManagerPanel.REVOKE).state().enabled()).isFalse();
                 emit(view, new UiEvent.Selected(ManagerPanel.GRANTS, Set.of("grant-0")));

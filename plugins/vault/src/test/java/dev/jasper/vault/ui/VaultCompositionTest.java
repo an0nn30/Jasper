@@ -25,7 +25,7 @@ class VaultCompositionTest {
             var note=new Note(UUID.randomUUID(),"Note","line one\nUnicode: \u03bb".toCharArray(),Instant.EPOCH);
             Map<UUID,Object> values=Map.of(login.id(),login,note.id(),note);
             var copied=new java.util.ArrayList<String>();
-            var panel=new ManagerPanel(new FakeKit("dev.jasper.vault"),id->Optional.ofNullable(values.get(id)),t->{},id->{},id->{},id->{},g->{},()->{},()->{},()->{},()->{},()->{});
+            var panel=new ManagerPanel(new FakeKit("dev.jasper.vault"),id->Optional.ofNullable(values.get(id)),t->{},id->{},id->{},id->{},g->{},()->{},()->{},()->{},()->{});
             panel.secretClipboard(copied::add);
             var rows=List.of(new VaultManager.Row(login.id(),login.name(),login.username(),VaultManager.Type.LOGIN),new VaultManager.Row(note.id(),note.name(),"",VaultManager.Type.NOTE));
             var status=new VaultManagerWindow.Status("test","5 min","/synthetic/vault.jv");panel.refresh(rows,List.of(),status,true);panel.select(login.id());
@@ -48,7 +48,7 @@ class VaultCompositionTest {
             var key = new SshKey(UUID.randomUUID(), "work", "ssh-ed25519", "SHA256:fixture", "Synthetic", Path.of("/synthetic/key"), Path.of("/synthetic/key.pub"), Instant.EPOCH);
             var note = new Note(UUID.randomUUID(), "Recovery", "fixture note".toCharArray(), Instant.EPOCH);
             Map<UUID,Object> values = Map.of(login.id(), login, key.id(), key, note.id(), note);
-            var panel = new ManagerPanel(new FakeKit("dev.jasper.vault"), id -> Optional.ofNullable(values.get(id)), t -> {}, id -> {}, id -> {}, id -> {}, grant -> {}, () -> {}, () -> {}, () -> {}, () -> {}, () -> {});
+            var panel = new ManagerPanel(new FakeKit("dev.jasper.vault"), id -> Optional.ofNullable(values.get(id)), t -> {}, id -> {}, id -> {}, id -> {}, grant -> {}, () -> {}, () -> {}, () -> {}, () -> {});
             var rows = List.of(new VaultManager.Row(login.id(),login.name(),login.username(),VaultManager.Type.LOGIN), new VaultManager.Row(key.id(),key.name(),key.fingerprint(),VaultManager.Type.SSH_KEY), new VaultManager.Row(note.id(),note.name(),"",VaultManager.Type.NOTE));
             panel.refresh(rows,List.of(),new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"),true);
             var view = panel.view();

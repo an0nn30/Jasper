@@ -49,7 +49,7 @@ class VaultRenderEvidenceTest {
                     onEdt(()->menu(manager.titleActions(),"add","Secure Note"));
                     var note=vault.awaitSurface("Add Secure Note");natural(theme,"note",note);onEdt(note::requestClose);
                     onEdt(()->click(manager,"delete"));var delete=vault.awaitSurface("Delete entry");natural(theme,"delete",delete);onEdt(delete::requestClose);
-                    onEdt(()->menu(manager.holder(),"more","Change Master Password..."));
+                    vault.invoke("dev.jasper.vault.change_password");
                     var password=vault.awaitSurface("Change Master Password");natural(theme,"change-password",password);onEdt(password::requestClose);
                     vault.invoke("dev.jasper.vault.generate_key");var generator=vault.awaitSurface("Generate SSH Key");natural(theme,"generator",generator);onEdt(generator::requestClose);
                     Class<?> apiType=vault.loader.loadClass("dev.jasper.vault.api.VaultApi");

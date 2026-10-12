@@ -33,9 +33,9 @@ import java.util.function.Function;
  */
 final class ManagerPanel implements AutoCloseable {
     static final String ROOT = "manager", SEARCH = "search", KIND = "kind", ADD = "add", EDIT = "edit", DELETE = "delete",
-        COPY_PUBLIC = "copy-public", LOCK = "lock", MORE = "more", ROWS = "rows", EMPTY = "empty", LOCKED = "locked", UNLOCK = "unlock",
+        COPY_PUBLIC = "copy-public", LOCK = "lock", ROWS = "rows", EMPTY = "empty", LOCKED = "locked", UNLOCK = "unlock",
         GRANTS = "grants", BACK = "back", REVOKE = "revoke", STATUS = "status", CANCEL = "cancel", OKAY = "okay", CLOSE = "close",
-        ADD_GENERATE = "add.generate", MORE_GRANTS = "more.grants", MORE_PASSWORD = "more.password", UNLOCK_PREFIX = "unlock.";
+        ADD_GENERATE = "add.generate", UNLOCK_PREFIX = "unlock.";
     static final String ALL_TYPES = "all";
     /** Full rows the former list showed in the 800×600 window (11.1 of its 42-pixel rows), measured at baseline f16ae32f. */
     static final int VISIBLE_ROWS = 11;
@@ -45,7 +45,7 @@ final class ManagerPanel implements AutoCloseable {
     private final Consumer<VaultManager.Type> onAdd;
     private final Consumer<UUID> onEdit, onDelete, onCopy;
     private final Consumer<Grant> onRevoke;
-    private final Runnable onGenerate, onChangePassword, onLock, onUnlock, onClose;
+    private final Runnable onGenerate, onLock, onUnlock, onClose;
     private final UiView view, titleActions;
     private List<VaultManager.Row> allRows = List.of(), visible = List.of();
     private List<Grant> grants = List.of();
@@ -62,10 +62,10 @@ final class ManagerPanel implements AutoCloseable {
 
     ManagerPanel(UiKit kit, Function<UUID, Optional<Object>> entry, Consumer<VaultManager.Type> onAdd,
                  Consumer<UUID> onEdit, Consumer<UUID> onDelete, Consumer<UUID> onCopy,
-                 Consumer<Grant> onRevoke, Runnable onGenerate, Runnable onChangePassword,
+                 Consumer<Grant> onRevoke, Runnable onGenerate,
                  Runnable onLock, Runnable onUnlock, Runnable onClose) {
         this.entry = entry; this.onAdd = onAdd; this.onEdit = onEdit; this.onDelete = onDelete; this.onCopy = onCopy;
-        this.onRevoke = onRevoke; this.onGenerate = onGenerate; this.onChangePassword = onChangePassword;
+        this.onRevoke = onRevoke; this.onGenerate = onGenerate;
         this.onLock = onLock; this.onUnlock = onUnlock; this.onClose = onClose;
         view = kit.create(new ViewSpec(node()), this::handle);
         titleActions = kit.create(new ViewSpec(actions()), this::handle);
@@ -153,8 +153,6 @@ final class ManagerPanel implements AutoCloseable {
             case LOCK -> onLock.run();
             case UNLOCK -> onUnlock.run();
             case ADD_GENERATE -> onGenerate.run();
-            case MORE_GRANTS -> { if (unlocked) { card = Card.GRANTS; render(); } }
-            case MORE_PASSWORD -> onChangePassword.run();
             case BACK -> { card = Card.ENTRIES; render(); }
             case REVOKE -> { if (grantSelection >= 0 && grantSelection < grants.size()) onRevoke.accept(grants.get(grantSelection)); }
             case CLOSE -> onClose.run();
@@ -163,6 +161,9 @@ final class ManagerPanel implements AutoCloseable {
             }
         }
     }
+
+    /** Shows the saved plugin grants (the Vault's "Plugin Grants" command); inert while locked. */
+    void showGrants() { if (unlocked) { card = Card.GRANTS; render(); } }
 
     private void copyDetail(String action) {
         if (!unlocked || selection == null) return;
@@ -215,7 +216,6 @@ final class ManagerPanel implements AutoCloseable {
         return new Nodes.Button(id, new ControlState(true, enabled, false, ""), "", icon, Nodes.ButtonKind.GHOST, id, tooltip);
     }
 
-    private static MenuItem item(String id, String label) { return new MenuItem(id, label, "", id, true, false); }
 
     private Nodes.Stack actions() {
         var adds = new ArrayList<MenuItem>();
@@ -241,9 +241,7 @@ final class ManagerPanel implements AutoCloseable {
             case LOGIN -> "Logins"; case SSH_KEY -> "SSH Keys"; case NOTE -> "Secure Notes";
         }, icon(type), hue(type), (int)allRows.stream().filter(row -> row.type() == type).count()));
         var rail = new Nodes.Panel("categories", ControlState.READY, hiddenHeader("categories.header", "Categories"), Optional.empty(),
-            new Nodes.ItemList(KIND, ControlState.READY, Nodes.ListKind.SINGLE, categories, Set.of(kind), "", List.of()), Optional.of(
-                new Nodes.MenuButton(MORE, ControlState.READY, "More", "more", Nodes.ButtonKind.GHOST, "",
-                    List.of(item(MORE_GRANTS, "Saved plugin grants..."), item(MORE_PASSWORD, "Change Master Password...")), "More vault actions")));
+            new Nodes.ItemList(KIND, ControlState.READY, Nodes.ListKind.SINGLE, categories, Set.of(kind), "", List.of()), Optional.empty());
         Nodes.Node list;
         if (visible.isEmpty()) {
             String title = allRows.isEmpty() ? "Nothing to show" : "No matching entries";
@@ -361,10 +359,12 @@ final class ManagerPanel implements AutoCloseable {
     }
     private Nodes.Node status() {
         return new Nodes.Stack(STATUS, ControlState.READY, Nodes.LayoutRole.FOOTER, List.of(
-            statusGroup("provider", "key", status.deviceSecret(), Nodes.TextRole.CAPTION),
+            statusGroup("provider", "key", sentence(status.deviceSecret()), Nodes.TextRole.CAPTION),
             statusGroup("autolock", "clock", "Auto-lock " + status.autoLock(), Nodes.TextRole.CAPTION),
             statusGroup("path", "folder", status.path(), Nodes.TextRole.MONO_CAPTION)));
     }
+    /** A store description ("keychain") as a footer label ("Keychain"). */
+    private static String sentence(String value) { return value.isEmpty() ? value : value.substring(0, 1).toUpperCase(Locale.ROOT) + value.substring(1); }
     private Nodes.Node statusGroup(String id,String icon,String value,Nodes.TextRole role) {
         return new Nodes.Stack("status."+id+".group",ControlState.READY,Nodes.LayoutRole.NAVIGATION,List.of(
             new Nodes.Icon("status."+id+".icon",ControlState.READY,icon,Nodes.Hue.NEUTRAL,Nodes.IconSize.CAPTION,id),

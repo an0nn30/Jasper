@@ -76,6 +76,10 @@ public class VaultPlugin implements Plugin {
     private VaultSettings settings;
     private VaultSettings.Declared declared;
     public static final String GENERATE = "dev.jasper.vault.generate_key";
+    /** Opens the manager and asks for a new master password. */
+    public static final String CHANGE_PASSWORD = "dev.jasper.vault.change_password";
+    /** Opens the manager on the saved plugin grants. */
+    public static final String GRANTS = "dev.jasper.vault.grants";
     private VaultManager manager;
     private VaultManagerWindow managerWindow;
     private PluginDialog createDialog;
@@ -132,7 +136,17 @@ public class VaultPlugin implements Plugin {
         context.actions().register(ActionSpec.of(GENERATE, "Generate SSH Key...")
             .withKeywords(List.of("vault", "ssh", "key", "generate")),
             invoked -> openThen(invoked.window(), Optional.empty(), this::showGenerator));
-        context.menus().standard(StandardMenu.FILE).add(OPEN);
+        // The manager's own surface stays as depicted (no extra rail menu); these reach its less frequent tasks.
+        context.actions().register(ActionSpec.of(CHANGE_PASSWORD, "Change Vault Master Password...")
+            .withKeywords(List.of("vault", "master", "password", "change")),
+            invoked -> openThen(invoked.window(), Optional.empty(), managerWindow::changePassword));
+        context.actions().register(ActionSpec.of(GRANTS, "Vault Plugin Grants...")
+            .withKeywords(List.of("vault", "grants", "plugins", "revoke", "permissions")),
+            invoked -> openThen(invoked.window(), Optional.empty(), managerWindow::showGrants));
+        var fileMenu = context.menus().standard(StandardMenu.FILE);
+        fileMenu.add(OPEN);
+        fileMenu.add(CHANGE_PASSWORD);
+        fileMenu.add(GRANTS);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 50));
         status.setText("Vault");
 //        context.rail().add(OPEN);

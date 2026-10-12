@@ -39,7 +39,6 @@ class ManagerPanelTest {
             assertThat(node(panel.titleActions(), ManagerPanel.ADD, Nodes.MenuButton.class).icon()).isEqualTo("add");
             assertThat(button(view, ManagerPanel.EDIT).icon()).isEqualTo("edit");
             assertThat(button(view, ManagerPanel.EDIT).tooltip()).isEqualTo("Edit entry");
-            assertThat(node(view, ManagerPanel.MORE, Nodes.MenuButton.class).icon()).isEqualTo("more");
             assertThat(button(panel.titleActions(), ManagerPanel.LOCK).icon()).isEqualTo("lock");
             assertThat(node(view, ManagerPanel.SEARCH, Nodes.Field.class).kind()).isEqualTo(Nodes.FieldKind.SEARCH);
             panel.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), false);
@@ -56,7 +55,7 @@ class ManagerPanelTest {
             var login = new VaultManager.Row(UUID.randomUUID(), "Alpha", "deploy", VaultManager.Type.LOGIN);
             panel.refresh(List.of(key, login), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
             assertThat(panel.visibleRows().getFirst()).isEqualTo(login);
-            assertThat(node(view, "status.provider", Nodes.Text.class).text()).isEqualTo("test");
+            assertThat(node(view, "status.provider", Nodes.Text.class).text()).isEqualTo("Test");
             var rows = node(view, ManagerPanel.ROWS, Nodes.ItemList.class);
             assertThat(rows.items()).extracting(i -> i.id()).containsExactly(login.id().toString(), key.id().toString());
             assertThat(rows.visibleRows()).hasValue(ManagerPanel.VISIBLE_ROWS);
@@ -94,9 +93,9 @@ class ManagerPanelTest {
 
     @Test void addMenuKeepsEveryExistingTypeAndKeyGenerationReachable() throws Exception {
         edt(() -> {
-            var added = new AtomicReference<VaultManager.Type>(); boolean[] generated = {false}, password = {false};
+            var added = new AtomicReference<VaultManager.Type>(); boolean[] generated = {false};
             var panel = new ManagerPanel(new FakeKit("dev.jasper.vault"), id -> Optional.empty(), added::set, id -> { }, id -> { }, id -> { }, grant -> { },
-                () -> generated[0] = true, () -> password[0] = true, () -> { }, () -> { }, () -> { });
+                () -> generated[0] = true, () -> { }, () -> { }, () -> { });
             panel.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
             var view = panel.view();
             var items = node(panel.titleActions(), ManagerPanel.ADD, Nodes.MenuButton.class).items();
@@ -107,9 +106,8 @@ class ManagerPanelTest {
             }
             assertThat(items).anyMatch(i -> i.separator());
             press(panel.titleActions(), items.getLast().action()); assertThat(generated[0]).isTrue();
-            var more = node(view, ManagerPanel.MORE, Nodes.MenuButton.class).items();
-            assertThat(more).hasSize(2);
-            press(view, more.getLast().action()); assertThat(password[0]).isTrue();
+            // As depicted, the category rail has no footer; password and grants are Vault commands.
+            assertThat(node(view, "categories", Nodes.Panel.class).footer()).isEmpty();
             panel.close();
         });
     }
@@ -118,7 +116,7 @@ class ManagerPanelTest {
         edt(() -> {
             int[] closes = {0};
             var panel = new ManagerPanel(new FakeKit("dev.jasper.vault"), id -> Optional.empty(), t -> { }, id -> { }, id -> { }, id -> { }, grant -> { },
-                () -> { }, () -> { }, () -> { }, () -> { }, () -> closes[0]++);
+                () -> { }, () -> { }, () -> { }, () -> closes[0]++);
             var view = panel.view();
             var form = node(view, ManagerPanel.ROOT, Nodes.Form.class);
             assertThat(form.actions()).filteredOn(b -> b.kind() == Nodes.ButtonKind.PRIMARY).singleElement()
@@ -131,6 +129,6 @@ class ManagerPanelTest {
 
     private static ManagerPanel panel(AtomicReference<VaultManager.Type> added) {
         return new ManagerPanel(new FakeKit("dev.jasper.vault"), id -> Optional.empty(), added::set, id -> { }, id -> { }, id -> { }, grant -> { },
-            () -> { }, () -> { }, () -> { }, () -> { }, () -> { });
+            () -> { }, () -> { }, () -> { }, () -> { });
     }
 }
