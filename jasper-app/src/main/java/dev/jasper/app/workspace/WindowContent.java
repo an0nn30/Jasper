@@ -1118,6 +1118,17 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
     }
 
+    /**
+     * Slate Steel's Dark ({@code dark}) or Light variant in every window sharing this window's themes, as
+     * {@code ui.appearance} applies it; the terminal scheme stays. Tests and previews switch variants this way.
+     */
+    void selectVariant(boolean dark) {
+        if (closed) return;
+        try { themes.configure(dark, themes.schemeChoice()); }
+        catch (ThemeController.InstallationFailure failure) { onError.accept("Could not apply the theme", failure.getMessage()); }
+        finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
+    }
+
     /** View \u203a Terminal Scheme: saved for every window; applied to this window's themes when no configuration is connected. */
     void selectTerminalScheme(dev.jasper.app.config.TerminalSchemeChoice scheme) {
         choose(dev.jasper.app.config.CoreSettings.TERMINAL_SCHEME, scheme, () -> {

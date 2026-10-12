@@ -236,7 +236,7 @@ class ConfigurationControllerTest {
         service = new ConfigService(directory.resolve("config.toml"), false);
         var errors = new ArrayList<String>();
         edt(() -> {
-            themes = ThemeTestSupport.slateSteel(true, theme -> theme.dark() && ThemeTestSupport.install(theme));
+            themes = ThemeTestSupport.controller(true, theme -> theme.dark() && ThemeTestSupport.install(theme));
             controller = new ConfigurationTestSupport(themes, service);
             owner().onError = (title, message) -> errors.add(message);
             var snapshot = ConfigSnapshot.builder().tabHeight(53).toolbar(ToolbarMode.ICONS).font(FontConfig.defaults().withSize(18))
@@ -540,7 +540,7 @@ class ConfigurationControllerTest {
         var errors = new ArrayList<String>();
         service = new ConfigService(file, false, configWorker, SwingUtilities::invokeLater);
         edt(() -> {
-            themes = ThemeTestSupport.slateSteel(true, theme -> { attempts.add(theme); return !broken.get() && ThemeTestSupport.install(theme); });
+            themes = ThemeTestSupport.controller(true, theme -> { attempts.add(theme); return !broken.get() && ThemeTestSupport.install(theme); });
             controller = new ConfigurationTestSupport(themes, service);
             owner().onError = (title, message) -> errors.add(message);
             assertThat(themes.current().chrome()).isSameAs(dark);
