@@ -239,7 +239,9 @@ final class Forms {
                     .setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_DIALOG));
             scroll.getVerticalScrollBar()
                     .setForeground(ThemePainting.color(context(), SemanticColor.BORDER_SUBTLE));
-            footerScroll.setBorder(new EmptyBorder(0, 0, 0, 0));
+            // Set once: replacing an equal border on every refresh fires a border change the scroll pane's look and feel
+            // answers by reading (and resolving) its table border default, even inside an appearance rollback.
+            if (!(footerScroll.getBorder() instanceof EmptyBorder)) footerScroll.setBorder(new EmptyBorder(0, 0, 0, 0));
             footerScroll.getVerticalScrollBar().setUnitIncrement(ThemePainting.metric(context(), DesignMetrics.Role.ROW_GAP));
             footerScroll.getVerticalScrollBar().setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_DIALOG));
             footerScroll.getVerticalScrollBar().setForeground(ThemePainting.color(context(), SemanticColor.BORDER_SUBTLE));
