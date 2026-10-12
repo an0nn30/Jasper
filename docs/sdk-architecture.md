@@ -119,7 +119,7 @@ The rail and toolbar use that same semantic color in both themes. Dialogs are pa
 Ordinary Swing buttons, fields, lists and dropdowns in any plugin layout, including content
 added later, are drawn by FlatLaf in the installed theme's colours: classic IntelliJ Light or
 Jasper Dark. Form text, button labels included, uses the 12-point form font and follows UI font
-changes. Plugin side panels paint the theme's tool window colour (`ToolWindow.background`) behind
+changes. Plugin side panels paint the tool-window body colour (`surface.panel`) behind
 plain containers; a background a plugin sets itself is kept. Toolbar button geometry stays
 independent (30-pixel height, 12-pixel arc).
 Small app-owned toolbar/rail/status controls keep their existing geometry. The SDK's ordinary-Swing

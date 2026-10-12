@@ -113,7 +113,7 @@ The user's checks after the first native pass found the dialog title rows standa
 - Indeterminate progress loops through the whole track, and the searchable dropdown rebuilds its rows in one step
   (the installed-font list opened slowly because each open re-measured every row once per row).
 - Unlock Vault and Create Vault are the kit's modal overlay (`ModalOverlay`, SDK 0.15.4
-  `DialogSpec.Presentation.OVERLAY`), as the user specified: the window dims under a black scrim at 40% while the
+  `DialogSpec.Presentation.OVERLAY`), as the user specified: the window dims under a black scrim (40% then; since Slate Steel Plan 1 the scrim is painted as its token gives it) while the
   card fades up 16 logical into place over 220 ms (ease-out cubic), and leaves as its opposite over 200 ms, lifting
   off at once and rising another 16 (ease-out) as it fades (ease-in); instant with animations off. The centred hero mocks' window frame no longer applies to these two prompts; their
   hero content keeps its geometry inside the outlined card. Remote's progress overlay uses the same kit overlay.
@@ -121,6 +121,50 @@ The user's checks after the first native pass found the dialog title rows standa
   dark window undimmed.
 - Show more… on an error notification failed for good once the Errors window's view had failed to build (the
   running app's jars had been replaced by a build); a failed open now closes its window, so the next one works.
+
+## Slate Steel Plan 1: engine and kit (2026-10-12)
+
+Plan [`2026-10-12-slate-steel-1-engine-and-kit.md`](../../superpowers/plans/2026-10-12-slate-steel-1-engine-and-kit.md)
+of the [Slate Steel specification](../../superpowers/specs/2026-10-12-jasper-slate-steel-themes-design.md). The theme is
+built into the engine from [`slate-steel.md`](slate-steel.md) (the user's `theme.md` plus derived editor schemes) but not
+yet installed: Plan 2 switches the app to it, Plan 3 removes the old themes. Until then the legacy themes give the ten new
+roles the colour their component painted before, so the app looks as it did except where a component moved roles.
+
+- Opacity is applied once: scrims are painted as their token gives them (legacy default black at 55%/25%); the focus ring
+  applies 32%/25% of `border.focus`, the error ring 22%, tiles and chips 17%/13% of their hue surface.
+- The title bar's command field is a raised field (hover changes only its edge); selected toolbar actions, rail items and
+  manager-rail rows take `surface.control.selected`; tool windows sit on `surface.panel`.
+- The tab strip is `surface.tabstrip`, the selected tab `surface.terminal`, at the window's alpha; hovered inactive tabs
+  take the hover overlay.
+- Secondary buttons take `button.secondary.border` and `text.strong.secondary`; the segmented track `segment.track` with a
+  `border.input` edge; panel empty tiles `surface.emptyTile`.
+- Captions, counts, table headers and row subtitles are `text.tertiary`; Settings row titles and the current breadcrumb
+  `text.strong.secondary`; empty picker values `text.placeholder`; the idle status dot `status.idle`.
+- The command palette is a `surface.menu` card with a `border.menu` hint rule and an accent highlight; menus highlight with
+  the accent; highlighted subtitles take `text.onAccent.secondary`, checkmarks `text.link`; the Settings body is
+  `surface.dialog` and the file chooser's Places `surface.sidebar`.
+- theme.md's shadows, black: the modal overlay's card, the palette, FlatLaf menus, the Light selected segment and the
+  primary button (a white inset line on its top row and a 1 px drop below the face).
+
+Decisions the plan recorded for review:
+
+1. Manager-rail selected rows (Vault categories, file-chooser Places) take `surface.control.selected` (the Vault mock's
+   grey "All Items" row), not `selection.bg`.
+2. Tab dividers stay `border.window` (theme.md is silent); terminal split dividers take `border.window` too (the legacy
+   divider token maps to it; Plan 3 moves the painter).
+3. The equal-width tab strip gets no accent "active tab indicator": the workspace mocks show none (the active tab is the
+   lighter `surface.terminal` slot). Inactive tabs gain the hover overlay.
+4. The command palette gets no backdrop scrim: the palette mock leaves the window undimmed, although theme.md lists the
+   palette among the scrim's users.
+5. Chrome icons (title bar toolbar, rails) keep `text.primary`, as the workspace mocks show them bright; kit icons already
+   tint `text.secondary`.
+6. The segmented control's Light "soft shadow" (theme.md gives no values) is black at 12%, 1 px down, 2 px blur.
+7. theme.md's "current breadcrumb" (`text.strong.secondary`) applies to the kit's breadcrumb control (file browsers). The
+   Settings header's current crumb is the page title and stays `text.primary`, which is what the Settings mock paints.
+8. The primary button's 1 px drop is painted by its kit view outside the face, as CSS `box-shadow` does, so the face keeps
+   the extent calibrated against the mocks (the plan first drew it inside the bounds with a 1 px shorter face; the
+   calibrated face tests showed that moved the visible bottom edge). A primary button outside a kit view has the inset
+   line only.
 
 ## User-run checks still open
 

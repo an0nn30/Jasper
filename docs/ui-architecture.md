@@ -104,8 +104,9 @@ Containers own semantic layout. Forms consume a host-supplied logical available-
 the host owns window chrome, sheet/scrim lifetime and cancellation cleanup.
 
 `ModalOverlay` is the kit's modal overlay, which `DialogSpec.Presentation.OVERLAY` and the SDK's progress
-overlays present: a scrim over a window's whole content (`surface.scrim`, black unless the theme names its own,
-at `OVERLAY_SCRIM_PERCENT`) and the content in a centred, outlined, rounded card with a soft shadow. Opening fades
+overlays present: a scrim over a window's whole content (`surface.scrim`, painted as its token gives it; a legacy
+theme that names none gets black at 55% in Dark and 25% in Light) and the content in a centred, outlined, rounded card
+with theme.md's dialog shadow (black, `DIALOG_SHADOW_*`). Opening fades
 the scrim in while the card fades from transparent and rises `OVERLAY_RISE` into place over
 `OVERLAY_ENTER_MILLIS`, easing out (cubic); closing is its opposite over `OVERLAY_EXIT_MILLIS`: the card lifts off
 at once and rises another `OVERLAY_RISE` (easing out, from wherever it is if the entrance had not finished) while it
@@ -116,7 +117,22 @@ it at once. The motion
 follows the kit's motion policy, so it is instant with animations off and settles at once if they are turned off
 mid-way. While it moves the card paints one snapshot of its content, so it fades as a single surface (no control
 paints its own disabled alpha ahead of the rest); at rest the content paints live. The host adds the overlay to a
-layered pane and owns keyboard routing and focus; the app's `WindowOverlay` stacks them per window. Panels own header,
+layered pane and owns keyboard routing and focus; the app's `WindowOverlay` stacks them per window.
+
+`SlateSteel` reads Jasper's theme from the bundled `slate-steel.json` (the colour reference
+`docs/design/theme-engine/slate-steel.md`'s machine-readable block, kept identical by a test) with the JDK-only
+`ThemeJson` reader: the Dark and Light semantic palettes (roles the file omits follow fixed rules), the terminal
+schemes (`TerminalScheme`, `SchemeColors` with a bold foreground) and the derived editor schemes (`EditorColors`
+and syntax styles, written as token references). `generated(dark)` assembles a full `GeneratedTheme`; until the
+legacy layer is removed it also carries a legacy token view derived from its tokens. Components paint theme.md's
+roles; alpha treatments (focus and error rings, hover, category tiles) apply one kit metric to a base token, and a
+token that carries alpha (the scrim, `border.subtle`) is painted as given. Shadows are black at the kit's shadow
+metrics: `ThemePainting.softShadow` blurs a mask once per size (cached) for the modal overlay's card and the
+command palette, FlatLaf paints menus' shadows, the Light selected segment has a soft shadow, and a primary
+button's 1 px drop is painted by its `KitView` outside the face (as `box-shadow` does), so the face keeps its
+calibrated extent while a white inset line tints its top row.
+
+Panels own header,
 context/navigation, virtual body and persistent footer. Hidden headers consume zero space.
 Three-column managers use named sidebar/list widths (192/272 logical pixels), then remaining detail;
 narrow hosts fit those roles proportionally. A trailing footer action anchors to the right edge.

@@ -241,7 +241,7 @@ colours are required), the 48 tokens and the syntax roles are derived with contr
 keys install through the IntelliJ path above. The four classic singleton built-ins are `Theme.DARK` (`themes/jasper-dark.toml`),
 `Theme.JASPER_LIGHT` (`themes/jasper-light.toml`), and `Theme.INTELLIJ_LIGHT` and `Theme.DARCULA`, converted from the
 vendored IntelliJ files by `IntellijConversion` as `ui_complete` documents (their own keys install unchanged).
-Tool windows paint `ToolWindow.background` through `ToolWindowSurface`, their headers included; the stripes stay chrome.
+Tool windows paint `surface.panel` (theme.md's tool-window body) through `ToolWindowSurface`, their headers included; the stripes stay chrome.
 
 Native themes come from `ThemeCatalog`: user TOML files beside the actual config, then the indexed offline
 collection. `Theme.Source` permits only `Bundled` and `UserFile`. The index loads lazily and reuses the four classic

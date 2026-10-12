@@ -1,5 +1,11 @@
 # Slate Steel Plan 1: engine and kit — Implementation Plan
 
+> **Status (2026-10-12): complete** on `claude/slate-steel`, executed inline. Deviations from the text below, each
+> recorded as a ruling in the executor's ledger: the primary button's drop is painted outside the face by its kit view
+> (decision 8 amended; the in-bounds drop moved the mock-calibrated face edge); the UI architecture check is the root
+> `verifyUiArchitecture` task; tool windows paint `surface.panel`, so a vendor `ToolWindow.background` no longer reaches
+> them; and existing tests that pinned the old roles were moved to the new roles (expected values only).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build Slate Steel (Dark and Light UI palettes, three terminal schemes, two derived editor schemes) into the theme engine from one bundled file, and move the kit's components onto `theme.md`'s tokens, alpha treatments and shadows — alongside the legacy theme pipeline, which Plans 2 and 3 replace and remove.
@@ -43,8 +49,8 @@ These were open in the component audit; each is the plan's choice, recorded in t
 7. theme.md's "current breadcrumb" (`text.strong.secondary`) applies to the kit's breadcrumb control (file browsers).
    The Settings header's current crumb is the page title (a `WINDOW_TITLE` text the app owns) and stays
    `text.primary`, which is what the Settings mock paints (`#EFF1F4`, probed at 2x in `settings_dialog_mock.png`).
-8. The primary button's 1 px drop sits inside its bounds, so its face is drawn 1 px shorter (its text does not move);
-   that is the only geometry change, and it comes from the shadow.
+8. The primary button's 1 px drop is painted by its kit view outside the face, as CSS `box-shadow` does, so the face keeps
+   its calibrated extent (amended during execution: the plan first drew it inside the bounds with a 1 px shorter face).
 
 ## Review Focus
 

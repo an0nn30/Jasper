@@ -26,6 +26,16 @@ new modal overlay (SDK 0.15.4 `DialogSpec.Presentation.OVERLAY`: a dimming scrim
 more… recovers from a failed Errors window. See the follow-up round in the
 [acceptance record](design/theme-engine/acceptance.md).
 
+**Slate Steel Plan 1 (engine and kit) complete — 2026-10-12.** On `claude/slate-steel` (not pushed, not merged): the
+user's `theme.md` became [`design/theme-engine/slate-steel.md`](design/theme-engine/slate-steel.md) with derived editor
+schemes, bundled as `slate-steel.json` and read by `SlateSteel` into the Dark/Light palettes, the Slate Steel Dark/Light
+and High Contrast terminal schemes (bold foreground included) and complete `GeneratedTheme`s that install into FlatLaf.
+Ten roles were added (SDK 0.15.5; every bundled manifest requires it). Opacity is applied once, and kit components moved
+onto theme.md's roles and shadows; the legacy themes are still installed, so the app looks as before except where a
+component moved roles. Deviations from the plan, and the eight decisions for review, are in the plan's status banner and
+the [acceptance record](design/theme-engine/acceptance.md). Plan 2 (the app switch: `ui.appearance`, `terminal.scheme`,
+the Appearance page) is next, then Plan 3 (removing the old themes and the import feature).
+
 **Task9c fix round1 — scoped re-review pending (2026-10-11).** Review I1 found that table useful-width search crossed the existing numeric-minimum feasibility boundary, where weighted allocation is not monotonic. The shared search now starts where all existing column minima fit, then reserves the useful first-column target; ordinary allocation remains unchanged. A long numeric-cell regression covers the returned minimum and larger/boundary widths with icons, selection modes and scale variants. This repairs the approved minimum contract without a new layout policy; scoped UI/chooser checks, default/controlled owner captures and fresh installDist evidence are recorded in scratch `task-9c-report.md`, preserving final02. Review M1 classifies inherited100JavaDoc warnings and injected native-notification authorization/delivery failures as known gate noise, not failing tests or new9c defects; source-warning cleanup stays final11. Native/pixel acceptance remains open.
 
 **Task9c constrained-scale correction (2026-10-11).** The first full gate passed, then actual fresh32pt/automatic2.5 owner images exposed fixed divider, zero form body/control width and double-scaled native text failures missed by transition-only checks. Approved shared corrections add measured automatic split negotiation with explicit drag preservation, table four-glyph minimum negotiation, retained stacked preview, all-form bounded body/footer overflow and narrow FormRows stacking. Native fonts share the existing exactly-once policy; an owned typography/scale signal refreshes retained chooser, Errors, notification/history and the specifically approved PluginDetails text consumer. No other Plugins composition or future11a work is included. These are behavioral deviations with layout/callback/disposal costs, covered by fresh owner and retained-state checks; final01 remains historical; the scratch report carries replacement frozen evidence. Native/pixel acceptance remains open.

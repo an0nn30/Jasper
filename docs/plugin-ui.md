@@ -187,7 +187,9 @@ identity art (Plugins page, Settings Tools, notification headers) comes from the
 
 ## Colors for specialized content
 
-Only custom content reads colors. Use `context.appearance().color(SemanticColor.X)` for canonical roles, or the
+Only custom content reads colors. Use `context.appearance().color(SemanticColor.X)` for canonical roles (including
+the ten Slate Steel roles of SDK 0.15.5: raised fields, the selected control, the tab strip, empty tiles, the segmented
+track, strong secondary text and the secondary button edge), or the
 `editorPalette()`, `workspacePalette()` and `syntaxPalette()` for document widgets, and repaint in
 `appearance().onChanged(...)` (chrome) or `onWorkspaceChanged(...)` (workspace content, including opacity). Never cache
 a color across a change. Content in the workspace area of a translucent window paints its background with
