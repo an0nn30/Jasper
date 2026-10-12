@@ -6,7 +6,6 @@ import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.swing.NativeControlStyles;
 
 import com.formdev.flatlaf.FlatClientProperties;
-import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.ui.theme.Token;
 import dev.jasper.terminal.search.FindResult;
@@ -136,8 +135,7 @@ final class FindBar extends JPanel {
 
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        g.setColor(ThemeZone.color(this, SemanticColor.BORDER_SUBTLE));
-        g.fillRect(0, getHeight() - NativeControlStyles.metric(DesignMetrics.Role.HAIRLINE), getWidth(), NativeControlStyles.metric(DesignMetrics.Role.HAIRLINE));
+        dev.jasper.ui.swing.NativeChromePainting.bottomHairline(this, g, ThemeZone.theme(this));
     }
 
     @Override public void removeNotify() {

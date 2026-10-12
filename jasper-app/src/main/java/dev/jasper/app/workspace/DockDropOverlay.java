@@ -1,17 +1,13 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.platform.ThemeZone;
-import dev.jasper.ui.theme.SemanticColor;
-import dev.jasper.ui.metrics.DesignMetrics;
 
-import com.formdev.flatlaf.util.UIScale;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
-import java.awt.geom.RoundRectangle2D;
 import java.util.Objects;
 import javax.swing.Icon;
 import javax.swing.JComponent;
@@ -26,9 +22,6 @@ import javax.swing.JComponent;
  * only the regions of the guides that changed, never the whole window under this transparent component. EDT only.
  */
 final class DockDropOverlay extends JComponent {
-    private static final int FILL_ALPHA = metric(DesignMetrics.Role.DOCK_DROP_FILL_ALPHA),
-        BORDER_ALPHA = metric(DesignMetrics.Role.DOCK_DROP_BORDER_ALPHA), ARC = metric(DesignMetrics.Role.DOCK_DROP_ARC);
-    private static int metric(DesignMetrics.Role role) { return DesignMetrics.DEFAULT.value(role); }
     /**
      * A margin, in pixels, for pipeline rounding when repainting the placeholder and the ghost. The antialiased stroke
      * stays inside its rectangle in the software pipeline.
@@ -85,35 +78,18 @@ final class DockDropOverlay extends JComponent {
     /** Events pass through to whatever is underneath. */
     @Override public boolean contains(int x, int y) { return false; }
 
-    static Color fill() { return withAlpha(accent(), FILL_ALPHA); }
-    static Color border() { return withAlpha(accent(), BORDER_ALPHA); }
-    private static Color accent() { return ThemeZone.color(null, SemanticColor.ACCENT); }
-
-    private static Color withAlpha(Color color, int alpha) { return new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha); }
+    static Color fill() { return dev.jasper.ui.swing.NativeChromePainting.dropGuide(ThemeZone.theme(null), false); }
+    static Color border() { return dev.jasper.ui.swing.NativeChromePainting.dropGuide(ThemeZone.theme(null), true); }
 
     @Override protected void paintComponent(Graphics graphics) {
+        dev.jasper.ui.swing.NativeChromePainting.dropGuides(graphics, highlight, placeholder, fill(), border());
+        Rectangle ghostBounds = ghostBounds();
+        if (ghostBounds == null) return;
         var g = (Graphics2D) graphics.create();
         try {
-            if (highlight != null) {
-                // The fill stays inside the border, so the two translucent colours never stack.
-                g.setColor(fill());
-                g.fillRect(highlight.x + 1, highlight.y + 1, highlight.width - 2, highlight.height - 2);
-                g.setColor(border());
-                g.drawRect(highlight.x, highlight.y, highlight.width - 1, highlight.height - 1);
-            }
-            if (placeholder != null) {
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                double arc = UIScale.scale(ARC);
-                // The fill sits inside the border, so the two never stack. The border is stroked 0.5px in, so its
-                // inner edge has corner diameter arc - 1: the fill uses it too, and the two are concentric.
-                double inner = Math.max(0, arc - 1);
-                g.setColor(fill());
-                g.fill(new RoundRectangle2D.Double(placeholder.x + 1, placeholder.y + 1, placeholder.width - 2, placeholder.height - 2, inner, inner));
-                g.setColor(border());
-                g.draw(new RoundRectangle2D.Double(placeholder.x + 0.5, placeholder.y + 0.5, placeholder.width - 1, placeholder.height - 1, arc, arc));
-            }
-            Rectangle ghostBounds = ghostBounds();
-            if (ghostBounds != null) ghost.paintIcon(this, g, ghostBounds.x, ghostBounds.y);
+            // The ghost keeps the antialiasing the placeholder's guide paint used before it.
+            if (placeholder != null) g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            ghost.paintIcon(this, g, ghostBounds.x, ghostBounds.y);
         } finally { g.dispose(); }
     }
 }
