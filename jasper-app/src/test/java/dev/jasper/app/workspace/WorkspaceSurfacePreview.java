@@ -167,18 +167,28 @@ public final class WorkspaceSurfacePreview {
             capture(window, output.resolve("tabs/calibration-791x712.png"), 791, 712, 2, manifest);
             capture(window, output.resolve("tabs/calibration-791x712-1x.png"), 791, 712, 1, manifest);
             capture(window, output.resolve("tabs/calibration-narrow-460x320.png"), 460, 320, 2, manifest);
-            edt(() -> {
-                window.owner().currentTab().rename("A deliberately long terminal tab title that must clip inside its equal-width slot");
-                window.owner().chrome().search().setContext("dustin@~/Desktop/Screenshots/with/a/very/long/working/directory : zsh",
-                    "dustin@~/Desktop/Screenshots/with/a/very/long/working/directory : zsh", dev.jasper.app.platform.AppIcons.named("TERMINAL"));
-            });
-            capture(window, output.resolve("tabs/calibration-long-titles-791x712.png"), 791, 712, 2, manifest);
-            edt(() -> { window.owner().currentTab().rename(""); window.owner().update(); });
+            // Enlarged user UI font: chrome text grows with it and must not clip in the 34 px title row or the tabs.
+            edt(() -> window.themes().configure(calibration, new dev.jasper.app.config.UiFontConfig("system", 20f)));
+            capture(window, output.resolve("tabs/calibration-font20-791x712.png"), 791, 712, 2, manifest);
+            edt(() -> window.themes().configure(calibration, new dev.jasper.app.config.UiFontConfig("system", 13f)));
             for (Theme theme : List.of(Theme.DARK, Theme.JASPER_LIGHT)) {
                 edt(() -> window.themes().configure(theme));
                 capture(window, output.resolve("tabs/" + slug(theme) + "-791x712.png"), 791, 712, 2, manifest);
             }
+            capture(window, output.resolve("tabs/light-791x712-1x.png"), 791, 712, 1, manifest);
+            // Mixed: light chrome around a dark workspace (Settings > Appearance workspace theme).
+            edt(() -> window.themes().configureWorkspace(new dev.jasper.app.config.WorkspaceThemeChoice(Theme.DARK.name()), Theme.DARK));
+            capture(window, output.resolve("tabs/mixed-light-chrome-dark-workspace-791x712.png"), 791, 712, 2, manifest);
         } finally { close(window); }
+        // A long working directory and tab title clip inside the command centre and the equal-width slots.
+        Path deep = Files.createDirectories(screenshots.resolve("with/a/deliberately/long/working/directory/for/clipping"));
+        var longWindow = window(deep, calibration, 1);
+        try {
+            edt(() -> { longWindow.owner().setStatusVisible(true);
+                longWindow.owner().currentTab().rename("A deliberately long terminal tab title that must clip inside its equal-width slot"); });
+            capture(longWindow, output.resolve("tabs/calibration-long-titles-791x712.png"), 791, 712, 2, manifest);
+            capture(longWindow, output.resolve("tabs/calibration-long-titles-narrow-520x360.png"), 520, 360, 2, manifest);
+        } finally { close(longWindow); }
     }
 
     private static void integrated(Path output, Path home, Path screenshots, Theme calibration, StringBuilder manifest, String filter) throws Exception {
