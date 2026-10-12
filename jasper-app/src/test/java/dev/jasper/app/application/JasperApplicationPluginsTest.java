@@ -343,7 +343,7 @@ class JasperApplicationPluginsTest {
     private static String installedLightLaf() {
         var laf = javax.swing.UIManager.getLookAndFeel();
         assertThat(laf).isInstanceOf(com.formdev.flatlaf.IntelliJTheme.ThemeLaf.class);
-        var light = dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+        var light = dev.jasper.ui.theme.SlateSteel.bundled().generated(false);
         assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(light);
         assertThat(laf.getDefaults().get("Jasper.installedTheme")).as("the snapshot travels with the LAF itself").isSameAs(light);
         assertThat(laf.getName()).isEqualTo(light.name());
@@ -371,7 +371,7 @@ class JasperApplicationPluginsTest {
 
     @Test void pluginsStartInTheSavedVariantBeforeAnyWindowExists() throws Exception {
         AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
-        java.nio.file.Files.writeString(dirs.configFile(), "ui.theme.name='Jasper Light'\n");
+        java.nio.file.Files.writeString(dirs.configFile(), "ui.appearance='light'\n");
         Path dev = home.resolve("look-plugin");
         PluginJars.build(dev, "look.jar", PluginJars.descriptor("dev.example.look", "1.0.0", "fix.look.Main"),
             Map.of("fix.look.Main", APPEARANCE_FIXTURE), List.of());

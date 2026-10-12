@@ -1,7 +1,6 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.Theme;
-import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.terminal.config.GridSize;
@@ -69,7 +68,7 @@ public final class FlatTabsPreview {
                     document.select(); render(root, owner, output, name + "-document", 1040);
                     owner.selectTab(owner.terminalTabs().get(1)); render(root, owner, output, name + "-overflow", 350);
                 }
-                owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT); owner.selectTerminalColors(TerminalColors.DARK);
+                owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT); owner.selectTerminalScheme(dev.jasper.app.config.TerminalSchemeChoice.SLATE_STEEL_DARK);
                 owner.selectTab(owner.terminalTabs().get(1)); render(root, owner, output, "light-chrome-dark-workspace", 1040);
                 owner.applyBackgroundOpacity(.5); render(root, owner, output, "glass", 1040);
             });

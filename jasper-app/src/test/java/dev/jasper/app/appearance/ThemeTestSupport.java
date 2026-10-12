@@ -10,6 +10,11 @@ public final class ThemeTestSupport {
     /** Installs a generated theme, as ThemeController's installer does. */
     public static boolean install(dev.jasper.ui.theme.GeneratedTheme theme) { return ThemeManager.install(theme); }
 
+    /** Slate Steel in {@code dark}, matching scheme, installed through {@code installer}. */
+    public static ThemeController slateSteel(boolean dark, java.util.function.Predicate<dev.jasper.ui.theme.GeneratedTheme> installer) {
+        return new ThemeController(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, installer);
+    }
+
     /** A built-in theme by name, or Jasper Dark: what start-up picks for a name no theme has. */
     public static Theme named(String name) { return ThemeCatalog.builtIn().latest().find(name).orElse(Theme.DARK); }
 }

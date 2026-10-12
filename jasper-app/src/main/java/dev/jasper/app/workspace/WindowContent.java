@@ -29,7 +29,6 @@ import dev.jasper.app.palette.CommandsScope;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.lifecycle.Subscription;
-import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.ToolbarMode;
 import dev.jasper.app.config.ViewMode;
 
@@ -597,27 +596,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         updateActions();
     }
 
-    private java.util.function.Supplier<dev.jasper.app.appearance.ThemeCatalog.Snapshot> themeCatalog = () -> dev.jasper.app.appearance.ThemeCatalog.builtIn().latest();
-    /** Connects a read-only current catalog; released with the configuration/window lifetime. */
-    public void connectThemeCatalog(java.util.function.Supplier<dev.jasper.app.appearance.ThemeCatalog.Snapshot> catalog) {
-        if (!closed) themeCatalog = java.util.Objects.requireNonNull(catalog);
-    }
-    dev.jasper.app.appearance.ThemeCatalog.Snapshot availableThemes() { return themeCatalog.get(); }
-    void chooseUiTheme(String name) {
-        choose(dev.jasper.app.config.CoreSettings.UI_THEME_NAME, name, () -> selectTheme(availableThemes().find(name).orElse(themes.choice().dark() ? Theme.DARK : Theme.JASPER_LIGHT)));
-    }
-    void chooseWorkspaceTheme(String name) {
-        var choice = new dev.jasper.app.config.WorkspaceThemeChoice(name);
-        choose(dev.jasper.app.config.CoreSettings.UI_THEME_WORKSPACE, choice.name(), () -> {
-            themes.configureWorkspace(choice, choice.matchesChrome() ? null : availableThemes().find(choice.name()).orElse(null));
-            chrome.refreshTheme();
-        });
-    }
     void openThemesSettings() { if (openSettingsAt != null) openSettingsAt.accept("appearance"); }
     public void disconnectConfiguration() {
         openSettings = null; reloadConfiguration = null; migrateConfiguration = null; unregisterConfiguration = () -> {};
         saveSettings = null; openSettingsAt = null; configurationState = null;
-        themeCatalog = () -> dev.jasper.app.appearance.ThemeCatalog.builtIn().latest();
         status().onConfigurationDetails = () -> {};
         status().configButton().setEnabled(false);
         updateActions();
@@ -917,7 +899,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         tab.onPaneCreated = pane -> connectActivity(tab, pane);
         for (TerminalPane pane : tab.panes()) connectActivity(tab, pane);
         WorkspaceTheme.apply(tab, themes.current());
-        tab.setBackground(themes.current().palette().background());
+        tab.setBackground(themes.current().surface());
         tab.setBackgroundOpacity((float) backgroundOpacity);
         for (TerminalPane pane : tab.panes()) pane.applyTheme(themes.current());
         tabs.addTab(tab.title(), tab);
@@ -1136,27 +1118,15 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
     }
 
-    dev.jasper.app.config.WorkspaceThemeChoice workspaceChoice() { return themes.workspaceChoice(); }
-
-    boolean terminalColorsSelected(TerminalColors colors) {
-        return workspaceChoice().name().equalsIgnoreCase(workspaceName(colors));
-    }
-
-    private static String workspaceName(TerminalColors colors) {
-        return switch (colors.name()) {
-            case "light" -> "Jasper Light";
-            case "dark" -> "Jasper Dark";
-            default -> colors.name();
-        };
-    }
-
-    /** View \u203a Terminal Colors: saved for every window; applied to this window's themes when no configuration is connected. */
-    void selectTerminalColors(TerminalColors colors) {
-        choose(dev.jasper.app.config.CoreSettings.UI_THEME_WORKSPACE, workspaceName(colors), () -> {
-            themes.configureTerminal(colors);
+    /** View \u203a Terminal Scheme: saved for every window; applied to this window's themes when no configuration is connected. */
+    void selectTerminalScheme(dev.jasper.app.config.TerminalSchemeChoice scheme) {
+        choose(dev.jasper.app.config.CoreSettings.TERMINAL_SCHEME, scheme, () -> {
+            themes.configureScheme(scheme);
             chrome.refreshTheme();
         });
     }
+
+    boolean terminalSchemeSelected(dev.jasper.app.config.TerminalSchemeChoice scheme) { return themes.schemeChoice() == scheme; }
 
     /** View \u203a Toolbar. */
     void chooseToolbarMode(ToolbarMode mode) {
@@ -1210,7 +1180,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             leftStripe.refreshTheme();
             rightStripe.refreshTheme();
             area.refreshTheme();
-            area.setTerminalBackground(theme.palette().background());
+            area.setTerminalBackground(theme.surface());
             WorkspaceTheme.apply(windowTabs, theme);
             windowTabs.refresh();
             for (var component : new ArrayList<>(hosted.keySet())) {
@@ -1220,15 +1190,15 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             if (updateDelegates && contributed != null) contributed.refreshTheme();
             for (TerminalTab tab : retained) {
                 WorkspaceTheme.apply(tab, theme);
-                tab.setBackground(theme.palette().background());
+                tab.setBackground(theme.surface());
                 for (TerminalPane pane : tab.panes()) {
                     // Zoom detaches sibling panes from the visible component hierarchy.
                     if (updateDelegates && !SwingUtilities.isDescendingFrom(pane, this)) SwingUtilities.updateComponentTreeUI(pane);
                     pane.applyTheme(theme);
                 }
             }
-            setBackground(theme.palette().background());
-            tabs.setBackground(theme.palette().background());
+            setBackground(theme.surface());
+            tabs.setBackground(theme.surface());
             chrome.status().applyPalette(theme.palette());
             chrome.refreshTheme();
             if (commandPalette != null) commandPalette.refreshTheme();
@@ -1281,7 +1251,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * tab strip shares it, so tabs, terminals and hosted content read as one space.
      */
     java.awt.Color workspaceSurface() {
-        java.awt.Color background = themes.current().palette().background();
+        java.awt.Color background = themes.current().surface();
         if (backgroundOpacity >= 1) return background;
         return new java.awt.Color(background.getRed(), background.getGreen(), background.getBlue(),
             (int) Math.round(255 * backgroundOpacity));

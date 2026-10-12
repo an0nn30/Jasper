@@ -4,13 +4,11 @@ import dev.jasper.app.config.KeyBindings;
 import java.util.Map;
 import java.util.Optional;
 
-import dev.jasper.app.appearance.Theme;
-import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
-import dev.jasper.app.config.WorkspaceThemeChoice;
+import dev.jasper.app.config.AppearanceMode;
 import dev.jasper.app.config.SettingsEdit;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.platform.ConfigEditor;
@@ -30,20 +28,15 @@ import javax.swing.SwingUtilities;
 final class ConfigurationController implements AutoCloseable {
     private final ThemeController themes;
     private final ConfigService service;
-    private final ThemeCatalog catalog;
     private final Set<WindowContent> owners = new LinkedHashSet<>();
     private final Consumer<Path> editor;
     private ConfigService.State state;
     private boolean closed;
-    private boolean lastChromeDark = true;
     private dev.jasper.app.platform.SystemAppearance.Observation systemAppearance;
-    private final Subscription appearance;
     private Consumer<ConfigSnapshot> applicationListener = snapshot -> {};
     private final List<ConfigDiagnostic> reported = new java.util.ArrayList<>();
-    /** The theme catalog's problems, and an unknown theme name, from the last state applied. */
+    /** A Slate Steel variant that could not be installed, from the last state applied. */
     private List<ConfigDiagnostic> themeProblems = List.of();
-    private List<ConfigDiagnostic> migrationProblems = List.of();
-    private final java.util.function.Supplier<List<ThemeCatalog.Problem>> migrationSource;
     private Predicate<String> pluginSettingsExist = id -> false;
     private final List<Consumer<ConfigService.State>> stateListeners = new java.util.ArrayList<>();
     private Consumer<ConfigService.State> problemListener = state -> {};
@@ -55,7 +48,6 @@ final class ConfigurationController implements AutoCloseable {
         requireEdt();
         var merged = new java.util.ArrayList<>(state.diagnostics());
         merged.addAll(themeProblems);
-        merged.addAll(migrationProblems);
         merged.addAll(reported);
         pluginReports.values().forEach(merged::addAll);
         var removable = state.deadTables().stream()
@@ -89,25 +81,18 @@ final class ConfigurationController implements AutoCloseable {
         publish();
     }
 
-    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog) {
-        this(themes, service, catalog, new ConfigEditor()::open, List::of);
+    ConfigurationController(ThemeController themes, ConfigService service) {
+        this(themes, service, new ConfigEditor()::open);
     }
-    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog, Consumer<Path> editor) {
-        this(themes, service, catalog, editor, List::of);
-    }
-    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog,
-                            Consumer<Path> editor, java.util.function.Supplier<List<ThemeCatalog.Problem>> migrationSource) {
-        this(themes, service, catalog, editor, migrationSource,
+    ConfigurationController(ThemeController themes, ConfigService service, Consumer<Path> editor) {
+        this(themes, service, editor,
             dev.jasper.app.platform.SystemAppearance.Observation.unavailable("No system appearance observer is attached."));
     }
-    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog,
-                            Consumer<Path> editor, java.util.function.Supplier<List<ThemeCatalog.Problem>> migrationSource,
+    ConfigurationController(ThemeController themes, ConfigService service, Consumer<Path> editor,
                             dev.jasper.app.platform.SystemAppearance.Observation initialAppearance) {
         this.systemAppearance = Objects.requireNonNull(initialAppearance);
-        this.migrationSource = migrationSource;
         requireEdt();
-        this.themes = themes; this.service = service; this.catalog = catalog; this.editor = editor;
-        appearance = themes.subscribe((resolved, refresh) -> lastChromeDark = resolved.chrome().dark());
+        this.themes = themes; this.service = service; this.editor = editor;
         state = service.initialState();
         try { configureThemes(state); }
         catch (ThemeController.InstallationFailure ignored) {
@@ -151,7 +136,6 @@ final class ConfigurationController implements AutoCloseable {
         if (closed || !owners.add(owner)) return;
         owner.connectConfiguration(() -> settingsOpener.accept(owner, null),
             () -> reportFailure(owner, "Could not reload the configuration", service.reload()), () -> migrateFor(owner), () -> unregister(owner));
-        owner.connectThemeCatalog(catalog::latest);
         owner.connectSettings(this::save, page -> settingsOpener.accept(owner, page));
         owner.applyConfiguration(state.snapshot(), service.macOs());
         owner.setConfigurationState(shown());
@@ -265,43 +249,19 @@ final class ConfigurationController implements AutoCloseable {
         problemListener.accept(visible);
     }
 
-    /**
-     * Applies the requested chrome, workspace and font from the latest scan. Missing chrome uses the safe
-     * built-in of the last applied darkness; missing workspace matches chrome without changing the request.
-     */
+    /** Applies the saved appearance, terminal scheme and interface font. */
     private void configureThemes(ConfigService.State next) {
-        migrationProblems = migrationSource.get().stream().distinct().map(problem -> new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING,
-            problem.file(), problem.line(), problem.line() == 0 ? 0 : 1, "", problem.message())).toList();
-        ThemeCatalog.Snapshot available = catalog.latest();
-        var problems = new java.util.ArrayList<ConfigDiagnostic>();
-        for (ThemeCatalog.Problem problem : available.problems())
-            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, problem.file(), problem.line(), problem.line() == 0 ? 0 : 1, "", problem.message()));
-        var resolved = ThemePolicy.resolve(next.snapshot(), available, systemAppearance, lastChromeDark);
-        Theme theme = resolved.theme();
-        for (String message : resolved.problems())
-            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0,
-                next.snapshot().followSystemTheme() ? "ui.theme.follow_system" : "ui.theme.name", message));
-        WorkspaceThemeChoice choice = next.snapshot().workspaceTheme();
-        Theme workspace = null;
-        if (!choice.matchesChrome()) workspace = available.find(choice.name()).orElse(null);
-        if (!choice.matchesChrome() && workspace == null)
-            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.workspace",
-                "Unknown workspace scheme \"" + choice.name() + "\"; matching the chrome theme."));
-        var retained = new java.util.ArrayList<>(available.themes());
-        retained.addAll(themes.activeThemes());
-        retained.add(theme);
-        if (workspace != null) retained.add(workspace);
-        dev.jasper.app.appearance.ThemeManager.retainGenerated(retained);
-        themes.configureAnimations(next.snapshot().animations().enabled());
+        var snapshot = next.snapshot();
+        boolean dark = AppearancePolicy.dark(snapshot.appearance(), systemAppearance);
+        themes.configureAnimations(snapshot.animations().enabled());
         try {
-            themes.configure(theme, choice, workspace, next.snapshot().uiFont());
-            themeProblems = List.copyOf(problems);
+            themes.configure(dark, snapshot.terminalScheme(), snapshot.uiFont());
+            themeProblems = List.of();
         } catch (ThemeController.InstallationFailure failure) {
             Throwable cause = failure.getCause();
-            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.name",
-                "Could not apply theme \"" + theme.name() + "\": " + (cause != null ? cause.getMessage() : failure.getMessage())
-                    + "; keeping " + themes.choice().name() + "."));
-            themeProblems = List.copyOf(problems);
+            themeProblems = List.of(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.appearance",
+                "Could not apply Slate Steel " + (dark ? "Dark" : "Light") + ": " + (cause != null ? cause.getMessage() : failure.getMessage())
+                    + "; keeping the current appearance."));
             throw failure;
         }
     }
@@ -311,7 +271,7 @@ final class ConfigurationController implements AutoCloseable {
         requireEdt();
         if (closed || systemAppearance.equals(observation)) return;
         systemAppearance = observation;
-        if (!state.snapshot().followSystemTheme()) return;
+        if (state.snapshot().appearance() != AppearanceMode.SYSTEM) return;
         try { configureThemes(state); }
         catch (ThemeController.InstallationFailure failure) {
             owners.stream().findFirst().ifPresent(owner -> owner.onError.accept("Could not apply the theme", failure.getMessage()));
@@ -325,7 +285,6 @@ final class ConfigurationController implements AutoCloseable {
         requireEdt();
         if (closed) return;
         closed = true;
-        appearance.close();
         applicationListener = snapshot -> {};
         stateListeners.clear();
         problemListener = state -> {};

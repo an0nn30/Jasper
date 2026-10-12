@@ -68,21 +68,6 @@ public final class ThemeController implements AutoCloseable {
         }
     }
 
-    /**
-     * Legacy start-up for fixture themes: the saved theme, or Jasper Dark when the saved one cannot be installed. Used
-     * by tests until the legacy themes are removed.
-     */
-    public static ThemeController startup(Theme saved, java.util.function.Consumer<InstallationFailure> fallingBack) {
-        return startup(saved, ThemeManager::install, fallingBack);
-    }
-    static ThemeController startup(Theme saved, Predicate<GeneratedTheme> installer, java.util.function.Consumer<InstallationFailure> fallingBack) {
-        try { return new ThemeController(saved, installer); }
-        catch (InstallationFailure failure) {
-            fallingBack.accept(failure);
-            return new ThemeController(Theme.DARK, installer);
-        }
-    }
-
     public ThemeController() { this(Theme.DARK); }
     public ThemeController(Theme saved) { this(saved, ThemeManager::install); }
     public ThemeController(Predicate<GeneratedTheme> installer) { this(Theme.DARK, installer); }

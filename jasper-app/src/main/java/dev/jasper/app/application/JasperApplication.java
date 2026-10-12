@@ -1,7 +1,5 @@
 package dev.jasper.app.application;
 
-import dev.jasper.app.appearance.Theme;
-import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.CoreSettings;
@@ -78,7 +76,6 @@ import dev.jasper.app.terminals.TerminalRegistry;
 public final class JasperApplication {
     private static final System.Logger LOG = System.getLogger(JasperApplication.class.getName());
     private final ThemeController themes;
-    private final ThemeCatalog themeCatalog;
     private final dev.jasper.app.platform.SystemAppearance systemAppearance;
     private Runnable systemAppearanceListening = () -> { };
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
@@ -180,8 +177,6 @@ public final class JasperApplication {
 
     TerminalRegistry terminals() { return terminals; }
 
-    private volatile List<ThemeCatalog.Problem> migrationProblems = List.of();
-    private List<ThemeCatalog.Problem> startupConfigProblems = List.of();
 
     public JasperApplication() { this(null); }
 
@@ -212,24 +207,16 @@ public final class JasperApplication {
      */
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate, Path shellIntegrationDir) {
-        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellIntegrationDir, List.of());
-    }
-    public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
-                      Runnable terminate, Path shellIntegrationDir, List<ThemeCatalog.Problem> startupThemeProblems) {
         dev.jasper.app.platform.BundledFonts.register();
-        migrationProblems = List.copyOf(startupThemeProblems);
-        if (service != null) startupConfigProblems = startupThemeProblems.stream().filter(problem -> problem.file().equals(service.initialState().file())).toList();
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
         startupViewMode = startup.viewMode();
-        themeCatalog = service == null ? ThemeCatalog.builtIn() : ThemeCatalog.beside(service.initialState().file());
-        if (service != null) scanThemes(service);
         systemAppearance = dev.jasper.app.platform.SystemAppearance.open();
         try {
-        Theme saved = ThemePolicy.resolve(startup, themeCatalog.latest(), systemAppearance.current(), true).theme();
-        // First Swing work: every later component may read the installed snapshot. A theme that cannot be installed
+        boolean dark = AppearancePolicy.dark(startup.appearance(), systemAppearance.current());
+        // First Swing work: every later component may read the installed snapshot. A variant that cannot be installed
         // never stops start-up; the configuration reports it.
-        themes = ThemeController.startup(saved,
-            failure -> LOG.log(System.Logger.Level.WARNING, "Starting in Jasper Dark: " + failure.getMessage(), failure));
+        themes = ThemeController.startup(dark, startup.terminalScheme(),
+            failure -> LOG.log(System.Logger.Level.WARNING, "Starting in Slate Steel Dark: " + failure.getMessage(), failure));
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
         notificationViews = new NotificationsFeature(notificationCenter, contributions,
             () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
@@ -249,7 +236,7 @@ public final class JasperApplication {
         buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome().dark()));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
             buddy.companion(), notificationCenter, buddy.companion()::setWorking, JasperApplication::afterDelay);
-        configuration = service == null ? null : new ConfigurationController(themes, service, themeCatalog, new dev.jasper.app.platform.ConfigEditor()::open, () -> migrationProblems, systemAppearance.current());
+        configuration = service == null ? null : new ConfigurationController(themes, service, new dev.jasper.app.platform.ConfigEditor()::open, systemAppearance.current());
         if (configuration != null) systemAppearanceListening = systemAppearance.subscribe(configuration::systemAppearanceChanged);
         Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
         shellProfiles = ShellProfileCatalog.system(savedShell);
@@ -292,35 +279,6 @@ public final class JasperApplication {
             systemAppearanceListening.run();
             systemAppearance.close();
             throw failure;
-        }
-    }
-
-    /**
-     * The first native scan runs on the configuration worker; start-up waits for it, at most 10 s,
-     * so the first window shows the saved theme. Later scans run on every configuration poll.
-     */
-    private void scanThemes(ConfigService service) {
-        try { service.watchChanges(() -> {
-            var before = themeCatalog.latest(); var previousProblems = migrationProblems;
-            scanQuietly("native themes", themeCatalog::scan);
-            var refreshed = new java.util.LinkedHashSet<>(startupConfigProblems);
-            refreshed.addAll(ThemeUpgrade.diagnostics(service.initialState().file()));
-            migrationProblems = List.copyOf(refreshed);
-            return !before.equals(themeCatalog.latest()) || !previousProblems.equals(migrationProblems);
-        })
-            .get(10, java.util.concurrent.TimeUnit.SECONDS); }
-        catch (ExecutionException | TimeoutException failure) {
-            LOG.log(System.Logger.Level.WARNING, "The themes folder could not be read at start-up", failure);
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    /** Runs one catalog scan, logging a failure so the next catalog is still scanned. */
-    private static void scanQuietly(String what, Runnable scan) {
-        try { scan.run(); }
-        catch (RuntimeException | OutOfMemoryError | StackOverflowError failure) {
-            LOG.log(System.Logger.Level.WARNING, "The " + what + " could not be scanned", failure);
         }
     }
 

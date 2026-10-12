@@ -38,9 +38,7 @@ public final class ApplicationBootstrap {
         if (result != 0) System.exit(result);
     }
 
-    record Startup(ConfigService service, AppArguments options, java.util.List<dev.jasper.app.appearance.ThemeCatalog.Problem> themeProblems) {
-        Startup { themeProblems = java.util.List.copyOf(themeProblems); }
-    }
+    record Startup(ConfigService service, AppArguments options) { }
     private static void prepareDesktop(Startup startup) {
         ConfigService service = startup.service(); AppArguments options = startup.options();
         var acquired = new StartupResources();
@@ -109,7 +107,7 @@ public final class ApplicationBootstrap {
             }
             compose(service, () -> new CommandHistory(dirs.commandHistory()),
                 history -> {
-                    JasperApplication application = createApplication(service, history, dirs, options, startup.themeProblems());
+                    JasperApplication application = createApplication(service, history, dirs, options);
                     exceptions.forwardTo(application::unexpected);
                     return application;
                 }, application -> {
@@ -146,7 +144,7 @@ public final class ApplicationBootstrap {
     }
 
     private static JasperApplication createApplication(ConfigService service, CommandHistory history, AppDirs dirs,
-                                                       AppArguments options, java.util.List<dev.jasper.app.appearance.ThemeCatalog.Problem> themeProblems) {
+                                                       AppArguments options) {
         long began = System.nanoTime();
         var acquired = new StartupResources();
         try {
@@ -158,7 +156,7 @@ public final class ApplicationBootstrap {
                     "Shell integration scripts could not be installed; integration is off", failure);
             }
             var application = new JasperApplication(service, null, history, dirs.buddyState(),
-                () -> System.exit(0), integrationDir, themeProblems);
+                () -> System.exit(0), integrationDir);
             Path source = HandoffSocket.codeSource();
             application.residentControl(new ResidentControl(() -> HandoffSocket.live(dirs.daemonSocket()),
                 () -> HandoffSocket.retire(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source))),
@@ -269,7 +267,7 @@ public final class ApplicationBootstrap {
         catch (IllegalArgumentException failure) { error.println(failure.getMessage()); return 2; }
         if (options.help()) { out.println(AppArguments.USAGE); return 0; }
         String os = System.getProperty("os.name");
-        // AppKit reads this as the toolkit initialises, and the theme upgrade below may already initialise it.
+        // AppKit reads this as the toolkit initialises.
         launchProperties(options.background(), os, System.getProperty("jpackage.app-path")).forEach(System::setProperty);
         Path home = Path.of(System.getProperty("user.home"));
         AppDirs dirs = AppDirs.resolve(os, System.getenv(), home, System.getProperty("jasper.home"));
@@ -278,16 +276,13 @@ public final class ApplicationBootstrap {
         // not settle a second icon into the Dock on its way out.
         if (handsOff(options, dirs)) return 0;
         Path file = options.configOverride() == null ? dirs.configFile() : options.configOverride();
-        long upgrade = System.nanoTime();
-        var problems = dev.jasper.app.application.ThemeUpgrade.prepare(file, os.startsWith("Mac"));
-        StartupTrace.current().phase("theme upgrade", upgrade);
         var acquired = new StartupResources();
         long read = System.nanoTime();
         ConfigService service = acquired.own(new ConfigService(file, os.startsWith("Mac")));
         StartupTrace.current().phase("config", read);
         StartupTrace.current().mark(StartupTrace.Milestone.CONFIG_LOADED);
         try {
-            launch.accept(new Startup(service, options, problems));
+            launch.accept(new Startup(service, options));
             acquired.transfer();
             return 0;
         } catch (RuntimeException | Error failure) { acquired.rollback(failure); throw failure; }

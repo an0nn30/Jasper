@@ -14,11 +14,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import javax.swing.*;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Completion smoke over shipped palettes and an imported custom JSON theme, with real live app publication. */
 class ThemeCompletionSmokeTest {
+    /** The loop leaves a 24-point interface font installed; a fresh controller restores the platform's. */
+    @AfterEach void resetInterfaceFont() throws Exception { SwingUtilities.invokeAndWait(ThemeController::new); }
     @org.junit.jupiter.api.io.TempDir Path temporary;
     @Test void allShippedThemesAndCustomKeepControlsAndInputAcrossBothRoutesAndFontSizes() throws Exception {
         var source = temporary.resolve("completion.theme.json");

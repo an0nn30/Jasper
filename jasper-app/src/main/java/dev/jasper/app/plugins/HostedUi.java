@@ -307,8 +307,7 @@ final class HostedUi {
     dev.jasper.ui.theme.ThemePair kitThemes() {
         var source = appearanceSnapshot;
         if (source != null) return source.pair();
-        var theme = dev.jasper.app.appearance.ThemeManager.generated(variant.get() == Variant.DARK
-            ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+        var theme = dev.jasper.ui.theme.SlateSteel.bundled().generated(variant.get() == Variant.DARK);
         return new dev.jasper.ui.theme.ThemePair(theme, theme);
     }
 

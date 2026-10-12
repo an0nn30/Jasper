@@ -102,25 +102,25 @@ class GraphiteChromeTest {
                 .map(child -> ((javax.swing.JButton) child).getToolTipText())).doesNotContain("Settings");
         }
     }
-    @Test void terminalBottomCornersRoundOutsideTheCellGridAndFollowTerminalColors() throws Exception {
+    @Test void terminalBottomCornersRoundOutsideTheCellGridAndOnlyTheGridFollowsTheScheme() throws Exception {
         for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
             try (var owner = content(launcher(new ArrayDeque<>()))) {
                 owner.selectTheme(theme);
                 showRail(owner);
                 var root = new javax.swing.JRootPane();
                 try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
-                    for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
-                        owner.selectTerminalColors(colors);
+                    for (var scheme : dev.jasper.app.config.TerminalSchemeChoice.values()) {
+                        owner.selectTerminalScheme(scheme);
                         root.setSize(1000, 640); layoutTree(root); layoutTree(root);
                         var grid = owner.tabStrip();
                         var bottom = javax.swing.SwingUtilities.convertPoint(grid, 0, grid.getHeight(), root);
                         var image = new java.awt.image.BufferedImage(1000, 640, 2);
                         var g = image.createGraphics(); root.printAll(g); g.dispose();
                         int chrome = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP).getRGB();
-                        int terminal = owner.theme().palette().background().getRGB();
+                        int terminal = owner.theme().palette().background().getRGB(), surface = owner.theme().surface().getRGB();
                         assertThat(image.getRGB(bottom.x, bottom.y + 7)).as("lower left curve exposes chrome").isEqualTo(chrome);
                         assertThat(image.getRGB(bottom.x + grid.getWidth() - 1, bottom.y + 7)).as("lower right curve exposes chrome").isEqualTo(chrome);
-                        assertThat(image.getRGB(bottom.x + grid.getWidth() / 2, bottom.y + 4)).as("inset continues terminal palette").isEqualTo(terminal);
+                        assertThat(image.getRGB(bottom.x + grid.getWidth() / 2, bottom.y + 4)).as("the inset stays on the UI surface").isEqualTo(surface);
                         assertThat(image.getRGB(bottom.x, bottom.y - 1)).as("last grid row stays rectangular").isEqualTo(terminal);
                         assertThat(image.getRGB(bottom.x + grid.getWidth() - 1, bottom.y - 1)).isEqualTo(terminal);
                     }

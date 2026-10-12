@@ -31,21 +31,6 @@ class ApplicationBootstrapTest {
         });
     }
 
-    @Test void upgradesSelectionsBeforeInitialServiceStateAndCarriesProblems() throws Exception {
-        Path config = directory.resolve("config.toml");
-        Files.writeString(config, "ui.theme.variant='light'\n");
-        Files.createDirectories(directory.resolve("themes"));
-        Path bad = Files.writeString(directory.resolve("themes/bad.jar"), "broken");
-        int result = ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err, startup -> {
-            try {
-                assertThat(startup.service().initialState().snapshot().theme()).isEqualTo("Jasper Light");
-                assertThat(startup.service().initialState().legacyKeys()).isEmpty();
-                assertThat(startup.themeProblems()).anyMatch(p -> p.file().equals(bad));
-                assertThat(directory.resolve("themes/legacy/.migrated")).exists();
-            } finally { startup.service().close(); }
-        });
-        assertThat(result).isZero();
-    }
     @Test void anUpdateIsTheJarChangingOrVanishingOnDisk() throws Exception {
         Path jar = Files.writeString(directory.resolve("jasper-app.jar"), "build 1");
         long started = HandoffSocket.lastModified(jar);

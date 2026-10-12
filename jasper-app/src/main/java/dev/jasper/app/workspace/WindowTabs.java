@@ -89,7 +89,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             sample(now);
         }
         selected = owner.selectedComponent();
-        setBackground(owner.theme().palette().background());
+        setBackground(owner.theme().surface());
         setVisible(order.size() > 1);
         for (Component tab : order) entries.get(tab).refresh();
         doLayout(); syncTimer(); revalidate(); repaint();
@@ -306,7 +306,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             select.setToolTipText(shortcut.isEmpty() ? tip : tip + " (" + shortcut + ")");
             boolean running = tab instanceof TerminalTab terminal && terminal.focusedPane() != null && terminal.focusedPane().running();
             select.getAccessibleContext().setAccessibleDescription(running ? "Session running" : null);
-            Color surface = surface(tab == selected), ink = owner.theme().palette().foreground();
+            Color surface = surface(tab == selected), ink = ThemeZone.color(this, SemanticColor.TEXT_PRIMARY);
             close.setIcon(AppIcons.forSurface(AppIcons.named("CLOSE"), surface, ink));
             close.setRolloverIcon(AppIcons.forSurface(AppIcons.named("CLOSE_HOVERED"), surface, ink));
             select.setSelected(tab == selected); select.setFont(ThemeZone.font(Typography.Role.BODY));

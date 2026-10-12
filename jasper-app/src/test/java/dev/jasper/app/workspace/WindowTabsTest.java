@@ -123,17 +123,17 @@ class WindowTabsTest {
             owner.currentTab().rename("other"); owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
             for (Theme chrome : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                 owner.selectTheme(chrome);
-                for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
-                    owner.selectTerminalColors(colors);
+                for (var scheme : dev.jasper.app.config.TerminalSchemeChoice.values()) {
+                    owner.selectTerminalScheme(scheme);
                     var strip = owner.windowTabs(); layout(strip, 800, 38);
-                    assertThat(strip.getBackground()).as("%s UI, %s terminal", chrome, colors).isEqualTo(owner.theme().palette().background());
+                    assertThat(strip.getBackground()).as("%s UI, %s terminal", chrome, scheme).isEqualTo(owner.theme().surface());
                     for (boolean active : new boolean[]{true, false}) {
                         owner.setActive(active);
                         Color text = named(strip, "select:other").getForeground();
                         if (!owner.theme().matching())
                             assertThat(text).as("inactive title uses workspace TEXT_MUTED, active %s", active)
                                 .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.ui.theme.Token.TEXT_MUTED));
-                        assertThat(contrast(text, pixel(strip, 10, 4))).as("%s UI, %s terminal, active %s", chrome, colors, active)
+                        assertThat(contrast(text, pixel(strip, 10, 4))).as("%s UI, %s terminal, active %s", chrome, scheme, active)
                             .isGreaterThanOrEqualTo(3);
                     }
                 }

@@ -230,7 +230,7 @@ class WorkspaceThemeTest {
             var pane = owner[0].currentPane(); var message = (JLabel) pane.getComponent(0);
             assertThat(message.getText()).contains("Could not start terminal");
             assertThat(message.getForeground()).isEqualTo(owner[0].theme().palette().foreground());
-            owner[0].selectTerminalColors(TerminalColors.MATCH);
+            owner[0].selectTerminalScheme(dev.jasper.app.config.TerminalSchemeChoice.MATCH);
             assertThat(message.getForeground()).isEqualTo(owner[0].theme().palette().foreground());
         });
     }

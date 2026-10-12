@@ -5,7 +5,6 @@ import dev.jasper.app.commands.Command;
 import dev.jasper.app.commands.CommandRegistry;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.lifecycle.Subscription;
-import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.ToolbarMode;
 
 import java.awt.event.ActionEvent;
@@ -62,12 +61,17 @@ final class WindowCommands implements AutoCloseable {
         add(registry, "view.rail", "Rail", "Hide Rail", () -> owner.setRailVisible(!owner.railVisible()), List.of("panels", "sidebar"));
         add(registry, "view.buddy", "Show Jasper", "Hide Jasper", () -> { owner.onToggleBuddy.run(); owner.updateActions(); },
             List.of("jasper", "mascot", "turtle", "desk buddy"));
-        for (var colors : TerminalColors.builtIns()) {
-            String label = colors.equals(TerminalColors.MATCH) ? "Match UI" : colors.equals(TerminalColors.LIGHT) ? "Light" : "Dark";
-            add(registry, "view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT), "Terminal: " + label,
-                "Terminal Colors: " + label, () -> owner.selectTerminalColors(colors), List.of("terminal", "colors", "palette"));
+        for (var scheme : dev.jasper.app.config.TerminalSchemeChoice.values()) {
+            String label = switch (scheme) {
+                case MATCH -> "Same as UI theme";
+                case SLATE_STEEL_DARK -> "Slate Steel Dark";
+                case SLATE_STEEL_LIGHT -> "Slate Steel Light";
+                case HIGH_CONTRAST -> "High Contrast";
+            };
+            add(registry, "view.terminal_scheme." + scheme.name().toLowerCase(java.util.Locale.ROOT), "Terminal: " + label,
+                "Terminal Scheme: " + label, () -> owner.selectTerminalScheme(scheme), List.of("terminal", "scheme", "colors", "palette"));
         }
-        add(registry, "view.themes", "Themes…", "Themes…", owner::openThemesSettings, List.of("theme", "workspace", "colors", "palette"));
+        add(registry, "view.themes", "Themes…", "Themes…", owner::openThemesSettings, List.of("theme", "appearance", "dark", "light", "terminal scheme"));
         add(registry, "view.window_settings", "Window Settings\u2026", "Window Settings\u2026", owner::openWindowSettings,
             List.of("tab height", "rail width", "toolbar height", "status bar height", "size"));
     }
@@ -112,9 +116,9 @@ final class WindowCommands implements AutoCloseable {
             var action = view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT));
             action.putValue(Action.SELECTED_KEY, owner.toolbarMode() == mode);
         }
-        for (var colors : TerminalColors.builtIns()) {
-            var action = view("view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT));
-            action.putValue(Action.SELECTED_KEY, owner.terminalColorsSelected(colors));
+        for (var scheme : dev.jasper.app.config.TerminalSchemeChoice.values()) {
+            var action = view("view.terminal_scheme." + scheme.name().toLowerCase(java.util.Locale.ROOT));
+            action.putValue(Action.SELECTED_KEY, owner.terminalSchemeSelected(scheme));
             action.setEnabled(true);
         }
         view("view.themes").setEnabled(owner.settingsConnected());
