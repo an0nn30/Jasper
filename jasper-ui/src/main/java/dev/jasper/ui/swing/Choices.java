@@ -70,7 +70,10 @@ final class Choices {
             label.setLabelFor(input); refresh();
         }
         private JComponent optionLabel(Option option, boolean selected, boolean popup) {
-            if(option!=null&&(!option.icon().isBlank()||!option.description().isBlank()))return new RichOptions(context(),option,selected,popup,option.id().equals(((Nodes.Choice)node).selectedId()),input.getWidth()-(input instanceof ChoiceCombo combo?popup?2*combo.popupPadding():combo.arrowWidth():ThemePainting.metric(context(),DesignMetrics.Role.CHOICE_ARROW_WIDTH)),settings);
+            // A list may measure its rows before the combo is laid out; a Settings dropdown's fixed width stands in until
+            // then, so its menu rows never outgrow the menu's padded width.
+            int base=input.getWidth()>0?input.getWidth():input instanceof ChoiceCombo fixed?fixed.settingsWidth:0;
+            if(option!=null&&(!option.icon().isBlank()||!option.description().isBlank()))return new RichOptions(context(),option,selected,popup,option.id().equals(((Nodes.Choice)node).selectedId()),base-(input instanceof ChoiceCombo combo?popup?2*combo.popupPadding():combo.arrowWidth():ThemePainting.metric(context(),DesignMetrics.Role.CHOICE_ARROW_WIDTH)),settings);
             var label = Choices.optionLabel(context(), option == null ? "Choose…" : option.label(), option == null ? Optional.empty() : option.hue(), selected,
                 option == null ? SemanticColor.TEXT_TERTIARY : null);
             // A Settings dropdown shows its value at label size, as its row title.
@@ -274,6 +277,9 @@ final class Choices {
             list.setSelectionForeground(ThemePainting.color(context, SemanticColor.TEXT_ONACCENT));
             boolean rich=false;for(int i=0;i<getItemCount();i++){var option=getItemAt(i);if(!option.icon().isBlank()||!option.description().isBlank()){rich=true;break;}}
             list.setFixedCellHeight(rich?-1:ThemePainting.height(context, DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.BODY));
+            // A Settings dropdown is a fixed width, so its rich rows are exactly the menu's padded width: the list never
+            // keeps a row width it measured before the dropdown was laid out.
+            list.setFixedCellWidth(rich && settingsWidth > 0 ? Math.max(1, settingsWidth - 2 * pad) : -1);
             list.setFont(ThemePainting.font(context, Typography.Role.BODY));
             popup.revalidate(); popup.repaint(); list.repaint();
         }
