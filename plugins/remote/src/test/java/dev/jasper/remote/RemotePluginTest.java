@@ -315,6 +315,9 @@ class RemotePluginTest {
             assertThat(host.openRequests()).hasSize(2);
             host.closeTerminalPane(pane);
             host.flush();
+            // The closed session's channel ends on its own thread; the count follows once that close is reported.
+            long counted = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+            while (!host.status().getFirst().contains("1 SSH session") && System.nanoTime() < counted) { Thread.sleep(10); host.flush(); }
             assertThat(host.status().getFirst()).contains("1 SSH session");
             host.typeIntoSession(second, "q");
             long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(3);
