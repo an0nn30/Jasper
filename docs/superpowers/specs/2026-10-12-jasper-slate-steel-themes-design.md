@@ -1,6 +1,6 @@
 # Jasper Slate Steel themes
 
-Status: **Design approved in conversation on 2026-10-12; written spec awaiting the user's review.**
+Status: **Approved for implementation planning on 2026-10-12.** The user approved the written spec ("lgtm").
 Branch: `claude/slate-steel`, from `codex/theme-engine` at `241d6e22`.
 
 This amends the [theme engine specification](2026-10-04-jasper-theme-engine-design.md) and supersedes the
