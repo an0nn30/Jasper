@@ -42,81 +42,6 @@ class ConfigLoaderTest {
         }
     }
 
-    @Test void themeNameDefaultsToJasperDarkAndAcceptsBuiltInNames() {
-        var path = Path.of("config.toml");
-        assertThat(ConfigLoader.parse(path, "", true).snapshot().theme()).isEqualTo("Jasper Dark");
-        assertThat(ConfigLoader.parse(path, "[ui.theme]\nname = 'Jasper Light'\n", true).snapshot().theme())
-            .isEqualTo("Jasper Light");
-        assertThat(ConfigLoader.parse(path, "ui.theme.name = 'Jasper Dark'\n", true).snapshot().theme())
-            .isEqualTo("Jasper Dark");
-    }
-
-    @Test void themeNameIsAStrippedStringOfAnyValue() {
-        assertThat(parse("").snapshot().theme()).isEqualTo(ConfigSnapshot.DEFAULT_THEME).isEqualTo("Jasper Dark");
-        assertThat(parse("[ui.theme]\nname = '  Dracula '\n").snapshot().theme()).isEqualTo("Dracula");
-        assertThat(parse("[ui.theme]\nname = ''\n").diagnostics()).as("resolution reports an empty name").isEmpty();
-        var wrongType = parse("ui.theme.name = 7\n");
-        assertThat(wrongType.rejected()).isTrue();
-        assertThat(wrongType.diagnostics()).singleElement().satisfies(problem -> assertThat(problem.key()).isEqualTo("ui.theme.name"));
-    }
-
-    @Test void oldVariantLightChoosesJaspersLightTheme() {
-        var result = parse("[ui.theme]\nvariant = 'light'\n");
-        assertThat(result.rejected()).isFalse();
-        assertThat(result.snapshot().theme()).isEqualTo("Jasper Light");
-        assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
-            assertThat(problem.key()).isEqualTo("ui.theme.variant");
-            assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
-        });
-    }
-
-    @Test void unsupportedOldVariantWarnsAndDefaultsWithoutChangingCanonicalNames() {
-        var old = parse("ui.theme.variant = 'neon'\nwindow.tab_height = 42\n");
-        assertThat(old.rejected()).isFalse();
-        assertThat(old.snapshot().theme()).isEqualTo(ConfigSnapshot.DEFAULT_THEME);
-        assertThat(old.snapshot().tabHeight()).isEqualTo(42);
-        assertThat(old.diagnostics()).extracting(ConfigDiagnostic::key).contains("ui.theme.variant");
-        assertThat(parse("ui.theme.name = 'Light'\n").snapshot().theme()).isEqualTo("Light");
-    }
-
-    @Test void workspaceCanonicalKeyWinsOverLegacyInEitherOrder() {
-        for (String text : java.util.List.of(
-                "terminal.colors = 'dark'\nui.theme.workspace = 'Jasper Light'\n",
-                "ui.theme.workspace = 'Jasper Light'\nterminal.colors = 'dark'\n")) {
-            var parsed = parse(text);
-            assertThat(parsed.rejected()).isFalse();
-            assertThat(parsed.snapshot().workspaceTheme().name()).isEqualTo("Jasper Light");
-        }
-    }
-
-    @Test void legacyWorkspaceAliasesNormalizeLightAndDark() {
-        for (String alias : java.util.List.of("terminal.colors", "ui.theme.terminal")) {
-            assertThat(parse(alias + " = 'light'\n").snapshot().workspaceTheme().name()).isEqualTo("Jasper Light");
-            assertThat(parse(alias + " = 'dark'\n").snapshot().workspaceTheme().name()).isEqualTo("Jasper Dark");
-        }
-        assertThat(parse("ui.theme.workspace = 'Light'\n").snapshot().workspaceTheme().name()).isEqualTo("Light");
-        assertThat(parse("ui.theme.workspace = 'jasper light'\n").snapshot().terminalColors()).isEqualTo(TerminalColors.LIGHT);
-    }
-
-    @Test void workspaceChoiceReservesOnlyMatch() {
-        assertThat(WorkspaceThemeChoice.parse(" Light ").name()).isEqualTo("Light");
-        assertThat(WorkspaceThemeChoice.parse("Dark").name()).isEqualTo("Dark");
-        assertThat(WorkspaceThemeChoice.parse(" match ").matchesChrome()).isTrue();
-        assertThat(WorkspaceThemeChoice.parse("Tokyo Night").name()).isEqualTo("Tokyo Night");
-    }
-
-    @Test void invalidWorkspaceValueDefaultsWhileOtherSettingsSurvive() {
-        var blank = parse("ui.theme.workspace = '  '\nwindow.tab_height = 40\n");
-        assertThat(blank.rejected()).isFalse();
-        assertThat(blank.snapshot().workspaceTheme()).isEqualTo(WorkspaceThemeChoice.MATCH);
-        assertThat(blank.snapshot().tabHeight()).isEqualTo(40);
-        assertThat(blank.diagnostics()).extracting(ConfigDiagnostic::key).contains("ui.theme.workspace");
-        var wrongType = parse("ui.theme.workspace = 9\nwindow.tab_height = 40\n");
-        assertThat(wrongType.rejected()).isTrue();
-        assertThat(wrongType.snapshot().workspaceTheme()).isEqualTo(WorkspaceThemeChoice.MATCH);
-        assertThat(wrongType.snapshot().tabHeight()).isEqualTo(40);
-    }
-
     @Test void emptyFileSuppliesUsableDefaultsOnBothPlatforms() {
         for (boolean mac : new boolean[]{true, false}) {
             var result = ConfigLoader.parse(FILE, "# empty", mac);
@@ -137,8 +62,8 @@ class ConfigLoaderTest {
             status_bar = false
             [terminal.font]
             size = 18
-            [ui.theme]
-            name = "Jasper Light"
+            [ui]
+            appearance = "light"
             [keybindings]
             "copy" = "cmd+v"
             paste = "cmd+c"
@@ -153,7 +78,7 @@ class ConfigLoaderTest {
         assertThat(state.toolbar()).isEqualTo(ToolbarMode.ICONS);
         assertThat(state.statusBar()).isFalse();
         assertThat(state.fontSize()).isEqualTo(18f);
-        assertThat(state.theme()).isEqualTo("Jasper Light");
+        assertThat(state.appearance()).isEqualTo(AppearanceMode.LIGHT);
         assertThat(state.bindings(true).actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.META_DOWN_MASK)))
             .contains(ActionId.COPY);
         assertThat(state.bindings(true).strokeFor(ActionId.NEW_TAB)).isEmpty();
@@ -253,7 +178,7 @@ class ConfigLoaderTest {
 
     @Test void wrongScalarTypesRejectWholeCandidate() {
         for (String assignment : new String[]{"window.tab_height=38.0", "window.toolbar=true", "window.status_bar=1",
-                "terminal.font.size='secret-value'", "ui.theme.name=1", "keybindings.copy=7", "terminal.font.size=[16]",
+                "terminal.font.size='secret-value'", "ui.appearance=1", "keybindings.copy=7", "terminal.font.size=[16]",
                 "window.tab_height={x=38}"}) {
             var result = parse(assignment);
             assertThat(result.rejected()).as(assignment).isTrue();
@@ -347,7 +272,9 @@ class ConfigLoaderTest {
     @Test void snapshotAndResultDefensivelyCopyCollections() {
         var bindings = new HashMap<String,String>();
         bindings.put("copy", "none");
-        var snapshot = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(20f), Theme.JASPER_LIGHT.name(), bindings, 150, 45, TerminalConfig.defaults());
+        var snapshot = ConfigSnapshot.builder().tabHeight(40).toolbar(ToolbarMode.HIDDEN).statusBar(false)
+            .font(FontConfig.defaults().withSize(20f)).keybindings(bindings).columns(150).lines(45)
+            .terminal(TerminalConfig.defaults()).build();
         bindings.put("copy", "cmd+c");
         assertThat(snapshot.bindings(true).strokeFor(ActionId.COPY)).isEmpty();
         assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> snapshot.keybindings().put("paste", "none"));
@@ -360,13 +287,20 @@ class ConfigLoaderTest {
 
     @Test void directSnapshotsRejectInvalidScalarFieldsAndBindings() {
         for (int height : new int[]{0, 19, 73}) assertThatIllegalArgumentException().isThrownBy(() ->
-            new ConfigSnapshot(height, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), Theme.DARK.name(), Map.of(), 150, 45, TerminalConfig.defaults()));
+            ConfigSnapshot.builder().tabHeight(height).toolbar(ToolbarMode.ICONS).statusBar(true)
+                .font(FontConfig.defaults().withSize(16f)).keybindings(Map.of()).columns(150).lines(45)
+                .terminal(TerminalConfig.defaults()).build());
         for (float size : new float[]{0, 5.9f, 72.1f, Float.NaN, Float.POSITIVE_INFINITY}) assertThatIllegalArgumentException().isThrownBy(() ->
-            new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(size), Theme.DARK.name(), Map.of(), 150, 45, TerminalConfig.defaults()));
-        assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, null, true, FontConfig.defaults().withSize(16f), Theme.DARK.name(), Map.of(), 150, 45, TerminalConfig.defaults()));
-        assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), (String) null, Map.of(), 150, 45, TerminalConfig.defaults()));
+            ConfigSnapshot.builder().tabHeight(38).toolbar(ToolbarMode.ICONS).statusBar(true)
+                .font(FontConfig.defaults().withSize(size)).keybindings(Map.of()).columns(150).lines(45)
+                .terminal(TerminalConfig.defaults()).build());
+        assertThatNullPointerException().isThrownBy(() -> ConfigSnapshot.builder().tabHeight(38).toolbar(null).statusBar(true)
+            .font(FontConfig.defaults().withSize(16f)).keybindings(Map.of()).columns(150).lines(45)
+            .terminal(TerminalConfig.defaults()).build());
         for (Map<String,String> bindings : java.util.List.of(Map.of("unknown", "none"), Map.of("copy", "cmd+secret"))) {
-            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), Theme.DARK.name(), bindings, 150, 45, TerminalConfig.defaults()));
+            assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.builder().tabHeight(38)
+                .toolbar(ToolbarMode.ICONS).statusBar(true).font(FontConfig.defaults().withSize(16f)).keybindings(bindings)
+                .columns(150).lines(45).terminal(TerminalConfig.defaults()).build());
         }
     }
 
@@ -486,38 +420,15 @@ class ConfigLoaderTest {
                 assertThat(d.message()).contains("plugins/dev.example.tool/dev.example.tool.toml");
             });
         }
-    @Test void terminalColorsDefaultToMatchAndAcceptEveryChoice() {
-        assertThat(parse("").snapshot().terminalColors()).isEqualTo(TerminalColors.MATCH);
-        for (var choice : TerminalColors.builtIns())
-            assertThat(parse("[terminal]\ncolors = '" + choice.name().toLowerCase(java.util.Locale.ROOT) + "'\n")
-                .snapshot().terminalColors()).isEqualTo(choice);
-        var mixed = parse("terminal.colors = 'dark'\nui.theme.name = 'Jasper Light'\n").snapshot();
-        assertThat(mixed.theme()).isEqualTo("Jasper Light");
-        assertThat(mixed.terminalColors()).isEqualTo(TerminalColors.DARK);
-    }
-
-    @Test void invalidTerminalColorsUseTheExistingPerFieldDiagnosticPolicy() {
-        for (String value : java.util.List.of("'   '", "7", "true")) {
-            var result = parse("[terminal]\ncolors=" + value + "\n[ui.theme]\nname='Jasper Light'\n");
-            assertThat(result.rejected()).isEqualTo(!value.startsWith("'"));
-            assertThat(result.snapshot().terminalColors()).isEqualTo(TerminalColors.MATCH);
-            assertThat(result.snapshot().theme()).isEqualTo("Jasper Light");
-            assertThat(result.diagnostics()).filteredOn(problem -> problem.severity() == ConfigDiagnostic.Severity.ERROR)
-                .singleElement().satisfies(problem -> {
-                assertThat(problem.key()).isEqualTo("terminal.colors");
-                assertThat(problem.line()).isEqualTo(2);
-                assertThat(problem.message()).doesNotContain("   ");
-            });
-        }
-    }
-
-    @Test void aLeftoverStyleLineIsAnOrdinaryUnknownSettingAndChangesNothing() {
-        var result = parse("[ui.theme]\nstyle = 'retro'\nname = 'Jasper Light'\n");
+    /** Review Focus 2: an older install's theme keys start Slate Steel and are reported, never applied or migrated. */
+    @Test void theRemovedThemeKeysAreUnknownSettings() {
+        var result = parse("[ui.theme]\nname = \"Nord\"\nfollow_system = true\nworkspace = \"Nord\"\n[terminal]\ncolors = \"light\"\n");
         assertThat(result.rejected()).isFalse();
-        assertThat(result.snapshot().theme()).isEqualTo("Jasper Light");
-        assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
-            assertThat(problem.key()).isEqualTo("ui.theme.style");
-            assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
+        assertThat(result.snapshot()).isEqualTo(ConfigSnapshot.defaults());
+        assertThat(result.diagnostics()).extracting(ConfigDiagnostic::key).containsExactlyInAnyOrder("ui.theme", "terminal.colors");
+        assertThat(result.diagnostics()).allSatisfy(d -> {
+            assertThat(d.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
+            assertThat(d.message()).isEqualTo("Unknown setting or table; ignored.");
         });
     }
 

@@ -17,10 +17,12 @@ class ConfigSnapshotBuilderTest {
         .isInstanceOf(IllegalArgumentException.class);
 }
 
-    @Test void terminalColorsRoundTripThroughTheBuilderAndDefaultToMatch() {
-        assertThat(ConfigSnapshot.defaults().terminalColors()).isEqualTo(TerminalColors.MATCH);
-        var dark = ConfigSnapshot.builder().terminalColors(TerminalColors.DARK).build();
-        assertThat(dark.terminalColors()).isEqualTo(TerminalColors.DARK);
-        assertThat(dark.toBuilder().tabHeight(40).build().terminalColors()).isEqualTo(TerminalColors.DARK);
+    @Test void appearanceAndSchemeRoundTripThroughTheBuilderAndDefaultToSystemAndMatch() {
+        assertThat(ConfigSnapshot.defaults().appearance()).isEqualTo(AppearanceMode.SYSTEM);
+        assertThat(ConfigSnapshot.defaults().terminalScheme()).isEqualTo(TerminalSchemeChoice.MATCH);
+        var chosen = ConfigSnapshot.builder().appearance(AppearanceMode.LIGHT).terminalScheme(TerminalSchemeChoice.HIGH_CONTRAST).build();
+        var copied = chosen.toBuilder().tabHeight(40).build();
+        assertThat(copied.appearance()).isEqualTo(AppearanceMode.LIGHT);
+        assertThat(copied.terminalScheme()).isEqualTo(TerminalSchemeChoice.HIGH_CONTRAST);
     }
 }

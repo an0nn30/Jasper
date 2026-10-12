@@ -79,10 +79,6 @@ public final class CorePages {
                 .row(UI_APPEARANCE, Editors.appearance(appearance))
                 .row(TERMINAL_SCHEME, Editors.choice(Map.of("match", Editors.SAME_AS_UI_THEME, "slate-steel-dark", "Slate Steel Dark",
                     "slate-steel-light", "Slate Steel Light", "high-contrast", "High Contrast"))).note("Colors for terminal panes")
-                .row(UI_THEME_NAME).shownWhen(false)
-                .row(UI_THEME_WORKSPACE).shownWhen(false)
-                .row(UI_THEME_SOURCE).shownWhen(false)
-                .row(UI_THEME_FOLLOW_SYSTEM).shownWhen(false)
                 .section("Workspace")
                 .row(UI_WORKSPACE_OPACITY, WorkspaceEditors.opacity(appearance)).shownWhen(glass)
                 .row(UI_WORKSPACE_BLUR, WorkspaceEditors.blur(appearance)).shownWhen(glass)

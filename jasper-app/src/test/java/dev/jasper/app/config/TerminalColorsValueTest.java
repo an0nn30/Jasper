@@ -18,12 +18,4 @@ class TerminalColorsValueTest {
         assertThat(TerminalColors.normalize(" Nord ")).isEqualTo("Nord");
         assertThatThrownBy(() -> new TerminalColors("  ")).isInstanceOf(IllegalArgumentException.class);
     }
-
-    @Test void theSettingKeepsTheNameAndTheSnapshotParsesIt() {
-        var snapshot = ConfigLoader.parse(java.nio.file.Path.of("config.toml"), "[terminal]\ncolors = ' Gruvbox Dark '\n", true);
-        assertThat(snapshot.values().get(CoreSettings.TERMINAL_COLORS)).isEqualTo("Gruvbox Dark");
-        assertThat(snapshot.snapshot().terminalColors()).isEqualTo(new TerminalColors("Gruvbox Dark"));
-        assertThat(ConfigLoader.parse(java.nio.file.Path.of("config.toml"), "[terminal]\ncolors = 'DARK'\n", true)
-            .snapshot().terminalColors()).isEqualTo(TerminalColors.DARK);
-    }
 }

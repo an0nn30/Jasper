@@ -78,7 +78,7 @@ class CorePagesTest {
     @Test void theWorkspaceSectionFollowsTheThemeSectionOnlyOnMacOs() {
         assertThat(sectionTitles(appearance(true))).containsExactly("Theme", "Workspace", "Interface Font", "View mode", "Animations");
         assertThat(sectionTitles(appearance(false))).containsExactly("Theme", "Interface Font", "View mode", "Animations");
-        assertThat(appearance(true).settings()).containsSubsequence(CoreSettings.UI_THEME_NAME, CoreSettings.UI_THEME_WORKSPACE,
+        assertThat(appearance(true).settings()).containsSubsequence(CoreSettings.UI_APPEARANCE, CoreSettings.TERMINAL_SCHEME,
             CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR, CoreSettings.UI_FONT_FAMILY);
     }
 
@@ -104,7 +104,7 @@ class CorePagesTest {
         PageKit.kit(page,"ui.workspace.blur:reset",javax.swing.JButton.class).doClick(0);
         assertThat(context.draft().value(CoreSettings.UI_WORKSPACE_BLUR)).isEqualTo(dev.jasper.app.config.WorkspaceBlur.THEME);
         assertThat(PageKit.kit(page,"ui.workspace.blur",javax.swing.JButton.class).getAccessibleContext().getAccessibleName()).isEqualTo("Use theme's value");
-        assertThat(page.rows()).extracting(row->row.setting().name()).doesNotContain(CoreSettings.UI_THEME_SOURCE.name(),CoreSettings.UI_THEME_FOLLOW_SYSTEM.name());
+        assertThat(page.rows()).allSatisfy(row -> assertThat(row.setting().name()).doesNotStartWith("ui.theme."));
     }
 
     @Test void theTreeIsTheApprovedOne() {

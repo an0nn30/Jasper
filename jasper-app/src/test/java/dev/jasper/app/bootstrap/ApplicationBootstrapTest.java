@@ -76,15 +76,15 @@ class ApplicationBootstrapTest {
         } finally { if (received.get() != null) received.get().close(); }
     }
 
-    @Test void explicitConfigurationSuppliesTheSavedThemeName() throws Exception {
+    @Test void explicitConfigurationSuppliesTheSavedAppearance() throws Exception {
         Path config = directory.resolve("elsewhere/config.toml");
         Files.createDirectories(config.getParent());
-        Files.writeString(config, "ui.theme.name='IntelliJ Light'");
+        Files.writeString(config, "ui.appearance='light'");
         var received = new AtomicReference<ConfigService>();
         try {
             assertThat(ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err,
                 (service, options) -> received.set(service))).isZero();
-            assertThat(received.get().initialState().snapshot().theme()).isEqualTo("IntelliJ Light");
+            assertThat(received.get().initialState().snapshot().appearance()).isEqualTo(dev.jasper.app.config.AppearanceMode.LIGHT);
         } finally {
             if (received.get() != null) received.get().close();
         }

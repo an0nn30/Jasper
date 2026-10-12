@@ -80,9 +80,10 @@ class ShellIntegrationEndToEndTest {
             terminal.scrollback(), terminal.optionAsMeta(), terminal.cursorShape(), terminal.cursorBlink(),
             terminal.dimInactivePanes(), terminal.copyOnSelect(), terminal.bell(), terminal.onExit(),
             ShellIntegrationMode.AUTO);
-        return new ConfigSnapshot(defaults.tabHeight(), defaults.toolbar(), defaults.statusBar(), defaults.font(),
-            defaults.theme(), Map.of(), defaults.columns(), defaults.lines(), configured, defaults.buddyEnabled(),
-            defaults.visibleRows());
+        return ConfigSnapshot.builder().tabHeight(defaults.tabHeight()).toolbar(defaults.toolbar())
+            .statusBar(defaults.statusBar()).font(defaults.font()).keybindings(Map.of()).columns(defaults.columns())
+            .lines(defaults.lines()).terminal(configured).buddyEnabled(defaults.buddyEnabled())
+            .visibleRows(defaults.visibleRows()).build();
     }
 
     /** A deliberately bare environment, so the developer's own dotfiles cannot change the result. */

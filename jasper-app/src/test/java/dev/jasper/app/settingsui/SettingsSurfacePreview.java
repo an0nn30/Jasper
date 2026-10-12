@@ -25,8 +25,8 @@ import javax.swing.*;
 public final class SettingsSurfacePreview {
     private SettingsSurfacePreview() { }
     public static final String CONFIG="""
-        [ui.theme]
-        name = "Slate Steel"
+        [ui]
+        appearance = "dark"
         [ui.workspace]
         opacity = 90
         [window]

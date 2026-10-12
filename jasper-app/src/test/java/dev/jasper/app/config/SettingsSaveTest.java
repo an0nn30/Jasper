@@ -89,15 +89,15 @@ class SettingsSaveTest {
         }
     }
 
-    @Test void savingWorkspaceRemovesSupersededAliasAndKeepsOtherContent() throws Exception {
+    @Test void savingAMovedSettingRemovesItsSupersededAliasAndKeepsOtherContent() throws Exception {
         Path file = directory.resolve("config.toml");
-        Files.writeString(file, "# mine\nterminal.colors = 'dark' # old\nui.theme.workspace = 'Light'\nwindow.tab_height = 40\n");
+        Files.writeString(file, "# mine\nfont.family = 'Menlo' # old\nterminal.font.family = 'Monaco'\nwindow.tab_height = 40\n");
         try (var service = new ConfigService(file, true)) {
-            var state = save(service, SettingsEdit.of(CoreSettings.UI_THEME_WORKSPACE, "Tokyo Night", service.initialState().values()));
+            var state = save(service, SettingsEdit.of(CoreSettings.TERMINAL_FONT_FAMILY, "Iosevka", service.initialState().values()));
             String text = Files.readString(file);
-            assertThat(text).contains("# mine", "# old", "window.tab_height = 40", "ui.theme.workspace = \"Tokyo Night\"");
-            assertThat(text).doesNotContain("terminal.colors");
-            assertThat(state.snapshot().workspaceTheme().name()).isEqualTo("Tokyo Night");
+            assertThat(text).contains("# mine", "# old", "window.tab_height = 40", "terminal.font.family = \"Iosevka\"");
+            assertThat(text).doesNotContain("Menlo");
+            assertThat(state.snapshot().font().family()).isEqualTo("Iosevka");
         }
     }
 

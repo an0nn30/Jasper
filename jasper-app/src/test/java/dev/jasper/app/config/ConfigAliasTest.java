@@ -12,24 +12,21 @@ class ConfigAliasTest {
     private static ConfigLoader.Result parse(String text) { return ConfigLoader.parse(FILE, text, true); }
 
     @Test void versionOneKeysStillLoadWithMovedWarnings() {
-        var result = parse("[font]\nsize = 20\nfamily = 'Iosevka'\n[background]\nenabled = true\n[ui.theme]\nterminal = 'dark'\n");
+        var result = parse("[font]\nsize = 20\nfamily = 'Iosevka'\n[background]\nenabled = true\n");
         assertThat(result.rejected()).isFalse();
         assertThat(result.snapshot().fontSize()).isEqualTo(20f);
         assertThat(result.snapshot().font().family()).isEqualTo("Iosevka");
         assertThat(result.snapshot().backgroundEnabled()).isTrue();
-        assertThat(result.snapshot().terminalColors()).isEqualTo(TerminalColors.DARK);
         assertThat(result.diagnostics()).allSatisfy(d -> assertThat(d.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING))
             .extracting(ConfigDiagnostic::key, ConfigDiagnostic::line, ConfigDiagnostic::message)
             .containsExactly(
                 tuple("font.size", 2, "Moved to terminal.font.size. Use Migrate Config to update the file."),
                 tuple("font.family", 3, "Moved to terminal.font.family. Use Migrate Config to update the file."),
-                tuple("background.enabled", 5, "Moved to system.run_in_background. Use Migrate Config to update the file."),
-                tuple("ui.theme.terminal", 7, "Moved to ui.theme.workspace. Use Migrate Config to update the file."));
+                tuple("background.enabled", 5, "Moved to system.run_in_background. Use Migrate Config to update the file."));
         assertThat(result.legacyKeys()).containsExactly(
             new LegacyKey(List.of("font", "size"), List.of("terminal", "font", "size")),
             new LegacyKey(List.of("font", "family"), List.of("terminal", "font", "family")),
-            new LegacyKey(List.of("background", "enabled"), List.of("system", "run_in_background")),
-            new LegacyKey(List.of("ui", "theme", "terminal"), List.of("ui", "theme", "workspace")));
+            new LegacyKey(List.of("background", "enabled"), List.of("system", "run_in_background")));
         assertThat(result.values().source(CoreSettings.TERMINAL_FONT_SIZE)).hasValue(List.of("font", "size"));
     }
 

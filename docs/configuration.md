@@ -45,9 +45,9 @@ Keymap lists every shortcut, grouped as in the menus; shortcuts that differ from
 sections holding them, are blue. Click one, press the new keys and click Set; Apply or OK saves every change
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
-Appearance holds View mode (Normal or Compact, applied after restart), the Theme and Workspace scheme dropdowns,
-and the theme gear's Import theme…; Terminal › Font & Colors links there. The old stores are retired; see [Themes](themes.md) for the offline collection and automatic
-legacy upgrade.
+Appearance holds View mode (Normal or Compact, applied after restart), the Dark, Light and Match System tiles,
+the Theme row (Slate Steel) and the Terminal scheme dropdown; Terminal › Font & Colors links there. See
+[Themes](themes.md).
 
 Tools holds a page for each running plugin that has settings, built from what the plugin declares or by the plugin
 itself; Apply writes the plugin's own file, keeping its comments. A plugin that is installed but not running (it
@@ -102,6 +102,7 @@ copy_on_select = false
 bell = "visual"
 on_exit = "keep_open"
 shell_integration = "auto"
+scheme = "match"
 
 [terminal.font]
 family = "Cousine Nerd Font Mono"
@@ -122,15 +123,13 @@ blink = true
 [terminal.env]
 # MY_VARIABLE = "value"
 
+[ui]
+appearance = "system"
+
 [ui.font]
 family = "system"
 # Optional: 8-32 points. Omit to keep the platform default.
 # size = 14.0
-
-[ui.theme]
-# A built-in or installed theme's name; see Themes.
-name = "Jasper Dark"
-workspace = "match"
 
 [keybindings]
 # Optional action overrides; see examples below.
@@ -177,10 +176,6 @@ workspace = "match"
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately | Live |
 | `ui.appearance` | `"system"` | `"system"` (the operating system's light or dark), `"dark"`, `"light"` | Live |
-| `ui.theme.source` | `"catalog"` | Source of the remembered manual theme: `catalog` or `bundled`; Settings changes this together with the name | Live |
-| `ui.theme.follow_system` | `false` | Follow ongoing OS appearance using the actual bundled dark/light themes, while remembering the manual source | Live |
-| `ui.theme.name` | `"Jasper Dark"` | A built-in theme, or a theme file or plugin in the `themes` folder ([Themes](themes.md)) | Live |
-| `ui.theme.workspace` | `"match"` | `"match"`, a native theme name, or an Alacritty theme name ([Themes](themes.md)) | Live |
 | `ui.workspace.opacity` | Workspace theme's value (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
 | `ui.workspace.blur` | `"theme"` | `"theme"` (the workspace theme's value), `"on"`, `"off"`; macOS only, ignored elsewhere | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
@@ -340,9 +335,8 @@ Program titles and manual tab names do not replace this label. A remote OSC 7 re
 from a local shell can also supply remote context; Jasper does not infer SSH hosts by
 parsing command text.
 
-Tabs sit directly beneath the header. The selected tab has an inset rounded fill and
-thin outline from the active workspace scheme, with a muted blue selection in Jasper Dark.
-An independent workspace scheme also changes tab text and icon artwork. Narrow
+Tabs sit directly beneath the header. The selected tab's fill, outline, text and icons follow the
+UI appearance; the terminal scheme never changes them. Narrow
 windows scroll overflowing tabs, and keyboard selection reveals the selected tab. Tab height remains configurable (30 logical
 pixels by default, 20–72).
 
@@ -727,8 +721,6 @@ while leaving View → Command Palette available.
 | Earlier key | Current key |
 |---|---|
 | `[font]` `family`, `size`, `fallback`, `ligatures`, `line_height` | `[terminal.font]` with the same names |
-| `ui.theme.terminal` (version 1), `terminal.colors` (version 2) | `ui.theme.workspace` |
-| `ui.theme.variant` (`light` or `dark`) | `ui.theme.name` (`Jasper Light` or `Jasper Dark`) |
 | `background.enabled` (version 1) | `system.run_in_background` |
 
 Each old key is read as its new one, with a warning: *Moved to terminal.font.size. Use Migrate Config to
@@ -758,74 +750,21 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 ## Theme
 
-`ui.theme.name` names the UI theme:
-- `"Jasper Dark"` (the default) or `"Jasper Light"`;
-- `"Nord"`, `"Clear Dark"` or `"Clear Light"`;
-- or a native Jasper TOML theme in the `themes` folder beside this file.
+Jasper's theme is Slate Steel, in Dark and Light.
 
-`ui.theme.follow_system = true` opts into the operating system's live appearance preference. On macOS,
-Jasper observes application appearance changes, including while Settings is open. Dark and Light use the actual
-bundled Jasper sources. The remembered `name` and `source` stay unchanged; an OS change never writes configuration
-or rebases an uncommitted Settings draft. If the platform observer is unavailable, Jasper reports that limitation
-and uses the remembered manual source until observation recovers.
+`ui.appearance` chooses the UI appearance: `"dark"` or `"light"` for Slate Steel Dark or Light, or `"system"`
+(the default) to follow the operating system's light or dark setting live. When the operating system's appearance is
+unavailable, `"system"` uses Dark. An operating-system change never writes `config.toml`.
 
-`ui.theme.source = "catalog"` is the default and preserves existing name lookup, including installed themes shadowing
-bundled names. `source = "bundled"` resolves only an actual bundled theme. A missing bundled name remains a missing
-source request, even when an installed theme has that name. To choose an installed/custom theme by editing the file,
-use `source = "catalog"` (or omit it) and `follow_system = false` together with `name`.
+`terminal.scheme` chooses the terminal panes' colours: `"match"` (the default) uses Slate Steel Dark with the Dark
+appearance and Slate Steel Light with the Light one; `"slate-steel-dark"`, `"slate-steel-light"` and
+`"high-contrast"` choose one. Only the terminal text area changes: tabs, the tab strip, the editor and panels stay on
+the UI appearance.
 
-Settings' Dark/Light tiles retain a resolving manual theme of that polarity; otherwise they select the corresponding
-actual bundled source. Selecting a named theme, including an imported entry, exits system mode. Import itself only installs files and reloads
-the catalog; it does not select a theme or change the remembered policy. Duplicate chooser names identify
-installed and bundled sources. The theme gear's Reset to defaults command resets all three coupled keys. There is no
-custom automatic light/dark pair.
-
-The name is matched ignoring case and surrounding spaces. [Themes](themes.md) covers writing and importing
-themes and how a theme colours the workspace. An unknown name is a warning that lists
-the available themes: at start-up Jasper uses Jasper Dark; on reload it uses the safe built-in
-for the last successfully applied chrome darkness. The requested name stays in the file for a later retry.
-A non-string value rejects the configuration.
-
-Terminal padding and the area behind panes match the workspace; toolbar, menus, sidebars,
-dialogs and the native title follow the UI theme. Find controls follow the workspace. Theme changes retain shells,
-scrollback, split
-ratios and font choices, and a failed installation keeps the previous theme and can be retried
-with Reload config.
-
-The former `[colors]` table (`appearance`, `theme`) and custom palette files are no longer
-supported: a `[colors]` table is reported as an unknown setting and ignored. See the
-[dark](design/mock-ui-dark.png) and [light](design/mock-ui-light.png) renders.
-
-## Workspace scheme
-
-`ui.theme.workspace` chooses the workspace scheme: the theme that colours the terminal workspace, independently of
-`ui.theme.name`. `"match"` follows the UI theme. A separate choice names a native theme, including converted Alacritty palettes;
-`"Jasper Light"` and `"Jasper Dark"` name the bundled themes. A native theme named `"Light"` is
-selected literally. The older `terminal.colors` and `ui.theme.terminal` keys still load; their
-`light` and `dark` values become `Jasper Light` and `Jasper Dark` when migrated. A canonical
-`ui.theme.workspace = "Light"` is not changed by that compatibility conversion.
-Canonical values always win over either alias, regardless of file order. Saving or migrating
-the setting removes the older paths. Legacy `dark` now selects native Jasper Dark, whose terminal
-background is `#191c20`.
-
-The workspace setting changes terminal panes, tabs, find controls, dividers, zone-aware icons
-and Editor syntax in all windows without restarting Editor or discarding edits. Even two themes
-with the same light/dark variant produce a workspace update. A missing workspace scheme warns and
-temporarily matches the chrome; its requested name stays saved for repair and reload.
-General hosted plugin pane controls also follow the workspace scheme.
-
-Settings › Appearance's **Workspace scheme** dropdown starts with **Same as UI theme**. Apply/OK saves choices;
-Cancel discards them. A confirmed Import theme… writes immediately and survives Cancel. The command palette’s
-Themes… command opens Settings at Appearance.
-Native file edits, deletions and repairs reload automatically on the existing one-second poll, including inherited
-parent changes. Filesystem work runs off the EDT. A blank workspace value warns and uses `"match"`; a non-string
-value rejects the configuration. [Themes](themes.md#settings-and-importing) details importing and fallback.
-
-### Alacritty themes
-
-Alacritty palettes are converted into native themes. Existing `terminal-themes/` files migrate once at startup;
-the old store is removed. Select converted palettes as the workspace scheme in Settings › Appearance. See
-[Themes](themes.md#converted-terminal-palettes). `themes.marketplace.enabled` is ignored for compatibility.
+Appearance and scheme changes keep shells, scrollback, split ratios and font choices. A failed installation keeps the
+current appearance, is reported as a warning on `ui.appearance`, and can be retried with Reload config. The former
+`[ui.theme]` table (`name`, `source`, `follow_system`, `workspace`), `terminal.colors` and the `[colors]` table are
+no longer read: each is reported as an unknown setting and ignored.
 
 ### Interface typography
 

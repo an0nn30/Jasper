@@ -100,12 +100,12 @@ class ThemeImportTest {
         });
     }
     @Test void importUsesFrozenPlanAndBusyGatesDoubleClickWithoutConfigWrite() throws Exception {
-        chosen=source("Example"); String config="ui.theme.name='Jasper Dark'\nui.theme.source='bundled'\nui.theme.follow_system=true\n";Files.writeString(home.resolve("config.toml"),config);
+        chosen=source("Example"); String config="ui.appearance='light'\nwindow.tab_height=40\n";Files.writeString(home.resolve("config.toml"),config);
         edt(()->draft.rebase(dev.jasper.app.config.ConfigLoader.parse(home.resolve("config.toml"),config,true).values()));
         edt(() -> { imports.importThemes(report::set); imports.importThemes(report::set); }); assertThat(worker.jobs).hasSize(1);
         next(); Files.delete(chosen); click("Import"); next();
         assertThat(report.get().imported()).extracting(ThemeImporter.Imported::name).containsExactly("Example");
-        assertThat(Files.readString(home.resolve("config.toml"))).isEqualTo(config);edt(()->{assertThat(draft.value(dev.jasper.app.config.CoreSettings.UI_THEME_FOLLOW_SYSTEM)).isTrue();assertThat(draft.value(dev.jasper.app.config.CoreSettings.UI_THEME_SOURCE)).isEqualTo(dev.jasper.app.config.ThemeSource.BUNDLED);assertThat(draft.modified()).isFalse();}); assertThat(refreshes).hasValue(1);
+        assertThat(Files.readString(home.resolve("config.toml"))).isEqualTo(config);edt(()->{assertThat(draft.value(dev.jasper.app.config.CoreSettings.UI_APPEARANCE)).isEqualTo(dev.jasper.app.config.AppearanceMode.LIGHT);assertThat(draft.modified()).isFalse();}); assertThat(refreshes).hasValue(1);
         edt(() -> assertThat(imports.busy()).isFalse());
     }
     @Test void importThemeReportsWhatItImportedOverSettings() throws Exception {

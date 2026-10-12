@@ -153,15 +153,6 @@ public final class CoreSettings {
         .label("Shell integration").keywords("integration", "prompt marks", "osc 133", "zsh", "bash", "fish").applies(Applies.NEW_PANES)
         .description("Shell integration: \"auto\" loads Jasper's zsh/bash/fish script after your own startup files (new panes only),\n"
             + "\"manual\" only exports JASPER_SHELL_INTEGRATION so you can source it yourself, \"off\" does neither.").build();
-    public static final Setting<String> UI_THEME_WORKSPACE = Setting.of("ui.theme.workspace",
-            SettingKind.string(text -> !text.isBlank(), "Use a workspace scheme name or match; using match.",
-                text -> WorkspaceThemeChoice.parse(text.isBlank() ? "match" : text).name()), "match")
-        .alias("terminal.colors").alias("ui.theme.terminal").label("Workspace scheme")
-        .keywords("palette", "colours", "color scheme", "scheme", "theme", "alacritty", "workspace")
-        .description("Colour scheme for terminal panes and their workspace controls. \"match\" follows the UI theme;\n"
-            + "otherwise name a native theme. Choose it in Settings > Appearance, whose theme gear imports theme files. Changes update the workspace live.").build();
-    /** Source compatibility for transitional pages; the schema registers this setting only once. */
-    @Deprecated public static final Setting<String> TERMINAL_COLORS = UI_THEME_WORKSPACE;
     public static final Setting<String> TERMINAL_FONT_FAMILY = Setting.of("terminal.font.family",
             SettingKind.string(CoreSettings::fontName, FONT_NAME), FontConfig.defaults().family())
         .alias("font.family").label("Font").keywords("font", "typeface", "family")
@@ -234,20 +225,6 @@ public final class CoreSettings {
     public static final Setting<Float> UI_FONT_SIZE = Setting.of("ui.font.size", SettingKind.number(8, 32), UiFontConfig.defaults().size())
         .example(14f).label("UI font size").keywords("font", "interface", "size", "points")
         .description("Omit size to retain platform sizing. Use 8-32 points, including fractions, when set.").build();
-    public static final Setting<String> UI_THEME_NAME = Setting.of("ui.theme.name",
-            SettingKind.string(text -> true, "", String::strip), ConfigSnapshot.DEFAULT_THEME)
-        .alias("ui.theme.variant").label("Theme").keywords("theme", "dark", "light", "appearance", "look")
-        .description("The UI theme by name: \"Jasper Dark\" (the default), \"Jasper Light\", \"Nord\",\n"
-            + "\"Clear Dark\", \"Clear Light\", or a native TOML theme in the themes folder beside this file. Choose it in Settings > Appearance, whose theme gear imports theme files. Switches live across windows.").build();
-    public static final Setting<Boolean> UI_THEME_FOLLOW_SYSTEM = Setting.of("ui.theme.follow_system", SettingKind.bool(), false)
-        .label("Match system appearance").keywords("theme", "dark", "light", "system")
-        .description("Follow the operating system's appearance using the actual bundled Jasper Dark and Jasper Light themes.\n"
-            + "Keeps name and source as the remembered manual choice. No custom theme pairs are inferred.").build();
-    public static final Setting<ThemeSource> UI_THEME_SOURCE = Setting.of("ui.theme.source", SettingKind.choice(List.of(
-            Map.entry("catalog", ThemeSource.CATALOG), Map.entry("bundled", ThemeSource.BUNDLED))), ThemeSource.CATALOG)
-        .label("Theme origin").keywords("theme", "bundled")
-        .description("catalog (default) resolves name with installed themes taking precedence; bundled uses only bundled authored sources.\n"
-            + "For an external custom-theme selection, remove source or use catalog and set follow_system=false.").build();
     public static final Setting<AppearanceMode> UI_APPEARANCE = Setting.of("ui.appearance", SettingKind.choice(List.of(
             Map.entry("system", AppearanceMode.SYSTEM), Map.entry("dark", AppearanceMode.DARK), Map.entry("light", AppearanceMode.LIGHT))),
             AppearanceMode.SYSTEM)
@@ -280,7 +257,7 @@ public final class CoreSettings {
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_SCHEME, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
-            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_APPEARANCE, UI_FONT_FAMILY, UI_FONT_SIZE, UI_THEME_NAME, UI_THEME_SOURCE, UI_THEME_FOLLOW_SYSTEM, UI_THEME_WORKSPACE,
+            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_APPEARANCE, UI_FONT_FAMILY, UI_FONT_SIZE,
             UI_WORKSPACE_OPACITY, UI_WORKSPACE_BLUR, UI_ANIMATIONS_ENABLED),
         Set.of(List.of("keybindings"), List.of("plugins"), List.of("palette", "scopes")),
         Map.ofEntries(
@@ -295,7 +272,6 @@ public final class CoreSettings {
             Map.entry(List.of("terminal", "cursor"), "The cursor a program sees until it chooses its own."),
             Map.entry(List.of("ui"), "The interface: its appearance, fonts, workspace glass and animations."),
             Map.entry(List.of("ui", "font"), "Interface typography, independent of the terminal font."),
-            Map.entry(List.of("ui", "theme"), "The UI theme and workspace scheme."),
             Map.entry(List.of("ui", "workspace"), "Translucent terminal and editor backgrounds on macOS; omitted values follow the workspace theme."),
             Map.entry(List.of("ui", "animations"), "App-wide animation policy. Changes apply live.")));
 }

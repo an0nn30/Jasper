@@ -135,16 +135,6 @@ family = "system"
 # Optional size: 8-32 points, including fractional values. Omit to keep platform sizing.
 # size = 14.0
 
-[ui.theme]
-# Live across open windows: "Jasper Dark", "Jasper Light", "Nord", "Clear Dark", "Clear Light", or a theme in the themes folder.
-name = "Jasper Dark"
-# catalog preserves installed-name precedence; bundled resolves only an actual bundled source.
-source = "catalog"
-# Opt in to live system appearance using the actual bundled dark/light pair; remembers name and source.
-follow_system = false
-# Workspace scheme, live: "match" follows the UI theme; or name a native theme.
-workspace = "match"
-
 [ui.workspace]
 # macOS only (ignored on other platforms), live: translucent terminal and editor backgrounds. Omit opacity to use the workspace theme's value.
 # Opacity: 10-100 percent.

@@ -51,7 +51,7 @@ class EditorsTest {
         assertThat(primary(Editors.byKind(CoreSettings.WINDOW_STATUS_BAR), CoreSettings.WINDOW_STATUS_BAR, context)).isInstanceOf(Nodes.Toggle.class);
         assertThat(primary(Editors.byKind(CoreSettings.WINDOW_TOOLBAR), CoreSettings.WINDOW_TOOLBAR, context))
             .isInstanceOfSatisfying(Nodes.Choice.class, choice -> assertThat(choice.kind()).isEqualTo(Nodes.ChoiceKind.DROPDOWN));
-        assertThat(primary(Editors.byKind(CoreSettings.UI_THEME_NAME), CoreSettings.UI_THEME_NAME, context))
+        assertThat(primary(Editors.byKind(CoreSettings.TERMINAL_SHELL_PROFILE), CoreSettings.TERMINAL_SHELL_PROFILE, context))
             .isInstanceOfSatisfying(Nodes.Field.class, field -> assertThat(field.kind()).isEqualTo(Nodes.FieldKind.TEXT));
         assertThat(primary(Editors.byKind(CoreSettings.PALETTE_VISIBLE_ROWS), CoreSettings.PALETTE_VISIBLE_ROWS, context))
             .isInstanceOfSatisfying(Nodes.Field.class, field -> assertThat(field.kind()).isEqualTo(Nodes.FieldKind.NUMBER));

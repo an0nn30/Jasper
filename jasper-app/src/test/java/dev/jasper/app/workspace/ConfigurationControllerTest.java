@@ -206,7 +206,9 @@ class ConfigurationControllerTest {
         edt(() -> {
             owner.close();
             assertThat(owner.action(ActionId.OPEN_SETTINGS).isEnabled()).isFalse();
-            var late = new ConfigService.State(new ConfigSnapshot(55, ToolbarMode.ICONS, false, FontConfig.defaults().withSize(22), Theme.DARK.name(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), file, true);
+            var late = new ConfigService.State(ConfigSnapshot.builder().tabHeight(55).toolbar(ToolbarMode.ICONS).statusBar(false)
+                .font(FontConfig.defaults().withSize(22)).keybindings(Map.of()).columns(150).lines(45)
+                .terminal(TerminalConfig.defaults()).build(), List.of(), file, true);
             controller.accept(late);
             assertThat(owner.tabHeight()).isEqualTo(48);
             assertThat(owner.status().configButton().isEnabled()).isFalse();
