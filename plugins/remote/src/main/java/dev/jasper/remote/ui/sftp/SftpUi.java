@@ -69,7 +69,8 @@ public final class SftpUi implements AutoCloseable {
     private UiView create(PanelHost host) {
         var panel=new SftpPanel(context.kit());var window=host.window();
         panel.onHeaderChanged(host::setHeader);
-        panel.onChooseSession(()-> { if(!closed && window.isOpen()) chooseHost(window); });
+        panel.onChooseSession(chosen-> { if(!closed && window.isOpen()) browse(window,chosen); });
+        panel.sessions(hosts.get());
         panel.transfers(transferStrip.apply(window));
         Function<ConnectionIdentity,CompletableFuture<FileEndpoint>> open=identity->endpoints.open(Optional.of(identity),window,status->{});
         var controller=new SftpController(context.dataDirectory().resolve("browser-cache"),background,ui,open,panel);
@@ -95,6 +96,8 @@ public final class SftpUi implements AutoCloseable {
         if(closed)return;var view=showView(window);if(view!=null)view.controller().open(pane.pane(),pane.identity(),pane.directory(),true);
     }
     public void toggle(WindowHandle window) { if(!closed) context.panels().toggle(PANEL,window); }
+    /** Saved hosts changed: every disconnected sidebar's Choose Session menu follows. */
+    public void hostsChanged() { if(closed) return;for(var view:views.values()) view.panel().sessions(hosts.get()); }
     /** Shows the window's SFTP sidebar without choosing a host. */
     public void reveal(WindowHandle window) { if(!closed) showView(window); }
     public void browse(WindowHandle window,RemoteHost host) {

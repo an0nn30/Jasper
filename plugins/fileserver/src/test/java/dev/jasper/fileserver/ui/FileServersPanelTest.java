@@ -88,7 +88,8 @@ class FileServersPanelTest {
         assertThat(list.detailsAction()).isEqualTo(FileServersPanel.KEY_DETAILS);
         assertThat(list.copyAction()).isEqualTo(FileServersPanel.KEY_COPY);
         assertThat(list.cancelAction()).isEqualTo(FileServersPanel.KEY_CANCEL);
-        assertThat(list.selectedIds()).containsExactly("server:" + docs.definition().id());
+        assertThat(list.selectedIds()).as("nothing shows as selected until the user selects a row").isEmpty();
+        assertThat(panel.selected()).as("the details and keys follow the first row meanwhile").contains(docs.definition().id());
         assertThat(list.items().getFirst().subtitle()).anyMatch(n -> n instanceof Nodes.Chip);
         assertThat(list.items().getFirst().trailing()).anyMatch(n -> n instanceof Nodes.Toggle t && t.compact());
         action(panel, FileServersPanel.KEY_COPY);
@@ -170,9 +171,8 @@ class FileServersPanelTest {
         assertThat(((Nodes.Text) node(panel, "fileserver.problem.text")).text()).isEqualTo("servers.toml: <html><i>broken</i>");
         assertThat(((Nodes.Text) node(panel, "fileserver.card.name")).text()).isEqualTo("<html><b>x</b>");
         var row = list.items().get(1);
-        var copy = (Nodes.Button) row.trailing().getFirst();
+        assertThat(row.trailing()).as("the row's one control is its switch; Copy Address is the menu's and the Copy key's").singleElement().isInstanceOf(Nodes.Toggle.class);
         var toggle = (Nodes.Toggle) row.trailing().getLast();
-        action(panel, copy.action());
         UiTestAccess.edt(() -> view(panel).emit(new UiEvent.Toggled(toggle.action(), true)));
         assertThat(events).containsExactly("toggle <html><b>x</b>");
         assertThat(panel.selected()).contains(docs.definition().id());

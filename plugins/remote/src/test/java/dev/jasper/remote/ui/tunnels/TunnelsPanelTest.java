@@ -168,25 +168,28 @@ class TunnelsPanelTest {
                 states.put(db.id(), values.get(i)); show();
                 assertThat(((Nodes.StatusDot) row(db).leading().orElseThrow()).kind()).as("dot for %s", values.get(i)).isEqualTo(dots.get(i));
                 var mapping = (Nodes.Text) row(db).subtitle().getFirst();
+                assertThat(row(db).subtitle()).as("the compact row's second line is the route alone").hasSize(1);
                 assertThat(mapping.role()).as("the mapping is small mono").isEqualTo(Nodes.TextRole.MONO_SMALL);
                 assertThat(mapping.text()).isEqualTo(":" + (values.get(i) instanceof TunnelState.Up ? "1234" : "5432") + " → db.internal:5432");
-                assertThat(((Nodes.Text) row(db).title().get(1)).role()).isEqualTo(Nodes.TextRole.DESCRIPTION);
+                assertThat(((Nodes.Text) row(db).title().getLast()).role()).as("the host or what needs attention").isEqualTo(Nodes.TextRole.DESCRIPTION);
             }
+            // What needs attention takes the host's place on the first line, where the panel's width leaves it room.
             states.put(db.id(), new TunnelState.Failed("broken")); show();
-            assertThat(row(db).subtitle()).satisfies(line -> {
+            assertThat(row(db).title()).satisfies(line -> {
                 assertThat(((Nodes.Icon) line.get(1)).severity()).as("a failure carries the danger colour").contains(Nodes.Severity.DANGER);
                 assertThat(((Nodes.Text) line.get(2)).text()).isEqualTo("broken");
             });
+            assertThat(row(db).tooltip()).as("the host stays in the row's description").contains("via prod");
             states.put(db.id(), new TunnelState.Up(NOW, 1234, warned)); show();
-            assertThat(((Nodes.Icon) row(db).subtitle().get(1)).severity()).as("a warning carries the warning colour").contains(Nodes.Severity.WARNING);
-            assertThat(((Nodes.Text) row(db).subtitle().get(2)).text()).isEqualTo("The target refused the connection");
+            assertThat(((Nodes.Icon) row(db).title().get(1)).severity()).as("a warning carries the warning colour").contains(Nodes.Severity.WARNING);
+            assertThat(((Nodes.Text) row(db).title().get(2)).text()).isEqualTo("The target refused the connection");
             states.put(db.id(), new TunnelState.Starting("Connecting…")); show();
             assertThat(texts(panel.view())).contains("Connecting…");
             states.put(db.id(), TunnelState.STOPPED); show();
             assertThat(row(db).subtitle()).as("a stopped tunnel with its host shows just the mapping").hasSize(1);
             var orphan = Tunnel.create("orphan", UUID.randomUUID(), TunnelKind.LOCAL, Tunnel.LOCALHOST, 1, "x", 1);
             panel.setTunnels(List.of(orphan), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
-            assertThat(texts(panel.view())).contains("Host missing", "Edit to choose a host");
+            assertThat(texts(panel.view())).contains("Host missing · Edit to choose a host");
             panel.setTunnels(List.of(db), List.of(), Optional.of("line 2"), id -> TunnelState.STOPPED, id -> Optional.of("prod"));
             var problem = item(list(), TunnelsPanel.PROBLEM_ROW);
             assertThat(((Nodes.Icon) problem.leading().orElseThrow()).severity()).contains(Nodes.Severity.DANGER);
@@ -276,8 +279,8 @@ class TunnelsPanelTest {
             panel();
             Tunnel html = Tunnel.create("<html><b>bold</b>", PROD, TunnelKind.LOCAL, Tunnel.LOCALHOST, 5432, "db.internal", 5432);
             panel.setTunnels(List.of(html), List.of(), Optional.of("<html>broken"), id -> new TunnelState.Failed("<html>boom"), id -> Optional.of("<html>host"));
-            assertThat(texts(panel.view())).contains("<html><b>bold</b>", "via <html>host", "<html>boom", "tunnels.toml has errors: <html>broken");
-            assertThat(row(html).tooltip()).as("kit tooltips are literal text").startsWith("<html><b>bold</b>, ");
+            assertThat(texts(panel.view())).contains("<html><b>bold</b>", "<html>boom", "tunnels.toml has errors: <html>broken");
+            assertThat(row(html).tooltip()).as("kit tooltips are literal text").startsWith("<html><b>bold</b>, ").contains("via <html>host");
             assertThat(switchOf(html).state().error()).isEqualTo("<html>boom");
         });
     }

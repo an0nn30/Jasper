@@ -293,7 +293,7 @@ public final class HostsPanel implements AutoCloseable {
         headerCount = count;
         headerChanged.accept(new PanelHeader("", false, List.of(
             new PanelHeader.Action("New session", "add", () -> { if (!closed) actions.edit().accept(Optional.empty()); }),
-            new PanelHeader.Action("Import sessions", "download", () -> { if (!closed) actions.importConfig().run(); }))));
+            new PanelHeader.Action("Import sessions", "import", () -> { if (!closed) actions.importConfig().run(); }))));
     }
 
     private static ControlState state(boolean visible) { return new ControlState(visible, true, false, ""); }

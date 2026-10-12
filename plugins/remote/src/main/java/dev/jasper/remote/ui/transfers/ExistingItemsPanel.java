@@ -12,12 +12,14 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * Asked once before copying when selected items already exist at the destination, on a host-rendered kit form: Replace,
- * Skip existing or Cancel. No button is the form's primary, so Enter copies nothing (the former dialog had no default
- * button); Escape cancels. The message is literal text. UI thread only; {@link #close()} makes late callbacks inert.
+ * Asked once before copying when selected items already exist at the destination, as the kit's compact question
+ * dialog: a warning tile, the question and what exists, then Cancel, Skip existing and Replace. Replace is the visual
+ * primary, but the form opts out of submission, so Enter copies nothing (the former dialog had no default button);
+ * Escape cancels. The message is literal text. UI thread only; {@link #close()} makes late callbacks inert.
  */
 public final class ExistingItemsPanel implements AutoCloseable {
     public static final String FORM = "existing", TEXT = "existing.text", REPLACE = "existing.replace", SKIP = "existing.skip", CANCEL = "existing.cancel";
+    static final String HERO = "existing.hero";
     private final String message;
     private final UiView view;
     private boolean closed;
@@ -25,11 +27,15 @@ public final class ExistingItemsPanel implements AutoCloseable {
     public ExistingItemsPanel(UiKit kit, String message, Consumer<ConflictDecision> choose, Runnable close) {
         this.message = message;
         var actions = List.of(
-            new Nodes.Button(REPLACE, ControlState.READY, "Replace", "", Nodes.ButtonKind.SECONDARY, REPLACE, ""),
+            new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
             new Nodes.Button(SKIP, ControlState.READY, "Skip existing", "", Nodes.ButtonKind.SECONDARY, SKIP, ""),
-            new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""));
-        var form = new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, "Items already exist", Optional.empty(),
-            List.of(new Nodes.Text(TEXT, ControlState.READY, message, Nodes.TextRole.BODY)), Optional.empty(), actions, CANCEL);
+            new Nodes.Button(REPLACE, ControlState.READY, "Replace", "", Nodes.ButtonKind.PRIMARY, REPLACE, ""));
+        var hero = new Nodes.Stack(HERO, ControlState.READY, Nodes.LayoutRole.HERO, List.of(
+            new Nodes.Icon(HERO + ".icon", ControlState.READY, "warning", Nodes.Hue.AMBER, Nodes.IconSize.HERO, "Items already exist"),
+            new Nodes.Text(HERO + ".title", ControlState.READY, "Replace Existing Items?", Nodes.TextRole.HERO_TITLE),
+            new Nodes.Text(TEXT, ControlState.READY, message, Nodes.TextRole.DESCRIPTION)));
+        var form = new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.HERO_COMPACT, "Items already exist", Optional.of(hero),
+            List.of(), Optional.empty(), actions, CANCEL, Nodes.FormSubmission.NONE);
         view = kit.create(new ViewSpec(form), event -> {
             if (closed || !(event instanceof UiEvent.Action action)) return;
             switch (action.id()) {

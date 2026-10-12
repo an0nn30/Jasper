@@ -180,7 +180,7 @@ class RemotePluginTest {
             var ask = awaitAsk(host);
             String where = SftpTestAccess.directory(panel);
             assertThat(Kits.<String>value(() -> Kits.node(ask, ExistingItemsPanel.TEXT, dev.jasper.sdk.ui.Nodes.Text.class).text())).isEqualTo("2 of 2 items already exist in prod:" + where + ".");
-            assertThat(Kits.<List<dev.jasper.sdk.ui.Nodes.Button>>value(() -> Kits.primaries(ask))).as("Enter copies nothing").isEmpty();
+            assertThat(Kits.<dev.jasper.sdk.ui.Nodes.FormSubmission>value(() -> Kits.form(ask).submission())).as("Enter copies nothing").isEqualTo(dev.jasper.sdk.ui.Nodes.FormSubmission.NONE);
             Kits.edt(() -> Kits.click(ask, ExistingItemsPanel.CANCEL));
             settle(host);
             assertThat(host.windowContent("dev.jasper.remote", "Items already exist")).isEmpty();

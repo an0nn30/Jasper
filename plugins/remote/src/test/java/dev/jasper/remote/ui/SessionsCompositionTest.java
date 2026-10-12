@@ -33,6 +33,8 @@ class SessionsCompositionTest {
                 assertThat(publications.getLast().detail()).as("the kit count is the only count").isEmpty();
                 assertThat(root.header().primary()).as("host actions are independent from plugin primary").isEmpty();
                 assertThat(publications.getLast().actions()).hasSize(2);
+                assertThat(publications.getLast().actions()).extracting(dev.jasper.sdk.ui.PanelHeader.Action::icon)
+                    .as("Import is the arrow into a corner, not the download tray").containsExactly("add", "import");
             }
         });
     }

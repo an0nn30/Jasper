@@ -6,7 +6,6 @@ import dev.jasper.remote.testsupport.Kits;
 import dev.jasper.remote.ui.sftp.SftpTestAccess;
 import dev.jasper.remote.ui.sftp.SftpUi;
 import dev.jasper.sdk.testing.FakePluginHost;
-import dev.jasper.sdk.ui.Nodes;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.Set;
@@ -14,55 +13,45 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
-/** Choose Session in the disconnected SFTP sidebar opens the window's host chooser, a kit form (Plan 2 Task 8c). */
+/**
+ * Choose Session in the disconnected SFTP sidebar is a menu of the saved hosts (Plan 3 Task 6, spec §6.1's dropdown
+ * empty-state action): choosing one browses it there, with no chooser dialog in between.
+ */
 class SftpChooseSessionTest {
     static final String CHOOSER="Browse files on SSH host";
 
-    @Test void choosingSessionFromDisconnectedSidebarOpensTheExistingHostChooser(@TempDir Path root) throws Exception {
+    @Test void withoutSavedHostsTheMenuSaysSoAndOpensNoDialog(@TempDir Path root) throws Exception {
         try(var host=new FakePluginHost(root.resolve("home"))) {
             var plugin=new TestRemotePlugin(Kits.UI,context->Optional.empty(),(delay,work)->()->{},root.resolve("ssh"));
             host.start(RemotePluginTest.INFO,Set.of(),Set.of(),plugin);
             var window=host.addTerminalWindow();
             Kits.edt(()->host.openPanel(SftpUi.PANEL,window));
             var sidebar=SftpTestAccess.panel(plugin.sftp(),window);
-            assertThat(host.windows()).isEmpty();
-            SftpTestAccess.chooseSession(sidebar);
-            var chooser=Kits.value(()->host.windowView("dev.jasper.remote",CHOOSER).orElseThrow());
-            Kits.edt(()-> {
-                var hosts=Kits.node(chooser,"browse-host.host",Nodes.Choice.class);
-                assertThat(hosts.kind()).isEqualTo(Nodes.ChoiceKind.DROPDOWN);
-                assertThat(hosts.options()).isEmpty();
-                assertThat(Kits.button(chooser,"browse-host.browse").state().enabled()).as("no saved hosts").isFalse();
-                assertThat(Kits.primaries(chooser)).as("Enter browses nothing").isEmpty();
-                Kits.press(chooser,Kits.form(chooser).cancelAction());
-            });
-            assertThat(Kits.value(()->host.windowView("dev.jasper.remote",CHOOSER))).as("Escape closes the chooser").isEmpty();
+            assertThat(SftpTestAccess.sessions(sidebar)).containsExactly("No saved sessions");
+            assertThatThrownBy(()->SftpTestAccess.chooseSession(sidebar,"No saved sessions")).hasMessageContaining("disabled");
+            assertThat(host.windows()).as("no chooser dialog").isEmpty();
+            assertThat(Kits.value(()->host.windowView("dev.jasper.remote",CHOOSER))).isEmpty();
             assertThat(host.failures()).isEmpty();
         }
     }
 
-    /** The chooser lists saved hosts literally with the first chosen; choosing and browsing is HostChooserTest's (no connection here). */
-    @Test void theChooserListsSavedHostsLiterallyWithTheFirstChosen(@TempDir Path root) throws Exception {
+    /** The menu lists the saved hosts literally and follows the host store; choosing one browses it in this sidebar. */
+    @Test void theMenuListsSavedHostsLiterallyAndChoosingOneBrowsesIt(@TempDir Path root) throws Exception {
         try(var host=new FakePluginHost(root.resolve("home"))) {
             var plugin=new TestRemotePlugin(Kits.UI,context->Optional.empty(),(delay,work)->()->{},root.resolve("ssh"));
             host.start(RemotePluginTest.INFO,Set.of(),Set.of(),plugin);
+            var window=host.addTerminalWindow();
+            Kits.edt(()->host.openPanel(SftpUi.PANEL,window));
+            var sidebar=SftpTestAccess.panel(plugin.sftp(),window);
             var first=RemoteHost.create("<html>first","first.invalid",22,"user",Auth.AGENT,"",Optional.empty());
             var second=RemoteHost.create("second","second.invalid",22,"user",Auth.AGENT,"",Optional.empty());
             plugin.store().put(first);plugin.store().put(second);
             RemotePluginTest.settle(host);
-            var window=host.addTerminalWindow();
-            Kits.edt(()->host.openPanel(SftpUi.PANEL,window));
-            var sidebar=SftpTestAccess.panel(plugin.sftp(),window);
-            SftpTestAccess.chooseSession(sidebar);
-            var chooser=Kits.value(()->host.windowView("dev.jasper.remote",CHOOSER).orElseThrow());
-            Kits.edt(()-> {
-                var hosts=Kits.node(chooser,"browse-host.host",Nodes.Choice.class);
-                assertThat(hosts.options()).extracting(option->option.label()).as("literal name — hostname").containsExactlyInAnyOrder("<html>first — first.invalid","second — second.invalid");
-                assertThat(hosts.selectedId()).as("the first host is chosen").isEqualTo(hosts.options().getFirst().id());
-                assertThat(Kits.button(chooser,"browse-host.browse").state().enabled()).isTrue();
-                Kits.press(chooser,Kits.form(chooser).cancelAction());
-            });
-            assertThat(SftpTestAccess.texts(sidebar)).as("nothing connects").doesNotContain("Connecting…");
+            assertThat(SftpTestAccess.sessions(sidebar)).as("literal names, as the store lists them").containsExactlyInAnyOrder("<html>first","second");
+            SftpTestAccess.chooseSession(sidebar,"second");
+            assertThat(SftpTestAccess.texts(sidebar)).as("browsing the chosen host starts here: connecting, or already loading its folder")
+                .containsAnyOf("Connecting…","Loading folder…");
+            assertThat(Kits.value(()->host.windowView("dev.jasper.remote",CHOOSER))).as("no chooser dialog").isEmpty();
             host.stopAll();
             assertThat(host.failures()).isEmpty();
         }

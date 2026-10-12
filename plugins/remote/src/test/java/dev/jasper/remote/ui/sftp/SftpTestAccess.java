@@ -55,8 +55,19 @@ public final class SftpTestAccess {
         Kits.edt(() -> Kits.press(panel.view(), Kits.node(panel.view(), SftpPanel.UPLOAD, Nodes.MenuButton.class).action()));
     }
 
-    /** Choose Session in the disconnected state. */
-    public static void chooseSession(SftpPanel panel) throws Exception { Kits.edt(() -> Kits.click(panel.view(), SftpPanel.CHOOSE)); }
+    /** The disconnected state's Choose Session menu: its items' labels, in order, as the menu lists them. */
+    public static List<String> sessions(SftpPanel panel) throws Exception {
+        return Kits.value(() -> Kits.node(panel.view(), SftpPanel.CHOOSE, Nodes.MenuButton.class).items().stream().map(MenuItem::label).toList());
+    }
+
+    /** Chooses the named saved host from the disconnected state's Choose Session menu, as a click on its item reports. */
+    public static void chooseSession(SftpPanel panel, String label) throws Exception {
+        Kits.edt(() -> {
+            var item = item(Kits.node(panel.view(), SftpPanel.CHOOSE, Nodes.MenuButton.class).items(), label);
+            if (!item.enabled()) throw new AssertionError(label + " is disabled");
+            Kits.press(panel.view(), item.action());
+        });
+    }
 
     /** The Upload button's menu item with this label, which acts on the selection. */
     public static void menu(SftpPanel panel, String label) throws Exception {

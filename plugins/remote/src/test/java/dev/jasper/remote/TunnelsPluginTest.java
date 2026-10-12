@@ -115,7 +115,7 @@ class TunnelsPluginTest {
             assertThat(host.windows()).containsExactly("dialog|New Tunnel|true");
             Kits.edt(() -> {
                 var editor = tunnels.currentEditor();
-                assertThat(Kits.primaries(editor.view())).as("Enter saves nothing").isEmpty();
+                assertThat(Kits.form(editor.view()).submission()).as("Enter saves nothing").isEqualTo(dev.jasper.sdk.ui.Nodes.FormSubmission.NONE);
                 Kits.press(editor.view(), Kits.form(editor.view()).cancelAction());
             });
             assertThat(host.windows()).as("Escape cancelled").isEmpty();

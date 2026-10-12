@@ -233,20 +233,20 @@ public final class TunnelsPanel implements AutoCloseable {
     private Nodes.Panel node() {
         var header = new Nodes.Header(HEADER, ControlState.READY, "Tunnels", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
         if (saved.isEmpty() && quick.isEmpty()) {
-            var body = new ArrayList<Nodes.Node>();
-            // A broken file shows above the empty state; its message wraps at the panel's width.
-            if (error.isPresent()) {
-                body.add(new Nodes.Stack(PROBLEM + ".line", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
-                    severity(PROBLEM + ".icon", "error", "Error", Nodes.Severity.DANGER, Nodes.IconSize.CAPTION),
-                    new Nodes.Text(PROBLEM + ".title", ControlState.READY, "tunnels.toml has errors", Nodes.TextRole.BODY_STRONG))));
-                body.add(new Nodes.Text(PROBLEM, ControlState.READY, problemText(), Nodes.TextRole.BODY));
-            }
-            body.add(new Nodes.Empty(EMPTY, ControlState.READY,
+            Nodes.Node empty = new Nodes.Empty(EMPTY, ControlState.READY,
                 new Nodes.Icon(EMPTY + ".icon", ControlState.READY, "tunnel", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Tunnels"), "No Tunnels",
                 "Forward a local port to a remote host, or use Forward Port from an SSH pane.",
-                List.of(new Nodes.Button(EMPTY_NEW, ControlState.READY, "New Tunnel", "", Nodes.ButtonKind.SECONDARY, EMPTY_NEW, ""))));
-            return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.empty(),
-                new Nodes.Stack(ROOT + ".body", ControlState.READY, Nodes.LayoutRole.VERTICAL, body), Optional.empty());
+                List.of(new Nodes.Button(EMPTY_NEW, ControlState.READY, "New Tunnel", "", Nodes.ButtonKind.SECONDARY, EMPTY_NEW, "")));
+            // The empty state fills the body and centers there. A broken file shows above it, its message wrapping at the
+            // panel's width; the empty state then fills what the note leaves (a document split's filling child).
+            if (error.isPresent()) empty = new Nodes.Split(ROOT + ".body", ControlState.READY, Nodes.SplitKind.DOCUMENT, List.of(
+                new Nodes.Stack(PROBLEM + ".note", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+                    new Nodes.Stack(PROBLEM + ".line", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+                        severity(PROBLEM + ".icon", "error", "Error", Nodes.Severity.DANGER, Nodes.IconSize.CAPTION),
+                        new Nodes.Text(PROBLEM + ".title", ControlState.READY, "tunnels.toml has errors", Nodes.TextRole.BODY_STRONG))),
+                    new Nodes.Text(PROBLEM, ControlState.READY, problemText(), Nodes.TextRole.BODY))),
+                empty));
+            return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.empty(), empty, Optional.empty());
         }
         List<Row> rows = shown();
         if (selectedRow != null && rows.stream().noneMatch(row -> row.id().equals(selectedRow) && row.tunnel() != null)) selectedRow = null;
@@ -277,24 +277,27 @@ public final class TunnelsPanel implements AutoCloseable {
         String mapping = TunnelRows.mapping(tunnel, state);
         String shortMapping = tunnel.bindAddress().equals(Tunnel.LOCALHOST) && tunnel.kind() != TunnelKind.REMOTE
             ? mapping.substring(tunnel.bindAddress().length()) : mapping;
-        // One subtitle line: the mapping, then what is happening or wrong (the old third line).
-        var subtitle = new ArrayList<Nodes.Node>();
-        subtitle.add(new Nodes.Text("row." + id + ".mapping", ControlState.READY, shortMapping, Nodes.TextRole.MONO_SMALL));
+        // The compact row's first line is the name and the host, or in its place what is happening or wrong (the old third
+        // line), which the panel's width would otherwise squeeze beside the route; the second line is the route alone.
+        var titleLine = new ArrayList<Nodes.Node>();
+        titleLine.add(new Nodes.Text("row." + id + ".name", ControlState.READY, title, Nodes.TextRole.BODY));
         String problem = "row." + id + ".problem";
         switch (state) {
             case TunnelState.Failed failed -> {
-                subtitle.add(severity(problem + ".icon", "error", "Failed", Nodes.Severity.DANGER, Nodes.IconSize.CAPTION));
-                subtitle.add(new Nodes.Text(problem, ControlState.READY, failed.reason(), Nodes.TextRole.DESCRIPTION));
+                titleLine.add(severity(problem + ".icon", "error", "Failed", Nodes.Severity.DANGER, Nodes.IconSize.CAPTION));
+                titleLine.add(new Nodes.Text(problem, ControlState.READY, failed.reason(), Nodes.TextRole.DESCRIPTION));
             }
-            case TunnelState.Starting starting -> subtitle.add(new Nodes.Text(problem, ControlState.READY, starting.stage(), Nodes.TextRole.DESCRIPTION));
+            case TunnelState.Starting starting -> titleLine.add(new Nodes.Text(problem, ControlState.READY, starting.stage(), Nodes.TextRole.DESCRIPTION));
             default -> {
-                if (hostName.isEmpty()) subtitle.add(new Nodes.Text(problem, ControlState.READY, "Edit to choose a host", Nodes.TextRole.DESCRIPTION));
+                if (hostName.isEmpty()) titleLine.add(new Nodes.Text(problem, ControlState.READY, "Host missing · Edit to choose a host", Nodes.TextRole.DESCRIPTION,
+                    Optional.of(Nodes.Severity.WARNING), OptionalInt.empty()));
                 else if (state instanceof TunnelState.Up up && up.counters().warning().isPresent()) {
-                    subtitle.add(severity(problem + ".icon", "warning", "Warning", Nodes.Severity.WARNING, Nodes.IconSize.CAPTION));
-                    subtitle.add(new Nodes.Text(problem, ControlState.READY, up.counters().warning().orElseThrow(), Nodes.TextRole.DESCRIPTION));
-                }
+                    titleLine.add(severity(problem + ".icon", "warning", "Warning", Nodes.Severity.WARNING, Nodes.IconSize.CAPTION));
+                    titleLine.add(new Nodes.Text(problem, ControlState.READY, up.counters().warning().orElseThrow(), Nodes.TextRole.DESCRIPTION));
+                } else titleLine.add(new Nodes.Text("row." + id + ".via", ControlState.READY, "via " + hostName.orElseThrow(), Nodes.TextRole.DESCRIPTION));
             }
         }
+        var subtitle = List.<Nodes.Node>of(new Nodes.Text("row." + id + ".mapping", ControlState.READY, shortMapping, Nodes.TextRole.MONO_SMALL));
         // Confirmed state only: on while Up, pending (operable) while Starting, the reason while Failed.
         var toggle = new Nodes.Toggle(SWITCH + tunnel.id(),
             new ControlState(true, true, false, state instanceof TunnelState.Failed failed ? failed.reason() : ""),
@@ -303,9 +306,7 @@ public final class TunnelsPanel implements AutoCloseable {
         String detail = TunnelRows.detail(tunnel, state, hostName, clock.get());
         return new ListItem(id,
             Optional.of(new Nodes.StatusDot("row." + id + ".dot", ControlState.READY, dot(state))),
-            List.of(new Nodes.Text("row." + id + ".name", ControlState.READY, title, Nodes.TextRole.BODY),
-                new Nodes.Text("row." + id + ".via", ControlState.READY, hostName.map(host -> "via " + host).orElse("Host missing"), Nodes.TextRole.DESCRIPTION)),
-            subtitle, List.of(toggle), false, Optional.of(menu(id, tunnel, state)), title + ", " + mapping + ", " + detail);
+            titleLine, subtitle, List.of(toggle), false, Optional.of(menu(id, tunnel, state)), title + ", " + mapping + ", " + detail);
     }
 
     /** Up is success (a warning while up is a warning), Starting a warning, Failed danger, Stopped idle. */
