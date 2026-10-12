@@ -51,7 +51,7 @@ final class PickerMenus {
         g.setFont(ThemePainting.font(c,compact?Typography.Role.PICKER_COMPACT:Typography.Role.BODY));var fm=g.getFontMetrics();int baseline=y+(height-fm.getHeight())/2+fm.getAscent();
         g.setColor(ThemePainting.color(c,active?SemanticColor.TEXT_ONACCENT:link?SemanticColor.TEXT_LINK:empty?SemanticColor.TEXT_PLACEHOLDER:SemanticColor.TEXT_PRIMARY));
         String primary=clipped(fm,label,width);g.drawString(primary,x,baseline);int used=fm.stringWidth(primary)+metric(c,DesignMetrics.Role.PICKER_GAP);
-        if(!caption.isEmpty()&&used<width){g.setFont(ThemePainting.font(c,compact?Typography.Role.PICKER_CAPTION:Typography.Role.CAPTION));g.setColor(ThemePainting.color(c,active?SemanticColor.TEXT_ONACCENT:SemanticColor.TEXT_TERTIARY));g.drawString(clipped(g.getFontMetrics(),caption,width-used),x+used,baseline);}
+        if(!caption.isEmpty()&&used<width){g.setFont(ThemePainting.font(c,compact?Typography.Role.PICKER_CAPTION:Typography.Role.CAPTION));g.setColor(ThemePainting.color(c,active?SemanticColor.TEXT_ONACCENT_SECONDARY:SemanticColor.TEXT_TERTIARY));g.drawString(clipped(g.getFontMetrics(),caption,width-used),x+used,baseline);}
     }
     static final class MenuControl extends ControlRegistry.Control {
         final JTextField search;
@@ -133,7 +133,7 @@ final class PickerMenus {
             if(item.kind()==Nodes.PickerItemKind.UTILITY){int glyph=metric(c,DesignMetrics.Role.PICKER_GLYPH);c.icons().icon(item.icon(),c.theme().semantic(),active?SemanticColor.TEXT_ONACCENT:footer?SemanticColor.TEXT_LINK:SemanticColor.TEXT_TERTIARY,glyph).paintIcon(this,g,pad+(tile-glyph)/2,top+(rowHeight-glyph)/2);}
             else tile(g,this,c,item.icon(),item.hue(),pad,(getHeight()-tile)/2,tile,active);
             int x=pad+tile+gap;line(g,c,item.label(),item.caption(),x,top,getWidth()-x-pad-tile,rowHeight,active,false,true,footer);
-            if(item.id().equals(n.checkedId()))c.icons().icon("check",c.theme().semantic(),active?SemanticColor.TEXT_ONACCENT:SemanticColor.ACCENT,metric(c,DesignMetrics.Role.ICON_CAPTION)).paintIcon(this,g,getWidth()-pad-tile,(getHeight()-tile)/2);
+            if(item.id().equals(n.checkedId()))c.icons().icon("check",c.theme().semantic(),active?SemanticColor.TEXT_ONACCENT:SemanticColor.TEXT_LINK,metric(c,DesignMetrics.Role.ICON_CAPTION)).paintIcon(this,g,getWidth()-pad-tile,(getHeight()-tile)/2);
         }finally{g.dispose();}}
     }
 }

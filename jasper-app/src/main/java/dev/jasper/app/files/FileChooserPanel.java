@@ -283,6 +283,7 @@ public final class FileChooserPanel extends JPanel {
         navigation.add(headingView, BorderLayout.NORTH);
         navigation.add(placesView, BorderLayout.CENTER);
         var navigationPane = rounded(navigation, () -> headingView.getHeight());
+        navigationPane.fill(dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR);
         navigationPane.setMinimumSize(new java.awt.Dimension(metric(DesignMetrics.Role.CHOOSER_NAVIGATION_MIN_WIDTH), 0));
         center.setOpaque(false);
         center.add(rounded(filesView, this::filesHeaderHeight), "table");

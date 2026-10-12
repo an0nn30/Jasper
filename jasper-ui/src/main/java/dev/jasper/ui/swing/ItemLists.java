@@ -467,7 +467,7 @@ final class ItemLists {
             for (var node : nodes) if (node instanceof Nodes.Text text
                     && row.controls.get(text.id()).component instanceof JLabel label) {
                 label.setForeground(SurfaceContrast.on(context().theme().semantic(), ink,
-                    SemanticColor.SELECTION_BG, SurfaceContrast.TEXT));
+                    SemanticColor.ACCENT, SurfaceContrast.TEXT));
                 label.setFont(SwingTypography.effective(context().typography().resultFont(
                     Typography.Role.valueOf(text.role().name()), strong)));
             }

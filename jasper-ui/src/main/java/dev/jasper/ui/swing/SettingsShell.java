@@ -50,7 +50,7 @@ public final class SettingsShell extends JPanel implements AutoCloseable {
     @Override protected void paintComponent(Graphics graphics) {
         var g = (Graphics2D)graphics.create();
         try {
-            g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_APP)); g.fillRect(0, 0, getWidth(), getHeight());
+            g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_DIALOG)); g.fillRect(0, 0, getWidth(), getHeight());
             g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_SIDEBAR)); g.fillRect(0, 0, sidebar(), getHeight());
             int bottom = Math.max(metric(DesignMetrics.Role.SETTINGS_FOOTER_HEIGHT), footer.getPreferredSize().height);
             g.fillRect(0, getHeight() - bottom, getWidth(), bottom);

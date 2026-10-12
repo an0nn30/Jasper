@@ -18,6 +18,10 @@ public class SurfacePanel extends JPanel {
     private final KitContext context;
     private final Kind kind;
     private final IntSupplier header;
+    private SemanticColor fill;
+
+    /** The surface's fill role: the menu surface for a popup, the card surface otherwise unless the owner names another. */
+    public void fill(SemanticColor role) { fill = Objects.requireNonNull(role); repaint(); }
 
     /** Creates a surface without a separate header allocation. */
     public SurfacePanel(KitContext context, Kind kind) { this(context, kind, () -> 0); }
@@ -28,6 +32,7 @@ public class SurfacePanel extends JPanel {
         this.context = Objects.requireNonNull(context);
         this.kind = Objects.requireNonNull(kind);
         this.header = Objects.requireNonNull(header);
+        fill = kind == Kind.POPUP ? SemanticColor.SURFACE_MENU : SemanticColor.SURFACE_CARD;
         setOpaque(false);
         if (kind == Kind.POPUP) setBorder(new AbstractBorder() {
             @Override public Insets getBorderInsets(Component c, Insets insets) {
@@ -65,7 +70,7 @@ public class SurfacePanel extends JPanel {
         try {
             ThemePainting.antialias(g);
             if(kind == Kind.CONTENT) { g.setColor(getBackground());g.fillRect(0,0,getWidth(),getHeight()); }
-            g.setColor(ThemePainting.color(context,SemanticColor.SURFACE_CARD));
+            g.setColor(ThemePainting.color(context,fill));
             if(kind == Kind.NOTICE) {
                 // The grouped card face: its fill, then a crisp hairline on the pixel grid (pure stroke control).
                 g.fill(new RoundRectangle2D.Double(0,0,getWidth(),getHeight(),arc(),arc()));
@@ -354,14 +359,20 @@ public class SurfacePanel extends JPanel {
 
     /** Content-measured row retaining a semantic minimum; optional top rule uses the shared subtle border. */
     public static JPanel row(KitContext context, DesignMetrics.Role minimum, boolean separator) {
-        return new NativeRow(context,minimum,separator);
+        return row(context, minimum, separator, SemanticColor.BORDER_SUBTLE);
+    }
+
+    /** A content-measured row whose optional top rule takes {@code separatorRole}, for example a menu's border. */
+    public static JPanel row(KitContext context, DesignMetrics.Role minimum, boolean separator, SemanticColor separatorRole) {
+        return new NativeRow(context,minimum,separator,separatorRole);
     }
     private static final class NativeRow extends JPanel {
         private final KitContext context;
         private final DesignMetrics.Role minimum;
         private final boolean separator;
-        NativeRow(KitContext context,DesignMetrics.Role minimum,boolean separator) {
-            super(new BorderLayout());this.context=context;this.minimum=minimum;this.separator=separator;setOpaque(false);
+        private final SemanticColor separatorRole;
+        NativeRow(KitContext context,DesignMetrics.Role minimum,boolean separator,SemanticColor separatorRole) {
+            super(new BorderLayout());this.context=context;this.minimum=minimum;this.separator=separator;this.separatorRole=Objects.requireNonNull(separatorRole);setOpaque(false);
         }
         int heightAt(int width) {
             var insets=getInsets();int measured=insets.top+insets.bottom;
@@ -376,7 +387,7 @@ public class SurfacePanel extends JPanel {
         @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE,getPreferredSize().height); }
         @Override protected void paintComponent(Graphics graphics) {
             if(separator) {
-                graphics.setColor(ThemePainting.color(context,SemanticColor.BORDER_SUBTLE));
+                graphics.setColor(ThemePainting.color(context,separatorRole));
                 graphics.fillRect(0,0,getWidth(),ThemePainting.metric(context,DesignMetrics.Role.HAIRLINE));
             }
         }

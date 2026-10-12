@@ -1217,7 +1217,7 @@ final class InteractiveRows {
             if (owner.passive()) return;
             if(owner instanceof Trees.TreeControl tree && tree.detail!=null && tree.detail.itemId.equals(id))return;
             if (owner.resultsLayout()) {
-                Color fill = owner.selected.contains(id) ? ThemePainting.color(owner.context(), SemanticColor.SELECTION_BG)
+                Color fill = owner.selected.contains(id) ? ThemePainting.color(owner.context(), SemanticColor.ACCENT)
                         : hover ? ColorMath.opacity(ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY), .05) : null;
                 if (fill != null) {
                     var rounded = (Graphics2D) g.create();

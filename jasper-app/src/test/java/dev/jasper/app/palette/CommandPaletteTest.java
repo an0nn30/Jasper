@@ -407,21 +407,21 @@ class CommandPaletteTest {
                     }
                     assertThat(palette.contains(palette.getWidth() / 2, 1)).isTrue();
                     var fieldRow = PaletteTestSupport.fieldRow(palette);
-                    assertPixel(image, at(fieldRow, fieldRow.getWidth() - UIScale.scale(3), fieldRow.getHeight() / 2, palette), semantic.color(SemanticColor.SURFACE_CARD), name + " field row");
-                    // One surface throughout: the query field is the card's colour inside its input outline.
+                    assertPixel(image, at(fieldRow, fieldRow.getWidth() - UIScale.scale(3), fieldRow.getHeight() / 2, palette), semantic.color(SemanticColor.SURFACE_MENU), name + " field row");
+                    // One surface throughout: the query field is the menu surface inside its input outline.
                     assertThat(((Nodes.Field) palette.queryView().spec().root()).presentation()).isEqualTo(Nodes.FieldPresentation.TRANSPARENT);
                     var input = PaletteTestSupport.query(palette);
                     var surface = (JComponent) input.getParent();
                     assertPixel(image, at(surface, surface.getWidth() - UIScale.scale(4), surface.getHeight() / 2, palette),
-                        semantic.color(SemanticColor.SURFACE_CARD), name + " the field is the card's colour");
+                        semantic.color(SemanticColor.SURFACE_MENU), name + " the field is the menu surface");
                     assertPixel(image, at(surface, surface.getWidth() / 2, 0, palette), semantic.color(SemanticColor.BORDER_INPUT), name + " field outline");
                     Component selected = row(palette, 1), plain = row(palette, 2), rule = row(palette, 3);
-                    assertPixel(image, at(selected, selected.getWidth() - 12, 3, palette), semantic.color(SemanticColor.SELECTION_BG), name + " selection");
-                    assertPixel(image, at(plain, plain.getWidth() - 3, 3, palette), semantic.color(SemanticColor.SURFACE_CARD), name + " row");
+                    assertPixel(image, at(selected, selected.getWidth() - 12, 3, palette), semantic.color(SemanticColor.ACCENT), name + " selection");
+                    assertPixel(image, at(plain, plain.getWidth() - 3, 3, palette), semantic.color(SemanticColor.SURFACE_MENU), name + " row");
                     assertPixel(image, at(rule, rule.getWidth() - 3, 0, palette), semantic.color(SemanticColor.BORDER_SUBTLE), name + " heading rule");
                     var hintBar = palette.hintBar();
-                    assertPixel(image, at(hintBar, hintBar.getWidth() - 3, hintBar.getHeight() / 2, palette), semantic.color(SemanticColor.SURFACE_CARD), name + " hint bar");
-                    assertPixel(image, at(hintBar, hintBar.getWidth() / 2, 0, palette), semantic.color(SemanticColor.BORDER_SUBTLE), name + " hint rule");
+                    assertPixel(image, at(hintBar, hintBar.getWidth() - 3, hintBar.getHeight() / 2, palette), semantic.color(SemanticColor.SURFACE_MENU), name + " hint bar");
+                    assertPixel(image, at(hintBar, hintBar.getWidth() / 2, 0, palette), semantic.color(SemanticColor.BORDER_MENU), name + " hint rule");
                     // Select History's row (three verbs, a detail) to populate the hint bar with link-coloured
                     // secondary verbs and its detail text, without disturbing the pixel assertions taken above.
                     palette.selectRow("c");
@@ -432,7 +432,7 @@ class CommandPaletteTest {
                         assertThat(KitTestSupport.require(palette.hintView(), CommandPalette.VERB + verb, AbstractButton.class).getForeground())
                             .as(name + " verb " + verb).isEqualTo(semantic.color(SemanticColor.TEXT_LINK));
                     layoutTree(palette);
-                    assertThat(label(row(palette, 4), "a detail").getForeground()).as(name).isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(semantic, SemanticColor.TEXT_ONACCENT_SECONDARY, SemanticColor.SELECTION_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT));
+                    assertThat(label(row(palette, 4), "a detail").getForeground()).as(name).isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(semantic, SemanticColor.TEXT_ONACCENT_SECONDARY, SemanticColor.ACCENT, dev.jasper.ui.theme.SurfaceContrast.TEXT));
                     assertThat(label(row(palette, 3), "History").getForeground()).as(name).isEqualTo(semantic.color(SemanticColor.TEXT_SECONDARY));
                     palette.close();
                 } finally { bindings.close(); }
@@ -453,8 +453,8 @@ class CommandPaletteTest {
                 Component first = row(palette, 0), second = row(palette, 1);
                 second.dispatchEvent(new MouseEvent(second, MouseEvent.MOUSE_ENTERED, 1L, 0, 4, 4, 0, false));
                 var image = paint(palette);
-                Color card = semantic.color(SemanticColor.SURFACE_CARD);
-                assertPixel(image, at(first, first.getWidth() - 12, 3, palette), semantic.color(SemanticColor.SELECTION_BG), "selected");
+                Color card = semantic.color(SemanticColor.SURFACE_MENU);
+                assertPixel(image, at(first, first.getWidth() - 12, 3, palette), semantic.color(SemanticColor.ACCENT), "selected");
                 assertPixel(image, at(second, second.getWidth() - 12, 3, palette),
                     over(card, ColorMath.opacity(semantic.color(SemanticColor.HOVER_OVERLAY), .05)), "hovered");
                 assertPixel(image, at(first, first.getWidth() - 5, 0, palette), card, "selected rounded corner");
@@ -695,7 +695,7 @@ class CommandPaletteTest {
                 palette.setEntries(List.of(new PaletteEntry.Item(HISTORY,new PaletteRow("one","Selected title","selected detail",null,null,true,null))),null,null);
                 palette.setSize(palette.getPreferredSize());layoutTree(palette);
                 var detail=label(row(palette,0),"selected detail");
-                assertThat(detail.getForeground()).isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(palette.kit().theme().semantic(),SemanticColor.TEXT_ONACCENT_SECONDARY,SemanticColor.SELECTION_BG,dev.jasper.ui.theme.SurfaceContrast.TEXT));
+                assertThat(detail.getForeground()).isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(palette.kit().theme().semantic(),SemanticColor.TEXT_ONACCENT_SECONDARY,SemanticColor.ACCENT,dev.jasper.ui.theme.SurfaceContrast.TEXT));
             }
         });
     }
@@ -797,10 +797,10 @@ class CommandPaletteTest {
                 assertThat(PaletteTestSupport.resultsSpec(palette).selectedIds()).containsExactly("entry.21");
                 assertThat(viewport.getViewPosition().y).as("the scroll position").isEqualTo(scrolled);
                 var semantic = kit.theme().semantic();
-                assertThat(semantic.color(SemanticColor.SURFACE_CARD)).isEqualTo(light.chrome().semantic().color(SemanticColor.SURFACE_CARD));
+                assertThat(semantic.color(SemanticColor.SURFACE_MENU)).isEqualTo(light.chrome().semantic().color(SemanticColor.SURFACE_MENU));
                 var image = paint(palette);
                 var hint = palette.hintBar();
-                assertPixel(image, at(hint, hint.getWidth() - 3, hint.getHeight() / 2, palette), semantic.color(SemanticColor.SURFACE_CARD), "light card");
+                assertPixel(image, at(hint, hint.getWidth() - 3, hint.getHeight() / 2, palette), semantic.color(SemanticColor.SURFACE_MENU), "light card");
                 assertThat(image.getRGB(palette.getWidth() / 2, palette.getHeight() / 2)).as("the card repainted")
                     .isNotEqualTo(dark.getRGB(palette.getWidth() / 2, palette.getHeight() / 2));
                 assertPixel(image, new Point(palette.getWidth() / 2, 0), semantic.color(SemanticColor.BORDER_MENU), "light outline");

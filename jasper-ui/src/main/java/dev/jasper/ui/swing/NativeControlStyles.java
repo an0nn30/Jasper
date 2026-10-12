@@ -130,7 +130,7 @@ public final class NativeControlStyles {
             item.setFont(font(Typography.Role.LABEL));
             item.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));
             item.setBackground(palette.color(SemanticColor.SURFACE_MENU));
-            item.putClientProperty("FlatLaf.style", Map.of("selectionBackground", palette.color(SemanticColor.SELECTION_BG),
+            item.putClientProperty("FlatLaf.style", Map.of("selectionBackground", palette.color(SemanticColor.ACCENT),
                 "selectionForeground", palette.color(SemanticColor.TEXT_ONACCENT)));
         });
     }

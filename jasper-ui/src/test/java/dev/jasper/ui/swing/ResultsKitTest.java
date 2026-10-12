@@ -40,7 +40,7 @@ class ResultsKitTest {
                     for(boolean selected:new boolean[]{true,false,true}) {
                         view.update(new ViewSpec(results(List.of(item),selected?Set.of("one"):Set.of(),OptionalInt.empty())));
                         assertThat(find(view,"detail",JLabel.class)).isSameAs(label);assertThat(label.getFont()).isEqualTo(font);
-                        assertThat(label.getForeground()).isEqualTo(selected?dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(),SemanticColor.TEXT_ONACCENT_SECONDARY,SemanticColor.SELECTION_BG,dev.jasper.ui.theme.SurfaceContrast.TEXT):context.theme().semantic().color(SemanticColor.TEXT_SECONDARY));
+                        assertThat(label.getForeground()).isEqualTo(selected?dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(),SemanticColor.TEXT_ONACCENT_SECONDARY,SemanticColor.ACCENT,dev.jasper.ui.theme.SurfaceContrast.TEXT):context.theme().semantic().color(SemanticColor.TEXT_SECONDARY));
                     }
                 }
             }
@@ -265,7 +265,7 @@ class ResultsKitTest {
                     var point = SwingUtilities.convertPoint(c, p, view); return new Color(image.getRGB(point.x, point.y), true);
                 };
                 int w = first.getWidth();
-                assertThat(at.apply(first, new Point(w - UIScale.scale(12), UIScale.scale(3)))).isEqualTo(semantic.color(SemanticColor.SELECTION_BG));
+                assertThat(at.apply(first, new Point(w - UIScale.scale(12), UIScale.scale(3)))).as("the palette highlights with the accent").isEqualTo(semantic.color(SemanticColor.ACCENT));
                 assertThat(at.apply(first, new Point(w - UIScale.scale(5), 0)).getAlpha()).as("selected rounded corner").isZero();
                 assertThat(at.apply(first, new Point(UIScale.scale(2), UIScale.scale(12))).getAlpha()).as("inset from the edge").isZero();
                 var hover = ColorMath.opacity(semantic.color(SemanticColor.HOVER_OVERLAY), .05);
