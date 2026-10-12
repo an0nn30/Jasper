@@ -280,7 +280,7 @@ and append `, appearance, terminalScheme` to the `new ConfigSnapshot(...)` in `b
     # Colors for terminal panes, live: "match" follows the UI appearance; or "slate-steel-dark", "slate-steel-light", "high-contrast".
     scheme = "match"
     ```
-  - `docs/configuration.md`, key table: after the `terminal.bell` row add ``| `terminal.scheme` | `"match"` | `"match"`, `"slate-steel-dark"`, `"slate-steel-light"`, `"high-contrast"`: the terminal panes' colors ([Themes](themes.md)) | Live |`` and before the `ui.theme.source` row add ``| `ui.appearance` | `"system"` | `"system"` (the operating system's light or dark), `"dark"`, `"light"` | Live |``.
+  - `docs/configuration.md`, key table: after the `terminal.bell` row add ``| `terminal.scheme` | `"match"` | `"match"`, `"slate-steel-dark"`, `"slate-steel-light"`, `"high-contrast"`: the terminal panes' colors, linked to the Themes guide | Live |`` and before the `ui.theme.source` row add ``| `ui.appearance` | `"system"` | `"system"` (the operating system's light or dark), `"dark"`, `"light"` | Live |``.
 
 - [ ] **Step 7: Run tests**
 
