@@ -19,8 +19,8 @@ class ChromeKeysTest {
         "Jasper.notification.foreground", "Jasper.notification.mutedForeground", "Jasper.notification.linkForeground");
 
     @Test void notificationAliasesAreNoLongerPublishedByAnyInstall() {
-        for (var theme : List.of(Theme.DARK, Theme.JASPER_LIGHT, Theme.DARK)) {
-            ThemeManager.install(theme);
+        for (boolean themeDark : new boolean[]{true, false, true}) {
+            ThemeTestSupport.install(themeDark);
             for (String key : NOTIFICATION_ALIASES) {
                 assertThat(UIManager.getColor(key)).as(key).isNull();
                 assertThat(((com.formdev.flatlaf.FlatLaf) UIManager.getLookAndFeel()).getExtraDefaults()).as(key).doesNotContainKey(key);

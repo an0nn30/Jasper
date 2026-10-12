@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.SurfaceFixtures;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.swing.KitView;
@@ -21,8 +22,8 @@ import static org.assertj.core.api.Assertions.*;
 class StagedFileServerFormTest {
     @TempDir Path root;
     @Test void actualGroupedFormAndAnchoredVaultCreationPreserveStateAndGrant() throws Exception {
-        var themes=onEdtValue(dev.jasper.app.appearance.ThemeController::new);
-        try(var owner=new KitViewTestAccess(root.resolve("home"),"fileserver-add",SurfaceFixtures.theme("server-calibration"))) {
+        var themes=onEdtValue(() -> ThemeTestSupport.controller(true));
+        try(var owner=new KitViewTestAccess(root.resolve("home"),"fileserver-add",SurfaceFixtures.theme("dark"))) {
             var vault=owner.vault();var form=owner.surface();
             onEdt(()->{
                 captureServer("anonymous",kitView(form),540,690);
@@ -31,9 +32,9 @@ class StagedFileServerFormTest {
                 assertThat(node(form,"server.save").state().enabled()).isFalse();
                 click(form,"server.login.option.vault");click(form,"server.writable");
             });
-            settle();owner.theme(SurfaceFixtures.theme("host-calibration"));
+            settle();owner.theme(SurfaceFixtures.theme("light"));
             onEdt(()->{captureServer("vault-old",kitView(form),540,730);captureServer("vault-old-natural",kitView(form),0,0);});
-            owner.theme(SurfaceFixtures.theme("server-calibration"));
+            owner.theme(SurfaceFixtures.theme("dark"));
             onEdt(()->{
                 click(form,"server.account.choose.input");captureServer("picker-open-empty",menu(vault),0,0);
                 search(menu(vault),"share");enter(named(menu(vault),"credential.menu.search"));click(vault.surface("New Credential"),"create.login");
@@ -55,9 +56,9 @@ class StagedFileServerFormTest {
                 captureServer("filtering",menu(vault),0,0);
                 try{owner.theme(SurfaceFixtures.theme("light"));}catch(Exception e){throw new AssertionError(e);}captureServer("light",kitView(form),540,730);captureServer("light-natural",kitView(form),0,0);
                 assertThat(field.getDocument()).isSameAs(document);assertThat(field.getCaretPosition()).isEqualTo(2);
-                try{owner.theme(SurfaceFixtures.theme("server-calibration"));}catch(Exception e){throw new AssertionError(e);}
-                themes.configure(dev.jasper.app.appearance.Theme.DARK,new dev.jasper.app.config.UiFontConfig("system",20));captureServer("enlarged",kitView(form),810,1095);captureServer("enlarged-natural",kitView(form),0,0);
-                themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
+                try{owner.theme(SurfaceFixtures.theme("dark"));}catch(Exception e){throw new AssertionError(e);}
+                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system",20));captureServer("enlarged",kitView(form),810,1095);captureServer("enlarged-natural",kitView(form),0,0);
+                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());
                 key(menu(vault),"escape");
             });
             for(String kind:List.of("login","key")) {
@@ -78,7 +79,7 @@ class StagedFileServerFormTest {
                 click(form,"server.protocol.option.HTTP");click(form,"server.writable");
                 type(form,"server.name.input","synthetic-preview-server");type(form,"server.folder.input",root.resolve("home").toString());
                 var field=(JTextField)require(form,"server.name.input");var document=field.getDocument();field.select(2,7);
-                try{owner.theme(SurfaceFixtures.theme("host-calibration"));owner.theme(SurfaceFixtures.theme("server-calibration"));}catch(Exception e){throw new AssertionError(e);}
+                try{owner.theme(SurfaceFixtures.theme("light"));owner.theme(SurfaceFixtures.theme("dark"));}catch(Exception e){throw new AssertionError(e);}
                 assertThat(field.getDocument()).isSameAs(document);assertThat(field.getSelectionStart()).isEqualTo(2);assertThat(field.getSelectionEnd()).isEqualTo(7);
                 type(form,"server.folder.input",root.resolve("home/very-long-synthetic-folder-path/with-many-segments/that-stays-in-the-input").toString());captureServer("long-path",kitView(form),540,690);
                 type(form,"server.folder.input",root.resolve("home").toString());captureServer("short",kitView(form),360,420);
@@ -89,10 +90,10 @@ class StagedFileServerFormTest {
             await(form::closed,"real persistence closes editor");onEdt(()->assertThat(vault.problems).isEmpty());
             vault.invoke("dev.jasper.fileserver.new");var second=vault.awaitSurface("New File Server");
             onEdt(()->{click(second,"server.login.option.vault");click(second,"server.account.choose.input");assertThat(menus(vault)).hasSize(1);second.close();assertThat(menus(vault)).isEmpty();assertThat(vault.problems).isEmpty();});
-        }finally{onEdt(()->{themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());themes.close();});}
+        }finally{onEdt(()->{themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());themes.close();});}
     }
     @Test void actualSaveFailureRetainsDraftAndSupportsRetry() throws Exception {
-        var themes=onEdtValue(dev.jasper.app.appearance.ThemeController::new);
+        var themes=onEdtValue(() -> ThemeTestSupport.controller(true));
         try(var surface=SurfaceFixtures.open("fileserver-add","error")) {
             onEdt(()->{assertThat(((JTextField)surface.component("server.name.input")).getText()).isEqualTo("synthetic-preview-server");assertThat(((AbstractButton)surface.component("server.save")).isEnabled()).isTrue();captureServer("error",surface.view(),540,690);});
         }finally{onEdt(themes::close);}

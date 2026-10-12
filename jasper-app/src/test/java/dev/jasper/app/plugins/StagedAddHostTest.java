@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.SurfaceFixtures;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.swing.KitView;
@@ -21,8 +22,8 @@ import static org.assertj.core.api.Assertions.*;
 class StagedAddHostTest {
     @TempDir Path root;
     @Test void groupedDefaultPickerUsesRealCreationClearCancelAndPendingAppearance() throws Exception {
-        var themes=onEdtValue(dev.jasper.app.appearance.ThemeController::new);
-        try(var owner=new KitViewTestAccess(root.resolve("home"),"host-add",SurfaceFixtures.theme("host-calibration"))) {
+        var themes=onEdtValue(() -> ThemeTestSupport.controller(true));
+        try(var owner=new KitViewTestAccess(root.resolve("home"),"host-add",SurfaceFixtures.theme("dark"))) {
             var vault=owner.vault();var form=owner.surface();
             onEdt(()->{
                 assertThat(((Nodes.Form)kitView(form).spec().root()).submission()).isEqualTo(Nodes.FormSubmission.NONE);
@@ -53,11 +54,11 @@ class StagedAddHostTest {
                 captureHost("selected",kitView(form),540,732);click(form,"host.choose.input");captureHost("open",menu(vault),0,0);
                 search(menu(vault),"fixt");var search=(JTextField)named(menu(vault),"credential.menu.search");search.setCaretPosition(2);var document=search.getDocument();captureHost("filtering",menu(vault),0,0);
                 try { owner.theme(SurfaceFixtures.theme("light")); }catch(Exception e){throw new AssertionError(e);}captureHost("filtering-light",menu(vault),0,0);captureHost("selected-light",kitView(form),540,732);
-                try { owner.theme(SurfaceFixtures.theme("host-calibration")); }catch(Exception e){throw new AssertionError(e);}
-                themes.configure(dev.jasper.app.appearance.Theme.DARK,new dev.jasper.app.config.UiFontConfig("system",20));
+                try { owner.theme(SurfaceFixtures.theme("dark")); }catch(Exception e){throw new AssertionError(e);}
+                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system",20));
                 captureHost("filtering-enlarged",menu(vault),0,0);captureHost("selected-enlarged",kitView(form),810,1098);
                 assertThat(search.getDocument()).isSameAs(document);assertThat(search.getCaretPosition()).isEqualTo(2);
-                themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
+                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());
                 search(menu(vault),"staging");captureHost("no-matches-selected",menu(vault),0,0);key(menu(vault),"escape");
             });
             settle();onEdt(()->{
@@ -102,10 +103,10 @@ class StagedAddHostTest {
             });
             await(form::closed,"synthetic host persisted and dialog closes");
             onEdt(()->assertThat(vault.problems).isEmpty());
-        }finally{onEdt(()->{themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());themes.close();});}
+        }finally{onEdt(()->{themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());themes.close();});}
     }
     @Test void surfaceFixturesExposeRealHostPersistenceErrorAndRetainDraft() throws Exception {
-        var themes=onEdtValue(dev.jasper.app.appearance.ThemeController::new);
+        var themes=onEdtValue(() -> ThemeTestSupport.controller(true));
         try(var surface=SurfaceFixtures.open("host-add","error")) {
             onEdt(()->{
                 assertThat(((Nodes.Form)surface.snapshot().root()).submission()).isEqualTo(Nodes.FormSubmission.NONE);

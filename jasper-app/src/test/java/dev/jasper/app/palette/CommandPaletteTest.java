@@ -418,7 +418,7 @@ class CommandPaletteTest {
                     Component selected = row(palette, 1), plain = row(palette, 2), rule = row(palette, 3);
                     assertPixel(image, at(selected, selected.getWidth() - 12, 3, palette), semantic.color(SemanticColor.ACCENT), name + " selection");
                     assertPixel(image, at(plain, plain.getWidth() - 3, 3, palette), semantic.color(SemanticColor.SURFACE_MENU), name + " row");
-                    assertPixel(image, at(rule, rule.getWidth() - 3, 0, palette), semantic.color(SemanticColor.BORDER_SUBTLE), name + " heading rule");
+                    assertPixel(image, at(rule, rule.getWidth() - 3, 0, palette), dev.jasper.app.appearance.ThemeTestSupport.over(semantic.color(SemanticColor.BORDER_SUBTLE), semantic.color(SemanticColor.SURFACE_MENU)), name + " heading rule");
                     var hintBar = palette.hintBar();
                     assertPixel(image, at(hintBar, hintBar.getWidth() - 3, hintBar.getHeight() / 2, palette), semantic.color(SemanticColor.SURFACE_MENU), name + " hint bar");
                     assertPixel(image, at(hintBar, hintBar.getWidth() / 2, 0, palette), semantic.color(SemanticColor.BORDER_MENU), name + " hint rule");
@@ -427,13 +427,13 @@ class CommandPaletteTest {
                     palette.selectRow("c");
                     assertThat(palette.hintText()).as(name).isEqualTo("a detail");
                     assertThat(palette.hintActionTexts()).as(name).isNotEmpty();
-                    assertThat(label(hintBar, "a detail").getForeground()).as(name).isEqualTo(semantic.color(SemanticColor.TEXT_SECONDARY));
+                    assertThat(label(hintBar, "a detail").getForeground()).as(name).isEqualTo(semantic.color(SemanticColor.TEXT_TERTIARY));
                     for (int verb = 1; verb <= palette.hintActionTexts().size(); verb++)
                         assertThat(KitTestSupport.require(palette.hintView(), CommandPalette.VERB + verb, AbstractButton.class).getForeground())
                             .as(name + " verb " + verb).isEqualTo(semantic.color(SemanticColor.TEXT_LINK));
                     layoutTree(palette);
                     assertThat(label(row(palette, 4), "a detail").getForeground()).as(name).isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(semantic, SemanticColor.TEXT_ONACCENT_SECONDARY, SemanticColor.ACCENT, dev.jasper.ui.theme.SurfaceContrast.TEXT));
-                    assertThat(label(row(palette, 3), "History").getForeground()).as(name).isEqualTo(semantic.color(SemanticColor.TEXT_SECONDARY));
+                    assertThat(label(row(palette, 3), "History").getForeground()).as(name).isEqualTo(semantic.color(SemanticColor.TEXT_TERTIARY));
                     palette.close();
                 } finally { bindings.close(); }
             }

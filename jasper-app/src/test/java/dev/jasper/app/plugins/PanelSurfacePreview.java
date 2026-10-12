@@ -24,31 +24,21 @@ public final class PanelSurfacePreview {
 
     public static void capture(Path output, String[] args) throws Exception {
         String filter = args.length > 1 ? args[1] : "";
-        for (String theme : args.length > 2 ? List.of(args[2]) : List.of("calibration", "dark", "light", "custom")) {
+        for (String theme : args.length > 2 ? List.of(args[2]) : List.of("dark", "light")) {
             if (wanted(filter, "tunnels-panel")) tunnels(output, theme, args);
             if (wanted(filter, "sftp-panel")) sftp(output, theme, args);
             if (wanted(filter, "fileservers-panel")) fileServers(output, theme, args);
             if (wanted(filter, "tunnel-new")) tunnelNew(output, theme, args);
         }
     }
-    /** Calibration colors are fixture themes; New Tunnel has its own measured family. */
-    static dev.jasper.app.appearance.ResolvedTheme theme(String name) throws Exception {
-        if (!name.equals("tunnel-calibration")) return SurfaceFixtures.theme(name);
-        try (var input = PanelSurfacePreview.class.getResourceAsStream("/dev/jasper/app/appearance/desktop-tunnel.toml")) {
-            if (input == null) throw new IllegalStateException("desktop-tunnel.toml");
-            var generated = dev.jasper.ui.theme.ThemeGenerator.generate(dev.jasper.ui.themeio.ThemeToml.parse(
-                new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8), "desktop-tunnel.toml"));
-            return new dev.jasper.app.appearance.ResolvedTheme(generated, generated);
-        }
-    }
+    static dev.jasper.app.appearance.ResolvedTheme theme(String name) { return SurfaceFixtures.theme(name); }
     private static boolean wanted(String filter, String id) { return filter.isEmpty() || id.contains(filter); }
-    private static String calibration(String theme) { return theme.equals("calibration") ? "sessions-calibration" : theme; }
     private static int width(String[] args) { return args.length > 5 ? Integer.parseInt(args[5]) : com.formdev.flatlaf.util.UIScale.scale(260); }
     private static int height() { return com.formdev.flatlaf.util.UIScale.scale(395); }
 
     private static void tunnels(Path output, String theme, String[] args) throws Exception {
         Path home = Files.createTempDirectory("jasper-tunnels-preview-");
-        try (var opened = new PanelSurfaceFixture(home, theme(calibration(theme)), PanelSurfaceFixture.TUNNELS)) {
+        try (var opened = new PanelSurfaceFixture(home, theme(theme), PanelSurfaceFixture.TUNNELS)) {
             int width = width(args), height = height();
             opened.size(width, height); save(output, theme, "tunnels-panel", "empty", opened, args);
             // plugin-panels.png's bottom-left Tunnels panel is 418 logical pixels tall.
@@ -72,7 +62,7 @@ public final class PanelSurfacePreview {
 
     private static void sftp(Path output, String theme, String[] args) throws Exception {
         Path home = Files.createTempDirectory("jasper-sftp-preview-");
-        try (var opened = new PanelSurfaceFixture(home, theme(calibration(theme)), PanelSurfaceFixture.SFTP)) {
+        try (var opened = new PanelSurfaceFixture(home, theme(theme), PanelSurfaceFixture.SFTP)) {
             int width = width(args), height = height();
             opened.size(width, height); save(output, theme, "sftp-panel", "disconnected", opened, args);
             // plugin-panels.png's top-right SFTP panel is 419 logical pixels tall.
@@ -97,7 +87,7 @@ public final class PanelSurfacePreview {
 
     private static void fileServers(Path output, String theme, String[] args) throws Exception {
         Path home = Files.createTempDirectory("jasper-fileservers-preview-");
-        try (var opened = new PanelSurfaceFixture(home, theme(calibration(theme)), PanelSurfaceFixture.FILE_SERVERS)) {
+        try (var opened = new PanelSurfaceFixture(home, theme(theme), PanelSurfaceFixture.FILE_SERVERS)) {
             int width = width(args), height = height();
             opened.size(width, height); save(output, theme, "fileservers-panel", "empty", opened, args);
             opened.fileServer("tester", "HTTP");
@@ -116,7 +106,7 @@ public final class PanelSurfacePreview {
         for (String state : List.of("local", "remote", "dynamic", "valid", "invalid", "warning", "error", "allow-others", "edit", "quick")) {
             if (args.length > 3 && !args[3].equals(state)) continue;
             Path home = Files.createTempDirectory("jasper-tunnel-preview-");
-            try (var opened = new TunnelSurfaceFixture(home, theme(theme.equals("calibration") ? "tunnel-calibration" : theme))) {
+            try (var opened = new TunnelSurfaceFixture(home, theme(theme))) {
                 var hosts = opened.hosts(new String[][] {{"amp-amp", "100.110.65.45", "amp", "Sessions"}, {"pve", "100.73.226.91", "root", ""}});
                 if (args.length > 5) opened.width(Integer.parseInt(args[5]));
                 switch (state) {

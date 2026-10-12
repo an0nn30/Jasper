@@ -1,7 +1,7 @@
 package dev.jasper.app.platform;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import com.formdev.flatlaf.extras.FlatSVGIcon;
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Color;
@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.*;
 @ExtendWith(EdtTestExtension.class)
 class ZoneIconsTest {
     @Test void authoredNativeIconsPrepareAtFirstConstructionAndActualScaleChangeBeforePaint() throws Exception {
-        var themes=new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+        var themes=ThemeTestSupport.controller(false);
         float scale=com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
         var setter=com.formdev.flatlaf.util.UIScale.class.getDeclaredMethod("setUserScaleFactor",float.class,boolean.class);setter.setAccessible(true);
         try {
@@ -41,7 +41,7 @@ class ZoneIconsTest {
                     var image=new BufferedImage(64,64,BufferedImage.TYPE_INT_ARGB);var graphics=image.createGraphics();
                     try{icon.paintIcon(label,graphics,0,0);}finally{graphics.dispose();}
                     assertThat(icon.getIconWidth()).isEqualTo(Math.round(16*next));
-                    for(var theme:java.util.List.of(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK),dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT))) {
+                    for(var theme:java.util.List.of(dev.jasper.app.appearance.ThemeTestSupport.generated(true),dev.jasper.app.appearance.ThemeTestSupport.generated(false))) {
                         workspace.putClientProperty("Jasper.workspaceTheme",theme);
                         var expected=registry.icon("settings",theme,dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY,icon.getIconWidth());
                         assertThat(pixels(icon,label)).isEqualTo(pixels(expected,label));
@@ -51,16 +51,16 @@ class ZoneIconsTest {
                     }
                 }
             }
-        } finally {setter.invoke(null,scale,false);themes.close();new ThemeController();}
+        } finally {setter.invoke(null,scale,false);themes.close();ThemeTestSupport.controller(true);}
     }
     @Test void retainedArtworkFollowsReparentingBoundariesAndMatch() {
-        var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+        var themes = ThemeTestSupport.controller(false);
         try {
             var label = new JLabel();
             var root = new JPanel();
             root.putClientProperty("Jasper.zone", "workspace");
             root.putClientProperty("Jasper.workspace.dark", true);
-            root.putClientProperty("Jasper.workspaceTheme", dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
+            root.putClientProperty("Jasper.workspaceTheme", dev.jasper.app.appearance.ThemeTestSupport.generated(true));
             // A tinted path glyph; original-art meanings (settings, search) select a theme sibling instead.
             var icon = AppIcons.semantic("home");
             var light = fixed(false);
@@ -88,54 +88,51 @@ class ZoneIconsTest {
             root.putClientProperty("Jasper.workspaceTheme", null);
             assertThat(pixels(disabled, label)).isEqualTo(pixels(((com.formdev.flatlaf.FlatLaf.DisabledIconProvider) light).getDisabledIcon(), label));
             assertThat(pixels(icon, label)).isEqualTo(pixels(light, label));
-            themes.configure(Theme.DARK);
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
             assertThat(pixels(icon, label)).isEqualTo(pixels(dark, label));
             root.putClientProperty("Jasper.workspace.dark", false);
-            root.putClientProperty("Jasper.workspaceTheme", dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT));
+            root.putClientProperty("Jasper.workspaceTheme", dev.jasper.app.appearance.ThemeTestSupport.generated(false));
             assertThat(pixels(icon, label)).isEqualTo(pixels(light, label));
             root.remove(label);
             assertThat(pixels(icon, label)).isEqualTo(pixels(dark, label));
-        } finally { new ThemeController(); }
+        } finally { ThemeTestSupport.controller(true); }
     }
 
     @Test void keyUsesZoneTextWhilePluginArtworkKeepsItsAuthoredColor() {
-        new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+        ThemeTestSupport.controller(false);
         try {
             var label = new JLabel();
             var root = new JPanel();
-            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new dev.jasper.app.config.WorkspaceThemeChoice("Jasper Dark"),
-                Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults());
-            dev.jasper.app.workspace.WorkspaceTheme.apply(root, themes.current());
+            var themes = ThemeTestSupport.controller(false);
+            var split = ThemeTestSupport.mixed(ThemeTestSupport.generated(false), ThemeTestSupport.generated(true));
+            dev.jasper.app.workspace.WorkspaceTheme.apply(root, split);
             var key = AppIcons.named("KEY");
             var plugin = new FlatSVGIcon("dev/jasper/app/icons/palette-probe.svg", 16, 16, getClass().getClassLoader());
             var original = pixels(plugin, label);
             var chromeKey = pixels(key, label);
             root.add(label);
-            assertThat(pixels(key, label)).contains(themes.current().workspace().tokens()
-                .get(dev.jasper.ui.theme.Token.TEXT).getRGB());
+            assertThat(pixels(key, label)).contains(split.workspace().semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY).getRGB());
             assertThat(pixels(plugin, label)).isEqualTo(original);
             assertThat(AppIcons.forBackground(plugin, Color.BLACK)).isSameAs(plugin);
-            themes.configureTerminal(dev.jasper.app.config.TerminalColors.MATCH);
             dev.jasper.app.workspace.WorkspaceTheme.apply(root, themes.current());
             assertThat(pixels(key, label)).isEqualTo(chromeKey);
             assertThat(root.getClientProperty("Jasper.workspace.foreground")).isNull();
             dev.jasper.app.workspace.WorkspaceTheme.clear(root);
             assertThat(ThemeZone.workspace(label)).isFalse();
             assertThat(root.getClientProperty("Jasper.workspace.foreground")).isNull();
-        } finally { new ThemeController(); }
+        } finally { ThemeTestSupport.controller(true); }
     }
 
     private static Icon fixed(boolean dark) {
-        var theme = dev.jasper.app.appearance.ThemeManager.generated(dark ? Theme.DARK : dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+        var theme = ThemeTestSupport.generated(dark);
         return AppIcons.forSurface(AppIcons.semantic("home"), theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL),
             theme.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
     }
 
     @Test void chromeReceiversAloneShowOriginalArtworkWithoutChangingIconValues() {
-        var themes = new ThemeController(Theme.DARK);
+        var themes = ThemeTestSupport.controller(true);
         try (var registry = new dev.jasper.ui.icons.IconRegistry()) {
-            var theme = dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK);
+            var theme = dev.jasper.app.appearance.ThemeTestSupport.generated(true);
             var chrome = new JPanel(); AppIcons.chromeReceiver(chrome);
             var chromeGroup = new JPanel(); chrome.add(chromeGroup);
             var inside = new JLabel(); chromeGroup.add(inside);
@@ -159,7 +156,7 @@ class ZoneIconsTest {
             // Meanings the chrome does not depict paint identically inside and outside a receiver.
             var settings = AppIcons.semantic("settings");
             assertThat(pixels(settings, inside)).isEqualTo(pixels(settings, outside));
-        } finally { themes.close(); new ThemeController(); }
+        } finally { themes.close(); ThemeTestSupport.controller(true); }
     }
 
     private static int[] pixels(Icon icon, Component component) {

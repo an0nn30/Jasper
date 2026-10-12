@@ -1,5 +1,6 @@
 package dev.jasper.app.application;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.config.ConfigService;
@@ -44,7 +45,7 @@ class JasperApplicationViewModeTest {
             });
         } finally {
             if (app[0] != null) { edt(app[0]::quit); assertThat(stopped.await(5, TimeUnit.SECONDS)).isTrue(); }
-            service.close(); edt(() -> new ThemeController());
+            service.close(); edt(() -> ThemeTestSupport.controller(true));
         }
     }
 
@@ -57,7 +58,7 @@ class JasperApplicationViewModeTest {
             });
         } finally {
             if (app[0] != null) { edt(app[0]::quit); assertThat(stopped.await(5, TimeUnit.SECONDS)).isTrue(); }
-            edt(() -> new ThemeController());
+            edt(() -> ThemeTestSupport.controller(true));
         }
     }
 }

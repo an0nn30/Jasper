@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.*;
 class SessionsCompositionTest {
     @TempDir Path home;
     @Test void actualLockedVaultAndSavedHostsComposeOneHeaderCountAndPersistentIdentity() throws Exception {
-        var calibration=SurfaceFixtures.theme("sessions-calibration");
+        var calibration=SurfaceFixtures.theme("dark");
         try(var fixture=new SessionsSurfaceFixture(home,calibration)) {
             fixture.size(260,395);
             onEdt(()->{
@@ -76,7 +76,7 @@ class SessionsCompositionTest {
                         assertThat(((dev.jasper.ui.model.Nodes.ItemList)findNode(fixture.view().spec().root(),"sessions.rows")).selectedIds()).isEqualTo(selected);
                     });
                 }finally{onEdt(()->KeyboardFocusManager.setCurrentKeyboardFocusManager(prior));}
-                fixture.theme(SurfaceFixtures.theme("sessions-calibration"));
+                fixture.theme(SurfaceFixtures.theme("dark"));
             }
         }
     }
@@ -128,7 +128,7 @@ class SessionsCompositionTest {
     @Test void enlargedNarrowHeaderMeasuresItsWrappedHostActionRows() throws Exception {
         var fonts=AppContractTest.onEdtValue(()->{
             var controller=new dev.jasper.app.appearance.ThemeController();
-            controller.configure(dev.jasper.app.appearance.Theme.DARK,new dev.jasper.app.config.UiFontConfig("system",20));return controller;
+            controller.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system",20));return controller;
         });
         try(var fixture=new SessionsSurfaceFixture(home,SurfaceFixtures.theme("dark"))) {
             fixture.populate();fixture.size(180,600);
@@ -140,7 +140,7 @@ class SessionsCompositionTest {
                     assertThat(box.y+box.height).as("wrapped %s remains fully visible",action.getAccessibleContext().getAccessibleName()).isLessThanOrEqualTo(header.getHeight());
                 }
             });
-        } finally {onEdt(()->{fonts.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());fonts.close();});}
+        } finally {onEdt(()->{fonts.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());fonts.close();});}
     }
     private static Rectangle bounds(Component c,Container root){return SwingUtilities.convertRectangle(c.getParent(),c.getBounds(),root);}
     private static dev.jasper.ui.model.Nodes.Node findNode(dev.jasper.ui.model.Nodes.Node node,String id){return StagedVaultHost.find(node,id);}

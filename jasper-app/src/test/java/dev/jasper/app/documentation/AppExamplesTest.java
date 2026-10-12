@@ -2,7 +2,6 @@ package dev.jasper.app.documentation;
 
 import dev.jasper.app.commands.*;
 import dev.jasper.app.config.*;
-import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.palette.*;
 import dev.jasper.app.bootstrap.StartupResources;

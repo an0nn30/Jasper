@@ -17,8 +17,9 @@ import java.util.function.Predicate;
 
 /** Package-local test access, excluded from production artifacts. */
 public final class ThemeTestSupport {
+    /** Slate Steel's variant on both routes. */
     public static dev.jasper.ui.theme.ThemePair pair(boolean dark) {
-        var theme = ThemeManager.generated(dark ? Theme.DARK : Theme.JASPER_LIGHT);
+        var theme = generated(dark);
         return new dev.jasper.ui.theme.ThemePair(theme, theme);
     }
     public static boolean install(Theme theme) { return ThemeManager.install(theme); }
@@ -72,6 +73,14 @@ public final class ThemeTestSupport {
     public static GeneratedTheme withDark(GeneratedTheme base, boolean dark) {
         return new GeneratedTheme(base.name(), dark, base.author(), base.tokens(), base.syntax(), base.terminal(),
             base.uiKeys(), base.icons(), base.glass(), base.semantic());
+    }
+
+    /** {@code top} painted over opaque {@code bottom} as Java2D composites it: what an alpha-carrying role shows on a surface. */
+    public static Color over(Color top, Color bottom) {
+        var image = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { g.setColor(bottom); g.fillRect(0, 0, 1, 1); g.setColor(top); g.fillRect(0, 0, 1, 1); } finally { g.dispose(); }
+        return new Color(image.getRGB(0, 0), true);
     }
 
     /** A built-in theme by name, or Jasper Dark: what start-up picks for a name no theme has. */

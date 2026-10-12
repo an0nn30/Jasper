@@ -140,17 +140,12 @@ class ThemeManagerTest {
     @Test void keysFlatLafSkipsAreRestoredWithoutReplacingItsOwn() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            var base = Theme.DARK.source().document();
-            var ui = new LinkedHashMap<>(base.ui());
-            ui.put("SearchEverywhere.Header.background", "#123456");
-            ui.put("EditorTabs.hoverBackground", "#00000019");
-            ui.put("ComboBox.background", "#010101");
-            var document = new dev.jasper.ui.theme.ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), base.parentLine(),
-                base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), base.tokens(), base.syntax(), ui, base.icons(), base.workspace());
-            assertThat(ThemeManager.install(dev.jasper.ui.theme.ThemeGenerator.generate(document))).isTrue();
+            var theme = ThemeTestSupport.withUiKeys(ThemeTestSupport.generated(true), Map.of("SearchEverywhere.Header.background", "#123456",
+                "EditorTabs.hoverBackground", "#00000019", "ComboBox.background", "#010101"));
+            assertThat(ThemeManager.install(theme)).isTrue();
             assertColours(Map.of("SearchEverywhere.Header.background", "#123456", "EditorTabs.hoverBackground", "#00000019",
                 "ComboBox.background", "#010101"));
-            // Native authored raw colors now win consistently, including alpha and same-instance reinstall.
+            // A theme's own raw colours win consistently, including alpha and same-instance reinstall.
             UIManager.setLookAndFeel(UIManager.getLookAndFeel());
             assertColours(Map.of("SearchEverywhere.Header.background", "#123456", "EditorTabs.hoverBackground", "#00000019",
                 "ComboBox.background", "#010101"));
@@ -160,14 +155,14 @@ class ThemeManagerTest {
     @Test void restoredAndDerivedKeysSurviveReinstallingTheSameLookAndFeel() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            ThemeManager.install(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            LookAndFeel light = UIManager.getLookAndFeel();
-            ThemeManager.install(Theme.DARK);
+            var light = ThemeTestSupport.generated(false);
+            ThemeManager.install(light);
+            LookAndFeel lightLaf = UIManager.getLookAndFeel();
+            ThemeManager.install(ThemeTestSupport.generated(true));
             // ThemeController rolls back like this when a later install fails.
-            UIManager.setLookAndFeel(light);
-            assertColours(Map.of("SearchEverywhere.Tab.selectedBackground", "#dfdfdf", "Jasper.semantic.surface.app",
-                hex(ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT).semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP)),
-                "Jasper.semantic.accent", hex(ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT).semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT))));
+            UIManager.setLookAndFeel(lightLaf);
+            assertColours(Map.of("Jasper.semantic.surface.app", hex(light.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP)),
+                "Jasper.semantic.accent", hex(light.semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT))));
             assertThat(UIManager.getFont("Label.font").getSize2D()).isEqualTo(13f);
         } finally { UIManager.setLookAndFeel(original); }
     }
@@ -175,11 +170,13 @@ class ThemeManagerTest {
     @Test void switchingThemesLeavesNothingOfThePreviousOneBehind() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            ThemeManager.install(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            ThemeManager.install(ThemeTestSupport.withUiKeys(ThemeTestSupport.generated(false), Map.of("Plugins.hoverBackground", "#123456")));
             assertThat(UIManager.getColor("Plugins.hoverBackground")).isNotNull();
-            ThemeManager.install(Theme.DARK);
+            var dark = ThemeTestSupport.generated(true);
+            ThemeManager.install(dark);
             assertThat(UIManager.getColor("Plugins.hoverBackground")).isNull();
-            assertColours(Map.of("ToolWindow.background", "#191c20", "Jasper.titleBackground", "#25292e"));
+            assertColours(Map.of("ToolWindow.background", (String) dark.uiKeys().get("ToolWindow.background"),
+                "Jasper.semantic.surface.app", hex(dark.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP))));
         } finally { UIManager.setLookAndFeel(original); }
     }
 
@@ -226,41 +223,33 @@ class ThemeManagerTest {
         expected.forEach((key, value) -> assertThat(hex(UIManager.getColor(key))).as(key).isEqualTo(value));
     }
 
-    @Test void aGeneratedThemeInstallsItsTokensAsTheLookAndFeel() throws Exception {
+    @Test void aGeneratedThemeInstallsItsRolesAsTheLookAndFeel() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            GeneratedTheme theme = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS);
+            GeneratedTheme theme = ThemeTestSupport.generated(true);
+            var roles = theme.semantic();
             assertThat(ThemeManager.install(theme)).isTrue();
-            assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Mocha");
+            assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Slate Steel");
             assertThat(FlatLaf.isLafDark()).isTrue();
-            assertThat(UIManager.getColor("Panel.background")).isEqualTo(theme.tokens().get(Token.SURFACE));
-            assertThat(UIManager.getColor("List.background")).isEqualTo(theme.tokens().get(Token.SURFACE_SUNKEN));
-            assertThat(UIManager.getColor("Jasper.tabSelectedBackground")).isEqualTo(theme.tokens().get(Token.TAB_ACTIVE));
+            assertThat(UIManager.getColor("Panel.background")).isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
+            assertThat(UIManager.getColor("List.background")).isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.SURFACE_CARD));
             assertThat(UIManager.getColor("EditorTabs.underlineColor")).as("a key FlatLaf skips is put back")
-                .isEqualTo(theme.tokens().get(Token.TAB_UNDERLINE));
+                .isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.ACCENT));
             assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT))
-                .as("native search reads its canonical role directly").isEqualTo(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT));
+                .as("native search reads its canonical role directly").isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT));
             assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(2 * dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.CONTROL_RADIUS));
             assertThat(UIManager.getFont("Label.font").getSize2D()).as("canonical module typography replaces the legacy app override").isEqualTo(13f);
         } finally { UIManager.setLookAndFeel(original); }
     }
 
-    /** The 2026-10-01 spike: FlatLaf re-derives its controls from the base variables the template sets. */
+    /** The 2026-10-01 spike: FlatLaf re-derives its controls from the base variables the theme sets. */
     @Test void flatLafReDerivesUnsetControlsFromTheBaseVariables() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            ThemeManager.install(ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS));
+            ThemeManager.install(ThemeTestSupport.generated(true));
             Color first = UIManager.getColor("Button.disabledSelectedBackground");
-            ThemeManager.install(ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS.replace("#1e1e2e", "#2e3440")));
+            ThemeManager.install(ThemeTestSupport.generated(false));
             assertThat(UIManager.getColor("Button.disabledSelectedBackground")).isNotEqualTo(first);
-        } finally { UIManager.setLookAndFeel(original); }
-    }
-
-    @Test void aThemesOwnKeysWinOverTheTemplate() throws Exception {
-        LookAndFeel original = UIManager.getLookAndFeel();
-        try {
-            ThemeManager.install(ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS + "[ui]\n\"Panel.background\" = \"#010203\"\n"));
-            assertThat(hex(UIManager.getColor("Panel.background"))).isEqualTo("#010203");
         } finally { UIManager.setLookAndFeel(original); }
     }
 

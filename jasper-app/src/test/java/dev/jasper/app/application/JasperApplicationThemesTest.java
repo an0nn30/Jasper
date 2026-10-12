@@ -1,5 +1,6 @@
 package dev.jasper.app.application;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.config.ConfigService;
@@ -39,7 +40,7 @@ class JasperApplicationThemesTest {
         } finally {
             if (application[0] != null) { edt(application[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); }
             service.close();
-            edt(() -> new ThemeController());
+            edt(() -> ThemeTestSupport.controller(true));
         }
     }
 

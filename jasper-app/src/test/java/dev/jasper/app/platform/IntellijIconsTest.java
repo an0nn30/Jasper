@@ -1,6 +1,7 @@
 package dev.jasper.app.platform;
 
-import dev.jasper.app.appearance.Theme;
+import dev.jasper.app.appearance.ThemeTestSupport;
+
 import com.formdev.flatlaf.extras.FlatSVGIcon;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.testsupport.EdtTestExtension;
@@ -21,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(EdtTestExtension.class)
 class IntellijIconsTest {
     private static final String BASE = "dev/jasper/app/icons/intellij/";
-
 
     @Test void manifestPinsEveryBundledSvgToItsUpstreamPathAndHash() throws Exception {
         List<String> rows;
@@ -52,18 +52,18 @@ class IntellijIconsTest {
     }
 
     @Test void flatLafRemapsIntellijPaletteColoursForTheRunningTheme() {
-        var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+        var themes = ThemeTestSupport.controller(false);
         try {
             var probe = new FlatSVGIcon("dev/jasper/app/icons/palette-probe.svg", 16, 16);
             assertThat(probe.hasFound()).isTrue();
             int light = centre(probe);
             assertThat(light).isEqualTo(UIManager.getColor("Actions.Blue").getRGB());
-            themes.configure(Theme.DARK);
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
             int dark = centre(probe);
             assertThat(dark).as("the same icon instance re-filters on a live theme change")
                 .isEqualTo(UIManager.getColor("Actions.Blue").getRGB());
             assertThat(dark).isNotEqualTo(light);
-        } finally { new ThemeController(); }
+        } finally { ThemeTestSupport.controller(true); }
     }
 
     static int centre(Icon icon) { return pixels(icon)[8 * 16 + 8]; }

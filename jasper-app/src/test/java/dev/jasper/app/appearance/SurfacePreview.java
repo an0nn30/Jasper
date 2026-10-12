@@ -15,8 +15,8 @@ public final class SurfacePreview {
         Path output = Path.of(args.length > 0 ? args[0] : "build/theme-surfaces");
         String filter = args.length > 1 ? args[1] : "";
         ThemeController fonts = args.length > 4 ? SurfaceFixtures.edt(() -> {
-            var controller = new ThemeController();
-            controller.configure(Theme.DARK, new dev.jasper.app.config.UiFontConfig("system",Float.parseFloat(args[4])));
+            var controller = ThemeTestSupport.controller(true);
+            controller.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system",Float.parseFloat(args[4])));
             return controller;
         }) : null;
         Object priorCaps = SurfaceFixtures.edt(() -> {
@@ -26,7 +26,7 @@ public final class SurfacePreview {
             return prior;
         });
         try {
-        for (String theme : args.length > 2 ? List.of(args[2]) : List.of("calibration", "dark", "light", "custom")) {
+        for (String theme : args.length > 2 ? List.of(args[2]) : List.of("dark", "light")) {
             for (String id : List.of("vault-create", "vault-unlock", "host-add", "fileserver-add")) {
                 if (!filter.isEmpty() && !id.contains(filter)) continue;
                 var states = id.equals("fileserver-add") ? List.of("empty", "focus", "vault", "entered", "busy", "error")
@@ -51,7 +51,7 @@ public final class SurfacePreview {
         dev.jasper.app.plugins.PanelSurfacePreview.capture(output, args);
         if(filter.isEmpty()||filter.contains("settings"))dev.jasper.app.settingsui.SettingsSurfacePreview.capture(output);
         } finally {
-            try { if (fonts != null) SurfaceFixtures.edt(() -> { fonts.configure(Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults()); fonts.close(); return null; }); }
+            try { if (fonts != null) SurfaceFixtures.edt(() -> { fonts.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults()); fonts.close(); return null; }); }
             finally { SurfaceFixtures.edt(() -> { javax.swing.UIManager.put("PasswordField.showCapsLock", priorCaps); return null; }); }
         }
     }

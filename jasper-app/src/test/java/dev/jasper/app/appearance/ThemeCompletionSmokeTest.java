@@ -1,12 +1,10 @@
 package dev.jasper.app.appearance;
 
 import dev.jasper.app.config.UiFontConfig;
-import dev.jasper.app.config.WorkspaceThemeChoice;
 import dev.jasper.sdk.contracts.ThemeMigrationCapture;
 import dev.jasper.ui.model.*;
 import dev.jasper.ui.swing.KitView;
 import dev.jasper.ui.theme.*;
-import dev.jasper.ui.themeimport.ThemeConverter;
 import java.awt.Component;
 import java.awt.Container;
 import java.nio.file.Path;
@@ -18,22 +16,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Completion smoke over shipped palettes and an imported custom JSON theme, with real live app publication. */
+/** Completion smoke over both Slate Steel variants, with real live app publication. */
 class ThemeCompletionSmokeTest {
     /** The loop leaves a 24-point interface font installed; a fresh controller restores the platform's. */
-    @AfterEach void resetInterfaceFont() throws Exception { SwingUtilities.invokeAndWait(ThemeController::new); }
+    @AfterEach void resetInterfaceFont() throws Exception { SwingUtilities.invokeAndWait(() -> ThemeTestSupport.controller(true)); }
     @org.junit.jupiter.api.io.TempDir Path temporary;
-    @Test void allShippedThemesAndCustomKeepControlsAndInputAcrossBothRoutesAndFontSizes() throws Exception {
-        var source = temporary.resolve("completion.theme.json");
-        java.nio.file.Files.writeString(source, """
-            {"name":"Custom completion fixture","dark":true,"ui":{"Panel.background":"#211a2d","Label.foreground":"#f1e8ff","Component.accentColor":"#bb99ee"}}
-            """);
-        var custom = ThemeConverter.convert(source).getFirst().document();
+    @Test void bothVariantsKeepControlsAndInputAcrossBothRoutesAndFontSizes() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var themes = new ArrayList<>(BuiltInThemes.all());
-            assertThat(themes).hasSize(5);
-            themes.add(Theme.of("completion-custom", new Theme.UserFile(source, custom)));
-            try (var controller = new ThemeController()) {
+            try (var controller = ThemeTestSupport.controller(true)) {
                 var state = ControlState.READY;
                 var spec = new ViewSpec(new Nodes.Stack("smoke", state, Nodes.LayoutRole.VERTICAL, List.of(
                     new Nodes.Text("title",state,"Theme completion",Nodes.TextRole.PANEL_TITLE),
@@ -45,15 +35,14 @@ class ThemeCompletionSmokeTest {
                     var field = find(workspace,"name.input",JTextField.class);
                     field.select(2,8);
                     var choice = find(workspace,"choice.input",JComboBox.class);
-                    for (int size : List.of(13,24)) for (var theme : themes) {
-                        controller.configure(theme,new UiFontConfig("system",size));
-                        controller.configureWorkspace(new WorkspaceThemeChoice(theme.name()),theme);
+                    for (int size : List.of(13,24)) for (boolean dark : new boolean[]{true, false}) {
+                        controller.configure(dark,dev.jasper.app.config.TerminalSchemeChoice.MATCH,new UiFontConfig("system",size));
                         for (var view : List.of(chrome,workspace)) {
                             SwingUtilities.updateComponentTreeUI(view);
                             for (var role:SemanticColor.values()) assertThat(view==chrome
                                 ? controller.appearance().context(ThemeRoute.CHROME).theme().semantic().color(role)
                                 : controller.appearance().context(ThemeRoute.WORKSPACE).theme().semantic().color(role)).isNotNull();
-                            ThemeMigrationCapture.save("completion-controls",theme.id()+"-font"+size,
+                            ThemeMigrationCapture.save("completion-controls",(dark ? "slate-steel-dark" : "slate-steel-light")+"-font"+size,
                                 view==chrome ? "chrome" : "workspace",view,560,440);
                         }
                         assertThat(find(workspace,"name.input",JTextField.class)).isSameAs(field);

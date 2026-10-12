@@ -9,10 +9,10 @@ import static org.assertj.core.api.Assertions.*;
 
 class SurfaceGeometryTest {
     @Test void recoveryWarningRemainsVisibleWithActualEnlargedSettingsAndConstrainedWidth() throws Exception {
-        var themes = SurfaceFixtures.edt(ThemeController::new);
+        var themes = SurfaceFixtures.edt(() -> ThemeTestSupport.controller(true));
         try (var open = SurfaceFixtures.open("vault-create", "entered")) {
             for (float size : new float[]{20, 32, 13}) SurfaceFixtures.edt(() -> {
-                themes.configure(Theme.DARK, new dev.jasper.app.config.UiFontConfig("system", size));
+                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system", size));
                 for (int width : new int[]{com.formdev.flatlaf.util.UIScale.scale(400), 340}) {
                     var view = open.view();
                     view.setSize(width, 2000); SurfaceFixtures.arrange(view);
@@ -32,7 +32,7 @@ class SurfaceGeometryTest {
                 }
                 return null;
             });
-        } finally { SurfaceFixtures.edt(() -> { themes.configure(Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults()); themes.close(); return null; }); }
+        } finally { SurfaceFixtures.edt(() -> { themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults()); themes.close(); return null; }); }
     }
 
     @Test void actualVaultOwnersUseReferenceHeroGeometryWithoutCreatingWindows() throws Exception {
@@ -70,7 +70,7 @@ class SurfaceGeometryTest {
             open.click("password.reveal");
             var input=(JPasswordField)open.component("password.input"); retained[0]=input;
             SurfaceFixtures.edt(() -> { input.select(2,5); assertThat(input.getEchoChar()).isEqualTo((char)0); return null; });
-            for(String theme:java.util.List.of("dark","light","custom","calibration")) {
+            for(String theme:java.util.List.of("dark","light")) {
                 open.theme(theme);
                 SurfaceFixtures.edt(() -> {
                     assertThat(open.component("password.input")).isSameAs(input);

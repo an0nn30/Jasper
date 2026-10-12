@@ -3,8 +3,6 @@ package dev.jasper.app.appearance;
 import dev.jasper.app.plugins.KitViewTestAccess;
 import dev.jasper.ui.model.ViewSpec;
 import dev.jasper.ui.swing.KitView;
-import dev.jasper.ui.theme.ThemeGenerator;
-import dev.jasper.ui.themeio.ThemeToml;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.nio.file.*;
@@ -14,12 +12,12 @@ import javax.swing.*;
 /** Real staged feature owners; no top-level Window, external connection or real user home. */
 public final class SurfaceFixtures {
     private SurfaceFixtures() {}
-    public static Opened open(String surfaceId, String state) throws Exception { return open(surfaceId, state, "calibration"); }
+    public static Opened open(String surfaceId, String state) throws Exception { return open(surfaceId, state, "dark"); }
     public static Opened open(String surfaceId, String state, String theme) throws Exception {
         Path home = Files.createTempDirectory("jasper-surface-");
         KitViewTestAccess owner = null;
         try {
-            owner = new KitViewTestAccess(home, surfaceId, theme(theme.equals("calibration") ? surfaceId.equals("host-add") ? "host-calibration" : surfaceId.equals("fileserver-add") ? "server-calibration" : theme : theme));
+            owner = new KitViewTestAccess(home, surfaceId, theme(theme));
             var opened = new Opened(home, owner, surfaceId, state);
             if (surfaceId.equals("fileserver-add")) {
                 if (state.equals("vault")) { owner.click("server.login.option.vault"); owner.click("server.writable"); }
@@ -54,20 +52,13 @@ public final class SurfaceFixtures {
         } catch (Exception | Error failure) { if (owner != null) owner.close(); delete(home); throw failure; }
     }
 
-    public static ResolvedTheme theme(String name) throws Exception {
-        var generated = switch (name) {
-            case "dark" -> ThemeGenerator.generate(Theme.DARK.source().document());
-            case "light" -> ThemeGenerator.generate(Theme.JASPER_LIGHT.source().document());
-            case "calibration", "host-calibration", "server-calibration", "sessions-calibration", "custom" -> {
-                String file = name.equals("sessions-calibration") ? "desktop-sessions.toml" : name.equals("server-calibration") ? "desktop-server.toml" : name.equals("host-calibration") ? "desktop-host.toml" : name.equals("calibration") ? "desktop-hero.toml" : "custom-hero.toml";
-                try (var input = SurfaceFixtures.class.getResourceAsStream("/dev/jasper/app/appearance/" + file)) {
-                    if (input == null) throw new IllegalStateException(file);
-                    yield ThemeGenerator.generate(ThemeToml.parse(new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8), file));
-                }
-            }
-            default -> throw new IllegalArgumentException(name);
+    /** Slate Steel's {@code "dark"} or {@code "light"} variant with its matching terminal scheme. */
+    public static ResolvedTheme theme(String name) {
+        return switch (name) {
+            case "dark" -> ThemeTestSupport.resolved(true);
+            case "light" -> ThemeTestSupport.resolved(false);
+            default -> throw new IllegalArgumentException("Unknown surface family: " + name + " (dark or light)");
         };
-        return new ResolvedTheme(generated, generated);
     }
 
     public static final class Opened implements AutoCloseable {

@@ -1,5 +1,6 @@
 package dev.jasper.app.platform;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import com.formdev.flatlaf.extras.FlatSVGIcon;
@@ -14,10 +15,10 @@ class AppIconsTest {
 
     @Test void originalSearchAndFileReachNativeOwnersAtDeviceAndUserScales() throws Exception {
         edt(()->{
-            var themes=new ThemeController();float previous=com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
+            var themes=ThemeTestSupport.controller(true);float previous=com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
             try(var registry=new dev.jasper.ui.icons.IconRegistry()) {
-                for(var theme:java.util.List.of(Theme.DARK,dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                    themes.configure(theme);
+                for (boolean themeDark : new boolean[]{true, false}) {
+                    themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
                     for(float scale:new float[]{1,2}) {
                         userScale(scale);
                         for(String meaning:java.util.List.of("SEARCH","FILE")) {
@@ -28,7 +29,7 @@ class AppIconsTest {
                         }
                     }
                 }
-            }finally {userScale(previous);themes.close();new ThemeController();}
+            }finally {userScale(previous);themes.close();ThemeTestSupport.controller(true);}
         });
     }
     private static void userScale(float scale){try{var setter=com.formdev.flatlaf.util.UIScale.class.getDeclaredMethod("setUserScaleFactor",float.class,boolean.class);setter.setAccessible(true);setter.invoke(null,scale,false);}catch(ReflectiveOperationException failure){throw new AssertionError(failure);}}
@@ -36,7 +37,7 @@ class AppIconsTest {
 
     @Test void modernApplicationIconsUseModuleNamedTinting() throws Exception {
         edt(() -> {
-            new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            ThemeTestSupport.controller(false);
             try {
                 for (String name : ICONS) {
                     var icon = AppIcons.icon(name);
@@ -47,24 +48,24 @@ class AppIconsTest {
                 var expected = new dev.jasper.ui.icons.IconRegistry().icon("search", dev.jasper.ui.swing.FlatLafInstaller.installedTheme(), dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY, 16);
                 assertThat(IntellijIconsTest.pixels(AppIcons.icon("search")))
                     .isEqualTo(IntellijIconsTest.pixels(expected));
-            } finally { new ThemeController(); }
+            } finally { ThemeTestSupport.controller(true); }
         });
     }
 
     @Test void theSameHostIconFollowsALiveDarkSwitch() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            var themes = ThemeTestSupport.controller(false);
             try {
                 var icon = AppIcons.icon("search");
                 int[] light = IntellijIconsTest.pixels(icon);
-                themes.configure(Theme.DARK);
+                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
                 int[] dark = IntellijIconsTest.pixels(icon);
                 assertThat(dark).isNotEqualTo(light);
-                themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+                themes.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
                 assertThat(IntellijIconsTest.pixels(icon)).isEqualTo(light);
                 assertThat(AppIcons.dropdown().getIconWidth()).isEqualTo(8);
                 assertThat(Arrays.stream(dark).anyMatch(pixel -> pixel == 0xff6c707e)).isFalse();
-            } finally { new ThemeController(); }
+            } finally { ThemeTestSupport.controller(true); }
         });
     }
 
@@ -74,7 +75,7 @@ class AppIconsTest {
      */
     @Test void namedIconsOnAnIndependentlyColouredSurfaceAreTintedForThatSurface() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.DARK);
+            var themes = ThemeTestSupport.controller(true);
             try {
                 var named = AppIcons.named("TERMINAL");
                 int[] chrome = IntellijIconsTest.pixels(named);
@@ -93,7 +94,7 @@ class AppIconsTest {
                 var disabled = (javax.swing.Icon) ((com.formdev.flatlaf.FlatLaf.DisabledIconProvider)
                     AppIcons.forSurface(named, lightTerminal, terminalText)).getDisabledIcon();
                 assertThat(disabled.getIconWidth()).isEqualTo(16);
-            } finally { themes.close(); new ThemeController(); }
+            } finally { themes.close(); ThemeTestSupport.controller(true); }
         });
     }
 
@@ -106,14 +107,14 @@ class AppIconsTest {
 
     @Test void bundledIconsKeepFlatLafDisabledRendering() throws Exception {
         edt(() -> {
-            new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            ThemeTestSupport.controller(false);
             try {
                 var icon = AppIcons.icon("search");
                 var disabled = javax.swing.UIManager.getLookAndFeel().getDisabledIcon(new javax.swing.JLabel(), icon);
                 assertThat(disabled).isNotNull();
                 assertThat(disabled.getIconWidth()).isEqualTo(16);
                 assertThat(IntellijIconsTest.pixels(disabled)).isNotEqualTo(IntellijIconsTest.pixels(icon));
-            } finally { new ThemeController(); }
+            } finally { ThemeTestSupport.controller(true); }
         });
     }
 

@@ -14,9 +14,9 @@ public final class SessionsSurfacePreview {
     public static void main(String[] args) throws Exception { capture(Path.of(args[0]), args); }
     public static void capture(Path output,String[] args) throws Exception {
         if(args.length>1 && !"sessions-panel".contains(args[1]))return;
-        for(String theme:args.length>2?List.of(args[2]):List.of("calibration","dark","light","custom")) {
+        for(String theme:args.length>2?List.of(args[2]):List.of("dark","light")) {
             Path home=Files.createTempDirectory("jasper-sessions-preview-");
-            try(var opened=new SessionsSurfaceFixture(home,SurfaceFixtures.theme(theme.equals("calibration")?"sessions-calibration":theme))) {
+            try(var opened=new SessionsSurfaceFixture(home,SurfaceFixtures.theme(theme))) {
                 int width=args.length>5?Integer.parseInt(args[5]):com.formdev.flatlaf.util.UIScale.scale(260);
                 int height=com.formdev.flatlaf.util.UIScale.scale(395);
                 opened.size(width,height);
