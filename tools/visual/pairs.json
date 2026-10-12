@@ -125,5 +125,82 @@
    790
   ],
   "render": "jasper-app/build/theme-surfaces/calibration/sessions-panel/selected.png"
+ },
+ {
+  "name": "tunnels-panel",
+  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
+  "crop": [
+   2220,
+   946,
+   520,
+   790
+  ],
+  "render": "jasper-app/build/theme-surfaces/calibration/tunnels-panel/empty.png"
+ },
+ {
+  "name": "tunnels-panel-plugin-panels",
+  "mock": "docs/design/theme-engine/reference/plugin-panels.png",
+  "crop": [
+   168,
+   994,
+   520,
+   836
+  ],
+  "render": "jasper-app/build/theme-surfaces/calibration/tunnels-panel/empty-418.png"
+ },
+ {
+  "name": "sftp-panel",
+  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
+  "crop": [
+   168,
+   946,
+   520,
+   790
+  ],
+  "render": "jasper-app/build/theme-surfaces/calibration/sftp-panel/cancelled.png"
+ },
+ {
+  "name": "sftp-panel-plugin-panels",
+  "mock": "docs/design/theme-engine/reference/plugin-panels.png",
+  "crop": [
+   2122,
+   144,
+   520,
+   838
+  ],
+  "render": "jasper-app/build/theme-surfaces/calibration/sftp-panel/disconnected-419.png"
+ },
+ {
+  "name": "fileservers-panel",
+  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
+  "crop": [
+   2220,
+   144,
+   520,
+   790
+  ],
+  "render": "jasper-app/build/theme-surfaces/calibration/fileservers-panel/empty.png"
+ },
+ {
+  "name": "fileservers-panel-populated",
+  "mock": "docs/design/theme-engine/reference/plugin-panels.png",
+  "crop": [
+   2122,
+   994,
+   520,
+   836
+  ],
+  "render": "jasper-app/build/theme-surfaces/calibration/fileservers-panel/populated.png"
+ },
+ {
+  "name": "tunnel-new",
+  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/new_tunnel_mock.png",
+  "crop": [
+   8,
+   62,
+   1080,
+   1116
+  ],
+  "render": "jasper-app/build/theme-surfaces/calibration/tunnel-new/local.png"
  }
 ]
