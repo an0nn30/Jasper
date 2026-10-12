@@ -534,7 +534,10 @@ heading wherever `section` changes, the description under each control, and an e
 setting, and `host.stage(setting, value)` sets a value from a control of your own; Settings saves them on Apply. Use
 `modified`, `apply` and `reset` only for state of your own, and `keywords` and `highlight` for search. Your panel
 lives as long as your plugin, so Settings calls `reset` before `dispose` whenever it closes a page it showed without a
-successful Apply, as on Cancel; drop unapplied state of your own there. The Sample
+successful Apply, as on Cancel; drop unapplied state of your own there. Compose the page as the generated ones are: a
+`Nodes.Stack` with role `SETTINGS_PAGE` whose `Section`s each hold a `Card` of kind `SETTINGS` of rows (host rows keep the
+control in the trailing slot with an icon-only Reset while the value differs from its default), and the standard `Empty`
+state where a collection of your own has nothing to show. The Sample
 plugin's `SampleSettingsPanel` is a complete example; the testkit's `settingsPanel`, `pendingSettings` and
 `settingsPanelChanges` let you test it without a window.
 
