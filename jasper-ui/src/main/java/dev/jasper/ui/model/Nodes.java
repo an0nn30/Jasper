@@ -35,8 +35,8 @@ public final class Nodes {
      * SUPPORTING keeps leading adornments natural-sized beside a wrapping final text/body child. ROUTE is a read-only
      * route preview (a tunnel's path): a bordered strip on the input surface whose children are its steps, left to
      * right, with the kit's arrow before every step after the first. A step is a stack whose leading Icon the kit shows
-     * on a category tile in its hue, its other children (Text) being the step's lines; steps keep their natural width,
-     * share the remaining width as equal gaps and truncate their lines when the strip is too narrow.
+     * on a category tile in its hue, its other children (Text) being the step's lines. The steps take equal columns,
+     * each later column opening with the arrow, and a step's lines truncate within its column.
      */
     public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION, SUPPORTING, JOINED_ACTIONS, SETTINGS_PAGE, SETTINGS_CONTROLS, SETTINGS_TRAILING, SETTINGS_GROUP_HEADER, SETTINGS_FOOTER, SETTINGS_NAVIGATION, ROUTE }
     /**
