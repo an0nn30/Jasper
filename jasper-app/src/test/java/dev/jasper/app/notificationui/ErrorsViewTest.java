@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 import javax.swing.JLabel;
 import javax.swing.plaf.basic.BasicHTML;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,10 +39,19 @@ class ErrorsViewTest {
     private final List<String> disabled = new ArrayList<>();
     private int logFolders, dones;
 
+    /** Views a test opens; each is closed afterwards, so no stale view (or its UI listeners) outlives its test. */
+    private final List<ErrorsView> opened = new ArrayList<>();
+
+    @AfterEach void closeViews() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { opened.forEach(ErrorsView::close); opened.clear(); });
+    }
+
+    private ErrorsView track(ErrorsView view) { opened.add(view); return view; }
+
     private ErrorsView view() {
-        return new ErrorsView(dev.jasper.app.testsupport.KitTestSupport.context(), incidents, new ErrorsView.Hooks(id -> id.equals("dev.jasper.remote") ? "Remote" : id,
+        return track(new ErrorsView(dev.jasper.app.testsupport.KitTestSupport.context(), incidents, new ErrorsView.Hooks(id -> id.equals("dev.jasper.remote") ? "Remote" : id,
             id -> id.equals("dev.jasper.remote") ? "2.1.0" : "", HERE, copied::add, disabled::add, () -> logFolders++),
-            ZoneOffset.UTC, () -> dones++);
+            ZoneOffset.UTC, () -> dones++));
     }
 
     private Incident record(String source, String operation, Throwable failure) {
@@ -290,8 +300,8 @@ class ErrorsViewTest {
     }
 
     @Test void textIsNeverMarkup() {
-        var view = new ErrorsView(dev.jasper.app.testsupport.KitTestSupport.context(), incidents, new ErrorsView.Hooks(id -> "<html><b>Evil</b>", id -> "", HERE, copied::add,
-            disabled::add, () -> { }), ZoneOffset.UTC, () -> { });
+        var view = track(new ErrorsView(dev.jasper.app.testsupport.KitTestSupport.context(), incidents, new ErrorsView.Hooks(id -> "<html><b>Evil</b>", id -> "", HERE, copied::add,
+            disabled::add, () -> { }), ZoneOffset.UTC, () -> { }));
         record("dev.example.evil", "<html><i>op</i>", new IllegalStateException("<html><u>message</u>"));
         assertThat(view.headerText()).isEqualTo("<html><b>Evil</b> · <html><i>op</i>");
         for (JLabel label : List.of(view.headerLabel(), view.rowLabels(0).get(0), view.rowLabels(0).get(1))) {
