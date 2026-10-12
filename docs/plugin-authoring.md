@@ -828,7 +828,7 @@ The [completion audit](design/theme-engine/completion.md) records exact gate sco
 rendering, distribution checks and the named Plan 3 composition owners. App host Settings error/stub
 content uses the dialog kit context and closes with its page; it is not covered by the plugin-only compiled gate.
 
-### Panel compositions (Plan 3 Tasks 6-7)
+### Panel compositions (SDK 0.15.3)
 
 Give a panel with nothing to show an `Empty` as its body: the host centres it in the body at the panel-reference size.
 A note above it (for example a settings-file problem) goes in a `SplitKind.DOCUMENT` split with the `Empty` last.
@@ -871,10 +871,18 @@ The host's immutable identity value includes this policy in equality and receive
 metadata updates therefore refresh selected presentation without replacing the plugin's authored art.
 This is manifest metadata, not a new SDK UI descriptor or general icon-state API.
 
-### Free-entry placeholders (unreleased SDK 0.15 generation)
+### Free-entry placeholders (SDK 0.15.3)
 
 `Nodes.ChoiceSearch` gains a fourth component, `placeholder`. A SEARCHABLE choice with free entry
 (`entry` present) shows a nonempty placeholder in the placeholder role while its text is empty, for
 example the group a blank value files a host under. It is display text only: it is never reported as an
 `Edited` value and never becomes the entry. A placeholder without free entry is rejected. The original
 three-argument constructor remains and supplies an empty placeholder.
+
+### SDK 0.15.3 summary
+
+SDK 0.15.3 adds, for plugins built against it (declare `sdk = ">=0.15.3, <0.16"`): `LayoutRole.ROUTE`; a
+`PickerFace` on DROPDOWN choices; the free-entry `ChoiceSearch.placeholder`; `SettingSpec.unit` (shown after a
+bounded integer's Settings stepper); the `border.identity` semantic color; and the icon names `laptop`, `target`,
+`arrow.right`, `import`, `clock`, `lock.keyhole`, `match.word`, `brightness`, `reset`, `expand.all` and
+`collapse.all`. [Building plugin UI](plugin-ui.md) shows the compositions they belong to.
