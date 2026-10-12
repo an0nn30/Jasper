@@ -752,7 +752,7 @@ class RemoteKitTest {
                 var entered=new MouseEvent(row,MouseEvent.MOUSE_ENTERED,1,0,0,0,0,false);
                 for(var listener:row.getMouseListeners())listener.mouseEntered(entered);
                 assertThat(ink(button)).isPositive();
-                for(var listener:row.getMouseListeners())listener.mouseExited(new MouseEvent(row,MouseEvent.MOUSE_EXITED,2,0,0,0,0,false));
+                for(var listener:row.getMouseListeners())listener.mouseExited(new MouseEvent(row,MouseEvent.MOUSE_EXITED,2,0,-1,-1,0,false));
                 assertThat(ink(button)).isZero();
                 rows.focusItem="second";
                 assertThat(ink(button)).as("logical focus alone is insufficient").isZero();

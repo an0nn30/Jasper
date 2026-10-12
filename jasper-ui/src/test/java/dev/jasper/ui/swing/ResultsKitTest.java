@@ -271,7 +271,8 @@ class ResultsKitTest {
                 var hover = ColorMath.opacity(semantic.color(SemanticColor.HOVER_OVERLAY), .05);
                 assertThat(at.apply(second, new Point(w - UIScale.scale(12), UIScale.scale(3)))).isEqualTo(over(new Color(0, 0, 0, 0), hover));
                 assertThat(at.apply(second, new Point(w - UIScale.scale(5), 0)).getAlpha()).as("hover rounded corner").isZero();
-                deliver(second, mouse(second, MouseEvent.MOUSE_EXITED, MouseEvent.NOBUTTON, 0, false));
+                // AWT reports where the pointer went: outside the row it left.
+                deliver(second, new MouseEvent(second, MouseEvent.MOUSE_EXITED, System.currentTimeMillis(), 0, -1, -1, 0, false));
                 var after = paint(view); var point = SwingUtilities.convertPoint(second, w - UIScale.scale(12), UIScale.scale(3), view);
                 assertThat(after.getRGB(point.x, point.y) >>> 24).as("after the mouse left").isZero();
             } finally { release(context); }

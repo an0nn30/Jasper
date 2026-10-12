@@ -811,6 +811,23 @@ final class InteractiveRows {
         int index, indent;
         boolean hover;
         final java.util.List<JComponent> cells = new ArrayList<>();
+        /**
+         * Hover follows the pointer over the whole row. Text with a tooltip, icons and switches take their own mouse
+         * events, so crossing into one is an exit from the slot beneath it; only an exit to a point outside the row ends
+         * the hover. The row, its slots and every control mounted in it share this tracker.
+         */
+        final MouseAdapter hoverTracker = hoverTracker();
+        /** The same tracking for mounted controls, as its own listener: the row's pointer handlers never sit on a control. */
+        final MouseAdapter controlHover = hoverTracker();
+        private MouseAdapter hoverTracker() {
+            return new MouseAdapter() {
+                @Override public void mouseEntered(MouseEvent e) { hover(true); }
+                @Override public void mouseExited(MouseEvent e) {
+                    hover(contains(SwingUtilities.convertPoint(e.getComponent(), e.getPoint(), Row.this)));
+                }
+            };
+        }
+        void hover(boolean value) { if (hover == value) return; hover = value; repaint(); }
 
         Row(RowsControl owner) {
             super(null);
@@ -825,18 +842,6 @@ final class InteractiveRows {
             check.addActionListener(e -> owner.select(id, true));
             MouseAdapter mouse =
                     new MouseAdapter() {
-                        @Override
-                        public void mouseEntered(MouseEvent e) {
-                            hover = true;
-                            repaint();
-                        }
-
-                        @Override
-                        public void mouseExited(MouseEvent e) {
-                            hover = false;
-                            repaint();
-                        }
-
                         @Override
                         public void mousePressed(MouseEvent e) {
                             owner.pressed(Row.this, e);
@@ -858,6 +863,7 @@ final class InteractiveRows {
             subtitle.addMouseListener(mouse);
             // The trailing slot listens too, so its empty area shows the row tooltip and still reaches the row.
             trailing.addMouseListener(mouse);
+            for (var part : List.of(this, leading, title, subtitle, trailing)) part.addMouseListener(hoverTracker);
         }
 
         @Override
@@ -916,6 +922,10 @@ final class InteractiveRows {
                         };
                 target.addFocusListener(listener);
                 c.own(() -> target.removeFocusListener(listener));
+                // Every mounted control keeps the row hovered while the pointer is over it, passive or interactive.
+                var hovered = c.component;
+                hovered.addMouseListener(controlHover);
+                c.own(() -> hovered.removeMouseListener(controlHover));
                 // Passive row content forwards pointer selection; interactive controls keep their
                 // own
                 // input.

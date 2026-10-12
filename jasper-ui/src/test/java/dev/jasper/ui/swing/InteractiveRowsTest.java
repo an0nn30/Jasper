@@ -903,4 +903,54 @@ class InteractiveRowsTest {
                     }
                 });
     }
+
+    /** The events AWT delivers when the pointer crosses from {@code from} into {@code into}, both inside the row. */
+    static void cross(Component from, Component into, Component row) {
+        var at = SwingUtilities.convertPoint(into, into.getWidth() / 2, into.getHeight() / 2, from);
+        from.dispatchEvent(new java.awt.event.MouseEvent(from, java.awt.event.MouseEvent.MOUSE_EXITED, 0, 0, at.x, at.y, 0, false));
+        into.dispatchEvent(new java.awt.event.MouseEvent(into, java.awt.event.MouseEvent.MOUSE_ENTERED, 0, 0, into.getWidth() / 2, into.getHeight() / 2, 0, false));
+    }
+
+    /** The pointer leaves {@code from} for a point above the row. */
+    static void leave(Component from, Component row) {
+        var above = SwingUtilities.convertPoint(row, row.getWidth() / 2, -4, from);
+        from.dispatchEvent(new java.awt.event.MouseEvent(from, java.awt.event.MouseEvent.MOUSE_EXITED, 0, 0, above.x, above.y, 0, false));
+    }
+
+    @Test
+    void hoverFollowsThePointerAcrossTheRowsTextIconAndSwitch() {
+        Edt.run(
+                () -> {
+                    var context = KitFixtures.context();
+                    try (var view = new KitView(context, new ViewSpec(list(List.of(item(0)), Set.of())), e -> {})) {
+                        view.setSize(320, 180);
+                        layout(view);
+                        var row = ((ItemLists.ListControl) view.control("servers")).mounted.get("item0");
+                        var name = find(view, "name0", JLabel.class);
+                        var icon = find(view, "folder0", JComponent.class);
+                        var toggle = find(view, "run0", JButton.class);
+                        row.title.dispatchEvent(new java.awt.event.MouseEvent(row.title, java.awt.event.MouseEvent.MOUSE_ENTERED, 0, 0, 1, 1, 0, false));
+                        assertThat(row.hover).isTrue();
+                        cross(row.title, name, row);
+                        assertThat(row.hover).as("over the title text the row is still hovered").isTrue();
+                        cross(name, row.title, row);
+                        cross(row.title, row.leading, row);
+                        cross(row.leading, icon, row);
+                        assertThat(row.hover).as("over the leading icon").isTrue();
+                        cross(icon, row.leading, row);
+                        cross(row.leading, row, row);
+                        cross(row, row.trailing, row);
+                        cross(row.trailing, toggle, row);
+                        assertThat(row.hover).as("over the row's switch").isTrue();
+                        leave(toggle, row);
+                        assertThat(row.hover).as("leaving the row from its switch ends the hover").isFalse();
+                        row.title.dispatchEvent(new java.awt.event.MouseEvent(row.title, java.awt.event.MouseEvent.MOUSE_ENTERED, 0, 0, 1, 1, 0, false));
+                        cross(row.title, name, row);
+                        leave(name, row);
+                        assertThat(row.hover).as("leaving the row from its text ends the hover").isFalse();
+                    } finally {
+                        release(context);
+                    }
+                });
+    }
 }
