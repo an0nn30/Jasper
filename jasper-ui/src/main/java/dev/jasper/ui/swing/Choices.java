@@ -195,6 +195,13 @@ final class Choices {
         int pad = ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
         renderer.setBorder(new EmptyBorder(0, pad, 0, pad)); return renderer;
     }
+    /** A hue's tile surface role colour, the base a tile or chip applies {@link ThemePainting#tileShare} to. */
+    static Color hueSurface(KitContext context, Nodes.Hue hue) {
+        return ThemePainting.color(context, switch (hue) {
+            case BLUE -> SemanticColor.HUE_BLUE_SURFACE; case GREEN -> SemanticColor.HUE_GREEN_SURFACE; case AMBER -> SemanticColor.HUE_AMBER_SURFACE;
+            case PURPLE -> SemanticColor.HUE_PURPLE_SURFACE; case NEUTRAL, NONE -> SemanticColor.HUE_NEUTRAL_SURFACE;
+        });
+    }
     static Color hue(KitContext context, Nodes.Hue hue) {
         return ThemePainting.color(context, switch (hue) {
             case BLUE -> SemanticColor.HUE_BLUE; case GREEN -> SemanticColor.HUE_GREEN; case AMBER -> SemanticColor.HUE_AMBER;

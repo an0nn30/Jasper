@@ -130,8 +130,9 @@ class SemanticPaletteTest {
         var theme = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS.replace("#f38ba8", "#000000"));
         for (var role : SemanticColor.values()) assertThat(theme.semantic().color(role)).as(role.key()).isNotNull();
         Color scrim = theme.semantic().color(SemanticColor.SURFACE_SCRIM);
-        assertThat(scrim).isEqualTo(Color.BLACK);
-        assertThat(ColorMath.opacity(scrim, .55).getAlpha()).isEqualTo(140);
+        // A scrim is painted as given (spec 3.3): a theme that names none gets black at 55% in Dark.
+        assertThat(scrim).isEqualTo(ColorMath.opacity(Color.BLACK, .55));
+        assertThat(scrim.getAlpha()).isEqualTo(140);
         assertThat(ColorMath.opacity(theme.semantic().color(SemanticColor.HUE_BLUE), .16).getAlpha()).isEqualTo(41);
         assertThat(ColorMath.opacity(theme.semantic().color(SemanticColor.BORDER_FOCUS), .25).getAlpha()).isEqualTo(64);
     }

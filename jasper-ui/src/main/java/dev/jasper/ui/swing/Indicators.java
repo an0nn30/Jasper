@@ -19,7 +19,7 @@ final class Indicators {
         void panelRow(boolean value) { if (panelRow != value) { panelRow = value; ((ChipLabel)component).panelRow = value; refresh(); } }
         @Override void refresh() {
             var chip = (Nodes.Chip)node; state(); var label = (JLabel)component;
-            label.setText(chip.label()); label.setFont(ThemePainting.font(context(), panelRow ? Typography.Role.PANEL_ROW_CHIP : Typography.Role.CHIP)); label.setForeground(Choices.hue(context(), chip.hue()));
+            label.setText(chip.label()); label.setFont(ThemePainting.font(context(), panelRow ? Typography.Role.PANEL_ROW_CHIP : Typography.Role.CHIP)); label.setForeground(Choices.hue(context(), chip.hue())); ((ChipLabel) label).fill = Choices.hueSurface(context(), chip.hue());
             int padding = ThemePainting.metric(context(), panelRow ? DesignMetrics.Role.PANEL_CHIP_PADDING : DesignMetrics.Role.CHIP_PADDING); label.setBorder(new EmptyBorder(0, padding, 0, padding));
             label.getAccessibleContext().setAccessibleName(chip.label()); label.revalidate(); label.repaint();
         }
@@ -27,6 +27,8 @@ final class Indicators {
     static final class ChipLabel extends Labels.LiteralLabel {
         final KitContext context;
         boolean panelRow;
+        /** The chip's tile surface role colour; the label paints it at the tile share. */
+        Color fill;
         // A chip keeps its label whole on an inline line (Navigation.InlineLayout); the texts beside it shrink instead.
         ChipLabel(KitContext context) { this.context = context; putClientProperty("html.disable", true); putClientProperty("Jasper.chip", Boolean.TRUE); }
         @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); return new Dimension(size.width, Math.max(size.height, ThemePainting.metric(context, panelRow ? DesignMetrics.Role.PANEL_CHIP_HEIGHT : DesignMetrics.Role.CHIP_HEIGHT))); }
@@ -35,7 +37,7 @@ final class Indicators {
             try {
                 ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
                 int radius = ThemePainting.metric(context, DesignMetrics.Role.CHIP_RADIUS);
-                g.setColor(ColorMath.opacity(getForeground(), .16)); g.fillRoundRect(0, 0, getWidth(), getHeight(), radius * 2, radius * 2);
+                g.setColor(ColorMath.opacity(fill == null ? getForeground() : fill, ThemePainting.tileShare(context))); g.fillRoundRect(0, 0, getWidth(), getHeight(), radius * 2, radius * 2);
             } finally { g.dispose(); }
             super.paintComponent(graphics);
         }

@@ -41,7 +41,7 @@ final class PickerMenus {
     }
     private static void tile(Graphics2D g,JComponent owner,KitContext c,String name,Nodes.Hue hue,int x,int y,int size,boolean active,int glyphSize){
         if(name.isEmpty())return;
-        if(hue!=Nodes.Hue.NONE){g.setColor(ColorMath.opacity(active?ThemePainting.color(c,SemanticColor.TEXT_ONACCENT):Choices.hue(c,hue),.18));int radius=metric(c,DesignMetrics.Role.CHIP_RADIUS);g.fillRoundRect(x,y,size,size,radius*2,radius*2);}
+        if(hue!=Nodes.Hue.NONE){g.setColor(ColorMath.opacity(active?ThemePainting.color(c,SemanticColor.TEXT_ONACCENT):Choices.hueSurface(c,hue),ThemePainting.tileShare(c)));int radius=metric(c,DesignMetrics.Role.CHIP_RADIUS);g.fillRoundRect(x,y,size,size,radius*2,radius*2);}
         SemanticColor role=active?SemanticColor.TEXT_ONACCENT:switch(hue){case BLUE->SemanticColor.HUE_BLUE;case GREEN->SemanticColor.HUE_GREEN;case AMBER->SemanticColor.HUE_AMBER;case PURPLE->SemanticColor.HUE_PURPLE;case NEUTRAL,NONE->SemanticColor.TEXT_TERTIARY;};
         int glyph=Math.min(size,glyphSize);
         c.icons().icon(name,c.theme().semantic(),role,glyph).paintIcon(owner,g,x+(size-glyph)/2,y+(size-glyph)/2);

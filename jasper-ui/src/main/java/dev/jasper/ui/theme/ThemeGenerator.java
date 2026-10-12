@@ -135,6 +135,8 @@ public final class ThemeGenerator {
             // their provenance avoids evaluating references against a second, different fallback map.
             var legacy = new EnumMap<Token,Color>(Token.class); legacy.putAll(tokens);
             var overrides = new EnumMap<SemanticColor,Color>(SemanticColor.class);
+            // A scrim is painted as given, so a theme that names none dims at theme.md's strengths.
+            overrides.put(SemanticColor.SURFACE_SCRIM, ColorMath.opacity(java.awt.Color.BLACK, dark ? .55 : .25));
             // Focus is a dependent default only when no legacy focus color was authored.
             if (authored.containsKey(FOCUS_RING) || document.tokens().containsKey(FOCUS_RING))
                 overrides.put(SemanticColor.BORDER_FOCUS, legacy.get(FOCUS_RING));

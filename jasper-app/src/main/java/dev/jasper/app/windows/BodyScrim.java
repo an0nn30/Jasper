@@ -2,7 +2,6 @@ package dev.jasper.app.windows;
 
 import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.app.platform.WindowBody;
-import dev.jasper.ui.theme.ColorMath;
 import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Graphics;
 import java.awt.Rectangle;
@@ -39,7 +38,7 @@ final class BodyScrim implements AutoCloseable {
         final JComponent layer = new JComponent() {
             @Override public boolean contains(int x, int y) { return false; }
             @Override protected void paintComponent(Graphics g) {
-                g.setColor(ColorMath.opacity(ThemeZone.color(this, SemanticColor.SURFACE_SCRIM), .35));
+                g.setColor(ThemeZone.color(this, SemanticColor.SURFACE_SCRIM));
                 g.fillRect(0, 0, getWidth(), getHeight());
             }
         };

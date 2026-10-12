@@ -127,7 +127,7 @@ class IconRegistryTest {
             BufferedImage selected = paint(registry.tile("add", palette, Nodes.Hue.BLUE, 24, true));
             Color tile = new Color(selected.getRGB(4, 4), true);
             assertThat(tile.getRGB() & 0xffffff).isEqualTo(palette.color(SemanticColor.TEXT_ONACCENT).getRGB() & 0xffffff);
-            assertThat(tile.getAlpha()).isEqualTo(46); // 18% rounded once
+            assertThat(tile.getAlpha()).isEqualTo(43); // the Dark tile share, 17%, rounded once
         }
     }
     @Test void registrationValidatesPathNamespaceAndLifetime() throws Exception {
@@ -159,7 +159,7 @@ class IconRegistryTest {
         colors.put(SemanticColor.HUE_BLUE_SURFACE, new Color(10, 20, 30, 128));
         try (var registry = new IconRegistry()) {
             assertThat(new Color(paint(registry.tile("add", new SemanticPalette(colors), Nodes.Hue.BLUE, 24, false)).getRGB(4, 4), true).getAlpha())
-                .isEqualTo(23); // 128 * 18%, once
+                .isEqualTo(22); // 128 * 17% (Dark), once
         }
     }
     @Test void panelOpticsPreserveAuthoredCustomStrokeAndRectangularTileGeometryAtEveryScale() {

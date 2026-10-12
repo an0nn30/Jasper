@@ -92,7 +92,7 @@ class ModalOverlayTest {
             assertThat(image.getRGB(400, 300)).as("the live content").isEqualTo(Color.RED.getRGB());
             Color scrim = f.context.theme().semantic().color(SemanticColor.SURFACE_SCRIM);
             var dimmed = new Color(image.getRGB(20, 20), true);
-            assertThat(dimmed.getAlpha()).as("the scrim dims everything else at 40%").isEqualTo(102);
+            assertThat(dimmed.getAlpha()).as("the scrim dims everything else at its own alpha").isEqualTo(scrim.getAlpha());
             assertThat(new int[] {dimmed.getRed(), dimmed.getGreen(), dimmed.getBlue()}).as("in the theme's scrim colour")
                 .satisfies(rgb -> { assertThat(rgb[0]).isCloseTo(scrim.getRed(), within(1)); assertThat(rgb[1]).isCloseTo(scrim.getGreen(), within(1));
                     assertThat(rgb[2]).isCloseTo(scrim.getBlue(), within(1)); });

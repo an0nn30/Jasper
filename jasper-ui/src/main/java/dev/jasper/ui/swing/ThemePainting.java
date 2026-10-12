@@ -30,6 +30,15 @@ final class ThemePainting {
         return Math.max(metric(context, role), line + metric(context, padding));
     }
     static Color color(KitContext context, SemanticColor role) { return context.theme().semantic().color(role); }
+    /** The focus ring's share of {@code border.focus} (about 32% in Dark, 25% in Light), or the error ring's of {@code border.error}. */
+    static double focusHaloShare(KitContext context, boolean error) {
+        return context.metrics().value(error ? DesignMetrics.Role.ERROR_HALO_PERCENT
+            : context.theme().dark() ? DesignMetrics.Role.FOCUS_HALO_PERCENT_DARK : DesignMetrics.Role.FOCUS_HALO_PERCENT_LIGHT) / 100.0;
+    }
+    /** A category tile's or chip's share of its {@code hue.<name>.surface}: 17% in Dark, 13% in Light. */
+    static double tileShare(KitContext context) {
+        return context.metrics().value(context.theme().dark() ? DesignMetrics.Role.TILE_PERCENT_DARK : DesignMetrics.Role.TILE_PERCENT_LIGHT) / 100.0;
+    }
     static void antialias(Graphics2D g) {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -99,7 +108,7 @@ final class ThemePainting {
                     double radius = halo.radius(), height = bounds.height - halo.bottomTrim();
                     var outer = new java.awt.geom.Area(new RoundRectangle2D.Double(bounds.x - ring, bounds.y - ring, bounds.width + 2.0 * ring, height + 2.0 * ring, 2.0 * (radius + ring), 2.0 * (radius + ring)));
                     outer.subtract(new java.awt.geom.Area(new RoundRectangle2D.Double(bounds.x, bounds.y, bounds.width, height, 2.0 * radius, 2.0 * radius)));
-                    g.setColor(ColorMath.opacity(color(halo.context(), halo.error() ? SemanticColor.BORDER_ERROR : SemanticColor.BORDER_FOCUS), halo.error() ? .22 : .25));
+                    g.setColor(ColorMath.opacity(color(halo.context(), halo.error() ? SemanticColor.BORDER_ERROR : SemanticColor.BORDER_FOCUS), focusHaloShare(halo.context(), halo.error())));
                     if (!component.isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
                     g.fill(outer);
                 } finally { g.dispose(); }

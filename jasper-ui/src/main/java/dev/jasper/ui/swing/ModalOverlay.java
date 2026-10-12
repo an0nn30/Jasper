@@ -258,7 +258,7 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
         try {
             ThemePainting.antialias(g);
             Color scrim = ThemePainting.color(context, SemanticColor.SURFACE_SCRIM);
-            g.setColor(ColorMath.opacity(scrim, context.metrics().value(DesignMetrics.Role.OVERLAY_SCRIM_PERCENT) / 100.0 * shown));
+            g.setColor(ColorMath.opacity(scrim, shown));
             g.fillRect(0, 0, getWidth(), getHeight());
             Rectangle at = card.getBounds();
             // A leaving card shows only as its picture; with none (motion off, never shown) nothing of it is drawn.

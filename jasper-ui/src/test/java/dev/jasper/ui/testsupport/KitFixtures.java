@@ -130,6 +130,12 @@ public final class KitFixtures {
         for (var child : container.getComponents()) if (child instanceof java.awt.Container nested) layout(nested);
     }
 
+    /** A context over {@code theme} for both routes; caller owns and closes the binding and icon registry; EDT. */
+    public static KitContext context(GeneratedTheme theme) {
+        return new KitContext(new ThemeBinding(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }),
+            ThemeRoute.WORKSPACE, DesignMetrics.DEFAULT, new IconRegistry(), () -> false);
+    }
+
     /** Caller owns and closes the binding and icon registry; creation requires EDT. */
     public static KitContext context() {
         return new KitContext(

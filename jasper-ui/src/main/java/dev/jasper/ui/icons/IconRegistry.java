@@ -202,7 +202,9 @@ public final class IconRegistry implements AutoCloseable {
             case AMBER -> SemanticColor.HUE_AMBER_SURFACE; case PURPLE -> SemanticColor.HUE_PURPLE_SURFACE;
             case NEUTRAL -> SemanticColor.HUE_NEUTRAL_SURFACE; case NONE -> SemanticColor.TEXT_SECONDARY;
         });
-        return painted(name, foreground, ColorMath.opacity(fill, .18), width, height, true, false, glyphSize,false,select(name,theme,palette,false),selectedForeground,outline);
+        // A palette-only tile has no theme: decide the variant as ordinary(...) does, from the panel surface.
+        boolean darkTile = theme != null ? theme.dark() : ColorMath.luminance(palette.color(SemanticColor.SURFACE_PANEL)) < .5;
+        return painted(name, foreground, ColorMath.opacity(fill, DesignMetrics.DEFAULT.value(darkTile ? DesignMetrics.Role.TILE_PERCENT_DARK : DesignMetrics.Role.TILE_PERCENT_LIGHT) / 100.0), width, height, true, false, glyphSize,false,select(name,theme,palette,false),selectedForeground,outline);
     }
     /** Compact context preserves calibrated legacy settings/chevron optics. */
     public Icon panel(String name,GeneratedTheme theme,SemanticColor tint,int size) {
