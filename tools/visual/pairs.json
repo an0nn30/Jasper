@@ -116,6 +116,56 @@
   ]
  },
  {
+  "name": "workspace-tabs",
+  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.25 AM.png",
+  "crop": [
+   112,
+   76,
+   1582,
+   1424
+  ],
+  "render": "jasper-app/build/workspace-surfaces/tabs/calibration-791x712.png"
+ },
+ {
+  "name": "workspace-rails",
+  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.41 AM.png",
+  "crop": [
+   112,
+   76,
+   1582,
+   1424
+  ],
+  "render": "jasper-app/build/workspace-surfaces/rails/calibration-791x712.png"
+ },
+ {
+  "name": "workspace-integrated",
+  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
+  "crop": [
+   112,
+   76,
+   2684,
+   1716
+  ],
+  "render": "jasper-app/build/workspace-surfaces/integrated/calibration-1342x858.png"
+ },
+ {
+  "name": "workspace-palette",
+  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.31 AM.png",
+  "crop": [
+   342,
+   84,
+   1120,
+   712
+  ],
+  "render": "jasper-app/build/palette-surfaces/user_palette.toml-13.0-791x712.png",
+  "render_crop": [
+   230,
+   8,
+   1120,
+   712
+  ]
+ },
+ {
   "name": "sessions-panel",
   "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
   "crop": [

@@ -263,6 +263,27 @@ tasks.register<JavaExec>("settings9bPreview") {
     jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
 }
 
+// Actual workspace chrome (title bar, tabs, rails, dock, status) with staged plugins at the Desktop references' sizes.
+// The disposable home and user name are fixture data for the header context; no native window or login shell.
+tasks.register<JavaExec>("workspaceSurfacePreview") {
+    group = "verification"
+    description = "Captures the actual workspace chrome and integrated panels headlessly at device scale 2."
+    dependsOn(tasks.testClasses, stagePlugins)
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "dev.jasper.app.workspace.WorkspaceSurfacePreview"
+    providers.gradleProperty("jasper.uiScale").orNull?.let { systemProperty("flatlaf.uiScale", it) }
+    systemProperty("jasper.stagedPlugins", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
+    val captureHome = layout.buildDirectory.dir("workspace-preview-home").get().asFile.absolutePath
+    systemProperty("user.home", captureHome)
+    systemProperty("user.name", "dustin")
+    environment("HISTFILE", "$captureHome/.zsh_history")
+    environment("XDG_CONFIG_HOME", "$captureHome/.config")
+    environment("APPDATA", "$captureHome/AppData/Roaming")
+    args(listOf(layout.buildDirectory.dir("workspace-surfaces").get().asFile.absolutePath) +
+        (providers.gradleProperty("jasper.workspaceFilter").orNull?.let { listOf(it) } ?: emptyList()))
+    jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
+}
+
 // Mounted management dialogs and the Settings-owned restart conversation, with inert native/process boundaries.
 tasks.register<JavaExec>("pluginManagerStatesPreview") {
     group = "verification"
