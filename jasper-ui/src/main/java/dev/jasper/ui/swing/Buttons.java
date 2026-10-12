@@ -214,6 +214,28 @@ final class Buttons {
                     || row.id.equals(row.owner.focusItem) && row.owner.canvas.isFocusOwner();
             return true;
         }
+        /**
+         * theme.md's primary button: a white inset line along the face's top, and a soft 1 px black drop below the face
+         * that the kit view paints outside the bounds (as {@code box-shadow} does), so the face keeps its calibrated extent.
+         */
+        private void primaryShadows(Graphics2D g, Color fill) {
+            if (kind != Nodes.ButtonKind.PRIMARY || embedded || fill == null || circular) { putClientProperty(ThemePainting.DROP, null); return; }
+            double radius = ThemePainting.metric(context, DesignMetrics.Role.CONTROL_RADIUS), inset = 0, trim = 0;
+            if (panelDetail) {
+                radius = UIScale.scale((float) context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_ARC)) / 2.0;
+                inset = ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING);
+                trim = UIScale.scale((float) context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_BOTTOM_TRIM));
+            }
+            var face = new java.awt.geom.RoundRectangle2D.Double(inset, inset, getWidth() - 2 * inset, getHeight() - trim - 2 * inset, 2 * radius, 2 * radius);
+            var top = (Graphics2D) g.create();
+            try {
+                ThemePainting.antialias(top);
+                top.clip(face);
+                top.setColor(ColorMath.opacity(Color.WHITE, context.metrics().value(DesignMetrics.Role.BUTTON_INSET_PERCENT) / 100.0));
+                top.fill(new java.awt.geom.Rectangle2D.Double(face.x, face.y, face.width, UIScale.scale(1)));
+            } finally { top.dispose(); }
+            putClientProperty(ThemePainting.DROP, new ThemePainting.Drop(context, face));
+        }
         @Override protected void paintComponent(Graphics graphics) {
             if (kind == null || !contextualVisible()) return;
             var g = (Graphics2D)graphics.create();
@@ -229,12 +251,13 @@ final class Buttons {
                 Color border = toggle && isSelected() ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : embedded ? null : border();
                 boolean focused = !embedded && focus != null && focus.visible();
                 // The outlined circle fills its bounds; like other buttons its focus halo lies outside them.
-                if(circular)ThemePainting.rounded(g,this,context,fill,ThemePainting.color(context,SemanticColor.BORDER_CONTROL),focused,false,Math.min(getWidth(),getHeight())/2.0,0,0);
+if(circular)ThemePainting.rounded(g,this,context,fill,ThemePainting.color(context,SemanticColor.BORDER_CONTROL),focused,false,Math.min(getWidth(),getHeight())/2.0,0,0);
                 else if (panelDetail) ThemePainting.rounded(g, this, context, fill, border, focused, false,
                     UIScale.scale((float)context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_ARC)) / 2.0,
                     ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING),
                     UIScale.scale((float)context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_BOTTOM_TRIM)));
                 else ThemePainting.rounded(g, this, context, fill, border, focused, false);
+                primaryShadows(g, fill);
                 g.setFont(getFont()); g.setColor(textColor(hover));
                 Insets insets = getInsets();
                 if (recorder()) {

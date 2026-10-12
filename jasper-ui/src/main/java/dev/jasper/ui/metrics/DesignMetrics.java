@@ -40,8 +40,13 @@ public final class DesignMetrics {
         WINDOW_TITLE_HEIGHT(45), DIALOG_TITLE_HEIGHT(30), DIALOG_TITLE_CENTER(21), HERO_TITLE_HEIGHT(20), HERO_CONTROLS_CENTER(18),
         // The modal overlay: the card rises this far as it fades in, over these durations; the scrim's and the soft
         // shadow's strength, the shadow's reach and the card's least distance from the window's edges.
-        OVERLAY_RISE(16), OVERLAY_ENTER_MILLIS(220), OVERLAY_EXIT_MILLIS(200), OVERLAY_SHADOW(16),
-        OVERLAY_SHADOW_PERCENT(24), OVERLAY_MARGIN(16),
+        OVERLAY_RISE(16), OVERLAY_ENTER_MILLIS(220), OVERLAY_EXIT_MILLIS(200), OVERLAY_MARGIN(16),
+        // theme.md's shadows, black at these strengths (not theme colours): the primary button's inset line and 1 px drop,
+        // popovers and menus, the modal overlay's card, and the segmented control's selected segment in Light.
+        BUTTON_INSET_PERCENT(14), BUTTON_DROP_PERCENT_DARK(30), BUTTON_DROP_PERCENT_LIGHT(12),
+        POPOVER_SHADOW_OFFSET(12), POPOVER_SHADOW_BLUR(32), POPOVER_SHADOW_PERCENT_DARK(50), POPOVER_SHADOW_PERCENT_LIGHT(18),
+        DIALOG_SHADOW_OFFSET(30), DIALOG_SHADOW_BLUR(80), DIALOG_SHADOW_PERCENT_DARK(58), DIALOG_SHADOW_PERCENT_LIGHT(22),
+        SEGMENT_SHADOW_PERCENT_LIGHT(12), SEGMENT_SHADOW_BLUR(2),
         // theme.md's alpha treatments on base tokens: the focus ring (about 32% in Dark), the error ring, and category
         // tiles and chips (16–18% in Dark, 12–14% in Light).
         FOCUS_HALO_PERCENT_DARK(32), FOCUS_HALO_PERCENT_LIGHT(25), ERROR_HALO_PERCENT(22), TILE_PERCENT_DARK(17), TILE_PERCENT_LIGHT(13),
@@ -62,7 +67,7 @@ public final class DesignMetrics {
         TAB_OPEN_MILLIS(475), TAB_CLOSE_MILLIS(425), TAB_SWITCH_MILLIS(0),
         // Plan 3 Task 10 native workspace chrome: former per-feature literals, unchanged values; shares are per mille.
         TOOLBAR_BUTTON_TRIM(6), TOOLBAR_ACTION_ICON(16),
-        NATIVE_HOVER_OVERLAY_PERCENT(8), PALETTE_SHADOW_SPREAD(12), PALETTE_SHADOW_ALPHA_DARK(4), PALETTE_SHADOW_ALPHA_LIGHT(2), PALETTE_WINDOW_MARGIN(16), PALETTE_HINT_ACTION_GAP(12), TRANSPARENT_FIELD_ICON_GAP(4),
+        NATIVE_HOVER_OVERLAY_PERCENT(8), PALETTE_WINDOW_MARGIN(16), PALETTE_HINT_ACTION_GAP(12), TRANSPARENT_FIELD_ICON_GAP(4),
         WORKSPACE_GUTTER(6), WORKSPACE_SURFACE_ARC(16), DOCK_DRAG_THRESHOLD(5), DOCK_DROP_ARC(10),
         TITLE_SEARCH_WIDTH(400), TITLE_SEARCH_MIN_WIDTH(240), TITLE_SEARCH_MAX_WIDTH(480), TITLE_SEARCH_HEIGHT(22),
         TITLE_SEARCH_ARC(12), NATIVE_TOOL_HEADER_HEIGHT(32), NATIVE_HEADER_GAP(12), NATIVE_ACTION_PADDING(4), NATIVE_MENU_SPACE(10), FIND_TOP_PADDING(2), FIND_BOTTOM_PADDING(3),

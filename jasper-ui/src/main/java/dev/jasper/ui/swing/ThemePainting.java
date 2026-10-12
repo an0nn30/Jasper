@@ -30,6 +30,62 @@ final class ThemePainting {
         return Math.max(metric(context, role), line + metric(context, padding));
     }
     static Color color(KitContext context, SemanticColor role) { return context.theme().semantic().color(role); }
+    private record ShadowKey(int width, int height, double radius, int blur, double strength) { }
+    /** Blurred shadow masks by face size and treatment; a few faces are on screen at once. EDT only. */
+    private static final java.util.Map<ShadowKey, java.awt.image.BufferedImage> SHADOWS = new java.util.LinkedHashMap<>(16, .75f, true) {
+        @Override protected boolean removeEldestEntry(java.util.Map.Entry<ShadowKey, java.awt.image.BufferedImage> eldest) { return size() > 16; }
+    };
+
+    /**
+     * A soft black shadow under {@code face}, like CSS {@code box-shadow: 0 offset blur rgba(0,0,0,strength)}: the
+     * rounded face at {@code strength}, lowered by {@code offset} and blurred by {@code blur} (three box passes each way,
+     * a Gaussian of sigma {@code blur / 2}). Paint it before the face; the graphics' composite scales it (a fading card).
+     */
+    static void softShadow(Graphics2D graphics, java.awt.geom.RectangularShape face, double radius, int offset, int blur, double strength) {
+        if (blur <= 0 || strength <= 0 || face.isEmpty()) return;
+        int width = (int) Math.ceil(face.getWidth()), height = (int) Math.ceil(face.getHeight()), pad = blur + blur / 2;
+        var mask = SHADOWS.computeIfAbsent(new ShadowKey(width, height, radius, blur, Math.min(1, strength)), key -> shadow(key, pad));
+        var g = (Graphics2D) graphics.create();
+        try {
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(mask, (int) Math.floor(face.getX()) - pad, (int) Math.floor(face.getY()) - pad + offset, null);
+        } finally { g.dispose(); }
+    }
+
+    private static java.awt.image.BufferedImage shadow(ShadowKey key, int pad) {
+        int w = key.width() + 2 * pad, h = key.height() + 2 * pad;
+        var mask = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var g = mask.createGraphics();
+        try {
+            antialias(g);
+            g.setColor(ColorMath.opacity(Color.BLACK, key.strength()));
+            g.fill(new RoundRectangle2D.Double(pad, pad, key.width(), key.height(), 2 * key.radius(), 2 * key.radius()));
+        } finally { g.dispose(); }
+        int[] pixels = mask.getRGB(0, 0, w, h, null, 0, w), alpha = new int[pixels.length];
+        for (int i = 0; i < pixels.length; i++) alpha[i] = pixels[i] >>> 24;
+        int box = Math.max(1, key.blur() / 2);
+        for (int pass = 0; pass < 3; pass++) { boxBlur(alpha, w, h, box, true); boxBlur(alpha, w, h, box, false); }
+        for (int i = 0; i < pixels.length; i++) pixels[i] = alpha[i] << 24;
+        mask.setRGB(0, 0, w, h, pixels, 0, w);
+        return mask;
+    }
+
+    /** One running-sum box blur of {@code radius} along each row ({@code horizontal}) or column, in place. */
+    private static void boxBlur(int[] alpha, int width, int height, int radius, boolean horizontal) {
+        int lines = horizontal ? height : width, length = horizontal ? width : height, span = 2 * radius + 1;
+        int[] line = new int[length];
+        for (int l = 0; l < lines; l++) {
+            for (int i = 0; i < length; i++) line[i] = alpha[horizontal ? l * width + i : i * width + l];
+            int sum = 0;
+            for (int i = 0; i <= Math.min(radius, length - 1); i++) sum += line[i];
+            for (int i = 0; i < length; i++) {
+                alpha[horizontal ? l * width + i : i * width + l] = (sum + span / 2) / span;
+                if (i - radius >= 0) sum -= line[i - radius];
+                if (i + radius + 1 < length) sum += line[i + radius + 1];
+            }
+        }
+    }
+
     /** The focus ring's share of {@code border.focus} (about 32% in Dark, 25% in Light), or the error ring's of {@code border.error}. */
     static double focusHaloShare(KitContext context, boolean error) {
         return context.metrics().value(error ? DesignMetrics.Role.ERROR_HALO_PERCENT
@@ -90,11 +146,35 @@ final class ThemePainting {
     }
 
     private record Halo(KitContext context, boolean error,double radius,int inset,double bottomTrim) {}
+    /** The client property holding a primary button's {@link Drop}. */
+    static final String DROP = "Jasper.kit.drop";
+    /** A primary button's face, in its own coordinates, whose soft drop the kit view paints outside it. */
+    record Drop(KitContext context, java.awt.geom.RoundRectangle2D face) {}
     /** View-owned final overlay: ring lies outside nominal bounds, clipped only by viewports/root. */
     static void halos(KitView root, Graphics graphics) { halos(root, root, graphics); }
+
+    /** theme.md's primary button drop, {@code 0 1px 2px} black, painted outside the face only. */
+    private static void drop(KitView root, JComponent component, Drop drop, Graphics graphics) {
+        var g = (Graphics2D) graphics.create();
+        try {
+            for (Container ancestor = component.getParent(); ancestor != null && ancestor != root; ancestor = ancestor.getParent())
+                if (ancestor instanceof JViewport) g.clip(SwingUtilities.convertRectangle(ancestor, new Rectangle(0, 0, ancestor.getWidth(), ancestor.getHeight()), root));
+            var origin = SwingUtilities.convertPoint(component, 0, 0, root);
+            var at = drop.face();
+            var face = new RoundRectangle2D.Double(origin.x + at.getX(), origin.y + at.getY(), at.getWidth(), at.getHeight(), at.getArcWidth(), at.getArcHeight());
+            var outside = new java.awt.geom.Area(new Rectangle(0, 0, root.getWidth(), root.getHeight()));
+            outside.subtract(new java.awt.geom.Area(face));
+            g.clip(outside);
+            if (!component.isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
+            var context = drop.context();
+            softShadow(g, face, at.getArcWidth() / 2, UIScale.scale(1), UIScale.scale(2), context.metrics().value(context.theme().dark()
+                ? DesignMetrics.Role.BUTTON_DROP_PERCENT_DARK : DesignMetrics.Role.BUTTON_DROP_PERCENT_LIGHT) / 100.0);
+        } finally { g.dispose(); }
+    }
     private static void halos(KitView root, Container container, Graphics graphics) {
         for (Component child : container.getComponents()) {
             if (!child.isVisible()) continue;
+            if (child instanceof JComponent component && component.getClientProperty(DROP) instanceof Drop drop) drop(root, component, drop, graphics);
             if (child instanceof JComponent component && component.getClientProperty("Jasper.kit.halo") instanceof Halo halo) {
                 var g = (Graphics2D)graphics.create();
                 try {

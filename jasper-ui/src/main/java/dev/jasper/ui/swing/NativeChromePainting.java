@@ -245,21 +245,14 @@ public final class NativeChromePainting {
     }
 
     /**
-     * The command palette's soft shadow around its card: stacked rings of the scrim colour at a named alpha (lighter in
-     * light chrome, as {@code dark} says), out to the named spread.
+     * The command palette's soft shadow around its card, theme.md's popover shadow: black, 12 px down, 32 px blur, 50% in
+     * Dark and 18% in Light (as {@code dark} says).
      */
     public static void popupShadow(Graphics graphics, Rectangle card, GeneratedTheme theme, boolean dark) {
-        var g = (Graphics2D) graphics.create();
-        try {
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            Color shadow = theme.semantic().color(SemanticColor.SURFACE_SCRIM);
-            g.setColor(new Color(shadow.getRed(), shadow.getGreen(), shadow.getBlue(), DesignMetrics.DEFAULT.value(
-                dark ? DesignMetrics.Role.PALETTE_SHADOW_ALPHA_DARK : DesignMetrics.Role.PALETTE_SHADOW_ALPHA_LIGHT)));
-            for (int i = DesignMetrics.DEFAULT.value(DesignMetrics.Role.PALETTE_SHADOW_SPREAD); i >= 1; i--) {
-                int expansion = UIScale.scale(i);
-                g.fillRect(card.x - expansion, card.y - expansion, card.width + expansion * 2, card.height + expansion * 2);
-            }
-        } finally { g.dispose(); }
+        ThemePainting.softShadow((Graphics2D) graphics, new java.awt.geom.Rectangle2D.Double(card.x, card.y, card.width, card.height),
+            NativeControlStyles.metric(DesignMetrics.Role.PALETTE_CORNER_ARC) / 2.0, NativeControlStyles.metric(DesignMetrics.Role.POPOVER_SHADOW_OFFSET),
+            NativeControlStyles.metric(DesignMetrics.Role.POPOVER_SHADOW_BLUR),
+            DesignMetrics.DEFAULT.value(dark ? DesignMetrics.Role.POPOVER_SHADOW_PERCENT_DARK : DesignMetrics.Role.POPOVER_SHADOW_PERCENT_LIGHT) / 100.0);
     }
 
     public static String clip(String text, FontMetrics metrics, int width) {

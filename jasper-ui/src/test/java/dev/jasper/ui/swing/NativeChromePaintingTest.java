@@ -58,11 +58,13 @@ class NativeChromePaintingTest {
         var theme = KitFixtures.dark();
         assertThat(NativeChromePainting.dropGuide(theme, false).getAlpha()).isEqualTo(DesignMetrics.DEFAULT.value(DesignMetrics.Role.DOCK_DROP_FILL_ALPHA));
         assertThat(NativeChromePainting.dropGuide(theme, true).getAlpha()).isEqualTo(DesignMetrics.DEFAULT.value(DesignMetrics.Role.DOCK_DROP_BORDER_ALPHA));
-        var image = new BufferedImage(80, 80, BufferedImage.TYPE_INT_ARGB);
+        // theme.md's popover shadow: black, lowered 12 and blurred 32, so it reaches 48 beyond the face and no further.
+        var image = new BufferedImage(240, 240, BufferedImage.TYPE_INT_ARGB);
         var g = image.createGraphics();
-        try { NativeChromePainting.popupShadow(g, new Rectangle(20, 20, 40, 40), theme, true); } finally { g.dispose(); }
-        int spread = DesignMetrics.DEFAULT.value(DesignMetrics.Role.PALETTE_SHADOW_SPREAD);
-        assertThat(image.getRGB(20 - spread, 30) >>> 24).as("outermost ring").isEqualTo(DesignMetrics.DEFAULT.value(DesignMetrics.Role.PALETTE_SHADOW_ALPHA_DARK));
-        assertThat(image.getRGB(20 - spread - 1, 30) >>> 24).as("beyond the spread").isZero();
+        try { NativeChromePainting.popupShadow(g, new Rectangle(100, 80, 40, 40), theme, true); } finally { g.dispose(); }
+        var below = new Color(image.getRGB(120, 122), true);
+        assertThat(below.getAlpha()).as("below the card").isPositive();
+        assertThat(below.getRGB() & 0xFFFFFF).as("black").isZero();
+        assertThat(image.getRGB(100 - 49, 100) >>> 24).as("nothing beyond the blur").isZero();
     }
 }

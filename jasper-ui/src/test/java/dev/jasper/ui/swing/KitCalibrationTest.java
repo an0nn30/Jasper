@@ -42,7 +42,7 @@ class KitCalibrationTest {
                     var image = ButtonsTest.paint(button);
                     int fill = context.theme().semantic().color(SemanticColor.ACCENT).getRGB();
                     assertThat(button.getPreferredSize().height).isEqualTo(height);
-                    assertThat(image.getRGB(width / 2, 0)).as("visible top at nominal bounds").isEqualTo(fill);
+                    assertThat(image.getRGB(width / 2, 0)).as("visible top at nominal bounds, under the inset line").isEqualTo(ButtonsTest.inset(context.theme().semantic().color(SemanticColor.ACCENT)));
                     assertThat(image.getRGB(width / 2, height - 1)).as("visible bottom at nominal bounds").isEqualTo(fill);
                     assertThat(image.getRGB(UIScale.scale(1), UIScale.scale(1))).as("6px radius corner is outside fill").isNotEqualTo(fill);
                 }

@@ -34,8 +34,13 @@ class SessionsCompositionTest {
                 assertThat(bounds(fixture.component("card.connect"),fixture.view())).isEqualTo(new Rectangle(174,358,74,28));
                 var shot=fixture.capture(2);
                 int accent=calibration.workspace().semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT).getRGB();
+                // theme.md's white inset line tints the face's top logical row; it is still the face.
+                var tint=new java.awt.image.BufferedImage(1,1,java.awt.image.BufferedImage.TYPE_INT_ARGB);var tg=tint.createGraphics();
+                try{tg.setColor(new java.awt.Color(accent,true));tg.fillRect(0,0,1,1);tg.setColor(dev.jasper.ui.theme.ColorMath.opacity(java.awt.Color.WHITE,
+                    dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_INSET_PERCENT)/100.0));tg.fillRect(0,0,1,1);}finally{tg.dispose();}
+                int inset=tint.getRGB(0,0);
                 int left=500,right=0,top=772,bottom=0;
-                for(int y=720;y<772;y++)for(int x=350;x<500;x++)if(shot.getRGB(x,y)==accent){left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);}
+                for(int y=720;y<772;y++)for(int x=350;x<500;x++)if(shot.getRGB(x,y)==accent||shot.getRGB(x,y)==inset){left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);}
                 assertThat(new Rectangle(left,top,right-left+1,bottom-top+1)).as("exact source2x Connect face; hit/text allocation remains unchanged").isEqualTo(new Rectangle(354,722,136,42));
                 assertThat(shot.getRGB(422,763)).isEqualTo(accent);
                 assertThat(shot.getRGB(422,764)).isNotEqualTo(accent);

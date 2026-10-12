@@ -34,7 +34,10 @@ class ButtonsTest {
                 assertThat(image.getRGB(74, 47)).as("source centerline ends at42device face pixels").isEqualTo(accent);
                 assertThat(image.getRGB(74, 48) >>> 24).as("hit/focus reservation is not fill").isZero();
                 for (int row = 0; row < sourceTopRows.length; row++) {
-                    int count = 0; for (int x = 0; x < image.getWidth(); x++) if (image.getRGB(x, row + 6) == accent) count++;
+                    // The first logical row (two device rows) carries theme.md's white inset line over the accent; the line's
+                    // hard clip leaves the face's outermost fully covered pixels plain accent, so both count as face.
+                    int tinted = row < 2 ? inset(ctx.theme().semantic().color(SemanticColor.ACCENT)) : accent;
+                    int count = 0; for (int x = 0; x < image.getWidth(); x++) { int rgb = image.getRGB(x, row + 6); if (rgb == accent || rgb == tinted) count++; }
                     assertThat(count).as("source top face row %s", row).isEqualTo(sourceTopRows[row]);
                 }
                 var previous = KeyboardFocusManager.getCurrentKeyboardFocusManager();
@@ -129,9 +132,9 @@ class ButtonsTest {
                     assertThat(button.getPreferredSize().height).isEqualTo(28);
                     button.setSize(button.getPreferredSize());var before=paint(button);
                     assertThat(before.getRGB(button.getWidth()/2,2)>>>24).isZero();
-                    assertThat(before.getRGB(button.getWidth()/2,3)).isEqualTo(theme.semantic().color(SemanticColor.ACCENT).getRGB());
+                    assertThat(before.getRGB(button.getWidth()/2,3)).as("the face's top row, under the inset line").isEqualTo(inset(theme.semantic().color(SemanticColor.ACCENT)));
                     button.getModel().setRollover(true);var hover=paint(button);
-                    assertThat(hover.getRGB(button.getWidth()/2,3)).isEqualTo(theme.semantic().color(SemanticColor.ACCENT_HOVER).getRGB());
+                    assertThat(hover.getRGB(button.getWidth()/2,3)).isEqualTo(inset(theme.semantic().color(SemanticColor.ACCENT_HOVER)));
                     button.getModel().setRollover(false);button.setEnabled(false);var disabled=paint(button);button.getModel().setRollover(true);
                     assertThat(paint(button).getRGB(0,0,button.getWidth(),button.getHeight(),null,0,button.getWidth())).containsExactly(disabled.getRGB(0,0,button.getWidth(),button.getHeight(),null,0,button.getWidth()));
                     button.doClick(0);assertThat(events).isEmpty();button.setEnabled(true);button.getModel().setRollover(false);
@@ -143,6 +146,17 @@ class ButtonsTest {
             } finally {if(old==null)UIManager.getDefaults().remove("defaultFont");else UIManager.put("defaultFont",old);release(ctx);}
         });
     }
+    /** A primary face's top row: theme.md's white inset line over {@code face}, as Java2D composes it. */
+    static int inset(java.awt.Color face) {
+        var image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB); var g = image.createGraphics();
+        try {
+            g.setColor(face); g.fillRect(0, 0, 1, 1);
+            g.setColor(dev.jasper.ui.theme.ColorMath.opacity(java.awt.Color.WHITE, dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(
+                dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_INSET_PERCENT) / 100.0)); g.fillRect(0, 0, 1, 1);
+        } finally { g.dispose(); }
+        return image.getRGB(0, 0);
+    }
+
     static BufferedImage paint(JComponent c) {
         var image = new BufferedImage(c.getWidth(), c.getHeight(), BufferedImage.TYPE_INT_ARGB); var g = image.createGraphics();
         try { c.paint(g); } finally { g.dispose(); } return image;

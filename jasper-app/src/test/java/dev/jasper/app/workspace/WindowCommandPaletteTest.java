@@ -232,7 +232,8 @@ class WindowCommandPaletteTest {
             }
         });
     }
-    @Test void overlayShadowTintsTowardTheModuleScrimRole() throws Exception {
+    /** theme.md's shadows are black, never theme colours: a red scrim leaves the palette's shadow neutral. */
+    @Test void overlayShadowIsBlackWhateverTheScrim() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
                 var root = install(owner);
@@ -256,8 +257,8 @@ class WindowCommandPaletteTest {
                         overlay.paint(graphics);
                     } finally { graphics.dispose(); }
                     var pixel = new Color(image.getRGB(card.x - 2, card.y - 2), true);
-                    assertThat(pixel.getRed()).as("the shadow is tinted toward the configured module scrim role")
-                        .isGreaterThan(pixel.getGreen());
+                    assertThat(pixel.getRed()).as("the shadow darkens what lies beneath").isLessThan(Color.GRAY.getRed());
+                    assertThat(pixel.getRed()).as("and stays neutral, not the scrim's red").isCloseTo(pixel.getGreen(), org.assertj.core.api.Assertions.within(1));
                 } finally {
                     // Putting the saved value back would pin it in the developer defaults, ahead of
                     // whatever look and feel installs next; clearing the override is the real restore.

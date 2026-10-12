@@ -263,16 +263,15 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
             Rectangle at = card.getBounds();
             // A leaving card shows only as its picture; with none (motion off, never shown) nothing of it is drawn.
             if (at.isEmpty() || shown <= 0 || phase == Phase.CLOSING && leaving == null) return;
-            // A soft shadow: nested rounded fills, one step wider each, together reaching the shadow's strength.
-            int reach = ThemePainting.metric(context, DesignMetrics.Role.OVERLAY_SHADOW), radius = ThemePainting.metric(context, DesignMetrics.Role.WINDOW_RADIUS);
-            double strength = context.metrics().value(DesignMetrics.Role.OVERLAY_SHADOW_PERCENT) / 100.0 * shown;
-            if (reach > 0) {
-                g.setColor(ColorMath.opacity(scrim, strength / reach));
-                int drop = Math.max(1, reach / 6);
-                for (int step = reach; step >= 1; step--)
-                    g.fill(new RoundRectangle2D.Float(at.x - step, at.y - step + drop, at.width + 2 * step, at.height + 2 * step,
-                        2 * (radius + step), 2 * (radius + step)));
-            }
+            // theme.md's dialog shadow, black, fading with the card.
+            var shadow = (Graphics2D) g.create();
+            try {
+                shadow.setComposite(AlphaComposite.SrcOver.derive((float) Math.min(1, Math.max(0, shown))));
+                ThemePainting.softShadow(shadow, new java.awt.geom.Rectangle2D.Double(at.x, at.y, at.width, at.height),
+                    ThemePainting.metric(context, DesignMetrics.Role.WINDOW_RADIUS), ThemePainting.metric(context, DesignMetrics.Role.DIALOG_SHADOW_OFFSET),
+                    ThemePainting.metric(context, DesignMetrics.Role.DIALOG_SHADOW_BLUR), context.metrics().value(context.theme().dark()
+                        ? DesignMetrics.Role.DIALOG_SHADOW_PERCENT_DARK : DesignMetrics.Role.DIALOG_SHADOW_PERCENT_LIGHT) / 100.0);
+            } finally { shadow.dispose(); }
             if (leaving != null) {
                 g.setComposite(AlphaComposite.SrcOver.derive((float) Math.min(1, Math.max(0, shown))));
                 g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);

@@ -1,5 +1,6 @@
 package dev.jasper.ui.swing;
 
+import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.ui.metrics.*;
 import dev.jasper.ui.model.*;
 import dev.jasper.ui.theme.*;
@@ -404,7 +405,14 @@ final class Choices {
         final KitContext context;
         SegmentTrack(KitContext context) { this.context = context; setOpaque(false); int pad = ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_PADDING); setBorder(new EmptyBorder(pad, pad, pad, pad)); }
         @Override protected void paintComponent(Graphics graphics) {
-            var g = (Graphics2D)graphics.create(); try { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); ThemePainting.rounded(g, this, context, ThemePainting.color(context, SemanticColor.SEGMENT_TRACK), ThemePainting.color(context, SemanticColor.BORDER_INPUT), false, false, DesignMetrics.Role.SEGMENT_TRACK_RADIUS); } finally { g.dispose(); }
+            var g = (Graphics2D)graphics.create(); try { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); ThemePainting.rounded(g, this, context, ThemePainting.color(context, SemanticColor.SEGMENT_TRACK), ThemePainting.color(context, SemanticColor.BORDER_INPUT), false, false, DesignMetrics.Role.SEGMENT_TRACK_RADIUS);
+                // The selected segment's soft shadow in Light; the track paints it, since the segment's own bounds would clip it.
+                if (!context.theme().dark()) for (var child : getComponents())
+                    if (child instanceof SegmentButton segment && segment.isVisible() && segment.isSelected())
+                        ThemePainting.softShadow(g, new java.awt.geom.Rectangle2D.Double(segment.getX(), segment.getY(), segment.getWidth(), segment.getHeight()),
+                            ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_ITEM_RADIUS), UIScale.scale(1),
+                            ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_SHADOW_BLUR), context.metrics().value(DesignMetrics.Role.SEGMENT_SHADOW_PERCENT_LIGHT) / 100.0);
+            } finally { g.dispose(); }
         }
     }
     static final class SegmentButton extends Buttons.KitButton {
