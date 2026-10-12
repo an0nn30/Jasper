@@ -201,6 +201,31 @@ class TunnelEditorTest {
         });
     }
 
+    @Test void everyProblemThatDisablesThePrimaryIsMarkedOnItsField() throws Exception {
+        edt(() -> {
+            var editor = editor(List.of(), Optional.empty(), Optional.empty());
+            type(editor.view(), TunnelEditor.NAME, "pg");
+            type(editor.view(), TunnelEditor.LISTEN_PORT, "5432");
+            type(editor.view(), TunnelEditor.FORWARD_PORT, "5432");
+            assertThat(saveEnabled(editor)).isTrue();
+            type(editor.view(), TunnelEditor.LISTEN_ADDRESS, "my-laptop");
+            assertThat(saveEnabled(editor)).as("a host name is refused so binding never waits on DNS").isFalse();
+            assertThat(field(editor, TunnelEditor.LISTEN_ADDRESS).state().error()).isEqualTo("Use localhost, * or an IP address");
+            type(editor.view(), TunnelEditor.LISTEN_ADDRESS, "");
+            assertThat(field(editor, TunnelEditor.LISTEN_ADDRESS).state().error()).as("the placeholder is not a value").isEqualTo("Enter localhost, * or an IP address");
+            type(editor.view(), TunnelEditor.LISTEN_ADDRESS, "127.0.0.1");
+            assertThat(field(editor, TunnelEditor.LISTEN_ADDRESS).state().error()).isEmpty();
+            type(editor.view(), TunnelEditor.FORWARD_HOST, " ");
+            assertThat(saveEnabled(editor)).isFalse();
+            assertThat(field(editor, TunnelEditor.FORWARD_HOST).state().error()).isEqualTo("Enter the host to forward to");
+            kind(editor, TunnelEditor.DYNAMIC);
+            assertThat(field(editor, TunnelEditor.FORWARD_HOST).state().error()).as("a SOCKS proxy has no target").isEmpty();
+            assertThat(saveEnabled(editor)).isTrue();
+            var empty = new TunnelEditor(new FakeKit("dev.jasper.remote"), List.of(), List.of(), Optional.empty(), Optional.empty(), saved::add, () -> cancelled++);
+            assertThat(choice(empty, TunnelEditor.HOST).state().error()).isEqualTo("Add a host in Sessions first");
+        });
+    }
+
     @Test void editingKeepsTheIdentityAndSavingAQuickForwardNamesIt() throws Exception {
         edt(() -> {
             Tunnel existing = Tunnel.create("pg", prod.id(), TunnelKind.REMOTE, Tunnel.ALL, 8080, "localhost", 3000);
@@ -235,9 +260,11 @@ class TunnelEditorTest {
             assertThat(choice(editor, TunnelEditor.HOST).selectedId()).isEmpty();
             assertThat(choice(editor, TunnelEditor.HOST).face()).as("no host to describe").isEmpty();
             assertThat(saveEnabled(editor)).isFalse();
+            assertThat(choice(editor, TunnelEditor.HOST).state().error()).as("the disabled primary says why").isEqualTo("Choose a host to go through");
             click(editor.view(), TunnelEditor.SAVE);
             assertThat(editor.message()).isEqualTo("Choose a host to go through");
             emit(editor.view(), new UiEvent.Selected(TunnelEditor.HOST, Set.of(web.id().toString())));
+            assertThat(choice(editor, TunnelEditor.HOST).state().error()).isEmpty();
             assertThat(row(editor, TunnelEditor.FORWARD_ROW).caption()).as("the chosen host names the target's side").isEqualTo("as seen from web");
             editor.showError("tunnels.toml has errors; fix it before saving");
             assertThat(editor.message()).isEqualTo("tunnels.toml has errors; fix it before saving");

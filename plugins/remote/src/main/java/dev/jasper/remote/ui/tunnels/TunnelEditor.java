@@ -153,6 +153,22 @@ public final class TunnelEditor implements AutoCloseable {
         } catch (NumberFormatException bad) { throw new IllegalArgumentException(problem); }
     }
 
+    /** The listen address's inline problem: the field is locked to every interface while others may connect. */
+    private String listenProblem() {
+        if (allowOthers) return "";
+        String address = listenAddress.strip();
+        return address.isEmpty() ? "Enter localhost, * or an IP address" : Tunnel.validBindAddress(address) ? "" : "Use localhost, * or an IP address";
+    }
+
+    /** The target host's inline problem; a SOCKS proxy has no target. */
+    private String forwardProblem() { return kind != TunnelKind.DYNAMIC && forwardHost.isBlank() ? "Enter the host to forward to" : ""; }
+
+    /** The Via Host choice's inline problem: an edited tunnel's host was removed, or there is no saved host at all. */
+    private String hostProblem() {
+        if (selectedHost().isPresent()) return "";
+        return hosts.isEmpty() ? "Add a host in Sessions first" : "Choose a host to go through";
+    }
+
     /** A port field's inline problem: nothing while it is blank (the primary waits for it), else a value out of range. */
     private static String portProblem(String text, int minimum) {
         if (text.isBlank()) return "";
@@ -250,7 +266,7 @@ public final class TunnelEditor implements AutoCloseable {
         String nameProblem = duplicate().map(other -> "A tunnel named " + other.name() + " exists").orElse("");
         var tunnel = section(TUNNEL_SECTION, "Tunnel", Nodes.CardKind.FORM, List.of(
             row("row." + NAME, "Name", "", field(NAME, Nodes.FieldKind.TEXT, name, "e.g. Postgres", "Name", true, nameProblem, Nodes.FieldPresentation.STANDARD), Optional.empty()),
-            row("row." + HOST, "Via Host", "", new Nodes.Choice(HOST, state(true, editable), Nodes.ChoiceKind.DROPDOWN, hostOptions, host, "Via Host", "", "",
+            row("row." + HOST, "Via Host", "", new Nodes.Choice(HOST, new ControlState(true, editable, false, hostProblem()), Nodes.ChoiceKind.DROPDOWN, hostOptions, host, "Via Host", "", "",
                 Optional.empty(), face), Optional.empty()),
             row("row." + TYPE, "Type", "", new Nodes.Choice(TYPE, state(true, editable), Nodes.ChoiceKind.SEGMENTED, List.of(
                 new Option(LOCAL, "Local", Optional.empty()), new Option(REMOTE, "Remote", Optional.empty()), new Option(DYNAMIC, "Dynamic (SOCKS)", Optional.empty())),
@@ -262,10 +278,10 @@ public final class TunnelEditor implements AutoCloseable {
             }, Nodes.TextRole.SUPPORTING), Optional.empty())));
         var ports = new ArrayList<Nodes.Node>();
         ports.add(row(LISTEN_ROW, "Listen On", server ? "on " + via : "this computer",
-            field(LISTEN_ADDRESS, Nodes.FieldKind.TEXT, listenAddress, "localhost", "Listen address", !allowOthers, "", Nodes.FieldPresentation.TECHNICAL),
+            field(LISTEN_ADDRESS, Nodes.FieldKind.TEXT, listenAddress, "localhost", "Listen address", !allowOthers, listenProblem(), Nodes.FieldPresentation.TECHNICAL),
             Optional.of(field(LISTEN_PORT, Nodes.FieldKind.PORT, listenPort, dynamic ? "1080" : "8080", "Listen port", true, portProblem(listenPort, 0), Nodes.FieldPresentation.STANDARD))));
         ports.add(new Nodes.FormRow(FORWARD_ROW, state(!dynamic, true), "Forward To", server ? "as seen from this computer" : "as seen from " + via,
-            field(FORWARD_HOST, Nodes.FieldKind.TEXT, forwardHost, "localhost", "Target host", true, "", Nodes.FieldPresentation.TECHNICAL),
+            field(FORWARD_HOST, Nodes.FieldKind.TEXT, forwardHost, "localhost", "Target host", true, forwardProblem(), Nodes.FieldPresentation.TECHNICAL),
             Optional.of(field(FORWARD_PORT, Nodes.FieldKind.PORT, forwardPort, "5432", "Target port", true, portProblem(forwardPort, 1), Nodes.FieldPresentation.STANDARD))));
         ports.add(route(via));
         ports.add(new Nodes.SettingRow("row." + ALLOW_OTHERS, ControlState.READY, "Allow other computers to connect",
