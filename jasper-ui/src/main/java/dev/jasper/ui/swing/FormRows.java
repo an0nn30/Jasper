@@ -179,7 +179,8 @@ final class FormRows {
             int lh = Composition.height(owner.label, lw),
                     y =
                             besideInput()
-                                    ? (p.getHeight() - lh - owner.caption.height(lw)) / 2
+                                    // Centred on the control's first line, so an error growing the row moves nothing.
+                                    ? (Math.max(line, lh + owner.caption.height(lw)) - lh - owner.caption.height(lw)) / 2
                                     : owner.caption.isVisible()
                                     ? ThemePainting.metric(
                                             owner.context(), DesignMetrics.Role.CAPTION_TOP_OFFSET)

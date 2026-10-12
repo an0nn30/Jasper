@@ -201,6 +201,22 @@ class GroupedFormGeometryTest {
             }finally{release(context);}
         });
     }
+    @Test void aCaptionedLabelStaysOnTheControlWhenItsTrailingFieldShowsAnError() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            java.util.function.Function<String,Node> row=error->new FormRow("listen",ControlState.READY,"Listen On","this computer",
+                new Field("address",ControlState.READY,FieldKind.TEXT,"localhost","","Listen address","",Optional.empty()),
+                Optional.of(new Field("port",new ControlState(true,true,false,error),FieldKind.PORT,"99999","","Listen port","",Optional.empty())));
+            try(var view=new KitView(context,new ViewSpec(new Card("card",ControlState.READY,CardKind.FORM,List.of(row.apply("")))),e->{})) {
+                KitFixtures.render(view,492,200,1);
+                var label=find(view,"listen.label",javax.swing.JComponent.class);int labelY=label.getY(),rowHeight=find(view,"listen",javax.swing.JComponent.class).getHeight();
+                view.update(new ViewSpec(new Card("card",ControlState.READY,CardKind.FORM,List.of(row.apply("Use 0 to 65535")))));
+                KitFixtures.render(view,492,200,1);
+                assertThat(find(view,"listen",javax.swing.JComponent.class).getHeight()).as("the trailing error grows the row").isGreaterThan(rowHeight);
+                assertThat(label.getY()).as("the label and caption stay centred on the control").isEqualTo(labelY);
+            }finally{release(context);}
+        });
+    }
     private static ListItem itemWithId(String id){return new ListItem(id,Optional.empty(),List.of(new Text(id+".name",ControlState.READY,id,TextRole.MONO)),List.of(),List.of());}
 
     @Test void descriptionDensityFollowsCurrentFormKindWithoutChangingCompactAndHeroRows() {
