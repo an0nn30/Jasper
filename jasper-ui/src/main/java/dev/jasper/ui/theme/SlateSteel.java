@@ -4,11 +4,13 @@ import java.awt.Color;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Jasper's theme, Slate Steel, from its bundled file {@code slate-steel.json} (the colour reference
@@ -28,12 +30,16 @@ public final class SlateSteel {
     private final String origin;
     private final Map<String, Object> ui, terminal, editor;
     private final SemanticPalette dark, light;
+    private final Map<TerminalScheme, SchemeColors> schemes;
 
     private SlateSteel(Map<String, Object> root, String origin) {
         this.origin = origin;
         objects(root, "", List.of("ui", "terminal", "editor"));
         ui = objects(root.get("ui"), "ui", List.of(DARK, LIGHT));
         terminal = objects(root.get("terminal"), "terminal", List.of(DARK, LIGHT, "high-contrast"));
+        var parsed = new EnumMap<TerminalScheme, SchemeColors>(TerminalScheme.class);
+        for (var scheme : TerminalScheme.values()) parsed.put(scheme, scheme(scheme));
+        schemes = Map.copyOf(parsed);
         editor = objects(root.get("editor"), "editor", List.of(DARK, LIGHT));
         dark = palette(DARK);
         light = palette(LIGHT);
@@ -81,6 +87,33 @@ public final class SlateSteel {
         colors.put(SemanticColor.HUE_PURPLE_SURFACE, colors.get(SemanticColor.HUE_PURPLE));
         colors.put(SemanticColor.HUE_NEUTRAL_SURFACE, colors.get(SemanticColor.HUE_NEUTRAL));
         return new SemanticPalette(colors);
+    }
+
+    static final List<String> ANSI = List.of("black", "red", "green", "yellow", "blue", "magenta", "cyan", "white");
+    static final List<String> TERMINAL_KEYS = terminalKeys();
+    private static List<String> terminalKeys() {
+        var keys = new ArrayList<>(List.of("bg", "fg", "fg.bold", "cursor", "selection"));
+        keys.addAll(ANSI);
+        for (String name : ANSI) keys.add("bright." + name);
+        return List.copyOf(keys);
+    }
+
+    /** A terminal scheme's colours. */
+    public SchemeColors terminal(TerminalScheme scheme) { return schemes.get(Objects.requireNonNull(scheme)); }
+
+    private SchemeColors scheme(TerminalScheme scheme) {
+        @SuppressWarnings("unchecked") var values = (Map<String, Object>) terminal.get(scheme.key());
+        String where = "terminal." + scheme.key();
+        if (!values.keySet().equals(Set.copyOf(TERMINAL_KEYS))) throw error(where + ": Expected the colours " + TERMINAL_KEYS);
+        Function<String, Color> get = key -> {
+            if (!(values.get(key) instanceof String text)) throw error(where + "." + key + ": Expected a colour");
+            return color(text, origin, where + "." + key);
+        };
+        var ansi = new ArrayList<Color>(16);
+        for (String name : ANSI) ansi.add(get.apply(name));
+        for (String name : ANSI) ansi.add(get.apply("bright." + name));
+        return new SchemeColors(new TerminalColors(get.apply("bg"), get.apply("fg"), get.apply("cursor"), get.apply("selection"), ansi),
+            get.apply("fg.bold"));
     }
 
     /** {@code #RRGGBB}, or {@code #RRGGBBAA} with alpha; {@code where} names the entry in errors. */
