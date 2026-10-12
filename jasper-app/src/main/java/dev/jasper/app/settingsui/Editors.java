@@ -48,7 +48,7 @@ public final class Editors {
     public static <T> Factory<T> byKind(Setting<T> setting) {
         Factory<?> factory = switch (setting.kind()) {
             case SettingKind.Bool ignored -> checkbox();
-            case SettingKind.IntegerRange ignored -> integer("");
+            case SettingKind.IntegerRange ignored -> stepper("");
             case SettingKind.NumberRange ignored -> number(1, "");
             case SettingKind.Choice<?> ignored -> choice(Map.of());
             case SettingKind.Text ignored -> text();
@@ -418,7 +418,7 @@ public final class Editors {
             var choice = new Nodes.Choice(id, state, Nodes.ChoiceKind.SEARCHABLE, options, index < 0 ? "" : "theme-" + index,
                 label, "", "", Optional.of(new Nodes.ChoiceSearch(leading.size(), "No matching themes", Optional.empty())));
             if (importer == null) return choice;
-            var gear = new Nodes.MenuButton(id + ":actions", plain(state), "", "settings", Nodes.ButtonKind.GHOST, "",
+            var gear = new Nodes.MenuButton(id + ":actions", plain(state), "", "brightness", Nodes.ButtonKind.GHOST, "",
                 List.of(new MenuItem(id + ":import", IMPORT_THEME, "", id + ":import", true, false)), "Theme actions");
             return new Nodes.Stack(id + ":line", plain(state), Nodes.LayoutRole.INLINE, List.of(choice, gear));
         }

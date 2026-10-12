@@ -58,8 +58,8 @@ class SettingsControlsTest {
         try(var view=new KitView(context,new ViewSpec(new Nodes.Stack("nav",ControlState.READY,Nodes.LayoutRole.SETTINGS_NAVIGATION,List.of(tree))),event->{})) {
             view.setSize(236,500);layout(view);var rows=(Trees.TreeControl)view.control("tree");
             assertThat(rows.mounted.get("child").getHeight()).isEqualTo(29);
-            assertThat(rows.top(2)-rows.top(1)-rows.mounted.get("child").getHeight()).isEqualTo(12);
-            assertThat(rows.top(3)-rows.top(2)-rows.mounted.get("leaf").getHeight()).isEqualTo(12);
+            assertThat(rows.top(2)-rows.top(1)-rows.mounted.get("child").getHeight()).as("an unlabelled root group").isEqualTo(context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_GROUP_GAP));
+            assertThat(rows.top(3)-rows.top(2)-rows.mounted.get("leaf").getHeight()).as("a labelled group heading").isEqualTo(context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_HEADING_GAP));
             view.update(new ViewSpec(tree));view.setSize(236,500);layout(view);
             assertThat(rows.top(2)-rows.top(1)).isEqualTo(rows.mounted.get("child").getHeight());
         }finally{context.binding().close();context.icons().close();}
@@ -199,6 +199,35 @@ class SettingsControlsTest {
             view.update(new ViewSpec(choice)); view.setSize(600, 200); layout(view);
             assertThat(find(view, "toolbar.option.none", JButton.class).getY()).isEqualTo(first.getY());
         }
+    }); }
+
+    /** A list editor (an ordered list and its entry) keeps its natural width beside its title; the page keeps its reading width. */
+    @Test void settingsListEditorsDoNotWidenTheCard() { Edt.run(()->{
+        var context=dev.jasper.ui.testsupport.KitFixtures.context();
+        var items=new ArrayList<ListItem>();
+        for(String word:List.of("ls","cd","pwd","clear","exit"))items.add(new ListItem("item-"+word,Optional.empty(),List.of(new Nodes.Text("text-"+word,ControlState.READY,word,Nodes.TextRole.BODY)),List.of(),List.of()));
+        var editor=new Nodes.Stack("trivial:editor",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
+            new Nodes.ItemList("trivial",ControlState.READY,Nodes.ListKind.ORDERED,items,Set.of(),"",List.of()),
+            new Nodes.Stack("trivial:entry",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(
+                new Nodes.Field("trivial:new",ControlState.READY,Nodes.FieldKind.TEXT,"","Add…","Add to Trivial commands",""),
+                new Nodes.Button("trivial:add",ControlState.READY,"Add","add",Nodes.ButtonKind.SECONDARY,"trivial:add","")))));
+        var reset=new Nodes.Button("trivial:reset",new ControlState(false,true,false,""),"","reset",Nodes.ButtonKind.GHOST,"trivial:reset","Reset");
+        var row=new Nodes.SettingRow("row:trivial",ControlState.READY,"Trivial commands","Single words compared with a command's first word.",
+            new Nodes.Stack("trivial:controls",ControlState.READY,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(editor,reset)),false);
+        var toggle=new Nodes.SettingRow("row:last",ControlState.READY,"Rank trivial commands last","",new Nodes.Toggle("last",ControlState.READY,"Rank trivial commands last",true,"last",false),false);
+        var page=new Nodes.Stack("page",ControlState.READY,Nodes.LayoutRole.SETTINGS_PAGE,List.of(
+            new Nodes.Section("ranking",ControlState.READY,"Ranking",new Nodes.Card("card",ControlState.READY,Nodes.CardKind.SETTINGS,List.of(row,toggle)))));
+        try(var view=new KitView(context,new ViewSpec(page),event->{})) {
+            view.setSize(744,900);layout(view);
+            var card=find(view,"card",JComponent.class);var list=find(view,"trivial",JComponent.class);var title=find(view,"row:trivial.title",JComponent.class);
+            assertThat(card.getWidth()).isEqualTo(context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_CARD_WIDTH));
+            var listBounds=SwingUtilities.convertRectangle(list.getParent(),list.getBounds(),card);var titleBounds=SwingUtilities.convertRectangle(title.getParent(),title.getBounds(),card);
+            var editorView=find(view,"trivial:editor",JComponent.class);
+            assertThat(editorView.getWidth()).as("at its natural width").isEqualTo(editorView.getPreferredSize().width);
+            assertThat(listBounds.x).as("beside its title").isGreaterThanOrEqualTo(titleBounds.x+context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH));
+            assertThat(listBounds.x+listBounds.width).as("inside the card").isLessThanOrEqualTo(card.getWidth());
+            assertThat(view.getMinimumSize().width).as("the page does not demand more than its card").isLessThanOrEqualTo(744);
+        }finally{context.binding().close();context.icons().close();}
     }); }
 
     private static void layout(java.awt.Container parent){parent.doLayout();for(var child:parent.getComponents())if(child instanceof java.awt.Container container)layout(container);}

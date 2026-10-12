@@ -27,7 +27,7 @@ import java.util.function.Consumer;
  */
 final class PluginCardList {
     /** A header's origin and title and its plugins, sorted by name. */
-    record Group(String origin, String title, List<PluginRuntime.Row> rows) { }
+    record Group(String origin, String title, String summary, List<PluginRuntime.Row> rows) { }
 
     static final String LIST = "plugins";
     private final KitView view;
@@ -109,7 +109,7 @@ final class PluginCardList {
         for (Group group : groups(rows)) {
             List<PluginRuntime.Row> matching = group.rows().stream().filter(row -> matches(row, query)).toList();
             if (matching.isEmpty()) continue;
-            headings.add(group.title());
+            headings.add(group.summary().isEmpty() ? group.title() : group.title() + ", " + group.summary());
             visible.addAll(matching);
         }
         shown = List.copyOf(visible);
@@ -138,8 +138,10 @@ final class PluginCardList {
             List<PluginRuntime.Row> matching = group.rows().stream().filter(row -> matches(row, query)).toList();
             if (matching.isEmpty()) continue;
             String heading = "group:" + group.origin();
-            items.add(new ListItem(heading, Optional.empty(), List.of(new Nodes.Text(heading + ":title", ControlState.READY, group.title(),
-                Nodes.TextRole.CAPTION)), List.of(), List.of(), true));
+            // The group's name as a section label, then how many of its plugins are enabled.
+            var title = new ArrayList<Nodes.Node>(List.of(new Nodes.Text(heading + ":title", ControlState.READY, group.title(), Nodes.TextRole.SECTION_LABEL)));
+            if (!group.summary().isEmpty()) title.add(new Nodes.Text(heading + ":summary", ControlState.READY, group.summary(), Nodes.TextRole.COUNT));
+            items.add(new ListItem(heading, Optional.empty(), title, List.of(), List.of(), true));
             for (PluginRuntime.Row row : matching) items.add(PluginCard.item(row, busy, artNames.getOrDefault(row.id(), "plugin")));
         }
         return new ViewSpec(new Nodes.ItemList(LIST, ControlState.READY, Nodes.ListKind.DOUBLE, items,
@@ -156,10 +158,10 @@ final class PluginCardList {
             long on = members.stream().filter(PluginCard::checked).count();
             String title = switch (origin) {
                 case "Development" -> "Development";
-                case "Installed" -> "User-installed (" + on + " of " + members.size() + " enabled)";
-                default -> "Bundled (" + on + " of " + members.size() + " enabled)";
+                case "Installed" -> "User-installed";
+                default -> "Bundled";
             };
-            result.add(new Group(origin, title, members));
+            result.add(new Group(origin, title, origin.equals("Development") ? "" : on + " of " + members.size() + " enabled", members));
         }
         return result;
     }

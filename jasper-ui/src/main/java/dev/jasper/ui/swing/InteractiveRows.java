@@ -1046,7 +1046,9 @@ final class InteractiveRows {
             boolean settingsNavigation=owner instanceof Trees.TreeControl tree && tree.settingsNavigation;
             int pad = ThemePainting.metric(owner.context(), settingsNavigation ? DesignMetrics.Role.SETTINGS_NAV_ROW_SIDE : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : owner.column >= 0 ? DesignMetrics.Role.COLUMN_LIST_SIDE : owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_PADDING : DesignMetrics.Role.ICON_GAP),
                     x = pad + indent,
-                    width = Math.max(0, getWidth() - pad),
+                    // A keycap tree's section counts end where its shortcut keys end.
+                    width = Math.max(0, getWidth() - (owner instanceof Trees.TreeControl keyed && !keyed.presentation.isEmpty()
+                        ? ThemePainting.metric(owner.context(), DesignMetrics.Role.KEYCAP_CONTENT_TRAILING) : pad)),
                     h = getHeight();
             int checkWidth =
                     check.isVisible()
@@ -1090,7 +1092,7 @@ final class InteractiveRows {
 
         /** A heading shows only its title, inset like the rows below it. */
         void headingLayout() {
-            int pad = ThemePainting.metric(owner.context(), owner.resultsLayout() ? DesignMetrics.Role.RESULTS_ROW_PADDING : DesignMetrics.Role.ICON_GAP);
+            int pad = ThemePainting.metric(owner.context(), owner.resultsLayout() ? DesignMetrics.Role.RESULTS_ROW_PADDING : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : DesignMetrics.Role.ICON_GAP);
             check.setBounds(0, 0, 0, 0);
             leading.setBounds(0, 0, 0, 0);
             subtitle.setBounds(0, 0, 0, 0);
@@ -1164,7 +1166,9 @@ final class InteractiveRows {
                     try { ThemePainting.antialias(rounded); rounded.setColor(fill);
                         int arc=ThemePainting.metric(owner.context(), owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_RADIUS : DesignMetrics.Role.CONTROL_RADIUS)*2;
                         int inset=owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.HAIRLINE) : 0;
-                        rounded.fillRoundRect(0,inset,getWidth(),getHeight()-2*inset,arc,arc);
+                        // Settings navigation rows keep their full hit height; the selection leaves the row spacing below it.
+                        int spacing=owner instanceof Trees.TreeControl tree && tree.settingsNavigation ? ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTINGS_NAV_ROW_SPACING) : 0;
+                        rounded.fillRoundRect(0,inset,getWidth(),Math.max(0,getHeight()-2*inset-spacing),arc,arc);
                     } finally {rounded.dispose();}
                 }
                 if (Objects.equals(id, owner.focusItem) && owner.canvas.isFocusOwner()) {

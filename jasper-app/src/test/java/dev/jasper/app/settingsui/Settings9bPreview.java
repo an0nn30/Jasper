@@ -44,6 +44,9 @@ public final class Settings9bPreview {
             SwingUtilities.invokeAndWait(()->{
                 themes[0]=new ThemeController();
                 runtime[0]=new PluginRuntime(new PluginRuntime.Options(Path.of(System.getProperty("jasper.stagedPlugins")),home.resolve("plugins"),null,false,home.resolve("plugins.toml"),home.resolve("plugins.lock")),new ActivityNotifier(new BuddyTestSupport().companion(),()->{}),PluginRuntime.SettingsReports.IGNORED,contributions,windows,new TerminalRegistry());runtime[0].start(Map.of(),true);
+                // The application's own contributed entries, registered as JasperApplication registers them.
+                contributions.addAction("plugins.manage","Manage Plugins…",null,List.of("plugins","extensions","install","safe mode"),Optional.empty(),invocation->{});
+                contributions.addAction("app.shortcuts","Keyboard Shortcuts…",null,List.of("help","keys","bindings","keymap","edit shortcuts","keyboard settings"),Optional.empty(),invocation->{});
                 var restarts=new RestartFlow(ResidentControl.NONE,mode->true,Runnable::run,Runnable::run,Duration.ofMillis(20),Duration.ofMillis(1));
                 manager[0]=new PluginManager(runtime[0],windows,new PluginManager.Hooks(surface->Optional.empty(),restarts,()->{},ResidentControl.NONE,false,Runnable::run,path->{},path->{},uri->{}));
             });
@@ -53,7 +56,8 @@ public final class Settings9bPreview {
                 SwingUtilities.invokeAndWait(()->{
                     themes[0].configure(theme,new UiFontConfig("system",font));
                     var groups=List.of(group(runtime[0],"jasper.general","Jasper","Jasper","jasper"),group(runtime[0],"jasper.commands","Long-running commands","Jasper","jasper"),group(runtime[0],"dev.jasper.editor","Editor","Editor","dev.jasper.editor"),group(runtime[0],"dev.jasper.editor.files","Files","Editor","dev.jasper.editor"));
-                    var hooks=new KeymapPage.Hooks(contributions,Map::of,()->Map.of("dev.jasper.editor","Editor"),true,edits->CompletableFuture.completedFuture(null));
+                    // One saved override (fixture) so a section shows its modified mark, as the reference does.
+                    var hooks=new KeymapPage.Hooks(contributions,()->Map.of("toggle_zen_mode","ctrl+cmd+f"),()->Map.of("dev.jasper.editor","Editor"),true,edits->CompletableFuture.completedFuture(null));
                     var pages=new CorePages.Pages(context->new KeymapPage(hooks,context),context->manager[0].page(context),context->runtime[0].settingsPages(context));
                     dialog[0]=new SettingsDialog(windows,CorePages.pages(SettingsThemeSourcesTestAccess.choices(catalog,()->Optional.of(false)),new CorePages.SystemActions(()->file,()->{},()->{},()->{},()->{},()->false),ShellChoices.NONE,new NotificationGroupChoices(()->groups),pages),new SettingsDialog.Hooks(edit->CompletableFuture.completedFuture(state),()->state,listener->new Subscription(()->{}),()->{},()->{},uri->{},(parent,count)->true,()->themes[0].appearance().context(ThemeRoute.CHROME)));
                     dialog[0].open(null,"plugins");

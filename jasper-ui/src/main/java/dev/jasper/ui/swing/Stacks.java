@@ -27,7 +27,7 @@ final class Stacks {
 
     static final class StackControl extends ControlRegistry.Control {
         final Tile tile;
-        boolean detail, sheetHeading, panelDetail, embedded, settings, identityHeader, identityGroup;
+        boolean detail, sheetHeading, panelDetail, embedded, settings, identityHeader, identityGroup, settingsHeader;
         List<ControlRegistry.Control> children = List.of();
         @Override void embeddedLabel(boolean value) { embedded = value; if (settings) children.forEach(c -> Composition.label(c, value)); }
         java.util.Set<Component> captions = java.util.Set.of();
@@ -68,7 +68,7 @@ final class Stacks {
             int detailPadding = stack.role() == Nodes.LayoutRole.DETAIL ? ThemePainting.metric(context(), panelDetail ? DesignMetrics.Role.PANEL_DETAIL_PADDING : DesignMetrics.Role.DETAIL_PADDING) : 0;
             component.setBorder(new javax.swing.border.EmptyBorder(detailPadding, detailPadding, panelDetail && stack.role()==Nodes.LayoutRole.DETAIL ? Math.max(0,detailPadding-ThemePainting.metric(context(),DesignMetrics.Role.FOCUS_RING)) : detailPadding, detailPadding));
             component.setLayout(
-                    stack.role() == Nodes.LayoutRole.SETTINGS_NAVIGATION ? new FillLayout() : stack.role() == Nodes.LayoutRole.SETTINGS_TRAILING ? new SettingsTrailingLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_GROUP_HEADER ? new SettingsGroupLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_FOOTER ? new SettingsFooterLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_PAGE ? new SettingsLayout(context()) : sheetHeading ? new Navigation.InlineLayout(context(),DesignMetrics.Role.COLUMN_GAP) : stack.role() == Nodes.LayoutRole.HERO
+                    settingsHeader ? new SettingsHeaderLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_NAVIGATION ? new FillLayout() : stack.role() == Nodes.LayoutRole.SETTINGS_TRAILING ? new SettingsTrailingLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_GROUP_HEADER ? new SettingsGroupLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_FOOTER ? new SettingsFooterLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_PAGE ? new SettingsLayout(context()) : sheetHeading ? new Navigation.InlineLayout(context(),DesignMetrics.Role.COLUMN_GAP) : stack.role() == Nodes.LayoutRole.HERO
                             ? new HeroLayout(this)
                             : stack.role() == Nodes.LayoutRole.FOOTER ? new FooterStatusLayout(context()) : stack.role() == Nodes.LayoutRole.SUPPORTING ? new SupportingLayout(context()) : stack.role() == Nodes.LayoutRole.NAVIGATION ? new Navigation.InlineLayout(context(), identityHeader ? DesignMetrics.Role.IDENTITY_HEADER_GAP : panelDetail && stack.children().stream().anyMatch(n -> n instanceof Nodes.Icon icon && icon.size() == Nodes.IconSize.HERO) ? DesignMetrics.Role.PANEL_DETAIL_IDENTITY_GAP : detail && !panelDetail ? DesignMetrics.Role.DETAIL_HEADING_GAP : DesignMetrics.Role.ICON_GAP) : new StackLayout(context(), stack.role(), stack.children().size()==2 && stack.children().getFirst() instanceof Nodes.Text text && text.role()==Nodes.TextRole.DETAIL_TITLE, captions) {
                                 @Override int gap() { return identityGroup ? ThemePainting.metric(context(),DesignMetrics.Role.IDENTITY_HEADER_AFTER) : panelDetail ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_DETAIL_GAP) : super.gap(); }
@@ -293,6 +293,43 @@ final class Stacks {
         }
     }
 
+    /**
+     * The Settings header: history buttons, then the breadcrumb (ancestors, separators and the current page) at natural
+     * widths, vertically centred. When the row is too narrow the ancestors elide first, then the current page.
+     */
+    static final class SettingsHeaderLayout implements Composition.WidthLayout {
+        final KitContext context;
+        SettingsHeaderLayout(KitContext context) { this.context = context; }
+        /** A page without ancestors sets its title further from the history buttons than a breadcrumb starts. */
+        int gap(int index, int count) { return ThemePainting.metric(context, index != 1 ? DesignMetrics.Role.SETTINGS_CRUMB_GAP : count == 2 ? DesignMetrics.Role.SETTINGS_HEADER_TITLE_GAP : DesignMetrics.Role.SETTINGS_HEADER_GAP); }
+        List<Component> visible(Container parent) { return java.util.Arrays.stream(parent.getComponents()).filter(Component::isVisible).toList(); }
+        @Override public int height(Container parent, int width) { return visible(parent).stream().mapToInt(c -> c.getPreferredSize().height).max().orElse(0); }
+        @Override public Dimension preferredLayoutSize(Container parent) {
+            var children = visible(parent); int width = 0;
+            for (int i = 0; i < children.size(); i++) width += (i > 0 ? gap(i, children.size()) : 0) + children.get(i).getPreferredSize().width;
+            return new Dimension(width, height(parent, width));
+        }
+        @Override public Dimension minimumLayoutSize(Container parent) { return new Dimension(0, height(parent, 0)); }
+        @Override public void layoutContainer(Container parent) {
+            var children = visible(parent); int[] widths = new int[children.size()]; int total = 0;
+            for (int i = 0; i < children.size(); i++) { widths[i] = children.get(i).getPreferredSize().width; total += (i > 0 ? gap(i, children.size()) : 0) + widths[i]; }
+            int excess = total - parent.getWidth(), last = children.size() - 1;
+            // Ancestors give way first; the current page (the last text) only when they are gone.
+            for (int pass = 0; pass < 2; pass++)
+                for (int i = 1; i < children.size() && excess > 0; i++)
+                    if ((pass == 0) == (i != last) && children.get(i) instanceof JLabel label && label.getIcon() == null) {
+                        int cut = Math.min(excess, widths[i]); widths[i] -= cut; excess -= cut;
+                    }
+            int x = 0;
+            for (int i = 0; i < children.size(); i++) {
+                if (i > 0) x += gap(i, children.size());
+                var child = children.get(i); int h = Math.min(parent.getHeight(), child.getPreferredSize().height);
+                child.setBounds(x, (parent.getHeight() - h) / 2, Math.max(0, Math.min(widths[i], parent.getWidth() - x)), h);
+                x += widths[i];
+            }
+        }
+    }
+
     /** Bounded reading width and responsive rows for ordinary settings pages. */
     static final class FillLayout implements Composition.WidthLayout {
         @Override public Dimension preferredLayoutSize(Container p){int w=0,h=0;for(var c:p.getComponents()){w=Math.max(w,c.getPreferredSize().width);h=Math.max(h,c.getPreferredSize().height);}return new Dimension(w,h);}
@@ -308,15 +345,21 @@ final class Stacks {
         int action(Container p){return p.getComponentCount()>1?p.getComponent(1).getPreferredSize().width:0;}
         @Override public Dimension preferredLayoutSize(Container p){if(p.getComponentCount()==0)return new Dimension();var c=p.getComponent(0).getPreferredSize();return new Dimension(c.width+gap()+action(p),c.height);}
         @Override public int height(Container p,int width){return p.getComponentCount()==0?0:Composition.height(p.getComponent(0),Math.max(0,width-gap()-action(p)));}
-        @Override public void layoutContainer(Container p){if(p.getComponentCount()==0)return;int a=action(p),w=Math.max(0,p.getWidth()-gap()-a);p.getComponent(0).setBounds(0,0,w,p.getHeight());if(p.getComponentCount()>1)p.getComponent(1).setBounds(w+gap(),0,a,p.getHeight());}
+        /** A switch's track aligns with the column's other controls; its focus halo lies in the gap before the action. */
+        int halo(Container p){return p.getComponent(0) instanceof Switches.SwitchButton?ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING):0;}
+        @Override public void layoutContainer(Container p){if(p.getComponentCount()==0)return;int a=action(p),w=Math.max(0,p.getWidth()-gap()-a);p.getComponent(0).setBounds(halo(p),0,w,p.getHeight());if(p.getComponentCount()>1)p.getComponent(1).setBounds(w+gap(),0,a,p.getHeight());}
         @Override public void addLayoutComponent(String n,Component c){} @Override public void removeLayoutComponent(Component c){}
     }
+    /** A Settings group card's heading row: owner tile and name at the leading edge, its count at the trailing edge. */
     static final class SettingsGroupLayout implements Composition.WidthLayout {
         final KitContext context;SettingsGroupLayout(KitContext context){this.context=context;}
-        int pad(){return ThemePainting.metric(context,DesignMetrics.Role.SETTING_SIDE_PADDING);}
-        @Override public Dimension preferredLayoutSize(Container p){int w=pad()*2,h=ThemePainting.metric(context,DesignMetrics.Role.SETTINGS_GROUP_HEIGHT);for(var c:p.getComponents()){w+=c.getPreferredSize().width+pad();h=Math.max(h,c.getPreferredSize().height+pad());}return new Dimension(w,h);}
+        int pad(){return ThemePainting.metric(context,DesignMetrics.Role.SETTINGS_ROW_SIDE);}
+        int gap(){return ThemePainting.metric(context,DesignMetrics.Role.SETTINGS_ICON_TEXT_GAP);}
+        // The row starts on the card's top stroke (or the line above it), which it counts in its height.
+        int top(){return ThemePainting.metric(context,DesignMetrics.Role.HAIRLINE);}
+        @Override public Dimension preferredLayoutSize(Container p){int w=pad()*2,h=ThemePainting.metric(context,DesignMetrics.Role.SETTINGS_GROUP_HEIGHT);for(var c:p.getComponents()){w+=c.getPreferredSize().width+gap();h=Math.max(h,c.getPreferredSize().height+2*gap()+top());}return new Dimension(w,h);}
         @Override public int height(Container p,int width){return preferredLayoutSize(p).height;}
-        @Override public void layoutContainer(Container p){int x=pad();for(int i=0;i<p.getComponentCount();i++){var c=p.getComponent(i);var d=c.getPreferredSize();int w=Math.min(d.width,Math.max(0,p.getWidth()-x-pad()));c.setBounds(i==p.getComponentCount()-1?Math.max(x,p.getWidth()-pad()-w):x,(p.getHeight()-d.height)/2,w,d.height);x+=w+pad();}}
+        @Override public void layoutContainer(Container p){int x=pad(),top=top();for(int i=0;i<p.getComponentCount();i++){var c=p.getComponent(i);var d=c.getPreferredSize();int w=Math.min(d.width,Math.max(0,p.getWidth()-x-pad()));c.setBounds(i==p.getComponentCount()-1?Math.max(x,p.getWidth()-pad()-w):x,top+(p.getHeight()-top-d.height)/2,w,d.height);x+=w+gap();}}
         @Override public void addLayoutComponent(String n,Component c){} @Override public void removeLayoutComponent(Component c){}
     }
 
@@ -344,7 +387,7 @@ final class Stacks {
         int fixedWidth(Container parent) {
             int width = 0;
             for (Component child : parent.getComponents()) if (child instanceof Container nested) {
-                if (nested.getLayout() instanceof SettingRows.RowLayout row && row.fixedControl()) width = Math.max(width, nested.getPreferredSize().width);
+                if (nested.getLayout() instanceof SettingRows.RowLayout row && row.fixedControl()) width = Math.max(width, row.fixedWidth(nested));
                 else width = Math.max(width, fixedWidth(nested));
             }
             return width;

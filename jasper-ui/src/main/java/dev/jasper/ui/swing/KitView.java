@@ -110,6 +110,18 @@ public final class KitView extends JPanel implements AutoCloseable {
         reconciler.refreshArtwork(iconId);
     }
     ArtworkPresentation artworkPresentation(String id){return artworkPresentations.getOrDefault(id,ArtworkPresentation.DEFAULT);}
+    private boolean settingsSurface, settingsHeader;
+    /**
+     * Kit-internal: this view is part of the Settings shell, so it composes with the Settings roles; the header view also
+     * lays out its history buttons and breadcrumb as the Settings header. Re-reconciles the current descriptor.
+     */
+    void settingsChrome(boolean header) {
+        requireOpen();
+        if (settingsSurface && settingsHeader == header) return;
+        settingsSurface = true; settingsHeader = header; update(spec);
+    }
+    boolean settingsSurface() { return settingsSurface; }
+    boolean settingsHeader() { return settingsHeader; }
     /**
      * App-only owned action inside a mounted TEXT or SEARCH field. The action has this view's normal
      * event, focus and accessibility routing. Validation is transactional, including ids in unmounted rows.

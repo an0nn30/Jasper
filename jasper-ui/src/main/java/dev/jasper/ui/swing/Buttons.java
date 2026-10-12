@@ -172,7 +172,8 @@ final class Buttons {
                 size.width = Math.max(size.width, textWidth + iconWidth + insets.left + insets.right);
             }
             if (recorder()) {
-                int height=ThemePainting.height(context,DesignMetrics.Role.FIELD_HEIGHT,Typography.Role.BODY);
+                // A recording field stands a little taller than an ordinary field.
+                int height=Math.max(ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_RECORDER_HEIGHT),ThemePainting.height(context,DesignMetrics.Role.FIELD_HEIGHT,Typography.Role.BODY));
                 return new Dimension(size.width+recorderIndicator(),Math.max(height,size.height));
             }
             if (embedded) return size;
@@ -215,7 +216,8 @@ final class Buttons {
                 }
                 Color border = toggle && isSelected() ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : embedded ? null : border();
                 boolean focused = !embedded && focus != null && focus.visible();
-                if(circular)ThemePainting.rounded(g,this,context,fill,ThemePainting.color(context,SemanticColor.BORDER_CONTROL),focused,false,Math.min(getWidth(),getHeight())/2.0,ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING),0);
+                // The outlined circle fills its bounds; like other buttons its focus halo lies outside them.
+                if(circular)ThemePainting.rounded(g,this,context,fill,ThemePainting.color(context,SemanticColor.BORDER_CONTROL),focused,false,Math.min(getWidth(),getHeight())/2.0,0,0);
                 else if (panelDetail) ThemePainting.rounded(g, this, context, fill, border, focused, false,
                     UIScale.scale((float)context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_ARC)) / 2.0,
                     ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING),

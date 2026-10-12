@@ -83,12 +83,13 @@ final class PluginDetails {
 
     /** Geometry and colours from the module: the former gaps and paddings as named metrics. */
     private void restyle() {
-        int edge = metric(DesignMetrics.Role.PLUGIN_DETAILS_EDGE_PADDING);
+        // The manager page leaves vertical padding to its lanes, so the details add the page's own above and below.
+        int edge = metric(DesignMetrics.Role.PLUGIN_DETAILS_EDGE_PADDING)+metric(DesignMetrics.Role.PLUGIN_MANAGER_PADDING);
         int leading=metric(DesignMetrics.Role.PLUGIN_DETAILS_LEADING_PADDING);
-        component.setBorder(BorderFactory.createEmptyBorder(edge, leading, edge, edge));
+        component.setBorder(BorderFactory.createEmptyBorder(edge, leading, edge, metric(DesignMetrics.Role.PLUGIN_DETAILS_TRAILING_PADDING)));
         // The source-sized identity section is also the readable minimum for this split receiver.
         // FillingPage lets Settings' existing horizontal viewport reveal it at constrained widths.
-        component.setMinimumSize(new Dimension(leading+metric(DesignMetrics.Role.IDENTITY_SECTION_WIDTH)+edge,0));
+        component.setMinimumSize(new Dimension(leading+metric(DesignMetrics.Role.IDENTITY_SECTION_WIDTH)+metric(DesignMetrics.Role.PLUGIN_DETAILS_TRAILING_PADDING),0));
         ((BorderLayout) component.getLayout()).setVgap(metric(DesignMetrics.Role.PLUGIN_DETAILS_GAP));
         int vertical = metric(DesignMetrics.Role.PLUGIN_TEXT_VERTICAL_PADDING), side = metric(DesignMetrics.Role.PLUGIN_TEXT_SIDE_PADDING);
         text.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));

@@ -316,6 +316,9 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("save", "M 2 2 H 12 L 14 4 V 14 H 2 Z M 5 2 V 6 H 11 V 2 M 5 14 V 9 H 11 V 14"),
             Map.entry("settings", "M 6.5 1.5 H 9.5 L 10 3.3 L 11.4 4.1 L 13.2 3.6 L 14.7 6.2 L 13.4 7.5 V 8.5 L 14.7 9.8 L 13.2 12.4 L 11.4 11.9 L 10 12.7 L 9.5 14.5 H 6.5 L 6 12.7 L 4.6 11.9 L 2.8 12.4 L 1.3 9.8 L 2.6 8.5 V 7.5 L 1.3 6.2 L 2.8 3.6 L 4.6 4.1 L 6 3.3 Z M 10.5 8 A 2.5 2.5 0 1 1 5.5 8 A 2.5 2.5 0 1 1 10.5 8"),
             Map.entry("appearance", "M 14 8 A 6 6 0 1 1 2 8 A 6 6 0 1 1 14 8 M 8 2 V 14"),
+            // Appearance actions (Settings theme row): a small sun, its disc and eight short rays.
+            Map.entry("brightness", "M 10.6 8 A 2.6 2.6 0 1 1 5.4 8 A 2.6 2.6 0 1 1 10.6 8 M 8 1.6 V 3.1 M 8 12.9 V 14.4 M 1.6 8 H 3.1 M 12.9 8 H 14.4 "
+                + "M 3.47 3.47 L 4.54 4.54 M 11.46 11.46 L 12.53 12.53 M 3.47 12.53 L 4.54 11.46 M 11.46 4.54 L 12.53 3.47"),
             Map.entry("window", "M 2 3 H 14 V 13 H 2 Z M 2 6 H 14"),
             Map.entry("font", "M 2 14 L 8 2 L 14 14 M 4.5 10 H 11.5"),
             Map.entry("cursor", "M 5 2 H 11 M 8 2 V 14 M 5 14 H 11"),
@@ -334,6 +337,9 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("chevron.down", "M 4 6 L 8 10 L 12 6"),
             Map.entry("chevron.right", "M 6 4 L 10 8 L 6 12"),
             Map.entry("chevron.up", "M 4 10 L 8 6 L 12 10"),
+            // Every section open (chevrons parting) and every section closed (chevrons meeting).
+            Map.entry("expand.all", "M 5 5.5 L 8 2.5 L 11 5.5 M 5 10.5 L 8 13.5 L 11 10.5"),
+            Map.entry("collapse.all", "M 5 2.5 L 8 5.5 L 11 2.5 M 5 13.5 L 8 10.5 L 11 13.5"),
             Map.entry("search", "M 11 7 A 4 4 0 1 1 3 7 A 4 4 0 1 1 11 7 M 10 10 L 14 14"),
             Map.entry("shield", "M 8 1.333 L 12.85 3.667 V 7.5 C 12.85 11 11 13.333 8 14.333 C 5 13.333 3.15 11 3.15 7.5 V 3.667 Z M 6.5 7 H 9.5 Q 10 7 10 7.5 V 10.5 Q 10 11 9.5 11 H 6.5 Q 6 11 6 10.5 V 7.5 Q 6 7 6.5 7 M 7 7 V 6 A 1 1 0 0 1 9 6 V 7"),
             Map.entry("lock", "M 5 7 V 5 A 3 3 0 0 1 11 5 V 7 M 4.25 7 H 11.75 Q 12.85 7 12.85 8.25 V 12.75 Q 12.85 14 11.75 14 H 4.25 Q 3.15 14 3.15 12.75 V 8.25 Q 3.15 7 4.25 7 M 8 10.5 H 8.05"),
@@ -342,6 +348,8 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("copy", "M 6 5 H 14 V 14 H 6 Z M 10 5 V 2 H 2 V 11 H 6"),
             Map.entry("reveal", "M 1 8 Q 8 0 15 8 Q 8 16 1 8 Z M 10 8 A 2 2 0 1 1 6 8 A 2 2 0 1 1 10 8"),
             Map.entry("refresh", "M 13 5 A 5 5 0 1 0 13 11 M 13 2 V 5 H 10"),
+            // Back to the default value: an arrow turning back over itself (Settings row Reset).
+            Map.entry("reset", "M 5.25 3 L 2.5 5.75 L 5.25 8.5 M 2.5 5.75 H 10 A 3.75 3.75 0 0 1 10 13.25 H 5.5"),
             Map.entry("upload", "M 8 11 V 2 M 4 6 L 8 2 L 12 6 M 2 10 V 14 H 14 V 10"),
             Map.entry("back", "M 10 3 L 5 8 L 10 13 M 5 8 H 14"),
             Map.entry("forward", "M 6 3 L 11 8 L 6 13 M 2 8 H 11"),

@@ -195,7 +195,7 @@ class PluginManagerPanelTest {
         panel.show(snapshot(TestRows.plugin("dev.example.found", "Found").needsReview("terminal.inject").row(),
             TestRows.plugin("dev.example.on", "On").row(), TestRows.plugin("dev.jasper.remote", "Remote").origin("Bundled").row()));
         assertThat(panel.groupTitles()).as("a plugin waiting for review is not enabled yet")
-            .containsExactly("User-installed (1 of 2 enabled)", "Bundled (1 of 1 enabled)");
+            .containsExactly("User-installed, 1 of 2 enabled", "Bundled, 1 of 1 enabled");
         assertThat(PluginKit.toggle(panel, "dev.example.found").isSelected()).isFalse();
         PluginKit.toggle(panel, "dev.example.found").doClick(0);
         PluginKit.toggle(panel, "dev.example.on").doClick(0);

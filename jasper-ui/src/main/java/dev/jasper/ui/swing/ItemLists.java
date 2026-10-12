@@ -281,7 +281,8 @@ final class ItemLists {
                                         inputHeight(
                                                 DesignMetrics.Role.BUTTON_HEIGHT,
                                                 Typography.Role.LABEL);
-                                case PREVIEWS -> ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_HEIGHT)+2*ThemePainting.metric(context(),DesignMetrics.Role.CARD_PADDING);
+                                case PREVIEWS -> ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_HEIGHT)+ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_CAPTION_GAP)+fontHeight(Typography.Role.SETTINGS_PREVIEW)
+                                    +2*ThemePainting.metric(context(),DesignMetrics.Role.CARD_PADDING)+ThemePainting.metric(context(),DesignMetrics.Role.HAIRLINE);
                                 case SEGMENTED ->
                                         inputHeight(
                                                         DesignMetrics.Role.PANEL_ACTION,

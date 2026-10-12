@@ -111,7 +111,7 @@ public final class CorePages {
                 .row(NOTIFICATIONS_GROUPS, Editors.notificationGroups(groups))
                 .note("How each kind of notification appears. A plugin's groups are listed once it has run."),
             SchemaPage.page("command-palette", "Command Palette").parent("appearance-behavior").anchor("palette")
-                .row(PALETTE_VISIBLE_ROWS, Editors.integer("")),
+                .row(PALETTE_VISIBLE_ROWS, Editors.stepper("")),
             SchemaPage.page("desk-buddy", "Desk Buddy").parent("appearance-behavior").anchor("desk-buddy")
                 .row(BUDDY_ENABLED),
             SchemaPage.page("system", "System Settings").parent("appearance-behavior").anchor("background-residency")
@@ -125,7 +125,7 @@ public final class CorePages {
                 .action(() -> "Rewrite old setting names to the current layout; the original is backed up first.",
                     new SchemaPage.Button("Migrate Config\u2026", system.migrate(), system.migratable())),
             SchemaPage.page("terminal", "Terminal")
-                .row(TERMINAL_SCROLLBACK, Editors.integer("lines"))
+                .row(TERMINAL_SCROLLBACK, Editors.stepper("lines"))
                 .row(TERMINAL_BELL)
                 .row(TERMINAL_ON_EXIT, Editors.choice(Map.of("keep_open", "Keep the pane open",
                     "close_on_success", "Close when it succeeds", "close", "Close")))

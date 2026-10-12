@@ -96,8 +96,14 @@ class CorePagesTest {
         page.component();
         var toggle=PageKit.kit(page,"ui.workspace.blur",javax.swing.JButton.class);
         assertThat(toggle.getAccessibleContext().getAccessibleName()).isEqualTo("Use theme's value");
-        assertThat(PageKit.node(page,"ui.workspace.blur:inheritance")).isInstanceOfSatisfying(Nodes.MenuButton.class,
-            menu->assertThat(menu.items()).anySatisfy(item->assertThat(item.label()).isEqualTo("Use theme's value")));
+        // The row's own Reset is the way back to the theme's value: hidden while inheriting, shown once overridden.
+        assertThat(PageKit.node(page,"ui.workspace.blur:reset").state().visible()).isFalse();
+        toggle.doClick(0);
+        assertThat(context.draft().value(CoreSettings.UI_WORKSPACE_BLUR)).isNotEqualTo(dev.jasper.app.config.WorkspaceBlur.THEME);
+        assertThat(PageKit.node(page,"ui.workspace.blur:reset").state().visible()).isTrue();
+        PageKit.kit(page,"ui.workspace.blur:reset",javax.swing.JButton.class).doClick(0);
+        assertThat(context.draft().value(CoreSettings.UI_WORKSPACE_BLUR)).isEqualTo(dev.jasper.app.config.WorkspaceBlur.THEME);
+        assertThat(PageKit.kit(page,"ui.workspace.blur",javax.swing.JButton.class).getAccessibleContext().getAccessibleName()).isEqualTo("Use theme's value");
         assertThat(page.rows()).extracting(row->row.setting().name()).doesNotContain(CoreSettings.UI_THEME_SOURCE.name(),CoreSettings.UI_THEME_FOLLOW_SYSTEM.name());
     }
 

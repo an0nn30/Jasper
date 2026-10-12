@@ -31,7 +31,7 @@ final class SettingsView extends JPanel implements AutoCloseable {
     final KitView header;
     final KitView banner;
     final KitView footer;
-    final JScrollPane body = new JScrollPane();
+    final JScrollPane body;
     private final dev.jasper.ui.swing.SettingsShell shell;
     private String query = "";
     private String breadcrumb = "";
@@ -51,6 +51,7 @@ final class SettingsView extends JPanel implements AutoCloseable {
         banner.setVisible(false);
         footer = new KitView(context, footerSpec(), events::accept);
 
+        body = dev.jasper.ui.swing.SettingsShell.pageScroller(context);
         body.setBorder(BorderFactory.createEmptyBorder());
         body.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         body.setOpaque(false); body.getViewport().setOpaque(false);
@@ -103,12 +104,14 @@ final class SettingsView extends JPanel implements AutoCloseable {
 
     private ViewSpec headerSpec() {
         int divider=breadcrumb.lastIndexOf(" › ");
-        String parent=divider<0?"":breadcrumb.substring(0,divider)+" › ";String current=divider<0?breadcrumb:breadcrumb.substring(divider+3);
+        String parent=divider<0?"":breadcrumb.substring(0,divider);String current=divider<0?breadcrumb:breadcrumb.substring(divider+3);
+        var crumbs=new ControlState(!parent.isBlank(),true,false,"");
         return new ViewSpec(new Nodes.Stack("header",ControlState.READY,Nodes.LayoutRole.NAVIGATION,List.of(
             new Nodes.Stack("history",ControlState.READY,Nodes.LayoutRole.JOINED_ACTIONS,List.of(
                 new Nodes.Button(BACK,enabled(back),"","chevron.left",Nodes.ButtonKind.GHOST,BACK,"Back"),
                 new Nodes.Button(FORWARD,enabled(forward),"","chevron.right",Nodes.ButtonKind.GHOST,FORWARD,"Forward"))),
-            new Nodes.Text("breadcrumb-parent",new ControlState(!parent.isBlank(),true,false,""),parent,Nodes.TextRole.DESCRIPTION),
+            new Nodes.Text("breadcrumb-parent",crumbs,parent,Nodes.TextRole.DESCRIPTION),
+            new Nodes.Icon("breadcrumb-separator",crumbs,"chevron.right",Nodes.Hue.NONE,Nodes.IconSize.CAPTION,"Breadcrumb separator"),
             new Nodes.Text("breadcrumb",ControlState.READY,current,Nodes.TextRole.WINDOW_TITLE))));
     }
 

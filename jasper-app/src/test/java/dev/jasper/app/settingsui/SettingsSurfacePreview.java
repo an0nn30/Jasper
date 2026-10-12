@@ -30,7 +30,6 @@ public final class SettingsSurfacePreview {
         name = "Slate Steel"
         [ui.workspace]
         opacity = 90
-        blur = "on"
         [window]
         toolbar = "icons_and_labels"
         toolbar_height = 34

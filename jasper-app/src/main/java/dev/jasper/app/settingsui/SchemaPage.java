@@ -252,7 +252,7 @@ public final class SchemaPage implements SettingsPage {
     private Nodes.Node row(Row<?> row) {
         boolean enabled = row.enabled.test(context.draft());
         var state = new ControlState(true, enabled, false, row.error);
-        var reset = new Nodes.Button(row.resetId(), new ControlState(row.resettable, true, false, ""), "", "refresh",
+        var reset = new Nodes.Button(row.resetId(), new ControlState(row.resettable, true, false, ""), "", "reset",
             Nodes.ButtonKind.GHOST, row.resetId(), "Reset " + row.setting.label() + " to default");
         if (row.editor.fullSpan()) return row.editor.node(row.id(), state, row.highlighted);
         var control = new Nodes.Stack(row.id() + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(row.editor.node(row.id(), state), reset));

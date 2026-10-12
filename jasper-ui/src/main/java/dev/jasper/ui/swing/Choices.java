@@ -70,9 +70,12 @@ final class Choices {
             label.setLabelFor(input); refresh();
         }
         private JComponent optionLabel(Option option, boolean selected, boolean popup) {
-            if(option!=null&&(!option.icon().isBlank()||!option.description().isBlank()))return new RichOptions(context(),option,selected,popup,option.id().equals(((Nodes.Choice)node).selectedId()),input.getWidth()-(popup?2*ThemePainting.metric(context(),DesignMetrics.Role.MENU_SEPARATOR_MARGIN):ThemePainting.metric(context(),DesignMetrics.Role.CHOICE_ARROW_WIDTH)));
-            return Choices.optionLabel(context(), option == null ? "Choose…" : option.label(), option == null ? Optional.empty() : option.hue(), selected,
+            if(option!=null&&(!option.icon().isBlank()||!option.description().isBlank()))return new RichOptions(context(),option,selected,popup,option.id().equals(((Nodes.Choice)node).selectedId()),input.getWidth()-(input instanceof ChoiceCombo combo?popup?2*combo.popupPadding():combo.arrowWidth():ThemePainting.metric(context(),DesignMetrics.Role.CHOICE_ARROW_WIDTH)),settings);
+            var label = Choices.optionLabel(context(), option == null ? "Choose…" : option.label(), option == null ? Optional.empty() : option.hue(), selected,
                 option == null ? SemanticColor.TEXT_TERTIARY : null);
+            // A Settings dropdown shows its value at label size, as its row title.
+            if (settings && !popup) label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
+            return label;
         }
         private void closeOptions() {
             for (var lifetime : optionLifetimes) try { lifetime.close(); } catch (Exception failure) { view.report(failure); }
@@ -123,15 +126,17 @@ final class Choices {
                             input.add(button);
                         }
                     }
+                    int inset = ThemePainting.metric(context(), settings || identitySection ? DesignMetrics.Role.SETTINGS_SEGMENT_INSET : DesignMetrics.Role.SEGMENT_PADDING);
+                    input.setBorder(new EmptyBorder(inset, inset, inset, inset));
                     for (int i = 0; i < input.getComponentCount(); i++) {
                         var button = (SegmentButton)input.getComponent(i); Option option = options.get(i);
-                        button.setEnabled(input.isEnabled()); button.setSelected(option.id().equals(choice.selectedId()));
-                        var font = context().typography().font(settings?Typography.Role.BODY:Typography.Role.LABEL, !settings && button.isSelected());
+                        button.setEnabled(input.isEnabled()); button.setSelected(option.id().equals(choice.selectedId())); button.settings = settings;
+                        var font = context().typography().font(Typography.Role.LABEL, !settings && button.isSelected());
                         button.setFont(SwingTypography.effective(font));
                         button.setForeground(button.textColor(false));
                         button.setIcon(option.hue().map(h -> (javax.swing.Icon)new HueDot(context(), h)).orElse(null)); button.setDisabledIcon(button.getIcon());
                         int pad = ThemePainting.metric(context(), settings?DesignMetrics.Role.SETTINGS_SEGMENT_PADDING:DesignMetrics.Role.SEGMENT_HORIZONTAL_PADDING);
-                        if(identitySection)pad=Math.max(pad,(ThemePainting.metric(context(),DesignMetrics.Role.IDENTITY_SECTION_WIDTH)/Math.max(1,choice.options().size())-button.getFontMetrics(button.getFont()).stringWidth(option.label()))/2);
+                        if(identitySection)pad=Math.max(pad,((ThemePainting.metric(context(),DesignMetrics.Role.IDENTITY_SECTION_WIDTH)-2*inset)/Math.max(1,choice.options().size())-button.getFontMetrics(button.getFont()).stringWidth(option.label()))/2);
                         button.setBorder(new EmptyBorder(0, pad, 0, pad));
                     }
                 }
@@ -214,6 +219,9 @@ final class Choices {
     }
     static class ChoiceCombo extends JComboBox<Option> {
         final KitContext context; ThemePainting.Focus focus; BasicComboPopup popup; int settingsWidth;
+        /** A rich value's trailing chevron lane; a Settings dropdown's lane also holds the gap before its chevron. */
+        int arrowWidth() { return ThemePainting.metric(context, settingsWidth > 0 ? DesignMetrics.Role.SETTINGS_CHOICE_ARROW : DesignMetrics.Role.CHOICE_ARROW_WIDTH); }
+        int popupPadding() { return ThemePainting.metric(context, settingsWidth > 0 ? DesignMetrics.Role.SETTINGS_POPUP_PADDING : DesignMetrics.Role.MENU_SEPARATOR_MARGIN); }
         ChoiceCombo(KitContext context) {
             this.context = context; setOpaque(false);
             setBorder(new EmptyBorder(ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0, ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0));
@@ -240,21 +248,24 @@ final class Choices {
                 @Override protected void installDefaults() { super.installDefaults(); padding = new Insets(0,0,0,0); }
                 @Override protected ComboPopup createPopup() { return createKitPopup(comboBox); }
                 private boolean rich(){for(int i=0;i<getItemCount();i++){var option=getItemAt(i);if(!option.icon().isBlank()||!option.description().isBlank())return true;}return false;}
-                @Override protected Rectangle rectangleForCurrentValue() { var bounds=super.rectangleForCurrentValue();if(rich())bounds.width=comboBox.getWidth()-comboBox.getInsets().left-comboBox.getInsets().right-ThemePainting.metric(context,DesignMetrics.Role.CHOICE_ARROW_WIDTH);return bounds; }
-                @Override protected LayoutManager createLayoutManager(){return new ComboBoxLayoutManager(){@Override public void layoutContainer(Container parent){super.layoutContainer(parent);if(arrowButton!=null&&rich()){int width=ThemePainting.metric(context,DesignMetrics.Role.CHOICE_ARROW_WIDTH);var i=comboBox.getInsets();arrowButton.setBounds(comboBox.getWidth()-i.right-width,i.top,width,comboBox.getHeight()-i.top-i.bottom);}}};}
+                @Override protected Rectangle rectangleForCurrentValue() { var bounds=super.rectangleForCurrentValue();if(rich())bounds.width=comboBox.getWidth()-comboBox.getInsets().left-comboBox.getInsets().right-arrowWidth();return bounds; }
+                @Override protected LayoutManager createLayoutManager(){return new ComboBoxLayoutManager(){@Override public void layoutContainer(Container parent){super.layoutContainer(parent);if(arrowButton!=null&&rich()){int width=arrowWidth();var i=comboBox.getInsets();arrowButton.setBounds(comboBox.getWidth()-i.right-width,i.top,width,comboBox.getHeight()-i.top-i.bottom);}}};}
                 @Override protected JButton createArrowButton() { return new JButton() {
                     { setBorder(new EmptyBorder(0, 0, 0, 0)); setContentAreaFilled(false); setOpaque(false); setFocusable(false); }
                     @Override protected void paintComponent(Graphics graphics) {
+                        // A Settings dropdown sets a smaller chevron at a fixed distance from its trailing edge.
+                        boolean settings = settingsWidth > 0;
                         var icon = context.icons().icon("chevron.down", context.theme().semantic(), SemanticColor.TEXT_SECONDARY,
-                            com.formdev.flatlaf.util.UIScale.scale(context.icons().size(Nodes.IconSize.CAPTION)));
-                        icon.paintIcon(this, graphics, (getWidth()-icon.getIconWidth())/2, (getHeight()-icon.getIconHeight())/2);
+                            settings ? ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_CHOICE_CHEVRON) : com.formdev.flatlaf.util.UIScale.scale(context.icons().size(Nodes.IconSize.CAPTION)));
+                        int x = settings ? getWidth() - ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_CHOICE_CHEVRON_INSET) - icon.getIconWidth() : (getWidth()-icon.getIconWidth())/2;
+                        icon.paintIcon(this, graphics, Math.max(0, x), (getHeight()-icon.getIconHeight())/2);
                     }
                 }; }
                 @Override public void paintCurrentValueBackground(Graphics graphics, Rectangle bounds, boolean hasFocus) {}
         }
         void refreshPopup() {
             if (popup == null) return;
-            int pad = ThemePainting.metric(context, DesignMetrics.Role.MENU_SEPARATOR_MARGIN);
+            int pad = popupPadding();
             popup.setBorder(new EmptyBorder(pad,pad,pad,pad));
             var list = popup.getList();
             list.setBackground(ThemePainting.color(context, SemanticColor.SURFACE_MENU));
@@ -337,13 +348,19 @@ final class Choices {
     }
     static final class SegmentButton extends Buttons.KitButton {
         final KitContext context;
+        /** In a Settings row the track is one field high: its inset segments fill the rest. */
+        boolean settings;
         SegmentButton(KitContext context) { super(context); this.context = context; kind = Nodes.ButtonKind.GHOST; }
         @Override SemanticColor textRole(boolean hover) { return isSelected() ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_SECONDARY; }
         @Override Color textColor(boolean hover) {
             return isSelected() ? dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(), SemanticColor.TEXT_ONACCENT,
                 SemanticColor.SEGMENT_SELECTED_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT) : super.textColor(hover);
         }
-        @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); return new Dimension(size.width, ThemePainting.height(context, DesignMetrics.Role.PANEL_ACTION, Typography.Role.LABEL)); }
+        @Override public Dimension getPreferredSize() {
+            var size = super.getPreferredSize();
+            return new Dimension(size.width, settings ? ThemePainting.height(context, DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.LABEL) - 2 * ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_SEGMENT_INSET)
+                : ThemePainting.height(context, DesignMetrics.Role.PANEL_ACTION, Typography.Role.LABEL));
+        }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create();
             try {

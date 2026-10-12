@@ -35,7 +35,8 @@ final class ViewReconciler implements AutoCloseable {
         applyColumns(spec.root(), next, -1, false);
         applyPanelDetail(spec.root(), next, false);
         applyFullForm(spec.root(), next, false);
-        applySettings(spec.root(), next, false);
+        applySettings(spec.root(), next, view.settingsSurface());
+        if (view.settingsHeader()) applySettingsHeader(spec.root(), next);
         applySettingsNavigation(spec.root(),next,false);
         applyArtworkComposition(spec.root(),next,false);
         for (var node : nodes.values()) next.get(node.id()).update(node);
@@ -101,7 +102,8 @@ final class ViewReconciler implements AutoCloseable {
             text.wrap = false;
             text.flow = false;
         }
-        if (control instanceof Stacks.StackControl stack) stack.sheetHeading = false;
+        if (control instanceof Labels.TextControl label) label.override = null;
+        if (control instanceof Stacks.StackControl stack) { stack.sheetHeading = false; stack.settingsHeader = false; }
         control.embeddedLabel(false);
         control.hero(false);
     }
@@ -140,7 +142,17 @@ final class ViewReconciler implements AutoCloseable {
         if (next.get(node.id()) instanceof SettingRows.RowControl row) row.settings = settings;
         if (next.get(node.id()) instanceof Stacks.StackControl stack) stack.settings = settings;
         if (next.get(node.id()) instanceof Choices.ChoiceControl choice)choice.settings=settings;
+        if (next.get(node.id()) instanceof Cards.CardControl card) card.settings = settings;
+        if (next.get(node.id()) instanceof Labels.TextControl text) text.settings = settings;
         ControlRegistry.children(node).forEach(child -> applySettings(child, next, settings));
+    }
+    /** The Settings header's root row: history buttons, then the breadcrumb, whose ancestors use the Settings body face. */
+    private void applySettingsHeader(Nodes.Node root, Map<String, ControlRegistry.Control> next) {
+        if (!(root instanceof Nodes.Stack stack) || stack.role() != Nodes.LayoutRole.NAVIGATION) return;
+        if (next.get(root.id()) instanceof Stacks.StackControl control) control.settingsHeader = true;
+        for (var child : stack.children())
+            if (child instanceof Nodes.Text text && text.role() == Nodes.TextRole.DESCRIPTION && next.get(child.id()) instanceof Labels.TextControl label)
+                label.override = dev.jasper.ui.metrics.Typography.Role.SETTINGS_BODY;
     }
     private void applySettingsNavigation(Nodes.Node node,Map<String,ControlRegistry.Control> next,boolean inherited) {
         boolean navigation=inherited||node instanceof Nodes.Stack stack&&stack.role()==Nodes.LayoutRole.SETTINGS_NAVIGATION;

@@ -16,8 +16,12 @@ public final class SettingsShell extends JPanel implements AutoCloseable {
         this.banner = banner; this.body = body; this.footer = footer;
         setOpaque(false); setLayout(null);
         for (JComponent child : new JComponent[]{search, navigation, header, banner, body, footer}) add(child);
+        for (JComponent child : new JComponent[]{search, navigation, header, banner, footer})
+            if (child instanceof KitView view) view.settingsChrome(child == header);
         appearance = context.binding().subscribe(pair -> { revalidate(); repaint(); });
     }
+    /** The page scroller the shell expects: the OVERLAY scroll policy, so a page never loses width to a resting bar. */
+    public static JScrollPane pageScroller(KitContext context) { return new OverlayScrollPane(java.util.Objects.requireNonNull(context)); }
     private int metric(DesignMetrics.Role role) { return ThemePainting.metric(context, role); }
     private int sidebar() { return Math.min(metric(DesignMetrics.Role.SETTINGS_SIDEBAR_WIDTH), Math.max(0, getWidth() / 3)); }
     @Override public Dimension getMinimumSize() { return new Dimension(0, 0); }
@@ -25,16 +29,16 @@ public final class SettingsShell extends JPanel implements AutoCloseable {
         int left = sidebar(), width = Math.max(0, getWidth() - left);
         int top = Math.max(metric(DesignMetrics.Role.SETTINGS_HEADER_HEIGHT), header.getPreferredSize().height);
         int bottom = Math.max(metric(DesignMetrics.Role.SETTINGS_FOOTER_HEIGHT), footer.getPreferredSize().height);
-        int gap = metric(DesignMetrics.Role.ICON_GAP), pad = metric(DesignMetrics.Role.COLUMN_GAP);
+        int inset = metric(DesignMetrics.Role.SETTINGS_SIDEBAR_INSET), side = metric(DesignMetrics.Role.SETTINGS_FOOTER_SIDE);
         int searchHeight = search.getPreferredSize().height;
-        search.setBounds(pad, top, Math.max(0, left - 2 * pad), searchHeight);
-        int navTop = top + searchHeight + gap;
+        search.setBounds(inset, top, Math.max(0, left - 2 * inset), searchHeight);
+        int navTop = top + searchHeight + metric(DesignMetrics.Role.SETTINGS_SEARCH_GAP);
         navigation.setBounds(metric(DesignMetrics.Role.SETTINGS_NAV_INSET), navTop, Math.max(0, left - 2 * metric(DesignMetrics.Role.SETTINGS_NAV_INSET)), Math.max(0, getHeight() - bottom - navTop));
         header.setBounds(left + metric(DesignMetrics.Role.SETTINGS_PAGE_INSET), 0, Math.max(0, width - 2 * metric(DesignMetrics.Role.SETTINGS_PAGE_INSET)), top);
         int bannerHeight = banner.isVisible() ? banner.getPreferredSize().height : 0;
         banner.setBounds(left, top, width, bannerHeight);
         body.setBounds(left, top + bannerHeight, width, Math.max(0, getHeight() - top - bannerHeight - bottom));
-        footer.setBounds(pad, Math.max(0, getHeight() - bottom), Math.max(0, getWidth() - 2 * pad), bottom);
+        footer.setBounds(side, Math.max(0, getHeight() - bottom), Math.max(0, getWidth() - 2 * side), bottom);
     }
     @Override protected void paintComponent(Graphics graphics) {
         var g = (Graphics2D)graphics.create();
