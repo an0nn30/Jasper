@@ -54,6 +54,7 @@ final class TextFields {
                 bindStep("UP", 1); bindStep("DOWN", -1); bindStep("KP_UP", 1); bindStep("KP_DOWN", -1);
             }
             surface = new FieldSurface(context(), input, node.kind() == Nodes.FieldKind.TEXTAREA);
+            surface.port = node.kind() == Nodes.FieldKind.PORT;
             var focus = new ThemePainting.Focus(input, surface, view); surface.focus = focus; own(focus);
             if (node.kind() == Nodes.FieldKind.TEXTAREA) {
                 scroll = new JScrollPane(input); scroll.setBorder(new EmptyBorder(0, 0, 0, 0));
@@ -370,6 +371,8 @@ final class TextFields {
         Typography.Role role = Typography.Role.BODY; String hint = ""; boolean error;
         /** The parent surface is the field's backdrop: no input fill, the outline kept. */
         boolean transparent;
+        /** A PORT field rests at the shared port width; an enlarged font still grows it past that. */
+        boolean port;
         ThemePainting.Focus focus;
         FieldSurface(KitContext context, JTextComponent input, boolean multiline) {
             super(new BorderLayout()); this.context = context; this.input = input; this.multiline = multiline; setOpaque(false);
@@ -377,7 +380,8 @@ final class TextFields {
         @Override public Dimension getPreferredSize() {
             var size = super.getPreferredSize();
             int height = ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_FIELD_HEIGHT : heightRole, role);
-            return new Dimension(size.width, multiline ? Math.max(size.height, height) : height);
+            int width = port ? Math.max(size.width, ThemePainting.metric(context, DesignMetrics.Role.PORT_FIELD_WIDTH)) : size.width;
+            return new Dimension(width, multiline ? Math.max(size.height, height) : height);
         }
         /**
          * A single-line input never clips its text: when the designed height leaves less than the input's preferred
