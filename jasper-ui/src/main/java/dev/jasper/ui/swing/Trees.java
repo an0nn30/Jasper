@@ -98,6 +98,7 @@ final class Trees {
             if(item==null || !item.leaf() || indexOf(itemId)<0)throw new IllegalArgumentException("Detail requires a visible leaf");
             validateDetail(spec.root(),context().icons().names());
             var body=new KitView(context(),spec,events);
+            if(!presentation.isEmpty())body.markKeycapDetail();
             detail=new TreeDetailHandle(this,itemId,body,detached);
             body.inheritedEnabled(interactive());canvas.add(body);detailChanged();return detail;
         }
@@ -117,11 +118,13 @@ final class Trees {
         private int detailTop(){return presentation.isEmpty()?detailInset():ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_TOP);}
         private int detailBottom(){return presentation.isEmpty()?detailInset():ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_BOTTOM);}
         private int detailTrailing(){return presentation.isEmpty()?detailInset():ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_CONTENT_TRAILING);}
+        /** Room between a keycap tree's edit card and the next row; the card stops short of it. */
+        int detailAfter(){return presentation.isEmpty()?0:ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_AFTER);}
         private int detailLeading(){return presentation.isEmpty()?detailInset():ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_LEADING);}
         private int detailHeight() {
             if(detail==null)return 0;
             int width=Math.max(1,scroll.getViewport().getExtentSize().width-detailLeading()-detailTrailing());
-            return detail.body.getComponentCount()==0?0:Composition.height(detail.body.getComponent(0),width)+detailTop()+detailBottom();
+            return detail.body.getComponentCount()==0?0:Composition.height(detail.body.getComponent(0),width)+detailTop()+detailBottom()+detailAfter();
         }
         @Override int minimumRowHeight(){return settingsNavigation?ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_ROW,dev.jasper.ui.metrics.Typography.Role.SETTINGS_BODY):presentation.isEmpty()?0:ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_ROW_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY);}
         @Override boolean uniformRows(){return !settingsNavigation && detail==null && presentation.isEmpty();}
@@ -180,7 +183,7 @@ final class Trees {
             if(detail==null)return;
             int index=indexOf(detail.itemId);if(index<0)return;
             int above=detailTop();
-            detail.body.setBounds(detailLeading(),top(index)+rowShellHeight(index)+above,Math.max(0,width-detailLeading()-detailTrailing()),Math.max(0,detailHeight()-above-detailBottom()));
+            detail.body.setBounds(detailLeading(),top(index)+rowShellHeight(index)+above,Math.max(0,width-detailLeading()-detailTrailing()),Math.max(0,detailHeight()-above-detailBottom()-detailAfter()));
             detail.body.doLayout();
         }
         @Override void refresh(){
@@ -351,6 +354,9 @@ final class Trees {
             var trailing = new ArrayList<Nodes.Node>();
             if(settingsNavigation&&!item.leaf())trailing.add(new Nodes.Button("@tree/"+node.id()+"/"+item.id()+"/expand",ControlState.READY,"",value().expandedIds().contains(item.id())?"chevron.down":"chevron.right",Nodes.ButtonKind.GHOST,"expand","Expand or collapse "+item.title(),Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED));
             var presented=presentation.get(item.id());
+            // A read-only contextual key reads quieter than the rows the user can change.
+            if(presented!=null && presented.locked() && !item.emphasized())
+                row.controls.get(titleId).component.setForeground(ThemePainting.color(context(), dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
             for (int i = 0; presented==null && i < item.trailing().size(); i++)
                 trailing.add(new Nodes.Text("@tree/" + node.id() + "/" + item.id() + "/trailing/" + i,
                         ControlState.READY, item.trailing().get(i), Nodes.TextRole.CAPTION));

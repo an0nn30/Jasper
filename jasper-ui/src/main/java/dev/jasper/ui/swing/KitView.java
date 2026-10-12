@@ -122,6 +122,10 @@ public final class KitView extends JPanel implements AutoCloseable {
     }
     boolean settingsSurface() { return settingsSurface; }
     boolean settingsHeader() { return settingsHeader; }
+    private boolean keycapDetail;
+    /** Kit-internal: this view is the inline editor of a keycap tree row, whose rows sit closer together. */
+    void markKeycapDetail() { requireOpen(); if (keycapDetail) return; keycapDetail = true; update(spec); }
+    boolean keycapDetail() { return keycapDetail; }
     /**
      * App-only owned action inside a mounted TEXT or SEARCH field. The action has this view's normal
      * event, focus and accessibility routing. Validation is transactional, including ids in unmounted rows.

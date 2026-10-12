@@ -14,7 +14,7 @@ import javax.swing.text.*;
 final class TextFields {
     private TextFields() {}
     static class FieldControl extends ControlRegistry.Control {
-        boolean panelSearch;
+        boolean panelSearch, settings;
         final JTextComponent input;
         final JLabel label = Labels.literal(), error = Labels.literal(), leading = Labels.literal();
         final FieldSurface surface;
@@ -281,7 +281,8 @@ final class TextFields {
                 leading.setIcon(panelSearch ? context().icons().panel(name, context().theme().semantic(), SemanticColor.HUE_NEUTRAL,extent)
                     : context().icons().icon(name,context().theme(),SemanticColor.TEXT_PLACEHOLDER,extent));
             }
-            int gap = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_GAP : field.kind() == Nodes.FieldKind.PORT ? DesignMetrics.Role.PORT_PREFIX_GAP : DesignMetrics.Role.ICON_GAP);
+            int gap = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_GAP : field.kind() == Nodes.FieldKind.PORT ? DesignMetrics.Role.PORT_PREFIX_GAP
+                : settings && field.kind() == Nodes.FieldKind.SEARCH ? DesignMetrics.Role.SETTINGS_SEARCH_ICON_GAP : DesignMetrics.Role.ICON_GAP);
             leading.setVisible(field.presentation() != Nodes.FieldPresentation.PLAIN_PATH);
             leading.setBorder(new EmptyBorder(0, 0, 0, gap));
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);

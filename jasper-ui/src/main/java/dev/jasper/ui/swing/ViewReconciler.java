@@ -37,6 +37,7 @@ final class ViewReconciler implements AutoCloseable {
         applyFullForm(spec.root(), next, false);
         applySettings(spec.root(), next, view.settingsSurface());
         if (view.settingsHeader()) applySettingsHeader(spec.root(), next);
+        if (view.keycapDetail() && next.get(spec.root().id()) instanceof Stacks.StackControl stack) stack.keycapDetail = true;
         applySettingsNavigation(spec.root(),next,false);
         applyArtworkComposition(spec.root(),next,false);
         for (var node : nodes.values()) next.get(node.id()).update(node);
@@ -103,7 +104,7 @@ final class ViewReconciler implements AutoCloseable {
             text.flow = false;
         }
         if (control instanceof Labels.TextControl label) label.override = null;
-        if (control instanceof Stacks.StackControl stack) { stack.sheetHeading = false; stack.settingsHeader = false; }
+        if (control instanceof Stacks.StackControl stack) { stack.sheetHeading = false; stack.settingsHeader = false; stack.keycapDetail = false; }
         control.embeddedLabel(false);
         control.hero(false);
     }
@@ -144,6 +145,7 @@ final class ViewReconciler implements AutoCloseable {
         if (next.get(node.id()) instanceof Choices.ChoiceControl choice)choice.settings=settings;
         if (next.get(node.id()) instanceof Cards.CardControl card) card.settings = settings;
         if (next.get(node.id()) instanceof Labels.TextControl text) text.settings = settings;
+        if (next.get(node.id()) instanceof TextFields.FieldControl field) field.settings = settings;
         ControlRegistry.children(node).forEach(child -> applySettings(child, next, settings));
     }
     /** The Settings header's root row: history buttons, then the breadcrumb, whose ancestors use the Settings body face. */

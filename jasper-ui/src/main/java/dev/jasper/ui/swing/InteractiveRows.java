@@ -734,9 +734,10 @@ final class InteractiveRows {
                         ThemePainting.antialias(g);
                         int inset=ThemePainting.metric(owner.context(),DesignMetrics.Role.KEYCAP_DETAIL_INSET),radius=ThemePainting.metric(owner.context(),DesignMetrics.Role.CONTROL_RADIUS)*2;
                         g.setColor(ThemePainting.color(owner.context(),SemanticColor.SURFACE_CONTROL));
-                        g.fillRoundRect(inset,tree.top(index),Math.max(0,getWidth()-2*inset),tree.heightAt(index),radius,radius);
+                        int card=Math.max(0,tree.heightAt(index)-tree.detailAfter());
+                        g.fillRoundRect(inset,tree.top(index),Math.max(0,getWidth()-2*inset),card,radius,radius);
                         g.setColor(ThemePainting.color(owner.context(),SemanticColor.BORDER_FOCUS));
-                        g.drawRoundRect(inset,tree.top(index),Math.max(0,getWidth()-2*inset-1),Math.max(0,tree.heightAt(index)-1),radius,radius);
+                        g.drawRoundRect(inset,tree.top(index),Math.max(0,getWidth()-2*inset-1),Math.max(0,card-1),radius,radius);
                     }finally{g.dispose();}
                 }
             }
@@ -1044,10 +1045,11 @@ final class InteractiveRows {
             if (owner.resultsLayout()) { resultLayout(); return; }
             if (owner instanceof Trees.TreeControl tree && tree.layoutPresented(this)) return;
             boolean settingsNavigation=owner instanceof Trees.TreeControl tree && tree.settingsNavigation;
-            int pad = ThemePainting.metric(owner.context(), settingsNavigation ? DesignMetrics.Role.SETTINGS_NAV_ROW_SIDE : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : owner.column >= 0 ? DesignMetrics.Role.COLUMN_LIST_SIDE : owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_PADDING : DesignMetrics.Role.ICON_GAP),
+            boolean keycapGroup=owner instanceof Trees.TreeControl keyed && !keyed.presentation.isEmpty();
+            int pad = ThemePainting.metric(owner.context(), settingsNavigation ? DesignMetrics.Role.SETTINGS_NAV_ROW_SIDE : keycapGroup ? DesignMetrics.Role.KEYCAP_GROUP_SIDE : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : owner.column >= 0 ? DesignMetrics.Role.COLUMN_LIST_SIDE : owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_PADDING : DesignMetrics.Role.ICON_GAP),
                     x = pad + indent,
                     // A keycap tree's section counts end where its shortcut keys end.
-                    width = Math.max(0, getWidth() - (owner instanceof Trees.TreeControl keyed && !keyed.presentation.isEmpty()
+                    width = Math.max(0, getWidth() - (keycapGroup
                         ? ThemePainting.metric(owner.context(), DesignMetrics.Role.KEYCAP_CONTENT_TRAILING) : pad)),
                     h = getHeight();
             int checkWidth =
@@ -1062,7 +1064,7 @@ final class InteractiveRows {
             width = Math.max(x, width - tw - (tw > 0 ? pad : 0));
             int lw = Math.min(leading.getPreferredSize().width, Math.max(0, width - x));
             leading.setBounds(x, 0, lw, h);
-            x += lw + (lw > 0 ? settingsNavigation ? ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTINGS_NAV_TEXT_GAP) : owner.identityRows() ? ThemePainting.metric(owner.context(),DesignMetrics.Role.IDENTITY_ROW_TEXT_GAP) : owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_TEXT_GAP) : pad : 0);
+            x += lw + (lw > 0 ? settingsNavigation ? ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTINGS_NAV_TEXT_GAP) : keycapGroup ? ThemePainting.metric(owner.context(),DesignMetrics.Role.KEYCAP_GROUP_TEXT_GAP) : owner.identityRows() ? ThemePainting.metric(owner.context(),DesignMetrics.Role.IDENTITY_ROW_TEXT_GAP) : owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_TEXT_GAP) : pad : 0);
             int content = Math.max(0, width - x);
             if (!cells.isEmpty()) {
                 title.setBounds(x, 0, content, h);

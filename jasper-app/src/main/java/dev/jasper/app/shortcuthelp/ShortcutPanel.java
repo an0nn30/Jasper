@@ -9,6 +9,7 @@ import dev.jasper.ui.model.UiEvent;
 import dev.jasper.ui.model.ViewSpec;
 import dev.jasper.ui.swing.KitContext;
 import dev.jasper.ui.swing.KitView;
+import dev.jasper.ui.swing.SettingsShell;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.KeyEventDispatcher;
@@ -64,6 +65,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         int side = scaled(context, DesignMetrics.Role.KEYMAP_PAGE_PADDING);
         setBorder(BorderFactory.createEmptyBorder(scaled(context, DesignMetrics.Role.KEYMAP_PAGE_TOP_PADDING), side, scaled(context, DesignMetrics.Role.KEYMAP_PAGE_BOTTOM_PADDING), side));
         top = new KitView(context, topSpec(), this::event);
+        SettingsShell.settingsPage(top);
         tools = new KitView(context, toolsSpec(), this::event);
         list = new KitView(context, new ViewSpec(tree.descriptor()), this::event);
         footer = new KitView(context, statusSpec(), this::event);
@@ -74,7 +76,15 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
             @Override public void actionPerformed(java.awt.event.ActionEvent event) { if (!closed) activate(tree.selected()); }
         });
         footer.getAccessibleContext().setAccessibleName("Shortcut search status");
-        var searchBar = new JPanel(new BorderLayout(scaled(context, DesignMetrics.Role.KEYMAP_TOOLS_GAP),0)); searchBar.setOpaque(false);
+        // The shortcut search stands a little taller than an ordinary field; a larger font still grows it.
+        var searchBar = new JPanel(new BorderLayout(scaled(context, DesignMetrics.Role.KEYMAP_TOOLS_GAP),0)) {
+            @Override public java.awt.Dimension getPreferredSize() {
+                var size = super.getPreferredSize();
+                size.height = Math.max(size.height, scaled(context, DesignMetrics.Role.KEYMAP_SEARCH_HEIGHT));
+                return size;
+            }
+        };
+        searchBar.setOpaque(false);
         searchBar.add(top,BorderLayout.CENTER); searchBar.add(tools,BorderLayout.EAST);
         add(searchBar, BorderLayout.NORTH);
         var sections = new JPanel(new BorderLayout());
@@ -167,7 +177,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
     private void render() {
         if (closed) return;
         top.update(topSpec());
-        top.setFieldTrailing(SEARCH, Optional.of(new Nodes.Button("record", ControlState.READY, recording ? "Stop recording" : "Record", "keyboard", Nodes.ButtonKind.GHOST, "record", "Record shortcut")));
+        top.setFieldTrailing(SEARCH, Optional.of(new Nodes.Button("record", ControlState.READY, recording ? "Stop recording" : "Record", "keyboard", Nodes.ButtonKind.GHOST, "record", "Record shortcut", Nodes.ButtonPresentation.EMBEDDED)));
         top.setFieldReadOnly(SEARCH,recording);
         tools.update(toolsSpec());
         list.update(new ViewSpec(tree.descriptor()));
@@ -197,7 +207,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
             return new ViewSpec(new Nodes.Text("status", ControlState.READY, text, Nodes.TextRole.CAPTION));
         }
         // The count, then the read-only marker that the contextual rows carry, explained.
-        return new ViewSpec(new Nodes.Stack("status", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+        return new ViewSpec(new Nodes.Stack("status", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
             new Nodes.Text("status.count", ControlState.READY, visible.size() + (visible.size() == 1 ? " shortcut" : " shortcuts"), Nodes.TextRole.CAPTION),
             new Nodes.Text("status.separator", ControlState.READY, "·", Nodes.TextRole.CAPTION),
             new Nodes.Stack("status.contextual-line", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(

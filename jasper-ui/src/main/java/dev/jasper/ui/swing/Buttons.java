@@ -92,7 +92,7 @@ final class Buttons {
             button.getAccessibleContext().setAccessibleName(keycaps!=null?keycaps.accessibleName():value.label().isEmpty() ? value.tooltip() : value.label());
             button.getAccessibleContext().setAccessibleDescription(value.state().error());
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
-            int horizontal = ThemePainting.metric(context(), button.recorder() ? DesignMetrics.Role.FIELD_HORIZONTAL_PADDING : button.panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION_PADDING : value.kind() == Nodes.ButtonKind.PRIMARY ? DesignMetrics.Role.PRIMARY_BUTTON_HORIZONTAL_PADDING : DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
+            int horizontal = ThemePainting.metric(context(), button.armed() ? DesignMetrics.Role.KEYCAP_RECORDER_PADDING : button.recorder() ? DesignMetrics.Role.FIELD_HORIZONTAL_PADDING : button.panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION_PADDING : value.kind() == Nodes.ButtonKind.PRIMARY ? DesignMetrics.Role.PRIMARY_BUTTON_HORIZONTAL_PADDING : DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
             button.setBorder(embedded ? new EmptyBorder(0, 0, 0, 0)
                 : new EmptyBorder(ring, value.label().isEmpty() ? ring : horizontal, ring, value.label().isEmpty() ? ring : horizontal));
             button.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
@@ -106,7 +106,9 @@ final class Buttons {
         ButtonValuePresentation valuePresentation = ButtonValuePresentation.DEFAULT;
         boolean recorder() { return valuePresentation != ButtonValuePresentation.DEFAULT; }
         boolean armed() { return valuePresentation == ButtonValuePresentation.RECORDER_ARMED; }
-        int recorderIndicator() { return armed() ? ThemePainting.metric(context,DesignMetrics.Role.ICON_GAP) + ThemePainting.metric(context,DesignMetrics.Role.STATUS_DOT) : 0; }
+        /** The armed recorder's dot and its soft halo, then the usual icon gap before the prompt. */
+        int recorderHalo() { return ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_RECORDER_DOT) + 2*ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_RECORDER_HALO); }
+        int recorderIndicator() { return armed() ? recorderHalo() + ThemePainting.metric(context,DesignMetrics.Role.ICON_GAP) : 0; }
         final Composition.WrappedText recorderText=new Composition.WrappedText();
         int heightAt(int width) {
             if (!recorder()) return getPreferredSize().height;
@@ -228,9 +230,11 @@ final class Buttons {
                 if (recorder()) {
                     int x=insets.left;
                     if (armed()) {
-                        int diameter=ThemePainting.metric(context,DesignMetrics.Role.STATUS_DOT);
-                        g.setColor(ThemePainting.color(context,SemanticColor.STATUS_DANGER));
-                        g.fillOval(x,(getHeight()-diameter)/2,diameter,diameter);
+                        int halo=recorderHalo(),ring=ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_RECORDER_HALO),top=(getHeight()-halo)/2;
+                        Color danger=ThemePainting.color(context,SemanticColor.STATUS_DANGER);
+                        g.setColor(new Color(danger.getRed(),danger.getGreen(),danger.getBlue(),context.metrics().value(DesignMetrics.Role.KEYCAP_RECORDER_HALO_ALPHA)));
+                        g.fill(new java.awt.geom.Ellipse2D.Double(x,top,halo,halo));
+                        g.setColor(danger);g.fill(new java.awt.geom.Ellipse2D.Double(x+ring,top+ring,halo-2*ring,halo-2*ring));
                         x+=recorderIndicator();
                     }
                     int available=Math.max(0,getWidth()-x-insets.right);

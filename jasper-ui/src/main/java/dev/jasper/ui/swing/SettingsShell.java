@@ -20,6 +20,8 @@ public final class SettingsShell extends JPanel implements AutoCloseable {
             if (child instanceof KitView view) view.settingsChrome(child == header);
         appearance = context.binding().subscribe(pair -> { revalidate(); repaint(); });
     }
+    /** Marks a page's own view as part of the Settings surface, so its controls take the Settings geometry. */
+    public static void settingsPage(KitView view) { view.settingsChrome(false); }
     /** The page scroller the shell expects: the OVERLAY scroll policy, so a page never loses width to a resting bar. */
     public static JScrollPane pageScroller(KitContext context) { return new OverlayScrollPane(java.util.Objects.requireNonNull(context)); }
     private int metric(DesignMetrics.Role role) { return ThemePainting.metric(context, role); }
