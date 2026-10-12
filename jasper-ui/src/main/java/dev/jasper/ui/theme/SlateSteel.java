@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,6 +35,7 @@ public final class SlateSteel {
     private final Map<TerminalScheme, SchemeColors> schemes;
     private final EditorColors darkEditor, lightEditor;
     private final Map<SyntaxRole, SyntaxStyle> darkSyntax, lightSyntax;
+    private final GeneratedTheme darkTheme, lightTheme;
 
     private SlateSteel(Map<String, Object> root, String origin) {
         this.origin = origin;
@@ -52,6 +54,8 @@ public final class SlateSteel {
         var lightStyles = new EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);
         lightEditor = editor(false, lightStyles);
         lightSyntax = Map.copyOf(lightStyles);
+        darkTheme = generate(true);
+        lightTheme = generate(false);
     }
 
     /** The bundled theme, read once. */
@@ -201,6 +205,83 @@ public final class SlateSteel {
         if (name.startsWith("ansi.") && ANSI.contains(name.substring("ansi.".length())))
             return colors.colors().ansi().get(ANSI.indexOf(name.substring("ansi.".length())));
         throw error(where + ": Unknown reference \"" + key + "\"");
+    }
+
+    /** The Dark or Light variant as a complete generated theme. */
+    public GeneratedTheme generated(boolean dark) { return dark ? darkTheme : lightTheme; }
+
+    private GeneratedTheme generate(boolean dark) {
+        var palette = palette(dark);
+        var scheme = terminal(TerminalScheme.matching(dark));
+        var tokens = legacy(palette, scheme, editor(dark));
+        return new GeneratedTheme("Slate Steel", dark, "Jasper", tokens, syntax(dark), scheme.colors(), uiKeys(tokens),
+            Map.of(), GlassLevels.OPAQUE, palette);
+    }
+
+    /**
+     * The legacy token view of a variant, so consumers of {@link GeneratedTheme#tokens()} and the FlatLaf template keep
+     * working until Plan 3 removes the legacy layer. Every token is one of the variant's colours.
+     */
+    private static Map<Token, Color> legacy(SemanticPalette p, SchemeColors scheme, EditorColors editor) {
+        var t = new EnumMap<Token, Color>(Token.class);
+        t.put(Token.SURFACE, p.color(SemanticColor.SURFACE_PANEL));
+        t.put(Token.SURFACE_RAISED, p.color(SemanticColor.SURFACE_PANEL_RAISED));
+        t.put(Token.SURFACE_SUNKEN, p.color(SemanticColor.SURFACE_CARD));
+        t.put(Token.TITLE_BAR, p.color(SemanticColor.SURFACE_APP));
+        t.put(Token.STATUS_BAR, p.color(SemanticColor.SURFACE_STATUS));
+        t.put(Token.SIDEBAR, p.color(SemanticColor.SURFACE_SIDEBAR));
+        t.put(Token.TEXT, p.color(SemanticColor.TEXT_PRIMARY));
+        t.put(Token.TEXT_MUTED, p.color(SemanticColor.TEXT_SECONDARY));
+        t.put(Token.TEXT_DISABLED, p.color(SemanticColor.TEXT_PLACEHOLDER));
+        t.put(Token.TEXT_ON_ACCENT, p.color(SemanticColor.TEXT_ONACCENT));
+        t.put(Token.LINK, p.color(SemanticColor.TEXT_LINK));
+        t.put(Token.BORDER, p.color(SemanticColor.BORDER_WINDOW));
+        t.put(Token.SEPARATOR, p.color(SemanticColor.BORDER_SUBTLE));
+        t.put(Token.DIVIDER, p.color(SemanticColor.BORDER_WINDOW));
+        t.put(Token.FOCUS_RING, p.color(SemanticColor.BORDER_FOCUS));
+        t.put(Token.HOVER, p.color(SemanticColor.SURFACE_CONTROL_HOVER));
+        t.put(Token.PRESSED, p.color(SemanticColor.SURFACE_CONTROL_SELECTED));
+        t.put(Token.SELECTION, p.color(SemanticColor.SELECTION_BG));
+        t.put(Token.SELECTION_TEXT, p.color(SemanticColor.TEXT_ONACCENT));
+        t.put(Token.SELECTION_INACTIVE, p.color(SemanticColor.SURFACE_CONTROL_SELECTED));
+        t.put(Token.TEXT_SELECTION, scheme.colors().selection());
+        t.put(Token.TEXT_SELECTION_TEXT, p.color(SemanticColor.TEXT_PRIMARY));
+        t.put(Token.TAB_BAR, p.color(SemanticColor.SURFACE_TABSTRIP));
+        t.put(Token.TAB_ACTIVE, p.color(SemanticColor.SURFACE_TERMINAL));
+        t.put(Token.TAB_ACTIVE_TEXT, p.color(SemanticColor.TEXT_PRIMARY));
+        t.put(Token.TAB_ACTIVE_BORDER, p.color(SemanticColor.BORDER_WINDOW));
+        t.put(Token.TAB_HOVER, p.color(SemanticColor.SURFACE_CONTROL_HOVER));
+        t.put(Token.TAB_UNDERLINE, p.color(SemanticColor.ACCENT));
+        t.put(Token.TAB_UNDERLINE_INACTIVE, p.color(SemanticColor.TEXT_TERTIARY));
+        t.put(Token.INPUT_BACKGROUND, p.color(SemanticColor.SURFACE_INPUT));
+        t.put(Token.BUTTON_BACKGROUND, p.color(SemanticColor.BUTTON_SECONDARY_BG));
+        t.put(Token.BUTTON_BORDER, p.color(SemanticColor.BUTTON_SECONDARY_BORDER));
+        t.put(Token.BUTTON_TEXT, p.color(SemanticColor.TEXT_STRONG_SECONDARY));
+        t.put(Token.BUTTON_DEFAULT, p.color(SemanticColor.ACCENT));
+        t.put(Token.SCROLLBAR_THUMB, p.color(SemanticColor.BORDER_CONTROL));
+        t.put(Token.SCROLLBAR_TRACK, p.color(SemanticColor.SURFACE_PANEL));
+        t.put(Token.ACCENT, p.color(SemanticColor.ACCENT));
+        t.put(Token.SUCCESS, p.color(SemanticColor.STATUS_SUCCESS));
+        t.put(Token.WARNING, p.color(SemanticColor.STATUS_WARNING));
+        t.put(Token.ERROR, p.color(SemanticColor.STATUS_DANGER));
+        // The find bar's no-match tint: the error border laid lightly over the input surface.
+        t.put(Token.ERROR_BACKGROUND, ColorMath.mix(p.color(SemanticColor.BORDER_ERROR), p.color(SemanticColor.SURFACE_INPUT), .16));
+        t.put(Token.EDITOR_BACKGROUND, editor.background());
+        t.put(Token.EDITOR_FOREGROUND, editor.foreground());
+        t.put(Token.EDITOR_CARET, editor.caret());
+        t.put(Token.EDITOR_SELECTION, editor.selection());
+        t.put(Token.EDITOR_CURRENT_LINE, editor.currentLine());
+        t.put(Token.EDITOR_GUTTER, editor.gutter());
+        t.put(Token.EDITOR_LINE_NUMBERS, editor.lineNumbers());
+        return t;
+    }
+
+    /** The FlatLaf and Jasper UI keys of a token view, as the legacy generator writes them. */
+    private static Map<String, Object> uiKeys(Map<Token, Color> tokens) {
+        var keys = new LinkedHashMap<String, Object>();
+        UiTemplate.FLATLAF.forEach((key, value) -> keys.put(key, value instanceof Token token ? UiTemplate.hex(tokens.get(token)) : value));
+        UiTemplate.JASPER.forEach((key, token) -> keys.put(key, UiTemplate.hex(tokens.get(token))));
+        return keys;
     }
 
     /** {@code #RRGGBB}, or {@code #RRGGBBAA} with alpha; {@code where} names the entry in errors. */
