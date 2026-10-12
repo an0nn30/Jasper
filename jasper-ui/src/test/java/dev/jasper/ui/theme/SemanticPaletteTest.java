@@ -65,7 +65,7 @@ class SemanticPaletteTest {
     }
 
     @Test void everySemanticNameRoundTrips() {
-        assertThat(SemanticColor.values()).hasSize(54);
+        assertThat(SemanticColor.values()).hasSize(64);
         assertThat(SemanticColor.of("surface.status")).contains(SemanticColor.SURFACE_STATUS);
         for (var role : SemanticColor.values()) assertThat(SemanticColor.of(role.key())).contains(role);
         assertThat(SemanticColor.of("unknown")).isEmpty();
@@ -134,5 +134,22 @@ class SemanticPaletteTest {
         assertThat(ColorMath.opacity(scrim, .55).getAlpha()).isEqualTo(140);
         assertThat(ColorMath.opacity(theme.semantic().color(SemanticColor.HUE_BLUE), .16).getAlpha()).isEqualTo(41);
         assertThat(ColorMath.opacity(theme.semantic().color(SemanticColor.BORDER_FOCUS), .25).getAlpha()).isEqualTo(64);
+    }
+
+    /** Legacy themes, still installed until Plan 2, give each new role the colour its component paints today. */
+    @Test void legacyThemesGiveTheTenNewRolesTheirCurrentSources() {
+        var theme = dev.jasper.ui.testsupport.KitFixtures.dark();
+        var semantic = theme.semantic(); var tokens = theme.tokens();
+        assertThat(semantic.color(SemanticColor.SURFACE_FIELD_RAISED)).isEqualTo(tokens.get(Token.INPUT_BACKGROUND));
+        assertThat(semantic.color(SemanticColor.SURFACE_CONTROL_SELECTED)).isEqualTo(tokens.get(Token.BUTTON_BACKGROUND));
+        assertThat(semantic.color(SemanticColor.SURFACE_TABSTRIP)).isEqualTo(tokens.get(Token.TAB_BAR));
+        assertThat(semantic.color(SemanticColor.SURFACE_EMPTY_TILE)).isEqualTo(tokens.get(Token.BUTTON_BACKGROUND));
+        assertThat(semantic.color(SemanticColor.BORDER_FIELD_RAISED)).isEqualTo(tokens.get(Token.BORDER));
+        assertThat(semantic.color(SemanticColor.BORDER_FIELD_RAISED_HOVER)).isEqualTo(tokens.get(Token.BUTTON_BORDER));
+        assertThat(semantic.color(SemanticColor.TEXT_STRONG_SECONDARY)).isEqualTo(tokens.get(Token.TEXT));
+        assertThat(semantic.color(SemanticColor.TEXT_FIELD_RAISED)).isEqualTo(tokens.get(Token.TEXT));
+        assertThat(semantic.color(SemanticColor.SEGMENT_TRACK)).isEqualTo(tokens.get(Token.INPUT_BACKGROUND));
+        assertThat(semantic.color(SemanticColor.BUTTON_SECONDARY_BORDER)).isEqualTo(tokens.get(Token.BUTTON_BORDER));
+        assertThat(SemanticColor.of("surface.emptyTile")).contains(SemanticColor.SURFACE_EMPTY_TILE);
     }
 }

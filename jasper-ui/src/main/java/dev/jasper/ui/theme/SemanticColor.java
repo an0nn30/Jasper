@@ -57,7 +57,17 @@ public enum SemanticColor {
     HUE_PURPLE_SURFACE("hue.purple.surface"),
     HUE_NEUTRAL_SURFACE("hue.neutral.surface"),
     BUTTON_SECONDARY_BG("button.secondary.bg"),
-    BUTTON_SECONDARY_BG_HOVER("button.secondary.bg.hover");
+    BUTTON_SECONDARY_BG_HOVER("button.secondary.bg.hover"),
+    SURFACE_FIELD_RAISED("surface.field.raised"),
+    SURFACE_CONTROL_SELECTED("surface.control.selected"),
+    SURFACE_TABSTRIP("surface.tabstrip"),
+    SURFACE_EMPTY_TILE("surface.emptyTile"),
+    BORDER_FIELD_RAISED("border.field.raised"),
+    BORDER_FIELD_RAISED_HOVER("border.field.raised.hover"),
+    TEXT_STRONG_SECONDARY("text.strong.secondary"),
+    TEXT_FIELD_RAISED("text.field.raised"),
+    SEGMENT_TRACK("segment.track"),
+    BUTTON_SECONDARY_BORDER("button.secondary.border");
 
     private final String key;
     SemanticColor(String key) { this.key = key; }

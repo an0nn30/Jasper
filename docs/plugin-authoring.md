@@ -905,4 +905,12 @@ dialog.show();
 ```
 
 `FakePluginHost.dialogPresentation(pluginId, title)` reports how an open dialog is presented. Declare
-`sdk = ">=0.15.4, <0.16"` to use it; every bundled manifest does.
+`sdk = ">=0.15.4, <0.16"` or later to use it.
+
+### Slate Steel colours (SDK 0.15.5)
+
+`SemanticColor` gains ten roles for the Slate Steel theme: `SURFACE_FIELD_RAISED`, `SURFACE_CONTROL_SELECTED`,
+`SURFACE_TABSTRIP`, `SURFACE_EMPTY_TILE`, `BORDER_FIELD_RAISED`, `BORDER_FIELD_RAISED_HOVER`,
+`TEXT_STRONG_SECONDARY`, `TEXT_FIELD_RAISED`, `SEGMENT_TRACK` and `BUTTON_SECONDARY_BORDER`. Read them with
+`context.appearance().color(role)` like any other role; the kit already paints its controls with them. Declare
+`sdk = ">=0.15.5, <0.16"` to use them; every bundled manifest does.

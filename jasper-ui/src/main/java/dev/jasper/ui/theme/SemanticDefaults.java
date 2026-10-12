@@ -86,6 +86,13 @@ public final class SemanticDefaults {
             case HUE_GREEN -> terminal.ansi().get(2);
             case HUE_AMBER -> terminal.ansi().get(3);
             case HUE_PURPLE -> terminal.ansi().get(5);
+            // The ten Slate Steel roles: for legacy themes, the colour their component paints today.
+            case SURFACE_FIELD_RAISED, SEGMENT_TRACK -> legacy.get(Token.INPUT_BACKGROUND);
+            case SURFACE_CONTROL_SELECTED, SURFACE_EMPTY_TILE -> legacy.get(Token.BUTTON_BACKGROUND);
+            case SURFACE_TABSTRIP -> legacy.get(Token.TAB_BAR);
+            case BORDER_FIELD_RAISED -> legacy.get(Token.BORDER);
+            case BORDER_FIELD_RAISED_HOVER, BUTTON_SECONDARY_BORDER -> legacy.get(Token.BUTTON_BORDER);
+            case TEXT_STRONG_SECONDARY, TEXT_FIELD_RAISED -> legacy.get(Token.TEXT);
             case BORDER_IDENTITY, HUE_BLUE_SURFACE, HUE_GREEN_SURFACE, HUE_AMBER_SURFACE, HUE_PURPLE_SURFACE, HUE_NEUTRAL_SURFACE, TEXT_ONACCENT_SECONDARY, BORDER_FOCUS, BORDER_ERROR, ACCENT_HOVER, TEXT_LINK_HOVER, HOVER_OVERLAY ->
                 throw new IllegalStateException("Dependent role cannot resolve before parents: " + role);
         };

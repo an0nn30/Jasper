@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.*;
 
 class AppearanceContractTest {
     @Test void semanticColorsIncludeTheStatusBarSurface() {
-        assertThat(SemanticColor.values()).hasSize(54);
+        assertThat(SemanticColor.values()).hasSize(64);
         assertThat(SemanticColor.of("border.identity")).contains(SemanticColor.BORDER_IDENTITY);
         assertThat(SemanticColor.of("surface.status")).contains(SemanticColor.SURFACE_STATUS);
     }

@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CapabilitiesTest {
     @Test void theSdkIsVersionElevenWithTheNetworkListenCapability() {
-        assertThat(JasperSdk.VERSION).isEqualTo("0.15.4");
+        assertThat(JasperSdk.VERSION).isEqualTo("0.15.5");
         assertThat(Capabilities.NETWORK_LISTEN).isEqualTo("network.listen");
         assertThat(Capabilities.ALL).endsWith(Capabilities.NETWORK_LISTEN);
     }
