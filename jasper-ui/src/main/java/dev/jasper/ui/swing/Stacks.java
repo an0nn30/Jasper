@@ -134,6 +134,10 @@ final class Stacks {
             if(((Nodes.Stack)node).role()==Nodes.LayoutRole.SETTINGS_GROUP_HEADER)
                 controls.forEach(c->{if(c instanceof Labels.IconControl icon)icon.tile(context().metrics().value(DesignMetrics.Role.SETTINGS_ICON_TILE),context().metrics().value(DesignMetrics.Role.SETTINGS_ICON_TILE),context().icons().size(Nodes.IconSize.CONTROL),false);});
             if (embedded && settings) controls.forEach(c -> Composition.label(c, true));
+            // A dropdown among actions (a file type filter beside Cancel and Open) is one action-height control: its
+            // label is its accessible name, not a caption stacked above the row.
+            if (((Nodes.Stack) node).role() == Nodes.LayoutRole.ACTIONS)
+                controls.forEach(c -> { if (c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.DROPDOWN) Composition.label(c, true); });
             var wanted = new java.util.ArrayList<JComponent>();
             for (var c : controls)
                 if (childParent(c.node) == tile) {

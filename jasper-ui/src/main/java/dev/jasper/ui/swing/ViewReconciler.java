@@ -32,7 +32,7 @@ final class ViewReconciler implements AutoCloseable {
         next.values().forEach(this::resetComposition);
         inherit(spec.root(), next, inheritedEnabled);
         applyFlow(spec.root(), next);
-        applyColumns(spec.root(), next, -1, false);
+        applyColumns(spec.root(), next, view.hostColumn(), false);
         applyPanelDetail(spec.root(), next, false);
         applyHint(spec.root(), next, false);
         applyPanelBody(spec.root(), next, false);

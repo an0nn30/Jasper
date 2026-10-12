@@ -290,7 +290,24 @@ final class Choices {
             var size = super.getPreferredSize();
             int height = face != null ? ThemePainting.height(context, DesignMetrics.Role.PICKER_DEFAULT_HEIGHT, Typography.Role.BODY)
                 : ThemePainting.height(context, compactHeight ? DesignMetrics.Role.FULL_SETTING_CHOICE_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY);
-            return new Dimension(settingsWidth>0?settingsWidth:size.width, compactHeight && face == null ? height : Math.max(size.height, height));
+            return new Dimension(settingsWidth>0?settingsWidth:Math.max(size.width, naturalWidth()), compactHeight && face == null ? height : Math.max(size.height, height));
+        }
+        /**
+         * The width a dropdown at its natural size needs to show its longest plain option whole: the value's padding on
+         * both sides, then the chevron lane and its trailing inset. Swing's estimate omits the kit's own chevron lane.
+         */
+        int naturalWidth() {
+            if (face != null) return 0;
+            var metrics = getFontMetrics(ThemePainting.font(context, Typography.Role.BODY));
+            int text = 0;
+            for (int i = 0; i < getItemCount(); i++) {
+                var option = getItemAt(i);
+                if (!option.icon().isBlank() || !option.description().isBlank()) return 0;
+                text = Math.max(text, metrics.stringWidth(option.label()));
+            }
+            var insets = getInsets();
+            return insets.left + insets.right + text + 2 * ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING)
+                + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_ARROW_WIDTH) + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_CHEVRON_INSET);
         }
         @Override public void paint(Graphics graphics) {
             if (face != null) {

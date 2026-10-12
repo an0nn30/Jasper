@@ -329,6 +329,29 @@ public class SurfacePanel extends JPanel {
         return Composition.height(component,width);
     }
 
+    /**
+     * A native window's footer band, as a WINDOW form paints its own: the sidebar surface below one full-width hairline,
+     * holding {@code content} (status on the leading side, actions on the trailing side) inside the window footer's
+     * vertical and side padding. Child lifetime belongs to the caller.
+     */
+    public static JPanel footerBand(KitContext context, JComponent content) {
+        var band = new JPanel(new BorderLayout()) {
+            @Override protected void paintComponent(Graphics graphics) {
+                graphics.setColor(ThemePainting.color(context, SemanticColor.SURFACE_SIDEBAR));
+                graphics.fillRect(0, 0, getWidth(), getHeight());
+                graphics.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE));
+                graphics.fillRect(0, 0, getWidth(), ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE));
+            }
+            @Override public Insets getInsets() {
+                int vertical = ThemePainting.metric(context, DesignMetrics.Role.WINDOW_FOOTER_VERTICAL), side = ThemePainting.metric(context, DesignMetrics.Role.WINDOW_FOOTER_SIDE);
+                return new Insets(vertical, side, vertical, side);
+            }
+        };
+        band.setOpaque(true);
+        band.add(content, BorderLayout.CENTER);
+        return band;
+    }
+
     /** Content-measured row retaining a semantic minimum; optional top rule uses the shared subtle border. */
     public static JPanel row(KitContext context, DesignMetrics.Role minimum, boolean separator) {
         return new NativeRow(context,minimum,separator);
