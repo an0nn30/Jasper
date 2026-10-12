@@ -96,8 +96,9 @@ class PanelCompositionTest {
                         assertThat(count.getX()).isEqualTo(title.getX() + title.getWidth() + s(6));
                         var body = find(view, "empty", JComponent.class);
                         var content = find(view, "empty.title", JComponent.class).getParent();
+                        // A panel body's empty state sits its optical lift above the exact middle, as the panel references do.
                         assertThat(content.getY() + content.getHeight() / 2)
-                                .isCloseTo(body.getHeight() / 2, within(1));
+                                .isCloseTo(body.getHeight() / 2 - s(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_EMPTY_LIFT)), within(1));
                         var footer = find(view, "footer", JComponent.class);
                         var fb = bounds(footer, view);
                         assertThat(fb.y + fb.height).isLessThanOrEqualTo(view.getHeight());
@@ -612,8 +613,9 @@ class PanelCompositionTest {
                     try (var view = new KitView(ctx, new ViewSpec(panel(0, empty())), e -> {})) {
                         KitFixtures.render(view, s(320), s(480), 1);
                         var tile = find(view, "empty.tile", JComponent.class);
-                        assertThat(tile.getWidth()).isEqualTo(s(40));
-                        assertThat(tile.getHeight()).isEqualTo(s(40));
+                        int panelTile = dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_EMPTY_TILE);
+                        assertThat(tile.getWidth()).as("a panel body's compact empty tile").isEqualTo(s(panelTile));
+                        assertThat(tile.getHeight()).isEqualTo(s(panelTile));
                         var action = find(view, "new", JComponent.class);
                         var body = find(view, "empty", JComponent.class);
                         assertThat(bounds(action, body).x + action.getWidth() / 2)
@@ -872,6 +874,7 @@ class PanelCompositionTest {
         Edt.run(() -> {
             var ctx=KitFixtures.context();
             try {
+                // An ordinary footer is the raised surface under its divider; a settings footer's rules belong to its rows.
                 var footer=new PanelFooters.Footer(ctx,"footer");footer.setSize(40,20);
                 for(int scale:new int[]{1,2}) {
                     var image=new java.awt.image.BufferedImage(40*scale,20*scale,java.awt.image.BufferedImage.TYPE_INT_ARGB);

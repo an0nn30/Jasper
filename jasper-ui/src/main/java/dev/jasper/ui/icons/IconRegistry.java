@@ -19,9 +19,11 @@ public final class IconRegistry implements AutoCloseable {
     // Only explicitly authored built-ins opt into silhouette fill. Public registrations retain
     // the validated outline stroke contract; a name suffix does not grant filled painting.
     private static final Set<String> FILLED_BUILT_INS = Set.of("folder.filled");
-    // Original compact-panel sources establish lighter plus/search/pencil outlines. Other built-ins
+    // Original compact-panel sources establish lighter plus/search/pencil/import outlines. Other built-ins
     // retain the common optical stroke; custom registrations never enter this catalog.
-    private static final Set<String> FINE_PANEL_BUILT_INS = Set.of("add", "search", "edit");
+    private static final Set<String> FINE_PANEL_BUILT_INS = Set.of("add", "search", "edit", "import");
+    /** Panel-context overflow dots are drawn two logical pixels across, as every plugin-panel reference header shows. */
+    private static final Set<String> DOT_PANEL_BUILT_INS = Set.of("more");
     private final Map<String, Received> encoded = new LinkedHashMap<>();
     private final Map<String, IconArtwork> artworks = new LinkedHashMap<>();
     private record Received(DecodedArtwork artwork, Nodes.Hue tileHue, IdentityArtwork.SelectedInk selectedInk) { }
@@ -278,7 +280,7 @@ public final class IconRegistry implements AutoCloseable {
                         g.drawImage(received, (width-w)/2, (height-h)/2, w, h, null);
                         return;
                     }
-                    float stroke = panel ? FINE_PANEL_BUILT_INS.contains(name) ? 1f : 7f / 6f
+                    float stroke = panel ? FINE_PANEL_BUILT_INS.contains(name) ? 1f : DOT_PANEL_BUILT_INS.contains(name) ? 2f : 7f / 6f
                         : hero ? 7f / 6f
                         : tile && glyphSize > 0 && artwork == BUILT_INS.get(name) ? 7f / 6f : artwork.stroke();
                     g.setColor(foreground); g.setStroke(new BasicStroke(stroke, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
@@ -306,9 +308,15 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("bookmark", "M 4 2 H 12 V 14 L 8 11 L 4 14 Z"),
             Map.entry("home", "M 2 8 L 8 2 L 14 8 M 4 6.5 V 14 H 12 V 6.5 M 7 14 V 10 H 9 V 14"),
             Map.entry("desktop", "M 2 3 H 14 V 11 H 2 Z M 6 14 H 10 M 8 11 V 14"),
+            // A route preview's endpoints and its connecting arrow (Plan 3 Task 6 tunnel editor).
+            Map.entry("laptop", "M 3 4 H 13 V 11 H 3 Z M 1.5 13 H 14.5"),
+            Map.entry("target", "M 14 8 A 6 6 0 1 1 2 8 A 6 6 0 1 1 14 8 M 11 8 A 3 3 0 1 1 5 8 A 3 3 0 1 1 11 8 M 8 8 H 8.1"),
+            Map.entry("arrow.right", "M 1.5 8 H 14.5 M 11 4.5 L 14.5 8 L 11 11.5"),
             Map.entry("preview", "M 1 8 Q 8 1 15 8 Q 8 15 1 8 Z M 10 8 A 2 2 0 1 1 6 8 A 2 2 0 1 1 10 8"),
             Map.entry("logout", "M 6 2 H 2 V 14 H 6 M 6 8 H 14 M 11 5 L 14 8 L 11 11"),
             Map.entry("download", "M 8 2 V 11 M 4 7 L 8 11 L 12 7 M 2 10 V 14 H 14 V 10"),
+            // Import: an arrow into a corner bracket, as the reference Sessions header shows (not the download tray).
+            Map.entry("import", "M 3.5 4.5 V 13 H 11 M 12.5 3.5 L 7.5 8.5 M 7.5 4.5 V 8.5 H 11"),
             Map.entry("question", "M 6 5 Q 10 3 10 6 L 8 8 V 9 M 8 12 H 8.1"),
             Map.entry("help", "M 14 8 A 6 6 0 1 1 2 8 A 6 6 0 1 1 14 8 M 6 5 Q 10 3 10 6 L 8 8 V 9 M 8 12 H 8.1"),
             Map.entry("history", "M 3 4 A 6 6 0 1 1 2 9 M 3 1 V 5 H 7 M 8 4 V 8 L 11 10"),

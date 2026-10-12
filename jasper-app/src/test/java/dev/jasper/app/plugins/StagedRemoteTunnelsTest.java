@@ -70,7 +70,7 @@ class StagedRemoteTunnelsTest {
                 view.setSize(260, 480);
                 layout(view);
                 var db = row(view, "db");
-                assertThat(db.getAccessibleContext().getAccessibleName()).as("named by its title").isEqualTo("db, Host missing");
+                assertThat(db.getAccessibleContext().getAccessibleName()).as("named by its title line").isEqualTo("db, " + MISSING_HOST);
                 assertThat(db.getAccessibleContext().getAccessibleDescription()).as("described by its live tooltip")
                     .isEqualTo("db, localhost:5432 → db.internal:5432, Host missing — edit to choose another");
                 assertThat(db.getHeight()).as("two lines fit the old row height").isBetween(2 * db.getFontMetrics(db.getFont()).getHeight() - 8, 50);
@@ -238,8 +238,11 @@ class StagedRemoteTunnelsTest {
             || text.startsWith("A tunnel") || text.startsWith("The listen port") || text.startsWith("The target port"));
     }
 
-    /** Rows asking for a host: the subtitle "Edit to choose a host" a stopped tunnel through a missing host shows. */
-    static long problems(Container view) { return labels(view).stream().filter("Edit to choose a host"::equals).count(); }
+    /** What a stopped tunnel through a missing host shows in place of its host, on the compact row's first line. */
+    static final String MISSING_HOST = "Host missing · Edit to choose a host";
+
+    /** Rows asking for a host. */
+    static long problems(Container view) { return labels(view).stream().filter(MISSING_HOST::equals).count(); }
 
     /** The kit list row whose accessible name starts with {@code name}. */
     static Component row(Container root, String name) {

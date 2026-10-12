@@ -70,7 +70,7 @@ final class Buttons {
         @Override void refresh() {
             var value = (Nodes.Button)node; state(); button.kind = value.kind(); button.iconSeverity = value.iconSeverity().orElse(null);
             button.toggle = value.selected().isPresent(); button.getModel().setSelected(value.selected().orElse(false));
-            button.setText(value.label()); button.setFont(ThemePainting.font(context(), button.hint ? Typography.Role.PALETTE_HINT : button.panelDetail || button.panel ? Typography.Role.PANEL_DETAIL_LABEL : button.orderedAction ? Typography.Role.ORDERED_ACTION : Typography.Role.LABEL));
+            button.setText(value.label()); button.setFont(ThemePainting.font(context(), button.hint ? Typography.Role.PALETTE_HINT : button.panelDetail || button.panel || button.panelEmpty ? Typography.Role.PANEL_DETAIL_LABEL : button.orderedAction ? Typography.Role.ORDERED_ACTION : Typography.Role.LABEL));
             button.setForeground(button.textColor(false));
             boolean embedded = value.presentation() == Nodes.ButtonPresentation.EMBEDDED || value.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
             button.circular=value.presentation()==Nodes.ButtonPresentation.CIRCULAR;
@@ -122,6 +122,8 @@ final class Buttons {
         boolean windowFooter;
         /** Paints its kind's fill without the kind's outline (a title-strip menu surface). */
         boolean borderless;
+        /** An action of a panel body's empty state: the panel references' smaller label and height. */
+        boolean panelEmpty;
         /** Content-sized for a host arrangement (ButtonPresentation.EMBEDDED): no minimum height and no resting or hover fill. */
         boolean embedded, contextual, panelRow;
         float disabledOpacity=.42f;
@@ -183,7 +185,7 @@ final class Buttons {
                 return new Dimension(size.width+recorderIndicator(),Math.max(height,size.height));
             }
             if (embedded) return size;
-            int height = ThemePainting.height(context, panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION : hero ? DesignMetrics.Role.HERO_BUTTON_HEIGHT : fullFooter ? DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT : orderedAction ? DesignMetrics.Role.ORDERED_ADD_HEIGHT : panel ? DesignMetrics.Role.PANEL_HEADER_ACTION : DesignMetrics.Role.BUTTON_HEIGHT, panelDetail || panel ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.LABEL);
+            int height = ThemePainting.height(context, panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION : hero ? DesignMetrics.Role.HERO_BUTTON_HEIGHT : fullFooter ? DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT : orderedAction ? DesignMetrics.Role.ORDERED_ADD_HEIGHT : panel ? DesignMetrics.Role.PANEL_HEADER_ACTION : panelEmpty ? DesignMetrics.Role.PANEL_EMPTY_ACTION_HEIGHT : DesignMetrics.Role.BUTTON_HEIGHT, panelDetail || panel || panelEmpty ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.LABEL);
             int reservation = panelDetail ? 2*ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING) : 0;
             height += reservation;
             size.width += reservation;

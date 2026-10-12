@@ -824,6 +824,19 @@ The [completion audit](design/theme-engine/completion.md) records exact gate sco
 rendering, distribution checks and the named Plan 3 composition owners. App host Settings error/stub
 content uses the dialog kit context and closes with its page; it is not covered by the plugin-only compiled gate.
 
+### Panel compositions (Plan 3 Tasks 6-7)
+
+Give a panel with nothing to show an `Empty` as its body: the host centres it in the body at the panel-reference size.
+A note above it (for example a settings-file problem) goes in a `SplitKind.DOCUMENT` split with the `Empty` last.
+Two-line `ItemList` rows in a panel are compact: put the name first on the title line (it keeps its width before
+whatever follows it) and a `Chip` plus a `MONO_SMALL` endpoint on the second; one compact `Toggle` trails. A persistent
+footer is a VERTICAL `Stack` whose last child is a `SettingRow`; status text above it stays above the rule.
+
+`LayoutRole.ROUTE` shows a connection as equal columns, each a child `Stack` of an `Icon` beside a description and a
+`MONO_SMALL` line; the host draws the arrows between them. A DROPDOWN `Choice` may pass a `PickerFace` to show a rich
+face (a saved host's name, address and glyph) while its options stay ordinary. New glyph names: `laptop`, `target`,
+`arrow.right` and `import`.
+
 ### Declared identity tile hue (SDK 0.15.1)
 
 `icon_hue = "neutral"` is optional. Its exact tokens are `neutral`, `blue`, `green`, `amber`, and `purple`;

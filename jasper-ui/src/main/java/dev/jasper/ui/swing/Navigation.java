@@ -91,10 +91,19 @@ final class Navigation {
             }
             int budget = Math.max(0, width - fixed), x = 0, consumed = 0;
             boolean anchor = !children.isEmpty() && children.getLast() instanceof AbstractButton;
+            // A leading-priority line keeps its first text whole while it fits in half the line; the rest share what is left.
+            Component lead = leadFirst() && flexible > budget ? children.stream().filter(this::flexible).findFirst().orElse(null) : null;
+            int kept = 0;
+            if (lead != null) {
+                int natural = lead.getPreferredSize().width, others = flexible - natural;
+                kept = others == 0 ? budget : Math.min(natural, Math.max(budget / 2, budget - others));
+                budget -= kept; flexible = others;
+            }
             for (var c : children) {
                 int natural = c.getPreferredSize().width;
                 int w = natural;
-                if (flexible(c) && (flexible > budget || anchor) && flexible > 0) {
+                if (c == lead) w = kept;
+                else if (flexible(c) && (flexible > budget || anchor) && flexible > 0) {
                     w = (int)((long)(consumed + natural) * budget / flexible - (long)consumed * budget / flexible);
                     consumed += natural;
                 }
@@ -104,6 +113,9 @@ final class Navigation {
                 x += w + gap();
             }
         }
+
+        /** Whether the line's first text keeps its width before the texts after it (a compact row's title line). */
+        boolean leadFirst() { return false; }
 
         boolean flexible(Component c) {
             return c instanceof JLabel label

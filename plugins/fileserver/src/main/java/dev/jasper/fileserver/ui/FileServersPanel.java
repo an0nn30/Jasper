@@ -29,7 +29,11 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-/** The per-window File Servers rail panel. Rows show confirmed state; the borrowed header owns count and New. */
+/**
+ * The per-window File Servers rail panel. Rows show confirmed state; the borrowed header owns count and New. The row the
+ * details and activity follow is the user's selection, or the first server while nothing is selected; only a selection
+ * the user (or {@link #select}) made is shown as selected.
+ */
 public final class FileServersPanel implements AutoCloseable {
     public record Actions(Consumer<UUID> toggle, Consumer<Optional<UUID>> edit, Consumer<UUID> duplicate, Consumer<UUID> delete,
                           Consumer<UUID> reveal, Consumer<String> copy, Consumer<UUID> copyPassword, Consumer<UUID> clearActivity,
@@ -54,6 +58,8 @@ public final class FileServersPanel implements AutoCloseable {
     private String activity = "";
     private List<String> activityLines = List.of();
     private UUID selected;
+    /** The row the user (or {@link #select}) selected, shown as selected; {@code selected} falls back to the first row. */
+    private UUID chosen;
     private boolean detailsOpen, closed;
 
     public FileServersPanel(UiKit kit, Actions actions, Function<UUID, List<ActivityLog.Entry>> log,
@@ -79,7 +85,8 @@ public final class FileServersPanel implements AutoCloseable {
     public void setServers(List<ServerRegistry.View> next, Optional<String> problem) {
         if (closed) return;
         servers = List.copyOf(next); this.problem = problem;
-        if (selectedView().isEmpty()) selected = servers.isEmpty() ? null : servers.getFirst().definition().id();
+        if (chosen != null && server(chosen).isEmpty()) chosen = null;
+        if (selectedView().isEmpty()) selected = chosen != null ? chosen : servers.isEmpty() ? null : servers.getFirst().definition().id();
         publishHeader();
         refreshActivity();
         render();
@@ -105,7 +112,7 @@ public final class FileServersPanel implements AutoCloseable {
     public Optional<UUID> selected() { return Optional.ofNullable(selected); }
     public void select(UUID id) {
         if (closed || servers.stream().noneMatch(server -> server.definition().id().equals(id))) return;
-        selected = id; refreshActivity(); render(); view.reveal("row." + id + ".name");
+        selected = id; chosen = id; refreshActivity(); render(); view.reveal("row." + id + ".name");
     }
 
     Optional<ServerRegistry.View> selectedView() {
@@ -116,7 +123,7 @@ public final class FileServersPanel implements AutoCloseable {
         if (closed) return;
         switch (event) {
             case UiEvent.Selected selection when selection.id().equals(ROWS) -> {
-                selection.ids().stream().findFirst().flatMap(FileServersPanel::rowUuid).ifPresent(id -> { selected = id; refreshActivity(); render(); });
+                selection.ids().stream().findFirst().flatMap(FileServersPanel::rowUuid).ifPresent(id -> { selected = id; chosen = id; refreshActivity(); render(); });
             }
             case UiEvent.Toggled toggle when toggle.id().startsWith("switch:") ->
                 rowUuid(toggle.id().substring("switch:".length())).ifPresent(id -> server(id)
@@ -140,8 +147,7 @@ public final class FileServersPanel implements AutoCloseable {
             case "fileserver.activity.clear" -> selectedView().ifPresent(server -> actions.clearActivity().accept(server.definition().id()));
             case "fileserver.activity.copy" -> actions.copy().accept(activity);
             default -> {
-                if (id.startsWith("copy:")) rowUuid(id.substring(5)).flatMap(this::server).ifPresent(this::copyAddress);
-                else if (id.startsWith("uri:")) copyUri(id);
+                if (id.startsWith("uri:")) copyUri(id);
                 else if (id.startsWith("menu:")) menuAction(id);
             }
         }
@@ -176,7 +182,7 @@ public final class FileServersPanel implements AutoCloseable {
                 case "copy" -> copyAddress(server);
                 case "password" -> actions.copyPassword().accept(id);
                 case "fingerprints" -> actions.fingerprints().accept(id);
-                case "details" -> { selected = id; detailsOpen = !detailsOpen; refreshActivity(); render(); revealLatestActivity(); }
+                case "details" -> { selected = id; chosen = id; detailsOpen = !detailsOpen; refreshActivity(); render(); revealLatestActivity(); }
                 default -> { }
             }
         });
@@ -201,16 +207,16 @@ public final class FileServersPanel implements AutoCloseable {
     private Nodes.Panel node() {
         var header = new Nodes.Header(HEADER, ControlState.READY, "File Servers", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
         if (servers.isEmpty()) {
-            var children = new ArrayList<Nodes.Node>();
-            problem.ifPresent(error -> children.add(new Nodes.Text("fileserver.problem", ControlState.READY, "servers.toml: " + error,
-                Nodes.TextRole.BODY, Optional.of(Nodes.Severity.DANGER), OptionalInt.empty())));
-            children.add(new Nodes.Empty(EMPTY, ControlState.READY,
+            Nodes.Node empty = new Nodes.Empty(EMPTY, ControlState.READY,
                 new Nodes.Icon("fileserver.empty.icon", ControlState.READY, "server", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "File Servers"),
                 "No File Servers", "Share a local folder over HTTP with devices on your network.",
-                List.of(new Nodes.Button("fileserver.empty.new", ControlState.READY, "Share Folder…", "add", Nodes.ButtonKind.SECONDARY,
-                    "fileserver.empty.new", ""))));
-            return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.empty(),
-                new Nodes.Stack("fileserver.empty.body", ControlState.READY, Nodes.LayoutRole.VERTICAL, children), Optional.empty());
+                List.of(new Nodes.Button("fileserver.empty.new", ControlState.READY, "Share Folder…", "", Nodes.ButtonKind.SECONDARY,
+                    "fileserver.empty.new", "")));
+            // The empty state fills the body and centers there; a broken file's note sits above it (a document split).
+            if (problem.isPresent()) empty = new Nodes.Split("fileserver.empty.body", ControlState.READY, Nodes.SplitKind.DOCUMENT, List.of(
+                new Nodes.Text("fileserver.problem", ControlState.READY, "servers.toml: " + problem.get(),
+                    Nodes.TextRole.BODY, Optional.of(Nodes.Severity.DANGER), OptionalInt.empty()), empty));
+            return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.empty(), empty, Optional.empty());
         }
         var rows = new ArrayList<ListItem>();
         problem.ifPresent(error -> rows.add(new ListItem("fileserver.problem.row", Optional.of(new Nodes.Icon("fileserver.problem.icon", ControlState.READY,
@@ -225,7 +231,7 @@ public final class FileServersPanel implements AutoCloseable {
             }
         }
         var list = new Nodes.ItemList(ROWS, ControlState.READY, Nodes.ListKind.DOUBLE, rows,
-            selected == null ? Set.of() : Set.of(rowId(selected)), ACTIVATE, List.of(), Nodes.SelectionMode.SINGLE,
+            chosen == null ? Set.of() : Set.of(rowId(chosen)), ACTIVATE, List.of(), Nodes.SelectionMode.SINGLE,
             Optional.empty(), OptionalInt.empty(), ENTER_TOGGLE, "", KEY_DETAILS, KEY_COPY, KEY_CANCEL);
         var body = new ArrayList<Nodes.Node>();
         body.add(list);
@@ -248,15 +254,14 @@ public final class FileServersPanel implements AutoCloseable {
         else if (!warning.isEmpty())
             subtitle.add(new Nodes.Text(prefix + ".warning", ControlState.READY, "Warning · " + warning, Nodes.TextRole.DESCRIPTION,
                 Optional.of(Nodes.Severity.WARNING), OptionalInt.empty()));
-        var copy = new Nodes.Button("copy:" + id, state(true, !server.addresses().isEmpty()), "", "copy", Nodes.ButtonKind.GHOST,
-            "copy:" + id, "Copy address", Nodes.ButtonPresentation.EMBEDDED);
         var toggle = new Nodes.Toggle("switch:" + id, state(true, phase != Phase.STOPPING),
             phase == Phase.STARTING ? "Cancel start" : phase == Phase.STOPPING ? "Stopping" : phase == Phase.RUNNING ? "Stop server" : "Start server",
             phase == Phase.RUNNING, "switch:" + id, true, "", phase == Phase.STARTING || phase == Phase.STOPPING);
         String description = definition.name() + ", " + definition.protocol().label() + ", " + ServerRows.address(server) + ", " + tooltip(server);
-        return new ListItem(rowId(id), Optional.of(new Nodes.Icon(prefix + ".folder", ControlState.READY, "folder", Nodes.Hue.NEUTRAL,
+        // The shared folder's filled glyph in the type hue; Copy Address is the row menu's and the platform Copy key's.
+        return new ListItem(rowId(id), Optional.of(new Nodes.Icon(prefix + ".folder", ControlState.READY, "folder.filled", Nodes.Hue.BLUE,
             Nodes.IconSize.CONTROL, "Folder")),
-            List.of(text(prefix + ".name", definition.name(), Nodes.TextRole.BODY)), subtitle, List.of(copy, toggle), false,
+            List.of(text(prefix + ".name", definition.name(), Nodes.TextRole.BODY)), subtitle, List.of(toggle), false,
             Optional.of(menu(server)), description);
     }
 

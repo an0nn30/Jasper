@@ -13,18 +13,23 @@ import static javax.swing.SwingConstants.*;
 final class Indicators {
     private Indicators() {}
     static final class ChipControl extends ControlRegistry.Control {
+        /** A compact panel row's protocol chip, as the plugin-panel reference measures it; set per row population. */
+        boolean panelRow;
         ChipControl(KitView view, Nodes.Chip node) { super(view, node, new ChipLabel(view.context())); refresh(); }
+        void panelRow(boolean value) { if (panelRow != value) { panelRow = value; ((ChipLabel)component).panelRow = value; refresh(); } }
         @Override void refresh() {
             var chip = (Nodes.Chip)node; state(); var label = (JLabel)component;
-            label.setText(chip.label()); label.setFont(ThemePainting.font(context(), Typography.Role.CHIP)); label.setForeground(Choices.hue(context(), chip.hue()));
-            int padding = ThemePainting.metric(context(), DesignMetrics.Role.CHIP_PADDING); label.setBorder(new EmptyBorder(0, padding, 0, padding));
+            label.setText(chip.label()); label.setFont(ThemePainting.font(context(), panelRow ? Typography.Role.PANEL_ROW_CHIP : Typography.Role.CHIP)); label.setForeground(Choices.hue(context(), chip.hue()));
+            int padding = ThemePainting.metric(context(), panelRow ? DesignMetrics.Role.PANEL_CHIP_PADDING : DesignMetrics.Role.CHIP_PADDING); label.setBorder(new EmptyBorder(0, padding, 0, padding));
             label.getAccessibleContext().setAccessibleName(chip.label()); label.revalidate(); label.repaint();
         }
     }
     static final class ChipLabel extends Labels.LiteralLabel {
         final KitContext context;
-        ChipLabel(KitContext context) { this.context = context; putClientProperty("html.disable", true); }
-        @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); return new Dimension(size.width, Math.max(size.height, ThemePainting.metric(context, DesignMetrics.Role.CHIP_HEIGHT))); }
+        boolean panelRow;
+        // A chip keeps its label whole on an inline line (Navigation.InlineLayout); the texts beside it shrink instead.
+        ChipLabel(KitContext context) { this.context = context; putClientProperty("html.disable", true); putClientProperty("Jasper.chip", Boolean.TRUE); }
+        @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); return new Dimension(size.width, Math.max(size.height, ThemePainting.metric(context, panelRow ? DesignMetrics.Role.PANEL_CHIP_HEIGHT : DesignMetrics.Role.CHIP_HEIGHT))); }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create();
             try {

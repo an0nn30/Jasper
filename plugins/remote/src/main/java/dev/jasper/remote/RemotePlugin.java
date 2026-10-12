@@ -226,7 +226,7 @@ public class RemotePlugin implements Plugin {
             if (panel == null) showPanel(window); else panel.show();
         }, () -> distros, this::openDistro);
 
-        store.onChanged(() -> { if (stopped) return; scope.changed(); refreshPanels(); sessionsToolbar.refresh(); tunnelsUi.hostsChanged(); store.warnings().forEach(warning -> context.log().log(System.Logger.Level.WARNING, "hosts.toml: {0}", warning)); });
+        store.onChanged(() -> { if (stopped) return; scope.changed(); refreshPanels(); sessionsToolbar.refresh(); tunnelsUi.hostsChanged(); sftpUi.hostsChanged(); store.warnings().forEach(warning -> context.log().log(System.Logger.Level.WARNING, "hosts.toml: {0}", warning)); });
         store.load();
         tunnelStore.load();
         poll = new Timer(1000, event -> { store.poll(); tunnelStore.poll(); });

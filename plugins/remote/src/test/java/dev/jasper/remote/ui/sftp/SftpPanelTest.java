@@ -149,7 +149,11 @@ class SftpPanelTest {
             var panel=panel();
             var empty=node(panel.view(),SftpPanel.EMPTY,Nodes.Empty.class);
             assertThat(empty.title()).isEqualTo("Not Connected");
-            assertThat(button(panel.view(),SftpPanel.CHOOSE).label()).isEqualTo("Choose Session");
+            var choose=node(panel.view(),SftpPanel.CHOOSE,Nodes.MenuButton.class);
+            assertThat(choose.label()).as("the label first; a menu-only button draws its chevron after it").isEqualTo("Choose Session");
+            assertThat(choose.icon()).isEmpty();
+            assertThat(choose.action()).as("menu-only").isEmpty();
+            assertThat(choose.items()).as("no saved host yet").singleElement().satisfies(item->assertThat(item.enabled()).isFalse());
             assertThat(find(panel.view(),SftpPanel.FILES)).isEmpty();
             assertThat(node(panel.view(),SftpPanel.NAVIGATION,Nodes.Stack.class).state().visible()).isFalse();
             assertThat(node(panel.view(),SftpPanel.PAGING,Nodes.Stack.class).state().visible()).isFalse();
@@ -174,9 +178,9 @@ class SftpPanelTest {
             assertThat(button(panel.view(),SftpPanel.CANCEL).state().visible()).isTrue();
             assertThat(texts(panel.view())).contains("Connecting…","Transfers");
             assertThat(find(panel.view(),TransferStrip.ROWS)).as("the transfers show in the sidebar while it connects").isPresent();
-            assertThat(button(panel.view(),SftpPanel.CHOOSE).state().enabled()).isFalse();
+            assertThat(node(panel.view(),SftpPanel.CHOOSE,Nodes.MenuButton.class).state().enabled()).isFalse();
             panel.error("Connection denied");
-            assertThat(button(panel.view(),SftpPanel.CHOOSE).state().enabled()).isTrue();
+            assertThat(node(panel.view(),SftpPanel.CHOOSE,Nodes.MenuButton.class).state().enabled()).isTrue();
             assertThat(button(panel.view(),SftpPanel.CANCEL).state().visible()).isFalse();
             assertThat(texts(panel.view())).contains("Connection denied");
             var follow=node(panel.view(),SftpPanel.FOLLOW,Nodes.Toggle.class);

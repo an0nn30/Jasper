@@ -1,5 +1,6 @@
 package dev.jasper.remote.ui.sftp;
 
+import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.sftp.FileEntry;
 import dev.jasper.remote.ui.transfers.TransferStrip;
 import dev.jasper.sdk.ui.Column;
@@ -33,7 +34,7 @@ import java.util.function.Consumer;
  * path as breadcrumbs, the folder's entries as a two-column table (folders first, a folder, file or link glyph, the
  * modified time in the row tooltip), and a footer with paging, the status line, the last operation's result, the Follow
  * terminal folder switch and the window's transfers. While nothing is connected the body is a "Not Connected" empty
- * state with Choose Session. In a Copy to host dialog the same browser is embedded in another owner's form
+ * state whose Choose Session menu lists the saved hosts; choosing one browses it. In a Copy to host dialog the same browser is embedded in another owner's form
  * ({@link #destination}): folders only, single selection, no menus, no follow switch, a New folder button.
  *
  * <p>Rows are keyed by entry name. A new listing or page selects its first row. Enter or a double click on one entry
@@ -56,7 +57,7 @@ public final class SftpPanel implements AutoCloseable {
         PREVIOUS="sftp.previous", NEXT="sftp.next", STATUS="sftp.status", MESSAGE="sftp.message", CANCEL="sftp.cancel",
         RESULT="sftp.result", FOLLOW="sftp.follow", FOLLOW_ROW="sftp.follow-row", BROWSER="sftp.browser";
     /** The table's activate action (Enter, double click), the path's actions and the menu action prefixes. */
-    static final String OPEN="open", PATH_EDIT="path.edit", PATH_GO="path.go", PATH_DONE="path.done", MENU="menu:", ROW_MENU="row:", ROW="entry:";
+    static final String OPEN="open", PATH_EDIT="path.edit", PATH_GO="path.go", PATH_DONE="path.done", MENU="menu:", ROW_MENU="row:", ROW="entry:", SESSION="session:";
     static final String NO_HOST="Select an SSH host to browse files", FOLLOW_TEXT="Follow terminal folder",
         FOLLOW_DESCRIPTION="Keep the SFTP browser in the active SSH terminal's folder";
     private static final int PAGE_SIZE=200;
@@ -67,7 +68,9 @@ public final class SftpPanel implements AutoCloseable {
     private final boolean destination;
     private Actions actions;
     private Editing editing;
-    private Runnable back=()->{},forward=()->{},choose=()->{},onLoaded=()->{};
+    private Runnable back=()->{},forward=()->{},onLoaded=()->{};
+    private Consumer<RemoteHost> choose=host->{};
+    private List<RemoteHost> sessions=List.of();
     private Consumer<PanelHeader> headerChanged=header->{};
     private TransferStrip transfers;
     private boolean canBack,canForward,working,browsingEnabled=true,loaded,following=true,editingPath,closed;
@@ -103,8 +106,10 @@ public final class SftpPanel implements AutoCloseable {
     public void navigationAvailable(boolean back,boolean forward) { canBack=back;canForward=forward;render(); }
     /** Publishes connection detail to the owning app header, including the current state immediately. */
     public void onHeaderChanged(Consumer<PanelHeader> listener) { headerChanged=Objects.requireNonNull(listener);publishHeader(); }
-    /** Opens the owning window's existing SSH host chooser from the disconnected state. */
-    public void onChooseSession(Runnable action) { choose=Objects.requireNonNull(action); }
+    /** Browses the saved host chosen from the disconnected state's Choose Session menu. */
+    public void onChooseSession(Consumer<RemoteHost> action) { choose=Objects.requireNonNull(action); }
+    /** The saved hosts Choose Session offers, in order; shown literally. */
+    public void sessions(List<RemoteHost> hosts) { sessions=List.copyOf(hosts);render(); }
     /** Runs after every listing or page shown. */
     public void onLoaded(Runnable listener) { onLoaded=Objects.requireNonNull(listener); }
     /** Shows Open in Editor and sends files to {@code editing}: double-click and Enter on one file or link, and the menu item. */
@@ -199,7 +204,6 @@ public final class SftpPanel implements AutoCloseable {
             case CANCEL -> { if(actions!=null) actions.cancel().run(); }
             case PREVIOUS -> { if(ready && offset>0) actions.page().accept(Math.max(0,offset-PAGE_SIZE)); }
             case NEXT -> { if(ready && offset+entries.size()<total) actions.page().accept(offset+PAGE_SIZE); }
-            case CHOOSE -> { if(!working) choose.run(); }
             case PATH_EDIT -> {
                 if(browsingEnabled && !working && (loaded || destination)) { editingPath=true;pathValue=directory;render();focus(PATH); }
             }
@@ -212,6 +216,11 @@ public final class SftpPanel implements AutoCloseable {
             default -> {
                 if(id.startsWith(MENU)) { run(id.substring(MENU.length()),selection());return true; }
                 if(id.startsWith(ROW_MENU)) { rowMenu(id.substring(ROW_MENU.length()));return true; }
+                if(id.startsWith(SESSION)) {
+                    String chosen=id.substring(SESSION.length());
+                    if(!working && !loaded) sessions.stream().filter(host->host.id().toString().equals(chosen)).findFirst().ifPresent(choose);
+                    return true;
+                }
                 return false;
             }
         }
@@ -284,14 +293,20 @@ public final class SftpPanel implements AutoCloseable {
 
     private Nodes.Panel panel() {
         var header=new Nodes.Header(HEADER,ControlState.READY,"SFTP",OptionalInt.empty(),Optional.empty(),Optional.empty(),List.of());
+        // Choose Session is a menu of the saved hosts: its label first, the menu chevron after it.
+        var choices=new ArrayList<MenuItem>();
+        for(var host:sessions) choices.add(new MenuItem("session."+host.id(),host.name(),"server",SESSION+host.id(),true,false));
+        if(choices.isEmpty()) choices.add(new MenuItem("session.none","No saved sessions","",SESSION+"none",false,false));
         Nodes.Node body=loaded?table():new Nodes.Empty(EMPTY,ControlState.READY,
             new Nodes.Icon(EMPTY+".icon",ControlState.READY,"folder",Nodes.Hue.NEUTRAL,Nodes.IconSize.EMPTY,"SFTP"),"Not Connected",
             "Connect to an SSH session to browse its files.",
-            List.of(new Nodes.Button(CHOOSE,state(true,!working),"Choose Session","chevron.down",Nodes.ButtonKind.SECONDARY,CHOOSE,"")));
-        var footer=new ArrayList<Nodes.Node>(List.of(paging(),status(),resultLine(),
+            List.of(new Nodes.MenuButton(CHOOSE,state(true,!working),"Choose Session","",Nodes.ButtonKind.SECONDARY,"",choices,"Choose an SSH session")));
+        // The window's transfers, then paging and the status lines, above the persistent Follow terminal folder row.
+        var footer=new ArrayList<Nodes.Node>();
+        if(transfers!=null) transfers.node().ifPresent(footer::add);
+        footer.addAll(List.of(paging(),status(),resultLine(),
             new Nodes.SettingRow(FOLLOW_ROW,ControlState.READY,FOLLOW_TEXT,"",
                 new Nodes.Toggle(FOLLOW,state(true,browsingEnabled),FOLLOW_TEXT,following,FOLLOW,true,FOLLOW_DESCRIPTION),false)));
-        if(transfers!=null) transfers.node().ifPresent(footer::add);
         return new Nodes.Panel(ROOT,ControlState.READY,header,Optional.of(navigation()),body,
             Optional.of(new Nodes.Stack(FOOTER,ControlState.READY,Nodes.LayoutRole.VERTICAL,footer)));
     }
@@ -387,10 +402,10 @@ public final class SftpPanel implements AutoCloseable {
             tool(NEXT,"forward","Next page",ready && offset+entries.size()<total)));
     }
 
-    /** What is happening or went wrong, wrapping at the panel's width; Cancel while something runs. */
+    /** What is happening or went wrong, in body text wrapping at the panel's width; Cancel while something runs. */
     private Nodes.Node status() {
         return new Nodes.Stack(STATUS,state(working || !message.isEmpty(),true),Nodes.LayoutRole.VERTICAL,List.of(
-            new Nodes.Text(MESSAGE,state(!message.isEmpty(),true),message,Nodes.TextRole.DESCRIPTION),
+            new Nodes.Text(MESSAGE,state(!message.isEmpty(),true),message,Nodes.TextRole.BODY),
             new Nodes.Button(CANCEL,state(working,true),"Cancel","close",Nodes.ButtonKind.SECONDARY,CANCEL,"")));
     }
 

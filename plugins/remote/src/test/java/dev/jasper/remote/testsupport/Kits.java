@@ -126,7 +126,7 @@ public final class Kits {
 
     public static Nodes.Form form(UiView view) { return (Nodes.Form) view.spec().root(); }
 
-    /** The form's buttons that Enter would press: none in Remote's dialogs. */
+    /** The form's primary-kind buttons; a form that opts out of submission (FormSubmission.NONE) presses none on Enter. */
     public static List<Nodes.Button> primaries(UiView view) {
         return form(view).actions().stream().filter(b -> b.kind() == Nodes.ButtonKind.PRIMARY).toList();
     }

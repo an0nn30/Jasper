@@ -36,6 +36,9 @@ final class FormRows {
             ((Labels.LiteralLabel)label).wrap = true;
             caption.text(row.caption());
             caption.setVisible(!row.caption().isEmpty());
+            // A caption is one line under its label, shortened at its end; its whole text is the tooltip.
+            caption.single = true;
+            caption.setToolTipText(row.caption().isEmpty() ? null : row.caption());
             Composition.style(
                     label, context(), row.control() instanceof Nodes.Choice choice && choice.face().filter(face -> face.density()==Nodes.PickerDensity.COMPACT).isPresent()?Typography.Role.PICKER_COMPACT:Typography.Role.LABEL, SemanticColor.TEXT_SECONDARY);
             Composition.style(
@@ -90,6 +93,17 @@ final class FormRows {
         }
 
         boolean trailingVisible(Container p) { return p.getComponentCount()>3 && p.getComponent(3).isVisible(); }
+        /**
+         * A label with a caption beside a single-line input (a field or a dropdown): the two lines sit as one block centered
+         * on the input, with no caption offset, as the New Tunnel reference shows. A taller control (an ordered list) keeps
+         * the label top-aligned at the caption offset.
+         */
+        boolean besideInput() {
+            var control = ((Nodes.FormRow) owner.node).control();
+            return owner.caption.isVisible() && (control instanceof Nodes.Field field && field.kind() != Nodes.FieldKind.TEXTAREA
+                || control instanceof Nodes.Choice choice && (choice.kind() == Nodes.ChoiceKind.DROPDOWN || choice.kind() == Nodes.ChoiceKind.PICKER || choice.kind() == Nodes.ChoiceKind.SEARCHABLE));
+        }
+        int captionOffset() { return besideInput() ? 0 : ThemePainting.metric(owner.context(), DesignMetrics.Role.CAPTION_TOP_OFFSET); }
         boolean stacked(Container p,int width) {
             int lane=p.getComponentCount()>2?Math.min(p.getComponent(2).getPreferredSize().width,SurfacePanel.bodyLaneWidth(owner.context())):0;
             return width<labelWidth()+gap()+lane+(trailingVisible(p)?gap()+Math.min(p.getComponent(3).getPreferredSize().width,SurfacePanel.bodyLaneWidth(owner.context())):0);
@@ -116,11 +130,10 @@ final class FormRows {
             int h =
                     Composition.height(owner.label, Math.min(labelWidth(), width))
                             + (owner.caption.isVisible()
-                                    ? owner.caption.height(labelWidth())
-                                            + ThemePainting.metric(
-                                                    owner.context(),
-                                                    DesignMetrics.Role.CAPTION_TOP_OFFSET)
+                                    ? owner.caption.height(labelWidth()) + captionOffset()
                                     : 0);
+            // Beside an input the block's line spacing may reach a few pixels past the input, into the row gap.
+            if (besideInput()) h = Math.max(0, h - ThemePainting.metric(owner.context(), DesignMetrics.Role.CAPTION_TOP_OFFSET));
             if (p.getComponentCount() > 2)
                 h = Math.max(h, Composition.height(p.getComponent(2), w));
             if (p.getComponentCount() > 3)
@@ -165,7 +178,9 @@ final class FormRows {
             int line = p.getComponentCount() > 2 ? firstLine(2, controlHeight) : p.getHeight();
             int lh = Composition.height(owner.label, lw),
                     y =
-                            owner.caption.isVisible()
+                            besideInput()
+                                    ? (p.getHeight() - lh - owner.caption.height(lw)) / 2
+                                    : owner.caption.isVisible()
                                     ? ThemePainting.metric(
                                             owner.context(), DesignMetrics.Role.CAPTION_TOP_OFFSET)
                                     : Math.max(0, (line - lh) / 2);

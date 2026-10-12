@@ -481,9 +481,14 @@ final class Forms {
                             : Math.min(contentWidth, owner.actions.getPreferredSize().width);
             int actionHeight = Composition.height(owner.actions, actionWidth);
             int sharedPreviewWidth = Math.max(0, contentWidth - actionWidth - gap());
+            // A technical preview (an equivalent command) keeps its one line beside the actions and shortens at its end,
+            // as a window footer does; any other preview (a message) takes its own line above them when it does not fit.
+            var form = (Nodes.Form) owner.node;
+            boolean technical = form.preview().filter(n -> n instanceof Nodes.Text text && (text.role() == Nodes.TextRole.MONO_CAPTION
+                || text.role() == Nodes.TextRole.MONO_SMALL || text.role() == Nodes.TextRole.MONO)).isPresent();
             boolean stacked =
                     owner.preview.isVisible()
-                            && (((Nodes.Form) owner.node).kind() == Nodes.FormKind.WINDOW
+                            && (form.kind() == Nodes.FormKind.WINDOW || technical
                                 ? sharedPreviewWidth < ThemePainting.metric(owner.context(), DesignMetrics.Role.FORM_LABEL_WIDTH)
                                 : owner.preview.getPreferredSize().width > sharedPreviewWidth);
             int previewWidth = stacked ? contentWidth : sharedPreviewWidth;

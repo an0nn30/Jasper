@@ -134,7 +134,8 @@ class TransferStripTest {
             assertThat(button(panel.view(), ResolvePanel.REPLACE).state().enabled()).isTrue();
             assertThat(button(panel.view(), ResolvePanel.MERGE).state().visible()).as("files cannot merge").isFalse();
             assertThat(texts(panel.view())).contains("report.pdf", "Destination changed");
-            assertThat(primaries(panel.view())).as("Enter decides nothing").isEmpty();
+            assertThat(form(panel.view()).submission()).as("Enter decides nothing").isEqualTo(Nodes.FormSubmission.NONE);
+            assertThat(primaries(panel.view())).extracting(Nodes.Button::id).as("a file's visual primary is Replace").containsExactly(ResolvePanel.REPLACE);
             assertThat(form(panel.view()).cancelAction()).as("Escape cancels").isEqualTo(ResolvePanel.CANCEL);
             emit(panel.view(), new UiEvent.Toggled(ResolvePanel.REMAINING, true));
             assertThat(node(panel.view(), ResolvePanel.REMAINING, Nodes.Toggle.class).checked()).isTrue();
@@ -164,13 +165,14 @@ class TransferStripTest {
         edt(() -> {
             var chosen = new ArrayList<Object>();
             var panel = new ExistingItemsPanel(new FakeKit("dev.jasper.remote"), "3 of 5 items already exist in prod:/srv/app.", chosen::add, () -> chosen.add("cancel"));
-            assertThat(texts(panel.view())).containsExactly("3 of 5 items already exist in prod:/srv/app.");
+            assertThat(texts(panel.view())).as("the question's title, then the literal message").containsExactly("Replace Existing Items?", "3 of 5 items already exist in prod:/srv/app.");
             click(panel.view(), ExistingItemsPanel.REPLACE);
             click(panel.view(), ExistingItemsPanel.SKIP);
             click(panel.view(), ExistingItemsPanel.CANCEL);
             assertThat(chosen).containsExactly(ConflictDecision.REPLACE, ConflictDecision.SKIP, "cancel");
             assertThat(button(panel.view(), ExistingItemsPanel.SKIP).label()).isEqualTo("Skip existing");
-            assertThat(primaries(panel.view())).as("Enter copies nothing").isEmpty();
+            assertThat(form(panel.view()).submission()).as("Enter copies nothing").isEqualTo(Nodes.FormSubmission.NONE);
+            assertThat(form(panel.view()).kind()).as("the kit's compact question dialog").isEqualTo(Nodes.FormKind.HERO_COMPACT);
             assertThat(form(panel.view()).cancelAction()).isEqualTo(ExistingItemsPanel.CANCEL);
             panel.close();
             assertThat(closed(panel.view())).isTrue();
@@ -184,7 +186,12 @@ class TransferStripTest {
             var field = node(panel.view(), RenamePanel.NAME, Nodes.Field.class);
             assertThat(field.value()).isEqualTo("report.pdf");
             assertThat(field.trailingAction()).as("Enter in the field applies nothing, as before").isEmpty();
-            assertThat(primaries(panel.view())).isEmpty();
+            assertThat(form(panel.view()).submission()).as("the form opts out of Enter").isEqualTo(Nodes.FormSubmission.NONE);
+            assertThat(primaries(panel.view())).extracting(Nodes.Button::id).containsExactly(RenamePanel.USE);
+            assertThat(form(panel.view()).actions()).extracting(Nodes.Button::id).as("Cancel beside Use name").containsExactly(RenamePanel.CLOSE, RenamePanel.USE);
+            type(panel.view(), RenamePanel.NAME, " ");
+            assertThat(button(panel.view(), RenamePanel.USE).state().enabled()).as("a blank name cannot be used").isFalse();
+            click(panel.view(), RenamePanel.USE);
             type(panel.view(), RenamePanel.NAME, "report (2).pdf");
             click(panel.view(), RenamePanel.USE);
             press(panel.view(), form(panel.view()).cancelAction());

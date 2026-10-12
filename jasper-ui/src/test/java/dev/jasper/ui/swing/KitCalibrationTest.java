@@ -135,7 +135,9 @@ class KitCalibrationTest {
             var c = KitFixtures.context();
             try (var view = new KitView(c, dev.jasper.ui.gallery.PanelFixtures.create("fileservers"), e -> {})) {
                 KitFixtures.render(view, UIScale.scale(264), UIScale.scale(424), 1);
-                assertThat(((JLabel)view.control("server-icon").component).getIcon().getIconWidth()).as("compact folder remains a plain control glyph").isEqualTo(UIScale.scale(14));
+                // A compact panel row's leading glyph is drawn at the panel-row glyph size (the plugin-panels reference's folder), untiled.
+                assertThat(((JLabel)view.control("server-icon").component).getIcon().getIconWidth()).as("compact folder remains a plain, untiled glyph")
+                    .isEqualTo(UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_COMPACT_ROW_GLYPH)));
             } finally { c.icons().close(); c.binding().close(); }
         });
     }

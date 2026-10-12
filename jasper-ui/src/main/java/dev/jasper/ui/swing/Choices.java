@@ -98,6 +98,7 @@ final class Choices {
                         combo.setModel(new DefaultComboBoxModel<>(choice.options().toArray(Option[]::new))); options = choice.options();
                     }
                     ((ChoiceCombo)combo).refreshPopup();
+                    ((ChoiceCombo)combo).face = choice.kind() == Nodes.ChoiceKind.DROPDOWN ? choice.face().orElse(null) : null;
                     combo.setSelectedItem(choice.options().stream().filter(o -> o.id().equals(choice.selectedId())).findFirst().orElse(null));
                 } else if (input instanceof PickerButton picker) {
                     Option option = choice.options().stream().filter(o -> o.id().equals(choice.selectedId())).findFirst().orElse(null);
@@ -223,10 +224,18 @@ final class Choices {
     }
     static class ChoiceCombo extends JComboBox<Option> {
         final KitContext context; ThemePainting.Focus focus; BasicComboPopup popup; int settingsWidth; boolean compactHeight;
+        /** A DROPDOWN's rich closed face (its owner keeps it describing the selected option); null paints the value. */
+        Nodes.PickerFace face;
+        boolean hover;
         ChoiceCombo(KitContext context) {
             this.context = context; setOpaque(false);
             setBorder(new EmptyBorder(ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0, ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0));
             setUI(kitUi());
+            var rollover = new java.awt.event.MouseAdapter() {
+                @Override public void mouseEntered(java.awt.event.MouseEvent e) { hover = true; repaint(); }
+                @Override public void mouseExited(java.awt.event.MouseEvent e) { hover = false; repaint(); }
+            };
+            addMouseListener(rollover);
         }
         /** Swing reinstalls delegates on theme changes; ordinary choices retain kit painting and popup roles. */
         @Override public void updateUI() {
@@ -277,8 +286,18 @@ final class Choices {
             list.setFont(ThemePainting.font(context, Typography.Role.BODY));
             popup.revalidate(); popup.repaint(); list.repaint();
         }
-        @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); int nominal = ThemePainting.height(context, compactHeight ? DesignMetrics.Role.FULL_SETTING_CHOICE_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY); return new Dimension(settingsWidth>0?settingsWidth:size.width, compactHeight ? nominal : Math.max(size.height, nominal)); }
+        @Override public Dimension getPreferredSize() {
+            var size = super.getPreferredSize();
+            int height = face != null ? ThemePainting.height(context, DesignMetrics.Role.PICKER_DEFAULT_HEIGHT, Typography.Role.BODY)
+                : ThemePainting.height(context, compactHeight ? DesignMetrics.Role.FULL_SETTING_CHOICE_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY);
+            return new Dimension(settingsWidth>0?settingsWidth:size.width, compactHeight && face == null ? height : Math.max(size.height, height));
+        }
         @Override public void paint(Graphics graphics) {
+            if (face != null) {
+                // The rich face is the whole closed control: tile, primary, caption and chevron; the popup lists the options.
+                PickerMenus.paintFace(this, graphics, context, face, face.primary().isEmpty(), focus != null && focus.visible(), hover, isPopupVisible());
+                return;
+            }
             var g = (Graphics2D)graphics.create(); try { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); super.paint(g); } finally { g.dispose(); }
         }
         @Override protected void paintComponent(Graphics graphics) {

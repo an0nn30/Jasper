@@ -16,12 +16,15 @@ final class PickerMenus {
     private static int metric(KitContext c,DesignMetrics.Role r){return ThemePainting.metric(c,r);}
     private static int height(KitContext c,DesignMetrics.Role r){return ThemePainting.height(c,r,Typography.Role.PICKER_COMPACT);}
     static void paintFace(JButton button,Graphics graphics,KitContext c,Nodes.PickerFace face,boolean empty,boolean focus){
+        paintFace(button,graphics,c,face,empty,focus,button.getModel().isRollover(),Boolean.TRUE.equals(button.getClientProperty("Jasper.pickerExpanded")));
+    }
+    /** The rich face on any control: a PICKER's button, or a DROPDOWN whose closed face describes its selected option. */
+    static void paintFace(JComponent button,Graphics graphics,KitContext c,Nodes.PickerFace face,boolean empty,boolean focus,boolean hover,boolean expanded){
         var g=(Graphics2D)graphics.create();try{
             ThemePainting.antialias(g);
             if(!button.isEnabled())g.setComposite(AlphaComposite.SrcOver.derive(c.metrics().value(DesignMetrics.Role.PICKER_DISABLED_PERCENT)/100f));
-            boolean expanded=Boolean.TRUE.equals(button.getClientProperty("Jasper.pickerExpanded"));
             // Focused or open faces take the focus border inside their halo, as text fields do.
-            ThemePainting.rounded(g,button,c,ThemePainting.color(c,button.isEnabled()&&button.getModel().isRollover()?SemanticColor.SURFACE_CONTROL_HOVER:SemanticColor.SURFACE_CONTROL),ThemePainting.color(c,focus||expanded?SemanticColor.BORDER_FOCUS:SemanticColor.BORDER_CONTROL),focus||expanded,false);
+            ThemePainting.rounded(g,button,c,ThemePainting.color(c,button.isEnabled()&&hover?SemanticColor.SURFACE_CONTROL_HOVER:SemanticColor.SURFACE_CONTROL),ThemePainting.color(c,focus||expanded?SemanticColor.BORDER_FOCUS:SemanticColor.BORDER_CONTROL),focus||expanded,false);
             boolean compact=face.density()==Nodes.PickerDensity.COMPACT;
             int pad=metric(c,DesignMetrics.Role.PICKER_PADDING),gap=metric(c,compact?DesignMetrics.Role.PICKER_GAP:DesignMetrics.Role.PICKER_DEFAULT_FACE_GAP),tile=metric(c,compact?DesignMetrics.Role.PICKER_FACE_TILE:DesignMetrics.Role.PICKER_DEFAULT_FACE_TILE);
             int x=metric(c,compact?DesignMetrics.Role.PICKER_COMPACT_FACE_INSET:DesignMetrics.Role.PICKER_DEFAULT_FACE_INSET);

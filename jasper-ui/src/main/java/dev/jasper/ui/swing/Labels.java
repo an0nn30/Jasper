@@ -98,11 +98,13 @@ final class Labels {
     }
     static final class TextControl extends ControlRegistry.Control {
         boolean panelDetail, hint;
+        /** A form footer's preview: a command reads from its start, so it shortens at its end (set by the reconciler). */
+        boolean formPreview;
         SemanticColor identityStatus;
         TextControl(KitView view, Nodes.Text node) { super(view, node, literal()); refresh(); }
         @Override void refresh() {
             var text = (Nodes.Text)node; var label = (JLabel)component; state();
-            label.putClientProperty("Jasper.leadingEllipsis",text.role()==Nodes.TextRole.MONO || text.role()==Nodes.TextRole.MONO_SMALL || text.role()==Nodes.TextRole.MONO_CAPTION);
+            label.putClientProperty("Jasper.leadingEllipsis",!formPreview && (text.role()==Nodes.TextRole.MONO || text.role()==Nodes.TextRole.MONO_SMALL || text.role()==Nodes.TextRole.MONO_CAPTION));
             ((LiteralLabel)label).baselineOffset=panelDetail && (text.role()==Nodes.TextRole.PANEL_TITLE || text.role()==Nodes.TextRole.MONO_CAPTION) ? ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_TEXT_BASELINE) : 0;
             label.setIcon(null); label.setDisabledIcon(null); label.setPreferredSize(null);
             label.setText(text.text());
@@ -133,13 +135,15 @@ final class Labels {
         };
     }
     static final class IconControl extends ControlRegistry.Control {
-        int tileSize, tileHeight, tileGlyph; boolean selected, panelDetail;
+        int tileSize, tileHeight, tileGlyph, glyphOverride; boolean selected, panelDetail;
         void tile(int logicalSize, boolean value) { tile(logicalSize, logicalSize, 0, value); }
+        /** A containing composition's logical glyph size in place of the icon's size role; 0 restores the role. */
+        void glyph(int logicalSize) { if (glyphOverride != logicalSize) { glyphOverride = logicalSize; refresh(); } }
         void tile(int width, int height, int glyph, boolean value) { tileSize = width; tileHeight = height; tileGlyph = glyph; selected = value; refresh(); }
         IconControl(KitView view, Nodes.Icon node) { super(view, node, literal()); refresh(); }
         @Override void refresh() {
             var icon = (Nodes.Icon)node; var label = (JLabel)component; state();
-            int size = com.formdev.flatlaf.util.UIScale.scale(context().icons().size(icon.size()));
+            int size = com.formdev.flatlaf.util.UIScale.scale(glyphOverride > 0 ? glyphOverride : context().icons().size(icon.size()));
             ((LiteralLabel)label).iconOffset=panelDetail && tileSize == 0 ? ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_TEXT_BASELINE) : 0;
             var receiving=view.artworkPresentation(node.id());
             int savedSize=tileSize, savedHeight=tileHeight, savedGlyph=tileGlyph;
