@@ -24,7 +24,8 @@ class ToolWindowSurfaceTest {
         return area;
     }
 
-    @Test void toolWindowsPaintTheToolWindowColourWhileControlsKeepTheirOwn() throws Exception {
+    /** theme.md: a tool window's body is surface.panel; a vendor ToolWindow.background no longer reaches it. */
+    @Test void toolWindowsPaintThePanelSurfaceWhileControlsKeepTheirOwn() throws Exception {
         var original = UIManager.getLookAndFeel();
         try {
             ThemeTestSupport.install(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
@@ -37,9 +38,9 @@ class ToolWindowSurfaceTest {
             content.add(inner, BorderLayout.NORTH); content.add(scroll); content.add(fixed, BorderLayout.SOUTH);
             var area = showing(Slot.LEFT_TOP, content, 250);
 
-            Color surface = UIManager.getColor("ToolWindow.background");
-            assertThat(surface).isEqualTo(Color.WHITE);
-            assertThat(UIManager.getColor("Panel.background")).isNotEqualTo(surface);
+            assertThat(UIManager.getColor("ToolWindow.background")).as("the vendor key the tool window ignores").isEqualTo(Color.WHITE);
+            Color surface = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL);
+            assertThat(surface).isNotEqualTo(Color.WHITE);
             assertThat(content.getParent().getBackground()).as("tool window frame").isEqualTo(surface);
             assertThat(area.headerOf(Slot.LEFT_TOP).getBackground()).as("the header has no bar colour").isEqualTo(surface);
             assertThat(content.getBackground()).isEqualTo(UIManager.getColor("Panel.background"));
@@ -54,8 +55,8 @@ class ToolWindowSurfaceTest {
             ThemeTestSupport.install(Theme.DARK);
             SwingUtilities.updateComponentTreeUI(area);
             area.refreshTheme();
-            Color dark = UIManager.getColor("ToolWindow.background");
-            assertThat(dark).isEqualTo(new Color(0x191c20));
+            Color dark = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL);
+            assertThat(dark).isEqualTo(new Color(0x21252a));
             assertThat(area.headerOf(Slot.LEFT_TOP).getBackground()).isEqualTo(dark);
             for (var component : List.<JComponent>of(content, inner, later))
                 assertThat(component.getBackground()).isEqualTo(UIManager.getColor("Panel.background"));

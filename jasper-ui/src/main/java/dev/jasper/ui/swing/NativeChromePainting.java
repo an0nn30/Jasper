@@ -23,7 +23,7 @@ public final class NativeChromePainting {
             var model = button.getModel();
             var palette = theme.semantic();
             if (button.isEnabled() && (model.isRollover() || model.isPressed() || model.isSelected())) {
-                g.setColor(model.isPressed() || model.isSelected() ? palette.color(SemanticColor.SEGMENT_SELECTED_BG)
+                g.setColor(model.isPressed() || model.isSelected() ? palette.color(SemanticColor.SURFACE_CONTROL_SELECTED)
                     : hoverOverlay(theme));
                 int arc = NativeControlStyles.metric(DesignMetrics.Role.NATIVE_TOOLBAR_HOVER_ARC);
                 g.fillRoundRect(0, 0, button.getWidth(), button.getHeight(), arc, arc);
@@ -55,9 +55,9 @@ public final class NativeChromePainting {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             int arc = NativeControlStyles.metric(DesignMetrics.Role.TITLE_SEARCH_ARC), width = component.getWidth(), height = component.getHeight();
-            g.setColor(palette.color(hover ? SemanticColor.SURFACE_CONTROL_HOVER : SemanticColor.SURFACE_INPUT));
+            g.setColor(palette.color(SemanticColor.SURFACE_FIELD_RAISED));
             g.fillRoundRect(0, 0, width - 1, height - 1, arc, arc);
-            g.setColor(palette.color(SemanticColor.BORDER_INPUT));
+            g.setColor(palette.color(hover ? SemanticColor.BORDER_FIELD_RAISED_HOVER : SemanticColor.BORDER_FIELD_RAISED));
             g.drawRoundRect(0, 0, width - 1, height - 1, arc, arc);
             if (collapsed) { search.paintIcon(component, g, (width - search.getIconWidth()) / 2, (height - search.getIconHeight()) / 2); return; }
             int pad = NativeControlStyles.metric(DesignMetrics.Role.TITLE_SEARCH_PADDING), gap = NativeControlStyles.metric(DesignMetrics.Role.TITLE_SEARCH_GAP), x = pad;
@@ -72,10 +72,10 @@ public final class NativeChromePainting {
                 x += contextIcon.getIconWidth() + gap;
             }
             int baseline = (height - metrics.getHeight()) / 2 + metrics.getAscent();
-            g.setColor(palette.color(SemanticColor.TEXT_PRIMARY)); g.drawString(clip(context, metrics, end - x), x, baseline);
+            g.setColor(palette.color(SemanticColor.TEXT_FIELD_RAISED)); g.drawString(clip(context, metrics, end - x), x, baseline);
             if (hintWidth > 0 && width - pad - hintWidth > x) {
                 g.setColor(SurfaceContrast.on(palette, SemanticColor.TEXT_PLACEHOLDER,
-                    hover ? SemanticColor.SURFACE_CONTROL_HOVER : SemanticColor.SURFACE_INPUT, SurfaceContrast.INDICATOR)); g.drawString(hint, width - pad - hintWidth, baseline);
+                    SemanticColor.SURFACE_FIELD_RAISED, SurfaceContrast.INDICATOR)); g.drawString(hint, width - pad - hintWidth, baseline);
             }
         } finally { g.dispose(); }
     }
@@ -193,12 +193,12 @@ public final class NativeChromePainting {
         } finally { g.dispose(); }
     }
 
-    /** A tool window header's connected dot: the success status held to the indicator floor on the sidebar surface. */
+    /** A tool window header's connected dot: the success status held to the indicator floor on the panel surface. */
     public static void connectedDot(Graphics graphics, int x, int y, int size, GeneratedTheme theme) {
         var g = (Graphics2D) graphics.create();
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(SurfaceContrast.on(theme.semantic(), SemanticColor.STATUS_SUCCESS, SemanticColor.SURFACE_SIDEBAR, SurfaceContrast.INDICATOR));
+            g.setColor(SurfaceContrast.on(theme.semantic(), SemanticColor.STATUS_SUCCESS, SemanticColor.SURFACE_PANEL, SurfaceContrast.INDICATOR));
             g.fillOval(x, y, size, size);
         } finally { g.dispose(); }
     }

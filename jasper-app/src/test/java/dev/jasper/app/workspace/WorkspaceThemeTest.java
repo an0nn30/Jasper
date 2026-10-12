@@ -36,7 +36,8 @@ class WorkspaceThemeTest {
                 .as("an authored ToolWindow.background reaches the canonical sidebar role").isEqualTo(sidebar);
             var toolWindow = new JPanel();
             ToolWindowSurface.apply(toolWindow);
-            assertThat(toolWindow.getBackground()).as("and the tool-window consumer paints it").isEqualTo(sidebar);
+            assertThat(toolWindow.getBackground()).as("tool windows paint theme.md's tool-window body, not the sidebar")
+                .isEqualTo(generated.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
             var owner = content(launcher(new ArrayDeque<>()), themes);
             owner.newTab(HOME);
             owner.setAnimations(new AnimationSettings(false, 0, 0, 0));

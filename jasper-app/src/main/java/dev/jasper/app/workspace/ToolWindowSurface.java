@@ -9,6 +9,6 @@ final class ToolWindowSurface {
     private ToolWindowSurface() {}
     static void apply(JComponent root) {
         if (!dev.jasper.ui.swing.KitOwnership.owns(root))
-            root.setBackground(ThemeZone.color(root, SemanticColor.SURFACE_SIDEBAR));
+            root.setBackground(ThemeZone.color(root, SemanticColor.SURFACE_PANEL));
     }
 }

@@ -87,7 +87,7 @@ class SidePanelRenderTest {
         assertThat(header.getY()).isEqualTo(gutter);
         assertThat(panel.root.getY()).as(name + "content sits under the header").isEqualTo(gutter + header.getHeight());
         assertThat(pixel(image, area, header, header.getWidth() / 2, header.getHeight() / 2)).as(name + "header has no bar colour")
-            .isEqualTo(UIManager.getColor("ToolWindow.background"));
+            .isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
 
         assertThat(pixel(image, area, panel.header, 12, 2)).as(name + "raw fixture owns its panel surface").isEqualTo(UIManager.getColor("Panel.background"));
         var field = panel.search;

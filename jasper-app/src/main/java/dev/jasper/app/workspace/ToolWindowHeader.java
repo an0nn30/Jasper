@@ -94,7 +94,7 @@ final class ToolWindowHeader extends JPanel {
     }
 
     /** This native shell owns its surface; no descendant walker styles it. */
-    @Override public java.awt.Color getBackground() { return ThemeZone.color(this, SemanticColor.SURFACE_SIDEBAR); }
+    @Override public java.awt.Color getBackground() { return ThemeZone.color(this, SemanticColor.SURFACE_PANEL); }
 
     private static JButton button(String icon, String name) {
         var button = new JButton(AppIcons.semantic(icon));

@@ -130,6 +130,20 @@ public final class KitFixtures {
         for (var child : container.getComponents()) if (child instanceof java.awt.Container nested) layout(nested);
     }
 
+    /** The dark fixture with every semantic role in its own colour, so a painted pixel names the role it came from. */
+    public static GeneratedTheme marked() {
+        var base = dark();
+        var values = new java.util.EnumMap<SemanticColor, java.awt.Color>(SemanticColor.class);
+        for (var role : SemanticColor.values()) values.put(role, marker(role));
+        return new GeneratedTheme(base.name(), base.dark(), base.author(), base.tokens(), base.syntax(), base.terminal(),
+            base.uiKeys(), base.icons(), base.glass(), new SemanticPalette(values));
+    }
+
+    /** {@code role}'s marker colour in {@link #marked()}: opaque, its red channel unique to the role. */
+    public static java.awt.Color marker(SemanticColor role) {
+        return new java.awt.Color(16 + 3 * role.ordinal(), 64 + role.ordinal(), 200 - role.ordinal());
+    }
+
     /** A context over {@code theme} for both routes; caller owns and closes the binding and icon registry; EDT. */
     public static KitContext context(GeneratedTheme theme) {
         return new KitContext(new ThemeBinding(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }),

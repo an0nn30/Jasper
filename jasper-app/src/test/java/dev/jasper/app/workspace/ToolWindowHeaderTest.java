@@ -146,4 +146,15 @@ class ToolWindowHeaderTest {
         var title = SwingUtilities.convertRectangle(header.titleLabel().getParent(), header.titleLabel().getBounds(), header);
         assertThat(title.x).isEqualTo(UIScale.scale(10));
     }
+
+    /** The class runs on the EDT (EdtTestExtension) with the module theme installed. */
+    @Test void toolWindowsSitOnThePanelSurface() {
+        var header = new ToolWindowHeader("Sessions", javax.swing.JPopupMenu::new, () -> { });
+        assertThat(header.getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(header, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
+        var root = new javax.swing.JPanel();
+        ToolWindowSurface.apply(root);
+        assertThat(root.getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(root, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
+        assertThat(dev.jasper.app.platform.ThemeZone.color(root, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL))
+            .as("the module theme tells panel from sidebar").isNotEqualTo(dev.jasper.app.platform.ThemeZone.color(root, dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR));
+    }
 }

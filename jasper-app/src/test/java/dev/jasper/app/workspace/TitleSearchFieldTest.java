@@ -67,12 +67,14 @@ class TitleSearchFieldTest {
         assertThat(TitleSearchField.clip("anything", metrics, 0)).isEmpty();
     }
 
-    @Test void paintsTheThemesFillAndAHoverFill() {
+    /** theme.md: the title bar's command field is a raised field; hover changes its edge, never its fill. */
+    @Test void paintsTheRaisedFieldFillAndKeepsItOnHover() {
         var field = new TitleSearchField(() -> { }, () -> "⌘K");
         field.setSize(400, 22);
-        assertThat(pixel(field, 200, 11)).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT));
+        var raised = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_FIELD_RAISED);
+        assertThat(pixel(field, 200, 11)).isEqualTo(raised);
         field.dispatchEvent(mouse(field, MouseEvent.MOUSE_ENTERED, 10));
-        assertThat(pixel(field, 390, 3)).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL_HOVER));
+        assertThat(pixel(field, 390, 3)).isEqualTo(raised);
         field.setCollapsed(true);
         assertThat(field.collapsed()).isTrue();
     }

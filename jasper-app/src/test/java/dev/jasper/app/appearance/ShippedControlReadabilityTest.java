@@ -58,7 +58,8 @@ class ShippedControlReadabilityTest {
                 var graphics = image.createGraphics();
                 try { NativeChromePainting.search(component, graphics, theme, hover, false, "", "MMMM", blank, null); }
                 finally { graphics.dispose(); }
-                var surface = hover ? SemanticColor.SURFACE_CONTROL_HOVER : SemanticColor.SURFACE_INPUT;
+                // The command field is a raised field whose hover changes only its edge.
+                var surface = SemanticColor.SURFACE_FIELD_RAISED;
                 var expected = SurfaceContrast.on(theme.semantic(), SemanticColor.TEXT_PLACEHOLDER, surface, SurfaceContrast.INDICATOR);
                 assertThat(ColorMath.contrast(expected, theme.semantic().color(surface))).isGreaterThanOrEqualTo(3);
                 assertThat(hasColor(image, expected)).as(source.name() + " hint paint hover=" + hover).isTrue();

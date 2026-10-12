@@ -86,7 +86,7 @@ public final class NativeControlStyles {
             if (arc != null) style.put("arc", DesignMetrics.DEFAULT.value(arc));
             style.put("toolbar.hoverBackground", ColorMath.opacity(palette.color(SemanticColor.HOVER_OVERLAY), .08));
             style.put("toolbar.pressedBackground", palette.color(SemanticColor.SURFACE_CONTROL_HOVER));
-            style.put("toolbar.selectedBackground", palette.color(SemanticColor.SEGMENT_SELECTED_BG));
+            style.put("toolbar.selectedBackground", palette.color(SemanticColor.SURFACE_CONTROL_SELECTED));
             button.putClientProperty("FlatLaf.style", Map.copyOf(style));
         });
     }
