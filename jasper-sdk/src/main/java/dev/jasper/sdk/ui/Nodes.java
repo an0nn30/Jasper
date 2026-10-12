@@ -40,7 +40,8 @@ public final class Nodes {
      */
     public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION, SUPPORTING, JOINED_ACTIONS, SETTINGS_PAGE, SETTINGS_CONTROLS, SETTINGS_TRAILING, SETTINGS_GROUP_HEADER, SETTINGS_FOOTER, SETTINGS_NAVIGATION, ROUTE }
     /**
-     * SIDEBAR_DETAIL and THREE_COLUMN place their children side by side. DOCUMENT stacks them top to bottom for a document
+     * THREE_COLUMN places a manager window's rail, list and detail columns side by side; SIDEBAR_DETAIL is the same manager
+     * without its rail (its last child is the detail column, the others list columns). DOCUMENT stacks them top to bottom for a document
      * surface (an editor tab): every visible child takes its preferred height except the first visible Custom or Empty
      * child, which fills the height left over; hidden children take no space. The other children are the document's bars:
      * an INLINE stack among them (directly, or as a row of a VERTICAL group) is one compact bar row whose first field or

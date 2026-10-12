@@ -50,8 +50,8 @@ public final class ChooserPrompts {
         Modal modal = modals.apply("Confirm Save As");
         boolean[] replace = {false};
         var view = new KitView(kit.get(), new ViewSpec(new Nodes.Form("replace-sheet", ControlState.READY, Nodes.FormKind.SHEET,
-            "Replace existing file?", Optional.empty(),
-            List.of(new Nodes.Text("replace-message", ControlState.READY, name + " already exists. Do you want to replace it?", Nodes.TextRole.BODY)),
+            "Replace Existing File?", Optional.empty(),
+            List.of(new Nodes.Text("replace-message", ControlState.READY, name + " already exists. Do you want to replace it?", Nodes.TextRole.DESCRIPTION)),
             Optional.empty(), List.of(new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
                 new Nodes.Button(REPLACE, ControlState.READY, "Replace", "", Nodes.ButtonKind.PRIMARY, REPLACE, "")), CANCEL)),
             event -> {
@@ -103,7 +103,9 @@ public final class ChooserPrompts {
     private static ViewSpec folderSpec(String value) {
         boolean ready = !value.strip().isEmpty();
         return new ViewSpec(new Nodes.Form("folder-sheet", ControlState.READY, Nodes.FormKind.SHEET, "New Folder", Optional.empty(),
-            List.of(new Nodes.Field(NAME, ControlState.READY, Nodes.FieldKind.TEXT, value, "", "Folder name", "")), Optional.empty(),
+            // The canonical sheet body: a form card with one labelled row.
+            List.of(new Nodes.Card("folder-card", ControlState.READY, Nodes.CardKind.FORM, List.of(new Nodes.FormRow("folder-row", ControlState.READY,
+                "Name", "", new Nodes.Field(NAME, ControlState.READY, Nodes.FieldKind.TEXT, value, "", "Folder name", ""), Optional.empty())))), Optional.empty(),
             List.of(new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
                 new Nodes.Button(CREATE, new ControlState(true, ready, false, ""), "Create", "", Nodes.ButtonKind.PRIMARY, CREATE, "")), CANCEL));
     }

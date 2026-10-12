@@ -24,7 +24,7 @@ class Task9cChooserEvidenceTest {
         SwingUtilities.invokeAndWait(()->{
             var themes=new ThemeController();
             try {
-                for(var theme:List.of(Theme.DARK,Theme.JASPER_LIGHT))for(float font:List.of(13f,32f)) {
+                for(var theme:List.of(Theme.DARK,Theme.JASPER_LIGHT))for(float font:List.of(13f,20f,32f)) {
                     themes.configure(theme,new UiFontConfig("system",font));
                     var sourceKit=themes.appearance().context(ThemeRoute.CHROME);
                     var kit=new dev.jasper.ui.swing.KitContext(sourceKit.binding(),sourceKit.route(),sourceKit.metrics(),sourceKit.icons(),()->false);
@@ -76,6 +76,20 @@ class Task9cChooserEvidenceTest {
                             }
                         } finally {panel.close();model.close();}
                     }
+                    // The chooser's own sheets (replace, new folder) through a modal that captures them as shown.
+                    var prompts=new dev.jasper.app.windows.ChooserPrompts(()->kit,title->new dev.jasper.app.windows.ChooserPrompts.Modal(){
+                        JComponent content;
+                        @Override public void setContent(JComponent value){content=value;}
+                        @Override public void show(Runnable shown){
+                            shown.run();
+                            // A modal packs the sheet at its width: lay it out there before reading its height.
+                            content.setSize(480,2000);for(int i=0;i<3;i++)KitTestSupport.layout(content);
+                            save(content,family,"prompt-"+title.replace(' ','-').toLowerCase(java.util.Locale.ROOT),480,content.getPreferredSize().height);
+                        }
+                        @Override public void close(){}
+                    });
+                    assertThat(prompts.confirmReplace("a-long-literal-file-name <html>.txt")).isFalse();
+                    assertThat(prompts.askFolderName()).isEmpty();
                     var attempts=new ArrayList<CompletableFuture<Browser>>();
                     ChooserSource remote=new ChooserSource(){
                         public String id(){return "fixture.remote";}public String heading(){return "Remote fixture";}

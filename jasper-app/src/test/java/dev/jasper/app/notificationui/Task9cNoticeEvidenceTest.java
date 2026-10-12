@@ -19,7 +19,7 @@ class Task9cNoticeEvidenceTest {
         SwingUtilities.invokeAndWait(()->{
             var themes=new ThemeController();
             try {
-                for(var theme:List.of(Theme.DARK,Theme.JASPER_LIGHT))for(float font:List.of(13f,32f)) {
+                for(var theme:List.of(Theme.DARK,Theme.JASPER_LIGHT))for(float font:List.of(13f,20f,32f)) {
                     themes.configure(theme,new UiFontConfig("system",font));var kit=themes.appearance().context(ThemeRoute.CHROME);
                     String family=(theme.dark()?"dark":"light")+"-"+font;
                     var clock=Clock.fixed(Instant.parse("2026-10-05T12:00:00Z"),ZoneOffset.UTC);

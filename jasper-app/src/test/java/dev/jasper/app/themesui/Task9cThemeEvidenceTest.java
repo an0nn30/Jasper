@@ -24,7 +24,7 @@ class Task9cThemeEvidenceTest {
             var windows=new AuxiliaryWindows(UiState.inMemory(),surface->new AuxiliarySurface.Shell(()->{},()->{},()->{},title->{},()->new Rectangle(0,0,680,440),(title,initial)->Optional.empty()));
             var owner=windows.window("settings","Settings",new Dimension(980,681),false);owner.show();
             try {
-                for(var theme:List.of(Theme.DARK,Theme.JASPER_LIGHT))for(float font:List.of(13f,32f)) {
+                for(var theme:List.of(Theme.DARK,Theme.JASPER_LIGHT))for(float font:List.of(13f,20f,32f)) {
                     themes.configure(theme,new UiFontConfig("system",font));
                     String family=(theme.dark()?"dark":"light")+"-"+font;
                     try(var dialogs=new ThemeDialogs(windows,()->owner,()->themes.appearance().context(ThemeRoute.CHROME))) {
