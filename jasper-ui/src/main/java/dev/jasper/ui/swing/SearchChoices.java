@@ -21,6 +21,7 @@ import java.awt.event.MouseMotionAdapter;
 import java.awt.event.MouseMotionListener;
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -453,12 +454,16 @@ final class SearchChoices {
             filter(wanted < 0 ? current() : wanted);
         }
 
-        /** Shows the entries matching the search, highlighting {@code wanted} when it matches and else the first match. */
+        /**
+         * Shows the entries matching the search, highlighting {@code wanted} when it matches and else the first match.
+         * The rows change in one step, and not at all when they are the same: added one by one, the list measured every
+         * row again for each row added, which made a long list such as the installed fonts slow to open.
+         */
         private void filter(int wanted) {
             filtering = true;
             try {
                 String[] words = query().strip().toLowerCase(Locale.ROOT).split("\\s+");
-                rows.clear();
+                var labels = new ArrayList<Object>();
                 indexes.clear();
                 int pinned = Math.min(combo.pinned, combo.getItemCount());
                 int keep = -1, first = -1, matched = 0;
@@ -467,14 +472,15 @@ final class SearchChoices {
                     boolean matches = matches(label, words);
                     if (!matches && index >= pinned) continue;
                     if (matches && index >= pinned) matched++;
-                    if (matches && first < 0) first = rows.size();
-                    if (matches && index == wanted) keep = rows.size();
-                    rows.addElement(label);
+                    if (matches && first < 0) first = labels.size();
+                    if (matches && index == wanted) keep = labels.size();
+                    labels.add(label);
                     indexes.add(index);
                 }
                 // With no match nothing is highlighted, so Enter after a typo picks nothing.
                 int row = keep >= 0 ? keep : first;
-                if (searching() && matched == 0) { rows.addElement(combo.noMatches); indexes.add(-1); }
+                if (searching() && matched == 0) { labels.add(combo.noMatches); indexes.add(-1); }
+                if (!Collections.list(rows.elements()).equals(labels)) { rows.clear(); rows.addAll(labels); }
                 if (row < 0) list.clearSelection();
                 else { list.setSelectedIndex(row); list.ensureIndexIsVisible(row); }
             } finally { filtering = false; }

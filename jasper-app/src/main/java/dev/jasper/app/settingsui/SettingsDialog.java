@@ -81,6 +81,9 @@ public final class SettingsDialog {
     /** The chrome kit context of the current opening. */
     private KitContext kit;
 
+    /** Reads the installed font families in the background, so the first Settings opening and its font lists are quick. */
+    public static void prepareFonts() { Fonts.prepare(); }
+
     public SettingsDialog(AuxiliaryWindows windows, Function<PageContext, List<SettingsPage>> pages, Hooks hooks) {
         this.windows = Objects.requireNonNull(windows);
         this.pageFactory = Objects.requireNonNull(pages);

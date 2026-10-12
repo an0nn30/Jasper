@@ -838,6 +838,9 @@ public final class JasperApplication {
                     this::openConfigFile, this::migrateConfiguration, this::browse, (parent, count) -> settings.askDiscard(parent, count),
                     () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME)));
             configuration.settingsOpener((owner, page) -> openSettings(owner.id(), page));
+            // Never on the start-up path: the font families are read once the first output shows or the warm-up ends.
+            trace.when(StartupTrace.Milestone.OUTPUT_PAINTED, Runnable::run, dev.jasper.app.settingsui.SettingsDialog::prepareFonts);
+            trace.when(StartupTrace.Milestone.WARMED_UP, Runnable::run, dev.jasper.app.settingsui.SettingsDialog::prepareFonts);
         }
         boolean[] replayed = new boolean[1];
         // subscribe replays the current theme at once; plugins read the look on demand, so only later changes are events.

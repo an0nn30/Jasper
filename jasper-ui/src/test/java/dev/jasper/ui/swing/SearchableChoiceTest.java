@@ -316,4 +316,25 @@ class SearchableChoiceTest {
             } finally { release(context); }
         });
     }
+
+    /**
+     * Opening and closing rebuild the list in one step: rebuilt row by row with the highlight on the first row, the
+     * highlight followed every added row and each move measured every row again, so a long font list lagged.
+     */
+    @Test void openingALongListMeasuresEachRowAFewTimesNotOncePerAddedRow() {
+        Edt.run(() -> { try (var f = new Fixture()) {
+            f.labels = new ArrayList<>(java.util.stream.IntStream.range(0, 400).mapToObj(i -> "Family " + i).toList());
+            f.select("Family 0");
+            var list = f.popup().getList();
+            var renderer = list.getCellRenderer();
+            int[] measured = {0};
+            list.setCellRenderer((source, value, row, selected, focused) -> {
+                measured[0]++;
+                return renderer.getListCellRendererComponent(source, value, row, selected, focused);
+            });
+            for (int round = 0; round < 3; round++) { f.popup().show(); f.popup().hide(); }
+            assertThat(f.popup().shown()).hasSize(400);
+            assertThat(measured[0]).as("cell measurements for three opens and closes of 400 rows").isLessThan(400 * 3 * 2 * 2);
+        } });
+    }
 }

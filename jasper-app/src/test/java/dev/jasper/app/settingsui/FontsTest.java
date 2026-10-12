@@ -17,4 +17,14 @@ class FontsTest {
             assertThat(font.canDisplay(0xE0B0)).isTrue();
         }
     }
+
+    @Test void preparingReadsTheFamiliesOnceInTheBackgroundAndCallersGetThatList() throws InterruptedException {
+        Fonts.prepare();
+        Fonts.prepare();
+        var reader = Thread.getAllStackTraces().keySet().stream().filter(thread -> thread.getName().equals("jasper-font-families")).toList();
+        assertThat(reader).hasSizeLessThanOrEqualTo(1).allMatch(Thread::isDaemon);
+        for (var thread : reader) thread.join(10_000);
+        assertThat(Fonts.families(false)).contains("Cousine Nerd Font Mono").isSameAs(Fonts.families(false));
+        assertThat(Fonts.families(true)).contains("Cousine Nerd Font Mono");
+    }
 }
