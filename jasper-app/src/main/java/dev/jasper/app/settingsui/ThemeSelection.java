@@ -50,14 +50,14 @@ final class ThemeSelection extends Editors.ThemePick {
             for(int i=0;i<sources.size();i++) {var source=sources.get(i);options.add(new Option("theme-"+i,sourceLabel(source),Optional.empty()));if(resolved.isPresent()&&resolved.get().equals(source))selected=i;}
             if(selected<0) {selected=options.size();String missing=draft.value(UI_THEME_NAME)+(draft.value(UI_THEME_SOURCE)==ThemeSource.BUNDLED?" (bundled source not found)":" (not found)");options.add(new Option("theme-"+selected,missing,Optional.empty()));}
             var choice=new Nodes.Choice(id,state,Nodes.ChoiceKind.SEARCHABLE,options,"theme-"+selected,label,"","",Optional.of(new Nodes.ChoiceSearch(0,"No matching themes",Optional.empty())));
-            var gear=new Nodes.MenuButton(id+":actions",plain,"","settings",Nodes.ButtonKind.GHOST,"",List.of(new MenuItem(id+":import",Editors.IMPORT_THEME,"",id+":import",true,false)),"Theme actions");
+            var gear=new Nodes.MenuButton(id+":actions",plain,"","brightness",Nodes.ButtonKind.GHOST,"",List.of(new MenuItem(id+":import",Editors.IMPORT_THEME,"",id+":import",true,false)),"Theme actions");
             picker=new Nodes.Stack(id+":line",plain,Nodes.LayoutRole.SETTINGS_CONTROLS,List.of(choice,gear));
         }
         boolean modified=!draft.value(UI_THEME_NAME).equals(UI_THEME_NAME.defaultValue())||draft.value(UI_THEME_SOURCE)!=UI_THEME_SOURCE.defaultValue()||draft.value(UI_THEME_FOLLOW_SYSTEM);
         var line=(Nodes.Stack)picker;
-        var gear=new Nodes.MenuButton(id+":actions",plain,"","settings",Nodes.ButtonKind.GHOST,"",List.of(
+        var gear=new Nodes.MenuButton(id+":actions",plain,"","brightness",Nodes.ButtonKind.GHOST,"",List.of(
             new MenuItem(id+":import",Editors.IMPORT_THEME,"",id+":import",true,false),
-            new MenuItem(id+":reset-menu","Reset to defaults","refresh",id+":reset",modified,false)),"Theme actions");
+            new MenuItem(id+":reset-menu","Reset to defaults","reset",id+":reset",modified,false)),"Theme actions");
         var controls=new Nodes.Stack(id+":controls",plain,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(line.children().getFirst(),gear));
         parts.add(new Nodes.SettingRow("row:"+id,plain,label,draft.value(UI_THEME_FOLLOW_SYSTEM)?themes.systemDark().get().map(dark->"System uses "+(dark?"Jasper Dark":"Jasper Light")+"; manual theme remembered").orElse("System unavailable; using remembered manual theme"): "",controls,false,highlighted));
         return new Nodes.Stack(id+":selection",plain,Nodes.LayoutRole.VERTICAL,parts);

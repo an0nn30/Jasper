@@ -16,7 +16,7 @@ final class SettingRows {
 
     static final class RowControl extends ControlRegistry.Control {
         final Composition.WrappedText title, description;
-        boolean panelFooter, hero, fullForm, detail, settings;
+        boolean panelFooter, hero, fullForm, detail, settings, grouped;
         SecretFields.SecretControl secret;
         @Override void hero(boolean value) { hero=value; }
 
@@ -44,10 +44,10 @@ final class SettingRows {
                     description, context(), detail ? Typography.Role.BODY : Typography.Role.SETTING_DESCRIPTION, detail ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_TERTIARY);
             title.setEnabled(component.isEnabled());
             description.setEnabled(component.isEnabled());
-            int side = ThemePainting.metric(context(), detail ? DesignMetrics.Role.DETAIL_ROW_SIDE : fullForm ? DesignMetrics.Role.FULL_SETTING_SIDE_PADDING : DesignMetrics.Role.SETTING_SIDE_PADDING),
+            int side = ThemePainting.metric(context(), detail ? DesignMetrics.Role.DETAIL_ROW_SIDE : settings ? DesignMetrics.Role.SETTINGS_ROW_SIDE : fullForm ? DesignMetrics.Role.FULL_SETTING_SIDE_PADDING : DesignMetrics.Role.SETTING_SIDE_PADDING),
                     vertical =
                             ThemePainting.metric(
-                                    context(), DesignMetrics.Role.SETTING_VERTICAL_PADDING);
+                                    context(), grouped ? DesignMetrics.Role.SETTINGS_GROUP_ROW_PADDING : DesignMetrics.Role.SETTING_VERTICAL_PADDING);
             // A panel footer row reserves its separator above its content; the footer paints the full-width rule there.
             component.setBorder(panelFooter ? new EmptyBorder(ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE),0,0,0) : new EmptyBorder(vertical, side + (row.dependent() ? ThemePainting.metric(context(), DesignMetrics.Role.SETTING_DEPENDENT_INDENT) : 0), vertical, side));
             component.setLayout(new RowLayout(this));
@@ -144,6 +144,9 @@ final class SettingRows {
             var i=p.getInsets();int content=Math.max(0,width-i.left-i.right);
             return content<Math.max(ThemePainting.metric(owner.context(),DesignMetrics.Role.FORM_LABEL_WIDTH),owner.title.getPreferredSize().width)+gap()+p.getComponent(2).getPreferredSize().width;
         }
+        /** What a row needs across. A Settings list editor sits beside its title at its natural width (the half-row rule of
+         *  other forms would widen the page past its reading width); elsewhere the row's natural width. */
+        int fixedWidth(Container p){var i=p.getInsets();return owner.settings&&p.getComponentCount()>2?i.left+i.right+Math.max(ThemePainting.metric(owner.context(),DesignMetrics.Role.FORM_LABEL_WIDTH),owner.title.getPreferredSize().width)+gap()+p.getComponent(2).getPreferredSize().width:p.getPreferredSize().width;}
         int settingsTextHeight(int width){return owner.title.height(width)+(owner.description.isVisible()?owner.description.height(width)+ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTING_DESCRIPTION_GAP):0);}
 
         /** A switch reserves its own halo; align its painted track while keeping the halo in the row padding. */
@@ -174,7 +177,7 @@ final class SettingRows {
             return Math.max(
                     owner.panelFooter ? ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE) + ThemePainting.metric(owner.context(), DesignMetrics.Role.PANEL_FOOTER_ROW_HEIGHT) : ThemePainting.metric(
                             owner.context(),
-                            owner.settings ? owner.description.isVisible() ? DesignMetrics.Role.SETTINGS_DESCRIPTION_HEIGHT : DesignMetrics.Role.SETTINGS_ROW_HEIGHT : owner.hero && owner.description.isVisible() ? DesignMetrics.Role.HERO_SETTING_HEIGHT : owner.description.isVisible()
+                            owner.settings ? owner.description.isVisible() ? DesignMetrics.Role.SETTINGS_DESCRIPTION_HEIGHT : owner.grouped ? DesignMetrics.Role.SETTINGS_GROUP_ROW_HEIGHT : DesignMetrics.Role.SETTINGS_ROW_HEIGHT : owner.hero && owner.description.isVisible() ? DesignMetrics.Role.HERO_SETTING_HEIGHT : owner.description.isVisible()
                                     ? owner.fullForm ? DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT : DesignMetrics.Role.SETTING_DESCRIPTION_HEIGHT
                                     : DesignMetrics.Role.SETTING_HEIGHT) + (owner.fullForm && !owner.hero ? ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE) : 0),
                     i.top + i.bottom + Math.max(text, control));

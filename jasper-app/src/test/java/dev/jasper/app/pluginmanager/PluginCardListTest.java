@@ -53,13 +53,13 @@ class PluginCardListTest {
             TestRows.plugin("dev.example.zeta", "zeta tool").row(),
             TestRows.plugin("dev.example.alpha", "Alpha").row(),
             TestRows.plugin("dev.example.local", "Local").origin("Development").row()));
-        assertThat(list.groupTitles()).containsExactly("Development", "User-installed (2 of 2 enabled)", "Bundled (1 of 2 enabled)");
+        assertThat(list.groupTitles()).containsExactly("Development", "User-installed, 2 of 2 enabled", "Bundled, 1 of 2 enabled");
         assertThat(list.listed()).containsExactly("Local  1.0.0", "Alpha  1.0.0", "zeta tool  1.0.0", "Editor  1.0.0", "Remote  1.0.0");
         assertThat(list.selected()).as("the first visible card").isEqualTo("dev.example.local");
         assertThat(selections).isPositive();
         var texts = PluginKit.texts(list.view());
         assertThat(texts).as("the headings and rows are on screen, in order")
-            .containsSubsequence("Development", "Local", "User-installed (2 of 2 enabled)", "Alpha", "zeta tool", "Bundled (1 of 2 enabled)", "Editor", "Remote");
+            .containsSubsequence("Development", "Local", "User-installed", "2 of 2 enabled", "Alpha", "zeta tool", "Bundled", "1 of 2 enabled", "Editor", "Remote");
     }
 
     @Test void eachCardShowsAtMostOneBadgeInTheSpecsOrder() {
@@ -110,7 +110,7 @@ class PluginCardListTest {
         list.select("dev.example.tool");
         list.search("ssh");
         assertThat(list.listed()).containsExactly("Remote  1.0.0");
-        assertThat(list.groupTitles()).as("counts cover the whole group").containsExactly("Bundled (1 of 1 enabled)");
+        assertThat(list.groupTitles()).as("counts cover the whole group").containsExactly("Bundled, 1 of 1 enabled");
         assertThat(list.selected()).isEqualTo("dev.jasper.remote");
         list.search("ACME");
         assertThat(list.listed()).containsExactly("Tool  1.0.0");

@@ -18,6 +18,8 @@ final class Cards {
     static final class CardControl extends ControlRegistry.Control {
         /** Inside a FULL form or a manager detail; its settings rows each own a top stroke, so the card adds its closing one. */
         boolean fullForm, detail;
+        /** On a Settings page: rows share the card's top stroke, and the bottom stroke has its own line below the last row. */
+        boolean settings;
         CardControl(KitView view, Nodes.Card node) {
             super(view, node, new CardSurface(view.context()));
             refresh();
@@ -31,7 +33,8 @@ final class Cards {
                             ? 0
                             : ThemePainting.metric(context(), DesignMetrics.Role.CARD_PADDING) + ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE);
             int closing = (fullForm || detail) && ((Nodes.Card) node).kind() == Nodes.CardKind.SETTINGS ? ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE) : 0;
-            component.setBorder(new EmptyBorder(pad, pad, pad + closing, pad));
+            int bottom = settings && ((Nodes.Card) node).kind() == Nodes.CardKind.SETTINGS ? ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE) : pad + closing;
+            component.setBorder(new EmptyBorder(pad, pad, bottom, pad));
             component.setLayout(
                     ((Nodes.Card) node).kind() == Nodes.CardKind.MIXED
                             ? new MixedLayout(this)
@@ -50,6 +53,9 @@ final class Cards {
                             .filter(c -> c.node instanceof Nodes.SettingRow)
                             .map(c -> c.component)
                             .toList();
+            // A Settings group card (a heading row over its members) lists its members as compact rows.
+            boolean grouped = settings && controls.stream().anyMatch(c -> c.node instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.SETTINGS_GROUP_HEADER);
+            controls.forEach(c -> { if (c instanceof SettingRows.RowControl row && row.grouped != grouped) { row.grouped = grouped; row.refresh(); } });
             Stacks.mount(component, controls.stream().map(c -> c.component).toList());
         }
     }

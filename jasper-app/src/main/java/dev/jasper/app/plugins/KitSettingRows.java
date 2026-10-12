@@ -32,7 +32,8 @@ final class KitSettingRows {
             String text=value instanceof List<?> list?String.join("\n",list.stream().map(Object::toString).toList()):value.toString();
             var kind=spec.kind() instanceof SettingKind.IntegerRange?Nodes.FieldKind.NUMBER:spec.kind() instanceof SettingKind.StringList?Nodes.FieldKind.TEXTAREA:spec.editor().orElse(null) instanceof EditorHint.File?Nodes.FieldKind.PATH:Nodes.FieldKind.TEXT;
             var numeric=spec.kind() instanceof SettingKind.IntegerRange range?Optional.of(new Nodes.Numeric(range.min(),range.max(),1,0)):Optional.<Nodes.Numeric>empty();
-            control=new Nodes.Field(id,state,kind,edits.getOrDefault(id,text),"",spec.label(),"",numeric);
+            // A bounded integer is the Settings stepper, its declared unit after the value.
+            control=new Nodes.Field(id,state,kind,edits.getOrDefault(id,text),numeric.isPresent()?spec.unit():"",spec.label(),"",numeric,numeric.isPresent()?Nodes.FieldPresentation.STEPPER:Nodes.FieldPresentation.STANDARD);
         }
         return new Nodes.SettingRow(id+":row",state,spec.label(),spec.description(),trailing(id,spec,value,control),false);
     }
@@ -41,7 +42,7 @@ final class KitSettingRows {
      * Reset, shown while the pending value differs from the default; its slot stays reserved so controls never move.
      */
     static Nodes.Stack trailing(String id,SettingSpec<?> spec,Object value,Nodes.Node control){
-        var reset=new Nodes.Button(id+":reset",new ControlState(!Objects.equals(value,spec.defaultValue()),true,false,""),"","refresh",
+        var reset=new Nodes.Button(id+":reset",new ControlState(!Objects.equals(value,spec.defaultValue()),true,false,""),"","reset",
             Nodes.ButtonKind.GHOST,id+":reset","Reset "+spec.label()+" to default");
         return new Nodes.Stack(id+":controls",ControlState.READY,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(control,reset));
     }

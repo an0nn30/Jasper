@@ -23,6 +23,8 @@ class ShortcutSectionsTest {
             var panel=panel(changes -> java.util.concurrent.CompletableFuture.completedFuture(null));
             try {
                 panel.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true),List.of(),Map.of(),true));
+                assertThat(button(panel,"clear").isVisible()).as("nothing to clear yet").isFalse();
+                panel.setQuery("tab");
                 var body=new dev.jasper.app.settingsui.FillingPage(panel);var scroll=new JScrollPane(body);scroll.setSize(427,534);
                 for(int i=0;i<4;i++)KitTestSupport.layout(scroll);
                 assertThat(body.getWidth()).as("width-aware Keymap owns wrapping, not the status label's intrinsic width").isEqualTo(scroll.getViewport().getExtentSize().width);
@@ -156,7 +158,7 @@ class ShortcutSectionsTest {
         });
     }
 
-    @Test void rowsAndSectionsThatDifferFromTheirDefaultsAreBlue() throws Exception {
+    @Test void rowsThatDifferFromTheirDefaultsAreBlueAndTheirSectionsCarryTheModifiedMark() throws Exception {
         edt(() -> {
             var panel = panel(changes -> { throw new AssertionError("Unexpected save"); });
             try {
@@ -170,7 +172,9 @@ class ShortcutSectionsTest {
                 var link = palette.color(SemanticColor.TEXT_LINK);
                 var plain = palette.color(SemanticColor.TEXT_PRIMARY);
                 assertThat(link).isNotEqualTo(plain);
-                assertThat(nameColor(panel, "group/Tabs")).as("a section holding a changed row").isEqualTo(link);
+                assertThat(nameColor(panel, "group/Tabs")).as("a section holding a changed row keeps its title colour").isEqualTo(plain);
+                assertThat(KitTestSupport.find(panel, "@tree/" + ShortcutTree.ID + "/group/Tabs/modified", JComponent.class)).as("and shows the modified mark").isNotNull();
+                assertThat(KitTestSupport.find(panel, "@tree/" + ShortcutTree.ID + "/group/Clipboard/modified", JComponent.class)).isNull();
                 assertThat(nameColor(panel, "action/new_tab")).isEqualTo(link);
                 assertThat(nameColor(panel, "action/close_tab")).isEqualTo(plain);
                 assertThat(nameColor(panel, "group/Clipboard")).isEqualTo(plain);
@@ -196,7 +200,8 @@ class ShortcutSectionsTest {
                 assertThat(texts).contains("Clear Scrollback", "Terminal");
                 var where = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/action/clear_scrollback/context", JLabel.class);
                 var binding = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/action/clear_scrollback/keys", JLabel.class);
-                assertThat(where.getWidth()).as("the Where column keeps its 88 px minimum").isGreaterThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(88));
+                assertThat(where.getHorizontalAlignment()).as("the Where column right-aligns against the shared keys column").isEqualTo(SwingConstants.RIGHT);
+                assertThat(where.getX() + where.getWidth()).as("before the keys").isLessThanOrEqualTo(binding.getX());
                 assertThat(binding.getIcon()).as("binding renders passive keycaps").isNotNull();
                 assertThat(binding.getAccessibleContext().getAccessibleName()).isEqualTo(ShortcutText.format(KeyStroke.getKeyStroke("meta K")));
             } finally { panel.close(); }
@@ -264,7 +269,7 @@ class ShortcutSectionsTest {
                 var tree = KitTestSupport.require(panel, ShortcutTree.ID, JScrollPane.class);
                 var treeView = (JComponent) SwingUtilities.getAncestorOfClass(dev.jasper.ui.swing.KitView.class, tree);
                 assertThat(treeView.getAccessibleContext().getAccessibleName()).isEqualTo("Keyboard shortcuts grouped by section or plugin");
-                var status = KitTestSupport.require(panel, "status", JLabel.class);
+                var status = KitTestSupport.require(panel, "status.count", JLabel.class);
                 var statusView = (JComponent) SwingUtilities.getAncestorOfClass(dev.jasper.ui.swing.KitView.class, status);
                 assertThat(statusView.getAccessibleContext().getAccessibleName()).isEqualTo("Shortcut search status");
                 assertThat(status.getText()).contains("shortcuts");

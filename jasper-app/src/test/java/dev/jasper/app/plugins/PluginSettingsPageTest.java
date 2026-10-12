@@ -85,7 +85,7 @@ class PluginSettingsPageTest {
 
     private static void declareEditor(PluginSettings settings) {
         settings.declare(SettingSpec.of("font_size", SettingKind.integer(8, 48), 13).label("Font size")
-            .description("Font size in points.").section("Editor"));
+            .description("Font size in points.").section("Editor").unit("pt"));
         settings.declare(SettingSpec.of("vim", SettingKind.bool(), false).label("Vim mode").section("Editor"));
         settings.declare(SettingSpec.of("sftp.parallel", SettingKind.integer(1, 8), 2).label("Parallel files").section("SFTP"));
         settings.declare(SettingSpec.of("mode", SettingKind.choice(List.of(Choice.of("fast", "Fast", 1), Choice.of("safe", "Safe", 2))), 1)
@@ -105,7 +105,25 @@ class PluginSettingsPageTest {
             assertThat(page.component()).isNotNull();
             assertThat(page.modified()).isFalse();
             assertThat(page.valid()).isTrue();
+            // A bounded integer is the Settings stepper, as on the core pages, with its declared unit after the value.
+            var steppers = new ArrayList<javax.swing.JButton>();
+            collect(page.component(), name -> name.endsWith(".plus"), steppers);
+            assertThat(steppers).as("both integer settings step").hasSize(2);
+            assertThat(texts(page.component())).contains("13", " pt");
         });
+    }
+
+    private static void collect(java.awt.Component root, java.util.function.Predicate<String> name, List<javax.swing.JButton> found) {
+        if (root instanceof javax.swing.JButton button && button.getName() != null && name.test(button.getName())) found.add(button);
+        if (root instanceof java.awt.Container container) for (var child : container.getComponents()) collect(child, name, found);
+    }
+
+    private static List<String> texts(java.awt.Component root) {
+        var texts = new ArrayList<String>();
+        if (root instanceof javax.swing.text.JTextComponent text) texts.add(text.getText());
+        if (root instanceof javax.swing.JLabel label && label.getText() != null) texts.add(label.getText());
+        if (root instanceof java.awt.Container container) for (var child : container.getComponents()) texts.addAll(texts(child));
+        return texts;
     }
 
     @Test @SuppressWarnings("unchecked") void applyWritesThePluginsFileAndTheDraftFollows() throws Exception {

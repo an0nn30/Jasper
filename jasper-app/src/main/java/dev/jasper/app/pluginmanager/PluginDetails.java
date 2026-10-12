@@ -26,7 +26,9 @@ import javax.swing.Icon;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
+import javax.swing.JTextPane;
+import javax.swing.text.StyleConstants;
+import javax.swing.text.SimpleAttributeSet;
 
 /**
  * The selected plugin: its icon, name, vendor and homepage, the primary action, More actions and the version, then an
@@ -41,7 +43,7 @@ final class PluginDetails {
     private final KitView header, body;
     private final dev.jasper.ui.icons.ReceivingArtwork artwork;
     private String artName="plugin";
-    private final JTextArea text = new JTextArea();
+    private final JTextPane text = new JTextPane();
     private final AutoCloseable theme;
     private final AutoCloseable typography;
     private PluginRuntime.Row row;
@@ -59,11 +61,9 @@ final class PluginDetails {
             events.accept(event);
         });
         body = new KitView(kit, new ViewSpec(new Nodes.Custom("plugin-text", ControlState.READY, TEXT, Nodes.CustomKind.EDITOR, "Overview")), events);
+        // Plain text in a styled pane, so its paragraphs can take the reading line spacing; it wraps at words.
         text.setEditable(false);
-        text.setLineWrap(true);
-        text.setWrapStyleWord(true);
         text.setOpaque(false);
-        text.putClientProperty("html.disable", Boolean.TRUE);
         // Specialized read-only text: selectable and scrollable like the former tabs, painted from module roles.
         var scroll = new JScrollPane(text, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.setBorder(BorderFactory.createEmptyBorder());
@@ -83,16 +83,18 @@ final class PluginDetails {
 
     /** Geometry and colours from the module: the former gaps and paddings as named metrics. */
     private void restyle() {
-        int edge = metric(DesignMetrics.Role.PLUGIN_DETAILS_EDGE_PADDING);
+        // The manager page leaves vertical padding to its lanes, so the details add the page's own above and below.
+        int edge = metric(DesignMetrics.Role.PLUGIN_DETAILS_EDGE_PADDING)+metric(DesignMetrics.Role.PLUGIN_MANAGER_PADDING);
         int leading=metric(DesignMetrics.Role.PLUGIN_DETAILS_LEADING_PADDING);
-        component.setBorder(BorderFactory.createEmptyBorder(edge, leading, edge, edge));
+        component.setBorder(BorderFactory.createEmptyBorder(edge, leading, edge, metric(DesignMetrics.Role.PLUGIN_DETAILS_TRAILING_PADDING)));
         // The source-sized identity section is also the readable minimum for this split receiver.
         // FillingPage lets Settings' existing horizontal viewport reveal it at constrained widths.
-        component.setMinimumSize(new Dimension(leading+metric(DesignMetrics.Role.IDENTITY_SECTION_WIDTH)+edge,0));
+        component.setMinimumSize(new Dimension(leading+metric(DesignMetrics.Role.IDENTITY_SECTION_WIDTH)+metric(DesignMetrics.Role.PLUGIN_DETAILS_TRAILING_PADDING),0));
         ((BorderLayout) component.getLayout()).setVgap(metric(DesignMetrics.Role.PLUGIN_DETAILS_GAP));
         int vertical = metric(DesignMetrics.Role.PLUGIN_TEXT_VERTICAL_PADDING), side = metric(DesignMetrics.Role.PLUGIN_TEXT_SIDE_PADDING);
         text.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
         text.setFont(dev.jasper.ui.swing.NativeControlStyles.font(kit,Typography.Role.BODY));
+        spacing();
         var palette = kit.theme().semantic();
         text.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));
         text.setCaretColor(text.getForeground());
@@ -103,6 +105,14 @@ final class PluginDetails {
     }
 
     private int metric(DesignMetrics.Role role) { return UIScale.scale(kit.metrics().value(role)); }
+
+    /** Extra room below each line, as a share of the line, so the overview reads as a paragraph. */
+    private void spacing() {
+        var attributes = new SimpleAttributeSet();
+        StyleConstants.setLineSpacing(attributes, kit.metrics().value(DesignMetrics.Role.PLUGIN_TEXT_LINE_SPACING) / 100f);
+        // Paragraph attributes (not the shared default style) reach the views, which read them when they change.
+        text.getStyledDocument().setParagraphAttributes(0, text.getDocument().getLength(), attributes, false);
+    }
 
     /** Shows {@code shown}, or nothing when it is null; {@code busy} disables the actions. */
     void show(PluginRuntime.Row shown, boolean busy) {
@@ -136,6 +146,7 @@ final class PluginDetails {
         String next = row == null ? "" : section.equals(OVERVIEW) ? overview(row) : describe(row);
         if (!next.equals(text.getText())) {
             text.setText(next);
+            spacing();
             text.setCaretPosition(0);
         }
         text.getAccessibleContext().setAccessibleName(section.equals(OVERVIEW) ? "Overview" : "Details");
@@ -156,8 +167,10 @@ final class PluginDetails {
         var metadata=new Nodes.Stack("metadata",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(
             new Nodes.Text("vendor",ControlState.READY,present?(shown.vendor().isBlank()?shown.origin():shown.vendor()):" ",Nodes.TextRole.CAPTION),
             new Nodes.Text("version",ControlState.READY,present?"·  Version "+shown.version()+"  ·":" ",Nodes.TextRole.CAPTION),
-            new Nodes.StatusDot("state-dot",new ControlState(present,true,false,""),present && shown.enabled() && shown.state().equals("ACTIVE") ? Nodes.StatusKind.SUCCESS : Nodes.StatusKind.WARNING),
-            new Nodes.Text("state",ControlState.READY,status,Nodes.TextRole.CAPTION)));
+            // The state's dot stays close to its label.
+            new Nodes.Stack("state-line",ControlState.READY,Nodes.LayoutRole.NAVIGATION,List.of(
+                new Nodes.StatusDot("state-dot",new ControlState(present,true,false,""),present && shown.enabled() && shown.state().equals("ACTIVE") ? Nodes.StatusKind.SUCCESS : Nodes.StatusKind.WARNING),
+                new Nodes.Text("state",ControlState.READY,status,Nodes.TextRole.CAPTION)))));
         var identity = new Nodes.Stack("identity", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
             new Nodes.Text("name", ControlState.READY, present ? shown.name() : " ", Nodes.TextRole.DETAIL_TITLE),metadata));
         var head = new Nodes.Stack("head", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
@@ -180,7 +193,7 @@ final class PluginDetails {
     /** The text the one text area shows now. */
     String shownText() { return text.getText(); }
 
-    JTextArea textArea() { return text; }
+    JTextPane textArea() { return text; }
 
     KitView header() { return header; }
 

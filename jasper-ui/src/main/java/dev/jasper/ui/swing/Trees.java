@@ -98,6 +98,7 @@ final class Trees {
             if(item==null || !item.leaf() || indexOf(itemId)<0)throw new IllegalArgumentException("Detail requires a visible leaf");
             validateDetail(spec.root(),context().icons().names());
             var body=new KitView(context(),spec,events);
+            if(!presentation.isEmpty())body.markKeycapDetail();
             detail=new TreeDetailHandle(this,itemId,body,detached);
             body.inheritedEnabled(interactive());canvas.add(body);detailChanged();return detail;
         }
@@ -113,14 +114,19 @@ final class Trees {
             try {handle.body.close();} finally {try {handle.detached.run();}finally{if(!closed)detailChanged();}}
         }
         private int detailInset(){return ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_INSET);}
+        // A keycap tree's editor sits just below its row and keeps more room beneath it, inside the edit card.
+        private int detailTop(){return presentation.isEmpty()?detailInset():ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_TOP);}
+        private int detailBottom(){return presentation.isEmpty()?detailInset():ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_BOTTOM);}
         private int detailTrailing(){return presentation.isEmpty()?detailInset():ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_CONTENT_TRAILING);}
+        /** Room between a keycap tree's edit card and the next row; the card stops short of it. */
+        int detailAfter(){return presentation.isEmpty()?0:ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_AFTER);}
         private int detailLeading(){return presentation.isEmpty()?detailInset():ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_LEADING);}
         private int detailHeight() {
             if(detail==null)return 0;
             int width=Math.max(1,scroll.getViewport().getExtentSize().width-detailLeading()-detailTrailing());
-            return detail.body.getComponentCount()==0?0:Composition.height(detail.body.getComponent(0),width)+2*detailInset();
+            return detail.body.getComponentCount()==0?0:Composition.height(detail.body.getComponent(0),width)+detailTop()+detailBottom()+detailAfter();
         }
-        @Override int minimumRowHeight(){return settingsNavigation?ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_ROW,dev.jasper.ui.metrics.Typography.Role.BODY):presentation.isEmpty()?0:ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_ROW_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY);}
+        @Override int minimumRowHeight(){return settingsNavigation?ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_ROW,dev.jasper.ui.metrics.Typography.Role.SETTINGS_BODY):presentation.isEmpty()?0:ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_ROW_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY);}
         @Override boolean uniformRows(){return !settingsNavigation && detail==null && presentation.isEmpty();}
         private int keyWidth(int index,int width) {
             var value=presentation.get(itemId(index));
@@ -136,39 +142,60 @@ final class Trees {
             row.leading.setBounds(0,0,0,0);
             int keys=keyWidth(row.index,row.getWidth());
             if(value.keycaps().isEmpty())keys=Math.min(row.trailing.getComponent(row.trailing.getComponentCount()-1).getPreferredSize().width,Math.max(0,(end-start)/2));
+            // Keys right-align in a shared column, so every row's context ends at the same place.
+            int column=Math.max(keys,Math.min(ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_KEYS_COLUMN),Math.max(0,(end-start)/2)));
+            int lane=column+ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP);
             var children=row.trailing.getComponents();
-            int natural=java.util.Arrays.stream(children).limit(children.length-1).mapToInt(c->c.getPreferredSize().width+pad).sum();
-            int contextWidth=Math.min(natural,Math.max(0,(end-start-keys)/2));
-            int trailing=keys+contextWidth;
+            int natural=java.util.Arrays.stream(children).limit(children.length-1).mapToInt(c->c.getPreferredSize().width+pad).sum()-pad;
+            int contextWidth=Math.max(0,Math.min(natural,(end-start-lane)/2));
+            int trailing=lane+contextWidth;
             row.trailing.setBounds(end-trailing,0,trailing,height);
-            int x=0;
+            int x=Math.max(0,contextWidth-natural);
             for(int i=0;i<children.length;i++) {
-                int w=i==children.length-1?keys:Math.min(children[i].getPreferredSize().width,Math.max(0,contextWidth-x-pad));
-                children[i].setBounds(i==children.length-1?contextWidth:x,0,w,height);x+=w+pad;
+                int w=i==children.length-1?keys:Math.min(children[i].getPreferredSize().width,Math.max(0,contextWidth-x));
+                children[i].setBounds(i==children.length-1?trailing-keys:x,0,w,height);x+=w+pad;
             }
             row.title.setBounds(start,0,Math.max(0,end-trailing-pad-start),height);row.title.doLayout();
             row.subtitle.setBounds(0,0,0,0);return true;
         }
         @Override int rowHeightAt(int index){return rowShellHeight(index)+navigationGapAfter(index)+(detail!=null && itemId(index).equals(detail.itemId)?detailHeight():0);}
+        /** A labelled group's heading carries its own space; an unlabelled root group is set apart by a wider gap. */
         private int navigationGapAfter(int index) {
             if(!settingsNavigation || index+1>=visible.size())return 0;
             var next=visible.get(index+1);var current=visible.get(index);
-            return next.depth()==0 && (!next.item().leaf() || current.depth()>0)
-                ? ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_GROUP_GAP):0;
+            if(next.depth()!=0)return 0;
+            if(!next.item().leaf())return ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_HEADING_GAP);
+            return current.depth()>0?ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_GROUP_GAP):0;
+        }
+        /** A keycap tree's section heading: one strong title line, a little shorter than its shortcut rows. */
+        private int keycapGroupHeight() {
+            var font=ThemePainting.font(context(),dev.jasper.ui.metrics.Typography.Role.PANEL_TITLE);
+            int line=(int)Math.ceil(font.getLineMetrics("Ag",new java.awt.font.FontRenderContext(null,true,true)).getHeight());
+            return Math.max(ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_GROUP_HEIGHT),line+ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_VERTICAL_PADDING));
         }
         @Override int rowShellHeight(int index){
             if(settingsNavigation && !visible.get(index).item().leaf())return ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_HEADING,dev.jasper.ui.metrics.Typography.Role.SECTION_LABEL);
+            if(!presentation.isEmpty() && !visible.get(index).item().leaf())return keycapGroupHeight();
             var value=presentation.get(itemId(index));
             return value==null || value.keycaps().isEmpty()?rowHeight:Math.max(rowHeight,new Keycaps(context(),value.keycaps().get()).heightAt(keyWidth(index,scroll.getViewport().getExtentSize().width))+2*detailInset());
         }
         @Override void layoutAccessories(int width) {
             if(detail==null)return;
             int index=indexOf(detail.itemId);if(index<0)return;
-            int inset=detailInset();
-            detail.body.setBounds(detailLeading(),top(index)+rowShellHeight(index)+inset,Math.max(0,width-detailLeading()-inset),Math.max(0,detailHeight()-2*inset));
+            int above=detailTop();
+            detail.body.setBounds(detailLeading(),top(index)+rowShellHeight(index)+above,Math.max(0,width-detailLeading()-detailTrailing()),Math.max(0,detailHeight()-above-detailBottom()-detailAfter()));
             detail.body.doLayout();
         }
-        @Override void refresh(){((TreePane)scroll).overlay(settingsNavigation);super.refresh();if(detail!=null)detail.body.inheritedEnabled(interactive());}
+        @Override void refresh(){
+            // Settings navigation and the keycap card use the overlay scroll policy; the card keeps a little space above and below its rows.
+            boolean card=!presentation.isEmpty();
+            ((TreePane)scroll).overlay(settingsNavigation || card);
+            int inset=card?ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_INSET):0;
+            var border=scroll.getViewportBorder();
+            if(!(border==null && inset==0) && !(border instanceof javax.swing.border.EmptyBorder empty && empty.getBorderInsets().top==inset))
+                scroll.setViewportBorder(inset==0?null:new javax.swing.border.EmptyBorder(inset,0,inset,0));
+            super.refresh();if(detail!=null)detail.body.inheritedEnabled(interactive());
+        }
         @Override public void close(){try {if(detail!=null)detach(detail);}finally{super.close();}}
 
         Nodes.Tree value() {
@@ -313,14 +340,23 @@ final class Trees {
                                     titleId,
                                     ControlState.READY,
                                     item.title(),
-                                    settingsNavigation && !item.leaf()?Nodes.TextRole.SECTION_LABEL:!presentation.isEmpty()&&!item.leaf()?Nodes.TextRole.BODY_STRONG:item.emphasized() ? Nodes.TextRole.BODY_STRONG : Nodes.TextRole.BODY)));
-            // Emphasis is strong text in the link color; the text control's own refresh picks its role color first.
-            if (item.emphasized())
+                                    settingsNavigation && !item.leaf()?Nodes.TextRole.SECTION_LABEL:!presentation.isEmpty()&&!item.leaf()?Nodes.TextRole.PANEL_TITLE:item.emphasized() ? Nodes.TextRole.BODY_STRONG : Nodes.TextRole.BODY)));
+            // Settings navigation pages use the Settings body face; recycled rows restore the declared role.
+            if(row.controls.get(titleId) instanceof Labels.TextControl titleText) {
+                var role=settingsNavigation && item.leaf() ? dev.jasper.ui.metrics.Typography.Role.SETTINGS_BODY : null;
+                if(titleText.override!=role){titleText.override=role;titleText.refresh();}
+            }
+            // Emphasis is strong text in the link color (a keycap tree marks a section with its modified dot instead); the text
+            // control's own refresh picks its role color first.
+            if (item.emphasized() && (presentation.isEmpty() || item.leaf()))
                 row.controls.get(titleId).component.setForeground(ThemePainting.color(context(), dev.jasper.ui.theme.SemanticColor.TEXT_LINK));
             row.slot(row.subtitle, List.of());
             var trailing = new ArrayList<Nodes.Node>();
             if(settingsNavigation&&!item.leaf())trailing.add(new Nodes.Button("@tree/"+node.id()+"/"+item.id()+"/expand",ControlState.READY,"",value().expandedIds().contains(item.id())?"chevron.down":"chevron.right",Nodes.ButtonKind.GHOST,"expand","Expand or collapse "+item.title(),Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED));
             var presented=presentation.get(item.id());
+            // A read-only contextual key reads quieter than the rows the user can change.
+            if(presented!=null && presented.locked() && !item.emphasized())
+                row.controls.get(titleId).component.setForeground(ThemePainting.color(context(), dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
             for (int i = 0; presented==null && i < item.trailing().size(); i++)
                 trailing.add(new Nodes.Text("@tree/" + node.id() + "/" + item.id() + "/trailing/" + i,
                         ControlState.READY, item.trailing().get(i), Nodes.TextRole.CAPTION));
@@ -337,8 +373,9 @@ final class Trees {
             if(presented!=null)row.trailing.setLayout(null);
             if(row.controls.get(modifiedId) instanceof Indicators.DotControl dot){dot.modified=true;dot.refresh();}
             if(presented!=null) {
+                // Context reads right-aligned against the keys column; a recycled row measures its own text.
                 var label=(javax.swing.JLabel)row.controls.get("@tree/"+node.id()+"/"+item.id()+"/context").component;
-                label.setPreferredSize(new java.awt.Dimension(Math.max(label.getPreferredSize().width, ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.TREE_DETAIL_COLUMN)),label.getPreferredSize().height));
+                label.setPreferredSize(null); label.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
             }
             if(presented!=null && presented.keycaps().isPresent()) {
                 var label=(javax.swing.JLabel)row.controls.get("@tree/"+node.id()+"/"+item.id()+"/keys").component;

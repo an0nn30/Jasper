@@ -168,10 +168,11 @@ final class ShortcutEditPanel extends JPanel {
         var capture = new Nodes.Stack("editor.capture", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(candidateLane,
             new Nodes.Button("editor.cancel", idle, "Cancel", "", Nodes.ButtonKind.SECONDARY, "editor.cancel", ""),
             new Nodes.Button("editor.set", new ControlState(true, settable(), false, ""), "Set", "", Nodes.ButtonKind.PRIMARY, "editor.set", "")));
+        // Recording and the shortcut actions stay at hand as compact text actions on the hint line.
         var note = new Nodes.Stack("editor.note", ControlState.READY, Nodes.LayoutRole.NAVIGATION,List.of(
             new Nodes.Text("editor.message", ControlState.READY, message(), Nodes.TextRole.CAPTION),
-            new Nodes.Button("editor.record", idle, recording ? "Stop" : "Record", "", Nodes.ButtonKind.GHOST, "editor.record", "Start or stop recording"),
-            new Nodes.MenuButton("editor.options",idle,"","more",Nodes.ButtonKind.GHOST,"",options,"Shortcut actions")));
+            new Nodes.Button("editor.record", idle, recording ? "Stop" : "Record", "", Nodes.ButtonKind.GHOST, "editor.record", "Start or stop recording", Nodes.ButtonPresentation.EMBEDDED),
+            new Nodes.MenuButton("editor.options",idle,"","more",Nodes.ButtonKind.GHOST,"",options,"Shortcut actions",Nodes.ButtonPresentation.EMBEDDED)));
         return new ViewSpec(new Nodes.Stack("editor", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(capture,note,
             new Nodes.SettingRow("editor.reassign.row", new ControlState(!conflicts.isEmpty(), !saving, false, ""), "Reassign from conflicting action", "",
                 new Nodes.Toggle("editor.reassign", new ControlState(!conflicts.isEmpty(), !saving, false, ""), "Reassign from conflicting action", reassign, "editor.reassign", false), false))));

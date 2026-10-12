@@ -86,7 +86,9 @@ final class PluginSettingsPage implements SettingsPage {
         if (hint instanceof EditorHint.File) return Editors.path("Choose a file");
         return switch (spec.kind()) {
             case dev.jasper.sdk.settings.SettingKind.OneOf<?> oneOf -> Editors.choice(names(oneOf));
-            case dev.jasper.sdk.settings.SettingKind.NumberRange range -> Editors.number(0.1, "");
+            // A bounded integer is the Settings stepper, as on the core pages, with its declared unit.
+            case dev.jasper.sdk.settings.SettingKind.IntegerRange range -> Editors.stepper(spec.unit());
+            case dev.jasper.sdk.settings.SettingKind.NumberRange range -> Editors.number(0.1, spec.unit());
             default -> Editors.byKind((Setting) handle.appSetting());
         };
     }

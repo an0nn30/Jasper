@@ -1,5 +1,6 @@
 package dev.jasper.ui.swing;
 
+import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.theme.SemanticColor;
 import java.awt.*;
@@ -14,11 +15,17 @@ final class Keycaps implements Icon {
     private final int width,height,pad,gap;
     Keycaps(KitContext context,KeycapSequence sequence) {
         this.context=context;this.sequence=sequence;font=ThemePainting.font(context,Typography.Role.CAPTION);
-        pad=com.formdev.flatlaf.util.UIScale.scale(5);gap=com.formdev.flatlaf.util.UIScale.scale(3);
+        pad=ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_PADDING);gap=ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_GAP);
         var metrics=new javax.swing.JLabel().getFontMetrics(font);
-        height=metrics.getHeight()+com.formdev.flatlaf.util.UIScale.scale(4);
-        widths=sequence.keys().stream().mapToInt(key->Math.max(height,metrics.stringWidth(key)+2*pad)).toArray();
+        height=metrics.getHeight()+ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_VERTICAL_PADDING);
+        // A single symbol sits on a near-square cap; longer key names take their own width.
+        int square=height+ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_SQUARE_EXTRA);
+        widths=sequence.keys().stream().mapToInt(key->Math.max(square,metrics.stringWidth(key)+2*pad)).toArray();
         width=java.util.Arrays.stream(widths).sum()+gap*(widths.length-1);
+    }
+    private Color translucent(SemanticColor role,DesignMetrics.Role alpha) {
+        Color color=ThemePainting.color(context,role);
+        return new Color(color.getRed(),color.getGreen(),color.getBlue(),context.metrics().value(alpha));
     }
     @Override public int getIconWidth(){return width;}
     @Override public int getIconHeight(){return height;}
@@ -33,17 +40,22 @@ final class Keycaps implements Icon {
         var g=(Graphics2D)graphics.create();
         try {
             ThemePainting.antialias(g);g.setFont(font);
-            int radius=com.formdev.flatlaf.util.UIScale.scale(4);
+            int radius=ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_RADIUS),stroke=ThemePainting.metric(context,DesignMetrics.Role.HAIRLINE),base=ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_BASE);
             int start=x,used=0;
             g.clipRect(x,y,Math.max(0,available),heightAt(available));
             for(int i=0;i<widths.length;i++) {
                 if(used>0 && used+gap+widths[i]>available){x=start;y+=height+gap;used=0;}
                 if(used>0){x+=gap;used+=gap;}
-                g.setColor(ThemePainting.color(context,SemanticColor.SURFACE_CONTROL));g.fillRoundRect(x,y,widths[i]-1,height-1,radius,radius);
-                g.setColor(ThemePainting.color(context,SemanticColor.BORDER_CONTROL));g.drawRoundRect(x,y,widths[i]-1,height-1,radius,radius);
+                // A passive cap: a translucent face inside a translucent outline that is heavier along the base, so it
+                // reads on any row background, selected and editing rows included.
+                var outer=new java.awt.geom.RoundRectangle2D.Double(x,y,widths[i],height,radius*2,radius*2);
+                var face=new java.awt.geom.RoundRectangle2D.Double(x+stroke,y+stroke,Math.max(0,widths[i]-2*stroke),Math.max(0,height-stroke-base),Math.max(0,radius-stroke)*2,Math.max(0,radius-stroke)*2);
+                var edge=new java.awt.geom.Area(outer);edge.subtract(new java.awt.geom.Area(face));
+                g.setColor(translucent(SemanticColor.TEXT_TERTIARY,DesignMetrics.Role.KEYCAP_EDGE_ALPHA));g.fill(edge);
+                g.setColor(translucent(SemanticColor.HOVER_OVERLAY,DesignMetrics.Role.KEYCAP_FACE_ALPHA));g.fill(face);
                 g.setColor(ThemePainting.color(context,SemanticColor.TEXT_PRIMARY));
                 var metrics=g.getFontMetrics();String key=sequence.keys().get(i);
-                g.drawString(key,x+(widths[i]-metrics.stringWidth(key))/2,y+(height-metrics.getHeight())/2+metrics.getAscent());
+                g.drawString(key,x+(widths[i]-metrics.stringWidth(key))/2,y+(height-base+stroke-metrics.getHeight())/2+metrics.getAscent());
                 x+=widths[i];used+=widths[i];
             }
         } finally {g.dispose();}

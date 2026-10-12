@@ -532,7 +532,8 @@ reported as unknown. Declaring after `start` returns throws. SDK 0.9 removed `Pl
 
 Settings shows a page for your plugin under Tools, generated from your declarations: rows in declaration order, a
 heading wherever `section` changes, the description under each control, and an editor chosen by kind or by
-`editor(EditorHint...)`. To build the page yourself, call `context.settings().page(panel)` during `start` with a
+`editor(EditorHint...)`. An `integer` setting is a stepper; `unit("min")` (a short unit, empty for none) shows its unit
+after the value. To build the page yourself, call `context.settings().page(panel)` during `start` with a
 `SettingsPanel`: `create(host)` builds an owned `UiView`, `host.row(setting)` gives you the standard `Nodes.Node` row for a declared
 setting, and `host.stage(setting, value)` sets a value from a control of your own; Settings saves them on Apply. Use
 `modified`, `apply` and `reset` only for state of your own, and `keywords` and `highlight` for search. Your panel

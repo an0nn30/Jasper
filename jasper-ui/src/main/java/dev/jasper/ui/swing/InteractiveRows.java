@@ -744,9 +744,10 @@ final class InteractiveRows {
                         ThemePainting.antialias(g);
                         int inset=ThemePainting.metric(owner.context(),DesignMetrics.Role.KEYCAP_DETAIL_INSET),radius=ThemePainting.metric(owner.context(),DesignMetrics.Role.CONTROL_RADIUS)*2;
                         g.setColor(ThemePainting.color(owner.context(),SemanticColor.SURFACE_CONTROL));
-                        g.fillRoundRect(inset,tree.top(index),Math.max(0,getWidth()-2*inset),tree.heightAt(index),radius,radius);
+                        int card=Math.max(0,tree.heightAt(index)-tree.detailAfter());
+                        g.fillRoundRect(inset,tree.top(index),Math.max(0,getWidth()-2*inset),card,radius,radius);
                         g.setColor(ThemePainting.color(owner.context(),SemanticColor.BORDER_FOCUS));
-                        g.drawRoundRect(inset,tree.top(index),Math.max(0,getWidth()-2*inset-1),Math.max(0,tree.heightAt(index)-1),radius,radius);
+                        g.drawRoundRect(inset,tree.top(index),Math.max(0,getWidth()-2*inset-1),Math.max(0,card-1),radius,radius);
                     }finally{g.dispose();}
                 }
             }
@@ -1059,10 +1060,15 @@ final class InteractiveRows {
             boolean settingsNavigation=owner instanceof Trees.TreeControl tree && tree.settingsNavigation;
             if (owner.panelCompact && owner.column < 0 && !settingsNavigation && !owner.identityRows()) { compactLayout(); return; }
             boolean ordered = ordered();
-            int pad = ThemePainting.metric(owner.context(), settingsNavigation ? DesignMetrics.Role.SETTINGS_NAV_ROW_SIDE : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : owner.column >= 0 ? DesignMetrics.Role.COLUMN_LIST_SIDE : owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_PADDING : DesignMetrics.Role.ICON_GAP),
+            boolean keycapGroup=owner instanceof Trees.TreeControl keyed && !keyed.presentation.isEmpty();
+            int pad = ThemePainting.metric(owner.context(), settingsNavigation ? DesignMetrics.Role.SETTINGS_NAV_ROW_SIDE : keycapGroup ? DesignMetrics.Role.KEYCAP_GROUP_SIDE : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : owner.column >= 0 ? DesignMetrics.Role.COLUMN_LIST_SIDE : owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_PADDING : DesignMetrics.Role.ICON_GAP),
                     // An ordered row's index column starts at the row inset; its commands keep the narrower trailing pad.
                     x = (ordered ? ThemePainting.metric(owner.context(), DesignMetrics.Role.ORDERED_ROW_SIDE) : pad) + indent,
-                    width = Math.max(0, getWidth() - pad),
+                    // A keycap tree's section counts end where its shortcut keys end; an identity row's switch sits a
+                    // little closer to the row's edge than its tile.
+                    width = Math.max(0, getWidth() - (keycapGroup
+                        ? ThemePainting.metric(owner.context(), DesignMetrics.Role.KEYCAP_CONTENT_TRAILING)
+                        : owner.identityRows() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.IDENTITY_ROW_TRAILING) : pad)),
                     h = getHeight();
             int checkWidth =
                     check.isVisible()
@@ -1076,7 +1082,7 @@ final class InteractiveRows {
             width = Math.max(x, width - tw - (tw > 0 ? pad : 0));
             int lw = Math.min(leading.getPreferredSize().width, Math.max(0, width - x));
             leading.setBounds(x, 0, lw, h);
-            x += lw + (lw > 0 ? ordered ? ThemePainting.metric(owner.context(),DesignMetrics.Role.ORDERED_TEXT_GAP) : owner.column == 0 || owner.column == 1 ? ThemePainting.metric(owner.context(),DesignMetrics.Role.COLUMN_TEXT_GAP) : settingsNavigation ? ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTINGS_NAV_TEXT_GAP) : owner.identityRows() ? ThemePainting.metric(owner.context(),DesignMetrics.Role.IDENTITY_ROW_TEXT_GAP) : owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_TEXT_GAP) : pad : 0);
+            x += lw + (lw > 0 ? ordered ? ThemePainting.metric(owner.context(),DesignMetrics.Role.ORDERED_TEXT_GAP) : owner.column == 0 || owner.column == 1 ? ThemePainting.metric(owner.context(),DesignMetrics.Role.COLUMN_TEXT_GAP) : settingsNavigation ? ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTINGS_NAV_TEXT_GAP) : keycapGroup ? ThemePainting.metric(owner.context(),DesignMetrics.Role.KEYCAP_GROUP_TEXT_GAP) : owner.identityRows() ? ThemePainting.metric(owner.context(),DesignMetrics.Role.IDENTITY_ROW_TEXT_GAP) : owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_TEXT_GAP) : pad : 0);
             int content = Math.max(0, width - x);
             if (!cells.isEmpty()) {
                 title.setBounds(x, 0, content, h);
@@ -1145,12 +1151,15 @@ final class InteractiveRows {
 
         /** A heading shows only its title, inset like the rows below it. */
         void headingLayout() {
-            int pad = ThemePainting.metric(owner.context(), owner.resultsLayout() ? DesignMetrics.Role.RESULTS_ROW_PADDING : DesignMetrics.Role.ICON_GAP);
+            int pad = ThemePainting.metric(owner.context(), owner.resultsLayout() ? DesignMetrics.Role.RESULTS_ROW_PADDING : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : DesignMetrics.Role.ICON_GAP);
             check.setBounds(0, 0, 0, 0);
             leading.setBounds(0, 0, 0, 0);
             subtitle.setBounds(0, 0, 0, 0);
             trailing.setBounds(0, 0, 0, 0);
-            title.setBounds(pad, 0, Math.max(0, getWidth() - 2 * pad), getHeight());
+            // An identity list's heading sits low in its band, close to the rows it introduces.
+            int line = owner.identityRows() ? Math.min(getHeight(), title.getPreferredSize().height) : getHeight();
+            int top = owner.identityRows() ? Math.max(0, getHeight() - line - ThemePainting.metric(owner.context(), DesignMetrics.Role.IDENTITY_HEADING_BOTTOM)) : 0;
+            title.setBounds(pad, top, Math.max(0, getWidth() - 2 * pad), line);
             title.doLayout();
         }
 
@@ -1220,9 +1229,11 @@ final class InteractiveRows {
                         boolean panelRow = owner.panelSingle || owner.panelCompact;
                         int arc=ThemePainting.metric(owner.context(), panelRow ? DesignMetrics.Role.PANEL_ROW_RADIUS : DesignMetrics.Role.CONTROL_RADIUS)*2;
                         int stroke=ThemePainting.metric(owner.context(),DesignMetrics.Role.HAIRLINE);
+                        // Settings navigation rows keep their full hit height; the selection leaves the row spacing below it.
+                        int spacing=owner instanceof Trees.TreeControl tree && tree.settingsNavigation ? ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTINGS_NAV_ROW_SPACING) : 0;
                         // Manager rail/list rows keep a one-stroke gap below each fill; panel rows inset both edges.
                         if(owner.column == 0 || owner.column == 1) rounded.fillRoundRect(0,0,getWidth(),getHeight()-stroke,arc,arc);
-                        else { int inset=panelRow ? stroke : 0; rounded.fillRoundRect(0,inset,getWidth(),getHeight()-2*inset,arc,arc); }
+                        else { int inset=panelRow ? stroke : 0; rounded.fillRoundRect(0,inset,getWidth(),Math.max(0,getHeight()-2*inset-spacing),arc,arc); }
                     } finally {rounded.dispose();}
                 }
                 if (Objects.equals(id, owner.focusItem) && owner.canvas.isFocusOwner()) {

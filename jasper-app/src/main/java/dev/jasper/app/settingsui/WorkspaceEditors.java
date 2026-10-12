@@ -25,14 +25,15 @@ final class WorkspaceEditors {
         @Override public Nodes.Node node(String id, ControlState state) { return node(id, state, false); }
         @Override public Nodes.Node node(String id, ControlState state, boolean highlighted) {
             boolean inherited=value==UI_WORKSPACE_OPACITY.defaultValue();
-            var toggle=new Nodes.Toggle(id+":default",state,"Use theme's opacity",inherited,id+":default",true);
+            // "Use theme's opacity" is the way back to the theme's value, so neither row adds a Reset of its own;
+            // both keep the page's reserved action slot so their controls align with the other rows.
+            var toggle=new Nodes.Toggle(id+":default",state,"Use theme's opacity",inherited,id+":default",false);
             var slider=new Nodes.Field(id,new ControlState(state.visible(),state.enabled()&&!inherited,state.busy(),state.error()),Nodes.FieldKind.NUMBER,Editors.NumberField.format(effective(),0),"%","Workspace opacity","",Optional.of(new Nodes.Numeric(10,100,1,0)),Nodes.FieldPresentation.SLIDER);
-            var reset=new Nodes.Button(id+":reset",new ControlState(!inherited,state.enabled(),false,""),"","refresh",Nodes.ButtonKind.GHOST,id+":reset","Reset workspace opacity to theme value");
-            var blank=new Nodes.Button(id+":reserved",new ControlState(false,false,false,""),"","refresh",Nodes.ButtonKind.GHOST,id+":reserved","Reserved reset space");
             return new Nodes.Stack(id+":optional",state,Nodes.LayoutRole.VERTICAL,List.of(
-                new Nodes.SettingRow(id+":inheritance-row",state,"Use theme's opacity","",new Nodes.Stack(id+":inheritance-controls",state,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(toggle,blank)),false,highlighted),
-                new Nodes.SettingRow("row:"+id,state,"Opacity","",new Nodes.Stack(id+":slider-controls",state,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(slider,reset)),true,highlighted)));
+                new Nodes.SettingRow(id+":inheritance-row",state,"Use theme's opacity","",new Nodes.Stack(id+":inheritance-controls",state,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(toggle,reserved(id+":reserved"))),false,highlighted),
+                new Nodes.SettingRow("row:"+id,state,"Opacity","",new Nodes.Stack(id+":slider-controls",state,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(slider,reserved(id+":slider-reserved"))),true,highlighted)));
         }
+        private static Nodes.Button reserved(String id){return new Nodes.Button(id,new ControlState(false,false,false,""),"","reset",Nodes.ButtonKind.GHOST,id,"Reserved reset space");}
         @Override public Float value(){return value;}
         @Override public void show(Float value){this.value=value;}
         @Override public boolean event(String id,UiEvent event){
@@ -44,18 +45,17 @@ final class WorkspaceEditors {
     static final class Blur implements ValueEditor<WorkspaceBlur> {
         final ThemeChoices choices;final SettingsDraft draft;WorkspaceBlur value=WorkspaceBlur.THEME;
         Blur(ThemeChoices choices,SettingsDraft draft){this.choices=choices;this.draft=draft;}
+        /** The switch shows the effective blur; the row's Reset (shown only while it overrides the theme) returns to the theme's value. */
         @Override public Nodes.Node node(String id,ControlState state){
             boolean enabled=value==WorkspaceBlur.ON||value==WorkspaceBlur.THEME&&source(choices,draft).map(ThemeChoices.Source::blur).orElse(false);
-            var toggle=new Nodes.Toggle(id,state,value==WorkspaceBlur.THEME?"Use theme's value":"Blur desktop behind workspace",enabled,id,false);
-            var menu=new Nodes.MenuButton(id+":inheritance",state,"","chevron.down",Nodes.ButtonKind.GHOST,"",List.of(new MenuItem(id+":theme","Use theme's value","",id+":theme",true,value==WorkspaceBlur.THEME)),"Workspace blur inheritance");
-            return new Nodes.Stack(id+":line",state,Nodes.LayoutRole.SETTINGS_CONTROLS,List.of(toggle,menu));
+            return new Nodes.Toggle(id,state,value==WorkspaceBlur.THEME?"Use theme's value":"Blur desktop behind workspace",enabled,id,false);
         }
         @Override public String rowLabel(String label){return "Background blur";}
         @Override public WorkspaceBlur value(){return value;}
         @Override public void show(WorkspaceBlur value){this.value=value;}
         @Override public boolean event(String id,UiEvent event){
             if(event instanceof UiEvent.Toggled toggle&&toggle.id().equals(id)){value=toggle.checked()?WorkspaceBlur.ON:WorkspaceBlur.OFF;return true;}
-            if(event instanceof UiEvent.Action action&&action.id().equals(id+":theme")){value=WorkspaceBlur.THEME;return true;}return false;
+            return false;
         }
         @Override public boolean removesAtDefault(){return true;}
     }

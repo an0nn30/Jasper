@@ -98,7 +98,7 @@ class FakePluginSettingsTest {
         var seen = new ArrayList<String>();
         host.start(INFO, Set.of(), Set.of(), context -> {
             settings.set(context.settings());
-            size.set(context.settings().declare(SettingSpec.of("font_size", SettingKind.integer(8, 48), 13).label("Font size")));
+            size.set(context.settings().declare(SettingSpec.of("font_size", SettingKind.integer(8, 48), 13).label("Font size").unit("pt")));
             context.settings().page(rows -> {
                 var panel = context.kit().create(new dev.jasper.sdk.ui.ViewSpec(rows.row(size.get())), e -> {});
                 seen.add("pending " + rows.pending(size.get()));
@@ -111,7 +111,12 @@ class FakePluginSettingsTest {
             assertThatIllegalStateException().isThrownBy(() -> context.settings().page(rows -> {throw new AssertionError("Lazy page");}));
         });
         var component = host.settingsPanel("test.fake").orElseThrow();
-        assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow)host.settingsPanelView("test.fake").orElseThrow().spec().root()).title()).isEqualTo("Font size");
+        var row = (dev.jasper.sdk.ui.Nodes.SettingRow) host.settingsPanelView("test.fake").orElseThrow().spec().root();
+        assertThat(row.title()).isEqualTo("Font size");
+        // As the host renders it: a bounded integer is the Settings stepper with its declared unit.
+        var input = (dev.jasper.sdk.ui.Nodes.Field) ((dev.jasper.sdk.ui.Nodes.Stack) row.control()).children().getFirst();
+        assertThat(input.presentation()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldPresentation.STEPPER);
+        assertThat(input.hint()).isEqualTo("pt");
         assertThat(seen).containsExactly("pending 13", "pending 20");
         assertThat(host.pendingSettings("test.fake")).containsEntry("font_size", 20);
         assertThat(host.settingsPanelChanges("test.fake")).isEqualTo(1);

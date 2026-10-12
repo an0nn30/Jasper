@@ -30,7 +30,6 @@ public final class SettingsSurfacePreview {
         name = "Slate Steel"
         [ui.workspace]
         opacity = 90
-        blur = "on"
         [window]
         toolbar = "icons_and_labels"
         toolbar_height = 34
@@ -117,7 +116,7 @@ public final class SettingsSurfacePreview {
         var anchor=SwingUtilities.convertPoint(combo,0,combo.getHeight(),root);
         var image=new BufferedImage(root.getWidth()*2,root.getHeight()*2,BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();
         try{g.scale(2,2);root.printAll(g);g.translate(anchor.x,anchor.y);content.printAll(g);}finally{g.dispose();}
-        try{ImageIO.write(image,"png",file.toFile());Files.writeString(file.resolveSibling("popup-geometry.txt"),"Headless actual BasicComboPopup over actual SettingsDialog at combo lower edge; not a native window. Anchor="+anchor+"; size="+content.getSize()+"; selected="+list.getSelectedIndex()+"; preferredList="+list.getPreferredSize()+"\n");}catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}
+        try{ImageIO.write(image,"png",file.toFile());Files.writeString(file.resolveSibling("popup-geometry.txt"),"Headless actual BasicComboPopup over actual SettingsDialog at combo lower edge; not a native window. Anchor="+anchor+"; size="+content.getSize()+"; selected="+list.getSelectedIndex()+"; preferredList="+list.getPreferredSize()+"; list="+list.getBounds()+" insets="+list.getInsets()+"; popupInsets="+content.getInsets()+"; cell="+((javax.swing.ListCellRenderer<Object>)combo.getRenderer()).getListCellRendererComponent(list,combo.getItemAt(0),0,false,false).getPreferredSize()+"; comboWidth="+combo.getWidth()+"; viewport="+javax.swing.SwingUtilities.getAncestorOfClass(javax.swing.JViewport.class,list).getBounds()+"\n");}catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}
         write(content,file.resolveSibling("popup-only.png"),width,height);
     }
     private static void write(JComponent view,Path file,int width,int height){

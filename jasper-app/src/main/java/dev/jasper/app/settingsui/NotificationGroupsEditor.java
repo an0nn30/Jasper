@@ -64,7 +64,7 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
         var owners=new LinkedHashMap<String,List<Integer>>();
         for(int i=0;i<groups.size();i++)owners.computeIfAbsent(groups.get(i).ownerId(),ignored->new ArrayList<>()).add(i);
         var sections=new ArrayList<Nodes.Node>();
-        sections.add(new Nodes.Text(id+":description",plain,"How each kind of notification appears. A plugin's groups are listed once it has run.",Nodes.TextRole.DESCRIPTION));
+        sections.add(new Nodes.Text(id+":description",plain,"How each kind of notification appears. A plugin's groups are listed once it has run.",Nodes.TextRole.SUPPORTING));
         int section=0;
         for(var indices:owners.values()) {
             var first=groups.get(indices.getFirst());var lines=new ArrayList<Nodes.Node>();
@@ -76,13 +76,13 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
             }
             if(!ownerIcon.isBlank())heading.add(new Nodes.Icon(id+":owner-"+section+":icon",plain,ownerIcon,first.ownerId().equals("jasper")?Nodes.Hue.BLUE:Nodes.Hue.NEUTRAL,Nodes.IconSize.CONTROL,first.owner()));
             heading.add(new Nodes.Text(id+":owner-"+section+":title",plain,first.owner(),Nodes.TextRole.PANEL_TITLE));
-            heading.add(new Nodes.Text(id+":owner-"+section+":count",plain,indices.size()+" groups",Nodes.TextRole.CAPTION));
+            heading.add(new Nodes.Text(id+":owner-"+section+":count",plain,indices.size()+" groups",Nodes.TextRole.COUNT));
             lines.add(new Nodes.Stack(id+":owner-"+section,plain,Nodes.LayoutRole.SETTINGS_GROUP_HEADER,heading));
             for(int i:indices) {
                 var group=groups.get(i);var options=new ArrayList<Option>();
                 for(var mode:MODES.entrySet())options.add(new Option(mode.getKey(),mode.getValue(),modeIcon(mode.getKey()),mode.getKey().equals(group.defaultMode())?"Default":""));
                 var choice=new Nodes.Choice(modeId(id,i),plain,Nodes.ChoiceKind.DROPDOWN,options,mode(group.id()),group.name()+": how its notifications appear; "+group.owner()+" · "+group.id(),"");
-                var reset=new Nodes.Button(resetId(id,i),new ControlState(plain.visible()&&value.containsKey(group.id()),plain.enabled()&&value.containsKey(group.id()),plain.busy(),""),"","refresh",Nodes.ButtonKind.GHOST,resetId(id,i),"Reset "+group.name()+" to its default");
+                var reset=new Nodes.Button(resetId(id,i),new ControlState(plain.visible()&&value.containsKey(group.id()),plain.enabled()&&value.containsKey(group.id()),plain.busy(),""),"","reset",Nodes.ButtonKind.GHOST,resetId(id,i),"Reset "+group.name()+" to its default");
                 var control=new Nodes.Stack(modeId(id,i)+":controls",plain,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(choice,reset));
                 lines.add(new Nodes.SettingRow(id+":row-"+i,plain,group.name(),"",control,false,highlighted));
             }

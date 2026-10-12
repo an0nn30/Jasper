@@ -9,6 +9,7 @@ import dev.jasper.ui.model.UiEvent;
 import dev.jasper.ui.model.ViewSpec;
 import dev.jasper.ui.swing.KitContext;
 import dev.jasper.ui.swing.KitView;
+import dev.jasper.ui.swing.SettingsShell;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.KeyEventDispatcher;
@@ -64,6 +65,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         int side = scaled(context, DesignMetrics.Role.KEYMAP_PAGE_PADDING);
         setBorder(BorderFactory.createEmptyBorder(scaled(context, DesignMetrics.Role.KEYMAP_PAGE_TOP_PADDING), side, scaled(context, DesignMetrics.Role.KEYMAP_PAGE_BOTTOM_PADDING), side));
         top = new KitView(context, topSpec(), this::event);
+        SettingsShell.settingsPage(top);
         tools = new KitView(context, toolsSpec(), this::event);
         list = new KitView(context, new ViewSpec(tree.descriptor()), this::event);
         footer = new KitView(context, statusSpec(), this::event);
@@ -74,17 +76,25 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
             @Override public void actionPerformed(java.awt.event.ActionEvent event) { if (!closed) activate(tree.selected()); }
         });
         footer.getAccessibleContext().setAccessibleName("Shortcut search status");
-        var searchBar = new JPanel(new BorderLayout(0,0)); searchBar.setOpaque(false);
+        // The shortcut search stands a little taller than an ordinary field; a larger font still grows it.
+        var searchBar = new JPanel(new BorderLayout(scaled(context, DesignMetrics.Role.KEYMAP_TOOLS_GAP),0)) {
+            @Override public java.awt.Dimension getPreferredSize() {
+                var size = super.getPreferredSize();
+                size.height = Math.max(size.height, scaled(context, DesignMetrics.Role.KEYMAP_SEARCH_HEIGHT));
+                return size;
+            }
+        };
+        searchBar.setOpaque(false);
         searchBar.add(top,BorderLayout.CENTER); searchBar.add(tools,BorderLayout.EAST);
         add(searchBar, BorderLayout.NORTH);
-        var sections = new JPanel(new BorderLayout(0, scaled(context, DesignMetrics.Role.KEYMAP_TOOLS_GAP)));
+        var sections = new JPanel(new BorderLayout());
         sections.setOpaque(false);
         sections.add(list, BorderLayout.CENTER);
         add(sections, BorderLayout.CENTER);
-        var bottom = new JPanel(new BorderLayout(0, scaled(context, DesignMetrics.Role.KEYMAP_STATUS_GAP)));
-        bottom.setOpaque(false);
-
-        bottom.add(footer, BorderLayout.SOUTH);
+        // The status line sits further below the list than the list sits below the search row.
+        var bottom = new JPanel(new BorderLayout());
+        bottom.setOpaque(false); bottom.setBorder(BorderFactory.createEmptyBorder(scaled(context, DesignMetrics.Role.KEYMAP_STATUS_GAP), 0, 0, 0));
+        bottom.add(footer, BorderLayout.CENTER);
         add(bottom, BorderLayout.SOUTH);
         filter();
     }
@@ -167,7 +177,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
     private void render() {
         if (closed) return;
         top.update(topSpec());
-        top.setFieldTrailing(SEARCH, Optional.of(new Nodes.Button("record", ControlState.READY, recording ? "Stop recording" : "Record", "keyboard", Nodes.ButtonKind.GHOST, "record", "Record shortcut")));
+        top.setFieldTrailing(SEARCH, Optional.of(new Nodes.Button("record", ControlState.READY, recording ? "Stop recording" : "Record", "keyboard", Nodes.ButtonKind.GHOST, "record", "Record shortcut", Nodes.ButtonPresentation.EMBEDDED)));
         top.setFieldReadOnly(SEARCH,recording);
         tools.update(toolsSpec());
         list.update(new ViewSpec(tree.descriptor()));
@@ -178,23 +188,31 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
     }
 
     private ViewSpec topSpec() {
-        var field = new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query,
-            "Search actions, plugins, or Cmd+Shift+H", "Search keyboard shortcuts", "");
-        var clear=new Nodes.Button("clear", ControlState.READY, "Clear", "", Nodes.ButtonKind.SECONDARY, "clear", "");
-        return new ViewSpec(new Nodes.Stack("find",ControlState.READY,Nodes.LayoutRole.NAVIGATION,List.of(field,clear)));
+        return new ViewSpec(new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query,
+            "Search actions, plugins, or Cmd+Shift+H", "Search keyboard shortcuts", ""));
     }
 
-    private static ViewSpec toolsSpec() {
-        return new ViewSpec(new Nodes.Stack("sections", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
-            new Nodes.Button("expand", ControlState.READY, "", "chevron.down", Nodes.ButtonKind.GHOST, "expand", "Expand all sections"),
-            new Nodes.Button("collapse", ControlState.READY, "", "collapse", Nodes.ButtonKind.GHOST, "collapse", "Collapse all sections"))));
+    /** Clear appears beside the section tools once there is a query or a recorded key to clear. */
+    private ViewSpec toolsSpec() {
+        return new ViewSpec(new Nodes.Stack("sections", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
+            new Nodes.Button("clear", new ControlState(captured != null || !query.isEmpty(), true, false, ""), "Clear", "", Nodes.ButtonKind.SECONDARY, "clear", ""),
+            new Nodes.Button("expand", ControlState.READY, "", "expand.all", Nodes.ButtonKind.GHOST, "expand", "Expand all sections"),
+            new Nodes.Button("collapse", ControlState.READY, "", "collapse.all", Nodes.ButtonKind.GHOST, "collapse", "Collapse all sections"))));
     }
 
     private ViewSpec statusSpec() {
-        String text = recording ? "Press a shortcut to find it. Click Stop recording when finished."
-            : visible.isEmpty() ? "No matching shortcuts. Try another name or key combination."
-            : visible.size() + (visible.size() == 1 ? " shortcut" : " shortcuts") + " · Select an action to edit · Contextual keys are read-only";
-        return new ViewSpec(new Nodes.Text("status", ControlState.READY, text, Nodes.TextRole.DESCRIPTION));
+        if (recording || visible.isEmpty()) {
+            String text = recording ? "Press a shortcut to find it. Click Stop recording when finished."
+                : "No matching shortcuts. Try another name or key combination.";
+            return new ViewSpec(new Nodes.Text("status", ControlState.READY, text, Nodes.TextRole.CAPTION));
+        }
+        // The count, then the read-only marker that the contextual rows carry, explained.
+        return new ViewSpec(new Nodes.Stack("status", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
+            new Nodes.Text("status.count", ControlState.READY, visible.size() + (visible.size() == 1 ? " shortcut" : " shortcuts"), Nodes.TextRole.CAPTION),
+            new Nodes.Text("status.separator", ControlState.READY, "·", Nodes.TextRole.CAPTION),
+            new Nodes.Stack("status.contextual-line", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
+                new Nodes.Icon("status.lock", ControlState.READY, "lock", Nodes.Hue.NEUTRAL, Nodes.IconSize.CAPTION, "Read-only contextual key"),
+                new Nodes.Text("status.contextual", ControlState.READY, "Contextual keys are read-only", Nodes.TextRole.CAPTION))))));
     }
 
     boolean capture(KeyStroke stroke) {

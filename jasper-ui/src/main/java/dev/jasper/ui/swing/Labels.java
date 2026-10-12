@@ -101,6 +101,10 @@ final class Labels {
         /** A form footer's preview: a command reads from its start, so it shortens at its end (set by the reconciler). */
         boolean formPreview;
         SemanticColor identityStatus;
+        /** A receiving composition's own type role (Settings chrome and pages); null keeps the text role's. */
+        Typography.Role override;
+        /** On a Settings page supporting text keeps its font's own line height. */
+        boolean settings;
         TextControl(KitView view, Nodes.Text node) { super(view, node, literal()); refresh(); }
         @Override void refresh() {
             var text = (Nodes.Text)node; var label = (JLabel)component; state();
@@ -110,14 +114,14 @@ final class Labels {
             label.setText(text.text());
             label.setToolTipText(text.text());
             label.getAccessibleContext().setAccessibleName(text.text());
-            label.setFont(ThemePainting.font(context(), hint && text.role() == Nodes.TextRole.CAPTION ? Typography.Role.PALETTE_HINT : panelDetail && text.role() == Nodes.TextRole.MONO_CAPTION ? Typography.Role.PANEL_DETAIL_MONO : panelDetail && text.role() == Nodes.TextRole.PANEL_TITLE ? Typography.Role.PANEL_DETAIL_TITLE : panelDetail && text.role() == Nodes.TextRole.CAPTION ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.valueOf(text.role().name())));
+            label.setFont(ThemePainting.font(context(), override != null ? override : hint && text.role() == Nodes.TextRole.CAPTION ? Typography.Role.PALETTE_HINT : panelDetail && text.role() == Nodes.TextRole.MONO_CAPTION ? Typography.Role.PANEL_DETAIL_MONO : panelDetail && text.role() == Nodes.TextRole.PANEL_TITLE ? Typography.Role.PANEL_DETAIL_TITLE : panelDetail && text.role() == Nodes.TextRole.CAPTION ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.valueOf(text.role().name())));
             label.setForeground(ThemePainting.color(context(), identityStatus != null ? identityStatus : text.severity().isPresent() ? tint(text.severity().get()) : panelDetail && text.role()==Nodes.TextRole.MONO_CAPTION ? SemanticColor.TEXT_SECONDARY : switch (text.role()) {
                 case LABEL, DESCRIPTION, CAPTION, COUNT -> SemanticColor.TEXT_SECONDARY;
                 case SECTION_LABEL, MONO_CAPTION, SUPPORTING -> SemanticColor.TEXT_TERTIARY;
                 default -> SemanticColor.TEXT_PRIMARY;
             }));
             ((LiteralLabel)label).caret = text.caret().orElse(-1);
-            boolean supporting = text.role() == Nodes.TextRole.SUPPORTING;
+            boolean supporting = text.role() == Nodes.TextRole.SUPPORTING && !settings;
             ((LiteralLabel)label).wrapped.lineHeight = (text.role() == Nodes.TextRole.DESCRIPTION || supporting)
                 ? Math.round(context().metrics().value(supporting ? dev.jasper.ui.metrics.DesignMetrics.Role.SUPPORTING_LINE_HEIGHT : dev.jasper.ui.metrics.DesignMetrics.Role.DESCRIPTION_LINE_HEIGHT)
                     * ThemePainting.font(context(), Typography.Role.BODY).getSize2D() / 13f) : 0;

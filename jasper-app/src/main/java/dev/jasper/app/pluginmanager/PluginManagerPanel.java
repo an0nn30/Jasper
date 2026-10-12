@@ -42,7 +42,7 @@ final class PluginManagerPanel extends JPanel {
     private final KitView searchView, gearView, headerView, messageView;
     private final PluginCardList list;
     private final PluginDetails details;
-    private final JPanel bar = new JPanel(new BorderLayout()), top = new JPanel(new BorderLayout());
+    private final JPanel bar = new JPanel(new BorderLayout()), top = new JPanel(new BorderLayout()), listLane = new JPanel(new BorderLayout());
     private final JSplitPane split;
     private final AutoCloseable theme;
     private String bannerText = "";
@@ -57,6 +57,7 @@ final class PluginManagerPanel extends JPanel {
         setOpaque(false);
         searchView = new KitView(kit, new ViewSpec(new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, "", "Search plugins",
             "Search plugins", "")), this::event);
+        dev.jasper.ui.swing.SettingsShell.settingsPage(searchView);
         gearView = new KitView(kit, gearSpec(), this::event);
         headerView = new KitView(kit, headerSpec(), this::event);
         messageView = new KitView(kit, messageSpec(), this::event);
@@ -70,7 +71,7 @@ final class PluginManagerPanel extends JPanel {
 
         top.add(headerView, BorderLayout.CENTER);
         add(top, BorderLayout.NORTH);
-        var listLane=new JPanel(new BorderLayout());listLane.setOpaque(false);listLane.add(bar,BorderLayout.NORTH);listLane.add(list.view(),BorderLayout.CENTER);
+        listLane.setOpaque(false);listLane.add(bar,BorderLayout.NORTH);listLane.add(list.view(),BorderLayout.CENTER);
         split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listLane, details.component()) {
             @Override public void updateUI() {
                 setUI(dev.jasper.ui.swing.NativeControlStyles.splitPaneUI(kit::theme));
@@ -107,13 +108,18 @@ final class PluginManagerPanel extends JPanel {
     private void restyle() {
         int pad = metric(DesignMetrics.Role.PLUGIN_MANAGER_PADDING), gap = metric(DesignMetrics.Role.PLUGIN_MANAGER_GAP);
         int side=metric(DesignMetrics.Role.PLUGIN_MANAGER_SIDE_PADDING);
-        setBorder(BorderFactory.createEmptyBorder(pad, side, pad, pad));
-        bar.setBorder(BorderFactory.createEmptyBorder(0,side,0,side));
+        // The list and details pad themselves, so the divider between them runs the page's full height.
+        setBorder(BorderFactory.createEmptyBorder(0, side, 0, pad));
+        listLane.setBorder(BorderFactory.createEmptyBorder(pad,0,pad,0));
+        // The gear sits a little in from the rows' trailing edge, close to the search it qualifies.
+        bar.setBorder(BorderFactory.createEmptyBorder(0,side,0,metric(DesignMetrics.Role.PLUGIN_SEARCH_TRAILING)));
         list.view().setBorder(BorderFactory.createEmptyBorder(0,0,0,side));
         ((BorderLayout) getLayout()).setVgap(gap);
-        ((BorderLayout) bar.getLayout()).setHgap(gap);
+        ((BorderLayout) bar.getLayout()).setHgap(metric(DesignMetrics.Role.PLUGIN_SEARCH_GAP));
         top.setVisible(!bannerText.isEmpty() || !notice.isEmpty());
-        headerView.setBorder(BorderFactory.createEmptyBorder(bannerText.isEmpty() && notice.isEmpty() ? 0 : gap, 0, 0, 0));
+        headerView.setBorder(BorderFactory.createEmptyBorder(bannerText.isEmpty() && notice.isEmpty() ? 0 : pad, 0, 0, 0));
+        messageView.setVisible(!message.isEmpty());
+        messageView.setBorder(BorderFactory.createEmptyBorder(0, 0, pad, 0));
         split.setDividerSize(metric(DesignMetrics.Role.WORKSPACE_GUTTER));
         revalidate();
         repaint();
@@ -207,6 +213,7 @@ final class PluginManagerPanel extends JPanel {
         message = text;
         this.error = error;
         render(messageView, messageSpec());
+        restyle();
     }
 
     /** Closes the kit views; the page calls this when Settings lets it go. Idempotent. */

@@ -127,6 +127,22 @@ public final class KitView extends JPanel implements AutoCloseable {
         if(hint ? hintStacks.add(stackId) : hintStacks.remove(stackId)) update(spec);
     }
     boolean hintStack(String id){return hintStacks.contains(id);}
+    private boolean settingsSurface, settingsHeader;
+    /**
+     * Kit-internal: this view is part of the Settings shell, so it composes with the Settings roles; the header view also
+     * lays out its history buttons and breadcrumb as the Settings header. Re-reconciles the current descriptor.
+     */
+    void settingsChrome(boolean header) {
+        requireOpen();
+        if (settingsSurface && settingsHeader == header) return;
+        settingsSurface = true; settingsHeader = header; update(spec);
+    }
+    boolean settingsSurface() { return settingsSurface; }
+    boolean settingsHeader() { return settingsHeader; }
+    private boolean keycapDetail;
+    /** Kit-internal: this view is the inline editor of a keycap tree row, whose rows sit closer together. */
+    void markKeycapDetail() { requireOpen(); if (keycapDetail) return; keycapDetail = true; update(spec); }
+    boolean keycapDetail() { return keycapDetail; }
     /**
      * App-only owned action inside a mounted TEXT or SEARCH field. The action has this view's normal
      * event, focus and accessibility routing. Validation is transactional, including ids in unmounted rows.

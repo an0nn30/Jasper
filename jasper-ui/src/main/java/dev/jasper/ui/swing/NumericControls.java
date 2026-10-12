@@ -16,13 +16,37 @@ final class NumericControls {
         Stepper(KitView view, Nodes.Field field) {
             super(view, field);
             unit = Labels.literal();
-            var center = new JPanel(new BorderLayout()); center.setOpaque(false);
-            surface.remove(input); center.add(input, BorderLayout.CENTER); center.add(unit, BorderLayout.EAST);
+            var center = new JPanel(new ValueLayout()); center.setOpaque(false);
+            surface.remove(input); center.add(input); center.add(unit);
             surface.add(center, BorderLayout.CENTER);
-            ((JTextField)input).setColumns(3); ((JTextField)input).setHorizontalAlignment(SwingConstants.CENTER);
+            ((JTextField)input).setHorizontalAlignment(SwingConstants.CENTER);
+            javax.swing.event.DocumentListener resize = new javax.swing.event.DocumentListener() {
+                @Override public void insertUpdate(javax.swing.event.DocumentEvent event) { center.revalidate(); }
+                @Override public void removeUpdate(javax.swing.event.DocumentEvent event) { center.revalidate(); }
+                @Override public void changedUpdate(javax.swing.event.DocumentEvent event) { }
+            };
+            var document = ((JTextField)input).getDocument(); document.addDocumentListener(resize); own(() -> document.removeDocumentListener(resize));
             minus = button("minus", "−", -1); plus = button("plus", "+", 1);
             surface.add(minus, BorderLayout.WEST); surface.add(plus, BorderLayout.EAST);
             refresh();
+        }
+        /** The value and its unit read as one centred phrase; the value cell keeps a stable minimum width. */
+        private final class ValueLayout implements LayoutManager {
+            int valueWidth() { var text = ((JTextField)input); var metrics = text.getFontMetrics(text.getFont());
+                return Math.max(metrics.stringWidth(text.getText()), metrics.charWidth('0')) + text.getInsets().left + text.getInsets().right + 1; }
+            int unitWidth() { return unit.getText().isEmpty() ? 0 : unit.getPreferredSize().width; }
+            @Override public void addLayoutComponent(String name, Component component) { }
+            @Override public void removeLayoutComponent(Component component) { }
+            @Override public Dimension preferredLayoutSize(Container parent) {
+                int pad = ThemePainting.metric(context(), DesignMetrics.Role.STEPPER_VALUE_PADDING);
+                return new Dimension(Math.max(ThemePainting.metric(context(), DesignMetrics.Role.STEPPER_VALUE_WIDTH), valueWidth() + unitWidth() + 2 * pad), input.getPreferredSize().height);
+            }
+            @Override public Dimension minimumLayoutSize(Container parent) { return preferredLayoutSize(parent); }
+            @Override public void layoutContainer(Container parent) {
+                int value = valueWidth(), unitWidth = unitWidth(), x = Math.max(0, (parent.getWidth() - value - unitWidth) / 2);
+                input.setBounds(x, 0, Math.min(value, parent.getWidth()), parent.getHeight());
+                unit.setBounds(x + value, 0, unitWidth, parent.getHeight());
+            }
         }
         private JButton button(String suffix, String text, int direction) {
             var cue = new ThemePainting.Focus[1];
@@ -53,7 +77,9 @@ final class NumericControls {
             if (unit == null) return;
             var field = (Nodes.Field)node;
             surface.hint = ""; surface.setBorder(new EmptyBorder(0, 0, 0, 0));
-            unit.setText(field.hint().isBlank() ? "" : " " + field.hint() + " ");
+            // A compact value reads at label size, its unit set after one space.
+            input.setFont(ThemePainting.font(context(), Typography.Role.LABEL)); ((JTextField)input).setBorder(new EmptyBorder(0, 0, 0, 0));
+            unit.setText(field.hint().isBlank() ? "" : " " + field.hint());
             unit.setFont(input.getFont()); unit.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_TERTIARY));
             for (var button : new JButton[]{minus, plus}) {
                 button.setFont(input.getFont()); button.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY));
@@ -83,11 +109,13 @@ final class NumericControls {
             @Override public void updateUI() {
                 setUI(new javax.swing.plaf.basic.BasicSliderUI(this) {
                 @Override public void paintFocus(Graphics graphics) { if(focus!=null&&focus.visible()){var g=(Graphics2D)graphics.create();try{ThemePainting.rounded(g,KitSlider.this,context(),null,ThemePainting.color(context(),SemanticColor.BORDER_FOCUS),false,false);}finally{g.dispose();}} }
+                /** The track spans the control; the thumb travels inside it, so its ends stay covered at the limits. */
                 @Override public void paintTrack(Graphics graphics) {
                     var g = (Graphics2D)graphics.create();
-                    try { ThemePainting.antialias(g); int h = ThemePainting.metric(context(), DesignMetrics.Role.SLIDER_TRACK); int y = trackRect.y + (trackRect.height - h) / 2;
-                        g.setColor(ThemePainting.color(context(), SemanticColor.BORDER_CONTROL)); g.fillRoundRect(trackRect.x, y, trackRect.width, h, h, h);
-                        g.setColor(ThemePainting.color(context(), SemanticColor.ACCENT)); g.fillRoundRect(trackRect.x, y, Math.max(0, thumbRect.x + thumbRect.width / 2 - trackRect.x), h, h, h);
+                    try { ThemePainting.antialias(g); int h = ThemePainting.metric(context(), DesignMetrics.Role.SLIDER_TRACK); int y = thumbRect.y + (thumbRect.height - h) / 2;
+                        int x = contentRect.x, width = contentRect.width;
+                        g.setColor(ThemePainting.color(context(), SemanticColor.BORDER_CONTROL)); g.fillRoundRect(x, y, width, h, h, h);
+                        g.setColor(ThemePainting.color(context(), SemanticColor.ACCENT)); g.fillRoundRect(x, y, Math.max(0, thumbRect.x + thumbRect.width / 2 - x), h, h, h);
                     } finally { g.dispose(); }
                 }
                 @Override protected Dimension getThumbSize() { int size = ThemePainting.metric(context(), DesignMetrics.Role.SLIDER_THUMB); return new Dimension(size, size); }
@@ -103,8 +131,11 @@ final class NumericControls {
             try { input.setMinimum(0); input.setMaximum((int)Math.ceil((numeric.max() - numeric.min()) / numeric.step())); input.setValue((int)Math.round((Double.parseDouble(field.value()) - numeric.min()) / numeric.step())); }
             finally { applying = false; }
             input.setEnabled(interactive()); input.getAccessibleContext().setAccessibleName(field.label());
-            value.setText(field.value() + field.hint()); value.setFont(ThemePainting.font(context(), Typography.Role.BODY)); value.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
+            value.setText(field.value() + field.hint()); value.setFont(ThemePainting.font(context(), Typography.Role.LABEL)); value.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
+            // The value reads right-aligned in a stable column, so the track does not move as the number changes.
             int gap = ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_GAP); value.setBorder(new EmptyBorder(0, gap, 0, 0));
+            value.setHorizontalAlignment(SwingConstants.RIGHT); value.setPreferredSize(null);
+            value.setPreferredSize(new Dimension(Math.max(value.getPreferredSize().width, ThemePainting.metric(context(), DesignMetrics.Role.SLIDER_VALUE_WIDTH)), value.getPreferredSize().height));
             component.setPreferredSize(new Dimension(ThemePainting.metric(context(), DesignMetrics.Role.SLIDER_WIDTH), ThemePainting.height(context(), DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY)));
         }
         @Override JComponent focusTarget() { return input; }

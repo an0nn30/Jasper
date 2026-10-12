@@ -13,7 +13,6 @@ import java.util.List;
 import javax.swing.AbstractButton;
 import javax.swing.JButton;
 import javax.swing.JLabel;
-import javax.swing.JTextArea;
 import javax.swing.text.JTextComponent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,7 +51,7 @@ class PluginManagerPanelTest {
             var area=actual.detailsPane().textArea();
             var first=area.modelToView2D(0);var last=area.modelToView2D(copy.length()-1);
             assertThat(last.getY()-first.getY()).as("same literal source description occupies two lines at744logical content allocation")
-                .isLessThanOrEqualTo(area.getFontMetrics(area.getFont()).getHeight());
+                .isLessThan(2 * first.getHeight());
             assertThat(area.getText()).isEqualTo(copy);
         }finally{actual.close();themes.close();}
     }
@@ -195,7 +194,7 @@ class PluginManagerPanelTest {
         panel.show(snapshot(TestRows.plugin("dev.example.found", "Found").needsReview("terminal.inject").row(),
             TestRows.plugin("dev.example.on", "On").row(), TestRows.plugin("dev.jasper.remote", "Remote").origin("Bundled").row()));
         assertThat(panel.groupTitles()).as("a plugin waiting for review is not enabled yet")
-            .containsExactly("User-installed (1 of 2 enabled)", "Bundled (1 of 1 enabled)");
+            .containsExactly("User-installed, 1 of 2 enabled", "Bundled, 1 of 1 enabled");
         assertThat(PluginKit.toggle(panel, "dev.example.found").isSelected()).isFalse();
         PluginKit.toggle(panel, "dev.example.found").doClick(0);
         PluginKit.toggle(panel, "dev.example.on").doClick(0);
@@ -372,7 +371,7 @@ class PluginManagerPanelTest {
             field.setText("Plugin 1");
             own.select("dev.example.p125");
             PluginKit.press(own.detailsPane().header(), PluginDetails.SECTION + ".option." + PluginDetails.DETAILS);
-            JTextArea text = own.detailsPane().textArea();
+            var text = own.detailsPane().textArea();
             text.select(2, 9);
             PluginKit.laidOut(own);
             var scroll = (javax.swing.JScrollPane) javax.swing.SwingUtilities.getAncestorOfClass(javax.swing.JScrollPane.class,

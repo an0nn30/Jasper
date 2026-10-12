@@ -14,7 +14,7 @@ import javax.swing.text.*;
 final class TextFields {
     private TextFields() {}
     static class FieldControl extends ControlRegistry.Control {
-        boolean panelSearch;
+        boolean panelSearch, settings;
         /** A three-column manager's list search: a full-size field with the measured column glyph and gap. */
         boolean columnSearch;
         final JTextComponent input;
@@ -289,7 +289,7 @@ final class TextFields {
                     : context().icons().icon(name,context().theme(),SemanticColor.TEXT_PLACEHOLDER,extent));
             }
             int gap = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_GAP : columnSearch ? DesignMetrics.Role.COLUMN_SEARCH_GAP : field.kind() == Nodes.FieldKind.PORT ? DesignMetrics.Role.PORT_PREFIX_GAP
-                : surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_ICON_GAP : DesignMetrics.Role.ICON_GAP);
+                : surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_ICON_GAP : settings && field.kind() == Nodes.FieldKind.SEARCH ? DesignMetrics.Role.SETTINGS_SEARCH_ICON_GAP : DesignMetrics.Role.ICON_GAP);
             leading.setVisible(field.presentation() != Nodes.FieldPresentation.PLAIN_PATH);
             leading.setBorder(new EmptyBorder(0, 0, 0, gap));
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
