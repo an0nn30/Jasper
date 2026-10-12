@@ -263,14 +263,16 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
             Rectangle at = card.getBounds();
             // A leaving card shows only as its picture; with none (motion off, never shown) nothing of it is drawn.
             if (at.isEmpty() || shown <= 0 || phase == Phase.CLOSING && leaving == null) return;
-            // theme.md's dialog shadow, black, fading with the card.
+            // theme.md's dialog shadow, black, fading with the card and kept outside it (as box-shadow is), so a card
+            // fading in or out does not darken over its own shadow.
             var shadow = (Graphics2D) g.create();
             try {
+                int radius = ThemePainting.metric(context, DesignMetrics.Role.WINDOW_RADIUS);
                 shadow.setComposite(AlphaComposite.SrcOver.derive((float) Math.min(1, Math.max(0, shown))));
                 ThemePainting.softShadow(shadow, new java.awt.geom.Rectangle2D.Double(at.x, at.y, at.width, at.height),
-                    ThemePainting.metric(context, DesignMetrics.Role.WINDOW_RADIUS), ThemePainting.metric(context, DesignMetrics.Role.DIALOG_SHADOW_OFFSET),
+                    radius, ThemePainting.metric(context, DesignMetrics.Role.DIALOG_SHADOW_OFFSET),
                     ThemePainting.metric(context, DesignMetrics.Role.DIALOG_SHADOW_BLUR), context.metrics().value(context.theme().dark()
-                        ? DesignMetrics.Role.DIALOG_SHADOW_PERCENT_DARK : DesignMetrics.Role.DIALOG_SHADOW_PERCENT_LIGHT) / 100.0);
+                        ? DesignMetrics.Role.DIALOG_SHADOW_PERCENT_DARK : DesignMetrics.Role.DIALOG_SHADOW_PERCENT_LIGHT) / 100.0, true);
             } finally { shadow.dispose(); }
             if (leaving != null) {
                 g.setComposite(AlphaComposite.SrcOver.derive((float) Math.min(1, Math.max(0, shown))));

@@ -89,7 +89,9 @@ public final class SemanticDefaults {
             // The ten Slate Steel roles: for legacy themes, the colour their component paints today.
             case SURFACE_FIELD_RAISED, SEGMENT_TRACK -> legacy.get(Token.INPUT_BACKGROUND);
             case SURFACE_CONTROL_SELECTED, SURFACE_EMPTY_TILE -> legacy.get(Token.BUTTON_BACKGROUND);
-            case SURFACE_TABSTRIP -> legacy.get(Token.TAB_BAR);
+            // The strip painted the terminal background sunk toward black (30% on a dark terminal, 6% on a light one), so the
+            // selected tab, the terminal background itself, stays the lighter slot.
+            case SURFACE_TABSTRIP -> ColorMath.mix(Color.BLACK, terminal.background(), ColorMath.luminance(terminal.background()) < .5 ? .30 : .06);
             case BORDER_FIELD_RAISED -> legacy.get(Token.BORDER);
             case BORDER_FIELD_RAISED_HOVER, BUTTON_SECONDARY_BORDER -> legacy.get(Token.BUTTON_BORDER);
             case TEXT_STRONG_SECONDARY, TEXT_FIELD_RAISED -> legacy.get(Token.TEXT);

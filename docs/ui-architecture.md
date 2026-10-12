@@ -127,10 +127,13 @@ and syntax styles, written as token references). `generated(dark)` assembles a f
 legacy layer is removed it also carries a legacy token view derived from its tokens. Components paint theme.md's
 roles; alpha treatments (focus and error rings, hover, category tiles) apply one kit metric to a base token, and a
 token that carries alpha (the scrim, `border.subtle`) is painted as given. Shadows are black at the kit's shadow
-metrics: `ThemePainting.softShadow` blurs a mask once per size (cached) for the modal overlay's card and the
-command palette, FlatLaf paints menus' shadows, the Light selected segment has a soft shadow, and a primary
-button's 1 px drop is painted by its `KitView` outside the face (as `box-shadow` does), so the face keeps its
-calibrated extent while a white inset line tints its top row.
+metrics: `ThemePainting.softShadow` blurs one mask per treatment and nine-slices it across face sizes (a face too
+small to slice gets its own cached mask), and a hollow mask has the face cut out so nothing of the shadow lies under a
+translucent face. It serves the modal overlay's card (hollow, so a fading card does not darken) and the command
+palette; FlatLaf paints menus' shadows off macOS; the Light selected segment has a soft shadow; and a primary button's
+1 px drop is painted by its `KitView` outside the face (as `box-shadow` does), so the face keeps its calibrated extent
+while a white inset line tints its top row. The button repaints its view over the drop when it is disabled, hidden,
+moved, removed or stops being primary, as the focus halo does.
 
 Panels own header,
 context/navigation, virtual body and persistent footer. Hidden headers consume zero space.

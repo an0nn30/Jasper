@@ -30,25 +30,52 @@ final class ThemePainting {
         return Math.max(metric(context, role), line + metric(context, padding));
     }
     static Color color(KitContext context, SemanticColor role) { return context.theme().semantic().color(role); }
-    private record ShadowKey(int width, int height, double radius, int blur, double strength) { }
+    /** A mask's face size and treatment; a hollow mask has the face, {@code cutout} above the shadow, cut out. */
+    private record ShadowKey(int width, int height, double radius, int blur, double strength, boolean hollow, int cutout) { }
     /** Blurred shadow masks by face size and treatment; a few faces are on screen at once. EDT only. */
     private static final java.util.Map<ShadowKey, java.awt.image.BufferedImage> SHADOWS = new java.util.LinkedHashMap<>(16, .75f, true) {
         @Override protected boolean removeEldestEntry(java.util.Map.Entry<ShadowKey, java.awt.image.BufferedImage> eldest) { return size() > 16; }
     };
 
+    /** How many blurred shadow masks are cached. */
+    static int shadowMasks() { return SHADOWS.size(); }
+
     /**
      * A soft black shadow under {@code face}, like CSS {@code box-shadow: 0 offset blur rgba(0,0,0,strength)}: the
      * rounded face at {@code strength}, lowered by {@code offset} and blurred by {@code blur} (three box passes each way,
      * a Gaussian of sigma {@code blur / 2}). Paint it before the face; the graphics' composite scales it (a fading card).
+     * One mask per treatment serves every face large enough to slice: its corners as blurred, its middle row and column
+     * stretched along the edges and its centre filled, so a face that changes size blurs nothing new.
      */
     static void softShadow(Graphics2D graphics, java.awt.geom.RectangularShape face, double radius, int offset, int blur, double strength) {
+        softShadow(graphics, face, radius, offset, blur, strength, false);
+    }
+
+    /**
+     * {@link #softShadow}; when {@code hollow}, none of it lies under the face (as {@code box-shadow} does), for a face
+     * that is translucent (a fading card) or painted before its shadow. The face is cut out of the mask itself, so the
+     * shadow paints the same whatever clip a repaint brings.
+     */
+    static void softShadow(Graphics2D graphics, java.awt.geom.RectangularShape face, double radius, int offset, int blur, double strength, boolean hollow) {
         if (blur <= 0 || strength <= 0 || face.isEmpty()) return;
+        double share = Math.min(1, strength);
         int width = (int) Math.ceil(face.getWidth()), height = (int) Math.ceil(face.getHeight()), pad = blur + blur / 2;
-        var mask = SHADOWS.computeIfAbsent(new ShadowKey(width, height, radius, blur, Math.min(1, strength)), key -> shadow(key, pad));
+        int x = (int) Math.floor(face.getX()) - pad, y = (int) Math.floor(face.getY()) - pad + offset;
+        // A corner slice holds the radius plus the blur's reach, so the mask's middle row and column are straight edges.
+        int corner = (int) Math.ceil(radius) + pad, core = 2 * corner + 1;
         var g = (Graphics2D) graphics.create();
         try {
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g.drawImage(mask, (int) Math.floor(face.getX()) - pad, (int) Math.floor(face.getY()) - pad + offset, null);
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            if (width < core || height < core) {
+                // A face too small to slice has its own mask.
+                g.drawImage(SHADOWS.computeIfAbsent(new ShadowKey(width, height, radius, blur, share, hollow, hollow ? offset : 0), key -> shadow(key, pad)), x, y, null);
+                return;
+            }
+            var mask = SHADOWS.computeIfAbsent(new ShadowKey(core, core, radius, blur, share, hollow, hollow ? offset : 0), key -> shadow(key, pad));
+            int slice = pad + corner, side = core + 2 * pad, across = width + 2 * pad, down = height + 2 * pad;
+            int[] dx = {0, slice, across - slice, across}, dy = {0, slice, down - slice, down}, s = {0, slice, slice + 1, side};
+            for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++)
+                g.drawImage(mask, x + dx[i], y + dy[j], x + dx[i + 1], y + dy[j + 1], s[i], s[j], s[i + 1], s[j + 1], null);
         } finally { g.dispose(); }
     }
 
@@ -67,6 +94,15 @@ final class ThemePainting {
         for (int pass = 0; pass < 3; pass++) { boxBlur(alpha, w, h, box, true); boxBlur(alpha, w, h, box, false); }
         for (int i = 0; i < pixels.length; i++) pixels[i] = alpha[i] << 24;
         mask.setRGB(0, 0, w, h, pixels, 0, w);
+        if (key.hollow()) {
+            // The face sits the offset above its lowered shadow; clear it, antialiased like the face's own edge.
+            var cut = mask.createGraphics();
+            try {
+                antialias(cut);
+                cut.setComposite(AlphaComposite.Clear);
+                cut.fill(new RoundRectangle2D.Double(pad, pad - key.cutout(), key.width(), key.height(), 2 * key.radius(), 2 * key.radius()));
+            } finally { cut.dispose(); }
+        }
         return mask;
     }
 
@@ -153,7 +189,7 @@ final class ThemePainting {
     /** View-owned final overlay: ring lies outside nominal bounds, clipped only by viewports/root. */
     static void halos(KitView root, Graphics graphics) { halos(root, root, graphics); }
 
-    /** theme.md's primary button drop, {@code 0 1px 2px} black, painted outside the face only. */
+    /** theme.md's primary button drop, {@code 0 1px 2px} black, painted outside the face only (a hollow shadow). */
     private static void drop(KitView root, JComponent component, Drop drop, Graphics graphics) {
         var g = (Graphics2D) graphics.create();
         try {
@@ -162,13 +198,10 @@ final class ThemePainting {
             var origin = SwingUtilities.convertPoint(component, 0, 0, root);
             var at = drop.face();
             var face = new RoundRectangle2D.Double(origin.x + at.getX(), origin.y + at.getY(), at.getWidth(), at.getHeight(), at.getArcWidth(), at.getArcHeight());
-            var outside = new java.awt.geom.Area(new Rectangle(0, 0, root.getWidth(), root.getHeight()));
-            outside.subtract(new java.awt.geom.Area(face));
-            g.clip(outside);
             if (!component.isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
             var context = drop.context();
             softShadow(g, face, at.getArcWidth() / 2, UIScale.scale(1), UIScale.scale(2), context.metrics().value(context.theme().dark()
-                ? DesignMetrics.Role.BUTTON_DROP_PERCENT_DARK : DesignMetrics.Role.BUTTON_DROP_PERCENT_LIGHT) / 100.0);
+                ? DesignMetrics.Role.BUTTON_DROP_PERCENT_DARK : DesignMetrics.Role.BUTTON_DROP_PERCENT_LIGHT) / 100.0, true);
         } finally { g.dispose(); }
     }
     private static void halos(KitView root, Container container, Graphics graphics) {

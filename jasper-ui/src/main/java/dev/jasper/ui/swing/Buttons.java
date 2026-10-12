@@ -103,6 +103,9 @@ final class Buttons {
     static class KitButton extends JButton {
         private final KitContext context;
         Nodes.ButtonKind kind;
+        /** Where this button's drop was last painted, in {@link #dropView}'s coordinates; kept to erase it. */
+        private Rectangle priorDrop;
+        private KitView dropView;
         ButtonValuePresentation valuePresentation = ButtonValuePresentation.DEFAULT;
         boolean recorder() { return valuePresentation != ButtonValuePresentation.DEFAULT; }
         boolean armed() { return valuePresentation == ButtonValuePresentation.RECORDER_ARMED; }
@@ -134,7 +137,15 @@ final class Buttons {
         /** A toggle button (Button.selected present): assistive technology reads it as one, checked while selected. */
         boolean toggle;
         ThemePainting.Focus focus;
-        KitButton(KitContext context) { this.context = context; }
+        KitButton(KitContext context) {
+            this.context = context;
+            // Leaving the view (this button or an ancestor removed) erases the drop the view painted for it.
+            addHierarchyListener(event -> {
+                if ((event.getChangeFlags() & java.awt.event.HierarchyEvent.PARENT_CHANGED) == 0) return;
+                if (SwingUtilities.getAncestorOfClass(KitView.class, this) == null) putClientProperty(ThemePainting.DROP, null);
+                repaintDrop();
+            });
+        }
         // A push-button model never flips its selection on a click: the owner confirms a toggle's state in its next update.
         @Override public javax.accessibility.AccessibleContext getAccessibleContext() {
             if (accessibleContext == null) accessibleContext = new AccessibleJButton() {
@@ -219,7 +230,10 @@ final class Buttons {
          * that the kit view paints outside the bounds (as {@code box-shadow} does), so the face keeps its calibrated extent.
          */
         private void primaryShadows(Graphics2D g, Color fill) {
-            if (kind != Nodes.ButtonKind.PRIMARY || embedded || fill == null || circular) { putClientProperty(ThemePainting.DROP, null); return; }
+            if (kind != Nodes.ButtonKind.PRIMARY || embedded || fill == null || circular) {
+                if (getClientProperty(ThemePainting.DROP) != null) { putClientProperty(ThemePainting.DROP, null); repaintDrop(); }
+                return;
+            }
             double radius = ThemePainting.metric(context, DesignMetrics.Role.CONTROL_RADIUS), inset = 0, trim = 0;
             if (panelDetail) {
                 radius = UIScale.scale((float) context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_ARC)) / 2.0;
@@ -234,7 +248,37 @@ final class Buttons {
                 top.setColor(ColorMath.opacity(Color.WHITE, context.metrics().value(DesignMetrics.Role.BUTTON_INSET_PERCENT) / 100.0));
                 top.fill(new java.awt.geom.Rectangle2D.Double(face.x, face.y, face.width, UIScale.scale(1)));
             } finally { top.dispose(); }
-            putClientProperty(ThemePainting.DROP, new ThemePainting.Drop(context, face));
+            var drop = new ThemePainting.Drop(context, face);
+            if (!drop.equals(getClientProperty(ThemePainting.DROP))) { putClientProperty(ThemePainting.DROP, drop); repaintDrop(); }
+        }
+
+        /**
+         * The view paints the drop outside this button, so the view repaints over where it was and where it is now: on
+         * a change of enablement, visibility, bounds, kind or parent (as the focus halo does).
+         */
+        private void repaintDrop() {
+            Rectangle dirty = priorDrop;
+            KitView view = dropView;
+            priorDrop = null;
+            var owner = (KitView) SwingUtilities.getAncestorOfClass(KitView.class, this);
+            if (owner != null && isVisible() && getClientProperty(ThemePainting.DROP) != null) {
+                // The drop reaches its blur past the face on every side, and its offset further below.
+                int reach = UIScale.scale(4);
+                var bounds = SwingUtilities.convertRectangle(this, new Rectangle(0, 0, getWidth(), getHeight()), owner);
+                bounds.grow(reach, reach);
+                priorDrop = bounds; dropView = owner;
+                if (view == owner) dirty = dirty == null ? bounds : dirty.union(bounds);
+                else { if (view != null && dirty != null) view.repaint(dirty); view = owner; dirty = bounds; }
+            }
+            if (view != null && dirty != null) view.repaint(dirty);
+        }
+        @Override public void setEnabled(boolean enabled) { boolean changed = enabled != isEnabled(); super.setEnabled(enabled); if (changed) repaintDrop(); }
+        @Override public void setVisible(boolean visible) { boolean changed = visible != isVisible(); super.setVisible(visible); if (changed) repaintDrop(); }
+        @SuppressWarnings("deprecation")
+        @Override public void reshape(int x, int y, int width, int height) {
+            boolean changed = x != getX() || y != getY() || width != getWidth() || height != getHeight();
+            super.reshape(x, y, width, height);
+            if (changed && priorDrop != null) repaintDrop();
         }
         @Override protected void paintComponent(Graphics graphics) {
             if (kind == null || !contextualVisible()) return;

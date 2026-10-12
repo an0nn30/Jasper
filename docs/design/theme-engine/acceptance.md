@@ -128,7 +128,9 @@ Plan [`2026-10-12-slate-steel-1-engine-and-kit.md`](../../superpowers/plans/2026
 of the [Slate Steel specification](../../superpowers/specs/2026-10-12-jasper-slate-steel-themes-design.md). The theme is
 built into the engine from [`slate-steel.md`](slate-steel.md) (the user's `theme.md` plus derived editor schemes) but not
 yet installed: Plan 2 switches the app to it, Plan 3 removes the old themes. Until then the legacy themes give the ten new
-roles the colour their component painted before, so the app looks as it did except where a component moved roles.
+roles the colour their component painted before, so the app looks as it did except where a component moved roles (the
+legacy tab strip is the terminal background sunk 30% toward black in a dark theme and 6% in a light one, as the strip
+painted before, so the selected tab stays the lighter slot; tool windows move from the sidebar to the panel surface).
 
 - Opacity is applied once: scrims are painted as their token gives them (legacy default black at 55%/25%); the focus ring
   applies 32%/25% of `border.focus`, the error ring 22%, tiles and chips 17%/13% of their hue surface.

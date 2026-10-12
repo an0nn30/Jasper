@@ -143,7 +143,6 @@ class SemanticPaletteTest {
         var semantic = theme.semantic(); var tokens = theme.tokens();
         assertThat(semantic.color(SemanticColor.SURFACE_FIELD_RAISED)).isEqualTo(tokens.get(Token.INPUT_BACKGROUND));
         assertThat(semantic.color(SemanticColor.SURFACE_CONTROL_SELECTED)).isEqualTo(tokens.get(Token.BUTTON_BACKGROUND));
-        assertThat(semantic.color(SemanticColor.SURFACE_TABSTRIP)).isEqualTo(tokens.get(Token.TAB_BAR));
         assertThat(semantic.color(SemanticColor.SURFACE_EMPTY_TILE)).isEqualTo(tokens.get(Token.BUTTON_BACKGROUND));
         assertThat(semantic.color(SemanticColor.BORDER_FIELD_RAISED)).isEqualTo(tokens.get(Token.BORDER));
         assertThat(semantic.color(SemanticColor.BORDER_FIELD_RAISED_HOVER)).isEqualTo(tokens.get(Token.BUTTON_BORDER));
@@ -152,5 +151,24 @@ class SemanticPaletteTest {
         assertThat(semantic.color(SemanticColor.SEGMENT_TRACK)).isEqualTo(tokens.get(Token.INPUT_BACKGROUND));
         assertThat(semantic.color(SemanticColor.BUTTON_SECONDARY_BORDER)).isEqualTo(tokens.get(Token.BUTTON_BORDER));
         assertThat(SemanticColor.of("surface.emptyTile")).contains(SemanticColor.SURFACE_EMPTY_TILE);
+    }
+
+    /**
+     * The tab strip under a legacy theme: its inactive tabs and strip are the terminal background sunk toward black
+     * (30% in a dark theme, 6% in a light one), as the strip painted before Slate Steel, so the selected tab, the terminal
+     * background itself, stays the lighter one in the shipped themes.
+     */
+    @Test void legacyThemesKeepTheSelectedTabLighterThanTheStrip() throws Exception {
+        for (String name : List.of("jasper-dark", "jasper-light")) {
+            String text;
+            try (var in = SemanticPaletteTest.class.getResourceAsStream("/dev/jasper/ui/themeimport/native/" + name + ".toml")) {
+                text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            }
+            var theme = ThemeGenerator.generate(ThemeResolver.resolve(ThemeToml.parse(text, name + ".toml")));
+            Color terminal = theme.terminal().background(), strip = theme.semantic().color(SemanticColor.SURFACE_TABSTRIP);
+            assertThat(strip).as(name).isEqualTo(ColorMath.mix(Color.BLACK, terminal, theme.dark() ? .30 : .06));
+            assertThat(ColorMath.luminance(theme.semantic().color(SemanticColor.SURFACE_TERMINAL)))
+                .as("%s: the selected tab is lighter than the strip", name).isGreaterThan(ColorMath.luminance(strip));
+        }
     }
 }

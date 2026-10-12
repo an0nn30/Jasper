@@ -118,8 +118,9 @@ class ModalOverlayTest {
             assertThat(f.overlay.shown()).isEqualTo(.75);
             assertThat(f.overlay.cardBounds().y).as("half way: most of the rise done").isEqualTo(f.restingY() - 14);
             // Its picture at .75 over the scrim and shadow, themselves at .75 of their strength.
-            // .75 + .25 x (1 - (1 - .41)(1 - .44)): the scrim (black 55% x .75) and the dialog shadow (black 58% x .75) beneath.
-            assertThat(f.paint().getRGB(400, 300) >>> 24).as("its picture fades").isBetween(226, 240);
+            // .75 + .25 x .41: only the scrim (black 55% x .75) lies under the card; the dialog shadow stays outside it, as
+            // box-shadow does, so the fading card does not darken.
+            assertThat(f.paint().getRGB(400, 300) >>> 24).as("its picture fades over the scrim alone").isBetween(213, 222);
             assertThat(removed[0]).isZero();
             f.at(100);
             assertThat(removed[0]).isEqualTo(1);
