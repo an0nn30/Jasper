@@ -174,8 +174,9 @@ final class SecretFields {
                                     ThemePainting.antialias(g);
                                     int pitch = ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_MASK_PITCH);
                                     char[] dot = {(char) 0x2022};
-                                    for (int i = 0; i < context().metrics().value(DesignMetrics.Role.DETAIL_MASK_COUNT); i++)
-                                        g.drawChars(dot, 0, 1, i * pitch, baseline);
+                                    int dots = Math.min(context().metrics().value(DesignMetrics.Role.DETAIL_MASK_COUNT),
+                                        Math.max(1, (getWidth() - fm.charWidth(dot[0])) / Math.max(1, pitch) + 1));
+                                    for (int i = 0; i < dots; i++) g.drawChars(dot, 0, 1, i * pitch, baseline);
                                 } else g.drawChars(chars, 0, chars.length, 0, baseline);
                             } finally {
                                 java.util.Arrays.fill(chars, (char) 0);

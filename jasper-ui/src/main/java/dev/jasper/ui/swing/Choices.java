@@ -133,7 +133,7 @@ final class Choices {
                     input.setBorder(new EmptyBorder(track, track, track, track));
                     for (int i = 0; i < input.getComponentCount(); i++) {
                         var button = (SegmentButton)input.getComponent(i); Option option = options.get(i);
-                        button.form = form; button.setIconTextGap(ThemePainting.metric(context(), form ? DesignMetrics.Role.SEGMENT_HUE_GAP : DesignMetrics.Role.ICON_GAP));
+                        button.form = form; if (form) button.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
                         button.setEnabled(input.isEnabled()); button.setSelected(option.id().equals(choice.selectedId()));
                         var font = context().typography().font(settings?Typography.Role.BODY:Typography.Role.LABEL, !settings && button.isSelected());
                         button.setFont(SwingTypography.effective(font));

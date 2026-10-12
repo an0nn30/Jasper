@@ -325,8 +325,11 @@ final class Forms {
         @Override protected void paintComponent(Graphics graphics) {
             super.paintComponent(graphics);
             if (window) {
+                // The window footer band shares the sidebar surface below one full-width hairline.
+                graphics.setColor(ThemePainting.color(context, SemanticColor.SURFACE_SIDEBAR));
+                graphics.fillRect(0, 0, getWidth(), getHeight());
                 graphics.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE));
-                graphics.drawLine(0, 0, getWidth() - 1, 0);
+                graphics.fillRect(0, 0, getWidth(), ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE));
             }
         }
         @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
