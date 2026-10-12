@@ -133,6 +133,9 @@ A form's primary and cancel actions own Enter and Escape through its descriptors
 Only specialized document or preview content uses `CustomContent`: register its component and
 lifetime on its owned view. Ordinary controls must remain descriptors.
 
+[Building plugin UI](plugin-ui.md) walks through the compositions (grouped dialogs, docked panels, empty
+states, settings pages), icons, colors for specialized content and testing, with compiled examples.
+
 ## Panels, the rail and windows
 
 A panel is an owned `UiView` docked as a tool window in every terminal window, as in IntelliJ:

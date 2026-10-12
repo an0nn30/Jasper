@@ -21,7 +21,7 @@ The SDK is **0.x: no compatibility promise** until the Vault and SSH plugins shi
 implement only `Plugin` and functional callbacks; the application and `jasper-sdk-testkit`
 implement everything else, so methods can be added without breaking plugins.
 
-Start with the [authoring guide](../docs/plugin-authoring.md); the
+Start with the [authoring guide](../docs/plugin-authoring.md) and [building plugin UI](../docs/plugin-ui.md); the
 [architecture](../docs/sdk-architecture.md) explains loading, threading and lifetimes.
 Unit-test a plugin with `dev.jasper.sdk.testing.FakePluginHost` from `jasper-sdk-testkit`.
 

@@ -12,7 +12,7 @@ visibility inside the app does not constitute a plugin API; the SDK does.
 | `jasper-ui` | [Engine and kit](../jasper-ui/README.md) | [Packages, API and ownership](ui-architecture.md) | [Gallery, extensions and distribution](ui-maintenance.md) |
 | `jasper-app` | [Onboarding](../jasper-app/README.md) | [Composition and feature ownership](app-architecture.md) | [Commands, scopes, settings, providers and platform hooks](app-maintenance.md) |
 | `jasper-buddy` | [Embedding](../jasper-buddy/README.md) | [Facade, model and presentation](buddy-architecture.md) | [Notices, options, animation and assets](buddy-maintenance.md) |
-| `jasper-sdk` and plugins | [SDK packages](../jasper-sdk/README.md) | [Loading, threading and lifetimes](sdk-architecture.md) | [Writing and testing a plugin](plugin-authoring.md) |
+| `jasper-sdk` and plugins | [SDK packages](../jasper-sdk/README.md) | [Loading, threading and lifetimes](sdk-architecture.md) | [Writing and testing a plugin](plugin-authoring.md), [building plugin UI](plugin-ui.md) |
 
 The [current handoff](STATUS.md) records integration and pending acceptance. The
 [documentation audit](documentation-audit.md) records source checks and corrected drift.
