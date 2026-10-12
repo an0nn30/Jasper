@@ -81,17 +81,34 @@ public final class AppIcons {
         return icon;
     }
 
+    /** Client property marking a native chrome receiver: icons painted inside it use the chrome's original artwork. */
+    private static final String CHROME_RECEIVER = "Jasper.chromeArtwork";
+
+    /**
+     * Marks {@code component} as one of the workspace chrome's receiving contexts (title bar header, tool window
+     * stripes, status bar): named glyphs painted inside it use {@link dev.jasper.ui.icons.IconRegistry#chromeIcon}'s
+     * original desktop artwork. Icon values, sizes and identities are unchanged; everything outside keeps ordinary artwork.
+     */
+    public static void chromeReceiver(javax.swing.JComponent component) { component.putClientProperty(CHROME_RECEIVER, Boolean.TRUE); }
+
+    static boolean inChrome(Component component) {
+        for (Component c = component; c != null; c = c.getParent())
+            if (c instanceof javax.swing.JComponent j && j.getClientProperty(CHROME_RECEIVER) == Boolean.TRUE) return true;
+        return false;
+    }
+
     private record PreparationKey(String name, int size) { }
-    private record NativeSnapshot(int size, dev.jasper.ui.icons.IconRegistry.PreparedIcon artwork) { }
+    private record NativeSnapshot(int size, dev.jasper.ui.icons.IconRegistry.PreparedIcon artwork,
+                                  dev.jasper.ui.icons.IconRegistry.PreparedIcon chrome) { }
     /** One process-lifetime preparation owner, shared with builtin PresentationIcons. No receiving theme is cached. */
     static final class NativePreparation {
         final String name; final int baseSize;
         volatile NativeSnapshot snapshot;
         NativePreparation(String name,int size) { this.name=name;this.baseSize=size;prepare(); }
-        void prepare() { int size=UIScale.scale(baseSize);snapshot=new NativeSnapshot(size,NAMED.themedIcon(name,size)); }
+        void prepare() { int size=UIScale.scale(baseSize);snapshot=new NativeSnapshot(size,NAMED.themedIcon(name,size),NAMED.chromeIcon(name,size)); }
         int size(){return snapshot.size();}
         void paint(Component c,Graphics g,int x,int y,SemanticColor tint) {
-            var current=snapshot;current.artwork().icon(ThemeZone.theme(c),tint).paintIcon(c,g,x,y);
+            var current=snapshot;(inChrome(c)?current.chrome():current.artwork()).icon(ThemeZone.theme(c),tint).paintIcon(c,g,x,y);
         }
     }
     private static final Map<PreparationKey,NativePreparation> PREPARED = new java.util.HashMap<>();

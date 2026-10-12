@@ -25,6 +25,21 @@ class TypographyTest {
         return max-min+1;
     }
 
+    @Test void nativeChromeRolesFollowTheReferenceWorkspaceSizesAndScaleWithTheUserSize() {
+        // Desktop workspace references: title context and status path 12, toolbar labels 11.5, status text 10,
+        // palette headings and hint 11; all regular weight on the platform text family.
+        var roles = java.util.Map.of(Typography.Role.TITLE_CONTEXT, 12f, Typography.Role.TOOLBAR_LABEL, 11.5f, Typography.Role.STATUS_TEXT, 10f,
+            Typography.Role.STATUS_PATH, 12f, Typography.Role.RESULTS_HEADING, 11f, Typography.Role.PALETTE_HINT, 11f);
+        var typography = new Typography();
+        roles.forEach((role, size) -> {
+            assertThat(typography.font(role).getSize2D()).as(role.name()).isEqualTo(size);
+            assertThat(typography.font(role).getAttributes().get(java.awt.font.TextAttribute.WEIGHT)).as(role.name())
+                .isEqualTo(typography.font(Typography.Role.LABEL).getAttributes().get(java.awt.font.TextAttribute.WEIGHT));
+            assertThat(new Typography(26).font(role).getSize2D()).as(role + " doubles with a 26pt body").isEqualTo(size * 2);
+            assertThat(typography.font(role).getFamily()).isEqualTo(typography.font(Typography.Role.LABEL).getFamily());
+        });
+    }
+
     @Test void selectedResultsKeepEveryDeclaredRoleIncludingWeight() {
         for (var typography : java.util.List.of(new Typography(), new Typography(java.awt.Font.MONOSPACED, 32)))
             for (var role : Typography.Role.values()) {

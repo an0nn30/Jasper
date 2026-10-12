@@ -95,6 +95,7 @@ final class ToolStripe extends JPanel {
         if (side == Side.BOTTOM) throw new IllegalArgumentException("A stripe stands on the left or the right");
         this.side = side;
         getAccessibleContext().setAccessibleName(side == Side.LEFT ? "Left tool windows" : "Right tool windows");
+        AppIcons.chromeReceiver(this);
         render(List.of(), List.of());
         refreshTheme();
     }

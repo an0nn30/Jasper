@@ -350,7 +350,7 @@ final class WindowChrome {
         }
 
         private Font chromeFont() {
-            return ThemeZone.font(Typography.Role.LABEL);
+            return ThemeZone.font(Typography.Role.TOOLBAR_LABEL);
         }
 
         /** The toolbar's button height; icon-only buttons are square. */

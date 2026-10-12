@@ -38,7 +38,7 @@ public final class NativeChromePainting {
             icon.paintIcon(button, g, x, (button.getHeight() - icon.getIconHeight()) / 2);
             x += icon.getIconWidth();
             if (labels) {
-                x += pad; g.setFont(NativeControlStyles.font(Typography.Role.LABEL)); g.setColor(palette.color(SemanticColor.TEXT_PRIMARY));
+                x += pad; g.setFont(NativeControlStyles.font(Typography.Role.TOOLBAR_LABEL)); g.setColor(palette.color(SemanticColor.TEXT_PRIMARY));
                 var metrics = g.getFontMetrics();
                 g.drawString(button.getText(), x, (button.getHeight() - metrics.getHeight()) / 2 + metrics.getAscent());
                 x += metrics.stringWidth(button.getText());
@@ -63,7 +63,7 @@ public final class NativeChromePainting {
             int pad = NativeControlStyles.metric(DesignMetrics.Role.TITLE_SEARCH_PADDING), gap = NativeControlStyles.metric(DesignMetrics.Role.TITLE_SEARCH_GAP), x = pad;
             search.paintIcon(component, g, x, (height - search.getIconHeight()) / 2);
             x += search.getIconWidth() + gap;
-            g.setFont(NativeControlStyles.font(Typography.Role.LABEL));
+            g.setFont(NativeControlStyles.font(Typography.Role.TITLE_CONTEXT));
             var metrics = g.getFontMetrics();
             int hintWidth = hint.isEmpty() ? 0 : metrics.stringWidth(hint);
             int end = width - pad - (hintWidth == 0 ? 0 : hintWidth + gap);
