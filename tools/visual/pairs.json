@@ -96,7 +96,7 @@
    1080,
    1380
   ],
-  "render": "jasper-app/build/theme-migration-evidence/fileserver-add/actual/http-anon.png"
+  "render": "jasper-app/build/theme-migration-evidence/fileserver-add/actual/anonymous.png"
  },
  {
   "name": "vault-manager",
