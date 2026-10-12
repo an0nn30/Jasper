@@ -139,16 +139,17 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     @Override protected boolean isPaintingOrigin() { return true; }
     @Override protected void paintComponent(Graphics graphics) {
         var bounds = new ArrayList<Rectangle>(slots.size());
-        int chosen = -1;
+        int chosen = -1, hovered = -1;
         for (Slot slot : slots) {
             if (slot.entry != null && slot.entry.tab == selected) chosen = bounds.size();
+            if (slot.entry != null && slot.entry.hovered) hovered = bounds.size();
             bounds.add(slot.bounds);
         }
-        NativeChromePainting.tabStrip(this, graphics, owner.theme().workspace(), owner.workspaceSurface(), bounds, chosen);
+        NativeChromePainting.tabStrip(this, graphics, owner.theme().workspace(), owner.workspaceSurface(), bounds, chosen, hovered);
     }
 
     private Color surface(boolean selected) {
-        return NativeChromePainting.tabSurface(owner.workspaceSurface(), owner.theme().workspace().dark(), selected);
+        return NativeChromePainting.tabSurface(owner.theme().workspace(), owner.workspaceSurface(), selected);
     }
 
     private static String capped(String title) {

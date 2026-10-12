@@ -12,28 +12,30 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Plan 3 Task 10: the workspace chrome's former per-feature paint, now kit painters over named roles and themes. */
 class NativeChromePaintingTest {
-    @Test void tabSurfacesLiftTheSelectedTabAndSinkTheOthersByTheirNamedShares() {
-        var base = new Color(0x22, 0x26, 0x29);
-        // The former owner literals: .035/.3 for dark workspaces and .12/.06 for light ones.
-        assertThat(NativeChromePainting.tabSurface(base, true, true)).isEqualTo(blend(base, .035, 255));
-        assertThat(NativeChromePainting.tabSurface(base, true, false)).isEqualTo(blend(base, .3, 0));
-        var light = new Color(0xf7, 0xf8, 0xfa, 200);
-        assertThat(NativeChromePainting.tabSurface(light, false, true)).isEqualTo(blend(light, .12, 255));
-        assertThat(NativeChromePainting.tabSurface(light, false, false)).isEqualTo(blend(light, .06, 0));
-        assertThat(NativeChromePainting.tabSurface(light, false, false).getAlpha()).isEqualTo(200);
+    @Test void tabSurfacesAreTheStripAndTerminalRolesAtTheWorkspacesAlpha() {
+        var theme = KitFixtures.marked();
+        var glass = new Color(0x22, 0x26, 0x29, 200);
+        var idle = NativeChromePainting.tabSurface(theme, glass, false);
+        var chosen = NativeChromePainting.tabSurface(theme, glass, true);
+        assertThat(idle.getRGB() & 0xFFFFFF).isEqualTo(KitFixtures.marker(SemanticColor.SURFACE_TABSTRIP).getRGB() & 0xFFFFFF);
+        assertThat(chosen.getRGB() & 0xFFFFFF).isEqualTo(KitFixtures.marker(SemanticColor.SURFACE_TERMINAL).getRGB() & 0xFFFFFF);
+        assertThat(idle.getAlpha()).isEqualTo(200);
+        assertThat(chosen.getAlpha()).isEqualTo(200);
     }
 
-    @Test void tabStripPaintsSlotsDividersAndTheLowerRuleInTheWorkspaceBorderRole() {
-        var theme = KitFixtures.dark();
+    @Test void tabStripPaintsSlotsAHoveredSlotDividersAndTheLowerRule() {
+        var theme = KitFixtures.marked();
         var base = new Color(0x22, 0x26, 0x29);
-        var strip = new JPanel(); strip.setSize(200, 28);
-        var image = new BufferedImage(200, 28, BufferedImage.TYPE_INT_ARGB);
+        var strip = new JPanel(); strip.setSize(300, 28);
+        var image = new BufferedImage(300, 28, BufferedImage.TYPE_INT_ARGB);
         var g = image.createGraphics();
-        try { NativeChromePainting.tabStrip(strip, g, theme, base, List.of(new Rectangle(0, 0, 100, 28), new Rectangle(100, 0, 100, 28)), 1); }
+        try { NativeChromePainting.tabStrip(strip, g, theme, base, List.of(new Rectangle(0, 0, 100, 28), new Rectangle(100, 0, 100, 28), new Rectangle(200, 0, 100, 28)), 1, 2); }
         finally { g.dispose(); }
-        int border = theme.semantic().color(SemanticColor.BORDER_WINDOW).getRGB();
-        assertThat(image.getRGB(50, 10)).isEqualTo(NativeChromePainting.tabSurface(base, true, false).getRGB());
-        assertThat(image.getRGB(150, 10)).isEqualTo(NativeChromePainting.tabSurface(base, true, true).getRGB());
+        int border = KitFixtures.marker(SemanticColor.BORDER_WINDOW).getRGB();
+        assertThat(image.getRGB(50, 10)).isEqualTo(KitFixtures.marker(SemanticColor.SURFACE_TABSTRIP).getRGB());
+        assertThat(image.getRGB(150, 10)).isEqualTo(KitFixtures.marker(SemanticColor.SURFACE_TERMINAL).getRGB());
+        assertThat(image.getRGB(250, 10)).as("a hovered inactive tab takes the hover overlay")
+            .isNotEqualTo(KitFixtures.marker(SemanticColor.SURFACE_TABSTRIP).getRGB());
         assertThat(image.getRGB(99, 10)).as("divider between slots").isEqualTo(border);
         assertThat(image.getRGB(150, 27)).as("lower rule").isEqualTo(border);
     }
@@ -62,10 +64,5 @@ class NativeChromePaintingTest {
         int spread = DesignMetrics.DEFAULT.value(DesignMetrics.Role.PALETTE_SHADOW_SPREAD);
         assertThat(image.getRGB(20 - spread, 30) >>> 24).as("outermost ring").isEqualTo(DesignMetrics.DEFAULT.value(DesignMetrics.Role.PALETTE_SHADOW_ALPHA_DARK));
         assertThat(image.getRGB(20 - spread - 1, 30) >>> 24).as("beyond the spread").isZero();
-    }
-
-    private static Color blend(Color base, double blend, int target) {
-        return new Color((int) Math.round(base.getRed() * (1 - blend) + target * blend), (int) Math.round(base.getGreen() * (1 - blend) + target * blend),
-            (int) Math.round(base.getBlue() * (1 - blend) + target * blend), base.getAlpha());
     }
 }

@@ -60,7 +60,7 @@ class WorkspaceMetricsTest {
         }
         // Plan 3 Task 10: the running dot, tab strip and toolbar painting live in the kit's native chrome painters.
         assertThat(Files.readString(swing.resolve("NativeChromePainting.java"))).contains("STATUS_RUNNING_DOT", "TAB_DIVIDER",
-            "TAB_SELECTED_LIFT_DARK", "TAB_IDLE_SHADE_DARK", "TOOLBAR_ACTION_ICON", "NATIVE_HOVER_OVERLAY_PERCENT", "PALETTE_SHADOW_SPREAD");
+            "SURFACE_TABSTRIP", "SURFACE_TERMINAL", "TOOLBAR_ACTION_ICON", "NATIVE_HOVER_OVERLAY_PERCENT", "PALETTE_SHADOW_SPREAD");
         var required = Map.of("WindowStatusBar.java", List.of("NativeChromePainting.statusDot"),
             "StatusProgressView.java", List.of("STATUS_PROGRESS_BAR_HEIGHT", "STATUS_PROGRESS_MIN_HEIGHT"),
             "WindowTabs.java", List.of("TAB_REVEAL_INSET", "TAB_CLOSE_FIT_WIDTH", "TAB_CLOSE_GUTTER", "TAB_COMPACT_GUTTER",

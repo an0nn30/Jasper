@@ -125,32 +125,29 @@ public final class NativeChromePainting {
     }
 
     /**
-     * An equal-width workspace tab's surface, derived from the workspace surface it sits on: the selected tab lifts
-     * toward white and the others sink toward black by named per-mille shares for dark and light workspaces.
+     * An equal-width workspace tab's surface: the selected tab is the terminal's surface and the others the tab strip's,
+     * both at {@code base}'s alpha (the window's opacity while it is translucent).
      */
-    public static Color tabSurface(Color base, boolean dark, boolean selected) {
-        var role = selected ? dark ? DesignMetrics.Role.TAB_SELECTED_LIFT_DARK : DesignMetrics.Role.TAB_SELECTED_LIFT_LIGHT
-            : dark ? DesignMetrics.Role.TAB_IDLE_SHADE_DARK : DesignMetrics.Role.TAB_IDLE_SHADE_LIGHT;
-        double blend = DesignMetrics.DEFAULT.value(role) / 1000.0;
-        int target = selected ? 255 : 0;
-        return new Color((int) Math.round(base.getRed() * (1 - blend) + target * blend),
-            (int) Math.round(base.getGreen() * (1 - blend) + target * blend),
-            (int) Math.round(base.getBlue() * (1 - blend) + target * blend), base.getAlpha());
+    public static Color tabSurface(GeneratedTheme workspace, Color base, boolean selected) {
+        Color role = workspace.semantic().color(selected ? SemanticColor.SURFACE_TERMINAL : SemanticColor.SURFACE_TABSTRIP);
+        return new Color(role.getRed(), role.getGreen(), role.getBlue(), base.getAlpha());
     }
 
     /**
-     * The equal-width tab strip: the lifted surface behind everything, each slot's surface (only {@code selected}
-     * lifted), the window-border dividers between slots and the rule along the bottom. Slot bounds are the host's
-     * retained motion geometry; {@code selected} is -1 when no slot is selected.
+     * The equal-width tab strip: the strip's surface behind everything, each slot's surface (only {@code selected} the
+     * terminal's), the hover overlay over a hovered inactive slot, the window-border dividers between slots and the rule
+     * along the bottom. Slot bounds are the host's retained motion geometry; {@code selected} and {@code hovered} are -1
+     * when no slot is.
      */
     public static void tabStrip(JComponent strip, Graphics graphics, GeneratedTheme workspace, Color base,
-                                java.util.List<Rectangle> slots, int selected) {
+                                java.util.List<Rectangle> slots, int selected, int hovered) {
         var g = (Graphics2D) graphics.create();
         try {
             g.setComposite(AlphaComposite.Src);
-            g.setColor(tabSurface(base, workspace.dark(), true)); g.fillRect(0, 0, strip.getWidth(), strip.getHeight());
-            for (int i = 0; i < slots.size(); i++) { g.setColor(tabSurface(base, workspace.dark(), i == selected)); g.fill(slots.get(i)); }
+            g.setColor(tabSurface(workspace, base, false)); g.fillRect(0, 0, strip.getWidth(), strip.getHeight());
+            for (int i = 0; i < slots.size(); i++) { g.setColor(tabSurface(workspace, base, i == selected)); g.fill(slots.get(i)); }
             g.setComposite(AlphaComposite.SrcOver);
+            if (hovered >= 0 && hovered < slots.size() && hovered != selected) { g.setColor(hoverOverlay(workspace)); g.fill(slots.get(hovered)); }
             g.setColor(workspace.semantic().color(SemanticColor.BORDER_WINDOW));
             int line = NativeControlStyles.metric(DesignMetrics.Role.TAB_DIVIDER);
             for (int i = 0; i < slots.size() - 1; i++) {
