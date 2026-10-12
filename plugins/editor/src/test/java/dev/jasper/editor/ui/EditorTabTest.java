@@ -206,8 +206,14 @@ class EditorTabTest {
     @Test void aFailureShowsRetryAndCloseAndABinaryFileHasNoRetry() throws Exception {
         var missing = open(folder.resolve("gone.txt"));
         drain();
-        assertThat(stateText(missing)).isEqualTo("gone.txt does not exist.");
+        var state = dev.jasper.editor.testsupport.Kits.node(missing.view(), EditorTab.STATE, dev.jasper.sdk.ui.Nodes.Empty.class);
+        assertThat(state.title()).as("a short title over the one-sentence reason").isEqualTo("Could Not Open File");
+        assertThat(state.description()).isEqualTo("gone.txt does not exist.");
         assertThat(button(missing, EditorTab.RETRY).state().visible()).isTrue();
+        assertThat(state.actions()).extracting(dev.jasper.sdk.ui.Nodes.Node::id).as("the secondary, then the one primary")
+            .containsExactly(EditorTab.DISMISS, EditorTab.RETRY);
+        assertThat(button(missing, EditorTab.RETRY).kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY);
+        assertThat(button(missing, EditorTab.DISMISS).kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.ButtonKind.SECONDARY);
         click(missing, EditorTab.DISMISS);
         assertThat(closed).containsExactly(missing);
         var binary = open(Files.write(folder.resolve("x.bin"), new byte[] {1, 0, 2}));

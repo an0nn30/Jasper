@@ -153,6 +153,16 @@ technology, confirmed by the owner); `Text.severity` tints text and `Text.caret`
 Host-only: `KitView.route(ThemeRoute)` re-routes one view in place (each view owns a copy of its context) and
 `KitView.paintsSurface(true)` paints its slot's `surface.panel` opaque; the app mounts plugin content tabs on the
 workspace slot over that surface, and their registered specialized content follows the view's slot.
+
+Document bars (Plan 3 Task 8): a `SplitKind.DOCUMENT` split presents its non-document children as compact bars,
+by structure and with no SDK shape change. An INLINE stack among them, directly or as a row of a VERTICAL group child,
+lays out with `DocumentBarLayout`: `DOCUMENT_BAR_*` padding and gaps (adjacent buttons closer), the first field or
+text filling what the controls after it leave (the rows of one group align their fills, so a replace field sits under
+its find field), other text holding a stable status width, the row's fields taking the panel search field's look and its
+buttons the panel action size. A group stacks its rows without gaps and shows a passive list's rows as text lines
+(command-line output); the split draws a subtle hairline at each boundary, inside the bar side. The glyph vocabulary
+gains `match.word` (whole word) beside `match.case` and `regex`. Only the Editor uses DOCUMENT splits.
+
 Task 9a's module-only sizing rule: an ItemList named by a field's `listId` reserves its `visibleRows` selectable-row
 height even when filtered or empty, so host-packed picker dialogs keep their height. Every list kind follows this rule;
 RESULTS reserves its fixed data-row metric, and existing heading sizing is retained. Lists without a referencing field

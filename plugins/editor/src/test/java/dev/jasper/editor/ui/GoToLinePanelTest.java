@@ -60,11 +60,32 @@ class GoToLinePanelTest {
         edt(() -> {
             int[] cancelled = {0};
             var panel = new GoToLinePanel(new FakeKit("dev.jasper.editor"), 3, 1200, line -> { }, () -> cancelled[0]++);
-            assertThat(field(panel).label()).isEqualTo("Line (1–1200):");
+            assertThat(field(panel).label()).as("the accessible name keeps the range").isEqualTo("Line (1–1200)");
             assertThat(form(panel.view()).actions()).extracting(Nodes.Button::label).containsExactly("Cancel", "Go");
             click(panel.view(), GoToLinePanel.CANCEL);
             escape(panel.view());
             assertThat(cancelled[0]).isEqualTo(2);
+        });
+    }
+
+    /** Plan 3 Task 8: the canonical sheet: a form card with a "Line" row (no colon) captioned with the range, then the field. */
+    @Test void composesACanonicalSheetWithOneFormRow() throws Exception {
+        edt(() -> {
+            var panel = new GoToLinePanel(new FakeKit("dev.jasper.editor"), 3, 1200, line -> { }, () -> { });
+            var form = form(panel.view());
+            assertThat(form.kind()).isEqualTo(Nodes.FormKind.SHEET);
+            assertThat(form.title()).isEqualTo("Go to Line");
+            assertThat(form.sections()).singleElement().isInstanceOfSatisfying(Nodes.Card.class, card -> {
+                assertThat(card.kind()).isEqualTo(Nodes.CardKind.FORM);
+                assertThat(card.children()).singleElement().isInstanceOfSatisfying(Nodes.FormRow.class, row -> {
+                    assertThat(row.label()).isEqualTo("Line").doesNotContain(":");
+                    assertThat(row.control()).isInstanceOf(Nodes.Field.class).extracting(Nodes.Node::id).isEqualTo(GoToLinePanel.LINE);
+                    assertThat(row.caption()).as("the range under the label").isEqualTo("1–1200");
+                    assertThat(row.trailing()).isEmpty();
+                });
+            });
+            assertThat(form.actions().getLast().kind()).as("the one primary is right-most").isEqualTo(Nodes.ButtonKind.PRIMARY);
+            assertThat(form.actions()).filteredOn(button -> button.kind() == Nodes.ButtonKind.PRIMARY).hasSize(1);
         });
     }
 

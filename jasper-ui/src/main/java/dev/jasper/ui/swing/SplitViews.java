@@ -14,7 +14,8 @@ final class SplitViews {
 
     static final class SplitControl extends ControlRegistry.Control {
         SplitControl(KitView view, Nodes.Split node) {
-            super(view, node, new JPanel());
+            super(view, node, new SplitSurface());
+            ((SplitSurface) component).owner = this;
             component.setOpaque(false);
             refresh();
         }
@@ -36,6 +37,30 @@ final class SplitViews {
         }
 
         boolean document() { return ((Nodes.Split) node).kind() == Nodes.SplitKind.DOCUMENT; }
+    }
+
+    /**
+     * DOCUMENT: a hairline in the subtle border colour at every boundary between visible children, drawn inside the bar
+     * side of the boundary (the document's own pixels and every child's bounds stay as laid out).
+     */
+    static final class SplitSurface extends JPanel {
+        SplitControl owner;
+        @Override protected void paintChildren(Graphics graphics) {
+            super.paintChildren(graphics);
+            if (owner == null || !owner.document()) return;
+            var children = java.util.Arrays.stream(getComponents()).filter(Component::isVisible).toList();
+            if (children.size() < 2) return;
+            var g = graphics.create();
+            try {
+                g.setColor(ThemePainting.color(owner.context(), dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE));
+                int stroke = ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE);
+                for (int i = 1; i < children.size(); i++) {
+                    Component above = children.get(i - 1), below = children.get(i);
+                    int y = owner.fills.contains(above) ? below.getY() : above.getY() + above.getHeight() - stroke;
+                    g.fillRect(0, y, getWidth(), stroke);
+                }
+            } finally { g.dispose(); }
+        }
     }
 
     static final class Layout implements Composition.WidthLayout {

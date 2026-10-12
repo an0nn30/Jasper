@@ -16,6 +16,7 @@ import org.fife.ui.rtextarea.SearchResult;
 public final class FindBar {
     static final String ROOT="find.bar", FIND="find.query", REPLACE="find.replacement", CASE="find.case", WORD="find.word", REGEX="find.regex";
     static final String NEXT="find.next", PREVIOUS="find.previous", ONE="find.one", ALL="find.all", CLOSE="find.close";
+    static final String ROW="find.row", REPLACE_ROW="find.replace.row", STATUS="find.status";
     private final Supplier<Optional<RSyntaxTextArea>> target;
     private final Runnable changed;
     private final Consumer<String> focus;
@@ -55,21 +56,30 @@ public final class FindBar {
         }
         return true;
     }
+    /**
+     * One compact document bar row (the kit's DOCUMENT split presentation): the query takes the width the match options
+     * (toggle buttons), the match count and the navigation and close icon buttons leave; the replace row lines its field
+     * up under the query and its actions under the options. Enter and Shift+Enter in the query go to the next and previous
+     * match and Escape anywhere in the bar closes it; each icon button names its action and key in its tooltip, which is
+     * also its accessible name.
+     */
     Nodes.Stack node() {
-        var row=new Nodes.Stack("find.row",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(
-            field(FIND,find,"Find",NEXT,PREVIOUS), button(PREVIOUS,"Previous"), button(NEXT,"Next"),
-            toggle(CASE,"Aa","Match case",matchCase), toggle(WORD,"W","Whole word",wholeWord), toggle(REGEX,".*","Regular expression",regex),
-            new Nodes.Text("find.status",ControlState.READY,status,Nodes.TextRole.CAPTION),button(CLOSE,"Close")));
-        var replacement=new Nodes.Stack("find.replace.row",new ControlState(withReplace,true,false,""),Nodes.LayoutRole.INLINE,List.of(
-            field(REPLACE,replace,"Replace",ONE,""),button(ONE,"Replace"),button(ALL,"Replace All")));
+        var row=new Nodes.Stack(ROW,ControlState.READY,Nodes.LayoutRole.INLINE,List.of(
+            field(FIND,find,"Find",Nodes.FieldKind.SEARCH,NEXT,PREVIOUS),
+            toggle(CASE,"match.case","Match Case",matchCase), toggle(WORD,"match.word","Whole Word",wholeWord), toggle(REGEX,"regex","Regular Expression",regex),
+            new Nodes.Text(STATUS,ControlState.READY,status,Nodes.TextRole.CAPTION),
+            icon(PREVIOUS,"chevron.up","Previous Match (Shift+Enter)"), icon(NEXT,"chevron.down","Next Match (Enter)"), icon(CLOSE,"close","Close (Escape)")));
+        var replacement=new Nodes.Stack(REPLACE_ROW,new ControlState(withReplace,true,false,""),Nodes.LayoutRole.INLINE,List.of(
+            field(REPLACE,replace,"Replace",Nodes.FieldKind.TEXT,ONE,""),button(ONE,"Replace"),button(ALL,"Replace All")));
         return new Nodes.Stack(ROOT,new ControlState(visible,true,false,""),Nodes.LayoutRole.VERTICAL,List.of(row,replacement),CLOSE);
     }
-    private static Nodes.Field field(String id,String value,String label,String enter,String alternate) {
-        return new Nodes.Field(id,ControlState.READY,Nodes.FieldKind.SEARCH,value,label,label,enter,Optional.empty(),Nodes.FieldPresentation.EMBEDDED,alternate,CLOSE,"");
+    private static Nodes.Field field(String id,String value,String label,Nodes.FieldKind kind,String enter,String alternate) {
+        return new Nodes.Field(id,ControlState.READY,kind,value,label,label,enter,Optional.empty(),Nodes.FieldPresentation.EMBEDDED,alternate,CLOSE,"");
     }
-    private static Nodes.Button button(String id,String label) { return new Nodes.Button(id,ControlState.READY,label,"",Nodes.ButtonKind.GHOST,id,""); }
-    private static Nodes.Button toggle(String id,String label,String tooltip,boolean selected) {
-        return new Nodes.Button(id,ControlState.READY,label,"",Nodes.ButtonKind.GHOST,id,tooltip,Nodes.ButtonPresentation.STANDARD,Optional.empty(),Optional.of(selected));
+    private static Nodes.Button button(String id,String label) { return new Nodes.Button(id,ControlState.READY,label,"",Nodes.ButtonKind.SECONDARY,id,""); }
+    private static Nodes.Button icon(String id,String icon,String tooltip) { return new Nodes.Button(id,ControlState.READY,"",icon,Nodes.ButtonKind.GHOST,id,tooltip); }
+    private static Nodes.Button toggle(String id,String icon,String tooltip,boolean selected) {
+        return new Nodes.Button(id,ControlState.READY,"",icon,Nodes.ButtonKind.GHOST,id,tooltip,Nodes.ButtonPresentation.STANDARD,Optional.empty(),Optional.of(selected));
     }
     public void next() { search(true); }
     public void previous() { search(false); }

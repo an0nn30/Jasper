@@ -36,7 +36,11 @@ public final class Nodes {
     /**
      * SIDEBAR_DETAIL and THREE_COLUMN place their children side by side. DOCUMENT stacks them top to bottom for a document
      * surface (an editor tab): every visible child takes its preferred height except the first visible Custom or Empty
-     * child, which fills the height left over; hidden children take no space.
+     * child, which fills the height left over; hidden children take no space. The other children are the document's bars:
+     * an INLINE stack among them (directly, or as a row of a VERTICAL group) is one compact bar row whose first field or
+     * text fills the width the controls after it leave (the rows of one group line their fills up), with the panel search
+     * field's look for its fields and the panel action size for its buttons; a group stacks its rows without gaps and
+     * shows a passive (SelectionMode.NONE) list's rows as text lines; a hairline separates neighbouring children.
      */
     public enum SplitKind { SIDEBAR_DETAIL, THREE_COLUMN, DOCUMENT }
     public enum CustomKind { EDITOR, TERMINAL, CHART, PREVIEW }

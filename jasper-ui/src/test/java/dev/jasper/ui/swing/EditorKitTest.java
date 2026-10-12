@@ -575,6 +575,70 @@ class EditorKitTest {
         });
     }
 
+    /** Plan 3 Task 8: a document's find and replace rows, notice and output under the document. */
+    static ViewSpec documentBars(boolean replace) {
+        var query = new Field("query", READY, FieldKind.SEARCH, "needle", "Find", "Find", "next", Optional.empty(), FieldPresentation.EMBEDDED, "previous", "close", "");
+        var replacement = new Field("replacement", READY, FieldKind.TEXT, "", "Replace", "Replace", "one", Optional.empty(), FieldPresentation.EMBEDDED, "", "close", "");
+        var icon = (java.util.function.BiFunction<String, String, Nodes.Button>) (id, glyph) -> new Nodes.Button(id, READY, "", glyph, ButtonKind.GHOST, id, id);
+        var output = new ItemList("output", READY, ListKind.COMPACT, List.of(
+            new ListItem("line.0", Optional.empty(), List.of(new Text("line.text.0", READY, "first output line", TextRole.MONO)), List.of(), List.of()),
+            new ListItem("line.1", Optional.empty(), List.of(new Text("line.text.1", READY, "second output line", TextRole.MONO)), List.of(), List.of())),
+            Set.of(), "", List.of(), SelectionMode.NONE, Optional.empty(), OptionalInt.of(2));
+        return new ViewSpec(new Split("tab", READY, SplitKind.DOCUMENT, List.of(
+            new Stack("notice", READY, LayoutRole.INLINE, List.of(new Text("notice.text", READY, "notes.txt changed on disk.", TextRole.BODY),
+                new Nodes.Button("reload", READY, "Reload", "", ButtonKind.SECONDARY, "reload", ""), new Nodes.Button("keep", READY, "Keep Mine", "", ButtonKind.SECONDARY, "keep", ""))),
+            new Custom("document", READY, "text", CustomKind.EDITOR, "Document"),
+            new Stack("vim", READY, LayoutRole.VERTICAL, List.of(output, new Stack("strip", READY, LayoutRole.INLINE, List.of(
+                new Text("status", READY, "-- INSERT --", TextRole.MONO), new Text("command", READY, "2d", TextRole.MONO))))),
+            new Stack("find", READY, LayoutRole.VERTICAL, List.of(
+                new Stack("find.row", READY, LayoutRole.INLINE, List.of(query, new Nodes.Button("case", READY, "", "match.case", ButtonKind.GHOST, "case", "Match Case", ButtonPresentation.STANDARD, Optional.empty(), Optional.of(true)), new Text("count", READY, "2 matches", TextRole.CAPTION),
+                    icon.apply("previous", "chevron.up"), icon.apply("next", "chevron.down"), icon.apply("close", "close"))),
+                new Stack("replace.row", new ControlState(replace, true, false, ""), LayoutRole.INLINE, List.of(replacement,
+                    new Nodes.Button("one", READY, "Replace", "", ButtonKind.SECONDARY, "one", ""), new Nodes.Button("all", READY, "Replace All", "", ButtonKind.SECONDARY, "all", "")))), "close"))));
+    }
+
+    @Test void aDocumentSplitsBarsAreCompactAlignedRowsSeparatedFromTheDocumentByHairlines() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var scroll = new JScrollPane(new JTextArea("text"));
+            try (var view = new KitView(context, documentBars(true), e -> { })) {
+                view.registerContent("text", scroll, () -> { });
+                view.setSize(700, 500); InteractiveRowsTest.layout(view); InteractiveRowsTest.layout(view);
+                int side = DesignMetrics.DEFAULT.value(DesignMetrics.Role.DOCUMENT_BAR_SIDE_PADDING), pad = DesignMetrics.DEFAULT.value(DesignMetrics.Role.DOCUMENT_BAR_VERTICAL_PADDING);
+                java.util.function.Function<String, Rectangle> at = id -> { var c = find(view, id, JComponent.class); return SwingUtilities.convertRectangle(c.getParent(), c.getBounds(), view); };
+                var query = at.apply("query"); var replacement = at.apply("replacement");
+                assertThat(query.x).as("inset by the bar padding").isEqualTo(side);
+                assertThat(replacement.x).isEqualTo(query.x); assertThat(replacement.width).as("the group's fills line up").isEqualTo(query.width);
+                assertThat(at.apply("one").x).as("replace actions start under the options").isEqualTo(at.apply("case").x);
+                var close = at.apply("close");
+                assertThat(close.x + close.width).as("the widest row ends at the trailing padding").isEqualTo(700 - side);
+                assertThat(close.width).isEqualTo(close.height).isEqualTo(DesignMetrics.DEFAULT.value(DesignMetrics.Role.PANEL_HEADER_ACTION));
+                assertThat(at.apply("next").x - (at.apply("previous").x + at.apply("previous").width)).as("adjacent icon buttons sit close")
+                    .isEqualTo(DesignMetrics.DEFAULT.value(DesignMetrics.Role.DOCUMENT_BAR_ACTION_GAP));
+                assertThat(query.height).as("the panel search field's height").isEqualTo(DesignMetrics.DEFAULT.value(DesignMetrics.Role.PANEL_SEARCH_HEIGHT));
+                assertThat(at.apply("count").width).as("status keeps a stable width").isGreaterThanOrEqualTo(DesignMetrics.DEFAULT.value(DesignMetrics.Role.DOCUMENT_BAR_STATUS_WIDTH));
+                var row = at.apply("find.row");
+                assertThat(row.height).isEqualTo(query.height + 2 * pad);
+                assertThat(at.apply("replace.row").y).as("a group stacks its rows without a gap").isEqualTo(row.y + row.height);
+                var notice = at.apply("notice.text"); var keep = at.apply("keep");
+                assertThat(notice.x).isEqualTo(side); assertThat(keep.x + keep.width).as("a lone row's actions end at the padding").isEqualTo(700 - side);
+                assertThat(at.apply("command").x + at.apply("command").width).isEqualTo(700 - side);
+                var first = at.apply("line.text.0"); var second = at.apply("line.text.1");
+                assertThat(second.y - first.y).as("passive output rows are text lines").isLessThan(DesignMetrics.DEFAULT.value(DesignMetrics.Role.BUTTON_HEIGHT));
+                assertThat(first.x).as("output text lines up with the strip").isEqualTo(at.apply("status").x);
+                // Hairlines on the bar side of each boundary; the document's own pixels stay untouched.
+                var image = paint(view, 700, 500);
+                var document = at.apply("document");
+                int hairline = context.theme().semantic().color(SemanticColor.BORDER_SUBTLE).getRGB();
+                assertThat(image.getRGB(350, document.y - 1)).as("under the notice").isEqualTo(hairline);
+                assertThat(image.getRGB(350, document.y + document.height)).as("above the bars below").isEqualTo(hairline);
+                view.update(documentBars(false)); InteractiveRowsTest.layout(view);
+                assertThat(find(view, "replace.row", JComponent.class).isVisible()).isFalse();
+                assertThat(at.apply("close").x + at.apply("close").width).isEqualTo(700 - side);
+            } finally { release(context); }
+        });
+    }
+
     @Test void theOtherSplitKindsStillPlaceTheirChildrenSideBySide() {
         Edt.run(() -> {
             var context = KitFixtures.context();

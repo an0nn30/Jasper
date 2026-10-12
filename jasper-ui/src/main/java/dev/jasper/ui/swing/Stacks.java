@@ -28,6 +28,12 @@ final class Stacks {
     static final class StackControl extends ControlRegistry.Control {
         final Tile tile;
         boolean detail, sheetHeading, panelDetail, embedded, settings, identityHeader, identityGroup;
+        /** An INLINE row among a DOCUMENT split's bars, assigned by the reconciler; see {@link DocumentBarLayout}. */
+        boolean documentBar;
+        /** A VERTICAL group of a DOCUMENT split's bars: its rows carry their own padding, so they stack without gaps. */
+        boolean documentBarGroup;
+        /** Components of Field and Text children, in order: the bar's fill candidates; Text ones also hold status. */
+        java.util.Set<Component> barFields = java.util.Set.of(), barTexts = java.util.Set.of();
         List<ControlRegistry.Control> children = List.of();
         @Override void embeddedLabel(boolean value) { embedded = value; if (settings) children.forEach(c -> Composition.label(c, value)); }
         java.util.Set<Component> captions = java.util.Set.of();
@@ -76,6 +82,8 @@ final class Stacks {
                                     return panelDetail && stack.role() == Nodes.LayoutRole.VERTICAL && stack.children().stream().allMatch(n -> n instanceof Nodes.Text) ? 0 : super.verticalGap(previous, child);
                                 }
                             });
+            if (documentBar && stack.role() == Nodes.LayoutRole.INLINE) component.setLayout(new DocumentBarLayout(this));
+            if (documentBarGroup && stack.role() == Nodes.LayoutRole.VERTICAL) component.setLayout(new Composition.Vertical(0));
             component.revalidate();
             component.repaint();
         }
@@ -103,6 +111,10 @@ final class Stacks {
             mount(component, wanted);
             captions = controls.stream().filter(c -> c.node instanceof Nodes.Text text && text.role() == Nodes.TextRole.CAPTION).map(c -> (Component)c.component).collect(java.util.stream.Collectors.toSet());
             if (component.getLayout() instanceof StackLayout layout) layout.captions = captions;
+            barFields = controls.stream().filter(c -> c.node instanceof Nodes.Field || c.node instanceof Nodes.Text).map(c -> (Component)c.component)
+                .collect(java.util.stream.Collectors.toCollection(() -> java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>())));
+            barTexts = controls.stream().filter(c -> c.node instanceof Nodes.Text).map(c -> (Component)c.component)
+                .collect(java.util.stream.Collectors.toCollection(() -> java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>())));
         }
     }
 
@@ -543,6 +555,81 @@ final class Stacks {
             if (role == Nodes.LayoutRole.DETAIL && previous instanceof Cards.CardSurface && captions.contains(child)) return ThemePainting.metric(context, DesignMetrics.Role.DETAIL_METADATA_GAP);
             return titlePair ? ThemePainting.metric(context, DesignMetrics.Role.DETAIL_VALUE_GAP) : child instanceof Indicators.StrengthMeter
                 ? ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_TOP_GAP) : gap();
+        }
+    }
+
+    /**
+     * One compact row of a document's bars (a find or replace row, a notice, a command strip): inset by the bar padding,
+     * the first visible field or text fills the width the controls after it leave, other text keeps a stable status
+     * width so its neighbours do not move as it changes, and buttons keep their natural widths, closer together when
+     * adjacent. Rows of one vertical group align their fills' trailing edges, so a replace field lines up under its find
+     * field. A row too narrow for its fill's minimum keeps the fill and clips what follows at the trailing edge.
+     */
+    static final class DocumentBarLayout implements Composition.WidthLayout {
+        final StackControl owner;
+        DocumentBarLayout(StackControl owner) { this.owner = owner; }
+        int metric(DesignMetrics.Role role) { return ThemePainting.metric(owner.context(), role); }
+        List<Component> visible(Container parent) { return java.util.Arrays.stream(parent.getComponents()).filter(Component::isVisible).toList(); }
+        Component fill(List<Component> children) {
+            for (Component child : children) if (owner.barFields.contains(child)) return child;
+            return null;
+        }
+        int natural(Component child, Component fill) {
+            int width = child.getPreferredSize().width;
+            return owner.barTexts.contains(child) && child != fill ? Math.max(width, metric(DesignMetrics.Role.DOCUMENT_BAR_STATUS_WIDTH)) : width;
+        }
+        int gap(Component before, Component after) {
+            return metric(before instanceof AbstractButton && after instanceof AbstractButton ? DesignMetrics.Role.DOCUMENT_BAR_ACTION_GAP : DesignMetrics.Role.DOCUMENT_BAR_GAP);
+        }
+        /** The width the children after the fill take, with their gaps; -1 without a fill. */
+        int trailing(Container parent) {
+            var children = visible(parent); Component fill = fill(children);
+            if (fill == null) return -1;
+            int width = 0;
+            for (int i = children.indexOf(fill) + 1; i < children.size(); i++) width += gap(children.get(i - 1), children.get(i)) + natural(children.get(i), fill);
+            return width;
+        }
+        /** The trailing width this row's fill leaves: the widest among the visible rows of its vertical group. */
+        int aligned(Container parent) {
+            int own = trailing(parent);
+            if (own < 0 || !(parent.getParent() instanceof StackSurface group)) return own;
+            int widest = own;
+            for (Component sibling : group.getComponents())
+                if (sibling != parent && sibling.isVisible() && sibling instanceof Container row && row.getLayout() instanceof DocumentBarLayout bar)
+                    widest = Math.max(widest, bar.trailing(row));
+            return widest;
+        }
+        @Override public int height(Container parent, int width) {
+            int height = 0;
+            for (Component child : visible(parent)) height = Math.max(height, child.getPreferredSize().height);
+            Insets insets = parent.getInsets();
+            return insets.top + insets.bottom + height + 2 * metric(DesignMetrics.Role.DOCUMENT_BAR_VERTICAL_PADDING);
+        }
+        @Override public Dimension preferredLayoutSize(Container parent) {
+            var children = visible(parent); Component fill = fill(children); Insets insets = parent.getInsets();
+            int width = insets.left + insets.right + 2 * metric(DesignMetrics.Role.DOCUMENT_BAR_SIDE_PADDING);
+            for (int i = 0; i < children.size(); i++) width += (i > 0 ? gap(children.get(i - 1), children.get(i)) : 0) + natural(children.get(i), fill);
+            return new Dimension(width, height(parent, parent.getWidth() > 0 ? parent.getWidth() : width));
+        }
+        @Override public void layoutContainer(Container parent) {
+            var children = visible(parent); if (children.isEmpty()) return;
+            Component fill = fill(children); Insets insets = parent.getInsets();
+            int side = metric(DesignMetrics.Role.DOCUMENT_BAR_SIDE_PADDING), top = insets.top + metric(DesignMetrics.Role.DOCUMENT_BAR_VERTICAL_PADDING);
+            int left = insets.left + side, right = parent.getWidth() - insets.right - side, inner = Math.max(0, parent.getHeight() - top - insets.bottom - metric(DesignMetrics.Role.DOCUMENT_BAR_VERTICAL_PADDING));
+            int x = left;
+            for (int i = 0; i < children.size(); i++) {
+                Component child = children.get(i);
+                if (i > 0) x += gap(children.get(i - 1), child);
+                int width = natural(child, fill);
+                if (child == fill) {
+                    int minimum = Math.min(metric(DesignMetrics.Role.DOCUMENT_BAR_FILL_MIN_WIDTH), Math.max(0, right - x));
+                    width = Math.max(minimum, right - aligned(parent) - x);
+                }
+                width = Math.max(0, Math.min(width, right - x));
+                int height = Math.min(inner, child.getPreferredSize().height);
+                child.setBounds(x, top + (inner - height) / 2, width, height);
+                x += width;
+            }
         }
     }
 }

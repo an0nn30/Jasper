@@ -21,6 +21,7 @@ import org.fife.ui.rtextarea.RTextScrollPane;
 public final class EditorTab {
     static final String DOCUMENT = "document", CONTENT = "document.content", STATE = "document.state", BANNER = "document.banner";
     static final String RETRY = "document.retry", DISMISS = "document.dismiss", FIRST = "document.banner.first", SECOND = "document.banner.second";
+    static final String FAILED_TITLE = "Could Not Open File";
     private final DocumentSession session;
     private final DocumentArea document = new DocumentArea();
     private final UiView view;
@@ -165,10 +166,12 @@ public final class EditorTab {
             new Nodes.Text("document.banner.text", ControlState.READY, session.name() + (deleted ? " was deleted." : " changed on disk."), Nodes.TextRole.BODY),
             button(FIRST, deleted ? "Close" : "Reload", true), button(SECOND, deleted ? "Keep" : "Keep Mine", true))));
         children.add(new Nodes.Custom(DOCUMENT, visible(ready), CONTENT, Nodes.CustomKind.EDITOR, "Document"));
+        // The canonical full-body empty state: a short title over one sentence, the secondary action, then the one primary.
         children.add(new Nodes.Empty(STATE, visible(!ready), new Nodes.Icon("document.state.icon", ControlState.READY,
             failed ? "error" : "file", Nodes.Hue.NONE, Nodes.IconSize.EMPTY, failed ? "Load failed" : "Loading"),
-            failed ? session.failure() : "Loading " + session.name() + session.host().map(host -> " from " + host).orElse("") + "…", "",
-            List.of(button(RETRY, "Retry", failed && session.retryable()), button(DISMISS, failed ? "Close" : "Cancel", true))));
+            failed ? FAILED_TITLE : "Loading " + session.name() + session.host().map(host -> " from " + host).orElse("") + "…", failed ? session.failure() : "",
+            List.of(button(DISMISS, failed ? "Close" : "Cancel", true),
+                new Nodes.Button(RETRY, visible(failed && session.retryable()), "Retry", "", Nodes.ButtonKind.PRIMARY, RETRY, ""))));
         children.add(vimBar.node(ready));
         if (find != null) children.add(find.node());
         return new ViewSpec(new Nodes.Split("document.tab", ControlState.READY, Nodes.SplitKind.DOCUMENT, children));

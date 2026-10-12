@@ -28,6 +28,8 @@ final class InteractiveRows {
         int rowHeight;
         int column = -1;
         boolean panelSingle;
+        /** A passive list among a DOCUMENT split's bars (command-line output): rows are text lines, not list rows. */
+        boolean documentLines;
         boolean syncing;
         JComponent footer;
         final Menus.Popup popup;
@@ -352,6 +354,8 @@ final class InteractiveRows {
             if (column == 0 || column == 1) rowHeight = Math.max(rowHeight,
                 ThemePainting.metric(context(), column == 0 ? DesignMetrics.Role.COLUMN_RAIL_ROW : DesignMetrics.Role.COLUMN_ITEM_ROW));
             rowHeight = Math.max(rowHeight, minimumRowHeight());
+            if (documentLines) rowHeight = Math.max(line, canvas.getFontMetrics(ThemePainting.font(context(), Typography.Role.MONO)).getHeight())
+                + ThemePainting.metric(context(), DesignMetrics.Role.DOCUMENT_BAR_LINE_GAP);
             measureRows();
             canvas.setFocusable(!externallyDriven() && !passive());
             if (passive()) { focusItem = null; focusControl = null; anchor = null; }

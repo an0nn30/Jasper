@@ -25,9 +25,33 @@ class FormsTest {
         edt(() -> {
             List<String> answers = new ArrayList<>();
             var question = new Forms.QuestionView(new FakeKit("dev.jasper.editor"), UNSAVED, answers::add);
-            assertThat(form(question.view()).actions()).extracting(Nodes.Button::label).containsExactly("Save All", "Discard", "Cancel");
-            click(question.view(), form(question.view()).actions().get(1).id());
+            assertThat(form(question.view()).actions()).as("the default is the right-most button; the others keep their order")
+                .extracting(Nodes.Button::label).containsExactly("Discard", "Cancel", "Save All");
+            assertThat(form(question.view()).actions()).extracting(Nodes.Button::id)
+                .containsExactly(Forms.CHOICE + 1, Forms.CHOICE + 2, Forms.CHOICE + 0);
+            click(question.view(), form(question.view()).actions().get(0).id());
             assertThat(answers).containsExactly("Discard");
+        });
+    }
+
+    /** Plan 3 Task 8: one primary, right-most, on every question; a destructive question already ends with Cancel. */
+    @Test void theOnePrimaryIsAlwaysTheRightMostButton() throws Exception {
+        edt(() -> {
+            var kit = new FakeKit("dev.jasper.editor");
+            for (var question : List.of(UNSAVED, CHANGED, new Question("Unsaved changes", "Save changes to a.txt?", List.of("Save", "Don't Save", "Cancel")),
+                    new Question("Cannot encode", "Line 1 of a.txt has a character Latin-1 cannot store.", List.of("Convert to UTF-8 and Save", "Cancel")),
+                    new Question("Revert to Saved", "Discard your changes to a.txt?", List.of("Discard", "Cancel"), true),
+                    new Question("Save failed", "Could not save a.txt: permission denied.", List.of("OK")))) {
+                var view = new Forms.QuestionView(kit, question, answer -> { });
+                var actions = form(view.view()).actions();
+                assertThat(actions).filteredOn(button -> button.kind() == Nodes.ButtonKind.PRIMARY).hasSize(1);
+                assertThat(actions.getLast().kind()).as(question.title()).isEqualTo(Nodes.ButtonKind.PRIMARY);
+                assertThat(actions.getLast().label()).isEqualTo(Forms.defaultChoice(question));
+                assertThat(actions).hasSize(question.choices().size());
+                view.close();
+            }
+            assertThat(form(new Forms.QuestionView(kit, CHANGED, answer -> { }).view()).actions()).extracting(Nodes.Button::label)
+                .as("a destructive question's order is unchanged").containsExactly("Overwrite", "Reload", "Cancel");
         });
     }
 

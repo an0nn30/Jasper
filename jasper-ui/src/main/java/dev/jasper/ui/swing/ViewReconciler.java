@@ -38,6 +38,7 @@ final class ViewReconciler implements AutoCloseable {
         applySettings(spec.root(), next, false);
         applySettingsNavigation(spec.root(),next,false);
         applyArtworkComposition(spec.root(),next,false);
+        applyDocumentBars(spec.root(), next);
         for (var node : nodes.values()) next.get(node.id()).update(node);
         applyHero(spec.root(), next, false);
         applyTiles(spec.root(), next, 0);
@@ -102,6 +103,8 @@ final class ViewReconciler implements AutoCloseable {
             text.flow = false;
         }
         if (control instanceof Stacks.StackControl stack) stack.sheetHeading = false;
+        if (control instanceof Stacks.StackControl stack) { stack.documentBar = false; stack.documentBarGroup = false; }
+        if (control instanceof InteractiveRows.RowsControl rows) rows.documentLines = false;
         control.embeddedLabel(false);
         control.hero(false);
     }
@@ -175,6 +178,35 @@ final class ViewReconciler implements AutoCloseable {
             boolean compact = inherited || node instanceof Nodes.Panel panel && panel.footer().filter(n -> n == child).isPresent()
                 && child instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.DETAIL;
             applyPanelDetail(child, next, compact);
+        }
+    }
+    /**
+     * A DOCUMENT split's bars: each INLINE stack among its children, directly or as a row of a VERTICAL group child, is a
+     * compact document bar row ({@link Stacks.DocumentBarLayout}); a group stacks its rows without gaps and shows a passive list's rows as text lines. The row's own single-line fields take the panel
+     * search field's compact presentation and its buttons the panel action size, as a tool window's search and icon
+     * actions do; nested content keeps its ordinary presentation.
+     */
+    private void applyDocumentBars(Nodes.Node node, Map<String, ControlRegistry.Control> next) {
+        if (node instanceof Nodes.Split split && split.kind() == Nodes.SplitKind.DOCUMENT)
+            for (var child : split.children()) {
+                if (child instanceof Nodes.Stack row && row.role() == Nodes.LayoutRole.INLINE) documentBar(row, next);
+                else if (child instanceof Nodes.Stack group && group.role() == Nodes.LayoutRole.VERTICAL) {
+                    if (next.get(group.id()) instanceof Stacks.StackControl stack) stack.documentBarGroup = true;
+                    for (var member : group.children()) {
+                        if (member instanceof Nodes.Stack row && row.role() == Nodes.LayoutRole.INLINE) documentBar(row, next);
+                        if (member instanceof Nodes.ItemList list && list.selectionMode() == Nodes.SelectionMode.NONE
+                            && next.get(list.id()) instanceof InteractiveRows.RowsControl rows) rows.documentLines = true;
+                    }
+                }
+            }
+        ControlRegistry.children(node).forEach(child -> applyDocumentBars(child, next));
+    }
+    private static void documentBar(Nodes.Stack row, Map<String, ControlRegistry.Control> next) {
+        if (next.get(row.id()) instanceof Stacks.StackControl stack) stack.documentBar = true;
+        for (var child : row.children()) {
+            var control = next.get(child.id());
+            if (control instanceof TextFields.FieldControl field && child instanceof Nodes.Field value && value.kind() != Nodes.FieldKind.TEXTAREA) field.panelSearch = true;
+            if (control instanceof Buttons.ButtonControl button) button.button.panel = true;
         }
     }
     private void applyTiles(Nodes.Node node, Map<String, ControlRegistry.Control> next, int inherited) {

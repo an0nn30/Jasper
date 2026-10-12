@@ -19,6 +19,7 @@ import java.util.function.IntConsumer;
 public final class GoToLinePanel implements AutoCloseable {
     public static final String FORM = "go-to-line", LINE = "go-to-line.line", GO = "go-to-line.go", CANCEL = "go-to-line.cancel",
         GO_ACTION = "go", CANCEL_ACTION = "cancel";
+    static final String CARD = "go-to-line.card", ROW = "go-to-line.row";
     private final UiView view;
     private final int lineCount;
     private final IntConsumer go;
@@ -69,14 +70,20 @@ public final class GoToLinePanel implements AutoCloseable {
 
     private void render() { if (!closed) view.update(new ViewSpec(form())); }
 
+    /**
+     * The canonical sheet: one form card with a "Line" row whose label caption gives the range (a multi-line label, so it
+     * stays beside the field when the kit shows an error under it) and the field in the control column; the field's
+     * accessible name keeps the range too.
+     */
     private Nodes.Form form() {
         var field = new Nodes.Field(LINE, new ControlState(true, true, false, error), Nodes.FieldKind.TEXT, text, "",
-            "Line (1–" + lineCount + "):", GO_ACTION);
+            "Line (1–" + lineCount + ")", GO_ACTION);
+        var row = new Nodes.FormRow(ROW, ControlState.READY, "Line", "1–" + lineCount, field, Optional.empty());
         var actions = List.of(
             new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL_ACTION, ""),
             new Nodes.Button(GO, ControlState.READY, "Go", "", Nodes.ButtonKind.PRIMARY, GO_ACTION, ""));
-        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.SHEET, "Go to Line", Optional.empty(), List.of(field), Optional.empty(),
-            actions, CANCEL_ACTION);
+        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.SHEET, "Go to Line", Optional.empty(),
+            List.of(new Nodes.Card(CARD, ControlState.READY, Nodes.CardKind.FORM, List.of(row))), Optional.empty(), actions, CANCEL_ACTION);
     }
 
     @Override public void close() { if (closed) return; closed = true; view.close(); }

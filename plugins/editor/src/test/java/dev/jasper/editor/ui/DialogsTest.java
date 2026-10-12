@@ -47,9 +47,9 @@ class DialogsTest {
             // The testkit's modal show() returns at once, so the answer is the dismissal and the dialog stays for inspection.
             assertThat(new DialogAsker(context.windows(), context.kit(), owner).apply(new Question("Replace", "Replace it?", List.of("Yes", "No")))).isEqualTo("No");
             var view = host.windowView("dev.jasper.editor", "Replace").orElseThrow();
-            assertThat(form(view).actions()).extracting(Nodes.Button::label).containsExactly("Yes", "No");
+            assertThat(form(view).actions()).extracting(Nodes.Button::label).containsExactly("No", "Yes");
             assertThat(primaries(view)).extracting(Nodes.Button::label).containsExactly("Yes");
-            click(view, form(view).actions().getFirst().id());
+            click(view, form(view).actions().getLast().id());
             assertThat(host.windows()).containsExactly("dev.jasper.editor.window|Editor|true");
             assertThat(closed(view)).as("closing the dialog disposed its view").isTrue();
             new DialogAsker(context.windows(), context.kit(), owner).apply(new Question("Overwrite", "Overwrite it?", List.of("Overwrite", "Cancel"), true));

@@ -306,6 +306,8 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("history", "M 3 4 A 6 6 0 1 1 2 9 M 3 1 V 5 H 7 M 8 4 V 8 L 11 10"),
             Map.entry("link", "M 6 10 L 10 6 M 5 8 L 3 10 A 2 2 0 0 0 6 13 L 8 11 M 8 5 L 10 3 A 2 2 0 0 1 13 6 L 11 8"),
             Map.entry("match.case", "M 2 12 L 5 3 L 8 12 M 3 9 H 7 M 14 8 Q 10 6 10 10 Q 10 13 14 11 V 7"),
+            // Whole word: a W standing on the word boundary underline.
+            Map.entry("match.word", "M 2.5 3 L 4.75 10.5 L 8 5 L 11.25 10.5 L 13.5 3 M 2 13.5 H 14"),
             Map.entry("folder.add", "M 2 4 H 6 L 8 6 H 14 V 13 H 2 Z M 8 8 V 12 M 6 10 H 10"),
             Map.entry("window.add", "M 2 3 H 14 V 13 H 2 Z M 2 6 H 14 M 8 8 V 12 M 6 10 H 10"),
             Map.entry("paste", "M 6 3 H 3 V 14 H 13 V 3 H 10 M 6 2 H 10 V 5 H 6 Z"),
