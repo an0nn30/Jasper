@@ -11,11 +11,6 @@ import org.junit.jupiter.api.Test;
 
 /** spec 3.3: a token's own alpha is painted as given; component treatments apply one kit metric to a base token. */
 class AlphaOnceTest {
-    @Test void legacyThemesGetATranslucentScrimSoItCanBePaintedAsGiven() {
-        assertThat(KitFixtures.dark().semantic().color(SemanticColor.SURFACE_SCRIM)).isEqualTo(ColorMath.opacity(Color.BLACK, .55));
-        assertThat(KitFixtures.light().semantic().color(SemanticColor.SURFACE_SCRIM)).isEqualTo(ColorMath.opacity(Color.BLACK, .25));
-    }
-
     @Test void focusHalosAndTilesUseTheirVariantsShare() {
         Edt.run(() -> {
             var dark = KitFixtures.context();

@@ -34,7 +34,7 @@ tasks.register<JavaExec>("gallery") {
     val theme = providers.gradleProperty("jasper.galleryTheme").orElse("dark")
     doFirst {
         require(scale.get() in listOf("1", "2")) { "jasper.galleryScale must be 1 or 2" }
-        require(theme.get() in listOf("dark", "light", "custom", "calibration")) { "Unknown jasper.galleryTheme" }
+        require(theme.get() in listOf("dark", "light")) { "Unknown jasper.galleryTheme" }
     }
     systemProperty("java.awt.headless", "true")
     systemProperty("flatlaf.uiScale", scale.get())

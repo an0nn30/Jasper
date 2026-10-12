@@ -37,7 +37,7 @@ class BuiltInArtworkTest {
         }
     }
     @Test void themeFlagIsAuthoritativeEvenWhenSemanticPalettesAreEqualAndLegacyContextsStaySeparate() {
-        var light=KitFixtures.light();var dark=new GeneratedTheme(light.name(),true,light.author(),light.tokens(),light.syntax(),light.terminal(),light.uiKeys(),light.icons(),light.glass(),light.semantic());
+        var light=KitFixtures.light();var dark=KitFixtures.withDark(light, true);
         try(var registry=new IconRegistry()) {
             assertThat(pixels(registry.icon("settings",light,Nodes.Hue.NONE,16),1)).isNotEqualTo(pixels(registry.icon("settings",dark,Nodes.Hue.NONE,16),1));
             assertThat(pixels(registry.panel("settings",light,SemanticColor.TEXT_PRIMARY,16),1)).isEqualTo(pixels(registry.panel("settings",light.semantic(),SemanticColor.TEXT_PRIMARY,16),1));

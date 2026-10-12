@@ -20,30 +20,12 @@ implementation dependencies. SDK `ui` values mirror the model without exposing S
 `dev.jasper.app.plugins.KitValues` is the translation boundary. Host and testkit implement the same
 SDK facade. Plugins never receive the engine jar on their runtime classpath.
 
-Resolve and generate authored colors without constructing Swing controls:
+Read a Slate Steel role without constructing Swing controls:
 
 <!-- example:palette -->
 ```java
-var document = ThemeToml.parse("""
-        name = "Example"
-        [colors]
-        background = "#18202b"
-        foreground = "#e6edf5"
-        accent = "#79afff"
-        [colors.normal]
-        black = "#313b49"
-        red = "#d75461"
-        green = "#4b9a6c"
-        yellow = "#c89d42"
-        blue = "#4b82cf"
-        magenta = "#9e6bc4"
-        cyan = "#448fa4"
-        white = "#c7ced7"
-        [semantic]
-        "surface.card" = "#20242b"
-        """, "example.toml");
-var generated = ThemeGenerator.generate(ThemeResolver.resolve(document));
-var cardColor = generated.semantic().color(SemanticColor.SURFACE_CARD);
+var theme = SlateSteel.bundled().generated(true);
+var cardColor = theme.semantic().color(SemanticColor.SURFACE_CARD);
 ```
 
 Theme seeds and semantic overrides supply colors. Geometry, spacing, artwork and typography roles

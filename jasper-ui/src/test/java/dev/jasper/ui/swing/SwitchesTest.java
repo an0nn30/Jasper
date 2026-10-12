@@ -112,7 +112,7 @@ class SwitchesTest {
         Edt.run(() -> {
             var base = KitFixtures.dark(); var values = new java.util.EnumMap<SemanticColor,Color>(SemanticColor.class); for (var role : SemanticColor.values()) values.put(role, base.semantic().color(role));
             values.put(SemanticColor.ACCENT, new Color(10, 20, 30, 128));
-            var theme = new GeneratedTheme(base.name(), base.dark(), base.author(), base.tokens(), base.syntax(), base.terminal(), base.uiKeys(), base.icons(), base.glass(), new SemanticPalette(values));
+            var theme = KitFixtures.withSemantic(base, new SemanticPalette(values));
             var context = KitFixtures.context(); context.binding().publish(new ThemePair(theme, theme));
             try (var view = new KitView(context, stack(toggle(true, new ControlState(true, false, false, ""), false)), e -> {})) {
                 var button = find(view, "run", JButton.class); button.setSize(button.getPreferredSize());

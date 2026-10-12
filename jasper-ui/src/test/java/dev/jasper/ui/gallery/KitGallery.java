@@ -9,7 +9,6 @@ import dev.jasper.ui.model.Nodes.*;
 import dev.jasper.ui.swing.*;
 import dev.jasper.ui.testsupport.*;
 import dev.jasper.ui.theme.*;
-import dev.jasper.ui.themeio.ThemeToml;
 import java.awt.*;
 import java.awt.event.FocusEvent;
 import java.awt.image.BufferedImage;
@@ -79,13 +78,7 @@ public final class KitGallery {
     }
     public static GeneratedTheme theme(String name) {
         return switch (name) {
-            case "dark" -> KitFixtures.dark(); case "light" -> KitFixtures.light(); case "custom" -> KitFixtures.custom();
-            case "calibration" -> {
-                try (var input = KitGallery.class.getResourceAsStream("calibration.toml")) {
-                    if (input == null) throw new IllegalStateException("Missing calibration theme");
-                    yield ThemeGenerator.generate(ThemeResolver.resolve(ThemeToml.parse(new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8), "calibration.toml")));
-                } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
-            }
+            case "dark" -> KitFixtures.dark(); case "light" -> KitFixtures.light();
             default -> throw new IllegalArgumentException("Unknown gallery theme: " + name);
         };
     }

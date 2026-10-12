@@ -4,49 +4,45 @@ import dev.jasper.ui.icons.IconRegistry;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.swing.KitContext;
 import dev.jasper.ui.theme.*;
-import dev.jasper.ui.themeio.ThemeToml;
 
 /** Deterministic module-only appearances; form/panel/render fixtures arrive with their renderer. */
 public final class KitFixtures {
     private KitFixtures() {}
 
-    public static GeneratedTheme dark() {
-        return generate("Dark", "#18202b", "#e6edf5", "#79afff");
-    }
+    public static GeneratedTheme dark() { return SlateSteel.bundled().generated(true); }
 
-    public static GeneratedTheme light() {
-        return generate("Light", "#f5f6f8", "#202734", "#245daa");
-    }
+    public static GeneratedTheme light() { return SlateSteel.bundled().generated(false); }
 
+    /** A third appearance: Slate Steel Dark with every role 20% plum (alpha kept), so a hard-coded variant colour shows. */
     public static GeneratedTheme custom() {
-        return generate("Custom", "#261b32", "#f0e8f7", "#b99cfa");
+        var plum = new java.awt.Color(0x7a3fa0);
+        var values = new java.util.EnumMap<SemanticColor, java.awt.Color>(SemanticColor.class);
+        for (var role : SemanticColor.values()) {
+            var base = dark().semantic().color(role);
+            var mixed = ColorMath.mix(base, plum, .8);
+            values.put(role, new java.awt.Color(mixed.getRed(), mixed.getGreen(), mixed.getBlue(), base.getAlpha()));
+        }
+        return withSemantic(dark(), new SemanticPalette(values));
     }
 
-    private static GeneratedTheme generate(String name, String bg, String fg, String accent) {
-        return ThemeGenerator.generate(
-                ThemeResolver.resolve(
-                        ThemeToml.parse(
-                                "name = \""
-                                        + name
-                                        + "\"\n[colors]\nbackground = \""
-                                        + bg
-                                        + "\"\nforeground = \""
-                                        + fg
-                                        + "\"\naccent = \""
-                                        + accent
-                                        + "\"\n"
-                                        + """
-                                        [colors.normal]
-                                        black = "#313b49"
-                                        red = "#d75461"
-                                        green = "#4b9a6c"
-                                        yellow = "#c89d42"
-                                        blue = "#4b82cf"
-                                        magenta = "#9e6bc4"
-                                        cyan = "#448fa4"
-                                        white = "#c7ced7"
-                                        """,
-                                "fixture.toml")));
+    /** {@code base} with its semantic palette replaced. */
+    public static GeneratedTheme withSemantic(GeneratedTheme base, SemanticPalette palette) {
+        return new GeneratedTheme(base.name(), base.dark(), base.author(), base.tokens(), base.syntax(), base.terminal(),
+            base.uiKeys(), base.icons(), base.glass(), palette);
+    }
+
+    /** {@code top} painted over opaque {@code bottom} as Java2D composites it: what an alpha-carrying role shows on a surface. */
+    public static int over(java.awt.Color top, java.awt.Color bottom) {
+        var image = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { g.setColor(bottom); g.fillRect(0, 0, 1, 1); g.setColor(top); g.fillRect(0, 0, 1, 1); } finally { g.dispose(); }
+        return image.getRGB(0, 0);
+    }
+
+    /** {@code base} reporting {@code dark}. */
+    public static GeneratedTheme withDark(GeneratedTheme base, boolean dark) {
+        return new GeneratedTheme(base.name(), dark, base.author(), base.tokens(), base.syntax(), base.terminal(),
+            base.uiKeys(), base.icons(), base.glass(), base.semantic());
     }
 
     /**
@@ -135,8 +131,7 @@ public final class KitFixtures {
         var base = dark();
         var values = new java.util.EnumMap<SemanticColor, java.awt.Color>(SemanticColor.class);
         for (var role : SemanticColor.values()) values.put(role, marker(role));
-        return new GeneratedTheme(base.name(), base.dark(), base.author(), base.tokens(), base.syntax(), base.terminal(),
-            base.uiKeys(), base.icons(), base.glass(), new SemanticPalette(values));
+        return withSemantic(base, new SemanticPalette(values));
     }
 
     /** {@code role}'s marker colour in {@link #marked()}: opaque, its red channel unique to the role. */

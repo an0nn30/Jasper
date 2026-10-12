@@ -164,7 +164,7 @@ class BrowserKitTest {
                 var light = KitFixtures.light();
                 context.binding().publish(new ThemePair(light, light));
                 InteractiveRowsTest.layout(view);
-                assertThat(find(view, "@tree/keys/new/trailing/1", JLabel.class).getForeground()).isEqualTo(light.semantic().color(SemanticColor.TEXT_SECONDARY));
+                assertThat(find(view, "@tree/keys/new/trailing/1", JLabel.class).getForeground()).isEqualTo(light.semantic().color(SemanticColor.TEXT_TERTIARY));
                 assertThat(owner.mounted.get("new").getToolTipText()).isEqualTo("Terminal window · Click to edit");
                 view.update(new ViewSpec(keymap(false)));
                 InteractiveRowsTest.layout(view);

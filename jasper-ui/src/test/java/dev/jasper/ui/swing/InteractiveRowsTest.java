@@ -611,7 +611,7 @@ class InteractiveRowsTest {
                         var baseTheme=context.theme();var colors=new java.util.EnumMap<dev.jasper.ui.theme.SemanticColor,java.awt.Color>(dev.jasper.ui.theme.SemanticColor.class);
                         for(var role:dev.jasper.ui.theme.SemanticColor.values())colors.put(role,baseTheme.semantic().color(role));
                         colors.put(dev.jasper.ui.theme.SemanticColor.HUE_PURPLE,java.awt.Color.RED);
-                        var contrasting=new dev.jasper.ui.theme.GeneratedTheme(baseTheme.name(),baseTheme.dark(),baseTheme.author(),baseTheme.tokens(),baseTheme.syntax(),baseTheme.terminal(),baseTheme.uiKeys(),baseTheme.icons(),baseTheme.glass(),new dev.jasper.ui.theme.SemanticPalette(colors));
+                        var contrasting=KitFixtures.withSemantic(baseTheme, new dev.jasper.ui.theme.SemanticPalette(colors));
                         for(var theme : List.of(baseTheme, contrasting)) {
                         context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme,theme));
                         var expectedIcon = context.icons().tile("delete", context.theme().semantic(), Hue.PURPLE, com.formdev.flatlaf.util.UIScale.scale(18), false);

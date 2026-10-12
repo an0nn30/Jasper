@@ -40,7 +40,7 @@ class ChoicesTest {
                 for(var role:dev.jasper.ui.theme.SemanticColor.values())colors.put(role,custom.semantic().color(role));
                 colors.put(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY,new java.awt.Color(100,100,100));
                 colors.put(dev.jasper.ui.theme.SemanticColor.SEGMENT_SELECTED_BG,new java.awt.Color(100,100,100));
-                custom=new dev.jasper.ui.theme.GeneratedTheme(custom.name(),custom.dark(),custom.author(),custom.tokens(),custom.syntax(),custom.terminal(),custom.uiKeys(),custom.icons(),custom.glass(),new dev.jasper.ui.theme.SemanticPalette(colors));
+                custom=KitFixtures.withSemantic(custom, new dev.jasper.ui.theme.SemanticPalette(colors));
                 for(var theme:List.of(KitFixtures.dark(),KitFixtures.light(),custom)) {
                     context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme,theme));KitFixtures.render(view,400,80,2);
                     var button=find(view,"choice.option.b",JButton.class);var fill=theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SEGMENT_SELECTED_BG);
@@ -88,7 +88,7 @@ class ChoicesTest {
                     var base=KitFixtures.dark();var colors=new EnumMap<dev.jasper.ui.theme.SemanticColor,java.awt.Color>(dev.jasper.ui.theme.SemanticColor.class);
                     for(var role:dev.jasper.ui.theme.SemanticColor.values())colors.put(role,base.semantic().color(role));
                     colors.put(dev.jasper.ui.theme.SemanticColor.SURFACE_MENU,color);
-                    var theme=new dev.jasper.ui.theme.GeneratedTheme(base.name(),base.dark(),base.author(),base.tokens(),base.syntax(),base.terminal(),base.uiKeys(),base.icons(),base.glass(),new dev.jasper.ui.theme.SemanticPalette(colors));
+                    var theme=KitFixtures.withSemantic(base, new dev.jasper.ui.theme.SemanticPalette(colors));
                     context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme,theme));
                     assertThat(popup.getList()).isSameAs(list);assertThat(list.getBackground()).isEqualTo(color);
                     assertThat(list.getFixedCellHeight()).isGreaterThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(28));
@@ -112,8 +112,7 @@ class ChoicesTest {
             colors.put(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL_HOVER, new java.awt.Color(42, 121, 175));
             colors.put(dev.jasper.ui.theme.SemanticColor.BUTTON_SECONDARY_BG, new java.awt.Color(193, 32, 68));
             colors.put(dev.jasper.ui.theme.SemanticColor.BUTTON_SECONDARY_BG_HOVER, new java.awt.Color(228, 61, 102));
-            var theme = new dev.jasper.ui.theme.GeneratedTheme(base.name(), base.dark(), base.author(), base.tokens(), base.syntax(),
-                base.terminal(), base.uiKeys(), base.icons(), base.glass(), new dev.jasper.ui.theme.SemanticPalette(colors));
+            var theme = KitFixtures.withSemantic(base, new dev.jasper.ui.theme.SemanticPalette(colors));
             var context = KitFixtures.context(); context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme, theme));
             var secondary = new Nodes.Button("secondary", ControlState.READY, "Browse", "", ButtonKind.SECONDARY, "browse", "");
             try (var view = new KitView(context, stack(choice(ChoiceKind.DROPDOWN, "a", ControlState.READY), secondary), e -> {})) {

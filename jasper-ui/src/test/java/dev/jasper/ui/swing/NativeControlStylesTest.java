@@ -57,7 +57,7 @@ class NativeControlStylesTest {
             assertThat(button.getClientProperty("FlatLaf.style")).isEqualTo(Map.of(
                 "toolbar.hoverBackground", ColorMath.opacity(palette.color(SemanticColor.HOVER_OVERLAY), .08),
                 "toolbar.pressedBackground", palette.color(SemanticColor.SURFACE_CONTROL_HOVER),
-                "toolbar.selectedBackground", palette.color(SemanticColor.SEGMENT_SELECTED_BG)));
+                "toolbar.selectedBackground", palette.color(SemanticColor.SURFACE_CONTROL_SELECTED)));
             var rail = new JButton();
             NativeControlStyles.button(rail, () -> theme, DesignMetrics.Role.RAIL_BUTTON_ARC);
             assertThat(((Map<?, ?>) rail.getClientProperty("FlatLaf.style")).get("arc")).isEqualTo(10);
@@ -90,7 +90,7 @@ class NativeControlStylesTest {
             assertThat(button.isBorderPainted()).isTrue();
             assertThat(button.getFont()).isSameAs(font);
             assertThat(button.getMargin()).isEqualTo(margin).isInstanceOf(javax.swing.plaf.UIResource.class);
-            assertThat(button.getForeground()).isEqualTo(palette.color(SemanticColor.TEXT_PRIMARY));
+            assertThat(button.getForeground()).isEqualTo(palette.color(SemanticColor.TEXT_STRONG_SECONDARY));
             assertThat(button.getClientProperty("FlatLaf.style")).isEqualTo(Map.of(
                 "background", palette.color(SemanticColor.BUTTON_SECONDARY_BG),
                 "hoverBackground", palette.color(SemanticColor.BUTTON_SECONDARY_BG_HOVER),

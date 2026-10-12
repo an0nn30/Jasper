@@ -879,8 +879,8 @@ class PanelCompositionTest {
                 for(int scale:new int[]{1,2}) {
                     var image=new java.awt.image.BufferedImage(40*scale,20*scale,java.awt.image.BufferedImage.TYPE_INT_ARGB);
                     var g=image.createGraphics();try{g.scale(scale,scale);footer.paint(g);}finally{g.dispose();}
-                    int border=ctx.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE).getRGB();
                     int fill=ctx.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL_RAISED).getRGB();
+                    int border=dev.jasper.ui.testsupport.KitFixtures.over(ctx.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE),new java.awt.Color(fill,true));
                     assertThat(image.getRGB(20*scale,0)).as("opaque divider at device scale %s",scale).isEqualTo(border);
                     assertThat(image.getRGB(20*scale,1)).as("fill immediately after one-device divider at scale %s",scale).isEqualTo(fill);
                 }

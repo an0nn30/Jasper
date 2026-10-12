@@ -37,7 +37,7 @@ class GroupedFormGeometryTest {
             try(var view=new KitView(context,new ViewSpec(new Card("mixed",ControlState.READY,CardKind.MIXED,List.of(form,hidden,setting))),e->{})) {
                 var image=KitFixtures.render(view,492,180,1);var control=find(view,"setting",javax.swing.JComponent.class);
                 var login=find(view,"row",javax.swing.JComponent.class);assertThat(control.getY()-login.getY()-login.getHeight()).isEqualTo(14);
-                assertThat(image.getRGB(5,control.getY())).isEqualTo(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE).getRGB());
+                assertThat(image.getRGB(5,control.getY())).isEqualTo(KitFixtures.over(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE),ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.SURFACE_CARD)));
             }finally{release(context);}
         });
     }

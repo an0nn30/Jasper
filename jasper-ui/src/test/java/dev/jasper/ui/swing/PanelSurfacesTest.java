@@ -151,7 +151,7 @@ class PanelSurfacesTest {
                 assertThat(rowBounds.y + rowBounds.height).as("the persistent row is flush with the bottom").isEqualTo(view.getHeight());
                 assertThat(rowBounds.height).isEqualTo(metric(DesignMetrics.Role.HAIRLINE) + metric(DesignMetrics.Role.PANEL_FOOTER_ROW_HEIGHT));
                 assertThat(rowBounds.x).isEqualTo(metric(DesignMetrics.Role.PANEL_FOOTER_SIDE));
-                int rule = ctx.theme().semantic().color(SemanticColor.BORDER_SUBTLE).getRGB();
+                int rule = KitFixtures.over(ctx.theme().semantic().color(SemanticColor.BORDER_SUBTLE), ctx.theme().semantic().color(SemanticColor.SURFACE_PANEL));
                 assertThat(image.getRGB(s(2), rowBounds.y)).as("a full-width rule at the row's top").isEqualTo(rule);
                 assertThat(image.getRGB(s(2), rowBounds.y + metric(DesignMetrics.Role.HAIRLINE) - 1)).as("filling the logical hairline the row reserves").isEqualTo(rule);
                 assertThat(image.getRGB(s(2), rowBounds.y + metric(DesignMetrics.Role.HAIRLINE))).as("and no more").isNotEqualTo(rule);

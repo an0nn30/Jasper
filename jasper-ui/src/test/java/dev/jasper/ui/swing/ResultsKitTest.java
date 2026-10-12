@@ -36,11 +36,11 @@ class ResultsKitTest {
                 var item=new ListItem("one",Optional.empty(),List.of(new Text("title",READY,"Title",TextRole.BODY)),List.of(detail),List.of());
                 try(var view=new KitView(context,new ViewSpec(results(List.of(item),Set.of(),OptionalInt.empty())),event->{})) {
                     var label=find(view,"detail",JLabel.class);var font=label.getFont();
-                    assertThat(label.getForeground()).isEqualTo(context.theme().semantic().color(SemanticColor.TEXT_SECONDARY));
+                    assertThat(label.getForeground()).isEqualTo(context.theme().semantic().color(SemanticColor.TEXT_TERTIARY));
                     for(boolean selected:new boolean[]{true,false,true}) {
                         view.update(new ViewSpec(results(List.of(item),selected?Set.of("one"):Set.of(),OptionalInt.empty())));
                         assertThat(find(view,"detail",JLabel.class)).isSameAs(label);assertThat(label.getFont()).isEqualTo(font);
-                        assertThat(label.getForeground()).isEqualTo(selected?dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(),SemanticColor.TEXT_ONACCENT_SECONDARY,SemanticColor.ACCENT,dev.jasper.ui.theme.SurfaceContrast.TEXT):context.theme().semantic().color(SemanticColor.TEXT_SECONDARY));
+                        assertThat(label.getForeground()).isEqualTo(selected?dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(),SemanticColor.TEXT_ONACCENT_SECONDARY,SemanticColor.ACCENT,dev.jasper.ui.theme.SurfaceContrast.TEXT):context.theme().semantic().color(SemanticColor.TEXT_TERTIARY));
                     }
                 }
             }
@@ -60,7 +60,7 @@ class ResultsKitTest {
                 assertThat(find(view,"a.tag",JLabel.class).getFont().isBold()).isFalse();
                 view.update(new ViewSpec(results(items,Set.of("b"),OptionalInt.empty())));
                 assertThat(title.getFont()).isEqualTo(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.BODY));
-                assertThat(detail.getForeground()).isEqualTo(context.theme().semantic().color(SemanticColor.TEXT_SECONDARY));
+                assertThat(detail.getForeground()).isEqualTo(context.theme().semantic().color(SemanticColor.TEXT_TERTIARY));
             } finally { release(context); }
         });
     }

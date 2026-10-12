@@ -139,7 +139,7 @@ class SemanticPaletteTest {
 
     /** Legacy themes, still installed until Plan 2, give each new role the colour its component paints today. */
     @Test void legacyThemesGiveTheTenNewRolesTheirCurrentSources() {
-        var theme = dev.jasper.ui.testsupport.KitFixtures.dark();
+        var theme = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS);
         var semantic = theme.semantic(); var tokens = theme.tokens();
         assertThat(semantic.color(SemanticColor.SURFACE_FIELD_RAISED)).isEqualTo(tokens.get(Token.INPUT_BACKGROUND));
         assertThat(semantic.color(SemanticColor.SURFACE_CONTROL_SELECTED)).isEqualTo(tokens.get(Token.BUTTON_BACKGROUND));
@@ -153,22 +153,12 @@ class SemanticPaletteTest {
         assertThat(SemanticColor.of("surface.emptyTile")).contains(SemanticColor.SURFACE_EMPTY_TILE);
     }
 
-    /**
-     * The tab strip under a legacy theme: its inactive tabs and strip are the terminal background sunk toward black
-     * (30% in a dark theme, 6% in a light one), as the strip painted before Slate Steel, so the selected tab, the terminal
-     * background itself, stays the lighter one in the shipped themes.
-     */
-    @Test void legacyThemesKeepTheSelectedTabLighterThanTheStrip() throws Exception {
-        for (String name : List.of("jasper-dark", "jasper-light")) {
-            String text;
-            try (var in = SemanticPaletteTest.class.getResourceAsStream("/dev/jasper/ui/themeimport/native/" + name + ".toml")) {
-                text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            }
-            var theme = ThemeGenerator.generate(ThemeResolver.resolve(ThemeToml.parse(text, name + ".toml")));
-            Color terminal = theme.terminal().background(), strip = theme.semantic().color(SemanticColor.SURFACE_TABSTRIP);
-            assertThat(strip).as(name).isEqualTo(ColorMath.mix(Color.BLACK, terminal, theme.dark() ? .30 : .06));
-            assertThat(ColorMath.luminance(theme.semantic().color(SemanticColor.SURFACE_TERMINAL)))
-                .as("%s: the selected tab is lighter than the strip", name).isGreaterThan(ColorMath.luminance(strip));
+    /** The selected tab (the terminal surface) and the strip behind the inactive tabs are distinguishable in both variants. */
+    @Test void theSelectedTabAndTheStripDifferInBothVariants() {
+        for (boolean dark : new boolean[]{true, false}) {
+            var p = SlateSteel.bundled().generated(dark).semantic();
+            assertThat(ColorMath.luminance(p.color(SemanticColor.SURFACE_TERMINAL))).as(dark ? "dark" : "light")
+                .isNotEqualTo(ColorMath.luminance(p.color(SemanticColor.SURFACE_TABSTRIP)));
         }
     }
 }

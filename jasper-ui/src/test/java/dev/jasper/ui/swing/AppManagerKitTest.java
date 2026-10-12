@@ -169,7 +169,7 @@ class AppManagerKitTest {
                 notice.setSize(200, 100);
                 var image = new BufferedImage(200, 100, BufferedImage.TYPE_INT_ARGB);
                 var g = image.createGraphics(); try { notice.printAll(g); } finally { g.dispose(); }
-                int border = ThemePainting.color(context, SemanticColor.BORDER_SUBTLE).getRGB(), card = ThemePainting.color(context, SemanticColor.SURFACE_CARD).getRGB();
+                int card = ThemePainting.color(context, SemanticColor.SURFACE_CARD).getRGB(), border = KitFixtures.over(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE), new java.awt.Color(card, true));
                 assertThat(image.getRGB(100, 0)).as("the hairline fills its pixel row").isEqualTo(border);
                 assertThat(image.getRGB(100, 1)).as("and does not smear inward").isEqualTo(card);
                 int radius = metric(DesignMetrics.Role.CARD_RADIUS);

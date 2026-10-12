@@ -181,7 +181,7 @@ class PanelHostHeaderTest {
     @Test void builtinHostArtworkUsesTheReceivingAppearanceEvenWithAnIdenticalPalette() {
         Edt.run(() -> {
             var ctx=KitFixtures.context();var light=KitFixtures.light();
-            var dark=new dev.jasper.ui.theme.GeneratedTheme(light.name(),true,light.author(),light.tokens(),light.syntax(),light.terminal(),light.uiKeys(),light.icons(),light.glass(),light.semantic());
+            var dark=KitFixtures.withDark(light, true);
             try(var view=new KitView(ctx,spec("panel",6),e->{})) {
                 view.setPanelHostHeader("panel",new PanelHostHeader("",false,List.of(new PanelHostHeader.Action("Network",ARTWORK,()->{},new PanelHostHeader.Artwork("network",null)))));
                 ctx.binding().publish(new ThemePair(light,light));

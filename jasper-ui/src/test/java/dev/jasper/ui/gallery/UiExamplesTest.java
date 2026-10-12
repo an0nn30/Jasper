@@ -7,7 +7,6 @@ import dev.jasper.ui.model.Nodes.*;
 import dev.jasper.ui.swing.*;
 import dev.jasper.ui.testsupport.*;
 import dev.jasper.ui.theme.*;
-import dev.jasper.ui.themeio.ThemeToml;
 import java.util.List;
 import java.util.ArrayList;
 import org.junit.jupiter.api.Test;
@@ -16,28 +15,10 @@ import static org.assertj.core.api.Assertions.*;
 class UiExamplesTest {
     @Test void colorEngineWorksWithoutSwing() {
         // example:palette:start
-        var document = ThemeToml.parse("""
-                name = "Example"
-                [colors]
-                background = "#18202b"
-                foreground = "#e6edf5"
-                accent = "#79afff"
-                [colors.normal]
-                black = "#313b49"
-                red = "#d75461"
-                green = "#4b9a6c"
-                yellow = "#c89d42"
-                blue = "#4b82cf"
-                magenta = "#9e6bc4"
-                cyan = "#448fa4"
-                white = "#c7ced7"
-                [semantic]
-                "surface.card" = "#20242b"
-                """, "example.toml");
-        var generated = ThemeGenerator.generate(ThemeResolver.resolve(document));
-        var cardColor = generated.semantic().color(SemanticColor.SURFACE_CARD);
+        var theme = SlateSteel.bundled().generated(true);
+        var cardColor = theme.semantic().color(SemanticColor.SURFACE_CARD);
         // example:palette:end
-        assertThat(cardColor).isEqualTo(new java.awt.Color(0x20242b));
+        assertThat(cardColor).isEqualTo(SlateSteel.bundled().palette(true).color(SemanticColor.SURFACE_CARD));
     }
     @Test void viewOwnsItsControlsAndCallerOwnsBindingAndIcons() {
         Edt.run(() -> {
