@@ -18,16 +18,37 @@ final class Stacks {
     private Stacks() {}
 
     static final class StackSurface extends JPanel {
-        final KitContext context;boolean joined;StackSurface(KitContext context){this.context=context;}
+        final KitContext context;boolean joined,route;StackSurface(KitContext context){this.context=context;}
+        /** A ROUTE strip's arrow positions, left to right, as its layout placed them. */
+        int[] arrows=new int[0];
         @Override protected void paintComponent(Graphics graphics){
-            super.paintComponent(graphics);if(!joined)return;var g=(Graphics2D)graphics.create();
+            super.paintComponent(graphics);
+            if(route){paintRoute(graphics);return;}
+            if(!joined)return;var g=(Graphics2D)graphics.create();
             try{ThemePainting.antialias(g);int radius=ThemePainting.metric(context,DesignMetrics.Role.CONTROL_RADIUS);g.setColor(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.BORDER_CONTROL));g.drawRoundRect(0,0,getWidth()-1,getHeight()-1,radius*2,radius*2);if(getComponentCount()>1)g.drawLine(getComponent(1).getX(),0,getComponent(1).getX(),getHeight());}finally{g.dispose();}
+        }
+        /** The route strip: the input surface inside the input outline, and the connecting arrow before each later step. */
+        private void paintRoute(Graphics graphics){
+            var g=(Graphics2D)graphics.create();
+            try{
+                ThemePainting.antialias(g);if(!isEnabled())g.setComposite(AlphaComposite.SrcOver.derive(.42f));
+                int radius=ThemePainting.metric(context,DesignMetrics.Role.CONTROL_RADIUS),top=ThemePainting.metric(context,DesignMetrics.Role.ROUTE_TOP),h=getHeight()-top;
+                g.setColor(ThemePainting.color(context,SemanticColor.SURFACE_INPUT));g.fillRoundRect(0,top,getWidth(),h,radius*2,radius*2);
+                g.setColor(ThemePainting.color(context,SemanticColor.BORDER_INPUT));g.drawRoundRect(0,top,getWidth()-1,h-1,radius*2,radius*2);
+                int size=ThemePainting.metric(context,DesignMetrics.Role.ROUTE_ARROW);
+                var arrow=context.icons().icon("arrow.right",context.theme().semantic(),SemanticColor.TEXT_PLACEHOLDER,size);
+                for(int x:arrows)arrow.paintIcon(this,g,x,top+(h-arrow.getIconHeight())/2);
+            }finally{g.dispose();}
         }
     }
 
     static final class StackControl extends ControlRegistry.Control {
         final Tile tile;
         boolean detail, sheetHeading, panelDetail, embedded, settings, identityHeader, identityGroup;
+        /** The panel footer this vertical stack is (set by its panel, cleared on every update); null otherwise. */
+        PanelFooters.Footer panelFooter;
+        /** A ROUTE strip's step: a tile beside its lines (set by the reconciler, cleared on every update). */
+        boolean routeStep;
         List<ControlRegistry.Control> children = List.of();
         @Override void embeddedLabel(boolean value) { embedded = value; if (settings) children.forEach(c -> Composition.label(c, value)); }
         java.util.Set<Component> captions = java.util.Set.of();
@@ -65,10 +86,14 @@ final class Stacks {
             state();
             var stack = (Nodes.Stack) node;
             ((StackSurface)component).joined=stack.role()==Nodes.LayoutRole.JOINED_ACTIONS;
+            ((StackSurface)component).route=stack.role()==Nodes.LayoutRole.ROUTE;
             int detailPadding = stack.role() == Nodes.LayoutRole.DETAIL ? ThemePainting.metric(context(), panelDetail ? DesignMetrics.Role.PANEL_DETAIL_PADDING : DesignMetrics.Role.DETAIL_PADDING) : 0;
             component.setBorder(new javax.swing.border.EmptyBorder(detailPadding, detailPadding, panelDetail && stack.role()==Nodes.LayoutRole.DETAIL ? Math.max(0,detailPadding-ThemePainting.metric(context(),DesignMetrics.Role.FOCUS_RING)) : detailPadding, detailPadding));
             component.setLayout(
-                    stack.role() == Nodes.LayoutRole.SETTINGS_NAVIGATION ? new FillLayout() : stack.role() == Nodes.LayoutRole.SETTINGS_TRAILING ? new SettingsTrailingLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_GROUP_HEADER ? new SettingsGroupLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_FOOTER ? new SettingsFooterLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_PAGE ? new SettingsLayout(context()) : sheetHeading ? new Navigation.InlineLayout(context(),DesignMetrics.Role.COLUMN_GAP) : stack.role() == Nodes.LayoutRole.HERO
+                    stack.role() == Nodes.LayoutRole.ROUTE ? new RouteLayout(this)
+                    : routeStep ? new RouteStepLayout(context())
+                    : panelFooter != null && stack.role() == Nodes.LayoutRole.VERTICAL ? new PanelFooters.StackLayout(this, panelFooter)
+                    : stack.role() == Nodes.LayoutRole.SETTINGS_NAVIGATION ? new FillLayout() : stack.role() == Nodes.LayoutRole.SETTINGS_TRAILING ? new SettingsTrailingLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_GROUP_HEADER ? new SettingsGroupLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_FOOTER ? new SettingsFooterLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_PAGE ? new SettingsLayout(context()) : sheetHeading ? new Navigation.InlineLayout(context(),DesignMetrics.Role.COLUMN_GAP) : stack.role() == Nodes.LayoutRole.HERO
                             ? new HeroLayout(this)
                             : stack.role() == Nodes.LayoutRole.FOOTER ? new FooterStatusLayout(context()) : stack.role() == Nodes.LayoutRole.SUPPORTING ? new SupportingLayout(context()) : stack.role() == Nodes.LayoutRole.NAVIGATION ? new Navigation.InlineLayout(context(), identityHeader ? DesignMetrics.Role.IDENTITY_HEADER_GAP : panelDetail && stack.children().stream().anyMatch(n -> n instanceof Nodes.Icon icon && icon.size() == Nodes.IconSize.HERO) ? DesignMetrics.Role.PANEL_DETAIL_IDENTITY_GAP : detail && !panelDetail ? DesignMetrics.Role.DETAIL_HEADING_GAP : DesignMetrics.Role.ICON_GAP) : new StackLayout(context(), stack.role(), stack.children().size()==2 && stack.children().getFirst() instanceof Nodes.Text text && text.role()==Nodes.TextRole.DETAIL_TITLE, captions) {
                                 @Override int gap() { return identityGroup ? ThemePainting.metric(context(),DesignMetrics.Role.IDENTITY_HEADER_AFTER) : panelDetail ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_DETAIL_GAP) : super.gap(); }
@@ -261,6 +286,88 @@ final class Stacks {
                 child.setBounds(x, insets.top + (child == body ? 0 : Math.max(0, (lineHeight-height)/2)), width, height);
                 x += width + gap();
             }
+        }
+    }
+
+    /**
+     * A ROUTE strip: equal columns, one per step, left to right; every later column opens with the kit's arrow and its
+     * step follows the arrow. A step's lines truncate within its column; the last step may run on into the strip's end
+     * padding before it truncates.
+     */
+    static final class RouteLayout implements Composition.WidthLayout {
+        final StackControl owner;
+        RouteLayout(StackControl owner) { this.owner = owner; }
+        int metric(DesignMetrics.Role role) { return ThemePainting.metric(owner.context(), role); }
+        int edge() { return metric(DesignMetrics.Role.HAIRLINE) + metric(DesignMetrics.Role.ROUTE_PADDING); }
+        /** What opens every column after the first: the arrow's inset, the arrow and its gap to the step. */
+        int lead() { return metric(DesignMetrics.Role.ROUTE_ARROW_INSET) + metric(DesignMetrics.Role.ROUTE_ARROW) + metric(DesignMetrics.Role.ROUTE_ARROW_GAP); }
+        List<Component> steps(Container parent) { return java.util.Arrays.stream(parent.getComponents()).filter(Component::isVisible).toList(); }
+        @Override public void addLayoutComponent(String name, Component component) {}
+        @Override public void removeLayoutComponent(Component component) {}
+        @Override public int height(Container parent, int width) {
+            // The strip stands a little apart from the rows above it.
+            int tallest = steps(parent).stream().mapToInt(c -> c.getPreferredSize().height).max().orElse(0);
+            return metric(DesignMetrics.Role.ROUTE_TOP) + Math.max(metric(DesignMetrics.Role.ROUTE_HEIGHT), tallest + 2 * (metric(DesignMetrics.Role.HAIRLINE) + metric(DesignMetrics.Role.ROUTE_VERTICAL_PADDING)));
+        }
+        int width(List<Component> steps, boolean minimum) {
+            int column = steps.stream().mapToInt(c -> (minimum ? c.getMinimumSize() : c.getPreferredSize()).width).max().orElse(0) + (steps.size() > 1 ? lead() : 0);
+            return 2 * edge() + column * steps.size();
+        }
+        @Override public Dimension preferredLayoutSize(Container parent) { var steps = steps(parent); int w = width(steps, false); return new Dimension(w, height(parent, w)); }
+        @Override public Dimension minimumLayoutSize(Container parent) { var steps = steps(parent); int w = width(steps, true); return new Dimension(w, height(parent, w)); }
+        @Override public void layoutContainer(Container parent) {
+            var steps = steps(parent); var surface = (StackSurface) parent;
+            int count = steps.size(), top = metric(DesignMetrics.Role.ROUTE_TOP), h = parent.getHeight() - top;
+            int inner = Math.max(0, parent.getWidth() - 2 * edge()), end = parent.getWidth() - metric(DesignMetrics.Role.HAIRLINE);
+            surface.arrows = new int[Math.max(0, count - 1)];
+            for (int i = 0; i < count; i++) {
+                int column = edge() + (int) ((long) inner * i / Math.max(1, count)), next = edge() + (int) ((long) inner * (i + 1) / Math.max(1, count));
+                int x = column;
+                if (i > 0) { surface.arrows[i - 1] = column + metric(DesignMetrics.Role.ROUTE_ARROW_INSET); x = column + lead(); }
+                var step = steps.get(i);
+                int natural = step.getPreferredSize().width, room = Math.max(0, (i == count - 1 ? end : next) - x);
+                int sh = Math.min(h, step.getPreferredSize().height);
+                step.setBounds(x, top + (h - sh) / 2, Math.min(natural, room), sh);
+            }
+        }
+    }
+
+    /** A route step: its leading tile beside its lines, stacked with no gap and centered on the tile. */
+    static final class RouteStepLayout implements Composition.WidthLayout {
+        final KitContext context;
+        RouteStepLayout(KitContext context) { this.context = context; }
+        int gap() { return ThemePainting.metric(context, DesignMetrics.Role.ROUTE_STEP_GAP); }
+        List<Component> visible(Container parent) { return java.util.Arrays.stream(parent.getComponents()).filter(Component::isVisible).toList(); }
+        boolean leading(List<Component> children) { return !children.isEmpty() && children.getFirst() instanceof JLabel label && label.getIcon() != null && (label.getText() == null || label.getText().isEmpty()); }
+        @Override public void addLayoutComponent(String name, Component component) {}
+        @Override public void removeLayoutComponent(Component component) {}
+        int lead(List<Component> children) { return leading(children) ? children.getFirst().getPreferredSize().width + (children.size() > 1 ? gap() : 0) : 0; }
+        List<Component> lines(List<Component> children) { return leading(children) ? children.subList(1, children.size()) : children; }
+        @Override public int height(Container parent, int width) {
+            var children = visible(parent);
+            int text = lines(children).stream().mapToInt(c -> c.getPreferredSize().height).sum();
+            return Math.max(leading(children) ? children.getFirst().getPreferredSize().height : 0, text);
+        }
+        @Override public Dimension preferredLayoutSize(Container parent) {
+            var children = visible(parent);
+            int text = lines(children).stream().mapToInt(c -> c.getPreferredSize().width).max().orElse(0);
+            return new Dimension(lead(children) + text, height(parent, 0));
+        }
+        @Override public Dimension minimumLayoutSize(Container parent) {
+            var children = visible(parent);
+            return new Dimension(lead(children), height(parent, 0));
+        }
+        @Override public void layoutContainer(Container parent) {
+            var children = visible(parent); if (children.isEmpty()) return;
+            int h = parent.getHeight(), x = 0;
+            if (leading(children)) {
+                var tile = children.getFirst(); var size = tile.getPreferredSize();
+                tile.setBounds(0, (h - size.height) / 2, size.width, size.height);
+                x = lead(children);
+            }
+            var lines = lines(children);
+            int y = (h - lines.stream().mapToInt(c -> c.getPreferredSize().height).sum()) / 2, width = Math.max(0, parent.getWidth() - x);
+            for (var line : lines) { int lh = line.getPreferredSize().height; line.setBounds(x, y, width, lh); y += lh; }
         }
     }
 

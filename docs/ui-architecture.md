@@ -159,6 +159,16 @@ RESULTS reserves its fixed data-row metric, and existing heading sizing is retai
 or without `visibleRows` keep their prior sizing. No SDK shape changes; the fake retains descriptors and validates
 references, while module and real-host tests verify layout.
 
+Panel capabilities (Plan 3 Tasks 6-7): an `Empty` that is a panel's body (or the last child of a DOCUMENT split
+body under a note) takes the plugin-panel geometry, centred in the body; a two-line `ItemList` directly in a panel is a
+compact inset row whose title line keeps its first text (the name) whole while it fits in half the line, and a `Chip` on
+an inline line keeps its label whole; a panel footer `Stack` (VERTICAL) of status lines above a `SettingRow` paints a
+full-width hairline-thick rule above the row and keeps the row flush with the bottom. `LayoutRole.ROUTE` is a framed strip
+of equal columns, one per child stack (a tile beside two lines), with the kit's arrow before every later column; a
+DROPDOWN `Choice` may carry a `PickerFace` (title, detail, glyph, hue) painted in place of its plain label. FormRow
+captions stay on one line, shortened at their end with the full caption as tooltip. The glyph vocabulary gains
+`laptop`, `target`, `arrow.right` and `import` (an arrow into a corner bracket, distinct from the `download` tray).
+
 Palette capabilities (Plan 2 Task 6b-2): `ListItem.heading` is a title-only section row (never selected, activated,
 hovered or given a menu; a hairline opens every heading after the first); `ListKind.RESULTS` is the one-line result
 list that follows an external field: it never takes focus, a left press runs a row, rows and headings keep fixed heights

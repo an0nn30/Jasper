@@ -102,6 +102,8 @@ final class Composition {
     static final class WrappedText extends JComponent {
         String text = "";
         boolean centered;
+        /** One line, shortened at its end with an ellipsis when it does not fit (a form row's caption). */
+        boolean single;
         int lineHeight;
         int noteStart = -1;
         Color noteColor;
@@ -127,6 +129,17 @@ final class Composition {
             var lines = new ArrayList<String>();
             if (text.isEmpty()) return lines;
             var metrics = getFontMetrics(getFont());
+            if (single) {
+                String line = text.replace('\n', ' ');
+                if (metrics.stringWidth(line) > width) {
+                    String ellipsis = "\u2026";
+                    int end = line.length();
+                    while (end > 0 && metrics.stringWidth(line.substring(0, end) + ellipsis) > width) end = line.offsetByCodePoints(end, -1);
+                    line = end == 0 ? "" : line.substring(0, end).stripTrailing() + ellipsis;
+                }
+                lines.add(line);
+                return lines;
+            }
             String line = "";
             for (String paragraph : text.split("\n", -1)) {
                 for (String word : paragraph.split(" ", -1)) {
@@ -172,7 +185,7 @@ final class Composition {
                 int y = fm.getAscent(), consumed = 0;
                 for (String line : lines(getWidth())) {
                     int x = centered ? Math.max(0, (getWidth() - fm.stringWidth(line)) / 2) : 0;
-                    int start = text.indexOf(line, consumed);
+                    int start = Math.max(0, text.indexOf(line, consumed));
                     int split = noteStart < 0 ? line.length() : Math.max(0, Math.min(line.length(), noteStart - start));
                     String leading = line.substring(0, split);
                     g.setColor(getForeground()); g.drawString(leading, x, y);

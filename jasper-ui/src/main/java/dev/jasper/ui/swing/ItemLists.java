@@ -252,6 +252,17 @@ final class ItemLists {
             return value().kind() == Nodes.ListKind.ORDERED ? Math.max(height, ThemePainting.metric(context(), DesignMetrics.Role.ORDERED_ROW_HEIGHT)) : height;
         }
 
+        @Override
+        int compactRowHeight() {
+            int vertical = 2 * ThemePainting.metric(context(), DesignMetrics.Role.PANEL_COMPACT_ROW_VERTICAL), height = 0;
+            for (var item : value().items()) {
+                int middle = slotHeight(item.title()) + slotHeight(item.subtitle());
+                int side = Math.max(item.leading().map(this::inlineHeight).orElse(0), slotHeight(item.trailing()));
+                height = Math.max(height, Math.max(middle, side) + vertical);
+            }
+            return height;
+        }
+
         int slotHeight(List<Nodes.Node> nodes) {
             return nodes.stream().mapToInt(this::inlineHeight).max().orElse(0);
         }
@@ -400,8 +411,11 @@ final class ItemLists {
             row.slot(row.leading, leading);
             if (item.leading().orElse(null) instanceof Nodes.Icon icon && (icon.size() == Nodes.IconSize.RAIL || icon.size() == Nodes.IconSize.HERO) && icon.hue() != Nodes.Hue.NONE) {
                 ((Labels.IconControl)row.controls.get(icon.id())).tile(context().metrics().value(value().kind() == Nodes.ListKind.DOUBLE ? DesignMetrics.Role.CATEGORY_ROW_TILE : DesignMetrics.Role.CATEGORY_RAIL_TILE), column != 0 && selected.contains(item.id()));
-            }
-            for(var control:row.controls.values()) if(control instanceof Indicators.DotControl dot) ((Indicators.Dot)dot.component).panelRow=panelSingle;
+            } else if (item.leading().orElse(null) instanceof Nodes.Icon icon && row.controls.get(icon.id()) instanceof Labels.IconControl glyph)
+                // A compact panel row draws its leading glyph at the panel-row size; elsewhere the icon's size role holds.
+                glyph.glyph(panelCompact ? context().metrics().value(DesignMetrics.Role.PANEL_COMPACT_ROW_GLYPH) : 0);
+            for(var control:row.controls.values()) if(control instanceof Indicators.DotControl dot) ((Indicators.Dot)dot.component).panelRow=panelSingle||panelCompact;
+            for(var control:row.controls.values()) if(control instanceof Indicators.ChipControl chip) chip.panelRow(panelCompact);
             row.slot(row.title, item.title());
             if(panelSingle)for(int i=1;i<item.title().size();i++)if(item.title().get(i) instanceof Nodes.Text text && text.role()==Nodes.TextRole.BODY && row.controls.get(text.id()).component instanceof javax.swing.JLabel label)label.setFont(ThemePainting.font(context(),Typography.Role.PANEL_ROW_SECONDARY));
             if (panelSingle && selected.contains(item.id())) {

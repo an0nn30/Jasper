@@ -28,6 +28,8 @@ final class InteractiveRows {
         int rowHeight;
         int column = -1;
         boolean panelSingle;
+        /** A panel body's two-line rows (Tunnels, File Servers): compact height, inset rounded selection; set by the reconciler. */
+        boolean panelCompact;
         boolean syncing;
         JComponent footer;
         final Menus.Popup popup;
@@ -352,6 +354,7 @@ final class InteractiveRows {
             if (column == 0 || column == 1) rowHeight = Math.max(rowHeight,
                 ThemePainting.metric(context(), column == 0 ? DesignMetrics.Role.COLUMN_RAIL_ROW : DesignMetrics.Role.COLUMN_ITEM_ROW));
             rowHeight = Math.max(rowHeight, minimumRowHeight());
+            if (panelCompact) rowHeight = Math.max(ThemePainting.metric(context(), DesignMetrics.Role.PANEL_COMPACT_ROW_HEIGHT), compactRowHeight());
             measureRows();
             canvas.setFocusable(!externallyDriven() && !passive());
             if (passive()) { focusItem = null; focusControl = null; anchor = null; }
@@ -368,6 +371,9 @@ final class InteractiveRows {
             }
             popup.revalidate(); popup.repaint();
         }
+
+        /** The content height a compact panel row needs at the current fonts (its slots stacked plus their vertical padding). */
+        int compactRowHeight() { return 0; }
 
         int footerHeight() {
             return footer == null || !footer.isVisible() ? 0 : footer.getPreferredSize().height;
@@ -987,7 +993,10 @@ final class InteractiveRows {
         }
 
         void slot(JPanel panel, List<Nodes.Node> nodes) {
-            panel.setLayout(new Navigation.InlineLayout(owner.context(), owner.panelSingle && panel == title ? DesignMetrics.Role.PANEL_ROW_TITLE_GAP : DesignMetrics.Role.ICON_GAP));
+            var gap = owner.panelSingle && panel == title ? DesignMetrics.Role.PANEL_ROW_TITLE_GAP : DesignMetrics.Role.ICON_GAP;
+            // A compact panel row's name keeps its width before the detail beside it (via host, a problem) is cut short.
+            panel.setLayout(owner.panelCompact && panel == title ? new Navigation.InlineLayout(owner.context(), gap) { @Override boolean leadFirst() { return true; } }
+                : new Navigation.InlineLayout(owner.context(), gap));
             Stacks.mount(panel, nodes.stream().map(n -> control(n).component).toList());
         }
 
@@ -1044,6 +1053,7 @@ final class InteractiveRows {
             if (owner.resultsLayout()) { resultLayout(); return; }
             if (owner instanceof Trees.TreeControl tree && tree.layoutPresented(this)) return;
             boolean settingsNavigation=owner instanceof Trees.TreeControl tree && tree.settingsNavigation;
+            if (owner.panelCompact && owner.column < 0 && !settingsNavigation && !owner.identityRows()) { compactLayout(); return; }
             int pad = ThemePainting.metric(owner.context(), settingsNavigation ? DesignMetrics.Role.SETTINGS_NAV_ROW_SIDE : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : owner.column >= 0 ? DesignMetrics.Role.COLUMN_LIST_SIDE : owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_PADDING : DesignMetrics.Role.ICON_GAP),
                     x = pad + indent,
                     width = Math.max(0, getWidth() - pad),
@@ -1082,6 +1092,45 @@ final class InteractiveRows {
                 title.setBounds(x, 0, content, h);
                 subtitle.setBounds(0, 0, 0, 0);
             }
+            leading.doLayout();
+            title.doLayout();
+            subtitle.doLayout();
+            trailing.doLayout();
+        }
+
+        /**
+         * A compact panel row: the leading status dot or glyph, then the title over the subtitle as one block centered in
+         * the row, and the trailing controls at the row's end. A glyph sits nearer the edge than a dot, as its artwork
+         * carries its own side bearing.
+         */
+        void compactLayout() {
+            var context = owner.context();
+            boolean dot = leading.getComponentCount() > 0 && leading.getComponent(0) instanceof Indicators.Dot;
+            int h = getHeight(), x = ThemePainting.metric(context, dot ? DesignMetrics.Role.PANEL_ROW_PADDING : DesignMetrics.Role.PANEL_COMPACT_ROW_PADDING) + indent;
+            // The trailing inset is measured to a switch's painted track; its focus halo extends into the inset.
+            boolean halo = trailing.getComponentCount() > 0 && trailing.getComponent(trailing.getComponentCount() - 1) instanceof Switches.SwitchButton;
+            int end = getWidth() - ThemePainting.metric(context, DesignMetrics.Role.PANEL_COMPACT_ROW_TRAILING)
+                + (halo ? ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING) : 0);
+            int checkWidth = check.isVisible() ? Math.min(check.getPreferredSize().width, Math.max(0, end - x)) : 0;
+            check.setBounds(x, 0, checkWidth, h);
+            x += checkWidth;
+            int tw = Math.min(trailing.getPreferredSize().width, Math.max(0, end - x));
+            trailing.setBounds(Math.max(x, end - tw), 0, tw, h);
+            int gap = ThemePainting.metric(context, DesignMetrics.Role.PANEL_ROW_TEXT_GAP);
+            int textEnd = Math.max(x, end - tw - (tw > 0 ? gap : 0));
+            int lw = Math.min(leading.getPreferredSize().width, Math.max(0, textEnd - x));
+            leading.setBounds(x, 0, lw, h);
+            x += lw + (lw > 0 ? gap : 0);
+            int content = Math.max(0, textEnd - x);
+            // The two lines sit at the title font's ascent-plus-descent pitch, without its leading, as the reference rows do.
+            int titleHeight = title.getPreferredSize().height, subtitleHeight = subtitle.getComponentCount() > 0 ? subtitle.getPreferredSize().height : 0;
+            if (subtitleHeight > 0 && title.getComponentCount() > 0) {
+                var metrics = title.getComponent(0).getFontMetrics(title.getComponent(0).getFont());
+                titleHeight = Math.min(titleHeight, metrics.getAscent() + metrics.getDescent());
+            }
+            int top = Math.max(0, (h - titleHeight - subtitleHeight) / 2);
+            title.setBounds(x, top, content, titleHeight);
+            subtitle.setBounds(x, top + titleHeight, subtitleHeight > 0 ? content : 0, subtitleHeight);
             leading.doLayout();
             title.doLayout();
             subtitle.doLayout();
@@ -1156,14 +1205,15 @@ final class InteractiveRows {
                 }
                 return;
             }
-            if (owner.identityRows() || owner.column == 0 || owner.column == 1 || owner.panelSingle || owner instanceof Trees.TreeControl tree && tree.settingsNavigation) {
+            if (owner.identityRows() || owner.column == 0 || owner.column == 1 || owner.panelSingle || owner.panelCompact || owner instanceof Trees.TreeControl tree && tree.settingsNavigation) {
                 Color fill = owner.selected.contains(id) ? ThemePainting.color(owner.context(), owner.column == 0 ? SemanticColor.SURFACE_CONTROL : SemanticColor.SELECTION_BG)
                     : hover ? ColorMath.opacity(ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY), .05) : null;
                 if (fill != null) {
                     var rounded=(Graphics2D)g.create();
                     try { ThemePainting.antialias(rounded); rounded.setColor(fill);
-                        int arc=ThemePainting.metric(owner.context(), owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_RADIUS : DesignMetrics.Role.CONTROL_RADIUS)*2;
-                        int inset=owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.HAIRLINE) : 0;
+                        boolean panelRow = owner.panelSingle || owner.panelCompact;
+                        int arc=ThemePainting.metric(owner.context(), panelRow ? DesignMetrics.Role.PANEL_ROW_RADIUS : DesignMetrics.Role.CONTROL_RADIUS)*2;
+                        int inset=panelRow ? ThemePainting.metric(owner.context(),DesignMetrics.Role.HAIRLINE) : 0;
                         rounded.fillRoundRect(0,inset,getWidth(),getHeight()-2*inset,arc,arc);
                     } finally {rounded.dispose();}
                 }

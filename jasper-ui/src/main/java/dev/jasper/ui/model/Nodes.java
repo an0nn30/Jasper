@@ -31,8 +31,14 @@ public final class Nodes {
     public enum ListKind { SINGLE, DOUBLE, COMPACT, ORDERED, RESULTS }
     /** WINDOW has exactly one full-bleed content section, no hero, and a shared pinned footer. */
     public enum FormKind { HERO, HERO_COMPACT, SHEET, FULL, SETTINGS, WINDOW }
-    /** SUPPORTING keeps leading adornments natural-sized beside a wrapping final text/body child. */
-    public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION, SUPPORTING, JOINED_ACTIONS, SETTINGS_PAGE, SETTINGS_CONTROLS, SETTINGS_TRAILING, SETTINGS_GROUP_HEADER, SETTINGS_FOOTER, SETTINGS_NAVIGATION }
+    /**
+     * SUPPORTING keeps leading adornments natural-sized beside a wrapping final text/body child. ROUTE is a read-only
+     * route preview (a tunnel's path): a bordered strip on the input surface whose children are its steps, left to
+     * right, with the kit's arrow before every step after the first. A step is a stack whose leading Icon the kit shows
+     * on a category tile in its hue, its other children (Text) being the step's lines; steps keep their natural width,
+     * share the remaining width as equal gaps and truncate their lines when the strip is too narrow.
+     */
+    public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION, SUPPORTING, JOINED_ACTIONS, SETTINGS_PAGE, SETTINGS_CONTROLS, SETTINGS_TRAILING, SETTINGS_GROUP_HEADER, SETTINGS_FOOTER, SETTINGS_NAVIGATION, ROUTE }
     /**
      * SIDEBAR_DETAIL and THREE_COLUMN place their children side by side. DOCUMENT stacks them top to bottom for a document
      * surface (an editor tab): every visible child takes its preferred height except the first visible Custom or Empty
@@ -266,7 +272,11 @@ public final class Nodes {
 
     /** The full form and inline picker share one renderer at two explicit densities. */
     public enum PickerDensity { DEFAULT, COMPACT }
-    /** Grant-free display metadata. Empty primary means the placeholder face. */
+    /**
+     * Grant-free display metadata. Empty primary means the placeholder face. A PICKER's face is its whole control; a
+     * DROPDOWN may carry one too (a rich closed face, such as a saved host's tile, name and endpoint) while its popup
+     * still lists the options and reports Selected; its owner keeps the face describing the selected option.
+     */
     public record PickerFace(String primary, String caption, String icon, Hue hue, PickerDensity density) {
         public PickerFace { Objects.requireNonNull(primary);Objects.requireNonNull(caption);Objects.requireNonNull(icon);Objects.requireNonNull(hue);Objects.requireNonNull(density); }
     }
@@ -296,7 +306,7 @@ public final class Nodes {
             Objects.requireNonNull(action);
             Objects.requireNonNull(icon);
             Objects.requireNonNull(search);Objects.requireNonNull(face);
-            if(face.isPresent() && kind!=ChoiceKind.PICKER)throw new IllegalArgumentException("Rich face requires PICKER");
+            if(face.isPresent() && kind!=ChoiceKind.PICKER && kind!=ChoiceKind.DROPDOWN)throw new IllegalArgumentException("Rich face requires PICKER or DROPDOWN");
             if (kind != ChoiceKind.PICKER && !icon.isEmpty()) throw new IllegalArgumentException("Icon cue requires PICKER");
             if ((kind == ChoiceKind.SEARCHABLE) != search.isPresent()) throw new IllegalArgumentException("Search configuration belongs to SEARCHABLE choices only, which require it");
             if (search.isPresent() && search.get().pinned() > options.size()) throw new IllegalArgumentException("More pinned entries than options");

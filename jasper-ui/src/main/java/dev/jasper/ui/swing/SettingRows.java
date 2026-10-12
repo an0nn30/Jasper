@@ -48,7 +48,8 @@ final class SettingRows {
                     vertical =
                             ThemePainting.metric(
                                     context(), DesignMetrics.Role.SETTING_VERTICAL_PADDING);
-            component.setBorder(panelFooter ? new EmptyBorder(0,0,0,0) : new EmptyBorder(vertical, side + (row.dependent() ? ThemePainting.metric(context(), DesignMetrics.Role.SETTING_DEPENDENT_INDENT) : 0), vertical, side));
+            // A panel footer row reserves its separator above its content; the footer paints the full-width rule there.
+            component.setBorder(panelFooter ? new EmptyBorder(ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE),0,0,0) : new EmptyBorder(vertical, side + (row.dependent() ? ThemePainting.metric(context(), DesignMetrics.Role.SETTING_DEPENDENT_INDENT) : 0), vertical, side));
             component.setLayout(new RowLayout(this));
             ((SearchHighlight) component).highlight(row.highlighted());
         }
@@ -147,8 +148,10 @@ final class SettingRows {
 
         /** A switch reserves its own halo; align its painted track while keeping the halo in the row padding. */
         int paintInset(Container parent) {
+            // A panel footer row has no side padding of its own: the footer's padding holds the switch's halo.
             return parent.getComponentCount() > 2 && parent.getComponent(2) instanceof Switches.SwitchButton
-                ? Math.min(parent.getInsets().right, ThemePainting.metric(owner.context(), DesignMetrics.Role.FOCUS_RING)) : 0;
+                ? owner.panelFooter ? ThemePainting.metric(owner.context(), DesignMetrics.Role.FOCUS_RING)
+                : Math.min(parent.getInsets().right, ThemePainting.metric(owner.context(), DesignMetrics.Role.FOCUS_RING)) : 0;
         }
 
         @Override
@@ -169,7 +172,7 @@ final class SettingRows {
                             + (owner.description.isVisible() ? owner.description.height(w) + ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_DESCRIPTION_GAP) : 0);
             int control = p.getComponentCount() > 2 ? Composition.height(p.getComponent(2), tw) : 0;
             return Math.max(
-                    owner.panelFooter ? 0 : ThemePainting.metric(
+                    owner.panelFooter ? ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE) + ThemePainting.metric(owner.context(), DesignMetrics.Role.PANEL_FOOTER_ROW_HEIGHT) : ThemePainting.metric(
                             owner.context(),
                             owner.settings ? owner.description.isVisible() ? DesignMetrics.Role.SETTINGS_DESCRIPTION_HEIGHT : DesignMetrics.Role.SETTINGS_ROW_HEIGHT : owner.hero && owner.description.isVisible() ? DesignMetrics.Role.HERO_SETTING_HEIGHT : owner.description.isVisible()
                                     ? owner.fullForm ? DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT : DesignMetrics.Role.SETTING_DESCRIPTION_HEIGHT

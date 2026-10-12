@@ -62,9 +62,16 @@ final class Panels {
             state();
             footer.refresh();
             ((Surface)component).column = column;
-            boolean single = ((Nodes.Panel)node).body() instanceof Nodes.ItemList list && list.kind()==Nodes.ListKind.SINGLE;
-            int side = column == 0 || column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_LIST_SIDE) : single ? ThemePainting.metric(context(),DesignMetrics.Role.PANEL_ROW_SIDE) : 0;
-            content.setBorder(new EmptyBorder(column == 0 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP) : 0, side, 0, side));
+            var panel = (Nodes.Panel)node;
+            boolean single = panel.body() instanceof Nodes.ItemList list && list.kind()==Nodes.ListKind.SINGLE;
+            // Two-line panel rows (the body list, or the first child of a vertical body stack) share the panel row inset;
+            // without a search or navigation row above them they start a compact gap below the header.
+            Nodes.Node first = panel.body() instanceof Nodes.Stack stack && stack.role()==Nodes.LayoutRole.VERTICAL && !stack.children().isEmpty() ? stack.children().getFirst() : panel.body();
+            boolean compact = column < 0 && first instanceof Nodes.ItemList list && list.kind()==Nodes.ListKind.DOUBLE;
+            int side = column == 0 || column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_LIST_SIDE) : single || compact ? ThemePainting.metric(context(),DesignMetrics.Role.PANEL_ROW_SIDE) : 0;
+            int top = column == 0 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP)
+                : compact && panel.searchOrNavigation().isEmpty() ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_COMPACT_LIST_TOP) : 0;
+            content.setBorder(new EmptyBorder(top, side, 0, side));
             boolean search=((Nodes.Panel)node).searchOrNavigation().filter(n -> n instanceof Nodes.Field f && f.kind()==Nodes.FieldKind.SEARCH).isPresent();
             int pad = ThemePainting.metric(context(), search && column<0 ? DesignMetrics.Role.PANEL_SEARCH_SIDE : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
             navigation.setBorder(
@@ -126,6 +133,7 @@ final class Panels {
                             && queryControl.component.isVisible());
             footer.setVisible(p.footer().isPresent());
             footerScroll.setVisible(p.footer().isPresent());
+            // The reconciler marks the footer's persistent rows and footer stack before each update (applyPanelBody).
             if (footerControl instanceof SettingRows.RowControl row) {
                 row.panelFooter = true;
                 row.refresh();

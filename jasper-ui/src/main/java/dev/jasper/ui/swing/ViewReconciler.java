@@ -34,6 +34,8 @@ final class ViewReconciler implements AutoCloseable {
         applyFlow(spec.root(), next);
         applyColumns(spec.root(), next, -1, false);
         applyPanelDetail(spec.root(), next, false);
+        applyPanelBody(spec.root(), next, false);
+        applyRoute(spec.root(), next, false);
         applyFullForm(spec.root(), next, false);
         applySettings(spec.root(), next, false);
         applySettingsNavigation(spec.root(),next,false);
@@ -41,6 +43,7 @@ final class ViewReconciler implements AutoCloseable {
         for (var node : nodes.values()) next.get(node.id()).update(node);
         applyHero(spec.root(), next, false);
         applyTiles(spec.root(), next, 0);
+        applyRoute(spec.root(), next, true);
         for (var control : next.values()) if (control instanceof SecretFields.SecretControl secret) {
             String group = ((Nodes.Secret)secret.node).revealGroup();
             if (!group.isEmpty()) secret.reveal(revealGroups.getOrDefault(group, false));
@@ -85,23 +88,26 @@ final class ViewReconciler implements AutoCloseable {
             secret.detailActionsBelow = false;
         }
         if (control instanceof SettingRows.RowControl row) row.panelFooter = false;
-        if (control instanceof InteractiveRows.RowsControl rows) rows.panelSingle = false;
+        if (control instanceof InteractiveRows.RowsControl rows) { rows.panelSingle = false; rows.panelCompact = false; }
         if (control instanceof Buttons.ButtonControl button) {
             button.button.panel = false;
             button.button.panelRow = false;
             button.button.fullFooter = false;
             button.button.orderedAction = false;
+            button.button.panelEmpty = false;
         }
         if (control instanceof Menus.MenuControl menu) {
             menu.main.panel = false;
             menu.arrow.panel = false;
         }
-        if (control instanceof Labels.IconControl icon) icon.tile(0, false);
+        if (control instanceof Labels.IconControl icon) { icon.glyphOverride = 0; icon.tile(0, false); }
+        if (control instanceof EmptyStates.EmptyControl empty) empty.panel = false;
+        if (control instanceof Labels.TextControl preview) preview.formPreview = false;
         if (control instanceof Labels.TextControl && control.component instanceof Labels.LiteralLabel text) {
             text.wrap = false;
             text.flow = false;
         }
-        if (control instanceof Stacks.StackControl stack) stack.sheetHeading = false;
+        if (control instanceof Stacks.StackControl stack) { stack.sheetHeading = false; stack.panelFooter = null; stack.routeStep = false; }
         control.embeddedLabel(false);
         control.hero(false);
     }
@@ -132,6 +138,7 @@ final class ViewReconciler implements AutoCloseable {
     }
     private void applyFullForm(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
         boolean full = node instanceof Nodes.Form form ? form.kind() == Nodes.FormKind.FULL : inherited;
+        if (node instanceof Nodes.Form form) form.preview().ifPresent(preview -> { if (next.get(preview.id()) instanceof Labels.TextControl text) text.formPreview = true; });
         if (next.get(node.id()) instanceof SettingRows.RowControl row) row.fullForm = full;
         ControlRegistry.children(node).forEach(child -> applyFullForm(child, next, full));
     }
@@ -176,6 +183,54 @@ final class ViewReconciler implements AutoCloseable {
                 && child instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.DETAIL;
             applyPanelDetail(child, next, compact);
         }
+    }
+    /**
+     * A panel body's empty states take the panel empty geometry, and its two-line item lists (the body itself or the
+     * first child of a vertical body stack) take the compact panel-row presentation. Header, navigation and footer keep theirs.
+     */
+    private void applyPanelBody(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean body) {
+        var control = next.get(node.id());
+        if (control instanceof EmptyStates.EmptyControl empty) empty.panel = body;
+        if (node instanceof Nodes.Panel panel) {
+            Nodes.Node list = panel.body() instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.VERTICAL && !stack.children().isEmpty()
+                ? stack.children().getFirst() : panel.body();
+            // Manager columns (THREE_COLUMN panels) keep their own column row presentation.
+            boolean dock = !(next.get(panel.id()) instanceof Panels.PanelControl placed) || placed.column < 0;
+            if (dock && list instanceof Nodes.ItemList items && items.kind() == Nodes.ListKind.DOUBLE && next.get(items.id()) instanceof InteractiveRows.RowsControl rows)
+                rows.panelCompact = true;
+            // A settings footer: its persistent setting rows carry the footer rule, and a vertical footer stack spaces its lines.
+            if (next.get(panel.id()) instanceof Panels.PanelControl owner) {
+                var separated = new ArrayList<java.awt.Component>();
+                boolean arranged = false;
+                var footer = panel.footer().orElse(null);
+                if (footer != null && next.get(footer.id()) instanceof SettingRows.RowControl row) { row.panelFooter = true; separated.add(row.component); arranged = true; }
+                else if (footer instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.VERTICAL && next.get(stack.id()) instanceof Stacks.StackControl lines) {
+                    lines.panelFooter = owner.footer; arranged = true;
+                    for (var child : stack.children()) if (next.get(child.id()) instanceof SettingRows.RowControl row) { row.panelFooter = true; separated.add(row.component); }
+                }
+                owner.footer.separators = java.util.List.copyOf(separated);
+                owner.footer.arranged = arranged;
+            }
+            for (var child : ControlRegistry.children(node)) applyPanelBody(child, next, child == panel.body());
+            return;
+        }
+        for (var child : ControlRegistry.children(node)) applyPanelBody(child, next, body);
+    }
+    /**
+     * A ROUTE strip's steps lay out as tile-and-lines (before the update), and each step's leading Icon takes the route
+     * tile in its hue (after it, as the other tile passes do).
+     */
+    private void applyRoute(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean tiles) {
+        if (node instanceof Nodes.Stack route && route.role() == Nodes.LayoutRole.ROUTE) {
+            int tile = view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.ROUTE_TILE),
+                glyph = view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.ROUTE_GLYPH);
+            for (var step : route.children()) {
+                if (!tiles && next.get(step.id()) instanceof Stacks.StackControl control) control.routeStep = true;
+                Nodes.Node lead = step instanceof Nodes.Stack stack && !stack.children().isEmpty() ? stack.children().getFirst() : step;
+                if (tiles && lead instanceof Nodes.Icon && next.get(lead.id()) instanceof Labels.IconControl icon) icon.tile(tile, tile, glyph, false);
+            }
+        }
+        for (var child : ControlRegistry.children(node)) applyRoute(child, next, tiles);
     }
     private void applyTiles(Nodes.Node node, Map<String, ControlRegistry.Control> next, int inherited) {
         int size = node instanceof Nodes.Form form && form.kind() == Nodes.FormKind.SHEET
