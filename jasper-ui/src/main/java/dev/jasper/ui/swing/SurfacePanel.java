@@ -47,10 +47,10 @@ public class SurfacePanel extends JPanel {
     private int metric(DesignMetrics.Role role) { return ThemePainting.metric(context,role); }
     /** Actual clamped boundary between the square header and rounded content. */
     public int surfaceTop() { return kind == Kind.CONTENT ? Math.max(0,Math.min(getHeight(),header.getAsInt())) : 0; }
-    private int arc() { return metric(switch(kind) {
+    /** Arc diameters: the popup and content surfaces' named arcs; a notice is a grouped card (twice the card radius). */
+    private int arc() { return kind == Kind.NOTICE ? 2 * metric(DesignMetrics.Role.CARD_RADIUS) : metric(switch(kind) {
         case POPUP -> DesignMetrics.Role.PALETTE_CORNER_ARC;
-        case CONTENT -> DesignMetrics.Role.WORKSPACE_SURFACE_ARC;
-        case NOTICE -> DesignMetrics.Role.NOTIFICATION_ARC;
+        default -> DesignMetrics.Role.WORKSPACE_SURFACE_ARC;
     }); }
     private Shape shape(int inset) {
         return new RoundRectangle2D.Double(inset,surfaceTop()+inset,Math.max(0,getWidth()-2*inset),
@@ -67,9 +67,11 @@ public class SurfacePanel extends JPanel {
             if(kind == Kind.CONTENT) { g.setColor(getBackground());g.fillRect(0,0,getWidth(),getHeight()); }
             g.setColor(ThemePainting.color(context,SemanticColor.SURFACE_CARD));
             if(kind == Kind.NOTICE) {
-                g.fillRoundRect(0,0,getWidth()-1,getHeight()-1,arc(),arc());
+                // The grouped card face: its fill, then a crisp hairline on the pixel grid (pure stroke control).
+                g.fill(new RoundRectangle2D.Double(0,0,getWidth(),getHeight(),arc(),arc()));
+                g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL,RenderingHints.VALUE_STROKE_PURE);
                 g.setColor(ThemePainting.color(context,SemanticColor.BORDER_SUBTLE));
-                g.drawRoundRect(0,0,getWidth()-1,getHeight()-1,arc(),arc());
+                g.draw(new RoundRectangle2D.Double(.5,.5,getWidth()-1,getHeight()-1,arc(),arc()));
             } else g.fill(shape(0));
         } finally { g.dispose(); }
     }

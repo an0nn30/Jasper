@@ -270,6 +270,19 @@ public final class KitView extends JPanel implements AutoCloseable {
     }
     private boolean surface;
     /**
+     * App-only: whether this view's panels (outside manager columns) paint their own rounded panel surface (the default).
+     * A native tool window that already paints the dock surface behind an app-owned body turns it off, so a body panel
+     * (an empty state) sits on that surface as the rest of the body does. EDT confined.
+     */
+    public void panelSurface(boolean painted) {
+        requireOpen();
+        if (panelSurface == painted) return;
+        panelSurface = painted; refresh(); repaint();
+    }
+    /** Whether this view's panels paint their own surface. */
+    public boolean panelSurface() { return panelSurface; }
+    private boolean panelSurface = true;
+    /**
      * App-only: this view is a native window's title action strip. Its icon-only menu buttons show their menu
      * indicator on the borderless control surface, as the window title references paint them. EDT confined.
      */

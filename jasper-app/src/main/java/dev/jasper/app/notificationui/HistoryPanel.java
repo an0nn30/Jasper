@@ -44,14 +44,17 @@ import javax.swing.Scrollable;
 public final class HistoryPanel extends JPanel {
     private static final String NEW = "New";
     private static final String EARLIER = "Earlier";
+    private static final String ROWS = "rows", EMPTY = "empty";
     static final String CLEAR_ALL = "clear-all";
     private final KitContext kit;
     private final NotificationCenter center;
     private final Set<UUID> fresh = new LinkedHashSet<>();
     private final Rows rows = new Rows();
     private final KitView header, empty, newHeading, earlierHeading;
-    /** Centres the empty text across the panel, as before. */
-    private final JPanel emptyHolder = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 0, 0));
+    /** The rows, or the empty state in their place: a panel body's standard empty state, centred in the body. */
+    private final java.awt.CardLayout bodies = new java.awt.CardLayout();
+    private final JPanel body = new JPanel(bodies);
+    private boolean showingEmpty;
     private final DateTimeFormatter time;
     private final Map<UUID, HistoryRow> shown = new LinkedHashMap<>();
     private final Subscription subscription;
@@ -84,16 +87,19 @@ public final class HistoryPanel extends JPanel {
         top.setOpaque(false);
         top.add(header, BorderLayout.EAST);
         add(top, BorderLayout.NORTH);
-        empty = new KitView(kit, new ViewSpec(new Nodes.Text("empty", ControlState.READY, "No notifications", Nodes.TextRole.DESCRIPTION)), event -> { }, true);
-        emptyHolder.setOpaque(false);
-        emptyHolder.add(empty);
+        empty = new KitView(kit, emptySpec(), event -> { }, true);
+        // The tool window paints the body surface; the empty state sits on it as the rows do.
+        empty.panelSurface(false);
         newHeading = heading(NEW);
         earlierHeading = heading(EARLIER);
         var scroll = new JScrollPane(rows, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.setOpaque(false);
         scroll.getViewport().setOpaque(false);
-        add(scroll, BorderLayout.CENTER);
+        body.setOpaque(false);
+        body.add(scroll, ROWS);
+        body.add(empty, EMPTY);
+        add(body, BorderLayout.CENTER);
         theme = kit.binding().subscribe(pair -> restyle());
         restyle();
         subscription = center.onChange(this::changed);
@@ -123,8 +129,6 @@ public final class HistoryPanel extends JPanel {
         int vertical = metric(DesignMetrics.Role.HISTORY_HEADER_VERTICAL_PADDING);
         header.setBorder(BorderFactory.createEmptyBorder(vertical, metric(DesignMetrics.Role.HISTORY_HEADER_LEADING_PADDING), vertical,
             metric(DesignMetrics.Role.HISTORY_HEADER_TRAILING_PADDING)));
-        int emptyPadding = metric(DesignMetrics.Role.HISTORY_EMPTY_VERTICAL_PADDING);
-        emptyHolder.setBorder(BorderFactory.createEmptyBorder(emptyPadding, side, emptyPadding, side));
         for (var view : List.of(newHeading, earlierHeading))
             view.setBorder(BorderFactory.createEmptyBorder(metric(DesignMetrics.Role.HISTORY_HEADING_TOP_PADDING), side,
                 metric(DesignMetrics.Role.HISTORY_HEADING_BOTTOM_PADDING), side));
@@ -168,10 +172,19 @@ public final class HistoryPanel extends JPanel {
         return ids;
     }
 
-    boolean showingEmpty() { return emptyHolder.getParent() == rows; }
+    boolean showingEmpty() { return showingEmpty; }
 
-    /** The empty text's view, for its placement. */
+    /** The empty state's view (a panel whose body is the standard empty state), for its placement. */
     KitView emptyView() { return empty; }
+
+    /** A hidden-header panel whose body is the standard empty state, so it takes the plugin panels' empty geometry. */
+    private static ViewSpec emptySpec() {
+        return new ViewSpec(new Nodes.Panel("history.empty", ControlState.READY, new Nodes.Header("history.empty.header",
+            new ControlState(false, true, false, ""), "Notification history", java.util.OptionalInt.empty(), java.util.Optional.empty(),
+            java.util.Optional.empty(), List.of()), java.util.Optional.empty(), new Nodes.Empty("empty", ControlState.READY,
+            new Nodes.Icon("empty.icon", ControlState.READY, "bell", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "No notifications"),
+            "No Notifications", "Notifications from Jasper and its plugins appear here.", List.of()), java.util.Optional.empty()));
+    }
 
     HistoryRow row(UUID id) { return shown.get(id); }
 
@@ -234,7 +247,8 @@ public final class HistoryPanel extends JPanel {
         var previous = new HashMap<>(shown);
         shown.clear();
         rows.removeAll();
-        if (all.isEmpty()) rows.add(emptyHolder);
+        showingEmpty = all.isEmpty();
+        bodies.show(body, showingEmpty ? EMPTY : ROWS);
         section(newHeading, all.stream().filter(this::isNew).toList(), previous);
         section(earlierHeading, all.stream().filter(entry -> !isNew(entry)).toList(), previous);
         previous.values().forEach(HistoryRow::close);

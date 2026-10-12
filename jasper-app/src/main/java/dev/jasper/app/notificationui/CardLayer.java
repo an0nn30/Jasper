@@ -340,7 +340,7 @@ public final class CardLayer extends JComponent implements AutoCloseable {
             int argb = new Color(shadow.getRed(), shadow.getGreen(), shadow.getBlue(), alpha).getRGB();
             AffineTransform device = g.getTransform();
             double deviceX = device.getScaleX() > 0 ? device.getScaleX() : 1, deviceY = device.getScaleY() > 0 ? device.getScaleY() : 1;
-            int arc = metric(DesignMetrics.Role.NOTIFICATION_ARC), margin = metric(DesignMetrics.Role.NOTIFICATION_STACK_MARGIN);
+            int arc = 2 * metric(DesignMetrics.Role.CARD_RADIUS), margin = metric(DesignMetrics.Role.NOTIFICATION_STACK_MARGIN);
             int rings = kit.metrics().value(DesignMetrics.Role.NOTIFICATION_STACK_MARGIN);
             for (Slot slot : slots) {
                 Rectangle card = slot.card.getBounds();

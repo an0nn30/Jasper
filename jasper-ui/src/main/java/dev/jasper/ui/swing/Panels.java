@@ -62,6 +62,7 @@ final class Panels {
             state();
             footer.refresh();
             ((Surface)component).column = column;
+            ((Surface)component).painted = view.panelSurface();
             var panel = (Nodes.Panel)node;
             boolean single = panel.body() instanceof Nodes.ItemList list && list.kind()==Nodes.ListKind.SINGLE;
             // Two-line panel rows (the body list, or the first child of a vertical body stack) share the panel row inset;
@@ -265,6 +266,8 @@ final class Panels {
     static final class Surface extends JPanel {
         final KitContext context;
         int column = -1;
+        /** False when the view's host paints the dock surface behind a body panel (KitView.panelSurface). */
+        boolean painted = true;
 
         Surface(KitContext context) {
             this.context = context;
@@ -286,6 +289,7 @@ final class Panels {
                     }
                     return;
                 }
+                if (!painted) return;
                 int r = ThemePainting.metric(context, DesignMetrics.Role.CARD_RADIUS);
                 g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2);
             } finally {
