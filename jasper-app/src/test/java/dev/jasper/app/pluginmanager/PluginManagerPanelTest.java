@@ -56,6 +56,25 @@ class PluginManagerPanelTest {
         }finally{actual.close();themes.close();}
     }
 
+    @Test void anUnbrokenPathWrapsInsideTheViewportInsteadOfWideningTheText() throws Exception {
+        var themes=new dev.jasper.app.appearance.ThemeController();
+        themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
+        var actual=new PluginManagerPanel(themes.appearance().context(ThemeRoute.CHROME),handlers);
+        try {
+            String path="/Users/someone/Library/Application Support/Jasper/plugins/dev.jasper.example.with.a.long.identifier/jars/example-plugin-1.0.0-all-dependencies.jar";
+            String copy="Folder: "+path.replace(" ","_");
+            actual.show(snapshot(TestRows.plugin("dev.jasper.vault","Credential Vault").description(copy).row()));
+            actual.setSize(600,582);for(int i=0;i<4;i++)KitTestSupport.layout(actual);
+            var area=actual.detailsPane().textArea();
+            var viewport=(javax.swing.JViewport)area.getParent();
+            assertThat(area.getWidth()).as("the text tracks its viewport").isLessThanOrEqualTo(viewport.getWidth());
+            var end=area.modelToView2D(copy.length()-1);
+            assertThat(end.getMaxX()).as("the path's end is inside the visible width").isLessThanOrEqualTo(viewport.getWidth());
+            assertThat(end.getY()).as("the path wrapped onto more lines").isGreaterThan(area.modelToView2D(0).getY());
+            assertThat(area.getText()).isEqualTo(copy);
+        }finally{actual.close();themes.close();}
+    }
+
     @Test void nativeDescriptionUsesExactlyOnceKitFontAndRetainsItsDocument() {
         var themes=new dev.jasper.app.appearance.ThemeController();
         themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());

@@ -61,7 +61,9 @@ final class PluginDetails {
             events.accept(event);
         });
         body = new KitView(kit, new ViewSpec(new Nodes.Custom("plugin-text", ControlState.READY, TEXT, Nodes.CustomKind.EDITOR, "Overview")), events);
-        // Plain text in a styled pane, so its paragraphs can take the reading line spacing; it wraps at words.
+        // Plain text in a styled pane, so its paragraphs can take the reading line spacing; it wraps at words, and
+        // an unbroken absolute path wraps at the edge instead of widening the text past the viewport.
+        text.setEditorKit(new WrappingKit());
         text.setEditable(false);
         text.setOpaque(false);
         // Specialized read-only text: selectable and scrollable like the former tabs, painted from module roles.
@@ -105,6 +107,18 @@ final class PluginDetails {
     }
 
     private int metric(DesignMetrics.Role role) { return UIScale.scale(kit.metrics().value(role)); }
+
+    /** Text runs report no minimum width, so the flow breaks a word longer than the line instead of overflowing. */
+    private static final class WrappingKit extends javax.swing.text.StyledEditorKit {
+        @Override public javax.swing.text.ViewFactory getViewFactory() {
+            var base = super.getViewFactory();
+            return element -> javax.swing.text.AbstractDocument.ContentElementName.equals(element.getName())
+                ? new javax.swing.text.LabelView(element) {
+                    @Override public float getMinimumSpan(int axis) { return axis == javax.swing.text.View.X_AXIS ? 0 : super.getMinimumSpan(axis); }
+                }
+                : base.create(element);
+        }
+    }
 
     /** Extra room below each line, as a share of the line, so the overview reads as a paragraph. */
     private void spacing() {
