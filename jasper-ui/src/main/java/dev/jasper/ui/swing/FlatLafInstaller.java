@@ -63,7 +63,7 @@ public final class FlatLafInstaller {
             Map.entry("TextField.background", SemanticColor.SURFACE_INPUT), Map.entry("TextField.foreground", SemanticColor.TEXT_PRIMARY),
             Map.entry("PasswordField.background", SemanticColor.SURFACE_INPUT), Map.entry("PasswordField.foreground", SemanticColor.TEXT_PRIMARY),
             Map.entry("Component.borderColor", SemanticColor.BORDER_INPUT), Map.entry("Component.focusColor", SemanticColor.BORDER_FOCUS),
-            Map.entry("Button.background", SemanticColor.BUTTON_SECONDARY_BG), Map.entry("Button.foreground", SemanticColor.TEXT_PRIMARY),
+            Map.entry("Button.background", SemanticColor.BUTTON_SECONDARY_BG), Map.entry("Button.foreground", SemanticColor.TEXT_STRONG_SECONDARY),
             Map.entry("List.selectionBackground", SemanticColor.SELECTION_BG), Map.entry("List.selectionForeground", SemanticColor.TEXT_ONACCENT));
         roles.forEach((key, role) -> defaults.put(key, new ColorUIResource(palette.color(role))));
     }

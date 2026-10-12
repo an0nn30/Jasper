@@ -218,6 +218,8 @@ final class Choices {
     static final class PickerButton extends Buttons.KitButton {
         final KitContext context; boolean empty; Nodes.PickerFace face;
         PickerButton(KitContext context) { super(context); this.context = context; }
+        // A dropdown trigger keeps the control edge; secondary buttons have their own.
+        @Override Color border() { return ThemePainting.color(context, SemanticColor.BORDER_CONTROL); }
         @Override public Dimension getPreferredSize(){if(face==null)return super.getPreferredSize();return new Dimension(ThemePainting.metric(context,DesignMetrics.Role.PICKER_FACE_WIDTH),ThemePainting.height(context,face.density()==Nodes.PickerDensity.COMPACT ? DesignMetrics.Role.PICKER_COMPACT_HEIGHT : DesignMetrics.Role.PICKER_DEFAULT_HEIGHT,face.density()==Nodes.PickerDensity.COMPACT?Typography.Role.PICKER_COMPACT:Typography.Role.BODY));}
         @Override Color fill(boolean hover) {
             return ThemePainting.color(context, hover ? SemanticColor.SURFACE_CONTROL_HOVER : SemanticColor.SURFACE_CONTROL);
@@ -341,7 +343,7 @@ final class Choices {
             var g = (Graphics2D)graphics.create(); try { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); super.paint(g); } finally { g.dispose(); }
         }
         @Override protected void paintComponent(Graphics graphics) {
-            var g = (Graphics2D)graphics.create(); try { ThemePainting.rounded(g, this, context, ThemePainting.color(context, SemanticColor.SURFACE_CONTROL), ThemePainting.color(context, SemanticColor.BORDER_CONTROL), focus != null && focus.visible(), false); super.paintComponent(g); } finally { g.dispose(); }
+            var g = (Graphics2D)graphics.create(); try { ThemePainting.rounded(g, this, context, ThemePainting.color(context, hover ? SemanticColor.SURFACE_CONTROL_HOVER : SemanticColor.SURFACE_CONTROL), ThemePainting.color(context, SemanticColor.BORDER_CONTROL), focus != null && focus.visible(), false); super.paintComponent(g); } finally { g.dispose(); }
         }
     }
     /** Propagates the segmented track's width-dependent height through its labelled control wrapper. */
@@ -402,7 +404,7 @@ final class Choices {
         final KitContext context;
         SegmentTrack(KitContext context) { this.context = context; setOpaque(false); int pad = ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_PADDING); setBorder(new EmptyBorder(pad, pad, pad, pad)); }
         @Override protected void paintComponent(Graphics graphics) {
-            var g = (Graphics2D)graphics.create(); try { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); ThemePainting.rounded(g, this, context, ThemePainting.color(context, SemanticColor.SURFACE_INPUT), ThemePainting.color(context, SemanticColor.BORDER_SUBTLE), false, false, DesignMetrics.Role.SEGMENT_TRACK_RADIUS); } finally { g.dispose(); }
+            var g = (Graphics2D)graphics.create(); try { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); ThemePainting.rounded(g, this, context, ThemePainting.color(context, SemanticColor.SEGMENT_TRACK), ThemePainting.color(context, SemanticColor.BORDER_INPUT), false, false, DesignMetrics.Role.SEGMENT_TRACK_RADIUS); } finally { g.dispose(); }
         }
     }
     static final class SegmentButton extends Buttons.KitButton {

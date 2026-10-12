@@ -154,7 +154,7 @@ final class Buttons {
             if (recorder()) return armed() && getIcon() == null ? SemanticColor.TEXT_PLACEHOLDER : SemanticColor.TEXT_PRIMARY;
             if (toggle && isSelected()) return SemanticColor.TEXT_PRIMARY;
             return switch (kind) {
-                case PRIMARY -> SemanticColor.TEXT_ONACCENT; case SECONDARY -> SemanticColor.TEXT_PRIMARY;
+                case PRIMARY -> SemanticColor.TEXT_ONACCENT; case SECONDARY -> SemanticColor.TEXT_STRONG_SECONDARY;
                 case GHOST -> hover ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_SECONDARY;
                 case DESTRUCTIVE_GHOST -> hover ? SemanticColor.STATUS_DANGER : SemanticColor.TEXT_SECONDARY;
                 case LINK -> hover ? SemanticColor.TEXT_LINK_HOVER : SemanticColor.TEXT_LINK;
@@ -206,7 +206,7 @@ final class Buttons {
                 case LINK -> hover ? ColorMath.opacity(ThemePainting.color(context, SemanticColor.ACCENT), .08) : null;
             };
         }
-        Color border() { if(borderless) return null; if(recorder()) return ThemePainting.color(context,getAccessibleContext().getAccessibleDescription()!=null && !getAccessibleContext().getAccessibleDescription().isEmpty()?SemanticColor.BORDER_ERROR:SemanticColor.BORDER_INPUT); return kind == Nodes.ButtonKind.SECONDARY ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : null; }
+        Color border() { if(borderless) return null; if(recorder()) return ThemePainting.color(context,getAccessibleContext().getAccessibleDescription()!=null && !getAccessibleContext().getAccessibleDescription().isEmpty()?SemanticColor.BORDER_ERROR:SemanticColor.BORDER_INPUT); return kind == Nodes.ButtonKind.SECONDARY ? ThemePainting.color(context, SemanticColor.BUTTON_SECONDARY_BORDER) : null; }
         boolean contextualVisible() {
             if (!contextual || isFocusOwner() || getModel().isRollover()) return true;
             for (Container parent=getParent();parent!=null;parent=parent.getParent())

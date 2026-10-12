@@ -99,11 +99,11 @@ public final class NativeControlStyles {
             var palette = theme.get().semantic();
             button.putClientProperty("JButton.buttonType", null);
             button.setContentAreaFilled(true); button.setBorderPainted(true);
-            button.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));
+            button.setForeground(palette.color(SemanticColor.TEXT_STRONG_SECONDARY));
             button.putClientProperty("FlatLaf.style", Map.of(
                 "background", palette.color(SemanticColor.BUTTON_SECONDARY_BG),
                 "hoverBackground", palette.color(SemanticColor.BUTTON_SECONDARY_BG_HOVER),
-                "borderColor", palette.color(SemanticColor.BORDER_CONTROL),
+                "borderColor", palette.color(SemanticColor.BUTTON_SECONDARY_BORDER),
                 "focusedBorderColor", palette.color(SemanticColor.BORDER_FOCUS)));
         });
     }
