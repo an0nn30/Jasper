@@ -33,6 +33,8 @@ import java.util.function.Predicate;
 public final class IndexerSettingsPanel implements SettingsPanel {
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT).withZone(ZoneId.systemDefault());
     private static final String TABLE = "indexer.projects", ADD = "indexer.add", REINDEX = "indexer.reindex", REMOVE = "indexer.remove";
+    static final String PAGE = "indexer.settings", PROJECTS_SECTION = "indexer.projects.section", PROJECTS_BODY = "indexer.projects.body",
+        ACTIONS = "indexer.actions", EMPTY = "indexer.projects.empty", DETECTION = "indexer.detection", INDEXING = "indexer.indexing";
     private final UiKit kit;
     private final IndexerSettings settings;
     private final Projects projects;
@@ -108,7 +110,20 @@ public final class IndexerSettingsPanel implements SettingsPanel {
 
     private void render() { if (view != null) view.update(new ViewSpec(node())); }
 
-    private Nodes.Form node() {
+    /**
+     * A Settings page in the canonical composition: section labels above their bodies. Projects is the indexed projects'
+     * table with its actions, or, with none, the standard empty state with Add Folder…; the declared settings follow
+     * as settings cards grouped by what they decide.
+     */
+    private Nodes.Stack node() {
+        var sections = new ArrayList<Nodes.Node>();
+        sections.add(new Nodes.Section(PROJECTS_SECTION, ControlState.READY, "Projects", projects.entries().isEmpty() ? empty() : projectsBody()));
+        sections.add(card(DETECTION, "Detection", List.of(host.row(settings.prompt), host.row(settings.markers), host.row(settings.ignored))));
+        sections.add(card(INDEXING, "Indexing", List.of(host.row(settings.excludes), host.row(settings.maxFiles), host.row(settings.refreshMinutes))));
+        return new Nodes.Stack(PAGE, ControlState.READY, Nodes.LayoutRole.SETTINGS_PAGE, sections);
+    }
+
+    private Nodes.Stack projectsBody() {
         var rows = new ArrayList<TableRow>();
         for (Projects.Entry entry : projects.entries()) {
             var key = entry.project().key();
@@ -119,28 +134,30 @@ public final class IndexerSettingsPanel implements SettingsPanel {
                 "when", entry.index().map(index -> WHEN.format(index.indexedAt())).orElse(""),
                 "state", state(entry)), Optional.of("folder")));
         }
+        // The right-aligned count is the last column, so no left-aligned heading runs into it.
         var table = new Nodes.Table(TABLE, ControlState.READY, List.of(
             new Column("name", "Name", Nodes.TextRole.BODY, false, 1.2, Optional.empty()),
-            new Column("location", "Location", Nodes.TextRole.BODY, false, 2.4, Optional.empty()),
-            new Column("files", "Files", Nodes.TextRole.MONO_SMALL, true, .6, Optional.empty()),
+            new Column("location", "Location", Nodes.TextRole.BODY, false, 2.2, Optional.empty()),
+            new Column("state", "State", Nodes.TextRole.CAPTION, false, 1, Optional.empty()),
             new Column("when", "Last indexed", Nodes.TextRole.CAPTION, false, 1.2, Optional.empty()),
-            new Column("state", "State", Nodes.TextRole.CAPTION, false, 1, Optional.empty())),
+            new Column("files", "Files", Nodes.TextRole.MONO_SMALL, true, .7, Optional.empty())),
             rows, selected == null ? Set.of() : Set.of(selected), "", List.of(), Nodes.SelectionMode.SINGLE);
-        var buttons = new Nodes.Stack("indexer.actions", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
-            new Nodes.Button(ADD, ControlState.READY, "Add Folder…", "add", Nodes.ButtonKind.SECONDARY, ADD, ""),
+        var buttons = new Nodes.Stack(ACTIONS, ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
+            add(),
             new Nodes.Button(REINDEX, enabled(selected != null), "Reindex", "refresh", Nodes.ButtonKind.SECONDARY, REINDEX, ""),
             new Nodes.Button(REMOVE, enabled(selected != null), "Remove", "remove", Nodes.ButtonKind.DESTRUCTIVE_GHOST, REMOVE, "")));
-        var sections = new ArrayList<Nodes.Node>();
-        sections.add(new Nodes.Section("indexer.projects.section", ControlState.READY, "Projects",
-            new Nodes.Stack("indexer.projects.body", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(table, buttons))));
-        sections.add(host.row(settings.prompt));
-        sections.add(host.row(settings.markers));
-        sections.add(host.row(settings.excludes));
-        sections.add(host.row(settings.ignored));
-        sections.add(host.row(settings.maxFiles));
-        sections.add(host.row(settings.refreshMinutes));
-        return new Nodes.Form("indexer.settings", ControlState.READY, Nodes.FormKind.SETTINGS,
-            "Project Index", Optional.empty(), sections, Optional.empty(), List.of());
+        return new Nodes.Stack(PROJECTS_BODY, ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(table, buttons));
+    }
+
+    private static Nodes.Empty empty() {
+        return new Nodes.Empty(EMPTY, ControlState.READY, new Nodes.Icon(EMPTY + ".icon", ControlState.READY, "folder", Nodes.Hue.NONE,
+            Nodes.IconSize.EMPTY, "Projects"), "No Projects", "Add a folder to index its files for the command palette.", List.of(add()));
+    }
+
+    private static Nodes.Button add() { return new Nodes.Button(ADD, ControlState.READY, "Add Folder…", "add", Nodes.ButtonKind.SECONDARY, ADD, ""); }
+
+    private static Nodes.Section card(String id, String title, List<Nodes.Node> rows) {
+        return new Nodes.Section(id, ControlState.READY, title, new Nodes.Card(id + ".card", ControlState.READY, Nodes.CardKind.SETTINGS, rows));
     }
 
     private static ControlState enabled(boolean value) { return new ControlState(true, value, false, ""); }

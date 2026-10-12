@@ -108,13 +108,15 @@ public final class SamplePlugin implements Plugin {
 
     // example:pluginpanels:start
     private static void installPanelAndWindow(PluginContext context, long stepMillis) {
-        // One instance per window, built the first time the panel is shown there.
+        // One instance per window, built the first time the panel is shown there. Its body is the kit's empty state:
+        // a tile, a title, one sentence and one secondary action, centered in the panel.
         context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, Anchor.LEFT), host ->
             context.kit().create(new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
                 new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
-                Optional.empty(), new Nodes.Stack("sample.body", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
-                    new Nodes.Text("sample.description", ControlState.READY, "Runs a short demo activity in the background.", Nodes.TextRole.DESCRIPTION),
-                    new Nodes.Button(RUN_BUTTON, ControlState.READY, "Run sample activity", FLASK, Nodes.ButtonKind.PRIMARY, RUN_BUTTON, ""))),
+                Optional.empty(), new Nodes.Empty("sample.body", ControlState.READY,
+                    new Nodes.Icon("sample.icon", ControlState.READY, FLASK, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, "Sample"),
+                    "Sample Activity", "Runs a short demo activity in the background.",
+                    List.of(new Nodes.Button(RUN_BUTTON, ControlState.READY, "Run Sample Activity", "", Nodes.ButtonKind.SECONDARY, RUN_BUTTON, ""))),
                 Optional.empty())), event -> {
                     if (event instanceof UiEvent.Action action && action.id().equals(RUN_BUTTON))
                         context.background().execute(() -> demo(context, stepMillis));
@@ -124,17 +126,18 @@ public final class SamplePlugin implements Plugin {
             // The application builds the frame, title bar and menu bar; a singleton comes back while it is open.
             PluginWindow window = context.windows().create(
                 new WindowSpec("dev.jasper.sample.about-window", "About Sample", new Dimension(360, 200), true));
-            var content = context.kit().create(new ViewSpec(new Nodes.Stack("sample.about", ControlState.READY,
-                Nodes.LayoutRole.VERTICAL, List.of(
-                    new Nodes.Text("sample.about.text", ControlState.READY,
-                        "This window's chrome belongs to Jasper; its content to the plugin.", Nodes.TextRole.BODY),
-                    new Nodes.Button(DETAILS_BUTTON, ControlState.READY, "Details…", "", Nodes.ButtonKind.SECONDARY, DETAILS_BUTTON, "")))), event -> {
+            var content = context.kit().create(new ViewSpec(new Nodes.Empty("sample.about", ControlState.READY,
+                new Nodes.Icon("sample.about.icon", ControlState.READY, FLASK, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, "Sample"), "Sample Plugin",
+                "This window's chrome belongs to Jasper; its content to the plugin.",
+                List.of(new Nodes.Button(DETAILS_BUTTON, ControlState.READY, "Details…", "", Nodes.ButtonKind.SECONDARY, DETAILS_BUTTON, "")))), event -> {
                 if (!(event instanceof UiEvent.Action action) || !action.id().equals(DETAILS_BUTTON)) return;
-                PluginDialog dialog = context.windows().dialog(new DialogSpec("Sample details", window, true));
+                PluginDialog dialog = context.windows().dialog(new DialogSpec("Sample Details", window, true));
+                // A sheet's canonical body: a form card of label/value rows, then the one primary action.
                 var body = context.kit().create(new ViewSpec(new Nodes.Form("sample.details", ControlState.READY,
-                    Nodes.FormKind.SHEET, "Sample details", Optional.empty(), List.of(
-                        new Nodes.Text("sample.version", ControlState.READY, "Sample plugin " + context.plugin().version(), Nodes.TextRole.BODY)),
-                    Optional.empty(), List.of(new Nodes.Button(CLOSE_BUTTON, ControlState.READY, "Close", "", Nodes.ButtonKind.SECONDARY, CLOSE_BUTTON, "")),
+                    Nodes.FormKind.SHEET, "Sample Details", Optional.empty(), List.of(new Nodes.Card("sample.details.card", ControlState.READY,
+                        Nodes.CardKind.FORM, List.of(new Nodes.FormRow("sample.version.row", ControlState.READY, "Version", "",
+                            new Nodes.Text("sample.version", ControlState.READY, context.plugin().version(), Nodes.TextRole.BODY), Optional.empty())))),
+                    Optional.empty(), List.of(new Nodes.Button(CLOSE_BUTTON, ControlState.READY, "Close", "", Nodes.ButtonKind.PRIMARY, CLOSE_BUTTON, "")),
                     CLOSE_BUTTON)), answer -> {
                     if (answer instanceof UiEvent.Action chosen && chosen.id().equals(CLOSE_BUTTON)) dialog.close();
                 });

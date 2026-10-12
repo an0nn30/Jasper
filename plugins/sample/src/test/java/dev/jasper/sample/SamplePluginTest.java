@@ -70,23 +70,36 @@ class SamplePluginTest {
             var page = host.settingsPanel("dev.jasper.sample").orElseThrow();
             assertThat(host.failures()).isEmpty();
             var view = host.settingsPanelView("dev.jasper.sample").orElseThrow();
-            assertThat(view.spec().root()).isInstanceOf(dev.jasper.sdk.ui.Nodes.Form.class);
+            // The canonical Settings page: section labels above settings cards of the host's rows.
+            var root = (dev.jasper.sdk.ui.Nodes.Stack) view.spec().root();
+            assertThat(root.role()).isEqualTo(dev.jasper.sdk.ui.Nodes.LayoutRole.SETTINGS_PAGE);
+            assertThat(root.children()).extracting(node -> ((dev.jasper.sdk.ui.Nodes.Section) node).title()).containsExactly("Demos", "Timing");
+            assertThat(root.children()).allSatisfy(node -> assertThat(((dev.jasper.sdk.ui.Nodes.Section) node).body())
+                .isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Card.class, card -> assertThat(card.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.CardKind.SETTINGS)));
+            assertThat(rows(view)).hasSize(6);
             assertThat(find(page, javax.swing.JSlider.class)).isNull();
-            assertThat(((dev.jasper.sdk.ui.Nodes.Form) view.spec().root()).sections()).hasSize(6);
-            var stepRow = (dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Form) view.spec().root()).sections().getLast();
-            var step = (dev.jasper.sdk.ui.Nodes.Field) ((dev.jasper.sdk.ui.Nodes.Stack) stepRow.control()).children().getFirst();
+            var stepRow = rows(view).getLast();
+            var controls = (dev.jasper.sdk.ui.Nodes.Stack) stepRow.control();
+            assertThat(controls.role()).as("the generated pages' trailing control slot").isEqualTo(dev.jasper.sdk.ui.Nodes.LayoutRole.SETTINGS_TRAILING);
+            var step = (dev.jasper.sdk.ui.Nodes.Field) controls.children().getFirst();
+            var reset = (dev.jasper.sdk.ui.Nodes.Button) controls.children().getLast();
+            assertThat(reset.label()).as("an icon-only Reset").isEmpty();
+            assertThat(reset.icon()).isEqualTo("refresh");
+            assertThat(reset.state().visible()).as("nothing to reset at the default").isFalse();
             assertThat(step.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldKind.NUMBER);
             assertThat(step.value()).isEqualTo("300");
             assertThat(step.numeric()).contains(new dev.jasper.sdk.ui.Nodes.Numeric(0, 5000, 1, 0));
             host.highlightSettingsPanel("dev.jasper.sample", "step delay");
-            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Form) view.spec().root()).sections().getLast()).highlighted()).isTrue();
+            assertThat(rows(view).getLast().highlighted()).isTrue();
             view.emit(new dev.jasper.sdk.ui.UiEvent.Edited("settings:demo_step_millis", "1200"));
             assertThat(host.pendingSettings("dev.jasper.sample")).containsEntry("demo_step_millis", 1200);
-            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Form) view.spec().root()).sections().getLast()).highlighted()).isTrue();
+            assertThat(rows(view).getLast().highlighted()).isTrue();
+            assertThat(((dev.jasper.sdk.ui.Nodes.Stack) rows(view).getLast().control()).children().getLast().state().visible())
+                .as("a changed value can be reset").isTrue();
             host.highlightSettingsPanel("dev.jasper.sample", "milliseconds");
-            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Form) view.spec().root()).sections().getLast()).highlighted()).isTrue();
+            assertThat(rows(view).getLast().highlighted()).isTrue();
             host.highlightSettingsPanel("dev.jasper.sample", "");
-            assertThat(((dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Form) view.spec().root()).sections().getLast()).highlighted()).isFalse();
+            assertThat(rows(view).getLast().highlighted()).isFalse();
             assertThat(host.settingsPanelChanges("dev.jasper.sample")).isPositive();
         } });
     }
@@ -101,23 +114,34 @@ class SamplePluginTest {
             javax.swing.SwingUtilities.invokeAndWait(() -> {
                 host.openPanel("dev.jasper.sample.panel", window);
                 var panel = host.panelView("dev.jasper.sample.panel", window).orElseThrow();
-                var body = (dev.jasper.sdk.ui.Nodes.Stack) ((dev.jasper.sdk.ui.Nodes.Panel) panel.spec().root()).body();
-                var run = (dev.jasper.sdk.ui.Nodes.Button) body.children().getLast();
+                var body = (dev.jasper.sdk.ui.Nodes.Empty) ((dev.jasper.sdk.ui.Nodes.Panel) panel.spec().root()).body();
+                assertThat(body.title()).isEqualTo("Sample Activity");
+                var run = (dev.jasper.sdk.ui.Nodes.Button) body.actions().getLast();
+                assertThat(run.kind()).as("an empty state's one secondary action").isEqualTo(dev.jasper.sdk.ui.Nodes.ButtonKind.SECONDARY);
                 panel.emit(new dev.jasper.sdk.ui.UiEvent.Action(run.action()));
                 assertThat(host.invoke("dev.jasper.sample.about", window, null)).isTrue();
                 var about = host.windowView("dev.jasper.sample", "About Sample").orElseThrow();
-                var details = (dev.jasper.sdk.ui.Nodes.Button) ((dev.jasper.sdk.ui.Nodes.Stack) about.spec().root()).children().getLast();
+                var details = (dev.jasper.sdk.ui.Nodes.Button) ((dev.jasper.sdk.ui.Nodes.Empty) about.spec().root()).actions().getLast();
                 about.emit(new dev.jasper.sdk.ui.UiEvent.Action(details.action()));
-                var dialog = host.windowView("dev.jasper.sample", "Sample details").orElseThrow();
+                var dialog = host.windowView("dev.jasper.sample", "Sample Details").orElseThrow();
                 var sheet = (dev.jasper.sdk.ui.Nodes.Form) dialog.spec().root();
+                assertThat(sheet.sections()).singleElement().isInstanceOf(dev.jasper.sdk.ui.Nodes.Card.class);
+                assertThat(sheet.actions()).singleElement().satisfies(close -> assertThat(close.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY));
                 dialog.emit(new dev.jasper.sdk.ui.UiEvent.Action(sheet.cancelAction()));
-                assertThat(host.windowView("dev.jasper.sample", "Sample details")).isEmpty();
+                assertThat(host.windowView("dev.jasper.sample", "Sample Details")).isEmpty();
             });
             assertThat(host.runBackground()).isEqualTo(1);
             host.flush();
             assertThat(host.activityLog()).anyMatch(event -> event.state() == ActivityEvent.State.STARTED);
             assertThat(host.failures()).isEmpty();
         }
+    }
+
+    /** The page's setting rows, in order, across its section cards. */
+    private static java.util.List<dev.jasper.sdk.ui.Nodes.SettingRow> rows(dev.jasper.sdk.testing.FakeKitView view) {
+        return ((dev.jasper.sdk.ui.Nodes.Stack) view.spec().root()).children().stream()
+            .flatMap(section -> ((dev.jasper.sdk.ui.Nodes.Card) ((dev.jasper.sdk.ui.Nodes.Section) section).body()).children().stream())
+            .map(dev.jasper.sdk.ui.Nodes.SettingRow.class::cast).toList();
     }
 
     private static <T> T find(java.awt.Container root, Class<T> type) {

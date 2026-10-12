@@ -32,9 +32,11 @@ final class KitSettingRows {
                 ? Optional.of(new Nodes.Numeric(range.min(), range.max(), 1, 0)) : Optional.<Nodes.Numeric>empty();
             input = new Nodes.Field(id, state, kind, text, "", spec.label(), "", numeric);
         }
-        var reset = new Nodes.Button(id + ":reset", ControlState.READY, "Reset", "", Nodes.ButtonKind.GHOST, id + ":reset", "Reset to default");
+        // As the host: the settings control slot, then the icon-only Reset, shown while the value differs from the default.
+        var reset = new Nodes.Button(id + ":reset", new ControlState(!Objects.equals(value, spec.defaultValue()), true, false, ""), "", "refresh",
+            Nodes.ButtonKind.GHOST, id + ":reset", "Reset " + spec.label() + " to default");
         return new Nodes.SettingRow(id + ":row", state, spec.label(), spec.description(),
-            new Nodes.Stack(id + ":controls", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(input, reset)), false);
+            new Nodes.Stack(id + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(input, reset)), false);
     }
 
     static boolean matches(SettingSpec<?> spec, String query) {

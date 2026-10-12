@@ -34,9 +34,16 @@ final class KitSettingRows {
             var numeric=spec.kind() instanceof SettingKind.IntegerRange range?Optional.of(new Nodes.Numeric(range.min(),range.max(),1,0)):Optional.<Nodes.Numeric>empty();
             control=new Nodes.Field(id,state,kind,edits.getOrDefault(id,text),"",spec.label(),"",numeric);
         }
-        var reset=new Nodes.Button(id+":reset",ControlState.READY,"Reset","",Nodes.ButtonKind.GHOST,id+":reset","Reset to default");
-        return new Nodes.SettingRow(id+":row",state,spec.label(),spec.description(),
-            new Nodes.Stack(id+":controls",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(control,reset)),false);
+        return new Nodes.SettingRow(id+":row",state,spec.label(),spec.description(),trailing(id,spec,value,control),false);
+    }
+    /**
+     * The generated Settings pages' trailing arrangement: the control in the settings control slot, then the icon-only
+     * Reset, shown while the pending value differs from the default; its slot stays reserved so controls never move.
+     */
+    static Nodes.Stack trailing(String id,SettingSpec<?> spec,Object value,Nodes.Node control){
+        var reset=new Nodes.Button(id+":reset",new ControlState(!Objects.equals(value,spec.defaultValue()),true,false,""),"","refresh",
+            Nodes.ButtonKind.GHOST,id+":reset","Reset "+spec.label()+" to default");
+        return new Nodes.Stack(id+":controls",ControlState.READY,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(control,reset));
     }
     private static boolean matches(SettingSpec<?> spec,String query){return SearchText.matches(String.join(" ",spec.label(),spec.description(),String.join(" ",spec.keywords())),query);}
     @SuppressWarnings({"unchecked","rawtypes"})

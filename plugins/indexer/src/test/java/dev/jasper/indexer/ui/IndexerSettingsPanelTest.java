@@ -54,14 +54,14 @@ class IndexerSettingsPanelTest {
                     adds::incrementAndGet, (question, accepted) -> { questions.add(question); pendingRemoval.set(accepted); if (allow.get()) accepted.run(); })));
                 host.settingsPanel(IndexerTesting.INFO.id()).orElseThrow();
                 FakeKitView view = host.settingsPanelView(IndexerTesting.INFO.id()).orElseThrow();
-                assertThat(view.spec().root()).isInstanceOf(Nodes.Form.class);
+                assertThat(view.spec().root()).isInstanceOfSatisfying(Nodes.Stack.class, page -> assertThat(page.role()).isEqualTo(Nodes.LayoutRole.SETTINGS_PAGE));
                 host.highlightSettingsPanel(IndexerTesting.INFO.id(), "excluded folders");
-                assertThat(((Nodes.SettingRow) ((Nodes.Form) view.spec().root()).sections().get(3)).highlighted()).isTrue();
+                assertThat(node(view, "settings:excludes:row", Nodes.SettingRow.class).highlighted()).isTrue();
                 view.emit(new UiEvent.Edited("settings:excludes", ".git\nnew-hidden"));
                 projects.indexing(APP, false);
-                assertThat(((Nodes.SettingRow) ((Nodes.Form) view.spec().root()).sections().get(3)).highlighted()).isTrue();
+                assertThat(node(view, "settings:excludes:row", Nodes.SettingRow.class).highlighted()).isTrue();
                 host.highlightSettingsPanel(IndexerTesting.INFO.id(), "");
-                assertThat(((Nodes.SettingRow) ((Nodes.Form) view.spec().root()).sections().get(3)).highlighted()).isFalse();
+                assertThat(node(view, "settings:excludes:row", Nodes.SettingRow.class).highlighted()).isFalse();
                 assertThat(row(view, 0).cells()).containsEntry("name", "app").containsEntry("location", "at /w/app")
                     .containsEntry("files", "2").containsEntry("state", "Fresh");
                 assertThat(action(view, "indexer.reindex").state().enabled()).isFalse();
@@ -83,7 +83,11 @@ class IndexerSettingsPanelTest {
                 allow.set(true);
                 view.emit(new UiEvent.Action(action(view, "indexer.remove").action()));
                 assertThat(projects.entries()).isEmpty();
-                assertThat(table(view).rows()).isEmpty();
+                assertThat(find(view.spec().root(), "indexer.projects")).as("no table without projects").isNull();
+                var empty = node(view, IndexerSettingsPanel.EMPTY, Nodes.Empty.class);
+                assertThat(empty.title()).isEqualTo("No Projects");
+                view.emit(new UiEvent.Action(action(view, "indexer.add").action()));
+                assertThat(adds).as("the empty state's Add Folder… is the same action").hasValue(2);
                 assertThat(host.failures()).isEmpty();
             }
         });
@@ -149,18 +153,30 @@ class IndexerSettingsPanelTest {
         });
     }
 
-    private static Nodes.Table table(FakeKitView view) {
-        var form = (Nodes.Form) view.spec().root();
-        var section = (Nodes.Section) form.sections().getFirst();
-        return (Nodes.Table) ((Nodes.Stack) section.body()).children().getFirst();
-    }
+    private static Nodes.Table table(FakeKitView view) { return node(view, "indexer.projects", Nodes.Table.class); }
 
     private static dev.jasper.sdk.ui.TableRow row(FakeKitView view, int index) { return table(view).rows().get(index); }
 
-    private static Nodes.Button action(FakeKitView view, String id) {
-        var form = (Nodes.Form) view.spec().root();
-        var section = (Nodes.Section) form.sections().getFirst();
-        var buttons = (Nodes.Stack) ((Nodes.Stack) section.body()).children().get(1);
-        return buttons.children().stream().map(Nodes.Button.class::cast).filter(button -> button.id().equals(id)).findFirst().orElseThrow();
+    private static Nodes.Button action(FakeKitView view, String id) { return node(view, id, Nodes.Button.class); }
+
+    static <T extends Nodes.Node> T node(FakeKitView view, String id, Class<T> type) {
+        var found = find(view.spec().root(), id);
+        assertThat(found).as(id).isInstanceOf(type);
+        return type.cast(found);
+    }
+
+    static Nodes.Node find(Nodes.Node node, String id) {
+        if (node.id().equals(id)) return node;
+        List<Nodes.Node> children = switch (node) {
+            case Nodes.Stack stack -> stack.children();
+            case Nodes.Section section -> List.of(section.body());
+            case Nodes.Card card -> card.children();
+            case Nodes.SettingRow row -> List.of(row.control());
+            case Nodes.Empty empty -> empty.actions();
+            case Nodes.Form form -> form.sections();
+            default -> List.of();
+        };
+        for (var child : children) { var found = find(child, id); if (found != null) return found; }
+        return null;
     }
 }
