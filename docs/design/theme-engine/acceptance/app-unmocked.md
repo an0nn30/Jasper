@@ -37,6 +37,12 @@ bars stay user-run checks and nothing here accepts a page. Fixture names, paths 
 - `SurfacePanel.Kind.NOTICE` paints a grouped card (`CARD_RADIUS`, pure-stroke hairline); `SurfacePanel.footerBand` (new,
   host-only) is the WINDOW footer band for native shells.
 - Host-only `KitView.managerColumn(ManagerColumn)` (NONE/RAIL/LIST) and `KitView.panelSurface(boolean)`; not in the SDK.
+- Forms install their footer scroll border once instead of replacing an equal border on every refresh (the replacement
+  fired a border change that FlatLaf answers by resolving `Table.scrollPaneBorder`; a WINDOW form refreshing during
+  another view's appearance rollback broke `WorkspaceRolesTest`'s defaults snapshot). No visual change.
+- Tests: `jasper-ui` `AppManagerKitTest` (SIDEBAR_DETAIL columns, rail tree and list table, panel surface, actions
+  dropdown, notice card); app owner tests rewritten for the new compositions with behaviour assertions kept
+  (`ErrorsViewTest` now closes the views it opens).
 - `DesignMetrics`: new `ERRORS_TRACE_ROWS(12)`, `DETAIL_IDENTITY_MIN_WIDTH(160)` (after `NOTIFICATION_WIDTH`); changed
   `CHOOSER_MODIFIED_COLUMN` 140 → 150; removed (unused) `NOTIFICATION_PADDING`, `NOTIFICATION_ARC`,
   `HISTORY_EMPTY_VERTICAL_PADDING`, `CHOOSER_TOOLBAR_GAP`, `CHOOSER_BOTTOM_GAP`, `CHOOSER_PREVIEW_SIDE_PADDING` and the
@@ -92,6 +98,14 @@ retry, and the replace and new-folder sheets. No clipping or overlap at 13 and 2
   panels paint `SURFACE_PANEL`; the host surface is workspace-stream chrome, not changed here.
 - Clear All stays a focusable ghost button in the panel body (an earlier explicit decision and test).
 - At 32 pt the evidence harness still saves notification cards 360 logical wide (pre-existing harness width).
+
+## Verification
+
+Full `./gradlew check --continue` headless on this branch (the app suite re-run after the Forms fix): 828 XML files,
+10,033 tests, 0 failures, 0 errors, 6 existing skips (jasper-app 2,744 / 1 skip, jasper-ui 583, plugins/editor 4,822,
+remote 498, terminal 400 / 4 skips, fileserver 263, vault 192 / 1 skip, testkit 151, buddy 150, indexer 98, sdk 66,
+history 41, sample 14, snippets 11); architecture gates, JavaDoc doclint and compiled documentation examples included.
+Changed Java sources pass the AGENTS.md character-hygiene scan. No GUI, benchmark or AOT task was run.
 
 ## Regenerate
 
