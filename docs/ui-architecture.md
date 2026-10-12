@@ -109,7 +109,10 @@ at `OVERLAY_SCRIM_PERCENT`) and the content in a centred, outlined, rounded card
 the scrim in while the card fades from transparent and rises `OVERLAY_RISE` into place over
 `OVERLAY_ENTER_MILLIS`, easing out (cubic); closing is its opposite over `OVERLAY_EXIT_MILLIS`: the card lifts off
 at once and rises another `OVERLAY_RISE` (easing out, from wherever it is if the entrance had not finished) while it
-fades (easing in) and the scrim lifts. With one shared ease-in the card barely moved before it had faded. The motion
+fades (easing in) and the scrim lifts. With one shared ease-in the card barely moved before it had faded. Each
+transition's clock starts at its first drawn frame (after a new form's layout and the card's snapshot), so none of the
+motion is spent before it can be seen, and a leaving card keeps its size although the closed dialog's content leaves
+it at once. The motion
 follows the kit's motion policy, so it is instant with animations off and settles at once if they are turned off
 mid-way. While it moves the card paints one snapshot of its content, so it fades as a single surface (no control
 paints its own disabled alpha ahead of the rest); at rest the content paints live. The host adds the overlay to a

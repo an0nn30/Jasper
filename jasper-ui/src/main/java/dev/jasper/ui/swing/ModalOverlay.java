@@ -47,7 +47,15 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
     private final AutoCloseable appearance;
     private AutoCloseable effect;
     private Phase phase = Phase.NEW;
+    /** The transition's clock: from the first frame drawn, so the layout and snapshot before it cost none of the motion. */
     private long started;
+    /** A transition waiting for its first frame; {@link #requested} is when it asked. */
+    private boolean waiting;
+    private long requested;
+    /** How long a transition waits for a frame before its clock starts anyway (a window that never draws). */
+    static final long FIRST_FRAME_WAIT_NANOS = 120_000_000L;
+    /** The leaving card's size, kept while it rises and fades: the closed dialog's content leaves the card at once. */
+    private Dimension leavingSize;
     /** How far in the card is, 0 (gone) to 1 (in place): the eased share of the running transition. */
     private double shown;
     /** Where the exit started from, so a close during the entrance fades out from there. */
@@ -119,13 +127,15 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
         from = phase == Phase.NEW ? 0 : shown;
         fromOffset = offset;
         phase = Phase.CLOSING;
+        leavingSize = card.getSize();
         leaving = from > 0 && motion.enabled() ? card.picture() : null;
         card.setVisible(false);
         begin(context.metrics().value(DesignMetrics.Role.OVERLAY_EXIT_MILLIS));
     }
 
     private void begin(int millis) {
-        started = clock.getAsLong();
+        requested = clock.getAsLong();
+        waiting = true;
         stopFrames();
         if (millis <= 0 || !motion.enabled() || phase == Phase.CLOSING && from == 0) { finish(); return; }
         effect = motion.register(this::finish);
@@ -138,6 +148,10 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
         if (phase != Phase.OPENING && phase != Phase.CLOSING) return;
         // Motion turned off mid-way settles the transition (the policy runs finish).
         if (!motion.enabled()) return;
+        if (waiting) {
+            if (clock.getAsLong() - requested < FIRST_FRAME_WAIT_NANOS) { placeCard(); repaint(); return; }
+            startClock();
+        }
         int millis = context.metrics().value(phase == Phase.OPENING ? DesignMetrics.Role.OVERLAY_ENTER_MILLIS : DesignMetrics.Role.OVERLAY_EXIT_MILLIS);
         double t = Math.min(1, Math.max(0, (clock.getAsLong() - started) / 1e6 / millis));
         if (phase == Phase.OPENING) { shown = easeOutCubic(t); offset = 1 - shown; }
@@ -149,8 +163,17 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
         repaint();
     }
 
+    private void startClock() { waiting = false; started = clock.getAsLong(); }
+
+    /** Draws the overlay; the first frame of a transition starts its clock once it has been drawn. */
+    @Override public void paint(Graphics graphics) {
+        super.paint(graphics);
+        if (waiting && (phase == Phase.OPENING || phase == Phase.CLOSING)) startClock();
+    }
+
     private void finish() {
         stopFrames();
+        waiting = false;
         if (phase == Phase.OPENING) {
             phase = Phase.OPEN;
             shown = 1;
@@ -163,6 +186,7 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
             shown = 0;
             offset = -1;
             leaving = null;
+            leavingSize = null;
             remove();
             Runnable after = removed;
             removed = () -> { };
@@ -220,7 +244,8 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
     /** Centred within the margin, moved by its offset: lowered while it rises in, raised as it rises out. */
     private void placeCard() {
         int margin = Math.min(ThemePainting.metric(context, DesignMetrics.Role.OVERLAY_MARGIN), Math.min(getWidth(), getHeight()) / 2);
-        Dimension preferred = card.getPreferredSize();
+        // A leaving card keeps its size: its content has gone, and re-measured it would shrink to a dot.
+        Dimension preferred = phase == Phase.CLOSING && leavingSize != null ? leavingSize : card.getPreferredSize();
         int width = Math.min(Math.max(0, preferred.width), Math.max(0, getWidth() - 2 * margin));
         int height = Math.min(Math.max(0, preferred.height), Math.max(0, getHeight() - 2 * margin));
         int lower = (int) Math.round(ThemePainting.metric(context, DesignMetrics.Role.OVERLAY_RISE) * offset);
@@ -236,7 +261,8 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
             g.setColor(ColorMath.opacity(scrim, context.metrics().value(DesignMetrics.Role.OVERLAY_SCRIM_PERCENT) / 100.0 * shown));
             g.fillRect(0, 0, getWidth(), getHeight());
             Rectangle at = card.getBounds();
-            if (at.isEmpty() || shown <= 0) return;
+            // A leaving card shows only as its picture; with none (motion off, never shown) nothing of it is drawn.
+            if (at.isEmpty() || shown <= 0 || phase == Phase.CLOSING && leaving == null) return;
             // A soft shadow: nested rounded fills, one step wider each, together reaching the shadow's strength.
             int reach = ThemePainting.metric(context, DesignMetrics.Role.OVERLAY_SHADOW), radius = ThemePainting.metric(context, DesignMetrics.Role.WINDOW_RADIUS);
             double strength = context.metrics().value(DesignMetrics.Role.OVERLAY_SHADOW_PERCENT) / 100.0 * shown;

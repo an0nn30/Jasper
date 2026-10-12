@@ -42,6 +42,10 @@ class ModalOverlayTest {
             overlay.setBounds(0, 0, 800, 600);
         }
         void at(long millis) { now.addAndGet(millis * MS); overlay.tick(); }
+        /** Opens and draws the first frame, which starts the entrance's clock. */
+        void open() { overlay.open(); paint(); }
+        /** Starts the exit and draws its first frame, which starts its clock. */
+        void dismiss(Runnable removed) { overlay.dismiss(removed); paint(); }
         /** The card's top when in place: centred in the window less the margin. */
         int restingY() { return 16 + (600 - 32 - 192) / 2; }
         BufferedImage paint() {
@@ -69,7 +73,7 @@ class ModalOverlayTest {
     @Test void theCardFadesUpSixteenIntoPlaceOverTheEntranceAsTheScrimDims() {
         Edt.run(() -> { try (var f = new Fixture()) {
             assertThat(f.context.metrics().value(DesignMetrics.Role.OVERLAY_ENTER_MILLIS)).isBetween(200, 250);
-            f.overlay.open();
+            f.open();
             assertThat(f.overlay.shown()).as("starts transparent").isZero();
             assertThat(f.overlay.cardBounds()).isEqualTo(new Rectangle(199, f.restingY() + 16, 402, 192));
             assertThat(f.paint().getRGB(20, 20) >>> 24).as("no scrim yet").isZero();
@@ -101,10 +105,10 @@ class ModalOverlayTest {
      */
     @Test void closingLiftsOffWhileStillVisibleFadesOutAndRemovesTheOverlayWhenDone() {
         Edt.run(() -> { try (var f = new Fixture()) {
-            f.overlay.open(); f.at(220);
+            f.open(); f.at(220);
             assertThat(f.context.metrics().value(DesignMetrics.Role.OVERLAY_EXIT_MILLIS)).isBetween(150, 200);
             int[] removed = {0};
-            f.overlay.dismiss(() -> removed[0]++);
+            f.dismiss(() -> removed[0]++);
             assertThat(f.overlay.active()).isFalse();
             assertThat(f.overlay.card().isVisible()).as("the leaving card takes no input").isFalse();
             f.at(40);
@@ -123,6 +127,53 @@ class ModalOverlayTest {
         } });
     }
 
+    /**
+     * The entrance's clock starts at the first frame drawn: a new form's layout and the card's snapshot come before it,
+     * and an ease-out spends most of its motion early, so starting at open() showed a card already nearly in place.
+     */
+    @Test void theClockStartsAtTheFirstFrameDrawnSoNoneOfTheEntranceIsLost() {
+        Edt.run(() -> { try (var f = new Fixture()) {
+            f.overlay.open();
+            f.at(100);
+            assertThat(f.overlay.shown()).as("nothing drawn yet, nothing spent").isZero();
+            assertThat(f.overlay.cardBounds().y).isEqualTo(f.restingY() + 16);
+            f.paint();
+            f.at(110);
+            assertThat(f.overlay.shown()).isEqualTo(.875);
+        } });
+    }
+
+    /** A window that never draws (hidden, or headless) still runs its transitions, a little late. */
+    @Test void withoutAFrameDrawnTheClockStartsAfterAShortWait() {
+        Edt.run(() -> { try (var f = new Fixture()) {
+            f.overlay.open();
+            f.at(130);
+            assertThat(f.overlay.shown()).isZero();
+            f.at(110);
+            assertThat(f.overlay.shown()).isEqualTo(.875);
+            f.at(110);
+            assertThat(f.overlay.phase()).isEqualTo(ModalOverlay.Phase.OPEN);
+        } });
+    }
+
+    /**
+     * The dialog's content goes as soon as it closes; the leaving card keeps its size, so its picture rises and fades
+     * whole. Re-measured each frame it shrank to a dot at the centre, its shadow a small dark circle.
+     */
+    @Test void theLeavingCardKeepsItsSizeWhenItsContentIsGone() {
+        Edt.run(() -> { try (var f = new Fixture()) {
+            f.open(); f.at(220);
+            f.dismiss(() -> { });
+            f.overlay.card().removeAll();
+            f.overlay.card().revalidate();
+            f.at(100);
+            assertThat(f.overlay.cardBounds().getSize()).isEqualTo(new Dimension(402, 192));
+            assertThat(f.overlay.cardBounds().y).isEqualTo(f.restingY() - 14);
+            var image = f.paint();
+            assertThat(new Color(image.getRGB(400, f.overlay.cardBounds().y + 96), true).getRed()).as("the content's picture, fading").isGreaterThan(150);
+        } });
+    }
+
     @Test void withMotionOffItAppearsAndLeavesAtOnce() {
         Edt.run(() -> { try (var f = new Fixture()) {
             f.motion.set(false);
@@ -138,7 +189,7 @@ class ModalOverlayTest {
 
     @Test void turningMotionOffMidwaySettlesInPlace() {
         Edt.run(() -> { try (var f = new Fixture()) {
-            f.overlay.open(); f.at(50);
+            f.open(); f.at(50);
             f.motion.set(false); f.at(10);
             assertThat(f.overlay.phase()).isEqualTo(ModalOverlay.Phase.OPEN);
             assertThat(f.overlay.cardBounds().y).isEqualTo(f.restingY());
@@ -148,8 +199,8 @@ class ModalOverlayTest {
     /** Dismissed while still rising in, it carries on upward from where it was as it fades out. */
     @Test void closingDuringTheEntranceCarriesOnUpwardFromWhereItWas() {
         Edt.run(() -> { try (var f = new Fixture()) {
-            f.overlay.open(); f.at(110);
-            f.overlay.dismiss(() -> { });
+            f.open(); f.at(110);
+            f.dismiss(() -> { });
             assertThat(f.overlay.shown()).isEqualTo(.875);
             int previous = f.overlay.cardBounds().y;
             assertThat(previous).isEqualTo(f.restingY() + 2);
@@ -173,8 +224,8 @@ class ModalOverlayTest {
             int before;
             try { before = ((java.util.List<?>) field.get(f.context.binding())).size(); }
             catch (IllegalAccessException e) { throw new AssertionError(e); }
-            f.overlay.open(); f.at(220);
-            f.overlay.dismiss(f.overlay::close); f.at(200);
+            f.open(); f.at(220);
+            f.dismiss(f.overlay::close); f.at(200);
             assertThat(f.overlay.getParent()).isNull();
             try { assertThat(((java.util.List<?>) field.get(f.context.binding())).size()).isEqualTo(before - 1); }
             catch (IllegalAccessException e) { throw new AssertionError(e); }
