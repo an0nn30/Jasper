@@ -169,6 +169,20 @@ RESULTS reserves its fixed data-row metric, and existing heading sizing is retai
 or without `visibleRows` keep their prior sizing. No SDK shape changes; the fake retains descriptors and validates
 references, while module and real-host tests verify layout.
 
+App manager surfaces (Plan 3 Task 9, unmocked app windows): `SplitKind.SIDEBAR_DETAIL` is the three-column manager
+without its rail: its last child is the detail column and the others list columns (list width `MANAGER_LIST_WIDTH`,
+fitted to at most half the width; no gap, the columns meet at their hairline). A list column without a search row starts
+its rows at `COLUMN_RAIL_TOP`, and one-line rows in a list column take the rail's `COLUMN_RAIL_ROW` (two-line rows keep
+`COLUMN_ITEM_ROW`). A manager detail heading's title block keeps `DETAIL_IDENTITY_MIN_WIDTH` (or its own width) before its
+actions wrap, and a caption over its value in a manager detail keeps `DETAIL_VALUE_GAP`. Host-only: `KitView.managerColumn`
+presents a whole native-arranged view as a RAIL (rail rows; a tree's branches become flat `SECTION_LABEL` headings
+without disclosure) or LIST column (rounded selection; a table's header on the row inset and its rows below
+`COLUMN_RAIL_TOP`); `KitView.panelSurface(false)` leaves a body panel's rounded surface to a native host that already
+paints it; `SurfacePanel.footerBand` is the WINDOW footer band for native shells. The notice surface (notification
+cards) is a grouped card: `CARD_RADIUS` corners and a crisp pure-stroke hairline. A dropdown in an ACTIONS stack is
+labelled by its accessible name only, and a natural-width dropdown reserves its chevron lane for its longest plain option.
+None of these is part of the plugin SDK except the SIDEBAR_DETAIL presentation, which plugins reach through the same kind.
+
 Panel capabilities (Plan 3 Tasks 6-7): an `Empty` that is a panel's body (or the last child of a DOCUMENT split
 body under a note) takes the plugin-panel geometry, centred in the body; a two-line `ItemList` directly in a panel is a
 compact inset row whose title line keeps its first text (the name) whole while it fits in half the line, and a `Chip` on

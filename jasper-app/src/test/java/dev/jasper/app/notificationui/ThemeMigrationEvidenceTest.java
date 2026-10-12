@@ -27,7 +27,7 @@ class ThemeMigrationEvidenceTest {
             save("notifications", theme, "warning-card", card, 360, 160);
             var incidents = new Incidents(Clock.fixed(Instant.parse("2026-10-05T12:00:00Z"), ZoneOffset.UTC));
             var view = new ErrorsView(kit, incidents, new ErrorsView.Hooks(id -> "Example plugin", id -> "1.0.0",
-                new IncidentReport.Environment("baseline", "Headless", "JBR 25"), text -> { }, id -> { }, () -> { }), ZoneOffset.UTC);
+                new IncidentReport.Environment("baseline", "Headless", "JBR 25"), text -> { }, id -> { }, () -> { }), ZoneOffset.UTC, () -> { });
             try {
                 save("notification-errors", theme, "empty", view, 900, 540);
                 incidents.record("dev.jasper.remote", "Fixture operation", "FixtureThread", Capture.of(new IllegalStateException("Fixture failure")));

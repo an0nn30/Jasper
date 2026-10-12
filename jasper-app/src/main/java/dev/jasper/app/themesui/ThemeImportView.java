@@ -16,8 +16,8 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * Immutable providers and explicit per-provider choices, as a kit sheet: one conflict dropdown per theme, the warnings
- * and failures as literal text, and Cancel/Import. No file operations. EDT only.
+ * Immutable providers and explicit per-provider choices, as a kit sheet: a Themes card with one conflict dropdown row per
+ * theme, a Warnings card of the warnings and failures as literal text, and Cancel/Import. No file operations. EDT only.
  */
 final class ThemeImportView {
     static final String IMPORT = "import", CANCEL = "cancel", DETAILS = "details";
@@ -61,20 +61,29 @@ final class ThemeImportView {
         return switch (choice) { case REPLACE -> "Replace"; case KEEP_BOTH -> "Keep both"; case SKIP -> "Skip"; };
     }
 
+    /**
+     * A Themes card of one row per provider (its name, source entry caption and conflict dropdown) and a Warnings card of
+     * the literal details, each under its section label, then Cancel and the primary Import.
+     */
     private ViewSpec spec() {
         var sections = new ArrayList<Nodes.Node>();
+        var rows = new ArrayList<Nodes.Node>();
         for (var item : plan.items()) {
             var offered = item.target().isPresent() ? List.of(ThemeImporter.ConflictChoice.values())
                 : List.of(ThemeImporter.ConflictChoice.KEEP_BOTH, ThemeImporter.ConflictChoice.SKIP);
             var options = offered.stream().map(choice -> new Option(choice.name(), label(choice), Optional.<Nodes.Hue>empty())).toList();
             String name = item.conversion().document().name();
-            sections.add(new Nodes.FormRow("row:" + item.id(), ControlState.READY, name, item.conversion().sourceEntry(),
+            rows.add(new Nodes.FormRow("row:" + item.id(), ControlState.READY, name, item.conversion().sourceEntry(),
                 new Nodes.Choice("decision:" + item.id(), new ControlState(true, !committing, false, ""), Nodes.ChoiceKind.DROPDOWN, options,
                     decisions.get(item.id()).name(), name + " conflict choice", ""), Optional.empty()));
         }
-        if (!details.isEmpty()) sections.add(new Nodes.Text(DETAILS, ControlState.READY, details, Nodes.TextRole.DESCRIPTION));
+        if (!rows.isEmpty()) sections.add(new Nodes.Section("themes", ControlState.READY, "Themes",
+            new Nodes.Card("themes.card", ControlState.READY, Nodes.CardKind.FORM, rows)));
+        if (!details.isEmpty()) sections.add(new Nodes.Section("warnings", ControlState.READY, "Warnings",
+            new Nodes.Card("warnings.card", ControlState.READY, Nodes.CardKind.FORM,
+                List.of(new Nodes.Text(DETAILS, ControlState.READY, details, Nodes.TextRole.DESCRIPTION)))));
         var importing = new ControlState(true, !plan.items().isEmpty() && !committing, false, "");
-        return new ViewSpec(new Nodes.Form("theme-import", ControlState.READY, Nodes.FormKind.SHEET, "Import themes", Optional.empty(), sections,
+        return new ViewSpec(new Nodes.Form("theme-import", ControlState.READY, Nodes.FormKind.SHEET, "Import Themes", Optional.empty(), sections,
             Optional.empty(), List.of(new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
                 new Nodes.Button(IMPORT, importing, "Import", "", Nodes.ButtonKind.PRIMARY, IMPORT, "")), CANCEL));
     }

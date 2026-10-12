@@ -146,6 +146,8 @@ final class Tables {
         void data() {
             measureColumns();
             scroll.setMinimumSize(new Dimension(usableWidth(),0));
+            // A manager list column's rows start at the rail's top inset below the header, level with a rail beside it.
+            scroll.setViewportBorder(column >= 0 ? BorderFactory.createEmptyBorder(ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP), 0, 0, 0) : null);
             header.removeAll();
             header.setLayout(weights());
             for (var column : value().columns()) {
@@ -171,15 +173,15 @@ final class Tables {
                 });
                 header.add(label);
             }
-            int pad =
-                    ThemePainting.metric(
-                            context(), DesignMetrics.Role.ICON_GAP);
+            // The header's titles start where the cells' text does: the row inset (a manager column's, else the icon gap).
+            int pad = ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP),
+                    side = column >= 0 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_LIST_SIDE) : pad;
             header.setBorder(
                     BorderFactory.createEmptyBorder(
                             pad,
-                            pad + (multiple() ? new JCheckBox().getPreferredSize().width : 0),
+                            side + (multiple() ? new JCheckBox().getPreferredSize().width : 0),
                             pad,
-                            pad));
+                            side));
             header.revalidate();
             header.repaint();
         }

@@ -70,8 +70,8 @@ class FileChooserPanelTest {
             var table=(JComponent)listing.getViewport().getView();
             int row=((javax.swing.Scrollable)table).getScrollableUnitIncrement(new java.awt.Rectangle(),javax.swing.SwingConstants.VERTICAL,1);
             assertThat(listing.getViewport().getHeight()).as("two browse rows survive short height").isGreaterThanOrEqualTo(2*row);
-            table.scrollRectToVisible(new java.awt.Rectangle(0,0,1,row));
-            assertThat(table.getVisibleRect().height).isGreaterThanOrEqualTo(row);
+            reveal(listing);table.scrollRectToVisible(new java.awt.Rectangle(0,0,1,row));
+            assertThat(table.getVisibleRect().height).as("the first row is reachable by scrolling").isGreaterThanOrEqualTo(row);
             for(String id:List.of("primary","cancel")) {
                 var action=KitTestSupport.require(panel,id,JComponent.class);action.scrollRectToVisible(new java.awt.Rectangle(0,0,action.getWidth(),action.getHeight()));
                 assertThat(action.getVisibleRect().height).isEqualTo(action.getHeight());
@@ -103,7 +103,7 @@ class FileChooserPanelTest {
             int inkWidth=nameCell.getWidth()-nameCell.getIcon().getIconWidth()-nameCell.getIconTextGap();
             assertThat(inkWidth).as("filename has meaningful ink beyond its icon and ellipsis").isGreaterThanOrEqualTo(nameCell.getFontMetrics(nameCell.getFont()).stringWidth("no…"));
             var table=(JComponent)listing.getViewport().getView();
-            table.scrollRectToVisible(new java.awt.Rectangle(0,0,1,40));
+            reveal(listing);table.scrollRectToVisible(new java.awt.Rectangle(0,0,1,40));
             assertThat(table.getVisibleRect().height).isGreaterThanOrEqualTo(40);
             assertThat(panel.previewText()).isEqualTo("hello\n");
             panel.setSize(2400,900);for(int i=0;i<6;i++)KitTestSupport.layout(panel);
@@ -112,6 +112,16 @@ class FileChooserPanelTest {
             for(int i=0;i<6;i++)KitTestSupport.layout(panel);
             assertThat(panel.split().getDividerLocation()).as("explicit drag survives refresh").isEqualTo(410);
         } finally {panel.close();themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());themes.close();}
+    }
+
+    /** Scrolls every scrolling ancestor of {@code target} until its top is in view, as a user scrolling there would. */
+    private static void reveal(java.awt.Component target) {
+        for (var parent = target.getParent(); parent != null; parent = parent.getParent())
+            if (parent instanceof javax.swing.JViewport viewport && viewport.getView() != null) {
+                var at = javax.swing.SwingUtilities.convertPoint(target, 0, 0, viewport.getView());
+                int limit = Math.max(0, viewport.getView().getHeight() - viewport.getExtentSize().height);
+                viewport.setViewPosition(new java.awt.Point(viewport.getViewPosition().x, Math.min(limit, Math.max(0, at.y))));
+            }
     }
 
     private ChooserSource hosts() {

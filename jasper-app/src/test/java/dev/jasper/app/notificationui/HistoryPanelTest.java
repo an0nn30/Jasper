@@ -73,16 +73,26 @@ class HistoryPanelTest {
         assertThat(panel.clearAllButton().isEnabled()).isFalse();
     }
 
-    /** Review M9: "No notifications" is centred across the panel, as before. */
-    @Test void theEmptyTextIsCentred() {
+    /** The empty history is the panels' standard empty state (tile, title, sentence), centred in the panel body. */
+    @Test void theEmptyStateIsThePanelEmptyStateCentred() {
         var panel = panel(true);
         show();
         panel.setSize(400, 300);
         for (int pass = 0; pass < 3; pass++) LayoutTestSupport.layoutTree(panel);
         var empty = panel.emptyView();
-        var bounds = SwingUtilities.convertRectangle(empty.getParent(), empty.getBounds(), panel);
-        assertThat(bounds.width).as("as wide as its text").isLessThan(panel.getWidth() / 2);
-        assertThat(Math.abs(bounds.x + bounds.width / 2 - panel.getWidth() / 2)).as("centred").isLessThanOrEqualTo(1);
+        assertThat(empty.isShowing() || empty.isVisible()).isTrue();
+        var root = (dev.jasper.ui.model.Nodes.Panel) empty.spec().root();
+        assertThat(root.body()).isInstanceOfSatisfying(dev.jasper.ui.model.Nodes.Empty.class, state -> {
+            assertThat(state.title()).isEqualTo("No Notifications");
+            assertThat(state.description()).isNotBlank();
+        });
+        var title = dev.jasper.app.testsupport.KitTestSupport.require(empty, "empty.title", java.awt.Component.class);
+        var bounds = SwingUtilities.convertRectangle(title.getParent(), title.getBounds(), panel);
+        assertThat(bounds.width).as("within the panel empty text width").isLessThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_EMPTY_TEXT_WIDTH)));
+        assertThat(Math.abs(bounds.x + bounds.width / 2 - panel.getWidth() / 2)).as("centred across").isLessThanOrEqualTo(1);
+        var clear = SwingUtilities.convertRectangle(panel.clearAllButton().getParent(), panel.clearAllButton().getBounds(), panel);
+        assertThat(bounds.y).as("in the body below Clear All").isGreaterThan(clear.y + clear.height);
+        assertThat(bounds.y + bounds.height / 2).as("centred down the body").isGreaterThan(panel.getHeight() / 3);
     }
 
     /** The title wraps to the row (as the former wrapping title did), strong while unread, with its count beside it. */

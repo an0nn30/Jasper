@@ -220,16 +220,18 @@ class NotificationCardTest {
     }
 
     /**
-     * The link row: each link fits its fractionally painted label (no padding), as tall as the text line plus the former
-     * 2 px above and below, 12 px before every link but the first, starting at the text column. Close keeps its 16 px
-     * glyph in the 16 px slot at the top right.
+     * The link row: each link fits its fractionally painted label (no padding), as tall as the text line plus 2 px above
+     * and below, 12 px before every link but the first, starting at the text column (the card's 15 px grouped-card
+     * padding, the 16 px glyph and its 8 px gap). Close keeps its 16 px glyph in the 16 px slot inside the top right padding.
      */
-    @Test void linksAndCloseKeepTheFormerGeometry() {
+    @Test void linksAndCloseUseTheCardGeometry() {
         var card = card(posted(withActions(titled("Geometry"), List.of("Open", "Show in Finder", "Copy", "Four"))), true);
         layOut(card);
         assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_LINK_GAP)).isEqualTo(12);
         assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_LINK_VERTICAL_PADDING)).isEqualTo(2);
-        int textX = UIScale.scale(12 + 16 + 8), gap = UIScale.scale(12), padding = UIScale.scale(2);
+        int pad = DesignMetrics.DEFAULT.value(DesignMetrics.Role.CARD_PADDING) + DesignMetrics.DEFAULT.value(DesignMetrics.Role.HAIRLINE);
+        assertThat(pad).as("a grouped card's inner padding").isEqualTo(15);
+        int textX = UIScale.scale(pad + 16 + 8), gap = UIScale.scale(12), padding = UIScale.scale(2);
         var views = new ArrayList<JComponent>();
         for (var view : card.linkViews()) if (view.isVisible()) views.add(view);
         if (card.moreView().isVisible()) views.add(card.moreView());
@@ -261,7 +263,7 @@ class NotificationCardTest {
             x += view.getWidth();
         }
         var close = card.closeView();
-        assertThat(close.getBounds()).isEqualTo(new java.awt.Rectangle(UIScale.scale(360 - 12 - 16), UIScale.scale(12), UIScale.scale(16), UIScale.scale(16)));
+        assertThat(close.getBounds()).isEqualTo(new java.awt.Rectangle(UIScale.scale(360 - pad - 16), UIScale.scale(pad), UIScale.scale(16), UIScale.scale(16)));
         var closeButton = find(close, NotificationCard.CLOSE, AbstractButton.class);
         assertThat(closeButton.getIcon().getIconWidth()).as("the whole 16 px glyph").isEqualTo(UIScale.scale(16));
         assertThat(closeButton.getInsets()).isEqualTo(new java.awt.Insets(0, 0, 0, 0));

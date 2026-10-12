@@ -3,6 +3,8 @@ package dev.jasper.app.themesui;
 import dev.jasper.app.settingsui.PageContext;
 import dev.jasper.app.themeimport.ThemeImporter;
 import dev.jasper.app.windows.AuxiliaryWindows;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.Nodes;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,7 +57,7 @@ public final class ThemeImport implements AutoCloseable {
     public boolean busy() { return busy; }
 
     /** Imports a chosen file and shows what was imported, warned about or failed. */
-    public void start() { importThemes(result -> dialogs.message("Import themes", report(result))); }
+    public void start() { importThemes(result -> dialogs.sheet(reportTitle(result), report(result))); }
 
     /** As {@link #start()}, handing the report to {@code report} instead of showing it. */
     void importThemes(Consumer<ThemeImporter.ImportReport> report) {
@@ -71,20 +73,48 @@ public final class ThemeImport implements AutoCloseable {
             error(new IllegalArgumentException("Choose a .theme.json, .jar, .zip or .toml file."));
             return;
         }
-        work(() -> importer.plan(chosen.get()), plan -> dialogs.view("Import themes", (accept, cancel) -> new ThemeImportView(dialogs.kit(), plan, choices -> {
+        work(() -> importer.plan(chosen.get()), plan -> dialogs.view("Import Themes", (accept, cancel) -> new ThemeImportView(dialogs.kit(), plan, choices -> {
             accept.run();
             if (closed || ticket != generation) return;
             work(() -> importer.commit(plan, choices), result -> { done(); report.accept(result); }, true);
         }, cancel).view, this::done), false);
     }
 
-    /** One line per imported theme, warning and failure. */
-    static String report(ThemeImporter.ImportReport result) {
-        var lines = new ArrayList<String>();
-        result.imported().forEach(item -> lines.add("Imported " + item.name() + " — " + item.path()));
-        lines.addAll(result.warnings());
-        result.failures().forEach(failure -> lines.add(failure.sourceEntry() + ": " + failure.message()));
-        return lines.isEmpty() ? "Nothing was imported." : String.join("\n", lines);
+    /** The report sheet's title: what happened, in Title Case. */
+    static String reportTitle(ThemeImporter.ImportReport result) {
+        int imported = result.imported().size();
+        return imported == 0 ? "Nothing Imported" : imported == 1 ? "Theme Imported" : "Themes Imported";
+    }
+
+    /**
+     * The report as sheet sections: an Imported card of theme name and written file rows, then Warnings and Not Imported
+     * cards of literal lines; a single sentence when nothing happened. All text is literal.
+     */
+    static List<Nodes.Node> report(ThemeImporter.ImportReport result) {
+        var sections = new ArrayList<Nodes.Node>();
+        if (!result.imported().isEmpty()) {
+            var rows = new ArrayList<Nodes.Node>();
+            for (int i = 0; i < result.imported().size(); i++) {
+                var item = result.imported().get(i);
+                rows.add(new Nodes.FormRow("imported:" + i, ControlState.READY, item.name(), "",
+                    new Nodes.Text("imported:" + i + ".path", ControlState.READY, item.path().toString(), Nodes.TextRole.MONO_SMALL), Optional.empty()));
+            }
+            sections.add(section("imported", "Imported", rows));
+        }
+        if (!result.warnings().isEmpty()) sections.add(section("warnings", "Warnings", List.of(
+            new Nodes.Text("warnings.text", ControlState.READY, String.join("\n", result.warnings()), Nodes.TextRole.DESCRIPTION))));
+        if (!result.failures().isEmpty()) {
+            var lines = new ArrayList<String>();
+            result.failures().forEach(failure -> lines.add(failure.sourceEntry() + ": " + failure.message()));
+            sections.add(section("failures", "Not Imported", List.of(
+                new Nodes.Text("failures.text", ControlState.READY, String.join("\n", lines), Nodes.TextRole.DESCRIPTION))));
+        }
+        if (sections.isEmpty()) sections.add(new Nodes.Text("message-text", ControlState.READY, "Nothing was imported.", Nodes.TextRole.DESCRIPTION));
+        return sections;
+    }
+
+    private static Nodes.Section section(String id, String title, List<Nodes.Node> children) {
+        return new Nodes.Section(id, ControlState.READY, title, new Nodes.Card(id + ".card", ControlState.READY, Nodes.CardKind.FORM, children));
     }
 
     private boolean begin() {
@@ -98,7 +128,7 @@ public final class ThemeImport implements AutoCloseable {
 
     private void error(Throwable failure) {
         done();
-        if (!closed) dialogs.message("Theme import failed", Objects.toString(failure.getMessage(), failure.toString()));
+        if (!closed) dialogs.message("Theme Import Failed", Objects.toString(failure.getMessage(), failure.toString()));
     }
 
     private <T> void work(Callable<T> operation, Consumer<T> success, boolean writes) {

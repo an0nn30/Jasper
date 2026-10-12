@@ -127,7 +127,7 @@ final class Trees {
             return detail.body.getComponentCount()==0?0:Composition.height(detail.body.getComponent(0),width)+detailTop()+detailBottom()+detailAfter();
         }
         @Override int minimumRowHeight(){return settingsNavigation?ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_ROW,dev.jasper.ui.metrics.Typography.Role.SETTINGS_BODY):presentation.isEmpty()?0:ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_ROW_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY);}
-        @Override boolean uniformRows(){return !settingsNavigation && detail==null && presentation.isEmpty();}
+        @Override boolean uniformRows(){return !settingsNavigation && !rail() && detail==null && presentation.isEmpty();}
         private int keyWidth(int index,int width) {
             var value=presentation.get(itemId(index));
             if(value==null || value.keycaps().isEmpty())return 0;
@@ -173,8 +173,10 @@ final class Trees {
             int line=(int)Math.ceil(font.getLineMetrics("Ag",new java.awt.font.FontRenderContext(null,true,true)).getHeight());
             return Math.max(ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_GROUP_HEIGHT),line+ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_VERTICAL_PADDING));
         }
+        /** A manager rail's tree (column 0): its branches are flat section headings, its leaves rail rows. */
+        boolean rail(){return column==0 && !settingsNavigation && presentation.isEmpty();}
         @Override int rowShellHeight(int index){
-            if(settingsNavigation && !visible.get(index).item().leaf())return ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_HEADING,dev.jasper.ui.metrics.Typography.Role.SECTION_LABEL);
+            if((settingsNavigation || rail()) && !visible.get(index).item().leaf())return ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_HEADING,dev.jasper.ui.metrics.Typography.Role.SECTION_LABEL);
             if(!presentation.isEmpty() && !visible.get(index).item().leaf())return keycapGroupHeight();
             var value=presentation.get(itemId(index));
             return value==null || value.keycaps().isEmpty()?rowHeight:Math.max(rowHeight,new Keycaps(context(),value.keycaps().get()).heightAt(keyWidth(index,scroll.getViewport().getExtentSize().width))+2*detailInset());
@@ -301,9 +303,9 @@ final class Trees {
             row.begin();
             var entry = visible.get(index);
             var item = entry.item();
-            row.indent = settingsNavigation?0:!presentation.isEmpty() && item.leaf()?ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_LEAF_INDENT):entry.depth() * com.formdev.flatlaf.util.UIScale.scale(16);
+            row.indent = settingsNavigation || rail()?0:!presentation.isEmpty() && item.leaf()?ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_LEAF_INDENT):entry.depth() * com.formdev.flatlaf.util.UIScale.scale(16);
             var leading = new ArrayList<Nodes.Node>();
-            if (!item.leaf() && !settingsNavigation)
+            if (!item.leaf() && !settingsNavigation && !rail())
                 leading.add(
                         new Nodes.Button(
                                 "@tree/" + node.id() + "/" + item.id() + "/expand",
@@ -340,7 +342,7 @@ final class Trees {
                                     titleId,
                                     ControlState.READY,
                                     item.title(),
-                                    settingsNavigation && !item.leaf()?Nodes.TextRole.SECTION_LABEL:!presentation.isEmpty()&&!item.leaf()?Nodes.TextRole.PANEL_TITLE:item.emphasized() ? Nodes.TextRole.BODY_STRONG : Nodes.TextRole.BODY)));
+                                    (settingsNavigation || rail()) && !item.leaf()?Nodes.TextRole.SECTION_LABEL:!presentation.isEmpty()&&!item.leaf()?Nodes.TextRole.PANEL_TITLE:item.emphasized() ? Nodes.TextRole.BODY_STRONG : Nodes.TextRole.BODY)));
             // Settings navigation pages use the Settings body face; recycled rows restore the declared role.
             if(row.controls.get(titleId) instanceof Labels.TextControl titleText) {
                 var role=settingsNavigation && item.leaf() ? dev.jasper.ui.metrics.Typography.Role.SETTINGS_BODY : null;
@@ -391,7 +393,8 @@ final class Trees {
             // The row, its slots and its passive texts (title, trailing columns, count) show the item's literal tooltip.
             row.tooltip(item.tooltip());
             row.name(List.of(new Nodes.Text("@tree/" + node.id() + "/" + item.id() + "/name", ControlState.READY, item.title(), Nodes.TextRole.BODY)));
-            if (!item.leaf()) {
+            // A rail's section headings have no disclosure button.
+            if (!item.leaf() && row.controls.get("@tree/"+node.id()+"/"+item.id()+"/expand") != null) {
                 var c = (Buttons.ButtonControl) row.controls.get("@tree/"+node.id()+"/"+item.id()+"/expand");
                 if (c.button.getClientProperty("Jasper.treeCommand") == null) {
                     for (var listener : c.button.getActionListeners())

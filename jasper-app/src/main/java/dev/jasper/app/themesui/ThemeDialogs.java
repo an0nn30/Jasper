@@ -52,10 +52,15 @@ final class ThemeDialogs implements AutoCloseable {
         }
     }
 
-    /** Shows literal {@code text} with a Close button. */
+    /** Shows literal {@code text} under {@code title} with a Close button: the canonical notice sheet. */
     void message(String title, String text) {
+        sheet(title, List.of(new Nodes.Text("message-text", ControlState.READY, text, Nodes.TextRole.DESCRIPTION)));
+    }
+
+    /** Shows a SHEET form of {@code sections} (literal text, section labels over cards) with its one primary Close. */
+    void sheet(String title, List<Nodes.Node> sections) {
         view(title, (accept, reject) -> new KitView(kit(), new ViewSpec(new Nodes.Form("message", ControlState.READY, Nodes.FormKind.SHEET, title,
-            Optional.empty(), List.of(new Nodes.Text("message-text", ControlState.READY, text, Nodes.TextRole.DESCRIPTION)), Optional.empty(),
+            Optional.empty(), sections, Optional.empty(),
             List.of(new Nodes.Button("close", ControlState.READY, "Close", "", Nodes.ButtonKind.PRIMARY, "close", "")), "close")),
             event -> { if (event instanceof UiEvent.Action action && action.id().equals("close")) accept.run(); }), () -> { });
     }

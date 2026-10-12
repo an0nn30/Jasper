@@ -114,7 +114,9 @@ class ThemeImportTest {
         edt(() -> {
             var shown=windows.open().getLast();
             assertThat(shown).isNotEqualTo(owner);
-            assertThat(texts(shown.holder())).anyMatch(text -> text.startsWith("Imported Example — "));
+            assertThat(shown.title()).isEqualTo("Theme Imported");
+            assertThat(texts(shown.holder())).contains("Theme Imported", "Imported", "Example")
+                .anyMatch(text -> text.endsWith("Example.toml") || text.endsWith("example.toml"));
         });
     }
     @Test void cancellationAndClosingBeforeWorkNeverWriteOrResurrectDialogs() throws Exception {
@@ -132,9 +134,29 @@ class ThemeImportTest {
     @Test void anUnsupportedFileIsRefusedWithoutWork() throws Exception {
         chosen=home.resolve("bad.exe"); edt(() -> {imports.importThemes(report::set);assertThat(imports.busy()).isFalse();}); assertThat(worker.jobs).isEmpty();
     }
+    /** The report is a sheet of section labels over cards: imported rows, then literal warnings and failures. */
     @Test void theReportListsImportsWarningsAndFailuresOrSaysNothingHappened() {
-        assertThat(ThemeImport.report(new ThemeImporter.ImportReport(List.of(), List.of(), List.of()))).isEqualTo("Nothing was imported.");
-        assertThat(ThemeImport.report(new ThemeImporter.ImportReport(List.of(), List.of("A warning"), List.of()))).isEqualTo("A warning");
+        var nothing = new ThemeImporter.ImportReport(List.of(), List.of(), List.of());
+        assertThat(ThemeImport.reportTitle(nothing)).isEqualTo("Nothing Imported");
+        assertThat(ThemeImport.report(nothing)).singleElement().isInstanceOfSatisfying(dev.jasper.ui.model.Nodes.Text.class,
+            text -> assertThat(text.text()).isEqualTo("Nothing was imported."));
+        var warned = new ThemeImporter.ImportReport(List.of(), List.of("A warning"), List.of());
+        assertThat(ThemeImport.report(warned)).singleElement().isInstanceOfSatisfying(dev.jasper.ui.model.Nodes.Section.class, section -> {
+            assertThat(section.title()).isEqualTo("Warnings");
+            assertThat(section.body()).isInstanceOfSatisfying(dev.jasper.ui.model.Nodes.Card.class, card -> assertThat(card.children())
+                .singleElement().isInstanceOfSatisfying(dev.jasper.ui.model.Nodes.Text.class, text -> assertThat(text.text()).isEqualTo("A warning")));
+        });
+        var full = new ThemeImporter.ImportReport(List.of(new ThemeImporter.Imported("a", "Alpha", Path.of("themes", "alpha.toml")),
+            new ThemeImporter.Imported("b", "Beta", Path.of("themes", "beta.toml"))), List.of("A warning"), List.of(new ThemeConverter.Failure("broken.json", "unreadable")));
+        assertThat(ThemeImport.reportTitle(full)).isEqualTo("Themes Imported");
+        var sections = ThemeImport.report(full);
+        assertThat(sections).extracting(node -> ((dev.jasper.ui.model.Nodes.Section) node).title()).containsExactly("Imported", "Warnings", "Not Imported");
+        var rows = ((dev.jasper.ui.model.Nodes.Card) ((dev.jasper.ui.model.Nodes.Section) sections.getFirst()).body()).children();
+        assertThat(rows).extracting(row -> ((dev.jasper.ui.model.Nodes.FormRow) row).label()).containsExactly("Alpha", "Beta");
+        assertThat(rows).extracting(row -> ((dev.jasper.ui.model.Nodes.Text) ((dev.jasper.ui.model.Nodes.FormRow) row).control()).text())
+            .containsExactly(Path.of("themes", "alpha.toml").toString(), Path.of("themes", "beta.toml").toString());
+        var failures = ((dev.jasper.ui.model.Nodes.Card) ((dev.jasper.ui.model.Nodes.Section) sections.getLast()).body()).children();
+        assertThat(((dev.jasper.ui.model.Nodes.Text) failures.getFirst()).text()).isEqualTo("broken.json: unreadable");
     }
     static final class QueueWorker extends AbstractExecutorService {
         final ArrayDeque<Runnable> jobs=new ArrayDeque<>(); boolean shutdown;

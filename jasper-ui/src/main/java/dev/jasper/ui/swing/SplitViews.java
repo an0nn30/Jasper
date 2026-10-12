@@ -70,8 +70,10 @@ final class SplitViews {
             this.owner = owner;
         }
 
+        /** Manager columns (THREE_COLUMN, SIDEBAR_DETAIL) meet at their own hairline; other splits keep the column gap. */
         int gap() {
-            return ((Nodes.Split)owner.node).kind() == Nodes.SplitKind.THREE_COLUMN ? 0 : ThemePainting.metric(owner.context(), DesignMetrics.Role.COLUMN_GAP);
+            var kind = ((Nodes.Split)owner.node).kind();
+            return kind == Nodes.SplitKind.THREE_COLUMN || kind == Nodes.SplitKind.SIDEBAR_DETAIL ? 0 : ThemePainting.metric(owner.context(), DesignMetrics.Role.COLUMN_GAP);
         }
 
         List<Component> visible(Container p) {
@@ -87,6 +89,11 @@ final class SplitViews {
                 double fit = Math.min(1.0, available / (double)(sidebar + list + sidebar));
                 result[0] = (int)Math.floor(sidebar * fit); result[1] = (int)Math.floor(list * fit);
                 result[2] = available - result[0] - result[1];
+            } else if (((Nodes.Split)owner.node).kind() == Nodes.SplitKind.SIDEBAR_DETAIL && n == 2) {
+                // The list column keeps the manager list width while the detail takes at least as much.
+                int list = ThemePainting.metric(owner.context(), DesignMetrics.Role.MANAGER_LIST_WIDTH);
+                result[0] = (int)Math.floor(list * Math.min(1.0, available / (2.0 * list)));
+                result[1] = available - result[0];
             } else for (int i = 0; i < n; i++) result[i] = available / n + (i < available % n ? 1 : 0);
             return result;
         }

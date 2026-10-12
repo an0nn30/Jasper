@@ -32,7 +32,7 @@ final class ViewReconciler implements AutoCloseable {
         next.values().forEach(this::resetComposition);
         inherit(spec.root(), next, inheritedEnabled);
         applyFlow(spec.root(), next);
-        applyColumns(spec.root(), next, -1, false);
+        applyColumns(spec.root(), next, view.hostColumn(), false);
         applyPanelDetail(spec.root(), next, false);
         applyHint(spec.root(), next, false);
         applyPanelBody(spec.root(), next, false);
@@ -177,7 +177,10 @@ final class ViewReconciler implements AutoCloseable {
         if(next.get(node.id()) instanceof Trees.TreeControl tree)tree.settingsNavigation=navigation;
         ControlRegistry.children(node).forEach(child->applySettingsNavigation(child,next,navigation));
     }
-    /** THREE_COLUMN assigns reusable rail/list/detail presentation; identities remain producer data. */
+    /**
+     * THREE_COLUMN assigns reusable rail/list/detail presentation; SIDEBAR_DETAIL is the same manager without its rail
+     * (its last child is the detail column, the others list columns). Identities remain producer data.
+     */
     private void applyColumns(Nodes.Node node, Map<String, ControlRegistry.Control> next, int column, boolean inheritedDetail) {
         boolean detail = inheritedDetail || node instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.DETAIL;
         var control = next.get(node.id());
@@ -188,7 +191,9 @@ final class ViewReconciler implements AutoCloseable {
         if (control instanceof Cards.CardControl card) card.detail = detail;
         var children = ControlRegistry.children(node);
         for (int i = 0; i < children.size(); i++) applyColumns(children.get(i), next,
-            node instanceof Nodes.Split split && split.kind() == Nodes.SplitKind.THREE_COLUMN ? i : column, detail);
+            node instanceof Nodes.Split split && split.kind() == Nodes.SplitKind.THREE_COLUMN ? i
+                : node instanceof Nodes.Split split && split.kind() == Nodes.SplitKind.SIDEBAR_DETAIL ? (i == children.size() - 1 ? 2 : 1)
+                : column, detail);
     }
     /** The app-only hint face (KitView.setHintPresentation) covers its stack and everything inside it. */
     private void applyHint(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {

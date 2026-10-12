@@ -62,6 +62,7 @@ final class Panels {
             state();
             footer.refresh();
             ((Surface)component).column = column;
+            ((Surface)component).painted = view.panelSurface();
             var panel = (Nodes.Panel)node;
             boolean single = panel.body() instanceof Nodes.ItemList list && list.kind()==Nodes.ListKind.SINGLE;
             // Two-line panel rows (the body list, or the first child of a vertical body stack) share the panel row inset;
@@ -69,7 +70,8 @@ final class Panels {
             Nodes.Node first = panel.body() instanceof Nodes.Stack stack && stack.role()==Nodes.LayoutRole.VERTICAL && !stack.children().isEmpty() ? stack.children().getFirst() : panel.body();
             boolean compact = column < 0 && first instanceof Nodes.ItemList list && list.kind()==Nodes.ListKind.DOUBLE;
             int side = column == 0 || column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_LIST_SIDE) : single || compact ? ThemePainting.metric(context(),DesignMetrics.Role.PANEL_ROW_SIDE) : 0;
-            int top = column == 0 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP)
+            // A rail, and a list column without its search row, start their rows at the rail's top inset.
+            int top = column == 0 || column == 1 && panel.searchOrNavigation().isEmpty() ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP)
                 : compact && panel.searchOrNavigation().isEmpty() ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_COMPACT_LIST_TOP) : 0;
             content.setBorder(new EmptyBorder(top, side, 0, side));
             boolean search=((Nodes.Panel)node).searchOrNavigation().filter(n -> n instanceof Nodes.Field f && f.kind()==Nodes.FieldKind.SEARCH).isPresent();
@@ -264,6 +266,8 @@ final class Panels {
     static final class Surface extends JPanel {
         final KitContext context;
         int column = -1;
+        /** False when the view's host paints the dock surface behind a body panel (KitView.panelSurface). */
+        boolean painted = true;
 
         Surface(KitContext context) {
             this.context = context;
@@ -285,6 +289,7 @@ final class Panels {
                     }
                     return;
                 }
+                if (!painted) return;
                 int r = ThemePainting.metric(context, DesignMetrics.Role.CARD_RADIUS);
                 g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2);
             } finally {

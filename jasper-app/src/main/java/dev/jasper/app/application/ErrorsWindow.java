@@ -49,8 +49,9 @@ final class ErrorsWindow {
      */
     void show(Optional<UUID> incident) {
         if (surface == null || surface.closed()) {
-            surface = windows.window(ID, "Errors", SIZE, true);
-            ErrorsView opened = new ErrorsView(kit.get(), incidents, hooks, zone);
+            AuxiliarySurface window = windows.window(ID, "Errors", SIZE, true);
+            surface = window;
+            ErrorsView opened = new ErrorsView(kit.get(), incidents, hooks, zone, window::close);
             surface.setContent(opened);
             surface.onClosed(opened::close);
             view = opened;

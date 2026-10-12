@@ -113,6 +113,8 @@ public final class FileChooserPanel extends JPanel {
     private String pathValue = "";
     private boolean previewVisible;
     private Optional<String> centerMessage = Optional.empty();
+    /** The center state's title over its message (the message is the sentence that says what happened). */
+    private String centerTitle = "Loading…";
     private Optional<String> centerActionLabel = Optional.empty();
     private Runnable centerAction = () -> { };
     private boolean updating;
@@ -149,11 +151,17 @@ public final class FileChooserPanel extends JPanel {
         placesView = view(placesSpec());
         filesView = view(filesSpec());
         messageView = view(messageSpec());
+        // The places and the listing are the manager window's rail and list columns inside the chooser's own panes; the
+        // message is a list column's empty state on the pane surface.
+        placesView.managerColumn(KitView.ManagerColumn.RAIL);
+        filesView.managerColumn(KitView.ManagerColumn.LIST);
+        messageView.panelSurface(false);
         previewHeaderView = view(previewHeaderSpec());
         previewContentView = view(new ViewSpec(new Nodes.Custom("preview.content", ControlState.READY, PREVIEW_CONTENT, Nodes.CustomKind.EDITOR, "File preview")));
         previewText.setEditable(false);
         previewText.setOpaque(false);
-        previewText.setBorder(BorderFactory.createEmptyBorder());
+        previewText.setBorder(BorderFactory.createEmptyBorder(metric(DesignMetrics.Role.CARD_PADDING), metric(DesignMetrics.Role.CARD_PADDING),
+            metric(DesignMetrics.Role.CARD_PADDING), metric(DesignMetrics.Role.CARD_PADDING)));
         // The preview is specialized read-only text content: selectable and scrollable, painted from module roles.
         var previewScroll = new JScrollPane(previewText);
         previewScroll.setBorder(BorderFactory.createEmptyBorder());
@@ -267,8 +275,11 @@ public final class FileChooserPanel extends JPanel {
     private JSplitPane body() {
         var navigation = new JPanel(new BorderLayout());
         navigation.setOpaque(false);
-        int pad = metric(DesignMetrics.Role.ICON_GAP);
-        headingView.setBorder(BorderFactory.createEmptyBorder(pad, metric(DesignMetrics.Role.CHOOSER_SIDE_PADDING), pad, pad));
+        int pad = metric(DesignMetrics.Role.ICON_GAP), inset = metric(DesignMetrics.Role.COLUMN_LIST_SIDE);
+        // Places heads its rail as the listing's column titles head theirs: on the rows' text inset.
+        headingView.setBorder(BorderFactory.createEmptyBorder(pad, 2 * inset, pad, pad));
+        placesView.setBorder(BorderFactory.createEmptyBorder(metric(DesignMetrics.Role.COLUMN_RAIL_TOP), inset, 0, inset));
+        filesView.setBorder(BorderFactory.createEmptyBorder(0, inset, 0, inset));
         navigation.add(headingView, BorderLayout.NORTH);
         navigation.add(placesView, BorderLayout.CENTER);
         var navigationPane = rounded(navigation, () -> headingView.getHeight());
@@ -277,22 +288,27 @@ public final class FileChooserPanel extends JPanel {
         center.add(rounded(filesView, this::filesHeaderHeight), "table");
         center.add(rounded(messageView, () -> 0), "message");
 
-        int vertical = metric(DesignMetrics.Role.CHOOSER_PREVIEW_VERTICAL_PADDING), side = metric(DesignMetrics.Role.CHOOSER_PREVIEW_SIDE_PADDING);
+        int vertical = metric(DesignMetrics.Role.CHOOSER_PREVIEW_VERTICAL_PADDING), card = metric(DesignMetrics.Role.CARD_PADDING);
         previewPane.setOpaque(false);
         ((BorderLayout) previewPane.getLayout()).setVgap(metric(DesignMetrics.Role.CHOOSER_PREVIEW_GAP));
+        // The heading's text lines up with the preview text inside its pane.
+        previewHeaderView.setBorder(BorderFactory.createEmptyBorder(0, card, 0, card));
         previewPane.add(previewHeaderView, BorderLayout.NORTH);
-        previewPane.add(previewContentView, BorderLayout.CENTER);
-        previewPane.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
+        // The preview text is mono text inside the chooser's rounded pane, as the listing is; the pane keeps the
+        // panes' gutter on its leading side and ends with them.
+        previewPane.add(rounded(previewContentView, () -> 0), BorderLayout.CENTER);
+        previewPane.setBorder(BorderFactory.createEmptyBorder(vertical, metric(DesignMetrics.Role.WORKSPACE_GUTTER), 0, 0));
         previewPane.setPreferredSize(new java.awt.Dimension(metric(DesignMetrics.Role.CHOOSER_PREVIEW_WIDTH), 0));
 
         var main = SurfacePanel.sidecar(kit,center,previewPane,width -> {
             var listing=find(filesView,FILES,JScrollPane.class);
             int row=((javax.swing.Scrollable)listing.getViewport().getView()).getScrollableUnitIncrement(new Rectangle(),javax.swing.SwingConstants.VERTICAL,1);
-            return listing.getColumnHeader().getPreferredSize().height+DesignMetrics.NATIVE_BODY_VISIBLE_UNITS*row;
+            var rowsInset=listing.getViewportBorder()==null?new java.awt.Insets(0,0,0,0):listing.getViewportBorder().getBorderInsets(listing);
+            return listing.getColumnHeader().getPreferredSize().height+rowsInset.top+rowsInset.bottom+DesignMetrics.NATIVE_BODY_VISIBLE_UNITS*row;
         },width -> previewPane.getInsets().top+previewPane.getInsets().bottom
             +SurfacePanel.measuredHeight(previewHeaderView,Math.max(0,width-previewPane.getInsets().left-previewPane.getInsets().right))
             +((BorderLayout)previewPane.getLayout()).getVgap()
-            +DesignMetrics.NATIVE_BODY_VISIBLE_UNITS*previewText.getFontMetrics(previewText.getFont()).getHeight()
+            +DesignMetrics.NATIVE_BODY_VISIBLE_UNITS*previewText.getFontMetrics(previewText.getFont()).getHeight()+previewText.getInsets().top+previewText.getInsets().bottom
             +((JScrollPane)previewText.getParent().getParent()).getHorizontalScrollBar().getPreferredSize().height);
         var pane = new SurfacePanel.NativeSplit(kit,navigationPane, main,() -> metric(DesignMetrics.Role.CHOOSER_NAVIGATION_WIDTH),
             () -> Math.max(SurfacePanel.bodyLaneWidth(kit),filesView.getMinimumSize().width)
@@ -323,7 +339,8 @@ public final class FileChooserPanel extends JPanel {
     private int filesHeaderHeight() {
         var scroll = find(filesView, FILES, JScrollPane.class);
         if (scroll == null || scroll.getColumnHeader() == null) return 0;
-        return SwingUtilities.convertPoint(scroll.getViewport(), 0, 0, filesView).y;
+        var header = scroll.getColumnHeader();
+        return SwingUtilities.convertPoint(header, 0, header.getHeight(), filesView).y;
     }
 
     private dev.jasper.ui.swing.SurfacePanel rounded(JComponent content, IntSupplier top) {
@@ -335,16 +352,19 @@ public final class FileChooserPanel extends JPanel {
 
     /** The name row (Save and Directory) and the buttons. Open has no name row: the selection is what opens. */
     private JComponent bottom() {
-        var actions = new JPanel(new BorderLayout());
+        var actions = new JPanel(new BorderLayout(metric(DesignMetrics.Role.FOOTER_STATUS_GAP), 0));
         actions.setOpaque(false);
         actions.add(statusView, BorderLayout.CENTER);
         actions.add(buttonsView, BorderLayout.EAST);
-        var bottom = new JPanel(new BorderLayout(0, metric(DesignMetrics.Role.CHOOSER_BOTTOM_GAP)));
+        // The status and the actions sit in the window footer band, as a manager window's do; the name row stays above it.
+        var bottom = new JPanel(new BorderLayout());
         bottom.setOpaque(false);
-        int vertical = metric(DesignMetrics.Role.CHOOSER_BOTTOM_VERTICAL_PADDING), side = metric(DesignMetrics.Role.CHOOSER_BOTTOM_SIDE_PADDING);
-        bottom.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
-        if (nameView != null) bottom.add(nameView, BorderLayout.NORTH);
-        bottom.add(actions, BorderLayout.SOUTH);
+        if (nameView != null) {
+            int vertical = metric(DesignMetrics.Role.CHOOSER_BOTTOM_VERTICAL_PADDING), side = metric(DesignMetrics.Role.CHOOSER_BOTTOM_SIDE_PADDING);
+            nameView.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
+            bottom.add(nameView, BorderLayout.NORTH);
+        }
+        bottom.add(SurfacePanel.footerBand(kit, actions), BorderLayout.SOUTH);
         return bottom;
     }
 
@@ -354,7 +374,7 @@ public final class FileChooserPanel extends JPanel {
         setBackground(color(SemanticColor.SURFACE_DIALOG));
         if (split != null) split.setBackground(getBackground());
         for (var pane : panes) pane.setBackground(getBackground());
-        previewText.setFont(dev.jasper.ui.swing.NativeControlStyles.font(kit,Typography.Role.MONO));
+        previewText.setFont(dev.jasper.ui.swing.NativeControlStyles.font(kit,Typography.Role.MONO_SMALL));
         previewText.setForeground(color(SemanticColor.TEXT_PRIMARY));
         previewText.setCaretColor(previewText.getForeground());
         previewText.setSelectionColor(color(SemanticColor.SELECTION_BG));
@@ -529,11 +549,14 @@ public final class FileChooserPanel extends JPanel {
     private void showCenter() {
         Optional<String> text;
         Optional<String> action = Optional.empty();
+        String title = "Loading…";
         if (model.connectingTo().isPresent()) {
+            title = "Connecting…";
             text = Optional.of("Connecting to " + safe(model.connectingTo().get()) + "…");
             action = Optional.of("Cancel connection");
             centerAction = model::cancelConnection;
         } else if (model.error().isPresent()) {
+            title = "Couldn't Open Folder";
             text = Optional.of(safe(model.error().get()));
             if (model.retryable()) {
                 action = Optional.of("Retry");
@@ -542,11 +565,13 @@ public final class FileChooserPanel extends JPanel {
         } else if (model.loading()) {
             text = model.entries().isEmpty() ? Optional.of("Loading…") : Optional.empty();
         } else if (model.entries().isEmpty()) {
+            title = model.filter().isBlank() ? "Empty Folder" : "No Matches";
             text = Optional.of(model.filter().isBlank() ? "This folder is empty." : "No items match your search.");
         } else {
             text = Optional.empty();
         }
         centerMessage = text;
+        centerTitle = title;
         centerActionLabel = action;
         render(messageView, messageSpec());
         centerCards.show(center, text.isPresent() ? "message" : "table");
@@ -655,13 +680,22 @@ public final class FileChooserPanel extends JPanel {
             model.sortColumn() == column ? Optional.of(model.ascending()) : Optional.empty());
     }
 
+    /**
+     * Connecting, loading, an error with Retry, an empty folder or no matches: a list column's standard empty state (a
+     * hidden-header panel's body, so it takes the panel empty geometry) with a title over the sentence that says why.
+     */
     private ViewSpec messageSpec() {
-        String text = centerMessage.orElse("Loading…");
-        String icon = model.connectingTo().isPresent() ? "server" : model.error().isPresent() ? "warning" : "folder";
+        String text = centerMessage.orElse("");
+        String icon = model.connectingTo().isPresent() ? "server" : model.error().isPresent() ? "warning"
+            : !model.loading() && model.entries().isEmpty() && !model.filter().isBlank() ? "search" : "folder";
         var actions = centerActionLabel.<List<Nodes.Node>>map(label -> List.of(new Nodes.Button("center", ControlState.READY, label, "",
             Nodes.ButtonKind.SECONDARY, "center", ""))).orElse(List.of());
-        return new ViewSpec(new Nodes.Empty("message", ControlState.READY,
-            new Nodes.Icon("message.icon", ControlState.READY, icon, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, text), text, "", actions));
+        var empty = new Nodes.Empty("message", ControlState.READY,
+            new Nodes.Icon("message.icon", ControlState.READY, icon, Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, centerTitle),
+            centerTitle, text.equals(centerTitle) ? "" : text, actions);
+        return new ViewSpec(new Nodes.Panel("message.panel", ControlState.READY, new Nodes.Header("message.header",
+            new ControlState(false, true, false, ""), "Folder", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
+            Optional.empty(), empty, Optional.empty()));
     }
 
     private ViewSpec previewHeaderSpec() {
@@ -698,7 +732,7 @@ public final class FileChooserPanel extends JPanel {
     }
 
     private ViewSpec statusSpec() {
-        return new ViewSpec(new Nodes.Text("status", ControlState.READY, status, Nodes.TextRole.DESCRIPTION));
+        return new ViewSpec(new Nodes.Text("status", ControlState.READY, status, Nodes.TextRole.CAPTION));
     }
 
     private ViewSpec buttonsSpec() {

@@ -57,7 +57,7 @@ final class HistoryRow extends JPanel implements AutoCloseable {
         this.notification = notification;
         setOpaque(false);
         title = new TextBlock(kit, role(notification), SemanticColor.TEXT_PRIMARY, 0);
-        count = new TextBlock(kit, Typography.Role.BODY, SemanticColor.TEXT_SECONDARY, 1);
+        count = new TextBlock(kit, Typography.Role.COUNT, SemanticColor.TEXT_SECONDARY, 1);
         lead = new KitView(kit, leadSpec(), event -> { }, true);
         body = new KitView(kit, bodySpec(), this::event, true);
         side = new KitView(kit, sideSpec(), this::event, true);
@@ -132,7 +132,7 @@ final class HistoryRow extends JPanel implements AutoCloseable {
     private ViewSpec bodySpec() {
         var request = notification.request();
         var nodes = new ArrayList<Nodes.Node>();
-        if (!request.content().isEmpty()) nodes.add(new Nodes.Text(CONTENT, ControlState.READY, request.content(), Nodes.TextRole.BODY));
+        if (!request.content().isEmpty()) nodes.add(new Nodes.Text(CONTENT, ControlState.READY, request.content(), Nodes.TextRole.DESCRIPTION));
         nodes.add(new Nodes.Text(META, ControlState.READY, group + " · " + time.format(notification.posted()), Nodes.TextRole.CAPTION));
         List<NotificationAction> all = request.actions();
         if (!all.isEmpty()) {

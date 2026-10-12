@@ -36,6 +36,9 @@ final class Navigation {
         int receiverMinimum(Component component) {
             if(gapRole==DesignMetrics.Role.IDENTITY_HEADER_GAP && component instanceof JPanel)
                 return Math.min(component.getPreferredSize().width,ThemePainting.metric(context,DesignMetrics.Role.IDENTITY_SECTION_WIDTH));
+            // A manager detail heading's identity (title over type) keeps a readable width; its actions wrap first.
+            if(gapRole==DesignMetrics.Role.DETAIL_HEADING_GAP && component instanceof JPanel)
+                return Math.min(component.getPreferredSize().width,ThemePainting.metric(context,DesignMetrics.Role.DETAIL_IDENTITY_MIN_WIDTH));
             if(component instanceof Buttons.KitButton button && button.recorder())return button.getPreferredSize().width;
             if(component instanceof TextFields.FieldSurface field && field.trailing!=null)
                 return field.trailing.getPreferredSize().width+ThemePainting.metric(context,DesignMetrics.Role.FIELD_HEIGHT)+4*ThemePainting.metric(context,DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);

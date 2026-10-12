@@ -286,6 +286,37 @@ public final class KitView extends JPanel implements AutoCloseable {
     }
     private boolean surface;
     /**
+     * App-only: whether this view's panels (outside manager columns) paint their own rounded panel surface (the default).
+     * A native tool window that already paints the dock surface behind an app-owned body turns it off, so a body panel
+     * (an empty state) sits on that surface as the rest of the body does. EDT confined.
+     */
+    public void panelSurface(boolean painted) {
+        requireOpen();
+        if (panelSurface == painted) return;
+        panelSurface = painted; refresh(); repaint();
+    }
+    /** Whether this view's panels paint their own surface. */
+    public boolean panelSurface() { return panelSurface; }
+    private boolean panelSurface = true;
+    /** The manager column a host's native arrangement places a whole view in (see {@link #managerColumn(ManagerColumn)}). */
+    public enum ManagerColumn { NONE, RAIL, LIST }
+    /**
+     * App-only: presents this view's rows as one column of a manager window, for a native shell that arranges its own
+     * columns (a file chooser's places and listing): RAIL rows are the manager rail's (one-line rows, rounded control
+     * fill, branches as section headings), LIST rows the list column's (rounded selection, one-line rows at the rail
+     * height, a table's header on the row inset). The host supplies the column's outer insets. EDT confined.
+     */
+    public void managerColumn(ManagerColumn column) {
+        requireOpen(); Objects.requireNonNull(column);
+        if (managerColumn == column) return;
+        managerColumn = column; update(spec);
+    }
+    /** The host-assigned manager column, NONE by default. */
+    public ManagerColumn managerColumn() { return managerColumn; }
+    private ManagerColumn managerColumn = ManagerColumn.NONE;
+    /** The reconciler's column index for the host-assigned column: -1 none, 0 rail, 1 list. */
+    int hostColumn() { return switch (managerColumn) { case NONE -> -1; case RAIL -> 0; case LIST -> 1; }; }
+    /**
      * App-only: this view is a native window's title action strip. Its icon-only menu buttons show their menu
      * indicator on the borderless control surface, as the window title references paint them. EDT confined.
      */

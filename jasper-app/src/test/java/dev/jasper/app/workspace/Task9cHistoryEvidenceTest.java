@@ -20,7 +20,7 @@ class Task9cHistoryEvidenceTest {
         SwingUtilities.invokeAndWait(() -> {
             var themes=new ThemeController();
             try {
-                for(var theme:List.of(Theme.DARK,Theme.JASPER_LIGHT))for(float font:List.of(13f,32f)) {
+                for(var theme:List.of(Theme.DARK,Theme.JASPER_LIGHT))for(float font:List.of(13f,20f,32f)) {
                     themes.configure(theme,new UiFontConfig("system",font));
                     var center=new NotificationCenter(Runnable::run,Clock.fixed(Instant.parse("2026-10-05T12:00:00Z"),ZoneOffset.UTC),()->Delivery.Presence.FOCUSED);
                     var group=new NotificationGroup("fixture.history","Synthetic history","jasper",DisplayMode.CARD);center.register(group);

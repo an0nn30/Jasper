@@ -28,11 +28,12 @@ import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
 /**
- * One notification as a card (spec section 3): severity glyph, wrapping strong title with a muted repeat count, at most
- * five lines of content, up to three action links with the rest under More, and a close button shown on hover (always
- * for a sticky card). Clicking the body runs the notification's default action. An app-owned layout shell (ruling G6)
- * painted from module roles, hosting pointer-only kit views (ruling G5): nothing in it takes the keyboard from the
- * terminal. Plain text only. EDT only; close it when it leaves its layer.
+ * One notification as a card (spec section 3): severity glyph, wrapping strong title with a muted repeat count (the count
+ * role), at most five lines of content in the description role, up to three action links with the rest under More, and a
+ * close button shown on hover (always for a sticky card). Clicking the body runs the notification's default action. An
+ * app-owned layout shell (ruling G6) on the kit's notice surface (a grouped card's radius, hairline and padding), hosting
+ * pointer-only kit views (ruling G5): nothing in it takes the keyboard from the terminal. Plain text only. EDT only;
+ * close it when it leaves its layer.
  */
 final class NotificationCard extends dev.jasper.ui.swing.SurfacePanel implements AutoCloseable {
     static final int CONTENT_LINES = 5;
@@ -69,8 +70,8 @@ final class NotificationCard extends dev.jasper.ui.swing.SurfacePanel implements
         setOpaque(false);
         setFocusable(false);
         title = new TextBlock(kit, Typography.Role.BODY_STRONG, SemanticColor.TEXT_PRIMARY, 0);
-        count = new TextBlock(kit, Typography.Role.BODY, SemanticColor.TEXT_SECONDARY, 1, SemanticColor.SURFACE_CARD);
-        content = new TextBlock(kit, Typography.Role.BODY, SemanticColor.TEXT_PRIMARY, CONTENT_LINES);
+        count = new TextBlock(kit, Typography.Role.COUNT, SemanticColor.TEXT_SECONDARY, 1, SemanticColor.SURFACE_CARD);
+        content = new TextBlock(kit, Typography.Role.DESCRIPTION, SemanticColor.TEXT_SECONDARY, CONTENT_LINES);
         icon = new KitView(kit, new ViewSpec(NotificationStyle.icon(ICON, notification, presentationIcons)), event -> { }, true);
         for (int i = 0; i < VISIBLE_ACTIONS; i++) {
             var link = new KitView(kit, linkSpec(i, "Action"), this::event, true);
@@ -242,15 +243,18 @@ final class NotificationCard extends dev.jasper.ui.swing.SurfacePanel implements
 
     private int metric(DesignMetrics.Role role) { return NotificationStyle.metric(kit, role); }
 
+    /** A form card's inner padding: the card padding inside its hairline, as every grouped card. */
+    private int padding() { return metric(DesignMetrics.Role.CARD_PADDING) + metric(DesignMetrics.Role.HAIRLINE); }
+
     /** The width of the text column: the card less its padding, glyph and the gap after the glyph. */
     private int textWidth() {
-        return metric(DesignMetrics.Role.NOTIFICATION_WIDTH) - metric(DesignMetrics.Role.NOTIFICATION_PADDING)
-            - metric(DesignMetrics.Role.NOTIFICATION_ICON) - metric(DesignMetrics.Role.NOTIFICATION_GAP) - metric(DesignMetrics.Role.NOTIFICATION_PADDING);
+        return metric(DesignMetrics.Role.NOTIFICATION_WIDTH) - padding()
+            - metric(DesignMetrics.Role.NOTIFICATION_ICON) - metric(DesignMetrics.Role.NOTIFICATION_GAP) - padding();
     }
 
     /** Places the parts and returns the height they need; with {@code apply} false it only measures. */
     private int arrange(boolean apply) {
-        int pad = metric(DesignMetrics.Role.NOTIFICATION_PADDING), iconSize = metric(DesignMetrics.Role.NOTIFICATION_ICON);
+        int pad = padding(), iconSize = metric(DesignMetrics.Role.NOTIFICATION_ICON);
         int gap = metric(DesignMetrics.Role.NOTIFICATION_GAP), closeSize = metric(DesignMetrics.Role.NOTIFICATION_CLOSE);
         int width = metric(DesignMetrics.Role.NOTIFICATION_WIDTH);
         int textX = pad + iconSize + gap;
