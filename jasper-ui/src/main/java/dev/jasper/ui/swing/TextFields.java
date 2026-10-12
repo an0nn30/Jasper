@@ -277,11 +277,13 @@ final class TextFields {
             leading.setText(field.kind() == Nodes.FieldKind.PORT ? ":" : "");
             if (field.kind() == Nodes.FieldKind.SEARCH || field.kind() == Nodes.FieldKind.PATH) {
                 String name=field.kind() == Nodes.FieldKind.PATH ? "folder.filled" : "search";
-                int extent=com.formdev.flatlaf.util.UIScale.scale(context().icons().size(panelSearch ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
+                // The palette's transparent query shows the rail-size glyph its reference depicts.
+                int extent=com.formdev.flatlaf.util.UIScale.scale(context().icons().size(panelSearch || surface.transparent ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
                 leading.setIcon(panelSearch ? context().icons().panel(name, context().theme().semantic(), SemanticColor.HUE_NEUTRAL,extent)
                     : context().icons().icon(name,context().theme(),SemanticColor.TEXT_PLACEHOLDER,extent));
             }
-            int gap = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_GAP : field.kind() == Nodes.FieldKind.PORT ? DesignMetrics.Role.PORT_PREFIX_GAP : DesignMetrics.Role.ICON_GAP);
+            int gap = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_GAP : field.kind() == Nodes.FieldKind.PORT ? DesignMetrics.Role.PORT_PREFIX_GAP
+                : surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_ICON_GAP : DesignMetrics.Role.ICON_GAP);
             leading.setVisible(field.presentation() != Nodes.FieldPresentation.PLAIN_PATH);
             leading.setBorder(new EmptyBorder(0, 0, 0, gap));
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);

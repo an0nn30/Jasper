@@ -34,6 +34,7 @@ final class ViewReconciler implements AutoCloseable {
         applyFlow(spec.root(), next);
         applyColumns(spec.root(), next, -1, false);
         applyPanelDetail(spec.root(), next, false);
+        applyHint(spec.root(), next, false);
         applyFullForm(spec.root(), next, false);
         applySettings(spec.root(), next, false);
         applySettingsNavigation(spec.root(),next,false);
@@ -158,6 +159,15 @@ final class ViewReconciler implements AutoCloseable {
         var children = ControlRegistry.children(node);
         for (int i = 0; i < children.size(); i++) applyColumns(children.get(i), next,
             node instanceof Nodes.Split split && split.kind() == Nodes.SplitKind.THREE_COLUMN ? i : column, detail);
+    }
+    /** The app-only hint face (KitView.setHintPresentation) covers its stack and everything inside it. */
+    private void applyHint(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
+        boolean hint = inherited || view.hintStack(node.id());
+        var control = next.get(node.id());
+        if (control instanceof Stacks.StackControl stack) stack.hint = hint;
+        if (control instanceof Buttons.ButtonControl button) button.button.hint = hint;
+        if (control instanceof Labels.TextControl text) text.hint = hint;
+        for (var child : ControlRegistry.children(node)) applyHint(child, next, hint);
     }
     /** Compact details are a panel-footer context; ordinary manager details retain their own scale. */
     private void applyPanelDetail(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {

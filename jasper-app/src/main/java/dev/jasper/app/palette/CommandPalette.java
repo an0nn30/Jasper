@@ -145,6 +145,7 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
 
         hintView = view(hintSpec());
         hintBar = dev.jasper.ui.swing.SurfacePanel.row(kit, DesignMetrics.Role.PALETTE_HINT_HEIGHT, true);
+        hintView.setHintPresentation(HINT, true);
         hintBar.add(hintView, BorderLayout.CENTER);
         add(hintBar, BorderLayout.SOUTH);
 

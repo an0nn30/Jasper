@@ -168,6 +168,17 @@ viewport in selectable rows; `KitView.composing(fieldId)` reports uncommitted in
 label is its accessible name only (the glyph and hint label it visually). `Field.presentation` lets a host composition
 supply a field's visible label (EMBEDDED) and, on a surface that backs the field, drop the input fill (TRANSPARENT).
 
+Workspace chrome and palette calibration (Plan 3 Task 10): RESULTS headings use `Typography.Role.RESULTS_HEADING` (11)
+for their text and measured height; a TRANSPARENT search field shows the rail-size glyph with `TRANSPARENT_FIELD_ICON_GAP`.
+The host-only `KitView.setHintPresentation(stackId, hint)` gives one stack (the palette footer) the compact hint face:
+its CAPTION text and embedded links use `PALETTE_HINT` (11) and its children `PALETTE_HINT_ACTION_GAP`; same-id updates
+keep it and it is not part of the plugin SDK. `NativeChromePainting` owns the native chrome's painting (tab strip, toolbar
+rules and action widths, status dot, rail badges, connected dot, split dividers, drop guides, find and title-bar rules,
+palette shadow) over named roles; `TITLE_CONTEXT`, `TOOLBAR_LABEL`, `STATUS_TEXT` and `STATUS_PATH` carry the reference
+chrome text sizes. `IconRegistry.chromeIcon` is the native chrome's receiving context: the meanings the workspace chrome
+depicts (add, new window, split, expand, chevron down, folder, server, bell, lock, terminal) use their byte-identical
+original desktop artwork (`assets-chrome.tsv`); descriptor, panel, tile and plugin-registered contexts never receive it.
+
 Manager and notification capabilities (Plan 2 Task 6c): item-list rows can carry their own context menu (offered on
 any row, never selecting it; the menu key and Shift+F10 open the focused row's menu); Space on a row whose trailing slot
 holds exactly one switch operates that switch, keeping a list of switch rows one focus stop; switches take a literal
