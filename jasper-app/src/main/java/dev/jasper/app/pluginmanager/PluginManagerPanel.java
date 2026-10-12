@@ -57,6 +57,7 @@ final class PluginManagerPanel extends JPanel {
         setOpaque(false);
         searchView = new KitView(kit, new ViewSpec(new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, "", "Search plugins",
             "Search plugins", "")), this::event);
+        dev.jasper.ui.swing.SettingsShell.settingsPage(searchView);
         gearView = new KitView(kit, gearSpec(), this::event);
         headerView = new KitView(kit, headerSpec(), this::event);
         messageView = new KitView(kit, messageSpec(), this::event);
@@ -110,10 +111,11 @@ final class PluginManagerPanel extends JPanel {
         // The list and details pad themselves, so the divider between them runs the page's full height.
         setBorder(BorderFactory.createEmptyBorder(0, side, 0, pad));
         listLane.setBorder(BorderFactory.createEmptyBorder(pad,0,pad,0));
-        bar.setBorder(BorderFactory.createEmptyBorder(0,side,0,side));
+        // The gear sits a little in from the rows' trailing edge, close to the search it qualifies.
+        bar.setBorder(BorderFactory.createEmptyBorder(0,side,0,metric(DesignMetrics.Role.PLUGIN_SEARCH_TRAILING)));
         list.view().setBorder(BorderFactory.createEmptyBorder(0,0,0,side));
         ((BorderLayout) getLayout()).setVgap(gap);
-        ((BorderLayout) bar.getLayout()).setHgap(gap);
+        ((BorderLayout) bar.getLayout()).setHgap(metric(DesignMetrics.Role.PLUGIN_SEARCH_GAP));
         top.setVisible(!bannerText.isEmpty() || !notice.isEmpty());
         headerView.setBorder(BorderFactory.createEmptyBorder(bannerText.isEmpty() && notice.isEmpty() ? 0 : pad, 0, 0, 0));
         messageView.setVisible(!message.isEmpty());

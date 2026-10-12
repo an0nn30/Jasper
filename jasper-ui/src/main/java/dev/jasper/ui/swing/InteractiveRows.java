@@ -1048,9 +1048,11 @@ final class InteractiveRows {
             boolean keycapGroup=owner instanceof Trees.TreeControl keyed && !keyed.presentation.isEmpty();
             int pad = ThemePainting.metric(owner.context(), settingsNavigation ? DesignMetrics.Role.SETTINGS_NAV_ROW_SIDE : keycapGroup ? DesignMetrics.Role.KEYCAP_GROUP_SIDE : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : owner.column >= 0 ? DesignMetrics.Role.COLUMN_LIST_SIDE : owner.panelSingle ? DesignMetrics.Role.PANEL_ROW_PADDING : DesignMetrics.Role.ICON_GAP),
                     x = pad + indent,
-                    // A keycap tree's section counts end where its shortcut keys end.
+                    // A keycap tree's section counts end where its shortcut keys end; an identity row's switch sits a
+                    // little closer to the row's edge than its tile.
                     width = Math.max(0, getWidth() - (keycapGroup
-                        ? ThemePainting.metric(owner.context(), DesignMetrics.Role.KEYCAP_CONTENT_TRAILING) : pad)),
+                        ? ThemePainting.metric(owner.context(), DesignMetrics.Role.KEYCAP_CONTENT_TRAILING)
+                        : owner.identityRows() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.IDENTITY_ROW_TRAILING) : pad)),
                     h = getHeight();
             int checkWidth =
                     check.isVisible()
@@ -1099,7 +1101,10 @@ final class InteractiveRows {
             leading.setBounds(0, 0, 0, 0);
             subtitle.setBounds(0, 0, 0, 0);
             trailing.setBounds(0, 0, 0, 0);
-            title.setBounds(pad, 0, Math.max(0, getWidth() - 2 * pad), getHeight());
+            // An identity list's heading sits low in its band, close to the rows it introduces.
+            int line = owner.identityRows() ? Math.min(getHeight(), title.getPreferredSize().height) : getHeight();
+            int top = owner.identityRows() ? Math.max(0, getHeight() - line - ThemePainting.metric(owner.context(), DesignMetrics.Role.IDENTITY_HEADING_BOTTOM)) : 0;
+            title.setBounds(pad, top, Math.max(0, getWidth() - 2 * pad), line);
             title.doLayout();
         }
 
