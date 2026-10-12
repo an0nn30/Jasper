@@ -107,9 +107,9 @@ the host owns window chrome, sheet/scrim lifetime and cancellation cleanup.
 overlays present: a scrim over a window's whole content (`surface.scrim`, black unless the theme names its own,
 at `OVERLAY_SCRIM_PERCENT`) and the content in a centred, outlined, rounded card with a soft shadow. Opening fades
 the scrim in while the card fades from transparent and rises `OVERLAY_RISE` into place over
-`OVERLAY_ENTER_MILLIS`, easing out (cubic); closing is its opposite over `OVERLAY_EXIT_MILLIS`, easing in: the card
-rises on another `OVERLAY_RISE` (from wherever it is, if the entrance had not finished) as it fades out and the scrim
-lifts. The motion
+`OVERLAY_ENTER_MILLIS`, easing out (cubic); closing is its opposite over `OVERLAY_EXIT_MILLIS`: the card lifts off
+at once and rises another `OVERLAY_RISE` (easing out, from wherever it is if the entrance had not finished) while it
+fades (easing in) and the scrim lifts. With one shared ease-in the card barely moved before it had faded. The motion
 follows the kit's motion policy, so it is instant with animations off and settles at once if they are turned off
 mid-way. While it moves the card paints one snapshot of its content, so it fades as a single surface (no control
 paints its own disabled alpha ahead of the rest); at rest the content paints live. The host adds the overlay to a

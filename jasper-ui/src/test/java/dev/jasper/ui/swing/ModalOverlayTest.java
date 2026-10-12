@@ -19,9 +19,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The modal overlay's motion, as the user specified it: the card fades from transparent to opaque while rising 16
- * logical into place over 220 ms with an ease-out cubic, the scrim dimming with it; closing is the opposite, the card
- * rising on another 16 as it fades out and the scrim lifting, over 170 ms with an ease-in. Never a slide across the
- * window; instant with motion off. Frames are driven by a test clock.
+ * logical into place over 220 ms with an ease-out cubic, the scrim dimming with it; closing is the opposite over
+ * 200 ms, the card lifting off and rising another 16 (ease-out) as it fades (ease-in) and the scrim lifts. Never a
+ * slide across the window; instant with motion off. Frames are driven by a test clock.
  */
 class ModalOverlayTest {
     static final long MS = 1_000_000;
@@ -95,8 +95,11 @@ class ModalOverlayTest {
         } });
     }
 
-    /** The exit is the entrance's opposite: the card keeps rising as it fades out, never sinking back down. */
-    @Test void closingKeepsRisingAsItFadesOutFasterAndRemovesTheOverlayWhenDone() {
+    /**
+     * The exit is the entrance's opposite: the card lifts off at once and keeps rising (easing out) while it is still
+     * clearly visible, and fades (easing in) as it goes. Sharing one ease-in, it barely moved before it was gone.
+     */
+    @Test void closingLiftsOffWhileStillVisibleFadesOutAndRemovesTheOverlayWhenDone() {
         Edt.run(() -> { try (var f = new Fixture()) {
             f.overlay.open(); f.at(220);
             assertThat(f.context.metrics().value(DesignMetrics.Role.OVERLAY_EXIT_MILLIS)).isBetween(150, 200);
@@ -104,15 +107,16 @@ class ModalOverlayTest {
             f.overlay.dismiss(() -> removed[0]++);
             assertThat(f.overlay.active()).isFalse();
             assertThat(f.overlay.card().isVisible()).as("the leaving card takes no input").isFalse();
-            f.at(85);
-            assertThat(f.overlay.shown()).isEqualTo(.875);
-            assertThat(f.overlay.cardBounds().y).as("an eighth of the way up and out").isEqualTo(f.restingY() - 2);
-            // Its picture at .875 over the scrim and shadow, themselves at .875 of their strength.
-            assertThat(f.paint().getRGB(400, 300) >>> 24).as("its picture fades").isBetween(232, 244);
-            f.at(68);
-            assertThat(f.overlay.cardBounds().y).as("near the end, most of a rise above its place").isLessThan(f.restingY() - 10);
+            f.at(40);
+            assertThat(f.overlay.cardBounds().y).as("a fifth of the way through, already rising").isLessThanOrEqualTo(f.restingY() - 7);
+            assertThat(f.overlay.shown()).as("and still nearly opaque").isGreaterThan(.95);
+            f.at(60);
+            assertThat(f.overlay.shown()).isEqualTo(.75);
+            assertThat(f.overlay.cardBounds().y).as("half way: most of the rise done").isEqualTo(f.restingY() - 14);
+            // Its picture at .75 over the scrim and shadow, themselves at .75 of their strength.
+            assertThat(f.paint().getRGB(400, 300) >>> 24).as("its picture fades").isBetween(208, 228);
             assertThat(removed[0]).isZero();
-            f.at(17);
+            f.at(100);
             assertThat(removed[0]).isEqualTo(1);
             assertThat(f.overlay.getParent()).isNull();
             assertThat(f.overlay.phase()).isEqualTo(ModalOverlay.Phase.CLOSED);
@@ -149,7 +153,7 @@ class ModalOverlayTest {
             assertThat(f.overlay.shown()).isEqualTo(.875);
             int previous = f.overlay.cardBounds().y;
             assertThat(previous).isEqualTo(f.restingY() + 2);
-            for (int frame = 0; frame < 9; frame++) {
+            for (int frame = 0; frame < 11; frame++) {
                 f.at(17);
                 int y = f.overlay.cardBounds().y;
                 assertThat(y).as("frame %s never moves down", frame).isLessThanOrEqualTo(previous);
@@ -170,7 +174,7 @@ class ModalOverlayTest {
             try { before = ((java.util.List<?>) field.get(f.context.binding())).size(); }
             catch (IllegalAccessException e) { throw new AssertionError(e); }
             f.overlay.open(); f.at(220);
-            f.overlay.dismiss(f.overlay::close); f.at(170);
+            f.overlay.dismiss(f.overlay::close); f.at(200);
             assertThat(f.overlay.getParent()).isNull();
             try { assertThat(((java.util.List<?>) field.get(f.context.binding())).size()).isEqualTo(before - 1); }
             catch (IllegalAccessException e) { throw new AssertionError(e); }

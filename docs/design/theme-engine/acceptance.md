@@ -114,8 +114,8 @@ The user's checks after the first native pass found the dialog title rows standa
   (the installed-font list opened slowly because each open re-measured every row once per row).
 - Unlock Vault and Create Vault are the kit's modal overlay (`ModalOverlay`, SDK 0.15.4
   `DialogSpec.Presentation.OVERLAY`), as the user specified: the window dims under a black scrim at 40% while the
-  card fades up 16 logical into place over 220 ms (ease-out cubic), and leaves as its opposite over 170 ms
-  (ease-in), rising on another 16 as it fades out; instant with animations off. The centred hero mocks' window frame no longer applies to these two prompts; their
+  card fades up 16 logical into place over 220 ms (ease-out cubic), and leaves as its opposite over 200 ms, lifting
+  off at once and rising another 16 (ease-out) as it fades (ease-in); instant with animations off. The centred hero mocks' window frame no longer applies to these two prompts; their
   hero content keeps its geometry inside the outlined card. Remote's progress overlay uses the same kit overlay.
   `surface.scrim` now defaults to black (a theme may name its own), since a terminal's darkest colour could leave a
   dark window undimmed.

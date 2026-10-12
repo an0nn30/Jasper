@@ -28,8 +28,8 @@ import javax.swing.border.EmptyBorder;
 /**
  * The kit's modal overlay: a scrim that dims a window's whole content and, above it, a centred card holding the host's
  * content. Opening fades the scrim in while the card fades up into place from {@code OVERLAY_RISE} below, easing out
- * over {@code OVERLAY_ENTER_MILLIS}; closing is its opposite, easing in over the shorter {@code OVERLAY_EXIT_MILLIS}:
- * the card rises on another {@code OVERLAY_RISE} as it fades out and the scrim lifts.
+ * over {@code OVERLAY_ENTER_MILLIS}; closing is its opposite over {@code OVERLAY_EXIT_MILLIS}: the card lifts off at
+ * once and rises another {@code OVERLAY_RISE} (easing out) while it fades (easing in) and the scrim lifts.
  * With motion off both are instant. While it moves the card paints a snapshot of its content, so the card fades as one
  * surface; at rest its content paints live. The scrim takes every pointer event outside the card.
  * <p>The host adds the overlay to a layered pane, keeps it the pane's size, calls {@link #open()}, and owns keyboard
@@ -141,7 +141,9 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
         int millis = context.metrics().value(phase == Phase.OPENING ? DesignMetrics.Role.OVERLAY_ENTER_MILLIS : DesignMetrics.Role.OVERLAY_EXIT_MILLIS);
         double t = Math.min(1, Math.max(0, (clock.getAsLong() - started) / 1e6 / millis));
         if (phase == Phase.OPENING) { shown = easeOutCubic(t); offset = 1 - shown; }
-        else { double eased = easeInCubic(t); shown = from * (1 - eased); offset = fromOffset + (-1 - fromOffset) * eased; }
+        // The exit lifts off at once and rises while still clearly visible (ease-out), fading as it goes (ease-in):
+        // on one shared ease-in it barely moved before it had faded.
+        else { shown = from * (1 - easeInQuad(t)); offset = fromOffset + (-1 - fromOffset) * easeOutCubic(t); }
         if (t >= 1) { finish(); return; }
         placeCard();
         repaint();
@@ -204,6 +206,9 @@ public final class ModalOverlay extends JComponent implements AutoCloseable {
 
     /** Ease-in cubic: gentle at first, leaving quickly. */
     static double easeInCubic(double t) { return t * t * t; }
+
+    /** Ease-in quadratic: the exit's fade, holding a little before it goes. */
+    static double easeInQuad(double t) { return t * t; }
 
     /** The eased progress of the running transition, 0 to 1; for tests. */
     double shown() { return shown; }
