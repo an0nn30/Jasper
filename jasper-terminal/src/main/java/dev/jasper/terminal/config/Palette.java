@@ -11,8 +11,9 @@ import java.util.Objects;
  * @param cursor cursor color
  * @param selection selected-cell background
  * @param ansi exactly 16 nonnull colors, copied on construction
+ * @param boldForeground the default color of bold text; an explicit SGR color stays as it is
  */
-public record Palette(Color foreground, Color background, Color cursor, Color selection, List<Color> ansi) {
+public record Palette(Color foreground, Color background, Color cursor, Color selection, List<Color> ansi, Color boldForeground) {
 
     /** Checks nonnull colors and exactly 16 ANSI entries, then copies the list. */
     public Palette {
@@ -20,6 +21,7 @@ public record Palette(Color foreground, Color background, Color cursor, Color se
         Objects.requireNonNull(background, "background");
         Objects.requireNonNull(cursor, "cursor");
         Objects.requireNonNull(selection, "selection");
+        Objects.requireNonNull(boldForeground, "boldForeground");
         Objects.requireNonNull(ansi, "ansi");
         if (ansi.size() != 16) {
             throw new IllegalArgumentException("ansi must have 16 colors, got " + ansi.size());
@@ -38,7 +40,7 @@ public record Palette(Color foreground, Color background, Color cursor, Color se
                 new Color(0x21222c), new Color(0xff5555), new Color(0x50fa7b), new Color(0xf1fa8c),
                 new Color(0xbd93f9), new Color(0xff79c6), new Color(0x8be9fd), new Color(0xf8f8f2),
                 new Color(0x6272a4), new Color(0xff6e6e), new Color(0x69ff94), new Color(0xffffa5),
-                new Color(0xd6acff), new Color(0xff92df), new Color(0xa4ffff), new Color(0xffffff)));
+                new Color(0xd6acff), new Color(0xff92df), new Color(0xa4ffff), new Color(0xffffff)), new Color(0xf8f8f2));
     }
 
     /** Returns the standalone light palette. */
@@ -49,7 +51,7 @@ public record Palette(Color foreground, Color background, Color cursor, Color se
                 new Color(0x383a42), new Color(0xe45649), new Color(0x50a14f), new Color(0xc18401),
                 new Color(0x4078f2), new Color(0xa626a4), new Color(0x0184bc), new Color(0xa0a1a7),
                 new Color(0x696c77), new Color(0xca4035), new Color(0x3d7d3b), new Color(0x986801),
-                new Color(0x315fc4), new Color(0x87218b), new Color(0x006b96), new Color(0xffffff)));
+                new Color(0x315fc4), new Color(0x87218b), new Color(0x006b96), new Color(0xffffff)), new Color(0x383a42));
     }
 
     /** xterm color index 0–255. */

@@ -294,7 +294,8 @@ scrollback capacity are new-session choices; changing the view's options does
 not resize its existing history. Grid dimensions can change through view layout
 or explicit session resize. Program cursor requests still override configured
 defaults until reset. App configuration reload and temporary overrides remain
-app policy, tested separately.
+app policy, tested separately. The palette's bold foreground colours bold text
+drawn in the default foreground; an explicit SGR colour stays.
 
 Future SDK work can adapt typed actions, immutable settings and listener events,
 with capability/lifetime/thread contracts decided at that time. Do not export

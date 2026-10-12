@@ -112,7 +112,7 @@ class ThemeManagerTest {
             assertThat(bundled.document().uiComplete()).isEmpty();
         });
         assertThat(Theme.DARK.palette()).isEqualTo(new Palette(new Color(0xd5dee5), new Color(0x191c20),
-            new Color(0xd5dee5), new Color(0x35434e), Palette.jasperDark().ansi()));
+            new Color(0xd5dee5), new Color(0x35434e), Palette.jasperDark().ansi(), new Color(0xd5dee5)));
         assertThat(ThemeManager.generated(Theme.DARK).tokens().get(Token.TAB_ACTIVE)).isEqualTo(new Color(0x293d51));
     }
 

@@ -49,7 +49,7 @@ class PaletteTest {
 
     @Test
     void rejectsAnsiListOfWrongSize() {
-        assertThatThrownBy(() -> new Palette(Color.WHITE, Color.BLACK, Color.WHITE, Color.GRAY, Collections.nCopies(8, Color.RED)))
+        assertThatThrownBy(() -> new Palette(Color.WHITE, Color.BLACK, Color.WHITE, Color.GRAY, Collections.nCopies(8, Color.RED), Color.WHITE))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("16");
     }
@@ -57,5 +57,11 @@ class PaletteTest {
     @Test
     void theThemeHasASelectionColor() {
         assertThat(palette.selection()).isEqualTo(new Color(0x44475a));
+    }
+
+    @Test
+    void rejectsAMissingBoldForeground() {
+        assertThatThrownBy(() -> new Palette(Color.WHITE, Color.BLACK, Color.WHITE, Color.GRAY, Collections.nCopies(16, Color.RED), null))
+            .isInstanceOf(NullPointerException.class).hasMessageContaining("boldForeground");
     }
 }

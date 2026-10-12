@@ -7,6 +7,6 @@ import dev.jasper.ui.theme.TerminalColors;
 public final class TerminalPaletteAdapter {
     private TerminalPaletteAdapter() {}
     public static Palette toTerminal(TerminalColors colors) {
-        return new Palette(colors.foreground(), colors.background(), colors.cursor(), colors.selection(), colors.ansi());
+        return new Palette(colors.foreground(), colors.background(), colors.cursor(), colors.selection(), colors.ansi(), colors.foreground());
     }
 }

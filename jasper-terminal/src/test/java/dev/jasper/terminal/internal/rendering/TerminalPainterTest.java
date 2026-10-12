@@ -201,4 +201,20 @@ class TerminalPainterTest {
     private static int rgb(Color color) {
         return color.getRGB() & 0xFFFFFF;
     }
+
+    @Test
+    void boldTextInTheDefaultColorIsDrawnInTheBoldForeground() throws Exception {
+        Palette bold = new Palette(palette.foreground(), palette.background(), palette.cursor(), palette.selection(),
+            palette.ansi(), new Color(0x12ab34));
+        TerminalPainter boldPainter = new TerminalPainter(fonts, bold);
+        var snapshot = snapshotAfter("\033[1m\u2588\033[0m", 1);
+        BufferedImage image = new BufferedImage(COLUMNS * cw, ROWS * ch, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = image.createGraphics();
+        try {
+            boldPainter.paint(g, snapshot, cursorOff(), List.of(), image.getWidth(), image.getHeight());
+        } finally {
+            g.dispose();
+        }
+        assertThat(rgb(image, cw / 2, ch / 2)).isEqualTo(0x12ab34);
+    }
 }
