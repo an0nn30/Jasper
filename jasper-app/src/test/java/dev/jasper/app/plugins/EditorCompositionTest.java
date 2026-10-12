@@ -51,6 +51,8 @@ class EditorCompositionTest {
             .filter(candidate -> candidate.dark() == dark && !candidate.equals(dark ? Theme.DARK : Theme.JASPER_LIGHT)).findFirst().orElseThrow()));
         onEdt(() -> appearance.setPair(new ResolvedTheme(first, first)));
         var controller = onEdtValue(dev.jasper.app.appearance.ThemeController::new);
+        // The look and feel follows the same theme, as the application's chrome does (native scroll bar tracks).
+        onEdt(() -> controller.configure(dark ? Theme.DARK : Theme.JASPER_LIGHT));
         try (var editor = new StagedEditorHost(data, dark, appearance)) {
             Object[] state = onEdtValue(() -> {
                 call(editor.editorWindow(), "newUntitled");
@@ -76,6 +78,7 @@ class EditorCompositionTest {
                     "find.replacement.input", "find.one", "find.all");
                 named(view, "find.replacement.input", JTextComponent.class).setText("bar");
                 EditorEvidence.capture(theme, "find-replace-options", view, WIDTH, HEIGHT, FIND_ANCHORS);
+                focused(named(view, "find.query.input", JTextComponent.class), () -> EditorEvidence.capture(theme, "find-focus", view, WIDTH, HEIGHT, FIND_ANCHORS));
                 named(view, "find.query.input", JTextComponent.class).setText("(");
                 assertThat(named(view, "find.status", JLabel.class).getText()).isEqualTo("Invalid pattern");
                 EditorEvidence.capture(theme, "find-invalid-pattern", view, WIDTH, HEIGHT, FIND_ANCHORS);
@@ -285,6 +288,13 @@ class EditorCompositionTest {
             var language = editor.awaitSurface("Language");
             StagedRemoteHost.awaitNamed(language, "language.list");
             onEdt(() -> { capture(theme, "language", editor, language); language.requestClose(); });
+            var saves = new java.util.concurrent.CompletableFuture<Boolean>();
+            var waited = editor.saveWait("Saving 3 files…", saves);
+            var saving = editor.awaitSurface("Saving");
+            StagedRemoteHost.awaitNamed(saving, "saving.progress");
+            onEdt(() -> capture(theme, "saving", editor, saving));
+            onEdt(() -> saves.complete(true));
+            assertThat(waited.get(10, TimeUnit.SECONDS)).isTrue();
             assertThat(editor.problems).isEmpty();
         } finally {
             onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); });
@@ -295,6 +305,23 @@ class EditorCompositionTest {
         var size = editor.dialogSize(surface);
         EditorEvidence.capture(theme, state, surface.holder(), size.width, size.height, "question.message", "question.choice.0", "question.choice.1",
             "question.choice.2", "go-to-line.card", "go-to-line.row", "go-to-line.line", "go-to-line.cancel", "go-to-line.go", "language.filter", "language.list");
+    }
+
+    /** Synthetic headless keyboard focus (as SurfaceFixtures does): never native focus proof. */
+    private static void focused(Component target, Runnable capture) {
+        var previous = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager();
+        java.awt.KeyboardFocusManager.setCurrentKeyboardFocusManager(new java.awt.DefaultKeyboardFocusManager() {
+            @Override public Component getFocusOwner() { return target; }
+        });
+        try {
+            var gained = new java.awt.event.FocusEvent(target, java.awt.event.FocusEvent.FOCUS_GAINED, false, null, java.awt.event.FocusEvent.Cause.TRAVERSAL_FORWARD);
+            for (var listener : target.getFocusListeners()) listener.focusGained(gained);
+            capture.run();
+        } finally {
+            var lost = new java.awt.event.FocusEvent(target, java.awt.event.FocusEvent.FOCUS_LOST);
+            for (var listener : target.getFocusListeners()) listener.focusLost(lost);
+            java.awt.KeyboardFocusManager.setCurrentKeyboardFocusManager(previous);
+        }
     }
 
     private static JLabel labelNamed(java.awt.Container root, String text) {

@@ -64,6 +64,34 @@ class EditorSettingsTest {
         }
     }
 
+    /**
+     * Plan 3 Task 8: the generated Settings page shows a section label above a settings card wherever the section
+     * changes, so the declarations group the page as Font, Editing and Files, with the two on/off settings as switches.
+     */
+    @Test void declaresTheSettingsPageAsFontEditingAndFilesGroups() {
+        var specs = new java.util.ArrayList<dev.jasper.sdk.settings.SettingSpec<?>>();
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.start(INFO, Set.of(), Set.of(), context -> new EditorSettings.Declared(recording(context.settings(), specs), Set.of()));
+            assertThat(specs).extracting(spec -> spec.section() + "/" + spec.key()).containsExactly(
+                "Font/font_family", "Font/font_size", "Editing/tab_size", "Editing/soft_wrap", "Editing/vim", "Files/max_file_mib", "Files/recent_files_days");
+            assertThat(specs).filteredOn(spec -> spec.kind() instanceof dev.jasper.sdk.settings.SettingKind.Bool)
+                .extracting(dev.jasper.sdk.settings.SettingSpec::key).containsExactly("soft_wrap", "vim");
+            assertThat(specs).allSatisfy(spec -> {
+                assertThat(spec.label()).as("sentence-case labels without a colon").doesNotEndWith(":").isNotBlank();
+                assertThat(spec.description()).isNotBlank();
+            });
+            assertThat(specs.getFirst().editor()).as("the font family is the settings font picker").isPresent();
+        }
+    }
+
+    private static dev.jasper.sdk.settings.PluginSettings recording(dev.jasper.sdk.settings.PluginSettings delegate, java.util.List<dev.jasper.sdk.settings.SettingSpec<?>> specs) {
+        return (dev.jasper.sdk.settings.PluginSettings) java.lang.reflect.Proxy.newProxyInstance(EditorSettingsTest.class.getClassLoader(),
+            new Class<?>[]{dev.jasper.sdk.settings.PluginSettings.class}, (proxy, method, args) -> {
+                if (method.getName().equals("declare") && args != null && args.length == 1 && args[0] instanceof dev.jasper.sdk.settings.SettingSpec<?> spec) specs.add(spec);
+                try { return method.invoke(delegate, args); } catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
+            });
+    }
+
     @Test void savingVimModeWritesTheFileAndTheValueFollows() {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
             var declared = start(host, Set.of());

@@ -93,6 +93,43 @@ class IndexerSettingsPanelTest {
         });
     }
 
+    /** Plan 3 Task 8: the canonical Settings page: labelled sections; no projects is the standard empty state. */
+    @Test void composesLabelledSectionsAndTheStandardEmptyState() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var projects = new Projects();
+            var notifications = new FakeNotifications();
+            var indexer = new Indexer(projects, new IndexStore(data.resolve("empty-store")), job -> new CompletableFuture<Listing>(),
+                new ManualExecutor(), new ManualExecutor(), Instant::now, text -> { }, notifications.group("r"), notifications.group("f"), System.getLogger("test"));
+            var adds = new AtomicInteger();
+            try (var host = new FakePluginHost(data)) {
+                host.start(IndexerTesting.INFO, Set.of(), Set.of(), context -> context.settings().page(new IndexerSettingsPanel(context.kit(),
+                    new IndexerSettings(context.settings()), projects, indexer, key -> key.root(), key -> true, key -> true, adds::incrementAndGet, (question, accepted) -> { })));
+                host.settingsPanel(IndexerTesting.INFO.id()).orElseThrow();
+                FakeKitView view = host.settingsPanelView(IndexerTesting.INFO.id()).orElseThrow();
+                var page = (Nodes.Stack) view.spec().root();
+                assertThat(page.role()).isEqualTo(Nodes.LayoutRole.SETTINGS_PAGE);
+                assertThat(page.children()).extracting(node -> ((Nodes.Section) node).title()).containsExactly("Projects", "Detection", "Indexing");
+                for (String card : List.of(IndexerSettingsPanel.DETECTION + ".card", IndexerSettingsPanel.INDEXING + ".card")) {
+                    var settings = node(view, card, Nodes.Card.class);
+                    assertThat(settings.kind()).isEqualTo(Nodes.CardKind.SETTINGS);
+                    assertThat(settings.children()).hasSize(3).allSatisfy(row -> assertThat(((Nodes.Stack) ((Nodes.SettingRow) row).control()).role())
+                        .as("the generated pages' trailing control slot").isEqualTo(Nodes.LayoutRole.SETTINGS_TRAILING));
+                }
+                var empty = node(view, IndexerSettingsPanel.EMPTY, Nodes.Empty.class);
+                assertThat(empty.title()).isEqualTo("No Projects");
+                assertThat(empty.actions()).singleElement().satisfies(add -> assertThat(((Nodes.Button) add).label()).isEqualTo("Add Folder…"));
+                assertThat(find(view.spec().root(), "indexer.projects")).as("no column headers without projects").isNull();
+                view.emit(new UiEvent.Action(action(view, "indexer.add").action()));
+                assertThat(adds).hasValue(1);
+                projects.loaded(new Project(APP, "app", false), Optional.of(new ProjectIndex(APP, List.of("a"), Strategy.GIT, Instant.EPOCH, false)));
+                assertThat(find(view.spec().root(), IndexerSettingsPanel.EMPTY)).isNull();
+                assertThat(table(view).columns()).extracting(dev.jasper.sdk.ui.Column::id).as("the right-aligned count last")
+                    .containsExactly("name", "location", "state", "when", "files");
+                assertThat(host.failures()).isEmpty();
+            }
+        });
+    }
+
     @Test void remoteProjectsShowWhetherTheyCanBeReached() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var host = java.util.UUID.randomUUID();
