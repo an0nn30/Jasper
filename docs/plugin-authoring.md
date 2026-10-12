@@ -886,3 +886,22 @@ SDK 0.15.3 adds, for plugins built against it (declare `sdk = ">=0.15.3, <0.16"`
 bounded integer's Settings stepper); the `border.identity` semantic color; and the icon names `laptop`, `target`,
 `arrow.right`, `import`, `clock`, `lock.keyhole`, `match.word`, `brightness`, `reset`, `expand.all` and
 `collapse.all`. [Building plugin UI](plugin-ui.md) shows the compositions they belong to.
+
+### Modal overlays (SDK 0.15.4)
+
+`DialogSpec.Presentation.OVERLAY` presents a modal dialog inside its owner's window instead of as a native window:
+the rest of the window dims under a scrim, and the dialog, centred above it, fades from transparent while rising
+16 logical pixels into place (about 220 ms, easing out); closing reverses it a little faster (about 170 ms, easing
+in). Both follow the motion setting and are instant with animations off. The owner may be a terminal window, one of
+your windows or a `UiAnchor`; an overlay may open over the window's progress overlay. It must be modal: `show()`
+returns once it closes, its form's Escape runs the form's cancel action, and the window takes no other input
+meanwhile. The Vault's Create Vault and Unlock Vault prompts use it:
+
+```java
+var dialog = context.windows().dialog(new DialogSpec("Unlock Vault", window, true, DialogSpec.Presentation.OVERLAY));
+dialog.setContent(form.view());
+dialog.show();
+```
+
+`FakePluginHost.dialogPresentation(pluginId, title)` reports how an open dialog is presented. Declare
+`sdk = ">=0.15.4, <0.16"` to use it; every bundled manifest does.

@@ -67,14 +67,38 @@ public final class AuxiliaryWindows implements AutoCloseable {
         return track(new AuxiliarySurface(id, title, AuxiliarySurface.Kind.DIALOG, true, preferred, ownerWindowOrNull, null, shells));
     }
 
-    /** Reserves one overlay per terminal owner, including surfaces not shown yet. */
+    /** Reserves one progress overlay per terminal owner, including surfaces not shown yet; modal overlays may stack over it. */
     public AuxiliarySurface overlay(String title, UUID ownerWindow) {
         Objects.requireNonNull(ownerWindow);
-        if (open.stream().anyMatch(surface -> surface.kind() == AuxiliarySurface.Kind.OVERLAY
+        if (open.stream().anyMatch(surface -> surface.kind() == AuxiliarySurface.Kind.OVERLAY && !surface.modal()
                 && surface.ownerWindow().filter(ownerWindow::equals).isPresent()))
             throw new IllegalStateException("This window already has an overlay");
         return track(new AuxiliarySurface("", title, AuxiliarySurface.Kind.OVERLAY, false,
             new Dimension(1, 1), ownerWindow, null, shells));
+    }
+
+    /**
+     * A modal overlay over the terminal window {@code ownerWindow}: a dialog presented inside the window, over a
+     * dimmed scrim. It may stack over the window's progress overlay. Showing it blocks until it closes.
+     */
+    public AuxiliarySurface modalOverlay(String title, UUID ownerWindow) {
+        return track(new AuxiliarySurface("", title, AuxiliarySurface.Kind.OVERLAY, true, new Dimension(1, 1),
+            Objects.requireNonNull(ownerWindow), null, shells));
+    }
+
+    /** A modal overlay inside the open auxiliary window or dialog {@code owner}; it closes with it. */
+    public AuxiliarySurface modalOverlay(String title, AuxiliarySurface owner) {
+        if (owner.closed() || !open.contains(owner)) throw new IllegalArgumentException("An overlay needs an open owner window");
+        return track(new AuxiliarySurface("", title, AuxiliarySurface.Kind.OVERLAY, true, new Dimension(1, 1), null, owner, shells));
+    }
+
+    /** A modal overlay inside the window that holds the checked control {@code anchor}. */
+    public AuxiliarySurface modalOverlay(String title, javax.swing.JComponent anchor) {
+        for (var surface : open) if (surface.shown() && javax.swing.SwingUtilities.isDescendingFrom(anchor, surface.holder()))
+            return modalOverlay(title, surface);
+        if (!anchor.isShowing()) throw new IllegalArgumentException("Anchor has no shown owner");
+        var result = new AuxiliarySurface("", title, AuxiliarySurface.Kind.OVERLAY, true, new Dimension(1, 1), null, null, shells);
+        result.anchorOwner(anchor); return track(result);
     }
 
     /** Removes terminal-owned surfaces even if they have never been shown. */

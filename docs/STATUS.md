@@ -21,7 +21,9 @@ remain user-run checks listed in the acceptance record. Older entries below are 
 **Follow-up fixes from the user's native checks — 2026-10-12.** Settings rows stay hovered over their text, icon and
 switch; the searchable dropdown (the font lists) rebuilds its rows in one step and the installed families are read off
 the EDT after start-up; indeterminate progress loops without jumping back; and auxiliary title rows follow the references
-(window, dialog, hero and Settings' integrated row, from new kit title metrics). See the follow-up round in the
+(window, dialog, hero and Settings' integrated row, from new kit title metrics). Unlock/Create Vault are the kit's
+new modal overlay (SDK 0.15.4 `DialogSpec.Presentation.OVERLAY`: a dimming scrim and a fade-up card), and Show
+more… recovers from a failed Errors window. See the follow-up round in the
 [acceptance record](design/theme-engine/acceptance.md).
 
 **Task9c fix round1 — scoped re-review pending (2026-10-11).** Review I1 found that table useful-width search crossed the existing numeric-minimum feasibility boundary, where weighted allocation is not monotonic. The shared search now starts where all existing column minima fit, then reserves the useful first-column target; ordinary allocation remains unchanged. A long numeric-cell regression covers the returned minimum and larger/boundary widths with icons, selection modes and scale variants. This repairs the approved minimum contract without a new layout policy; scoped UI/chooser checks, default/controlled owner captures and fresh installDist evidence are recorded in scratch `task-9c-report.md`, preserving final02. Review M1 classifies inherited100JavaDoc warnings and injected native-notification authorization/delivery failures as known gate noise, not failing tests or new9c defects; source-warning cleanup stays final11. Native/pixel acceptance remains open.

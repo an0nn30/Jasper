@@ -38,6 +38,7 @@ Pick the composition from what the surface is, not from how it should look:
 | Small, focused prompt with an icon tile (unlock, create) | `Form` with `FormKind.HERO` or `HERO_COMPACT` and a hero |
 | Dialog with grouped fields (add host, new server, new tunnel) | `Form` with `FormKind.FULL`; each group is a `Section` holding a `Card` |
 | Sheet attached to one of your windows | `Form` with `FormKind.SHEET`, shown with `DialogSpec` sheet presentation |
+| Modal prompt inside a window, over its dimmed content (unlock, create) | Any `Form`, often `HERO`/`HERO_COMPACT`, shown with `DialogSpec.Presentation.OVERLAY` (SDK 0.15.4) |
 | Window body with a pinned footer | `Form` with `FormKind.WINDOW` (one section) |
 | Docked panel | `Panel` with a `Header`, optional search or navigation, a body and an optional footer |
 | Sidebar, list and detail (a manager) | `Split` with `SplitKind.THREE_COLUMN` or `SIDEBAR_DETAIL` |

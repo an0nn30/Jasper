@@ -2,7 +2,9 @@
 
 Credential Vault is bundled with Jasper. Press **F8**, click the vault button in the rail, or
 choose **Open Vault...** in the command palette. First use creates a vault with a master password
-and an optional device binding. Later use unlocks the vault and opens its manager window.
+and an optional device binding. Later use unlocks the vault and opens its manager window. Creating and unlocking
+are modal overlays inside the window that asked: it dims, and the prompt fades up over it (instantly with animations
+off). While the manager is open, it unlocks in place.
 
 The manager uses a single list of logins, SSH keys and secure notes. Search names, usernames or
 fingerprints and narrow the list with **All Types**. Each row shows its name, secondary details

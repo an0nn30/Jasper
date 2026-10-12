@@ -112,6 +112,15 @@ The user's checks after the first native pass found the dialog title rows standa
   body stays at 0.786 with the render crop moved below the new row.
 - Indeterminate progress loops through the whole track, and the searchable dropdown rebuilds its rows in one step
   (the installed-font list opened slowly because each open re-measured every row once per row).
+- Unlock Vault and Create Vault are the kit's modal overlay (`ModalOverlay`, SDK 0.15.4
+  `DialogSpec.Presentation.OVERLAY`), as the user specified: the window dims under a black scrim at 40% while the
+  card fades up 16 logical into place over 220 ms (ease-out cubic), and leaves in reverse over 170 ms (ease-in),
+  instant with animations off. The centred hero mocks' window frame no longer applies to these two prompts; their
+  hero content keeps its geometry inside the outlined card. Remote's progress overlay uses the same kit overlay.
+  `surface.scrim` now defaults to black (a theme may name its own), since a terminal's darkest colour could leave a
+  dark window undimmed.
+- Show more… on an error notification failed for good once the Errors window's view had failed to build (the
+  running app's jars had been replaced by a build); a failed open now closes its window, so the next one works.
 
 ## User-run checks still open
 

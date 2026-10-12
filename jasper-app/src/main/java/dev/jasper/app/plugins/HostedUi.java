@@ -721,14 +721,24 @@ final class HostedUi {
             @Override public PluginDialog dialog(DialogSpec spec) {
                 guard("dialog");
                 WindowOwner owner = resolveContentOwner(spec.owner());
+                // An overlay is the kit's modal overlay inside the owner's window; the others are native dialogs.
+                boolean overlay = spec.presentation() == DialogSpec.Presentation.OVERLAY;
                 AuxiliarySurface surface;
                 if (owner instanceof dev.jasper.sdk.ui.UiAnchor value) {
                     var anchor=HostedAnchor.require(value,windows);
-                    surface=anchor.ownerSurface()!=null ? windows.dialog(spec.title(),spec.modal(),anchor.ownerSurface()) : windows.dialog(spec.title(),spec.modal(),anchor.target);
+                    surface=anchor.ownerSurface()!=null
+                        ? overlay ? windows.modalOverlay(spec.title(),anchor.ownerSurface()) : windows.dialog(spec.title(),spec.modal(),anchor.ownerSurface())
+                        : overlay ? windows.modalOverlay(spec.title(),anchor.target) : windows.dialog(spec.title(),spec.modal(),anchor.target);
                     var registration=anchor.onClosed(surface::close);surface.onClosed(registration::close);
                 } else if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window)
-                    surface = windows.dialog(spec.title(), spec.modal(), window.surface);
-                else if (owner instanceof WindowHandle terminalWindow && terminals.ownsOpenWindow(terminalWindow)) surface = windows.dialog(spec.title(), spec.modal(), terminalWindow.id());
+                    surface = overlay ? windows.modalOverlay(spec.title(), window.surface) : windows.dialog(spec.title(), spec.modal(), window.surface);
+                else if (owner instanceof WindowHandle terminalWindow && terminals.ownsOpenWindow(terminalWindow)) {
+                    surface = overlay ? windows.modalOverlay(spec.title(), terminalWindow.id()) : windows.dialog(spec.title(), spec.modal(), terminalWindow.id());
+                    if (overlay) {
+                        var ownerClosed = terminals.onWindowClosed(terminalWindow.id(), surface::close);
+                        surface.onClosed(ownerClosed::close);
+                    }
+                }
                 else throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
                 surface.attachedSheet(spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET);
                 if (spec.owner() instanceof OwnedContent content) {

@@ -41,6 +41,45 @@ class VaultSheetRenderTest {
             }
         } finally { SurfaceFixtures.edt(() -> {controller.configure(Theme.DARK,UiFontConfig.defaults());controller.close();return null;}); }
     }
+    /** Unlock and Create are modal overlays inside the asking window: centred over its dimmed content. */
+    @Test void unlockAndCreateAreModalOverlaysCentredOverTheDimmedWindow() throws Exception {
+        var controller = SurfaceFixtures.edt(ThemeController::new);
+        try {
+            for (String state : List.of("dark", "light")) {
+                // At rest: the motion itself is the kit's ModalOverlayTest.
+                SurfaceFixtures.edt(() -> {controller.configure(state.equals("light") ? Theme.JASPER_LIGHT : Theme.DARK, UiFontConfig.defaults());
+                    controller.configureAnimations(false); return null;});
+                for (String id : List.of("vault-unlock", "vault-create")) {
+                    try (var fixture = new KitViewTestAccess(home.resolve("overlay-" + state + "-" + id), id, SurfaceFixtures.edt(controller::current))) {
+                        SurfaceFixtures.edt(() -> {
+                            var surface = fixture.surface();
+                            assertThat(surface.kind()).as("%s is an overlay", id).isEqualTo(AuxiliarySurface.Kind.OVERLAY);
+                            assertThat(surface.modal()).isTrue();
+                            // A stand-in terminal window: a title row and a body with some text.
+                            var owner = new JRootPane(); var body = new JPanel(new BorderLayout());
+                            var text = new JLabel("  dustin@mac ~ % ssh dustin@192.168.1.120"); text.setForeground(new Color(200, 200, 200));
+                            text.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13)); text.setVerticalAlignment(SwingConstants.TOP);
+                            body.add(text); body.setBackground(state.equals("light") ? Color.WHITE : new Color(30, 31, 34));
+                            if (state.equals("light")) text.setForeground(new Color(40, 40, 40));
+                            var title = new JPanel(); title.setPreferredSize(new Dimension(900, 38)); title.setBackground(state.equals("light") ? new Color(236, 236, 236) : new Color(43, 45, 48));
+                            owner.setContentPane(new JPanel(new BorderLayout()));
+                            owner.getContentPane().add(title, BorderLayout.NORTH); owner.getContentPane().add(body, BorderLayout.CENTER);
+                            owner.setSize(900, 600); layout(owner);
+                            var overlay = new WindowOverlay(owner, surface.holder(), controller.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), true);
+                            try {
+                                overlay.show(); layout(owner);
+                                Rectangle card = overlay.cardBounds();
+                                assertThat(card.x * 2 + card.width).as("centred across the window").isEqualTo(900);
+                                assertThat(Math.abs(card.y * 2 + card.height - 600)).as("and down it").isLessThanOrEqualTo(1);
+                                capture(state, id + "-overlay", owner, null, null, "card=" + card);
+                            } finally { overlay.close(); }
+                            return null;
+                        });
+                    }
+                }
+            }
+        } finally { SurfaceFixtures.edt(() -> {controller.configure(Theme.DARK, UiFontConfig.defaults()); controller.close(); return null;}); }
+    }
     @Test void populatedManagerKeepsFullActionsReachableAtNarrowAndEnlargedWidths() throws Exception {
         var controller=SurfaceFixtures.edt(ThemeController::new);
         try {

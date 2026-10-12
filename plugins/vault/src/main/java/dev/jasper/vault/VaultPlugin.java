@@ -219,7 +219,8 @@ public class VaultPlugin implements Plugin {
     private CompletableFuture<Boolean> createVault(WindowHandle owner) {
         if (creating != null) { createDialog.toFront(); return attachCreate(); }
         var result = new CompletableFuture<Boolean>();
-        PluginDialog dialog = context.windows().dialog(new DialogSpec("Create Vault", owner, true));
+        // Setup and unlocking are the kit's modal overlay: the window dims and the prompt fades up over it.
+        PluginDialog dialog = context.windows().dialog(new DialogSpec("Create Vault", owner, true, DialogSpec.Presentation.OVERLAY));
         creating = result; createDialog = dialog;
         boolean[] success = {false}, submitted = {false};
         PasswordPanel[] form = new PasswordPanel[1];
@@ -267,7 +268,8 @@ public class VaultPlugin implements Plugin {
         prompt.onDismiss(() -> { if (currentUnlock == prompt) currentUnlock = null; });
         if (!prompt.anchored() && managerWindow != null && managerWindow.showUnlock(prompt)) return;
         var presentation=prompt.presentationOwner();
-        PluginDialog dialog = context.windows().dialog(new DialogSpec("Unlock Vault", prompt.anchored()?presentation:owner(prompt.owner()), true));
+        PluginDialog dialog = context.windows().dialog(new DialogSpec("Unlock Vault", prompt.anchored()?presentation:owner(prompt.owner()), true,
+            DialogSpec.Presentation.OVERLAY));
         PasswordPanel panel = PasswordPanel.unlock(context.kit(), prompt);
         dialog.setContent(panel.view());
         boolean[] active={true};

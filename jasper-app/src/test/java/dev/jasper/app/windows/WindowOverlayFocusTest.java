@@ -27,7 +27,7 @@ class WindowOverlayFocusTest {
             root.getLayeredPane().setSize(800, 600);
             var card = new JPanel(); card.add(cancel);
             focus.current = previous;
-            var overlay = new WindowOverlay(root, card, focus); overlay.show();
+            var overlay = new WindowOverlay(root, card, dev.jasper.app.testsupport.KitTestSupport.context(), false, focus); overlay.show();
             focus.current = cancel; overlay.close();
             assertThat(focus.dispatchers()).isZero();
             assertThat(focus.getPropertyChangeListeners("focusOwner")).isEmpty();
@@ -35,7 +35,7 @@ class WindowOverlayFocusTest {
         SwingUtilities.invokeAndWait(() -> assertThat(previous.requests.get()).isEqualTo(1));
         SwingUtilities.invokeAndWait(() -> {
             var card = new JPanel(); card.add(cancel); focus.current = previous;
-            var overlay = new WindowOverlay(root, card, focus); overlay.show();
+            var overlay = new WindowOverlay(root, card, dev.jasper.app.testsupport.KitTestSupport.context(), false, focus); overlay.show();
             focus.current = cancel; overlay.close();
             // Pending successful-session focus arrives before the restoration callback.
             focus.current = next;

@@ -272,6 +272,8 @@ final class FakeUi {
         final SurfaceMount bodyMount = new SurfaceMount(this, false), titleMount = new SurfaceMount(this, true);
         FakeKitView mounted, titleActions;
         boolean attachedSheet;
+        /** The presentation a dialog asked for; plain windows and overlays have none. */
+        DialogSpec.Presentation presentation;
         java.util.function.BooleanSupplier ownerLive = () -> true;
         @Override public void setTitleActions(Optional<dev.jasper.sdk.ui.UiView> actions) {
             context.requireOpen(); java.util.Objects.requireNonNull(actions, "actions");
@@ -561,6 +563,7 @@ final class FakeUi {
                     throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
                 var dialog = new FakeWindow("dialog", spec.title(), parent);
                 dialog.attachedSheet = spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET;
+                dialog.presentation = spec.presentation();
                 dialog.ownerLive = () -> owner instanceof dev.jasper.sdk.ui.UiAnchor anchor ? anchor.isOpen() : liveChooserOwner(owner);
                 if(owner instanceof dev.jasper.sdk.ui.UiAnchor value){var registration=value.onClosed(dialog::close);dialog.onClosed(registration::close);}
                 if (owner instanceof FakeContent content) {

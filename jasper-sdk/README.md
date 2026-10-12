@@ -35,7 +35,8 @@ monochrome paths with `UiKit.registerIcon`; see [icons](../docs/sdk-icons.md).
 Panels and settings factories return `UiView`; window surfaces and tabs mount only `UiView`.
 Settings hosts supply `Nodes.Node` rows. The host owns ordinary controls and their presentation.
 Specialized content retains explicit Appearance palettes and workspace opacity.
-All bundled manifests now require `sdk = ">=0.15.3, <0.16"` (0.15.0 was the breaking boundary: raw factories,
+All bundled manifests now require `sdk = ">=0.15.4, <0.16"` (0.15.4 adds the modal overlay presentation,
+`DialogSpec.Presentation.OVERLAY`; 0.15.0 was the breaking boundary: raw factories,
 Appearance icon loaders, arbitrary Icon arguments and palette fallback readers were removed).
 
 ## File workflows and progress (0.7.5)

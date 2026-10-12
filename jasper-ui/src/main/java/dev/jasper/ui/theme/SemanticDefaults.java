@@ -1,7 +1,6 @@
 package dev.jasper.ui.theme;
 
 import java.awt.Color;
-import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -67,7 +66,9 @@ public final class SemanticDefaults {
             case SURFACE_CONTROL, SEGMENT_SELECTED_BG, TOGGLE_TRACK_OFF, BUTTON_SECONDARY_BG -> legacy.get(Token.BUTTON_BACKGROUND);
             case SURFACE_CONTROL_HOVER, BUTTON_SECONDARY_BG_HOVER -> legacy.get(Token.HOVER);
             case SURFACE_TERMINAL -> terminal.background();
-            case SURFACE_SCRIM -> terminal.ansi().stream().min(Comparator.comparingDouble(ColorMath::luminance)).orElseThrow();
+            // A scrim dims: black unless the theme names its own. A terminal's darkest colour can sit near its
+            // background, and dimming with it would leave a dark window as it was.
+            case SURFACE_SCRIM -> Color.BLACK;
             case BORDER_WINDOW, BORDER_INPUT, BORDER_MENU -> legacy.get(Token.BORDER);
             case BORDER_SUBTLE -> legacy.get(Token.SEPARATOR);
             case BORDER_CONTROL -> legacy.get(Token.BUTTON_BORDER);

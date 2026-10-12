@@ -966,6 +966,20 @@ public final class FakePluginHost implements AutoCloseable {
             .map(w -> w.mounted).filter(java.util.Objects::nonNull).findFirst();
     }
 
+    /**
+     * How an open plugin dialog is presented, as its {@code DialogSpec} asked. Call it on the UI thread.
+     * @param pluginId dialog owner
+     * @param title exact dialog title
+     * @return the presentation while the dialog is open; empty for windows, overlays, closed or absent dialogs
+     * @since 0.15.4
+     */
+    public java.util.Optional<dev.jasper.sdk.ui.DialogSpec.Presentation> dialogPresentation(String pluginId, String title) {
+        FakePluginContext context = contexts.get(pluginId);
+        if (context == null) return java.util.Optional.empty();
+        return context.ui.windows.stream().filter(w -> !w.closed && w.title.equals(title))
+            .map(w -> w.presentation).filter(java.util.Objects::nonNull).findFirst();
+    }
+
     /** Shown producer-owned popover views, in creation order, for deterministic input/lifetime tests.
      * @param pluginId content producer @return live mounted views */
     public List<FakeKitView> popoverViews(String pluginId){var context=contexts.get(pluginId);if(context==null)return List.of();return context.ui.popovers.stream().filter(p->p.shown&&!p.closed&&p.content!=null).map(p->p.content).toList();}

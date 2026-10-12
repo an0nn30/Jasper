@@ -11,13 +11,46 @@ import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
 class WindowOverlayTest {
+    /** The overlays' kit: motion off, so each appears and leaves at once. */
+    private static dev.jasper.ui.swing.KitContext kit() { return dev.jasper.app.testsupport.KitTestSupport.context(); }
+
+    /**
+     * A dialog over a progress overlay (Vault unlock while Remote connects) stacks: the newest takes the keys, its
+     * Escape reaches its content, and closing it hands the window back to the one below.
+     */
+    @Test void aDialogOverlayStacksOverAProgressOverlayAndHandsInputBack() {
+        var root = new JRootPane(); root.getLayeredPane().setSize(800, 600);
+        var behind = new JTextField(); root.setContentPane(behind);
+        var progress = new JPanel(); var cancel = new JButton("Cancel"); progress.add(cancel);
+        var prompt = new JPanel(); var password = new JTextField(); prompt.add(password);
+        var connecting = new WindowOverlay(root, progress, kit(), false); connecting.show();
+        var unlock = new WindowOverlay(root, prompt, kit(), true);
+        try {
+            unlock.show();
+            assertThat(root.getClientProperty(dev.jasper.app.platform.WindowInput.OVERLAY)).isSameAs(unlock);
+            var layers = root.getLayeredPane();
+            assertThat(layers.getLayer(SwingUtilities.getAncestorOfClass(dev.jasper.ui.swing.ModalOverlay.class, prompt)))
+                .as("above the progress overlay").isGreaterThan(layers.getLayer(SwingUtilities.getAncestorOfClass(dev.jasper.ui.swing.ModalOverlay.class, progress)));
+            assertThat(unlock.filterKey(key(password, KeyEvent.VK_ESCAPE, 0))).as("a dialog's Escape reaches its Cancel").isFalse();
+            assertThat(unlock.filterKey(key(cancel, KeyEvent.VK_SPACE, 0))).as("the overlay below is blocked").isTrue();
+            assertThat(connecting.filterKey(key(password, KeyEvent.VK_A, 0))).as("only the newest filters").isFalse();
+            unlock.close();
+            assertThat(prompt.getParent()).isNull();
+            assertThat(root.getClientProperty(dev.jasper.app.platform.WindowInput.OVERLAY)).isSameAs(connecting);
+            assertThat(connecting.filterKey(key(cancel, KeyEvent.VK_ESCAPE, 0))).as("the progress overlay keeps Escape").isTrue();
+            assertThat(connecting.filterKey(key(behind, KeyEvent.VK_A, 0))).isTrue();
+        } finally { unlock.close(); connecting.close(); }
+        assertThat(dev.jasper.app.platform.WindowInput.blocked(root)).isFalse();
+        assertThat(root.getClientProperty("Jasper.windowOverlays")).isNull();
+    }
+
     @Test void repaintingOpaqueContentPreservesTheRoundedCornerFill() {
         var root = new JRootPane(); root.setSize(800, 600);
         root.getContentPane().setBackground(java.awt.Color.WHITE);
         root.doLayout(); root.getLayeredPane().doLayout();
         var content = new JPanel(); content.setBackground(java.awt.Color.RED);
         content.setPreferredSize(new Dimension(400, 190));
-        var overlay = new WindowOverlay(root, content); overlay.show();
+        var overlay = new WindowOverlay(root, content, kit(), false); overlay.show();
         try {
             var card = (JPanel) content.getParent(); card.doLayout();
             for (int scale : new int[] {1, 2}) {
@@ -39,26 +72,30 @@ class WindowOverlayTest {
         } finally { overlay.close(); }
     }
 
-    @Test void roundedCardClipsOpaqueContentAndKeepsItsBorderAfterThemeChanges() {
-        var root = new JRootPane(); root.getLayeredPane().setSize(800, 600);
-        var content = new JPanel(); content.setPreferredSize(new Dimension(400, 190));
-        content.setBackground(java.awt.Color.RED);
-        var overlay = new WindowOverlay(root, content);
-        Object previous = UIManager.get("Component.borderColor");
+    @Test void roundedCardClipsOpaqueContentAndKeepsTheKitOutlineAcrossThemes() {
+        var bindings = dev.jasper.app.testsupport.KitTestSupport.bindings(true);
         try {
-            overlay.show();
-            var card = (JPanel) content.getParent(); card.doLayout();
-            for (var border : new java.awt.Color[] {java.awt.Color.BLUE, java.awt.Color.GREEN}) {
-                UIManager.put("Component.borderColor", border);
-                SwingUtilities.updateComponentTreeUI(card);
-                var image = new java.awt.image.BufferedImage(card.getWidth(), card.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
-                var graphics = image.createGraphics();
-                try { card.paint(graphics); } finally { graphics.dispose(); }
-                assertThat(image.getRGB(1, 1) >>> 24).as("opaque plugin content must not square off the card").isZero();
-                assertThat(image.getRGB(card.getWidth() / 2, card.getHeight() / 2)).isEqualTo(java.awt.Color.RED.getRGB());
-                assertThat(image.getRGB(card.getWidth() / 2, 0)).isEqualTo(border.getRGB());
-            }
-        } finally { UIManager.put("Component.borderColor", previous); overlay.close(); }
+            var context = bindings.context(dev.jasper.ui.theme.ThemeRoute.CHROME);
+            var root = new JRootPane(); root.getLayeredPane().setSize(800, 600);
+            var content = new JPanel(); content.setPreferredSize(new Dimension(400, 190));
+            content.setBackground(java.awt.Color.RED);
+            var overlay = new WindowOverlay(root, content, context, false);
+            try {
+                overlay.show();
+                var card = (JPanel) content.getParent(); card.doLayout();
+                for (boolean dark : new boolean[] {true, false}) {
+                    bindings.binding().publish(dev.jasper.app.appearance.ThemeTestSupport.pair(dark));
+                    var border = context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.BORDER_WINDOW);
+                    var image = new java.awt.image.BufferedImage(card.getWidth(), card.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                    var graphics = image.createGraphics();
+                    try { card.paint(graphics); } finally { graphics.dispose(); }
+                    assertThat(image.getRGB(1, 1) >>> 24).as("opaque plugin content must not square off the card").isZero();
+                    assertThat(image.getRGB(card.getWidth() / 2, card.getHeight() / 2)).isEqualTo(java.awt.Color.RED.getRGB());
+                    assertThat(new java.awt.Color(image.getRGB(card.getWidth() / 2, 0), true).getRGB() & 0xFFFFFF)
+                        .as("the kit's window outline in the %s theme", dark ? "dark" : "light").isEqualTo(border.getRGB() & 0xFFFFFF);
+                }
+            } finally { overlay.close(); }
+        } finally { bindings.close(); }
     }
 
     @Test void centersClampsAndReleasesTheRootAfterRepeatedUse() {
@@ -66,7 +103,7 @@ class WindowOverlayTest {
         var card = new JPanel(); card.setPreferredSize(new Dimension(400, 190));
         int listeners = root.getLayeredPane().getComponentListeners().length;
         for (int i = 0; i < 3; i++) {
-            var overlay = new WindowOverlay(root, card);
+            var overlay = new WindowOverlay(root, card, kit(), false);
             overlay.show(); overlay.show();
             assertThat(overlay.cardBounds()).isEqualTo(new Rectangle(199, 204, 402, 192));
             root.getLayeredPane().setSize(240, 140); overlay.layout();
@@ -87,7 +124,7 @@ class WindowOverlayTest {
         var behind = new JTextField(); root.setContentPane(behind);
         var card = new JPanel(); var cancel = new JButton("Cancel"); var text = new JTextField();
         card.add(cancel); card.add(text);
-        var overlay = new WindowOverlay(root, card); overlay.show();
+        var overlay = new WindowOverlay(root, card, kit(), false); overlay.show();
         try {
             var backdrop = root.getLayeredPane().getComponent(0);
             var outside = new java.awt.event.MouseEvent(backdrop, java.awt.event.MouseEvent.MOUSE_PRESSED,
@@ -109,7 +146,7 @@ class WindowOverlayTest {
     @Test void resizedContentIsRecenteredWithoutAddingAnotherLayer() {
         var root = new JRootPane(); root.getLayeredPane().setSize(800, 600);
         var card = new JPanel(); card.setPreferredSize(new Dimension(300, 150));
-        var overlay = new WindowOverlay(root, card); overlay.show();
+        var overlay = new WindowOverlay(root, card, kit(), false); overlay.show();
         try {
             int layers = root.getLayeredPane().getComponentCount();
             card.setPreferredSize(new Dimension(500, 250)); overlay.layout();
@@ -122,7 +159,7 @@ class WindowOverlayTest {
         var outer = new JPanel(new java.awt.BorderLayout());
         var root = new JRootPane(); outer.add(root); outer.setSize(800, 600); outer.addNotify(); outer.validate();
         var content = new JPanel(); content.setPreferredSize(new Dimension(400, 190));
-        var overlay = new WindowOverlay(root, content);
+        var overlay = new WindowOverlay(root, content, kit(), false);
         try {
             overlay.show(); root.validate();
             assertThat(hasScrollbars(root.getLayeredPane())).isFalse();
@@ -145,7 +182,7 @@ class WindowOverlayTest {
         var content = new JPanel(new java.awt.BorderLayout());
         var cancel = new JButton("Cancel"); content.add(cancel, java.awt.BorderLayout.SOUTH);
         content.setPreferredSize(new Dimension(500, 280));
-        var overlay = new WindowOverlay(root, content);
+        var overlay = new WindowOverlay(root, content, kit(), false);
         try {
             overlay.show(); content.doLayout();
             assertThat(hasScrollbars(root.getLayeredPane())).isFalse();

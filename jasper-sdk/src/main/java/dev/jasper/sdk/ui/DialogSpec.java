@@ -8,12 +8,26 @@ import java.util.Objects;
  *
  * @param title non-blank title
  * @param owner the terminal window or plugin window the dialog belongs to
- * @param presentation explicit native presentation; attached sheets require modality and a live checked owner at show
+ * @param presentation explicit presentation; attached sheets and overlays require modality, and attached sheets a live
+ *     checked owner at show
  * @param modal whether the dialog blocks its owner; {@link WindowSurface#show()} then returns only after it closes
  */
 public record DialogSpec(String title, WindowOwner owner, boolean modal, Presentation presentation) {
-    /** Native placement, independent of the form's content kind. */
-    public enum Presentation { CENTERED, ATTACHED_SHEET }
+    /** Placement, independent of the form's content kind. */
+    public enum Presentation {
+        /** A native dialog centred over its owner. */
+        CENTERED,
+        /** A native sheet hanging from the owner's title edge. */
+        ATTACHED_SHEET,
+        /**
+         * Inside the owner's window, with no native window: the rest of the window dims under a scrim and the dialog,
+         * centred above it, fades up into place, and fades back out as it closes (both instant with motion off).
+         * Modal only.
+         *
+         * @since 0.15.4
+         */
+        OVERLAY
+    }
     /** Retains the centered presentation and original JVM constructor. */
     public DialogSpec(String title, WindowOwner owner, boolean modal) { this(title, owner, modal, Presentation.CENTERED); }
     /** Validates the title and owner. */
@@ -22,5 +36,6 @@ public record DialogSpec(String title, WindowOwner owner, boolean modal, Present
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(presentation, "presentation");
         if (presentation == Presentation.ATTACHED_SHEET && !modal) throw new IllegalArgumentException("Attached sheets must be modal");
+        if (presentation == Presentation.OVERLAY && !modal) throw new IllegalArgumentException("Overlays must be modal");
     }
 }

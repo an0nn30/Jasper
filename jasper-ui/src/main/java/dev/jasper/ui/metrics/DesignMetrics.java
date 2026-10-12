@@ -38,6 +38,10 @@ public final class DesignMetrics {
         // the Settings header that stands in for it), a dialog's band before its content (Add Host, New File Server, New
         // Tunnel) and where a dialog's title and window controls centre, and a hero dialog's band and controls centre.
         WINDOW_TITLE_HEIGHT(45), DIALOG_TITLE_HEIGHT(30), DIALOG_TITLE_CENTER(21), HERO_TITLE_HEIGHT(20), HERO_CONTROLS_CENTER(18),
+        // The modal overlay: the card rises this far as it fades in, over these durations; the scrim's and the soft
+        // shadow's strength, the shadow's reach and the card's least distance from the window's edges.
+        OVERLAY_RISE(16), OVERLAY_ENTER_MILLIS(220), OVERLAY_EXIT_MILLIS(170), OVERLAY_SCRIM_PERCENT(40), OVERLAY_SHADOW(16),
+        OVERLAY_SHADOW_PERCENT(24), OVERLAY_MARGIN(16),
         FOCUS_RING(3), PANEL_HEADER(38), PANEL_HEADER_BOTTOM_GAP(6), PANEL_HEADER_ACTION(24), PANEL_HEADER_ACTION_GAP(3), PANEL_HEADER_TRAILING_PADDING(7), PANEL_HEADER_CONTRIBUTED_GLYPH(18), PANEL_SEARCH_SIDE(9), PANEL_SEARCH_BOTTOM(8), PANEL_SEARCH_HEIGHT(26), PANEL_SEARCH_VERTICAL_PADDING(10), PANEL_HEADER_ACTION_VERTICAL(9), PANEL_SEARCH_PADDING(6), PANEL_SEARCH_GAP(4), PANEL_SEARCH_TEXT_BASELINE(1), PANEL_FOOTER(34), SWITCH_WIDTH(32), SWITCH_HEIGHT(18), SWITCH_KNOB(14),
         COMPACT_SWITCH_WIDTH(28), COMPACT_SWITCH_HEIGHT(16), COMPACT_SWITCH_KNOB(12),
         ICON_CAPTION(12), ICON_CONTROL(14), ICON_RAIL(16), ICON_EMPTY(20), ICON_HERO(24),

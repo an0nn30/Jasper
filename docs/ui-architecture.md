@@ -101,7 +101,17 @@ Disposal still contains callback diagnostics and permits reentrant close; normal
 continue updating synchronously outside reconciliation.
 
 Containers own semantic layout. Forms consume a host-supplied logical available-content-height;
-the host owns window chrome, sheet/scrim lifetime and cancellation cleanup. Panels own header,
+the host owns window chrome, sheet/scrim lifetime and cancellation cleanup.
+
+`ModalOverlay` is the kit's modal overlay, which `DialogSpec.Presentation.OVERLAY` and the SDK's progress
+overlays present: a scrim over a window's whole content (`surface.scrim`, black unless the theme names its own,
+at `OVERLAY_SCRIM_PERCENT`) and the content in a centred, outlined, rounded card with a soft shadow. Opening fades
+the scrim in while the card fades from transparent and rises `OVERLAY_RISE` into place over
+`OVERLAY_ENTER_MILLIS`, easing out (cubic); closing reverses both over `OVERLAY_EXIT_MILLIS`, easing in. The motion
+follows the kit's motion policy, so it is instant with animations off and settles at once if they are turned off
+mid-way. While it moves the card paints one snapshot of its content, so it fades as a single surface (no control
+paints its own disabled alpha ahead of the rest); at rest the content paints live. The host adds the overlay to a
+layered pane and owns keyboard routing and focus; the app's `WindowOverlay` stacks them per window. Panels own header,
 context/navigation, virtual body and persistent footer. Hidden headers consume zero space.
 Three-column managers use named sidebar/list widths (192/272 logical pixels), then remaining detail;
 narrow hosts fit those roles proportionally. A trailing footer action anchors to the right edge.

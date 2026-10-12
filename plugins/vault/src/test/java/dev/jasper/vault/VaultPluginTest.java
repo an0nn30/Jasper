@@ -320,6 +320,8 @@ class VaultPluginTest {
             UUID window = host.addTerminalWindow();
             host.invoke(VaultPlugin.OPEN, window, null);
             var view = host.windowView(INFO.id(), "Create Vault").orElseThrow();
+            assertThat(host.dialogPresentation(INFO.id(), "Create Vault")).as("setup is the kit's modal overlay")
+                .contains(dev.jasper.sdk.ui.DialogSpec.Presentation.OVERLAY);
             // An obstructed vault file makes the write fail.
             java.nio.file.Files.createDirectories(context.dataDirectory().resolve("vault.jv.tmp"));
             dev.jasper.vault.testsupport.KitViews.type(view, "password", "synthetic-create-1");
@@ -349,6 +351,8 @@ class VaultPluginTest {
             plugin.lockManager().lock();
             host.invoke(VaultPlugin.OPEN, window, null);
             var view = host.windowView(INFO.id(), "Unlock Vault").orElseThrow();
+            assertThat(host.dialogPresentation(INFO.id(), "Unlock Vault")).as("unlocking is the kit's modal overlay")
+                .contains(dev.jasper.sdk.ui.DialogSpec.Presentation.OVERLAY);
             dev.jasper.vault.testsupport.KitViews.type(view, "password", "test-password");
             dev.jasper.vault.testsupport.KitViews.press(view, "submit");
             assertThat(dev.jasper.vault.testsupport.KitViews.secret(view, "password")).isEmpty();

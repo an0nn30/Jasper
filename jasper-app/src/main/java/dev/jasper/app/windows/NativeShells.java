@@ -91,21 +91,34 @@ public final class NativeShells {
         };
     }
 
+    /**
+     * The kit's modal overlay inside the owner's window: a terminal window, an auxiliary window or a dialog. A modal
+     * one (a dialog presented as an overlay) blocks {@code show} until it closes, as a modal dialog does, and lets
+     * Escape reach its content; a progress overlay returns at once and keeps Escape from the window.
+     */
     private AuxiliarySurface.Shell overlay(AuxiliarySurface surface) {
-        Window owner = surface.ownerWindow().map(terminalWindows).orElse(null);
+        Window owner = owner(surface);
         if (!(owner instanceof javax.swing.RootPaneContainer container))
-            throw new IllegalStateException("An overlay needs an open terminal window");
+            throw new IllegalStateException("An overlay needs an open window");
         SwingUtilities.updateComponentTreeUI(surface.holder());
-        var overlay = new WindowOverlay(container.getRootPane(), surface.holder());
+        var overlay = new WindowOverlay(container.getRootPane(), surface.holder(),
+            themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), surface.modal());
         surface.holder().getAccessibleContext().setAccessibleName(surface.title());
         var close = new WindowAdapter() {
             @Override public void windowClosed(WindowEvent event) { surface.close(); }
         };
         owner.addWindowListener(close);
-        return new AuxiliarySurface.Shell(overlay::show, overlay::focus,
+        Runnable show = () -> {
+            overlay.show();
+            if (!surface.modal() || surface.closed()) return;
+            var loop = Toolkit.getDefaultToolkit().getSystemEventQueue().createSecondaryLoop();
+            var closed = surface.onClosed(loop::exit);
+            try { if (!surface.closed()) loop.enter(); } finally { closed.close(); }
+        };
+        return new AuxiliarySurface.Shell(show, overlay::focus,
             () -> { owner.removeWindowListener(close); overlay.close(); },
             title -> surface.holder().getAccessibleContext().setAccessibleName(title), overlay::cardBounds,
-            (title, initial) -> chooseFile(owner, title, initial, Optional.empty()));
+            (title, initial) -> chooseFile(TopModal.over(owner), title, initial, Optional.empty()));
     }
 
     /** Bounded shell resources exist before any native show can reenter plugin callbacks. */
@@ -170,7 +183,7 @@ public final class NativeShells {
     private Window owner(AuxiliarySurface surface) {
         if (surface.ownerSurface().isPresent()) {
             var parent = surface.ownerSurface().orElseThrow();
-            if (parent.kind() == AuxiliarySurface.Kind.OVERLAY) return parent.ownerWindow().map(terminalWindows).orElse(null);
+            if (parent.kind() == AuxiliarySurface.Kind.OVERLAY) return owner(parent);
             return natives.get(parent);
         }
         return surface.anchorOwner().map(SwingUtilities::getWindowAncestor).orElseGet(() -> surface.ownerWindow().map(terminalWindows).orElse(null));
