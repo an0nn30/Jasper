@@ -8,7 +8,7 @@ class SettingSpecTest {
     @Test void aDeclarationCarriesEverythingSettingsShows() {
         var spec = SettingSpec.of("sftp.max_parallel_files", SettingKind.integer(1, 8), 2).label("Parallel files")
             .description("Files transferred at once.").keywords("sftp", "transfer").section("SFTP")
-            .applies(Applies.RESTART).editor(EditorHint.directory());
+            .applies(Applies.RESTART).editor(EditorHint.directory()).unit(" files ");
         assertThat(spec.key()).isEqualTo("sftp.max_parallel_files");
         assertThat(spec.defaultValue()).isEqualTo(2);
         assertThat(spec.label()).isEqualTo("Parallel files");
@@ -17,6 +17,7 @@ class SettingSpecTest {
         assertThat(spec.section()).isEqualTo("SFTP");
         assertThat(spec.applies()).isEqualTo(Applies.RESTART);
         assertThat(spec.editor()).contains(EditorHint.directory());
+        assertThat(spec.unit()).as("a short unit, trimmed").isEqualTo("files");
         var plain = SettingSpec.of("vim", SettingKind.bool(), false);
         assertThat(plain.label()).isEmpty();
         assertThat(plain.description()).isEmpty();
@@ -24,6 +25,7 @@ class SettingSpecTest {
         assertThat(plain.section()).isEmpty();
         assertThat(plain.applies()).isEqualTo(Applies.LIVE);
         assertThat(plain.editor()).isEmpty();
+        assertThat(plain.unit()).isEmpty();
         assertThat(EditorHint.font(true)).isEqualTo(new EditorHint.Font(true));
     }
 
@@ -36,5 +38,7 @@ class SettingSpecTest {
         assertThatIllegalArgumentException().isThrownBy(() -> SettingSpec.of("vim", SettingKind.bool(), false).label(" "));
         assertThatNullPointerException().isThrownBy(() -> SettingSpec.of("vim", SettingKind.bool(), null));
         assertThatNullPointerException().isThrownBy(() -> SettingSpec.of("vim", null, false));
+        assertThatIllegalArgumentException().as("a unit is short").isThrownBy(() -> SettingSpec.of("size", SettingKind.integer(1, 8), 2).unit("seventeen letters"));
+        assertThatIllegalArgumentException().isThrownBy(() -> SettingSpec.of("size", SettingKind.integer(1, 8), 2).unit("m\nin"));
     }
 }

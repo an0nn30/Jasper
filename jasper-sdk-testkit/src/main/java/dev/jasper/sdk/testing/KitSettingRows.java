@@ -30,7 +30,9 @@ final class KitSettingRows {
                 ? String.join("\n", items.stream().map(Object::toString).toList()) : String.valueOf(value);
             var numeric = spec.kind() instanceof SettingKind.IntegerRange range
                 ? Optional.of(new Nodes.Numeric(range.min(), range.max(), 1, 0)) : Optional.<Nodes.Numeric>empty();
-            input = new Nodes.Field(id, state, kind, text, "", spec.label(), "", numeric);
+            // As the host: a bounded integer is the Settings stepper, its declared unit after the value.
+            input = new Nodes.Field(id, state, kind, text, numeric.isPresent() ? spec.unit() : "", spec.label(), "", numeric,
+                numeric.isPresent() ? Nodes.FieldPresentation.STEPPER : Nodes.FieldPresentation.STANDARD);
         }
         var reset = new Nodes.Button(id + ":reset", ControlState.READY, "Reset", "", Nodes.ButtonKind.GHOST, id + ":reset", "Reset to default");
         return new Nodes.SettingRow(id + ":row", state, spec.label(), spec.description(),
