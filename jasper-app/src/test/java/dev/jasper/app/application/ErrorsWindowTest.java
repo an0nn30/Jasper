@@ -87,6 +87,26 @@ class ErrorsWindowTest {
         assertThat(shell).containsExactly("show", "front", "show", "front");
     }
 
+    /**
+     * A window whose view failed to build is closed again, so the next Show more… opens a working one; it used to stay
+     * open without a view, and every later Show more… failed.
+     */
+    @Test void aViewThatFailsToBuildLeavesNoWindowBehindAndTheNextShowWorks() {
+        boolean[] fail = {true};
+        var errors = new ErrorsWindow(contributions, windows, incidents, new ErrorsView.Hooks(id -> id, id -> "",
+            new IncidentReport.Environment("1", "os", "java"), text -> { }, id -> { }, () -> { }), ZoneOffset.UTC,
+            () -> {
+                if (fail[0]) { fail[0] = false; throw new NoClassDefFoundError("dev/jasper/ui/swing/Stacks$HeroLayout"); }
+                return dev.jasper.app.testsupport.KitTestSupport.context();
+            });
+        Incident incident = incidents.record("jasper", "a", "t", Capture.of(new IllegalStateException("boom")));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> errors.show(Optional.of(incident.id()))).isInstanceOf(NoClassDefFoundError.class);
+        assertThat(windows.open()).as("the half-built window is gone").isEmpty();
+        errors.show(Optional.of(incident.id()));
+        assertThat(windows.open()).singleElement().satisfies(surface -> assertThat(surface.shown()).isTrue());
+        assertThat(ErrorsViewTestSupport.selected(errors.view().orElseThrow())).contains(incident.id());
+    }
+
     @Test void showMoreSelectsItsIncidentInTheSameWindow() {
         var errors = window();
         Incident first = incidents.record("jasper", "a", "t", Capture.of(new IllegalStateException("first")));
