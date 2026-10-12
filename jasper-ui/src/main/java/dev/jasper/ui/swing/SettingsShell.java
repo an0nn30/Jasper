@@ -26,10 +26,15 @@ public final class SettingsShell extends JPanel implements AutoCloseable {
     public static JScrollPane pageScroller(KitContext context) { return new OverlayScrollPane(java.util.Objects.requireNonNull(context)); }
     private int metric(DesignMetrics.Role role) { return ThemePainting.metric(context, role); }
     private int sidebar() { return Math.min(metric(DesignMetrics.Role.SETTINGS_SIDEBAR_WIDTH), Math.max(0, getWidth() / 3)); }
+    /**
+     * The header row's height, in pixels. The shell spans the whole window, so this row is the window's title row: the
+     * window controls sit over the sidebar beside it and the header's rule closes it.
+     */
+    public int titleRowHeight() { return Math.max(metric(DesignMetrics.Role.SETTINGS_HEADER_HEIGHT), header.getPreferredSize().height); }
     @Override public Dimension getMinimumSize() { return new Dimension(0, 0); }
     @Override public void doLayout() {
         int left = sidebar(), width = Math.max(0, getWidth() - left);
-        int top = Math.max(metric(DesignMetrics.Role.SETTINGS_HEADER_HEIGHT), header.getPreferredSize().height);
+        int top = titleRowHeight();
         int bottom = Math.max(metric(DesignMetrics.Role.SETTINGS_FOOTER_HEIGHT), footer.getPreferredSize().height);
         int inset = metric(DesignMetrics.Role.SETTINGS_SIDEBAR_INSET), side = metric(DesignMetrics.Role.SETTINGS_FOOTER_SIDE);
         int searchHeight = search.getPreferredSize().height;

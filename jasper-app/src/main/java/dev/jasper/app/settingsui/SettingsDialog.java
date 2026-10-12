@@ -143,6 +143,8 @@ public final class SettingsDialog {
         query = "";
         surface = windows.modalDialog("app.settings", "Settings", new Dimension(1000, 700), ownerOrNull);
         surface.setContent(view);
+        // The shell's sidebar and header reach the window's top: they are its title row, as in the Settings mocks.
+        surface.integratedTitle(view::titleRowHeight);
         surface.onClosing(this::mayClose);
         surface.onClosed(this::closed);
         draftListening = draft.onChanged(this::refreshNow);

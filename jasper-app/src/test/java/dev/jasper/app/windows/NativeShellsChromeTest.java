@@ -67,6 +67,63 @@ class NativeShellsChromeTest {
             }
         }
     }
+    /**
+     * The 2026-10-10 references: a window's title row is 45 above a hairline, with the controls and title on its middle;
+     * a dialog's 30-logical band continues the dialog surface with no rule, its title and controls centred 21 down;
+     * Settings draws its own title row, so its window shows no strip and the controls centre on the content's row.
+     */
+    @Test void titleRowsFollowTheReferencesForWindowsDialogsAndContentThatDrawsItsOwn() {
+        var controller = new ThemeController();
+        try {
+            var semantic = controller.current().chrome().semantic();
+            int line = com.formdev.flatlaf.util.UIScale.scale(1);
+            var window = new AuxiliarySurface("test", "Credential Vault", AuxiliarySurface.Kind.WINDOW, false,
+                new Dimension(900, 555), null, null, ignored -> { throw new AssertionError(); });
+            var root = new JRootPane();
+            try (var chrome = NativeShells.installChrome(root, window, true)) {
+                var bar = chrome.bar(); root.setSize(900, 600); layout(root);
+                assertThat(bar.style()).isEqualTo(dev.jasper.app.platform.MacTitleBar.Style.WINDOW);
+                assertThat(bar.getHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(45) + line);
+                assertThat(bar.controlsHeight()).isEqualTo(bar.getHeight());
+                var title = (JLabel) bar.getComponent(0);
+                assertThat(title.getY() + title.getHeight() / 2).isEqualTo((bar.getHeight() - line) / 2);
+                assertThat(row(bar, bar.getHeight() - line)).as("the rule").isEqualTo(semantic.color(dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE));
+            }
+            var dialog = new AuxiliarySurface("", "Add Host", AuxiliarySurface.Kind.DIALOG, true,
+                new Dimension(500, 700), null, null, ignored -> { throw new AssertionError(); });
+            root = new JRootPane();
+            try (var chrome = NativeShells.installChrome(root, dialog, true)) {
+                var bar = chrome.bar(); root.setSize(500, 700); layout(root);
+                assertThat(bar.style()).isEqualTo(dev.jasper.app.platform.MacTitleBar.Style.DIALOG);
+                assertThat(bar.getHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(30));
+                assertThat(bar.controlsHeight()).as("controls centred 21 down").isEqualTo(2 * com.formdev.flatlaf.util.UIScale.scale(21));
+                var title = (JLabel) bar.getComponent(0);
+                assertThat(title.getY() + title.getHeight() / 2).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(21));
+                assertThat(row(bar, bar.getHeight() - line)).as("no rule; the band continues the dialog")
+                    .isEqualTo(semantic.color(dev.jasper.ui.theme.SemanticColor.SURFACE_DIALOG));
+            }
+            var settings = new AuxiliarySurface("app.settings", "Settings", AuxiliarySurface.Kind.DIALOG, true,
+                new Dimension(1000, 700), null, null, ignored -> { throw new AssertionError(); });
+            var content = new JPanel(); settings.setContent(content);
+            settings.integratedTitle(() -> com.formdev.flatlaf.util.UIScale.scale(45));
+            root = new JRootPane();
+            try (var chrome = NativeShells.installChrome(root, settings, true)) {
+                var bar = chrome.bar(); root.setSize(1000, 700); layout(root);
+                assertThat(bar.style()).isEqualTo(dev.jasper.app.platform.MacTitleBar.Style.INTEGRATED);
+                assertThat(bar.getHeight()).as("no strip").isZero();
+                assertThat(bar.controlsHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(45));
+                assertThat(javax.swing.SwingUtilities.convertPoint(content, 0, 0, root).y).as("content reaches the window top").isZero();
+                assertThat(((JLabel) bar.getComponent(0)).isVisible()).isFalse();
+            }
+        } finally { controller.close(); }
+    }
+    /** The bar's painted colour in the middle of row {@code y}. */
+    private static java.awt.Color row(javax.swing.JComponent bar, int y) {
+        var image = new java.awt.image.BufferedImage(bar.getWidth(), bar.getHeight(), java.awt.image.BufferedImage.TYPE_INT_RGB);
+        var graphics = image.createGraphics();
+        try { bar.paint(graphics); } finally { graphics.dispose(); }
+        return new java.awt.Color(image.getRGB(bar.getWidth() / 2 + 200, y));
+    }
     private static void layout(java.awt.Container node) {
         node.doLayout(); for (var child : node.getComponents()) if (child instanceof java.awt.Container container) layout(container);
     }

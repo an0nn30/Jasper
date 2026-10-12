@@ -80,6 +80,13 @@ public final class AuxiliarySurface {
         if (value && !modal) throw new IllegalArgumentException("Attached sheets must be modal");
         attachedSheet = value;
     }
+    private java.util.function.IntSupplier integratedTitle;
+    /**
+     * The content draws the window's title row itself, {@code height} pixels tall (Settings: its sidebar and header):
+     * the native shell then shows no title strip and centres the window controls on that row. Set before the first show.
+     */
+    public void integratedTitle(java.util.function.IntSupplier height) { integratedTitle = Objects.requireNonNull(height); }
+    public Optional<java.util.function.IntSupplier> integratedTitle() { return Optional.ofNullable(integratedTitle); }
     private boolean fitContent;
     private DialogFit fit;
     private AttachedSheet attachment;

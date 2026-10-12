@@ -65,8 +65,8 @@ Each follows the compositions the mocked families calibrated; rendered dark, lig
 
 ## Accepted differences
 
-- macOS draws the window frame, traffic lights, title-bar and window shadow; renders leave that space and never paint
-  counterfeit controls.
+- macOS draws the window frame, traffic lights and window shadow; renders leave that space and never paint
+  counterfeit controls. The title rows around them follow the references (see the follow-up round below).
 - Native text advance and antialiasing differ from headless Java2D; font families, sizes, weights and baselines are
   matched, ink widths are not.
 - Mock text, hosts, keys, counts and paths are fixture data; real defaults, stored data and validation were never
@@ -97,6 +97,21 @@ Each follows the compositions the mocked families calibrated; rendered dark, lig
   sides and no calibration value was lost.
 - Native smoke launch (2026-10-12, `./gradlew :jasper-app:run`, isolated `build/dev-home`): all eight bundled plugins
   active, window shown and painted with shell output, no warnings or errors in the log.
+
+## Follow-up round (2026-10-12)
+
+The user's checks after the first native pass found the dialog title rows standard rather than as mocked.
+
+- Title rows, measured on the references with pixel probes (logical, from the window's top edge): a window row is 45
+  above a hairline, title centred 23 down (Credential Vault); a dialog's title and controls centre 21 down and its
+  content starts 30 down, with no rule and the dialog surface throughout (Add Host, New File Server, New Tunnel); the
+  Settings header row is the window's title row (rule at 45, controls over the sidebar). They are kit metrics
+  (`WINDOW_TITLE_HEIGHT`, `DIALOG_TITLE_HEIGHT`, `DIALOG_TITLE_CENTER`, `HERO_TITLE_HEIGHT`, `HERO_CONTROLS_CENTER`)
+  applied by `MacTitleBar.Style`; Settings declares `AuxiliarySurface.integratedTitle`. The Vault manager's title
+  row now compares at 0.648 (`vault-manager-title`; the native traffic lights are absent from the render) and its
+  body stays at 0.786 with the render crop moved below the new row.
+- Indeterminate progress loops through the whole track, and the searchable dropdown rebuilds its rows in one step
+  (the installed-font list opened slowly because each open re-measured every row once per row).
 
 ## User-run checks still open
 

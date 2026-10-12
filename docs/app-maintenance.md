@@ -577,8 +577,13 @@ coverage, while kit control tests cover their owned rounded selections.
 Workspace boundaries use continuous chrome instead of painted rules: rail, toolbar,
 workspace title bar and status bar have no edge strokes. The equal-width tab strip uses
 vertical separators and a subtle bottom rule. Dock dividers paint nothing, so no UI
-update can give them a border or grip; terminal-internal splits keep their existing visible indicators. The standalone
-dialog title bar retains its separator. `GraphiteChromeTest` writes headless full-window
+update can give them a border or grip; terminal-internal splits keep their existing visible indicators. Auxiliary title rows follow the
+2026-10-10 references through `MacTitleBar.Style` and the kit's title metrics: a window (`WINDOW`, the Vault
+manager, the file chooser) has a 45-logical row above a hairline with the title and controls on its middle; a dialog
+(`DIALOG`) has a 30-logical band in the dialog surface with no rule, its title and controls centred 21 down (the
+native title region reaches over the content's top padding); a hero dialog keeps a 20-logical band with the controls
+centred 18 down; and content that draws its own title row (`INTEGRATED`, Settings, through
+`AuxiliarySurface.integratedTitle`) gets no strip, with the controls centred on its row. Attached sheets have none. `GraphiteChromeTest` writes headless full-window
 previews to `build/render-preview/fluid-workspace-{dark,light}.png`.
 
 

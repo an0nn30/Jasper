@@ -112,12 +112,13 @@ public final class NativeChromePainting {
 
     /**
      * The native title row's edges: a header row (the workspace title bar) gets the hover overlay's highlight along its
-     * top; a plain dialog title row gets a subtle hairline along its bottom; a hero dialog title row gets neither.
+     * top; a window's title row gets a subtle hairline along its bottom; a dialog's title band, which continues into
+     * the dialog surface, gets neither.
      */
-    public static void titleBarEdges(JComponent bar, Graphics graphics, GeneratedTheme theme, boolean header, boolean hero) {
+    public static void titleBarEdges(JComponent bar, Graphics graphics, GeneratedTheme theme, boolean header, boolean rule) {
         int line = NativeControlStyles.metric(DesignMetrics.Role.HAIRLINE);
         if (header) { graphics.setColor(hoverOverlay(theme)); graphics.fillRect(0, 0, bar.getWidth(), line); }
-        if (!header && !hero) {
+        if (!header && rule) {
             graphics.setColor(theme.semantic().color(SemanticColor.BORDER_SUBTLE));
             graphics.fillRect(0, bar.getHeight() - line, bar.getWidth(), line);
         }

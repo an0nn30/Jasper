@@ -459,7 +459,8 @@ class CommandPaletteTest {
                     over(card, ColorMath.opacity(semantic.color(SemanticColor.HOVER_OVERLAY), .05)), "hovered");
                 assertPixel(image, at(first, first.getWidth() - 5, 0, palette), card, "selected rounded corner");
                 assertPixel(image, at(second, second.getWidth() - 5, 0, palette), card, "hover rounded corner");
-                second.dispatchEvent(new MouseEvent(second, MouseEvent.MOUSE_EXITED, 1L, 0, 4, 4, 0, false));
+                // The pointer leaves the row: an exit inside it only crosses onto the row's own text.
+                second.dispatchEvent(new MouseEvent(second, MouseEvent.MOUSE_EXITED, 1L, 0, -1, -1, 0, false));
                 assertPixel(paint(palette), at(second, second.getWidth() - 12, 3, palette), card, "after the mouse left");
                 palette.close();
             } finally { bindings.close(); }

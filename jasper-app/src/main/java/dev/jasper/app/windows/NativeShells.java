@@ -323,17 +323,18 @@ public final class NativeShells {
             surface.onTitleActionsChanged(() -> { toolbar.setVisible(surface.titleActions().isVisible()); content.revalidate(); content.repaint(); });
         }
         if (bar != null) {
+            bar.setStyle(surface.kind() == AuxiliarySurface.Kind.WINDOW ? MacTitleBar.Style.WINDOW : MacTitleBar.Style.DIALOG);
             if (surface.kind() == AuxiliarySurface.Kind.WINDOW) {
                 bar.setAccessory(surface.titleActions()); surface.onTitleActionsChanged(bar::accessoryChanged);
             }
             bar.setTitle(surface.title());
             for (var child : surface.holder().getComponents()) {
                 if (child instanceof dev.jasper.ui.swing.KitView view
-                        && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Form form) {
-                    bar.setDialogHero(form.kind() == dev.jasper.ui.model.Nodes.FormKind.HERO
-                        || form.kind() == dev.jasper.ui.model.Nodes.FormKind.HERO_COMPACT);
-                }
+                        && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Form form
+                        && (form.kind() == dev.jasper.ui.model.Nodes.FormKind.HERO || form.kind() == dev.jasper.ui.model.Nodes.FormKind.HERO_COMPACT))
+                    bar.setStyle(MacTitleBar.Style.HERO);
             }
+            surface.integratedTitle().ifPresent(bar::integrate);
         }
         return bar;
     }

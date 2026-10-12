@@ -110,9 +110,26 @@
   "render": "jasper-app/build/task-4b-captures/calibration/vault-manager.png",
   "render_crop": [
    0,
-   56,
+   91,
    1800,
    1110
+  ]
+ },
+ {
+  "name": "vault-manager-title",
+  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/vault_ui_mock.png",
+  "crop": [
+   200,
+   6,
+   1600,
+   90
+  ],
+  "render": "jasper-app/build/task-4b-captures/calibration/vault-manager.png",
+  "render_crop": [
+   196,
+   0,
+   1600,
+   90
   ]
  },
  {

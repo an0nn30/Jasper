@@ -203,6 +203,9 @@ final class SettingsView extends JPanel implements AutoCloseable {
         }
     }
 
+    /** The shell's header row, which is the window's title row; in pixels. */
+    int titleRowHeight() { return shell.titleRowHeight(); }
+
     /** The mounted kit control named {@code id} in any of the shell's views; for tests and previews. */
     <T extends Component> T control(String id, Class<T> type) {
         for (var view : List.of(search, navigation, header, banner, footer)) {
