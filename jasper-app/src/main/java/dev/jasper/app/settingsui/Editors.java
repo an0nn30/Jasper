@@ -2,7 +2,7 @@ package dev.jasper.app.settingsui;
 
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.config.TerminalConfig;
-import dev.jasper.app.config.WorkspaceThemeChoice;
+import dev.jasper.app.config.AppearanceMode;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.settings.Setting;
 import dev.jasper.app.settings.SettingKind;
@@ -136,21 +136,13 @@ public final class Editors {
         return new Factory<>((setting,context)->new FontField(setting.label(),()->Fonts.families(false),true),List.of("System"));
     }
 
-    /** The gear menu's one item beside the theme dropdown. */
-    static final String IMPORT_THEME = "Import theme…";
-    /** The workspace scheme entry for {@code match}. */
+    /** The terminal scheme entry for {@code match}. */
     static final String SAME_AS_UI_THEME = "Same as UI theme";
 
-    /** Every installed theme by name, with a gear whose menu offers Import theme…. */
-    public static Factory<String> theme(ThemeChoices themes) {
-        return new Factory<>((setting, context) -> new ThemeSelection(setting.label(), themes, context),
-            List.of(IMPORT_THEME));
-    }
-
-    /** "Same as UI theme" ({@code match}), then every installed theme by name. */
-    public static Factory<String> workspaceScheme(ThemeChoices themes) {
-        return new Factory<>((setting, context) -> new ThemePick(setting.label(), themes.names(),
-            Map.of(WorkspaceThemeChoice.MATCH.name(), SAME_AS_UI_THEME), null), List.of(SAME_AS_UI_THEME));
+    /** The Dark / Light / Match System tiles, then the Theme row with its one entry, Slate Steel. */
+    public static Factory<AppearanceMode> appearance(AppearanceChoices choices) {
+        return new Factory<>((setting, context) -> new AppearanceSelection(choices),
+            List.of("Dark", "Light", "Match System", "Theme", AppearanceSelection.THEME));
     }
 
     /** A path field with Browse…, for a program path. */
@@ -343,114 +335,6 @@ public final class Editors {
         var options = new ArrayList<Option>();
         for (int i = 0; i < families.size(); i++) options.add(new Option("family-" + i, families.get(i), Optional.empty()));
         return options;
-    }
-
-    /**
-     * A theme by name: the {@code leading} entries (value to label), then the installed names, read again on each
-     * refresh. The dropdown searches as you type, keeping the leading entries. A saved name the list lacks shows as
-     * "(not found)" until another is chosen; a name matches an entry as the catalog finds themes, ignoring case and
-     * surrounding spaces, and keeps its saved spelling. With an import, a gear beside the dropdown offers Import theme….
-     */
-    static class ThemePick implements ValueEditor<String> {
-        private final String label;
-        private final Supplier<List<String>> names;
-        private final Map<String, String> leading;
-        private final ThemeChoices.Import importer;
-        private final List<String> values = new ArrayList<>();
-        private final List<String> labels = new ArrayList<>();
-        /** How many entries are choices; any after them is the one missing choice being shown. */
-        private int listed;
-        private int index = -1;
-        private String shown = "";
-        /** The value shown or last chosen; picking it again is no edit. */
-        private String current = "";
-
-        ThemePick(String label, Supplier<List<String>> names, Map<String, String> leading, ThemeChoices.Import importer) {
-            this.label = label;
-            this.names = names;
-            this.leading = leading;
-            this.importer = importer;
-            fill();
-        }
-
-        /** Every entry's label, the missing one included; for tests. */
-        List<String> labels() { return List.copyOf(labels); }
-        String selectedLabel() { return index < 0 ? null : labels.get(index); }
-        boolean hasActions() { return importer != null; }
-
-        private void fill() {
-            String keep = value();
-            values.clear();
-            labels.clear();
-            leading.forEach(this::add);
-            for (String name : names.get()) add(name, name);
-            listed = values.size();
-            index = -1;
-            select(keep);
-        }
-
-        private void add(String value, String label) { values.add(value); labels.add(label); }
-
-        private void select(String value) {
-            dropMissing();
-            int found = -1;
-            for (int i = 0; i < values.size() && found < 0; i++) if (same(values.get(i), value)) found = i;
-            if (found < 0) {
-                add(value, value.isBlank() ? "(none)" : value + " (not found)");
-                found = values.size() - 1;
-            }
-            index = found;
-        }
-
-        private void dropMissing() {
-            while (values.size() > listed) {
-                values.removeLast();
-                labels.removeLast();
-            }
-            if (index >= values.size()) index = -1;
-        }
-
-        private static boolean same(String listed, String value) { return listed.strip().equalsIgnoreCase(value.strip()); }
-
-        @Override public Nodes.Node node(String id, ControlState state) {
-            var options = new ArrayList<Option>();
-            for (int i = 0; i < labels.size(); i++) options.add(new Option("theme-" + i, labels.get(i), Optional.empty()));
-            var choice = new Nodes.Choice(id, state, Nodes.ChoiceKind.SEARCHABLE, options, index < 0 ? "" : "theme-" + index,
-                label, "", "", Optional.of(new Nodes.ChoiceSearch(leading.size(), "No matching themes", Optional.empty())));
-            if (importer == null) return choice;
-            var gear = new Nodes.MenuButton(id + ":actions", plain(state), "", "brightness", Nodes.ButtonKind.GHOST, "",
-                List.of(new MenuItem(id + ":import", IMPORT_THEME, "", id + ":import", true, false)), "Theme actions");
-            return new Nodes.Stack(id + ":line", plain(state), Nodes.LayoutRole.INLINE, List.of(choice, gear));
-        }
-
-        @Override public String value() {
-            if (index < 0) return shown;
-            String value = values.get(index);
-            return same(value, shown) ? shown : value;
-        }
-
-        @Override public void show(String value) { shown = value; select(value); current = value(); }
-
-        @Override public boolean event(String id, UiEvent event) {
-            if (event instanceof UiEvent.Action action && action.id().equals(id + ":import")) {
-                if (importer != null) importer.start().run();
-                return false;
-            }
-            if (!(event instanceof UiEvent.Selected picked) || !picked.id().equals(id)) return false;
-            String option = picked.ids().stream().findFirst().orElse("");
-            if (!option.startsWith("theme-")) return false;
-            int chosen = Integer.parseInt(option.substring("theme-".length()));
-            if (chosen < 0 || chosen >= values.size()) return false;
-            int before = index;
-            index = chosen;
-            if (value().equals(current)) { index = before; return false; }
-            current = value();
-            if (chosen < listed) dropMissing();
-            return true;
-        }
-
-        @Override public void refresh() { fill(); }
-        @Override public void dispose() { if (importer != null) importer.close().run(); }
     }
 
     static final class Browse implements ValueEditor<String> {

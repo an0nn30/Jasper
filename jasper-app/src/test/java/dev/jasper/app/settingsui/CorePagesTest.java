@@ -20,24 +20,24 @@ class CorePagesTest {
     private final List<String> calls = new ArrayList<>();
     private final CorePages.SystemActions system = new CorePages.SystemActions(() -> Path.of("/home/me/.config/jasper/config.toml"),
         () -> calls.add("open"), () -> calls.add("reveal"), () -> calls.add("reload"), () -> calls.add("migrate"), () -> true);
-    private static final ThemeChoices JASPER_DARK = ThemeChoices.of(() -> List.of("Jasper Dark"));
+    private static final AppearanceChoices APPEARANCE = AppearanceFixtures.CHOICES;
     private final PageContext context = PageKit.context(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values()),
         id -> { }, () -> { });
 
     @Test void everyCoreSettingIsOnExactlyOnePage() {
         var shown = new ArrayList<Setting<?>>();
-        for (var spec : CorePages.specs(JASPER_DARK, system)) shown.addAll(spec.settings());
+        for (var spec : CorePages.specs(APPEARANCE, system)) shown.addAll(spec.settings());
         assertThat(shown).doesNotHaveDuplicates().containsExactlyInAnyOrderElementsOf(CoreSettings.SCHEMA.settings());
     }
 
     @Test void appearanceHasAWorkspaceSectionForOpacityAndBlur() {
-        var appearance = CorePages.specs(JASPER_DARK, system).getFirst();
+        var appearance = CorePages.specs(APPEARANCE, system).getFirst();
         assertThat(appearance.id()).isEqualTo("appearance");
         assertThat(appearance.settings()).containsSubsequence(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR);
     }
 
     private static SchemaPage.Spec appearance(boolean glass) {
-        return CorePages.specs(JASPER_DARK, system(), ShellChoices.NONE, id -> { }, glass).getFirst();
+        return CorePages.specs(APPEARANCE, system(), ShellChoices.NONE, id -> { }, glass).getFirst();
     }
 
     private static CorePages.SystemActions system() {
@@ -108,7 +108,7 @@ class CorePagesTest {
     }
 
     @Test void theTreeIsTheApprovedOne() {
-        var pages = CorePages.pages(JASPER_DARK, system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
+        var pages = CorePages.pages(APPEARANCE, system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
         assertThat(pages).extracting(SettingsPage::id).containsExactly("appearance-behavior", "appearance", "window", "notifications",
             "command-palette", "desk-buddy", "system", "keymap", "plugins", "terminal", "terminal.font",
             "terminal.cursor", "terminal.shell", "tools");
@@ -123,14 +123,14 @@ class CorePagesTest {
 
     @Test void toolsPagesComeLastUnderTools() {
         var extra = new GroupPage("plugin.dev.example", "Example", Optional.of("tools"), false, List::of, context);
-        var pages = CorePages.pages(JASPER_DARK, system, CorePagesTest::keymap, CorePagesTest::plugins,
+        var pages = CorePages.pages(APPEARANCE, system, CorePagesTest::keymap, CorePagesTest::plugins,
             page -> List.of(extra)).apply(context);
         assertThat(pages.getLast()).isSameAs(extra);
         assertThat(pages.get(pages.size() - 2).id()).isEqualTo("tools");
     }
 
     @Test void systemSettingsOffersTheConfigurationFileActions() {
-        var pages = CorePages.pages(JASPER_DARK, system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
+        var pages = CorePages.pages(APPEARANCE, system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
         var systemPage = (SchemaPage) pages.stream().filter(page -> page.id().equals("system")).findFirst().orElseThrow();
         systemPage.component();
         var buttons = systemPage.actionButtons().stream().map(id -> PageKit.kit(systemPage, id, javax.swing.JButton.class)).toList();
@@ -140,9 +140,9 @@ class CorePagesTest {
         assertThat(calls).containsExactly("open", "reveal", "reload", "migrate");
     }
 
-    @Test void fontAndColorsLinksToTheWorkspaceSchemeInAppearance() {
+    @Test void fontAndColorsLinksToTheTerminalSchemeInAppearance() {
         var navigation = new ArrayList<String>();
-        for (var spec : CorePages.specs(ThemeChoices.of(List::of), system, ShellChoices.NONE, navigation::add)) {
+        for (var spec : CorePages.specs(AppearanceFixtures.CHOICES, system, ShellChoices.NONE, navigation::add)) {
             var page = spec.build(context); page.component();
             page.actionButtons().forEach(id -> PageKit.kit(page, id, javax.swing.JButton.class).doClick()); page.dispose();
         }
@@ -159,7 +159,7 @@ class CorePagesTest {
     @Test void theShellPageOffersProfilesAndEnablesProgramAndArgsOnlyForCustom() {
         var shells = new ShellChoices(() -> List.of(new ShellChoices.Choice("powershell", "PowerShell"), new ShellChoices.Choice("custom", "Custom")),
             () -> { }, listener -> new Subscription(() -> { }));
-        var spec = CorePages.specs(JASPER_DARK, system, shells).stream()
+        var spec = CorePages.specs(APPEARANCE, system, shells).stream()
             .filter(candidate -> candidate.id().equals("terminal.shell")).findFirst().orElseThrow();
         assertThat(spec.settings()).startsWith(CoreSettings.TERMINAL_SHELL_PROFILE, CoreSettings.TERMINAL_SHELL_PROGRAM, CoreSettings.TERMINAL_SHELL_ARGS);
         var page = spec.build(context);
@@ -183,7 +183,7 @@ class CorePagesTest {
     @Test void theNotificationsPageListsEveryGroupInItsOwnSection() {
         var groups = new NotificationGroupChoices(() -> List.of(
             new NotificationGroupChoices.Group("jasper.commands", "Long-running commands", "Jasper", "card")));
-        var spec = CorePages.specs(JASPER_DARK, system(), ShellChoices.NONE, id -> { }, false, groups).stream()
+        var spec = CorePages.specs(APPEARANCE, system(), ShellChoices.NONE, id -> { }, false, groups).stream()
             .filter(page -> page.settings().contains(CoreSettings.NOTIFICATIONS_GROUPS)).findFirst().orElseThrow();
         var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
         var page = spec.build(PageKit.context(draft, id -> { }, () -> { }));
@@ -202,7 +202,7 @@ class CorePagesTest {
     @Test void aGroupBackAtItsDefaultIsNoChangeInAFileMadeFromTheTemplate() {
         var groups = new NotificationGroupChoices(() -> List.of(
             new NotificationGroupChoices.Group("jasper.commands", "Long-running commands", "Jasper", "card")));
-        var spec = CorePages.specs(JASPER_DARK, system(), ShellChoices.NONE, id -> { }, false, groups).stream()
+        var spec = CorePages.specs(APPEARANCE, system(), ShellChoices.NONE, id -> { }, false, groups).stream()
             .filter(page -> page.settings().contains(CoreSettings.NOTIFICATIONS_GROUPS)).findFirst().orElseThrow();
         var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), dev.jasper.app.config.ConfigTemplate.text(true), true).values());
         var page = spec.build(PageKit.context(draft, id -> { }, () -> { }));

@@ -66,8 +66,6 @@ class EditorsTest {
                 assertThat(choice.kind()).isEqualTo(Nodes.ChoiceKind.SEARCHABLE);
                 assertThat(choice.search().orElseThrow().entry()).as("font families are free entry").isPresent();
             });
-        assertThat(primary(Editors.theme(ThemeChoices.of(() -> List.of("Jasper Dark"))), CoreSettings.UI_THEME_NAME, context))
-            .isInstanceOfSatisfying(Nodes.Choice.class, choice -> assertThat(choice.kind()).isEqualTo(Nodes.ChoiceKind.SEARCHABLE));
     }
 
     @Test void switchesCarryTheirLabelAndShowingDoesNotCountAsAnEdit() {

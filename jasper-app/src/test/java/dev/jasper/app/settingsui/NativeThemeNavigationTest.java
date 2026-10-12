@@ -22,7 +22,7 @@ class NativeThemeNavigationTest {
         var system = new CorePages.SystemActions(() -> Path.of("config.toml"), () -> {}, () -> {}, () -> {}, () -> {}, () -> false);
         var context = new PageContext(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", false).values()), id -> {}, Runnable::run, (title, initial) -> Optional.empty(), () -> {});
         var names = ThemeManager.builtIns().stream().map(t -> t.name()).toList();
-        var pages = CorePages.pages(ThemeChoices.of(() -> names), system,
+        var pages = CorePages.pages(AppearanceFixtures.CHOICES, system,
             ctx -> new GroupPage("keymap", "Keymap", Optional.empty(), false, List::of, ctx),
             ctx -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, ctx)).apply(context);
         var ids = pages.stream().map(SettingsPage::id).toList();

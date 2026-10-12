@@ -98,7 +98,7 @@ public final class SettingsDialogPreview {
             for (var theme : ThemeManager.builtIns()) for (int size : new int[]{0, 18}) {
                 String suffix = theme.id() + "-" + size + ".png";
                 var keymap = new KeymapPage[1];
-                var dialog = new SettingsDialog(windows, CorePages.pages(ThemeChoices.of(() -> List.of("Jasper Dark", "IntelliJ Light")),
+                var dialog = new SettingsDialog(windows, CorePages.pages(AppearanceFixtures.CHOICES,
                     new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false),
                     context -> keymap[0] = new KeymapPage(keymapHooks, context), context -> manager[0].page(context), context -> {
                         var pages = new java.util.ArrayList<>(previewPlugins[0].pages().apply(context));

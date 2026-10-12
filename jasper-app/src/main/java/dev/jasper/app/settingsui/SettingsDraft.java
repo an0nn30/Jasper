@@ -18,8 +18,6 @@ import java.util.Optional;
  * user has made since. An empty pending value means "restore the default", which removes the key when saved. EDT only.
  */
 public final class SettingsDraft {
-    // A manual source and its policy are one editing intent, even when only one member differs.
-    private static final List<Setting<?>> THEME_SELECTION = List.of(UI_THEME_NAME, UI_THEME_SOURCE, UI_THEME_FOLLOW_SYSTEM);
     private final Map<Setting<?>, Optional<?>> pending = new LinkedHashMap<>();
     private final List<Runnable> listeners = new ArrayList<>();
     private SettingValues baseline;
@@ -44,26 +42,14 @@ public final class SettingsDraft {
         stageAll(Map.of(setting, Objects.requireNonNull(value, "value")));
     }
 
-    /** Publishes one edit atomically, retaining theme companions until the complete selection is accepted. */
+    /** Publishes one edit atomically. */
     public void stageAll(Map<Setting<?>, Optional<?>> values) {
         values.forEach((setting, value) -> { Objects.requireNonNull(setting); Objects.requireNonNull(value); });
-        if (THEME_SELECTION.stream().anyMatch(values::containsKey)) {
-            for (Setting<?> setting : THEME_SELECTION)
-                pending.put(setting, values.getOrDefault(setting, pending.getOrDefault(setting, baseline.saved(setting))));
-            normalizeThemeSelection();
-        }
         values.forEach((setting, value) -> {
-            if (THEME_SELECTION.contains(setting)) return;
             if (setting.sameSaved(value, baseline.saved(setting))) pending.remove(setting);
             else pending.put(setting, value);
         });
         changed();
-    }
-
-    private void normalizeThemeSelection() {
-        if (THEME_SELECTION.stream().allMatch(setting -> !pending.containsKey(setting)
-                || setting.sameSaved(pending.get(setting), baseline.saved(setting))))
-            THEME_SELECTION.forEach(pending::remove);
     }
 
     public boolean modified() { return !pending.isEmpty(); }
@@ -83,16 +69,13 @@ public final class SettingsDraft {
     /** Adopts newer saved values; pending edits the new values already hold are dropped. */
     public void rebase(SettingValues next) {
         baseline = Objects.requireNonNull(next, "next");
-        pending.entrySet().removeIf(entry -> !THEME_SELECTION.contains(entry.getKey()) && entry.getKey().sameSaved(entry.getValue(), baseline.saved(entry.getKey())));
-        normalizeThemeSelection();
+        pending.entrySet().removeIf(entry -> entry.getKey().sameSaved(entry.getValue(), baseline.saved(entry.getKey())));
         changed();
     }
 
     /** Drops the pending edits of {@code settings}. */
     public void reset(Collection<? extends Setting<?>> settings) {
-        var clearing = new java.util.LinkedHashSet<Setting<?>>(settings);
-        if (THEME_SELECTION.stream().anyMatch(clearing::contains)) clearing.addAll(THEME_SELECTION);
-        if (pending.keySet().removeAll(clearing)) changed();
+        if (pending.keySet().removeAll(settings)) changed();
     }
 
     public Subscription onChanged(Runnable listener) {

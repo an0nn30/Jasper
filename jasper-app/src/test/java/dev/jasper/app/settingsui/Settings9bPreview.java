@@ -1,7 +1,6 @@
 package dev.jasper.app.settingsui;
 
 import dev.jasper.app.appearance.*;
-import dev.jasper.app.application.SettingsThemeSourcesTestAccess;
 import dev.jasper.app.config.*;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.lifecycle.Subscription;
@@ -59,7 +58,7 @@ public final class Settings9bPreview {
                     // One saved override (fixture) so a section shows its modified mark, as the reference does.
                     var hooks=new KeymapPage.Hooks(contributions,()->Map.of("toggle_zen_mode","ctrl+cmd+f"),()->Map.of("dev.jasper.editor","Editor"),true,edits->CompletableFuture.completedFuture(null));
                     var pages=new CorePages.Pages(context->new KeymapPage(hooks,context),context->manager[0].page(context),context->runtime[0].settingsPages(context));
-                    dialog[0]=new SettingsDialog(windows,CorePages.pages(SettingsThemeSourcesTestAccess.choices(catalog,()->Optional.of(false)),new CorePages.SystemActions(()->file,()->{},()->{},()->{},()->{},()->false),ShellChoices.NONE,new NotificationGroupChoices(()->groups),pages),new SettingsDialog.Hooks(edit->CompletableFuture.completedFuture(state),()->state,listener->new Subscription(()->{}),()->{},()->{},uri->{},(parent,count)->true,()->themes[0].appearance().context(ThemeRoute.CHROME)));
+                    dialog[0]=new SettingsDialog(windows,CorePages.pages(AppearanceFixtures.choices(()->Optional.of(false)),new CorePages.SystemActions(()->file,()->{},()->{},()->{},()->{},()->false),ShellChoices.NONE,new NotificationGroupChoices(()->groups),pages),new SettingsDialog.Hooks(edit->CompletableFuture.completedFuture(state),()->state,listener->new Subscription(()->{}),()->{},()->{},uri->{},(parent,count)->true,()->themes[0].appearance().context(ThemeRoute.CHROME)));
                     dialog[0].open(null,"plugins");
                 });
                 // Serial admin barrier and EDT callback: the real manager's preceding refresh has published.

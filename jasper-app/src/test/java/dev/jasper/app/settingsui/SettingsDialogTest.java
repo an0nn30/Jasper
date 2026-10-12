@@ -69,7 +69,7 @@ class SettingsDialogTest {
     private SettingsDialog dialog() {
         return new SettingsDialog(windows, context -> {
             contexts.add(context);
-            return CorePages.pages(ThemeChoices.of(() -> List.of("Jasper Dark", "IntelliJ Light")), new CorePages.SystemActions(() -> FILE,
+            return CorePages.pages(AppearanceFixtures.CHOICES, new CorePages.SystemActions(() -> FILE,
                     () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
                 page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context);
         }, hooks());
@@ -79,7 +79,7 @@ class SettingsDialogTest {
         for (boolean populated : List.of(false, true)) {
             var groups = new NotificationGroupChoices(() -> populated
                 ? List.of(new NotificationGroupChoices.Group("configuration", "Configuration", "Jasper", "sticky")) : List.of());
-            var dialog = new SettingsDialog(windows, context -> CorePages.pages(ThemeChoices.of(List::of),
+            var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
                 new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false), ShellChoices.NONE,
                 groups, new CorePages.Pages(page -> fake, page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page), page -> List.of())).apply(context), hooks());
             try {
@@ -106,7 +106,7 @@ class SettingsDialogTest {
         try {
             edt(() -> {
                 dialog.open(null, "appearance");
-                for (var entry : java.util.Map.of("opacity", "row:ui.workspace.opacity", "platform font size", "row:ui.font.size", "theme", "row:ui.theme.name").entrySet()) {
+                for (var entry : java.util.Map.of("opacity", "row:ui.workspace.opacity", "platform font size", "row:ui.font.size", "theme", "row:ui.appearance").entrySet()) {
                     var row = KitTestSupport.require(page(dialog), entry.getValue(), javax.swing.JComponent.class);
                     dialog.search(entry.getKey());
                     assertThat(KitTestSupport.require(page(dialog), entry.getValue(), javax.swing.JComponent.class)).isSameAs(row);
@@ -141,7 +141,7 @@ class SettingsDialogTest {
         edt(() -> {
             try (var themes = new dev.jasper.app.appearance.ThemeController()) {
                 themes.configure(dev.jasper.app.appearance.Theme.DARK, new dev.jasper.app.config.UiFontConfig("system", 20));
-                var dialog = new SettingsDialog(windows, CorePages.pages(ThemeChoices.of(List::of),
+                var dialog = new SettingsDialog(windows, CorePages.pages(AppearanceFixtures.CHOICES,
                     new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false), page -> fake,
                     page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)),
                     new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> {}),
@@ -185,7 +185,7 @@ class SettingsDialogTest {
 
     @Test void aFragmentRevealsItsPartBeforeThePageIsSelectedEvenWhenItIsAlreadyShown() throws Exception {
         var revealed = new ArrayList<String>();
-        var dialog = new SettingsDialog(windows, context -> CorePages.pages(ThemeChoices.of(() -> List.of("Jasper Dark")),
+        var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
                 new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), ShellChoices.NONE,
                 page -> fake, page -> new Revealing(new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page), revealed), page -> List.of()).apply(context), hooks());
         edt(() -> {
@@ -215,30 +215,30 @@ class SettingsDialogTest {
         @Override public void selected() { header.selected(); revealed.add("selected"); }
     }
 
-    @Test void themeAndWorkspaceSchemeShareOneSaveRetainFailedDraftAndCancelDiscardsThem() throws Exception {
-        var dialog = new SettingsDialog(windows, context -> CorePages.pages(ThemeChoices.of(() -> List.of("Darcula", "Jasper Dark", "Jasper Light")),
+    @Test void appearanceAndTerminalSchemeShareOneSaveRetainFailedDraftAndCancelDiscardsThem() throws Exception {
+        var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
             new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false),
             page -> fake, page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context), hooks());
         saveResult = CompletableFuture.failedFuture(new IllegalStateException("Setting changed on disk"));
         edt(() -> {
             dialog.open(null, "appearance");
-            dialog.draft().stage(CoreSettings.UI_THEME_NAME, Optional.of("Jasper Light"));
-            dialog.draft().stage(CoreSettings.UI_THEME_WORKSPACE, Optional.of("Darcula"));
+            dialog.draft().stage(CoreSettings.UI_APPEARANCE, Optional.of(dev.jasper.app.config.AppearanceMode.LIGHT));
+            dialog.draft().stage(CoreSettings.TERMINAL_SCHEME, Optional.of(dev.jasper.app.config.TerminalSchemeChoice.HIGH_CONTRAST));
             dialog.apply();
         });
         edt(() -> {});
         edt(() -> {
             assertThat(saved).hasSize(1);
-            assertThat(saved.getFirst().changes()).containsKeys(CoreSettings.UI_THEME_NAME, CoreSettings.UI_THEME_WORKSPACE);
+            assertThat(saved.getFirst().changes()).containsKeys(CoreSettings.UI_APPEARANCE, CoreSettings.TERMINAL_SCHEME);
             assertThat(dialog.draft().modified()).isTrue();
         });
-        state = state("ui.theme.name='Jasper Light'\nui.theme.workspace='Darcula'\n"); saveResult = CompletableFuture.completedFuture(state);
+        state = state("ui.appearance='light'\nterminal.scheme='high-contrast'\n"); saveResult = CompletableFuture.completedFuture(state);
         edt(dialog::apply); edt(() -> {});
         edt(() -> {
             assertThat(saved).hasSize(2); assertThat(dialog.draft().modified()).isFalse();
-            dialog.draft().stage(CoreSettings.UI_THEME_WORKSPACE, Optional.of("Jasper Dark")); dialog.cancel();
+            dialog.draft().stage(CoreSettings.TERMINAL_SCHEME, Optional.of(dev.jasper.app.config.TerminalSchemeChoice.SLATE_STEEL_DARK)); dialog.cancel();
             assertThat(dialog.isOpen()).isFalse(); dialog.open(null,"appearance");
-            assertThat(dialog.draft().value(CoreSettings.UI_THEME_WORKSPACE)).isEqualTo("Darcula"); dialog.cancel();
+            assertThat(dialog.draft().value(CoreSettings.TERMINAL_SCHEME)).isEqualTo(dev.jasper.app.config.TerminalSchemeChoice.HIGH_CONTRAST); dialog.cancel();
         });
     }
 
@@ -258,15 +258,14 @@ class SettingsDialogTest {
         });
     }
 
-    @Test void pickingAThemeFromTheListEnablesApply() throws Exception {
+    @Test void pickingTheLightTileEnablesApply() throws Exception {
         var dialog = dialog();
         edt(() -> {
             dialog.open(null, "appearance");
             // The dialog's window replays the current theme when it opens, which updates every component's UI.
             javax.swing.SwingUtilities.updateComponentTreeUI(dialog.view());
-            var box = KitTestSupport.require(dialog.view(), "ui.theme.name.input", javax.swing.JComboBox.class);
-            box.setSelectedIndex(1);
-            assertThat(dialog.draft().value(CoreSettings.UI_THEME_NAME)).isEqualTo("IntelliJ Light");
+            KitTestSupport.require(dialog.view(), "ui.appearance:policy.option.light", javax.swing.JButton.class).doClick(0);
+            assertThat(dialog.draft().value(CoreSettings.UI_APPEARANCE)).isEqualTo(dev.jasper.app.config.AppearanceMode.LIGHT);
             assertThat(button(dialog, "apply").isEnabled()).isTrue();
         });
     }
@@ -599,7 +598,7 @@ class SettingsDialogTest {
     @Test void searchHighlightAndQuerySurviveAThemeSwitch() throws Exception {
         var bindings = new dev.jasper.app.appearance.AppearanceBindings[1];
         edt(() -> bindings[0] = KitTestSupport.bindings(true));
-        var dialog = new SettingsDialog(windows, context -> CorePages.pages(ThemeChoices.of(() -> List.of("Jasper Dark")),
+        var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
             new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
             page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context),
             new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }),
@@ -630,51 +629,39 @@ class SettingsDialogTest {
         });
     }
 
-    @Test void retainedThemeSelectionsApplyAndReopenAfterExternalTupleChanges(@org.junit.jupiter.api.io.TempDir Path home) throws Exception {
-        var palette = new dev.jasper.ui.model.Option.Palette(1, 2, 3, 4, 5);
-        var sources = List.of(
-            new ThemeChoices.Source("Custom Night", dev.jasper.app.config.ThemeSource.CATALOG, true, palette, 90, true),
-            new ThemeChoices.Source("Nord", dev.jasper.app.config.ThemeSource.CATALOG, false, palette, 90, true),
-            new ThemeChoices.Source("Jasper Dark", dev.jasper.app.config.ThemeSource.BUNDLED, true, palette, 90, true),
-            new ThemeChoices.Source("Jasper Light", dev.jasper.app.config.ThemeSource.BUNDLED, false, palette, 100, false));
-        var themes = new ThemeChoices(() -> sources.stream().map(ThemeChoices.Source::name).toList(), ignored -> new ThemeChoices.Import(() -> {}, () -> {}), () -> sources, () -> Optional.of(false), ignored -> new Subscription(() -> {}));
-        for (String action : List.of("named", "dark", "light", "reset")) {
+    @Test void appearanceSelectionsApplyAndReopenAfterAnExternalChange(@org.junit.jupiter.api.io.TempDir Path home) throws Exception {
+        for (String action : List.of("dark", "light", "reset")) {
             Path file = home.resolve(action + ".toml");
-            java.nio.file.Files.writeString(file, "[ui.theme]\nname='Nord'\nsource='catalog'\nfollow_system=true");
+            String saved = action.equals("reset") ? "light" : "system";
+            java.nio.file.Files.writeString(file, "[ui]\nappearance='" + saved + "'\n");
             try (var service = new ConfigService(file, false)) {
                 var current = new ConfigService.State[]{service.initialState()};
                 var external = new ArrayList<Consumer<ConfigService.State>>();
-                var dialog = new SettingsDialog(windows, CorePages.pages(themes,
+                var dialog = new SettingsDialog(windows, CorePages.pages(AppearanceFixtures.CHOICES,
                     new CorePages.SystemActions(() -> file, () -> {}, () -> {}, () -> {}, () -> {}, () -> false), page -> fake,
                     page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)),
                     new SettingsDialog.Hooks(edit -> service.save(edit).thenApply(next -> current[0] = next), () -> current[0], listener -> { external.add(listener); return new Subscription(() -> external.remove(listener)); },
                         () -> {}, () -> {}, uri -> {}, (parent, count) -> true, KitTestSupport::context));
-                var wanted = new Object[3];
+                var wanted = new Object[1];
                 var pending = new SettingsEdit[1];
                 try {
                     edt(() -> {
                         dialog.open(null, "appearance");
-                        if (action.equals("named")) KitTestSupport.require(page(dialog), "ui.theme.name.input", javax.swing.JComboBox.class).setSelectedIndex(0);
-                        else if (!action.equals("reset")) KitTestSupport.require(page(dialog), "ui.theme.name:policy.option." + action, javax.swing.JButton.class).doClick(0);
-                        else {
-                            var menu = KitTestSupport.require(page(dialog), "ui.theme.name:actions", javax.swing.JComponent.class).getComponentPopupMenu();
-                            java.util.Arrays.stream(menu.getComponents()).filter(javax.swing.JMenuItem.class::isInstance).map(javax.swing.JMenuItem.class::cast).filter(item -> item.getText().equals("Reset to defaults")).findFirst().orElseThrow().doClick(0);
-                        }
-                        wanted[0] = dialog.draft().value(CoreSettings.UI_THEME_NAME); wanted[1] = dialog.draft().value(CoreSettings.UI_THEME_SOURCE); wanted[2] = dialog.draft().value(CoreSettings.UI_THEME_FOLLOW_SYSTEM);
+                        if (!action.equals("reset")) KitTestSupport.require(page(dialog), "ui.appearance:policy.option." + action, javax.swing.JButton.class).doClick(0);
+                        else KitTestSupport.require(page(dialog), "ui.appearance:reset", javax.swing.JButton.class).doClick(0);
+                        wanted[0] = dialog.draft().value(CoreSettings.UI_APPEARANCE);
                         assertThat(dialog.draft().modified()).isTrue();
                         pending[0] = dialog.draft().edit();
                     });
-                    java.nio.file.Files.writeString(file, "[ui.theme]\nname='Nord'\nsource='bundled'\nfollow_system=true");
-                    assertThatThrownBy(() -> service.save(pending[0]).get(5, java.util.concurrent.TimeUnit.SECONDS)).hasRootCauseMessage("ui.theme.source changed on disk. Review the new value and try again.");
-                    java.nio.file.Files.writeString(file, "[ui.theme]\nname='Jasper Dark'\nsource='bundled'\nfollow_system=true");
+                    String other = action.equals("dark") ? "light" : "dark";
+                    java.nio.file.Files.writeString(file, "[ui]\nappearance='" + other + "'\n");
+                    assertThatThrownBy(() -> service.save(pending[0]).get(5, java.util.concurrent.TimeUnit.SECONDS)).hasRootCauseMessage("ui.appearance changed on disk. Review the new value and try again.");
                     current[0] = service.reload().get(5, java.util.concurrent.TimeUnit.SECONDS);
                     edt(() -> { List.copyOf(external).forEach(listener -> listener.accept(current[0])); dialog.apply(); });
                     until(() -> !dialog.draft().modified());
                     edt(() -> {
                         dialog.cancel(); dialog.open(null, "appearance");
-                        assertThat(dialog.draft().value(CoreSettings.UI_THEME_NAME)).as(action).isEqualTo(wanted[0]);
-                        assertThat(dialog.draft().value(CoreSettings.UI_THEME_SOURCE)).as(action).isEqualTo(wanted[1]);
-                        assertThat(dialog.draft().value(CoreSettings.UI_THEME_FOLLOW_SYSTEM)).as(action).isEqualTo(wanted[2]);
+                        assertThat(dialog.draft().value(CoreSettings.UI_APPEARANCE)).as(action).isEqualTo(wanted[0]);
                     });
                 } finally { edt(dialog::cancel); }
             }
@@ -687,7 +674,7 @@ class SettingsDialogTest {
         java.nio.file.Files.writeString(file, original);
         try (var service = new ConfigService(file, false)) {
             var current = new ConfigService.State[]{service.initialState()};
-            var dialog = new SettingsDialog(windows, context -> CorePages.pages(ThemeChoices.of(() -> List.of("Jasper Dark")),
+            var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
                 new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
                 page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context),
                 new SettingsDialog.Hooks(edit -> service.save(edit).thenApply(next -> current[0] = next), () -> current[0],
@@ -736,7 +723,7 @@ class SettingsDialogTest {
             }, () -> { if (surface.title().equals("Settings")) fronted[0]++; }, () -> { }, title -> { }, () -> new Rectangle(0, 0, 1000, 700),
             (title, initial) -> Optional.empty()));
         var holder = new SettingsDialog[1];
-        holder[0] = new SettingsDialog(confirming, context -> CorePages.pages(ThemeChoices.of(() -> List.of("Jasper Dark")),
+        holder[0] = new SettingsDialog(confirming, context -> CorePages.pages(AppearanceFixtures.CHOICES,
             new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
             page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context),
             new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }),

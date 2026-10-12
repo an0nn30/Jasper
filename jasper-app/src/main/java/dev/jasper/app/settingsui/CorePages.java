@@ -49,42 +49,43 @@ public final class CorePages {
     }
 
     /** Every schema page's spec, in tree order, with no detected shells. */
-    public static List<SchemaPage.Spec> specs(ThemeChoices themes, SystemActions system) {
-        return specs(themes, system, ShellChoices.NONE);
+    public static List<SchemaPage.Spec> specs(AppearanceChoices appearance, SystemActions system) {
+        return specs(appearance, system, ShellChoices.NONE);
     }
 
     /** Every schema page's spec, in tree order. */
-    public static List<SchemaPage.Spec> specs(ThemeChoices themes, SystemActions system, ShellChoices shells) {
-        return specs(themes, system, shells, id -> {});
+    public static List<SchemaPage.Spec> specs(AppearanceChoices appearance, SystemActions system, ShellChoices shells) {
+        return specs(appearance, system, shells, id -> {});
     }
     /** Schema pages whose links select other pages with {@code navigate}. */
-    public static List<SchemaPage.Spec> specs(ThemeChoices themes, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate) {
-        return specs(themes, system, shells, navigate, com.formdev.flatlaf.util.SystemInfo.isMacOS);
+    public static List<SchemaPage.Spec> specs(AppearanceChoices appearance, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate) {
+        return specs(appearance, system, shells, navigate, com.formdev.flatlaf.util.SystemInfo.isMacOS);
     }
 
     /**
      * Schema pages; {@code glass} is whether workspace glass exists here (macOS only), which decides whether its
      * Settings rows (and their Workspace section) are built.
      */
-    static List<SchemaPage.Spec> specs(ThemeChoices themes, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate, boolean glass) {
-        return specs(themes, system, shells, navigate, glass, NotificationGroupChoices.NONE);
+    static List<SchemaPage.Spec> specs(AppearanceChoices appearance, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate, boolean glass) {
+        return specs(appearance, system, shells, navigate, glass, NotificationGroupChoices.NONE);
     }
 
     /** As above, with the notification groups the Notifications page lists. */
-    static List<SchemaPage.Spec> specs(ThemeChoices themes, SystemActions system, ShellChoices shells,
+    static List<SchemaPage.Spec> specs(AppearanceChoices appearance, SystemActions system, ShellChoices shells,
                                        java.util.function.Consumer<String> navigate, boolean glass, NotificationGroupChoices groups) {
         return List.of(
             SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
                 .section("Theme")
-                .row(UI_THEME_NAME, Editors.theme(themes))
-                .row(UI_THEME_WORKSPACE, Editors.workspaceScheme(themes)).note("Colors for terminal and editor panes")
+                .row(UI_APPEARANCE, Editors.appearance(appearance))
+                .row(TERMINAL_SCHEME, Editors.choice(Map.of("match", Editors.SAME_AS_UI_THEME, "slate-steel-dark", "Slate Steel Dark",
+                    "slate-steel-light", "Slate Steel Light", "high-contrast", "High Contrast"))).note("Colors for terminal panes")
+                .row(UI_THEME_NAME).shownWhen(false)
+                .row(UI_THEME_WORKSPACE).shownWhen(false)
                 .row(UI_THEME_SOURCE).shownWhen(false)
                 .row(UI_THEME_FOLLOW_SYSTEM).shownWhen(false)
-                .row(UI_APPEARANCE).shownWhen(false)
-                .row(TERMINAL_SCHEME).shownWhen(false)
                 .section("Workspace")
-                .row(UI_WORKSPACE_OPACITY, WorkspaceEditors.opacity(themes)).shownWhen(glass)
-                .row(UI_WORKSPACE_BLUR, WorkspaceEditors.blur(themes)).shownWhen(glass)
+                .row(UI_WORKSPACE_OPACITY, WorkspaceEditors.opacity(appearance)).shownWhen(glass)
+                .row(UI_WORKSPACE_BLUR, WorkspaceEditors.blur(appearance)).shownWhen(glass)
                 .section("Interface Font")
                 .row(UI_FONT_FAMILY, Editors.interfaceFont())
                 .row(UI_FONT_SIZE, PlatformFontSize.factory())
@@ -143,8 +144,8 @@ public final class CorePages {
                 .row(TERMINAL_FONT_LIGATURES)
                 .row(TERMINAL_FONT_LINE_HEIGHT, Editors.number(0.05, "×"))
                 .section("Colors")
-                .action(() -> "Terminal colors come from the workspace scheme in Appearance.",
-                    new SchemaPage.Button("Choose workspace scheme…", () -> navigate.accept("appearance"), () -> true)),
+                .action(() -> "Terminal colors come from the terminal scheme in Appearance.",
+                    new SchemaPage.Button("Choose terminal scheme…", () -> navigate.accept("appearance"), () -> true)),
             SchemaPage.page("terminal.cursor", "Cursor").parent("terminal")
                 .row(TERMINAL_CURSOR_SHAPE)
                 .row(TERMINAL_CURSOR_BLINK),
@@ -163,49 +164,49 @@ public final class CorePages {
     }
 
     /** The whole tree with no detected shells. */
-    public static Function<PageContext, List<SettingsPage>> pages(ThemeChoices themes, SystemActions system,
+    public static Function<PageContext, List<SettingsPage>> pages(AppearanceChoices appearance, SystemActions system,
                                                                    Function<PageContext, SettingsPage> keymap,
                                                                    Function<PageContext, SettingsPage> plugins) {
-        return pages(themes, system, ShellChoices.NONE, keymap, plugins);
+        return pages(appearance, system, ShellChoices.NONE, keymap, plugins);
     }
 
     /**
      * The whole tree for one dialog, in display order: group and schema pages, with the Keymap and Plugins pages the
      * application supplies.
      */
-    public static Function<PageContext, List<SettingsPage>> pages(ThemeChoices themes, SystemActions system, ShellChoices shells,
+    public static Function<PageContext, List<SettingsPage>> pages(AppearanceChoices appearance, SystemActions system, ShellChoices shells,
                                                                    Function<PageContext, SettingsPage> keymap,
                                                                    Function<PageContext, SettingsPage> plugins) {
-        return pages(themes, system, shells, keymap, plugins, context -> List.of());
+        return pages(appearance, system, shells, keymap, plugins, context -> List.of());
     }
 
     /** The whole tree with no detected shells, followed by {@code tools}. */
-    public static Function<PageContext, List<SettingsPage>> pages(ThemeChoices themes, SystemActions system,
+    public static Function<PageContext, List<SettingsPage>> pages(AppearanceChoices appearance, SystemActions system,
                                                                    Function<PageContext, SettingsPage> keymap,
                                                                    Function<PageContext, SettingsPage> plugins,
                                                                    Function<PageContext, List<SettingsPage>> tools) {
-        return pages(themes, system, ShellChoices.NONE, keymap, plugins, tools);
+        return pages(appearance, system, ShellChoices.NONE, keymap, plugins, tools);
     }
 
     /** As above with {@code shells}, followed by {@code tools}: pages under Tools, such as plugins' settings pages. */
-    public static Function<PageContext, List<SettingsPage>> pages(ThemeChoices themes, SystemActions system, ShellChoices shells,
+    public static Function<PageContext, List<SettingsPage>> pages(AppearanceChoices appearance, SystemActions system, ShellChoices shells,
                                                                    Function<PageContext, SettingsPage> keymap,
                                                                    Function<PageContext, SettingsPage> plugins,
                                                                    Function<PageContext, List<SettingsPage>> tools) {
-        return pages(themes, system, shells, new Pages(keymap, plugins, tools));
+        return pages(appearance, system, shells, new Pages(keymap, plugins, tools));
     }
 
     /** The whole tree for one dialog, in display order, with the pages the application supplies and no notification groups. */
-    public static Function<PageContext, List<SettingsPage>> pages(ThemeChoices themes,
+    public static Function<PageContext, List<SettingsPage>> pages(AppearanceChoices appearance,
                                                                    SystemActions system, ShellChoices shells, Pages supplied) {
-        return pages(themes, system, shells, NotificationGroupChoices.NONE, supplied);
+        return pages(appearance, system, shells, NotificationGroupChoices.NONE, supplied);
     }
 
     /** The whole tree for one dialog, in display order, with the notification groups and pages the application supplies. */
-    public static Function<PageContext, List<SettingsPage>> pages(ThemeChoices themes, SystemActions system, ShellChoices shells,
+    public static Function<PageContext, List<SettingsPage>> pages(AppearanceChoices appearance, SystemActions system, ShellChoices shells,
                                                                    NotificationGroupChoices groups, Pages supplied) {
         return context -> {
-            var specs = specs(themes, system, shells, context.navigate(), com.formdev.flatlaf.util.SystemInfo.isMacOS, groups);
+            var specs = specs(appearance, system, shells, context.navigate(), com.formdev.flatlaf.util.SystemInfo.isMacOS, groups);
             var all = new ArrayList<SettingsPage>();
             Function<String, Supplier<List<SettingsPage>>> childrenOf = id ->
                 () -> all.stream().filter(page -> page.parent().equals(Optional.of(id))).toList();

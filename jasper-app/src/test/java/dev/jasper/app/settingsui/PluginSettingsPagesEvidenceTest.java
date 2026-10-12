@@ -3,7 +3,6 @@ package dev.jasper.app.settingsui;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
-import dev.jasper.app.application.SettingsThemeSourcesTestAccess;
 import dev.jasper.app.config.ConfigLoader;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.UiFontConfig;
@@ -87,7 +86,7 @@ class PluginSettingsPagesEvidenceTest {
                     themes[0].configure(theme, new UiFontConfig("system", family.endsWith("font20") ? 20 : 0));
                     var hooks = new KeymapPage.Hooks(contributions, Map::of, () -> Map.of("dev.jasper.editor", "Editor"), true, edits -> CompletableFuture.completedFuture(null));
                     var pages = new CorePages.Pages(context -> new KeymapPage(hooks, context), context -> manager[0].page(context), context -> runtime[0].settingsPages(context));
-                    dialog[0] = new SettingsDialog(windows, CorePages.pages(SettingsThemeSourcesTestAccess.choices(catalog, () -> Optional.of(false)),
+                    dialog[0] = new SettingsDialog(windows, CorePages.pages(AppearanceFixtures.choices(() -> Optional.of(false)),
                         new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), ShellChoices.NONE,
                         new NotificationGroupChoices(List::of), pages),
                         new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }),

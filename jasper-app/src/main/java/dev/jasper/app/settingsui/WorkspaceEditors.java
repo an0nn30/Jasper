@@ -5,21 +5,15 @@ import dev.jasper.app.config.*;
 import dev.jasper.ui.model.*;
 import java.util.*;
 
-/** Workspace overrides read the current draft's effective authored source, retaining inheritance explicitly. */
+/** Workspace overrides; the theme's own glass (from {@link AppearanceChoices}) is what they inherit. */
 final class WorkspaceEditors {
     private WorkspaceEditors() { }
-    static Editors.Factory<Float> opacity(ThemeChoices choices) { return new Editors.Factory<>((setting,context)->new Opacity(choices,context.draft()),List.of("Use theme's value","opacity","transparency")); }
-    static Editors.Factory<WorkspaceBlur> blur(ThemeChoices choices) { return new Editors.Factory<>((setting,context)->new Blur(choices,context.draft()),List.of("Use theme's value","blur")); }
-    static Optional<ThemeChoices.Source> source(ThemeChoices choices,SettingsDraft draft) {
-        String workspace=draft.value(UI_THEME_WORKSPACE);
-        if(!workspace.equalsIgnoreCase("match")) {var found=choices.find(workspace,ThemeSource.CATALOG);if(found.isPresent())return found;}
-        if(draft.value(UI_THEME_FOLLOW_SYSTEM)&&choices.systemDark().get().isPresent())return choices.find(choices.systemDark().get().get()?"Jasper Dark":"Jasper Light",ThemeSource.BUNDLED);
-        return choices.find(draft.value(UI_THEME_NAME),draft.value(UI_THEME_SOURCE)).or(()->choices.find("Jasper Dark",ThemeSource.BUNDLED));
-    }
+    static Editors.Factory<Float> opacity(AppearanceChoices choices) { return new Editors.Factory<>((setting,context)->new Opacity(choices,context.draft()),List.of("Use theme's value","opacity","transparency")); }
+    static Editors.Factory<WorkspaceBlur> blur(AppearanceChoices choices) { return new Editors.Factory<>((setting,context)->new Blur(choices,context.draft()),List.of("Use theme's value","blur")); }
     static final class Opacity implements ValueEditor<Float> {
-        final ThemeChoices choices;final SettingsDraft draft;float value;
-        Opacity(ThemeChoices choices,SettingsDraft draft){this.choices=choices;this.draft=draft;value=UI_WORKSPACE_OPACITY.defaultValue();}
-        private float effective(){return value==UI_WORKSPACE_OPACITY.defaultValue()?source(choices,draft).map(ThemeChoices.Source::opacity).orElse(100f):value;}
+        final AppearanceChoices choices;final SettingsDraft draft;float value;
+        Opacity(AppearanceChoices choices,SettingsDraft draft){this.choices=choices;this.draft=draft;value=UI_WORKSPACE_OPACITY.defaultValue();}
+        private float effective(){return value==UI_WORKSPACE_OPACITY.defaultValue()?choices.opacity():value;}
         @Override public boolean fullSpan(){return true;}
         @Override public boolean cardRows(){return true;}
         @Override public Nodes.Node node(String id, ControlState state) { return node(id, state, false); }
@@ -43,11 +37,11 @@ final class WorkspaceEditors {
         @Override public boolean removesAtDefault(){return true;}
     }
     static final class Blur implements ValueEditor<WorkspaceBlur> {
-        final ThemeChoices choices;final SettingsDraft draft;WorkspaceBlur value=WorkspaceBlur.THEME;
-        Blur(ThemeChoices choices,SettingsDraft draft){this.choices=choices;this.draft=draft;}
+        final AppearanceChoices choices;final SettingsDraft draft;WorkspaceBlur value=WorkspaceBlur.THEME;
+        Blur(AppearanceChoices choices,SettingsDraft draft){this.choices=choices;this.draft=draft;}
         /** The switch shows the effective blur; the row's Reset (shown only while it overrides the theme) returns to the theme's value. */
         @Override public Nodes.Node node(String id,ControlState state){
-            boolean enabled=value==WorkspaceBlur.ON||value==WorkspaceBlur.THEME&&source(choices,draft).map(ThemeChoices.Source::blur).orElse(false);
+            boolean enabled=value==WorkspaceBlur.ON||value==WorkspaceBlur.THEME&&choices.blur();
             return new Nodes.Toggle(id,state,value==WorkspaceBlur.THEME?"Use theme's value":"Blur desktop behind workspace",enabled,id,false);
         }
         @Override public String rowLabel(String label){return "Background blur";}

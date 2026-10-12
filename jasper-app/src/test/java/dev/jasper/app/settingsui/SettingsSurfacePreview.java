@@ -1,7 +1,6 @@
 package dev.jasper.app.settingsui;
 
 import dev.jasper.app.appearance.*;
-import dev.jasper.app.application.SettingsThemeSourcesTestAccess;
 import dev.jasper.app.config.*;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.lifecycle.Subscription;
@@ -66,7 +65,7 @@ public final class SettingsSurfacePreview {
                         var groups=List.of(group("jasper.general","Jasper","card","Jasper","jasper","appearance"),group("jasper.config","Configuration","sticky","Jasper","jasper","appearance"),group("jasper.plugins","Plugin problems","card","Jasper","jasper","appearance"),group("jasper.internal","Internal errors","sticky","Jasper","jasper","appearance"),group("jasper.commands","Long-running commands","card","Jasper","jasper","appearance"),group("dev.jasper.editor","Editor","card","Editor","dev.jasper.editor","edit"),group("dev.jasper.editor.files","Files","card","Editor","dev.jasper.editor","edit"));
                         var pages=new CorePages.Pages(context->new GroupPage("keymap","Keymap",Optional.empty(),false,List::of,context),context->new GroupPage("plugins","Plugins",Optional.empty(),false,List::of,context),context->runtime[0].settingsPages(context));
                         var systemDark=new java.util.concurrent.atomic.AtomicReference<>(Optional.of(false));
-                        var dialog=new SettingsDialog(windows,CorePages.pages(SettingsThemeSourcesTestAccess.choices(catalog,systemDark::get),new CorePages.SystemActions(()->file,()->{},()->{},()->{},()->{},()->false),ShellChoices.NONE,new NotificationGroupChoices(()->groups),pages),new SettingsDialog.Hooks(edit->CompletableFuture.completedFuture(state),()->state,listener->new Subscription(()->{}),()->{},()->{},uri->{},(parent,count)->true,()->controller[0].appearance().context(ThemeRoute.CHROME)));
+                        var dialog=new SettingsDialog(windows,CorePages.pages(AppearanceFixtures.choices(systemDark::get),new CorePages.SystemActions(()->file,()->{},()->{},()->{},()->{},()->false),ShellChoices.NONE,new NotificationGroupChoices(()->groups),pages),new SettingsDialog.Hooks(edit->CompletableFuture.completedFuture(state),()->state,listener->new Subscription(()->{}),()->{},()->{},uri->{},(parent,count)->true,()->controller[0].appearance().context(ThemeRoute.CHROME)));
                         try {
                             dialog.open(null,"appearance");
                             for(String page:List.of("appearance","window","notifications")) {
@@ -76,11 +75,9 @@ public final class SettingsSurfacePreview {
                                 save(dialog,views[0],directory.resolve("narrow.png"),640,681);
                                 if(page.equals("appearance")) {
                                     systemDark.set(Optional.empty());
-                                    dialog.draft().stage(CoreSettings.UI_THEME_FOLLOW_SYSTEM,Optional.of(true));
+                                    dialog.draft().stage(CoreSettings.UI_APPEARANCE,Optional.of(AppearanceMode.SYSTEM));
                                     save(dialog,views[0],directory.resolve("system-unavailable.png"),980,681);
-                                    dialog.draft().stageAll(Map.of(CoreSettings.UI_THEME_FOLLOW_SYSTEM,Optional.of(false),CoreSettings.UI_THEME_NAME,Optional.of("Missing bundled source"),CoreSettings.UI_THEME_SOURCE,Optional.of(ThemeSource.BUNDLED)));
-                                    save(dialog,views[0],directory.resolve("missing-source.png"),980,681);
-                                    dialog.draft().reset(List.of(CoreSettings.UI_THEME_NAME,CoreSettings.UI_THEME_SOURCE,CoreSettings.UI_THEME_FOLLOW_SYSTEM));
+                                    dialog.draft().reset(List.of(CoreSettings.UI_APPEARANCE));
                                     systemDark.set(Optional.of(false));
                                 }
                                 if(page.equals("notifications")){save(dialog,views[0],directory.resolve("popup-base.png"),980,681);popup(dialog,views[0],directory.resolve("popup.png"));}

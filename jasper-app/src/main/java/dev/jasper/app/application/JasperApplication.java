@@ -818,18 +818,9 @@ public final class JasperApplication {
             var shells = new dev.jasper.app.settingsui.ShellChoices(() -> shellProfiles.current().stream()
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
                 shellProfiles::refresh, shellProfiles::onChanged);
-            var themeChoices = new dev.jasper.app.settingsui.ThemeChoices(() -> themeCatalog.latest().names(), context -> {
-                var imports = new dev.jasper.app.themesui.ThemeImport(context, configuration.state().file().toAbsolutePath().getParent(), auxiliary,
-                    () -> configuration.reload().thenApply(ignored -> null),
-                    java.util.concurrent.Executors.newSingleThreadExecutor(runnable -> {
-                        var thread = new Thread(runnable, "jasper-theme-import"); thread.setDaemon(true); return thread;
-                    }));
-                return new dev.jasper.app.settingsui.ThemeChoices.Import(imports::start, imports::close);
-            }, new SettingsThemeSources(themeCatalog), () -> switch (systemAppearance.current().preference()) {
-                case DARK -> Optional.of(true); case LIGHT -> Optional.of(false); case UNAVAILABLE -> Optional.empty();
-            }, listener -> new dev.jasper.app.lifecycle.Subscription(systemAppearance.subscribe(ignored -> listener.run())));
+            var appearanceChoices = SettingsAppearance.choices(systemAppearance);
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
-                dev.jasper.app.settingsui.CorePages.pages(themeChoices, system, shells,
+                dev.jasper.app.settingsui.CorePages.pages(appearanceChoices, system, shells,
                     new dev.jasper.app.settingsui.NotificationGroupChoices(() -> groupChoices(notificationCenter.groups(), this::pluginName, plugins == null ? Map.of() : plugins.pluginIcons())),
                     new dev.jasper.app.settingsui.CorePages.Pages(
                         context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context),
