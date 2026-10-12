@@ -45,6 +45,9 @@ class ChoicesTest {
                     context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme,theme));KitFixtures.render(view,400,80,2);
                     var button=find(view,"choice.option.b",JButton.class);var fill=theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SEGMENT_SELECTED_BG);
                     assertThat(dev.jasper.ui.theme.ColorMath.contrast(button.getForeground(),fill)).as("%s selected label",theme.name()).isGreaterThanOrEqualTo(4.5);
+                    // A readable primary text stays primary: the selected label is never dimmed toward the floor.
+                    if(theme!=custom)assertThat(button.getForeground()).as("%s selected label keeps primary text",theme.name())
+                        .isEqualTo(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
                     var painted=ButtonsTest.paint(button);double maximum=1;
                     for(int y=3;y<painted.getHeight()-3;y++)for(int x=3;x<painted.getWidth()-3;x++)maximum=Math.max(maximum,dev.jasper.ui.theme.ColorMath.contrast(new java.awt.Color(painted.getRGB(x,y)),fill));
                     assertThat(maximum).as("actual text ink against selected fill").isGreaterThanOrEqualTo(4.5);

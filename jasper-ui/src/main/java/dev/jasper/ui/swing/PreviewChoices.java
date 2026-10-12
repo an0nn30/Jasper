@@ -78,7 +78,7 @@ final class PreviewChoices extends ControlRegistry.Control {
                     g.setColor(ThemePainting.color(context(),SemanticColor.ACCENT));g.fill(shape);
                 }
                 if(focus!=null&&focus.visible()){g.setColor(ThemePainting.color(context(),SemanticColor.ACCENT));g.drawRoundRect(0,0,getWidth()-1,getHeight()-1,radius*2,radius*2);}
-                g.setFont(getFont());g.setColor(isSelected()?dev.jasper.ui.theme.SurfaceContrast.on(context().theme().semantic(),SemanticColor.TEXT_ONACCENT,SemanticColor.SURFACE_CARD,dev.jasper.ui.theme.SurfaceContrast.TEXT):ThemePainting.color(context(),SemanticColor.TEXT_SECONDARY));var fm=g.getFontMetrics();String label=option==null?"":option.label();if(fm.stringWidth(label)>getWidth()){while(!label.isEmpty()&&fm.stringWidth(label+"…")>getWidth())label=label.substring(0,label.offsetByCodePoints(label.length(),-1));label+="…";}
+                g.setFont(getFont());g.setColor(isSelected()?dev.jasper.ui.theme.SurfaceContrast.on(context().theme().semantic(),SemanticColor.TEXT_PRIMARY,SemanticColor.SURFACE_CARD,dev.jasper.ui.theme.SurfaceContrast.TEXT):ThemePainting.color(context(),SemanticColor.TEXT_SECONDARY));var fm=g.getFontMetrics();String label=option==null?"":option.label();if(fm.stringWidth(label)>getWidth()){while(!label.isEmpty()&&fm.stringWidth(label+"…")>getWidth())label=label.substring(0,label.offsetByCodePoints(label.length(),-1));label+="…";}
                 g.drawString(label,(getWidth()-fm.stringWidth(label))/2,h+ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_CAPTION_GAP)+fm.getAscent());
             } finally {g.dispose();}
         }

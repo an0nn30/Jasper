@@ -389,7 +389,8 @@ final class Choices {
         SegmentButton(KitContext context) { super(context); this.context = context; kind = Nodes.ButtonKind.GHOST; }
         @Override SemanticColor textRole(boolean hover) { return isSelected() ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_SECONDARY; }
         @Override Color textColor(boolean hover) {
-            return isSelected() ? dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(), SemanticColor.TEXT_ONACCENT,
+            // The selected segment is not an accent surface: primary text, held to the text floor on its fill.
+            return isSelected() ? dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(), SemanticColor.TEXT_PRIMARY,
                 SemanticColor.SEGMENT_SELECTED_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT) : super.textColor(hover);
         }
         @Override public Dimension getPreferredSize() {
