@@ -87,6 +87,55 @@ class AppManagerKitTest {
         });
     }
 
+    /** Plan 3 Task 9 (Light inspection): a selected manager list row's text reads on the selection, as a panel row's does. */
+    @Test void aSelectedManagerRowsTextReadsOnTheSelectionInBothVariants() {
+        Edt.run(() -> {
+            for (boolean dark : new boolean[] {true, false}) {
+                var context = KitFixtures.context(dark ? KitFixtures.dark() : KitFixtures.light());
+                // The Vault manager's shape: a DOUBLE list, the name in the title and a caption in the subtitle.
+                var item = new ListItem("a", Optional.empty(), List.of(new Text("a.title", READY, "amp", TextRole.BODY)),
+                    List.of(new Text("a.subtitle", READY, "ubuntu · Password", TextRole.CAPTION)), List.of());
+                var other = new ListItem("b", Optional.empty(), List.of(new Text("b.title", READY, "Proxmox", TextRole.BODY)),
+                    List.of(new Text("b.subtitle", READY, "root · Private key", TextRole.CAPTION)), List.of());
+                var list = new Panel("list", READY, hidden("list.header"), Optional.empty(),
+                    new ItemList("rows", READY, ListKind.DOUBLE, List.of(item, other), Set.of("a"), "", List.of()), Optional.empty());
+                var detail = new Panel("detail", READY, hidden("detail.header"), Optional.empty(), new Text("body", READY, "Body", TextRole.BODY), Optional.empty());
+                try (var view = new KitView(context, new ViewSpec(new Split("columns", READY, SplitKind.SIDEBAR_DETAIL, List.of(list, detail))), event -> { })) {
+                    view.setSize(900, 520); for (int i = 0; i < 3; i++) InteractiveRowsTest.layout(view);
+                    assertThat(((InteractiveRows.RowsControl) view.control("rows")).column).isEqualTo(1);
+                    var p = context.theme().semantic();
+                    var title = KitViewTest.find(view, "a.title", javax.swing.JLabel.class);
+                    var subtitle = KitViewTest.find(view, "a.subtitle", javax.swing.JLabel.class);
+                    String variant = dark ? "dark" : "light";
+                    assertThat(title.getForeground()).as(variant + " title").isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(p,
+                        dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT, dev.jasper.ui.theme.SemanticColor.SELECTION_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT));
+                    assertThat(subtitle.getForeground()).as(variant + " subtitle").isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(p,
+                        dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT_SECONDARY, dev.jasper.ui.theme.SemanticColor.SELECTION_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT));
+                    assertThat(KitViewTest.find(view, "b.subtitle", javax.swing.JLabel.class).getForeground()).as(variant + " an unselected caption")
+                        .isEqualTo(p.color(dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
+                    // Moving the selection returns the first row's text to its roles.
+                    view.update(new ViewSpec(new Split("columns", READY, SplitKind.SIDEBAR_DETAIL, List.of(new Panel("list", READY, hidden("list.header"),
+                        Optional.empty(), new ItemList("rows", READY, ListKind.DOUBLE, List.of(item, other), Set.of("b"), "", List.of()), Optional.empty()), detail))));
+                    assertThat(KitViewTest.find(view, "a.subtitle", javax.swing.JLabel.class).getForeground()).as(variant + " deselected caption")
+                        .isEqualTo(p.color(dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
+                    assertThat(KitViewTest.find(view, "a.title", javax.swing.JLabel.class).getForeground()).as(variant + " deselected title")
+                        .isEqualTo(p.color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
+                } finally { KitViewTest.release(context); }
+                // The plugin list's shape: a DOUBLE list standing alone (no manager column), its caption inside an inline stack.
+                context = KitFixtures.context(dark ? KitFixtures.dark() : KitFixtures.light());
+                var card = new ListItem("a", Optional.empty(), List.of(new Text("a.title", READY, "Credential Vault", TextRole.BODY_STRONG)),
+                    List.of(new Stack("a.second", READY, LayoutRole.INLINE, List.of(new Text("a.subtitle", READY, "0.4.0 · Jasper", TextRole.CAPTION)))), List.of());
+                try (var view = new KitView(context, new ViewSpec(new ItemList("rows", READY, ListKind.DOUBLE, List.of(card, other), Set.of("a"), "", List.of())), event -> { })) {
+                    view.setSize(300, 200); for (int i = 0; i < 3; i++) InteractiveRowsTest.layout(view);
+                    var p = context.theme().semantic();
+                    assertThat(KitViewTest.find(view, "a.subtitle", javax.swing.JLabel.class).getForeground()).as((dark ? "dark" : "light") + " standalone caption")
+                        .isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(p, dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT_SECONDARY,
+                            dev.jasper.ui.theme.SemanticColor.SELECTION_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT));
+                } finally { KitViewTest.release(context); }
+            }
+        });
+    }
+
     @Test void aHostPresentsANativeArrangedTreeAsARailAndATableAsAListColumn() {
         Edt.run(() -> {
             var context = KitFixtures.context();

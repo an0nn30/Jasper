@@ -436,6 +436,15 @@ final class ItemLists {
                     label.setFont(ThemePainting.font(context(), Typography.Role.RESULTS_HEADING));
             row.slot(row.subtitle, item.subtitle());
             row.slot(row.trailing, trailing);
+            // A selected row on selection.bg (every list but a rail, results and an ordered list's focus-only selection), as a
+            // selected panel row: its text takes the on-accent roles.
+            if (column != 0 && !panelSingle && !results() && value().kind() != Nodes.ListKind.ORDERED && selected.contains(item.id())) {
+                for (int i = 0; i < item.title().size(); i++)
+                    if (item.title().get(i) instanceof Nodes.Text text && row.controls.get(text.id()).component instanceof JLabel label)
+                        label.setForeground(SurfaceContrast.on(context().theme().semantic(), i == 0 ? SemanticColor.TEXT_ONACCENT
+                            : SemanticColor.TEXT_ONACCENT_SECONDARY, SemanticColor.SELECTION_BG, SurfaceContrast.TEXT));
+                for (var node : item.subtitle()) onSelection(row, node);
+            }
             if(results() && !item.heading() && !selected.contains(item.id()))
                 for(var node:item.subtitle())if(node instanceof Nodes.Text text && text.severity().isEmpty()
                         && row.controls.get(text.id()).component instanceof JLabel label)
@@ -461,6 +470,15 @@ final class ItemLists {
                         () -> emit(new UiEvent.Reordered(node.id(), row.id, row.index + 1)));
                 command(row, "remove", true, () -> emit(new UiEvent.Removed(node.id(), row.id)));
             }
+        }
+
+        /** A selected row's secondary text, inline stacks included, on selection.bg; a text with a severity keeps its colour. */
+        private void onSelection(InteractiveRows.Row row, Nodes.Node node) {
+            if (node instanceof Nodes.Stack stack) for (var child : stack.children()) onSelection(row, child);
+            else if (node instanceof Nodes.Text text && text.severity().isEmpty() && row.controls.get(text.id()) != null
+                    && row.controls.get(text.id()).component instanceof JLabel label)
+                label.setForeground(SurfaceContrast.on(context().theme().semantic(), SemanticColor.TEXT_ONACCENT_SECONDARY,
+                    SemanticColor.SELECTION_BG, SurfaceContrast.TEXT));
         }
 
         private void resultSelection(InteractiveRows.Row row, List<Nodes.Node> nodes, SemanticColor ink, boolean strong) {
