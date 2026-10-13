@@ -223,15 +223,7 @@ final class BreadcrumbControls {
             for (MenuItem item : crumb.get().contextActions()) {
                 if (item.separator()) { popup.add(new Menus.Separator(context())); continue; }
                 var entry = new Menus.Item(context());
-                entry.setText(item.label());
-                entry.putClientProperty("Jasper.menu.item", item);
-                entry.putClientProperty("html.disable", true);
-                entry.setEnabled(item.enabled());
-                Composition.style(entry, context(), Typography.Role.BODY, SemanticColor.TEXT_PRIMARY);
-                int inset = ThemePainting.metric(context(), DesignMetrics.Role.MENU_ITEM_PADDING);
-                entry.setBorder(BorderFactory.createEmptyBorder(0, inset, 0, inset));
-                entry.setIcon(item.icon().isBlank() ? null : context().icons().tile(item.icon(), context().theme().semantic(), item.hue(),
-                    ThemePainting.metric(context(), DesignMetrics.Role.MENU_TILE), false));
+                entry.describe(item);
                 // A crumb's menu acts on that crumb without navigating to it, so it reports only the item's action.
                 ActionListener chosen = event -> {
                     if (value().crumbs().stream().anyMatch(candidate -> candidate.id().equals(crumbId) && candidate.contextActions().contains(item)))

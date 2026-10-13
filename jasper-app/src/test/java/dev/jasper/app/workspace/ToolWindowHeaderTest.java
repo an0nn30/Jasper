@@ -99,7 +99,7 @@ class ToolWindowHeaderTest {
 
     @Test void theMenuMovesToAnyOfTheSixSlotsAndHides() {
         JPopupMenu menu = menu(Slot.LEFT_BOTTOM, true);
-        assertThat(item(menu, "Hide").getFont()).isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.LABEL));
+        assertThat(item(menu, "Hide").getFont()).as("the kit menu's type").isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.BODY));
         var moveTo = (JMenu) menu.getComponent(0);
         assertThat(moveTo.getText()).isEqualTo("Move to");
         assertThat(Arrays.stream(moveTo.getMenuComponents()).map(item -> ((JMenuItem) item).getText()))

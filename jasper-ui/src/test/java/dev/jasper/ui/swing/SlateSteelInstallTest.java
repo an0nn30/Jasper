@@ -55,6 +55,26 @@ class SlateSteelInstallTest {
         });
     }
 
+    @Test void nativeMenusTakeTheKitMenusRoles() {
+        Edt.run(() -> {
+            var prior = UIManager.getLookAndFeel();
+            try {
+                for (boolean dark : new boolean[] {true, false}) {
+                    var theme = SlateSteel.bundled().generated(dark); var p = theme.semantic();
+                    FlatLafInstaller.install(theme);
+                    for (var key : List.of("PopupMenu.background", "MenuItem.background", "Menu.background")) assertThat(UIManager.getColor(key)).as(key).isEqualTo(p.color(SemanticColor.SURFACE_MENU));
+                    for (var key : List.of("MenuItem.selectionBackground", "Menu.selectionBackground", "CheckBoxMenuItem.selectionBackground", "RadioButtonMenuItem.selectionBackground"))
+                        assertThat(UIManager.getColor(key)).as(key).isEqualTo(p.color(SemanticColor.ACCENT));
+                    assertThat(UIManager.getColor("PopupMenu.borderColor")).isEqualTo(p.color(SemanticColor.BORDER_MENU));
+                    assertThat(UIManager.getColor("MenuItem.acceleratorForeground")).isEqualTo(p.color(SemanticColor.TEXT_TERTIARY));
+                    assertThat(UIManager.getColor("MenuItem.acceleratorSelectionForeground")).isEqualTo(p.color(SemanticColor.TEXT_ONACCENT));
+                }
+            } finally {
+                try { UIManager.setLookAndFeel(prior); } catch (UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
+            }
+        });
+    }
+
     @Test void eachVariantInstallsIntoFlatLafWithItsRoles() {
         Edt.run(() -> {
             var prior = UIManager.getLookAndFeel();

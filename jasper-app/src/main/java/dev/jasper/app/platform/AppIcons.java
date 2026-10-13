@@ -137,7 +137,10 @@ public final class AppIcons {
             var g=(Graphics2D)graphics.create();
             try {
                 if(disabled)g.setComposite(java.awt.AlphaComposite.SrcOver.derive(.42f));
-                preparation.paint(component,g,x,y,SemanticColor.TEXT_PRIMARY);
+                // A highlighted native menu row is the accent: its glyph turns white with its label.
+                boolean highlighted = component instanceof javax.swing.JMenu menu ? menu.isSelected()
+                    : component instanceof javax.swing.JMenuItem item && item.getModel().isArmed();
+                preparation.paint(component,g,x,y,highlighted ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_PRIMARY);
             } finally {g.dispose();}
         }
     }

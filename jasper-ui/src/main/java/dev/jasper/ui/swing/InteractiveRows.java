@@ -380,11 +380,8 @@ final class InteractiveRows {
             sync();
             canvas.repaint();
             for (var child : popup.getComponents()) if (child instanceof Menus.Item entry
-                    && entry.getClientProperty("Jasper.menu.item") instanceof MenuItem item) {
-                Composition.style(entry, context(), Typography.Role.BODY, SemanticColor.TEXT_PRIMARY);
-                entry.setIcon(item.icon().isBlank() ? null : context().icons().tile(item.icon(),
-                        context().theme().semantic(), item.hue(), ThemePainting.metric(context(), DesignMetrics.Role.MENU_TILE), false));
-            }
+                    && entry.getClientProperty("Jasper.menu.item") instanceof MenuItem item) entry.describe(item);
+            popup.restyle();
             popup.revalidate(); popup.repaint();
         }
 
@@ -656,26 +653,7 @@ final class InteractiveRows {
                     continue;
                 }
                 var entry = new Menus.Item(context());
-                entry.setText(item.label());
-                entry.putClientProperty("Jasper.menu.item", item);
-                entry.putClientProperty("html.disable", true);
-                entry.setEnabled(item.enabled());
-                Composition.style(
-                        entry, context(), Typography.Role.BODY, SemanticColor.TEXT_PRIMARY);
-                int inset = ThemePainting.metric(context(), DesignMetrics.Role.MENU_ITEM_PADDING);
-                entry.setBorder(BorderFactory.createEmptyBorder(0, inset, 0, inset));
-                entry.setIcon(
-                        item.icon().isBlank()
-                                ? null
-                                : context()
-                                        .icons()
-                                        .tile(
-                                                item.icon(),
-                                                context().theme().semantic(),
-                                                item.hue(),
-                                                ThemePainting.metric(
-                                                        context(), DesignMetrics.Role.MENU_TILE),
-                                                false));
+                entry.describe(item);
                 ActionListener listener =
                         e -> {
                             if (current.test(item)) emit(new UiEvent.Action(item.action()));

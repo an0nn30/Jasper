@@ -56,7 +56,8 @@ public final class UiColorKeys {
         role(keys, "@disabledBackground", SURFACE_PANEL);
         role(keys, "@disabledForeground", TEXT_PLACEHOLDER);
         role(keys, "@menuHoverBackground", SURFACE_CONTROL_HOVER);
-        role(keys, "@menuAcceleratorForeground", TEXT_PRIMARY);
+        role(keys, "@menuAcceleratorForeground", TEXT_TERTIARY);
+        role(keys, "@menuAcceleratorSelectionForeground", TEXT_ONACCENT);
         role(keys, "Panel.background", SURFACE_PANEL);
         role(keys, "Label.foreground", TEXT_PRIMARY);
         role(keys, "Label.disabledForeground", TEXT_PLACEHOLDER);
@@ -107,14 +108,21 @@ public final class UiColorKeys {
         role(keys, "Separator.separatorColor", BORDER_SUBTLE);
         role(keys, "ToolBar.background", SURFACE_APP);
         role(keys, "MenuBar.background", SURFACE_APP);
-        role(keys, "Menu.background", SURFACE_PANEL_RAISED);
+        // Native menus are the kit menu: its surface, an accent highlight, a border.menu edge, tertiary accelerators.
+        role(keys, "Menu.background", SURFACE_MENU);
         role(keys, "Menu.foreground", TEXT_PRIMARY);
-        role(keys, "MenuItem.background", SURFACE_PANEL_RAISED);
+        role(keys, "Menu.selectionBackground", ACCENT);
+        role(keys, "Menu.selectionForeground", TEXT_ONACCENT);
+        role(keys, "MenuItem.background", SURFACE_MENU);
         role(keys, "MenuItem.foreground", TEXT_PRIMARY);
         role(keys, "MenuItem.selectionForeground", TEXT_ONACCENT);
-        role(keys, "MenuItem.acceleratorForeground", TEXT_PRIMARY);
-        role(keys, "PopupMenu.background", SURFACE_PANEL_RAISED);
-        role(keys, "PopupMenu.borderColor", BORDER_WINDOW);
+        role(keys, "MenuItem.selectionBackground", ACCENT);
+        role(keys, "MenuItem.acceleratorForeground", TEXT_TERTIARY);
+        role(keys, "MenuItem.acceleratorSelectionForeground", TEXT_ONACCENT);
+        role(keys, "CheckBoxMenuItem.selectionBackground", ACCENT);
+        role(keys, "RadioButtonMenuItem.selectionBackground", ACCENT);
+        role(keys, "PopupMenu.background", SURFACE_MENU);
+        role(keys, "PopupMenu.borderColor", BORDER_MENU);
         role(keys, "TitlePane.background", SURFACE_APP);
         role(keys, "TitlePane.inactiveBackground", SURFACE_APP);
         role(keys, "TitlePane.foreground", TEXT_SECONDARY);

@@ -33,16 +33,37 @@ class MenusTest {
                 "");
     }
 
-    @Test void categoryMenuUsesTheMeasuredPopupEnvelope() {
+    @Test void categoryMenuIsCompactAndSizedToItsRows() {
         Edt.run(()->{
             var context=KitFixtures.context();
             var items=List.of(new MenuItem("a","Login","user","a",true,false,Hue.BLUE),new MenuItem("b","SSH Key","key","b",true,false,Hue.GREEN),
                 new MenuItem("c","Secure Note","note","c",true,false,Hue.AMBER),new MenuItem("sep","","","",true,true),new MenuItem("d","Generate SSH Key...","sparkle","d",true,false,Hue.PURPLE));
             try(var view=new KitView(context,stack(new MenuButton("menu",ControlState.READY,"Add","",ButtonKind.GHOST,"",items,"")),e->{})) {
                 var popup=find(view,"menu",JComponent.class).getComponentPopupMenu();
-                assertThat(popup.getPreferredSize().width).isGreaterThanOrEqualTo(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_MIN_WIDTH)));
-                assertThat(popup.getPreferredSize().height).isEqualTo(2*s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_PADDING))+4*s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_ITEM_HEIGHT))+2*s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_SEPARATOR_MARGIN))+s(1));
+                var size=popup.getPreferredSize();
+                int widest=0; for(var c:popup.getComponents()) if(c instanceof Menus.Item item) widest=Math.max(widest,item.getPreferredSize().width);
+                assertThat(size.width).as("content width, at least the menu minimum").isEqualTo(Math.max(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_MIN_WIDTH)), widest+2*s(m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE))));
+                assertThat(size.height).isEqualTo(2*s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_PADDING))+4*s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_ITEM_HEIGHT))
+                    +2*s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_SEPARATOR_MARGIN))+s(1));
             }finally{release(context);}
+        });
+    }
+
+    @Test void aHighlightedRowIsARectangleOfTheAccentAndRowsShareTheIconColumn() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var popup = new Menus.Popup(context);
+            var tiled = new Menus.Item(context); tiled.describe(new MenuItem("a", "Login", "key", "a", true, false, Hue.BLUE));
+            var plain = new Menus.Item(context); plain.describe(new MenuItem("b", "Settings", "", "b", true, false));
+            popup.add(tiled); popup.add(plain); popup.setSize(popup.getPreferredSize()); popup.doLayout();
+            assertThat(plain.labelX()).as("a row without an icon aligns with the icon rows").isEqualTo(tiled.labelX());
+            tiled.getModel().setArmed(true);
+            var image = new java.awt.image.BufferedImage(tiled.getWidth(), tiled.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            var g = image.createGraphics(); try { tiled.paint(g); } finally { g.dispose(); }
+            var accent = context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT);
+            assertThat(new java.awt.Color(image.getRGB(0, 0))).isEqualTo(accent);
+            assertThat(new java.awt.Color(image.getRGB(tiled.getWidth() - 1, tiled.getHeight() - 1))).isEqualTo(accent);
+            release(context);
         });
     }
 
