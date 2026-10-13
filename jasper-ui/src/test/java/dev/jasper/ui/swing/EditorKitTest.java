@@ -575,6 +575,22 @@ class EditorKitTest {
         });
     }
 
+    @Test void aDocumentSplitsMinimumHeightIsItsBarsAndTheDocumentsMinimumNotTheDocumentsLength() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var text = new JTextArea(String.join("\n", Collections.nCopies(400, "a long document line")));
+            var scroll = new JScrollPane(text);
+            try (var view = new KitView(context, documentTab(false, true), e -> { })) {
+                view.registerContent("text", scroll, () -> { });
+                view.setSize(600, 500); InteractiveRowsTest.layout(view);
+                var banner = find(view, "banner", JComponent.class); var vim = find(view, "vim", JComponent.class);
+                int bars = banner.getHeight() + view.control("bar").component.getHeight() + vim.getHeight();
+                assertThat(view.getMinimumSize().height).as("a window holding the document can shrink below the document's length")
+                    .isEqualTo(bars + scroll.getMinimumSize().height).isLessThan(text.getPreferredSize().height);
+            } finally { release(context); }
+        });
+    }
+
     /** Plan 3 Task 8: a document's find and replace rows, notice and output under the document. */
     static ViewSpec documentBars(boolean replace) {
         var query = new Field("query", READY, FieldKind.SEARCH, "needle", "Find", "Find", "next", Optional.empty(), FieldPresentation.EMBEDDED, "previous", "close", "");
