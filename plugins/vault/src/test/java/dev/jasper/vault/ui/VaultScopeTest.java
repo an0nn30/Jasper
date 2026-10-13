@@ -166,8 +166,8 @@ class VaultScopeTest {
         scope.execute(row(all, "cred." + PROD), VaultScope.COPY_PASSWORD, query);
         scope.execute(row(all, "cred." + PROD), VaultScope.COPY_USERNAME, query);
         assertThat(host.notifications().lines()).containsExactly(
-            "dev.jasper.vault.copies|INFO|Copied the password for prod|Jasper clears it from the clipboard in 30 seconds.",
-            "dev.jasper.vault.copies|INFO|Copied the username for prod|Jasper clears it from the clipboard in 30 seconds.");
+            "dev.jasper.vault.copies|INFO|Copied the password for prod|Copied to Clipboard for 30 seconds",
+            "dev.jasper.vault.copies|INFO|Copied the username for prod|Copied to Clipboard for 30 seconds");
         assertThat(host.notifications().groups()).contains("dev.jasper.vault.copies|Vault copies|CARD");
     }
 

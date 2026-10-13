@@ -1,5 +1,14 @@
 # Jasper — Status and Handoff
 
+**Enter's verb in the palette hint bar — 2026-10-13** (`claude/palette-enter-hint`, worktree
+`.claude/worktrees/palette-enter-hint`; bounded change, design approved in chat, no spec or plan). In a scope with two or
+three verbs the hint bar now lists every verb with its key, Enter's first ("Copy password ⏎ · Copy username ⌘⏎ · Open
+in Vault ⇧⏎"), so the Vault's password copy shows a key; a click on Enter's link runs the first verb. Single-verb scopes
+(Commands) still show only the row's detail. This replaces the search-everywhere spec's secondary-verbs-only hint bar
+(user decision). A test pins that the longest bundled set (Files: Open, Copy path, Open terminal here) stays on one line
+at the 560 px anchored minimum on macOS and elsewhere. `./gradlew check --continue`: **9,776 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched.
+GUI check for the user: Cmd+\\, select a login and read the hint bar. Not merged or pushed.
+
 **Custom VM options plan 1 (launcher) complete — 2026-10-13.** Merged to local `main` (not pushed): Jasper builds
 jpackage's launcher from vendored JBR 25.0.4.1 sources (`packaging/launcher`) with marked hooks that merge the user's
 `jasper.vmoptions` (location, format and IntelliJ's merge from the
