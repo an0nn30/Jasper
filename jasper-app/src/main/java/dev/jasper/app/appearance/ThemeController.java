@@ -3,6 +3,7 @@ package dev.jasper.app.appearance;
 import dev.jasper.app.config.TerminalSchemeChoice;
 import dev.jasper.app.config.UiFontConfig;
 import dev.jasper.ui.theme.GeneratedTheme;
+import dev.jasper.ui.theme.SlateSteel;
 import dev.jasper.ui.theme.TerminalScheme;
 import java.awt.Font;
 import javax.swing.plaf.FontUIResource;
@@ -28,7 +29,8 @@ public final class ThemeController implements AutoCloseable {
 
     public static final class InstallationFailure extends IllegalStateException {
         InstallationFailure(GeneratedTheme theme, RuntimeException cause) {
-            super("Could not apply theme: " + theme.name() + (theme.name().equals("Slate Steel") ? (theme.dark() ? " Dark" : " Light") : ""), cause);
+            super("Could not apply theme: " + theme.name()
+                + (theme == SlateSteel.bundled().generated(theme.dark()) ? (theme.dark() ? " Dark" : " Light") : ""), cause);
         }
     }
 

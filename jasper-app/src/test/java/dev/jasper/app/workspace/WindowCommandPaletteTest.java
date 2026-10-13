@@ -243,10 +243,11 @@ class WindowCommandPaletteTest {
                 var overlay = (JComponent) owner.commandPalette().component().getParent();
                 var card = owner.commandPalette().component().getBounds();
                 try {
-                    // A red scrim, and a red popup shadow key, in the window's binding and the installed look.
-                    var red = ThemeTestSupport.withUiKeys(ThemeTestSupport.recolored(ThemeTestSupport.generated(true),
-                        java.util.Map.of(dev.jasper.ui.theme.SemanticColor.SURFACE_SCRIM, Color.RED)), java.util.Map.of("Popup.dropShadowColor", "#ff0000"));
+                    // A red scrim in the window's binding and the installed look, and a red popup shadow over the installed one.
+                    var red = ThemeTestSupport.recolored(ThemeTestSupport.generated(true),
+                        java.util.Map.of(dev.jasper.ui.theme.SemanticColor.SURFACE_SCRIM, Color.RED));
                     ThemeTestSupport.install(red);
+                    UIManager.put("Popup.dropShadowColor", Color.RED);
                     themes.appearance().binding().publish(new dev.jasper.ui.theme.ThemePair(red, red));
                     owner.commandPalette().refreshTheme();
                     var image = new BufferedImage(overlay.getWidth(), overlay.getHeight(), BufferedImage.TYPE_INT_ARGB);

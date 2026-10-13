@@ -11,7 +11,6 @@ import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.contributions.StatusEntry;
 import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.terminal.config.Palette;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,7 +35,6 @@ final class WindowStatusBar extends JPanel {
     private String shell = "", directory = "", dimensions = "";
     private boolean running;
     private boolean integration;
-    private Palette palette = Palette.jasperDark();
     private String text = "Built-in defaults";
     /** Height in logical pixels; the bar is taller only when the status font needs more. */
     private int barHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
@@ -189,7 +187,6 @@ final class WindowStatusBar extends JPanel {
 
     JButton configButton() { return configButton; }
     String getText() { return text; }
-    void applyPalette(Palette next) { palette = java.util.Objects.requireNonNull(next); refreshTheme(); }
     private static java.awt.Font statusFont() {
         return ThemeZone.font(Typography.Role.STATUS_TEXT);
     }

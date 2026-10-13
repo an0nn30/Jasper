@@ -244,9 +244,12 @@ final class Buttons {
             var top = (Graphics2D) g.create();
             try {
                 ThemePainting.antialias(top);
-                top.clip(face);
+                // The face minus itself moved down one pixel: the inset line follows the rounded corners, antialiased.
+                var line = new java.awt.geom.Area(face);
+                line.subtract(new java.awt.geom.Area(new java.awt.geom.RoundRectangle2D.Double(face.x, face.y + UIScale.scale(1),
+                    face.width, face.height, face.arcwidth, face.archeight)));
                 top.setColor(ColorMath.opacity(Color.WHITE, context.metrics().value(DesignMetrics.Role.BUTTON_INSET_PERCENT) / 100.0));
-                top.fill(new java.awt.geom.Rectangle2D.Double(face.x, face.y, face.width, UIScale.scale(1)));
+                top.fill(line);
             } finally { top.dispose(); }
             var drop = new ThemePainting.Drop(context, face);
             if (!drop.equals(getClientProperty(ThemePainting.DROP))) { putClientProperty(ThemePainting.DROP, drop); repaintDrop(); }

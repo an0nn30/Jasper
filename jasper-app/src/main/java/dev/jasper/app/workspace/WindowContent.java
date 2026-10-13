@@ -1201,7 +1201,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             }
             setBackground(theme.surface());
             tabs.setBackground(theme.surface());
-            chrome.status().applyPalette(theme.palette());
             chrome.refreshTheme();
             if (commandPalette != null) commandPalette.refreshTheme();
             onThemeChanged.accept(theme); update();

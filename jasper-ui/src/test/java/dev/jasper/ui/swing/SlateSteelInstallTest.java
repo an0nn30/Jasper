@@ -10,6 +10,24 @@ import javax.swing.UnsupportedLookAndFeelException;
 import org.junit.jupiter.api.Test;
 
 class SlateSteelInstallTest {
+    @Test void thePopupShadowComesFromTheMetricsNotTheThemeKeys() {
+        Edt.run(() -> {
+            var prior = UIManager.getLookAndFeel();
+            try {
+                for (boolean dark : new boolean[] {true, false}) {
+                    var theme = SlateSteel.bundled().generated(dark);
+                    assertThat(theme.uiKeys()).doesNotContainKeys("Popup.dropShadowColor", "Popup.dropShadowOpacity");
+                    FlatLafInstaller.install(theme);
+                    assertThat(UIManager.getColor("Popup.dropShadowColor")).isEqualTo(java.awt.Color.BLACK);
+                    assertThat(((Number) UIManager.get("Popup.dropShadowOpacity")).doubleValue()).isCloseTo(dark ? .5 : .18,
+                        org.assertj.core.data.Offset.offset(1e-6));
+                }
+            } finally {
+                try { UIManager.setLookAndFeel(prior); } catch (UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
+            }
+        });
+    }
+
     @Test void eachVariantInstallsIntoFlatLafWithItsRoles() {
         Edt.run(() -> {
             var prior = UIManager.getLookAndFeel();

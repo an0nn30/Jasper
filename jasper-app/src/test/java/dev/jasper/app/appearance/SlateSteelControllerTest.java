@@ -17,6 +17,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 class SlateSteelControllerTest {
     static final SlateSteel STEEL = SlateSteel.bundled();
 
+    @Test void aFailureNamesTheVariantOnlyForSlateSteelItself() {
+        var copy = ThemeTestSupport.recolored(STEEL.generated(true), java.util.Map.of());
+        assertThat(new ThemeController.InstallationFailure(copy, new IllegalStateException("x")).getMessage())
+            .isEqualTo("Could not apply theme: Slate Steel");
+        assertThat(new ThemeController.InstallationFailure(STEEL.generated(false), new IllegalStateException("x")).getMessage())
+            .isEqualTo("Could not apply theme: Slate Steel Light");
+    }
+
     @Test void oneVariantServesChromeAndWorkspaceAndTheSchemeColoursTheTerminalOnly() {
         var controller = new ThemeController(false, TerminalSchemeChoice.HIGH_CONTRAST, theme -> true);
         var current = controller.current();

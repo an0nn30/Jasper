@@ -21,7 +21,7 @@ class ConfigurationStatusTest {
             for (boolean themeDark : new boolean[]{true, false}) {
                 themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
                 var status = new WindowStatusBar();
-                status.applyPalette(ThemeTestSupport.terminal(themeDark));
+                status.refreshTheme();
                 for (var severity : ConfigDiagnostic.Severity.values()) {
                     Path file = Path.of("fixture", "settings.toml");
                     status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(
@@ -49,7 +49,7 @@ class ConfigurationStatusTest {
             var status = new WindowStatusBar();
             for (boolean themeDark : new boolean[]{true, false}) {
                 themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
-                status.applyPalette(ThemeTestSupport.terminal(themeDark));
+                status.refreshTheme();
                 status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(), Path.of("config.toml"), true));
                 assertThat(status.getBackground()).isEqualTo(UIManager.getColor("StatusBar.background"));
                 assertThat(contrast(status.configButton().getForeground(), status.getBackground())).isGreaterThanOrEqualTo(3);

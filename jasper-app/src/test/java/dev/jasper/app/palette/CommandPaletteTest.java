@@ -417,7 +417,7 @@ class CommandPaletteTest {
                     Component selected = row(palette, 1), plain = row(palette, 2), rule = row(palette, 3);
                     assertPixel(image, at(selected, selected.getWidth() - 12, 3, palette), semantic.color(SemanticColor.ACCENT), name + " selection");
                     assertPixel(image, at(plain, plain.getWidth() - 3, 3, palette), semantic.color(SemanticColor.SURFACE_MENU), name + " row");
-                    assertPixel(image, at(rule, rule.getWidth() - 3, 0, palette), dev.jasper.app.appearance.ThemeTestSupport.over(semantic.color(SemanticColor.BORDER_SUBTLE), semantic.color(SemanticColor.SURFACE_MENU)), name + " heading rule");
+                    assertPixel(image, at(rule, rule.getWidth() - 3, 0, palette), semantic.color(SemanticColor.BORDER_MENU), name + " heading rule");
                     var hintBar = palette.hintBar();
                     assertPixel(image, at(hintBar, hintBar.getWidth() - 3, hintBar.getHeight() / 2, palette), semantic.color(SemanticColor.SURFACE_MENU), name + " hint bar");
                     assertPixel(image, at(hintBar, hintBar.getWidth() / 2, 0, palette), semantic.color(SemanticColor.BORDER_MENU), name + " hint rule");

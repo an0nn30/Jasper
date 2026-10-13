@@ -76,6 +76,8 @@ import dev.jasper.app.terminals.TerminalRegistry;
 public final class JasperApplication {
     private static final System.Logger LOG = System.getLogger(JasperApplication.class.getName());
     private final ThemeController themes;
+    /** The application's theme controller. */
+    ThemeController themes() { return themes; }
     private final dev.jasper.app.platform.SystemAppearance systemAppearance;
     private Runnable systemAppearanceListening = () -> { };
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();

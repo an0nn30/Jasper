@@ -22,12 +22,6 @@ class ShadowsTest {
         assertThat(new Color(image.getRGB(5, 5), true).getAlpha()).as("nothing beyond the blur").isZero();
     }
 
-    @Test void popoverShadowKeysCarryTheVariantsStrength() {
-        var dark = dev.jasper.ui.theme.SlateSteel.bundled().generated(true).uiKeys();
-        var light = dev.jasper.ui.theme.SlateSteel.bundled().generated(false).uiKeys();
-        assertThat(dark).containsEntry("Popup.dropShadowColor", "#000000").containsEntry("Popup.dropShadowOpacity", .5);
-        assertThat(light).containsEntry("Popup.dropShadowOpacity", .18);
-    }
 
     @Test void aShadowFollowsTheCompositeSoAFadingCardsShadowFadesWithIt() {
         var image = new BufferedImage(200, 200, BufferedImage.TYPE_INT_ARGB);

@@ -660,6 +660,8 @@ class SettingsDialogTest {
                     current[0] = service.reload().get(5, java.util.concurrent.TimeUnit.SECONDS);
                     edt(() -> { List.copyOf(external).forEach(listener -> listener.accept(current[0])); dialog.apply(); });
                     until(() -> !dialog.draft().modified());
+                    // Plan 2 finding 7: a reset removes the key from the file rather than writing the default.
+                    if (action.equals("reset")) assertThat(java.nio.file.Files.readString(file)).doesNotContain("appearance");
                     edt(() -> {
                         dialog.cancel(); dialog.open(null, "appearance");
                         assertThat(dialog.draft().value(CoreSettings.UI_APPEARANCE)).as(action).isEqualTo(wanted[0]);

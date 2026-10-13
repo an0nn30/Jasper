@@ -44,7 +44,7 @@ public final class DesignMetrics {
         // theme.md's shadows, black at these strengths (not theme colours): the primary button's inset line and 1 px drop,
         // popovers and menus, the modal overlay's card, and the segmented control's selected segment in Light.
         BUTTON_INSET_PERCENT(14), BUTTON_DROP_PERCENT_DARK(30), BUTTON_DROP_PERCENT_LIGHT(12),
-        POPOVER_SHADOW_OFFSET(12), POPOVER_SHADOW_BLUR(32), POPOVER_SHADOW_PERCENT_DARK(50), POPOVER_SHADOW_PERCENT_LIGHT(18),
+        POPOVER_SHADOW_OFFSET(12), POPOVER_SHADOW_BLUR(32), POPOVER_SHADOW_PERCENT_DARK(50), POPOVER_SHADOW_PERCENT_LIGHT(18), SWITCH_KNOB_SHADOW_PERCENT(15),
         DIALOG_SHADOW_OFFSET(30), DIALOG_SHADOW_BLUR(80), DIALOG_SHADOW_PERCENT_DARK(58), DIALOG_SHADOW_PERCENT_LIGHT(22),
         SEGMENT_SHADOW_PERCENT_LIGHT(12), SEGMENT_SHADOW_BLUR(2),
         // theme.md's alpha treatments on base tokens: the focus ring (about 32% in Dark), the error ring, and category

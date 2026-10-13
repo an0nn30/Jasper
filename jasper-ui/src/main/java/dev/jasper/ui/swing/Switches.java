@@ -92,7 +92,7 @@ final class Switches {
                 g.setColor(new Color(rgb.getRed(), rgb.getGreen(), rgb.getBlue(), (int)Math.round(on.getAlpha()*position + off.getAlpha()*(1-position))));
                 g.fillRoundRect(x, y, w, h, h, h);
                 int inset = (h-knob)/2, knobX = x+inset+(int)Math.round((w-knob-2*inset)*position);
-                g.setColor(ColorMath.opacity(Color.BLACK, .15)); g.fillOval(knobX, y+inset+com.formdev.flatlaf.util.UIScale.scale(1), knob, knob);
+                g.setColor(ColorMath.opacity(Color.BLACK, context.metrics().value(DesignMetrics.Role.SWITCH_KNOB_SHADOW_PERCENT) / 100.0)); g.fillOval(knobX, y+inset+com.formdev.flatlaf.util.UIScale.scale(1), knob, knob);
                 g.setColor(ThemePainting.color(context, SemanticColor.TOGGLE_KNOB)); g.fillOval(knobX, y+inset, knob, knob);
             } finally { g.dispose(); }
         }

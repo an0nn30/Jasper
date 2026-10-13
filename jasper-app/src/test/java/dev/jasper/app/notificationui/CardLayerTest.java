@@ -238,6 +238,35 @@ class CardLayerTest {
         return layer;
     }
 
+    /**
+     * Plan 1 finding 5: card shadows are black (theme.md), not the scrim's colour. Slate Steel's scrims are near black, and
+     * at a ring's alpha their tint rounds away, so the variants here carry a red scrim the old shadow would show.
+     */
+    @Test void cardShadowsAreBlackInBothVariants() {
+        for (boolean dark : new boolean[] {true, false}) {
+            var theme = dev.jasper.app.appearance.ThemeTestSupport.recolored(dev.jasper.app.appearance.ThemeTestSupport.generated(dark),
+                java.util.Map.of(dev.jasper.ui.theme.SemanticColor.SURFACE_SCRIM, java.awt.Color.RED));
+            var bindings = new dev.jasper.app.appearance.AppearanceBindings(new dev.jasper.ui.theme.ThemePair(theme, theme),
+                failure -> { throw new AssertionError(failure); }, () -> false);
+            try {
+                var ids = new UUID[2];
+                var layer = showingTwo(bindings.context(dev.jasper.ui.theme.ThemeRoute.CHROME), ids);
+                var image = paint(layer, 1);
+                var card = layer.card(ids[1]).getBounds();
+                int shadowed = 0;
+                for (int x = card.x; x < card.x + card.width; x++)
+                    for (int y = card.y + card.height; y < Math.min(image.getHeight(), card.y + card.height + 6); y++) {
+                        int argb = image.getRGB(x, y);
+                        if (argb >>> 24 == 0) continue;
+                        shadowed++;
+                        assertThat(argb & 0xFFFFFF).as("%s shadow pixel (%s,%s)", dark ? "dark" : "light", x, y).isZero();
+                    }
+                assertThat(shadowed).as("the card casts a shadow").isPositive();
+                layer.close();
+            } finally { bindings.close(); }
+        }
+    }
+
     @Test void eachCardsShadowIsRenderedOnceNoMatterHowOftenTheLayerPaints() {
         var ids = new UUID[2];
         var layer = showingTwo(ids);

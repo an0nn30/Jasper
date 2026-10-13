@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -117,7 +118,7 @@ public final class SlateSteel {
     private SchemeColors scheme(TerminalScheme scheme) {
         @SuppressWarnings("unchecked") var values = (Map<String, Object>) terminal.get(scheme.key());
         String where = "terminal." + scheme.key();
-        if (!values.keySet().equals(Set.copyOf(TERMINAL_KEYS))) throw error(where + ": Expected the colours " + TERMINAL_KEYS);
+        exactly(values.keySet(), TERMINAL_KEYS, where, "colour");
         Function<String, Color> get = key -> {
             if (!(values.get(key) instanceof String text)) throw error(where + "." + key + ": Expected a colour");
             return color(text, origin, where + "." + key);
@@ -142,7 +143,7 @@ public final class SlateSteel {
         @SuppressWarnings("unchecked") var values = (Map<String, Object>) editor.get(variant);
         var expected = new HashSet<>(EDITOR_SURFACES);
         for (var role : SyntaxRole.values()) expected.add(role.key());
-        if (!values.keySet().equals(expected)) throw error(where + ": Expected the entries " + EDITOR_SURFACES + " and every syntax role");
+        exactly(values.keySet(), expected, where, "entry");
         Function<String, String> text = key -> {
             if (!(values.get(key) instanceof String value)) throw error(where + "." + key + ": Expected a reference");
             return value;
@@ -214,16 +215,12 @@ public final class SlateSteel {
         var palette = palette(dark);
         var scheme = terminal(TerminalScheme.matching(dark));
         return new GeneratedTheme("Slate Steel", dark, "Jasper", palette, scheme.colors(), editor(dark), syntax(dark),
-            uiKeys(palette, scheme, dark), GlassLevels.OPAQUE);
+            uiKeys(palette, scheme), GlassLevels.OPAQUE);
     }
 
-    /** FlatLaf's colour keys from the variant's roles; FlatLafInstaller adds the metric keys. */
-    private static Map<String, Object> uiKeys(SemanticPalette palette, SchemeColors scheme, boolean dark) {
-        var keys = new LinkedHashMap<>(UiColorKeys.flatLaf(palette, scheme.colors().selection()));
-        // Popovers and menus: FlatLaf's painted popup shadow (macOS keeps its native one), black at theme.md's strength.
-        keys.put("Popup.dropShadowColor", ColorMath.hex(Color.BLACK));
-        keys.put("Popup.dropShadowOpacity", dark ? .5 : .18);
-        return keys;
+    /** FlatLaf's colour keys from the variant's roles; FlatLafInstaller adds the metric keys and the popup shadow. */
+    private static Map<String, Object> uiKeys(SemanticPalette palette, SchemeColors scheme) {
+        return UiColorKeys.flatLaf(palette, scheme.colors().selection());
     }
 
     /** {@code #RRGGBB}, or {@code #RRGGBBAA} with alpha; {@code where} names the entry in errors. */
@@ -236,11 +233,17 @@ public final class SlateSteel {
         throw new ThemeFileException(origin, 0, where + ": Expected #RRGGBB or #RRGGBBAA, got \"" + text + "\"");
     }
 
+    /** {@code keys} exactly: names the first missing, then the first unknown entry. */
+    private void exactly(Set<?> actual, Collection<String> keys, String where, String noun) {
+        for (String key : keys) if (!actual.contains(key)) throw error(where + ": Missing " + noun + " \"" + key + "\"");
+        for (Object key : actual) if (!keys.contains(key)) throw error(where + ": Unknown " + noun + " \"" + key + "\"");
+    }
+
     /** The object at {@code value}, whose keys must be exactly {@code keys}, each an object. */
     @SuppressWarnings("unchecked")
     private Map<String, Object> objects(Object value, String where, List<String> keys) {
-        if (!(value instanceof Map<?, ?> map) || !map.keySet().equals(Set.copyOf(keys)))
-            throw error((where.isEmpty() ? "" : where + ": ") + "Expected the objects " + keys);
+        if (!(value instanceof Map<?, ?> map)) throw error((where.isEmpty() ? "" : where + ": ") + "Expected the objects " + keys);
+        exactly(map.keySet(), keys, where.isEmpty() ? "slate-steel.json" : where, "object");
         for (String key : keys) if (!(map.get(key) instanceof Map)) throw error(where + "." + key + ": Expected an object");
         return (Map<String, Object>) map;
     }

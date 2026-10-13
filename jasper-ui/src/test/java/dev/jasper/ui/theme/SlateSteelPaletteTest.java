@@ -49,6 +49,18 @@ class SlateSteelPaletteTest {
         assertThatThrownBy(() -> SlateSteel.parse(json.replace("\"slate-steel-light\": {\n      \"surface.app\"", "\"slate-steel-pale\": {\n      \"surface.app\""), "t.json"))
             .isInstanceOf(ThemeFileException.class).hasMessageContaining("ui");
         assertThatThrownBy(() -> SlateSteel.parse("{ \"ui\": {} }", "t.json")).isInstanceOf(ThemeFileException.class)
-            .hasMessageContaining("Expected the objects");
+            .hasMessageContaining("Missing object \"terminal\"");
+    }
+
+    @Test void aMissingOrUnknownSchemeOrEditorEntryIsNamed() throws Exception {
+        String json = bundledJson();
+        assertThatThrownBy(() -> SlateSteel.parse(json.replaceFirst("\"fg\\.bold\": \"#[0-9A-Fa-f]+\",\\s*", ""), "t.json"))
+            .hasMessageContaining("terminal.slate-steel-dark: Missing colour \"fg.bold\"");
+        assertThatThrownBy(() -> SlateSteel.parse(json.replaceFirst("\"bg\":", "\"bgx\": \"#000000\", \"bg\":"), "t.json"))
+            .hasMessageContaining("terminal.slate-steel-dark: Unknown colour \"bgx\"");
+        assertThatThrownBy(() -> SlateSteel.parse(json.replaceFirst("\"caret\": \"[^\"]+\",\\s*", ""), "t.json"))
+            .hasMessageContaining("editor.slate-steel-dark: Missing entry \"caret\"");
+        assertThatThrownBy(() -> SlateSteel.parse(json.replaceFirst("\"editor\":", "\"extra\": {}, \"editor\":"), "t.json"))
+            .hasMessageContaining("Unknown object \"extra\"");
     }
 }

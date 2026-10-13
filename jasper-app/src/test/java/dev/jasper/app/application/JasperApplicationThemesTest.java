@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class JasperApplicationThemesTest {
     @TempDir Path home;
 
-    private void start(String config, boolean dark) throws Exception {
+    private void start(String config, boolean dark, dev.jasper.ui.theme.TerminalScheme scheme) throws Exception {
         Files.writeString(home.resolve("config.toml"), config);
         var service = new ConfigService(home.resolve("config.toml"), false);
         var terminated = new CountDownLatch(1);
@@ -35,6 +35,9 @@ class JasperApplicationThemesTest {
                 var expected = SlateSteel.bundled().generated(dark);
                 assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(expected);
                 assertThat(dev.jasper.app.platform.ThemeZone.theme(null)).isSameAs(expected);
+                // Plan 2 finding 8: the configured scheme reaches the terminal palette.
+                assertThat(application[0].themes().current().palette())
+                    .isEqualTo(dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(SlateSteel.bundled().terminal(scheme)));
             });
         } finally {
             if (application[0] != null) { edt(application[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); }
@@ -45,12 +48,12 @@ class JasperApplicationThemesTest {
 
     /** From a fresh look and feel (no Jasper snapshot), start-up installs its variant before any chrome reads the snapshot. */
     @Test void aFreshProcessInstallsTheConfiguredVariantBeforeAnyChromeReadsTheSnapshot() throws Exception {
-        start("[ui]\nappearance = 'light'\n[terminal]\nscheme = 'high-contrast'\n", false);
+        start("[ui]\nappearance = 'light'\n[terminal]\nscheme = 'high-contrast'\n", false, dev.jasper.ui.theme.TerminalScheme.HIGH_CONTRAST);
     }
 
     /** The default follows the operating system; a headless run has none, so it starts Dark. */
     @Test void withNoAppearanceAHeadlessStartIsDark() throws Exception {
-        start("", true);
+        start("", true, dev.jasper.ui.theme.TerminalScheme.SLATE_STEEL_DARK);
     }
 
     /** Review Focus 1: an older install's theme folders are neither read nor changed. */
@@ -59,7 +62,7 @@ class JasperApplicationThemesTest {
         java.nio.file.Files.createDirectories(home.resolve("terminal-themes"));
         var theme = java.nio.file.Files.writeString(home.resolve("themes/nord.toml"), "name = \"Nord\"\n");
         var colors = java.nio.file.Files.writeString(home.resolve("terminal-themes/dark.toml"), "[colors]\n");
-        start("[ui]\nappearance = 'light'\n", false);
+        start("[ui]\nappearance = 'light'\n", false, dev.jasper.ui.theme.TerminalScheme.SLATE_STEEL_LIGHT);
         assertThat(java.nio.file.Files.readString(theme)).isEqualTo("name = \"Nord\"\n");
         assertThat(java.nio.file.Files.readString(colors)).isEqualTo("[colors]\n");
         try (var listing = java.nio.file.Files.list(home)) {

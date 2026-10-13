@@ -14,6 +14,29 @@ import static org.assertj.core.api.Assertions.*;
 import static dev.jasper.ui.swing.KitViewTest.*;
 
 class ButtonsTest {
+    /** Plan 1 finding 2: the inset line reaches the face's outermost pixels, antialiased into its rounded corners. */
+    @Test void thePrimaryInsetLineReachesTheFacesOutermostPixels() {
+        Edt.run(() -> {
+            var ctx = KitFixtures.context();
+            var action = new Nodes.Button("connect", ControlState.READY, "Connect", "", ButtonKind.PRIMARY, "connect", "Connect");
+            var detail = new Nodes.Stack("detail", ControlState.READY, LayoutRole.DETAIL, List.of(action));
+            var panel = new Nodes.Panel("panel", ControlState.READY, new Header("header", ControlState.READY, "Panel", java.util.OptionalInt.empty(), java.util.Optional.empty(), java.util.Optional.empty(), List.of()),
+                java.util.Optional.empty(), new Text("body", ControlState.READY, "Body", TextRole.BODY), java.util.Optional.of(detail));
+            try (var view = new KitView(ctx, new ViewSpec(panel), e -> {})) {
+                view.setSize(260, 160); InteractiveRowsTest.layout(view);
+                var button = find(view, "connect", JButton.class); button.setSize(74, 28);
+                var image = new BufferedImage(148, 56, BufferedImage.TYPE_INT_ARGB); var g = image.createGraphics();
+                try { g.scale(2, 2); button.paint(g); } finally { g.dispose(); }
+                int accent = ctx.theme().semantic().color(SemanticColor.ACCENT).getRGB();
+                for (int row = 6; row < 8; row++) {
+                    int x = 0;
+                    while (x < image.getWidth() && (image.getRGB(x, row) >>> 24) != 255) x++;
+                    assertThat(image.getRGB(x, row)).as("row %s's outermost opaque face pixel carries the inset line", row).isNotEqualTo(accent);
+                }
+            }
+        });
+    }
+
     @Test void compactDetailFaceMatchesSourceExtentAndCornersWithoutShrinkingItsHitBox() {
         Edt.run(() -> {
             var ctx = KitFixtures.context();
@@ -34,10 +57,9 @@ class ButtonsTest {
                 assertThat(image.getRGB(74, 47)).as("source centerline ends at42device face pixels").isEqualTo(accent);
                 assertThat(image.getRGB(74, 48) >>> 24).as("hit/focus reservation is not fill").isZero();
                 for (int row = 0; row < sourceTopRows.length; row++) {
-                    // The first logical row (two device rows) carries theme.md's white inset line over the accent; the line's
-                    // hard clip leaves the face's outermost fully covered pixels plain accent, so both count as face.
-                    int tinted = row < 2 ? inset(ctx.theme().semantic().color(SemanticColor.ACCENT)) : accent;
-                    int count = 0; for (int x = 0; x < image.getWidth(); x++) { int rgb = image.getRGB(x, row + 6); if (rgb == accent || rgb == tinted) count++; }
+                    // The top rows carry theme.md's white inset line, antialiased into the rounded corners, so the face is
+                    // its fully covered (opaque) pixels rather than one exact colour.
+                    int count = 0; for (int x = 0; x < image.getWidth(); x++) if (image.getRGB(x, row + 6) >>> 24 == 255) count++;
                     assertThat(count).as("source top face row %s", row).isEqualTo(sourceTopRows[row]);
                 }
                 var previous = KeyboardFocusManager.getCurrentKeyboardFocusManager();

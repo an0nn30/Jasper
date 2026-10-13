@@ -28,11 +28,16 @@ class SystemThemeApplicationTest {
         var states = new ArrayList<ConfigService.State>(); controller.onState(states::add);
         try {
             assertThat(themes.current().chrome()).isSameAs(STEEL.generated(true));
+            // Plan 2 finding 9: an open Settings draft keeps its unsaved edit through the flip.
+            var draft = new dev.jasper.app.settingsui.SettingsDraft(service.initialState().values());
+            draft.stage(dev.jasper.app.config.CoreSettings.WINDOW_TAB_HEIGHT, java.util.Optional.of(44));
             controller.systemAppearanceChanged(Observation.light());
             assertThat(themes.current().chrome()).isSameAs(STEEL.generated(false));
             assertThat(themes.current().palette().background()).isEqualTo(STEEL.terminal(TerminalScheme.SLATE_STEEL_LIGHT).colors().background());
             assertThat(states).as("no configuration state reaches an open Settings draft").isEmpty();
             assertThat(Files.readString(file)).isEqualTo(text);
+            assertThat(draft.modified()).isTrue();
+            assertThat(draft.value(dev.jasper.app.config.CoreSettings.WINDOW_TAB_HEIGHT)).isEqualTo(44);
             controller.systemAppearanceChanged(Observation.unavailable("temporarily unavailable"));
             assertThat(themes.current().chrome()).as("unavailable: Dark").isSameAs(STEEL.generated(true));
             controller.close(); controller.systemAppearanceChanged(Observation.light());

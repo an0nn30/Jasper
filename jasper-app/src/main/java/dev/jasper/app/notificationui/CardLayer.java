@@ -12,7 +12,6 @@ import dev.jasper.ui.model.UiEvent;
 import dev.jasper.ui.model.ViewSpec;
 import dev.jasper.ui.swing.KitContext;
 import dev.jasper.ui.swing.KitView;
-import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -334,10 +333,9 @@ public final class CardLayer extends JComponent implements AutoCloseable {
         var g = (Graphics2D) graphics.create();
         try {
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            // The shadow is the module's scrim colour at the former per-ring alphas, stronger on a dark theme.
-            Color shadow = kit.theme().semantic().color(SemanticColor.SURFACE_SCRIM);
+            // The shadow is black (theme.md) at the former per-ring alphas, stronger on a dark theme.
             int alpha = kit.metrics().value(kit.theme().dark() ? DesignMetrics.Role.NOTIFICATION_SHADOW_ALPHA_DARK : DesignMetrics.Role.NOTIFICATION_SHADOW_ALPHA_LIGHT);
-            int argb = new Color(shadow.getRed(), shadow.getGreen(), shadow.getBlue(), alpha).getRGB();
+            int argb = new Color(0, 0, 0, alpha).getRGB();
             AffineTransform device = g.getTransform();
             double deviceX = device.getScaleX() > 0 ? device.getScaleX() : 1, deviceY = device.getScaleY() > 0 ? device.getScaleY() : 1;
             int arc = 2 * metric(DesignMetrics.Role.CARD_RADIUS), margin = metric(DesignMetrics.Role.NOTIFICATION_STACK_MARGIN);

@@ -55,6 +55,10 @@ public final class FlatLafInstaller {
         defaults.put("Jasper.installedTheme", theme);
         FlatLafThemeData.explicitColors(theme.uiKeys()).forEach((key, color) -> defaults.put(key, new ColorUIResource(color)));
         for (var role : SemanticColor.values()) defaults.put("Jasper.semantic." + role.key(), new ColorUIResource(theme.semantic().color(role)));
+        // Popovers and menus: FlatLaf's painted popup shadow (macOS keeps its native one), black at theme.md's strength.
+        defaults.put("Popup.dropShadowColor", new ColorUIResource(java.awt.Color.BLACK));
+        defaults.put("Popup.dropShadowOpacity", DesignMetrics.DEFAULT.value(theme.dark()
+            ? DesignMetrics.Role.POPOVER_SHADOW_PERCENT_DARK : DesignMetrics.Role.POPOVER_SHADOW_PERCENT_LIGHT) / 100f);
         var palette = theme.semantic();
         // FlatLaf primitives also inherit the canonical roles; kit paints use the palette directly.
         Map<String, SemanticColor> roles = Map.ofEntries(
