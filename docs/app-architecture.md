@@ -231,7 +231,7 @@ the theme's UI keys, which `UiColorKeys` derives from the semantic roles, then t
 the popup shadow) and adds the app's native defaults: the split divider border by class name and the centred title.
 Tool windows paint `surface.panel` (theme.md's tool-window body) through `ToolWindowSurface`, their headers included; the stripes stay chrome.
 
-`SlateSteel.bundled()` (jasper-ui) supplies one `GeneratedTheme` per variant and the terminal schemes. `ThemeController.configure(dark, scheme, font)` installs the variant for chrome and workspace and
+`JasperTheme.bundled()` (jasper-ui) supplies one `GeneratedTheme` per variant and the terminal schemes. `ThemeController.configure(dark, scheme, font)` installs the variant for chrome and workspace and
 resolves the scheme's palette for terminal panes (`ResolvedTheme.slateSteel`); `ResolvedTheme.surface()`, the
 workspace's `surface.terminal`, is what the window behind panes, tab backgrounds and the tab strip use, so a scheme
 colours only the text area. `ConfigurationController` resolves `ui.appearance` with `AppearancePolicy` against the

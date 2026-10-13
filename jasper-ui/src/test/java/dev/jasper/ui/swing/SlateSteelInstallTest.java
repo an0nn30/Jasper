@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.jasper.ui.testsupport.Edt;
 import dev.jasper.ui.theme.SemanticColor;
-import dev.jasper.ui.theme.SlateSteel;
+import dev.jasper.ui.theme.JasperTheme;
 import java.awt.Insets;
 import java.util.List;
 import javax.swing.UIManager;
@@ -17,7 +17,7 @@ class SlateSteelInstallTest {
             var prior = UIManager.getLookAndFeel();
             try {
                 for (boolean dark : new boolean[] {true, false}) {
-                    var theme = SlateSteel.bundled().generated(dark);
+                    var theme = JasperTheme.bundled().generated(dark);
                     assertThat(theme.uiKeys()).doesNotContainKeys("Popup.dropShadowColor", "Popup.dropShadowOpacity");
                     FlatLafInstaller.install(theme);
                     assertThat(UIManager.getColor("Popup.dropShadowColor")).isEqualTo(java.awt.Color.BLACK);
@@ -34,7 +34,7 @@ class SlateSteelInstallTest {
         Edt.run(() -> {
             var prior = UIManager.getLookAndFeel();
             try {
-                FlatLafInstaller.install(SlateSteel.bundled().generated(true));
+                FlatLafInstaller.install(JasperTheme.bundled().generated(true));
                 for (var key : List.of("Button.arc", "Component.arc", "TextComponent.arc")) assertThat(UIManager.getInt(key)).as(key).isEqualTo(8);
                 assertThat(UIManager.getInsets("Button.margin")).isEqualTo(new Insets(2, 14, 2, 14));
                 assertThat(UIManager.getInt("Button.minimumWidth")).isEqualTo(72);
@@ -60,7 +60,7 @@ class SlateSteelInstallTest {
             var prior = UIManager.getLookAndFeel();
             try {
                 for (boolean dark : new boolean[] {true, false}) {
-                    var theme = SlateSteel.bundled().generated(dark); var p = theme.semantic();
+                    var theme = JasperTheme.bundled().generated(dark); var p = theme.semantic();
                     FlatLafInstaller.install(theme);
                     for (var key : List.of("PopupMenu.background", "MenuItem.background", "Menu.background")) assertThat(UIManager.getColor(key)).as(key).isEqualTo(p.color(SemanticColor.SURFACE_MENU));
                     for (var key : List.of("MenuItem.selectionBackground", "Menu.selectionBackground", "CheckBoxMenuItem.selectionBackground", "RadioButtonMenuItem.selectionBackground"))
@@ -80,7 +80,7 @@ class SlateSteelInstallTest {
             var prior = UIManager.getLookAndFeel();
             try {
                 for (boolean dark : new boolean[] {true, false}) {
-                    var theme = SlateSteel.bundled().generated(dark);
+                    var theme = JasperTheme.bundled().generated(dark);
                     FlatLafInstaller.install(theme);
                     assertThat(UIManager.get("Jasper.installedTheme")).isSameAs(theme);
                     assertThat(UIManager.getColor("Panel.background")).isEqualTo(theme.semantic().color(SemanticColor.SURFACE_PANEL));

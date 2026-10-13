@@ -4,7 +4,7 @@ Standalone theme engine and Swing UI kit. `jasper-ui` has no dependency on the
 application, terminal, Buddy, SDK or plugins. The app adapts its configuration
 and library APIs into these values; plugins use SDK contracts and host adapters.
 
-The engine is Slate Steel (`dev.jasper.ui.theme`): `SlateSteel` reads the bundled `slate-steel.json` once and gives
+The engine is `dev.jasper.ui.theme`: `JasperTheme` reads a Jasper theme file (the bundled Slate Steel is `slate-steel.json`) and gives
 each variant's semantic palette, terminal and editor schemes, syntax styles, glass levels and FlatLaf UI keys
 (`UiColorKeys`, from the roles) as an immutable `GeneratedTheme`. There are no other themes and no theme files to
 parse. The app and plugins use this authority; [completion evidence](../docs/design/theme-engine/completion.md)
@@ -22,7 +22,7 @@ the kit. Views and bindings are EDT-confined and their owner closes them.
 Use Java 25 on JetBrains Runtime and the repository wrapper:
 
 ```sh
-./gradlew :jasper-ui:test --tests '*SlateSteel*'
+./gradlew :jasper-ui:test --tests '*SlateSteel*' --tests '*JasperTheme*'
 ./gradlew :jasper-ui:check verifyUiArchitecture
 ```
 

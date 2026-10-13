@@ -3,7 +3,7 @@ package dev.jasper.app.appearance;
 import dev.jasper.terminal.config.Palette;
 import dev.jasper.ui.theme.GeneratedTheme;
 import dev.jasper.ui.theme.SemanticColor;
-import dev.jasper.ui.theme.SlateSteel;
+import dev.jasper.ui.theme.JasperTheme;
 import dev.jasper.ui.theme.TerminalScheme;
 import java.awt.Color;
 import java.util.Objects;
@@ -14,8 +14,8 @@ public record ResolvedTheme(GeneratedTheme chrome, GeneratedTheme workspace, Pal
 
     /** Slate Steel: one variant for chrome and workspace, and the terminal scheme's palette. */
     public static ResolvedTheme slateSteel(boolean dark, TerminalScheme scheme) {
-        var theme = SlateSteel.bundled().generated(dark);
-        return new ResolvedTheme(theme, theme, TerminalPaletteAdapter.toTerminal(SlateSteel.bundled().terminal(scheme)));
+        var theme = JasperTheme.bundled().generated(dark);
+        return new ResolvedTheme(theme, theme, TerminalPaletteAdapter.toTerminal(scheme));
     }
 
     public dev.jasper.ui.theme.ThemePair pair() { return new dev.jasper.ui.theme.ThemePair(chrome, workspace); }

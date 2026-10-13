@@ -4,10 +4,9 @@ import dev.jasper.app.config.TerminalSchemeChoice;
 import dev.jasper.terminal.config.Palette;
 import dev.jasper.ui.theme.GeneratedTheme;
 import dev.jasper.ui.theme.GlassLevels;
-import dev.jasper.ui.theme.SchemeColors;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SemanticPalette;
-import dev.jasper.ui.theme.SlateSteel;
+import dev.jasper.ui.theme.JasperTheme;
 import dev.jasper.ui.theme.TerminalScheme;
 import java.awt.Color;
 import java.util.EnumMap;
@@ -26,22 +25,22 @@ public final class ThemeTestSupport {
     public static boolean install(GeneratedTheme theme) { return ThemeManager.install(theme); }
 
     /** Slate Steel's Dark or Light variant. */
-    public static GeneratedTheme generated(boolean dark) { return SlateSteel.bundled().generated(dark); }
+    public static GeneratedTheme generated(boolean dark) { return JasperTheme.bundled().generated(dark); }
     /** The variant with its matching terminal scheme, as a window shows it. */
-    public static ResolvedTheme resolved(boolean dark) { return resolved(dark, TerminalScheme.matching(dark)); }
+    public static ResolvedTheme resolved(boolean dark) { return resolved(dark, JasperTheme.bundled().matching(dark)); }
     /** The variant with {@code scheme} in its terminal panes. */
     public static ResolvedTheme resolved(boolean dark, TerminalScheme scheme) { return ResolvedTheme.slateSteel(dark, scheme); }
     /** Chrome and workspace that differ, for hosting code that accepts any pair; panes take the workspace's terminal colours. */
     public static ResolvedTheme mixed(GeneratedTheme chrome, GeneratedTheme workspace) {
         return new ResolvedTheme(chrome, workspace,
-            TerminalPaletteAdapter.toTerminal(new SchemeColors(workspace.terminal(), workspace.terminal().foreground())));
+            TerminalPaletteAdapter.toTerminal(workspace.terminal(), workspace.terminal().foreground()));
     }
     /** The variant's matching terminal scheme as a terminal palette. */
-    public static Palette terminal(boolean dark) { return terminal(TerminalScheme.matching(dark)); }
+    public static Palette terminal(boolean dark) { return terminal(JasperTheme.bundled().matching(dark)); }
     /** {@code scheme} as a terminal palette. */
-    public static Palette terminal(TerminalScheme scheme) { return TerminalPaletteAdapter.toTerminal(SlateSteel.bundled().terminal(scheme)); }
+    public static Palette terminal(TerminalScheme scheme) { return TerminalPaletteAdapter.toTerminal(scheme); }
     /** {@code role} in the variant. */
-    public static Color color(boolean dark, SemanticColor role) { return SlateSteel.bundled().palette(dark).color(role); }
+    public static Color color(boolean dark, SemanticColor role) { return JasperTheme.bundled().palette(dark).color(role); }
     /** A controller showing the variant with the matching scheme; constructing one also resets the installed look and fonts. */
     public static ThemeController controller(boolean dark) { return new ThemeController(dark, TerminalSchemeChoice.MATCH); }
     /** As {@link #controller(boolean)}, installing through {@code installer}. */

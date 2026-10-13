@@ -45,8 +45,8 @@ public final class HostedContentPreview {
                     for (var entry : model.content().entries()) {
                         var scroll = (JScrollPane)entry.component();
                         var text = (JTextArea)scroll.getViewport().getView();
-                        text.setBackground(dev.jasper.ui.theme.SlateSteel.bundled().editor(dev.jasper.app.platform.ThemeZone.theme(text).dark()).background());
-                        text.setForeground(dev.jasper.ui.theme.SlateSteel.bundled().editor(dev.jasper.app.platform.ThemeZone.theme(text).dark()).foreground());
+                        text.setBackground(dev.jasper.ui.theme.JasperTheme.bundled().editor(dev.jasper.app.platform.ThemeZone.theme(text).dark()).background());
+                        text.setForeground(dev.jasper.ui.theme.JasperTheme.bundled().editor(dev.jasper.app.platform.ThemeZone.theme(text).dark()).foreground());
                         scroll.getViewport().setBackground(text.getBackground());
                     }
                     selected.select();

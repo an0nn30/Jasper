@@ -13,7 +13,7 @@ class SemanticPaletteTest {
 
     @Test void authoredSharedTextRemainsRawWhileDedicatedSurfacesApplyTheirFloors() {
         var values = new EnumMap<SemanticColor, Color>(SemanticColor.class);
-        var light = SlateSteel.bundled().palette(false);
+        var light = JasperTheme.bundled().palette(false);
         for (var role : SemanticColor.values()) values.put(role, light.color(role));
         values.putAll(Map.of(SemanticColor.TEXT_PLACEHOLDER, new Color(0xeeeeee), SemanticColor.TEXT_SECONDARY, new Color(0xeeeeee),
             SemanticColor.SURFACE_INPUT, Color.WHITE, SemanticColor.SURFACE_CARD, Color.WHITE));
@@ -54,7 +54,7 @@ class SemanticPaletteTest {
     /** The selected tab (the terminal surface) and the strip behind the inactive tabs are distinguishable in both variants. */
     @Test void theSelectedTabAndTheStripDifferInBothVariants() {
         for (boolean dark : new boolean[]{true, false}) {
-            var p = SlateSteel.bundled().generated(dark).semantic();
+            var p = JasperTheme.bundled().generated(dark).semantic();
             assertThat(ColorMath.luminance(p.color(SemanticColor.SURFACE_TERMINAL))).as(dark ? "dark" : "light")
                 .isNotEqualTo(ColorMath.luminance(p.color(SemanticColor.SURFACE_TABSTRIP)));
         }

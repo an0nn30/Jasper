@@ -4,9 +4,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * A strict reader for Jasper's bundled theme file: JSON objects whose values are strings or objects, nothing else.
- * Numbers, arrays, booleans, null, duplicate keys and trailing content are errors naming the origin and line. The
- * theme package is JDK-only, so it cannot use FlatLaf's parser.
+ * A strict reader for Jasper theme files: JSON objects whose values are strings, objects or whole numbers (the format
+ * marker), nothing else. Fractions, signs, exponents, arrays, booleans, null, duplicate keys and trailing content are
+ * errors naming the origin and line. The theme package is JDK-only, so it cannot use FlatLaf's parser.
  */
 final class ThemeJson {
     private final String text, origin;
@@ -14,7 +14,7 @@ final class ThemeJson {
 
     private ThemeJson(String text, String origin) { this.text = text; this.origin = origin; }
 
-    /** The top-level object, as ordered maps of strings and maps. */
+    /** The top-level object, as ordered maps of strings, maps and {@code Long}s. */
     static Map<String, Object> parse(String text, String origin) {
         var reader = new ThemeJson(text, origin);
         reader.space();
@@ -35,8 +35,8 @@ final class ThemeJson {
             String key = string();
             space(); expect(':'); space();
             char first = peek();
-            Object value = first == '{' ? object() : first == '"' ? string() : null;
-            if (value == null) throw error("Expected a string or an object for \"" + key + "\"");
+            Object value = first == '{' ? object() : first == '"' ? string() : first >= '0' && first <= '9' ? number() : null;
+            if (value == null) throw error("Expected a string, an object or a whole number for \"" + key + "\"");
             if (map.putIfAbsent(key, value) != null) { at = keyAt; throw error("Duplicate key \"" + key + "\""); }
             space();
             char next = peek();
@@ -44,6 +44,17 @@ final class ThemeJson {
             if (next != ',') throw error("Expected ',' or '}'");
             at++;
         }
+    }
+
+    /** Digits without sign, fraction, exponent or leading zero, such as the format marker {@code 1}. */
+    private Long number() {
+        int start = at;
+        while (at < text.length() && text.charAt(at) >= '0' && text.charAt(at) <= '9') at++;
+        String digits = text.substring(start, at);
+        if (at < text.length() && ".eE".indexOf(text.charAt(at)) >= 0) throw error("Expected a whole number");
+        if (digits.length() > 1 && digits.charAt(0) == '0') { at = start; throw error("A number has no leading zeros"); }
+        if (digits.length() > 9) { at = start; throw error("A number of at most nine digits"); }
+        return Long.parseLong(digits);
     }
 
     private String string() {

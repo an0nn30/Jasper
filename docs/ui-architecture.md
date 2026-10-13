@@ -21,7 +21,7 @@ Read a Slate Steel role without constructing Swing controls:
 
 <!-- example:palette -->
 ```java
-var theme = SlateSteel.bundled().generated(true);
+var theme = JasperTheme.bundled().generated(true);
 var cardColor = theme.semantic().color(SemanticColor.SURFACE_CARD);
 ```
 
@@ -97,11 +97,11 @@ mid-way. While it moves the card paints one snapshot of its content, so it fades
 paints its own disabled alpha ahead of the rest); at rest the content paints live. The host adds the overlay to a
 layered pane and owns keyboard routing and focus; the app's `WindowOverlay` stacks them per window.
 
-`SlateSteel` reads Jasper's theme from the bundled `slate-steel.json` (the colour reference
-`docs/design/theme-engine/slate-steel.md`'s machine-readable block, kept identical by a test) with the JDK-only
-`ThemeJson` reader: the Dark and Light semantic palettes (roles the file omits follow fixed rules), the terminal
-schemes (`TerminalScheme`, `SchemeColors` with a bold foreground) and the derived editor schemes (`EditorColors`
-and syntax styles, written as references into the palettes). `generated(dark)` assembles a full `GeneratedTheme`: the
+`JasperTheme` reads a Jasper theme file with the JDK-only `ThemeJson` reader; `JasperTheme.bundled()` is Slate Steel,
+the bundled `slate-steel.json` (the colour reference `docs/design/theme-engine/slate-steel.md`'s machine-readable
+block, kept identical by a test). A theme has the Dark and/or Light semantic palettes (roles the file omits follow
+fixed rules), its terminal schemes (`TerminalScheme`, with an id and a bold foreground) and an editor scheme per
+variant (`EditorColors` and syntax styles, written as colours or as references into the palettes). `generated(dark)` assembles a full `GeneratedTheme`: the
 palette, the matching terminal scheme, the editor scheme and syntax, FlatLaf's UI keys from the roles (`UiColorKeys`)
 and the glass. Components paint theme.md's roles; alpha treatments (focus and error rings, hover, category tiles)
 apply one kit metric to a base role, and a role that carries alpha (the scrim, `border.subtle`) is painted as given.

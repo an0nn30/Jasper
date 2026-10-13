@@ -5,7 +5,7 @@ import dev.jasper.app.appearance.*;
 import dev.jasper.app.config.*;
 import dev.jasper.app.platform.SystemAppearance.Observation;
 import dev.jasper.app.testsupport.EdtTestExtension;
-import dev.jasper.ui.theme.SlateSteel;
+import dev.jasper.ui.theme.JasperTheme;
 import dev.jasper.ui.theme.TerminalScheme;
 import java.nio.file.*;
 import java.util.*;
@@ -16,7 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 /** spec 5.2, Review Focus 1: the OS appearance re-themes live and never writes configuration or reaches a draft. */
 @ExtendWith(EdtTestExtension.class)
 class SystemThemeApplicationTest {
-    static final SlateSteel STEEL = SlateSteel.bundled();
+    static final JasperTheme STEEL = JasperTheme.bundled();
     @TempDir Path home;
 
     @Test void withTheSystemAppearanceAnOsChangeReThemesWithoutPublishingOrWritingConfiguration() throws Exception {
@@ -33,7 +33,7 @@ class SystemThemeApplicationTest {
             draft.stage(dev.jasper.app.config.CoreSettings.WINDOW_TAB_HEIGHT, java.util.Optional.of(44));
             controller.systemAppearanceChanged(Observation.light());
             assertThat(themes.current().chrome()).isSameAs(STEEL.generated(false));
-            assertThat(themes.current().palette().background()).isEqualTo(STEEL.terminal(TerminalScheme.SLATE_STEEL_LIGHT).colors().background());
+            assertThat(themes.current().palette().background()).isEqualTo(STEEL.matching(false).colors().background());
             assertThat(states).as("no configuration state reaches an open Settings draft").isEmpty();
             assertThat(Files.readString(file)).isEqualTo(text);
             assertThat(draft.modified()).isTrue();

@@ -324,8 +324,8 @@ boundaries; this refactor promises no plugin loading, binary compatibility or pe
 
 Jasper has one theme, Slate Steel, in Dark and Light ([themes](themes.md)). Its colours live only in jasper-ui's
 `slate-steel.json`, the machine-readable block of [the Slate Steel record](design/theme-engine/slate-steel.md) (a test
-keeps the two identical). `SlateSteel` reads the file once: the semantic palettes, the terminal schemes (`TerminalScheme`,
-`SchemeColors`), the derived editor schemes and syntax styles, and one `GeneratedTheme` per variant whose FlatLaf UI keys
+keeps the two identical). `JasperTheme` reads the file once: the semantic palettes, the terminal schemes (`TerminalScheme`),
+the derived editor schemes and syntax styles, and one `GeneratedTheme` per variant whose FlatLaf UI keys
 `UiColorKeys.flatLaf` derives from the roles (text selection from the terminal selection, a search miss from
 `UiColorKeys.errorTint`). To change a colour, edit the record's block and the JSON together; to give a component a
 colour, give it a role, never a value.
@@ -335,7 +335,7 @@ plugins) outside `slate-steel.json`; `UiColorKeysTest`, `SlateSteelGeneratedTest
 keys, the variants and the plugins' palettes. `RemovedThemeLayerTest` pins that the former theme layer is gone.
 
 ```sh
-./gradlew :jasper-ui:test --tests "*SlateSteel*" --tests "*UiColorKeysTest"
+./gradlew :jasper-ui:test --tests "*SlateSteel*" --tests "*JasperTheme*" --tests "*UiColorKeysTest"
 ./gradlew :jasper-app:test --tests "*ColourLiteralScanTest" --tests "*HostedPalettesTest" --tests "*RemovedThemeLayerTest"
 ```
 

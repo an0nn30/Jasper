@@ -3,7 +3,7 @@ package dev.jasper.app.appearance;
 import dev.jasper.app.config.TerminalSchemeChoice;
 import dev.jasper.app.config.UiFontConfig;
 import dev.jasper.ui.theme.GeneratedTheme;
-import dev.jasper.ui.theme.SlateSteel;
+import dev.jasper.ui.theme.JasperTheme;
 import dev.jasper.ui.theme.TerminalScheme;
 import java.awt.Font;
 import javax.swing.plaf.FontUIResource;
@@ -30,7 +30,7 @@ public final class ThemeController implements AutoCloseable {
     public static final class InstallationFailure extends IllegalStateException {
         InstallationFailure(GeneratedTheme theme, RuntimeException cause) {
             super("Could not apply theme: " + theme.name()
-                + (theme == SlateSteel.bundled().generated(theme.dark()) ? (theme.dark() ? " Dark" : " Light") : ""), cause);
+                + (theme == JasperTheme.bundled().generated(theme.dark()) ? (theme.dark() ? " Dark" : " Light") : ""), cause);
         }
     }
 
@@ -89,7 +89,13 @@ public final class ThemeController implements AutoCloseable {
 
     /** The bundled scheme for a UI variant: the choice's, or with {@code MATCH} the variant's own. */
     public static TerminalScheme scheme(boolean dark, TerminalSchemeChoice choice) {
-        return choice == TerminalSchemeChoice.MATCH ? TerminalScheme.matching(dark) : TerminalScheme.of(choice.key()).orElseThrow();
+        var bundled = JasperTheme.bundled();
+        return switch (choice) {
+            case MATCH -> bundled.matching(dark);
+            case SLATE_STEEL_DARK -> bundled.matching(true);
+            case SLATE_STEEL_LIGHT -> bundled.matching(false);
+            case HIGH_CONTRAST -> bundled.scheme("high-contrast").orElseThrow();
+        };
     }
     private static ResolvedTheme resolve(Slate slate) {
         return ResolvedTheme.slateSteel(slate.dark(), scheme(slate.dark(), slate.scheme()));

@@ -24,6 +24,6 @@ class SlateSteelFileTest {
             bundled = new String(in.readAllBytes(), StandardCharsets.UTF_8);
         }
         assertThat(bundled.strip()).isEqualTo(json.strip());
-        assertThat(json).contains("\"editor\"", "\"slate-steel-dark\"", "\"high-contrast\"");
+        assertThat(json).contains("\"jasper-theme\": 1", "\"editor\"", "\"high-contrast\"");
     }
 }

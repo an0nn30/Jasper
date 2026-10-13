@@ -7,13 +7,14 @@ import org.junit.jupiter.api.Test;
 class SlateSteelGeneratedTest {
     @Test void eachVariantIsACompleteGeneratedTheme() {
         for (boolean dark : new boolean[] {true, false}) {
-            var steel = SlateSteel.bundled();
+            var steel = JasperTheme.bundled();
             var theme = steel.generated(dark);
             assertThat(theme).isSameAs(steel.generated(dark));
             assertThat(theme.name()).isEqualTo("Slate Steel");
             assertThat(theme.dark()).isEqualTo(dark);
             assertThat(theme.semantic()).isEqualTo(steel.palette(dark));
-            assertThat(theme.terminal()).isEqualTo(steel.terminal(TerminalScheme.matching(dark)).colors());
+            assertThat(theme.terminal()).isEqualTo(steel.matching(dark).colors());
+            assertThat(theme.author()).isEqualTo("Jasper");
             assertThat(theme.syntax()).isEqualTo(steel.syntax(dark));
             assertThat(theme.glass()).isEqualTo(GlassLevels.OPAQUE);
             assertThat(theme.editor()).isEqualTo(steel.editor(dark));

@@ -17,10 +17,19 @@ class ThemeJsonTest {
         assertThat(root.get("z")).isEqualTo(Map.of());
     }
 
+    @Test void readsWholeNumbers() {
+        assertThat(ThemeJson.parse("{ \"jasper-theme\": 1, \"n\": 120 }", "t.json")).containsExactly(Map.entry("jasper-theme", 1L), Map.entry("n", 120L));
+    }
+
     @Test void rejectsWhatTheThemeFileNeverHoldsNamingTheOriginAndLine() {
         for (var bad : List.of(
-                Map.entry("{ \"a\": 1 }", "Expected a string or an object for \"a\""),
-                Map.entry("{ \"a\": [\"x\"] }", "Expected a string or an object for \"a\""),
+                Map.entry("{ \"a\": 1.5 }", "Expected a whole number"),
+                Map.entry("{ \"a\": 1e3 }", "Expected a whole number"),
+                Map.entry("{ \"a\": 01 }", "A number has no leading zeros"),
+                Map.entry("{ \"a\": 1234567890 }", "A number of at most nine digits"),
+                Map.entry("{ \"a\": -1 }", "Expected a string, an object or a whole number for \"a\""),
+                Map.entry("{ \"a\": true }", "Expected a string, an object or a whole number for \"a\""),
+                Map.entry("{ \"a\": [\"x\"] }", "Expected a string, an object or a whole number for \"a\""),
                 Map.entry("{ \"a\": \"x\",\n  \"a\": \"y\" }", "t.json:2: Duplicate key \"a\""),
                 Map.entry("{ \"a\": \"x\" } x", "Unexpected content after the theme object"),
                 Map.entry("{ \"a\": \"x\" ", "Unexpected end"),
@@ -34,7 +43,7 @@ class ThemeJsonTest {
     @Test void readsTheBundledFile() throws Exception {
         try (var in = ThemeJsonTest.class.getResourceAsStream("/dev/jasper/ui/theme/slate-steel.json")) {
             var root = ThemeJson.parse(new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8), "slate-steel.json");
-            assertThat(root.keySet()).containsExactly("ui", "terminal", "editor");
+            assertThat(root.keySet()).containsExactly("jasper-theme", "name", "author", "ui", "terminal", "editor");
         }
     }
 }
