@@ -2200,7 +2200,8 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
         File none = home('no-file', null)
         def report = launch('no-file', console, environment([JASPER_HOME: none.absolutePath]))
         expect('no file', one(report, 'vmOptionsFile') == file(none), 'reports the Jasper home file', report)
-        expect('no file', one(report, 'digest') == 'null' && report.input.contains('-Xmx256m'), 'only the bundled options', report)
+        expect('no file', one(report, 'digest') == 'null' && one(report, 'corrupted') == 'null' && report.input.contains('-Xmx256m'),
+            'only the bundled options', report)
 
         File ordered = home('ordered', '# heap\r\n\r\n  -Xmx300m  \r\n-Dprobe.marker=a b\r\n')
         report = launch('ordered', console, environment([JASPER_HOME: ordered.absolutePath]))
@@ -2260,8 +2261,13 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
         File directory = home('directory', null)
         new File(directory, 'jasper.vmoptions').mkdirs()
         report = launch('directory', console, environment([JASPER_HOME: directory.absolutePath]))
-        expect('directory', one(report, 'digest') == 'null' && one(report, 'vmOptionsFile') == file(directory),
-            'a directory named jasper.vmoptions counts as no file', report)
+        expect('directory', one(report, 'digest') == 'null' && one(report, 'corrupted') == 'null' &&
+            one(report, 'vmOptionsFile') == file(directory), 'a directory named jasper.vmoptions counts as no file', report)
+
+        File spaced = home('spaced home', '-Dprobe.marker=spaced\n')
+        report = launch('spaced', console, environment([JASPER_HOME: spaced.absolutePath]))
+        expect('home with a space', one(report, 'marker') == 'spaced' && one(report, 'vmOptionsFile') == file(spaced),
+            'the file is read and reported', report)
 
         // A home with a space and a non-ASCII letter. POSIX passes the name in the build's file-name encoding.
         if (host.os == 'windows' || System.getProperty('sun.jnu.encoding', '').equalsIgnoreCase('UTF-8')) {
@@ -2276,8 +2282,8 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
 
         if (host.os == 'windows') {
             File windowed = image('LauncherProbeGui', false)
-            report = launch('windowed-rejected', windowed, environment([JASPER_HOME: rejected.absolutePath]), ['alpha'])
-            expect('windowed launcher', one(report, 'skipped') == 'launch-failed' && report.argument == ['alpha'],
+            report = launch('windowed-rejected', windowed, environment([JASPER_HOME: rejected.absolutePath]), ['alpha', 'with space'])
+            expect('windowed launcher', one(report, 'skipped') == 'launch-failed' && report.argument == ['alpha', 'with space'],
                 'the windowed launcher starts once more without the options', report)
         }
 
@@ -2304,7 +2310,7 @@ Restore the line exactly as Task 4 Step 2 wrote it.
 
 Run: `./gradlew :jasper-app:verifyLauncherImage`
 Expected: BUILD SUCCESSFUL. On macOS this builds `LauncherProbe.app` with Jasper's launcher (no window opens; the
-probe is headless) and runs 12 scenarios.
+probe is headless) and runs 13 scenarios.
 
 - [ ] **Step 4: Document the tests**
 
@@ -2323,7 +2329,8 @@ All in `check`, on every OS:
   throwing `main`, an unarmed launch and a launch that fails before any libjvm loads do not.
 - `verifyLauncherImage`: packages `test/LauncherProbe.java` with Jasper's launcher (`jpackage
   -J--patch-module=jdk.jpackage=…`) and checks the location rules, the merge order and filters, a corrupted file, the
-  skip variable, the fallback start with the arguments intact, a directory in the file's place and a non-ASCII home.
+  skip variable, the fallback start with the arguments intact, a directory in the file's place, a home with a space and
+  a non-ASCII home.
   On Windows it also checks the windowed launcher.
 ~~~
 
