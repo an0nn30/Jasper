@@ -37,8 +37,8 @@ class HostClipboardTest {
     void userCopies(String text) { system.setContents(new StringSelection(text), null); }
 
     @Test void copiesTextAndReadsItBack() {
-        clipboard.copy("line one\nline two λ");
-        assertThat(clipboard.text()).contains("line one\nline two λ");
+        clipboard.copy("line one\nline two \u03bb");
+        assertThat(clipboard.text()).contains("line one\nline two \u03bb");
         clipboard.copy("");
         assertThat(clipboard.text()).contains("");
     }
@@ -105,16 +105,41 @@ class HostClipboardTest {
         assertThat(timers).isEmpty();
     }
 
-    @Test void aBusyClipboardThrowsAndLeavesThePendingSecretAlone() {
+    @Test void aBusyClipboardThrowsAndTheClearRetriesUntilItCanWrite() {
         clipboard.copySecret("hunter2", "dev.example.a");
         busy = true;
         assertThatThrownBy(() -> clipboard.copy("lost")).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> clipboard.copySecret("lost", "dev.example.b")).isInstanceOf(IllegalStateException.class);
         assertThat(timers).as("the first secret's clear is still armed").hasSize(1);
-        assertThatCode(this::elapse).as("clearing while busy throws nothing").doesNotThrowAnyException();
+        assertThatCode(this::elapse).as("a refused clear throws nothing").doesNotThrowAnyException();
+        assertThat(timers).as("the refused clear is retried").hasSize(1);
+        assertThat(delays.get(delays.size() - 1)).isEqualTo(Duration.ofSeconds(1));
         busy = false;
+        elapse();
+        assertThat(clipboard.text()).contains("");
         assertThat(timers).isEmpty();
-        assertThat(clipboard.text()).as("nothing could be cleared").contains("hunter2");
+    }
+
+    @Test void aClearThatNeverSucceedsGivesUpAfterItsRetries() {
+        clipboard.copySecret("hunter2", "dev.example.a");
+        busy = true;
+        for (int attempt = 1; attempt <= 6; attempt++) {
+            assertThatCode(this::elapse).as("attempt %d throws nothing", attempt).doesNotThrowAnyException();
+            assertThat(timers).as("retries left after attempt %d", attempt).hasSize(attempt < 6 ? 1 : 0);
+        }
+        busy = false;
+        assertThat(clipboard.text()).as("it could not be cleared").contains("hunter2");
+        elapse();
+        assertThat(clipboard.text()).contains("hunter2");
+    }
+
+    @Test void stoppingWhileBusyTriesOnceAndGivesUp() {
+        clipboard.copySecret("hunter2", "dev.example.a");
+        busy = true;
+        assertThatCode(() -> clipboard.ownerStopped("dev.example.a")).doesNotThrowAnyException();
+        assertThat(timers).as("a stop gets one try and no retry").isEmpty();
+        busy = false;
+        assertThat(clipboard.text()).contains("hunter2");
     }
 
     @Test void nullTextIsRejected() {

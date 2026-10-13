@@ -16,11 +16,19 @@ import java.util.function.Supplier;
 
 /**
  * The one clipboard Jasper and its plugins put text on. A secret copy is cleared later, when the plugin that copied it
- * stops, or at quit, but only while the clipboard still holds it; any later copy through here ends it. UI thread.
+ * stops, or at quit, but only while the clipboard still holds it; any later copy through here ends it. A timed clear the
+ * clipboard refuses is retried every {@link #CLEAR_RETRY}, up to {@link #CLEAR_RETRIES} times, then logged and dropped;
+ * a stop or quit gets one try. UI thread.
  */
 public final class HostClipboard {
     /** How long a secret stays on the clipboard. */
     public static final Duration SECRET_LIFETIME = Duration.ofSeconds(30);
+    /** How long to wait before retrying a clear the clipboard refused. */
+    public static final Duration CLEAR_RETRY = Duration.ofSeconds(1);
+    /** How many times a refused clear is retried before it is abandoned. */
+    public static final int CLEAR_RETRIES = 5;
+
+    private static final System.Logger LOG = System.getLogger(HostClipboard.class.getName());
 
     private record Pending(String text, String owner, Runnable cancel) { }
 
@@ -63,46 +71,68 @@ public final class HostClipboard {
         Objects.requireNonNull(owner, "owner");
         put(text);
         end();
-        Pending[] armed = new Pending[1];
-        armed[0] = new Pending(text, owner, after.apply(SECRET_LIFETIME, () -> { if (pending == armed[0]) clear(); }));
-        pending = armed[0];
+        arm(text, owner, SECRET_LIFETIME, CLEAR_RETRIES);
     }
 
     /** The clipboard's text; empty when it holds none or cannot be read. */
     public Optional<String> text() {
         try {
-            Transferable contents = clipboard.get().getContents(null);
-            if (contents == null || !contents.isDataFlavorSupported(DataFlavor.stringFlavor)) return Optional.empty();
-            return Optional.of((String) contents.getTransferData(DataFlavor.stringFlavor));
-        } catch (HeadlessException | IllegalStateException | UnsupportedFlavorException | IOException unreadable) {
+            return read();
+        } catch (HeadlessException | IllegalStateException unreadable) {
             return Optional.empty();
         }
     }
 
-    /** Clears the pending secret if {@code owner} copied it. */
+    /** Clears the pending secret if {@code owner} copied it; one try, no retry. */
     public void ownerStopped(String owner) {
-        if (pending != null && pending.owner().equals(owner)) clear();
+        if (pending != null && pending.owner().equals(owner)) clear(0);
     }
 
-    /** Clears any pending secret: Jasper is quitting. */
+    /** Clears any pending secret: Jasper is quitting. One try, no retry. */
     public void quit() {
-        if (pending != null) clear();
+        if (pending != null) clear(0);
     }
 
-    private void clear() {
+    /** One attempt to clear the pending secret; a refused attempt is re-armed while {@code retries} remain. */
+    private void clear(int retries) {
         Pending secret = pending;
-        end();
+        secret.cancel().run();
         try {
-            if (text().map(secret.text()::equals).orElse(false)) put("");
+            if (read().map(secret.text()::equals).orElse(false)) put("");
+            pending = null;
         } catch (IllegalStateException | HeadlessException unavailable) {
-            // Another program holds the clipboard now; there is nothing Jasper can clear.
+            if (retries > 0) {
+                arm(secret.text(), secret.owner(), CLEAR_RETRY, retries - 1);
+            } else {
+                pending = null;
+                LOG.log(System.Logger.Level.WARNING,
+                        "Could not clear a copied secret from the clipboard: " + unavailable.getMessage());
+            }
         }
+    }
+
+    /** Arms the clear of {@code text} after {@code delay}, replacing the pending secret. */
+    private void arm(String text, String owner, Duration delay, int retries) {
+        Pending[] armed = new Pending[1];
+        armed[0] = new Pending(text, owner, after.apply(delay, () -> { if (pending == armed[0]) clear(retries); }));
+        pending = armed[0];
     }
 
     private void end() {
         if (pending == null) return;
         pending.cancel().run();
         pending = null;
+    }
+
+    /** The clipboard's text; empty when it holds no string. Throws when the clipboard is busy or absent. */
+    private Optional<String> read() {
+        try {
+            Transferable contents = clipboard.get().getContents(null);
+            if (contents == null || !contents.isDataFlavorSupported(DataFlavor.stringFlavor)) return Optional.empty();
+            return Optional.of((String) contents.getTransferData(DataFlavor.stringFlavor));
+        } catch (UnsupportedFlavorException | IOException unreadable) {
+            return Optional.empty();
+        }
     }
 
     private void put(String text) {
