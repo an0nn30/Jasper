@@ -71,6 +71,14 @@ class CorePagesTest {
             assertThat(control.children().getFirst().state().enabled()).as(row.setting().label()).isEqualTo(row.setting()!=CoreSettings.UI_WORKSPACE_OPACITY);
             if(row.setting()==CoreSettings.UI_WORKSPACE_OPACITY)assertThat(PageKit.node(page,"ui.workspace.opacity:default").state().enabled()).isTrue();
         }
+        var enable = (dev.jasper.ui.model.Nodes.Toggle) PageKit.node(page, "ui.workspace.opacity:default");
+        assertThat(enable.label()).isEqualTo("Enable opacity");
+        assertThat(enable.checked()).as("off while the theme's value applies").isFalse();
+        PageKit.kit(page, "ui.workspace.opacity:default", javax.swing.JButton.class).doClick(0);
+        assertThat(context.draft().value(CoreSettings.UI_WORKSPACE_OPACITY)).isEqualTo(100f);
+        assertThat(((dev.jasper.ui.model.Nodes.Toggle) PageKit.node(page, "ui.workspace.opacity:default")).checked()).isTrue();
+        PageKit.kit(page, "ui.workspace.opacity:default", javax.swing.JButton.class).doClick(0);
+        assertThat(context.draft().value(CoreSettings.UI_WORKSPACE_OPACITY)).isEqualTo(dev.jasper.app.config.GlassSettings.UNSET_OPACITY);
         assertThat(page.searchTerms()).contains(CoreSettings.UI_WORKSPACE_OPACITY.label(), CoreSettings.UI_WORKSPACE_BLUR.label());
         page.dispose();
     }

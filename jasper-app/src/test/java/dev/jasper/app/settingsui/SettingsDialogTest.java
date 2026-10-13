@@ -307,11 +307,11 @@ class SettingsDialogTest {
             var blur = KitTestSupport.require(dialog.view(), "ui.workspace.blur", javax.swing.JButton.class);
             blur.doClick(0);
             assertThat(button(dialog, "apply").isEnabled()).as("Apply after Blur: On").isTrue();
-            var useTheme = KitTestSupport.require(dialog.view(), "ui.workspace.opacity:default", javax.swing.JButton.class);
-            assertThat(useTheme.getAccessibleContext().getAccessibleName()).isEqualTo("Use theme's opacity");
-            useTheme.doClick();
+            var enable = KitTestSupport.require(dialog.view(), "ui.workspace.opacity:default", javax.swing.JButton.class);
+            assertThat(enable.getAccessibleContext().getAccessibleName()).isEqualTo("Enable opacity");
+            enable.doClick();
             assertThat(dialog.draft().modified(CoreSettings.UI_WORKSPACE_OPACITY)).isTrue();
-            assertThat(button(dialog, "apply").isEnabled()).as("Apply after turning off Use theme's value").isTrue();
+            assertThat(button(dialog, "apply").isEnabled()).as("Apply after turning on Enable opacity").isTrue();
         });
     }
 
