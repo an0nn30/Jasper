@@ -35,9 +35,19 @@ monochrome paths with `UiKit.registerIcon`; see [icons](../docs/sdk-icons.md).
 Panels and settings factories return `UiView`; window surfaces and tabs mount only `UiView`.
 Settings hosts supply `Nodes.Node` rows. The host owns ordinary controls and their presentation.
 Specialized content retains explicit Appearance palettes and workspace opacity.
-All bundled manifests now require `sdk = ">=0.16.0, <0.17"` (0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
+Bundled manifests require `sdk = ">=0.16.0, <0.17"`, or `>=0.16.1` where they use the clipboard or the Tools menu (0.16.1 adds `Platform.copy`, `copySecret`, `clipboardText`, `clipboard.read` and `StandardMenu.TOOLS`; 0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
 `DialogSpec.Presentation.OVERLAY`; 0.15.0 was the breaking boundary: raw factories,
 Appearance icon loaders, arbitrary Icon arguments and palette fallback readers were removed).
+
+## Clipboard and the Tools menu (SDK 0.16.1)
+
+`Platform.copy(text)`, `copySecret(text)` and `clipboardText()` give plugins the clipboard on the UI thread. A write that
+fails is posted as "Could not copy" in the plugin's group and returns `false`; a secret is cleared 30 seconds later
+(retrying briefly while another program holds the clipboard), and again when its plugin stops or when Jasper quits, if the
+clipboard still holds it. Reading needs the new `clipboard.read` capability (`Capabilities.CLIPBOARD_READ`).
+`StandardMenu.TOOLS` is a Tools menu for utility commands, shown after Tab only while a plugin has entries in it; the
+View submenu that lists tool windows is now View › Tool Windows. The testkit models the clipboard with
+`FakePluginHost.clipboard()`. Plugins that use any of these declare `sdk = ">=0.16.1, <0.17"`.
 
 ## File workflows and progress (0.7.5)
 

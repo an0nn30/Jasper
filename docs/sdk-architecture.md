@@ -103,7 +103,7 @@ side or the bottom area. A stripe drop moves the
 window and keeps its visibility, so a hidden window's stripe drop previews no frame; a workspace
 drop moves and shows it. A window with nothing contributed has no stripes and its old layout.
 Requests to show, hide or toggle a panel travel through the model tagged with a window id, so an
-action or a `PanelHost` reaches exactly one window. Every panel gets a View → Tools entry for its
+action or a `PanelHost` reaches exactly one window. Every panel gets a View › Tool Windows entry for its
 toggle action: the application-registered `<panel id>.toggle`, or, since SDK 0.8.1, the plugin's
 own action named by `PanelSpec.toggleActionId` (which must already be registered by that plugin),
 so a plugin action that toggles a panel appears once in the menu and the palette.
