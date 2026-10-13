@@ -1,5 +1,31 @@
 # Jasper — Status and Handoff
 
+**Tool windows in Zen, and more plugin commands — 2026-10-13** (`claude/zen-panels-actions`, worktree
+`.claude/worktrees/zen-panels-actions`; design agreed in chat, no spec). Zen now hides the showing tool windows through
+the dock and remembers them: a panel opened in Zen (shortcut, View › Tool Windows, palette, plugin command) shows in
+its slot without the rails, and leaving Zen closes it and restores the earlier ones. The saved layout keeps the pre-Zen
+visibility; moves and resizes in Zen are saved. New unbound commands: Remote New Host... and Start or Stop a Tunnel...
+(both in the SSH menu), Vault Add Login.../Add SSH Key.../Add Secure Note..., File Server Show TLS Certificate
+Fingerprint…/Show SFTP Host Key Fingerprint…, Edit Snippets File, Remove Current Project from Index…. No SDK change.
+Remote's Add Host form gains **Add and Connect** (secondary, beside the primary Add Host; adding only): it saves, then
+connects in a new tab as the palette's Connect does. The form's footer was matched to the design mock with two buttons,
+so the [acceptance record](design/theme-engine/acceptance.md)'s Add Host footer measurements are now historical.
+Each rail now shows only while it holds something (they used to show together, an empty right rail included); on a
+hidden rail's side the terminal is borderless and square, as in Zen, while tool window frames keep their gutter. A dock
+drag still drops onto an empty hidden rail at its window edge: `DockDrag.standAtEdge` gives it bounds there without
+showing it, so only the placeholder marks it and the terminal does not move, and `DockDrag.areaAfter` lays the guide
+out for the rails that show or hide after the drop. A second review found a mid-drag resize left that edge stale (fixed
+with a test) and stale `app-maintenance.md` rules (fixed).
+Rebased onto `main` (f8bd2c41) and merged to local `main` (not pushed). `./gradlew check --continue` on b92d5c1f:
+**9,795 tests**, whose only failure was the `SftpChooseSessionTest` flake that `main`'s c6523372 then fixed; after
+rebasing onto that fix, `:jasper-plugin-remote:check` passes (0 failures, 8 skipped overall). An independent review found one Important issue (the
+last panel restored in Zen was saved as hidden until the next dock change), fixed with a regression test, and doc nits,
+fixed. No GUI launched. GUI checks for the user: in Zen, Cmd+Alt+1 and View › Tool Windows show a panel with no rail
+(frame corners and insets as with View › Rail hidden); a divider drag in Zen; leaving Zen restores the earlier layout;
+quitting and relaunching in Zen; the new commands from the palette; Add and Connect in the Add Host form; one rail
+hidden (the borderless, square side), the placeholder over the terminal's edge while dragging to an empty side, and a
+drop there showing the rail. Not pushed.
+
 **Enter's verb in the palette hint bar — 2026-10-13** (`claude/palette-enter-hint`, worktree
 `.claude/worktrees/palette-enter-hint`; bounded change, design approved in chat, no spec or plan). In a scope with two or
 three verbs the hint bar now lists every verb with its key, Enter's first ("Copy password ⏎ · Copy username ⌘⏎ · Open

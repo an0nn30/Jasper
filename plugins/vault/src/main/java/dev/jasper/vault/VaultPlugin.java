@@ -80,6 +80,9 @@ public class VaultPlugin implements Plugin {
     public static final String CHANGE_PASSWORD = "dev.jasper.vault.change_password";
     /** Opens the manager on the saved plugin grants. */
     public static final String GRANTS = "dev.jasper.vault.grants";
+    /** Open the manager and its sheet for a new entry of one type. */
+    public static final String ADD_LOGIN = "dev.jasper.vault.add_login", ADD_KEY = "dev.jasper.vault.add_key",
+        ADD_NOTE = "dev.jasper.vault.add_note";
     private VaultManager manager;
     private VaultManagerWindow managerWindow;
     private PluginDialog createDialog;
@@ -142,6 +145,15 @@ public class VaultPlugin implements Plugin {
         context.actions().register(ActionSpec.of(GRANTS, "Vault Plugin Grants...")
             .withKeywords(List.of("vault", "grants", "plugins", "revoke", "permissions")),
             invoked -> openThen(invoked.window(), Optional.empty(), managerWindow::showGrants));
+        context.actions().register(ActionSpec.of(ADD_LOGIN, "Add Login...")
+            .withKeywords(List.of("vault", "login", "password", "credential", "add", "new")),
+            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerWindow.add(VaultManager.Type.LOGIN)));
+        context.actions().register(ActionSpec.of(ADD_KEY, "Add SSH Key...")
+            .withKeywords(List.of("vault", "ssh", "key", "add", "new")),
+            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerWindow.add(VaultManager.Type.SSH_KEY)));
+        context.actions().register(ActionSpec.of(ADD_NOTE, "Add Secure Note...")
+            .withKeywords(List.of("vault", "secure", "note", "add", "new")),
+            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerWindow.add(VaultManager.Type.NOTE)));
         var fileMenu = context.menus().standard(StandardMenu.FILE);
         fileMenu.add(OPEN);
         fileMenu.add(CHANGE_PASSWORD);

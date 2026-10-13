@@ -97,7 +97,7 @@ class ToolWindowSurfaceTest {
         terminal.setBackground(palette.background()); terminal.setForeground(palette.foreground());
         terminal.setFont(new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 14));
         var area = new ToolWindowArea(terminal, new DockState());
-        area.setStripesVisible(true);
+        area.setStripesVisible(true, true);
         var plugin = new JPanel(new BorderLayout(0, 8));
         plugin.setBorder(BorderFactory.createEmptyBorder(0, 12, 12, 12));
         // The header carries the title now, so the panel starts with its search field.

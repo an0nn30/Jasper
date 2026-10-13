@@ -218,6 +218,9 @@ final class ToolStripe extends JPanel {
     /** True when there are neither tool windows nor actions on this stripe. */
     boolean empty() { return buttons.isEmpty(); }
 
+    /** True when the window's button, if it has one here, is all this stripe has: moving it away empties it. */
+    boolean emptyWithout(String id) { return buttons.stream().allMatch(button -> id.equals(ids.get(button))); }
+
     /** Every button, top to bottom: the groups' toggles and the actions. */
     List<AbstractButton> buttons() { return List.copyOf(buttons); }
 
