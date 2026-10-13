@@ -376,7 +376,7 @@ public final class ServerEditor implements AutoCloseable {
         boolean ftp = protocol == Protocol.FTP, sftp = protocol == Protocol.SFTP;
         boolean editable = saving == null;
         boolean tls = protocol.allowsTls() && useTls;
-        String loginLabel = !protocol.hasLogin() ? "No login (TFTP has none)" : sftp ? "Keys only (no password)" : "Anonymous";
+        String loginLabel = !protocol.hasLogin() ? "No login (TFTP has none)" : sftp ? "Keys Only" : "Anonymous";
         var loginOptions = new ArrayList<Option>();
         if (!protocol.hasLogin() || protocol.allowsAnonymous() || sftp) loginOptions.add(new Option("anon", loginLabel, Optional.empty()));
         if (protocol.hasLogin()) {

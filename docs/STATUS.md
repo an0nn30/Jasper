@@ -63,7 +63,7 @@ the credential picker sizes to its rows. System › Configuration file is one ca
 are steppers, and a segment's label keeps 10 px from its edge. A whole-branch review found four Important issues,
 all fixed with regressions: a focus bounce back into a row's control, popups that left no room for their scrollbar,
 switches and chips that vanished on a selected row, and plugin guides that still told authors to declare SDK 0.15.
-Secondary text on a selected row stays as authored, below 4.5:1 (a design note awaiting the user's ruling). Deviations
+Secondary text on a selected row stays as authored, below 4.5:1 (a design note awaiting the user's ruling). From the user's native pass: segments stay on one line while their labels fit (equal cells when the widest label fits every cell, otherwise each its label plus an even share), so New File Server's Login no longer wraps; its SFTP option reads Keys Only. Deviations
 are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.md). Native acceptance is the user's
 ([record](design/theme-engine/acceptance.md#compact-density-2026-10-12)).
 

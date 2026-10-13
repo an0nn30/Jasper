@@ -377,7 +377,10 @@ final class Choices {
         }
     }
 
-    /** Equal-width segments use another row before any option's distinguishing label is clipped. */
+    /**
+     * Segments share one line while their labels fit: equal cells when every cell holds the widest label, otherwise each
+     * its own label and an even share of the rest. They use another row only before an option's label would be clipped.
+     */
     static final class SegmentLayout implements Composition.WidthLayout {
         private Dimension cell(Container parent) {
             int width = 0, height = 0;
@@ -387,9 +390,15 @@ final class Choices {
             }
             return new Dimension(width, height);
         }
+        private static int labels(Container parent) {
+            int width = 0;
+            for (Component child : parent.getComponents()) width += child.getPreferredSize().width;
+            return width;
+        }
         int columns(Container parent, int width) {
-            Insets insets = parent.getInsets();
-            return Math.max(1, Math.min(parent.getComponentCount(), Math.max(0, width - insets.left - insets.right) / Math.max(1, cell(parent).width)));
+            Insets insets = parent.getInsets(); int room = Math.max(0, width - insets.left - insets.right);
+            if (labels(parent) <= room) return Math.max(1, parent.getComponentCount());
+            return Math.max(1, Math.min(parent.getComponentCount(), room / Math.max(1, cell(parent).width)));
         }
         @Override public int height(Container parent, int width) {
             Insets insets = parent.getInsets();
@@ -401,9 +410,16 @@ final class Choices {
             return new Dimension(insets.left + insets.right + parent.getComponentCount() * cell.width, insets.top + insets.bottom + cell.height);
         }
         @Override public void layoutContainer(Container parent) {
-            Insets insets = parent.getInsets(); int columns = columns(parent, parent.getWidth());
-            if (columns == parent.getComponentCount()) {
-                new GridLayout(1, columns, 0, 0).layoutContainer(parent);
+            Insets insets = parent.getInsets(); int columns = columns(parent, parent.getWidth()), count = parent.getComponentCount();
+            if (columns == count) {
+                int room = Math.max(0, parent.getWidth() - insets.left - insets.right);
+                if (count * cell(parent).width <= room) { new GridLayout(1, columns, 0, 0).layoutContainer(parent); return; }
+                int spare = room - labels(parent), x = insets.left, height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);
+                for (int index = 0; index < count; index++) {
+                    var child = parent.getComponent(index);
+                    int width = child.getPreferredSize().width + spare * (index + 1) / count - spare * index / count;
+                    child.setBounds(x, insets.top, width, height); x += width;
+                }
                 return;
             }
             int rows = Math.max(1, (parent.getComponentCount() + columns - 1) / columns);

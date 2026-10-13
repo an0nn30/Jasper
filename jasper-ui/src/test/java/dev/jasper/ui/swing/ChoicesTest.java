@@ -235,6 +235,39 @@ class ChoicesTest {
         });
     }
 
+    /** New File Server's Login: equal cells for its widest label overflow the track, but the labels themselves fit on one line. */
+    @Test void aSegmentedChoiceStaysOnOneLineWhileItsLabelsFit() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var login = new Nodes.Choice("login", ControlState.READY, Nodes.ChoiceKind.SEGMENTED, List.of(new Option("anon", "Anonymous", Optional.empty()),
+                new Option("vault", "Vault Account", Optional.empty()), new Option("session", "Session Password", Optional.empty())), "anon", "Login", "");
+            var protocol = new Nodes.Choice("protocol", ControlState.READY, Nodes.ChoiceKind.SEGMENTED, List.of(new Option("http", "HTTP", Optional.empty()),
+                new Option("ftp", "FTP", Optional.empty()), new Option("sftp", "SFTP", Optional.empty()), new Option("tftp", "TFTP", Optional.empty())), "http", "Protocol", "");
+            for (var choice : List.of(login, protocol)) {
+                try (var view = new KitView(context, new ViewSpec(choice), e -> { })) {
+                    view.setSize(370, 100); InteractiveRowsTest.layout(view);
+                    var first = find(view, choice.id() + ".option." + choice.options().getFirst().id(), Choices.SegmentButton.class);
+                    var track = first.getParent(); var insets = track.getInsets();
+                    int x = insets.left, widest = 0;
+                    for (var option : choice.options()) widest = Math.max(widest, find(view, choice.id() + ".option." + option.id(), Choices.SegmentButton.class).getPreferredSize().width);
+                    boolean equal = widest * choice.options().size() <= track.getWidth() - insets.left - insets.right;
+                    for (var option : choice.options()) {
+                        var segment = find(view, choice.id() + ".option." + option.id(), Choices.SegmentButton.class);
+                        assertThat(segment.getY()).as(option.label() + " on the first line").isEqualTo(first.getY());
+                        assertThat(segment.getWidth()).as(option.label() + " whole label").isGreaterThanOrEqualTo(segment.getPreferredSize().width);
+                        if (equal) assertThat(segment.getWidth()).as(option.label() + " equal cells while they fit").isBetween(first.getWidth() - 1, first.getWidth() + 1);
+                        else assertThat(segment.getX()).as(option.label() + " follows the one before").isEqualTo(x);
+                        x += segment.getWidth();
+                    }
+                    assertThat(equal).as(choice.id() + ": the case under test").isEqualTo(choice == protocol);
+                    if (!equal) assertThat(x).as(choice.id() + " fills its track").isEqualTo(track.getWidth() - insets.right);
+                    assertThat(track.getHeight()).as(choice.id() + " one line high").isEqualTo(first.getHeight() + insets.top + insets.bottom);
+                }
+            }
+            release(context);
+        });
+    }
+
     @Test void aSettingsSegmentsLabelKeepsItsPaddingFromTheSegmentsEdge() {
         Edt.run(() -> {
             var context = KitFixtures.context();

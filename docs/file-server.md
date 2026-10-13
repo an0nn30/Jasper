@@ -102,7 +102,7 @@ WinSCP). It serves file transfer only: no shell, no commands and no port forward
 
 - **Logins.** A Vault account or a session password, and/or **authorized keys**: OpenSSH public key lines added in
   the editor with Add from File… (for example `~/.ssh/id_ed25519.pub`) or Paste. A server with a password login
-  accepts keys only for that user name. **Keys only (no password)** accepts any user name with an authorized key.
+  accepts keys only for that user name. **Keys Only** accepts any user name with an authorized key, and no password.
   Key lines with options (`command=`, `from=`, `restrict`) are refused. Wrong passwords are throttled as for FTP; an
   offered key that isn't authorized doesn't count.
 - **Host key.** File Server creates an Ed25519 host key the first time an SFTP server starts and keeps it in

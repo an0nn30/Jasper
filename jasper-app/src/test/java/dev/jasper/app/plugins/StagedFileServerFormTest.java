@@ -76,6 +76,9 @@ class StagedFileServerFormTest {
                     for(String login:protocol.equals("TFTP")?List.of("anon"):List.of("anon","vault","session")) {
                         if(!protocol.equals("TFTP"))click(form,"server.login.option."+login);
                         captureServer(protocol.toLowerCase()+"-"+login,kitView(form),540,730);
+                        // The Login choice is one line of segments at the editor's width, for every protocol.
+                        var segments=((Nodes.Choice)node(form,"server.login")).options().stream().map(option->require(form,"server.login.option."+option.id())).toList();
+                        for(var segment:segments)assertThat(segment.getY()).as(protocol+" "+((JButton)segment).getText()+" on one line").isEqualTo(segments.getFirst().getY());
                     }
                 }
                 click(form,"server.protocol.option.HTTP");click(form,"server.writable");
