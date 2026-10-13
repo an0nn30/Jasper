@@ -91,5 +91,5 @@ All in `check`, on every OS:
   throwing `main`, an unarmed launch and a launch that fails before any libjvm loads do not.
 - `verifyLauncherImage`: packages `test/LauncherProbe.java` with Jasper's launcher (`jpackage
   -J--patch-module=jdk.jpackage=…`) and checks the location rules, the merge order and filters, a corrupted file, the
-  skip variable, the fallback start with the arguments intact, a directory in the file's place and a non-ASCII home.
-  On Windows it also checks the windowed launcher.
+  skip variable, the fallback start with the arguments intact, a directory in the file's place, a home with a space
+  and a non-ASCII home. On Windows it also checks the windowed launcher.
