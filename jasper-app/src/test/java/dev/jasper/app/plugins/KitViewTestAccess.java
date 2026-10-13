@@ -32,9 +32,9 @@ public final class KitViewTestAccess implements AutoCloseable {
                 var pluginClass=remoteLoader.loadClass("dev.jasper.fileserver.FileServerPlugin");
                 var environmentClass=remoteLoader.loadClass("dev.jasper.fileserver.FileServerPlugin$Environment");
                 var environment=environmentClass.getDeclaredConstructor(java.util.concurrent.Executor.class,java.util.function.Supplier.class,java.util.function.IntPredicate.class,
-                    java.util.function.Consumer.class,java.util.function.Consumer.class,Path.class,String.class,java.time.ZoneId.class,java.util.function.BiFunction.class);environment.setAccessible(true);
+                    java.util.function.Consumer.class,Path.class,String.class,java.time.ZoneId.class,java.util.function.BiFunction.class);environment.setAccessible(true);
                 Object settings=environment.newInstance((java.util.concurrent.Executor)javax.swing.SwingUtilities::invokeLater,(java.util.function.Supplier<java.util.List<?>>)java.util.List::of,
-                    (java.util.function.IntPredicate)port->true,(java.util.function.Consumer<String>)text->{},(java.util.function.Consumer<Path>)path->{},home,"Mac OS X",java.time.ZoneOffset.UTC,
+                    (java.util.function.IntPredicate)port->true,(java.util.function.Consumer<Path>)path->{},home,"Mac OS X",java.time.ZoneOffset.UTC,
                     (java.util.function.BiFunction<java.time.Duration,Runnable,Runnable>)(delay,task)->()->{});
                 var constructor=pluginClass.getDeclaredConstructor(environmentClass);constructor.setAccessible(true);
                 remote=(dev.jasper.sdk.plugin.Plugin)constructor.newInstance(settings);

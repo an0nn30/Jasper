@@ -61,10 +61,10 @@ class FileServerRenderEvidenceTest {
             var pluginClass = loader.loadClass("dev.jasper.fileserver.FileServerPlugin");
             var environmentClass = loader.loadClass("dev.jasper.fileserver.FileServerPlugin$Environment");
             var environment = environmentClass.getDeclaredConstructor(Executor.class, Supplier.class, IntPredicate.class,
-                Consumer.class, Consumer.class, Path.class, String.class, java.time.ZoneId.class, BiFunction.class);
+                Consumer.class, Path.class, String.class, java.time.ZoneId.class, BiFunction.class);
             environment.setAccessible(true);
             Object settings = environment.newInstance((Executor) SwingUtilities::invokeLater, (Supplier<List<?>>) List::of,
-                (IntPredicate) port -> true, (Consumer<String>) text -> { }, (Consumer<Path>) path -> { }, home,
+                (IntPredicate) port -> true, (Consumer<Path>) path -> { }, home,
                 "Mac OS X", ZoneOffset.UTC, (BiFunction<Duration, Runnable, Runnable>) (delay, task) -> () -> { });
             var constructor = pluginClass.getDeclaredConstructor(environmentClass); constructor.setAccessible(true);
             Plugin plugin = (Plugin) constructor.newInstance(settings);
