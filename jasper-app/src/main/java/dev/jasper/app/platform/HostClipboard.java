@@ -18,7 +18,8 @@ import java.util.function.Supplier;
  * The one clipboard Jasper and its plugins put text on. A secret copy is cleared later, when the plugin that copied it
  * stops, or at quit, but only while the clipboard still holds it; any later copy through here ends it. A timed clear the
  * clipboard refuses is retried every {@link #CLEAR_RETRY}, up to {@link #CLEAR_RETRIES} times, then logged and dropped;
- * a stop or quit gets one try. UI thread.
+ * a stop or quit gets one try. Any other failure while clearing is logged without the secret and ends it without a
+ * retry; clearing never throws. UI thread.
  */
 public final class HostClipboard {
     /** How long a secret stays on the clipboard. */
@@ -30,7 +31,10 @@ public final class HostClipboard {
 
     private static final System.Logger LOG = System.getLogger(HostClipboard.class.getName());
 
-    private record Pending(String text, String owner, Runnable cancel) { }
+    private record Pending(String text, String owner, Runnable cancel) {
+        /** Never prints the secret. */
+        @Override public String toString() { return "Pending[owner=" + owner + "]"; }
+    }
 
     private final Supplier<Clipboard> clipboard;
     private final BiFunction<Duration, Runnable, Runnable> after;
@@ -74,11 +78,11 @@ public final class HostClipboard {
         arm(text, owner, SECRET_LIFETIME, CLEAR_RETRIES);
     }
 
-    /** The clipboard's text; empty when it holds none or cannot be read. */
+    /** The clipboard's text; empty when it holds none or cannot be read, whatever the reason. */
     public Optional<String> text() {
         try {
             return read();
-        } catch (HeadlessException | IllegalStateException unreadable) {
+        } catch (RuntimeException unreadable) {
             return Optional.empty();
         }
     }
@@ -93,7 +97,10 @@ public final class HostClipboard {
         if (pending != null) clear(0);
     }
 
-    /** One attempt to clear the pending secret; a refused attempt is re-armed while {@code retries} remain. */
+    /**
+     * One attempt to clear the pending secret; a refused attempt is re-armed while {@code retries} remain. Nothing
+     * escapes: this runs from plugin teardown and from quit, which an owner's odd failure must not abort.
+     */
     private void clear(int retries) {
         Pending secret = pending;
         secret.cancel().run();
@@ -108,6 +115,10 @@ public final class HostClipboard {
                 LOG.log(System.Logger.Level.WARNING,
                         "Could not clear a copied secret from the clipboard: " + unavailable.getMessage());
             }
+        } catch (RuntimeException unexpected) {
+            pending = null;
+            LOG.log(System.Logger.Level.WARNING,
+                    "Could not clear a copied secret from the clipboard: " + unexpected.getClass().getSimpleName());
         }
     }
 
@@ -129,7 +140,9 @@ public final class HostClipboard {
         try {
             Transferable contents = clipboard.get().getContents(null);
             if (contents == null || !contents.isDataFlavorSupported(DataFlavor.stringFlavor)) return Optional.empty();
-            return Optional.of((String) contents.getTransferData(DataFlavor.stringFlavor));
+            return Optional.ofNullable(contents.getTransferData(DataFlavor.stringFlavor))
+                    .filter(String.class::isInstance)
+                    .map(String.class::cast);
         } catch (UnsupportedFlavorException | IOException unreadable) {
             return Optional.empty();
         }

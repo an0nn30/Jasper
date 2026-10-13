@@ -12,14 +12,21 @@ import java.awt.datatransfer.Transferable;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 class HostClipboardTest {
     boolean busy;
+    /** When set, what the clipboard hands out instead of its real contents. */
+    Transferable oddContents;
     final Clipboard system = new Clipboard("test") {
         @Override public synchronized void setContents(Transferable contents, ClipboardOwner owner) {
             if (busy) throw new IllegalStateException("cannot open system clipboard");
             super.setContents(contents, owner);
+        }
+
+        @Override public synchronized Transferable getContents(Object requestor) {
+            return oddContents != null ? oddContents : super.getContents(requestor);
         }
     };
     final List<Runnable> timers = new ArrayList<>();
@@ -142,10 +149,51 @@ class HostClipboardTest {
         assertThat(clipboard.text()).contains("hunter2");
     }
 
+    @Test void aTransferableThatFailsOddlyNeverBreaksClearOrQuit() {
+        clipboard.copySecret("hunter2", "dev.example.a");
+        oddContents = stringTransferable(() -> { throw new IllegalArgumentException("odd owner"); });
+        assertThatCode(() -> clipboard.ownerStopped("dev.example.a")).doesNotThrowAnyException();
+        assertThat(timers).as("a stop gets one try and no retry").isEmpty();
+        assertThat(clipboard.text()).as("an unreadable clipboard reads as empty").isEmpty();
+
+        clipboard.copySecret("hunter3", "dev.example.a");
+        assertThatCode(clipboard::quit).doesNotThrowAnyException();
+        assertThat(timers).isEmpty();
+
+        clipboard.copySecret("hunter4", "dev.example.a");
+        assertThatCode(this::elapse).as("a timed clear throws nothing either").doesNotThrowAnyException();
+        assertThat(timers).as("an unexpected failure is not retried").isEmpty();
+        assertThat(clipboard.text()).isEmpty();
+    }
+
+    @Test void aTransferableReturningNullTextReadsAsEmpty() {
+        clipboard.copySecret("hunter2", "dev.example.a");
+        oddContents = stringTransferable(() -> null);
+        assertThat(clipboard.text()).isEmpty();
+        assertThatCode(() -> clipboard.ownerStopped("dev.example.a")).doesNotThrowAnyException();
+        assertThat(timers).isEmpty();
+
+        oddContents = null;
+        clipboard.copySecret("hunter3", "dev.example.a");
+        oddContents = stringTransferable(() -> 42);
+        assertThat(clipboard.text()).as("a value that is not a string reads as empty").isEmpty();
+        assertThatCode(clipboard::quit).doesNotThrowAnyException();
+        assertThat(timers).isEmpty();
+    }
+
     @Test void nullTextIsRejected() {
         assertThatThrownBy(() -> clipboard.copy(null)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> clipboard.copySecret(null, "dev.example.a")).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> clipboard.copySecret("x", null)).isInstanceOf(NullPointerException.class);
+    }
+
+    /** A transferable that claims string flavor and hands out whatever {@code data} produces. */
+    private static Transferable stringTransferable(Supplier<Object> data) {
+        return new Transferable() {
+            @Override public DataFlavor[] getTransferDataFlavors() { return new DataFlavor[] {DataFlavor.stringFlavor}; }
+            @Override public boolean isDataFlavorSupported(DataFlavor flavor) { return DataFlavor.stringFlavor.equals(flavor); }
+            @Override public Object getTransferData(DataFlavor flavor) { return data.get(); }
+        };
     }
 
     private static Transferable image() {
