@@ -10,10 +10,10 @@ PolyForm Noncommercial 1.0.0 (`LICENSE.md`); `notices.toml` lists the 25 third-p
 winpty, ConPTY and libffi binaries inside pty4j and JNA) and `verifyThirdPartyNotices` keeps the jars complete. About Jasper (palette; Help on Windows/Linux; the macOS application menu)
 shows the icon, version, chip, commit, date and license with Licenses… and Copy; error reports name the build the same
 way. Deviations from the spec are listed in the plan's status banner; the final-review fixes are its entry 17.
-`./gradlew check --continue`: **9,806 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched. GUI checks for the user: Jasper › About Jasper on macOS; Help ›
+`./gradlew check --continue` after merging `main`: **9,839 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched. GUI checks for the user: Jasper › About Jasper on macOS; Help ›
 About Jasper on Windows and Linux; About and Licenses in Dark and Light; Copy (and "Copied" for two seconds); the
-Licenses list and texts; the sharpness of the About icon; a long branch name's fit in the commit line. Not merged or
-pushed.
+Licenses list and texts; the sharpness of the About icon; a long branch name's fit in the commit line. Merged to
+`main`.
 
 **Copy cards in the Vault manager — 2026-10-13** (`claude/vault-manager-copy-cards`, worktree
 `.claude/worktrees/vault-manager-copy-cards`; bounded change, design approved in chat, no spec or plan). The manager's
