@@ -88,8 +88,8 @@ class PaletteScopesTest {
                 assertThat(entries.getFirst()).as("nothing used yet").isEqualTo("# Suggested");
                 assertThat(entries).contains("test.fake/alpha", "test.fake/beta").noneMatch(entry -> entry.startsWith("mode:"));
                 PaletteTestSupport.selectRow(card, "alpha");
-                assertThat(PaletteTestSupport.hintBarTexts(card)).as("only the selected row's detail and other verbs")
-                    .containsExactly("the alpha detail", "Two ⌘⏎", "Three ⇧⏎");
+                assertThat(PaletteTestSupport.hintBarTexts(card)).as("only the selected row's detail and its verbs")
+                    .containsExactly("the alpha detail", "One ⏎", "Two ⌘⏎", "Three ⇧⏎");
                 assertThat(fake.activations).isEqualTo(1);
                 dev.jasper.app.palette.PaletteTestSupport.query(card).setText("al");
                 assertThat(PaletteTestSupport.entries(card)).containsSubsequence("# Fake", "test.fake/alpha");
@@ -295,7 +295,7 @@ class PaletteScopesTest {
         });
     }
 
-    @Test void theHintBarShowsTheRowsDetailAndItsScopesOtherVerbsWhichAreClickable() throws Exception {
+    @Test void theHintBarShowsTheRowsDetailAndEveryVerbOfItsScopeWhichAreClickable() throws Exception {
         edt(() -> {
             try (var owner = owner(true)) {
                 install(owner);
@@ -305,11 +305,14 @@ class PaletteScopesTest {
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.open("test.fake");
                 assertThat(PaletteTestSupport.hint(card)).isEqualTo("alpha detail");
-                assertThat(PaletteTestSupport.hintActions(card)).containsExactly("Two ⌘⏎", "Three ⇧⏎");
+                assertThat(PaletteTestSupport.hintActions(card)).containsExactly("One ⏎", "Two ⌘⏎", "Three ⇧⏎");
                 PaletteTestSupport.clickHintAction(card, 0);
-                assertThat(fake.executed).containsExactly("alpha:two");
+                assertThat(fake.executed).containsExactly("alpha:one");
                 palette.open("test.fake");
                 PaletteTestSupport.clickHintAction(card, 1);
+                assertThat(fake.executed).containsExactly("alpha:one", "alpha:two");
+                palette.open("test.fake");
+                PaletteTestSupport.clickHintAction(card, 2);
                 assertThat(palette.stepOpen()).isTrue();
                 assertThat(PaletteTestSupport.hintBar(card).isVisible()).as("hidden in a step").isFalse();
                 palette.escape();
@@ -513,7 +516,7 @@ class PaletteScopesTest {
                 var router = PaletteKeyRouterTest.router(owner, true, root);
                 palette.open("test.fake");
                 dev.jasper.app.palette.PaletteTestSupport.query(card).setText("al");
-                assertThat(PaletteTestSupport.hintActions(card)).containsExactly("Two ⌘⏎", "Three ⇧⏎");
+                assertThat(PaletteTestSupport.hintActions(card)).containsExactly("One ⏎", "Two ⌘⏎", "Three ⇧⏎");
                 assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_ENTER, InputEvent.SHIFT_DOWN_MASK))).isTrue();
                 router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_ENTER));
                 assertThat(palette.stepOpen()).isTrue();
