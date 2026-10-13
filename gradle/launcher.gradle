@@ -1,6 +1,9 @@
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.security.MessageDigest
+import java.util.Locale
+import org.gradle.api.plugins.JavaPluginExtension
+import org.gradle.jvm.toolchain.JavaToolchainService
 
 // Jasper's build of jpackage's native application launcher (packaging/launcher/README.md), applied by
 // gradle/packaging.gradle. Blocks are in dependency order: later tasks use the helpers defined above them.
@@ -57,3 +60,185 @@ def verifyLauncherSources = tasks.register('verifyLauncherSources') {
     }
 }
 tasks.named('check') { dependsOn(verifyLauncherSources) }
+
+// ---- The host's C/C++ toolchain ----
+
+def jasperNative = new File(launcherSource, 'jasper')
+def launcherTestSource = new File(launcherSource, 'test')
+def launcherToolchains = extensions.getByType(JavaToolchainService)
+def launcherJava = extensions.getByType(JavaPluginExtension)
+def launcherSdk = launcherToolchains.launcherFor(launcherJava.toolchain).map { it.metadata.installationPath.asFile }
+
+def launcherHost = { ->
+    String os = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+    String architecture = System.getProperty('os.arch').toLowerCase(Locale.ROOT)
+    [os: os.startsWith('mac') ? 'macos' : (os.startsWith('windows') ? 'windows' : 'linux'),
+     architecture: architecture in ['aarch64', 'arm64'] ? 'aarch64' : 'x64']
+}
+
+def launcherToolchainHint = { String os ->
+    switch (os) {
+        case 'macos': return 'Install the Xcode command line tools: xcode-select --install'
+        case 'linux': return 'Install gcc and g++ (Debian/Ubuntu: sudo apt-get install build-essential; Fedora: sudo dnf install gcc gcc-c++)'
+        default: return "Install Visual Studio or its Build Tools with the 'Desktop development with C++' workload"
+    }
+}
+
+// Runs a tool and returns its output; throws with the command and output when it fails or cannot start.
+def runLauncherTool = { List<String> command, Map<String, String> environment, File directory, String purpose, String hint = null ->
+    def builder = new ProcessBuilder(command.collect { it.toString() }).redirectErrorStream(true)
+    if (directory != null) builder.directory(directory)
+    if (environment != null) {
+        builder.environment().clear()
+        builder.environment().putAll(environment)
+    }
+    Process process
+    try {
+        process = builder.start()
+    } catch (IOException failure) {
+        throw new GradleException("${purpose}: cannot run ${command[0]}${hint ? '. ' + hint : ''}", failure)
+    }
+    String output = new String(process.inputStream.readAllBytes(), StandardCharsets.UTF_8)
+    int exit = process.waitFor()
+    if (exit != 0) throw new GradleException("${purpose} failed with exit code ${exit}\n${command.join(' ')}\n${output}")
+    output
+}
+
+// MSVC's environment for this host's architecture, from vcvarsall.bat as vswhere finds it; read once per build.
+def msvcCache = [:]
+def msvc = { ->
+    if (msvcCache.environment != null) return msvcCache.environment
+    String hint = launcherToolchainHint('windows')
+    String programFiles = System.getenv('ProgramFiles(x86)') ?: 'C:\\Program Files (x86)'
+    File vswhere = new File(programFiles, 'Microsoft Visual Studio\\Installer\\vswhere.exe')
+    if (!vswhere.isFile()) throw new GradleException("Building Jasper's launcher needs MSVC; ${vswhere} was not found. ${hint}")
+    boolean arm = launcherHost().architecture == 'aarch64'
+    String component = arm ? 'Microsoft.VisualStudio.Component.VC.Tools.ARM64' : 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
+    String installation = runLauncherTool([vswhere.absolutePath, '-latest', '-products', '*', '-requires', component,
+        '-property', 'installationPath'], null, null, 'vswhere').readLines().find { it.trim() }?.trim()
+    if (!installation) throw new GradleException("Building Jasper's launcher needs the MSVC component ${component}. ${hint}")
+    File vcvarsall = new File(installation, 'VC\\Auxiliary\\Build\\vcvarsall.bat')
+    File script = launcherBuild.get().file('msvc-environment.bat').asFile
+    script.parentFile.mkdirs()
+    script.setText("@echo off\r\ncall \"${vcvarsall.absolutePath}\" ${arm ? 'arm64' : 'x64'} >nul\r\nif errorlevel 1 exit /b 1\r\nset\r\n", 'UTF-8')
+    Map<String, String> environment = new TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)
+    runLauncherTool(['cmd.exe', '/d', '/c', script.absolutePath], null, null, 'vcvarsall', hint).readLines().each { String line ->
+        int equals = line.indexOf('=')
+        if (equals > 0) environment.put(line.substring(0, equals), line.substring(equals + 1))
+    }
+    msvcCache.environment = environment
+    environment
+}
+
+def msvcTool = { String name ->
+    String path = msvc().get('PATH') ?: ''
+    String found = path.split(';').collect { it.trim() }.findAll { it }.collect { new File(it, name) }.find { it.isFile() }?.absolutePath
+    if (found == null) throw new GradleException("${name} is not on the MSVC environment's PATH. ${launcherToolchainHint('windows')}")
+    found
+}
+
+// The JDK's own defines for jpackage's launcher (make/autoconf/flags-cflags.m4).
+def launcherDefines = { String os ->
+    List<String> common = ['_LITTLE_ENDIAN', '_LP64=1', 'NDEBUG']
+    switch (os) {
+        case 'macos': return ['_ALLBSD_SOURCE', '_DARWIN_UNLIMITED_SELECT', 'MACOSX'] + common
+        case 'linux': return ['_GNU_SOURCE', '_REENTRANT', '_FILE_OFFSET_BITS=64', 'LINUX'] + common
+        default: return ['WIN32_LEAN_AND_MEAN', '_WIN32_WINNT=0x0602', '_CRT_DECLARE_NONSTDC_NAMES', '_CRT_NONSTDC_NO_WARNINGS',
+            '_CRT_SECURE_NO_WARNINGS', 'WIN32', 'IAL', 'WINDOWS', 'UNICODE', '_UNICODE'] + common
+    }
+}
+
+def launcherMacArch = { host -> host.architecture == 'aarch64' ? 'arm64' : 'x86_64' }
+
+// Compiles sources into one binary for this host with the flags of the JDK's make/modules/jdk.jpackage/Lib.gmk.
+// spec: kind ('executable' | 'shared'), output, work (object directory), sources (.c/.cpp), includes, defines,
+// strict (sources compiled with warnings as errors), exportAll (test binaries: default visibility, no stripping),
+// libraries (linker arguments), rpaths (macOS), subsystem ('CONSOLE' | 'WINDOWS') and resources (.res) on Windows.
+def nativeBuild = { Map spec ->
+    def host = launcherHost()
+    File output = spec.output
+    File work = spec.work
+    work.mkdirs()
+    output.parentFile.mkdirs()
+    List<File> sources = spec.sources
+    Set<String> strict = (spec.strict ?: []).collect { it.absolutePath } as Set
+    File include = new File(launcherSdk.get(), 'include')
+    List<File> includes = (spec.includes ?: []) +
+        [include, new File(include, host.os == 'macos' ? 'darwin' : (host.os == 'windows' ? 'win32' : 'linux'))]
+    List<String> defines = launcherDefines(host.os) + (spec.defines ?: [])
+    boolean exportAll = spec.exportAll ?: false
+    String hint = launcherToolchainHint(host.os)
+    List<String> objects = []
+    sources.eachWithIndex { File source, int index ->
+        boolean cxx = source.name.endsWith('.cpp')
+        boolean warningsAreErrors = strict.contains(source.absolutePath)
+        File object = new File(work, "${index}-${source.name}.${host.os == 'windows' ? 'obj' : 'o'}")
+        objects << object.absolutePath
+        List<String> command
+        if (host.os == 'windows') {
+            command = [msvcTool('cl.exe'), '/nologo', '/c', '/O1', '/MT', '/utf-8', '/validate-charset', '/Zc:preprocessor'] +
+                (cxx ? ['/std:c++14', '/EHsc', '/Zc:inline', '/Zc:throwingNew', '/permissive-', '/Zc:wchar_t-'] : ['/std:c11']) +
+                (warningsAreErrors ? ['/W4', '/WX'] : ['/W3']) +
+                defines.collect { "/D${it}".toString() } + includes.collect { "/I${it.absolutePath}".toString() } +
+                ["/Fo${object.absolutePath}".toString(), source.absolutePath]
+        } else {
+            List<String> compiler = host.os == 'macos' ? ['/usr/bin/xcrun', cxx ? 'clang++' : 'clang'] : [cxx ? 'g++' : 'gcc']
+            List<String> flags = host.os == 'macos'
+                ? ['-arch', launcherMacArch(host), '-mmacosx-version-min=11.0', '-O2', '-fstack-protector', '-Wall']
+                : ['-O2', '-fstack-protector', '-fPIC', '-Wall']
+            command = compiler + flags + (exportAll ? [] : ['-fvisibility=hidden']) + [cxx ? '-std=c++14' : '-std=c11'] +
+                (warningsAreErrors ? ['-Wextra', '-Werror'] : []) +
+                defines.collect { "-D${it}".toString() } + includes.collect { "-I${it.absolutePath}".toString() } +
+                ['-c', source.absolutePath, '-o', object.absolutePath]
+        }
+        runLauncherTool(command, host.os == 'windows' ? msvc() : null, null, "compiling ${source.name}", hint)
+    }
+    boolean anyCxx = sources.any { it.name.endsWith('.cpp') }
+    List<String> link
+    switch (host.os) {
+        case 'macos':
+            link = ['/usr/bin/xcrun', 'clang++', '-arch', launcherMacArch(host), '-mmacosx-version-min=11.0', '-Wl,-reproducible'] +
+                (exportAll ? [] : ['-Wl,-dead_strip']) + objects + (spec.libraries ?: []) +
+                (spec.rpaths ?: []).collect { "-Wl,-rpath,${it}".toString() } + ['-o', output.absolutePath]
+            break
+        case 'linux':
+            link = (spec.kind == 'shared'
+                    ? ['g++', '-shared', '-Wl,--exclude-libs,ALL', '-static-libstdc++', '-static-libgcc']
+                    : [anyCxx ? 'g++' : 'gcc', '-pie']) +
+                ['-Wl,-z,defs', '-Wl,-z,relro', '-Wl,-z,now', '-Wl,--no-as-needed'] + objects + (spec.libraries ?: []) +
+                ['-o', output.absolutePath]
+            break
+        default:
+            link = [msvcTool('cl.exe'), '/nologo'] + objects + (spec.resources ?: []).collect { it.absolutePath } +
+                ["/Fe${output.absolutePath}".toString(), '/link', '/OPT:REF', '/INCREMENTAL:NO', '/STACK:1048576'] +
+                (spec.subsystem ? ["/SUBSYSTEM:${spec.subsystem}".toString()] : []) + (spec.libraries ?: [])
+    }
+    runLauncherTool(link, host.os == 'windows' ? msvc() : null, work, "linking ${output.name}", hint)
+    if (host.os == 'macos' && !exportAll) {
+        runLauncherTool(['/usr/bin/xcrun', 'strip', '-S', output.absolutePath], null, null, "stripping ${output.name}", hint)
+    }
+    output
+}
+
+// ---- Native tests of the options logic ----
+
+def testLauncherCore = tasks.register('testLauncherCore') {
+    group = 'verification'
+    description = "Compiles and runs the native tests of the launcher's options logic."
+    inputs.dir(jasperNative).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(launcherTestSource).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(launcherBuild.map { it.file('core-test/passed') })
+    doLast {
+        File work = launcherBuild.get().dir('core-test').asFile
+        project.delete(work)
+        List<File> sources = [new File(launcherTestSource, 'vmoptions_core_test.cpp'), new File(jasperNative, 'JasperVmOptionsCore.cpp')]
+        File test = nativeBuild(kind: 'executable', exportAll: true, sources: sources, strict: sources, includes: [jasperNative],
+            output: new File(work, launcherHost().os == 'windows' ? 'vmoptions-core-test.exe' : 'vmoptions-core-test'),
+            work: new File(work, 'objects'))
+        String output = runLauncherTool([test.absolutePath, new File(launcherTestSource, 'digest-vectors.txt').absolutePath],
+            null, null, "the launcher's options tests")
+        logger.lifecycle(output.trim())
+        new File(work, 'passed').text = output
+    }
+}
+tasks.named('check') { dependsOn(testLauncherCore) }
