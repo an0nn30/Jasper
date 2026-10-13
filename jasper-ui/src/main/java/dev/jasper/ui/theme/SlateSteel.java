@@ -244,7 +244,8 @@ public final class SlateSteel {
     private Map<String, Object> objects(Object value, String where, List<String> keys) {
         if (!(value instanceof Map<?, ?> map)) throw error((where.isEmpty() ? "" : where + ": ") + "Expected the objects " + keys);
         exactly(map.keySet(), keys, where.isEmpty() ? "slate-steel.json" : where, "object");
-        for (String key : keys) if (!(map.get(key) instanceof Map)) throw error(where + "." + key + ": Expected an object");
+        for (String key : keys)
+            if (!(map.get(key) instanceof Map)) throw error((where.isEmpty() ? key : where + "." + key) + ": Expected an object");
         return (Map<String, Object>) map;
     }
 

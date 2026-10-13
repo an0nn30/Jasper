@@ -28,6 +28,13 @@
 > - Final review: Task 8 Step 5's heading-rule change applied to every list; heading rules outside the command palette
 >   are `border.subtle` again, the palette's results keep `border.menu`. The subscriber-containment case deleted in Task 4
 >   is restored on Slate Steel (`aFailingSubscriberDoesNotStopTheOthersOrTheChange`).
+> - Follow-ups to the final review's minors (branch `claude/slate-steel-followups`): the FlatLaf key→source table is
+>   frozen (`ui-color-keys.tsv`) and checked on a palette whose every role is distinct, as are the plugin palettes;
+>   the colour scan also matches fully qualified constructors; the older-install test compares every path and byte
+>   under the home; the failed-install case checks that the selection rolled back; the rejected-install palette check
+>   reads the failing controller; `LegacyPalettePublicationTest` is `HostedPalettePublicationTest`; a root entry that
+>   is not an object no longer reads ".ui"; `tools/icons/IconPreview.java` runs on Slate Steel; `docs/themes.md` states
+>   the scan's scope and STATUS lists the open items. The heading-rule check needed no change after the fix pass.
 
 **Goal:** Delete the legacy theme pipeline, assets, tools and test seams, so Slate Steel is the only theme in code, resources, tests and documentation; prove no colour value exists outside `slate-steel.json`; re-render and record the mock comparisons on Slate Steel; and fold in the review findings deferred from Plans 1 and 2.
 

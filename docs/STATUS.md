@@ -48,7 +48,11 @@ pipeline, the old themes, theme import, the vendored theme sources and their too
 helper; FlatLaf's keys come from the roles; a scan pins that no colour value lives outside `slate-steel.json`; the 34
 mock comparisons are re-rendered on Slate Steel Dark (Light inspected); the deferred review findings are fixed. The
 native pass is the user's ([acceptance record](design/theme-engine/acceptance.md)). Deviations are in the
-[plan's](superpowers/plans/2026-10-12-slate-steel-3-removal-and-verification.md) status banner.
+[plan's](superpowers/plans/2026-10-12-slate-steel-3-removal-and-verification.md) status banner. Open for the user, all
+in the acceptance record's Slate Steel Plan 3 section: the plan's 11 decisions for review; theme.md's authored colours
+below the former contrast floors (Light off-switch 1.68:1, Light `status.success` 3.32:1 on panels, the split divider
+1.43:1/1.58:1, Light menu selection text 3.98:1, the status slash about 1.15:1, dark floored text with white glyphs on
+Light selected rows); and New File Server's Login control wrapping to two rows when the form scrolls.
 
 **Task9c fix round1 — scoped re-review pending (2026-10-11).** Review I1 found that table useful-width search crossed the existing numeric-minimum feasibility boundary, where weighted allocation is not monotonic. The shared search now starts where all existing column minima fit, then reserves the useful first-column target; ordinary allocation remains unchanged. A long numeric-cell regression covers the returned minimum and larger/boundary widths with icons, selection modes and scale variants. This repairs the approved minimum contract without a new layout policy; scoped UI/chooser checks, default/controlled owner captures and fresh installDist evidence are recorded in scratch `task-9c-report.md`, preserving final02. Review M1 classifies inherited100JavaDoc warnings and injected native-notification authorization/delivery failures as known gate noise, not failing tests or new9c defects; source-warning cleanup stays final11. Native/pixel acceptance remains open.
 

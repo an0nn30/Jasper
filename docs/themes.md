@@ -35,11 +35,15 @@ appearance, with the editor scheme derived from Slate Steel.
 
 ## The token rule
 
-Every colour in Jasper's code is a semantic role (`surface.panel`, `text.primary`, `accent`, …) read from the active
-variant; no component holds a colour value, and a test fails on any colour literal in production code or resources
-outside `slate-steel.json`. A role that carries opacity (`surface.scrim`, `border.subtle`, `text.onAccent.secondary`)
-is painted as given; treatments such as focus rings, hovers and tile tints are kit metrics applied to a role.
-Shadows are black at the strengths the colour reference gives. Plugins receive the same roles through the SDK.
+Every colour in Jasper's interface code is a semantic role (`surface.panel`, `text.primary`, `accent`, …) read from the
+active variant. A test fails on any hex colour literal (`#RRGGBB`, `0xRRGGBB` given to a colour constructor) in the
+production code or text resources of jasper-ui, the app and the plugins outside `slate-steel.json`. Outside that scan
+are SVG artwork (icons are painted as drawn), the terminal library's default palettes for embedders that set none, the
+desk buddy's own artwork, decimal component literals (transparent fills, the editor's vim sneak highlight) and the
+black and white that shadows and inset lines are painted in. A role that carries opacity (`surface.scrim`,
+`border.subtle`, `text.onAccent.secondary`) is painted as given; treatments such as focus rings, hovers and tile tints
+are kit metrics applied to a role. Shadows are black at the strengths the colour reference gives. Plugins receive the
+same roles through the SDK.
 
 ## When something is wrong
 

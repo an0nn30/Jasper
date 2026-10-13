@@ -150,10 +150,12 @@ class HostedUiTest {
         assertThat(HostedPalettes.syntax(themes.current().workspace()).style(dev.jasper.sdk.ui.SyntaxRole.KEYWORD).color())
             .isNotEqualTo(HostedPalettes.editor(themes.current().workspace()).foreground());
         var rejected = ThemeTestSupport.controller(true, value -> value.dark() && ThemeTestSupport.install(value));
-        var before = HostedPalettes.workspace(themes.current().workspace());
+        // The controller that failed keeps publishing the palettes it had.
+        var before = HostedPalettes.workspace(rejected.current().workspace());
         assertThatThrownBy(() -> rejected.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH))
             .isInstanceOf(dev.jasper.app.appearance.ThemeController.InstallationFailure.class);
-        assertThat(HostedPalettes.workspace(themes.current().workspace())).isEqualTo(before);
+        assertThat(HostedPalettes.workspace(rejected.current().workspace())).isEqualTo(before)
+            .isEqualTo(HostedPalettes.workspace(ThemeTestSupport.generated(true)));
     }
 
     @Test void closingWorkspaceSubscriptionOffThreadSuppressesDeliveryBeforeQueuedRemoval() {

@@ -4,17 +4,15 @@ import dev.jasper.app.appearance.*;
 import dev.jasper.app.config.*;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.sdk.ui.*;
-import javax.swing.JPanel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Explicit host adapters follow the published workspace's roles, editor scheme and syntax through variant changes. */
 @ExtendWith(EdtTestExtension.class)
-class LegacyPalettePublicationTest {
+class HostedPalettePublicationTest {
     @Test void dynamicWorkspaceEditorAndSyntaxReadersTrackTheVariant() {
         try (var themes = ThemeTestSupport.controller(false)) {
-            var component = new JPanel(); component.putClientProperty("Jasper.zone", "workspace");
             for (boolean dark : new boolean[]{true, false, true}) {
                 themes.configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
                 var expected = themes.current().workspace();

@@ -311,9 +311,12 @@ class ThemeControllerTest {
             var before = UIManager.getLookAndFeel();
             owner.selectVariant(false);
             assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.generated(true));
-            assertThat(themes.current().chrome().dark()).isTrue();
             assertThat(UIManager.getLookAndFeel()).isSameAs(before);
             assertThat(errors).singleElement().asString().contains("Could not apply theme");
+            // The selection rolled back too: a later scheme change keeps Dark instead of retrying Light.
+            themes.configureScheme(dev.jasper.app.config.TerminalSchemeChoice.HIGH_CONTRAST);
+            assertThat(themes.current().chrome()).isSameAs(dev.jasper.app.appearance.ThemeTestSupport.generated(true));
+            assertThat(themes.schemeChoice()).isEqualTo(dev.jasper.app.config.TerminalSchemeChoice.HIGH_CONTRAST);
         });
     }
 

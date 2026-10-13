@@ -52,6 +52,11 @@ class SlateSteelPaletteTest {
             .hasMessageContaining("Missing object \"terminal\"");
     }
 
+    @Test void aTopLevelEntryThatIsNotAnObjectIsNamedWithoutALeadingDot() throws Exception {
+        assertThatThrownBy(() -> SlateSteel.parse("{ \"ui\": \"x\", \"terminal\": {}, \"editor\": {} }", "t.json"))
+            .isInstanceOf(ThemeFileException.class).hasMessageContaining(": ui: Expected an object").hasMessageNotContaining(".ui");
+    }
+
     @Test void aMissingOrUnknownSchemeOrEditorEntryIsNamed() throws Exception {
         String json = bundledJson();
         assertThatThrownBy(() -> SlateSteel.parse(json.replaceFirst("\"fg\\.bold\": \"#[0-9A-Fa-f]+\",\\s*", ""), "t.json"))

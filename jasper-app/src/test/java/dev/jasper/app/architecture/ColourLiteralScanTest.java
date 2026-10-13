@@ -14,9 +14,20 @@ class ColourLiteralScanTest {
     static final Path ROOT = Path.of(System.getProperty("jasper.repoRoot"));
     static final Path THEME = ROOT.resolve("jasper-ui/src/main/resources/dev/jasper/ui/theme/slate-steel.json");
     static final Pattern STRING_HEX = Pattern.compile("\"[^\"\\n]*#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?(?![0-9A-Za-z])[^\"\\n]*\"");
-    static final Pattern CONSTRUCTED = Pattern.compile("(?:new Color|new ColorUIResource|Color\\.decode)\\(\\s*\"?(?:0x|#)[0-9A-Fa-f]{6}");
+    // A constructor or decode call, simple or fully qualified (new java.awt.Color(0x…)), given a hex literal.
+    static final Pattern CONSTRUCTED = Pattern.compile("(?:\\bColor(?:UIResource)?|\\bColor\\.decode)\\(\\s*\"?(?:0x|#)[0-9A-Fa-f]{6}");
     static final Pattern RESOURCE_HEX = Pattern.compile("#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?(?![0-9A-Za-z])");
     static final Set<String> TEXT_RESOURCES = Set.of("json", "toml", "properties", "xml", "css", "html", "tsv");
+
+    /** The constructed forms the scan matches, simple or fully qualified; decimal components are not hex literals. */
+    @Test void theConstructedPatternMatchesQualifiedAndSimpleNames() {
+        for (String line : List.of("g.setColor(new Color(0x112233));", "var c = new java.awt.Color(0xC45A53);",
+                "defaults.put(key, new javax.swing.plaf.ColorUIResource(0x112233));", "new ColorUIResource(0xabcdef)",
+                "Color.decode(\"#112233\")", "java.awt.Color.decode(\"0x112233\")"))
+            assertThat(CONSTRUCTED.matcher(line).find()).as(line).isTrue();
+        for (String line : List.of("new Color(12, 34, 56)", "new java.awt.Color(0, 0, 0, alpha)", "ColorMath.opacity(Color.BLACK, .5)"))
+            assertThat(CONSTRUCTED.matcher(line).find()).as(line).isFalse();
+    }
 
     @Test void noProductionColourLiteralOutsideTheThemeFile() throws IOException {
         var offenders = new ArrayList<String>();

@@ -56,18 +56,30 @@ class JasperApplicationThemesTest {
         start("", true, dev.jasper.ui.theme.TerminalScheme.SLATE_STEEL_DARK);
     }
 
-    /** Review Focus 1: an older install's theme folders are neither read nor changed. */
+    /** Review Focus 1: an older install's theme folders are neither read nor changed; nothing else appears beside them. */
     @Test void anOlderInstallsThemeFoldersAreIgnoredAndLeftAsTheyAre() throws Exception {
-        java.nio.file.Files.createDirectories(home.resolve("themes"));
+        String config = "[ui]\nappearance = 'light'\n";
+        java.nio.file.Files.createDirectories(home.resolve("themes/nested"));
         java.nio.file.Files.createDirectories(home.resolve("terminal-themes"));
-        var theme = java.nio.file.Files.writeString(home.resolve("themes/nord.toml"), "name = \"Nord\"\n");
-        var colors = java.nio.file.Files.writeString(home.resolve("terminal-themes/dark.toml"), "[colors]\n");
-        start("[ui]\nappearance = 'light'\n", false, dev.jasper.ui.theme.TerminalScheme.SLATE_STEEL_LIGHT);
-        assertThat(java.nio.file.Files.readString(theme)).isEqualTo("name = \"Nord\"\n");
-        assertThat(java.nio.file.Files.readString(colors)).isEqualTo("[colors]\n");
-        try (var listing = java.nio.file.Files.list(home)) {
-            assertThat(listing.map(path -> path.getFileName().toString()))
-                .containsExactlyInAnyOrder("config.toml", "themes", "terminal-themes");
+        java.nio.file.Files.writeString(home.resolve("themes/nord.toml"), "name = \"Nord\"\n");
+        java.nio.file.Files.writeString(home.resolve("themes/nested/custom.theme.json"), "{ \"name\": \"Custom\" }\n");
+        java.nio.file.Files.writeString(home.resolve("terminal-themes/dark.toml"), "[colors]\n");
+        java.nio.file.Files.writeString(home.resolve("config.toml"), config);
+        var before = snapshot(home);
+        start(config, false, dev.jasper.ui.theme.TerminalScheme.SLATE_STEEL_LIGHT);
+        assertThat(snapshot(home)).as("every path and byte under the home").isEqualTo(before);
+    }
+
+    /** Every path under {@code root} with its bytes (directories map to an empty marker). */
+    private static java.util.Map<String, String> snapshot(Path root) throws java.io.IOException {
+        var files = new java.util.TreeMap<String, String>();
+        try (var walk = java.nio.file.Files.walk(root)) {
+            for (Path path : walk.toList()) {
+                if (path.equals(root)) continue;
+                files.put(root.relativize(path).toString(), java.nio.file.Files.isDirectory(path) ? "<dir>"
+                    : java.util.HexFormat.of().formatHex(java.nio.file.Files.readAllBytes(path)));
+            }
         }
+        return files;
     }
 }
