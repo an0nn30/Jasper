@@ -684,6 +684,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (SwingUtilities.getRootPane(field) != SwingUtilities.getRootPane(target)) return null;
         return SwingUtilities.convertRectangle(field.getParent(), field.getBounds(), target);
     }
+    /** The title row inside the insets that keep the header clear of the window controls, in {@code target}'s coordinates. */
+    java.awt.Rectangle titleRowClear(Component target) {
+        WindowHeader header = chrome.header();
+        java.awt.Insets insets = header.getInsets();
+        var row = new java.awt.Rectangle(insets.left, 0, Math.max(0, header.getWidth() - insets.left - insets.right), header.getHeight());
+        return SwingUtilities.convertRectangle(header, row, target);
+    }
     WindowChrome chrome() { return chrome; }
     UiState uiState() { return uiState; }
     WindowCommands windowCommands() { return windowCommands; }

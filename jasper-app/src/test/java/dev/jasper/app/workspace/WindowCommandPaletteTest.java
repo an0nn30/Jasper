@@ -165,16 +165,27 @@ class WindowCommandPaletteTest {
     @Test void anAnchoredCardCoversTheFieldIsAtLeast560WideAndStaysInTheWindow() {
         var window = new Rectangle(0, 0, 1400, 900);
         var field = new Rectangle(420, 4, 560, 22);
-        assertThat(WindowCommandPalette.anchored(field, window, new Dimension(680, 300), 560, 16))
+        assertThat(WindowCommandPalette.anchored(field, window, window, new Dimension(680, 300), 560, 16))
             .isEqualTo(new Rectangle(420, 4, 560, 300));
         var narrow = new Rectangle(500, 4, 300, 22);
-        assertThat(WindowCommandPalette.anchored(narrow, window, new Dimension(680, 300), 560, 16))
+        assertThat(WindowCommandPalette.anchored(narrow, window, window, new Dimension(680, 300), 560, 16))
             .as("centred on the field, widened to the minimum").isEqualTo(new Rectangle(370, 4, 560, 300));
         var edge = new Rectangle(20, 4, 300, 22);
-        assertThat(WindowCommandPalette.anchored(edge, window, new Dimension(680, 300), 560, 16).x).isEqualTo(16);
+        assertThat(WindowCommandPalette.anchored(edge, window, window, new Dimension(680, 300), 560, 16).x).isEqualTo(16);
         var small = new Rectangle(0, 0, 350, 210);
-        assertThat(WindowCommandPalette.anchored(new Rectangle(20, 4, 286, 22), small, new Dimension(680, 400), 560, 16))
+        assertThat(WindowCommandPalette.anchored(new Rectangle(20, 4, 286, 22), small, small, new Dimension(680, 400), 560, 16))
             .isEqualTo(new Rectangle(16, 4, 318, 210 - 16 - 4));
+    }
+    @Test void anAnchoredCardStaysClearOfTheWindowControls() {
+        var field = new Rectangle(250, 4, 200, 22);
+        var window = new Rectangle(0, 0, 700, 600);
+        assertThat(WindowCommandPalette.anchored(field, window, new Rectangle(96, 0, 596, 38), new Dimension(680, 300), 560, 16))
+            .as("controls at the left: moved right, still the minimum wide").isEqualTo(new Rectangle(96, 4, 560, 300));
+        assertThat(WindowCommandPalette.anchored(field, window, new Rectangle(0, 0, 562, 38), new Dimension(680, 300), 560, 16))
+            .as("controls at the right: narrowed to the room before them").isEqualTo(new Rectangle(16, 4, 546, 300));
+        var narrow = new Rectangle(0, 0, 658, 600);
+        assertThat(WindowCommandPalette.anchored(new Rectangle(229, 4, 200, 22), narrow, new Rectangle(96, 0, 554, 38),
+            new Dimension(680, 300), 560, 16)).as("no room for the minimum").isEqualTo(new Rectangle(96, 4, 546, 300));
     }
     @Test void overlayDoesNotResizeTerminalAndTheCardDropsFromTheTitleField() throws Exception {
         DesktopTestSupport.edt(() -> {
@@ -230,6 +241,28 @@ class WindowCommandPaletteTest {
                         assertThat(Math.abs(palette.getBounds().getCenterX() - field.getCenterX())).isLessThanOrEqualTo(1);
                         assertThat(palette.getY()).isEqualTo(field.y);
                     }
+                }
+            }
+        });
+    }
+    @Test void aNarrowWindowKeepsTheDroppedCardClearOfTheWindowControls() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                var root = new JRootPane();
+                try (var title = WindowContent.installTitleBar(root, owner, true, value -> {})) {
+                    owner.installRootBindings(root); root.setSize(com.formdev.flatlaf.util.UIScale.scale(658), 600);
+                    LayoutTestSupport.layoutTree(root);
+                    owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
+                    var palette = owner.commandPalette().component();
+                    var header = owner.chrome().header();
+                    int clear = SwingUtilities.convertPoint(header, header.getInsets().left, 0, palette.getParent()).x;
+                    assertThat(clear).as("the header keeps room for the controls").isPositive();
+                    assertThat(palette.getX()).as("the card starts past the window controls").isGreaterThanOrEqualTo(clear);
+                    assertThat(palette.getBounds().getMaxX()).as("and stays inside the window")
+                        .isLessThanOrEqualTo(root.getWidth() - com.formdev.flatlaf.util.UIScale.scale(16));
+                    var search = owner.chrome().search();
+                    var field = SwingUtilities.convertRectangle(search.getParent(), search.getBounds(), palette.getParent());
+                    assertThat(palette.getY()).as("still dropped from the field").isEqualTo(field.y);
                 }
             }
         });

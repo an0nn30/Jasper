@@ -190,12 +190,17 @@ final class WindowCommandPalette implements AutoCloseable {
 
     static final int ANCHORED_MINIMUM_WIDTH = 560;
 
-    /** The card dropped from the title field: over it, centred on it, at least the minimum wide, inside the window. */
-    static Rectangle anchored(Rectangle field, Rectangle window, Dimension preferred, int minimumWidth, int margin) {
+    /**
+     * The card dropped from the title field: over it, centred on it, at least the minimum wide, inside the window and,
+     * across, inside {@code clear}, the title row's span clear of the window controls, which draw over the card.
+     */
+    static Rectangle anchored(Rectangle field, Rectangle window, Rectangle clear, Dimension preferred, int minimumWidth, int margin) {
         int insetX = Math.min(margin, Math.max(0, window.width / 2));
-        int width = Math.min(Math.max(field.width, minimumWidth), Math.max(0, window.width - 2 * insetX));
+        int left = Math.max(window.x + insetX, clear.x);
+        int right = Math.max(left, Math.min(window.x + window.width - insetX, clear.x + clear.width));
+        int width = Math.min(Math.max(field.width, minimumWidth), right - left);
         int x = field.x + (field.width - width) / 2;
-        x = Math.max(window.x + insetX, Math.min(x, window.x + window.width - insetX - width));
+        x = Math.max(left, Math.min(x, right - width));
         int height = Math.min(preferred.height, Math.max(0, window.y + window.height - margin - field.y));
         return new Rectangle(x, field.y, width, height);
     }
@@ -370,8 +375,8 @@ final class WindowCommandPalette implements AutoCloseable {
         /** The card's default place, dropped from the title field; null in Compact mode or without a usable field. */
         Rectangle home() {
             Rectangle field = owner.paletteAnchor(this);
-            return field == null ? null : anchored(field, new Rectangle(0, 0, getWidth(), getHeight()), palette.getPreferredSize(),
-                UIScale.scale(ANCHORED_MINIMUM_WIDTH), margin());
+            return field == null ? null : anchored(field, new Rectangle(0, 0, getWidth(), getHeight()), owner.titleRowClear(this),
+                palette.getPreferredSize(), UIScale.scale(ANCHORED_MINIMUM_WIDTH), margin());
         }
 
         @Override public void doLayout() {
