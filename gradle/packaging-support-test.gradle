@@ -112,15 +112,21 @@ verifySupport.configure {
         assert trainingTraceProblem(good + [milestones: null], 42L) == 'start-up settled without WINDOW_SHOWN, OUTPUT_PAINTED, PLUGINS_BOUND'
         logger.lifecycle('Verified launcher configuration edits and the AOT checks')
 
-        // Training must not see the user's real Jasper home or any JVM option or class path a real launch would not have.
+        // Training must not see the user's real Jasper home, their jasper.vmoptions, or any JVM option or class path a
+        // real launch would not have.
         Map<String, String> inherited = [JASPER_HOME: '/Users/x/real-jasper', _JAVA_OPTIONS: '-Xmx1m', JDK_JAVA_OPTIONS: '-Xms1m',
-            CLASSPATH: '/some/classes', JAVA_TOOL_OPTIONS: '-Dinherited=1', HOME: '/Users/x', PATH: '/usr/bin:/bin']
-        Map<String, String> training = aotTrainingEnvironment(inherited, '-Dtraining=2')
-        ['JASPER_HOME', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS', 'CLASSPATH'].each { assert !training.containsKey(it) : "${it} leaked into the training environment" }
+            CLASSPATH: '/some/classes', JAVA_TOOL_OPTIONS: '-Dinherited=1', HOME: '/Users/x', PATH: '/usr/bin:/bin',
+            JASPER_VM_OPTIONS: '/Users/x/mine.vmoptions', JASPER_VM_OPTIONS_SKIP: 'manual']
+        File emptyVmOptions = new File('/work/empty.vmoptions')
+        Map<String, String> training = aotTrainingEnvironment(inherited, '-Dtraining=2', emptyVmOptions)
+        ['JASPER_HOME', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS', 'CLASSPATH', 'JASPER_VM_OPTIONS_SKIP'].each {
+            assert !training.containsKey(it) : "${it} leaked into the training environment"
+        }
         assert training.JAVA_TOOL_OPTIONS == '-Dtraining=2'
+        assert training.JASPER_VM_OPTIONS == emptyVmOptions.absolutePath : 'training must read an empty options file'
         assert training.HOME == '/Users/x' && training.PATH == '/usr/bin:/bin'
-        assert training.keySet() == ['JAVA_TOOL_OPTIONS', 'HOME', 'PATH'] as Set
-        assert inherited.size() == 7 && inherited.JASPER_HOME == '/Users/x/real-jasper' : 'the inherited map must not be modified'
+        assert training.keySet() == ['JAVA_TOOL_OPTIONS', 'HOME', 'PATH', 'JASPER_VM_OPTIONS'] as Set
+        assert inherited.size() == 9 && inherited.JASPER_HOME == '/Users/x/real-jasper' : 'the inherited map must not be modified'
         logger.lifecycle('Verified the training environment scrub')
     }
 }

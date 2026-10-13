@@ -291,6 +291,14 @@ checks a built image ([start-up performance](packaging.md#start-up-performance))
 - **The AOT cache.** It is trained per build, so it follows class-path changes automatically; never edit a jar inside a
   trained image, rebuild it. Training opens a window: agents ask the user before `packageDist`, `trainAotCache` or
   `-Pjasper.aot=true`.
+- **Jasper's launcher.** `packageApp` builds the image with Jasper's own build of jpackage's launcher
+  (`gradle/launcher.gradle`, [packaging/launcher](../packaging/launcher/README.md)), which merges the user's
+  `jasper.vmoptions` over these options. A JBR update means re-vendoring its launcher sources and re-applying the
+  hook lines; `verifyLauncherSources`, `testLauncherCore`, `testLauncherGuard` and `verifyLauncherImage` (all in
+  `check`) show what changed.
+- **Bundled JVM defaults.** `-Xmx2048m` and `-XX:+IgnoreUnrecognizedVMOptions` are in `applicationDefaultJvmArgs`; a
+  user's `jasper.vmoptions` overrides them. AOT training and the start-up benchmark's isolated home give the launcher
+  an empty options file, so a developer's own flags never shape the cache or the numbers.
 
 ## Session lifecycle change
 

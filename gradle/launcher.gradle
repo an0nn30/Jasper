@@ -1,0 +1,619 @@
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.security.MessageDigest
+import java.util.Locale
+import java.util.concurrent.TimeUnit
+import org.gradle.api.plugins.JavaPluginExtension
+import org.gradle.jvm.toolchain.JavaToolchainService
+
+// Jasper's build of jpackage's native application launcher (packaging/launcher/README.md), applied by
+// gradle/packaging.gradle. Blocks are in dependency order: later tasks use the helpers defined above them.
+
+def launcherSource = rootProject.file('packaging/launcher')
+def upstreamRoot = new File(launcherSource, 'upstream')
+def launcherBuild = layout.buildDirectory.dir('launcher')
+// Vendored files that carry Jasper's hook lines (each such line contains JASPER-HOOK); every other file is upstream's.
+def launcherHookedFiles = ['src/jdk.jpackage/share/native/applauncher/AppLauncher.cpp',
+    'src/jdk.jpackage/share/native/applauncher/JvmLauncherLib.c'] as Set<String>
+
+// A vendored file as upstream ships it: Jasper's hook lines removed, CRLF read as LF. ISO-8859-1 keeps every byte.
+def upstreamText = { File file ->
+    new String(Files.readAllBytes(file.toPath()), StandardCharsets.ISO_8859_1).replace('\r\n', '\n')
+        .replaceAll('(?m)^[^\n]*JASPER-HOOK[^\n]*\n', '')
+}
+
+def verifyLauncherSources = tasks.register('verifyLauncherSources') {
+    group = 'verification'
+    description = 'Checks packaging/launcher/upstream against SHA256SUMS: upstream bytes apart from JASPER-HOOK lines.'
+    inputs.dir(upstreamRoot).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(launcherBuild.map { it.file('sources-verified') })
+    doLast {
+        File sums = new File(upstreamRoot, 'SHA256SUMS')
+        if (!sums.isFile()) throw new GradleException("verifyLauncherSources: ${sums} is missing")
+        Map<String, String> expected = [:]
+        sums.readLines('UTF-8').findAll { it.trim() && !it.startsWith('#') }.each { String line ->
+            def match = line =~ /^([0-9a-f]{64})  (\S.*)$/
+            if (!match.matches()) throw new GradleException("verifyLauncherSources: malformed line in ${sums}: ${line}")
+            expected[match.group(2)] = match.group(1)
+        }
+        Set<String> present = [] as Set
+        upstreamRoot.eachFileRecurse(groovy.io.FileType.FILES) { File file ->
+            String path = upstreamRoot.toPath().relativize(file.toPath()).toString().replace('\\', '/')
+            if (path != 'SHA256SUMS') present << path
+        }
+        List<String> problems = []
+        (expected.keySet() - present).sort().each { problems << "missing: ${it}".toString() }
+        (present - expected.keySet()).sort().each { problems << "not in SHA256SUMS: ${it}".toString() }
+        Set<String> hooked = [] as Set
+        expected.keySet().intersect(present).sort().each { String path ->
+            File file = new File(upstreamRoot, path)
+            if (new String(Files.readAllBytes(file.toPath()), StandardCharsets.ISO_8859_1).contains('JASPER-HOOK')) hooked << path
+            String actual = MessageDigest.getInstance('SHA-256')
+                .digest(upstreamText(file).getBytes(StandardCharsets.ISO_8859_1)).encodeHex().toString()
+            if (actual != expected[path]) problems << "differs from upstream beyond JASPER-HOOK lines: ${path}".toString()
+        }
+        if (hooked != launcherHookedFiles) {
+            problems << "files with JASPER-HOOK lines: ${hooked.sort()}; expected ${launcherHookedFiles.sort()}".toString()
+        }
+        if (problems) throw new GradleException('verifyLauncherSources:\n' + problems.join('\n'))
+        File marker = launcherBuild.get().file('sources-verified').asFile
+        marker.parentFile.mkdirs()
+        marker.text = "${expected.size()} files\n"
+    }
+}
+tasks.named('check') { dependsOn(verifyLauncherSources) }
+
+// ---- The host's C/C++ toolchain ----
+
+def jasperNative = new File(launcherSource, 'jasper')
+def launcherTestSource = new File(launcherSource, 'test')
+def launcherToolchains = extensions.getByType(JavaToolchainService)
+def launcherJava = extensions.getByType(JavaPluginExtension)
+def launcherSdk = launcherToolchains.launcherFor(launcherJava.toolchain).map { it.metadata.installationPath.asFile }
+
+def launcherHost = { ->
+    String os = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+    String architecture = System.getProperty('os.arch').toLowerCase(Locale.ROOT)
+    [os: os.startsWith('mac') ? 'macos' : (os.startsWith('windows') ? 'windows' : 'linux'),
+     architecture: architecture in ['aarch64', 'arm64'] ? 'aarch64' : 'x64']
+}
+
+def launcherToolchainHint = { String os ->
+    switch (os) {
+        case 'macos': return 'Install the Xcode command line tools: xcode-select --install'
+        case 'linux': return 'Install gcc and g++ (Debian/Ubuntu: sudo apt-get install build-essential; Fedora: sudo dnf install gcc gcc-c++)'
+        default: return "Install Visual Studio or its Build Tools with the 'Desktop development with C++' workload"
+    }
+}
+
+// Runs a tool and returns its output; throws with the command and output when it fails or cannot start.
+def runLauncherTool = { List<String> command, Map<String, String> environment, File directory, String purpose, String hint = null ->
+    def builder = new ProcessBuilder(command.collect { it.toString() }).redirectErrorStream(true)
+    if (directory != null) builder.directory(directory)
+    if (environment != null) {
+        builder.environment().clear()
+        builder.environment().putAll(environment)
+    }
+    Process process
+    try {
+        process = builder.start()
+    } catch (IOException failure) {
+        throw new GradleException("${purpose}: cannot run ${command[0]}${hint ? '. ' + hint : ''}", failure)
+    }
+    String output = new String(process.inputStream.readAllBytes(), StandardCharsets.UTF_8)
+    int exit = process.waitFor()
+    if (exit != 0) throw new GradleException("${purpose} failed with exit code ${exit}\n${command.join(' ')}\n${output}")
+    output
+}
+
+// MSVC's environment for this host's architecture, from vcvarsall.bat as vswhere finds it; read once per build.
+def msvcCache = [:]
+def msvc = { ->
+    if (msvcCache.environment != null) return msvcCache.environment
+    String hint = launcherToolchainHint('windows')
+    String programFiles = System.getenv('ProgramFiles(x86)') ?: 'C:\\Program Files (x86)'
+    File vswhere = new File(programFiles, 'Microsoft Visual Studio\\Installer\\vswhere.exe')
+    if (!vswhere.isFile()) throw new GradleException("Building Jasper's launcher needs MSVC; ${vswhere} was not found. ${hint}")
+    boolean arm = launcherHost().architecture == 'aarch64'
+    String component = arm ? 'Microsoft.VisualStudio.Component.VC.Tools.ARM64' : 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
+    String installation = runLauncherTool([vswhere.absolutePath, '-latest', '-products', '*', '-requires', component,
+        '-property', 'installationPath'], null, null, 'vswhere').readLines().find { it.trim() }?.trim()
+    if (!installation) throw new GradleException("Building Jasper's launcher needs the MSVC component ${component}. ${hint}")
+    File vcvarsall = new File(installation, 'VC\\Auxiliary\\Build\\vcvarsall.bat')
+    File script = launcherBuild.get().file('msvc-environment.bat').asFile
+    script.parentFile.mkdirs()
+    script.setText("@echo off\r\ncall \"${vcvarsall.absolutePath}\" ${arm ? 'arm64' : 'x64'} >nul\r\nif errorlevel 1 exit /b 1\r\nset\r\n", 'UTF-8')
+    Map<String, String> environment = new TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)
+    runLauncherTool(['cmd.exe', '/d', '/c', script.absolutePath], null, null, 'vcvarsall', hint).readLines().each { String line ->
+        int equals = line.indexOf('=')
+        if (equals > 0) environment.put(line.substring(0, equals), line.substring(equals + 1))
+    }
+    msvcCache.environment = environment
+    environment
+}
+
+def msvcTool = { String name ->
+    String path = msvc().get('PATH') ?: ''
+    String found = path.split(';').collect { it.trim() }.findAll { it }.collect { new File(it, name) }.find { it.isFile() }?.absolutePath
+    if (found == null) throw new GradleException("${name} is not on the MSVC environment's PATH. ${launcherToolchainHint('windows')}")
+    found
+}
+
+// The JDK's own defines for jpackage's launcher (make/autoconf/flags-cflags.m4).
+def launcherDefines = { String os ->
+    List<String> common = ['_LITTLE_ENDIAN', '_LP64=1', 'NDEBUG']
+    switch (os) {
+        case 'macos': return ['_ALLBSD_SOURCE', '_DARWIN_UNLIMITED_SELECT', 'MACOSX'] + common
+        case 'linux': return ['_GNU_SOURCE', '_REENTRANT', '_FILE_OFFSET_BITS=64', 'LINUX'] + common
+        default: return ['WIN32_LEAN_AND_MEAN', '_WIN32_WINNT=0x0602', '_CRT_DECLARE_NONSTDC_NAMES', '_CRT_NONSTDC_NO_WARNINGS',
+            '_CRT_SECURE_NO_WARNINGS', 'WIN32', 'IAL', 'WINDOWS', 'UNICODE', '_UNICODE'] + common
+    }
+}
+
+def launcherMacArch = { host -> host.architecture == 'aarch64' ? 'arm64' : 'x86_64' }
+
+// Compiles sources into one binary for this host with the flags of the JDK's make/modules/jdk.jpackage/Lib.gmk.
+// spec: kind ('executable' | 'shared'), output, work (object directory), sources (.c/.cpp), includes, defines,
+// strict (sources compiled with warnings as errors), exportAll (test binaries: default visibility, no stripping),
+// libraries (linker arguments), rpaths (macOS), subsystem ('CONSOLE' | 'WINDOWS') and resources (.res) on Windows.
+def nativeBuild = { Map spec ->
+    def host = launcherHost()
+    File output = spec.output
+    File work = spec.work
+    work.mkdirs()
+    output.parentFile.mkdirs()
+    List<File> sources = spec.sources
+    Set<String> strict = (spec.strict ?: []).collect { it.absolutePath } as Set
+    File include = new File(launcherSdk.get(), 'include')
+    List<File> includes = (spec.includes ?: []) +
+        [include, new File(include, host.os == 'macos' ? 'darwin' : (host.os == 'windows' ? 'win32' : 'linux'))]
+    List<String> defines = launcherDefines(host.os) + (spec.defines ?: [])
+    boolean exportAll = spec.exportAll ?: false
+    String hint = launcherToolchainHint(host.os)
+    List<String> objects = []
+    sources.eachWithIndex { File source, int index ->
+        boolean cxx = source.name.endsWith('.cpp')
+        boolean warningsAreErrors = strict.contains(source.absolutePath)
+        File object = new File(work, "${index}-${source.name}.${host.os == 'windows' ? 'obj' : 'o'}")
+        objects << object.absolutePath
+        List<String> command
+        if (host.os == 'windows') {
+            command = [msvcTool('cl.exe'), '/nologo', '/c', '/O1', '/MT', '/utf-8', '/validate-charset', '/Zc:preprocessor'] +
+                (cxx ? ['/std:c++14', '/EHsc', '/Zc:inline', '/Zc:throwingNew', '/permissive-', '/Zc:wchar_t-'] : ['/std:c11']) +
+                (warningsAreErrors ? ['/W4', '/WX'] : ['/W3']) +
+                defines.collect { "/D${it}".toString() } + includes.collect { "/I${it.absolutePath}".toString() } +
+                ["/Fo${object.absolutePath}".toString(), source.absolutePath]
+        } else {
+            List<String> compiler = host.os == 'macos' ? ['/usr/bin/xcrun', cxx ? 'clang++' : 'clang'] : [cxx ? 'g++' : 'gcc']
+            List<String> flags = host.os == 'macos'
+                ? ['-arch', launcherMacArch(host), '-mmacosx-version-min=11.0', '-O2', '-fstack-protector', '-Wall']
+                : ['-O2', '-fstack-protector', '-fPIC', '-Wall']
+            command = compiler + flags + (exportAll ? [] : ['-fvisibility=hidden']) + [cxx ? '-std=c++14' : '-std=c11'] +
+                (warningsAreErrors ? ['-Wextra', '-Werror'] : []) +
+                defines.collect { "-D${it}".toString() } + includes.collect { "-I${it.absolutePath}".toString() } +
+                ['-c', source.absolutePath, '-o', object.absolutePath]
+        }
+        runLauncherTool(command, host.os == 'windows' ? msvc() : null, null, "compiling ${source.name}", hint)
+    }
+    boolean anyCxx = sources.any { it.name.endsWith('.cpp') }
+    List<String> link
+    switch (host.os) {
+        case 'macos':
+            link = ['/usr/bin/xcrun', 'clang++', '-arch', launcherMacArch(host), '-mmacosx-version-min=11.0', '-Wl,-reproducible'] +
+                (exportAll ? [] : ['-Wl,-dead_strip']) + objects + (spec.libraries ?: []) +
+                (spec.rpaths ?: []).collect { "-Wl,-rpath,${it}".toString() } + ['-o', output.absolutePath]
+            break
+        case 'linux':
+            link = (spec.kind == 'shared'
+                    ? ['g++', '-shared', '-Wl,--exclude-libs,ALL', '-static-libstdc++', '-static-libgcc']
+                    : [anyCxx ? 'g++' : 'gcc', '-pie']) +
+                ['-Wl,-z,defs', '-Wl,-z,relro', '-Wl,-z,now', '-Wl,--no-as-needed'] + objects + (spec.libraries ?: []) +
+                ['-o', output.absolutePath]
+            break
+        default:
+            link = [msvcTool('cl.exe'), '/nologo'] + objects + (spec.resources ?: []).collect { it.absolutePath } +
+                ["/Fe${output.absolutePath}".toString(), '/link', '/OPT:REF', '/INCREMENTAL:NO', '/MANIFEST:NO', '/STACK:1048576'] +
+                (spec.subsystem ? ["/SUBSYSTEM:${spec.subsystem}".toString()] : []) + (spec.libraries ?: [])
+    }
+    runLauncherTool(link, host.os == 'windows' ? msvc() : null, work, "linking ${output.name}", hint)
+    if (host.os == 'macos' && !exportAll) {
+        runLauncherTool(['/usr/bin/xcrun', 'strip', '-S', output.absolutePath], null, null, "stripping ${output.name}", hint)
+    }
+    output
+}
+
+// ---- Native tests of the options logic ----
+
+def testLauncherCore = tasks.register('testLauncherCore') {
+    group = 'verification'
+    description = "Compiles and runs the native tests of the launcher's options logic."
+    inputs.dir(jasperNative).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(launcherTestSource).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(launcherBuild.map { it.file('core-test/passed') })
+    doLast {
+        File work = launcherBuild.get().dir('core-test').asFile
+        delete(work)
+        List<File> sources = [new File(launcherTestSource, 'vmoptions_core_test.cpp'), new File(jasperNative, 'JasperVmOptionsCore.cpp')]
+        File test = nativeBuild(kind: 'executable', exportAll: true, sources: sources, strict: sources, includes: [jasperNative],
+            output: new File(work, launcherHost().os == 'windows' ? 'vmoptions-core-test.exe' : 'vmoptions-core-test'),
+            work: new File(work, 'objects'))
+        String output = runLauncherTool([test.absolutePath, new File(launcherTestSource, 'digest-vectors.txt').absolutePath],
+            null, null, "the launcher's options tests")
+        logger.lifecycle(output.trim())
+        // The JDK's defines are macros in every source (-DLINUX, /DWINDOWS). Check the core and its test once more with
+        // the other hosts' defines, so a name that collides with one fails here, not only on that host's CI.
+        def host = launcherHost()
+        if (host.os != 'windows') {
+            List<String> compiler = host.os == 'macos' ? ['/usr/bin/xcrun', 'clang++'] : ['g++']
+            ['macos', 'linux', 'windows'].findAll { it != host.os }.each { String other ->
+                runLauncherTool(compiler + ['-std=c++14', '-fsyntax-only', '-Wall', '-Wextra', '-Werror'] +
+                    launcherDefines(other).collect { "-D${it}".toString() } + ["-I${jasperNative.absolutePath}".toString()] +
+                    sources.collect { it.absolutePath }, null, null, "checking the options logic with ${other}'s defines",
+                    launcherToolchainHint(host.os))
+            }
+        }
+        new File(work, 'passed').text = output
+    }
+}
+tasks.named('check') { dependsOn(testLauncherCore) }
+
+// ---- The exit guard, against the toolchain JDK's real libjli ----
+
+def compileLauncherProbes = tasks.register('compileLauncherProbes', JavaCompile) {
+    description = "Compiles the Java probes the launcher's tests run."
+    source = fileTree(launcherTestSource) { include '*.java' }
+    classpath = files()
+    destinationDirectory.set(launcherBuild.map { it.dir('probes') })
+    javaCompiler.set(launcherToolchains.compilerFor(launcherJava.toolchain))
+    options.release.set(25)
+    options.encoding = 'UTF-8'
+}
+
+def testLauncherGuard = tasks.register('testLauncherGuard') {
+    group = 'verification'
+    description = "Checks the launcher's exit guard with the toolchain JDK's libjli: re-spawn only when no JVM was created."
+    dependsOn(compileLauncherProbes)
+    inputs.dir(jasperNative).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(launcherTestSource).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(launcherBuild.map { it.file('guard-test/passed') })
+    doLast {
+        def host = launcherHost()
+        File work = launcherBuild.get().dir('guard-test').asFile
+        delete(work)
+        List<File> sources = [new File(launcherTestSource, 'guard_harness.c'), new File(jasperNative, 'jasper_launch_guard.c')]
+        File harness = nativeBuild(kind: 'executable', exportAll: true, sources: sources, strict: sources, includes: [jasperNative],
+            libraries: host.os == 'linux' ? ['-ldl'] : [],
+            output: new File(work, host.os == 'windows' ? 'guard-harness.exe' : 'guard-harness'), work: new File(work, 'objects'))
+        File sdk = launcherSdk.get()
+        File jli = host.os == 'windows' ? new File(sdk, 'bin/jli.dll') : new File(sdk, host.os == 'macos' ? 'lib/libjli.dylib' : 'lib/libjli.so')
+        String probes = compileLauncherProbes.get().destinationDirectory.get().asFile.absolutePath
+        String armed = '-Djasper.vmOptionsDigest=0123456789abcdef'
+        def scenarios = [
+            [name: 'malformed heap value', arguments: ['-Xmx3q', armed, '-cp', probes, 'GuardProbe'], respawn: true, exit: null],
+            [name: 'conflicting collectors', arguments: ['-XX:+UseSerialGC', '-XX:+UseParallelGC', armed, '-cp', probes, 'GuardProbe'],
+                respawn: true, exit: null],
+            [name: 'System.exit', arguments: [armed, '-cp', probes, 'GuardProbe', 'exit'], respawn: false, exit: 3],
+            [name: 'normal return', arguments: [armed, '-cp', probes, 'GuardProbe'], respawn: false, exit: 0],
+            [name: 'main throws', arguments: [armed, '-cp', probes, 'GuardProbe', 'throw'], respawn: false, exit: 1],
+            [name: 'unarmed malformed heap value', arguments: ['-Xmx3q', '-cp', probes, 'GuardProbe'], respawn: false, exit: null],
+            [name: 'no libjvm loaded', arguments: ['-XXaltjvm=/nonexistent/jvm', armed, '-cp', probes, 'GuardProbe'], respawn: false, exit: null],
+            [name: 'fallback start never arms', arguments: ['-Xmx3q', armed, '-cp', probes, 'GuardProbe'], skip: true, respawn: false, exit: null],
+        ]
+        List<String> failures = []
+        scenarios.eachWithIndex { Map scenario, int index ->
+            File marker = new File(work, "respawn-${index}")
+            File log = new File(work, "output-${index}.txt")
+            def builder = new ProcessBuilder([harness.absolutePath] + scenario.arguments).redirectErrorStream(true).redirectOutput(log)
+            ['JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS', 'CLASSPATH'].each { builder.environment().remove(it) }
+            builder.environment().put('GUARD_HARNESS_JLI', jli.absolutePath)
+            builder.environment().put('GUARD_HARNESS_MARKER', marker.absolutePath)
+            if (scenario.skip) builder.environment().put('JASPER_VM_OPTIONS_SKIP', 'launch-failed')
+            Process process = builder.start()
+            boolean exited = process.waitFor(60, TimeUnit.SECONDS)
+            if (!exited) process.destroyForcibly()
+            String output = log.getText('UTF-8')
+            if (!exited) {
+                failures << "${scenario.name}: the harness did not exit within 60 s\n${output}".toString()
+                return
+            }
+            int exit = process.exitValue()
+            if (marker.isFile() != scenario.respawn) {
+                failures << "${scenario.name}: re-spawn ${marker.isFile() ? 'happened' : 'did not happen'} (exit ${exit})\n${output}".toString()
+            }
+            if (scenario.exit != null && exit != scenario.exit) failures << "${scenario.name}: exit ${exit}, expected ${scenario.exit}\n${output}".toString()
+            if (scenario.exit == null && exit == 0) failures << "${scenario.name}: the JVM started\n${output}".toString()
+        }
+        if (failures) throw new GradleException('testLauncherGuard:\n' + failures.join('\n'))
+        new File(work, 'passed').text = "${scenarios.size()} scenarios\n"
+    }
+}
+tasks.named('check') { dependsOn(testLauncherGuard) }
+
+// ---- Jasper's launcher for this host ----
+
+def launcherResources = launcherBuild.map { it.dir('resources') }
+ext.launcherResources = launcherResources
+// jpackage's own option that makes it copy Jasper's launcher instead of its built-in one.
+ext.jpackageLauncherOption = { -> "-J--patch-module=jdk.jpackage=${launcherResources.get().asFile.absolutePath}".toString() }
+def jpackageNative = new File(upstreamRoot, 'src/jdk.jpackage')
+def nativeDirectory = { String os, String kind -> new File(jpackageNative, "${os}/native/${kind}") }
+// Every C and C++ source directly in the directories, as the JDK's make compiles them.
+def sourcesIn = { List<File> directories ->
+    directories.collectMany { File directory -> (directory.listFiles() ?: []).findAll { it.name.endsWith('.c') || it.name.endsWith('.cpp') } }
+        .sort { it.absolutePath }
+}
+String launcherUpstreamVersion = '25.0.4.1'
+
+def windowsVersionResource = { File work ->
+    work.mkdirs()
+    File resource = new File(work, 'version.res')
+    runLauncherTool([msvcTool('rc.exe'), '/nologo', '/fo', resource.absolutePath, '/DJDK_FTYPE=0x1L',
+        "/DJDK_FVER=${launcherUpstreamVersion.replace('.', ',')}".toString(), "/DJDK_VER=${launcherUpstreamVersion}".toString(),
+        "/DJDK_VERSION_STRING=${launcherUpstreamVersion}".toString(), '/DJDK_COMPANY=Jasper', '/DJDK_NAME=Jasper',
+        '/DJDK_FILEDESC=Jasper', '/DJDK_COPYRIGHT=Jasper', '/DJDK_INTERNAL_NAME=jpackageapplauncher',
+        '/DJDK_FNAME=jpackageapplauncher.exe', new File(upstreamRoot, 'src/java.base/windows/native/common/version.rc').absolutePath],
+        msvc(), work, 'rc version.rc', launcherToolchainHint('windows'))
+    resource
+}
+
+def embedWindowsManifest = { File exe, String name ->
+    runLauncherTool([msvcTool('mt.exe'), '-nologo', '-manifest',
+        new File(upstreamRoot, 'src/java.base/windows/native/launcher/java.manifest').absolutePath,
+        "-identity:${name}.exe, version=${launcherUpstreamVersion}".toString(), "-outputresource:${exe.absolutePath};#1".toString()],
+        msvc(), exe.parentFile, "mt ${name}.exe", launcherToolchainHint('windows'))
+}
+
+def buildLauncher = tasks.register('buildLauncher') {
+    group = 'build'
+    description = "Builds Jasper's jpackage launcher for this host into build/launcher/resources."
+    dependsOn(verifyLauncherSources)
+    inputs.dir(upstreamRoot).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(jasperNative).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.property('sdk', launcherSdk.map { it.absolutePath })
+    inputs.property('host', providers.provider { launcherHost().toString() })
+    outputs.dir(launcherResources)
+    doLast {
+        def host = launcherHost()
+        delete(launcherResources.get().asFile)
+        File output = new File(launcherResources.get().asFile, 'jdk/jpackage/internal/resources')
+        output.mkdirs()
+        File work = launcherBuild.get().dir('objects').asFile
+        delete(work)
+        File core = new File(jasperNative, 'JasperVmOptionsCore.cpp')
+        File guard = new File(jasperNative, 'jasper_launch_guard.c')
+        List<File> jasperSources = [new File(jasperNative, 'JasperVmOptions.cpp'), core, guard]
+        List<File> strict = [core, guard]
+        switch (host.os) {
+            case 'macos':
+                List<File> directories = [nativeDirectory('macosx', 'applauncher'), nativeDirectory('share', 'applauncher'),
+                    nativeDirectory('macosx', 'common'), nativeDirectory('unix', 'common'), nativeDirectory('share', 'common')]
+                nativeBuild(kind: 'executable', output: new File(output, 'jpackageapplauncher'), work: new File(work, 'macos'),
+                    sources: sourcesIn(directories) + jasperSources, strict: strict, includes: directories + [jasperNative],
+                    libraries: ['-framework', 'Cocoa'], rpaths: ['@executable_path/../Frameworks/', '@executable_path/../PlugIns/'])
+                break
+            case 'linux':
+                List<File> launcherDirectories = [nativeDirectory('linux', 'applauncher'), nativeDirectory('share', 'applauncher'),
+                    nativeDirectory('linux', 'common'), nativeDirectory('unix', 'common'), nativeDirectory('share', 'common')]
+                nativeBuild(kind: 'executable', output: new File(output, 'jpackageapplauncher'), work: new File(work, 'linux-launcher'),
+                    sources: sourcesIn(launcherDirectories).findAll { it.name.endsWith('.c') } + [guard], strict: [guard],
+                    includes: launcherDirectories + [jasperNative], libraries: ['-ldl', '-lpthread'])
+                List<File> libraryDirectories = [nativeDirectory('linux', 'libapplauncher')] + launcherDirectories
+                nativeBuild(kind: 'shared', output: new File(output, 'libjpackageapplauncheraux.so'), work: new File(work, 'linux-library'),
+                    sources: sourcesIn(libraryDirectories).findAll { !(it.name in ['LinuxLauncher.c', 'LinuxPackage.c']) } + jasperSources,
+                    strict: strict, includes: libraryDirectories + [jasperNative], libraries: ['-ldl', '-lpthread'])
+                break
+            default:
+                List<File> directories = [nativeDirectory('windows', 'applauncher'), nativeDirectory('share', 'applauncher'),
+                    nativeDirectory('windows', 'common'), nativeDirectory('share', 'common')]
+                File resource = windowsVersionResource(new File(work, 'resources'))
+                [[name: 'jpackageapplauncher', subsystem: 'CONSOLE', defines: []],
+                 [name: 'jpackageapplauncherw', subsystem: 'WINDOWS', defines: ['JP_LAUNCHERW']]].each { Map variant ->
+                    File exe = new File(output, "${variant.name}.exe")
+                    nativeBuild(kind: 'executable', output: exe, work: new File(work, variant.name),
+                        sources: sourcesIn(directories) + jasperSources, strict: strict, includes: directories + [jasperNative],
+                        defines: variant.defines, subsystem: variant.subsystem, resources: [resource],
+                        libraries: ['msi.lib', 'ole32.lib', 'shell32.lib', 'shlwapi.lib', 'user32.lib', 'advapi32.lib', 'kernel32.lib'])
+                    embedWindowsManifest(exe, variant.name)
+                }
+        }
+        List<File> binaries = (output.listFiles() ?: []).findAll { it.isFile() }
+        binaries.each { File binary ->
+            if (!new String(Files.readAllBytes(binary.toPath()), StandardCharsets.ISO_8859_1).contains('JASPER_VM_OPTIONS_SKIP')) {
+                throw new GradleException("buildLauncher: ${binary.name} lacks Jasper's hook")
+            }
+        }
+        logger.lifecycle("Built Jasper's launcher: ${binaries*.name.sort().join(', ')}")
+    }
+}
+
+// ---- End to end: a probe app packaged with Jasper's launcher ----
+
+def launcherProbeJar = tasks.register('launcherProbeJar', Jar) {
+    description = "Packs the launcher image test's probe application."
+    from(compileLauncherProbes)
+    include('LauncherProbe*.class')
+    archiveFileName.set('launcher-probe.jar')
+    destinationDirectory.set(launcherBuild.map { it.dir('probe-input') })
+}
+
+def verifyLauncherImage = tasks.register('verifyLauncherImage') {
+    group = 'verification'
+    description = "Packages a probe app with Jasper's launcher and checks jasper.vmoptions end to end, headlessly."
+    dependsOn(buildLauncher, launcherProbeJar)
+    inputs.dir(launcherResources).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(launcherProbeJar.flatMap { it.archiveFile })
+    outputs.file(launcherBuild.map { it.file('image-test/passed') })
+    doLast {
+        def host = launcherHost()
+        File work = launcherBuild.get().dir('image-test').asFile
+        delete(work)
+        work.mkdirs()
+        File images = new File(work, 'images')
+        File probeInput = launcherProbeJar.get().archiveFile.get().asFile.parentFile
+        String jpackage = new File(launcherSdk.get(), host.os == 'windows' ? 'bin/jpackage.exe' : 'bin/jpackage').absolutePath
+        // Bundled options the user's lines can replace: -Xmx256m and -XX:+UseSerialGC, plus IntelliJ's ignore flag.
+        def image = { String name, boolean console ->
+            List<String> command = [jpackage, jpackageLauncherOption(), '--type', 'app-image', '--name', name,
+                '--dest', images.absolutePath, '--input', probeInput.absolutePath, '--main-jar', 'launcher-probe.jar',
+                '--main-class', 'LauncherProbe', '--add-modules', 'java.base,java.management',
+                '--java-options', '-Xmx256m', '--java-options', '-XX:+UseSerialGC', '--java-options', '-XX:+IgnoreUnrecognizedVMOptions']
+            if (host.os == 'macos') command += ['--mac-package-identifier', "dev.jasper.${name.toLowerCase(Locale.ROOT)}".toString()]
+            if (host.os == 'windows' && console) command += ['--win-console']
+            runLauncherTool(command, null, null, "jpackage ${name}")
+            host.os == 'macos' ? new File(images, "${name}.app/Contents/MacOS/${name}")
+                : (host.os == 'windows' ? new File(images, "${name}/${name}.exe") : new File(images, "${name}/bin/${name}"))
+        }
+        File console = image('LauncherProbe', true)
+
+        // The build's environment without anything that steers the launcher or the JVM, plus the scenario's variables.
+        def environment = { Map<String, String> extra ->
+            Map<String, String> result = new LinkedHashMap<String, String>(System.getenv())
+            ['JASPER_HOME', 'JASPER_VM_OPTIONS', 'JASPER_VM_OPTIONS_SKIP', 'JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS',
+                'JDK_JAVA_OPTIONS', 'XDG_CONFIG_HOME'].each { result.remove(it) }
+            result.putAll(extra)
+            result
+        }
+        // Runs the launcher; returns the single report the probe appended (key -> values). Waits for a re-spawned start.
+        def launch = { String scenario, File launcher, Map<String, String> env, List<String> arguments = [] ->
+            File report = new File(work, "${scenario}.report")
+            File log = new File(work, "${scenario}.log")
+            def builder = new ProcessBuilder([launcher.absolutePath] + arguments).redirectErrorStream(true).redirectOutput(log)
+            builder.environment().clear()
+            builder.environment().putAll(env)
+            builder.environment().put('PROBE_OUTPUT', report.absolutePath)
+            Process process = builder.start()
+            if (!process.waitFor(60, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                throw new GradleException("verifyLauncherImage: ${scenario}: the launcher did not exit\n${log.text}")
+            }
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60)
+            while (!(report.isFile() && report.getText('UTF-8').contains('end\n'))) {
+                if (System.nanoTime() > deadline) {
+                    throw new GradleException("verifyLauncherImage: ${scenario}: no report (exit ${process.exitValue()})\n${log.text}")
+                }
+                Thread.sleep(100)
+            }
+            Thread.sleep(500) // a second report would mean a second start
+            String text = report.getText('UTF-8')
+            int reports = text.readLines().count { it == 'end' }
+            if (reports != 1) throw new GradleException("verifyLauncherImage: ${scenario}: ${reports} reports\n${text}")
+            Map<String, List<String>> values = [:]
+            text.readLines().findAll { it != 'end' }.each { String line ->
+                int equals = line.indexOf('=')
+                values.computeIfAbsent(line.substring(0, equals)) { [] } << line.substring(equals + 1)
+            }
+            values
+        }
+        def one = { Map<String, List<String>> report, String key -> report[key] ? report[key][0] : null }
+        List<String> failures = []
+        def expect = { String scenario, boolean condition, String message, Map report ->
+            if (!condition) failures << "${scenario}: ${message}\n  report: ${report}".toString()
+        }
+        def home = { String name, String content ->
+            File directory = new File(work, name)
+            directory.mkdirs()
+            if (content != null) new File(directory, 'jasper.vmoptions').setText(content, 'UTF-8')
+            directory
+        }
+        def file = { File directory -> new File(directory, 'jasper.vmoptions').absolutePath }
+
+        File none = home('no-file', null)
+        def report = launch('no-file', console, environment([JASPER_HOME: none.absolutePath]))
+        expect('no file', one(report, 'vmOptionsFile') == file(none), 'reports the Jasper home file', report)
+        expect('no file', one(report, 'digest') == 'null' && one(report, 'corrupted') == 'null' && report.input.contains('-Xmx256m'),
+            'only the bundled options', report)
+
+        File ordered = home('ordered', '# heap\r\n\r\n  -Xmx300m  \r\n-Dprobe.marker=a b\r\n')
+        report = launch('ordered', console, environment([JASPER_HOME: ordered.absolutePath]))
+        List<String> sequence = ['-Xmx256m', '-Xmx300m', '-Dprobe.marker=a b', "-Djasper.vmOptionsFile=${file(ordered)}".toString(),
+            '-Djasper.vmOptionsDigest=f88af5c65b6cd728']
+        List<Integer> positions = sequence.collect { report.input.indexOf(it) }
+        expect('ordered', one(report, 'digest') == 'f88af5c65b6cd728', 'the digest of the applied lines', report)
+        expect('ordered', one(report, 'marker') == 'a b', 'a -D value keeps its space', report)
+        expect('ordered', !positions.contains(-1) && positions == positions.toSorted(),
+            "bundled options, then the user's lines, then the bookkeeping properties: ${sequence}", report)
+
+        File collector = home('collector', '-XX:+UseParallelGC\n')
+        report = launch('collector', console, environment([JASPER_HOME: collector.absolutePath]))
+        expect('collector', one(report, 'skipped') == 'null' && !report.input.contains('-XX:+UseSerialGC') &&
+            report.gc.any { it.startsWith('PS ') }, "the user's collector replaces the bundled one", report)
+
+        File percentage = home('percentage', '-XX:MaxRAMPercentage=10\n')
+        report = launch('percentage', console, environment([JASPER_HOME: percentage.absolutePath]))
+        expect('percentage', !report.input.contains('-Xmx256m') && report.input.contains('-XX:MaxRAMPercentage=10'),
+            'MaxRAMPercentage replaces the bundled -Xmx', report)
+
+        File typo = home('typo', 'Xmx300m\n-Dprobe.marker=typo\n')
+        report = launch('typo', console, environment([JASPER_HOME: typo.absolutePath]))
+        expect('ignored line', one(report, 'marker') == 'typo' && one(report, 'digest') == '01aca14713a53a67' &&
+            !report.input.contains('Xmx300m'), 'a line without a dash is ignored and Jasper still starts', report)
+
+        File corrupted = home('corrupted', '-Xmx300m\n\u0000\n')
+        report = launch('corrupted', console, environment([JASPER_HOME: corrupted.absolutePath]))
+        expect('corrupted', one(report, 'corrupted') == 'true' && one(report, 'digest') == 'null' &&
+            !report.input.contains('-Xmx300m'), 'a NUL character makes the launcher ignore the file', report)
+
+        File chosen = home('chosen-home', '-Dprobe.marker=home\n')
+        File other = new File(work, 'other.vmoptions')
+        other.setText('-Dprobe.marker=other\n', 'UTF-8')
+        report = launch('chosen', console, environment([JASPER_HOME: chosen.absolutePath, JASPER_VM_OPTIONS: other.absolutePath]))
+        expect('JASPER_VM_OPTIONS', one(report, 'vmOptionsFile') == other.absolutePath && one(report, 'marker') == 'other',
+            'JASPER_VM_OPTIONS names the file', report)
+        report = launch('chosen-missing', console, environment([JASPER_HOME: chosen.absolutePath,
+            JASPER_VM_OPTIONS: new File(work, 'missing.vmoptions').absolutePath]))
+        expect('missing JASPER_VM_OPTIONS', one(report, 'vmOptionsFile') == file(chosen) && one(report, 'marker') == 'home',
+            'a JASPER_VM_OPTIONS naming no file falls back to the Jasper home', report)
+
+        File user = new File(work, 'user-home')
+        File defaultFile = host.os == 'windows' ? new File(user, 'jasper\\jasper.vmoptions') : new File(user, '.config/jasper/jasper.vmoptions')
+        defaultFile.parentFile.mkdirs()
+        defaultFile.setText('-Dprobe.marker=default\n', 'UTF-8')
+        report = launch('default', console, environment(host.os == 'windows' ? [APPDATA: user.absolutePath] : [HOME: user.absolutePath]))
+        expect('default location', one(report, 'vmOptionsFile') == defaultFile.absolutePath && one(report, 'marker') == 'default',
+            "the OS default in the Jasper home", report)
+
+        File skipped = home('skipped', '-Xmx300m\n')
+        report = launch('skipped', console, environment([JASPER_HOME: skipped.absolutePath, JASPER_VM_OPTIONS_SKIP: 'manual']))
+        expect('JASPER_VM_OPTIONS_SKIP', one(report, 'skipped') == 'manual' && one(report, 'skipVariable') == 'null' &&
+            !report.input.contains('-Xmx300m'), 'skips the file and keeps the variable from the JVM', report)
+
+        File rejected = home('rejected', '-Xmx3q\n')
+        report = launch('rejected', console, environment([JASPER_HOME: rejected.absolutePath]), ['alpha', 'with space'])
+        expect('rejected options', one(report, 'skipped') == 'launch-failed' && one(report, 'skipVariable') == 'null' &&
+            !report.input.contains('-Xmx3q'), 'one more start without the options', report)
+        expect('rejected options', report.argument == ['alpha', 'with space'], 'the arguments survive the second start', report)
+
+        File directory = home('directory', null)
+        new File(directory, 'jasper.vmoptions').mkdirs()
+        report = launch('directory', console, environment([JASPER_HOME: directory.absolutePath]))
+        expect('directory', one(report, 'digest') == 'null' && one(report, 'corrupted') == 'null' &&
+            one(report, 'vmOptionsFile') == file(directory), 'a directory named jasper.vmoptions counts as no file', report)
+
+        File spaced = home('spaced home', '-Dprobe.marker=spaced\n')
+        report = launch('spaced', console, environment([JASPER_HOME: spaced.absolutePath]))
+        expect('home with a space', one(report, 'marker') == 'spaced' && one(report, 'vmOptionsFile') == file(spaced),
+            'the file is read and reported', report)
+
+        // A home with a space and a non-ASCII letter. POSIX passes the name in the build's file-name encoding.
+        if (host.os == 'windows' || System.getProperty('sun.jnu.encoding', '').equalsIgnoreCase('UTF-8')) {
+            File unicode = home('J\u00fcrgen home', '-Dprobe.marker=unicode\n')
+            report = launch('unicode', console, environment([JASPER_HOME: unicode.absolutePath]))
+            expect('non-ASCII home', one(report, 'marker') == 'unicode', 'the file is read', report)
+            // Windows hands the JVM its options in the ANSI code page, so only POSIX compares the reported path.
+            if (host.os != 'windows') expect('non-ASCII home', one(report, 'vmOptionsFile') == file(unicode), 'the path is reported', report)
+        } else {
+            logger.lifecycle("verifyLauncherImage: skipped the non-ASCII home (file names are ${System.getProperty('sun.jnu.encoding')})")
+        }
+
+        if (host.os == 'windows') {
+            File windowed = image('LauncherProbeGui', false)
+            report = launch('windowed-rejected', windowed, environment([JASPER_HOME: rejected.absolutePath]), ['alpha', 'with space'])
+            expect('windowed launcher', one(report, 'skipped') == 'launch-failed' && report.argument == ['alpha', 'with space'],
+                'the windowed launcher starts once more without the options', report)
+        }
+
+        if (failures) throw new GradleException('verifyLauncherImage:\n' + failures.join('\n'))
+        new File(work, 'passed').text = 'passed\n'
+    }
+}
+tasks.named('check') { dependsOn(verifyLauncherImage) }

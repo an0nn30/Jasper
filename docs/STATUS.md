@@ -1,5 +1,21 @@
 # Jasper — Status and Handoff
 
+**Custom VM options plan 1 (launcher) complete — 2026-10-13.** Merged to local `main` (not pushed): Jasper builds
+jpackage's launcher from vendored JBR 25.0.4.1 sources (`packaging/launcher`) with marked hooks that merge the user's
+`jasper.vmoptions` (location, format and IntelliJ's merge from the
+[spec](superpowers/specs/2026-10-13-jasper-custom-vm-options-design.md)) and an exit guard that starts once more
+without the user's options when the JVM rejects them. Bundled defaults `-Xmx2048m -XX:+IgnoreUnrecognizedVMOptions`.
+Only option lines apply: a line without a leading `-`, or one of the `java` launcher's own options, is ignored
+(spec 3.2, final review). A fallback start never arms the guard.
+`check` builds the launcher and runs its native tests, a guard test against the real libjli and a probe-image
+end-to-end test on each OS. Deviations: the nine in the plan's banner; also `FileUtils::isDirectory` exists only in
+upstream's Windows sources, so the wrapper uses `stat`/`S_ISREG` elsewhere. Full `./gradlew check` after merging `main`: 9,775 tests,
+0 failures, 8 skips. Known limit (spec 4.5): HotSpot's own initialization failures (`-Xms` above `-Xmx`, a
+missing agent, an unusable CDS archive) end with `_exit` and are not recovered at launch; plan 2's Settings check
+reports them before a restart. Manual checks pending (the user): the packaged app on macOS with a `jasper.vmoptions`
+(`-Xmx3g`, then `-Xmx3q`; expect one new Local Network prompt for the rebuilt launcher), Windows and Linux packages.
+Plans 2 (settings and actions) and 3 (memory) are next.
+
 **Vault logins in the palette — 2026-10-13** (`claude/vault-palette-logins`, worktree
 `.claude/worktrees/vault-palette-logins`; bounded change, design approved in chat, no spec or plan). Vault 0.5.0: the
 Vault scope lists logins only (SSH keys stay in the manager) and its placeholder is "Search logins". New action

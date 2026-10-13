@@ -28,9 +28,12 @@ else emptyList()
 
 application {
     mainClass = "dev.jasper.app.Main"
+    // The heap default and IntelliJ's tolerance of outdated flags; a user's jasper.vmoptions overrides them.
     applicationDefaultJvmArgs = listOf(
         "--enable-native-access=ALL-UNNAMED",
         "-Dapple.awt.application.name=Jasper",
+        "-Xmx2048m",
+        "-XX:+IgnoreUnrecognizedVMOptions",
     ) + glassJvmArgs
 }
 
