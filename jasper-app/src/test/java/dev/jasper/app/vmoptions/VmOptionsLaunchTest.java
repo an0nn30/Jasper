@@ -32,6 +32,13 @@ class VmOptionsLaunchTest {
         assertThat(development.file()).isEmpty();
     }
 
+    @Test void aLauncherPathThePlatformCannotParseLeavesTheLaunchUnmanaged() {
+        var launch = VmOptionsLaunch.of(properties("jasper.vmOptionsFile", "bad\u0000path", "jasper.vmOptionsDigest", "c758526d21c369d0"));
+        assertThat(launch.launcherManaged()).isFalse();
+        assertThat(launch.file()).isEmpty();
+        assertThat(launch.digest()).contains("c758526d21c369d0");
+    }
+
     @Test void aRestartIsNeededWhenTheAppliedLinesDiffer() {
         var applied = new VmOptionsLaunch(Optional.of(Path.of("/h/jasper.vmoptions")), Optional.of(VmOptionsSyntax.digest(List.of("-Xmx2048m"))),
             false, Optional.empty());

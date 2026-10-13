@@ -59,6 +59,7 @@ class LauncherImageTest {
     @Test void noLauncherMeansNoImage() {
         assertThat(LauncherImage.locate(null)).isEmpty();
         assertThat(LauncherImage.locate(" ")).isEmpty();
+        assertThat(LauncherImage.locate("bad\u0000path")).as("a path the platform cannot parse").isEmpty();
         assertThat(LauncherImage.locate(root.resolve("nowhere/Jasper").toString())).isEmpty();
         var bare = LauncherImage.parse(root, List.of("java-options=-Dx=1"));
         assertThat(bare.bundledMaxHeapMiB()).isEqualTo(LauncherImage.DEFAULT_MAX_HEAP_MIB);

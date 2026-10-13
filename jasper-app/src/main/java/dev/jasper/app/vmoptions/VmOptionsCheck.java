@@ -74,26 +74,32 @@ public final class VmOptionsCheck {
         return Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java");
     }
 
-    /** Checks {@code parsed}'s applied lines; a corrupted file, or one without option lines, is not checked. */
+    /**
+     * Checks {@code parsed}'s applied lines; a corrupted file, or one without option lines, is not checked. A run over its
+     * time limit ends the check with no findings at all (spec section 7).
+     */
     public Findings check(VmOptionsSyntax.Parsed parsed) throws IOException {
         if (parsed.corrupted() || parsed.lines().isEmpty()) return Findings.NONE;
         var unrecognized = new ArrayList<String>();
         for (String line : parsed.lines()) {
             Outcome alone = run(List.of(java.toString(), "-XX:-IgnoreUnrecognizedVMOptions", line, "-version"));
-            if (!alone.timedOut() && alone.exit() != 0 && unrecognized(alone.output())) unrecognized.add(line);
+            if (alone.timedOut()) return Findings.NONE;
+            if (alone.exit() != 0 && unrecognized(alone.output())) unrecognized.add(line);
         }
         List<String> options = VmOptionsSyntax.merge(image.javaOptions(), parsed.lines());
         Outcome merged = run(command(options, List.of("-version")));
-        Optional<Fatal> fatal = !merged.timedOut() && merged.exit() != 0 ? Optional.of(fatal(merged.output())) : Optional.empty();
+        if (merged.timedOut()) return Findings.NONE;
+        Optional<Fatal> fatal = merged.exit() != 0 ? Optional.of(fatal(merged.output())) : Optional.empty();
         boolean cacheRejected = false;
-        if (image.hasAotCache() && fatal.isEmpty() && !merged.timedOut()) {
+        if (image.hasAotCache() && fatal.isEmpty()) {
             Outcome cache = run(command(options, List.of("-XX:AOTMode=on", "-cp", String.join(File.pathSeparator, image.classpath()), "-version")));
-            cacheRejected = !cache.timedOut() && cache.exit() != 0;
+            if (cache.timedOut()) return Findings.NONE;
+            cacheRejected = cache.exit() != 0;
         }
         return new Findings(unrecognized, fatal, cacheRejected);
     }
 
-    /** One run; a run over its limit finds nothing and is logged (spec section 7). */
+    /** One run; a run over its limit is logged (spec section 7). */
     private Outcome run(List<String> command) throws IOException {
         Outcome outcome = runner.run(command, limit);
         if (outcome.timedOut()) LOG.log(System.Logger.Level.WARNING, "The VM options check timed out after {0}: {1}", limit, String.join(" ", command));

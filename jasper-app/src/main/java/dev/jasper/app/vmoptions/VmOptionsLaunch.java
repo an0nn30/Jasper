@@ -1,6 +1,7 @@
 package dev.jasper.app.vmoptions;
 
 import java.lang.management.ManagementFactory;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -21,9 +22,27 @@ public record VmOptionsLaunch(Optional<Path> file, Optional<String> digest, bool
     /** This JVM's launch. */
     public static VmOptionsLaunch current() { return of(System.getProperties()); }
 
+    private static final System.Logger LOG = System.getLogger(VmOptionsLaunch.class.getName());
+
     static VmOptionsLaunch of(Properties properties) {
-        return new VmOptionsLaunch(present(properties, "jasper.vmOptionsFile").map(Path::of), present(properties, "jasper.vmOptionsDigest"),
+        return new VmOptionsLaunch(file(properties), present(properties, "jasper.vmOptionsDigest"),
             "true".equals(properties.getProperty("jasper.vmOptionsFile.corrupted")), present(properties, "jasper.vmOptionsSkipped"));
+    }
+
+    /**
+     * The launcher's options file. A value this platform cannot parse (the Windows launcher passes arguments through the
+     * ANSI code page, so unrepresentable characters arrive as {@code ?}) leaves the launch unmanaged instead of stopping
+     * Jasper from starting.
+     */
+    private static Optional<Path> file(Properties properties) {
+        Optional<String> value = present(properties, "jasper.vmOptionsFile");
+        if (value.isEmpty()) return Optional.empty();
+        try {
+            return Optional.of(Path.of(value.get()));
+        } catch (InvalidPathException unparsable) {
+            LOG.log(System.Logger.Level.WARNING, "jasper.vmOptionsFile is not a path this platform can parse, so the VM options are read-only: {0}", value.get());
+            return Optional.empty();
+        }
     }
 
     /** Whether Jasper's launcher started this JVM, so jasper.vmoptions applies to it. */

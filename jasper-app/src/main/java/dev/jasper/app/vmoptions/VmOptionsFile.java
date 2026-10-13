@@ -69,28 +69,34 @@ public final class VmOptionsFile {
         return lines.isEmpty() ? "" : String.join(separator, lines) + separator;
     }
 
-    /** Reads {@code file}, sets the heap limit as {@link #withMaxHeap} does, and writes it back. */
-    public static void setMaxHeap(Path file, long mib, long bundledMib) throws IOException {
-        write(file, withMaxHeap(read(file).text(), mib, bundledMib));
-    }
-
     /** Creates {@code file} with the header and a blank line when it does not exist; returns it. */
     public static Path ensureExists(Path file) throws IOException {
         if (!Files.exists(file)) write(file, HEADER + "\n\n");
         return file;
     }
 
-    /** Replaces {@code file} with {@code text} (UTF-8) atomically, creating its directory. */
+    /**
+     * Replaces {@code file} with {@code text} (UTF-8) atomically, creating its directory. A symbolic link is followed, so
+     * a dotfile manager's link stays a link and its target is rewritten (a dangling link is replaced).
+     */
     public static void write(Path file, String text) throws IOException {
-        Path directory = file.toAbsolutePath().getParent();
+        Path target = file;
+        if (Files.isSymbolicLink(file)) {
+            try {
+                target = file.toRealPath();
+            } catch (IOException dangling) {
+                // Nothing to follow: the link itself is replaced.
+            }
+        }
+        Path directory = target.toAbsolutePath().getParent();
         Files.createDirectories(directory);
         Path temporary = Files.createTempFile(directory, ".jasper.vmoptions", ".tmp");
         try {
             Files.writeString(temporary, text, StandardCharsets.UTF_8);
             try {
-                Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException unsupported) {
-                Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING);
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
             }
         } finally {
             Files.deleteIfExists(temporary);

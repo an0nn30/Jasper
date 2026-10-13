@@ -81,6 +81,17 @@ class VmOptionsCheckTest {
         assertThat(findings).isEqualTo(VmOptionsCheck.Findings.NONE);
     }
 
+    @Test void aCheckOverItsTimeLimitShowsNoFindingsAtAll() throws IOException {
+        var findings = check(IMAGE, command -> command.contains("-XX:-IgnoreUnrecognizedVMOptions")
+            ? new VmOptionsCheck.Outcome(1, "Unrecognized VM option 'NoSuchFlag'\n", false)
+            : new VmOptionsCheck.Outcome(-1, "", true)).check(parsed("-XX:+NoSuchFlag\n"));
+        assertThat(findings).as("the line alone found something, but the merged run timed out").isEqualTo(VmOptionsCheck.Findings.NONE);
+        runs.clear();
+        var aloneTimedOut = check(IMAGE, command -> command.contains("-XX:-IgnoreUnrecognizedVMOptions")
+            ? new VmOptionsCheck.Outcome(-1, "", true) : new VmOptionsCheck.Outcome(1, RECOVERABLE, false)).check(parsed("-Xmx3q\n"));
+        assertThat(aloneTimedOut).as("any run over its limit").isEqualTo(VmOptionsCheck.Findings.NONE);
+    }
+
     @Test void theRealJvmAgrees() throws IOException {
         var check = new VmOptionsCheck(VmOptionsCheck.runtimeJava(), IMAGE, VmOptionsCheck::runProcess, Duration.ofSeconds(30));
         var findings = check.check(parsed("-XX:+NoSuchFlag\n-Xmx3q\n"));

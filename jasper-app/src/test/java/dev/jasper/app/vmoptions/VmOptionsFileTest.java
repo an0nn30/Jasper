@@ -8,6 +8,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 class VmOptionsFileTest {
@@ -58,10 +60,26 @@ class VmOptionsFileTest {
         Files.writeString(file, "-Xmx1g\n");
         VmOptionsFile.ensureExists(file);
         assertThat(Files.readString(file)).isEqualTo("-Xmx1g\n");
-        VmOptionsFile.setMaxHeap(file, 8192, 2048);
+        VmOptionsFile.write(file, VmOptionsFile.withMaxHeap(VmOptionsFile.read(file).text(), 8192, 2048));
         assertThat(Files.readString(file, StandardCharsets.UTF_8)).isEqualTo("-Xmx8192m\n");
         try (Stream<Path> entries = Files.list(file.getParent())) {
             assertThat(entries.map(path -> path.getFileName().toString())).containsExactly("jasper.vmoptions");
         }
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS) void savingFollowsASymbolicLinkInsteadOfReplacingIt() throws IOException {
+        Path real = Files.createDirectories(home.resolve("dotfiles")).resolve("jasper.vmoptions");
+        Files.writeString(real, "-Xmx1g\n");
+        Path link = Files.createSymbolicLink(home.resolve("jasper.vmoptions"), real);
+        VmOptionsFile.write(link, "-Xmx3g\n");
+        assertThat(Files.isSymbolicLink(link)).as("the link survives").isTrue();
+        assertThat(Files.readString(real)).isEqualTo("-Xmx3g\n");
+        try (Stream<Path> entries = Files.list(real.getParent())) {
+            assertThat(entries.map(path -> path.getFileName().toString())).as("no temporary file").containsExactly("jasper.vmoptions");
+        }
+        Path dangling = Files.createSymbolicLink(home.resolve("dangling.vmoptions"), home.resolve("nowhere/jasper.vmoptions"));
+        VmOptionsFile.write(dangling, "-Xmx2g\n");
+        assertThat(Files.isSymbolicLink(dangling)).as("a dangling link is replaced, as before").isFalse();
+        assertThat(Files.readString(dangling)).isEqualTo("-Xmx2g\n");
     }
 }

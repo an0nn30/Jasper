@@ -3,6 +3,7 @@ package dev.jasper.app.vmoptions;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +30,12 @@ public record LauncherImage(Path appDirectory, List<String> javaOptions, List<St
     /** The image of the launcher at {@code appPath}; empty when there is none (a development run) or it cannot be read. */
     public static Optional<LauncherImage> locate(String appPath) {
         if (appPath == null || appPath.isBlank()) return Optional.empty();
-        Path launcher = Path.of(appPath.strip()).toAbsolutePath().normalize();
+        Path launcher;
+        try {
+            launcher = Path.of(appPath.strip()).toAbsolutePath().normalize();
+        } catch (InvalidPathException unparsable) {
+            return Optional.empty();
+        }
         Path parent = launcher.getParent();
         if (parent == null || launcher.getFileName() == null) return Optional.empty();
         String name = launcher.getFileName().toString();
