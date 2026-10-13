@@ -7,6 +7,8 @@ import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.model.UiEvent;
 import dev.jasper.ui.model.ViewSpec;
 import dev.jasper.ui.swing.KitView;
+import java.awt.event.HierarchyEvent;
+import java.awt.event.HierarchyListener;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -203,6 +205,7 @@ public final class SchemaPage implements SettingsPage {
     private String revealed;
     private KitView view;
     private PageBody body;
+    private HierarchyListener waiting;
     private Subscription listening;
     private boolean disposed;
 
@@ -589,9 +592,28 @@ public final class SchemaPage implements SettingsPage {
     /** Remembers the row to focus once the dialog shows this page; {@code fragment} is an external row's id. */
     @Override public void reveal(String fragment) { revealed = fragment; }
 
-    /** Focuses the revealed row once the page's view exists; until then the request waits. */
+    /**
+     * Focuses the revealed row once the page shows; until then the request waits. A modal dialog selects its first page
+     * before it is visible, when the page has no native peer and focus requests are refused.
+     */
     @Override public void selected() {
-        if (revealed == null || view == null || view.isClosed()) return;
+        if (disposed || revealed == null || view == null || view.isClosed()) return;
+        if (body.isShowing()) {
+            focusRevealed();
+        } else if (waiting == null) {
+            waiting = new HierarchyListener() {
+                @Override public void hierarchyChanged(HierarchyEvent event) {
+                    if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) == 0 || !body.isShowing()) return;
+                    stopWaiting();
+                    // After the window's own initial focus; selected() waits again if the page was hidden meanwhile.
+                    javax.swing.SwingUtilities.invokeLater(SchemaPage.this::selected);
+                }
+            };
+            body.addHierarchyListener(waiting);
+        }
+    }
+
+    private void focusRevealed() {
         String target = revealed;
         revealed = null;
         for (var row : externals) {
@@ -603,9 +625,16 @@ public final class SchemaPage implements SettingsPage {
         }
     }
 
+    private void stopWaiting() {
+        if (waiting == null) return;
+        body.removeHierarchyListener(waiting);
+        waiting = null;
+    }
+
     @Override public void dispose() {
         if (disposed) return;
         disposed = true;
+        stopWaiting();
         RuntimeException failure=null;
         var cleanup=new java.util.ArrayList<Runnable>();
         if(listening!=null)cleanup.add(listening::close);

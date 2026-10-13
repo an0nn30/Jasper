@@ -133,13 +133,23 @@ class SchemaPageExternalTest {
         assertThat(listeners).as("the page closes its refresh subscription").isEmpty();
     }
 
-    @Test void revealThenSelectedFocusesTheExternalRow() {
+    @Test void aRevealWaitsForThePageToShowAndTheLatestRequestWins() {
         var page = page();
-        page.component();
+        var body = page.component();
+        int listeners = body.getHierarchyListeners().length;
         page.reveal("vm.heap");
         assertThat(page.revealed()).isEqualTo("vm.heap");
         page.selected();
-        assertThat(page.revealed()).isNull();
+        assertThat(page.revealed()).as("a page that is not showing keeps the request").isEqualTo("vm.heap");
+        assertThat(body.getHierarchyListeners()).hasSize(listeners + 1);
+        page.reveal("other");
+        page.selected();
+        assertThat(page.revealed()).as("the later request replaces the pending one").isEqualTo("other");
+        assertThat(body.getHierarchyListeners()).as("one listener waits, however often it is selected").hasSize(listeners + 1);
+        page.dispose();
+        assertThat(body.getHierarchyListeners()).as("dispose stops waiting").hasSize(listeners);
+        page.selected();
+        assertThat(body.getHierarchyListeners()).as("a disposed page waits for nothing").hasSize(listeners);
     }
 
     @Test void searchFindsTheExternalRow() {
