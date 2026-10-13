@@ -212,7 +212,7 @@ public class RemotePlugin implements Plugin {
         menu.add(CONNECT); menu.add(HOSTS); menu.add(SPLIT); menu.addSeparator(); menu.add(IMPORT);
         menu.addSeparator();menu.add(SFTP);menu.add(dev.jasper.remote.ui.transfers.TransferUi.SHOW);
         tunnelsUi.addToMenu(menu);
-        // View > Tools lists HOSTS, SFTP_TOGGLE and the Tunnels toggle: the panels name them as their toggles.
+        // View > Tool Windows lists HOSTS, SFTP_TOGGLE and the Tunnels toggle: the panels name them as their toggles.
 
         distros = wslProfiles();
         scope = new RemoteScope(store::hosts, store::error, this::openHost, this::splitHost, (window, host) -> editHost(window, Optional.of(host)),

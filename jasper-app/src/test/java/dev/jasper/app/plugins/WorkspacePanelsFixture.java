@@ -73,10 +73,10 @@ public final class WorkspacePanelsFixture implements AutoCloseable {
         var pluginClass = serverLoader.loadClass("dev.jasper.fileserver.FileServerPlugin");
         var environmentClass = serverLoader.loadClass("dev.jasper.fileserver.FileServerPlugin$Environment");
         var environment = environmentClass.getDeclaredConstructor(Executor.class, Supplier.class, IntPredicate.class,
-            Consumer.class, Consumer.class, Path.class, String.class, java.time.ZoneId.class, BiFunction.class);
+            Consumer.class, Path.class, String.class, java.time.ZoneId.class, BiFunction.class);
         environment.setAccessible(true);
         Object settings = environment.newInstance((Executor) SwingUtilities::invokeLater, (Supplier<List<?>>) List::of,
-            (IntPredicate) port -> true, (Consumer<String>) text -> { }, (Consumer<Path>) path -> { },
+            (IntPredicate) port -> true, (Consumer<Path>) path -> { },
             Files.createDirectories(home.resolve("synthetic-share")), "Mac OS X", ZoneOffset.UTC,
             (BiFunction<Duration, Runnable, Runnable>) (delay, task) -> () -> { });
         var serverConstructor = pluginClass.getDeclaredConstructor(environmentClass);

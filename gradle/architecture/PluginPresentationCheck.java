@@ -16,6 +16,8 @@ public final class PluginPresentationCheck {
 
     private static final Set<String> CANVASES = Set.of("dev/jasper/editor/ui/DocumentArea", "dev/jasper/editor/vim/VimTextArea");
     private static final String EDITOR_THEME = "dev/jasper/editor/ui/EditorTheme";
+    // Plugins reach the clipboard through Platform; only the Editor's Vim registers keep their own.
+    private static final String EDITOR_CLIPBOARD = "dev/jasper/editor/ui/SystemClipboard";
     private static final Set<String> PAINT = Set.of("paint", "paintComponent", "paintBorder", "paintChildren", "paintIcon", "update");
     private static final Set<String> STYLE = Set.of("setBackground", "setForeground", "setFont", "setBorder", "setOpaque",
         "setUI", "putClientProperty", "setSelectionColor", "setSelectedTextColor", "setCaretColor", "setSelectionBackground", "setSelectionForeground",
@@ -87,6 +89,10 @@ public final class PluginPresentationCheck {
                     problems.add(name + " reads/writes global presentation defaults: " + operation);
                 if (owner.startsWith("javax/swing/BorderFactory") && !canvas)
                     problems.add(name + " builds ordinary borders: " + operation);
+                boolean awtClipboard = owner.equals("java/awt/Toolkit")
+                    && (member.equals("getSystemClipboard") || member.equals("getSystemSelection"));
+                if (awtClipboard && !(exactSource && sourceOwner.equals(EDITOR_CLIPBOARD)))
+                    problems.add(name + " uses the AWT clipboard directly; use Platform.copy, copySecret or clipboardText: " + operation);
             }
         }
         return problems;
@@ -207,6 +213,7 @@ public final class PluginPresentationCheck {
         cases.put("fixture/IconAssignment", "class IconAssignment { void apply(javax.swing.AbstractButton b, javax.swing.Icon i) { b.setIcon(i); } }");
         cases.put("fixture/InheritedSize", "class InheritedSize extends javax.swing.JLabel { void apply(){setMinimumSize(new java.awt.Dimension(900,900));} }");
         cases.put("fixture/InheritedStyle", "class InheritedStyle extends javax.swing.JLabel { void style(){setForeground(java.awt.Color.RED);} }");
+        cases.put("fixture/Clipboard", "class Clipboard { Object get() { return java.awt.Toolkit.getDefaultToolkit().getSystemClipboard(); } }");
         cases.put("dev/jasper/editor/ui/Other", "class Other { Object create(){return new javax.swing.JButton();} }");
         cases.put("dev/jasper/editor/ui/EditorTheme", "class EditorTheme { Object create(){return new javax.swing.JButton();} }");
         cases.put("dev/jasper/editor/ui/DocumentArea", "class DocumentArea extends javax.swing.JComponent { Object create(){return new javax.swing.JButton();} }");
@@ -218,6 +225,7 @@ public final class PluginPresentationCheck {
                 case "fixture/Paint" -> "declares ordinary paint method";
                 case "fixture/ColoredIcon" -> "paints outside a custom canvas";
                 case "fixture/Style", "fixture/InheritedStyle", "fixture/Margin", "fixture/PreferredSize", "fixture/IconAssignment", "fixture/InheritedSize" -> "styles ordinary controls";
+                case "fixture/Clipboard" -> "uses the AWT clipboard directly";
                 default -> "constructs visible control";
             };
             if (problems.stream().noneMatch(problem -> problem.contains(expected)))
@@ -226,7 +234,8 @@ public final class PluginPresentationCheck {
         var positive = Map.of(
             "fixture/Domain", "class Domain { java.awt.Color color = new java.awt.Color(123); java.awt.Point point = new java.awt.Point(1,2); java.awt.Dimension size = new java.awt.Dimension(3,4); javax.swing.Timer timer = new javax.swing.Timer(5,e -> {}); void resize(){size.setSize(7,8);} }",
             "dev/jasper/editor/ui/DocumentArea", "class DocumentArea extends javax.swing.JComponent { void geometry(){setPreferredSize(new java.awt.Dimension(900,900));} protected void paintComponent(java.awt.Graphics g) {g.setColor(java.awt.Color.RED); g.fillRect(0,0,4,4);} }",
-            "dev/jasper/editor/ui/EditorTheme", "class EditorTheme { void apply(javax.swing.JViewport v){v.setOpaque(false); v.setBackground(new java.awt.Color(123));} }");
+            "dev/jasper/editor/ui/EditorTheme", "class EditorTheme { void apply(javax.swing.JViewport v){v.setOpaque(false); v.setBackground(new java.awt.Color(123));} }",
+            "dev/jasper/editor/ui/SystemClipboard", "class SystemClipboard { Object get() { return java.awt.Toolkit.getDefaultToolkit().getSystemClipboard(); } }");
         for (var fixture : positive.entrySet()) {
             var problems = check(compile(root.resolve("positive_" + fixture.getKey().replace('/', '_')), fixture.getKey(), fixture.getValue()));
             if (!problems.isEmpty()) failures.add("Rejected legitimate fixture " + fixture.getKey() + ": " + problems);

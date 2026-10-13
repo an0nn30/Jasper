@@ -16,8 +16,8 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.16.0, <0.17"
-capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen
+sdk = ">=0.16.1, <0.17"
+capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen, clipboard.read
 exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
 homepage = "https://example.dev/tool"  # optional, SDK 0.9.3: an http or https link on your plugin's page
@@ -28,7 +28,7 @@ version = ">=1.0"
 optional = false
 ```
 
-`icon` and `homepage` need Jasper 0.9.3 or later (declare `sdk = ">=0.16.0, <0.17"`); an older Jasper rejects a
+`icon` and `homepage` need Jasper 0.9.3 or later (declare `sdk = ">=0.16.1, <0.17"`); an older Jasper rejects a
 manifest with keys it does not know. An icon that is missing, too large or not an SVG or PNG, and a homepage that is
 not an `http` or `https` address, are ignored: the plugin still loads, with the default icon and no link.
 
@@ -85,7 +85,7 @@ private static void installUi(PluginContext context, long stepMillis) {
         });
     context.toolbar().add(ToolbarItem.action(DEMO));
     context.menus().create("dev.jasper.sample.menu", "Sample").add(DEMO);
-    context.menus().standard(StandardMenu.VIEW).add(DEMO);
+    context.menus().standard(StandardMenu.TOOLS).add(DEMO);
     context.menus().terminalContext().add(DEMO);
 
     StatusItem status = context.statusBar().add(new StatusItemSpec("dev.jasper.sample.status", Side.RIGHT, 100));
@@ -115,6 +115,9 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Placements** may name only actions your plugin registered. Closing an action removes it from
   everywhere it was placed.
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
+- **The Tools menu** (SDK 0.16.1) is the home for utility commands: `context.menus().standard(StandardMenu.TOOLS).add(id)`.
+  Jasper has no tools of its own, so the menu shows only while some plugin has entries in it, after Tab and before
+  plugins' own top-level menus.
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** Pass semantic names such as `"lock"`, `"server"` and `"file"` to presentation records.
   Register a plugin-owned monochrome path with `context.kit().registerIcon(new IconAsset("your.plugin:icon", path))`.
@@ -145,10 +148,10 @@ and a right half. `Anchor` picks the side and `PanelSpec.withSplit()` (SDK 0.13.
 SFTP, for example, opens under Sessions. Register a panel once; Jasper asks your factory for one
 instance per window, the first time the panel is shown there, and gives the panel a stripe icon, a
 header (its title, an options menu and a hide button), a `<panel id>.toggle` action and a
-View → Tools entry, so don't add a View menu item of your own that toggles it, and don't repeat the
+View › Tool Windows entry, so don't add a View menu item of your own that toggles it, and don't repeat the
 panel's title inside it. If you already have
 an action that toggles the panel, for example to give it a shortcut, register it first and name it
-with `PanelSpec.withToggleActionId(id)` (SDK 0.8.1): Tools and the palette then list your action,
+with `PanelSpec.withToggleActionId(id)` (SDK 0.8.1): Tool Windows and the palette then list your action,
 with its shortcut, and Jasper registers no `<panel id>.toggle`. One panel shows per slot; the user
 can drag a panel by its stripe icon or its header to another slot or another place on a stripe, or
 use the Move to menu on either, and Jasper remembers its slot, its place on the stripe and the side's
@@ -256,6 +259,7 @@ equal. Finding things needs no capability. What a handle may do does:
 | `session.provide` | `Terminals.openTab` and `split` with `OpenRequest.session(...)` |
 | `files.source` | `FileSources.register`: add places, such as saved hosts, to the file chooser |
 | `network.listen` | nothing gated: declare it when your plugin accepts connections from other programs or computers, such as serving files |
+| `clipboard.read` | `Platform.clipboardText()`: read the text on the clipboard (SDK 0.16.1) |
 
 Declare them in `plugin.toml`; the user is shown the list before your plugin loads. A gated call
 without the capability throws `MissingCapabilityException`. Jasper logs gated calls with your plugin
@@ -487,6 +491,24 @@ revealing the file), in the background; a failure is posted in your plugin's gro
 opens an http or https address in the user's browser the same way (SDK 0.10.2); any other address throws
 `IllegalArgumentException`.
 
+## The clipboard
+
+Since SDK 0.16.1, `context.platform()` puts text on the clipboard and reads it, on the UI thread (elsewhere the calls throw
+`IllegalStateException`):
+
+- `copy(text)` puts text on the clipboard. When it cannot be written, for example while another program holds it, Jasper
+  posts "Could not copy" with the cause in your plugin's group and the call returns `false`; nothing is thrown.
+- `copySecret(text)` is `copy` for text that should not linger, such as a password or a decrypted value. Jasper clears the
+  clipboard 30 seconds later (retrying briefly while another program holds it), and tries once when your plugin stops and
+  once when Jasper quits, in each case only if the clipboard still holds that text: a later copy, by the user or by any
+  plugin, is left alone.
+- `clipboardText()` returns the clipboard's text, or empty when it holds none or cannot be read. It needs the
+  `clipboard.read` capability, because the clipboard often holds something the user just copied elsewhere, such as a
+  password; Jasper logs each read with your plugin id and the number of characters, never the text.
+
+Plugin code does not use the AWT clipboard (`Toolkit.getSystemClipboard()` or `getSystemSelection()`):
+`verifyPluginArchitecture` rejects both in the bundled plugins, except for the Editor's Vim registers. Declare `sdk = ">=0.16.1, <0.17"` when you use these methods.
+
 ## Rules that matter
 
 - **Threads.** Subscribe and publish services on the event thread. `publish`, activity
@@ -564,7 +586,7 @@ try (var host = new FakePluginHost()) {
 `host.invoke(id, windowId, paneIdOrNull)` show and drive what the plugin contributed.
 `host.panels()`, `host.openPanel(id, windowId)`, `host.rail()`, `host.windows()` and
 `host.requestClose(windowId)` cover panels and windows. The fake does not model Jasper's own
-`<panel id>.toggle` action or View → Tools menu; `host.panels()` lists `id|title|ANCHOR`, with
+`<panel id>.toggle` action or View › Tool Windows menu; `host.panels()` lists `id|title|ANCHOR`, with
 `+split` after the anchor for a split panel and `|<action id>` for a panel that names its own toggle.
 `host.addTerminalWindow()`, `addTerminalTab`, `addTerminalPane`, `activateTerminalWindow`,
 `focusTerminalPane` and `closeTerminalPane` script a workspace; `host.sent(paneId)` and
@@ -578,7 +600,10 @@ A provided session is driven with `host.sessionState(paneId)`, `typeIntoSession`
 and closes inline where Jasper uses its cleanup thread.
 `host.scopes()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep` and `executeInScope`
 drive a contributed scope as the palette would; `paletteOpens()`, `openedInEditor()`
-and `browsed()` record what the plugin asked for. `connectionLog()` lists delivered connection events, as
+and `browsed()` record what the plugin asked for. `host.clipboard()` is the clipboard every plugin's `Platform` writes
+to: `copies()` lists `copy|<plugin id>|<text>` and `secret|<plugin id>|<text>`, `text()` and `setText(value)` read and
+set it as the user would, `failWrites(true)` makes it busy, and `expireSecrets()` runs the 30-second clear now. The fake
+does not model the UI thread, so the application's off-thread `IllegalStateException` is not reproduced. `connectionLog()` lists delivered connection events, as
 `activityLog()` does activities. `host.notifications()` records what the plugin posted: `lines()` as
 `group|SEVERITY|title|content`, with `|` and the cause's simple class name when it had one, `posts()` with their specs
 and whether they expired, `groups()` as `id|name|MODE`, and `runAction(title, label)` and `click(title)` act as the

@@ -51,10 +51,10 @@ public final class PanelSurfaceFixture implements AutoCloseable {
             var pluginClass = loader.loadClass("dev.jasper.fileserver.FileServerPlugin");
             var environmentClass = loader.loadClass("dev.jasper.fileserver.FileServerPlugin$Environment");
             var environment = environmentClass.getDeclaredConstructor(java.util.concurrent.Executor.class, Supplier.class, IntPredicate.class,
-                Consumer.class, Consumer.class, Path.class, String.class, java.time.ZoneId.class, BiFunction.class);
+                Consumer.class, Path.class, String.class, java.time.ZoneId.class, BiFunction.class);
             environment.setAccessible(true);
             Object settings = environment.newInstance((java.util.concurrent.Executor) SwingUtilities::invokeLater, (Supplier<List<?>>) List::of,
-                (IntPredicate) port -> true, (Consumer<String>) text -> { }, (Consumer<Path>) path -> { }, home, "Mac OS X", java.time.ZoneOffset.UTC,
+                (IntPredicate) port -> true, (Consumer<Path>) path -> { }, home, "Mac OS X", java.time.ZoneOffset.UTC,
                 (BiFunction<java.time.Duration, Runnable, Runnable>) (delay, task) -> () -> { });
             var constructor = pluginClass.getDeclaredConstructor(environmentClass); constructor.setAccessible(true);
             plugin = (Plugin) constructor.newInstance(settings);

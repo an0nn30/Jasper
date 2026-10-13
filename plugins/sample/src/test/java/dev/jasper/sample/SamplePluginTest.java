@@ -170,7 +170,8 @@ class SamplePluginTest {
             assertThat(host.actions()).contains("dev.jasper.sample.demo|Run Sample Activity|true");
             assertThat(host.toolbar()).containsExactly("button:dev.jasper.sample.demo");
             assertThat(host.menu("top:dev.jasper.sample.menu")).containsExactly("item:dev.jasper.sample.demo");
-            assertThat(host.menu("VIEW")).containsExactly("item:dev.jasper.sample.demo");
+            assertThat(host.menu("TOOLS")).containsExactly("item:dev.jasper.sample.demo");
+            assertThat(host.menu("VIEW")).isEmpty();
             assertThat(host.menu("context")).containsExactly("item:dev.jasper.sample.demo");
             assertThat(host.status()).containsExactly("dev.jasper.sample.status|RIGHT|Sample: idle|Run the sample activity|dev.jasper.sample.demo");
 

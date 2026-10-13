@@ -27,7 +27,6 @@ import dev.jasper.vault.store.VaultFile;
 import dev.jasper.vault.ui.GrantPanel;
 import dev.jasper.vault.ui.PasswordPanel;
 import dev.jasper.vault.ui.PickerPanel;
-import dev.jasper.vault.ui.SecretClipboard;
 import dev.jasper.vault.ui.VaultScope;
 import dev.jasper.vault.ui.VaultManager;
 import dev.jasper.vault.ui.VaultManagerWindow;
@@ -42,14 +41,13 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
 /**
  * Wires the vault to Jasper: the lock manager on the plugin's executors, the service published per
  * consumer, the Open and Lock actions, the lock-state topic, the settings file and the inactivity lock.
- * Owns the manager window, clipboard, status item, rail action and palette scope.
+ * Owns the manager window, status item, rail action and palette scope.
  */
 public class VaultPlugin implements Plugin {
     public static final String OPEN = "dev.jasper.vault.open";
@@ -61,7 +59,6 @@ public class VaultPlugin implements Plugin {
 
     private final Function<PluginContext, DeviceSecrets> secretsFactory;
     private final Executor ui;
-    private final Supplier<SecretClipboard> clipboardFactory;
     private PluginContext context;
     private LockManager lock;
     private VaultService service;
@@ -72,7 +69,6 @@ public class VaultPlugin implements Plugin {
     private Timer ticker;
     private AWTEventListener activity;
     private VaultScope scope;
-    private SecretClipboard clipboard;
     private VaultSettings settings;
     private VaultSettings.Declared declared;
     public static final String GENERATE = "dev.jasper.vault.generate_key";
@@ -91,16 +87,12 @@ public class VaultPlugin implements Plugin {
 
     /** Created by the runtime: the platform keychain with the file fallback, completing on the EDT. */
     public VaultPlugin() {
-        this(context -> new DeviceSecrets(KeychainStore.forPlatform(context.dataDirectory()), new FileStore(context.dataDirectory().resolve("device.secret"))), SwingUtilities::invokeLater, SecretClipboard::system);
+        this(context -> new DeviceSecrets(KeychainStore.forPlatform(context.dataDirectory()), new FileStore(context.dataDirectory().resolve("device.secret"))), SwingUtilities::invokeLater);
     }
 
     /** For tests: the device secret store to use and the executor that stands in for the UI thread. */
     VaultPlugin(Function<PluginContext, DeviceSecrets> secretsFactory, Executor ui) {
-        this(secretsFactory, ui, () -> new SecretClipboard(text -> { }, Optional::empty, clear -> { }));
-    }
-
-    VaultPlugin(Function<PluginContext, DeviceSecrets> secretsFactory, Executor ui, Supplier<SecretClipboard> clipboardFactory) {
-        this.secretsFactory = secretsFactory; this.ui = ui; this.clipboardFactory = clipboardFactory;
+        this.secretsFactory = secretsFactory; this.ui = ui;
     }
 
     @Override public void start(PluginContext context) throws Exception {
@@ -128,11 +120,10 @@ public class VaultPlugin implements Plugin {
         lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock"))
             .withDefaultBinding("cmd+shift+l"), invoked -> lock.lock());
         lockAction.setEnabled(false);
-        clipboard = clipboardFactory.get();
-        scope = new VaultScope(lock, service, clipboard, this::open, context.notifications().group());
+        scope = new VaultScope(lock, service, context.platform(), this::open);
         context.palette().register(scope);
         manager = new VaultManager(lock, context.background(), ui, this::vaultChanged);
-        managerWindow = new VaultManagerWindow(context, lock, manager, service, clipboard, this::managerStatus, this::showGenerator);
+        managerWindow = new VaultManagerWindow(context, lock, manager, service, this::managerStatus, this::showGenerator);
         context.actions().register(ActionSpec.of(GENERATE, "Generate SSH Key...")
             .withKeywords(List.of("vault", "ssh", "key", "generate")),
             invoked -> openThen(invoked.window(), Optional.empty(), this::showGenerator));
@@ -169,13 +160,8 @@ public class VaultPlugin implements Plugin {
             if (currentUnlock != null) currentUnlock.cancel();
         } finally {
             if (manager != null) manager.invalidate();
-            try {
-                if (clipboard != null) clipboard.close();
-            } catch (RuntimeException ignored) {
-                // Clipboard ownership may already have gone away during shutdown.
-            } finally {
-                if (lock != null) lock.lock();
-            }
+            // Jasper clears a secret this plugin copied when the plugin stops.
+            if (lock != null) lock.lock();
         }
     }
 

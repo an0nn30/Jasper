@@ -160,7 +160,7 @@ class ZenModeTest {
             var view = view(owner);
             assertThat(item(view, "Zoom Pane").getAction()).isSameAs(owner.action(ActionId.ZOOM_PANE));
             assertThat(item(child(view, "Font Size"), "Increase Font Size").getAction()).isSameAs(owner.action(ActionId.FONT_BIGGER));
-            item(child(view, "Tools"), "Toggle Panel").doClick();
+            item(child(view, "Tool Windows"), "Toggle Panel").doClick();
             assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
             toggle(owner);
             var visibility = child(view, "Show/Hide");

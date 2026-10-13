@@ -98,6 +98,8 @@ final class PluginHost {
     java.util.function.BooleanSupplier animations = () -> true;
     /** The keymap text a plugin's menus show beside an item's action. */
     java.util.function.Function<String, String> shortcuts = action -> "";
+    /** The clipboard every plugin's Platform writes to; the application shares it with its own copies. */
+    dev.jasper.app.platform.HostClipboard clipboard = dev.jasper.app.platform.HostClipboard.system();
     final Environment environment;
     /** Runs cancellation handlers and connection closes off the EDT; outlives every plugin's own executor. */
     final CleanupWorker cleanup = new CleanupWorker();

@@ -8,8 +8,6 @@ import dev.jasper.remote.transfer.*;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.*;
 import dev.jasper.sdk.ui.*;
-import java.awt.Toolkit;
-import java.awt.datatransfer.StringSelection;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
@@ -25,7 +23,7 @@ import java.util.function.*;
  */
 public final class SftpUi implements AutoCloseable {
     public static final String PANEL="dev.jasper.remote.sftp.panel";
-    /** The action that toggles the panel; registered by the plugin before this UI, so View &gt; Tools lists it once. */
+    /** The action that toggles the panel; registered by the plugin before this UI, so View &gt; Tool Windows lists it once. */
     public static final String TOGGLE="dev.jasper.remote.sftp.toggle";
     /** The panel's history and parent folder shortcuts, in the panel's own shortcut context. */
     public static final String BACK="dev.jasper.remote.sftp.back",FORWARD="dev.jasper.remote.sftp.forward",PARENT="dev.jasper.remote.sftp.parent";
@@ -49,7 +47,7 @@ public final class SftpUi implements AutoCloseable {
     private volatile boolean closed;
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
                   Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,dev.jasper.remote.ui.transfers.TransferStrip> transferStrip,Consumer<WindowHandle> releaseStrip) {
-        this(context,ui,background,connections,endpoints,transfers,hosts,activePane,transferStrip,releaseStrip,text->Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text),null));
+        this(context,ui,background,connections,endpoints,transfers,hosts,activePane,transferStrip,releaseStrip,text->context.platform().copy(text));
     }
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
                   Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,dev.jasper.remote.ui.transfers.TransferStrip> transferStrip,Consumer<WindowHandle> releaseStrip,Consumer<String> clipboard) {

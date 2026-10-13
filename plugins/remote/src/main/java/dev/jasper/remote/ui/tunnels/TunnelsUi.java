@@ -23,8 +23,6 @@ import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
-import java.awt.Toolkit;
-import java.awt.datatransfer.StringSelection;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -85,7 +83,7 @@ public final class TunnelsUi implements AutoCloseable {
     public TunnelsUi(PluginContext context, Executor ui, TunnelStore store, TunnelManager manager, Supplier<List<RemoteHost>> hosts,
                      Function<UUID, Optional<RemoteHost>> host, Function<UUID, Optional<RemoteHost>> paneHost) {
         this(context, ui, store, manager, hosts, host, paneHost,
-            text -> Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null));
+            text -> context.platform().copy(text));
     }
 
     /**

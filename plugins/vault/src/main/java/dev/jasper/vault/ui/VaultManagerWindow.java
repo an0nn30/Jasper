@@ -31,7 +31,6 @@ public final class VaultManagerWindow implements AutoCloseable {
     private final LockManager lock;
     private final VaultManager manager;
     private final VaultService service;
-    private final SecretClipboard clipboard;
     /** Presentation of the configured provider, auto-lock policy and actual vault path. */
     public record Status(String deviceSecret, String autoLock, String path) { }
     private final Supplier<Status> status;
@@ -44,9 +43,9 @@ public final class VaultManagerWindow implements AutoCloseable {
     PasswordPanel passwordPanel;
 
     public VaultManagerWindow(PluginContext context, LockManager lock, VaultManager manager,
-                              VaultService service, SecretClipboard clipboard, Supplier<Status> status, Runnable generate) {
+                              VaultService service, Supplier<Status> status, Runnable generate) {
         this.context = context; this.lock = lock; this.manager = manager; this.service = service;
-        this.clipboard = clipboard; this.status = status; this.generate = generate;this.editors=new EntryPresenter(context);
+        this.status = status; this.generate = generate;this.editors=new EntryPresenter(context);
     }
     public boolean isOpen() { return window != null; }
     /** The plugin's kit, for the forms this window owns. */
@@ -58,7 +57,7 @@ public final class VaultManagerWindow implements AutoCloseable {
             var shown = new ManagerPanel(context.kit(), manager::entry, this::add, this::edit, this::delete, this::copyPublic,
                 grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, lock::lock,
                 () -> service.requestUnlock(this.owner), this::close);
-            shown.secretClipboard(clipboard::copySecret);
+            shown.secretClipboard(text -> context.platform().copySecret(text));
             panel = shown;
             window.setContent(shown.view());
             window.setTitleActions(Optional.of(shown.titleActions()));
@@ -154,7 +153,7 @@ public final class VaultManagerWindow implements AutoCloseable {
         }));
     }
     private void copyPublic(UUID id) {
-        CompletableFuture<Void> copied = manager.publicKey(id).thenAccept(clipboard::copy);
+        CompletableFuture<Void> copied = manager.publicKey(id).thenAccept(text -> context.platform().copy(text));
         report("Could not copy the public key", copied);
     }
     private void report(String title, CompletableFuture<Void> operation) {

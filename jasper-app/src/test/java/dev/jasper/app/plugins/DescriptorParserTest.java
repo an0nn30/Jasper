@@ -170,7 +170,8 @@ class DescriptorParserTest {
         }
         assertThatThrownBy(() -> DescriptorParser.parse("id = ")).isInstanceOf(DescriptorParser.InvalidDescriptor.class);
         assertThat(DescriptorParser.CAPABILITIES).isEqualTo(Set.of("terminal.observe", "terminal.selection",
-            "terminal.inject", "terminal.open", "session.provide", "palette.contribute", "files.source", "network.listen"));
+            "terminal.inject", "terminal.open", "session.provide", "palette.contribute", "files.source", "network.listen",
+            "clipboard.read"));
     }
 
     @Test void aNameThatShowsNothingIsRejected() {
@@ -185,6 +186,11 @@ class DescriptorParserTest {
     @Test void acceptsTheNetworkListenCapability() throws Exception {
         PluginDescriptor descriptor = DescriptorParser.parse(FULL.replace("\"session.provide\"", "\"network.listen\""));
         assertThat(descriptor.capabilities()).contains("network.listen");
+    }
+
+    @Test void acceptsTheClipboardReadCapability() throws Exception {
+        PluginDescriptor descriptor = DescriptorParser.parse(FULL.replace("\"session.provide\"", "\"clipboard.read\""));
+        assertThat(descriptor.capabilities()).contains("clipboard.read");
     }
 
     @Test void anIconAndAHomepageAreOptionalAndABadOneIsDropped() throws Exception {

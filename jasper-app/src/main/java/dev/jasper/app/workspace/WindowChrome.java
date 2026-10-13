@@ -248,24 +248,34 @@ final class WindowChrome {
         contributedMenus.forEach(menuBar::remove);
         contributedMenus.clear();
         if (contributions != null) {
-            for (MenuSection section : contributions.model().menus()) {
+            var sections = contributions.model().menus();
+            // Tools holds only plugin entries and, like a plugin's own menu, is built fresh on every pass and added
+            // to the bar only while it has any: a stale one would keep an old look and feel, and one JMenu would be
+            // re-inserted into the macOS screen menu bar.
+            standardMenus.put(MenuTarget.Slot.TOOLS, menu("Tools"));
+            for (MenuSection section : sections) {
+                if (section.target().type() != MenuTarget.Type.STANDARD) continue;
                 List<Component> built = build(section.entries(), MenuBarItems.Item::new);
                 if (built.isEmpty()) continue;
-                switch (section.target().type()) {
-                    case STANDARD -> {
-                        JMenu menu = standardMenus.get(MenuTarget.Slot.valueOf(section.target().key()));
-                        List<Component> added = contributedSections.computeIfAbsent(menu, key -> new ArrayList<>());
-                        var separator = new JPopupMenu.Separator();
-                        menu.add(separator); added.add(separator);
-                        for (Component child : built) { menu.add(child); added.add(child); }
-                    }
-                    case TOP_LEVEL -> {
-                        JMenu menu = observe(new JMenu(section.target().title()));
-                        built.forEach(menu::add);
-                        menuBar.add(menu); contributedMenus.add(menu);
-                    }
-                    case CONTEXT -> { }
+                JMenu menu = standardMenus.get(MenuTarget.Slot.valueOf(section.target().key()));
+                List<Component> added = contributedSections.computeIfAbsent(menu, key -> new ArrayList<>());
+                // Tools has no items of its own, so its first section needs no separator.
+                if (menu.getMenuComponentCount() > 0) {
+                    var separator = new JPopupMenu.Separator();
+                    menu.add(separator); added.add(separator);
                 }
+                for (Component child : built) { menu.add(child); added.add(child); }
+            }
+            // The bar orders menus as they are added: Tools after Tab, then plugins' own menus.
+            JMenu tools = standardMenus.get(MenuTarget.Slot.TOOLS);
+            if (tools.getMenuComponentCount() > 0) { menuBar.add(tools); contributedMenus.add(tools); }
+            for (MenuSection section : sections) {
+                if (section.target().type() != MenuTarget.Type.TOP_LEVEL) continue;
+                List<Component> built = build(section.entries(), MenuBarItems.Item::new);
+                if (built.isEmpty()) continue;
+                JMenu menu = observe(new JMenu(section.target().title()));
+                built.forEach(menu::add);
+                menuBar.add(menu); contributedMenus.add(menu);
             }
         }
         menuBar.revalidate(); menuBar.repaint();

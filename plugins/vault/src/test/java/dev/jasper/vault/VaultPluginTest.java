@@ -10,7 +10,6 @@ import dev.jasper.vault.model.Auth;
 import dev.jasper.vault.store.DeviceSecrets;
 import dev.jasper.vault.store.FileStore;
 import dev.jasper.vault.store.KeychainStore;
-import dev.jasper.vault.ui.SecretClipboard;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Duration;
@@ -63,21 +62,13 @@ class VaultPluginTest {
     }); }
     static final PluginInfo OTHER_SETUP = new PluginInfo("dev.jasper.other", "Other", "0.2.0", Set.of());
 
-    @Test void stopLocksTheVaultEvenWhenClipboardCleanupFails() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
-        String[] contents = {""};
-        SecretClipboard clipboard = new SecretClipboard(text -> {
-            if (text.isEmpty()) throw new IllegalStateException("clipboard busy");
-            contents[0] = text;
-        }, () -> Optional.of(contents[0]), clear -> { });
-        VaultPlugin plugin = new VaultPlugin(context -> new DeviceSecrets(
-            new KeychainStore("Linux", command -> { throw new UncheckedIOException(new IOException("none")); }, context.dataDirectory().resolve("x")),
-            new FileStore(context.dataDirectory().resolve("device.secret"))), Runnable::run, () -> clipboard);
+    @Test void stopLocksTheVault() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
+        VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), plugin);
             plugin.lockManager().create("hunter2!".toCharArray(), false);
             host.runBackground();
             host.flush();
-            clipboard.copySecret("deliberate copy");
             assertThat(plugin.lockManager().state()).isEqualTo(LockState.UNLOCKED);
             assertThatCode(plugin::stop).doesNotThrowAnyException();
             assertThat(plugin.lockManager().state()).isEqualTo(LockState.LOCKED);

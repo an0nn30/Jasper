@@ -13,7 +13,8 @@ import org.tomlj.TomlTable;
 /** Pure parsing and validation of {@code plugin.toml}; every failure names the offending key. */
 final class DescriptorParser {
     static final Set<String> CAPABILITIES = Set.of("terminal.observe", "terminal.selection",
-        "terminal.inject", "terminal.open", "session.provide", "palette.contribute", "files.source", "network.listen");
+        "terminal.inject", "terminal.open", "session.provide", "palette.contribute", "files.source", "network.listen",
+        "clipboard.read");
     /** Packages a plugin may neither define nor export. */
     static final List<String> FORBIDDEN_PACKAGES = List.of("dev.jasper.sdk", "dev.jasper.app",
         "dev.jasper.terminal", "dev.jasper.buddy", "java", "javax", "jdk");

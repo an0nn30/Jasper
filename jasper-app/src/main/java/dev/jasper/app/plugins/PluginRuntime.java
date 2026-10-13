@@ -370,6 +370,12 @@ public final class PluginRuntime {
         if(host!=null)throw new IllegalStateException("Plugins have already started");
         shortcuts = Objects.requireNonNull(labels);
     }
+    private dev.jasper.app.platform.HostClipboard clipboard = dev.jasper.app.platform.HostClipboard.system();
+    /** Supplies the application's clipboard before plugin startup, so plugins share it with Jasper's own copies. */
+    public void clipboard(dev.jasper.app.platform.HostClipboard value) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        clipboard = Objects.requireNonNull(value);
+    }
     /** Supplies the live application motion policy before plugin startup. */
     public void animations(java.util.function.BooleanSupplier enabled) {
         if(host!=null)throw new IllegalStateException("Plugins have already started");
@@ -558,6 +564,7 @@ public final class PluginRuntime {
             dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass));
         created.animations = animations;
         created.shortcuts = shortcuts;
+        created.clipboard = clipboard;
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         connectionBridge = created.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, this::forwardConnection);

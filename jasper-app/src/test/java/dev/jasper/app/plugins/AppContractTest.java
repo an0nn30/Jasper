@@ -152,6 +152,16 @@ class AppContractTest extends PluginContractTest {
         });
         PluginHost host = host(data, Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notifications, edited,
             diagnostics, shells.source(), browsed, appearance, glass);
+        boolean[] clipboardBusy = {false};
+        var clipboardContents = new java.awt.datatransfer.Clipboard("contract") {
+            @Override public synchronized void setContents(java.awt.datatransfer.Transferable contents, java.awt.datatransfer.ClipboardOwner owner) {
+                if (clipboardBusy[0]) throw new IllegalStateException("cannot open system clipboard");
+                super.setContents(contents, owner);
+            }
+        };
+        List<Runnable> clipboardClears = new CopyOnWriteArrayList<>();
+        onEdt(() -> host.clipboard = new dev.jasper.app.platform.HostClipboard(() -> clipboardContents,
+            (delay, task) -> { clipboardClears.add(task); return () -> clipboardClears.remove(task); }));
         PluginSettingsFiles files = host.environment.settingsFiles();
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
@@ -418,6 +428,12 @@ class AppContractTest extends PluginContractTest {
                         @Override public boolean clickNotification(String title) { return notifications.click(title); }
                         @Override public List<Path> openedInEditor() { return List.copyOf(edited); }
                         @Override public List<java.net.URI> browsed() { return List.copyOf(browsed); }
+                        @Override public java.util.Optional<String> clipboard() { return onEdtValue(() -> host.clipboard.text()); }
+                        @Override public void userCopies(String text) {
+                            onEdt(() -> clipboardContents.setContents(new java.awt.datatransfer.StringSelection(text), null));
+                        }
+                        @Override public void clipboardBusy(boolean busy) { clipboardBusy[0] = busy; }
+                        @Override public void expireClipboardSecret() { onEdt(() -> List.copyOf(clipboardClears).forEach(Runnable::run)); }
             @Override public void close() { stopAll(); flush(); }
         };
     }

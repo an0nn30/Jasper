@@ -79,6 +79,7 @@ public final class FakePluginHost implements AutoCloseable {
         final List<String> paletteOpens = new ArrayList<>();
         final List<Path> openedInEditor = new ArrayList<>();
     final List<java.net.URI> browsed = new CopyOnWriteArrayList<>();
+    final FakeClipboard clipboard = new FakeClipboard();
     final FakeNotifications notifications = new FakeNotifications(this);
         private final Map<String, Map<String, PaletteRow>> lastRows = new HashMap<>();
     private final List<String> failures = new CopyOnWriteArrayList<>();
@@ -604,6 +605,7 @@ public final class FakePluginHost implements AutoCloseable {
         context.palette.closeAll();
         context.fileSources.closeAll();
         notifications.stopped(context.plugin().id());
+        clipboard.ownerStopped(context.plugin().id());
         String id = context.plugin().id();
         for (var list : subscribers.values()) list.removeIf(entry -> entry.pluginId().equals(id));
         for (ActivityEvent open : List.copyOf(running.values())) {
@@ -1470,6 +1472,13 @@ public final class FakePluginHost implements AutoCloseable {
      * @return the addresses in request order
      */
     public List<java.net.URI> browsed() { return List.copyOf(browsed); }
+
+    /**
+     * The clipboard every plugin's {@code Platform} writes to.
+     *
+     * @return the fake clipboard
+     */
+    public FakeClipboard clipboard() { return clipboard; }
     /** @return hosted content in registration order, for contract assertions */
     public List<dev.jasper.sdk.ui.ContentTab> contentTabs() {
         return contexts.values().stream().flatMap(c -> c.ui.contents.stream()).map(c -> (dev.jasper.sdk.ui.ContentTab)c).toList();

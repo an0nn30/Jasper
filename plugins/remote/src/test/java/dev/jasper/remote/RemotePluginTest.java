@@ -269,7 +269,7 @@ class RemotePluginTest {
             assertThat(host.scopes()).containsExactly("dev.jasper.remote.tunnels.scope|Tunnels|toggle,browse,edit",
                 "dev.jasper.remote.scope|SSH|connect,split,edit");
             assertThat(host.menu("top:dev.jasper.remote.menu")).isNotEmpty();
-            assertThat(host.menu("VIEW")).as("View > Tools already lists the three panel toggles").isEmpty();
+            assertThat(host.menu("VIEW")).as("View > Tool Windows already lists the three panel toggles").isEmpty();
             assertThat(host.status()).as("hidden at zero").isEmpty();
             assertThat(vault.consumers).containsExactly("dev.jasper.remote");
 
