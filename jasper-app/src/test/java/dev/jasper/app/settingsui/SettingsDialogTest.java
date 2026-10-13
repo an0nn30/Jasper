@@ -392,6 +392,28 @@ class SettingsDialogTest {
         until(() -> !dialog.isOpen());
     }
 
+    @Test void anExternalRowsEditIsAppliedWithoutWritingConfigToml() throws Exception {
+        var saves = new CopyOnWriteArrayList<Integer>();
+        int[] stored = {2048};
+        var dialog = new SettingsDialog(windows, context -> List.of(SchemaPage.page("vm", "VM")
+            .external(new SchemaPage.External("vm.heap", "Maximum heap size", "MiB", List.of("heap"), new Nodes.Numeric(512, 1_048_576, 256, 0),
+                () -> stored[0], () -> 2048, value -> value < 512 ? "Use 512 MiB or more." : "", value -> "",
+                value -> { saves.add(value); stored[0] = value; return CompletableFuture.completedFuture(null); }, () -> true))
+            .build(context)), hooks());
+        edt(() -> {
+            dialog.open(null, "vm");
+            KitTestSupport.require(page(dialog), "vm.heap.input", javax.swing.JTextField.class).setText("4096");
+            assertThat(button(dialog, "apply").isEnabled()).isTrue();
+            dialog.apply();
+        });
+        until(() -> saves.equals(List.of(4096)));
+        edt(() -> {
+            assertThat(saved).as("an external edit leaves config.toml alone").isEmpty();
+            dialog.refreshNow();
+            assertThat(button(dialog, "apply").isEnabled()).isFalse();
+        });
+    }
+
     @Test void aFailedSaveKeepsTheEditsAndSaysWhy() throws Exception {
         var dialog = dialog();
         saveResult = CompletableFuture.failedFuture(new IllegalArgumentException("window.tab_height changed on disk. Review the new value and try again."));

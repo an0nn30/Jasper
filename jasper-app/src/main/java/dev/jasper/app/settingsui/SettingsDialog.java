@@ -276,7 +276,12 @@ public final class SettingsDialog {
     private boolean modified() { return draft.modified() || pages.stream().anyMatch(SettingsPage::modified); }
 
     private int pendingCount() {
-        return draft.size() + (int) pages.stream().filter(page -> !(page instanceof SchemaPage) && page.modified()).count();
+        return draft.size() + (int) pages.stream().filter(page -> appliedAfterDraft(page) && page.modified()).count();
+    }
+
+    /** Pages the dialog applies after the draft: every page but a schema page, which applies only its external rows. */
+    private static boolean appliedAfterDraft(SettingsPage page) {
+        return !(page instanceof SchemaPage schema) || schema.externalModified();
     }
 
     private boolean valid() { return pages.stream().allMatch(SettingsPage::valid); }
@@ -327,7 +332,7 @@ public final class SettingsDialog {
             if (failure != null) { failed(null, failure); return; }
             if (state != null) draft.rebase(state.values());
             var remaining = new ArrayDeque<SettingsPage>();
-            for (SettingsPage page : pages) if (!(page instanceof SchemaPage) && page.modified()) remaining.add(page);
+            for (SettingsPage page : pages) if (appliedAfterDraft(page) && page.modified()) remaining.add(page);
             applyPages(remaining, done);
         }));
     }
