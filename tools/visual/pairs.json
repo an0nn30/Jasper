@@ -1,436 +1,436 @@
 [
- {
-  "name": "settings-appearance",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_dialog_mock.png",
-  "crop": [
-   4,
-   6,
-   1960,
-   1362
-  ],
-  "render": "jasper-app/build/theme-surfaces/settings/calibration-0/appearance/default.png"
- },
- {
-  "name": "settings-window",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_windows_mock.png",
-  "crop": [
-   4,
-   2,
-   1960,
-   1362
-  ],
-  "render": "jasper-app/build/theme-surfaces/settings/calibration-0/window/default.png"
- },
- {
-  "name": "settings-notifications",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_notification_mock.png",
-  "crop": [
-   8,
-   2,
-   1960,
-   1362
-  ],
-  "render": "jasper-app/build/theme-surfaces/settings/calibration-0/notifications/popup.png"
- },
- {
-  "name": "settings-keymap",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_keymap_mock.png",
-  "crop": [
-   8,
-   6,
-   1960,
-   1362
-  ],
-  "render": "jasper-app/build/theme-surfaces9b/calibration-0/keymap-recording.png"
- },
- {
-  "name": "settings-plugins",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_plugins_mock.png",
-  "crop": [
-   0,
-   0,
-   1488,
-   1364
-  ],
-  "render": "jasper-app/build/theme-surfaces9b/calibration-0/plugins-content.png"
- },
- {
-  "name": "vault-create",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/create_vault_dialog_mock.png",
-  "crop": [
-   10,
-   46,
-   800,
-   856
-  ],
-  "render": "jasper-app/build/theme-surfaces/calibration/vault-create/empty.png"
- },
- {
-  "name": "vault-unlock",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/rename_vault_dialog.png",
-  "crop": [
-   2,
-   38,
-   760,
-   528
-  ],
-  "render": "jasper-app/build/theme-surfaces/calibration/vault-unlock/empty.png"
- },
- {
-  "name": "host-add",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/add_host_dialog_mock.png",
-  "crop": [
-   26,
-   82,
-   1080,
-   1464
-  ],
-  "render": "jasper-app/build/theme-migration-evidence/add-host/actual/source-depicted-keys-natural.png"
- },
- {
-  "name": "fileserver-add",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/new_file_server_mock.png",
-  "crop": [
-   8,
-   64,
-   1080,
-   1380
-  ],
-  "render": "jasper-app/build/theme-migration-evidence/fileserver-add/actual/anonymous.png"
- },
- {
-  "name": "vault-manager",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/vault_ui_mock.png",
-  "crop": [
-   4,
-   96,
-   1800,
-   1110
-  ],
-  "render": "jasper-app/build/task-4b-captures/calibration/vault-manager.png",
-  "render_crop": [
-   0,
-   91,
-   1800,
-   1110
-  ]
- },
- {
-  "name": "vault-manager-title",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/vault_ui_mock.png",
-  "crop": [
-   200,
-   6,
-   1600,
-   90
-  ],
-  "render": "jasper-app/build/task-4b-captures/calibration/vault-manager.png",
-  "render_crop": [
-   196,
-   0,
-   1600,
-   90
-  ]
- },
- {
-  "name": "workspace-tabs",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.25 AM.png",
-  "crop": [
-   112,
-   76,
-   1582,
-   1424
-  ],
-  "render": "jasper-app/build/workspace-surfaces/tabs/calibration-791x712.png"
- },
- {
-  "name": "workspace-rails",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.41 AM.png",
-  "crop": [
-   112,
-   76,
-   1582,
-   1424
-  ],
-  "render": "jasper-app/build/workspace-surfaces/rails/calibration-791x712.png"
- },
- {
-  "name": "workspace-integrated",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
-  "crop": [
-   112,
-   76,
-   2684,
-   1716
-  ],
-  "render": "jasper-app/build/workspace-surfaces/integrated/calibration-1342x858.png"
- },
- {
-  "name": "workspace-palette",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.31 AM.png",
-  "crop": [
-   342,
-   84,
-   1120,
-   712
-  ],
-  "render": "jasper-app/build/palette-surfaces/user_palette.toml-13.0-791x712.png",
-  "render_crop": [
-   230,
-   8,
-   1120,
-   712
-  ]
- },
- {
-  "name": "sessions-panel",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
-  "crop": [
-   168,
-   144,
-   520,
-   790
-  ],
-  "render": "jasper-app/build/theme-surfaces/calibration/sessions-panel/selected.png"
- },
- {
-  "name": "vault-menu",
-  "mock": "docs/design/theme-engine/reference/vault-add-menu.png",
-  "crop": [
-   160,
-   140,
-   444,
-   274
-  ],
-  "render": "jasper-app/build/task-4b-captures/calibration/vault-menu.png"
- },
- {
-  "name": "vault-login-sheet",
-  "mock": "docs/design/theme-engine/reference/add-login-sheet.png",
-  "crop": [
-   434,
-   106,
-   964,
-   730
-  ],
-  "render": "jasper-app/build/task-4b-captures/calibration/vault-login-sheet.png"
- },
- {
-  "name": "vault-key-sheet",
-  "mock": "docs/design/theme-engine/reference/add-ssh-key-sheet.png",
-  "crop": [
-   446,
-   120,
-   964,
-   614
-  ],
-  "render": "jasper-app/build/task-4b-captures/calibration/vault-key-sheet.png"
- },
- {
-  "name": "picker-empty",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
-  "crop": [
-   214,
-   198,
-   396,
-   60
-  ],
-  "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/empty.png",
-  "render_crop": [
-   256,
-   92,
-   396,
-   60
-  ]
- },
- {
-  "name": "picker-selected",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
-  "crop": [
-   862,
-   198,
-   396,
-   60
-  ],
-  "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/selected.png",
-  "render_crop": [
-   256,
-   92,
-   396,
-   60
-  ]
- },
- {
-  "name": "picker-open-face",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
-  "crop": [
-   1510,
-   198,
-   396,
-   60
-  ],
-  "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/open-face.png",
-  "render_crop": [
-   256,
-   92,
-   396,
-   60
-  ]
- },
- {
-  "name": "picker-open-top",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
-  "crop": [
-   1518,
-   256,
-   444,
-   124
-  ],
-  "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/open.png",
-  "render_crop": [
-   0,
-   0,
-   444,
-   124
-  ]
- },
- {
-  "name": "picker-open-footer",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
-  "crop": [
-   1518,
-   716,
-   444,
-   72
-  ],
-  "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/open.png",
-  "render_crop": [
-   0,
-   164,
-   444,
-   72
-  ]
- },
- {
-  "name": "picker-filtering-top",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
-  "crop": [
-   222,
-   1065,
-   444,
-   56
-  ],
-  "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/filtering.png",
-  "render_crop": [
-   0,
-   0,
-   444,
-   56
-  ]
- },
- {
-  "name": "picker-no-matches",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
-  "crop": [
-   870,
-   1065,
-   444,
-   214
-  ],
-  "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/no-matches.png"
- },
- {
-  "name": "picker-disabled",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
-  "crop": [
-   1510,
-   1006,
-   396,
-   60
-  ],
-  "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/disabled.png",
-  "render_crop": [
-   256,
-   92,
-   396,
-   60
-  ]
- },
- {
-  "name": "tunnels-panel",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
-  "crop": [
-   2220,
-   946,
-   520,
-   790
-  ],
-  "render": "jasper-app/build/theme-surfaces/calibration/tunnels-panel/empty.png"
- },
- {
-  "name": "tunnels-panel-plugin-panels",
-  "mock": "docs/design/theme-engine/reference/plugin-panels.png",
-  "crop": [
-   168,
-   994,
-   520,
-   836
-  ],
-  "render": "jasper-app/build/theme-surfaces/calibration/tunnels-panel/empty-418.png"
- },
- {
-  "name": "sftp-panel",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
-  "crop": [
-   168,
-   946,
-   520,
-   790
-  ],
-  "render": "jasper-app/build/theme-surfaces/calibration/sftp-panel/cancelled.png"
- },
- {
-  "name": "sftp-panel-plugin-panels",
-  "mock": "docs/design/theme-engine/reference/plugin-panels.png",
-  "crop": [
-   2122,
-   144,
-   520,
-   838
-  ],
-  "render": "jasper-app/build/theme-surfaces/calibration/sftp-panel/disconnected-419.png"
- },
- {
-  "name": "fileservers-panel",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
-  "crop": [
-   2220,
-   144,
-   520,
-   790
-  ],
-  "render": "jasper-app/build/theme-surfaces/calibration/fileservers-panel/empty.png"
- },
- {
-  "name": "fileservers-panel-populated",
-  "mock": "docs/design/theme-engine/reference/plugin-panels.png",
-  "crop": [
-   2122,
-   994,
-   520,
-   836
-  ],
-  "render": "jasper-app/build/theme-surfaces/calibration/fileservers-panel/populated.png"
- },
- {
-  "name": "tunnel-new",
-  "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/new_tunnel_mock.png",
-  "crop": [
-   8,
-   62,
-   1080,
-   1116
-  ],
-  "render": "jasper-app/build/theme-surfaces/calibration/tunnel-new/local.png"
- }
+  {
+    "name": "settings-appearance",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_dialog_mock.png",
+    "crop": [
+      4,
+      6,
+      1960,
+      1362
+    ],
+    "render": "jasper-app/build/theme-surfaces/settings/dark-0/appearance/default.png"
+  },
+  {
+    "name": "settings-window",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_windows_mock.png",
+    "crop": [
+      4,
+      2,
+      1960,
+      1362
+    ],
+    "render": "jasper-app/build/theme-surfaces/settings/dark-0/window/default.png"
+  },
+  {
+    "name": "settings-notifications",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_notification_mock.png",
+    "crop": [
+      8,
+      2,
+      1960,
+      1362
+    ],
+    "render": "jasper-app/build/theme-surfaces/settings/dark-0/notifications/popup.png"
+  },
+  {
+    "name": "settings-keymap",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_keymap_mock.png",
+    "crop": [
+      8,
+      6,
+      1960,
+      1362
+    ],
+    "render": "jasper-app/build/theme-surfaces9b/dark-0/keymap-recording.png"
+  },
+  {
+    "name": "settings-plugins",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_plugins_mock.png",
+    "crop": [
+      0,
+      0,
+      1488,
+      1364
+    ],
+    "render": "jasper-app/build/theme-surfaces9b/dark-0/plugins-content.png"
+  },
+  {
+    "name": "vault-create",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/create_vault_dialog_mock.png",
+    "crop": [
+      10,
+      46,
+      800,
+      856
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/vault-create/empty.png"
+  },
+  {
+    "name": "vault-unlock",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/rename_vault_dialog.png",
+    "crop": [
+      2,
+      38,
+      760,
+      528
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/vault-unlock/empty.png"
+  },
+  {
+    "name": "host-add",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/add_host_dialog_mock.png",
+    "crop": [
+      26,
+      82,
+      1080,
+      1464
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/add-host/actual/source-depicted-keys-natural.png"
+  },
+  {
+    "name": "fileserver-add",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/new_file_server_mock.png",
+    "crop": [
+      8,
+      64,
+      1080,
+      1380
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/fileserver-add/actual/anonymous.png"
+  },
+  {
+    "name": "vault-manager",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/vault_ui_mock.png",
+    "crop": [
+      4,
+      96,
+      1800,
+      1110
+    ],
+    "render": "jasper-app/build/task-4b-captures/dark/vault-manager.png",
+    "render_crop": [
+      0,
+      91,
+      1800,
+      1110
+    ]
+  },
+  {
+    "name": "vault-manager-title",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/vault_ui_mock.png",
+    "crop": [
+      200,
+      6,
+      1600,
+      90
+    ],
+    "render": "jasper-app/build/task-4b-captures/dark/vault-manager.png",
+    "render_crop": [
+      196,
+      0,
+      1600,
+      90
+    ]
+  },
+  {
+    "name": "workspace-tabs",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.25\u202fAM.png",
+    "crop": [
+      112,
+      76,
+      1582,
+      1424
+    ],
+    "render": "jasper-app/build/workspace-surfaces/tabs/dark-791x712.png"
+  },
+  {
+    "name": "workspace-rails",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.41\u202fAM.png",
+    "crop": [
+      112,
+      76,
+      1582,
+      1424
+    ],
+    "render": "jasper-app/build/workspace-surfaces/rails/dark-791x712.png"
+  },
+  {
+    "name": "workspace-integrated",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "crop": [
+      112,
+      76,
+      2684,
+      1716
+    ],
+    "render": "jasper-app/build/workspace-surfaces/integrated/dark-1342x858.png"
+  },
+  {
+    "name": "workspace-palette",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.31\u202fAM.png",
+    "crop": [
+      342,
+      84,
+      1120,
+      712
+    ],
+    "render": "jasper-app/build/palette-surfaces/dark-13.0-791x712.png",
+    "render_crop": [
+      230,
+      8,
+      1120,
+      712
+    ]
+  },
+  {
+    "name": "sessions-panel",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "crop": [
+      168,
+      144,
+      520,
+      790
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/sessions-panel/selected.png"
+  },
+  {
+    "name": "vault-menu",
+    "mock": "docs/design/theme-engine/reference/vault-add-menu.png",
+    "crop": [
+      160,
+      140,
+      444,
+      274
+    ],
+    "render": "jasper-app/build/task-4b-captures/dark/vault-menu.png"
+  },
+  {
+    "name": "vault-login-sheet",
+    "mock": "docs/design/theme-engine/reference/add-login-sheet.png",
+    "crop": [
+      434,
+      106,
+      964,
+      730
+    ],
+    "render": "jasper-app/build/task-4b-captures/dark/vault-login-sheet.png"
+  },
+  {
+    "name": "vault-key-sheet",
+    "mock": "docs/design/theme-engine/reference/add-ssh-key-sheet.png",
+    "crop": [
+      446,
+      120,
+      964,
+      614
+    ],
+    "render": "jasper-app/build/task-4b-captures/dark/vault-key-sheet.png"
+  },
+  {
+    "name": "picker-empty",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      214,
+      198,
+      396,
+      60
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/empty.png",
+    "render_crop": [
+      256,
+      92,
+      396,
+      60
+    ]
+  },
+  {
+    "name": "picker-selected",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      862,
+      198,
+      396,
+      60
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/selected.png",
+    "render_crop": [
+      256,
+      92,
+      396,
+      60
+    ]
+  },
+  {
+    "name": "picker-open-face",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      1510,
+      198,
+      396,
+      60
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/open-face.png",
+    "render_crop": [
+      256,
+      92,
+      396,
+      60
+    ]
+  },
+  {
+    "name": "picker-open-top",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      1518,
+      256,
+      444,
+      124
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/open.png",
+    "render_crop": [
+      0,
+      0,
+      444,
+      124
+    ]
+  },
+  {
+    "name": "picker-open-footer",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      1518,
+      716,
+      444,
+      72
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/open.png",
+    "render_crop": [
+      0,
+      164,
+      444,
+      72
+    ]
+  },
+  {
+    "name": "picker-filtering-top",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      222,
+      1065,
+      444,
+      56
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/filtering.png",
+    "render_crop": [
+      0,
+      0,
+      444,
+      56
+    ]
+  },
+  {
+    "name": "picker-no-matches",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      870,
+      1065,
+      444,
+      214
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/no-matches.png"
+  },
+  {
+    "name": "picker-disabled",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      1510,
+      1006,
+      396,
+      60
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/disabled.png",
+    "render_crop": [
+      256,
+      92,
+      396,
+      60
+    ]
+  },
+  {
+    "name": "tunnels-panel",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "crop": [
+      2220,
+      946,
+      520,
+      790
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/tunnels-panel/empty.png"
+  },
+  {
+    "name": "tunnels-panel-plugin-panels",
+    "mock": "docs/design/theme-engine/reference/plugin-panels.png",
+    "crop": [
+      168,
+      994,
+      520,
+      836
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/tunnels-panel/empty-418.png"
+  },
+  {
+    "name": "sftp-panel",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "crop": [
+      168,
+      946,
+      520,
+      790
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/sftp-panel/cancelled.png"
+  },
+  {
+    "name": "sftp-panel-plugin-panels",
+    "mock": "docs/design/theme-engine/reference/plugin-panels.png",
+    "crop": [
+      2122,
+      144,
+      520,
+      838
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/sftp-panel/disconnected-419.png"
+  },
+  {
+    "name": "fileservers-panel",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "crop": [
+      2220,
+      144,
+      520,
+      790
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/fileservers-panel/empty.png"
+  },
+  {
+    "name": "fileservers-panel-populated",
+    "mock": "docs/design/theme-engine/reference/plugin-panels.png",
+    "crop": [
+      2122,
+      994,
+      520,
+      836
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/fileservers-panel/populated.png"
+  },
+  {
+    "name": "tunnel-new",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/new_tunnel_mock.png",
+    "crop": [
+      8,
+      62,
+      1080,
+      1116
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/tunnel-new/local.png"
+  }
 ]

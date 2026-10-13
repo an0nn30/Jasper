@@ -10,21 +10,23 @@ component looks live in `jasper-ui` (exposed to plugins through the SDK) and lay
 
 - Every render is the **actual owner** (staged plugins in a disposable home, the real app windows and Settings pages)
   painted headlessly at device scale 2, at the logical size the reference crop implies. Nothing is resized.
-- Calibration themes (`jasper-app/src/test/resources/dev/jasper/app/appearance/desktop-*.toml`) approximate the mock
-  colors only so that edges are comparable; production uses real themes, and light/custom/enlarged renders of every
-  family were inspected too.
+- Since Slate Steel Plan 3 the renders are **Slate Steel Dark** (each family's Light render was inspected too, see
+  [Slate Steel Plan 3](#slate-steel-plan-3-removal-and-verification-2026-10-12)). The calibration themes that
+  approximated the mock colours are retired; the tables below that say "calibration" record the values they gave.
 - [`tools/visual`](../../../tools/visual/README.md) compares luminance edges (`compare_mock.py`), cuts matching
-  regions at original pixels (`region.py`) and runs all 33 recorded pairs (`compare_all.py`, `pairs.json`).
+  regions at original pixels (`region.py`) and runs all 34 recorded pairs (`compare_all.py`, `pairs.json`). Edges are
+  luminance, so mocks drawn in other palettes (the Vault mock's accent `#4676EE`) still compare.
   The edge agreement is a guide; each stream measured bounds, insets, baselines, control sizes, radii and glyphs with
   pixel probes, and recorded what still differs.
 - Regenerate: `./gradlew :jasper-app:themeSurfacePreview :jasper-app:settingsSurfacePreview :jasper-app:settings9bPreview
   :jasper-app:workspaceSurfacePreview`, `./gradlew :jasper-app:commandPalettePreview --args="$PWD/jasper-app/build/palette-surfaces --task9c"`,
-  `./gradlew :jasper-app:test --tests '*StagedAnchoredPickerTest' --tests '*VaultSheetRenderTest' --tests '*StagedAddHostTest' --tests '*StagedFileServerFormTest'`,
+  `./gradlew :jasper-app:test --tests '*StagedAnchoredPickerTest' --tests '*VaultSheetRenderTest' --tests '*StagedAddHostTest' --tests '*StagedFileServerFormTest' --tests '*SessionsCompositionTest'`,
   then `python3 -I tools/visual/compare_all.py <outdir>`.
 
 ## Mocked surfaces
 
-Edge agreement at the start of this round → at merge (calibration theme, device scale 2). Stream notes hold the
+Edge agreement at the start of this round → at merge (calibration theme, device scale 2; Slate Steel Dark values are in
+[Slate Steel Plan 3](#slate-steel-plan-3-removal-and-verification-2026-10-12)). Stream notes hold the
 measurements and every residual.
 
 | Reference (`reference/desktop-2026-10-10/` unless noted) | Surface and owner | Before | After | Notes |
@@ -72,7 +74,7 @@ Each follows the compositions the mocked families calibrated; rendered dark, lig
 - Mock text, hosts, keys, counts and paths are fixture data; real defaults, stored data and validation were never
   changed to imitate them. Where the domain has no data the mock shows (key algorithms in Add Host, "Used by" in the
   Vault detail), the render shows only what exists.
-- Colors follow the active theme (the user's rule); calibration themes only make comparisons legible.
+- Colors follow the active theme (the user's rule): Slate Steel Dark or Light; the retired calibration themes only made comparisons legible.
 
 ## Recorded residuals (decisions)
 
@@ -200,14 +202,82 @@ Decisions the plan recorded for review:
 7. `new ThemeController()` and the other legacy seams keep Jasper Dark for existing tests until Plan 3 migrates them; production starts with `ThemeController.startup(dark, scheme, …)` and configures only Slate Steel.
 8. The app's `themeimport` and `themesui` packages lose their wiring here (no Import theme…, no start-up theme upgrade) and are deleted with the rest in Plan 3.
 
+## Slate Steel Plan 3: removal and verification (2026-10-12)
+
+Plan [`2026-10-12-slate-steel-3-removal-and-verification.md`](../../superpowers/plans/2026-10-12-slate-steel-3-removal-and-verification.md)
+of the [Slate Steel specification](../../superpowers/specs/2026-10-12-jasper-slate-steel-themes-design.md): the legacy
+themes, their layer and their test seams are gone; every test, preview and render runs Slate Steel Dark and Light.
+
+### The mock comparisons on Slate Steel Dark
+
+The calibration column is the last value the calibration themes gave (re-rendered at `f65b40bb`, the end of Slate
+Steel Plan 2); the Slate Steel column is the same owner on Slate Steel Dark. Notes explain each drop over 0.05.
+
+| Reference (`reference/desktop-2026-10-10/` unless noted) | Surface (pair) | Calibration | Slate Steel Dark | Notes |
+| --- | --- | ---: | ---: | --- |
+| `settings_dialog_mock.png` | Settings Appearance (`settings-appearance`) | 0.865 | 0.843 |  |
+| `settings_windows_mock.png` | Settings Window (`settings-window`) | 0.796 | 0.801 |  |
+| `settings_notification_mock.png` | Settings Notifications (popup open) (`settings-notifications`) | 0.848 | 0.820 |  |
+| `settings_keymap_mock.png` | Settings Keymap (recording) (`settings-keymap`) | 0.846 | 0.866 |  |
+| `settings_plugins_mock.png` | Settings Plugins (`settings-plugins`) | 0.799 | 0.827 |  |
+| `create_vault_dialog_mock.png` | Vault create hero (`vault-create`) | 0.949 | 0.965 |  |
+| `rename_vault_dialog.png` | Vault unlock hero (`vault-unlock`) | 0.977 | 0.977 |  |
+| `add_host_dialog_mock.png` | Add Host (`host-add`) | 0.890 | 0.925 |  |
+| `new_file_server_mock.png` | New File Server (`fileserver-add`) | 0.906 | 0.923 |  |
+| `vault_ui_mock.png` | Credential Vault manager (`vault-manager`) | 0.785 | 0.817 |  |
+| `vault_ui_mock.png` | Credential Vault title row (`vault-manager-title`) | 0.648 | 0.648 |  |
+| `Screenshot … 11.16.25 AM.png` | Workspace title bar, toolbar and tabs (`workspace-tabs`) | 0.796 | 0.820 |  |
+| `Screenshot … 11.16.41 AM.png` | Workspace rails and status bar (`workspace-rails`) | 0.854 | 0.871 |  |
+| `Screenshot … 11.16.50 AM.png` | Integrated workspace, four docked panels (`workspace-integrated`) | 0.770 | 0.823 |  |
+| `Screenshot … 11.16.31 AM.png` | Command palette (`workspace-palette`) | 0.897 | 0.897 |  |
+| `Screenshot … 11.16.50 AM.png` | Sessions panel (`sessions-panel`) | 0.964 | 0.963 |  |
+| `reference/vault-add-menu.png` | Vault add menu (`vault-menu`) | 0.966 | 0.973 |  |
+| `reference/add-login-sheet.png` | Attached Login sheet (`vault-login-sheet`) | 0.959 | 0.974 |  |
+| `reference/add-ssh-key-sheet.png` | Attached SSH key sheet (`vault-key-sheet`) | 0.967 | 0.967 |  |
+| `combo_box_mock.png` | Credential picker, empty (`picker-empty`) | 0.987 | 0.891 | The mock's highlight is `#4676EE` and its menu card `#2B2F37`; Slate Steel Dark's are `accent` `#4E7DB4` and `surface.menu` `#30343C`, so the highlight and the text on it give weaker luminance edges (`-side.png`); geometry unchanged. |
+| `combo_box_mock.png` | Credential picker, selected (`picker-selected`) | 0.875 | 0.880 |  |
+| `combo_box_mock.png` | Credential picker, open (face) (`picker-open-face`) | 0.879 | 0.881 |  |
+| `combo_box_mock.png` | Credential picker, open (top) (`picker-open-top`) | 0.935 | 0.846 | The mock's highlight is `#4676EE` and its menu card `#2B2F37`; Slate Steel Dark's are `accent` `#4E7DB4` and `surface.menu` `#30343C`, so the highlight and the text on it give weaker luminance edges (`-side.png`); geometry unchanged. |
+| `combo_box_mock.png` | Credential picker, open (footer) (`picker-open-footer`) | 0.987 | 0.987 |  |
+| `combo_box_mock.png` | Credential picker, filtering (`picker-filtering-top`) | 0.985 | 0.844 | The mock's highlight is `#4676EE` and its menu card `#2B2F37`; Slate Steel Dark's are `accent` `#4E7DB4` and `surface.menu` `#30343C`, so the highlight and the text on it give weaker luminance edges (`-side.png`); geometry unchanged. |
+| `combo_box_mock.png` | Credential picker, no matches (`picker-no-matches`) | 0.902 | 0.840 | The mock's highlight is `#4676EE` and its menu card `#2B2F37`; Slate Steel Dark's are `accent` `#4E7DB4` and `surface.menu` `#30343C`, so the highlight and the text on it give weaker luminance edges (`-side.png`); geometry unchanged. |
+| `combo_box_mock.png` | Credential picker, disabled (`picker-disabled`) | 0.764 | 0.762 |  |
+| `Screenshot … 11.16.50 AM.png` | Tunnels panel (`tunnels-panel`) | 0.948 | 0.947 |  |
+| `reference/plugin-panels.png` | Tunnels panel (plugin-panels) (`tunnels-panel-plugin-panels`) | 0.948 | 0.948 |  |
+| `Screenshot … 11.16.50 AM.png` | SFTP panel (`sftp-panel`) | 0.831 | 0.830 |  |
+| `reference/plugin-panels.png` | SFTP panel (plugin-panels) (`sftp-panel-plugin-panels`) | 0.825 | 0.825 |  |
+| `Screenshot … 11.16.50 AM.png` | File Servers panel (`fileservers-panel`) | 0.949 | 0.949 |  |
+| `reference/plugin-panels.png` | File Servers panel, populated (`fileservers-panel-populated`) | 0.947 | 0.947 |  |
+| `new_tunnel_mock.png` | New Tunnel (`tunnel-new`) | 0.909 | 0.916 |  |
+
+### Light, inspected
+
+Each family's Light render was opened beside its Dark render (Settings pages, Vault hero/manager/menu/sheets, Add Host,
+New File Server, New Tunnel, the workspace, the palette, the credential picker and the four panels).
+
+- Fixed: a selected row in a list outside the panels (the Vault item list, the Settings plugin list) kept
+  `text.primary` and `text.secondary`/`text.tertiary` on `selection.bg`; on Light's `#5482B9` the subtitle was
+  1.5:1 (secondary) and 1.1:1 (tertiary). Selected rows on `selection.bg` now take the on-accent roles with the text
+  floor, as selected panel rows did (`AppManagerKitTest.aSelectedManagerRowsTextReadsOnTheSelectionInBothVariants`).
+  White on Light's `selection.bg` is 3.98:1, so the floor gives those rows dark text while their glyphs stay white
+  (a theme.md design note).
+- Observed, not Light-specific: New File Server's three-way Login control wraps to two rows when the form shows its
+  vertical scroll bar (344 instead of 354 logical wide); it is one row at natural height and in both variants.
+- Authored values below the former floors (theme.md design notes): Light's off-switch track 1.68:1; Light
+  `status.success` 3.32:1 and `status.warning` 3.76:1 on `surface.panel`; the split divider `border.window` 1.43:1
+  (Dark) and 1.58:1 (Light) against the terminal; Light menu selection `text.onAccent` on `selection.bg` 3.98:1; the
+  status bar's path slash `border.subtle` 1.19:1 (Dark) and 1.14:1 (Light).
+
 ## User-run checks still open
 
 Screen capture and UI scripting are unavailable to the agent session, so these need a person at the Mac:
 
-1. Open each mocked page in the running app and compare it with its mock at 100%: Settings (all five pages),
-   Vault create/unlock/manager/menu/sheets, Add Host, New File Server, New Tunnel, the credential picker, the four
-   panels docked as in `Screenshot … 11.16.50 AM.png`, the title bar and status bar, and the command palette.
-2. Native behavior: attached sheets follow their window, popups and menus place correctly, focus rings and keyboard
-   order, IME in fields, live theme switching with open dialogs, light theme.
-3. VoiceOver on the new descriptors (route strip, row switches, keycaps).
-4. Windows and Linux packaging and a native pass there.
+1. Compare each mocked page with its mock at 100% in Slate Steel Dark: Settings (all five pages), Vault
+   create/unlock/manager/menu/sheets, Add Host, New File Server, New Tunnel, the credential picker, the four panels docked
+   as in `Screenshot … 11.16.50 AM.png`, the title bar and status bar, and the command palette.
+2. Native behaviour with Dark, Light and Match System followed live (switch the OS appearance with Settings and a sheet
+   open), and each terminal scheme including High Contrast (the band below the grid, a tab meeting a black pane);
+   attached sheets, popups and menus, focus rings and keyboard order, IME in fields.
+3. The Dark active tab's title colour.
+4. VoiceOver on the new descriptors (route strip, row switches, keycaps).
+5. Windows and Linux packaging and a native pass there.
