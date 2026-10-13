@@ -88,8 +88,6 @@ final class WindowChrome {
         standardMenus.put(MenuTarget.Slot.FILE, file); standardMenus.put(MenuTarget.Slot.EDIT, edit);
         standardMenus.put(MenuTarget.Slot.VIEW, view); standardMenus.put(MenuTarget.Slot.PANE, pane);
         standardMenus.put(MenuTarget.Slot.TAB, tab);
-        // Tools holds only plugin entries; rebuildContributedMenus adds it to the bar while it has any.
-        standardMenus.put(MenuTarget.Slot.TOOLS, menu("Tools"));
         JMenu modes = menu("Toolbar");
         for (ToolbarMode mode : ToolbarMode.values()) {
             JRadioButtonMenuItem item = new MenuBarItems.Radio(owner.windowCommands().view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)));
@@ -251,6 +249,10 @@ final class WindowChrome {
         contributedMenus.clear();
         if (contributions != null) {
             var sections = contributions.model().menus();
+            // Tools holds only plugin entries and, like a plugin's own menu, is built fresh on every pass and added
+            // to the bar only while it has any: a stale one would keep an old look and feel, and one JMenu would be
+            // re-inserted into the macOS screen menu bar.
+            standardMenus.put(MenuTarget.Slot.TOOLS, menu("Tools"));
             for (MenuSection section : sections) {
                 if (section.target().type() != MenuTarget.Type.STANDARD) continue;
                 List<Component> built = build(section.entries(), MenuBarItems.Item::new);

@@ -169,6 +169,35 @@ class WindowChromeContributionsTest {
         });
     }
 
+    @Test void toolsIsBuiltFreshOnEachRebuildAndNeverDuplicated() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            try {
+                owner.connectContributions(model);
+                model.addAction("dev.x.run", "Run Tool", null, List.of(), Optional.empty(), invocation -> { });
+                MenuSection section = model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS));
+                section.set(List.of(new MenuEntry.Item("dev.x.run")));
+                JMenu before = tools(owner);
+
+                owner.chrome().renderContributedMenus();
+
+                JMenu after = tools(owner);
+                assertThat(after).as("each rebuild builds its own Tools menu").isNotSameAs(before);
+                assertThat(before.getParent()).as("the old one left the bar").isNull();
+                assertThat(titles(owner)).containsOnlyOnce("Tools");
+                assertThat(items(after)).containsExactly("Run Tool");
+
+                section.close();
+                assertThat(titles(owner)).doesNotContain("Tools");
+                section = model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS));
+                section.set(List.of(new MenuEntry.Item("dev.x.run")));
+                assertThat(titles(owner)).containsOnlyOnce("Tools");
+                assertThat(items(tools(owner))).as("the closed section left nothing behind").containsExactly("Run Tool");
+            } finally { owner.close(); }
+        });
+    }
+
     private static List<String> titles(WindowContent owner) {
         return owner.chrome().menuBar().menus().stream().map(JMenu::getText).toList();
     }
@@ -189,6 +218,8 @@ class WindowChromeContributionsTest {
                 model.addAction("app.help", "Shortcuts", null, List.of(), Optional.empty(), event -> {});
                 var ssh = model.addMenuSection(MenuTarget.topLevel("dev.x.ssh", "SSH"));
                 ssh.set(List.of(new MenuEntry.Item("dev.x.connect")));
+                model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS))
+                    .set(List.of(new MenuEntry.Item("dev.x.connect")));
                 model.addMenuSection(MenuTarget.topLevel("app.help", "Help"))
                     .set(List.of(new MenuEntry.Item("app.help")));
                 // JBR can dispatch an EDT callback while creating a native menu peer.
@@ -211,9 +242,11 @@ class WindowChromeContributionsTest {
                 owner.chrome().renderContributedMenus();
 
                 assertThat(owner.chrome().menuBar().menus().stream().map(JMenu::getText).toList())
-                    .containsExactly("File", "Edit", "View", "Pane", "Tab", "SSH", "Help");
+                    .containsExactly("File", "Edit", "View", "Pane", "Tab", "Tools", "SSH", "Help");
                 assertThat(menu(owner, "SSH").getItem(0).isEnabled()).isFalse();
                 assertThat(items(menu(owner, "SSH"))).containsExactly("Connect", "Shortcuts");
+                assertThat(items(menu(owner, "Tools"))).containsExactly("Connect");
+                assertThat(menu(owner, "Tools").getItem(0).isEnabled()).isFalse();
             } finally { owner.close(); }
         });
     }
