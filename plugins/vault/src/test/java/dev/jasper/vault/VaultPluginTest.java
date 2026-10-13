@@ -139,7 +139,7 @@ class VaultPluginTest {
             assertThat(host.searchScope("dev.jasper.vault.scope", "pro", window, null)).containsExactly("cred." + id + "|prod|true");
             host.executeInScope("dev.jasper.vault.scope", "cred." + id, "copy_password", window, null);
             assertThat(host.clipboard().text()).contains("s3cret");
-            assertThat(host.notifications().lines()).contains("dev.jasper.vault.copies|INFO|Copied the password for prod|Jasper clears it from the clipboard in 30 seconds.");
+            assertThat(host.notifications().lines()).contains("dev.jasper.vault.copies|INFO|Copied the password for prod|Copied to Clipboard for 30 seconds");
         }
     }); }
 

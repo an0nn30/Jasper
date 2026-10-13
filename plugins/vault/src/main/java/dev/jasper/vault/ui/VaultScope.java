@@ -122,7 +122,7 @@ public final class VaultScope implements PaletteScope {
             if (Character.isHighSurrogate(title.charAt(end - 1))) end--;
             title = title.substring(0, end) + "\u2026";
         }
-        copies.info(title, "Jasper clears it from the clipboard in 30 seconds.");
+        copies.info(title, "Copied to Clipboard for 30 seconds");
     }
 
     @Override public Subscription onChanged(Runnable listener) { listeners.add(listener); return () -> listeners.remove(listener); }
