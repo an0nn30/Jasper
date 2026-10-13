@@ -9,6 +9,7 @@ import dev.jasper.fileserver.engine.ServerEvent;
 import dev.jasper.fileserver.runtime.ServerState.Phase;
 import dev.jasper.fileserver.ui.FileServerScope;
 import dev.jasper.fileserver.ui.FileServersPanel;
+import dev.jasper.fileserver.ui.ServerEditor;
 import dev.jasper.fileserver.ui.UiTestAccess;
 import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.PluginInfo;
@@ -16,6 +17,8 @@ import dev.jasper.sdk.terminal.PaneInfo;
 import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.SessionState;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.vault.api.LockState;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -44,6 +47,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FileServerPluginTest {
+    static final String ED25519 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAEgwWITbeAjMHfs63n4fe6AxR8buxH3Wx+IdWdotPF0 alice@laptop";
     static final PluginInfo INFO = new PluginInfo("dev.jasper.fileserver", "File Server", "0.4.0",
         Set.of(Capabilities.NETWORK_LISTEN, Capabilities.TERMINAL_OBSERVE, Capabilities.PALETTE_CONTRIBUTE, Capabilities.CLIPBOARD_READ));
     @TempDir Path home;
@@ -228,6 +232,30 @@ class FileServerPluginTest {
             assertThat(host.notifications().lines()).containsExactly(
                 "dev.jasper.fileserver|ERROR|Could not read a public key file|" + huge + reason,
                 "dev.jasper.fileserver|ERROR|Could not read a public key file|" + folder + reason);
+        }
+    }
+
+    @Test void pastingAKeyReadsTheClipboardAndAnEmptyOrBlankClipboardChangesNothing() throws Exception {
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID window = host.addTerminalWindow();
+            UiTestAccess.add(openPanel(host, plugin, window)).doClick();
+            var view = UiTestAccess.fake(plugin.currentEditor().view());
+            UiTestAccess.edt(() -> view.emit(new UiEvent.Selected(ServerEditor.PROTOCOL, Set.of("SFTP"))));
+            assertThat(UiTestAccess.node(view, ServerEditor.PASTE_KEY)).as("SFTP shows the key controls").isNotNull();
+            var paste = new UiEvent.Action(ServerEditor.PASTE_KEY);
+            for (String blank : List.of("   \n", "")) {
+                host.clipboard().setText(blank);
+                UiTestAccess.edt(() -> view.emit(paste));
+                assertThat(UiTestAccess.node(view, ServerEditor.MESSAGE)).as("no error for a blank clipboard").isNull();
+                assertThat(((Nodes.ItemList) UiTestAccess.node(view, ServerEditor.KEYS)).items()).isEmpty();
+            }
+            host.clipboard().setText(ED25519);
+            UiTestAccess.edt(() -> view.emit(paste));
+            assertThat(((Nodes.ItemList) UiTestAccess.node(view, ServerEditor.KEYS)).items()).hasSize(1);
+            assertThat(UiTestAccess.node(view, ServerEditor.MESSAGE)).isNull();
         }
     }
 

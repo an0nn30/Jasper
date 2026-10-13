@@ -315,8 +315,8 @@ public final class FileServerPlugin implements Plugin {
         return text.isEmpty() ? Optional.empty() : Optional.of(text.toString());
     }
 
-    /** The clipboard's text, for a key or certificate pasted into the editor; empty when there is none. */
-    private Optional<String> pasted() { return context.platform().clipboardText(); }
+    /** The clipboard's text, for a key or certificate pasted into the editor; empty when there is none or it is blank. */
+    private Optional<String> pasted() { return context.platform().clipboardText().filter(text -> !text.isBlank()); }
 
     private void registerShareAction(PluginMenu menu, Protocol protocol, boolean tls) {
         if (!Engines.AVAILABLE.contains(protocol)) return;
