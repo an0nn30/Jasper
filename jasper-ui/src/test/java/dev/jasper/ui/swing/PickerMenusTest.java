@@ -58,15 +58,15 @@ class PickerMenusTest {
    var rows=find(view,"menu.rows",JList.class);var scroll=(JScrollPane)SwingUtilities.getAncestorOfClass(JScrollPane.class,rows);
    assertThat(popup.getInsets()).as("native host wrapper insets").isEqualTo(new java.awt.Insets(0,0,0,0));
    assertThat(view.getSize()).isEqualTo(new java.awt.Dimension(222,107));
-   assertThat(scroll.getVerticalScrollBar().isVisible()).isFalse();assertThat(rows.getCellBounds(0,0).width).as("rows run edge to edge").isEqualTo(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.PICKER_WIDTH));
+   assertThat(scroll.getVerticalScrollBar().isVisible()).isFalse();assertThat(rows.getCellBounds(0,0).width).as("rows run edge to edge").isEqualTo(rows.getWidth());
   }finally{release(context);try{javax.swing.UIManager.setLookAndFeel(priorLaf);}catch(javax.swing.UnsupportedLookAndFeelException failure){throw new AssertionError(failure);}}
  });}
  @Test void referenceMenuAllocatesItsVisibleSearchAndUtilityRowsWithoutHorizontalClipping(){Edt.run(()->{
   var context=KitFixtures.context();var menu=new Nodes.PickerMenu("menu",ControlState.READY,"staging","Search credentials",List.of(),"","create","No credentials match “staging”","New Credential…","create","cancel");
   try(var view=new KitView(context,new ViewSpec(menu),e->{})){
-   var size=view.getPreferredSize();assertThat(size.width).isEqualTo(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.PICKER_WIDTH));assertThat(size.height).isEqualTo(92);view.setSize(size);layout(view);
+   var size=view.getPreferredSize();assertThat(size.width).as("its widest row").isEqualTo(find(view,"menu.rows",JList.class).getPreferredSize().width);assertThat(size.height).isEqualTo(92);view.setSize(size);layout(view);
    var field=find(view,"menu.search",JTextField.class);assertThat(field.getParent().getHeight()).isEqualTo(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.PICKER_SEARCH_HEIGHT));
-   var list=find(view,"menu.rows",JList.class);assertThat(list.getCellBounds(0,0).height).isEqualTo(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.PICKER_UTILITY_HEIGHT)+dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.PICKER_FOOTER_TOP));assertThat(list.getCellBounds(0,0).width).isEqualTo(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.PICKER_WIDTH));
+   var list=find(view,"menu.rows",JList.class);assertThat(list.getCellBounds(0,0).height).isEqualTo(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.PICKER_UTILITY_HEIGHT)+dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.PICKER_FOOTER_TOP));assertThat(list.getCellBounds(0,0).width).isEqualTo(list.getWidth());
   }finally{release(context);}
  });}
  static void layout(java.awt.Container owner){owner.doLayout();for(var child:owner.getComponents())if(child instanceof java.awt.Container c)layout(c);}
@@ -83,6 +83,21 @@ class PickerMenusTest {
    var input=find(view,"menu.search",JTextField.class);input.setText("roo");input.setCaretPosition(1);var document=input.getDocument();
    view.update(stack(choice,menu));assertThat(input.getDocument()).isSameAs(document);assertThat(input.getText()).isEqualTo("roo");assertThat(input.getCaretPosition()).isEqualTo(1);
    input.getActionMap().get("picker.enter").actionPerformed(null);assertThat(events).contains(new UiEvent.Action("root"));
+  }finally{release(context);}
+ });}
+
+ @Test void theMenuIsSizedByItsWidestRowInTheDefaultFacesType(){Edt.run(()->{
+  var context=KitFixtures.context();
+  var items=List.of(new Nodes.PickerItem("login","Production database login","deploy@prod","key",Nodes.Hue.BLUE,Nodes.PickerItemKind.VALUE));
+  var menu=new Nodes.PickerMenu("menu",ControlState.READY,"","Search",items,"","login","No matches","New Credential\u2026","create","cancel");
+  try(var view=new KitView(context,new ViewSpec(menu),e->{})){
+   layout(view);
+   var control=(PickerMenus.MenuControl)view.control("menu");
+   var row=control.list.getCellRenderer().getListCellRendererComponent(control.list,items.getFirst(),0,false,false);
+   var body=ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.BODY);
+   assertThat(row.getPreferredSize().width).as("a row reports its content width").isGreaterThan(control.list.getFontMetrics(body).stringWidth("Production database login"));
+   assertThat(control.search.getFont()).as("the default face's type").isEqualTo(body);
+   assertThat(control.component.getPreferredSize().width).as("no fixed menu width").isEqualTo(control.scroll.getPreferredSize().width);
   }finally{release(context);}
  });}
 }

@@ -13,6 +13,7 @@ class HostedAnchorTest {
         assertThat(HostedPopover.fit(new java.awt.Rectangle(40,30,190,22),new java.awt.Dimension(220,100),screen)).isEqualTo(new java.awt.Rectangle(40,52,220,100));
         assertThat(HostedPopover.fit(new java.awt.Rectangle(250,190,190,22),new java.awt.Dimension(220,100),screen)).isEqualTo(new java.awt.Rectangle(90,90,220,100));
         assertThat(HostedPopover.fit(new java.awt.Rectangle(40,100,190,22),new java.awt.Dimension(500,400),screen)).isEqualTo(new java.awt.Rectangle(10,20,300,200));
+        assertThat(HostedPopover.fit(new java.awt.Rectangle(40,30,190,22),new java.awt.Dimension(150,100),screen)).as("as wide as its anchor").isEqualTo(new java.awt.Rectangle(40,52,190,100));
     }
 
     static ViewSpec picker(ControlState state) { return new ViewSpec(new Nodes.Choice("pick",state,Nodes.ChoiceKind.PICKER,List.of(),"","Credential","pick")); }

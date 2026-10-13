@@ -42,7 +42,7 @@ final class RichOptions extends JPanel {
         int text=getFontMetrics(font()).getHeight()*lines(width).size();
         // A Settings menu row keeps its height until its wrapped lines need more; their own leading pads them.
         int margin=settings?0:ThemePainting.metric(context,DesignMetrics.Role.MENU_SEPARATOR_MARGIN)*2;
-        return new Dimension(width,popup?Math.max(ThemePainting.metric(context,settings?DesignMetrics.Role.SETTINGS_OPTION_HEIGHT:DesignMetrics.Role.BUTTON_HEIGHT),text+margin):getFontMetrics(font()).getHeight());
+        return new Dimension(width,popup?Math.max(ThemePainting.height(context,DesignMetrics.Role.MENU_ITEM_HEIGHT,settings?Typography.Role.LABEL:Typography.Role.BODY),text+margin):getFontMetrics(font()).getHeight());
     }
     private static String clip(String text,FontMetrics fm,int width){if(fm.stringWidth(text)<=width)return text;String ellipsis="…";while(!text.isEmpty()&&fm.stringWidth(text+ellipsis)>width)text=text.substring(0,text.offsetByCodePoints(text.length(),-1));return text.isEmpty()?"":text+ellipsis;}
     @Override protected void paintComponent(Graphics graphics){

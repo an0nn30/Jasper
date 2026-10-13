@@ -39,7 +39,8 @@ final class HostedPopover implements PluginPopover {
     }
     /** Fitting is host geometry only; no producer descriptor values enter attachment authority. */
     static Rectangle fit(Rectangle anchor,Dimension preferred,Rectangle usable){
-        int width=Math.min(preferred.width,usable.width),height=Math.min(preferred.height,usable.height);
+        // A popover is at least as wide as the control that opened it (a picker matches its face).
+        int width=Math.min(Math.max(preferred.width,anchor.width),usable.width),height=Math.min(preferred.height,usable.height);
         int below=anchor.y+anchor.height;
         int y=below+height<=usable.y+usable.height?below:anchor.y-height;
         return new Rectangle(Math.max(usable.x,Math.min(anchor.x,usable.x+usable.width-width)),Math.max(usable.y,Math.min(y,usable.y+usable.height-height)),width,height);

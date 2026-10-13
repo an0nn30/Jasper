@@ -92,7 +92,7 @@ class ChoicesTest {
                     var theme=KitFixtures.withSemantic(base, new dev.jasper.ui.theme.SemanticPalette(colors));
                     context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme,theme));
                     assertThat(popup.getList()).isSameAs(list);assertThat(list.getBackground()).isEqualTo(color);
-                    assertThat(list.getFixedCellHeight()).isGreaterThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT)));
+                    assertThat(list.getFixedCellHeight()).isGreaterThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_ITEM_HEIGHT)));
                     var row=(JComponent)combo.getRenderer().getListCellRendererComponent(list,combo.getItemAt(0),0,true,false);
                     row.setSize(com.formdev.flatlaf.util.UIScale.scale(220),list.getFixedCellHeight());
                     assertThat(ButtonsTest.paint(row).getRGB(com.formdev.flatlaf.util.UIScale.scale(200),list.getFixedCellHeight()/2)).as("a highlighted option is selection.bg").isEqualTo(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SELECTION_BG).getRGB());
@@ -191,6 +191,26 @@ class ChoicesTest {
                 owner[0] = view; var combo = find(view, "choice.input", JComboBox.class); combo.setSelectedIndex(1);
                 assertThat(combo.isEnabled()).isFalse(); combo.setSelectedIndex(0); assertThat(events).hasSize(1);
                 assertThat(combo.getAccessibleContext().getAccessibleName()).isEqualTo("Protocol");
+            } finally { release(context); }
+        });
+    }
+
+    @Test void aDropdownPopupIsAsWideAsItsFieldAndWiderOnlyForALongerRow() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var choice = new Nodes.Choice("mode", ControlState.READY, Nodes.ChoiceKind.DROPDOWN,
+                List.of(new Option("a", "A", Optional.empty()), new Option("long", "A considerably longer option than its field", Optional.empty())), "a", "Mode", "");
+            try (var view = new KitView(context, stack(choice), e -> { })) {
+                view.setSize(400, 80); InteractiveRowsTest.layout(view);
+                var combo = find(view, "mode.input", Choices.ChoiceCombo.class);
+                var popup = combo.popup;
+                var list = popup.getList();
+                assertThat(list.getFixedCellHeight()).isEqualTo(ThemePainting.height(context, dev.jasper.ui.metrics.DesignMetrics.Role.MENU_ITEM_HEIGHT, dev.jasper.ui.metrics.Typography.Role.BODY));
+                int rows = list.getPreferredSize().width + popup.getInsets().left + popup.getInsets().right;
+                assertThat(popup.popupWidth(rows + 50)).as("as wide as a wider field").isEqualTo(rows + 50);
+                assertThat(popup.popupWidth(80)).as("wider only for its widest row").isEqualTo(rows);
+                assertThat(popup.getInsets().left).isEqualTo(ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE));
+                assertThat(popup.getInsets().top).isEqualTo(ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.MENU_PADDING));
             } finally { release(context); }
         });
     }

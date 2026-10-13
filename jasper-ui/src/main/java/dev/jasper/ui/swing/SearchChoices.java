@@ -324,10 +324,10 @@ final class SearchChoices {
         /** Kit colors, fonts and padding from the combo's context; replayed on every theme change. */
         void restyle() {
             var context = combo.context;
-            int pad = ThemePainting.metric(context, DesignMetrics.Role.MENU_SEPARATOR_MARGIN);
-            setBorder(new EmptyBorder(pad, pad, pad, pad));
+            int pad = ThemePainting.metric(context, DesignMetrics.Role.MENU_PADDING), line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
+            setBorder(new EmptyBorder(pad, line, pad, line));
             list.setFont(ThemePainting.font(context, Typography.Role.BODY));
-            list.setFixedCellHeight(ThemePainting.height(context, DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.BODY));
+            list.setFixedCellHeight(ThemePainting.height(context, DesignMetrics.Role.MENU_ITEM_HEIGHT, Typography.Role.BODY));
             list.setBackground(ThemePainting.color(context, SemanticColor.SURFACE_MENU));
             list.setForeground(ThemePainting.color(context, SemanticColor.TEXT_PRIMARY));
             list.setSelectionBackground(ThemePainting.color(context, SemanticColor.SELECTION_BG));
