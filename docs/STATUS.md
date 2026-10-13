@@ -1,5 +1,15 @@
 # Jasper — Status and Handoff
 
+**Vault logins in the palette — 2026-10-13** (`claude/vault-palette-logins`, worktree
+`.claude/worktrees/vault-palette-logins`; bounded change, design approved in chat, no spec or plan). Vault 0.5.0: the
+Vault scope lists logins only (SSH keys stay in the manager) and its placeholder is "Search logins". New action
+**Search Vault Logins** (`dev.jasper.vault.search`, Cmd+\\) opens the palette on that scope and is its chip shortcut;
+Open Vault... moves to Cmd+Shift+\\. The locked row's Enter unlocks and reopens the palette on the Vault scope (with no
+vault yet it still creates one in the manager). Each copy that worked posts a card naming the login, never the secret,
+in the new `dev.jasper.vault.copies` group ("Vault copies", cards by default). `./gradlew check --continue`: **9,775 tests, 0 failures, 0 errors, 8 skipped**.
+No GUI launched. GUI check for the user: lock the vault, press Cmd+\\, Enter on the locked row, unlock, search, copy a
+password and a username, and see the two cards. Not merged or pushed.
+
 **Clear Terminal in the terminal context menu — 2026-10-13** (`claude/clear-terminal`, worktree
 `.claude/worktrees/clear-terminal`; bounded change, design approved in chat, no spec or plan). Right-click › Clear
 Terminal (after Find) erases scrollback and the live screen; the cursor's line moves to the top with the cursor, and

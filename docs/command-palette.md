@@ -21,7 +21,7 @@ Chips: `>` at the start of the query is Commands; `<scope> >` (for example `hist
 unique start such as `hist >`) is that scope, and the prefix leaves the field. With a chip set, `>`
 is ordinary text. Backspace in an empty query removes the chip. Each scope's own shortcut opens the
 palette with its chip, or switches to it while the palette is open: Cmd+R (Ctrl+Shift+R elsewhere) History,
-Cmd+J (Ctrl+Shift+J) Snippets.
+Cmd+J (Ctrl+Shift+J) Snippets, Cmd+\\ (Ctrl+Shift+\\) Vault.
 Pressing the shortcut of the chip already showing, or Cmd/Ctrl+K with no chip, closes the palette.
 Tab does nothing outside a form.
 
