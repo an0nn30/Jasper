@@ -43,6 +43,7 @@ final class WindowCommands implements AutoCloseable {
                 case TOGGLE_ZEN_MODE -> List.of("view mode", "focus", "distraction free", "hide tools", "restore layout");
                 case FIND, FIND_NEXT, FIND_PREVIOUS -> List.of("search");
                 case CLEAR_SCROLLBACK -> List.of("history", "clear");
+                case CLEAR_TERMINAL -> List.of("clear", "screen");
                 case FONT_BIGGER, FONT_SMALLER, FONT_RESET -> List.of("text", "size");
                 default -> List.of();
             });

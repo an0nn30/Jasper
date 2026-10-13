@@ -239,6 +239,25 @@ public final class JediTermEngine implements AutoCloseable {
         buffer.clearHistory();
     }
 
+    /**
+     * Clears saved history and the screen rows above the cursor, which moves to the top with its line and anything
+     * below it, then notifies listeners that absolute rows were reset. The alternate screen is left alone.
+     */
+    public void clearTerminal() {
+        buffer.lock();
+        try {
+            if (buffer.isUsingAlternateBuffer()) return;
+            int above = terminal.getCursorY() - 1;
+            if (above > 0) {
+                buffer.deleteLines(0, above, buffer.getHeight());
+                terminal.cursorUp(above);
+            }
+            buffer.clearHistory();
+        } finally {
+            buffer.unlock();
+        }
+    }
+
     public int columns() {
         return columns;
     }

@@ -3,7 +3,8 @@
 Every window's header has a search field in the middle showing the focused pane's context, with the
 palette shortcut on the right. Clicking it, Cmd+K on macOS or Ctrl+K on Windows and Linux, or View →
 Command Palette drops the palette from the field: the card covers the field, centred on it and at
-least 560 px wide. When the window is too narrow for the field, the palette opens centred near the
+least 560 px wide, moving or narrowing to stay clear of the window controls. When the window is too
+narrow for the field, the palette opens centred near the
 top fifth of the window instead.
 
 The palette opens with no **scope chip**. An empty query shows **Recently used**, the last two rows
@@ -20,14 +21,14 @@ Chips: `>` at the start of the query is Commands; `<scope> >` (for example `hist
 unique start such as `hist >`) is that scope, and the prefix leaves the field. With a chip set, `>`
 is ordinary text. Backspace in an empty query removes the chip. Each scope's own shortcut opens the
 palette with its chip, or switches to it while the palette is open: Cmd+R (Ctrl+Shift+R elsewhere) History,
-Cmd+J (Ctrl+Shift+J) Snippets.
+Cmd+J (Ctrl+Shift+J) Snippets, Cmd+\\ (Ctrl+Shift+\\) Vault.
 Pressing the shortcut of the chip already showing, or Cmd/Ctrl+K with no chip, closes the palette.
 Tab does nothing outside a form.
 
 Rows are one line: an icon, the title, a grey detail and a right-aligned tag. Up and Down move
 between rows, skipping the section headers. Enter runs a row's first verb, Cmd+Enter (Ctrl+Enter
 elsewhere) its second and Shift+Enter its third. The hint bar under the list shows the selected
-row's detail and its other verbs with their keys; click one to run it. Escape leaves an open step,
+row's detail and, when its scope has more than one verb, every verb with its key, Enter's first; click one to run it. Escape leaves an open step,
 keeping the list underneath, and otherwise closes the palette, as does an outside click. Plain
 digits are search text. Every colour comes from the installed theme.
 

@@ -636,6 +636,27 @@ class FileServerPluginTest {
         }
     }
 
+    @Test void theFingerprintCommandsNeedNoServerOrPanel() throws Exception {
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID window = host.addTerminalWindow();
+            for (String id : List.of(FileServerPlugin.TLS_FINGERPRINT, FileServerPlugin.HOST_KEY_FINGERPRINT))
+                assertThat(host.actionSpec(id).orElseThrow().defaultBinding()).as("unbound until the user binds it").isEmpty();
+            assertThat(host.invoke(FileServerPlugin.TLS_FINGERPRINT, window, null)).isTrue();
+            await(host, () -> plugin.currentConfirm() != null, "the TLS fingerprint dialog opens");
+            assertThat(host.windows()).containsExactly("dialog|Fingerprints|true");
+            assertThat(UiTestAccess.message(plugin.currentConfirm()).getText()).startsWith("No TLS certificate yet");
+            assertThat(host.requestClose("dialog")).isTrue();
+            assertThat(host.invoke(FileServerPlugin.HOST_KEY_FINGERPRINT, window, null)).isTrue();
+            await(host, () -> plugin.currentConfirm() != null, "the host key dialog opens");
+            assertThat(UiTestAccess.message(plugin.currentConfirm()).getText()).startsWith("No SSH host key yet");
+            assertThat(plugin.panel(window)).as("the File Servers panel stays closed").isNull();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
     @Test void showsTheCertificateFingerprintAndRegeneratesIt() throws Exception {
         try (var host = new FakePluginHost(root)) {
             var plugin = plugin();

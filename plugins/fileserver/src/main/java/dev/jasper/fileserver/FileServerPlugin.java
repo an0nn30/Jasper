@@ -82,6 +82,8 @@ public final class FileServerPlugin implements Plugin {
     public static final String STOP_ALL = ID + ".stop-all";
     public static final String STATUS = ID + ".status";
     public static final String SERVERS = ID + ".servers";
+    public static final String TLS_FINGERPRINT = ID + ".tls-fingerprint";
+    public static final String HOST_KEY_FINGERPRINT = ID + ".host-key-fingerprint";
     public static final String SERVE_HTTP = ID + ".serve-http";
     public static final String SERVE_FTP = ID + ".serve-ftp";
     public static final String SERVE_SFTP = ID + ".serve-sftp";
@@ -157,6 +159,12 @@ public final class FileServerPlugin implements Plugin {
         context.actions().register(ActionSpec.of(SERVERS, "Start or Stop a File Server…").withIcon(icon)
                 .withKeywords(List.of("file server", "start", "stop", "share")),
             invoked -> context.palette().open(invoked.window(), FileServerScope.ID, Optional.empty(), Optional.empty()));
+        context.actions().register(ActionSpec.of(TLS_FINGERPRINT, "Show TLS Certificate Fingerprint…")
+                .withKeywords(List.of("file server", "tls", "https", "ftps", "certificate", "fingerprint")),
+            invoked -> showTlsFingerprint(invoked.window()));
+        context.actions().register(ActionSpec.of(HOST_KEY_FINGERPRINT, "Show SFTP Host Key Fingerprint…")
+                .withKeywords(List.of("file server", "sftp", "ssh", "host key", "fingerprint")),
+            invoked -> showHostKey(invoked.window()));
         context.actions().register(ActionSpec.of(SERVE_HTTP, "Serve Current Folder over HTTP").withIcon(icon)
                 .withKeywords(List.of("file server", "share", "serve", "http", "folder")),
             invoked -> serve(invoked, Protocol.HTTP));
@@ -494,14 +502,16 @@ public final class FileServerPlugin implements Plugin {
         }
     }
 
-    /** Shows the shared certificate's fingerprint, offering to regenerate it; the file I/O runs off the UI thread. */
+    /** Shows the fingerprint the server presents: the shared SSH host key's for SFTP, else the shared certificate's. */
     void showFingerprints(WindowHandle window, UUID id) {
         Optional<ServerRegistry.View> server = registry.server(id);
         if (server.isEmpty()) return;
-        if (server.get().definition().protocol() == Protocol.SFTP) {
-            showHostKey(window);
-            return;
-        }
+        if (server.get().definition().protocol() == Protocol.SFTP) showHostKey(window);
+        else showTlsFingerprint(window);
+    }
+
+    /** Shows the shared certificate's fingerprint, offering to regenerate it; the file I/O runs off the UI thread. */
+    private void showTlsFingerprint(WindowHandle window) {
         context.background().execute(() -> {
             String text;
             try {

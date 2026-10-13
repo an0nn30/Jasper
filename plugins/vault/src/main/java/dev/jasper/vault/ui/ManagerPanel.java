@@ -57,8 +57,9 @@ final class ManagerPanel implements AutoCloseable {
     private java.time.Instant shownSecretVersion;
     private int grantSelection = -1;
     private PasswordPanel unlock;
-    private Consumer<String> copySecret = text -> {};
-    void secretClipboard(Consumer<String> copy) { copySecret = copy; }
+    private CopyCards copies;
+    /** Where the detail pane's copy buttons copy; until set they do nothing. */
+    void copies(CopyCards cards) { copies = cards; }
 
     ManagerPanel(UiKit kit, Function<UUID, Optional<Object>> entry, Consumer<VaultManager.Type> onAdd,
                  Consumer<UUID> onEdit, Consumer<UUID> onDelete, Consumer<UUID> onCopy,
@@ -166,15 +167,15 @@ final class ManagerPanel implements AutoCloseable {
     void showGrants() { if (unlocked) { card = Card.GRANTS; render(); } }
 
     private void copyDetail(String action) {
-        if (!unlocked || selection == null) return;
+        if (!unlocked || selection == null || copies == null) return;
         entry.apply(selection).ifPresent(value -> {
             if (value instanceof Account account) {
-                if (action.equals("detail.username.copy")) copySecret.accept(account.username());
+                if (action.equals("detail.username.copy")) copies.secret("username", account.name(), account.username());
                 else if (action.equals("detail.password.copy")) {
                     char[] secret = password(account.auth());
-                    if (secret != null) copySecret.accept(new String(secret));
+                    if (secret != null) copies.secret("password", account.name(), new String(secret));
                 }
-            } else if (value instanceof Note note && action.equals("detail.note.copy")) copySecret.accept(new String(note.text()));
+            } else if (value instanceof Note note && action.equals("detail.note.copy")) copies.secret("note", note.name(), new String(note.text()));
         });
     }
 

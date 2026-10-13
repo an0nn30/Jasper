@@ -104,6 +104,8 @@ public final class TerminalAccess implements AutoCloseable {
     /** Clears saved history while preserving the live screen and notifying listeners that absolute rows were reset. Unsupported module collaboration API. */
     public void clearScrollback() { engine.clearScrollback(); }
     /** Unsupported module collaboration API; used only by terminal owners. */
+    public void clearTerminal() { engine.clearTerminal(); }
+    /** Unsupported module collaboration API; used only by terminal owners. */
     public int columns() { return engine.columns(); }
     /** Unsupported module collaboration API; used only by terminal owners. */
     public int rows() { return engine.rows(); }

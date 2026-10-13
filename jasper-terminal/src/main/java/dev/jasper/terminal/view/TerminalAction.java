@@ -8,6 +8,8 @@ public enum TerminalAction {
     PASTE_CLIPBOARD,
     /** Clear saved history, retaining the live screen. */
     CLEAR_SCROLLBACK,
+    /** Clear saved history and the live screen except the cursor's line, which moves to the top. */
+    CLEAR_TERMINAL,
     /** Reveal the next newer match, wrapping. */
     FIND_NEXT,
     /** Reveal the next older match, wrapping. */

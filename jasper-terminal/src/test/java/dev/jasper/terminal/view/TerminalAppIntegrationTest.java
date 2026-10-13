@@ -151,6 +151,39 @@ class TerminalAppIntegrationTest {
     }
 
     @Test
+    void clearTerminalKeepsOnlyTheCursorLineAtTheTop() throws Exception {
+        show("1\r\n2\r\n3\r\n4\r\n5\r\n$ ls", 3, "$ ls");
+        assertThat(session.internalAccess().snapshot().historyLines()).isPositive();
+
+        onEdt(() -> view.execute(TerminalAction.CLEAR_TERMINAL));
+
+        var cleared = session.internalAccess().snapshot();
+        assertThat(cleared.historyLines()).isZero();
+        assertThat(cleared.lineText(0)).isEqualTo("$ ls");
+        assertThat(List.of(cleared.lineText(1), cleared.lineText(2), cleared.lineText(3))).allMatch(String::isBlank);
+        assertThat(cleared.cursorRow()).isZero();
+        assertThat(cleared.cursorColumn()).isEqualTo(4);
+        assertThat(connector.written()).isEmpty();
+        connector.feed("\r\nnext");
+        Await.until(() -> "next".equals(session.internalAccess().snapshot().lineText(1)), "output continues below the kept line");
+    }
+
+    @Test
+    void clearTerminalLeavesTheAlternateScreenAlone() throws Exception {
+        show("1\r\n2\r\n3\r\n4\r\n5\r\n6", 3, "6");
+        connector.feed("\033[?1049h\033[Hvim");
+        Await.until(() -> session.usingAlternateBuffer() && "vim".equals(session.internalAccess().snapshot().lineText(0)), "vim on the alternate screen");
+
+        onEdt(() -> view.execute(TerminalAction.CLEAR_TERMINAL));
+
+        assertThat(session.internalAccess().snapshot().lineText(0)).isEqualTo("vim");
+        connector.feed("\033[?1049l");
+        Await.until(() -> !session.usingAlternateBuffer(), "back on the main screen");
+        assertThat(session.internalAccess().snapshot().historyLines()).isPositive();
+        assertThat(session.internalAccess().snapshot().lineText(3)).isEqualTo("6");
+    }
+
+    @Test
     void popupCallbacksRunOnlyForLocallyOwnedRightClicks() throws Exception {
         AtomicInteger popups = new AtomicInteger();
         view.setContextMenuHandler(event -> popups.incrementAndGet());
@@ -232,7 +265,7 @@ class TerminalAppIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"history", "alternate", "reflow", "reset"})
+    @ValueSource(strings = {"history", "clear", "alternate", "reflow", "reset"})
     void rowResetRejectsACompletedSearchAlreadyQueuedAheadOfReconciliation(String reset) throws Exception {
         show("alpha\r\n2\r\n3\r\n4\r\n5", 3, "5");
         AtomicInteger callbacks = new AtomicInteger();
@@ -248,6 +281,7 @@ class TerminalAppIntegrationTest {
                     long epoch = session.internalAccess().absoluteRowEpoch();
                     switch (reset) {
                         case "history" -> session.clearScrollback();
+                        case "clear" -> session.clearTerminal();
                         case "reflow" -> session.resize(18, 4);
                         case "alternate" -> connector.feed("\033[?1049h");
                         case "reset" -> connector.feed("\033c");

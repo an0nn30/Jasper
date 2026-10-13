@@ -251,6 +251,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
         body.add(leftStripe, BorderLayout.WEST); body.add(area, BorderLayout.CENTER); body.add(rightStripe, BorderLayout.EAST);
         dockDrag = new DockDrag(this, dock, area, leftStripe, rightStripe);
+        dockDrag.railsEnabled = this::railsEnabled;
         leftStripe.dragSource = dockDrag::install;
         rightStripe.dragSource = dockDrag::install;
         area.dragSource = dockDrag::install;
@@ -684,6 +685,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (SwingUtilities.getRootPane(field) != SwingUtilities.getRootPane(target)) return null;
         return SwingUtilities.convertRectangle(field.getParent(), field.getBounds(), target);
     }
+    /** The title row inside the insets that keep the header clear of the window controls, in {@code target}'s coordinates. */
+    java.awt.Rectangle titleRowClear(Component target) {
+        WindowHeader header = chrome.header();
+        java.awt.Insets insets = header.getInsets();
+        var row = new java.awt.Rectangle(insets.left, 0, Math.max(0, header.getWidth() - insets.left - insets.right), header.getHeight());
+        return SwingUtilities.convertRectangle(header, row, target);
+    }
     WindowChrome chrome() { return chrome; }
     UiState uiState() { return uiState; }
     WindowCommands windowCommands() { return windowCommands; }
@@ -691,7 +699,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     boolean statusVisible() { return statusVisible; }
     boolean zenMode() { return zenMode; }
 
-    /** Saves this window's mode without changing its normal visibility or dock layout. */
+    /** Saves this window's mode; the saved dock layout keeps the windows that showed before Zen. */
     void toggleZenMode() {
         if (closed) return;
         setZenMode(!zenMode());
@@ -703,11 +711,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed || zenMode == enabled) return;
         dockDrag.cancel();
         zenMode = enabled;
+        area.cancelResize();
         refreshChromeVisibility();
-        area.setToolsSuppressed(zenMode());
         syncRailVisibility();
+        if (contributed != null) contributed.zenChanged();
         if (zenMode()) focusSelected();
-        if (contributed != null) contributed.viewModeChanged();
         updateActions();
     }
     ViewMode viewMode() { return viewMode; }
@@ -843,20 +851,23 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * Both stripes show together while either has a tool window or an action (an empty right stripe included: it is a
-     * place to move windows to), unless the user hid them with View > Rail.
+     * Each stripe shows while it has a tool window or an action, unless View > Rail or Zen hides the rails. An empty
+     * stripe stays hidden; a dock drag still drops onto it at its edge ({@link DockDrag#railsEnabled}), and its guides
+     * predict this rule for the layout after the drop.
      */
     void syncRailVisibility() {
-        boolean wanted = !zenMode() && !(leftStripe.empty() && rightStripe.empty()) && railVisible;
-        area.setStripesVisible(wanted);
-        if (leftStripe.isVisible() != wanted || rightStripe.isVisible() != wanted) {
-            leftStripe.setVisible(wanted);
-            rightStripe.setVisible(wanted);
+        boolean left = railsEnabled() && !leftStripe.empty(), right = railsEnabled() && !rightStripe.empty();
+        area.setStripesVisible(left, right);
+        if (leftStripe.isVisible() != left || rightStripe.isVisible() != right) {
+            leftStripe.setVisible(left);
+            rightStripe.setVisible(right);
             revalidate(); repaint();
             // The stripes' own width, and the area's lower inset, are part of the window's minimum size.
             onMinimumSizeChanged.run();
         }
     }
+    /** Whether the stripes may show: neither View > Rail nor Zen hides them. */
+    boolean railsEnabled() { return !zenMode() && railVisible; }
     boolean updatingActions() { return workspaceActions.updating(); }
     Action action(ActionId id) { return workspaceActions.action(id); }
     KeyBindings bindings() { return bindings; }

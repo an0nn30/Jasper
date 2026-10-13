@@ -94,6 +94,19 @@ class EditorTabTest {
         });
     }
 
+    /** The kit's document split gives its document its own minimum height: a long file must not make that the window's. */
+    @Test void theDocumentsMinimumHeightDoesNotGrowWithItsText() throws Exception {
+        dev.jasper.editor.testsupport.Kits.edt(() -> {
+            var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), DocumentSession.untitled("Untitled", environment), closed::add, false);
+            tab.apply(new EditorSettings("Monospaced", 17, 2, false, 10, false), new EditorTheme(), EditorThemeTest.EDITOR, EditorThemeTest.syntax(0x223300), 1.0);
+            measure(tab);
+            int empty = tab.surface().getMinimumSize().height;
+            tab.area().setText(String.join("\n", java.util.Collections.nCopies(400, "a long document line")));
+            assertThat(tab.surface().getMinimumSize().height).isEqualTo(empty).isLessThan(tab.area().getPreferredSize().height / 10);
+            tab.dispose();
+        });
+    }
+
     @TempDir Path folder;
     private final List<Runnable> background = new ArrayList<>();
     private final SessionEnvironment environment = new SessionEnvironment(background::add, Runnable::run, Question::dismissed, () -> 1 << 20);

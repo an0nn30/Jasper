@@ -88,7 +88,7 @@ final class ShortcutCatalog {
             case FIND, FIND_NEXT, FIND_PREVIOUS -> "Search";
             case COPY, PASTE -> "Clipboard";
             case FONT_BIGGER, FONT_SMALLER, FONT_RESET -> "Appearance";
-            case PREVIOUS_PROMPT, NEXT_PROMPT, CLEAR_SCROLLBACK -> "Terminal";
+            case PREVIOUS_PROMPT, NEXT_PROMPT, CLEAR_SCROLLBACK, CLEAR_TERMINAL -> "Terminal";
             case COMMAND_PALETTE -> "Command Palette";
             default -> "Application";
         };

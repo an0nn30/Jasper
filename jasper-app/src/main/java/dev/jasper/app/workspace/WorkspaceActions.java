@@ -79,6 +79,7 @@ final class WorkspaceActions {
             case COPY -> view.execute(TerminalAction.COPY_SELECTION);
             case PASTE -> view.execute(TerminalAction.PASTE_CLIPBOARD);
             case CLEAR_SCROLLBACK -> view.execute(TerminalAction.CLEAR_SCROLLBACK);
+            case CLEAR_TERMINAL -> view.execute(TerminalAction.CLEAR_TERMINAL);
             case FONT_BIGGER -> view.setFontSize(view.fontSize() + 1);
             case FONT_SMALLER -> view.setFontSize(view.fontSize() - 1);
             case FONT_RESET -> view.setFontSize(owner.configuredFontSize());
@@ -118,6 +119,7 @@ final class WorkspaceActions {
                     case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, QUIT, TOGGLE_ZEN_MODE -> true;
                     case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();
+                    case CLEAR_TERMINAL -> ready && !pane.session().usingAlternateBuffer();
                     case FIND, FIND_NEXT, FIND_PREVIOUS, PREVIOUS_PROMPT, NEXT_PROMPT,
                          CLEAR_SCROLLBACK, FONT_BIGGER, FONT_SMALLER, FONT_RESET -> ready;
                     case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,

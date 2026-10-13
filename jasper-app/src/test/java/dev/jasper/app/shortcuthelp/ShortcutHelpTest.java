@@ -215,6 +215,10 @@ class ShortcutHelpTest {
                 assertThat(row.where()).isEqualTo("Terminal");
                 assertThat(row.context()).isEqualTo("In a terminal pane");
             });
+            assertThat(rows).filteredOn(row -> row.id().equals("clear_terminal")).singleElement().satisfies(row -> {
+                assertThat(row.group()).isEqualTo("Terminal");
+                assertThat(row.stroke()).isNull();
+            });
             assertThat(rows).filteredOn(row -> row.id().equals("dev.x.save")).singleElement()
                 .satisfies(row -> assertThat(row.where()).isEqualTo("Tool tabs"));
             assertThat(rows).filteredOn(row -> row.id().equals("dev.x.hosts.new")).singleElement().satisfies(row -> {
