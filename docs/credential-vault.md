@@ -1,6 +1,6 @@
 # Credential Vault
 
-Credential Vault is bundled with Jasper. Press **F8**, click the vault button in the rail, or
+Credential Vault is bundled with Jasper. Press **Cmd+Shift+\\** (Ctrl+Alt+Shift+\\ on Windows and Linux), click the vault button in the rail, or
 choose **Open Vault...** in the command palette. First use creates a vault with a master password
 and an optional device binding. Later use unlocks the vault and opens its manager window. Creating and unlocking
 are modal overlays inside the window that asked: it dims, and the prompt fades up over it (instantly with animations
@@ -42,9 +42,12 @@ secrets from the open vault and clears its editor forms. The window stays open w
 The padlock in the status bar unlocks/opens a locked vault and locks an unlocked vault; its tooltip
 shows the remaining inactivity time. Already connected SSH sessions are unaffected by locking.
 
-In the command palette, select **Vault**, or enter `>vault` / `>cred`. Search by entry name,
-username or key fingerprint. Enter copies an account's password, Cmd/Ctrl+Enter copies its
-username, and Shift+Enter opens the selected entry in the manager. Both password and username
+**Search Vault Logins** (Cmd+\\, or Ctrl+Shift+\\ on Windows and Linux) opens the command palette on the Vault scope;
+`vault >` in the palette does the same. It lists logins, searched by name or username; SSH keys stay in the manager.
+Enter copies a login's password, Cmd/Ctrl+Enter copies its username, and Shift+Enter opens the selected entry in the
+manager. A card confirms each copy, naming the login; turn these off in the **Vault copies** group under **Settings ›
+Notifications › Groups**. While the vault is locked the scope shows one row, whose Enter unlocks the vault and returns
+to the search; with no vault yet, Enter creates one in the manager. Both password and username
 copies are secret copies to Jasper's clipboard (SDK `Platform.copySecret`): Jasper clears them after 30 seconds (retrying
 briefly while another program holds the clipboard), and tries once when the vault plugin stops and once when Jasper
 quits, in each case only if the clipboard still contains that copy. A later copy, by the user or a plugin, is left
@@ -68,7 +71,7 @@ keys_directory = ""              # empty uses this plugin's data/keys directory
 bind_new_vaults_to_device = true  # initial state of the create checkbox
 ```
 
-The five actions are `dev.jasper.vault.open` (F8), `dev.jasper.vault.lock`, `dev.jasper.vault.generate_key`,
+The six actions are `dev.jasper.vault.search` (Cmd+\\), `dev.jasper.vault.open` (Cmd+Shift+\\), `dev.jasper.vault.lock`, `dev.jasper.vault.generate_key`,
 `dev.jasper.vault.change_password` and `dev.jasper.vault.grants`. Configure their shortcuts like other contributed actions.
 
 ## Native acceptance
@@ -76,15 +79,16 @@ The five actions are `dev.jasper.vault.open` (F8), `dev.jasper.vault.lock`, `dev
 Headless tests cover the forms, persistence failures, lock transitions, service requests and
 clipboard timing. The following checks need a user-run Jasper window:
 
-1. Open F8 and create a throwaway vault. Verify native keychain access, then lock and unlock it.
+1. Press Cmd+Shift+\\ and create a throwaway vault. Verify native keychain access, then lock and unlock it.
 2. Add/edit a login and a multiline note; generate/import an SSH key and copy its public key.
    Generate a passphrase-protected key, confirm the optional login retains its passphrase, and
    Use Browse beside both SSH key paths and the login key path; verify the chooser opens above
    the editor, starts from its current path, and cancellation keeps the value. Then
    verify the key works with your SSH client. Leave both passphrase fields empty to test that path.
-3. Open F8 repeatedly; verify only one manager window opens. Lock with an editor open; verify
+3. Press Cmd+Shift+\\ repeatedly; verify only one manager window opens. Lock with an editor open; verify
    its secret fields disappear and the manager offers inline unlock.
-4. Copy a password and username through the Vault scope. Check 30-second clearing, then copy
+4. Lock the vault, press Cmd+\\ and press Enter on the locked row; after unlocking, the palette is back on the Vault
+   scope. Copy a password and username, check each confirmation card, check 30-second clearing, then copy
    ordinary text before expiry and verify it survives.
 5. Set `auto_lock_minutes = 1`, leave Jasper inactive and verify the padlock locks. Set it to 0
    and confirm the countdown disappears. Restore the desired timeout.

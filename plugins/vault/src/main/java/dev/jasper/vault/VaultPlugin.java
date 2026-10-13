@@ -3,6 +3,8 @@ package dev.jasper.vault;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
+import dev.jasper.sdk.notifications.DisplayMode;
+import dev.jasper.sdk.notifications.GroupSpec;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
@@ -52,6 +54,8 @@ import javax.swing.Timer;
 public class VaultPlugin implements Plugin {
     public static final String OPEN = "dev.jasper.vault.open";
     public static final String LOCK = "dev.jasper.vault.lock";
+    /** Opens the palette on the Vault scope. */
+    public static final String SEARCH = "dev.jasper.vault.search";
     public static final String STATUS = "dev.jasper.vault.status";
     private StatusItem status;
     private String locked, unlocked;
@@ -115,12 +119,16 @@ public class VaultPlugin implements Plugin {
         context.services().publishPerConsumer(VaultApi.class, service::forConsumer);
         locked = "lock";
         unlocked = "unlock";
-        context.actions().register(ActionSpec.of(OPEN, "Open Vault...").withIcon(locked).withKeywords(List.of("vault", "credentials", "password", "unlock")).withDefaultBinding("cmd+\\"),
+        context.actions().register(ActionSpec.of(OPEN, "Open Vault...").withIcon(locked).withKeywords(List.of("vault", "credentials", "password", "unlock")).withDefaultBinding("cmd+shift+\\"),
             invoked -> open(invoked.window(), Optional.empty()));
+        context.actions().register(ActionSpec.of(SEARCH, "Search Vault Logins").withKeywords(List.of("vault", "login", "password", "username", "copy"))
+            .withDefaultBinding("cmd+\\"),
+            invoked -> context.palette().open(invoked.window(), VaultScope.ID, Optional.empty(), Optional.empty()));
         lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock"))
             .withDefaultBinding("cmd+shift+l"), invoked -> lock.lock());
         lockAction.setEnabled(false);
-        scope = new VaultScope(lock, service, context.platform(), this::open);
+        var copies = context.notifications().group(new GroupSpec(VaultScope.COPIES, "Vault copies", DisplayMode.CARD));
+        scope = new VaultScope(lock, service, context.platform(), copies, this::open, this::unlockThenSearch);
         context.palette().register(scope);
         manager = new VaultManager(lock, context.background(), ui, this::vaultChanged);
         managerWindow = new VaultManagerWindow(context, lock, manager, service, this::managerStatus, this::showGenerator);
@@ -182,6 +190,19 @@ public class VaultPlugin implements Plugin {
             after.run();
         }).exceptionally(failure -> {
             if (!stopped) context.notifications().group().error("Could not open Credential Vault", message(failure), failure);
+            return null;
+        });
+    }
+
+    /** The palette's locked row: unlock, then show the Vault scope again so the search goes on. */
+    private void unlockThenSearch(WindowHandle window) {
+        if (stopped) return;
+        WindowHandle named = owner(window);
+        service.requestUnlock(named).thenAccept(ok -> {
+            if (ok && !stopped && lock.state() == LockState.UNLOCKED && named.isOpen())
+                context.palette().open(named, VaultScope.ID, Optional.empty(), Optional.empty());
+        }).exceptionally(failure -> {
+            if (!stopped) context.notifications().group().error("Could not unlock Credential Vault", message(failure), failure);
             return null;
         });
     }
