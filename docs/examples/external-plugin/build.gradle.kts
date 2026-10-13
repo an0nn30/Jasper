@@ -7,6 +7,19 @@ val jasperSdkDir = file(providers.gradleProperty("jasperSdkDir").getOrElse("libs
 val jasperSdkVersion = providers.gradleProperty("jasperSdkVersion").getOrElse("0.16.1")
 fun jasperJar(name: String) = files(jasperSdkDir.resolve("$name-$jasperSdkVersion.jar"))
 
+// Name the missing jar instead of failing later with "package dev.jasper.sdk... does not exist".
+tasks.withType<JavaCompile>().configureEach {
+    doFirst {
+        for (name in listOf("jasper-sdk", "jasper-sdk-testkit")) {
+            val jar = jasperSdkDir.resolve("$name-$jasperSdkVersion.jar")
+            check(jar.isFile) {
+                "Missing $jar: put the Jasper release's SDK jars in $jasperSdkDir, " +
+                    "or pass -PjasperSdkDir=<folder> and -PjasperSdkVersion=<version>"
+            }
+        }
+    }
+}
+
 /** The id and version come from plugin.toml, so the build keeps no second copy of either. */
 val descriptor = file("src/main/resources/plugin.toml").readText()
 fun field(name: String) = Regex("^$name\\s*=\\s*\"([^\"]+)\"", RegexOption.MULTILINE).find(descriptor)?.groupValues?.get(1)

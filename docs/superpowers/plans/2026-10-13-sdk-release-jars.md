@@ -1,5 +1,12 @@
 # SDK release jars for external plugins — Implementation Plan
 
+> **Status:** complete on `claude/sdk-release` (2026-10-13). **Deviation:** Task 1 Step 3's stale-jar check cannot
+> pass as written. Gradle's up-to-date check ignores files a task did not write, so a jar placed in `build/sdk-release/`
+> by hand leaves `sdkRelease` UP-TO-DATE and `verifySdkRelease` fails, listing it; `./gradlew sdkRelease --rerun` (or
+> deleting `build/sdk-release/`) removes it. A real stale jar comes from a `JasperSdk.VERSION` bump, which changes
+> `sdkRelease`'s inputs, and CI builds from a fresh checkout. The final review also added a guard on the example's SDK
+> range and default version (`VersionRangeTest`) and an early missing-jar message in the example build.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build versioned SDK and testkit jars that a GitHub release carries, prove an external plugin builds from them,
