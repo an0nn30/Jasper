@@ -89,4 +89,14 @@ class ThemeLibraryTest {
         Files.delete(themes().resolve("ocean.json"));
         assertThat(ThemeLibrary.read(themes(), second).themes()).extracting(JasperTheme::id).containsExactly("slate-steel", "zenburn");
     }
+
+    @Test void aFileNestedTooDeeplyIsSkippedAndReportedNotACrash() throws Exception {
+        Files.writeString(themes().resolve("deep.json"), "{\"a\":".repeat(150_000) + "{}" + "}".repeat(150_000));
+        var library = ThemeLibrary.read(themes(), ThemeLibrary.bundledOnly());
+        assertThat(library.imported()).isEmpty();
+        assertThat(library.problems()).singleElement().satisfies(problem -> {
+            assertThat(problem.file().getFileName().toString()).isEqualTo("deep.json");
+            assertThat(problem.message()).isEqualTo("Objects nested more than 8 deep");
+        });
+    }
 }

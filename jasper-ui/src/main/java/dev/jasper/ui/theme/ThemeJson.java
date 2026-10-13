@@ -9,6 +9,8 @@ import java.util.Map;
  * errors naming the origin and line. The theme package is JDK-only, so it cannot use FlatLaf's parser.
  */
 final class ThemeJson {
+    /** A theme file nests three deep; anything past eight is not one, and the limit keeps a hostile file from exhausting the stack. */
+    static final int MAX_DEPTH = 8;
     private final String text, origin;
     private int at;
 
@@ -18,13 +20,14 @@ final class ThemeJson {
     static Map<String, Object> parse(String text, String origin) {
         var reader = new ThemeJson(text, origin);
         reader.space();
-        var root = reader.object();
+        var root = reader.object(1);
         reader.space();
         if (reader.at != text.length()) throw reader.error("Unexpected content after the theme object");
         return root;
     }
 
-    private Map<String, Object> object() {
+    private Map<String, Object> object(int depth) {
+        if (depth > MAX_DEPTH) throw error("Objects nested more than " + MAX_DEPTH + " deep");
         expect('{');
         var map = new LinkedHashMap<String, Object>();
         space();
@@ -35,7 +38,7 @@ final class ThemeJson {
             String key = string();
             space(); expect(':'); space();
             char first = peek();
-            Object value = first == '{' ? object() : first == '"' ? string() : first >= '0' && first <= '9' ? number() : null;
+            Object value = first == '{' ? object(depth + 1) : first == '"' ? string() : first >= '0' && first <= '9' ? number() : null;
             if (value == null) throw error("Expected a string, an object or a whole number for \"" + key + "\"");
             if (map.putIfAbsent(key, value) != null) { at = keyAt; throw error("Duplicate key \"" + key + "\""); }
             space();

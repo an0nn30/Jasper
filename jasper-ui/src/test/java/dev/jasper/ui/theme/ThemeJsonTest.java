@@ -40,6 +40,16 @@ class ThemeJsonTest {
         }
     }
 
+    @Test void objectsNestedTooDeeplyAreRefusedNotACrash() {
+        String nine = "{ \"a\": ".repeat(9) + "{}" + " }".repeat(9);
+        assertThatThrownBy(() -> ThemeJson.parse(nine, "t.json")).isInstanceOf(ThemeFileException.class)
+            .hasMessageContaining("Objects nested more than 8 deep");
+        String deep = "{\"a\":".repeat(150_000) + "{}" + "}".repeat(150_000);
+        assertThatThrownBy(() -> ThemeJson.parse(deep, "t.json")).isInstanceOf(ThemeFileException.class)
+            .hasMessageContaining("Objects nested more than 8 deep");
+        assertThat(ThemeJson.parse("{ \"a\": ".repeat(7) + "{}" + " }".repeat(7), "t.json")).containsKey("a");
+    }
+
     @Test void readsTheBundledFile() throws Exception {
         try (var in = ThemeJsonTest.class.getResourceAsStream("/dev/jasper/ui/theme/slate-steel.json")) {
             var root = ThemeJson.parse(new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8), "slate-steel.json");
