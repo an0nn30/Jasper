@@ -29,6 +29,10 @@ def verifyBuildInfo = tasks.register('verifyBuildInfoSupport') {
             "commit=${'a' * 40}".toString(), 'branch=claude/über', 'commitDate=2026-10-13T14:02:11-04:00', 'dirty=true',
             'headTags=v1.2.0', 'describe=v1.2.0-0-gaaaaaaa']
         assert buildInfoText([branch: 'a\\b']).readLines().contains('branch=a\\\\b')
+        // What gradle/packaging.gradle asks for, on this checkout: a valid X.Y.Z, and the same as packaging's own provider.
+        String here = packageVersion(providers.gradleProperty('jasperVersion').orNull, buildFacts.get())
+        assert here ==~ /[1-9][0-9]{0,2}\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,4})/
+        assert jasperPackageVersion.get() == here
         logger.lifecycle('Verified the build-information helpers')
     }
 }

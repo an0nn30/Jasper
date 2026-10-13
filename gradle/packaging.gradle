@@ -17,7 +17,9 @@ def app = extensions.getByType(JavaApplication)
 def toolchains = extensions.getByType(JavaToolchainService)
 def java = extensions.getByType(JavaPluginExtension)
 def launcher = toolchains.launcherFor(java.toolchain)
-def version = providers.gradleProperty('jasperVersion').orElse('1.0.0')
+// -PjasperVersion, else the commit's release tag, else the latest release tag behind it, else 1.0.0 (gradle/build-info.gradle).
+def version = providers.provider { packageVersion(providers.gradleProperty('jasperVersion').orNull, buildFacts.get()) }
+ext.jasperPackageVersion = version
 def jarTask = tasks.named('jar')
 def packagingRoot = layout.buildDirectory.dir('packaging')
 def inputDirectory = packagingRoot.map { it.dir('input') }
@@ -61,11 +63,11 @@ def validatedVersion = {
     String value = version.get()
     def match = value =~ /^(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,4})$/
     if (!match.matches()) {
-        throw new GradleException("Invalid -PjasperVersion '${value}'; expected X.Y.Z with major 1..255, minor 0..255, patch 0..65535, and no leading zeroes")
+        throw new GradleException("Invalid package version '${value}' (from -PjasperVersion or a vX.Y.Z release tag); expected X.Y.Z with major 1..255, minor 0..255, patch 0..65535, and no leading zeroes")
     }
     List<Integer> components = [match.group(1), match.group(2), match.group(3)].collect { Integer.parseInt(it) }
     if (components[0] < 1 || components[0] > 255 || components[1] > 255 || components[2] > 65535) {
-        throw new GradleException("Invalid -PjasperVersion '${value}'; expected X.Y.Z with major 1..255, minor 0..255, patch 0..65535, and no leading zeroes")
+        throw new GradleException("Invalid package version '${value}' (from -PjasperVersion or a vX.Y.Z release tag); expected X.Y.Z with major 1..255, minor 0..255, patch 0..65535, and no leading zeroes")
     }
     value
 }

@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Package version (X.Y.Z)
-        default: 1.0.0
+        description: Package version (X.Y.Z); leave empty to take it from the commit's release tag
+        required: false
   push:
     paths:
       - gradle/packaging.gradle
@@ -48,8 +48,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Package
         env:
-          JASPER_VERSION: ${{ inputs.version || '1.0.0' }}
-        run: ./gradlew :jasper-app:packageDist "-PjasperVersion=$JASPER_VERSION" --continue --stacktrace
+          JASPER_VERSION: ${{ inputs.version }}
+        run: ./gradlew :jasper-app:packageDist ${JASPER_VERSION:+"-PjasperVersion=$JASPER_VERSION"} --continue --stacktrace
       - uses: actions/upload-artifact@v7
         with:
           name: jasper-linux-${{ matrix.arch }}
