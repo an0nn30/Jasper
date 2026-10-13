@@ -17,6 +17,19 @@ class NativeShellsChromeTest {
         for (var kind : AuxiliarySurface.Kind.values()) verifyChrome(kind);
     }
 
+    /** A dialog sized to its content (every plugin dialog, a confirmation) is fixed-size; only a dialog that remembers its bounds resizes. */
+    @Test void onlyADialogThatRemembersItsBoundsCanBeResized() {
+        java.util.function.BiFunction<String, Boolean, AuxiliarySurface> dialog = (id, sheet) -> {
+            var surface = new AuxiliarySurface(id, "New Tunnel", AuxiliarySurface.Kind.DIALOG, true, new Dimension(1, 1), null, null,
+                ignored -> { throw new AssertionError("No native shell in tests"); });
+            surface.attachedSheet(sheet);
+            return surface;
+        };
+        assertThat(NativeShells.resizable(dialog.apply("", false))).as("a dialog packed to its content").isFalse();
+        assertThat(NativeShells.resizable(dialog.apply("", true))).as("an attached sheet").isFalse();
+        assertThat(NativeShells.resizable(dialog.apply("file-chooser", false))).as("a dialog with remembered bounds").isTrue();
+    }
+
     @Test void compactHeroPackingUsesContentWidthAndUnifiedUntitledChrome() {
         var controller = ThemeTestSupport.controller(true);
         var resolved = controller.current();

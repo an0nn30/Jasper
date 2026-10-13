@@ -198,6 +198,12 @@ public final class NativeShells {
         return dev.jasper.app.platform.WindowBody.find(container.getRootPane()).filter(value -> value.boundsInRoot().isPresent())
             .orElseThrow(() -> new IllegalArgumentException("Attached sheet needs a registered measured owner body"));
     }
+    /**
+     * Whether the user may resize this dialog's native window: only one that remembers its bounds. A dialog sized to its
+     * content (every plugin dialog, a confirmation) and an attached sheet are fixed-size; their content still re-packs them.
+     */
+    static boolean resizable(AuxiliarySurface surface) { return !surface.attachedSheet() && !surface.id().isEmpty(); }
+
     private AuxiliarySurface.Shell dialog(AuxiliarySurface surface) {
         Window owner = owner(surface);
         boolean attached = surface.attachedSheet(), remembered = !surface.id().isEmpty();
@@ -209,12 +215,13 @@ public final class NativeShells {
         var resources = new ShellResources(surface, dialog);
         try {
             if (attached) {
-                dialog.setUndecorated(true); dialog.setResizable(false);
+                dialog.setUndecorated(true);
                 if (dialog.getGraphicsConfiguration().getDevice().isWindowTranslucencySupported(java.awt.GraphicsDevice.WindowTranslucency.PERPIXEL_TRANSLUCENT)) {
                     dialog.setBackground(new java.awt.Color(0, 0, 0, 0)); dialog.getRootPane().setOpaque(false);
                     dialog.getLayeredPane().setOpaque(false); surface.holder().setOpaque(false);
                 }
             }
+            dialog.setResizable(resizable(surface));
             dialog.getAccessibleContext().setAccessibleName(surface.title());
             dialog.setIconImages(ApplicationIcon.images());
             resources.layout = installChrome(dialog.getRootPane(), surface, MacTitleBar.isSupported());

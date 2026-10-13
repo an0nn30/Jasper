@@ -15,7 +15,7 @@ import java.util.Objects;
 public record DialogSpec(String title, WindowOwner owner, boolean modal, Presentation presentation) {
     /** Placement, independent of the form's content kind. */
     public enum Presentation {
-        /** A native dialog centred over its owner. */
+        /** A native dialog centred over its owner, sized to its content; the user cannot resize it. */
         CENTERED,
         /** A native sheet hanging from the owner's title edge. */
         ATTACHED_SHEET,
