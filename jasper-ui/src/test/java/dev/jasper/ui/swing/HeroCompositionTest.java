@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class HeroCompositionTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     @Test void supportingTextPaintsEveryLineBesideANaturalFirstLineAdornment() {
         Edt.run(() -> {
             var previous = new java.util.HashMap<String,Object>();
@@ -32,7 +34,7 @@ class HeroCompositionTest {
                             var label = (Labels.LiteralLabel)view.control("body").component;
                             var icon = view.control("icon").component;
                             assertThat(icon.getWidth()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(12));
-                            assertThat(label.getX()).isEqualTo(icon.getWidth()+com.formdev.flatlaf.util.UIScale.scale(9));
+                            assertThat(label.getX()).isEqualTo(icon.getWidth()+com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.INLINE_GAP)));
                             assertThat(icon.getY()).isEqualTo(Math.max(0,(label.getFontMetrics(label.getFont()).getHeight()-icon.getHeight())/2));
                             assertThat(label.wraps()).isTrue();
                             var lines = label.wrapped.lines(label.getWidth());
@@ -66,7 +68,7 @@ class HeroCompositionTest {
                     assertThat(preferred.height).isGreaterThanOrEqualTo(3);
                     KitFixtures.render(view, 300, preferred.height, 1);
                     var control = view.control("meter").component;
-                    int expected = children.getFirst() == preceding ? view.control("before").component.getHeight() + 6 : 0;
+                    int expected = children.getFirst() == preceding ? view.control("before").component.getHeight() + m(dev.jasper.ui.metrics.DesignMetrics.Role.STRENGTH_TOP_GAP) : 0;
                     assertThat(control.getY()).isEqualTo(expected);
                     assertThat(control.getHeight()).isEqualTo(3);
                     assertThat(control.getY()+control.getHeight()).isLessThanOrEqualTo(preferred.height);
@@ -120,7 +122,7 @@ class HeroCompositionTest {
                         var toggle = (Switches.SwitchButton)view.control("toggle").component;
                         int ring = ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.FOCUS_RING);
                         assertThat(control.component.getWidth() - (toggle.getX() + toggle.getWidth() - ring))
-                            .as("setting rows align the painted switch to the shared 13px inset").isEqualTo(com.formdev.flatlaf.util.UIScale.scale(13));
+                            .as("setting rows align the painted switch to the shared setting inset").isEqualTo(com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_SIDE_PADDING)));
                         assertThat(toggle.getX() + toggle.getWidth()).isLessThanOrEqualTo(control.component.getWidth());
                         assertThat(control.title.getX() + control.title.getWidth()).isLessThan(toggle.getX());
                         var previousFocus = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager();
@@ -137,7 +139,7 @@ class HeroCompositionTest {
                                 new Toggle("toggle", ControlState.READY, "Bind", false, "bind", false), false, false, row.titleNote())));
                             KitFixtures.render(view, 260, 160, 1);
                             assertThat(view.control("toggle").component).isSameAs(toggle);
-                            assertThat(control.component.getWidth() - (toggle.getX() + toggle.getWidth() - ring)).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(13));
+                            assertThat(control.component.getWidth() - (toggle.getX() + toggle.getWidth() - ring)).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_SIDE_PADDING)));
                         } finally { java.awt.KeyboardFocusManager.setCurrentKeyboardFocusManager(previousFocus); }
                     }
                 }

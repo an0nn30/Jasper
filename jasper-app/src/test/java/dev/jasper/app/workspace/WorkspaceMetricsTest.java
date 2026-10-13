@@ -28,7 +28,7 @@ class WorkspaceMetricsTest {
             DesignMetrics.Role.STATUS_PROGRESS_MIN_HEIGHT, 24, DesignMetrics.Role.TOOL_HEADER_LEADING_PADDING, 10,
             DesignMetrics.Role.TOOL_HEADER_TRAILING_PADDING, 6, DesignMetrics.Role.TOOL_HEADER_DETAIL_GAP, 6,
             DesignMetrics.Role.TOOL_HEADER_ACTIVE_DOT, 6));
-        expected.putAll(Map.of(DesignMetrics.Role.RAIL_BUTTON_ARC, 10, DesignMetrics.Role.NATIVE_TOOLBAR_HOVER_ARC, 6,
+        expected.putAll(Map.of(DesignMetrics.Role.RAIL_BUTTON_ARC, 8, DesignMetrics.Role.NATIVE_TOOLBAR_HOVER_ARC, 6,
             DesignMetrics.Role.NATIVE_TOOLBAR_DISABLED_PERCENT, 38, DesignMetrics.Role.RAIL_BADGE_DOT, 6,
             DesignMetrics.Role.FIND_GAP, 6, DesignMetrics.Role.FIND_SIDE_PADDING, 6, DesignMetrics.Role.FIND_CONTROL_GAP, 4,
             DesignMetrics.Role.FIND_CLOSE_SPACER, 16, DesignMetrics.Role.TITLE_SEARCH_PADDING, 8, DesignMetrics.Role.TITLE_SEARCH_GAP, 6));

@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class UiTypographyTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     @Test void actualMountedAndAdapterSizesApplyConfiguredPointsAndDisplayScaleOnce() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             String previousScale = System.getProperty("flatlaf.uiScale");
@@ -29,10 +31,10 @@ class UiTypographyTest {
                             assertThat(body.getFont().getSize2D()).as("mounted config=%s scale=%s", config, scale).isEqualTo(expected);
                             var input = dev.jasper.app.testsupport.KitTestSupport.require(view,"password.input",JPasswordField.class);
                             assertThat(input.getFont().getSize2D()).isEqualTo(expected);
-                            int minimumHeight = com.formdev.flatlaf.util.UIScale.scale(28);
+                            int minimumHeight = com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT));
                             int actualLine = (int)Math.ceil(input.getFont().getLineMetrics("Ag",new java.awt.font.FontRenderContext(null,true,true)).getHeight());
                             assertThat(input.getParent().getPreferredSize().height).as("field accommodates actual text plus scaled padding once")
-                                .isEqualTo(Math.max(minimumHeight, actualLine + com.formdev.flatlaf.util.UIScale.scale(12)));
+                                .isEqualTo(Math.max(minimumHeight, actualLine + com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_VERTICAL_PADDING))));
                             var description = dev.jasper.app.testsupport.KitTestSupport.require(view,"description",JLabel.class);
                             int expectedLineHeight = Math.max(Math.round(18*expected/13),description.getFontMetrics(description.getFont()).getHeight());
                             assertThat(description.getPreferredSize().height).as("two description lines sized once").isEqualTo(2*expectedLineHeight);

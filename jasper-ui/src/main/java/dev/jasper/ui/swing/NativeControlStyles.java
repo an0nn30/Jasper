@@ -127,7 +127,8 @@ public final class NativeControlStyles {
     public static void menu(JMenuItem item, Supplier<GeneratedTheme> theme) {
         bind(item, () -> {
             var palette = theme.get().semantic();
-            item.setFont(font(Typography.Role.LABEL));
+            // The kit menu's type, so native and kit menus read the same.
+            item.setFont(font(Typography.Role.BODY));
             item.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));
             item.setBackground(palette.color(SemanticColor.SURFACE_MENU));
             item.putClientProperty("FlatLaf.style", Map.of("selectionBackground", palette.color(SemanticColor.ACCENT),

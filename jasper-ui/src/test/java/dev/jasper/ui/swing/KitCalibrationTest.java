@@ -15,6 +15,8 @@ import static org.assertj.core.api.Assertions.*;
 
 /** Calibration is against visible source geometry under the actual shipped LAF. */
 class KitCalibrationTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     @Test void kitIsTheOnlyPlaceholderPainterUnderRealFlatLaf() {
         Edt.run(() -> {
             var old = UIManager.getLookAndFeel(); Object font = UIManager.get("defaultFont"); UIManager.put("defaultFont", new Font(new dev.jasper.ui.metrics.Typography().family(), Font.PLAIN, 13)); var context = KitFixtures.context();
@@ -30,21 +32,21 @@ class KitCalibrationTest {
             } finally { context.binding().close(); context.icons().close(); restore(old); UIManager.put("defaultFont", font); }
         });
     }
-    @Test void nominalButtonHeightIsTheVisibleFillAndRadiusIsSixLogicalPixels() {
+    @Test void nominalButtonHeightIsTheVisibleFillAndRadiusIsTheControlRadius() {
         Edt.run(() -> {
             var old = UIManager.getLookAndFeel(); Object font = UIManager.get("defaultFont"); UIManager.put("defaultFont", new Font(new dev.jasper.ui.metrics.Typography().family(), Font.PLAIN, 13)); var context = KitFixtures.context();
             try {
                 FlatLafInstaller.install(context.theme());
                 try (var view = new KitView(context, new ViewSpec(new Nodes.Button("button", ControlState.READY, "Continue", "", ButtonKind.PRIMARY, "continue", "")), e -> {})) {
                     var button = view.control("button").component;
-                    int width = UIScale.scale(120), height = UIScale.scale(28);
+                    int width = UIScale.scale(120), height = UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT));
                     button.setSize(width, height);
                     var image = ButtonsTest.paint(button);
                     int fill = context.theme().semantic().color(SemanticColor.ACCENT).getRGB();
                     assertThat(button.getPreferredSize().height).isEqualTo(height);
                     assertThat(image.getRGB(width / 2, 0)).as("visible top at nominal bounds, under the inset line").isEqualTo(ButtonsTest.inset(context.theme().semantic().color(SemanticColor.ACCENT)));
                     assertThat(image.getRGB(width / 2, height - 1)).as("visible bottom at nominal bounds").isEqualTo(fill);
-                    assertThat(image.getRGB(UIScale.scale(1), UIScale.scale(1))).as("6px radius corner is outside fill").isNotEqualTo(fill);
+                    assertThat(image.getRGB(0, 0)).as("the control radius corner is outside fill").isNotEqualTo(fill);
                 }
             } finally { context.binding().close(); context.icons().close(); restore(old); UIManager.put("defaultFont", font); }
         });
@@ -61,7 +63,7 @@ class KitCalibrationTest {
                     var before = KitFixtures.render(view, UIScale.scale(540), UIScale.scale(180), 1);
                     var control = (TextFields.FieldControl)view.control("field");
                     var bounds = SwingUtilities.convertRectangle(control.surface.getParent(), control.surface.getBounds(), view);
-                    assertThat(bounds.height).as("font=%s, typography=%s, line=%s, input=%s, surface=%s", control.input.getFont(), context.typography().family(), context.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getLineMetrics("Ag", new java.awt.font.FontRenderContext(null,true,true)).getHeight(), control.input.getPreferredSize(), control.surface.getPreferredSize()).isEqualTo(UIScale.scale(28));
+                    assertThat(bounds.height).as("font=%s, typography=%s, line=%s, input=%s, surface=%s", control.input.getFont(), context.typography().family(), context.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getLineMetrics("Ag", new java.awt.font.FontRenderContext(null,true,true)).getHeight(), control.input.getPreferredSize(), control.surface.getPreferredSize()).isEqualTo(UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT)));
                     manager.target = control.input;
                     var event = new FocusEvent(control.input, FocusEvent.FOCUS_GAINED, false, null, FocusEvent.Cause.TRAVERSAL_FORWARD);
                     for (var listener : control.input.getFocusListeners()) listener.focusGained(event);
@@ -130,7 +132,7 @@ class KitCalibrationTest {
                 var done = view.control("done").component;
                 var bounds = SwingUtilities.convertRectangle(done.getParent(), done.getBounds(), view);
                 assertThat(bounds.y).isGreaterThan(UIScale.scale(500));
-                assertThat(bounds.x + bounds.width).isEqualTo(UIScale.scale(890));
+                assertThat(bounds.x + bounds.width).as("the action's focus reservation overhangs the footer side by 2").isEqualTo(UIScale.scale(900 - m(dev.jasper.ui.metrics.DesignMetrics.Role.WINDOW_FOOTER_SIDE) + 2));
             } finally { context.icons().close(); base.icons().close(); base.binding().close(); }
             var c = KitFixtures.context();
             try (var view = new KitView(c, dev.jasper.ui.gallery.PanelFixtures.create("fileservers"), e -> {})) {
@@ -141,13 +143,13 @@ class KitCalibrationTest {
             } finally { c.icons().close(); c.binding().close(); }
         });
     }
-    @Test void cardRadiusUsesNineLogicalPixelsRatherThanNinePixelArcDiameter() {
+    @Test void cardRadiusIsARadiusRatherThanAnArcDiameter() {
         Edt.run(() -> {
             var context = KitFixtures.context();
             try (var view = new KitView(context, new ViewSpec(new Card("card", ControlState.READY, CardKind.FORM, List.of())), e -> {})) {
                 var card = view.control("card").component; card.setSize(UIScale.scale(180), UIScale.scale(80));
                 var image = ButtonsTest.paint(card);
-                assertThat((image.getRGB(0, UIScale.scale(5)) >>> 24) & 255).as("9px radius corner remains outside the full fill").isLessThan(200);
+                assertThat((image.getRGB(0, UIScale.scale(2)) >>> 24) & 255).as("the card radius corner remains outside the full fill").isLessThan(200);
             } finally { context.icons().close(); context.binding().close(); }
         });
     }
@@ -157,10 +159,10 @@ class KitCalibrationTest {
             try {
                 for (JComponent component : List.of(new Panels.Surface(context), new Menus.Popup(context))) {
                     component.setBorder(javax.swing.BorderFactory.createEmptyBorder()); component.setSize(UIScale.scale(180), UIScale.scale(80));
-                    assertThat((ButtonsTest.paint(component).getRGB(0, UIScale.scale(5)) >>> 24) & 255).isLessThan(200);
+                    assertThat((ButtonsTest.paint(component).getRGB(0, UIScale.scale(2)) >>> 24) & 255).isLessThan(200);
                 }
                 var item = new Menus.Item(context); item.setText(""); item.setSize(UIScale.scale(180), UIScale.scale(28)); item.getModel().setArmed(true);
-                assertThat((ButtonsTest.paint(item).getRGB(0, UIScale.scale(2)) >>> 24) & 255).isLessThan(200);
+                assertThat((ButtonsTest.paint(item).getRGB(0, UIScale.scale(2)) >>> 24) & 255).as("a square highlight").isEqualTo(255);
             } finally { context.icons().close(); context.binding().close(); }
         });
     }
@@ -169,7 +171,7 @@ class KitCalibrationTest {
             var context = KitFixtures.context();
             try (var view = new KitView(context, new ViewSpec(new Form("sheet", ControlState.READY, FormKind.SHEET, "Sheet", Optional.empty(), List.of(), Optional.empty(), List.of())), e -> {})) {
                 var surface = view.control("sheet").component; surface.setSize(UIScale.scale(180), UIScale.scale(80));
-                assertThat((ButtonsTest.paint(surface).getRGB(0, UIScale.scale(80-7)) >>> 24) & 255).isLessThan(200);
+                assertThat((ButtonsTest.paint(surface).getRGB(0, UIScale.scale(80-3)) >>> 24) & 255).isLessThan(200);
             } finally { context.icons().close(); context.binding().close(); }
         });
     }
@@ -186,9 +188,10 @@ class KitCalibrationTest {
                 KitFixtures.render(vault, UIScale.scale(900), UIScale.scale(555), 1);
                 var identity = vault.control("identity").component;
                 var bounds = SwingUtilities.convertRectangle(identity.getParent(), identity.getBounds(), vault);
-                assertThat(bounds.x).as("192 sidebar + 272 list + 24 detail inset").isEqualTo(UIScale.scale(488));
-                assertThat(bounds.y).isEqualTo(UIScale.scale(24));
-                assertThat(bounds.width).isEqualTo(UIScale.scale(900 - 488 - 24));
+                int detailX = m(dev.jasper.ui.metrics.DesignMetrics.Role.MANAGER_SIDEBAR_WIDTH) + m(dev.jasper.ui.metrics.DesignMetrics.Role.MANAGER_LIST_WIDTH) + m(dev.jasper.ui.metrics.DesignMetrics.Role.DETAIL_PADDING);
+                assertThat(bounds.x).as("sidebar + list + detail inset").isEqualTo(UIScale.scale(detailX));
+                assertThat(bounds.y).isEqualTo(UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.DETAIL_PADDING)));
+                assertThat(bounds.width).isEqualTo(UIScale.scale(900 - detailX - m(dev.jasper.ui.metrics.DesignMetrics.Role.DETAIL_PADDING)));
             } finally { context.icons().close(); base.icons().close(); base.binding().close(); }
         });
     }
@@ -207,7 +210,7 @@ class KitCalibrationTest {
                         var actual = new java.awt.image.BufferedImage(UIScale.scale(18), UIScale.scale(18), java.awt.image.BufferedImage.TYPE_INT_ARGB);
                         var expected = new java.awt.image.BufferedImage(UIScale.scale(18), UIScale.scale(18), java.awt.image.BufferedImage.TYPE_INT_ARGB);
                         var a = actual.createGraphics(); var b = expected.createGraphics();
-                        try { menu.getIcon().paintIcon(menu, a, 0, 0); context.icons().tile(item.icon(), context.theme().semantic(), item.hue(), UIScale.scale(18), false).paintIcon(menu, b, 0, 0); }
+                        try { menu.getIcon().paintIcon(menu, a, 0, 0); context.icons().tile(item.icon(), context.theme().semantic(), item.hue(), UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_TILE)), false).paintIcon(menu, b, 0, 0); }
                         finally { a.dispose(); b.dispose(); }
                         assertThat(actual.getRGB(0,0,actual.getWidth(),actual.getHeight(),null,0,actual.getWidth())).isEqualTo(expected.getRGB(0,0,expected.getWidth(),expected.getHeight(),null,0,expected.getWidth()));
                     }

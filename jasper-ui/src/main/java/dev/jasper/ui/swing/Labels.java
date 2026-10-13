@@ -105,6 +105,16 @@ final class Labels {
         Typography.Role override;
         /** On a Settings page supporting text keeps its font's own line height. */
         boolean settings;
+        /** On a selected row's fill (set by the row before each refresh). */
+        boolean inked;
+        /** A selected row's ink for {@code text}: white, supporting text in the secondary on-accent role. */
+        static SemanticColor onSelection(Nodes.Text text) {
+            boolean supporting = text.severity().isEmpty() && switch (text.role()) {
+                case LABEL, DESCRIPTION, CAPTION, COUNT, MONO_CAPTION, SUPPORTING -> true;
+                default -> false;
+            };
+            return supporting ? SemanticColor.TEXT_ONACCENT_SECONDARY : SemanticColor.TEXT_ONACCENT;
+        }
         TextControl(KitView view, Nodes.Text node) { super(view, node, literal()); refresh(); }
         @Override void refresh() {
             var text = (Nodes.Text)node; var label = (JLabel)component; state();
@@ -115,11 +125,13 @@ final class Labels {
             label.setToolTipText(text.text());
             label.getAccessibleContext().setAccessibleName(text.text());
             label.setFont(ThemePainting.font(context(), override != null ? override : hint && text.role() == Nodes.TextRole.CAPTION ? Typography.Role.PALETTE_HINT : panelDetail && text.role() == Nodes.TextRole.MONO_CAPTION ? Typography.Role.PANEL_DETAIL_MONO : panelDetail && text.role() == Nodes.TextRole.PANEL_TITLE ? Typography.Role.PANEL_DETAIL_TITLE : panelDetail && text.role() == Nodes.TextRole.CAPTION ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.valueOf(text.role().name())));
-            label.setForeground(ThemePainting.color(context(), identityStatus != null ? identityStatus : text.severity().isPresent() ? tint(text.severity().get()) : panelDetail && text.role()==Nodes.TextRole.MONO_CAPTION ? SemanticColor.TEXT_SECONDARY : switch (text.role()) {
+            SemanticColor role = identityStatus != null ? identityStatus : text.severity().isPresent() ? tint(text.severity().get()) : panelDetail && text.role()==Nodes.TextRole.MONO_CAPTION ? SemanticColor.TEXT_SECONDARY : switch (text.role()) {
                 case LABEL, DESCRIPTION -> SemanticColor.TEXT_SECONDARY;
                 case CAPTION, COUNT, SECTION_LABEL, MONO_CAPTION, SUPPORTING -> SemanticColor.TEXT_TERTIARY;
                 default -> SemanticColor.TEXT_PRIMARY;
-            }));
+            };
+            if (inked) role = onSelection(text);
+            label.setForeground(ThemePainting.color(context(), role));
             ((LiteralLabel)label).caret = text.caret().orElse(-1);
             boolean supporting = text.role() == Nodes.TextRole.SUPPORTING && !settings;
             ((LiteralLabel)label).wrapped.lineHeight = (text.role() == Nodes.TextRole.DESCRIPTION || supporting)
@@ -140,6 +152,8 @@ final class Labels {
     }
     static final class IconControl extends ControlRegistry.Control {
         int tileSize, tileHeight, tileGlyph, glyphOverride; boolean selected, panelDetail;
+        /** On a selected row's fill (set by the row before each refresh): the glyph turns white, a tile selected. */
+        boolean inked;
         void tile(int logicalSize, boolean value) { tile(logicalSize, logicalSize, 0, value); }
         /** A containing composition's logical glyph size in place of the icon's size role; 0 restores the role. */
         void glyph(int logicalSize) { if (glyphOverride != logicalSize) { glyphOverride = logicalSize; refresh(); } }
@@ -155,8 +169,10 @@ final class Labels {
                 tileSize=tileHeight=context().metrics().value(receiving==ArtworkPresentation.IDENTITY_ROW ? dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_ROW_TILE : dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_HEADER_TILE);
                 tileGlyph=context().metrics().value(receiving==ArtworkPresentation.IDENTITY_ROW ? dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_ROW_GLYPH : dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_HEADER_GLYPH);
             }
-            label.setIcon(receiving==ArtworkPresentation.IDENTITY_HEADER ? context().icons().identityHeader(icon.name(),context().theme(),icon.hue(),com.formdev.flatlaf.util.UIScale.scale(tileSize),com.formdev.flatlaf.util.UIScale.scale(tileHeight),com.formdev.flatlaf.util.UIScale.scale(tileGlyph))
-                : tileSize > 0 ? context().icons().tile(icon.name(), context().theme(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(tileSize), com.formdev.flatlaf.util.UIScale.scale(tileHeight), com.formdev.flatlaf.util.UIScale.scale(tileGlyph), selected)
+            // A selected row recolours every vector glyph white; registered identity artwork keeps its pixels.
+            label.setIcon(inked && tileSize == 0 && receiving == ArtworkPresentation.DEFAULT ? context().icons().icon(icon.name(), context().theme().semantic(), SemanticColor.TEXT_ONACCENT, size)
+                : receiving==ArtworkPresentation.IDENTITY_HEADER ? context().icons().identityHeader(icon.name(),context().theme(),icon.hue(),com.formdev.flatlaf.util.UIScale.scale(tileSize),com.formdev.flatlaf.util.UIScale.scale(tileHeight),com.formdev.flatlaf.util.UIScale.scale(tileGlyph))
+                : tileSize > 0 ? context().icons().tile(icon.name(), context().theme(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(tileSize), com.formdev.flatlaf.util.UIScale.scale(tileHeight), com.formdev.flatlaf.util.UIScale.scale(tileGlyph), selected || inked)
                 : panelDetail ? context().icons().panel(icon.name(), context().theme(), icon.severity().isPresent() ? tint(icon.severity().get()) : SemanticColor.HUE_NEUTRAL, size)
                 : icon.size() == Nodes.IconSize.HERO && icon.severity().isEmpty() ? context().icons().hero(icon.name(), context().theme(), icon.hue(), size)
                 : icon.severity().isPresent() ? context().icons().icon(icon.name(), context().theme(), tint(icon.severity().get()), size)

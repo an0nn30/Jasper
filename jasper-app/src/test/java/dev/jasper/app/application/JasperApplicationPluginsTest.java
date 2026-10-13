@@ -397,4 +397,21 @@ class JasperApplicationPluginsTest {
             edt(() -> ThemeTestSupport.controller(true));
         }
     }
+
+    @Test void menusShowTheCurrentBindingOfAnActionAndNothingForAnUnknownOne() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].startPlugins(null, null, false, dirs);
+            boolean mac = System.getProperty("os.name").startsWith("Mac");
+            var expected = dev.jasper.app.config.KeyBindings.display(dev.jasper.app.config.KeyBindings.defaults(mac).strokeFor(dev.jasper.app.commands.ActionId.NEW_TAB).orElseThrow(), mac);
+            assertThat(application[0].shortcutLabel("new_tab")).isEqualTo(expected).isNotEmpty();
+            assertThat(application[0].shortcutLabel("dev.example.unknown")).isEmpty();
+            assertThat(application[0].themes().appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME).shortcut("new_tab")).isEqualTo(expected);
+        });
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+    }
 }

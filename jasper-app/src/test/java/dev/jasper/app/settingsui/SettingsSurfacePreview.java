@@ -65,7 +65,7 @@ public final class SettingsSurfacePreview {
                         var dialog=new SettingsDialog(windows,CorePages.pages(AppearanceFixtures.choices(systemDark::get),new CorePages.SystemActions(()->file,()->{},()->{},()->{},()->{},()->false),ShellChoices.NONE,new NotificationGroupChoices(()->groups),pages),new SettingsDialog.Hooks(edit->CompletableFuture.completedFuture(state),()->state,listener->new Subscription(()->{}),()->{},()->{},uri->{},(parent,count)->true,()->controller[0].appearance().context(ThemeRoute.CHROME)));
                         try {
                             dialog.open(null,"appearance");
-                            for(String page:List.of("appearance","window","notifications")) {
+                            for(String page:List.of("appearance","window","notifications","system","terminal.font")) {
                                 dialog.select(page);Path directory=output.resolve("settings").resolve(family+"-"+font).resolve(page);
                                 save(dialog,views[0],directory.resolve("default.png"),980,681);
                                 save(dialog,views[0],directory.resolve("short.png"),980,400);

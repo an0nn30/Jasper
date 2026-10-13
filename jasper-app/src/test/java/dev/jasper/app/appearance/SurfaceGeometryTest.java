@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class SurfaceGeometryTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     @Test void recoveryWarningRemainsVisibleWithActualEnlargedSettingsAndConstrainedWidth() throws Exception {
         var themes = SurfaceFixtures.edt(() -> ThemeTestSupport.controller(true));
         try (var open = SurfaceFixtures.open("vault-create", "entered")) {
@@ -40,7 +42,8 @@ class SurfaceGeometryTest {
         for(String id:java.util.List.of("vault-create","vault-unlock")) try(var open=SurfaceFixtures.open(id,"empty")) {
             assertThat(Window.getWindows()).hasSize(windows);
             assertThat(open.preferred().width).isEqualTo(id.equals("vault-create")?400:380);
-            assertThat(open.preferred().height).isEqualTo(id.equals("vault-create")?428:264);
+            // The packed hero heights at the compact scale.
+            assertThat(open.preferred().height).isEqualTo(id.equals("vault-create")?379:238);
             SurfaceFixtures.edt(() -> {
                 for (String textId : id.equals("vault-create") ? java.util.List.of("form.heading", "form.warning.text") : java.util.List.of("form.heading")) {
                     var label = (javax.swing.JLabel)open.component(textId);
@@ -50,12 +53,12 @@ class SurfaceGeometryTest {
                 return null;
             });
             assertThat(open.bounds("form.hero.tile").width).isEqualTo(54);
-            assertThat(open.bounds("password").height).isEqualTo(32);
-            assertThat(open.bounds("password").x).isEqualTo(28);
-            assertThat(open.bounds("submit").height).isEqualTo(30);
+            assertThat(open.bounds("password").height).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_FIELD_HEIGHT));
+            assertThat(open.bounds("password").x).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_SIDES));
+            assertThat(open.bounds("submit").height).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_BUTTON_HEIGHT));
             assertThat(open.bounds("cancel").width).isEqualTo(open.bounds("submit").width);
-            assertThat(open.bounds("submit").x-open.bounds("cancel").x-open.bounds("cancel").width).isEqualTo(8);
-            assertThat(open.bounds("password").y).isEqualTo(id.equals("vault-create")?164:146);
+            assertThat(open.bounds("submit").x-open.bounds("cancel").x-open.bounds("cancel").width).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_GAP));
+            assertThat(open.bounds("password").y).isEqualTo(id.equals("vault-create")?155:137);
         }
     }
 
@@ -99,7 +102,7 @@ class SurfaceGeometryTest {
                 var message = open.component("message");
                 assertThat(message.isVisible()).isTrue();
                 assertThat(open.bounds("message").y + message.getHeight()).isLessThanOrEqualTo(open.bounds("cancel").y);
-                assertThat(open.bounds("password").width).isEqualTo(324);
+                assertThat(open.bounds("password").width).isEqualTo(380 - 2 * m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_SIDES));
                 return null;
             });
         }

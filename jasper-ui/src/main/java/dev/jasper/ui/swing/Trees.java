@@ -169,9 +169,7 @@ final class Trees {
         }
         /** A keycap tree's section heading: one strong title line, a little shorter than its shortcut rows. */
         private int keycapGroupHeight() {
-            var font=ThemePainting.font(context(),dev.jasper.ui.metrics.Typography.Role.PANEL_TITLE);
-            int line=(int)Math.ceil(font.getLineMetrics("Ag",new java.awt.font.FontRenderContext(null,true,true)).getHeight());
-            return Math.max(ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_GROUP_HEIGHT),line+ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_VERTICAL_PADDING));
+            return ThemePainting.height(context(), dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_GROUP_HEIGHT, dev.jasper.ui.metrics.Typography.Role.PANEL_TITLE);
         }
         /** A manager rail's tree (column 0): its branches are flat section headings, its leaves rail rows. */
         boolean rail(){return column==0 && !settingsNavigation && presentation.isEmpty();}
@@ -350,14 +348,14 @@ final class Trees {
             }
             // Emphasis is strong text in the link color (a keycap tree marks a section with its modified dot instead); the text
             // control's own refresh picks its role color first.
-            if (item.emphasized() && (presentation.isEmpty() || item.leaf()))
+            if (!row.inked && item.emphasized() && (presentation.isEmpty() || item.leaf()))
                 row.controls.get(titleId).component.setForeground(ThemePainting.color(context(), dev.jasper.ui.theme.SemanticColor.TEXT_LINK));
             row.slot(row.subtitle, List.of());
             var trailing = new ArrayList<Nodes.Node>();
             if(settingsNavigation&&!item.leaf())trailing.add(new Nodes.Button("@tree/"+node.id()+"/"+item.id()+"/expand",ControlState.READY,"",value().expandedIds().contains(item.id())?"chevron.down":"chevron.right",Nodes.ButtonKind.GHOST,"expand","Expand or collapse "+item.title(),Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED));
             var presented=presentation.get(item.id());
             // A read-only contextual key reads quieter than the rows the user can change.
-            if(presented!=null && presented.locked() && !item.emphasized())
+            if(!row.inked && presented!=null && presented.locked() && !item.emphasized())
                 row.controls.get(titleId).component.setForeground(ThemePainting.color(context(), dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
             for (int i = 0; presented==null && i < item.trailing().size(); i++)
                 trailing.add(new Nodes.Text("@tree/" + node.id() + "/" + item.id() + "/trailing/" + i,

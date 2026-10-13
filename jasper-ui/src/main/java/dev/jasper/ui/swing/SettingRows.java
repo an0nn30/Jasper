@@ -42,6 +42,11 @@ final class SettingRows {
             Composition.style(title, context(), detail ? Typography.Role.SETTING_DESCRIPTION : Typography.Role.LABEL, detail ? SemanticColor.TEXT_SECONDARY : SemanticColor.TEXT_STRONG_SECONDARY);
             Composition.style(
                     description, context(), detail ? Typography.Role.BODY : Typography.Role.SETTING_DESCRIPTION, detail ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_SECONDARY);
+            if (row.highlighted()) {
+                title.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ONACCENT));
+                description.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ONACCENT_SECONDARY));
+                title.noteColor = ThemePainting.color(context(), SemanticColor.TEXT_ONACCENT_SECONDARY);
+            }
             title.setEnabled(component.isEnabled());
             description.setEnabled(component.isEnabled());
             int side = ThemePainting.metric(context(), detail ? DesignMetrics.Role.DETAIL_ROW_SIDE : settings ? DesignMetrics.Role.SETTINGS_ROW_SIDE : fullForm ? DesignMetrics.Role.FULL_SETTING_SIDE_PADDING : DesignMetrics.Role.SETTING_SIDE_PADDING),
@@ -82,10 +87,9 @@ final class SettingRows {
             if (highlighted) {
                 var g = (Graphics2D) graphics.create();
                 try {
-                    ThemePainting.antialias(g);
+                    // A search match is a plain rectangle across the row, its text white (spec 2).
                     g.setColor(ThemePainting.color(context, SemanticColor.SELECTION_BG));
-                    int r = ThemePainting.metric(context, DesignMetrics.Role.CONTROL_RADIUS);
-                    g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2);
+                    g.fillRect(0, 0, getWidth(), getHeight());
                 } finally {
                     g.dispose();
                 }

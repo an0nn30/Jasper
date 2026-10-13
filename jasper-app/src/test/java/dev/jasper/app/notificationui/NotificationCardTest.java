@@ -227,11 +227,12 @@ class NotificationCardTest {
     @Test void linksAndCloseUseTheCardGeometry() {
         var card = card(posted(withActions(titled("Geometry"), List.of("Open", "Show in Finder", "Copy", "Four"))), true);
         layOut(card);
-        assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_LINK_GAP)).isEqualTo(12);
+        assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_LINK_GAP)).isEqualTo(10);
         assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_LINK_VERTICAL_PADDING)).isEqualTo(2);
         int pad = DesignMetrics.DEFAULT.value(DesignMetrics.Role.CARD_PADDING) + DesignMetrics.DEFAULT.value(DesignMetrics.Role.HAIRLINE);
-        assertThat(pad).as("a grouped card's inner padding").isEqualTo(15);
-        int textX = UIScale.scale(pad + 16 + 8), gap = UIScale.scale(12), padding = UIScale.scale(2);
+        assertThat(pad).as("a grouped card's inner padding").isEqualTo(12);
+        int textX = UIScale.scale(pad + DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_ICON) + DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_GAP)),
+            gap = UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_LINK_GAP)), padding = UIScale.scale(2);
         var views = new ArrayList<JComponent>();
         for (var view : card.linkViews()) if (view.isVisible()) views.add(view);
         if (card.moreView().isVisible()) views.add(card.moreView());
@@ -242,7 +243,7 @@ class NotificationCardTest {
             var button = firstButton(view);
             var metrics = button.getFontMetrics(button.getFont());
             if (i > 0) x += gap;
-            assertThat(view.getX()).as("link %d starts after the former gap", i).isEqualTo(x);
+            assertThat(view.getX()).as("link %d starts after the link gap", i).isEqualTo(x);
             var image = new BufferedImage(view.getWidth(), view.getHeight(), BufferedImage.TYPE_INT_ARGB);
             var graphics = image.createGraphics();
             try {

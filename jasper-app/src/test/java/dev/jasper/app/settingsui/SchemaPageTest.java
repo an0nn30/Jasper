@@ -160,43 +160,45 @@ class SchemaPageTest {
         assertThat(scroller.getViewport().getViewPosition().y).isPositive();
     }
 
-    @Test void actionRowsReadTheirTextAndEnablementOnRefresh() {
+    @Test void anActionRowIsASettingsRowWithItsButtonsAtTheEnd() {
         boolean[] enabled = {false};
         int[] runs = {0};
         var page = SchemaPage.page("system", "System Settings")
-            .action(() -> "Rewrite old names.", new SchemaPage.Button("Migrate Config…", () -> runs[0]++, () -> enabled[0]))
+            .action("Migrate old settings", () -> "Rewrite old names.", new SchemaPage.Button("Migrate\u2026", () -> runs[0]++, () -> enabled[0], "Nothing to migrate"))
             .build(context);
         page.component();
+        var row = (Nodes.SettingRow) ((Nodes.Card) ((Nodes.Stack) page.viewSpec().root()).children().getFirst()).children().getFirst();
+        assertThat(row.title()).isEqualTo("Migrate old settings");
+        assertThat(row.description()).isEqualTo("Rewrite old names.");
         JButton migrate = kit(page, page.actionButtons().getFirst(), JButton.class);
-        assertThat(migrate.getText()).isEqualTo("Migrate Config…");
-        assertThat(KitTestSupport.texts(page.component())).contains("Rewrite old names.");
+        assertThat(migrate.getText()).isEqualTo("Migrate\u2026");
         assertThat(migrate.isEnabled()).isFalse();
+        assertThat(migrate.getToolTipText()).isEqualTo("Nothing to migrate");
         enabled[0] = true;
         page.refresh();
         assertThat(migrate.isEnabled()).isTrue();
+        assertThat(migrate.getToolTipText()).isNull();
         migrate.doClick();
         assertThat(runs[0]).isEqualTo(1);
     }
 
-    /** Plan 2 Task 6c (ruling G4): a long action description flows over lines above its buttons in a narrow page. */
-    @Test void aLongActionDescriptionFlowsAboveItsButtons() {
+    /** A long action description wraps beside or above its buttons and never under them. */
+    @Test void aLongActionDescriptionWrapsBesideOrAboveItsButtonsInsideThePage() {
         String text = "Rewrite every option that an older Jasper wrote under a former name, keeping the file's comments and order. ".repeat(3).strip();
         var page = SchemaPage.page("system", "System Settings")
-            .action(() -> text, new SchemaPage.Button("Migrate Config…", () -> { }, () -> true))
+            .action("Migrate old settings", () -> text, new SchemaPage.Button("Migrate\u2026", () -> { }, () -> true))
             .build(context);
         var body = page.component();
         body.setSize(420, 600);
         for (int pass = 0; pass < 3; pass++) KitTestSupport.layout(body);
-        var label = labelWithText(body, text);
-        assertThat(label).as("the description is shown whole").isNotNull();
-        int line = Math.max(label.getFontMetrics(label.getFont()).getHeight(), Math.round(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.DESCRIPTION_LINE_HEIGHT)*dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()/13f));
-        assertThat(label.getHeight()).as("several lines").isGreaterThanOrEqualTo(3 * line);
-        assertThat(label.getHeight() % line).isZero();
+        // The row's description is its wrapped text, a settings row's description (kit id <row>.description).
+        var label = kit(page, "action-0.description", javax.swing.JComponent.class);
+        assertThat(label.getHeight()).as("the description wraps over several lines").isGreaterThan(3 * label.getFontMetrics(label.getFont()).getHeight() - 1);
         JButton migrate = kit(page, page.actionButtons().getFirst(), JButton.class);
         var labelBounds = javax.swing.SwingUtilities.convertRectangle(label.getParent(), label.getBounds(), body);
         var buttonBounds = javax.swing.SwingUtilities.convertRectangle(migrate.getParent(), migrate.getBounds(), body);
-        assertThat(buttonBounds.y).as("the buttons sit below the text, not over it").isGreaterThanOrEqualTo(labelBounds.y + labelBounds.height);
-        assertThat(labelBounds.x + labelBounds.width).as("the text stays inside the page").isLessThanOrEqualTo(body.getWidth());
+        assertThat(labelBounds.intersects(buttonBounds)).as("the button never covers the text").isFalse();
+        assertThat(buttonBounds.x + buttonBounds.width).as("the button stays inside the page").isLessThanOrEqualTo(body.getWidth());
     }
 
     private static javax.swing.JLabel labelWithText(java.awt.Component root, String text) {

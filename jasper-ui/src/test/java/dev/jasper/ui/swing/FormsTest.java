@@ -35,6 +35,8 @@ class FormsTest {
                         button("save", ButtonKind.PRIMARY)));
     }
 
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return s(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role)); }
+
     static int s(int value) {
         return com.formdev.flatlaf.util.UIScale.scale(value);
     }
@@ -55,7 +57,7 @@ class FormsTest {
             try (var view = new KitView(context, new ViewSpec(spec), e -> {})) {
                 view.setSize(s(900), s(555)); layout(view);
                 var columns = find(view, "columns", JPanel.class);
-                assertThat(SwingUtilities.convertRectangle(columns.getParent(), columns.getBounds(), view)).isEqualTo(new Rectangle(0, 0, s(900), s(511)));
+                assertThat(SwingUtilities.convertRectangle(columns.getParent(), columns.getBounds(), view)).isEqualTo(new Rectangle(0, 0, s(900), s(555) - (2*m(dev.jasper.ui.metrics.DesignMetrics.Role.WINDOW_FOOTER_VERTICAL)+m(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT))));
                 assertThat(find(view, "left", JPanel.class).getWidth()).isEqualTo(s(192));
                 assertThat(find(view, "middle", JPanel.class).getWidth()).isEqualTo(s(272));
                 var input = find(view, "left.input", JTextField.class); var document = input.getDocument();
@@ -77,14 +79,14 @@ class FormsTest {
             try(var view=new KitView(context,new ViewSpec(spec),e->{})) {
                 view.setSize(s(900),s(555));layout(view);
                 var owner=(Forms.FormControl)view.control("form");
-                assertThat(owner.footerScroll.getHeight()).isEqualTo(s(44));
+                assertThat(owner.footerScroll.getHeight()).isEqualTo((2*m(dev.jasper.ui.metrics.DesignMetrics.Role.WINDOW_FOOTER_VERTICAL)+m(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT)));
                 assertThat(find(view,"path",JLabel.class).getToolTipText()).isEqualTo(status.text());
                 assertThat(find(view,"path",JLabel.class).getAccessibleContext().getAccessibleName()).isEqualTo(status.text());
             }finally{release(context);}
         });
     }
 
-    @Test void threeColumnPanelsUseInsetRailAndListRowsAndAFullBleedDivider() {
+    @Test void threeColumnPanelsUseGutteredRailAndListRowsAndAFullBleedDivider() {
         Edt.run(() -> {
             var context=KitFixtures.context();
             java.util.function.BiFunction<String,ListKind,Nodes.Panel> panel=(id,kind)->new Nodes.Panel(id,ControlState.READY,
@@ -96,12 +98,17 @@ class FormsTest {
             try(var view=new KitView(context,new ViewSpec(spec),e->{})) {
                 view.setSize(s(900),s(555));layout(view);
                 var rail=(Panels.PanelControl)view.control("rail");var list=(Panels.PanelControl)view.control("list");
-                assertThat(rail.content.getInsets().left).isEqualTo(s(8));
+                // A list body runs edge to edge: the column's side inset is its rows' gutter.
+                assertThat(rail.content.getInsets().left).isZero();
+                assertThat(((InteractiveRows.RowsControl)view.control("rail.rows")).gutter).isEqualTo(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_LIST_SIDE));
                 // Source 2x: rail fill top 10.5 logical, 31 pitch; list rows 45 below a 30-logical search.
-                assertThat(rail.content.getInsets().top).isEqualTo(s(10));
-                assertThat(list.content.getInsets().left).isEqualTo(s(8));
-                assertThat(((InteractiveRows.RowsControl)view.control("rail.rows")).rowHeight).isEqualTo(s(31));
-                assertThat(((InteractiveRows.RowsControl)view.control("list.rows")).rowHeight).isEqualTo(s(45));
+                assertThat(rail.content.getInsets().top).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_RAIL_TOP));
+                assertThat(list.content.getInsets().left).isZero();
+                assertThat(((InteractiveRows.RowsControl)view.control("list.rows")).gutter).isEqualTo(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_LIST_SIDE));
+                // A row is its role's height, or its lines plus the one-line row padding when that is taller.
+                int line=((InteractiveRows.RowsControl)view.control("rail.rows")).canvas.getFontMetrics(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.BODY)).getHeight();
+                assertThat(((InteractiveRows.RowsControl)view.control("rail.rows")).rowHeight).isEqualTo(Math.max(m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_RAIL_ROW), line + m(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_VERTICAL_PADDING)));
+                assertThat(((InteractiveRows.RowsControl)view.control("list.rows")).rowHeight).isEqualTo(Math.max(m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_ITEM_ROW), 2 * line + m(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_VERTICAL_PADDING)));
             }finally{release(context);}
         });
     }
@@ -136,7 +143,7 @@ class FormsTest {
                     assertThat(label.wraps()).isTrue();assertThat(label.getHeight()).isGreaterThan(label.getFontMetrics(label.getFont()).getHeight());
                     assertThat(label.getHeight()).isEqualTo(label.wrappedHeight(label.getWidth()));
                     var c=find(view,"card",JComponent.class);var m=find(view,"metadata",JComponent.class);
-                    assertThat(m.getY()-c.getY()-c.getHeight()).isEqualTo(s(15));
+                    assertThat(m.getY()-c.getY()-c.getHeight()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.DETAIL_METADATA_GAP));
                     assertThat(find(view,"input.input",javax.swing.text.JTextComponent.class).getText()).isEqualTo("draft");
                 }finally{release(context);}
             }} finally {UIManager.put("defaultFont",old);}
@@ -150,10 +157,10 @@ class FormsTest {
             try(var view=new KitView(context,stack(new Stack("detail",ControlState.READY,LayoutRole.DETAIL,List.of(new Card("card",ControlState.READY,CardKind.SETTINGS,List.of(row))))),e->{})) {
                 KitFixtures.render(view,436,300,1);
                 var owner=(SettingRows.RowControl)view.control("row");var secret=find(view,"secret",JComponent.class);
-                assertThat(owner.component.getHeight()).isEqualTo(s(67));
+                assertThat(owner.component.getHeight()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.DETAIL_ROW_HEIGHT));
                 assertThat(secret.getX()).isEqualTo(owner.title.getX());
-                // Centred below the row's top stroke with the measured 2-logical caption/value gap.
-                assertThat(owner.title.getY()).isEqualTo(s(18));
+                // Centred in the detail row, with the 2-logical caption/value gap (11 at the compact row height).
+                assertThat(owner.title.getY()).isEqualTo(s(11));
                 var reveal=find(view,"secret.reveal",JButton.class);
                 var value=find(view,"secret.value",JComponent.class);
                 var revealBounds=SwingUtilities.convertRectangle(reveal.getParent(),reveal.getBounds(),owner.component);
@@ -206,7 +213,8 @@ class FormsTest {
                 var editor=find(view,"input.input",JTextField.class);var document=editor.getDocument();
                 assertThat(owner.label.getLabelFor()).isSameAs(editor);
                 view.setSize(s(650),s(300));for(int i=0;i<5;i++)layout(view);
-                assertThat(input.getX()).isEqualTo(s(108));assertThat(input.getY()).isZero();
+                assertThat(input.getX()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH)+m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP));
+                assertThat(input.getY()).as("centred on its taller label block").isEqualTo(Math.max(0,owner.caption.getY()+owner.caption.getHeight()-owner.label.getY()-input.getHeight())/2);
                 assertThat(editor.getDocument()).isSameAs(document);
                 view.update(new ViewSpec(new FormRow("row",ControlState.READY,row.label(),row.caption(),row.control(),
                     Optional.of(new Field("port",new ControlState(false,true,false,""),FieldKind.PORT,"22","","Port","")))));
@@ -245,15 +253,15 @@ class FormsTest {
                 assertThat(view.getPreferredSize().width).isEqualTo(s(482));
                 view.setSize(view.getPreferredSize());layout(view);
                 var card=find(view,"card",JComponent.class);
-                assertThat(card.getWidth()).isEqualTo(s(432));
-                assertThat(find(view,"input",JComponent.class).getWidth()).isEqualTo(s(294));
+                assertThat(card.getWidth()).isEqualTo(s(480) - 2*m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SIDES));
+                assertThat(find(view,"input",JComponent.class).getWidth()).isEqualTo(card.getWidth() - 2*(m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING) + m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE)) - m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH) - m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP));
                 var owner=(Forms.FormControl)view.control("form");
                 assertThat(owner.scroll.getX()).isEqualTo(s(1));assertThat(owner.scroll.getWidth()).isEqualTo(s(480));
             }finally{release(context);}
         });
     }
 
-    @Test void sheetIdentityUsesTheMeasuredTwelvePixelTitleGap() {
+    @Test void sheetIdentityUsesItsTitleGap() {
         Edt.run(()->{
             var context=KitFixtures.context();
             var heading=new Stack("heading",ControlState.READY,LayoutRole.INLINE,List.of(new Nodes.Icon("icon",ControlState.READY,"user",Hue.BLUE,IconSize.HERO,"Login"),new Text("title",ControlState.READY,"Add Login",TextRole.HERO_TITLE)));
@@ -261,7 +269,7 @@ class FormsTest {
             try(var view=new KitView(context,new ViewSpec(spec),e->{})) {
                 view.setSize(view.getPreferredSize());layout(view);
                 var icon=find(view,"icon",JComponent.class);var title=find(view,"title",JComponent.class);
-                assertThat(title.getX()-icon.getX()-icon.getWidth()).isEqualTo(s(12));
+                assertThat(title.getX()-icon.getX()-icon.getWidth()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP));
             }finally{release(context);}
         });
     }
@@ -459,13 +467,13 @@ class FormsTest {
                         var port = find(view, "port", JComponent.class);
                         assertThat(label.getX()).isZero();
                         assertThat(label.getWidth()).isEqualTo(s(96));
-                        assertThat(host.getX()).isEqualTo(s(108));
-                        assertThat(port.getX() - host.getX() - host.getWidth()).isEqualTo(s(12));
-                        assertThat(find(view, "row", JComponent.class).getX()).isEqualTo(s(15));
-                        assertThat(find(view, "hint", JComponent.class).getX()).isEqualTo(s(108));
+                        assertThat(host.getX()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH) + m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP));
+                        assertThat(port.getX() - host.getX() - host.getWidth()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP));
+                        assertThat(find(view, "row", JComponent.class).getX()).isEqualTo((m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING) + m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE)));
+                        assertThat(find(view, "hint", JComponent.class).getX()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH) + m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP));
                         assertThat(find(view, "host.label", JComponent.class).isVisible())
                                 .isFalse();
-                        assertThat(card.getInsets().left).isEqualTo(s(15));
+                        assertThat(card.getInsets().left).isEqualTo((m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING) + m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE)));
                     } finally {
                         release(ctx);
                     }
@@ -557,9 +565,9 @@ class FormsTest {
                             assertThat(description.getHeight()).isGreaterThan(s(25));
                             int ring = ThemePainting.metric(ctx, dev.jasper.ui.metrics.DesignMetrics.Role.FOCUS_RING);
                             assertThat(description.getX() + description.getWidth())
-                                    .isLessThanOrEqualTo(control.getX() + ring - s(12));
+                                    .isLessThanOrEqualTo(control.getX() + ring - m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP));
                             assertThat(control.getX() + control.getWidth() - ring)
-                                    .isEqualTo(row.getWidth() - s(13));
+                                    .isEqualTo(row.getWidth() - m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_SIDE_PADDING));
                             assertThat(control.getX() + control.getWidth()).isLessThanOrEqualTo(row.getWidth());
                         }
                     } finally {
@@ -681,7 +689,7 @@ class FormsTest {
                             var save = find(view, "save", JButton.class);
                             Point p = SwingUtilities.convertPoint(save, 0, 0, view);
                             assertThat(p.y + save.getHeight()).isLessThanOrEqualTo(s(204));
-                            assertThat(save.getHeight()).isGreaterThanOrEqualTo(s(30));
+                            assertThat(save.getHeight()).isGreaterThanOrEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT));
                             assertThatThrownBy(() -> view.setAvailableHeight(0))
                                     .isInstanceOf(IllegalArgumentException.class);
                         }
@@ -877,7 +885,7 @@ class FormsTest {
                         layout(view);
                         var input = editor(view, "input");
                         assertThat(input.getParent().getPreferredSize().height)
-                                .isGreaterThanOrEqualTo(s(32));
+                                .isGreaterThanOrEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_FIELD_HEIGHT));
                         view.update(stack(field("input", FieldKind.TEXT, "")));
                         assertThat(find(view, "input.label", JComponent.class).isVisible())
                                 .isTrue();
@@ -927,7 +935,7 @@ class FormsTest {
                         assertThat(tile.getX() + s(27)).isEqualTo(s(170));
                         assertThat(title.getY() - tile.getY() - s(54)).isEqualTo(s(14));
                         assertThat(description.getY() - title.getY() - title.getHeight())
-                                .isEqualTo(s(4));
+                                .isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.DESCRIPTION_GAP));
                     } finally {
                         release(ctx);
                     }
@@ -1016,7 +1024,7 @@ class FormsTest {
                                         SwingUtilities.convertPoint(
                                                         browse, browse.getWidth(), 0, view)
                                                 .x)
-                                .isLessThanOrEqualTo(s(196));
+                                .isLessThanOrEqualTo(s(210) - m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING));
                     } finally {
                         release(ctx);
                     }
@@ -1064,7 +1072,7 @@ class FormsTest {
                         layout(view);
                         var row = find(view, "row", JComponent.class);
                         var settings = find(view, "setting", JComponent.class);
-                        assertThat(row.getX()).isEqualTo(s(15));
+                        assertThat(row.getX()).isEqualTo((m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING) + m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE)));
                         assertThat(settings.getX()).isZero();
                         assertThat(settings.getWidth()).isEqualTo(s(440));
                         find(view, "toggle", JButton.class).doClick(0);
@@ -1224,8 +1232,8 @@ class FormsTest {
                         var previewBottom =
                                 SwingUtilities.convertPoint(preview, 0, preview.getHeight(), view);
                         var actionTop = SwingUtilities.convertPoint(action, 0, 0, view);
-                        assertThat(previewBottom.y).isLessThanOrEqualTo(actionTop.y - s(12));
-                        assertThat(action.getWidth()).isEqualTo(s(344));
+                        assertThat(previewBottom.y).isLessThanOrEqualTo(actionTop.y - m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP));
+                        assertThat(action.getWidth()).isEqualTo(s(400) - 2*m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_SIDES));
                         assertThat(view.getPreferredSize()).isEqualTo(view.getSize());
                     } finally {
                         release(ctx);
@@ -1284,10 +1292,10 @@ class FormsTest {
                                         find(view, "setting.description", JComponent.class);
                                 var following = find(view, "following", JComponent.class);
                                 assertThat(description.getY() + description.getHeight())
-                                        .isLessThanOrEqualTo(row.getHeight() - s(8));
+                                        .isLessThanOrEqualTo(row.getHeight() - m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_VERTICAL_PADDING));
                                 assertThat(following.getY())
                                         .isGreaterThanOrEqualTo(
-                                                row.getY() + row.getHeight() + s(10));
+                                                row.getY() + row.getHeight() + m(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_GAP));
                                 assertThat(find(view, "nested", JComponent.class).getHeight())
                                         .isGreaterThanOrEqualTo(
                                                 following.getY() + following.getHeight());

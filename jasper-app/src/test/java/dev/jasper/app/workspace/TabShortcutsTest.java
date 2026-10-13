@@ -119,4 +119,16 @@ class TabShortcutsTest {
                 stroke.getModifiers(), stroke.getKeyCode(), KeyEvent.CHAR_UNDEFINED), WHEN_IN_FOCUSED_WINDOW, true);
         }
     }
+
+    @Test void theTabMenusCloseTabShowsTheCloseTabBinding() throws Exception {
+        edt(() -> {
+            var keys = KeyBindings.defaults(true);
+            var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {}, ThemeTestSupport.controller(true), keys);
+            try {
+                var menu = owner.tabMenu(owner.currentTab());
+                var close = java.util.Arrays.stream(menu.getComponents()).filter(c -> c instanceof JMenuItem item && item.getText().equals("Close Tab")).map(JMenuItem.class::cast).findFirst().orElseThrow();
+                assertThat(close.getAccelerator()).isEqualTo(keys.strokeFor(ActionId.CLOSE_TAB).orElseThrow());
+            } finally { owner.close(); }
+        });
+    }
 }

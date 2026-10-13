@@ -107,10 +107,10 @@ class AppManagerKitTest {
                     var title = KitViewTest.find(view, "a.title", javax.swing.JLabel.class);
                     var subtitle = KitViewTest.find(view, "a.subtitle", javax.swing.JLabel.class);
                     String variant = dark ? "dark" : "light";
-                    assertThat(title.getForeground()).as(variant + " title").isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(p,
-                        dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT, dev.jasper.ui.theme.SemanticColor.SELECTION_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT));
-                    assertThat(subtitle.getForeground()).as(variant + " subtitle").isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(p,
-                        dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT_SECONDARY, dev.jasper.ui.theme.SemanticColor.SELECTION_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT));
+                    // White on selection.bg reads at 9.65:1 (Dark) and 5.18:1 (Light).
+                    assertThat(dev.jasper.ui.theme.ColorMath.contrast(p.color(dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT), p.color(dev.jasper.ui.theme.SemanticColor.SELECTION_BG))).as(variant).isGreaterThanOrEqualTo(4.5);
+                    assertThat(title.getForeground()).as(variant + " title").isEqualTo(p.color(dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT));
+                    assertThat(subtitle.getForeground()).as(variant + " subtitle").isEqualTo(p.color(dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT_SECONDARY));
                     assertThat(KitViewTest.find(view, "b.subtitle", javax.swing.JLabel.class).getForeground()).as(variant + " an unselected caption")
                         .isEqualTo(p.color(dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
                     // Moving the selection returns the first row's text to its roles.
@@ -129,18 +129,15 @@ class AppManagerKitTest {
                     view.setSize(300, 200); for (int i = 0; i < 3; i++) InteractiveRowsTest.layout(view);
                     var p = context.theme().semantic();
                     assertThat(KitViewTest.find(view, "a.subtitle", javax.swing.JLabel.class).getForeground()).as((dark ? "dark" : "light") + " standalone caption")
-                        .isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(p, dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT_SECONDARY,
-                            dev.jasper.ui.theme.SemanticColor.SELECTION_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT));
+                        .isEqualTo(p.color(dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT_SECONDARY));
                     // A variant switch while the row is selected recomputes its text on the new selection.
                     var flipped = dark ? KitFixtures.light() : KitFixtures.dark();
                     context.binding().publish(new dev.jasper.ui.theme.ThemePair(flipped, flipped));
                     for (int i = 0; i < 3; i++) InteractiveRowsTest.layout(view);
                     assertThat(KitViewTest.find(view, "a.title", javax.swing.JLabel.class).getForeground()).as((dark ? "dark" : "light") + " → other title")
-                        .isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(flipped.semantic(), dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT,
-                            dev.jasper.ui.theme.SemanticColor.SELECTION_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT));
+                        .isEqualTo(flipped.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT));
                     assertThat(KitViewTest.find(view, "a.subtitle", javax.swing.JLabel.class).getForeground()).as((dark ? "dark" : "light") + " → other caption")
-                        .isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(flipped.semantic(), dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT_SECONDARY,
-                            dev.jasper.ui.theme.SemanticColor.SELECTION_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT));
+                        .isEqualTo(flipped.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT_SECONDARY));
                 } finally { KitViewTest.release(context); }
             }
         });
@@ -232,7 +229,7 @@ class AppManagerKitTest {
                 assertThat(image.getRGB(100, 0)).as("the hairline fills its pixel row").isEqualTo(border);
                 assertThat(image.getRGB(100, 1)).as("and does not smear inward").isEqualTo(card);
                 int radius = metric(DesignMetrics.Role.CARD_RADIUS);
-                assertThat(image.getRGB(1, 1) >>> 24).as("the corner is the card radius").isZero();
+                assertThat(image.getRGB(0, 0) >>> 24).as("the corner is the card radius").isZero();
                 assertThat(image.getRGB(radius, 0)).isNotEqualTo(0);
             } finally { KitViewTest.release(context); }
         });

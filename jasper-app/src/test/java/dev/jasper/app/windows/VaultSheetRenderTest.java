@@ -17,6 +17,8 @@ import static org.assertj.core.api.Assertions.*;
 
 /** Actual staged owners through the production chrome/attachment helpers. No native peers are created. */
 class VaultSheetRenderTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     @TempDir Path home;
     @Test void mountedTitleMenuAndAttachedFormsRenderAcrossThemesFontsAndShortOwners() throws Exception {
         var controller = SurfaceFixtures.edt(() -> ThemeTestSupport.controller(true));
@@ -171,12 +173,12 @@ class VaultSheetRenderTest {
                     }
                     assertThat(sheet.fallback()).isEqualTo(state.equals("short"));
                     if (id.equals("vault-login")) {
-                        // Measured form segment: 24 logical item inside a 3-logical track inset (30 outer at default).
-                        int segmentHeight = com.formdev.flatlaf.util.UIScale.scale(24);
+                        // The form segment height inside the form track inset.
+                        int segmentHeight = com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SEGMENT_HEIGHT));
                         assertThat(find(surface.holder(), "auth.option.password").getHeight())
                             .as("actual Login segment preserves its nonheader height in %s", state).isEqualTo(segmentHeight);
                         assertThat(find(surface.holder(), "auth.input").getHeight())
-                            .isEqualTo(segmentHeight + 2 * com.formdev.flatlaf.util.UIScale.scale(3));
+                            .isEqualTo(segmentHeight + 2 * com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SEGMENT_PADDING)));
                     }
                     capture(state,id,root,child,bounds.get(),"body="+chrome.body().boundsInRoot().orElseThrow()+"\nsheet="+bounds.get()+"\nfallback="+sheet.fallback());
                     capture(state,id+"-sheet",child,null,null,"same actual mounted attached sheet; no native shadow/peer");

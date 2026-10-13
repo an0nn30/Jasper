@@ -131,15 +131,20 @@ final class FormRows {
                     Composition.height(owner.label, Math.min(labelWidth(), width))
                             + (owner.caption.isVisible()
                                     ? owner.caption.height(labelWidth()) + captionOffset()
-                                    : 0);
-            // Beside an input the block's line spacing may reach a few pixels past the input, into the row gap.
-            if (besideInput()) h = Math.max(0, h - ThemePainting.metric(owner.context(), DesignMetrics.Role.CAPTION_TOP_OFFSET));
-            if (p.getComponentCount() > 2)
-                h = Math.max(h, Composition.height(p.getComponent(2), w));
+                                    : 0), shift = 0;
+            // The row holds its whole label block; beside an input that is taller than it, the input moves down to centre on it.
+            if (p.getComponentCount() > 2) {
+                int control = Composition.height(p.getComponent(2), w);
+                shift = inputShift(firstLine(2, control), h);
+                h = Math.max(h, control + shift);
+            }
             if (p.getComponentCount() > 3)
-                h = Math.max(h, Composition.height(p.getComponent(3), trailing));
+                h = Math.max(h, Composition.height(p.getComponent(3), trailing) + shift);
             return h;
         }
+
+        /** How far an input sits below its row's top: half of what its label and caption are taller than its first line. */
+        int inputShift(int line, int block) { return besideInput() ? Math.max(0, block - line) / 2 : 0; }
 
         @Override
         public Dimension preferredLayoutSize(Container p) {
@@ -174,9 +179,9 @@ final class FormRows {
                     x = lw + gap(),
                     w = Math.max(0, p.getWidth() - x - (trailing > 0 ? trailing + gap() : 0));
             int controlHeight = p.getComponentCount() > 2 ? Composition.height(p.getComponent(2), w) : p.getHeight();
-            if (p.getComponentCount() > 2) p.getComponent(2).setBounds(x, 0, w, controlHeight);
             int line = p.getComponentCount() > 2 ? firstLine(2, controlHeight) : p.getHeight();
             int lh = Composition.height(owner.label, lw),
+                    shift = inputShift(line, lh + (owner.caption.isVisible() ? owner.caption.height(lw) : 0)),
                     y =
                             besideInput()
                                     // Centred on the control's first line, so an error growing the row moves nothing.
@@ -185,12 +190,13 @@ final class FormRows {
                                     ? ThemePainting.metric(
                                             owner.context(), DesignMetrics.Role.CAPTION_TOP_OFFSET)
                                     : Math.max(0, (line - lh) / 2);
+            if (p.getComponentCount() > 2) p.getComponent(2).setBounds(x, shift, w, controlHeight);
             owner.label.setBounds(0, y, lw, lh);
             owner.caption.setBounds(0, y + lh, lw, owner.caption.height(lw));
             if (p.getComponentCount() > 3) {
                 int th = Composition.height(p.getComponent(3), trailing);
                 // Shorter trailing content (a unit or note) centres on the control's first line as the label does.
-                p.getComponent(3).setBounds(x + w + gap(), th < line ? (line - th) / 2 : 0, trailing, th);
+                p.getComponent(3).setBounds(x + w + gap(), shift + (th < line ? (line - th) / 2 : 0), trailing, th);
             }
         }
     }

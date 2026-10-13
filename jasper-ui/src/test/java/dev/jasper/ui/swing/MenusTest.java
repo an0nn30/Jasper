@@ -17,6 +17,8 @@ import javax.swing.*;
 
 @SuppressWarnings("try")
 class MenusTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     static MenuButton menu(String action) {
         return new MenuButton(
                 "menu",
@@ -31,15 +33,37 @@ class MenusTest {
                 "");
     }
 
-    @Test void categoryMenuUsesTheMeasuredPopupEnvelope() {
+    @Test void categoryMenuIsCompactAndSizedToItsRows() {
         Edt.run(()->{
             var context=KitFixtures.context();
             var items=List.of(new MenuItem("a","Login","user","a",true,false,Hue.BLUE),new MenuItem("b","SSH Key","key","b",true,false,Hue.GREEN),
                 new MenuItem("c","Secure Note","note","c",true,false,Hue.AMBER),new MenuItem("sep","","","",true,true),new MenuItem("d","Generate SSH Key...","sparkle","d",true,false,Hue.PURPLE));
             try(var view=new KitView(context,stack(new MenuButton("menu",ControlState.READY,"Add","",ButtonKind.GHOST,"",items,"")),e->{})) {
                 var popup=find(view,"menu",JComponent.class).getComponentPopupMenu();
-                assertThat(popup.getPreferredSize()).isEqualTo(new java.awt.Dimension(s(222),s(137)));
+                var size=popup.getPreferredSize();
+                int widest=0; for(var c:popup.getComponents()) if(c instanceof Menus.Item item) widest=Math.max(widest,item.getPreferredSize().width);
+                assertThat(size.width).as("content width, at least the menu minimum").isEqualTo(Math.max(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_MIN_WIDTH)), widest+2*s(m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE))));
+                assertThat(size.height).isEqualTo(2*s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_PADDING))+4*s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_ITEM_HEIGHT))
+                    +2*s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_SEPARATOR_MARGIN))+s(1));
             }finally{release(context);}
+        });
+    }
+
+    @Test void aHighlightedRowIsARectangleOfTheAccentAndRowsShareTheIconColumn() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var popup = new Menus.Popup(context);
+            var tiled = new Menus.Item(context); tiled.describe(new MenuItem("a", "Login", "key", "a", true, false, Hue.BLUE));
+            var plain = new Menus.Item(context); plain.describe(new MenuItem("b", "Settings", "", "b", true, false));
+            popup.add(tiled); popup.add(plain); popup.setSize(popup.getPreferredSize()); popup.doLayout();
+            assertThat(plain.labelX()).as("a row without an icon aligns with the icon rows").isEqualTo(tiled.labelX());
+            tiled.getModel().setArmed(true);
+            var image = new java.awt.image.BufferedImage(tiled.getWidth(), tiled.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            var g = image.createGraphics(); try { tiled.paint(g); } finally { g.dispose(); }
+            var accent = context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT);
+            assertThat(new java.awt.Color(image.getRGB(0, 0))).isEqualTo(accent);
+            assertThat(new java.awt.Color(image.getRGB(tiled.getWidth() - 1, tiled.getHeight() - 1))).isEqualTo(accent);
+            release(context);
         });
     }
 
@@ -219,8 +243,10 @@ class MenusTest {
                             var popup =
                                     find(view, "menu", JComponent.class).getComponentPopupMenu();
                             var item = (JMenuItem) popup.getComponent(0);
-                            assertThat(item.getIcon().getIconWidth()).isEqualTo(s(18));
-                            assertThat(item.getPreferredSize().height).isGreaterThan(s(28));
+                            assertThat(item.getIcon().getIconWidth()).isEqualTo(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_TILE)));
+                            // The row grows with its line: at least the line plus the one-line row padding, never below the row height.
+                            int line = (int) Math.ceil(item.getFont().getLineMetrics("Ag", new java.awt.font.FontRenderContext(null, true, true)).getHeight());
+                            assertThat(item.getPreferredSize().height).isGreaterThanOrEqualTo(Math.max(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_ITEM_HEIGHT)), line + s(m(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_VERTICAL_PADDING))));
                         }
                     } finally {
                         UIManager.put("defaultFont", old);
@@ -242,4 +268,25 @@ class MenusTest {
         });
     }
 
+    @Test void aRowShowsItsActionsCurrentBindingRightAlignedAndNothingWhenUnbound() {
+        Edt.run(() -> {
+            var bindings = new java.util.HashMap<String, String>(java.util.Map.of("dev.jasper.sample.open", "\u21e7\u2318O"));
+            var base = KitFixtures.context();
+            var context = new KitContext(base.binding(), base.route(), base.metrics(), base.icons(), base.animationsEnabled(), id -> bindings.getOrDefault(id, ""));
+            var popup = new Menus.Popup(context);
+            var open = new Menus.Item(context); open.describe(new MenuItem("o", "Open", "", "o", true, false).withShortcut("dev.jasper.sample.open"));
+            var other = new Menus.Item(context); other.describe(new MenuItem("u", "Unbound", "", "u", true, false).withShortcut("dev.jasper.sample.none"));
+            popup.add(open); popup.add(other);
+            assertThat(open.shortcutText).isEqualTo("\u21e7\u2318O");
+            assertThat(other.shortcutText).isEmpty();
+            var fm = open.getFontMetrics(open.getFont());
+            assertThat(open.getPreferredSize().width).isEqualTo(open.labelX() + fm.stringWidth("Open")
+                + s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_SHORTCUT_GAP)) + fm.stringWidth("\u21e7\u2318O") + open.getInsets().right);
+            bindings.put("dev.jasper.sample.open", "\u2325\u2318O");
+            open.addNotify();
+            assertThat(open.shortcutText).as("a rebinding shows at the next open").isEqualTo("\u2325\u2318O");
+            open.removeNotify();
+            release(base);
+        });
+    }
 }

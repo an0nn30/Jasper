@@ -26,6 +26,16 @@ final class InteractiveRows {
         boolean declaredMultiple, declaredPassive;
         String focusItem, focusControl;
         int rowHeight;
+        /** Logical inset of this list's rows from its edges; the owner moved its own side inset here (spec 2). */
+        int gutter;
+        void gutter(int logical) { if (gutter != logical) { gutter = logical; sync(); } }
+        /** Whether row {@code index} shows the selection; an ordered list's shows only while it has focus. */
+        boolean selectionShown(int index) {
+            String id = itemId(index);
+            if (!dataRow(index) || passive() || !selected.contains(id)) return false;
+            if (this instanceof Trees.TreeControl tree && tree.detail != null && tree.detail.itemId.equals(id)) return false;
+            return !(node instanceof Nodes.ItemList list && list.kind() == Nodes.ListKind.ORDERED) || canvas.isFocusOwner();
+        }
         int column = -1;
         boolean panelSingle;
         /** A passive list among a DOCUMENT split's bars (command-line output): rows are text lines, not list rows. */
@@ -55,8 +65,13 @@ final class InteractiveRows {
             if (pane instanceof OverlayScrollPane overlay) own(overlay::stop);
             canvas = new Canvas(this);
             FocusListener focusPaint=new FocusAdapter() {
-                @Override public void focusGained(FocusEvent e){canvas.repaint();}
-                @Override public void focusLost(FocusEvent e){canvas.repaint();}
+                @Override public void focusGained(FocusEvent e){
+                    // Tab or Shift+Tab onto the list means the list, not the row control a recycle would hand focus back to.
+                    if (switch (e.getCause()) { case TRAVERSAL, TRAVERSAL_FORWARD, TRAVERSAL_BACKWARD -> true; default -> false; })
+                        focusControl = null;
+                    sync();canvas.repaint();
+                }
+                @Override public void focusLost(FocusEvent e){sync();canvas.repaint();}
             };
             canvas.addFocusListener(focusPaint);
             own(() -> canvas.removeFocusListener(focusPaint));
@@ -351,8 +366,9 @@ final class InteractiveRows {
                                     context(),
                                     DesignMetrics.Role.BUTTON_HEIGHT,
                                     Typography.Role.LABEL),
+                            // A row's lines take the one-line row padding (as menus and navigation do), not a form's row gap.
                             line * lines()
-                                    + ThemePainting.metric(context(), DesignMetrics.Role.ROW_GAP));
+                                    + ThemePainting.metric(context(), DesignMetrics.Role.ROW_VERTICAL_PADDING));
             // Manager columns: one-line rows (the rail's, a list column's single-line rows) take the rail row, two-line list rows the item row.
             if (column == 0 || column == 1) rowHeight = Math.max(rowHeight,
                 ThemePainting.metric(context(), column == 0 || lines() < 2 ? DesignMetrics.Role.COLUMN_RAIL_ROW : DesignMetrics.Role.COLUMN_ITEM_ROW));
@@ -369,11 +385,8 @@ final class InteractiveRows {
             sync();
             canvas.repaint();
             for (var child : popup.getComponents()) if (child instanceof Menus.Item entry
-                    && entry.getClientProperty("Jasper.menu.item") instanceof MenuItem item) {
-                Composition.style(entry, context(), Typography.Role.BODY, SemanticColor.TEXT_PRIMARY);
-                entry.setIcon(item.icon().isBlank() ? null : context().icons().tile(item.icon(),
-                        context().theme().semantic(), item.hue(), ThemePainting.metric(context(), DesignMetrics.Role.MENU_TILE), false));
-            }
+                    && entry.getClientProperty("Jasper.menu.item") instanceof MenuItem item) entry.describe(item);
+            popup.restyle();
             popup.revalidate(); popup.repaint();
         }
 
@@ -418,7 +431,7 @@ final class InteractiveRows {
                         it.remove();
                     }
                 }
-                int width = scroll.getViewport().getExtentSize().width;
+                int width = scroll.getViewport().getExtentSize().width, inset = com.formdev.flatlaf.util.UIScale.scale(gutter);
                 for (int i = first; i < last; i++) {
                     String id = itemId(i);
                     Row row = mounted.get(id);
@@ -429,14 +442,15 @@ final class InteractiveRows {
                         canvas.add(row);
                     }
                     row.index = i;
+                    row.inked = selectionShown(i);
                     populate(row, i);
                     row.finish();
-                    row.setBounds(0, top(i), Math.max(0, width), rowShellHeight(i));
+                    row.setBounds(inset, top(i), Math.max(0, width - 2 * inset), rowShellHeight(i));
                     row.doLayout();
                 }
                 for (var row : spare) canvas.remove(row);
                 if (footer != null)
-                    footer.setBounds(0, rowsHeight(), Math.max(0, width), footerHeight());
+                    footer.setBounds(inset, rowsHeight(), Math.max(0, width - 2 * inset), footerHeight());
                 layoutAccessories(width);
                 canvas.repaint();
             } finally {
@@ -644,26 +658,7 @@ final class InteractiveRows {
                     continue;
                 }
                 var entry = new Menus.Item(context());
-                entry.setText(item.label());
-                entry.putClientProperty("Jasper.menu.item", item);
-                entry.putClientProperty("html.disable", true);
-                entry.setEnabled(item.enabled());
-                Composition.style(
-                        entry, context(), Typography.Role.BODY, SemanticColor.TEXT_PRIMARY);
-                int inset = ThemePainting.metric(context(), DesignMetrics.Role.MENU_ITEM_PADDING);
-                entry.setBorder(BorderFactory.createEmptyBorder(0, inset, 0, inset));
-                entry.setIcon(
-                        item.icon().isBlank()
-                                ? null
-                                : context()
-                                        .icons()
-                                        .tile(
-                                                item.icon(),
-                                                context().theme().semantic(),
-                                                item.hue(),
-                                                ThemePainting.metric(
-                                                        context(), DesignMetrics.Role.MENU_TILE),
-                                                false));
+                entry.describe(item);
                 ActionListener listener =
                         e -> {
                             if (current.test(item)) emit(new UiEvent.Action(item.action()));
@@ -762,6 +757,8 @@ final class InteractiveRows {
                     for (int i = 1; i <= owner.size(); i++) g.fillRect(stroke, i * owner.rowHeight, Math.max(0, getWidth() - 2 * stroke), stroke);
                 } finally { g.dispose(); }
             }
+            // Selection and hover fill each row's whole band, edge to edge of the list, under the row's inset content.
+            for (var row : owner.mounted.values()) row.paintFill(graphics, getWidth());
         }
         @Override
         public Dimension getPreferredSize() {
@@ -804,12 +801,32 @@ final class InteractiveRows {
         final Map<String, ControlRegistry.Control> controls = new LinkedHashMap<>();
         final Set<String> used = new HashSet<>();
         final JPanel leading = part(), title = part(), subtitle = part(), trailing = part();
-        final JCheckBox check = new JCheckBox();
         String id;
         /** The last press or release opened the context menu, so its click is not a selection. */
         boolean contextPress;
         int index, indent;
         boolean hover;
+        /** Whether this row shows the selection: its kit text and glyphs take the on-accent roles (set before populate). */
+        boolean inked;
+
+        /** This row's selection or hover fill across the list's full {@code width}, in the canvas's coordinates. */
+        void paintFill(Graphics graphics, int width) {
+            if (!owner.dataRow(index) || owner.passive()) return;
+            if (owner instanceof Trees.TreeControl tree && tree.detail != null && tree.detail.itemId.equals(id)) return;
+            boolean focusedOnly = Objects.equals(id, owner.focusItem) && owner.canvas.isFocusOwner() && !owner.selected.contains(id);
+            Color fill = owner.selectionShown(index)
+                ? ThemePainting.color(owner.context(), owner.resultsLayout() ? SemanticColor.ACCENT : SemanticColor.SELECTION_BG)
+                : hover || focusedOnly ? ColorMath.opacity(ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY), .05) : null;
+            if (fill == null) return;
+            graphics.setColor(fill);
+            graphics.fillRect(0, getY(), width, getHeight());
+        }
+
+        /** The fill lies on the canvas across the list's width, so a row's repaint redraws its whole band. */
+        @Override public void repaint(long tm, int x, int y, int width, int height) {
+            if (owner != null && getParent() == owner.canvas) owner.canvas.repaint(tm, 0, getY() + y, owner.canvas.getWidth(), height);
+            else super.repaint(tm, x, y, width, height);
+        }
         final java.util.List<JComponent> cells = new ArrayList<>();
         /**
          * Hover follows the pointer over the whole row. Text with a tooltip, icons and switches take their own mouse
@@ -837,9 +854,6 @@ final class InteractiveRows {
             add(title);
             add(subtitle);
             add(trailing);
-            add(check);
-            check.setOpaque(false);
-            check.addActionListener(e -> owner.select(id, true));
             MouseAdapter mouse =
                     new MouseAdapter() {
                         @Override
@@ -957,6 +971,11 @@ final class InteractiveRows {
             }
             c.parentEnabled = parentEnabled;
             c.embeddedLabel(true);
+            if (c instanceof Labels.TextControl text) text.inked = inked;
+            else if (c instanceof Labels.IconControl icon) icon.inked = inked;
+            else if (c instanceof Buttons.ButtonControl button) button.button.onSelection = inked;
+            else if (c instanceof Switches.ToggleControl toggle) toggle.button.onSelection = inked;
+            else if (c instanceof Indicators.ChipControl chip) chip.inked = inked;
             c.update(node);
             boolean enabled = c.interactive();
             var children =
@@ -1024,10 +1043,6 @@ final class InteractiveRows {
                     it.remove();
                 }
             }
-            check.setVisible(owner.multiple() && owner.selectable(index));
-            check.setEnabled(owner.interactive());
-            check.setSelected(owner.selected.contains(id));
-            check.getAccessibleContext().setAccessibleName("Select " + id);
             if (Objects.equals(id, owner.focusItem) && owner.focusControl != null) {
                 var target = controls.get(owner.focusControl);
                 Component focused =
@@ -1081,12 +1096,6 @@ final class InteractiveRows {
                         ? ThemePainting.metric(owner.context(), DesignMetrics.Role.KEYCAP_CONTENT_TRAILING)
                         : owner.identityRows() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.IDENTITY_ROW_TRAILING) : pad)),
                     h = getHeight();
-            int checkWidth =
-                    check.isVisible()
-                            ? Math.min(check.getPreferredSize().width, Math.max(0, width - x))
-                            : 0;
-            check.setBounds(x, 0, checkWidth, h);
-            x += checkWidth;
             int tw = Math.min(trailing.getPreferredSize().width, Math.max(0, width - x));
             int actionInset=owner.panelSingle && owner.column < 0 ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_ACTION_INSET) : 0;
             trailing.setBounds(Math.max(x,width - tw - actionInset), 0, tw, h);
@@ -1134,9 +1143,6 @@ final class InteractiveRows {
             boolean halo = trailing.getComponentCount() > 0 && trailing.getComponent(trailing.getComponentCount() - 1) instanceof Switches.SwitchButton;
             int end = getWidth() - ThemePainting.metric(context, DesignMetrics.Role.PANEL_COMPACT_ROW_TRAILING)
                 + (halo ? ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING) : 0);
-            int checkWidth = check.isVisible() ? Math.min(check.getPreferredSize().width, Math.max(0, end - x)) : 0;
-            check.setBounds(x, 0, checkWidth, h);
-            x += checkWidth;
             int tw = Math.min(trailing.getPreferredSize().width, Math.max(0, end - x));
             trailing.setBounds(Math.max(x, end - tw), 0, tw, h);
             int gap = ThemePainting.metric(context, DesignMetrics.Role.PANEL_ROW_TEXT_GAP);
@@ -1163,7 +1169,6 @@ final class InteractiveRows {
         /** A heading shows only its title, inset like the rows below it. */
         void headingLayout() {
             int pad = ThemePainting.metric(owner.context(), owner.resultsLayout() ? DesignMetrics.Role.RESULTS_ROW_PADDING : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : DesignMetrics.Role.ICON_GAP);
-            check.setBounds(0, 0, 0, 0);
             leading.setBounds(0, 0, 0, 0);
             subtitle.setBounds(0, 0, 0, 0);
             trailing.setBounds(0, 0, 0, 0);
@@ -1184,7 +1189,6 @@ final class InteractiveRows {
             int side = ThemePainting.metric(context, DesignMetrics.Role.RESULTS_ROW_PADDING),
                     gap = ThemePainting.metric(context, DesignMetrics.Role.RESULTS_ROW_GAP),
                     icon = ThemePainting.metric(context, DesignMetrics.Role.ICON_RAIL), h = getHeight();
-            check.setBounds(0, 0, 0, 0);
             leading.setBounds(side, 0, icon, h);
             int start = side + icon + gap, end = getWidth() - side;
             int titleWidth = title.getPreferredSize().width;
@@ -1214,59 +1218,6 @@ final class InteractiveRows {
                     g.fillRect(0, 0, getWidth(), ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE));
                 }
                 return;
-            }
-            if (owner.passive()) return;
-            if(owner instanceof Trees.TreeControl tree && tree.detail!=null && tree.detail.itemId.equals(id))return;
-            if (owner.resultsLayout()) {
-                Color fill = owner.selected.contains(id) ? ThemePainting.color(owner.context(), SemanticColor.ACCENT)
-                        : hover ? ColorMath.opacity(ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY), .05) : null;
-                if (fill != null) {
-                    var rounded = (Graphics2D) g.create();
-                    try {
-                        ThemePainting.antialias(rounded);
-                        int inset = ThemePainting.metric(owner.context(), DesignMetrics.Role.RESULTS_SELECTION_INSET),
-                                arc = ThemePainting.metric(owner.context(), DesignMetrics.Role.RESULTS_SELECTION_ARC);
-                        rounded.setColor(fill);
-                        rounded.fillRoundRect(inset, 0, Math.max(0, getWidth() - 2 * inset), getHeight(), arc, arc);
-                    } finally { rounded.dispose(); }
-                }
-                return;
-            }
-            if (owner.identityRows() || owner.column == 0 || owner.column == 1 || owner.panelSingle || owner.panelCompact || owner instanceof Trees.TreeControl tree && tree.settingsNavigation) {
-                Color fill = owner.selected.contains(id) ? ThemePainting.color(owner.context(), owner.column == 0 ? SemanticColor.SURFACE_CONTROL_SELECTED : SemanticColor.SELECTION_BG)
-                    : hover ? ColorMath.opacity(ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY), .05) : null;
-                if (fill != null) {
-                    var rounded=(Graphics2D)g.create();
-                    try { ThemePainting.antialias(rounded); rounded.setColor(fill);
-                        boolean panelRow = owner.panelSingle || owner.panelCompact;
-                        int arc=ThemePainting.metric(owner.context(), panelRow ? DesignMetrics.Role.PANEL_ROW_RADIUS : DesignMetrics.Role.CONTROL_RADIUS)*2;
-                        int stroke=ThemePainting.metric(owner.context(),DesignMetrics.Role.HAIRLINE);
-                        // Settings navigation rows keep their full hit height; the selection leaves the row spacing below it.
-                        int spacing=owner instanceof Trees.TreeControl tree && tree.settingsNavigation ? ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTINGS_NAV_ROW_SPACING) : 0;
-                        // Manager rail/list rows keep a one-stroke gap below each fill; panel rows inset both edges.
-                        if(owner.column == 0 || owner.column == 1) rounded.fillRoundRect(0,0,getWidth(),getHeight()-stroke,arc,arc);
-                        else { int inset=panelRow ? stroke : 0; rounded.fillRoundRect(0,inset,getWidth(),Math.max(0,getHeight()-2*inset-spacing),arc,arc); }
-                    } finally {rounded.dispose();}
-                }
-                if (Objects.equals(id, owner.focusItem) && owner.canvas.isFocusOwner()) {
-                    g.setColor(ThemePainting.color(owner.context(), SemanticColor.BORDER_FOCUS));g.drawRect(0,0,getWidth()-1,getHeight()-1);
-                }
-                return;
-            }
-            // An ordered list's selection only drives keyboard reordering: it shows while the list has focus.
-            if (owner.selected.contains(id) && (!ordered() || owner.canvas.isFocusOwner())) {
-                g.setColor(ThemePainting.color(owner.context(), SemanticColor.SELECTION_BG));
-                g.fillRect(0, 0, getWidth(), getHeight());
-            } else if (hover) {
-                g.setColor(
-                        ColorMath.opacity(
-                                ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY),
-                                .05));
-                g.fillRect(0, 0, getWidth(), getHeight());
-            }
-            if (Objects.equals(id, owner.focusItem) && owner.canvas.isFocusOwner()) {
-                g.setColor(ThemePainting.color(owner.context(), SemanticColor.BORDER_FOCUS));
-                g.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
             }
         }
     }

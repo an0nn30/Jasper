@@ -122,8 +122,8 @@ class StagedRemoteSftpTest {
                 assertThat(readme.getAccessibleContext().getAccessibleDescription()).as("described by name, size and modified time")
                     .startsWith("readme.txt — 3.7 KB — ");
                 var name = label((Container) readme, "readme.txt");
-                assertThat(readme.getHeight()).as("a row fits its text with room, as the old 27 px rows did")
-                    .isGreaterThanOrEqualTo(name.getFontMetrics(name.getFont()).getHeight() + 8);
+                assertThat(readme.getHeight()).as("a row fits its text with the one-line row padding")
+                    .isGreaterThanOrEqualTo(name.getFontMetrics(name.getFont()).getHeight() + dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_VERTICAL_PADDING));
                 click(readme, 1);
                 press(StagedRemoteTunnelsTest.canvas(readme), KeyEvent.VK_ENTER, '\n');
             });

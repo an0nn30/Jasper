@@ -21,8 +21,9 @@ class ChoicesTest {
                     KitFixtures.render(view, 400, 100, 2);
                     var font = ThemePainting.font(context, dev.jasper.ui.metrics.Typography.Role.LABEL);
                     int line = (int)Math.ceil(font.getLineMetrics("Ag", new java.awt.font.FontRenderContext(null, true, true)).getHeight());
-                    // Form segments use the measured 24-logical item, growing with the label line at larger fonts.
-                    int expected = Math.max(com.formdev.flatlaf.util.UIScale.scale(24), line + com.formdev.flatlaf.util.UIScale.scale(4));
+                    // Form segments take the form segment height, growing with the label line at larger fonts.
+                    int expected = Math.max(com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SEGMENT_HEIGHT)),
+                        line + com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_VERTICAL_PADDING)));
                     assertThat(find(view, "choice.option.b", JButton.class).getPreferredSize().height)
                         .as("nonheader form segments keep the measured item height at font %s", size).isEqualTo(expected);
                 }
@@ -91,10 +92,10 @@ class ChoicesTest {
                     var theme=KitFixtures.withSemantic(base, new dev.jasper.ui.theme.SemanticPalette(colors));
                     context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme,theme));
                     assertThat(popup.getList()).isSameAs(list);assertThat(list.getBackground()).isEqualTo(color);
-                    assertThat(list.getFixedCellHeight()).isGreaterThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(28));
+                    assertThat(list.getFixedCellHeight()).isGreaterThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_ITEM_HEIGHT)));
                     var row=(JComponent)combo.getRenderer().getListCellRendererComponent(list,combo.getItemAt(0),0,true,false);
                     row.setSize(com.formdev.flatlaf.util.UIScale.scale(220),list.getFixedCellHeight());
-                    assertThat(ButtonsTest.paint(row).getRGB(com.formdev.flatlaf.util.UIScale.scale(200),list.getFixedCellHeight()/2)).isEqualTo(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT).getRGB());
+                    assertThat(ButtonsTest.paint(row).getRGB(com.formdev.flatlaf.util.UIScale.scale(200),list.getFixedCellHeight()/2)).as("a highlighted option is selection.bg").isEqualTo(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SELECTION_BG).getRGB());
                     popup.setSize(com.formdev.flatlaf.util.UIScale.scale(180),com.formdev.flatlaf.util.UIScale.scale(80));
                     assertThat(ButtonsTest.paint(popup).getRGB(com.formdev.flatlaf.util.UIScale.scale(90),com.formdev.flatlaf.util.UIScale.scale(2))).isEqualTo(color.getRGB());
                 }
@@ -190,6 +191,100 @@ class ChoicesTest {
                 owner[0] = view; var combo = find(view, "choice.input", JComboBox.class); combo.setSelectedIndex(1);
                 assertThat(combo.isEnabled()).isFalse(); combo.setSelectedIndex(0); assertThat(events).hasSize(1);
                 assertThat(combo.getAccessibleContext().getAccessibleName()).isEqualTo("Protocol");
+            } finally { release(context); }
+        });
+    }
+
+    @Test void aDropdownPopupIsAsWideAsItsFieldAndWiderOnlyForALongerRow() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var choice = new Nodes.Choice("mode", ControlState.READY, Nodes.ChoiceKind.DROPDOWN,
+                List.of(new Option("a", "A", Optional.empty()), new Option("long", "A considerably longer option than its field", Optional.empty())), "a", "Mode", "");
+            try (var view = new KitView(context, stack(choice), e -> { })) {
+                view.setSize(400, 80); InteractiveRowsTest.layout(view);
+                var combo = find(view, "mode.input", Choices.ChoiceCombo.class);
+                var popup = combo.popup;
+                var list = popup.getList();
+                assertThat(list.getFixedCellHeight()).isEqualTo(ThemePainting.height(context, dev.jasper.ui.metrics.DesignMetrics.Role.MENU_ITEM_HEIGHT, dev.jasper.ui.metrics.Typography.Role.BODY));
+                int rows = list.getPreferredSize().width + popup.getInsets().left + popup.getInsets().right;
+                assertThat(popup.popupWidth(rows + 50)).as("as wide as a wider field").isEqualTo(rows + 50);
+                assertThat(popup.popupWidth(80)).as("wider only for its widest row").isEqualTo(rows);
+                assertThat(popup.getInsets().left).isEqualTo(ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE));
+                assertThat(popup.getInsets().top).isEqualTo(ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.MENU_PADDING));
+            } finally { release(context); }
+        });
+    }
+
+    @Test void aScrollingDropdownPopupLeavesItsWidestRowRoomBesideTheScrollbar() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var options = new ArrayList<Option>();
+            for (int i = 0; i < 20; i++) options.add(new Option("o" + i, i == 7 ? "A considerably longer option than its field" : "Option " + i, Optional.empty()));
+            var choice = new Nodes.Choice("mode", ControlState.READY, Nodes.ChoiceKind.DROPDOWN, options, "o0", "Mode", "");
+            try (var view = new KitView(context, stack(choice), e -> { })) {
+                view.setSize(400, 80); InteractiveRowsTest.layout(view);
+                var combo = find(view, "mode.input", Choices.ChoiceCombo.class);
+                var popup = combo.popup;
+                assertThat(combo.getItemCount()).as("precondition: the menu scrolls").isGreaterThan(combo.getMaximumRowCount());
+                int bar = ((JScrollPane) popup.getComponent(0)).getVerticalScrollBar().getPreferredSize().width;
+                assertThat(bar).as("precondition: the bar takes width").isPositive();
+                int rows = popup.getList().getPreferredSize().width + popup.getInsets().left + popup.getInsets().right;
+                assertThat(popup.popupWidth(80)).as("the widest row plus the bar").isEqualTo(rows + bar);
+                assertThat(popup.popupWidth(rows + bar + 50)).as("a wider field still sets it").isEqualTo(rows + bar + 50);
+            } finally { release(context); }
+        });
+    }
+
+    /** New File Server's Login: equal cells for its widest label overflow the track, but the labels themselves fit on one line. */
+    @Test void aSegmentedChoiceStaysOnOneLineWhileItsLabelsFit() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var login = new Nodes.Choice("login", ControlState.READY, Nodes.ChoiceKind.SEGMENTED, List.of(new Option("anon", "Anonymous", Optional.empty()),
+                new Option("vault", "Vault Account", Optional.empty()), new Option("session", "Session Password", Optional.empty())), "anon", "Login", "");
+            var protocol = new Nodes.Choice("protocol", ControlState.READY, Nodes.ChoiceKind.SEGMENTED, List.of(new Option("http", "HTTP", Optional.empty()),
+                new Option("ftp", "FTP", Optional.empty()), new Option("sftp", "SFTP", Optional.empty()), new Option("tftp", "TFTP", Optional.empty())), "http", "Protocol", "");
+            for (var choice : List.of(login, protocol)) {
+                try (var view = new KitView(context, new ViewSpec(choice), e -> { })) {
+                    view.setSize(370, 100); InteractiveRowsTest.layout(view);
+                    var first = find(view, choice.id() + ".option." + choice.options().getFirst().id(), Choices.SegmentButton.class);
+                    var track = first.getParent(); var insets = track.getInsets();
+                    int x = insets.left, widest = 0;
+                    for (var option : choice.options()) widest = Math.max(widest, find(view, choice.id() + ".option." + option.id(), Choices.SegmentButton.class).getPreferredSize().width);
+                    boolean equal = widest * choice.options().size() <= track.getWidth() - insets.left - insets.right;
+                    for (var option : choice.options()) {
+                        var segment = find(view, choice.id() + ".option." + option.id(), Choices.SegmentButton.class);
+                        assertThat(segment.getY()).as(option.label() + " on the first line").isEqualTo(first.getY());
+                        assertThat(segment.getWidth()).as(option.label() + " whole label").isGreaterThanOrEqualTo(segment.getPreferredSize().width);
+                        if (equal) assertThat(segment.getWidth()).as(option.label() + " equal cells while they fit").isBetween(first.getWidth() - 1, first.getWidth() + 1);
+                        else assertThat(segment.getX()).as(option.label() + " follows the one before").isEqualTo(x);
+                        x += segment.getWidth();
+                    }
+                    assertThat(equal).as(choice.id() + ": the case under test").isEqualTo(choice == protocol);
+                    if (!equal) assertThat(x).as(choice.id() + " fills its track").isEqualTo(track.getWidth() - insets.right);
+                    assertThat(track.getHeight()).as(choice.id() + " one line high").isEqualTo(first.getHeight() + insets.top + insets.bottom);
+                }
+            }
+            release(context);
+        });
+    }
+
+    @Test void aSettingsSegmentsLabelKeepsItsPaddingFromTheSegmentsEdge() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var choice = new Nodes.Choice("toolbar", ControlState.READY, Nodes.ChoiceKind.SEGMENTED,
+                List.of(new Option("icons", "Icons Only", Optional.empty()), new Option("both", "Icons & Labels", Optional.empty()), new Option("hidden", "Hidden", Optional.empty())), "both", "Toolbar", "");
+            try (var view = new KitView(context, new ViewSpec(new Nodes.Stack("page", ControlState.READY, Nodes.LayoutRole.SETTINGS_PAGE, List.of(choice))), e -> { })) {
+                view.setSize(600, 200); InteractiveRowsTest.layout(view);
+                int pad = ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.SEGMENT_HORIZONTAL_PADDING);
+                var buttons = new ArrayList<Choices.SegmentButton>();
+                new Object() { void walk(java.awt.Component c) { if (c instanceof Choices.SegmentButton b) buttons.add(b); if (c instanceof java.awt.Container k) for (var child : k.getComponents()) walk(child); } }.walk(view);
+                assertThat(buttons).hasSize(3);
+                for (var button : buttons) {
+                    assertThat(button.getInsets().left).isEqualTo(pad);
+                    assertThat(button.getInsets().right).isEqualTo(pad);
+                    int text = (int) Math.ceil(button.getFont().getStringBounds(button.getText(), new java.awt.font.FontRenderContext(null, true, true)).getWidth());
+                    assertThat(button.getWidth()).as(button.getText()).isGreaterThanOrEqualTo(text + 2 * pad);
+                }
             } finally { release(context); }
         });
     }

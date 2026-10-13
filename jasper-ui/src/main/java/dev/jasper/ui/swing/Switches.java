@@ -66,6 +66,8 @@ final class Switches {
         ThemePainting.Focus focus;
         double position;
         boolean compact, error, pending;
+        /** Whether the switch sits on a selected row's accent fill; set by the row before each population. */
+        boolean onSelection;
         SwitchButton(KitContext context) { this.context = context; }
         @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
         @Override public Dimension getPreferredSize() {
@@ -86,14 +88,20 @@ final class Switches {
                     g.setColor(ColorMath.opacity(ThemePainting.color(context, error ? SemanticColor.BORDER_ERROR : SemanticColor.BORDER_FOCUS), ThemePainting.focusHaloShare(context, error)));
                     g.fillRoundRect(x-ring, y-ring, w+2*ring, h+2*ring, h+2*ring, h+2*ring);
                 }
-                Color on = ThemePainting.color(context, SemanticColor.ACCENT), off = ThemePainting.color(context, SemanticColor.TOGGLE_TRACK_OFF);
-                if (pending) on = off = ThemePainting.color(context, SemanticColor.STATUS_WARNING);
+                Color on = ThemePainting.color(context, SemanticColor.ACCENT), off = ThemePainting.color(context, SemanticColor.TOGGLE_TRACK_OFF),
+                    knobOn = ThemePainting.color(context, SemanticColor.TOGGLE_KNOB), knobOff = knobOn;
+                // On a selected row's accent fill the ON track turns white around a knob of the fill's colour, the OFF track a white tint.
+                if (onSelection) {
+                    on = ThemePainting.color(context, SemanticColor.TEXT_ONACCENT); off = ColorMath.opacity(on, ThemePainting.tileShare(context));
+                    knobOn = ThemePainting.color(context, SemanticColor.SELECTION_BG);
+                }
+                if (pending) { on = off = ThemePainting.color(context, SemanticColor.STATUS_WARNING); knobOn = knobOff; }
                 Color rgb = ColorMath.mix(on, off, position);
                 g.setColor(new Color(rgb.getRed(), rgb.getGreen(), rgb.getBlue(), (int)Math.round(on.getAlpha()*position + off.getAlpha()*(1-position))));
                 g.fillRoundRect(x, y, w, h, h, h);
                 int inset = (h-knob)/2, knobX = x+inset+(int)Math.round((w-knob-2*inset)*position);
                 g.setColor(ColorMath.opacity(Color.BLACK, context.metrics().value(DesignMetrics.Role.SWITCH_KNOB_SHADOW_PERCENT) / 100.0)); g.fillOval(knobX, y+inset+com.formdev.flatlaf.util.UIScale.scale(1), knob, knob);
-                g.setColor(ThemePainting.color(context, SemanticColor.TOGGLE_KNOB)); g.fillOval(knobX, y+inset, knob, knob);
+                g.setColor(ColorMath.mix(knobOn, knobOff, position)); g.fillOval(knobX, y+inset, knob, knob);
             } finally { g.dispose(); }
         }
     }

@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
  * selection kept in view), field composition state and unlabelled search fields.
  */
 class ResultsKitTest {
-    @Test void subtitleInkUsesItsReceivingSlotWhileRoleAndExplicitSeveritySurviveSelection() {
+    @Test void subtitleInkUsesItsReceivingSlotOnTheSelection() {
         Edt.run(()->{
             var context=KitFixtures.context();
             for(var role:List.of(TextRole.BODY,TextRole.MONO)) {
@@ -40,7 +40,7 @@ class ResultsKitTest {
                     for(boolean selected:new boolean[]{true,false,true}) {
                         view.update(new ViewSpec(results(List.of(item),selected?Set.of("one"):Set.of(),OptionalInt.empty())));
                         assertThat(find(view,"detail",JLabel.class)).isSameAs(label);assertThat(label.getFont()).isEqualTo(font);
-                        assertThat(label.getForeground()).isEqualTo(selected?dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(),SemanticColor.TEXT_ONACCENT_SECONDARY,SemanticColor.ACCENT,dev.jasper.ui.theme.SurfaceContrast.TEXT):context.theme().semantic().color(SemanticColor.TEXT_TERTIARY));
+                        assertThat(label.getForeground()).isEqualTo(selected?context.theme().semantic().color(SemanticColor.TEXT_ONACCENT_SECONDARY):context.theme().semantic().color(SemanticColor.TEXT_TERTIARY));
                     }
                 }
             }
@@ -149,8 +149,6 @@ class ResultsKitTest {
                 assertThat(events.getLast()).isEqualTo(new UiEvent.Selected("results", Set.of("r1")));
                 control.move(-1); control.move(-1);
                 assertThat(events.getLast()).as("and stops at the first row").isEqualTo(new UiEvent.Selected("results", Set.of("r0")));
-                assertThat(((InteractiveRows.Row) row(view, "h1")).check.isVisible()).as("headings have no checkbox").isFalse();
-                assertThat(((InteractiveRows.Row) row(view, "r1")).check.isVisible()).isTrue();
                 var image = paint(view);
                 var rule = SwingUtilities.convertPoint(row(view, "h1"), row(view, "h1").getWidth() / 2, 0, view);
                 // A list outside the palette keeps the subtle row divider; the palette's RESULTS headings take the menu edge.
@@ -180,7 +178,7 @@ class ResultsKitTest {
             var context = KitFixtures.context();
             try (var view = new KitView(context, new ViewSpec(results(sections(8), Set.of("r0"), OptionalInt.of(5))), e -> { })) {
                 view.setSize(500, 600); InteractiveRowsTest.layout(view);
-                int rowHeight = UIScale.scale(24), headingHeight = UIScale.scale(22);
+                int rowHeight = UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RESULTS_ROW_HEIGHT)), headingHeight = UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RESULTS_HEADING_HEIGHT));
                 assertThat(row(view, "h0").getHeight()).isEqualTo(headingHeight);
                 assertThat(row(view, "r0").getHeight()).isEqualTo(rowHeight);
                 assertThat(row(view, "r1").getY()).isEqualTo(headingHeight + rowHeight);
@@ -227,7 +225,7 @@ class ResultsKitTest {
             var context = KitFixtures.context();
             var items = List.of(row("r", "Rendered command", "a detail", "Cmd+T"), row("plain", "Plain", null, null));
             try (var view = new KitView(context, new ViewSpec(results(items, Set.of(), OptionalInt.empty())), e -> { })) {
-                int side = UIScale.scale(8), gap = UIScale.scale(8), icon = UIScale.scale(16), width = UIScale.scale(680);
+                int side = UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RESULTS_ROW_PADDING)), gap = UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RESULTS_ROW_GAP)), icon = UIScale.scale(16), width = UIScale.scale(680);
                 view.setSize(width, 200); InteractiveRowsTest.layout(view);
                 var line = (InteractiveRows.Row) row(view, "r");
                 JLabel title = find(view, "r.title", JLabel.class), detail = find(view, "r.detail", JLabel.class), tag = find(view, "r.tag", JLabel.class);
@@ -253,7 +251,7 @@ class ResultsKitTest {
         });
     }
 
-    @Test void selectedAndHoveredResultsPaintRoundedRoleColours() {
+    @Test void selectedAndHoveredResultsFillTheirWholeRow() {
         Edt.run(() -> {
             var context = KitFixtures.context();
             try (var view = new KitView(context, new ViewSpec(results(List.of(row("a", "A", null, null), row("b", "B", null, null)), Set.of("a"), OptionalInt.empty())), e -> { })) {
@@ -267,11 +265,12 @@ class ResultsKitTest {
                 };
                 int w = first.getWidth();
                 assertThat(at.apply(first, new Point(w - UIScale.scale(12), UIScale.scale(3)))).as("the palette highlights with the accent").isEqualTo(semantic.color(SemanticColor.ACCENT));
-                assertThat(at.apply(first, new Point(w - UIScale.scale(5), 0)).getAlpha()).as("selected rounded corner").isZero();
-                assertThat(at.apply(first, new Point(UIScale.scale(2), UIScale.scale(12))).getAlpha()).as("inset from the edge").isZero();
+                assertThat(at.apply(first, new Point(w - 1, 0))).as("a square corner").isEqualTo(semantic.color(SemanticColor.ACCENT));
+                assertThat(at.apply(first, new Point(0, UIScale.scale(12)))).as("edge to edge").isEqualTo(semantic.color(SemanticColor.ACCENT));
+                assertThat(find(view, "a.title", JLabel.class).getForeground()).as("white on the accent").isEqualTo(semantic.color(SemanticColor.TEXT_ONACCENT));
                 var hover = ColorMath.opacity(semantic.color(SemanticColor.HOVER_OVERLAY), .05);
                 assertThat(at.apply(second, new Point(w - UIScale.scale(12), UIScale.scale(3)))).isEqualTo(over(new Color(0, 0, 0, 0), hover));
-                assertThat(at.apply(second, new Point(w - UIScale.scale(5), 0)).getAlpha()).as("hover rounded corner").isZero();
+                assertThat(at.apply(second, new Point(w - 1, 0))).as("a square hover corner").isEqualTo(over(new Color(0, 0, 0, 0), hover));
                 // AWT reports where the pointer went: outside the row it left.
                 deliver(second, new MouseEvent(second, MouseEvent.MOUSE_EXITED, System.currentTimeMillis(), 0, -1, -1, 0, false));
                 var after = paint(view); var point = SwingUtilities.convertPoint(second, w - UIScale.scale(12), UIScale.scale(3), view);

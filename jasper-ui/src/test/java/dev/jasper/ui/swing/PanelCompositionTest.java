@@ -19,6 +19,8 @@ import java.util.OptionalInt;
 import javax.swing.*;
 
 class PanelCompositionTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     static final ControlState READY = ControlState.READY;
 
     static Nodes.Button button(String id, String label) {
@@ -515,7 +517,7 @@ class PanelCompositionTest {
                                                     image, index++ * s(size[0]), 0, null);
                                             var header = view.panelHeader(name);
                                             assertThat(header.getHeight())
-                                                    .isGreaterThanOrEqualTo(s(38));
+                                                    .isGreaterThanOrEqualTo(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_HEADER)));
                                             var root = (Nodes.Panel) view.spec().root();
                                             if (root.footer().isPresent()) {
                                                 var footer =
@@ -702,7 +704,7 @@ class PanelCompositionTest {
                                                 List.of(original.footer().orElseThrow()))));
                         assertThat(view.control("sftp-footer")).isSameAs(restored);
                         assertThat(restored.panelFooter).isFalse();
-                        assertThat(restored.component.getInsets().left).isEqualTo(s(13));
+                        assertThat(restored.component.getInsets().left).isEqualTo(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_SIDE_PADDING)));
                     } finally {
                         release(ctx);
                     }
@@ -845,13 +847,13 @@ class PanelCompositionTest {
             try (var view = new KitView(ctx, new ViewSpec(new Nodes.Panel("panel", READY, header(6), Optional.empty(), empty(), Optional.of(detail))), e -> {})) {
                 view.setSize(s(260), s(395)); layout(view);
                 var mounted = view.control("detail").component;
-                assertThat(bounds(mounted, view).x + mounted.getInsets().left).as("one 12px inset, no outer duplicate").isEqualTo(s(12));
-                assertThat(mounted.getInsets().top).isEqualTo(s(12));
+                assertThat(bounds(mounted, view).x + mounted.getInsets().left).as("one detail inset, no outer duplicate").isEqualTo(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_PADDING)));
+                assertThat(mounted.getInsets().top).isEqualTo(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_PADDING)));
                 assertThat(view.control("identity-icon").component.getPreferredSize().width).isEqualTo(s(28));
                 assertThat(view.control("identity-icon").component.getPreferredSize().height).isEqualTo(s(30));
                 view.update(new ViewSpec(detail)); layout(view);
                 assertThat(view.control("detail").component).isSameAs(mounted);
-                assertThat(mounted.getInsets().left).as("manager DETAIL recovers its normal24 inset").isEqualTo(s(24));
+                assertThat(mounted.getInsets().left).as("manager DETAIL recovers its normal inset").isEqualTo(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.DETAIL_PADDING)));
                 assertThat(view.control("identity-icon").component.getPreferredSize().width).isEqualTo(s(44));
             } finally { release(ctx); }
         });
@@ -863,9 +865,9 @@ class PanelCompositionTest {
             try(var view=new KitView(ctx,new ViewSpec(panel(6,empty())),e -> {})) {
                 view.setPanelHostActions("panel",List.of(button("options","Options"),button("hide","Hide")),e -> {});
                 view.setSize(s(400),s(395));layout(view);
-                assertThat(view.panelHeader("panel").getHeight()).as("normal action row stays the panel header height").isEqualTo(s(38));
+                assertThat(view.panelHeader("panel").getHeight()).as("normal action row stays the panel header height").isEqualTo(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_HEADER)));
                 var title=find(view,"header.title",JLabel.class);
-                assertThat(title.getY()).as("32px content lane leaves6px below it").isEqualTo(s(32)/2-title.getHeight()/2);
+                assertThat(title.getY()).as("the content lane leaves the bottom gap below it").isEqualTo((s(m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_HEADER))-s(m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_HEADER_BOTTOM_GAP)))/2-title.getHeight()/2);
             }finally{release(ctx);}
         });
     }
@@ -894,7 +896,7 @@ class PanelCompositionTest {
             var rows=new ItemList("transfers",READY,ListKind.SINGLE,java.util.stream.IntStream.range(0,200).mapToObj(i->RemoteKitTest.contextual("transfer"+i)).toList(),java.util.Set.of(),"",List.of());
             try(var view=new KitView(ctx,new ViewSpec(new Nodes.Panel("panel",READY,header(1),Optional.empty(),empty(),Optional.of(rows))),e->{})) {
                 view.setSize(s(260),s(90));layout(view);
-                assertThat(view.panelHeader("panel").getHeight()).isEqualTo(s(38));
+                assertThat(view.panelHeader("panel").getHeight()).isEqualTo(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_HEADER)));
                 var footer=(Panels.PanelControl)view.control("panel");
                 var list=(ItemLists.ListControl)view.control("transfers");
                 assertThat(footer.footer.interactiveHeight(footer.footer)).isLessThanOrEqualTo(list.rowHeight);

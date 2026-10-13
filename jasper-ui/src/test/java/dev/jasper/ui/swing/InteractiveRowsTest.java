@@ -137,6 +137,38 @@ class InteractiveRowsTest {
                 });
     }
 
+    /** Shift+Tab from a row's control back to the list leaves focus on the list; only a recycle restores the control. */
+    @Test
+    void traversingBackToTheListForgetsTheRowControl() {
+        Edt.run(
+                () -> {
+                    var context = KitFixtures.context();
+                    try (var view =
+                            new KitView(context, new ViewSpec(list(List.of(item(0), item(1)), Set.of())), e -> {})) {
+                        view.setSize(400, 250);
+                        layout(view);
+                        var owner = (ItemLists.ListControl) view.control("servers");
+                        var run = find(view, "run0", JButton.class);
+                        for (var cause : List.of(java.awt.event.FocusEvent.Cause.TRAVERSAL_BACKWARD,
+                                java.awt.event.FocusEvent.Cause.TRAVERSAL_FORWARD, java.awt.event.FocusEvent.Cause.TRAVERSAL,
+                                java.awt.event.FocusEvent.Cause.UNKNOWN)) {
+                            for (var listener : run.getFocusListeners())
+                                listener.focusGained(new java.awt.event.FocusEvent(run, java.awt.event.FocusEvent.FOCUS_GAINED));
+                            assertThat(owner.focusControl).as("precondition").isEqualTo("run0");
+                            for (var listener : owner.canvas.getFocusListeners())
+                                listener.focusGained(new java.awt.event.FocusEvent(owner.canvas, java.awt.event.FocusEvent.FOCUS_GAINED,
+                                        false, run, cause));
+                            if (cause == java.awt.event.FocusEvent.Cause.UNKNOWN)
+                                assertThat(owner.focusControl).as("a recycle's hand-back keeps the control").isEqualTo("run0");
+                            else assertThat(owner.focusControl).as(cause.name()).isNull();
+                            assertThat(owner.focusItem).as(cause.name()).isEqualTo("item0");
+                        }
+                    } finally {
+                        release(context);
+                    }
+                });
+    }
+
     @Test
     void recycleClosesOldControlListenersAndRestoresLogicalFocusAndConfirmedValue() {
         Edt.run(
@@ -243,7 +275,7 @@ class InteractiveRowsTest {
     }
 
     @Test
-    void multipleCheckboxesAndContextUseCurrentStableSelection() {
+    void multipleSelectionAndContextUseCurrentStableSelection() {
         Edt.run(
                 () -> {
                     var context = KitFixtures.context();
@@ -266,8 +298,8 @@ class InteractiveRowsTest {
                         view.setSize(400, 240);
                         layout(view);
                         var owner = (ItemLists.ListControl) view.control("servers");
-                        owner.mounted.get("item0").check.doClick(0);
-                        owner.mounted.get("item1").check.doClick(0);
+                        owner.select("item0", true);
+                        owner.select("item1", true);
                         assertThat(owner.selected).containsExactlyInAnyOrder("item0", "item1");
                         events.clear();
                         owner.context("item1", owner.canvas, 0, 0);
@@ -277,7 +309,7 @@ class InteractiveRowsTest {
                                 .containsExactly(new UiEvent.Action("delete-selected"));
                         assertThat(owner.selected).containsExactlyInAnyOrder("item0", "item1");
                         owner.select("item0", false);
-                        assertThat(owner.mounted.get("item1").check.isSelected()).isFalse();
+                        assertThat(owner.selected).containsExactly("item0");
                     } finally {
                         release(context);
                     }
@@ -614,7 +646,7 @@ class InteractiveRowsTest {
                         var contrasting=KitFixtures.withSemantic(baseTheme, new dev.jasper.ui.theme.SemanticPalette(colors));
                         for(var theme : List.of(baseTheme, contrasting)) {
                         context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme,theme));
-                        var expectedIcon = context.icons().tile("delete", context.theme().semantic(), Hue.PURPLE, com.formdev.flatlaf.util.UIScale.scale(18), false);
+                        var expectedIcon = context.icons().tile("delete", context.theme().semantic(), Hue.PURPLE, com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_TILE)), false);
                         var actualPixels = new java.awt.image.BufferedImage(expectedIcon.getIconWidth(), expectedIcon.getIconHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
                         var expectedPixels = new java.awt.image.BufferedImage(expectedIcon.getIconWidth(), expectedIcon.getIconHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
                         var ag = actualPixels.createGraphics(); var eg = expectedPixels.createGraphics();
@@ -792,7 +824,6 @@ class InteractiveRowsTest {
                                                 SelectionMode.SINGLE,
                                                 Optional.empty())));
                         assertThat(owner.selected).isEmpty();
-                        assertThat(owner.mounted.get("item0").check.isVisible()).isFalse();
                         owner.select("item1", false);
                         assertThat(owner.selected).containsExactly("item1");
                     } finally {

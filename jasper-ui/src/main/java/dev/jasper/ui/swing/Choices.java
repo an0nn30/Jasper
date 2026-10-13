@@ -77,11 +77,11 @@ final class Choices {
             // A list may measure its rows before the combo is laid out; a Settings dropdown's fixed width stands in until
             // then, so its menu rows never outgrow the menu's padded width.
             int base=input.getWidth()>0?input.getWidth():input instanceof ChoiceCombo fixed?fixed.settingsWidth:0;
-            if(option!=null&&(!option.icon().isBlank()||!option.description().isBlank()))return new RichOptions(context(),option,selected,popup,option.id().equals(((Nodes.Choice)node).selectedId()),base-(input instanceof ChoiceCombo combo?popup?2*combo.popupPadding():combo.arrowWidth():ThemePainting.metric(context(),DesignMetrics.Role.CHOICE_ARROW_WIDTH)),settings);
+            if(option!=null&&(!option.icon().isBlank()||!option.description().isBlank()))return new RichOptions(context(),option,selected,popup,option.id().equals(((Nodes.Choice)node).selectedId()),base-(input instanceof ChoiceCombo combo?popup?(combo.popup==null?0:combo.popup.getInsets().left+combo.popup.getInsets().right):combo.arrowWidth():ThemePainting.metric(context(),DesignMetrics.Role.CHOICE_ARROW_WIDTH)),settings);
             var label = Choices.optionLabel(context(), option == null ? "Choose…" : option.label(), option == null ? Optional.empty() : option.hue(), selected,
                 option == null ? SemanticColor.TEXT_PLACEHOLDER : null);
-            // A Settings dropdown shows its value at label size, as its row title.
-            if (settings && !popup) label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
+            // A Settings dropdown shows its value, and its menu's rows, at label size, as its row title.
+            if (settings) label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
             return label;
         }
         private void closeOptions() {
@@ -147,7 +147,8 @@ final class Choices {
                         button.setFont(SwingTypography.effective(font));
                         button.setForeground(button.textColor(false));
                         button.setIcon(option.hue().map(h -> (javax.swing.Icon)new HueDot(context(), h)).orElse(null)); button.setDisabledIcon(button.getIcon());
-                        int pad = ThemePainting.metric(context(), settings?DesignMetrics.Role.SETTINGS_SEGMENT_PADDING:DesignMetrics.Role.SEGMENT_HORIZONTAL_PADDING);
+                        // A segment's label keeps its padding from the segment's edge everywhere (spec 4).
+                        int pad = ThemePainting.metric(context(), DesignMetrics.Role.SEGMENT_HORIZONTAL_PADDING);
                         if(identitySection)pad=Math.max(pad,((ThemePainting.metric(context(),DesignMetrics.Role.IDENTITY_SECTION_WIDTH)-2*track)/Math.max(1,choice.options().size())-button.getFontMetrics(button.getFont()).stringWidth(option.label()))/2);
                         button.setBorder(new EmptyBorder(0, pad, 0, pad));
                     }
@@ -179,9 +180,8 @@ final class Choices {
             @Override protected void paintComponent(Graphics graphics) {
                 if (selected) {
                     var g=(Graphics2D)graphics.create();
-                    try { ThemePainting.antialias(g);g.setColor(ThemePainting.color(context,SemanticColor.ACCENT));
-                        int r=ThemePainting.metric(context,DesignMetrics.Role.MENU_ITEM_RADIUS);
-                        g.fillRoundRect(0,0,getWidth(),getHeight(),r*2,r*2);
+                    // A highlighted option is a plain rectangle across the row (spec 2).
+                    try { g.setColor(ThemePainting.color(context,SemanticColor.SELECTION_BG)); g.fillRect(0,0,getWidth(),getHeight());
                     } finally {g.dispose();}
                 }
                 super.paintComponent(graphics);
@@ -191,7 +191,7 @@ final class Choices {
         renderer.setText(text);
         renderer.setFont(ThemePainting.font(context, Typography.Role.BODY));
         renderer.setForeground(ThemePainting.color(context, selected ? SemanticColor.TEXT_ONACCENT : role != null ? role : SemanticColor.TEXT_PRIMARY));
-        renderer.setBackground(ThemePainting.color(context, selected ? SemanticColor.ACCENT : SemanticColor.SURFACE_MENU));
+        renderer.setBackground(ThemePainting.color(context, selected ? SemanticColor.SELECTION_BG : SemanticColor.SURFACE_MENU));
         hue.ifPresent(h -> renderer.setIcon(new HueDot(context, h)));
         int pad = ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
         renderer.setBorder(new EmptyBorder(0, pad, 0, pad)); return renderer;
@@ -238,14 +238,33 @@ final class Choices {
             } finally { g.dispose(); }
         }
     }
+    /** A dropdown's menu: as wide as its field, wider only when its widest row needs it (spec 3). */
+    static final class KitComboPopup extends BasicComboPopup {
+        final KitContext context;
+        @SuppressWarnings("unchecked")
+        KitComboPopup(JComboBox<?> combo, KitContext context) { super((JComboBox<Object>) combo); this.context = context; setOpaque(false); }
+        @Override protected void paintComponent(Graphics graphics) { Menus.paintSurface(this, graphics, context); }
+        @Override protected Rectangle computePopupBounds(int px, int py, int pw, int ph) { return super.computePopupBounds(px, py, popupWidth(pw), ph); }
+        /** The field's width {@code fieldWidth}, or the widest row's with the menu's insets (and its scrollbar, when the rows scroll) when that is wider. */
+        int popupWidth(int fieldWidth) {
+            var insets = getInsets();
+            int bar = comboBox.getItemCount() > comboBox.getMaximumRowCount() ? scroller.getVerticalScrollBar().getPreferredSize().width : 0;
+            return Math.max(fieldWidth, list.getPreferredSize().width + bar + insets.left + insets.right);
+        }
+        /** The menu's padding above and below its rows, its 1 px edge beside them. */
+        void restyle() {
+            int padding = ThemePainting.metric(context, DesignMetrics.Role.MENU_PADDING), line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
+            setBorder(new EmptyBorder(padding, line, padding, line));
+        }
+    }
+
     static class ChoiceCombo extends JComboBox<Option> {
-        final KitContext context; ThemePainting.Focus focus; BasicComboPopup popup; int settingsWidth; boolean compactHeight;
+        final KitContext context; ThemePainting.Focus focus; KitComboPopup popup; int settingsWidth; boolean compactHeight;
         /** A DROPDOWN's rich closed face (its owner keeps it describing the selected option); null paints the value. */
         Nodes.PickerFace face;
         boolean hover;
         /** A rich value's trailing chevron lane; a Settings dropdown's lane also holds the gap before its chevron. */
         int arrowWidth() { return ThemePainting.metric(context, settingsWidth > 0 ? DesignMetrics.Role.SETTINGS_CHOICE_ARROW : DesignMetrics.Role.CHOICE_ARROW_WIDTH); }
-        int popupPadding() { return ThemePainting.metric(context, settingsWidth > 0 ? DesignMetrics.Role.SETTINGS_POPUP_PADDING : DesignMetrics.Role.MENU_SEPARATOR_MARGIN); }
         ChoiceCombo(KitContext context) {
             this.context = context; setOpaque(false);
             setBorder(new EmptyBorder(ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0, ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0));
@@ -265,10 +284,7 @@ final class Choices {
         }
         /** The kit's popup for this combo; a searchable combo supplies its own. */
         ComboPopup createKitPopup(JComboBox<Object> comboBox) {
-            popup = new BasicComboPopup(comboBox) {
-                @Override protected void paintComponent(Graphics graphics) { Menus.paintSurface(this, graphics, context); }
-            };
-            popup.setOpaque(false);
+            popup = new KitComboPopup(comboBox, context);
             return popup;
         }
         final BasicComboBoxUI kitUi() { return new KitUi(); }
@@ -297,19 +313,20 @@ final class Choices {
         }
         void refreshPopup() {
             if (popup == null) return;
-            int pad = popupPadding();
-            popup.setBorder(new EmptyBorder(pad,pad,pad,pad));
+            popup.restyle();
             var list = popup.getList();
             list.setBackground(ThemePainting.color(context, SemanticColor.SURFACE_MENU));
             list.setForeground(ThemePainting.color(context, SemanticColor.TEXT_PRIMARY));
-            list.setSelectionBackground(ThemePainting.color(context, SemanticColor.ACCENT));
+            list.setSelectionBackground(ThemePainting.color(context, SemanticColor.SELECTION_BG));
             list.setSelectionForeground(ThemePainting.color(context, SemanticColor.TEXT_ONACCENT));
             boolean rich=false;for(int i=0;i<getItemCount();i++){var option=getItemAt(i);if(!option.icon().isBlank()||!option.description().isBlank()){rich=true;break;}}
-            list.setFixedCellHeight(rich?-1:ThemePainting.height(context, DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.BODY));
+            // Rows are the menu's height in the field's own type (a Settings dropdown shows its value at label size).
+            var type = settingsWidth > 0 ? Typography.Role.LABEL : Typography.Role.BODY;
+            list.setFixedCellHeight(rich?-1:ThemePainting.height(context, DesignMetrics.Role.MENU_ITEM_HEIGHT, type));
             // A Settings dropdown is a fixed width, so its rich rows are exactly the menu's padded width: the list never
             // keeps a row width it measured before the dropdown was laid out.
-            list.setFixedCellWidth(rich && settingsWidth > 0 ? Math.max(1, settingsWidth - 2 * pad) : -1);
-            list.setFont(ThemePainting.font(context, Typography.Role.BODY));
+            list.setFixedCellWidth(rich && settingsWidth > 0 ? Math.max(1, settingsWidth - popup.getInsets().left - popup.getInsets().right) : -1);
+            list.setFont(ThemePainting.font(context, type));
             popup.revalidate(); popup.repaint(); list.repaint();
         }
         @Override public Dimension getPreferredSize() {
@@ -360,7 +377,10 @@ final class Choices {
         }
     }
 
-    /** Equal-width segments use another row before any option's distinguishing label is clipped. */
+    /**
+     * Segments share one line while their labels fit: equal cells when every cell holds the widest label, otherwise each
+     * its own label and an even share of the rest. They use another row only before an option's label would be clipped.
+     */
     static final class SegmentLayout implements Composition.WidthLayout {
         private Dimension cell(Container parent) {
             int width = 0, height = 0;
@@ -370,9 +390,15 @@ final class Choices {
             }
             return new Dimension(width, height);
         }
+        private static int labels(Container parent) {
+            int width = 0;
+            for (Component child : parent.getComponents()) width += child.getPreferredSize().width;
+            return width;
+        }
         int columns(Container parent, int width) {
-            Insets insets = parent.getInsets();
-            return Math.max(1, Math.min(parent.getComponentCount(), Math.max(0, width - insets.left - insets.right) / Math.max(1, cell(parent).width)));
+            Insets insets = parent.getInsets(); int room = Math.max(0, width - insets.left - insets.right);
+            if (labels(parent) <= room) return Math.max(1, parent.getComponentCount());
+            return Math.max(1, Math.min(parent.getComponentCount(), room / Math.max(1, cell(parent).width)));
         }
         @Override public int height(Container parent, int width) {
             Insets insets = parent.getInsets();
@@ -384,9 +410,16 @@ final class Choices {
             return new Dimension(insets.left + insets.right + parent.getComponentCount() * cell.width, insets.top + insets.bottom + cell.height);
         }
         @Override public void layoutContainer(Container parent) {
-            Insets insets = parent.getInsets(); int columns = columns(parent, parent.getWidth());
-            if (columns == parent.getComponentCount()) {
-                new GridLayout(1, columns, 0, 0).layoutContainer(parent);
+            Insets insets = parent.getInsets(); int columns = columns(parent, parent.getWidth()), count = parent.getComponentCount();
+            if (columns == count) {
+                int room = Math.max(0, parent.getWidth() - insets.left - insets.right);
+                if (count * cell(parent).width <= room) { new GridLayout(1, columns, 0, 0).layoutContainer(parent); return; }
+                int spare = room - labels(parent), x = insets.left, height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);
+                for (int index = 0; index < count; index++) {
+                    var child = parent.getComponent(index);
+                    int width = child.getPreferredSize().width + spare * (index + 1) / count - spare * index / count;
+                    child.setBounds(x, insets.top, width, height); x += width;
+                }
                 return;
             }
             int rows = Math.max(1, (parent.getComponentCount() + columns - 1) / columns);

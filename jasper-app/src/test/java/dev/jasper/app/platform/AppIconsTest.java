@@ -34,6 +34,30 @@ class AppIconsTest {
     private static void userScale(float scale){try{var setter=com.formdev.flatlaf.util.UIScale.class.getDeclaredMethod("setUserScaleFactor",float.class,boolean.class);setter.setAccessible(true);setter.invoke(null,scale,false);}catch(ReflectiveOperationException failure){throw new AssertionError(failure);}}
     private static int[] pixels(javax.swing.Icon icon,int scale){var image=new java.awt.image.BufferedImage(icon.getIconWidth()*scale,icon.getIconHeight()*scale,java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();try{g.scale(scale,scale);icon.paintIcon(null,g,0,0);}finally{g.dispose();}return image.getRGB(0,0,image.getWidth(),image.getHeight(),null,0,image.getWidth());}
 
+    /** A highlighted native menu row is the accent: its glyph turns white with its label (spec 2). */
+    @Test void aHighlightedNativeMenuRowsGlyphIsWhite() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            try {
+                var item = new javax.swing.JMenuItem("Add");
+                var icon = AppIcons.semantic("add");
+                item.setIcon(icon);
+                assertThat(ink(icon, item)).isEqualTo(ThemeZone.color(item, dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
+                item.getModel().setArmed(true);
+                assertThat(ink(icon, item)).isEqualTo(ThemeZone.color(item, dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT));
+            } finally { themes.close(); ThemeTestSupport.controller(true); }
+        });
+    }
+    /** The colour of an icon's most opaque pixel, painted for {@code owner}. */
+    private static java.awt.Color ink(javax.swing.Icon icon, java.awt.Component owner) {
+        var image = new java.awt.image.BufferedImage(icon.getIconWidth(), icon.getIconHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics(); try { icon.paintIcon(owner, g, 0, 0); } finally { g.dispose(); }
+        int best = 0;
+        for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++)
+            if ((image.getRGB(x, y) >>> 24) > (best >>> 24)) best = image.getRGB(x, y);
+        return new java.awt.Color(best & 0xFFFFFF);
+    }
+
     @Test void modernApplicationIconsUseModuleNamedTinting() throws Exception {
         edt(() -> {
             ThemeTestSupport.controller(false);

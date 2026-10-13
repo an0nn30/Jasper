@@ -87,7 +87,7 @@ final class HostedContext implements PluginContext {
             handler -> events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant())),
             host.environment.windows(), terminals, host.environment.appearance(), host.environment.appearanceSubscriber(),
             host.environment.glass());
-        this.kit = new HostedKit(id, () -> state != State.CLOSED, ui::kitThemes, ui.appearance(), host.containment, () -> host.animations.getAsBoolean());
+        this.kit = new HostedKit(id, () -> state != State.CLOSED, ui::kitThemes, ui.appearance(), host.containment, () -> host.animations.getAsBoolean(), action -> host.shortcuts.apply(action));
         ui.kit(kit);
         this.palette = new HostedPalette(id, gate, host.environment.contributions(), host.containment, ui, terminals);
         this.fileSources = new HostedFileSources(id, gate, host.environment.contributions(), host.containment, ui, terminals);

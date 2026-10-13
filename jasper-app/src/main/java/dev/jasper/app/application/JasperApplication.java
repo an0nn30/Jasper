@@ -219,6 +219,8 @@ public final class JasperApplication {
         // never stops start-up; the configuration reports it.
         themes = ThemeController.startup(dark, startup.terminalScheme(),
             failure -> LOG.log(System.Logger.Level.WARNING, "Starting in Slate Steel Dark: " + failure.getMessage(), failure));
+        // App-native menus show each item's action binding from the live keymap.
+        themes.appearance().shortcuts(this::shortcutLabel);
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
         notificationViews = new NotificationsFeature(notificationCenter, contributions,
             () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
@@ -743,6 +745,7 @@ public final class JasperApplication {
         }) : dev.jasper.app.plugins.GlassSource.NONE);
         plugins.reportFailuresTo(failure -> incidentNotices.pluginFailure(failure.pluginId(), failure.operation(), failure.cause()));
         plugins.animations(themes::animationsEnabled);
+        plugins.shortcuts(this::shortcutLabel);
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
@@ -951,14 +954,23 @@ public final class JasperApplication {
         target.content().showConfigurationDetails();
     }
 
-    /** What resolving the saved shortcuts against the contributed actions could not honor, right now. */
-    List<KeyBindings.Problem> bindingProblems() {
-        boolean macOs = configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs();
+    private boolean macOs() { return configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs(); }
+
+    /** The keymap every window resolves right now: the saved shortcuts with the contributed actions' defaults. */
+    KeyBindings.Resolved resolvedBindings() {
         ConfigSnapshot snapshot = configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot();
         List<KeyBindings.Extension> extensions = new ArrayList<>();
         for (ActionEntry action : contributions.actions())
             if (KeyBindings.extensionId(action.id())) extensions.add(action.extension());
-        return snapshot.bindings(macOs).withExtensions(extensions).problems();
+        return snapshot.bindings(macOs()).withExtensions(extensions);
+    }
+
+    /** What resolving the saved shortcuts against the contributed actions could not honor, right now. */
+    List<KeyBindings.Problem> bindingProblems() { return resolvedBindings().problems(); }
+
+    /** A menu's text for {@code actionId}'s current binding in the platform's glyphs; "" when it is unbound or unknown. */
+    String shortcutLabel(String actionId) {
+        return KeyBindings.display(resolvedBindings().bindings().strokeFor(actionId).orElse(null), macOs());
     }
 
     /** A user's binding for an unknown action is theirs to fix; a plugin's losing default is only worth a log line. */

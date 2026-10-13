@@ -96,6 +96,8 @@ final class PluginHost {
     record Outcome(PluginStatus.State state, String reason) { }
 
     java.util.function.BooleanSupplier animations = () -> true;
+    /** The keymap text a plugin's menus show beside an item's action. */
+    java.util.function.Function<String, String> shortcuts = action -> "";
     final Environment environment;
     /** Runs cancellation handlers and connection closes off the EDT; outlives every plugin's own executor. */
     final CleanupWorker cleanup = new CleanupWorker();

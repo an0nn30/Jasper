@@ -42,15 +42,15 @@ final class RichOptions extends JPanel {
         int text=getFontMetrics(font()).getHeight()*lines(width).size();
         // A Settings menu row keeps its height until its wrapped lines need more; their own leading pads them.
         int margin=settings?0:ThemePainting.metric(context,DesignMetrics.Role.MENU_SEPARATOR_MARGIN)*2;
-        return new Dimension(width,popup?Math.max(ThemePainting.metric(context,settings?DesignMetrics.Role.SETTINGS_OPTION_HEIGHT:DesignMetrics.Role.BUTTON_HEIGHT),text+margin):getFontMetrics(font()).getHeight());
+        return new Dimension(width,popup?Math.max(ThemePainting.height(context,DesignMetrics.Role.MENU_ITEM_HEIGHT,settings?Typography.Role.LABEL:Typography.Role.BODY),text+margin):getFontMetrics(font()).getHeight());
     }
     private static String clip(String text,FontMetrics fm,int width){if(fm.stringWidth(text)<=width)return text;String ellipsis="…";while(!text.isEmpty()&&fm.stringWidth(text+ellipsis)>width)text=text.substring(0,text.offsetByCodePoints(text.length(),-1));return text.isEmpty()?"":text+ellipsis;}
     @Override protected void paintComponent(Graphics graphics){
         var g=(Graphics2D)graphics.create();try{
             ThemePainting.antialias(g);
-            // A Settings menu row keeps one line of spacing below its selection, as the Settings navigation does.
-            int spacing=settings&&popup?ThemePainting.metric(context,DesignMetrics.Role.SETTINGS_NAV_ROW_SPACING):0,h=getHeight()-spacing;
-            if(selected){g.setColor(ThemePainting.color(context,SemanticColor.ACCENT));int r=ThemePainting.metric(context,DesignMetrics.Role.MENU_ITEM_RADIUS);g.fillRoundRect(0,0,getWidth(),h,r*2,r*2);}
+            // A highlighted option is a plain rectangle across the row (spec 2).
+            int h=getHeight();
+            if(selected){g.setColor(ThemePainting.color(context,SemanticColor.SELECTION_BG));g.fillRect(0,0,getWidth(),h);}
             SemanticColor role=selected?SemanticColor.TEXT_ONACCENT:SemanticColor.TEXT_PRIMARY;int x=pad(),right=getWidth()-(popup?pad():ThemePainting.metric(context,DesignMetrics.Role.CHOICE_VALUE_END_PADDING));
             if(!option.icon().isBlank()){var icon=context.icons().icon(option.icon(),context.theme().semantic(),role,glyph());icon.paintIcon(this,g,x,(h-icon.getIconHeight())/2);x+=icon.getIconWidth()+gap();}
             if(popup){if(checked){var icon=context.icons().icon("check",context.theme().semantic(),selected?SemanticColor.TEXT_ONACCENT:SemanticColor.TEXT_LINK,check());icon.paintIcon(this,g,right-check(),(h-check())/2);}right-=check()+gap();}

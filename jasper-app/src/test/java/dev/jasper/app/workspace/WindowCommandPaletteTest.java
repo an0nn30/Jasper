@@ -23,6 +23,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class WindowCommandPaletteTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     static JRootPane install(WindowContent owner) {
         var root = new JRootPane(); root.setContentPane(owner); owner.installRootBindings(root);
         root.setSize(900, 600); LayoutTestSupport.layoutTree(root); return root;
@@ -484,7 +486,7 @@ class WindowCommandPaletteTest {
                 dev.jasper.app.palette.PaletteTestSupport.query(palette).setText("custom"); root.setSize(350, 210); LayoutTestSupport.layoutTree(root);
                 root.dispatchEvent(new ComponentEvent(root, ComponentEvent.COMPONENT_RESIZED)); LayoutTestSupport.layoutTree(root);
                 assertThat(palette.getWidth()).isLessThanOrEqualTo(318);
-                assertThat(dev.jasper.app.palette.PaletteTestSupport.fieldRow(palette).getHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(44));
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.fieldRow(palette).getHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.PALETTE_FIELD_HEIGHT)));
                 PaletteTestSupport.selectRelative(palette, 4); LayoutTestSupport.layoutTree(root);
                 assertThat(dev.jasper.app.palette.PaletteTestSupport.resultsCanvas(palette).getVisibleRect().intersects(dev.jasper.app.palette.PaletteTestSupport.rowBounds(palette, 4))).isTrue();
                 assertThat(palette.getHeight()).isLessThan(palette.getPreferredSize().height);

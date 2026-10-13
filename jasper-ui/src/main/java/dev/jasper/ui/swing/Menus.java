@@ -242,8 +242,7 @@ final class Menus {
             ((Main) main).iconMenu = strip;
             ((MenuSurface) component).background.kind = strip ? Nodes.ButtonKind.SECONDARY : menu.kind();
             ((MenuSurface) component).background.borderless = strip;
-            int pad = ThemePainting.metric(context(), DesignMetrics.Role.MENU_PADDING);
-            popup.setBorder(new EmptyBorder(pad, pad, pad, pad));
+            popup.restyle();
             if (!prior.equals(menu.items())) {
                 closeItems();
                 popup.removeAll();
@@ -254,8 +253,7 @@ final class Menus {
                         continue;
                     }
                     var item = new Item(context());
-                    item.setText(descriptor.label());
-                    item.putClientProperty("html.disable", true);
+                    item.describe(descriptor);
                     ActionListener listener =
                             e -> {
                                 if (descriptor.enabled() && interactive()) {
@@ -272,26 +270,8 @@ final class Menus {
             for (var descriptor : prior) {
                 Component raw = popup.getComponent(i++);
                 if (raw instanceof Item item) {
-                    Composition.style(
-                            item, context(), Typography.Role.BODY, SemanticColor.TEXT_PRIMARY);
+                    item.describe(descriptor);
                     item.setEnabled(component.isEnabled() && descriptor.enabled());
-                    int inset =
-                            ThemePainting.metric(context(), DesignMetrics.Role.MENU_ITEM_PADDING);
-                    item.setBorder(new EmptyBorder(0, inset, 0, inset));
-                    item.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.MENU_TILE_GAP));
-                    item.setIcon(
-                            descriptor.icon().isBlank()
-                                    ? null
-                                    : context()
-                                            .icons()
-                                            .tile(
-                                                    descriptor.icon(),
-                                                    context().theme().semantic(),
-                                                    descriptor.hue(),
-                                                    ThemePainting.metric(
-                                                            context(),
-                                                            DesignMetrics.Role.MENU_TILE),
-                                                    false));
                 }
             }
             if (!interactive()) dismiss();
@@ -434,6 +414,13 @@ final class Menus {
         Popup(KitContext context) {
             this.context = context;
             setOpaque(false);
+            restyle();
+        }
+
+        /** A menu's card: its padding above and below its rows, its 1 px edge beside them. */
+        void restyle() {
+            int padding = ThemePainting.metric(context, DesignMetrics.Role.MENU_PADDING), line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
+            setBorder(new EmptyBorder(padding, line, padding, line));
         }
 
         @Override
@@ -465,6 +452,10 @@ final class Menus {
 
     static final class Item extends JMenuItem {
         final KitContext context;
+        /** What this row shows; a highlighted row repaints its category tile as a selected tile. */
+        MenuItem descriptor;
+        /** The bound shortcut of the row's action, as the menu shows it ("" for none). */
+        String shortcutText = "";
 
         Item(KitContext context) {
             this.context = context;
@@ -474,50 +465,75 @@ final class Menus {
             setBorderPainted(false);
         }
 
-        @Override
-        public Dimension getPreferredSize() {
-            Dimension s = super.getPreferredSize();
-            return new Dimension(
-                    s.width,
-                    Math.max(
-                            s.height,
-                            ThemePainting.height(
-                                    context,
-                                    DesignMetrics.Role.MENU_ITEM_HEIGHT,
-                                    Typography.Role.BODY)));
+        /** Shows {@code item}: its label, its category tile and its enablement, in the menu's type and insets. */
+        void describe(MenuItem item) {
+            descriptor = item;
+            putClientProperty("Jasper.menu.item", item);
+            setText(item.label());
+            setEnabled(item.enabled());
+            Composition.style(this, context, Typography.Role.BODY, SemanticColor.TEXT_PRIMARY);
+            int inset = ThemePainting.metric(context, DesignMetrics.Role.MENU_ITEM_PADDING);
+            setBorder(new EmptyBorder(0, inset, 0, inset));
+            setIcon(item.icon().isBlank() ? null : tile(false));
+            shortcutText = context.shortcut(item.shortcut());
+            revalidate(); repaint();
         }
 
-        @Override
-        protected void paintComponent(Graphics graphics) {
+        /** A menu resolves its rows' bindings each time it opens, so a rebinding shows at the next open. */
+        @Override public void addNotify() {
+            super.addNotify();
+            if (descriptor != null) {
+                String next = context.shortcut(descriptor.shortcut());
+                if (!next.equals(shortcutText)) { shortcutText = next; revalidate(); }
+            }
+        }
+
+        javax.swing.Icon tile(boolean highlighted) {
+            return context.icons().tile(descriptor.icon(), context.theme().semantic(), descriptor.hue(),
+                ThemePainting.metric(context, DesignMetrics.Role.MENU_TILE), highlighted);
+        }
+
+        /** The icon column is there when any row of this menu has an icon; then every label starts after it. */
+        boolean iconColumn() {
+            if (getParent() == null) return getIcon() != null;
+            for (var sibling : getParent().getComponents()) if (sibling instanceof Item item && item.getIcon() != null) return true;
+            return false;
+        }
+
+        int labelX() {
+            int x = getInsets().left;
+            return iconColumn() ? x + ThemePainting.metric(context, DesignMetrics.Role.MENU_TILE) + ThemePainting.metric(context, DesignMetrics.Role.MENU_TILE_GAP) : x;
+        }
+
+        @Override public Dimension getPreferredSize() {
+            var fm = getFontMetrics(getFont());
+            int width = labelX() + fm.stringWidth(getText()) + getInsets().right;
+            if (!shortcutText.isEmpty()) width += ThemePainting.metric(context, DesignMetrics.Role.MENU_SHORTCUT_GAP) + fm.stringWidth(shortcutText);
+            return new Dimension(width, ThemePainting.height(context, DesignMetrics.Role.MENU_ITEM_HEIGHT, Typography.Role.BODY));
+        }
+
+        @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D) graphics.create();
             try {
                 ThemePainting.antialias(g);
-                if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
-                boolean hover = isEnabled() && (getModel().isArmed() || getModel().isRollover());
-                if (hover) {
+                boolean highlighted = isEnabled() && (getModel().isArmed() || getModel().isRollover());
+                if (highlighted) {
                     g.setColor(ThemePainting.color(context, SemanticColor.ACCENT));
-                    int r = ThemePainting.metric(context, DesignMetrics.Role.MENU_ITEM_RADIUS);
-                    g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2);
+                    g.fillRect(0, 0, getWidth(), getHeight());
                 }
-                g.setColor(
-                        ThemePainting.color(
-                                context,
-                                hover ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_PRIMARY));
-                g.setFont(getFont());
-                Insets i = getInsets();
-                int x = i.left;
                 if (getIcon() != null) {
-                    getIcon().paintIcon(this, g, x, (getHeight() - getIcon().getIconHeight()) / 2);
-                    // Category tiles take the measured wider tile-to-label gap of the add-menu reference.
-                    x +=
-                            getIcon().getIconWidth()
-                                    + ThemePainting.metric(context, DesignMetrics.Role.MENU_TILE_GAP);
+                    var icon = highlighted && descriptor != null ? tile(true) : getIcon();
+                    icon.paintIcon(this, g, getInsets().left, (getHeight() - icon.getIconHeight()) / 2);
                 }
-                g.drawString(
-                        getText(),
-                        x,
-                        (getHeight() - g.getFontMetrics().getHeight()) / 2
-                                + g.getFontMetrics().getAscent());
+                g.setFont(getFont());
+                var fm = g.getFontMetrics();
+                int baseline = (getHeight() - fm.getHeight()) / 2 + fm.getAscent();
+                g.setColor(ThemePainting.color(context, !isEnabled() ? SemanticColor.TEXT_PLACEHOLDER : highlighted ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_PRIMARY));
+                g.drawString(getText(), labelX(), baseline);
+                if (!shortcutText.isEmpty()) {
+                    g.setColor(ThemePainting.color(context, !isEnabled() ? SemanticColor.TEXT_PLACEHOLDER : highlighted ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_TERTIARY));
+                    g.drawString(shortcutText, getWidth() - getInsets().right - fm.stringWidth(shortcutText), baseline);
+                }
             } finally {
                 g.dispose();
             }

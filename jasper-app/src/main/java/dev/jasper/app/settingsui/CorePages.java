@@ -116,13 +116,13 @@ public final class CorePages {
             SchemaPage.page("system", "System Settings").parent("appearance-behavior").anchor("background-residency")
                 .row(SYSTEM_RUN_IN_BACKGROUND)
                 .section("Configuration file")
-                .action(() -> system.file().get().toString(),
+                .action("Location", () -> system.file().get().toString(),
                     new SchemaPage.Button("Open in Editor", system.openInEditor(), () -> true),
                     new SchemaPage.Button("Reveal", system.reveal(), () -> true))
-                .action(() -> "Read the file again after editing it elsewhere.",
-                    new SchemaPage.Button("Reload from Disk", system.reload(), () -> true))
-                .action(() -> "Rewrite old setting names to the current layout; the original is backed up first.",
-                    new SchemaPage.Button("Migrate Config\u2026", system.migrate(), system.migratable())),
+                .action("Reload from disk", () -> "Read the file again after editing it elsewhere.",
+                    new SchemaPage.Button("Reload", system.reload(), () -> true))
+                .action("Migrate old settings", () -> "Rewrite old setting names to the current layout; the original is backed up first.",
+                    new SchemaPage.Button("Migrate\u2026", system.migrate(), system.migratable(), "Nothing to migrate")),
             SchemaPage.page("terminal", "Terminal")
                 .row(TERMINAL_SCROLLBACK, Editors.stepper("lines"))
                 .row(TERMINAL_BELL)
@@ -138,10 +138,10 @@ public final class CorePages {
                 .row(TERMINAL_FONT_SIZE, Editors.number(0.5, "pt"))
                 .row(TERMINAL_FONT_FALLBACK, Editors.fontList(false))
                 .row(TERMINAL_FONT_LIGATURES)
-                .row(TERMINAL_FONT_LINE_HEIGHT, Editors.number(0.05, "×"))
+                .row(TERMINAL_FONT_LINE_HEIGHT, Editors.number(0.1, "×"))
                 .section("Colors")
-                .action(() -> "Terminal colors come from the terminal scheme in Appearance.",
-                    new SchemaPage.Button("Choose terminal scheme…", () -> navigate.accept("appearance"), () -> true)),
+                .action("Terminal colors", () -> "They come from the terminal scheme in Appearance.",
+                    new SchemaPage.Button("Choose Scheme…", () -> navigate.accept("appearance"), () -> true)),
             SchemaPage.page("terminal.cursor", "Cursor").parent("terminal")
                 .row(TERMINAL_CURSOR_SHAPE)
                 .row(TERMINAL_CURSOR_BLINK),

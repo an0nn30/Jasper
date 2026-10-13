@@ -376,7 +376,7 @@ public final class ServerEditor implements AutoCloseable {
         boolean ftp = protocol == Protocol.FTP, sftp = protocol == Protocol.SFTP;
         boolean editable = saving == null;
         boolean tls = protocol.allowsTls() && useTls;
-        String loginLabel = !protocol.hasLogin() ? "No login (TFTP has none)" : sftp ? "Keys only (no password)" : "Anonymous";
+        String loginLabel = !protocol.hasLogin() ? "No login (TFTP has none)" : sftp ? "Keys Only" : "Anonymous";
         var loginOptions = new ArrayList<Option>();
         if (!protocol.hasLogin() || protocol.allowsAnonymous() || sftp) loginOptions.add(new Option("anon", loginLabel, Optional.empty()));
         if (protocol.hasLogin()) {
@@ -413,7 +413,8 @@ public final class ServerEditor implements AutoCloseable {
         var face = vaultPresent ? CredentialPresentation.face(selected, Nodes.PickerDensity.DEFAULT)
             : new Nodes.PickerFace("", "", "lock", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT);
         if (accountId != null && face.primary().isEmpty()) face = new Nodes.PickerFace(accountLabel, "", "lock", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT);
-        access.add(row("server.login.row", "Login", new Nodes.Choice(LOGIN, state(true, protocol.hasLogin()), Nodes.ChoiceKind.SEGMENTED, loginOptions, shownLogin, "Login", "")));
+        // The Access card is the login's own card, so its segments need no label: they span the card, as Add Host's do.
+        access.add(new Nodes.Choice(LOGIN, state(true, protocol.hasLogin()), Nodes.ChoiceKind.SEGMENTED, loginOptions, shownLogin, "Login", ""));
         access.add(new Nodes.FormRow("server.account.row", state(protocol.hasLogin() && shownLogin.equals("vault"), true), "Account", "",
             new Nodes.Choice(CHOOSE_ACCOUNT, state(true, vaultPresent), Nodes.ChoiceKind.PICKER, List.of(), "", "Choose…", CHOOSE_ACCOUNT, "lock", Optional.empty(),
                 Optional.of(face)), Optional.empty()));
@@ -422,7 +423,7 @@ public final class ServerEditor implements AutoCloseable {
             : shownLogin.equals("session") ? "Jasper generates a temporary password when the server starts."
             : sftp ? "Clients sign in with an authorized SSH key."
             : "Anyone who can reach the server can connect without a password.";
-        access.add(row("server.login.help.row", "", text("server.login.help", explanation, Nodes.TextRole.SUPPORTING)));
+        access.add(text("server.login.help", explanation, Nodes.TextRole.SUPPORTING));
         var keys = new ArrayList<ListItem>();
         for (int i = 0; i < keyLines.size(); i++) keys.add(new ListItem("key." + i, Optional.empty(),
             List.of(new Nodes.Text("server.key." + i + ".summary", ControlState.READY, keySummary(keyLines.get(i)), Nodes.TextRole.MONO_SMALL)),

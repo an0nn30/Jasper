@@ -49,8 +49,8 @@ class ButtonsTest {
                 var button = find(view, "connect", JButton.class); button.setSize(74, 28);
                 assertThat(button.getPreferredSize().height).isEqualTo(28);
                 // Original Sessions crop168,144,520,790 at2x; SHA2566cb0edee...585.
-                // Source face354,722,136,42 and its first10 exact-blue row widths. No source resize.
-                int[] sourceTopRows = {118, 126, 128, 130, 132, 134, 134, 134, 134, 136};
+                // Source face354,722,136,42; its first 10 opaque row widths at the compact detail arc. No source resize.
+                int[] sourceTopRows = {120, 126, 130, 132, 132, 134, 134, 134, 136, 136};
                 var image = new BufferedImage(148, 56, BufferedImage.TYPE_INT_ARGB); var g = image.createGraphics();
                 try { g.scale(2, 2); button.paint(g); } finally { g.dispose(); }
                 int accent = ctx.theme().semantic().color(SemanticColor.ACCENT).getRGB();

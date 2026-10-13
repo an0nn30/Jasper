@@ -509,4 +509,15 @@ public abstract class KitContractTest {
             new UiEvent.Selected("languages",Set.of("java")),new UiEvent.Action("choose"));
         stop(kit);assertThat(disposed.get()).isEqualTo(1);
     }); }
+
+    @Test void menuItemsKeepTheirShortcutSourceThroughMountAndUpdate() throws Exception { edt(() -> {
+        var kit = kit("owner"); var events = new ArrayList<UiEvent>();
+        var open = new MenuItem("open", "Open", "", "open", true, false).withShortcut("dev.jasper.sample.open");
+        var spec = new ViewSpec(new Nodes.MenuButton("menu", ControlState.READY, "Actions", "", Nodes.ButtonKind.SECONDARY, "menu", List.of(open), "Actions", Nodes.ButtonPresentation.STANDARD));
+        var view = kit.create(spec, events::add);
+        try {
+            view.update(spec); assertThat(view.spec()).isEqualTo(spec);
+            emit(view, new UiEvent.Action("open")); assertThat(events).containsExactly(new UiEvent.Action("open"));
+        } finally { view.close(); stop(kit); }
+    }); }
 }

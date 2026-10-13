@@ -458,7 +458,7 @@ public final class Nodes {
     }
 
     /**
-     * Virtual row collection. MULTIPLE shows checkboxes; addAction is a footer, never a data item. A present
+     * Virtual row collection. MULTIPLE selects rows with Shift (a range) and Cmd/Ctrl or Space (one row), without checkboxes; addAction is a footer, never a data item. A present
      * {@code visibleRows} is how many selectable rows the viewport shows before it scrolls (headings above them add their
      * own height); absent keeps the kit default. Headings are never selected and ORDERED lists have none.
      * A present {@code enterAction} is what Enter on the focused row reports (after selecting it), so a double click and
@@ -588,7 +588,7 @@ public final class Nodes {
         }
     }
 
-    /** Column collection with explicit single or checkbox-based multiple selection and an explicit scroll policy. */
+    /** Column collection with explicit single or multiple (Shift, Cmd/Ctrl or Space) selection and an explicit scroll policy. */
     public record Table(String id, ControlState state, List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, ScrollPolicy scroll) implements Node {
         public Table {
             ModelChecks.id(id); Objects.requireNonNull(state);

@@ -69,11 +69,12 @@ final class Panels {
             // without a search or navigation row above them they start a compact gap below the header.
             Nodes.Node first = panel.body() instanceof Nodes.Stack stack && stack.role()==Nodes.LayoutRole.VERTICAL && !stack.children().isEmpty() ? stack.children().getFirst() : panel.body();
             boolean compact = column < 0 && first instanceof Nodes.ItemList list && list.kind()==Nodes.ListKind.DOUBLE;
-            int side = column == 0 || column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_LIST_SIDE) : single || compact ? ThemePainting.metric(context(),DesignMetrics.Role.PANEL_ROW_SIDE) : 0;
+            int side = column == 0 || column == 1 ? context().metrics().value(DesignMetrics.Role.COLUMN_LIST_SIDE) : single || compact ? context().metrics().value(DesignMetrics.Role.PANEL_ROW_SIDE) : 0;
             // A rail, and a list column without its search row, start their rows at the rail's top inset.
             int top = column == 0 || column == 1 && panel.searchOrNavigation().isEmpty() ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP)
                 : compact && panel.searchOrNavigation().isEmpty() ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_COMPACT_LIST_TOP) : 0;
-            content.setBorder(new EmptyBorder(top, side, 0, side));
+            contentSide = side; contentTop = top;
+            contentInsets();
             boolean search=((Nodes.Panel)node).searchOrNavigation().filter(n -> n instanceof Nodes.Field f && f.kind()==Nodes.FieldKind.SEARCH).isPresent();
             int pad = ThemePainting.metric(context(), search && column<0 ? DesignMetrics.Role.PANEL_SEARCH_SIDE : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
             navigation.setBorder(
@@ -118,8 +119,24 @@ final class Panels {
                     Stacks.mount(content, List.of(c.component));
                 }
             }
+            contentInsets();
             presentation();
             Stacks.mount(component, List.of(header.component, scroll, footerScroll));
+        }
+
+        /** The body's logical side inset and its top inset in pixels, from the last refresh. */
+        int contentSide, contentTop;
+        /**
+         * A list body runs its selection edge to edge (spec 2): the panel's side inset becomes its rows' gutter. Any other
+         * body keeps the inset on the content.
+         */
+        void contentInsets() {
+            var p = (Nodes.Panel) node;
+            boolean rows = p.body() instanceof Nodes.ItemList || p.body() instanceof Nodes.Table || p.body() instanceof Nodes.Tree;
+            int side = contentSide;
+            if (rows && body.control instanceof InteractiveRows.RowsControl list) { list.gutter(side); side = 0; }
+            int scaled = com.formdev.flatlaf.util.UIScale.scale(side);
+            content.setBorder(new EmptyBorder(contentTop, scaled, 0, scaled));
         }
 
         void presentation() {
