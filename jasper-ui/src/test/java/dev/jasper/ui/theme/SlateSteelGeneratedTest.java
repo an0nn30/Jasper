@@ -23,7 +23,8 @@ class SlateSteelGeneratedTest {
             assertThat(theme.tokens().get(Token.SURFACE)).isEqualTo(theme.semantic().color(SemanticColor.SURFACE_PANEL));
             assertThat(theme.tokens().get(Token.TAB_BAR)).isEqualTo(theme.semantic().color(SemanticColor.SURFACE_TABSTRIP));
             assertThat(theme.tokens().get(Token.DIVIDER)).isEqualTo(theme.semantic().color(SemanticColor.BORDER_WINDOW));
-            assertThat(theme.uiKeys()).containsKeys("*.background", "Panel.background", "Jasper.editorBackground");
+            assertThat(theme.uiKeys()).containsKeys("*.background", "Panel.background");
+            assertThat(theme.uiKeys().keySet()).as("no Jasper.* aliases: chrome reads Jasper.semantic.*").noneMatch(key -> key.startsWith("Jasper."));
             assertThat(theme.uiKeys().get("Panel.background")).isEqualTo(ColorMath.hex(theme.tokens().get(Token.SURFACE)));
         }
     }

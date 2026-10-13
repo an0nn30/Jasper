@@ -7,7 +7,6 @@ import dev.jasper.ui.swing.NativeControlStyles;
 
 import com.formdev.flatlaf.FlatClientProperties;
 import dev.jasper.app.platform.AppIcons;
-import dev.jasper.ui.theme.Token;
 import dev.jasper.terminal.search.FindResult;
 import dev.jasper.terminal.search.SearchQuery;
 import dev.jasper.terminal.view.TerminalView;
@@ -233,7 +232,7 @@ final class FindBar extends JPanel {
         query.putClientProperty(FlatClientProperties.OUTLINE, value ? FlatClientProperties.OUTLINE_ERROR : null);
         // The tint is a plain Color so the field's own updateUI keeps it; the default stays a
         // UIResource so a theme switch restores the new theme's background.
-        Color background = value ? ThemeZone.theme(this).tokens().get(Token.ERROR_BACKGROUND) : ThemeZone.color(this, SemanticColor.SURFACE_INPUT);
+        Color background = value ? dev.jasper.ui.theme.UiColorKeys.errorTint(ThemeZone.theme(this).semantic()) : ThemeZone.color(this, SemanticColor.SURFACE_INPUT);
         query.setBackground(value ? new Color(background.getRGB(), true) : background);
     }
 

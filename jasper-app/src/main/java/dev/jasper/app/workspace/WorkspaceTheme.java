@@ -1,7 +1,6 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.ResolvedTheme;
-import dev.jasper.ui.theme.Token;
 import java.util.function.BooleanSupplier;
 import javax.swing.JComponent;
 
@@ -22,7 +21,7 @@ public final class WorkspaceTheme {
         if (!stillOwned.getAsBoolean()) return;
         root.putClientProperty("Jasper.workspace.dark", theme.matching() ? null : theme.workspace().dark());
         if (!stillOwned.getAsBoolean()) return;
-        root.putClientProperty("Jasper.workspace.foreground", theme.matching() ? null : theme.workspace().tokens().get(Token.TEXT));
+        root.putClientProperty("Jasper.workspace.foreground", theme.matching() ? null : theme.workspace().semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
         if (!stillOwned.getAsBoolean()) return;
         root.repaint();
     }

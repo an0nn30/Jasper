@@ -28,6 +28,25 @@ class BuddyCardTest {
         } finally { g.dispose(); }
     }
 
+    /** A connection that is down draws its cross in the host's danger role, as the host publishes it. */
+    @Test void aDownConnectionsCrossUsesTheHostsDangerRole() {
+        String key = "Jasper.semantic.status.danger";
+        Object previous = javax.swing.UIManager.get(key);
+        javax.swing.UIManager.put(key, new java.awt.Color(0x12ab34));
+        try {
+            var down = new BuddyNotice(new BuddyNoticeId("ssh", "k"), BuddyNotice.Kind.CONNECTION, "prod", BuddyNotice.State.DOWN,
+                () -> "Disconnected", () -> { });
+            Rectangle bounds = new Rectangle(0, 0, BuddyCard.WIDTH, BuddyCard.height(owner));
+            BufferedImage image = new BufferedImage(bounds.width, bounds.height, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = image.createGraphics();
+            try { BuddyCard.paint(BuddyTestAppearance.options(), g, owner, down, bounds, 0f, 1f, false, 0); } finally { g.dispose(); }
+            boolean cross = false;
+            for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++)
+                cross |= image.getRGB(x, y) == 0xff12ab34;
+            assertThat(cross).as("the cross's fully covered pixels").isTrue();
+        } finally { javax.swing.UIManager.put(key, previous); }
+    }
+
     @Test void aCardIsTallEnoughForBothItsLines() {
         int height = BuddyCard.height(owner);
 

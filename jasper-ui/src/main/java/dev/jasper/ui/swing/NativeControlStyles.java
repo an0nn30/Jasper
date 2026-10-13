@@ -156,7 +156,7 @@ public final class NativeControlStyles {
         var palette = theme.semantic();
         field.setFont(font(Typography.Role.LABEL));
         field.setBackground("error".equals(field.getClientProperty("JComponent.outline"))
-            ? theme.tokens().get(Token.ERROR_BACKGROUND) : palette.color(SemanticColor.SURFACE_INPUT));
+            ? UiColorKeys.errorTint(palette) : palette.color(SemanticColor.SURFACE_INPUT));
         field.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));
         field.setCaretColor(palette.color(SemanticColor.TEXT_PRIMARY));
         field.setSelectionColor(palette.color(SemanticColor.SELECTION_BG));

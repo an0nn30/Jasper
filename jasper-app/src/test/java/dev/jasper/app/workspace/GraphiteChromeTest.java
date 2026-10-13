@@ -95,7 +95,7 @@ class GraphiteChromeTest {
             assertThat(owner.theme().palette().background()).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.terminal(true).background());
             assertThat(UIManager.getColor("ToolWindow.background")).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.color(true, dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR));
             assertThat(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP)).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.color(true, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
-            assertThat(UIManager.getColor("Jasper.tabUnderline")).isEqualTo(UIManager.getColor("Jasper.semantic.accent"))
+            assertThat(UIManager.getColor("Jasper.semantic.accent")).as("the tab underline's role")
                 .isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.color(true, dev.jasper.ui.theme.SemanticColor.ACCENT));
             assertThat(java.util.Arrays.stream(owner.leftStripe().getComponents())
                 .filter(javax.swing.JButton.class::isInstance)

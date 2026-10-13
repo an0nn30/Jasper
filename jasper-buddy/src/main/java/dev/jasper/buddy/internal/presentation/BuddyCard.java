@@ -205,7 +205,7 @@ final class BuddyCard {
     /** A cross for a connection that is down; a dot for a task waiting on you or a connection in trouble. */
     private static void paintGlyph(BuddyOptions options, Graphics2D g2, BuddyNotice.State state, int x, int y) {
         boolean down = state == BuddyNotice.State.DOWN;
-        Color configured = UIManager.getColor("Jasper.configErrorForeground");
+        Color configured = UIManager.getColor("Jasper.semantic.status.danger");
         Graphics2D c = (Graphics2D) g2.create();
         try {
             c.setColor(down ? (configured != null ? configured : new Color(0xC45A53)) : detailColor(options));

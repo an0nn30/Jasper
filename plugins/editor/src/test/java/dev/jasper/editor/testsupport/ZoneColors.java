@@ -12,8 +12,8 @@ public final class ZoneColors implements AutoCloseable {
     public ZoneColors() {
         put("Jasper.workspace.dark", Boolean.TRUE);
         String[] names = {"background", "text", "textMuted", "border", "accent", "success", "warning", "error"};
-        String[] keys = {"Panel.background", "Label.foreground", "Jasper.mutedForeground", "Component.borderColor",
-            "Component.accentColor", "Jasper.configSuccessForeground", "Jasper.configWarningForeground", "Jasper.configErrorForeground"};
+        String[] keys = {"Panel.background", "Label.foreground", "Jasper.semantic.text.secondary", "Component.borderColor",
+            "Component.accentColor", "Jasper.semantic.status.success", "Jasper.semantic.status.warning", "Jasper.semantic.status.danger"};
         for (int i = 0; i < names.length; i++) {
             put("Jasper.workspace." + names[i], new Color(0x203040 + i * 0x050301));
             put(keys[i], new Color(0x807060 + i * 0x030105));

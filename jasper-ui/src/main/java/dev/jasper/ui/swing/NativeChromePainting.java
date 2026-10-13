@@ -205,7 +205,7 @@ public final class NativeChromePainting {
         int thickness = NativeControlStyles.metric(DesignMetrics.Role.SPLIT_STROKE);
         Graphics g = graphics.create();
         try {
-            g.setColor(theme.tokens().get(Token.DIVIDER));
+            g.setColor(theme.semantic().color(SemanticColor.BORDER_WINDOW));
             if (vertical) g.fillRect(x + (width - thickness) / 2, y, thickness, height);
             else g.fillRect(x, y + (height - thickness) / 2, width, thickness);
         } finally { g.dispose(); }

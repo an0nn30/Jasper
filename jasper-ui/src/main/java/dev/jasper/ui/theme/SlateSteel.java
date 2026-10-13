@@ -214,7 +214,7 @@ public final class SlateSteel {
         var palette = palette(dark);
         var scheme = terminal(TerminalScheme.matching(dark));
         var tokens = legacy(palette, scheme, editor(dark));
-        return new GeneratedTheme("Slate Steel", dark, "Jasper", tokens, syntax(dark), scheme.colors(), uiKeys(tokens, dark),
+        return new GeneratedTheme("Slate Steel", dark, "Jasper", tokens, syntax(dark), scheme.colors(), uiKeys(palette, scheme, dark),
             Map.of(), GlassLevels.OPAQUE, palette);
     }
 
@@ -276,11 +276,9 @@ public final class SlateSteel {
         return t;
     }
 
-    /** The FlatLaf and Jasper UI keys of a token view, as the legacy generator writes them. */
-    private static Map<String, Object> uiKeys(Map<Token, Color> tokens, boolean dark) {
-        var keys = new LinkedHashMap<String, Object>();
-        UiTemplate.FLATLAF.forEach((key, value) -> keys.put(key, value instanceof Token token ? UiTemplate.hex(tokens.get(token)) : value));
-        UiTemplate.JASPER.forEach((key, token) -> keys.put(key, UiTemplate.hex(tokens.get(token))));
+    /** FlatLaf's colour keys from the variant's roles; FlatLafInstaller adds the metric keys. */
+    private static Map<String, Object> uiKeys(SemanticPalette palette, SchemeColors scheme, boolean dark) {
+        var keys = new LinkedHashMap<>(UiColorKeys.flatLaf(palette, scheme.colors().selection()));
         // Popovers and menus: FlatLaf's painted popup shadow (macOS keeps its native one), black at theme.md's strength.
         keys.put("Popup.dropShadowColor", ColorMath.hex(Color.BLACK));
         keys.put("Popup.dropShadowOpacity", dark ? .5 : .18);
