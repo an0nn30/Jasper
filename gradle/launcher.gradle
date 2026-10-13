@@ -2,6 +2,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.security.MessageDigest
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.jvm.toolchain.JavaToolchainService
 
@@ -254,3 +255,70 @@ def testLauncherCore = tasks.register('testLauncherCore') {
     }
 }
 tasks.named('check') { dependsOn(testLauncherCore) }
+
+// ---- The exit guard, against the toolchain JDK's real libjli ----
+
+def compileLauncherProbes = tasks.register('compileLauncherProbes', JavaCompile) {
+    description = "Compiles the Java probes the launcher's tests run."
+    source = fileTree(launcherTestSource) { include '*.java' }
+    classpath = files()
+    destinationDirectory.set(launcherBuild.map { it.dir('probes') })
+    javaCompiler.set(launcherToolchains.compilerFor(launcherJava.toolchain))
+    options.release.set(25)
+    options.encoding = 'UTF-8'
+}
+
+def testLauncherGuard = tasks.register('testLauncherGuard') {
+    group = 'verification'
+    description = "Checks the launcher's exit guard with the toolchain JDK's libjli: re-spawn only when no JVM was created."
+    dependsOn(compileLauncherProbes)
+    inputs.dir(jasperNative).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(launcherTestSource).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(launcherBuild.map { it.file('guard-test/passed') })
+    doLast {
+        def host = launcherHost()
+        File work = launcherBuild.get().dir('guard-test').asFile
+        project.delete(work)
+        List<File> sources = [new File(launcherTestSource, 'guard_harness.c'), new File(jasperNative, 'jasper_launch_guard.c')]
+        File harness = nativeBuild(kind: 'executable', exportAll: true, sources: sources, strict: sources, includes: [jasperNative],
+            libraries: host.os == 'linux' ? ['-ldl'] : [],
+            output: new File(work, host.os == 'windows' ? 'guard-harness.exe' : 'guard-harness'), work: new File(work, 'objects'))
+        File sdk = launcherSdk.get()
+        File jli = host.os == 'windows' ? new File(sdk, 'bin/jli.dll') : new File(sdk, host.os == 'macos' ? 'lib/libjli.dylib' : 'lib/libjli.so')
+        String probes = compileLauncherProbes.get().destinationDirectory.get().asFile.absolutePath
+        String armed = '-Djasper.vmOptionsDigest=0123456789abcdef'
+        def scenarios = [
+            [name: 'malformed heap value', arguments: ['-Xmx3q', armed, '-cp', probes, 'GuardProbe'], respawn: true, exit: null],
+            [name: 'conflicting collectors', arguments: ['-XX:+UseSerialGC', '-XX:+UseParallelGC', armed, '-cp', probes, 'GuardProbe'],
+                respawn: true, exit: null],
+            [name: 'System.exit', arguments: [armed, '-cp', probes, 'GuardProbe', 'exit'], respawn: false, exit: 3],
+            [name: 'normal return', arguments: [armed, '-cp', probes, 'GuardProbe'], respawn: false, exit: 0],
+            [name: 'main throws', arguments: [armed, '-cp', probes, 'GuardProbe', 'throw'], respawn: false, exit: 1],
+            [name: 'unarmed malformed heap value', arguments: ['-Xmx3q', '-cp', probes, 'GuardProbe'], respawn: false, exit: null],
+        ]
+        List<String> failures = []
+        scenarios.eachWithIndex { Map scenario, int index ->
+            File marker = new File(work, "respawn-${index}")
+            def builder = new ProcessBuilder([harness.absolutePath] + scenario.arguments).redirectErrorStream(true)
+            ['JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS', 'CLASSPATH'].each { builder.environment().remove(it) }
+            builder.environment().put('GUARD_HARNESS_JLI', jli.absolutePath)
+            builder.environment().put('GUARD_HARNESS_MARKER', marker.absolutePath)
+            Process process = builder.start()
+            String output = new String(process.inputStream.readAllBytes(), StandardCharsets.UTF_8)
+            if (!process.waitFor(60, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                failures << "${scenario.name}: the harness did not exit\n${output}".toString()
+                return
+            }
+            int exit = process.exitValue()
+            if (marker.isFile() != scenario.respawn) {
+                failures << "${scenario.name}: re-spawn ${marker.isFile() ? 'happened' : 'did not happen'} (exit ${exit})\n${output}".toString()
+            }
+            if (scenario.exit != null && exit != scenario.exit) failures << "${scenario.name}: exit ${exit}, expected ${scenario.exit}\n${output}".toString()
+            if (scenario.exit == null && exit == 0) failures << "${scenario.name}: the JVM started\n${output}".toString()
+        }
+        if (failures) throw new GradleException('testLauncherGuard:\n' + failures.join('\n'))
+        new File(work, 'passed').text = "${scenarios.size()} scenarios\n"
+    }
+}
+tasks.named('check') { dependsOn(testLauncherGuard) }
