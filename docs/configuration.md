@@ -39,6 +39,13 @@ once more without them. Failures inside the JVM's own start-up (`-Xms` above `-X
 cannot be resolved) stop it instead; setting `JASPER_VM_OPTIONS_SKIP=1` in the environment starts Jasper without the
 file so you can fix it. `./gradlew :jasper-app:run` does not read the file.
 
+In the installed app, System Settings → Java Virtual Machine sets the maximum heap size (it edits the file's `-Xmx` line;
+the bundled 2048 MiB removes it) and opens the file with **Edit Custom VM Options…**; Help → **Change Memory
+Settings…** and **Edit Custom VM Options…** lead to the same places. The section checks the options with the bundled
+`java` and says which lines it ignores, which options the JVM does not know, whether Jasper would start with them, and
+when a restart is needed (**Restart Now**). When Jasper had to start without your options, or ignored the file, it says
+so in a notification in the **Memory & VM options** group.
+
 ## Settings dialog
 
 **Settings** (Cmd+, on macOS, or Jasper › Settings…) edits every setting in this guide without opening the file.
@@ -54,7 +61,8 @@ changes shows its name in blue, and a setting that differs from its default has 
 the key from the file. Settings writes `config.toml` in place and keeps your comments; a value the file would
 reject is refused with the same message the file would produce. If `config.toml` has errors, Settings shows a
 banner and saves nothing until the file is fixed; if it uses old setting names, the banner offers Migrate Config.
-System Settings shows the file's location with Open in Editor, Reveal, Reload from Disk and Migrate Config.
+System Settings shows the file's location with Open in Editor, Reveal, Reload from Disk and Migrate Config, and a
+Java Virtual Machine section for the [custom VM options](#custom-vm-options).
 Keymap lists every shortcut, grouped as in the menus; shortcuts that differ from their defaults, and the
 sections holding them, are blue. Click one, press the new keys and click Set; Apply or OK saves every change
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and

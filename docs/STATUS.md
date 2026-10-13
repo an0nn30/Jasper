@@ -1,5 +1,16 @@
 # Jasper — Status and Handoff
 
+**Custom VM options plan 2 (settings and actions) complete — 2026-10-13.** On `claude/custom-vm-options-settings` (not
+pushed): System Settings has a Java Virtual Machine section (heap limit in `jasper.vmoptions`, Edit Custom VM Options…,
+Reveal, the options' check with the bundled `java`, a restart banner with Restart Now; read-only outside the installed
+app), Help and the palette have Change Memory Settings… and Edit Custom VM Options…, and Jasper says in the new
+**Memory & VM options** notification group when it started without the user's options or ignored the file. New JDK-only
+package `dev.jasper.app.vmoptions` mirrors the launcher's reading (shared digest vectors). A blank
+`JASPER_VM_OPTIONS_SKIP` now skips too. Deviations: the seven planned ones and five review rulings, listed in the plan's
+banner. Full `./gradlew check`: 9,831 tests, 0 failures, 8 skips. Manual checks pending (the user): in the packaged
+app, set the heap in Settings, see the restart banner, Restart Now, and see the new limit; type an invalid line and see
+the findings; Help menu entries. Plan 3 (memory indicator and low-memory warning) is next.
+
 **Custom VM options plan 1 (launcher) complete — 2026-10-13.** Merged to local `main` (not pushed): Jasper builds
 jpackage's launcher from vendored JBR 25.0.4.1 sources (`packaging/launcher`) with marked hooks that merge the user's
 `jasper.vmoptions` (location, format and IntelliJ's merge from the

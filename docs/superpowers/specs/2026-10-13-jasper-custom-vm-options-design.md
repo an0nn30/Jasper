@@ -2,7 +2,7 @@
 
 Status: **Approved on 2026-10-13** (the user: "spec approved"). Plan 1 (launcher) complete on 2026-10-13:
 [`2026-10-13-jasper-custom-vm-options-1-launcher.md`](../plans/2026-10-13-jasper-custom-vm-options-1-launcher.md).
-Branch: `claude/custom-vm-options`, from `main` at `13cc10ca`.
+Branch: `claude/custom-vm-options`, from `main` at `13cc10ca`. Plan 2 (settings and actions) complete on 2026-10-13.
 
 ## 1. Intent and decisions
 

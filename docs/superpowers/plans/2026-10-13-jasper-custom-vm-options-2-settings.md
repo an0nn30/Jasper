@@ -2,8 +2,14 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: **Not started.** Written 2026-10-13 on `claude/custom-vm-options-settings` (from `main` at `3bf81d1c`, which
+Status: **Complete on 2026-10-13.** Written 2026-10-13 on `claude/custom-vm-options-settings` (from `main` at `3bf81d1c`, which
 holds plan 1).
+
+Deviations beyond the seven planned ones, made in review: (R2) the plan's own docs text spells out the
+`custom-vm-options` link in words, because `AppDocumentationTest` resolves links in plan files; (R3)
+`VmOptionsFile.withMaxHeap` drops a leading byte order mark so a first-line `-Xmx` is still found; (R4)
+`VmOptionsCheck.runProcess` throws `InterruptedIOException` on an interrupt instead of reporting a timeout; (R5) saving
+the heap reads the file back so the new value shows at once; (R6) saving never rewrites a corrupted file.
 
 **Goal:** In the installed app, System Settings gets a Java Virtual Machine section (heap limit, Edit Custom VM
 Options…, the options' check, a restart banner), Help and the palette get the two IntelliJ actions, and Jasper says
