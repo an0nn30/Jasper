@@ -631,6 +631,26 @@ version come from `plugin.toml`. A new `plugins/<name>/` directory is built, che
 the `stagePlugins` task (`jasper-app/build.gradle.kts`) when it ships in the application image.
 `PluginZipsTest` stages every collected zip through the installer.
 
+## Building a plugin outside the Jasper repository
+
+Each Jasper GitHub release carries the SDK as jars: `jasper-sdk-<v>.jar` (with `-sources` and `-javadoc` jars) and
+`jasper-sdk-testkit-<v>.jar` (with `-sources`), where `<v>` is that release's `JasperSdk.VERSION`. Take them from the
+release whose SDK version your `plugin.toml` `sdk` range admits, put them in your plugin's `libs/`, and start from the
+[example external plugin](examples/external-plugin/build.gradle.kts):
+
+- [`build.gradle.kts`](examples/external-plugin/build.gradle.kts) links the SDK as `compileOnly` (Jasper supplies it at
+  run time), puts the SDK and testkit on the test classpath with JUnit and AssertJ from Maven Central, compiles with any
+  Java 25, and adds `stagePlugin` and `pluginZip`.
+- [`plugin.toml`](examples/external-plugin/src/main/resources/plugin.toml),
+  [`HelloPlugin`](examples/external-plugin/src/main/java/dev/example/hello/HelloPlugin.java) and
+  [`HelloPluginTest`](examples/external-plugin/src/test/java/dev/example/hello/HelloPluginTest.java) are a minimal
+  plugin and its `FakePluginHost` test.
+
+To build the jars yourself from a Jasper checkout, run `./gradlew sdkRelease`; they land in `build/sdk-release/`. The
+example builds from them with `./gradlew -p docs/examples/external-plugin -PjasperSdkDir="$PWD/build/sdk-release" check pluginZip`
+(CI does exactly this), and `-PjasperSdkVersion=<v>` selects another release's jars. The zip then installs as described
+in [Distributing a plugin](#distributing-a-plugin).
+
 ## Running a plugin in Jasper
 
 ```sh

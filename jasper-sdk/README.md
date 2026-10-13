@@ -3,6 +3,12 @@
 The API Jasper plugins compile against. It depends only on the JDK; `verifySdkArchitecture`
 enforces that from bytecode, and `check` runs Javadoc with doclint.
 
+Each Jasper GitHub release carries `jasper-sdk-<v>.jar` and `jasper-sdk-testkit-<v>.jar` (with sources and Javadoc) for
+plugins built outside this repository; `./gradlew sdkRelease` builds them into `build/sdk-release/`, and
+`verifySdkRelease` (part of `check`) pins their names and contents. Start from the
+[example external plugin](../docs/examples/external-plugin/build.gradle.kts) and the
+[authoring guide](../docs/plugin-authoring.md#building-a-plugin-outside-the-jasper-repository).
+
 | Package | Contents |
 | --- | --- |
 | `dev.jasper.sdk` | `JasperSdk.VERSION`, `PluginInfo`, `Variant`, `Subscription`, `WindowOwner`, `Capabilities`, `MissingCapabilityException` |
