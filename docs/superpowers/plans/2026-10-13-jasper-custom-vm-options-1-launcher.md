@@ -66,6 +66,11 @@ Recorded here and, when the plan completes, in `docs/STATUS.md`:
 7. **Recovery scope.** HotSpot's initialization failures (`-Xms` above `-Xmx`, a missing agent, an unusable CDS archive)
    end with `_exit`, which runs no exit handler, so the launcher cannot recover from them (spec 4.5, added in Task 3's
    review); plan 2's System Settings check reports them before a restart.
+8. **Who removes the skip variable.** The guard's `jasperGuardBeforeLaunch` removes `JASPER_VM_OPTIONS_SKIP` just
+   before `JLI_Launch`, in the process that starts the JVM; the wrapper only reads it (the core's `Plan` has no
+   `removeSkipVariable`). On Linux the cfg is read in a forked child and on Windows possibly in a restart wrapper, so a
+   removal there never reached the JVM (Task 4's review). The options file must also be a regular file off Windows
+   (`S_ISREG`), and the Windows link passes `/MANIFEST:NO` because `java.manifest` is embedded with `mt`.
 
 ## Review Focus
 

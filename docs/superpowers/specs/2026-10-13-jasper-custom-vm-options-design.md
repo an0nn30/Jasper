@@ -244,7 +244,9 @@ low-memory notifications, so users tune them like every other group.
   - `JasperVmOptions.{h,cpp}` (C++14): sections 3.1–3.3 and 4.2 as pure functions over strings and an environment
     map, plus the thin wrapper that reads the file and rewrites the cfg's `JavaOptions`.
   - `jasper_launch_guard.{h,c}` (C11): section 4.1. Armed only when the JVM arguments contain
-    `-Djasper.vmOptionsDigest=`; the re-spawn target is replaceable in tests.
+    `-Djasper.vmOptionsDigest=`; the re-spawn target is replaceable in tests. It also removes `JASPER_VM_OPTIONS_SKIP`
+    (section 4.2) just before `JLI_Launch`, in the process that starts the JVM: on Linux the cfg is read in a forked
+    child, and on Windows possibly in a restart wrapper, so the wrapper cannot do it.
 - `README.md`: the upstream tag, the two hook lines, the build flags and how to re-port on a JDK update.
 - `jni.h` / `jni_md.h` come from the toolchain SDK's `include/`.
 - The binaries embed a marker string (`jasper-launcher`) for packaging verification.
