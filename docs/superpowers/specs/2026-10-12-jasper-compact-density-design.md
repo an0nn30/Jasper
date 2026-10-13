@@ -1,7 +1,6 @@
 # Jasper compact density — design
 
-Status: **Draft for review (2026-10-12).** Design sections approved in conversation; this written spec awaits the
-user's review before an implementation plan is written.
+Status: **Approved (2026-10-12)**; implemented by [the compact density plan](../plans/2026-10-12-jasper-compact-density.md).
 
 ## Goal
 

@@ -306,6 +306,92 @@ New File Server, New Tunnel, the workspace, the palette, the credential picker a
   (Dark) and 1.58:1 (Light) against the terminal; Light menu selection `text.onAccent` on `selection.bg` 3.98:1; the
   status bar's path slash `border.subtle` 1.19:1 (Dark) and 1.14:1 (Light).
 
+## Compact density (2026-10-12)
+
+[The compact density plan](../../superpowers/plans/2026-10-12-jasper-compact-density.md) makes Jasper a compact desktop
+workstation: controls and fields 24 px (hero 28), one-line rows 22–24 (menus, pickers, dropdown rows and results 22,
+Settings navigation 24), two-line rows from 36, a control radius of 4 (cards and popups 6, the overlay card 8), and the
+kit's spacing × 0.8. The scale is in [the plan's role table](../../superpowers/plans/2026-10-12-jasper-compact-density.md#the-compact-role-table)
+and frozen in `compact-roles.tsv`. Selection is a plain rectangle across the list's full width (`selection.bg`; menus and
+the palette `accent`) with white text and glyphs; Light `selection.bg` is the Light accent `#3F6FA8`. Kit and native menus
+share one look (22 px rows, an icon column, right-aligned shortcuts from the keymap, a square highlight). A dropdown's
+menu is as wide as its field, and the credential picker sizes to its rows at least as wide as its face. System ›
+Configuration file is one card of settings rows, decimal settings are steppers, and a segment's label keeps 10 px
+from its edge.
+
+### The mock comparisons, compact
+
+The mocks fix composition only (spec decision 1), so edge agreement falls wherever sizes changed; the Slate Steel Dark
+column is the value at the end of Slate Steel Plan 3.
+
+| Reference | Surface (pair) | Slate Steel Dark | Compact | Notes |
+| --- | --- | ---: | ---: | --- |
+| `settings_dialog_mock.png` | Settings Appearance (`settings-appearance`) | 0.843 | 0.272 | sizes from the compact scale |
+| `settings_windows_mock.png` | Settings Window (`settings-window`) | 0.801 | 0.273 | sizes from the compact scale |
+| `settings_notification_mock.png` | Settings Notifications (popup open) (`settings-notifications`) | 0.820 | 0.260 | sizes from the compact scale |
+| `settings_keymap_mock.png` | Settings Keymap (recording) (`settings-keymap`) | 0.866 | 0.258 | sizes from the compact scale |
+| `settings_plugins_mock.png` | Settings Plugins (`settings-plugins`) | 0.827 | 0.288 | sizes from the compact scale |
+| `create_vault_dialog_mock.png` | Vault create hero (`vault-create`) | 0.965 | 0.311 | sizes from the compact scale |
+| `rename_vault_dialog.png` | Vault unlock hero (`vault-unlock`) | 0.977 | 0.486 | sizes from the compact scale |
+| `add_host_dialog_mock.png` | Add Host (`host-add`) | 0.925 | 0.193 | sizes from the compact scale |
+| `new_file_server_mock.png` | New File Server (`fileserver-add`) | 0.923 | 0.252 | sizes from the compact scale |
+| `vault_ui_mock.png` | Credential Vault manager (`vault-manager`) | 0.817 | 0.310 | sizes from the compact scale |
+| `vault_ui_mock.png` | Credential Vault title row (`vault-manager-title`) | 0.648 | 0.619 |  |
+| `Screenshot … 11.16.25 AM.png` | Workspace title bar, toolbar and tabs (`workspace-tabs`) | 0.820 | 0.819 |  |
+| `Screenshot … 11.16.41 AM.png` | Workspace rails and status bar (`workspace-rails`) | 0.871 | 0.871 |  |
+| `Screenshot … 11.16.50 AM.png` | Integrated workspace, four docked panels (`workspace-integrated`) | 0.823 | 0.598 | sizes from the compact scale |
+| `Screenshot … 11.16.31 AM.png` | Command palette (`workspace-palette`) | 0.897 | 0.368 | sizes from the compact scale |
+| `Screenshot … 11.16.50 AM.png` | Sessions panel (`sessions-panel`) | 0.963 | 0.467 | sizes from the compact scale |
+| `reference/vault-add-menu.png` | Vault add menu (`vault-menu`) | 0.973 | 0.324 | sizes from the compact scale |
+| `reference/add-login-sheet.png` | Attached Login sheet (`vault-login-sheet`) | 0.974 | 0.247 | sizes from the compact scale |
+| `reference/add-ssh-key-sheet.png` | Attached SSH key sheet (`vault-key-sheet`) | 0.967 | 0.301 | sizes from the compact scale |
+| `combo_box_mock.png` | Credential picker, empty (`picker-empty`) | 0.891 | 0.750 | sizes from the compact scale |
+| `combo_box_mock.png` | Credential picker, selected (`picker-selected`) | 0.880 | 0.733 | sizes from the compact scale |
+| `combo_box_mock.png` | Credential picker, open (face) (`picker-open-face`) | 0.881 | 0.696 | sizes from the compact scale |
+| `combo_box_mock.png` | Credential picker, open (top) (`picker-open-top`) | 0.846 | 0.652 | sizes from the compact scale |
+| `combo_box_mock.png` | Credential picker, open (footer) (`picker-open-footer`) | 0.987 | 0.292 | sizes from the compact scale |
+| `combo_box_mock.png` | Credential picker, filtering (`picker-filtering-top`) | 0.844 | 0.881 |  |
+| `combo_box_mock.png` | Credential picker, no matches (`picker-no-matches`) | 0.840 | 0.484 | sizes from the compact scale |
+| `combo_box_mock.png` | Credential picker, disabled (`picker-disabled`) | 0.762 | 0.623 | sizes from the compact scale |
+| `Screenshot … 11.16.50 AM.png` | Tunnels panel (`tunnels-panel`) | 0.947 | 0.797 | sizes from the compact scale |
+| `reference/plugin-panels.png` | Tunnels panel (plugin-panels) (`tunnels-panel-plugin-panels`) | 0.948 | 0.797 | sizes from the compact scale |
+| `Screenshot … 11.16.50 AM.png` | SFTP panel (`sftp-panel`) | 0.830 | 0.569 | sizes from the compact scale |
+| `reference/plugin-panels.png` | SFTP panel (plugin-panels) (`sftp-panel-plugin-panels`) | 0.825 | 0.545 | sizes from the compact scale |
+| `Screenshot … 11.16.50 AM.png` | File Servers panel (`fileservers-panel`) | 0.949 | 0.797 | sizes from the compact scale |
+| `reference/plugin-panels.png` | File Servers panel, populated (`fileservers-panel-populated`) | 0.947 | 0.713 | sizes from the compact scale |
+| `new_tunnel_mock.png` | New Tunnel (`tunnel-new`) | 0.916 | 0.264 | sizes from the compact scale |
+
+### Inspected, Dark and Light
+
+The Dark and Light renders were opened beside their mocks: the Settings pages (now also System and Font & Colors), the
+Vault hero, manager and menu, Add Host, the credential picker, the command palette, the integrated workspace and its
+panels. Each keeps its mock's controls, order, grouping and alignment at the compact sizes; selected rows fill edge to
+edge with white text and glyphs (Settings navigation, the Vault rail and list, the Sessions panel, the picker and the
+palette), the segmented Toolbar choice keeps its label padding, and no text clips at 24 px. No painter needed a fix.
+
+Design notes:
+
+- White on Light `selection.bg` (`#3F6FA8`) is 5.18:1 and on Dark (`#2E4664`) 9.65:1; the Light 3.98:1 note and the
+  text floor that gave Light selected rows dark text are retired.
+- Menus and the palette highlight with `accent`: white on it is 5.18:1 in Light and 4.27:1 in Dark, as authored.
+
+### User-run checks (compact density)
+
+At 100% in Dark and Light:
+
+1. Menus: the Sessions row menu and the Vault add menu (kit), and the tab menu, the terminal context menu and the
+   editor's popup (native). Check the 22 px rows, the icon column, the shortcuts (Close Tab in the tab menu) and the
+   white highlight ink.
+2. Dropdowns (Theme, Terminal scheme, Via Host) and the credential picker: each is as wide as its face, with 22 px rows
+   and its icons.
+3. Selection in lists, trees and tables. Select "Appearance & Behavior" in the Settings navigation, and check the file
+   chooser and the Vault manager.
+4. Buttons and fields are 24 px.
+5. System › Configuration file.
+6. The font size and line height steppers.
+7. Window › Toolbar's segments.
+8. An 18-pt interface font.
+
 ## User-run checks still open
 
 Screen capture and UI scripting are unavailable to the agent session, so these need a person at the Mac:

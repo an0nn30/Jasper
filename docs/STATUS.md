@@ -54,6 +54,16 @@ below the former contrast floors (Light off-switch 1.68:1, Light `status.success
 1.43:1/1.58:1, Light menu selection text 3.98:1, the status slash about 1.15:1, dark floored text with white glyphs on
 Light selected rows); and New File Server's Login control wrapping to two rows when the form scrolls.
 
+**Compact density complete — 2026-10-13.** On `claude/compact-density` (not merged, not pushed): Jasper is a compact
+desktop workstation. Controls and fields are 24 px, one-line rows 22–24, the control radius 4 (cards and popups 6), and
+the kit's spacing × 0.8, all from `DesignMetrics` (frozen in `compact-roles.tsv`). Selection is an edge-to-edge
+rectangle with white text and glyphs; Light `selection.bg` is `#3F6FA8`. Kit and native menus share one look, with
+shortcuts from the live keymap (SDK 0.16.0 `MenuItem.withShortcut`). Dropdown menus are as wide as their fields, and
+the credential picker sizes to its rows. System › Configuration file is one card of settings rows, decimal settings
+are steppers, and a segment's label keeps 10 px from its edge. Deviations are ledgered in
+[the plan](superpowers/plans/2026-10-12-jasper-compact-density.md). Native acceptance is the user's
+([record](design/theme-engine/acceptance.md#compact-density-2026-10-12)).
+
 **Task9c fix round1 — scoped re-review pending (2026-10-11).** Review I1 found that table useful-width search crossed the existing numeric-minimum feasibility boundary, where weighted allocation is not monotonic. The shared search now starts where all existing column minima fit, then reserves the useful first-column target; ordinary allocation remains unchanged. A long numeric-cell regression covers the returned minimum and larger/boundary widths with icons, selection modes and scale variants. This repairs the approved minimum contract without a new layout policy; scoped UI/chooser checks, default/controlled owner captures and fresh installDist evidence are recorded in scratch `task-9c-report.md`, preserving final02. Review M1 classifies inherited100JavaDoc warnings and injected native-notification authorization/delivery failures as known gate noise, not failing tests or new9c defects; source-warning cleanup stays final11. Native/pixel acceptance remains open.
 
 **Task9c constrained-scale correction (2026-10-11).** The first full gate passed, then actual fresh32pt/automatic2.5 owner images exposed fixed divider, zero form body/control width and double-scaled native text failures missed by transition-only checks. Approved shared corrections add measured automatic split negotiation with explicit drag preservation, table four-glyph minimum negotiation, retained stacked preview, all-form bounded body/footer overflow and narrow FormRows stacking. Native fonts share the existing exactly-once policy; an owned typography/scale signal refreshes retained chooser, Errors, notification/history and the specifically approved PluginDetails text consumer. No other Plugins composition or future11a work is included. These are behavioral deviations with layout/callback/disposal costs, covered by fresh owner and retained-state checks; final01 remains historical; the scratch report carries replacement frozen evidence. Native/pixel acceptance remains open.

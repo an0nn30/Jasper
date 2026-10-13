@@ -2,11 +2,26 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: ready for review (2026-10-12).** Written against `claude/compact-density` at f35f9242 (the spec commit on
-> `codex/theme-engine` 61e70e06). The compact scale was probed in a throwaway worktree before this plan was written:
-> with the role table below applied, 84 tests fail, all listed in Task 1, and one order-dependent test
-> (`WindowContentFirstTerminalTest.aThrowingObserverDoesNotEscapeIntoThePanesAdoption`) fails in the full run but passes
-> alone. That is the known Swing test-isolation leak, not this change.
+> **Status: complete on 2026-10-13** on `claude/compact-density`, executed natively. Deviations from the text below
+> (ledgered as rulings):
+> - Task 1:
+>   - List rows pad their lines with `ROW_VERTICAL_PADDING` (4), not the form's `ROW_GAP`, in `InteractiveRows` and
+>     `ItemLists.minimumRowHeight`, so one-line rows reach 24 and two-line rows max(36, two lines + 4).
+>   - Four roles took different values: `PANEL_HEADER` 35 (host actions with their focus reservation need it, and
+>     every header must match), `ROUTE_HEIGHT` 42 and `PALETTE_FIELD_VERTICAL_PADDING` 3 (the palette field reaches 36).
+>   - `NOTICE_*` kept 8/12/8, as native document-bar chrome.
+>   - The table script stripped comments before splitting the enum.
+>   - Literals whose role was not evident took the checked new value.
+> - Task 2:
+>   - `SETTINGS_NAV_ROW_SPACING` was deleted with the rounded painters' roles.
+>   - A selected item-list row's subtitle keeps the slot rule (`text.onAccent.secondary`).
+>   - `PickerMenusTest`'s install test now restores the look and feel. It never did, and a new class's fork order
+>     exposed that as headless popups.
+> - Task 3: native menu items use the BODY face, like kit menus.
+> - Task 5: the dropdown width rule is `KitComboPopup.popupWidth(fieldWidth)`. `Component` already has `bounds()`, and
+>   `BasicComboPopup.computePopupBounds` reads screen bounds, so headless tests test the width rule alone.
+> - Task 7: the Settings preview also renders System and Font & Colors.
+>   - No painter needed a fix after inspection.
 
 **Goal:** Make Jasper feel like a compact desktop workstation (IntelliJ classic): smaller radii, tighter spacing and
 rows, rectangular edge-to-edge selection with white ink, one compact menu look with shortcuts, dropdown popups as wide
