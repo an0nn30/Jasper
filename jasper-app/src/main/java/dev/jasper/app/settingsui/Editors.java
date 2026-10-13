@@ -145,10 +145,10 @@ public final class Editors {
             List.of(SAME_AS_UI_THEME, "Slate Steel Dark", "Slate Steel Light", "High Contrast"));
     }
 
-    /** The Dark / Light / Match System tiles, then the Theme row with its one entry, Slate Steel. */
+    /** The Dark / Light / Match System tiles, then the Dark theme and Light theme rows over the installed themes. */
     public static Factory<AppearanceMode> appearance(AppearanceChoices choices) {
-        return new Factory<>((setting, context) -> new AppearanceSelection(choices),
-            List.of("Dark", "Light", "Match System", "Theme", AppearanceSelection.THEME));
+        return new Factory<>((setting, context) -> new AppearanceSelection(choices, context.draft()),
+            List.of("Dark", "Light", "Match System", "Theme", "Dark theme", "Light theme", "Slate Steel"));
     }
 
     /** A path field with Browse…, for a program path. */

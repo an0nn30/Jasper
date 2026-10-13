@@ -102,6 +102,20 @@ class AppearancePageTest {
         assertThat(page.modified()).isTrue();
     }
 
+    @Test void pickingADarkThemeStagesItForApplyAndResetReturnsToSlateSteel() {
+        page.component();
+        var box = kit(page, "ui.appearance:dark-theme.input", JComboBox.class);
+        assertThat(items(box)).containsExactly("Slate Steel");
+        assertThat(selected(box)).isEqualTo("Slate Steel");
+        draft.rebase(ConfigLoader.parse(Path.of("config.toml"), "[ui.theme]\ndark = 'ocean'\n", true).values());
+        page.refresh();
+        assertThat(items(kit(page, "ui.appearance:dark-theme.input", JComboBox.class))).containsExactly("Slate Steel", "ocean (not installed)");
+        pick(kit(page, "ui.appearance:dark-theme.input", JComboBox.class), "Slate Steel");
+        assertThat(draft.value(CoreSettings.UI_THEME_DARK)).isEqualTo("slate-steel");
+        assertThat(draft.edit().changes()).containsEntry(CoreSettings.UI_THEME_DARK, Optional.empty());
+        assertThat(page.modified()).isTrue();
+    }
+
     @Test void theTerminalSchemeIsADropdownOfTheFourSchemes() {
         var box = combo("terminal.scheme");
         assertThat(items(box)).containsExactly("Same as UI theme", "Slate Steel Dark", "Slate Steel Light", "High Contrast");

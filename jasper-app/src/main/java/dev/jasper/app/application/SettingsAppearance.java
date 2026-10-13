@@ -10,19 +10,24 @@ import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.JasperTheme;
 import java.util.Optional;
 
-/** The Appearance page's values: Slate Steel's variants as previews, its workspace glass and the live OS appearance. */
+/** The Appearance page's values: the installed themes with their previews, the workspace glass and the live OS appearance. */
 final class SettingsAppearance {
     private SettingsAppearance() { }
 
-    static AppearanceChoices choices(SystemAppearance system) {
+    /** The choices over {@code library}, the installed themes as they are whenever the page reads them. */
+    static AppearanceChoices choices(SystemAppearance system, java.util.function.Supplier<ThemeLibrary> library) {
         var glass = JasperTheme.bundled().generated(true).glass();
-        var themes = themeChoices(ThemeLibrary.bundledOnly());
-        return new AppearanceChoices(preview(true), preview(false), (float) (glass.opacity() * 100), glass.blur(),
+        var cache = new Object() { ThemeLibrary from; InstalledThemes themes; };
+        return new AppearanceChoices((float) (glass.opacity() * 100), glass.blur(),
             () -> switch (system.current().preference()) {
                 case DARK -> Optional.of(true);
                 case LIGHT -> Optional.of(false);
                 case UNAVAILABLE -> Optional.empty();
-            }, listener -> new Subscription(system.subscribe(ignored -> listener.run())), () -> themes);
+            }, listener -> new Subscription(system.subscribe(ignored -> listener.run())), () -> {
+                var current = library.get();
+                if (cache.from != current) { cache.themes = themeChoices(current); cache.from = current; }
+                return cache.themes;
+            });
     }
 
     /** What the Appearance page offers from {@code library}: its themes for each appearance and its schemes, with their labels. */
