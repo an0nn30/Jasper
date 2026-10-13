@@ -103,7 +103,8 @@ public final class VaultManagerWindow implements AutoCloseable {
         if (window == null || lock.state() != LockState.UNLOCKED) return;
         editors.show(window,title,factory,()->{});
     }
-    private void add(VaultManager.Type type) {
+    /** Opens the sheet for a new entry of the type over the open window; does nothing when it is closed or locked. */
+    public void add(VaultManager.Type type) {
         UiKit kit = context.kit();
         switch (type) {
             case LOGIN -> dialog("Add Login", close -> EntryEditor.login(kit, null, manager::saveAccount, close));
