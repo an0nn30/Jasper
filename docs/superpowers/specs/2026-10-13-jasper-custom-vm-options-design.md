@@ -44,8 +44,8 @@ doubt.
 - macOS's libjli exports its own `JNI_GetCreatedJavaVMs`, a compatibility wrapper that loads the default libjvm on
   demand, so a `dlsym(RTLD_DEFAULT, …)` lookup can answer for the wrong libjvm (found in Task 3's review).
 - HotSpot's own initialization failures (`vm_exit_during_initialization`: `-Xms` above `-Xmx`, a missing `-agentlib` or
-  `-javaagent`, an unusable CDS archive) end the process with `_exit`, which runs no exit handlers (verified on macOS
-  in Task 3's review).
+  `-javaagent`, an unusable CDS archive, a module that cannot be resolved such as `--add-modules=jdk.nonexistent`) end
+  the process with `_exit`, which runs no exit handlers (verified on macOS in Task 3's and the final review).
 - With `-XX:+IgnoreUnrecognizedVMOptions`, unknown `-XX:`, `-X…` and `--…` options are ignored. Still fatal:
   malformed values (`Invalid maximum heap size: -Xmx3q`), conflicting collectors, a heap that cannot be reserved.
 - `jpackage -J--patch-module=jdk.jpackage=<dir>` with `<dir>/jdk/jpackage/internal/resources/jpackageapplauncher`
@@ -96,6 +96,14 @@ IntelliJ's format:
   it entirely and reports it (section 3.4).
 - On Windows, non-ASCII option text goes through the same conversion the launcher already applies to `Jasper.cfg`
   values.
+- A line is applied only when it starts with `-` and is not one of libjli's own launcher options: `-version`,
+  `--version`, `-help`, `--help`, `-h`, `-?`, `-X`, `--help-extra`, `--dry-run`, `--list-modules`, `-d`,
+  `--describe-module`, `--validate-modules`, `-jar`, `-m`, `--module`, `-cp`, `-classpath`, `--class-path`, `--source`
+  (with the `=value` forms of `--describe-module`, `--module`, `--class-path` and `--source`), and the bare forms of
+  `--add-opens`, `--add-exports`, `--add-reads`, `--add-modules`, `--limit-modules`, `--module-path`, `-p`,
+  `--upgrade-module-path`, `--patch-module` and `--enable-native-access`. Other lines are ignored: libjli would take
+  them as the main class, a mode or an option's argument, so the JVM would start without running Jasper and the guard
+  could not tell (found in the final review). The digest covers the applied lines only; plan 2 reports ignored lines.
 
 ### 3.3 Merge
 

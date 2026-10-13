@@ -71,6 +71,9 @@ Recorded here and, when the plan completes, in `docs/STATUS.md`:
    `removeSkipVariable`). On Linux the cfg is read in a forked child and on Windows possibly in a restart wrapper, so a
    removal there never reached the JVM (Task 4's review). The options file must also be a regular file off Windows
    (`S_ISREG`), and the Windows link passes `/MANIFEST:NO` because `java.manifest` is embedded with `mt`.
+9. **Ignored lines.** The core applies only lines that start with `-` and are not libjli launcher options (spec 3.2,
+   amended in the final review); a typo such as `Xmx300m`, a quoted option or `-version` would otherwise start the JVM
+   without running Jasper. A fallback launch (skip variable present) never arms the guard, whatever argv holds.
 
 ## Review Focus
 
@@ -2823,7 +2826,9 @@ Agents never launch the GUI. After the branch is reviewed, the user checks:
 1. **macOS:** build with `./gradlew :jasper-app:packageApp`, open `jasper-app/build/packaging/image/Jasper.app`. Then
    write `-Xmx3g` into `~/.config/jasper/jasper.vmoptions`, quit and reopen: `jcmd <pid> VM.flags | tr ' ' '\n' | grep MaxHeapSize`
    shows 3 GiB. Change it to `-Xmx3q`, reopen: Jasper starts (once, no loop) with the defaults. Remove the file.
-2. **macOS Local Network:** an SSH connection to a LAN host still works without a new permission prompt.
+2. **macOS Local Network:** the launcher's Mach-O identity is now derived from the compiled launcher, so expect one new
+   Local Network prompt after this update (and again whenever the launcher is rebuilt with a different Xcode); once
+   granted, an SSH connection to a LAN host works and later launches do not ask again.
 3. **Windows** (`.\gradlew.bat :jasper-app:packageInstaller` with MSVC and WiX): the exe keeps its icon and version
    information; the same two `jasper.vmoptions` checks under `%APPDATA%\jasper\`.
 4. **Linux:** the `linux-packages` workflow builds and installs the `.deb` and `.rpm`; the same two checks under
