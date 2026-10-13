@@ -214,4 +214,25 @@ class ChoicesTest {
             } finally { release(context); }
         });
     }
+
+    @Test void aSettingsSegmentsLabelKeepsItsPaddingFromTheSegmentsEdge() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var choice = new Nodes.Choice("toolbar", ControlState.READY, Nodes.ChoiceKind.SEGMENTED,
+                List.of(new Option("icons", "Icons Only", Optional.empty()), new Option("both", "Icons & Labels", Optional.empty()), new Option("hidden", "Hidden", Optional.empty())), "both", "Toolbar", "");
+            try (var view = new KitView(context, new ViewSpec(new Nodes.Stack("page", ControlState.READY, Nodes.LayoutRole.SETTINGS_PAGE, List.of(choice))), e -> { })) {
+                view.setSize(600, 200); InteractiveRowsTest.layout(view);
+                int pad = ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.SEGMENT_HORIZONTAL_PADDING);
+                var buttons = new ArrayList<Choices.SegmentButton>();
+                new Object() { void walk(java.awt.Component c) { if (c instanceof Choices.SegmentButton b) buttons.add(b); if (c instanceof java.awt.Container k) for (var child : k.getComponents()) walk(child); } }.walk(view);
+                assertThat(buttons).hasSize(3);
+                for (var button : buttons) {
+                    assertThat(button.getInsets().left).isEqualTo(pad);
+                    assertThat(button.getInsets().right).isEqualTo(pad);
+                    int text = (int) Math.ceil(button.getFont().getStringBounds(button.getText(), new java.awt.font.FontRenderContext(null, true, true)).getWidth());
+                    assertThat(button.getWidth()).as(button.getText()).isGreaterThanOrEqualTo(text + 2 * pad);
+                }
+            } finally { release(context); }
+        });
+    }
 }

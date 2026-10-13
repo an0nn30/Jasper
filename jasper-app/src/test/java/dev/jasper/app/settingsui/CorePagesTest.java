@@ -135,9 +135,38 @@ class CorePagesTest {
         systemPage.component();
         var buttons = systemPage.actionButtons().stream().map(id -> PageKit.kit(systemPage, id, javax.swing.JButton.class)).toList();
         assertThat(buttons).extracting(javax.swing.JButton::getText)
-            .containsExactly("Open in Editor", "Reveal", "Reload from Disk", "Migrate Config\u2026");
+            .containsExactly("Open in Editor", "Reveal", "Reload", "Migrate\u2026");
         buttons.forEach(javax.swing.JButton::doClick);
         assertThat(calls).containsExactly("open", "reveal", "reload", "migrate");
+        // One card of settings rows: title and description left, the buttons at each row's end.
+        var titles = new ArrayList<String>();
+        walk(systemPage.viewSpec().root(), node -> { if (node instanceof Nodes.SettingRow row) titles.add(row.title()); });
+        assertThat(titles).containsSubsequence("Location", "Reload from disk", "Migrate old settings");
+    }
+
+    /** Every node below {@code node}: stacks, cards, sections and a settings row's control. */
+    static void walk(Nodes.Node node, java.util.function.Consumer<Nodes.Node> visit) {
+        visit.accept(node);
+        if (node instanceof Nodes.Stack stack) stack.children().forEach(child -> walk(child, visit));
+        if (node instanceof Nodes.Card card) card.children().forEach(child -> walk(child, visit));
+        if (node instanceof Nodes.Section section) walk(section.body(), visit);
+        if (node instanceof Nodes.SettingRow row) walk(row.control(), visit);
+    }
+
+    @Test void decimalSettingsAreSteppers() {
+        var pages = CorePages.pages(APPEARANCE, system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
+        var font = (SchemaPage) pages.stream().filter(page -> page.id().equals("terminal.font")).findFirst().orElseThrow();
+        font.component();
+        var fields = new java.util.HashMap<String, Nodes.Field>();
+        walk(font.viewSpec().root(), node -> { if (node instanceof Nodes.Field field) fields.put(field.id(), field); });
+        var size = fields.get(CoreSettings.TERMINAL_FONT_SIZE.name());
+        assertThat(size.presentation()).isEqualTo(Nodes.FieldPresentation.STEPPER);
+        assertThat(size.numeric().orElseThrow().step()).isEqualTo(0.5);
+        assertThat(size.hint()).isEqualTo("pt");
+        var line = fields.get(CoreSettings.TERMINAL_FONT_LINE_HEIGHT.name());
+        assertThat(line.presentation()).isEqualTo(Nodes.FieldPresentation.STEPPER);
+        assertThat(line.numeric().orElseThrow().step()).isEqualTo(0.1);
+        assertThat(line.numeric().orElseThrow().decimals()).isEqualTo(2);
     }
 
     @Test void fontAndColorsLinksToTheTerminalSchemeInAppearance() {

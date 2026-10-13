@@ -106,11 +106,11 @@ public final class Editors {
         return new Factory<>((setting,context) -> new Pick<>(setting.label(),(SettingKind.Choice<E>)setting.kind(),names,Nodes.ChoiceKind.SEGMENTED),List.copyOf(names.values()));
     }
 
-    /** A number field within the kind's range with up to two decimals; Up and Down step by {@code step}. */
+    /** A − value + stepper within the kind's range with up to two decimals; its buttons, Up and Down step by {@code step}. */
     public static Factory<Float> number(double step, String unit) {
         return new Factory<>((setting, context) -> {
             var kind = (SettingKind.NumberRange) setting.kind();
-            return new NumberField<>(setting.label(), new Nodes.Numeric(kind.min(), kind.max(), step, DECIMALS), unit, Float::valueOf);
+            return new NumberField<>(setting.label(), new Nodes.Numeric(kind.min(), kind.max(), step, DECIMALS), unit, Float::valueOf, Nodes.FieldPresentation.STEPPER);
         }, List.of());
     }
 
@@ -485,7 +485,7 @@ public final class Editors {
             this.label = label;
             unset = setting.defaultValue();
             fallback = setting.example().orElse((float) kind.min());
-            number = new NumberField<>(setting.label(), new Nodes.Numeric(kind.min(), kind.max(), step, DECIMALS), unit, Float::valueOf);
+            number = new NumberField<>(setting.label(), new Nodes.Numeric(kind.min(), kind.max(), step, DECIMALS), unit, Float::valueOf, Nodes.FieldPresentation.STEPPER);
             number.show(fallback);
         }
         boolean usesDefault() { return useDefault; }

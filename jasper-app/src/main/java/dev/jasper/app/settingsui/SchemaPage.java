@@ -22,13 +22,15 @@ import javax.swing.JComponent;
  * sections. The page owns its kit view and the editors' state; the dialog's draft owns the values. EDT only.
  */
 public final class SchemaPage implements SettingsPage {
-    /** A button on an action row; {@code enabled} is read again on every refresh. */
-    public record Button(String label, Runnable action, BooleanSupplier enabled) { }
+    /** A button on an action row; {@code enabled} is read again on every refresh, and {@code whenDisabled} is its tooltip while disabled. */
+    public record Button(String label, Runnable action, BooleanSupplier enabled, String whenDisabled) {
+        public Button(String label, Runnable action, BooleanSupplier enabled) { this(label, action, enabled, ""); }
+    }
 
     private sealed interface Item permits RowItem, SectionItem, ActionItem { }
     private record RowItem(Setting<?> setting, Editors.Factory<?> editor, String note, Predicate<SettingsDraft> enabled, boolean shown) implements Item { }
     private record SectionItem(String title) implements Item { }
-    private record ActionItem(Supplier<String> text, List<Button> buttons) implements Item { }
+    private record ActionItem(String title, Supplier<String> description, List<Button> buttons) implements Item { }
 
     /** Starts the spec of a page. */
     public static Spec page(String id, String title) { return new Spec(id, title); }
@@ -77,7 +79,8 @@ public final class SchemaPage implements SettingsPage {
             return this;
         }
 
-        public Spec action(Supplier<String> text, Button... buttons) { items.add(new ActionItem(text, List.of(buttons))); return this; }
+        /** A settings row of buttons: {@code title} and {@code description} on the left, the buttons at its end. */
+        public Spec action(String title, Supplier<String> description, Button... buttons) { items.add(new ActionItem(title, description, List.of(buttons))); return this; }
 
         /** Every setting this page shows, in order. */
         public List<Setting<?>> settings() {
@@ -263,12 +266,12 @@ public final class SchemaPage implements SettingsPage {
         var buttons = new ArrayList<Nodes.Node>();
         for (int i = 0; i < action.item().buttons().size(); i++) {
             var button = action.item().buttons().get(i);
-            buttons.add(new Nodes.Button(action.buttonId(i), new ControlState(true, button.enabled().getAsBoolean(), false, ""), button.label(), "",
-                Nodes.ButtonKind.SECONDARY, action.buttonId(i), ""));
+            boolean enabled = button.enabled().getAsBoolean();
+            buttons.add(new Nodes.Button(action.buttonId(i), new ControlState(true, enabled, false, ""), button.label(), "",
+                Nodes.ButtonKind.SECONDARY, action.buttonId(i), enabled ? "" : button.whenDisabled()));
         }
-        return new Nodes.Stack("action-" + action.index(), ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
-            new Nodes.Text("action-" + action.index() + ":text", ControlState.READY, action.item().text().get(), Nodes.TextRole.DESCRIPTION),
-            new Nodes.Stack("action-" + action.index() + ":buttons", ControlState.READY, Nodes.LayoutRole.INLINE, buttons)));
+        var control = new Nodes.Stack("action-" + action.index() + ":buttons", ControlState.READY, Nodes.LayoutRole.INLINE, buttons);
+        return new Nodes.SettingRow("action-" + action.index(), ControlState.READY, action.item().title(), action.item().description().get(), control, false, false);
     }
 
     private void render() {
