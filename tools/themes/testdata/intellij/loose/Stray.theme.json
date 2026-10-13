@@ -1,0 +1,6 @@
+{
+  "name": "Stray",
+  "dark": true,
+  "parentTheme": "Some Theme Jasper Does Not Know",
+  "ui": { "*": { "background": "#202020" } }
+}

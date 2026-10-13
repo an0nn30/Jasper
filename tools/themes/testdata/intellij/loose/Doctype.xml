@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!DOCTYPE scheme [ <!ENTITY boom "boom"> ]>
+<scheme name="Doctype" version="142" parent_scheme="Darcula"><colors/></scheme>
