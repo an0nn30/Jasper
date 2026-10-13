@@ -68,3 +68,10 @@ App public visibility is for internal feature collaboration, not a plugin ABI. P
 files name allowed outgoing dependencies and lifetime owners. The app/Buddy refactor uses
 the user-approved native inline workflow with one independent final review. Pure test
 fixtures live in testsupport; owner-package test access bridges stay out of production jars.
+
+## Documentation edits
+
+- Prefer the smallest edit that makes the doc accurate. Don't add sections, summaries, or restatements unless asked.
+- When asked to remove or correct content, delete it entirely. Never replace it with a negation or disclaimer ("this does not do X").
+- Document only what the system does. Negative statements are allowed only when readers would plausibly expect the behavior and be misled without them.
+- After a removal request, compare before and after. If the text grew, redo the edit.
