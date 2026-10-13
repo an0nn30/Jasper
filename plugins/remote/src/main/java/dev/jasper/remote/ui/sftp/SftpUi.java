@@ -23,7 +23,7 @@ import java.util.function.*;
  */
 public final class SftpUi implements AutoCloseable {
     public static final String PANEL="dev.jasper.remote.sftp.panel";
-    /** The action that toggles the panel; registered by the plugin before this UI, so View &gt; Tools lists it once. */
+    /** The action that toggles the panel; registered by the plugin before this UI, so View &gt; Tool Windows lists it once. */
     public static final String TOGGLE="dev.jasper.remote.sftp.toggle";
     /** The panel's history and parent folder shortcuts, in the panel's own shortcut context. */
     public static final String BACK="dev.jasper.remote.sftp.back",FORWARD="dev.jasper.remote.sftp.forward",PARENT="dev.jasper.remote.sftp.parent";

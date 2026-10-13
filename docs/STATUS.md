@@ -5,15 +5,18 @@
 [plan](superpowers/plans/2026-10-13-sdk-clipboard-and-tools-menu.md)). `Platform.copy`, `copySecret` and
 `clipboardText` (behind the new `clipboard.read` capability) go through one `HostClipboard` shared with Jasper's own
 copies: a busy clipboard is posted as "Could not copy" in the plugin's group, and a secret is cleared after 30 seconds
-(retried every second, up to five times, while another program holds the clipboard) and tried once more when its plugin
-stops or at quit, only while the clipboard still holds it. `StandardMenu.TOOLS` adds a Tools menu after
+(retried every second, up to five times, while another program holds the clipboard) and tried once when its plugin
+stops and once at quit, in each case only while the clipboard still holds it. `StandardMenu.TOOLS` adds a Tools menu after
 Tab that exists only while a plugin has entries; View › Tools is now View › Tool Windows. FileServer, Indexer, Remote
 and Vault moved onto the SDK clipboard (Vault's `SecretClipboard` is gone); `PluginPresentationCheck` now rejects the AWT
 clipboard in plugins except the Editor's Vim registers. The Sample's demo is in Tools. Learned from porting an external
-encrypt/decrypt plugin. `./gradlew check --continue`: **9,759 tests, 0 failures, 0 errors, 8 skipped**. No GUI
-launched. GUI checks for the user: Tools › Run Sample Activity after Tab in a dev run; View › Tool Windows; a Vault copy
-cleared after 30 seconds and a later copy left alone; FileServer's Copy Address and paste-a-key; macOS native menu bar
-shows Tools only while a plugin has entries. Not merged or pushed.
+encrypt/decrypt plugin. `./gradlew check --continue`: **9,762 tests, 0 failures, 0 errors, 8 skipped**. No GUI
+launched. GUI checks for the user: the Sample's UI is off by default, so turn on its `demo_ui` setting (Settings ›
+Plugins › Sample, "Show the sample action", or `demo_ui = true` in its settings file) before Tools › Run Sample
+Activity appears after Tab in a dev run; View › Tool Windows; a Vault copy cleared after 30 seconds and a later copy
+left alone; FileServer's Copy Address and paste-a-key; macOS native menu bar shows Tools only while a plugin has
+entries. `JasperApplication`'s own report copy and its clearing of a pending secret at quit have no automated test:
+check them by hand. Not merged or pushed.
 
 **`main` merged into `codex/theme-engine` — 2026-10-13.** Seven `main` commits since 2026-10-05: the command palette's
 drag (snap guides that are felt, not drawn; a remembered place; re-attach by dragging to the title field; double click

@@ -46,8 +46,9 @@ In the command palette, select **Vault**, or enter `>vault` / `>cred`. Search by
 username or key fingerprint. Enter copies an account's password, Cmd/Ctrl+Enter copies its
 username, and Shift+Enter opens the selected entry in the manager. Both password and username
 copies are secret copies to Jasper's clipboard (SDK `Platform.copySecret`): Jasper clears them after 30 seconds (retrying
-briefly while another program holds the clipboard), and tries again when the vault plugin stops and when Jasper quits, if
-the clipboard still contains that copy. A later user copy is left alone. The vault never types clipboard contents into a
+briefly while another program holds the clipboard), and tries once when the vault plugin stops and once when Jasper
+quits, in each case only if the clipboard still contains that copy. A later copy, by the user or a plugin, is left
+alone. The vault never types clipboard contents into a
 terminal.
 
 Other plugins request credentials through `dev.jasper.vault.api.VaultApi`. The first use asks

@@ -43,8 +43,8 @@ Appearance icon loaders, arbitrary Icon arguments and palette fallback readers w
 
 `Platform.copy(text)`, `copySecret(text)` and `clipboardText()` give plugins the clipboard on the UI thread. A write that
 fails is posted as "Could not copy" in the plugin's group and returns `false`; a secret is cleared 30 seconds later
-(retrying briefly while another program holds the clipboard), and again when its plugin stops or when Jasper quits, if the
-clipboard still holds it. Reading needs the new `clipboard.read` capability (`Capabilities.CLIPBOARD_READ`).
+(retrying briefly while another program holds the clipboard), and Jasper tries once when its plugin stops and once when
+Jasper quits, in each case only if the clipboard still holds it. Reading needs the new `clipboard.read` capability (`Capabilities.CLIPBOARD_READ`).
 `StandardMenu.TOOLS` is a Tools menu for utility commands, shown after Tab only while a plugin has entries in it; the
 View submenu that lists tool windows is now View › Tool Windows. The testkit models the clipboard with
 `FakePluginHost.clipboard()`. Plugins that use any of these declare `sdk = ">=0.16.1, <0.17"`.

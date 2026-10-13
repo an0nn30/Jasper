@@ -16,7 +16,7 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.16.0, <0.17"
+sdk = ">=0.16.1, <0.17"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen, clipboard.read
 exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
@@ -28,7 +28,7 @@ version = ">=1.0"
 optional = false
 ```
 
-`icon` and `homepage` need Jasper 0.9.3 or later (declare `sdk = ">=0.16.0, <0.17"`); an older Jasper rejects a
+`icon` and `homepage` need Jasper 0.9.3 or later (declare `sdk = ">=0.16.1, <0.17"`); an older Jasper rejects a
 manifest with keys it does not know. An icon that is missing, too large or not an SVG or PNG, and a homepage that is
 not an `http` or `https` address, are ignored: the plugin still loads, with the default icon and no link.
 
@@ -499,15 +499,15 @@ Since SDK 0.16.1, `context.platform()` puts text on the clipboard and reads it, 
 - `copy(text)` puts text on the clipboard. When it cannot be written, for example while another program holds it, Jasper
   posts "Could not copy" with the cause in your plugin's group and the call returns `false`; nothing is thrown.
 - `copySecret(text)` is `copy` for text that should not linger, such as a password or a decrypted value. Jasper clears the
-  clipboard 30 seconds later (retrying briefly while another program holds it), and tries again when your plugin stops and
-  when Jasper quits, but only if the clipboard still holds that text: a later copy, by the user or by any plugin, is left
-  alone.
+  clipboard 30 seconds later (retrying briefly while another program holds it), and tries once when your plugin stops and
+  once when Jasper quits, in each case only if the clipboard still holds that text: a later copy, by the user or by any
+  plugin, is left alone.
 - `clipboardText()` returns the clipboard's text, or empty when it holds none or cannot be read. It needs the
   `clipboard.read` capability, because the clipboard often holds something the user just copied elsewhere, such as a
   password; Jasper logs each read with your plugin id and the number of characters, never the text.
 
-Plugin code does not use the AWT clipboard (`Toolkit.getSystemClipboard()`): `verifyPluginArchitecture` rejects it in the
-bundled plugins, except for the Editor's Vim registers. Declare `sdk = ">=0.16.1, <0.17"` when you use these methods.
+Plugin code does not use the AWT clipboard (`Toolkit.getSystemClipboard()` or `getSystemSelection()`):
+`verifyPluginArchitecture` rejects both in the bundled plugins, except for the Editor's Vim registers. Declare `sdk = ">=0.16.1, <0.17"` when you use these methods.
 
 ## Rules that matter
 

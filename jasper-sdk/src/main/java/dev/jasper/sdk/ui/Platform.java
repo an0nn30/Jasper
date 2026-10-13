@@ -35,17 +35,20 @@ public interface Platform {
      *
      * @param text the text, possibly empty
      * @return whether the text is on the clipboard
+     * @throws NullPointerException when {@code text} is null
      * @since 0.16.1
      */
     boolean copy(String text);
 
     /**
-     * As {@link #copy}, for text that should not linger, such as a password or a decrypted value: Jasper clears the
-     * clipboard 30 seconds later, when the plugin stops and when Jasper quits, if the clipboard still holds this text.
-     * A later copy, by the user or by any plugin, is left alone.
+     * As {@link #copy}, for text that should not linger, such as a password or a decrypted value. Jasper clears the
+     * clipboard 30 seconds later (retrying briefly while another program holds it), and tries once when the plugin
+     * stops and once when Jasper quits, in each case only if the clipboard still holds this text. A later copy, by
+     * the user or by any plugin, is left alone.
      *
      * @param text the text, possibly empty
      * @return whether the text is on the clipboard
+     * @throws NullPointerException when {@code text} is null
      * @since 0.16.1
      */
     boolean copySecret(String text);
