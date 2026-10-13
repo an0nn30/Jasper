@@ -74,10 +74,10 @@ class PackagedResourcesTest {
                 "dev/jasper/app/shell-integration/zsh/.zlogin",
                 "dev/jasper/app/shell-integration/zsh/.zprofile",
                 "dev/jasper/app/shell-integration/zsh/.zshenv",
-                "dev/jasper/app/shell-integration/zsh/.zshrc",
-                "dev/jasper/app/themes/legacy-aliases.json"
+                "dev/jasper/app/shell-integration/zsh/.zshrc"
             )) assertThat(jar.getJarEntry(name)).as(name).isNotNull();
             var names = jar.stream().filter(entry -> !entry.isDirectory()).map(java.util.jar.JarEntry::getName).toList();
+            assertThat(names).as("no theme resources: Slate Steel lives in jasper-ui").noneMatch(n -> n.startsWith("dev/jasper/app/themes/"));
             assertThat(names.stream().filter(n -> n.startsWith("dev/jasper/app/icons/intellij/") && n.endsWith(".svg")).toList())
                 .containsExactlyInAnyOrder("dev/jasper/app/icons/intellij/terminal/toolwindow/terminal.svg",
                     "dev/jasper/app/icons/intellij/nodes/pluginLogo.svg", "dev/jasper/app/icons/intellij/nodes/pluginLogo_dark.svg");

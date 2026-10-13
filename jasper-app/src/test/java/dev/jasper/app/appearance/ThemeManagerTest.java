@@ -1,142 +1,19 @@
 package dev.jasper.app.appearance;
-import dev.jasper.ui.theme.ThemeGeneratorTest;
-import dev.jasper.ui.theme.Token;
 import dev.jasper.ui.theme.GeneratedTheme;
 
 import com.formdev.flatlaf.FlatLaf;
 import dev.jasper.app.testsupport.EdtTestExtension;
-import dev.jasper.terminal.config.Palette;
 import java.awt.Color;
-import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.swing.LookAndFeel;
 import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
 class ThemeManagerTest {
-    /** Jasper Dark before the engine: FlatLaf Dark plus Jasper's former properties files. */
-    private static final String[] TODAYS_DARK = {
-        "Panel.background", "#21252a", "List.background", "#191c20", "List.foreground", "#d5dee5",
-        "List.selectionBackground", "#5e7293", "List.selectionForeground", "#ffffff", "List.selectionInactiveBackground", "#5e7293",
-        "TextField.background", "#25292e", "TextField.foreground", "#d5dee5", "TextField.selectionBackground", "#3e4451",
-        "TextArea.background", "#25292e", "PasswordField.background", "#25292e", "ComboBox.background", "#333841",
-        "ComboBox.buttonBackground", "#333841", "ComboBox.foreground", "#d5dee5", "ComboBox.selectionBackground", "#5e7293",
-        "ComboBox.buttonArrowColor", "#d5dee5", "Button.background", "#3d424b", "Button.foreground", "#a7aebb",
-        "Button.borderColor", "#464c55", "Button.hoverBackground", "#323942", "Button.pressedBackground", "#3e4451",
-        "Button.focusedBackground", "#3d424b", "Button.default.background", "#6b80a1", "Button.default.foreground", "#ffffff",
-        "Button.default.borderColor", "#6b80a1", "Button.default.hoverBackground", "#7b8dab", "Button.default.pressedBackground", "#5e7394",
-        "Button.toolbar.hoverBackground", "#323942", "Button.toolbar.pressedBackground", "#3e4451", "Button.toolbar.selectedBackground", "#3e4451",
-        "ToolBar.background", "#25292e", "MenuBar.background", "#25292e", "Menu.background", "#21252a", "MenuItem.background", "#21252a",
-        "MenuItem.foreground", "#d5dee5", "MenuItem.acceleratorForeground", "#d5dee5", "PopupMenu.background", "#21252a",
-        "PopupMenu.borderColor", "#343a42", "TitlePane.background", "#25292e", "TitlePane.foreground", "#a7b2bf",
-        "TitlePane.inactiveForeground", "#a7b2bf", "TabbedPane.background", "#25292e", "TabbedPane.selectedBackground", "#191c20",
-        "TabbedPane.selectedForeground", "#d5dee5", "TabbedPane.hoverColor", "#323942", "TabbedPane.underlineColor", "#8eb8d2",
-        "Label.foreground", "#d5dee5", "Label.disabledForeground", "#7e8491", "Component.borderColor", "#343a42",
-        "Component.focusedBorderColor", "#8eb8d2", "Component.focusColor", "#8eb8d2", "Component.accentColor", "#8eb8d2",
-        "Component.linkColor", "#8eb8d2", "Separator.foreground", "#343a42", "ScrollBar.thumb", "#4d5262", "ScrollBar.track", "#2b2e37",
-        "SplitPaneDivider.gripColor", "#d5dee5", "SplitPaneDivider.hoverColor", "#323942", "SplitPaneDivider.pressedColor", "#3e4451",
-        "ToolTip.background", "#15161a", "ToolTip.foreground", "#d5dee5", "Tree.background", "#191c20",
-        "Tree.selectionBackground", "#3e4451", "CheckBox.background", "#21252a", "ProgressBar.foreground", "#8eb8d2",
-        "Jasper.chromeForeground", "#d5dee5", "Jasper.configErrorForeground", "#ff858d", "Jasper.configSuccessForeground", "#a8c58d",
-        "Jasper.configWarningForeground", "#e5c07b", "Jasper.findErrorBackground", "#5c3b3b", "Jasper.mutedForeground", "#a7b2bf",
-        "Jasper.runningForeground", "#a8c58d", "Jasper.splitDivider", "#77808f", "Jasper.tabHoverBackground", "#2c3036",
-        "Jasper.tabSelectedBackground", "#293d51", "Jasper.tabSelectedForeground", "#d5dee5", "Jasper.tabUnderline", "#8eb8d2",
-        "Jasper.tabUnderlineInactive", "#747a80", "Jasper.titleBackground", "#25292e", "Jasper.titleForeground", "#a7b2bf",
-        "Jasper.titleInactiveForeground", "#a7b2bf", "Jasper.titleSeparator", "#343a42",
-        // FlatLaf builds IntelliJ dark themes on its Darcula base; these keep FlatLaf Dark's values.
-        "Button.disabledBackground", "#21252a", "Button.disabledText", "#8b929f", "CheckBox.disabledText", "#8b929f",
-        "CheckBox.icon.background", "#34373e", "CheckBox.icon.disabledBackground", "#21252a",
-        "CheckBox.icon.focusedBackground", "#61afef4d", "CheckBox.icon.hoverBackground", "#3b3e46",
-        "CheckBox.icon.pressedBackground", "#42464f", "CheckBox.icon.selectedBackground", "#34373e",
-        "CheckBox.icon[filled].checkmarkColor", "#34373e", "CheckBoxMenuItem.acceleratorForeground", "#d5dee5",
-        "CheckBoxMenuItem.icon.checkmarkColor", "#afb2b9", "ComboBox.buttonEditableBackground", "#2f333b",
-        "ComboBox.disabledBackground", "#21252a", "EditorPane.disabledBackground", "#21252a",
-        "EditorPane.inactiveBackground", "#21252a", "FormattedTextField.disabledBackground", "#21252a",
-        "FormattedTextField.inactiveBackground", "#21252a", "FormattedTextField.placeholderForeground", "#8b929f",
-        "HelpButton.disabledBackground", "#21252a", "InternalFrame.inactiveTitleForeground", "#8b929f",
-        "List.cellFocusColor", "#545c6e", "Menu.acceleratorForeground", "#d5dee5", "MenuBar.hoverBackground", "#323942",
-        "MenuItem.underlineSelectionBackground", "#323942", "PasswordField.disabledBackground", "#21252a",
-        "PasswordField.inactiveBackground", "#21252a", "PasswordField.placeholderForeground", "#8b929f",
-        "PopupMenu.hoverScrollArrowBackground", "#343842", "ProgressBar.background", "#3b3f4b",
-        "RadioButton.disabledText", "#8b929f", "RadioButtonMenuItem.acceleratorForeground", "#d5dee5",
-        "ScrollPane.background", "#2b2e37", "Slider.tickColor", "#8b929f", "Spinner.buttonArrowColor", "#afb2b9",
-        "Spinner.buttonBackground", "#25272e", "Spinner.disabledBackground", "#21252a",
-        "TabbedPane.closeForeground", "#8b929f", "Table.cellFocusColor", "#545c6e", "TextArea.disabledBackground", "#21252a",
-        "TextArea.inactiveBackground", "#21252a", "TextField.disabledBackground", "#21252a",
-        "TextField.inactiveBackground", "#21252a", "TextField.placeholderForeground", "#8b929f",
-        "TextPane.disabledBackground", "#21252a", "TextPane.inactiveBackground", "#21252a",
-        "ToggleButton.disabledBackground", "#21252a", "ToggleButton.disabledText", "#8b929f",
-        "Tree.selectionBorderColor", "#545c6e"};
-    /** Geometry Jasper Dark keeps from FlatLaf Dark where FlatLaf's Darcula base differs. */
-    private static final String[] TODAYS_DARK_NUMBERS = {
-        "CheckBox.icon.focusWidth", "1", "Component.innerOutlineWidth", "1", "RadioButton.icon.centerDiameter", "8"};
-
-    @Test void intellijLightInstallsTheClassicLightColours() throws Exception {
-        LookAndFeel original = UIManager.getLookAndFeel();
-        try {
-            assertThat(ThemeManager.install(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)).isTrue();
-            assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("IntelliJ Light");
-            assertThat(FlatLaf.isLafDark()).isFalse();
-            assertColours(Map.ofEntries(
-                Map.entry("Panel.background", "#f2f2f2"), Map.entry("TextField.background", "#ffffff"),
-                Map.entry("List.background", "#ffffff"), Map.entry("List.selectionBackground", "#2675bf"),
-                Map.entry("List.hoverBackground", "#edf5fc"), Map.entry("Button.background", "#ffffff"),
-                Map.entry("Component.linkColor", "#2470b3"), Map.entry("ToolWindow.background", "#ffffff"),
-                Map.entry("ToolWindow.Header.background", "#e2e6ec"), Map.entry("StatusBar.background", "#f2f2f2"),
-                Map.entry("StatusBar.borderColor", "#d1d1d1"), Map.entry("MainToolbar.background", "#f2f2f2"),
-                Map.entry("EditorTabs.underlineColor", "#4083c9"), Map.entry("EditorTabs.inactiveUnderlineColor", "#9ca7b8"),
-                Map.entry("EditorTabs.hoverBackground", "#00000019"), Map.entry("EditorTabs.underlinedTabBackground", "#ffffff"),
-                Map.entry("SearchEverywhere.Header.background", "#f2f2f2"), Map.entry("SearchEverywhere.Tab.selectedBackground", "#dfdfdf"),
-                Map.entry("SearchEverywhere.Tab.selectedForeground", "#000000"), Map.entry("SearchEverywhere.SearchField.background", "#ffffff"),
-                Map.entry("SearchEverywhere.SearchField.borderColor", "#c4c4c4"), Map.entry("SearchEverywhere.SearchField.infoForeground", "#808080"),
-                Map.entry("SearchEverywhere.List.separatorColor", "#d9d9d9"), Map.entry("SearchEverywhere.List.separatorForeground", "#999999"),
-                Map.entry("SearchEverywhere.Advertiser.background", "#f2f2f2"), Map.entry("SearchEverywhere.Advertiser.foreground", "#808080"),
-                Map.entry("Popup.borderColor", "#ababab")));
-            assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme())
-                .isSameAs(ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT));
-            // IntelliJ's border classes are dropped, so FlatLaf keeps its own.
-            assertThat(UIManager.getBorder("ScrollPane.border")).isInstanceOf(com.formdev.flatlaf.ui.FlatScrollPaneBorder.class);
-            assertThat(UIManager.getFont("Label.font").getSize2D()).isEqualTo(13f);
-        } finally { UIManager.setLookAndFeel(original); }
-    }
-
-    @Test void jasperDarkIsANativeThemeFile() {
-        assertThat(Theme.DARK.source()).isInstanceOfSatisfying(Theme.Bundled.class, bundled -> {
-            assertThat(bundled.file()).isEqualTo("jasper-dark.toml");
-            assertThat(bundled.document().uiComplete()).isEmpty();
-        });
-        assertThat(Theme.DARK.palette()).isEqualTo(new Palette(new Color(0xd5dee5), new Color(0x191c20),
-            new Color(0xd5dee5), new Color(0x35434e), Palette.jasperDark().ansi(), new Color(0xd5dee5)));
-        assertThat(ThemeManager.generated(Theme.DARK).tokens().get(Token.TAB_ACTIVE)).isEqualTo(new Color(0x293d51));
-    }
-
-    @Test void jasperDarkUsesGraphiteSurfacesAndRetainsControlContracts() throws Exception {
-        LookAndFeel original = UIManager.getLookAndFeel();
-        try {
-            assertThat(ThemeManager.install(Theme.DARK)).isTrue();
-            assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Jasper Dark");
-            assertThat(FlatLaf.isLafDark()).isTrue();
-            var expected = new LinkedHashMap<String, String>();
-            for (int i = 0; i < TODAYS_DARK.length; i += 2) expected.put(TODAYS_DARK[i], TODAYS_DARK[i + 1]);
-            expected.put("Button.foreground", hex(ThemeManager.generated(Theme.DARK).semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY)));
-            expected.put("Component.borderColor", hex(ThemeManager.generated(Theme.DARK).semantic().color(dev.jasper.ui.theme.SemanticColor.BORDER_INPUT)));
-            assertColours(expected);
-            assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(12);
-            assertThat(UIManager.getInt("Component.minimumHeight")).isEqualTo(28);
-            // FlatLaf copies the list selection into menus; white text keeps it readable.
-            assertColours(Map.of("MenuItem.selectionBackground", "#5e7293", "MenuItem.selectionForeground", "#ffffff"));
-            assertColours(Map.of("ToolWindow.background", "#191c20", "Table.background", "#191c20", "StatusBar.background", "#25292e",
-                "SearchEverywhere.Tab.selectedBackground", "#3e4451", "List.hoverBackground", "#323942"));
-            assertThat(UIManager.getBoolean("TitlePane.centerTitle")).as("dialog titles are centred").isTrue();
-        } finally { UIManager.setLookAndFeel(original); }
-    }
-
     @Test void keysFlatLafSkipsAreRestoredWithoutReplacingItsOwn() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
@@ -180,44 +57,9 @@ class ThemeManagerTest {
         } finally { UIManager.setLookAndFeel(original); }
     }
 
-    @Test void everyBuiltInThemeGeneratesUnderItsOwnName() {
-        assertThat(ThemeManager.builtIns()).hasSize(5).contains(Theme.JASPER_LIGHT, Theme.DARK);
-        assertThat(ThemeManager.builtIns()).extracting(Theme::name).contains("Clear Dark", "Clear Light");
-        for (Theme theme : ThemeManager.builtIns()) {
-            GeneratedTheme generated = ThemeManager.generated(theme);
-            assertThat(generated.name()).isEqualTo(theme.name());
-            assertThat(generated.dark()).isEqualTo(theme.dark());
-            assertThat(TerminalPaletteAdapter.toTerminal(generated.terminal())).isEqualTo(theme.palette());
-        }
-        assertThat(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.id()).isEqualTo("intellij-light");
-        assertThat(Theme.DARK.id()).isEqualTo("jasper-dark");
-        assertThat(dev.jasper.app.appearance.ThemeFixtures.DARCULA).extracting(Theme::id, Theme::name, Theme::dark).containsExactly("darcula", "Darcula", true);
-    }
 
-    @Test void intellijLightsTerminalPaletteIsItsEditorSchemes() {
-        assertThat(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette()).isNotEqualTo(Palette.jasperLight());
-        // IntelliJ Light's scheme takes its console background from its parent, Default: CONSOLE_BACKGROUND_KEY ffffff.
-        assertThat(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette().background()).isEqualTo(new Color(0xffffff));
-        assertThat(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette()).isEqualTo(dev.jasper.ui.themeimport.LegacyThemeTestSupport.palette("IntelliJ Light", false));
-    }
 
-    @Test void theVendoredIntellijThemesLoadWithoutWarnings() {
-        for (String file : List.of("intellij/Light.theme.json", "intellij/darcula.theme.json"))
-            assertThat(dev.jasper.ui.themeimport.LegacyThemeTestSupport.bundled(file).warnings()).as(file).allMatch(w -> w.contains("discarded non-color override") || w.contains("no longer controls Jasper native UI"));
-    }
 
-    @Test void anInstalledThemeInstallsWithItsOwnColoursAndDerivedChromeKeys(@TempDir Path home) throws Exception {
-        LookAndFeel original = UIManager.getLookAndFeel();
-        try {
-            ThemeFixtures.nativePlugin(home.resolve("themes/fixture.toml"), "Fixture Dark", true, "#123456", "101820");
-            Theme theme = ThemeCatalog.beside(home.resolve("config.toml")).scan().find("Fixture Dark").orElseThrow();
-            assertThat(ThemeManager.install(theme)).isTrue();
-            assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Fixture Dark");
-            assertThat(UIManager.getColor("Panel.background")).isEqualTo(new Color(0x123456));
-            assertThat(FlatLaf.isLafDark()).isTrue();
-            assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP)).isNotNull();
-        } finally { UIManager.setLookAndFeel(original); }
-    }
 
     private static void assertColours(Map<String, String> expected) {
         expected.forEach((key, value) -> assertThat(hex(UIManager.getColor(key))).as(key).isEqualTo(value));

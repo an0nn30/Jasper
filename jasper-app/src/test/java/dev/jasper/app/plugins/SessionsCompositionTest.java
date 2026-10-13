@@ -127,7 +127,7 @@ class SessionsCompositionTest {
     }
     @Test void enlargedNarrowHeaderMeasuresItsWrappedHostActionRows() throws Exception {
         var fonts=AppContractTest.onEdtValue(()->{
-            var controller=new dev.jasper.app.appearance.ThemeController();
+            var controller=dev.jasper.app.appearance.ThemeTestSupport.controller(true);
             controller.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system",20));return controller;
         });
         try(var fixture=new SessionsSurfaceFixture(home,SurfaceFixtures.theme("dark"))) {

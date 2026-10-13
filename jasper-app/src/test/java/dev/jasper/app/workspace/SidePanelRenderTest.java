@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Slot;

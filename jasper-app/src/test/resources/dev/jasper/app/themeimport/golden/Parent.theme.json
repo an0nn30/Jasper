@@ -1,1 +1,0 @@
-{"name":"Parent","parentTheme":"Darcula","colors":{"base":"#223344"},"ui":{"*.background":"base","Panel.background":"#334455","Button.arc":7,"TextField.background":{"os.mac":"#112233","os.default":"#445566"}},"icons":{"ColorPalette":{"Actions.Red":"#ab1234"}}}

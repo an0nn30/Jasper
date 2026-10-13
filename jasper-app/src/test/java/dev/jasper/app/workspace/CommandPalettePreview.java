@@ -2,7 +2,6 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.palette.*;
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.config.KeyBindings;

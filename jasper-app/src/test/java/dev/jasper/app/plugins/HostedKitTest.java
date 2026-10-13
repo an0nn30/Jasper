@@ -140,7 +140,7 @@ class HostedKitTest {
   var before=appearance.color(SemanticColor.ACCENT);var previous=current.get().chrome();
   var tokens=new java.util.EnumMap<dev.jasper.ui.theme.Token,java.awt.Color>(dev.jasper.ui.theme.Token.class);tokens.putAll(previous.tokens());tokens.put(dev.jasper.ui.theme.Token.ACCENT,java.awt.Color.MAGENTA);tokens.put(dev.jasper.ui.theme.Token.EDITOR_CARET,java.awt.Color.ORANGE);
   var styles=new java.util.EnumMap<dev.jasper.ui.theme.SyntaxRole,dev.jasper.ui.theme.SyntaxStyle>(dev.jasper.ui.theme.SyntaxRole.class);styles.putAll(previous.syntax());styles.put(dev.jasper.ui.theme.SyntaxRole.COMMENT,new dev.jasper.ui.theme.SyntaxStyle(java.awt.Color.GREEN,false,true));
-  var changed=new dev.jasper.ui.theme.GeneratedTheme(previous.name(),previous.dark(),previous.author(),tokens,styles,previous.terminal(),previous.uiKeys(),previous.icons(),previous.glass(),dev.jasper.ui.theme.SemanticDefaults.resolve(java.util.Map.of(),tokens,previous.terminal()));current.set(new dev.jasper.app.appearance.ResolvedTheme(changed,changed));
+  var changed=new dev.jasper.ui.theme.GeneratedTheme(previous.name(),previous.dark(),previous.author(),tokens,styles,previous.terminal(),previous.uiKeys(),previous.icons(),previous.glass(),dev.jasper.ui.theme.SemanticDefaults.resolve(java.util.Map.of(),tokens,previous.terminal()));current.set(dev.jasper.app.appearance.ThemeTestSupport.mixed(changed,changed));
   var variants=new java.util.ArrayList<dev.jasper.sdk.Variant>();appearance.onChanged(variants::add);for(var update:java.util.List.copyOf(updates))update.accept(current.get());
   assertThat(variants).containsExactly(appearance.variant());assertThat(appearance.color(SemanticColor.ACCENT)).isNotEqualTo(before).isEqualTo(java.awt.Color.MAGENTA);
   assertThat(editor.getCaretColor()).isEqualTo(java.awt.Color.ORANGE);assertThat(syntax.get().style(dev.jasper.sdk.ui.SyntaxRole.COMMENT).color()).isEqualTo(java.awt.Color.GREEN);
@@ -203,7 +203,7 @@ class HostedKitTest {
    var previous=current.get().chrome();var tokens=new java.util.EnumMap<dev.jasper.ui.theme.Token,java.awt.Color>(dev.jasper.ui.theme.Token.class);tokens.putAll(previous.tokens());
    tokens.put(dev.jasper.ui.theme.Token.INPUT_BACKGROUND,java.awt.Color.MAGENTA);tokens.put(dev.jasper.ui.theme.Token.TEXT,java.awt.Color.GREEN);
    var changed=new dev.jasper.ui.theme.GeneratedTheme(previous.name(),previous.dark(),previous.author(),tokens,previous.syntax(),previous.terminal(),previous.uiKeys(),previous.icons(),previous.glass(),dev.jasper.ui.theme.SemanticDefaults.resolve(java.util.Map.of(),tokens,previous.terminal()));
-   current.set(new dev.jasper.app.appearance.ResolvedTheme(changed,workspace));for(var update:java.util.List.copyOf(updates))update.accept(current.get());
+   current.set(dev.jasper.app.appearance.ThemeTestSupport.mixed(changed,workspace));for(var update:java.util.List.copyOf(updates))update.accept(current.get());
    assertThat(current.get().workspace()).isSameAs(workspace);assertThat(source.editorPalette()).isEqualTo(HostedPalettes.editor(workspace));assertThat(source.syntaxPalette()).isEqualTo(HostedPalettes.syntax(workspace));
    assertThat(scroll.getBackground()).isEqualTo(source.color(SemanticColor.SURFACE_INPUT));assertThat(scroll.getForeground()).isEqualTo(source.color(SemanticColor.TEXT_PRIMARY));
    assertThat(editor.getDocument()).isSameAs(document);assertThat(editor.getCaretPosition()).isEqualTo(4);

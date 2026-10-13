@@ -12,11 +12,6 @@ import java.util.Objects;
 public record ResolvedTheme(GeneratedTheme chrome, GeneratedTheme workspace, Palette palette) {
     public ResolvedTheme { Objects.requireNonNull(chrome); Objects.requireNonNull(workspace); Objects.requireNonNull(palette); }
 
-    /** A legacy fixture pair: the terminal palette is the workspace theme's own, bold text in its foreground. */
-    public ResolvedTheme(GeneratedTheme chrome, GeneratedTheme workspace) {
-        this(chrome, workspace, TerminalPaletteAdapter.toTerminal(workspace.terminal()));
-    }
-
     /** Slate Steel: one variant for chrome and workspace, and the terminal scheme's palette. */
     public static ResolvedTheme slateSteel(boolean dark, TerminalScheme scheme) {
         var theme = SlateSteel.bundled().generated(dark);

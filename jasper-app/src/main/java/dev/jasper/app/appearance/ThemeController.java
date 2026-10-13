@@ -1,8 +1,6 @@
 package dev.jasper.app.appearance;
 
-import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.TerminalSchemeChoice;
-import dev.jasper.app.config.WorkspaceThemeChoice;
 import dev.jasper.app.config.UiFontConfig;
 import dev.jasper.ui.theme.GeneratedTheme;
 import dev.jasper.ui.theme.TerminalScheme;
@@ -19,8 +17,7 @@ import javax.swing.*;
 
 /**
  * Application-owned, EDT-confined theme selection and value subscriptions. The application shows Slate Steel: one
- * variant for chrome and workspace, and the terminal scheme's palette. The {@link Theme}-based constructors and
- * overloads show a legacy fixture theme for tests until the legacy themes are removed.
+ * variant for chrome and workspace, and the terminal scheme's palette in the terminal panes.
  */
 public final class ThemeController implements AutoCloseable {
     private AppearanceBindings appearance;
@@ -40,9 +37,7 @@ public final class ThemeController implements AutoCloseable {
 
     private final Set<BiConsumer<ResolvedTheme, Boolean>> listeners = new LinkedHashSet<>();
     private final Predicate<GeneratedTheme> installer;
-    /** The legacy fixture selection, or null while Slate Steel is shown. */
-    private ThemeState state;
-    /** The Slate Steel selection, or null while a legacy fixture theme is shown. */
+    /** The Slate Steel selection. */
     private Slate slate;
     private ResolvedTheme current;
     private UiFontConfig uiFont = UiFontConfig.defaults();
@@ -68,21 +63,14 @@ public final class ThemeController implements AutoCloseable {
         }
     }
 
-    public ThemeController() { this(Theme.DARK); }
-    public ThemeController(Theme saved) { this(saved, ThemeManager::install); }
-    public ThemeController(Predicate<GeneratedTheme> installer) { this(Theme.DARK, installer); }
-    ThemeController(Theme saved, Predicate<GeneratedTheme> installer) {
-        this(ThemeState.defaults().configure(Objects.requireNonNull(saved)), null, installer);
-    }
     /** Slate Steel in {@code dark} with {@code scheme}. */
     public ThemeController(boolean dark, TerminalSchemeChoice scheme) { this(dark, scheme, ThemeManager::install); }
     ThemeController(boolean dark, TerminalSchemeChoice scheme, Predicate<GeneratedTheme> installer) {
-        this(null, new Slate(dark, Objects.requireNonNull(scheme)), installer);
+        this(new Slate(dark, Objects.requireNonNull(scheme)), installer);
     }
-    private ThemeController(ThemeState legacy, Slate slate, Predicate<GeneratedTheme> installer) {
+    private ThemeController(Slate slate, Predicate<GeneratedTheme> installer) {
         requireEdt();
         this.installer = Objects.requireNonNull(installer);
-        this.state = legacy;
         this.slate = slate;
         // Swing otherwise tries the component's plugin loader for third-party LAF delegates.
         // Only UI delegate lookup belongs to the app; plugin class visibility stays isolated.
@@ -90,7 +78,7 @@ public final class ThemeController implements AutoCloseable {
         FORM_FONTS.forEach(key -> UIManager.put(key, null));
         UIManager.put("defaultFont", null);
         UIManager.put("Jasper.uiFontFamilyOverride", false);
-        current = resolve(legacy, slate);
+        current = resolve(slate);
         appearance = new AppearanceBindings(current.pair(), ThemeController::reportFailure, () -> animationsEnabled);
         new dev.jasper.ui.swing.AppearanceTransaction(appearance.binding(), ignored -> installOrThrow(current.chrome()), ignored -> {}).apply(current.pair());
         platformFont = UIManager.getFont("defaultFont") != null ? UIManager.getFont("defaultFont") : UIManager.getFont("Label.font");
@@ -101,65 +89,30 @@ public final class ThemeController implements AutoCloseable {
     public static TerminalScheme scheme(boolean dark, TerminalSchemeChoice choice) {
         return choice == TerminalSchemeChoice.MATCH ? TerminalScheme.matching(dark) : TerminalScheme.of(choice.key()).orElseThrow();
     }
-    private static ResolvedTheme resolve(ThemeState legacy, Slate slate) {
-        return slate != null ? ResolvedTheme.slateSteel(slate.dark(), scheme(slate.dark(), slate.scheme())) : legacy.resolve();
+    private static ResolvedTheme resolve(Slate slate) {
+        return ResolvedTheme.slateSteel(slate.dark(), scheme(slate.dark(), slate.scheme()));
     }
 
     public ResolvedTheme current() { requireEdt(); return current; }
-    /** The configured legacy fixture theme; null while Slate Steel is shown. */
-    public Theme choice() { requireEdt(); return state == null ? null : state.choice(); }
-    public WorkspaceThemeChoice workspaceChoice() { requireEdt(); return state == null ? WorkspaceThemeChoice.MATCH : state.workspaceChoice(); }
-    /** Legacy sources that must survive cache pruning, including an active converted workspace; none with Slate Steel. */
-    public List<Theme> activeThemes() {
-        requireEdt();
-        if (state == null) return List.of();
-        return state.workspace() == null ? List.of(state.choice()) : List.of(state.choice(), state.workspace());
-    }
-    /** The terminal scheme chosen; {@code MATCH} while a legacy fixture theme is shown. */
-    public TerminalSchemeChoice schemeChoice() { requireEdt(); return slate == null ? TerminalSchemeChoice.MATCH : slate.scheme(); }
+    /** The terminal scheme chosen. */
+    public TerminalSchemeChoice schemeChoice() { requireEdt(); return slate.scheme(); }
 
     /** Slate Steel in {@code dark} with {@code scheme} and {@code font}. */
     public void configure(boolean dark, TerminalSchemeChoice scheme, UiFontConfig font) {
         requireEdt();
         var next = new Slate(dark, Objects.requireNonNull(scheme));
-        apply(null, next, resolve(null, next), Objects.requireNonNull(font));
+        apply(next, resolve(next), Objects.requireNonNull(font));
     }
     public void configure(boolean dark, TerminalSchemeChoice scheme) { requireEdt(); configure(dark, scheme, uiFont); }
     /** Changes only the terminal scheme; the UI variant and font stay. */
     public void configureScheme(TerminalSchemeChoice scheme) {
-        requireEdt(); configure(slate != null ? slate.dark() : current.chrome().dark(), scheme, uiFont);
+        requireEdt(); configure(slate.dark(), scheme, uiFont);
     }
 
-    private ThemeState legacy() { return state == null ? ThemeState.defaults() : state; }
-    /** Changes only workspace values, preserving the active chrome and interface typography. */
-    public void configureWorkspace(WorkspaceThemeChoice choice, Theme workspaceOrNull) {
-        requireEdt(); configure(legacy().choice(), choice, workspaceOrNull, uiFont);
-    }
-    public void configureTerminal(TerminalColors terminal) {
-        requireEdt(); configure(legacy().choice(), terminal, uiFont);
-    }
-    public void configure(Theme saved) { requireEdt(); configure(saved, uiFont); }
-    public void configure(Theme saved, UiFontConfig font) {
-        requireEdt(); configure(saved, legacy().workspaceChoice(), legacy().workspace(), font);
-    }
-    /** Compatibility for built-in terminal-colour menu choices. */
-    public void configure(Theme saved, TerminalColors terminal, UiFontConfig font) {
-        requireEdt(); Objects.requireNonNull(terminal);
-        Theme workspace = terminal.equals(TerminalColors.LIGHT) ? Theme.JASPER_LIGHT
-            : terminal.equals(TerminalColors.DARK) ? Theme.DARK : null;
-        configure(saved, workspace == null ? WorkspaceThemeChoice.parse(terminal.name())
-            : new WorkspaceThemeChoice(workspace.name()), workspace, font);
-    }
-    /** Resolves both slots before installing chrome, then publishes both only after successful installation. */
-    public void configure(Theme saved, WorkspaceThemeChoice choice, Theme workspaceOrNull, UiFontConfig font) {
-        requireEdt();
-        var next = new ThemeState(saved, choice, workspaceOrNull);
-        apply(next, null, next.resolve(), Objects.requireNonNull(font));
-    }
-    private void apply(ThemeState nextLegacy, Slate nextSlate, ResolvedTheme next, UiFontConfig font) {
+    private void apply(Slate nextSlate, ResolvedTheme next, UiFontConfig font) {
         ResolvedTheme previous = current;
         boolean chromeChanged = previous.chrome() != next.chrome() || !uiFont.equals(font);
-        boolean selectionChanged = !Objects.equals(state, nextLegacy) || !Objects.equals(slate, nextSlate);
+        boolean selectionChanged = !Objects.equals(slate, nextSlate);
         if (applying) throw new IllegalStateException("Theme configuration cannot re-enter");
         applying = true;
         try {
@@ -170,7 +123,6 @@ public final class ThemeController implements AutoCloseable {
                 }
                 UIManager.put("Jasper.uiFontFamilyOverride", !font.family().equalsIgnoreCase("system"));
                 uiFont = font;
-                state = nextLegacy;
                 slate = nextSlate;
                 current = next;
             }, ignored -> {}).apply(next.pair());

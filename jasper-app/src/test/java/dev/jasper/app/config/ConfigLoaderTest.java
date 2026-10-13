@@ -1,6 +1,5 @@
 package dev.jasper.app.config;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.ToolbarMode;
 

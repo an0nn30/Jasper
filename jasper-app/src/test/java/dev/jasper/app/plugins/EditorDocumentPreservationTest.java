@@ -2,7 +2,6 @@ package dev.jasper.app.plugins;
 
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ResolvedTheme;
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.sdk.ui.UiView;
 import dev.jasper.ui.swing.KitView;
 import dev.jasper.ui.theme.ThemeRoute;

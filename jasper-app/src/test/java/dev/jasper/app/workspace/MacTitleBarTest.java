@@ -253,7 +253,7 @@ class MacTitleBarTest {
             owner.onMinimumSizeChanged = changed::incrementAndGet;
             root.putClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle(100, 80));
             assertThat(changed.get()).isZero();
-            owner.onThemeChanged.accept(new ResolvedTheme(dev.jasper.app.appearance.ThemeTestSupport.generated(false), dev.jasper.app.appearance.ThemeTestSupport.generated(false)));
+            owner.onThemeChanged.accept(dev.jasper.app.appearance.ThemeTestSupport.resolved(false));
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameDarkAqua");
         });
     }

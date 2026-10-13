@@ -1,7 +1,6 @@
 package dev.jasper.app.palette;
 
 import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.config.UiFontConfig;

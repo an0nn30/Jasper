@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.config.AppearanceMode;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigLoader;

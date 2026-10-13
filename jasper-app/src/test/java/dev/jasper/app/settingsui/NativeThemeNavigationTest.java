@@ -1,8 +1,6 @@
 package dev.jasper.app.settingsui;
 
-import dev.jasper.app.appearance.ThemeManager;
 import dev.jasper.app.config.*;
-import dev.jasper.app.config.TerminalColors;
 import java.nio.file.Path;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -21,13 +19,11 @@ class NativeThemeNavigationTest {
     @Test void pagesAndPickersOfferOnlyNativeNamesAndLiveNavigationTargets() {
         var system = new CorePages.SystemActions(() -> Path.of("config.toml"), () -> {}, () -> {}, () -> {}, () -> {}, () -> false);
         var context = new PageContext(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", false).values()), id -> {}, Runnable::run, (title, initial) -> Optional.empty(), () -> {});
-        var names = ThemeManager.builtIns().stream().map(t -> t.name()).toList();
         var pages = CorePages.pages(AppearanceFixtures.CHOICES, system,
             ctx -> new GroupPage("keymap", "Keymap", Optional.empty(), false, List::of, ctx),
             ctx -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, ctx)).apply(context);
         var ids = pages.stream().map(SettingsPage::id).toList();
         assertThat(ids).doesNotContain("themes", "themes.intellij", "themes.alacritty").contains("appearance", "terminal.font");
         for (var page : pages) page.parent().ifPresent(parent -> assertThat(ids).contains(parent));
-        assertThat(names).containsExactlyInAnyOrder("Jasper Light", "Jasper Dark", "Nord", "Clear Dark", "Clear Light");
     }
 }

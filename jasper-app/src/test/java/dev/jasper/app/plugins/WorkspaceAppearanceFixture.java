@@ -53,7 +53,7 @@ final class WorkspaceAppearanceFixture {
             new SyntaxStyle(style.color(), style.bold(), style.italic())));
         var workspace = new GeneratedTheme("Contract", variant == Variant.DARK, "", tokens, styles,
             previous.terminal(), previous.uiKeys(), previous.icons(), previous.glass(), previous.semantic());
-        current = new ResolvedTheme(current.chrome(), workspace);
+        current = ThemeTestSupport.mixed(current.chrome(), workspace);
         for (var listener : List.copyOf(listeners)) listener.accept(current);
     }
 }

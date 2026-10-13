@@ -191,38 +191,6 @@ tasks.register<JavaExec>("shortcutHelpPreview") {
     args(layout.buildDirectory.dir("reports/shortcut-help").get().asFile.absolutePath)
 }
 
-// Offline catalog generation: compile classes and dependencies, without a processResources cycle.
-tasks.register<JavaExec>("convertThemes") {
-    group = "themes"
-    description = "Regenerates native themes from the checked-in source lock (offline)."
-    dependsOn(tasks.compileJava)
-    classpath = files(sourceSets.main.get().output.classesDirs, sourceSets.main.get().resources.srcDirs,
-        configurations.runtimeClasspath)
-    mainClass = "dev.jasper.app.themeimport.ConvertThemes"
-    jvmArgs("-Djava.awt.headless=true")
-    args("--manifest", rootProject.file("tools/themes/sources.json"),
-        "--sources", rootProject.file("third_party/themes"),
-        "--output", file("src/main/resources/dev/jasper/app/themes"),
-        "--notices", rootProject.file("THIRD-PARTY-THEMES.md"))
-}
-
-// Pre-migration evidence uses current build outputs; immutable before captures are checked in separately.
-tasks.register<JavaExec>("themeMigrationPreview") {
-    group = "verification"
-    description = "Captures real existing app families headlessly without replacing golden expectations."
-    dependsOn(tasks.testClasses, stagePlugins)
-    classpath = sourceSets["test"].runtimeClasspath
-    mainClass = "dev.jasper.app.appearance.ThemeMigrationPreview"
-    providers.gradleProperty("jasper.uiScale").orNull?.let { systemProperty("flatlaf.uiScale", it) }
-    systemProperty("jasper.stagedPlugins", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
-    val captureHome = layout.buildDirectory.dir("theme-migration-home").get().asFile.absolutePath
-    systemProperty("user.home", captureHome)
-    environment("HISTFILE", "$captureHome/.zsh_history")
-    environment("XDG_CONFIG_HOME", "$captureHome/.config")
-    environment("APPDATA", "$captureHome/AppData/Roaming")
-    jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
-}
-
 // Exact device-scale captures of real staged feature owners in disposable homes.
 tasks.register<JavaExec>("themeSurfacePreview") {
     group = "verification"

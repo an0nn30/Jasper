@@ -38,7 +38,7 @@ class KitMountingTest {
 
     @Test void livePolicySettlesActiveNativeAndHostedEffectsAndDisablesFutureEffects() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            try(var themes=new dev.jasper.app.appearance.ThemeController()) {
+            try(var themes=dev.jasper.app.appearance.ThemeTestSupport.controller(true)) {
                 var kit=new HostedKit("test.kit",() -> true,() -> themes.current().pair(),null,new Containment(() -> true),themes::animationsEnabled);
                 var hosted=kit.create(toggle(false),e -> {});
                 try(var nativeView=new dev.jasper.ui.swing.KitView(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),KitValues.toModule(toggle(false)),e -> {})) {
@@ -66,7 +66,7 @@ class KitMountingTest {
     }
     @Test void customDocumentReparentResamplesOpacityWithoutRecreation() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var containment=new Containment(() -> true);var current=new dev.jasper.app.appearance.ThemeController();
+            var containment=new Containment(() -> true);var current=dev.jasper.app.appearance.ThemeTestSupport.controller(true);
             var left=new JPanel();var right=new JPanel();
             var ui=new HostedUi("test.kit",new dev.jasper.app.contributions.Contributions(),containment,Runnable::run,() -> true,() -> true,getClass().getClassLoader(),() -> dev.jasper.sdk.Variant.DARK,h -> () -> {},AppContractTest.headlessWindows(),null,current::current,h -> current.subscribe((value,changed) -> h.accept(value)),new GlassSource(c -> SwingUtilities.isDescendingFrom(c,right) ? .4 : 1,h -> new dev.jasper.app.lifecycle.Subscription(() -> {})));
             var kit=new HostedKit("test.kit",() -> true,ui::kitThemes,ui.appearance(),containment);ui.kit(kit);
@@ -235,7 +235,7 @@ class KitMountingTest {
     }
     @Test void nativeAndHostedContextsUseLiveMotionPolicy() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            try (var themes = new dev.jasper.app.appearance.ThemeController()) {
+            try (var themes = dev.jasper.app.appearance.ThemeTestSupport.controller(true)) {
                 var nativeContext = themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME);
                 var kit = new HostedKit("test.kit", () -> true, () -> themes.current().pair(), null,
                     new Containment(java.awt.EventQueue::isDispatchThread), themes::animationsEnabled);

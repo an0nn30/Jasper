@@ -22,7 +22,7 @@ class ConfigurationReportTest {
         // The service reads its initial state here, off the EDT, as production does; the controller is EDT-owned.
         try (var service = new ConfigService(file, true, worker, SwingUtilities::invokeLater)) {
             edt(() -> {
-                var controller = new ConfigurationController(new ThemeController(theme -> true), service, path -> { });
+                var controller = new ConfigurationController(dev.jasper.app.appearance.ThemeTestSupport.controller(true, theme -> true), service, path -> { });
                 assertThat(controller.shown().diagnostics()).isEmpty();
                 controller.report("plugins.\"a.b\".port", "out of range");
                 assertThat(controller.shown().diagnostics()).singleElement().satisfies(diagnostic -> {

@@ -1,7 +1,6 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.ThemeTestSupport;
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.application.ApplicationTestSupport;
 import dev.jasper.app.palette.PaletteTestSupport;
 import dev.jasper.app.testsupport.LayoutTestSupport;

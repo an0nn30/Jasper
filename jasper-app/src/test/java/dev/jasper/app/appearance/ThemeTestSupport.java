@@ -22,7 +22,6 @@ public final class ThemeTestSupport {
         var theme = generated(dark);
         return new dev.jasper.ui.theme.ThemePair(theme, theme);
     }
-    public static boolean install(Theme theme) { return ThemeManager.install(theme); }
     /** Installs a generated theme, as ThemeController's installer does. */
     public static boolean install(GeneratedTheme theme) { return ThemeManager.install(theme); }
 
@@ -89,7 +88,4 @@ public final class ThemeTestSupport {
         try { g.setColor(bottom); g.fillRect(0, 0, 1, 1); g.setColor(top); g.fillRect(0, 0, 1, 1); } finally { g.dispose(); }
         return new Color(image.getRGB(0, 0), true);
     }
-
-    /** A built-in theme by name, or Jasper Dark: what start-up picks for a name no theme has. */
-    public static Theme named(String name) { return ThemeCatalog.builtIn().latest().find(name).orElse(Theme.DARK); }
 }

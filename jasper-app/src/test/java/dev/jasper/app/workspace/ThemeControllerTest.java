@@ -3,7 +3,6 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ResolvedTheme;
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.workspace.DesktopTestSupport;
 import dev.jasper.app.workspace.SplitTree;
@@ -280,7 +279,7 @@ class ThemeControllerTest {
             owner.close();
             // A closed owner must not even receive UI-delegate changes.
             var closedUi = owner.getUI();
-            owner.onThemeChanged.accept(new ResolvedTheme(dev.jasper.app.appearance.ThemeTestSupport.generated(true), dev.jasper.app.appearance.ThemeTestSupport.generated(true)));
+            owner.onThemeChanged.accept(dev.jasper.app.appearance.ThemeTestSupport.resolved(true));
             themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
             assertThat(owner.getUI()).isSameAs(closedUi);
             assertThat(received).containsExactly(ThemeTestSupport.resolved(false));

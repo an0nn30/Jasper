@@ -2,7 +2,6 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.ThemeTestSupport;
 import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.testsupport.EdtTestExtension;

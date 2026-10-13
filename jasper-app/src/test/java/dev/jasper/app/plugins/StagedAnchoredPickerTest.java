@@ -58,8 +58,7 @@ class StagedAnchoredPickerTest {
     onEdt(()->{capture("selected",kitView(form));KitView menu;
      click(form,"import.choose.0.input");menu=menu(vault);capture("open",menu);capture("open-face",kitView(form));
      var field=(JTextField)named(menu,"credential.menu.search");var document=field.getDocument();field.setText("fixt");field.setCaretPosition(2);capture("filtering",menu);
-     var light=dev.jasper.app.appearance.ThemeTestSupport.generated(false);
-     appearance.setPair(new dev.jasper.app.appearance.ResolvedTheme(light,light));capture("filtering-light",menu);
+     appearance.setPair(dev.jasper.app.appearance.ThemeTestSupport.resolved(false));capture("filtering-light",menu);
      appearance.setPair(theme.current());capture("filtering-default-theme",menu);appearance.setPair(pair);
      var raw=new HashMap<Object,Object>();UIManager.getDefaults().forEach(raw::put);var font=raw.get("defaultFont");try{UIManager.put("defaultFont",new Font("Dialog",Font.PLAIN,20));capture("filtering-enlarged",menu);capture("selected-enlarged",kitView(form));assertFooterLabelsFit(kitView(form));}finally{UIManager.put("defaultFont",font);}
      menu.setAvailableHeight(90);capture("filtering-short",menu);assertThat(menu.getPreferredSize().height).isLessThanOrEqualTo(90);menu.setAvailableHeight(Integer.MAX_VALUE);

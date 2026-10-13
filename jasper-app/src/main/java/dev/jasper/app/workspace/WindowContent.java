@@ -4,7 +4,6 @@ import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.ui.theme.SemanticColor;
 
 import dev.jasper.ui.theme.GlassLevels;
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
@@ -1109,14 +1108,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     ResolvedTheme theme() { return themes.current(); }
-
-    /** Applies {@code theme} to every window, as the saved configuration applies its theme. */
-    void selectTheme(Theme theme) {
-        if (closed) return;
-        try { themes.configure(theme); }
-        catch (ThemeController.InstallationFailure failure) { onError.accept("Could not apply the theme", failure.getMessage()); }
-        finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
-    }
 
     /**
      * Slate Steel's Dark ({@code dark}) or Light variant in every window sharing this window's themes, as

@@ -1,7 +1,6 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.app.appearance.ThemeTestSupport;
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelSite;

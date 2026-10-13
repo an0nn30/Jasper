@@ -1,7 +1,6 @@
 package dev.jasper.app.notificationui;
 
 import dev.jasper.app.appearance.ThemeTestSupport;
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.contributions.PanelSite;
 import dev.jasper.app.notifications.*;

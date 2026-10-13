@@ -1,6 +1,6 @@
 /**
  * EDT theme resolution and global look-and-feel installation. Subscribers own returned cancellation handles.
- * <p>Allowed outgoing Jasper dependencies: dev.jasper.app.config, dev.jasper.app.lifecycle, dev.jasper.terminal.config, dev.jasper.ui.theme, dev.jasper.ui.themeio, dev.jasper.ui.themeimport,
+ * <p>Allowed outgoing Jasper dependencies: dev.jasper.app.config, dev.jasper.app.lifecycle, dev.jasper.terminal.config, dev.jasper.ui.theme,
  * dev.jasper.ui.swing, dev.jasper.ui.metrics, dev.jasper.ui.icons.
  * The module architecture check forbids package cycles; app types are not an external plugin API.
  */

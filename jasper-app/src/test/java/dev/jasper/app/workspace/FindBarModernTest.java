@@ -1,7 +1,6 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.ThemeTestSupport;
-import dev.jasper.app.appearance.Theme;
 import com.formdev.flatlaf.FlatClientProperties;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.terminal.config.GridSize;

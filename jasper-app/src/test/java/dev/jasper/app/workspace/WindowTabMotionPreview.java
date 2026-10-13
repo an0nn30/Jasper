@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.*;

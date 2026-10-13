@@ -36,7 +36,6 @@ class JasperApplicationThemesTest {
                 assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(expected);
                 assertThat(dev.jasper.app.platform.ThemeZone.theme(null)).isSameAs(expected);
             });
-            assertThat(Files.exists(home.resolve("themes"))).as("no themes folder").isFalse();
         } finally {
             if (application[0] != null) { edt(application[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); }
             service.close();
@@ -52,5 +51,20 @@ class JasperApplicationThemesTest {
     /** The default follows the operating system; a headless run has none, so it starts Dark. */
     @Test void withNoAppearanceAHeadlessStartIsDark() throws Exception {
         start("", true);
+    }
+
+    /** Review Focus 1: an older install's theme folders are neither read nor changed. */
+    @Test void anOlderInstallsThemeFoldersAreIgnoredAndLeftAsTheyAre() throws Exception {
+        java.nio.file.Files.createDirectories(home.resolve("themes"));
+        java.nio.file.Files.createDirectories(home.resolve("terminal-themes"));
+        var theme = java.nio.file.Files.writeString(home.resolve("themes/nord.toml"), "name = \"Nord\"\n");
+        var colors = java.nio.file.Files.writeString(home.resolve("terminal-themes/dark.toml"), "[colors]\n");
+        start("[ui]\nappearance = 'light'\n", false);
+        assertThat(java.nio.file.Files.readString(theme)).isEqualTo("name = \"Nord\"\n");
+        assertThat(java.nio.file.Files.readString(colors)).isEqualTo("[colors]\n");
+        try (var listing = java.nio.file.Files.list(home)) {
+            assertThat(listing.map(path -> path.getFileName().toString()))
+                .containsExactlyInAnyOrder("config.toml", "themes", "terminal-themes");
+        }
     }
 }

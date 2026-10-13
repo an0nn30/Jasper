@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.platform.MacTitleBar;
 import java.awt.*;
 import java.awt.image.BufferedImage;

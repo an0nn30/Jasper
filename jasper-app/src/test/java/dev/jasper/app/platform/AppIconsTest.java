@@ -1,7 +1,6 @@
 package dev.jasper.app.platform;
 
 import dev.jasper.app.appearance.ThemeTestSupport;
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import com.formdev.flatlaf.extras.FlatSVGIcon;
 import java.util.Arrays;
