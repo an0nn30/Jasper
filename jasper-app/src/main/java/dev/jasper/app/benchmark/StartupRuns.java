@@ -68,9 +68,15 @@ final class StartupRuns {
         return "-D" + StartupTrace.TRACE_FILE_PROPERTY + "=" + traceFile + (home == null ? "" : " -Duser.home=" + home);
     }
 
-    static List<String> openCommand(Path app, String javaToolOptions, boolean background) {
+    /** The empty options file an isolated home gives Jasper's launcher, so the developer's jasper.vmoptions never applies. */
+    static Path isolatedVmOptions(Path home) {
+        return home.resolve(".config/jasper/jasper.vmoptions");
+    }
+
+    static List<String> openCommand(Path app, String javaToolOptions, Path home, boolean background) {
         List<String> command = new ArrayList<>(List.of("open", "-n", "-a", app.toString(), "--env",
             "JAVA_TOOL_OPTIONS=" + javaToolOptions));
+        if (home != null) command.addAll(List.of("--env", "JASPER_VM_OPTIONS=" + isolatedVmOptions(home)));
         if (background) command.addAll(List.of("--args", "--background"));
         return command;
     }
@@ -129,6 +135,11 @@ final class StartupRuns {
         Path root = Files.createTempDirectory(Path.of("/tmp"), "jsb");
         try {
             Path home = options.realHome() ? null : Files.createDirectories(root.resolve("home"));
+            if (home != null) {
+                Path vmOptions = isolatedVmOptions(home);
+                Files.createDirectories(vmOptions.getParent());
+                Files.writeString(vmOptions, "", StandardCharsets.UTF_8);
+            }
             if (home != null && options.mode().equals("warm")) {
                 Path config = Files.createDirectories(home.resolve(".config/jasper")).resolve("config.toml");
                 Files.writeString(config, "[system]\nrun_in_background = true\n", StandardCharsets.UTF_8);
@@ -188,14 +199,14 @@ final class StartupRuns {
     private Map<String, Object> cold(Path root, Path home, int index) throws IOException {
         Path traceFile = root.resolve("trace-" + index + ".json");
         long click = host.epochMillis().getAsLong();
-        host.run().apply(openCommand(options.app(), launchOptions(traceFile, home), false));
+        host.run().apply(openCommand(options.app(), launchOptions(traceFile, home), home, false));
         Map<String, Object> trace = await(traceFile, document -> Boolean.TRUE.equals(document.get("settled")));
         return finish(index, trace, trace == null ? Map.of() : fromClick(trace, click, null));
     }
 
     private Map<String, Object> warm(Path root, Path home, int index) throws IOException {
         Path traceFile = root.resolve("trace-" + index + ".json");
-        host.run().apply(openCommand(options.app(), launchOptions(traceFile, home), true));
+        host.run().apply(openCommand(options.app(), launchOptions(traceFile, home), home, true));
         Map<String, Object> resident = await(traceFile, document -> Boolean.TRUE.equals(document.get("settled")));
         if (resident == null) return finish(index, null, Map.of());
         // Idle memory of the warm, windowless resident: what residency costs while it waits.

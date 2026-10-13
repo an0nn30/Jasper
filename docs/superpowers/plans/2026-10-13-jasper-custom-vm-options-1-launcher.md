@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: **Not started.** Written 2026-10-13 on `claude/custom-vm-options` (spec approved by the user the same day).
+Status: **Complete on 2026-10-13.** Fixes from the task reviews are recorded as deviations 7 and 8 and in the spec (sections 2, 4.1, 4.5, 6.1); the core's enum is `Os { Mac, Linux, Windows }`. Written 2026-10-13 on `claude/custom-vm-options` (spec approved by the user the same day).
 
 **Goal:** Packaged Jasper starts from its own build of jpackage's launcher, which merges the user's `jasper.vmoptions`
 over the bundled JVM options and starts once more without them when the JVM rejects them.

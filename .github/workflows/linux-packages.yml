@@ -14,12 +14,14 @@ on:
     paths:
       - gradle/packaging.gradle
       - gradle/packaging-support.gradle
+      - gradle/launcher.gradle
       - packaging/**
       - .github/workflows/linux-packages.yml
   pull_request:
     paths:
       - gradle/packaging.gradle
       - gradle/packaging-support.gradle
+      - gradle/launcher.gradle
       - packaging/**
       - .github/workflows/linux-packages.yml
 
@@ -40,7 +42,7 @@ jobs:
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils
+          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils g++
       - uses: actions/setup-java@v6
         with:
           distribution: jetbrains

@@ -29,7 +29,7 @@ ext.macLauncherWithIdentity = { byte[] executable, String bundleIdentifier, byte
     if (bundleIdentifier == null || bundleIdentifier.isBlank() || bundleIdentifier.indexOf(0) >= 0) {
         throw new GradleException('A nonempty bundle identifier is required for the launcher identity')
     }
-    // Seed with the immutable SDK resource, not the already patched/signed output. This keeps
+    // Seed with the compiled launcher (gradle/launcher.gradle), not the already patched/signed output. This keeps
     // verification independent of signing bytes and makes rewriting idempotent and reproducible.
     MessageDigest digest = MessageDigest.getInstance('SHA-256')
     digest.update(('jasper-launcher-uuid-v1\u0000' + bundleIdentifier + '\u0000').getBytes(StandardCharsets.UTF_8))

@@ -1,6 +1,6 @@
 # Jasper custom VM options
 
-Status: **Approved on 2026-10-13** (the user: "spec approved"). Plan 1 (launcher) written:
+Status: **Approved on 2026-10-13** (the user: "spec approved"). Plan 1 (launcher) complete on 2026-10-13:
 [`2026-10-13-jasper-custom-vm-options-1-launcher.md`](../plans/2026-10-13-jasper-custom-vm-options-1-launcher.md).
 Branch: `claude/custom-vm-options`, from `main` at `13cc10ca`.
 

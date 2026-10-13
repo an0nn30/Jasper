@@ -1,5 +1,18 @@
 # Jasper — Status and Handoff
 
+**Custom VM options plan 1 (launcher) complete — 2026-10-13.** On `claude/custom-vm-options` (not pushed): Jasper builds
+jpackage's launcher from vendored JBR 25.0.4.1 sources (`packaging/launcher`) with marked hooks that merge the user's
+`jasper.vmoptions` (location, format and IntelliJ's merge from the
+[spec](superpowers/specs/2026-10-13-jasper-custom-vm-options-design.md)) and an exit guard that starts once more
+without the user's options when the JVM rejects them. Bundled defaults `-Xmx2048m -XX:+IgnoreUnrecognizedVMOptions`.
+`check` builds the launcher and runs its native tests, a guard test against the real libjli and a probe-image
+end-to-end test on each OS. Deviations: the eight in the plan's banner; also `FileUtils::isDirectory` exists only in
+upstream's Windows sources, so the wrapper uses `stat`/`S_ISREG` elsewhere. Full `./gradlew check`: 9,730 tests,
+0 failures, 8 skips. Known limit (spec 4.5): HotSpot's own initialization failures (`-Xms` above `-Xmx`, a
+missing agent, an unusable CDS archive) end with `_exit` and are not recovered at launch; plan 2's Settings check
+reports them before a restart. Manual checks pending (the user): the packaged app on macOS with a `jasper.vmoptions`
+(`-Xmx3g`, then `-Xmx3q`), Windows and Linux packages. Plans 2 (settings and actions) and 3 (memory) are next.
+
 **`main` merged into `codex/theme-engine` — 2026-10-13.** Seven `main` commits since 2026-10-05: the command palette's
 drag (snap guides that are felt, not drawn; a remembered place; re-attach by dragging to the title field; double click
 resets) and its drip-open reveal behind `ui.animations.enabled`, plus Windows ARM64 packaging and resident relaunch.
