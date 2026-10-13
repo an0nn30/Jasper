@@ -124,7 +124,7 @@ license = "Apache-2.0"
 homepage = "https://github.com/java-native-access/jna"
 modules = ["net.java.dev.jna:jna:5.14.0", "net.java.dev.jna:jna-platform:5.14.0"]
 text = "apache-2.0.txt"
-notice = "jna.LICENSE.txt"
+notice = "jna.NOTICE.txt"
 
 [[component]]
 name = "jsvg"
@@ -189,3 +189,17 @@ license = "Apache-2.0"
 homepage = "https://github.com/tomlj/tomlj"
 modules = ["org.tomlj:tomlj:1.1.1"]
 text = "apache-2.0.txt"
+
+[[component]]
+name = "Windows Terminal ConPTY"
+version = ""
+license = "MIT"
+homepage = "https://github.com/microsoft/terminal"
+text = "microsoft-terminal.LICENSE.txt"
+
+[[component]]
+name = "winpty"
+version = "0.4.3"
+license = "MIT"
+homepage = "https://github.com/rprichard/winpty"
+text = "winpty.LICENSE.txt"
