@@ -239,8 +239,8 @@ Create `packaging/launcher/README.md`:
 
 Packaged Jasper starts from jpackage's native application launcher. Jasper builds that launcher itself from the
 JetBrains Runtime's sources, with one addition: it merges the user's `jasper.vmoptions` over the bundled JVM options,
-and starts once more without them when the JVM rejects them. The design is
-[Jasper custom VM options](../../docs/superpowers/specs/2026-10-13-jasper-custom-vm-options-design.md).
+and starts once more without them when the JVM rejects them. The design is the spec
+`docs/superpowers/specs/2026-10-13-jasper-custom-vm-options-design.md`.
 
 ## Upstream sources
 
