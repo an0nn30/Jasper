@@ -1,0 +1,133 @@
+package dev.jasper.app.platform;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.ClipboardOwner;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.StringSelection;
+import java.awt.datatransfer.Transferable;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class HostClipboardTest {
+    boolean busy;
+    final Clipboard system = new Clipboard("test") {
+        @Override public synchronized void setContents(Transferable contents, ClipboardOwner owner) {
+            if (busy) throw new IllegalStateException("cannot open system clipboard");
+            super.setContents(contents, owner);
+        }
+    };
+    final List<Runnable> timers = new ArrayList<>();
+    final List<Duration> delays = new ArrayList<>();
+    final HostClipboard clipboard = new HostClipboard(() -> system, (delay, task) -> {
+        delays.add(delay);
+        timers.add(task);
+        return () -> timers.remove(task);
+    });
+
+    /** Fires every armed clear, as their delays would. */
+    void elapse() { List.copyOf(timers).forEach(Runnable::run); }
+
+    /** The user copies in another program. */
+    void userCopies(String text) { system.setContents(new StringSelection(text), null); }
+
+    @Test void copiesTextAndReadsItBack() {
+        clipboard.copy("line one\nline two λ");
+        assertThat(clipboard.text()).contains("line one\nline two λ");
+        clipboard.copy("");
+        assertThat(clipboard.text()).contains("");
+    }
+
+    @Test void nothingOnTheClipboardOrNoTextReadsAsEmpty() {
+        assertThat(clipboard.text()).isEmpty();
+        system.setContents(image(), null);
+        assertThat(clipboard.text()).isEmpty();
+    }
+
+    @Test void aSecretIsClearedAfterThirtySecondsIfTheClipboardStillHoldsIt() {
+        clipboard.copySecret("hunter2", "dev.example.a");
+        assertThat(delays).containsExactly(Duration.ofSeconds(30));
+        assertThat(clipboard.text()).contains("hunter2");
+        elapse();
+        assertThat(clipboard.text()).contains("");
+        assertThat(timers).isEmpty();
+    }
+
+    @Test void aLaterUserCopyIsLeftAlone() {
+        clipboard.copySecret("hunter2", "dev.example.a");
+        userCopies("my own text");
+        elapse();
+        assertThat(clipboard.text()).contains("my own text");
+    }
+
+    @Test void aSecretIsLeftAloneWhenTheClipboardNowHoldsSomethingElse() {
+        clipboard.copySecret("hunter2", "dev.example.a");
+        system.setContents(image(), null);
+        elapse();
+        assertThat(system.getContents(null).isDataFlavorSupported(DataFlavor.imageFlavor)).isTrue();
+    }
+
+    @Test void aLaterCopyEndsThePendingSecret() {
+        clipboard.copySecret("hunter2", "dev.example.a");
+        clipboard.copy("plain");
+        assertThat(timers).as("the clear was cancelled").isEmpty();
+        clipboard.ownerStopped("dev.example.a");
+        clipboard.quit();
+        assertThat(clipboard.text()).contains("plain");
+    }
+
+    @Test void aSecondSecretRestartsTheClock() {
+        clipboard.copySecret("first", "dev.example.a");
+        clipboard.copySecret("second", "dev.example.a");
+        assertThat(timers).as("only the second secret's clear is armed").hasSize(1);
+        elapse();
+        assertThat(clipboard.text()).contains("");
+    }
+
+    @Test void stoppingThePluginThatCopiedTheSecretClearsItAndOnlyThatPlugin() {
+        clipboard.copySecret("hunter2", "dev.example.a");
+        clipboard.ownerStopped("dev.example.b");
+        assertThat(clipboard.text()).contains("hunter2");
+        clipboard.ownerStopped("dev.example.a");
+        assertThat(clipboard.text()).contains("");
+        assertThat(timers).isEmpty();
+    }
+
+    @Test void quittingClearsAPendingSecret() {
+        clipboard.copySecret("hunter2", "dev.example.a");
+        clipboard.quit();
+        assertThat(clipboard.text()).contains("");
+        assertThat(timers).isEmpty();
+    }
+
+    @Test void aBusyClipboardThrowsAndLeavesThePendingSecretAlone() {
+        clipboard.copySecret("hunter2", "dev.example.a");
+        busy = true;
+        assertThatThrownBy(() -> clipboard.copy("lost")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> clipboard.copySecret("lost", "dev.example.b")).isInstanceOf(IllegalStateException.class);
+        assertThat(timers).as("the first secret's clear is still armed").hasSize(1);
+        assertThatCode(this::elapse).as("clearing while busy throws nothing").doesNotThrowAnyException();
+        busy = false;
+        assertThat(timers).isEmpty();
+        assertThat(clipboard.text()).as("nothing could be cleared").contains("hunter2");
+    }
+
+    @Test void nullTextIsRejected() {
+        assertThatThrownBy(() -> clipboard.copy(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> clipboard.copySecret(null, "dev.example.a")).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> clipboard.copySecret("x", null)).isInstanceOf(NullPointerException.class);
+    }
+
+    private static Transferable image() {
+        return new Transferable() {
+            @Override public DataFlavor[] getTransferDataFlavors() { return new DataFlavor[] {DataFlavor.imageFlavor}; }
+            @Override public boolean isDataFlavorSupported(DataFlavor flavor) { return DataFlavor.imageFlavor.equals(flavor); }
+            @Override public Object getTransferData(DataFlavor flavor) { return null; }
+        };
+    }
+}
