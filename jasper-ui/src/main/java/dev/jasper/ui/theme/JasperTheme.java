@@ -51,10 +51,10 @@ public final class JasperTheme {
     private JasperTheme(Map<String, Object> root, String id) {
         this.id = id;
         origin = id + ".json";
-        for (String key : root.keySet()) if (!TOP.contains(key)) throw error("Unknown entry \"" + key + "\"");
         if (!root.containsKey("jasper-theme")) throw error("Not a Jasper theme: \"jasper-theme\": " + FORMAT + " is missing");
         if (!(root.get("jasper-theme") instanceof Long format)) throw error("jasper-theme: Expected the number " + FORMAT);
         if (format != FORMAT) throw error("jasper-theme: Format " + format + " is not one this Jasper reads; expected " + FORMAT);
+        for (String key : root.keySet()) if (!TOP.contains(key)) throw error("Unknown entry \"" + key + "\"");
         name = text(root, "name");
         if (root.containsKey("author") && !(root.get("author") instanceof String)) throw error("author: Expected a string");
         author = (String) root.getOrDefault("author", "");

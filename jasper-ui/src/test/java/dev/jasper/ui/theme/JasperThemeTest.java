@@ -84,6 +84,7 @@ class JasperThemeTest {
         assertThat(failure(json.replace("\"name\": \"Slate Steel\"", "\"name\": \" \""))).hasMessageContaining("name: Expected a non-empty string");
         assertThat(failure(json.replace("\"author\": \"Jasper\"", "\"author\": {}"))).hasMessageContaining("author: Expected a string");
         assertThat(failure(json.replace("\"author\": \"Jasper\",", "\"author\": \"Jasper\", \"extra\": \"x\","))).hasMessageContaining("Unknown entry \"extra\"");
+        assertThat(failure("{ \"name\": \"X\", \"editorScheme\": \"x.xml\" }")).as("not a Jasper theme, whatever else it holds").hasMessage("t.json: Not a Jasper theme: \"jasper-theme\": 1 is missing");
     }
 
     @Test void aVariantNeedsItsMatchingSchemeAndEditorAndNothingElse() throws Exception {
