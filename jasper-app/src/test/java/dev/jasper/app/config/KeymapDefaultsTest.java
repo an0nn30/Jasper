@@ -51,6 +51,7 @@ class KeymapDefaultsTest {
         new Row("copy", KeyContext.GLOBAL, "cmd+c", "ctrl+shift+c"),                           // 42
         new Row("paste", KeyContext.GLOBAL, "cmd+v", "ctrl+shift+v"),                          // 43
         new Row("clear_scrollback", KeyContext.TERMINAL, "cmd+k", "ctrl+shift+k"),             // 45
+        new Row("clear_terminal", KeyContext.TERMINAL, "none", "none"),                       // Clear Terminal follow-up
         new Row("find", KeyContext.GLOBAL, "cmd+f", "ctrl+shift+f"),                           // 47
         new Row("find_next", KeyContext.GLOBAL, "cmd+g", "ctrl+shift+g"),                      // 48
         new Row("find_previous", KeyContext.GLOBAL, "cmd+shift+g", "ctrl+alt+shift+g"),        // 49

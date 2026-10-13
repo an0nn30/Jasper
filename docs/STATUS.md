@@ -1,5 +1,14 @@
 # Jasper — Status and Handoff
 
+**Clear Terminal in the terminal context menu — 2026-10-13** (`claude/clear-terminal`, worktree
+`.claude/worktrees/clear-terminal`; bounded change, design approved in chat, no spec or plan). Right-click › Clear
+Terminal (after Find) erases scrollback and the live screen; the cursor's line moves to the top with the cursor, and
+nothing is sent to the child. It is disabled while the alternate screen is active. New `clear_terminal` action (palette,
+`[keybindings]`, Shortcuts › Terminal; no default shortcut). Terminal API: `TerminalSession.clearTerminal()` and
+`usingAlternateBuffer()`, `TerminalView.clearTerminal()`, `TerminalAction.CLEAR_TERMINAL`. A multi-line prompt keeps
+only its last line until the next prompt. `./gradlew check --continue`: **9,767 tests, 0 failures, 0 errors, 8
+skipped**. No GUI launched. GUI check for the user: right-click a shell with history, choose Clear Terminal, and type.
+
 **SDK release jars for external plugins — 2026-10-13** (`claude/sdk-release`, worktree `.claude/worktrees/sdk-release`;
 [spec](superpowers/specs/2026-10-13-sdk-release-jars-design.md), [plan](superpowers/plans/2026-10-13-sdk-release-jars.md)).
 `./gradlew sdkRelease` writes `jasper-sdk-<v>.jar` (with `-sources` and `-javadoc`) and `jasper-sdk-testkit-<v>.jar`

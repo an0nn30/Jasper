@@ -19,6 +19,7 @@ class KeyBindingsContextTest {
 
     @Test void builtInsCarryTheirContexts() {
         assertThat(ActionId.CLEAR_SCROLLBACK.context()).isEqualTo(KeyContext.TERMINAL);
+        assertThat(ActionId.CLEAR_TERMINAL.context()).isEqualTo(KeyContext.TERMINAL);
         assertThat(ActionId.PREVIOUS_PROMPT.context()).isEqualTo(KeyContext.TERMINAL);
         assertThat(ActionId.NEW_TAB.context()).isEqualTo(KeyContext.GLOBAL);
         KeyBindings bindings = KeyBindings.defaults(true);

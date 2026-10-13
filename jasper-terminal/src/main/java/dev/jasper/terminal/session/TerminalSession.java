@@ -83,6 +83,13 @@ public final class TerminalSession implements AutoCloseable {
     public void resize(int newColumns, int newRows) { access.resize(newColumns, newRows); }
     /** Clears saved history while preserving the live screen and notifying listeners that absolute rows were reset. */
     public void clearScrollback() { access.clearScrollback(); }
+    /**
+     * Clears saved history and the live screen except the cursor's line, which moves to the top with the cursor, and
+     * notifies listeners that absolute rows were reset. Sends nothing to the child; leaves the alternate screen alone.
+     */
+    public void clearTerminal() { access.clearTerminal(); }
+    /** Whether a program switched to the alternate screen, as full-screen programs do. */
+    public boolean usingAlternateBuffer() { return access.usingAlternateBuffer(); }
     /** Returns the last requested, clamped grid width from published state; not an atomic width/height snapshot. */
     public int columns() { return access.columns(); }
     /** Returns the last requested, clamped grid height from published state; not an atomic width/height snapshot. */

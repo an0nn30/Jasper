@@ -386,8 +386,8 @@ final class WindowChrome {
     JPopupMenu contextMenu() {
         owner.updateActions();
         JPopupMenu menu = new JPopupMenu();
-        for (ActionId id : new ActionId[]{ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.SPLIT_RIGHT,
-            ActionId.SPLIT_DOWN, ActionId.ZOOM_PANE, ActionId.CLOSE_PANE}) menu.add(owner.action(id));
+        for (ActionId id : new ActionId[]{ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.CLEAR_TERMINAL,
+            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.ZOOM_PANE, ActionId.CLOSE_PANE}) menu.add(owner.action(id));
         if (contributions != null) {
             for (MenuSection section : contributions.model().menus()) {
                 if (section.target().type() != MenuTarget.Type.CONTEXT) continue;

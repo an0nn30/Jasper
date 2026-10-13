@@ -257,6 +257,11 @@ public final class TerminalView extends JComponent {
         session.clearScrollback();
     }
 
+    /** Clears saved history and the live screen except the cursor's line, without sending input to the child. */
+    public void clearTerminal() {
+        session.clearTerminal();
+    }
+
     /** Installs application key routing; {@code null} restores the standalone shortcuts. */
     public void setShortcutHandler(Predicate<KeyEvent> handler) {
         shortcutHandler = handler;
@@ -669,6 +674,7 @@ public final class TerminalView extends JComponent {
             case COPY_SELECTION -> copySelection();
             case PASTE_CLIPBOARD -> pasteClipboard();
             case CLEAR_SCROLLBACK -> clearScrollback();
+            case CLEAR_TERMINAL -> clearTerminal();
             case FIND_NEXT -> findNext();
             case FIND_PREVIOUS -> findPrevious();
             case PREVIOUS_PROMPT -> scrollToPreviousPrompt();

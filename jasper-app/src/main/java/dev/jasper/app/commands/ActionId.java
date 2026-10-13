@@ -41,6 +41,7 @@ public enum ActionId {
     PASTE("paste", "Paste", "cmd+v", "ctrl+shift+v"),
     COMMAND_PALETTE("command_palette", "Command Palette", "cmd+shift+p", "ctrl+shift+p"),
     CLEAR_SCROLLBACK("clear_scrollback", "Clear Scrollback", "cmd+k", "ctrl+shift+k", KeyContext.TERMINAL),
+    CLEAR_TERMINAL("clear_terminal", "Clear Terminal", "none", "none", KeyContext.TERMINAL),
     FONT_BIGGER("font_bigger", "Increase Font Size", "cmd+=", "ctrl+shift+="),
     FONT_SMALLER("font_smaller", "Decrease Font Size", "cmd+-", "ctrl+shift+-"),
     FONT_RESET("font_reset", "Reset Font Size", "cmd+0", "ctrl+shift+0"),
