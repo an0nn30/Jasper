@@ -78,6 +78,8 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
     private String stepError;
     private int stepFocus = -1;
     private boolean closed;
+    /** The shown fraction of the card's height while it drips open; 1 when fully open. */
+    private double reveal = 1;
 
     CommandPalette(KitContext kit, boolean macOs, Consumer<String> queryChanged, ObjIntConsumer<PaletteEntry> execute,
                    Function<String, Optional<ScopePrefix>> prefixes, Consumer<PaletteScope> chipTyped) {
@@ -154,6 +156,22 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
         setChip(null, null);
         updateHint();
     }
+
+    /**
+     * Shows only the top {@code fraction} of the card, 0-1: its fill, border, corners and hit area follow that edge while
+     * the content stays laid out at full height, so an opening reveal uncovers the card without moving its rows.
+     */
+    public void setReveal(double fraction) {
+        double clamped = Math.max(0, Math.min(1, fraction));
+        if (clamped == reveal) return;
+        reveal = clamped;
+        repaint();
+    }
+
+    /** The height currently shown; the full height unless a reveal is under way. */
+    public int revealedHeight() { return reveal >= 1 ? getHeight() : (int) Math.ceil(getHeight() * reveal); }
+
+    @Override protected int surfaceHeight() { return revealedHeight(); }
 
     private KitView view(ViewSpec spec) {
         var view = new KitView(kit, spec, this::event);

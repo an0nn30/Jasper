@@ -12,8 +12,11 @@ import dev.jasper.app.platform.LoginItem;
 import dev.jasper.app.platform.MacDock;
 import dev.jasper.app.platform.ResidentTray;
 import dev.jasper.app.platform.SystemNotifier;
+import dev.jasper.app.platform.WindowsForeground;
+import dev.jasper.app.platform.WindowsProcess;
 import dev.jasper.app.residency.HandoffSocket;
 import dev.jasper.app.residency.LaunchRequest;
+import dev.jasper.app.startup.MemoryReading;
 import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.bootstrap.StartupResources;
 import java.nio.file.Path;
@@ -165,7 +168,21 @@ public final class ApplicationBootstrap {
             // The macOS menu bar item and the Windows notification-area icon, once start-up has settled. On Windows the
             // same icon carries the system notifications' balloons, and one is added for them when Jasper is not resident.
             ResidentTray tray = ResidentTray.forThisDesktop();
-            application.residentIndicator(tray::install);
+            boolean onWindows = WindowsProcess.supported(System.getProperty("os.name"));
+            application.residentIndicator(actions -> {
+                // Resident and settled: from here this process may sit for hours with no window. On Windows, keep the
+                // next one from being built throttled and out of a trimmed working set. Off the EDT: the first foreign
+                // calls take tens of milliseconds to prepare, which this also pays before any window needs a reading.
+                if (onWindows) Thread.ofPlatform().daemon().name("jasper-keep-responsive").start(WindowsProcess::keepResponsive);
+                return tray.install(actions);
+            });
+            if (onWindows) {
+                // A window opened after a spell with none then says whether its memory had to be paged back in.
+                StartupTrace.current().readMemoryWith(() -> {
+                    WindowsProcess.Sample sample = WindowsProcess.sample();
+                    return sample == null ? null : new MemoryReading(sample.pageFaults(), sample.workingSetBytes());
+                });
+            }
             application.systemNotifier(SystemNotifier.forThisPlatform(System.getProperty("os.name"), dirs, tray));
             // A packaged macOS Jasper keeps running on Quit and leaves the Dock while it has no window.
             if (MacDock.available())
@@ -275,6 +292,10 @@ public final class ApplicationBootstrap {
         // Before any toolkit initialization: a handed-off launch must cost almost nothing and must
         // not settle a second icon into the Dock on its way out.
         if (handsOff(options, dirs)) return 0;
+        if (alreadyResident(options, dirs)) {
+            LOG.log(System.Logger.Level.INFO, "Started with --background while a resident Jasper is running; exiting");
+            return 0;
+        }
         Path file = options.configOverride() == null ? dirs.configFile() : options.configOverride();
         var acquired = new StartupResources();
         long read = System.nanoTime();
@@ -296,8 +317,21 @@ public final class ApplicationBootstrap {
      */
     static boolean handsOff(AppArguments options, AppDirs dirs) {
         if (options.background() || options.standaloneLaunch()) return false;
+        // Windows lets only this freshly launched process bring a window forward; the resident needs that right by the
+        // time it shows its window. Grant before sending, including when an existing window can be raised immediately.
+        WindowsForeground.allow(System.getProperty("os.name"), HandoffSocket.ownerPid(dirs.daemonToken()));
         Path source = HandoffSocket.codeSource();
-        return HandoffSocket.handOff(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source));
+        boolean handed = HandoffSocket.handOff(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source));
+        return handed;
+    }
+
+    /**
+     * True for a {@code --background} launch (the login item) while another process already owns the endpoint. That
+     * launch could only lose the bind, and would first have spent seconds of the login starting plugins and rehearsing a
+     * window, competing with the resident it would lose to. A standalone launch is left to its own refusal later.
+     */
+    static boolean alreadyResident(AppArguments options, AppDirs dirs) {
+        return options.background() && !options.standaloneLaunch() && HandoffSocket.live(dirs.daemonSocket());
     }
 
     /** Residency needs the shared endpoint, so a standalone launch ({@code --config}, {@code --safe-mode},
@@ -354,7 +388,7 @@ public final class ApplicationBootstrap {
                 SwingUtilities.invokeLater(() -> application.endpointReleased());
                 return LaunchRequest.Response.STALE;
             }
-            SwingUtilities.invokeLater(() -> application.openOrRaise("handoff"));
+            SwingUtilities.invokeLater(() -> application.openOrRaise(JasperApplication.HANDOFF));
             return LaunchRequest.Response.OK;
         };
     }

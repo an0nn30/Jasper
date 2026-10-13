@@ -234,6 +234,217 @@ class WindowCommandPaletteTest {
             }
         });
     }
+    @Test void theCardDripsOpenFastThenSlowWithoutMovingOrResizing() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                var clock = new java.util.concurrent.atomic.AtomicLong(1_000_000_000L);
+                var palette = owner.commandPalette(); palette.useClock(clock::get);
+                var root = install(owner);
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                var card = palette.component();
+                Rectangle placed = card.getBounds();
+                assertThat(palette.revealRunning()).isTrue();
+                assertThat(card.revealedHeight()).as("the reveal starts closed").isZero();
+                int previous = 0;
+                for (int quarter = 1; quarter <= 4; quarter++) {
+                    clock.addAndGet(WindowCommandPalette.REVEAL_MILLIS * 1_000_000L / 4);
+                    palette.animate(clock.get());
+                    LayoutTestSupport.layoutTree(root);
+                    assertThat(card.getBounds()).as("only the visible edge moves").isEqualTo(placed);
+                    assertThat(card.revealedHeight()).as("quarter %d", quarter).isGreaterThanOrEqualTo(previous);
+                    previous = card.revealedHeight();
+                    if (quarter == 1) assertThat(previous).as("fast at first").isGreaterThan(placed.height / 2);
+                }
+                assertThat(card.revealedHeight()).isEqualTo(placed.height);
+                assertThat(palette.revealRunning()).isFalse();
+            }
+        });
+    }
+    private static void mouse(JComponent card, int type, Point overlayPoint, int clicks) {
+        var at = SwingUtilities.convertPoint(card.getParent(), overlayPoint, card);
+        card.dispatchEvent(new MouseEvent(card, type, 0, type == MouseEvent.MOUSE_RELEASED || type == MouseEvent.MOUSE_CLICKED
+            ? 0 : InputEvent.BUTTON1_DOWN_MASK, at.x, at.y, clicks, false, MouseEvent.BUTTON1));
+    }
+    private static Point grab(JComponent card) {
+        // The field row's top padding: no field, chip or row takes a press there.
+        return new Point(card.getX() + card.getWidth() / 2, card.getY() + com.formdev.flatlaf.util.UIScale.scale(3));
+    }
+    @Test void draggingTheCardByItsEmptyAreasMovesSnapsAndRemembersItForEveryWindow() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            var state = dev.jasper.app.persistence.UiState.inMemory();
+            try (var owner = owner(new CommandHistory()); var other = owner(new CommandHistory())) {
+                owner.connectContributions(new dev.jasper.app.contributions.Contributions(), state);
+                other.connectContributions(new dev.jasper.app.contributions.Contributions(), state);
+                var root = install(owner); root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
+                var palette = owner.commandPalette();
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                var card = palette.component();
+                var overlay = (JComponent) card.getParent();
+                Rectangle anchoredBounds = card.getBounds();
+                Point press = grab(card);
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x + 2, press.y + 1), 1);
+                assertThat(palette.dragging()).as("a press that barely moves is a click").isFalse();
+                assertThat(card.getBounds()).isEqualTo(anchoredBounds);
+
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x - 300, press.y + 250), 1);
+                assertThat(palette.dragging()).isTrue();
+                assertThat(palette.snappedToCenter() || palette.snappedToTop()).isFalse();
+                assertThat(card.getLocation()).isEqualTo(new Point(anchoredBounds.x - 300, anchoredBounds.y + 250));
+                LayoutTestSupport.layoutTree(root);
+                assertThat(card.getLocation()).as("layout keeps the dragged place").isEqualTo(new Point(anchoredBounds.x - 300, anchoredBounds.y + 250));
+                mouse(card, MouseEvent.MOUSE_RELEASED, new Point(press.x - 300, press.y + 250), 1);
+                assertThat(palette.dragging()).isFalse();
+                var saved = state.palettePosition().orElseThrow();
+                Rectangle window = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), overlay);
+                assertThat(saved.centerX()).isCloseTo((card.getX() + card.getWidth() / 2.0 - window.x) / window.width, within(0.002));
+                assertThat(saved.top()).isCloseTo((card.getY() - window.y) / (double) window.height, within(0.002));
+                Rectangle dropped = card.getBounds();
+                palette.dismiss(); palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(card.getBounds()).as("reopening keeps the saved place").isEqualTo(dropped);
+                palette.dismiss();
+
+                var otherRoot = install(other); otherRoot.setSize(1000, 700); LayoutTestSupport.layoutTree(otherRoot);
+                other.commandPalette().toggle(); LayoutTestSupport.layoutTree(otherRoot);
+                var otherCard = other.commandPalette().component();
+                var otherWindow = SwingUtilities.convertRectangle(other.getParent(), other.getBounds(), otherCard.getParent());
+                assertThat(otherCard.getBounds()).as("another window opens it in the same relative place")
+                    .isEqualTo(WindowCommandPalette.placed(otherWindow, otherCard.getSize(), saved, com.formdev.flatlaf.util.UIScale.scale(16)));
+                other.commandPalette().dismiss();
+
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                press = grab(card);
+                int guideX = window.x + (int) Math.round(window.width * 0.5), guideY = window.y + (int) Math.round(window.height * 0.2);
+                int dx = guideX - (card.getX() + card.getWidth() / 2) + 5, dy = guideY - card.getY() - 6;
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x + dx, press.y + dy), 1);
+                assertThat(palette.snappedToCenter()).isTrue();
+                assertThat(palette.snappedToTop()).isTrue();
+                assertThat(card.getX() + card.getWidth() / 2).isEqualTo(guideX);
+                assertThat(card.getY()).isEqualTo(guideY);
+                var image = new java.awt.image.BufferedImage(overlay.getWidth(), overlay.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                var graphics = image.createGraphics();
+                try { overlay.paint(graphics); } finally { graphics.dispose(); }
+                assertThat(image.getRGB(guideX, window.y + window.height - 5) >>> 24).as("the centre guide is felt, not drawn").isZero();
+                assertThat(image.getRGB(window.x + 5, guideY) >>> 24).as("the top guide is felt, not drawn").isZero();
+                mouse(card, MouseEvent.MOUSE_RELEASED, new Point(press.x + dx, press.y + dy), 1);
+                assertThat(state.palettePosition()).hasValue(new dev.jasper.app.persistence.UiState.PalettePosition(0.5, 0.2));
+
+                press = grab(card);
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_RELEASED, press, 1);
+                mouse(card, MouseEvent.MOUSE_CLICKED, press, 2);
+                assertThat(state.palettePosition()).as("a double click forgets the place").isEmpty();
+                assertThat(card.getBounds()).as("back under the title field").isEqualTo(anchoredBounds);
+            }
+        });
+    }
+    @Test void draggingTheCardBackToTheTitleFieldReattachesIt() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            var state = dev.jasper.app.persistence.UiState.inMemory();
+            try (var owner = owner(new CommandHistory())) {
+                owner.connectContributions(new dev.jasper.app.contributions.Contributions(), state);
+                var root = install(owner); root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
+                var palette = owner.commandPalette();
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                var card = palette.component();
+                Rectangle home = card.getBounds();
+                Point press = grab(card);
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x - 300, press.y + 250), 1);
+                mouse(card, MouseEvent.MOUSE_RELEASED, new Point(press.x - 300, press.y + 250), 1);
+                assertThat(state.palettePosition()).isPresent();
+                palette.dismiss(); palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(card.getBounds()).isNotEqualTo(home);
+
+                press = grab(card);
+                int dx = home.x - card.getX(), dy = home.y - card.getY();
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x + dx + 30, press.y + dy + 60), 1);
+                assertThat(palette.snappedHome()).as("still too far below its home").isFalse();
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x + dx + 12, press.y + dy - 80), 1);
+                assertThat(palette.snappedHome()).as("near it across and above it").isTrue();
+                assertThat(card.getBounds()).isEqualTo(home);
+                mouse(card, MouseEvent.MOUSE_RELEASED, new Point(press.x + dx + 12, press.y + dy - 80), 1);
+                assertThat(state.palettePosition()).as("re-attached: the dragged place is forgotten").isEmpty();
+                assertThat(card.getBounds()).isEqualTo(home);
+                palette.dismiss(); palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(card.getBounds()).isEqualTo(home);
+            }
+        });
+    }
+    @Test void compactModeHasNoHomeToSnapTo() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                owner.applyConfiguration(dev.jasper.app.config.ConfigSnapshot.defaults().toBuilder()
+                    .viewMode(dev.jasper.app.config.ViewMode.COMPACT).build(), true);
+                var root = install(owner); root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
+                var palette = owner.commandPalette();
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                var card = palette.component();
+                Point press = grab(card);
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x, press.y - 400), 1);
+                assertThat(palette.dragging()).isTrue();
+                assertThat(palette.snappedHome()).isFalse();
+                mouse(card, MouseEvent.MOUSE_RELEASED, new Point(press.x, press.y - 400), 1);
+                assertThat(owner.uiState().palettePosition()).isPresent();
+            }
+        });
+    }
+    @Test void aSavedPlaceKeepsTheCardInsideTheWindow() {
+        var window = new Rectangle(0, 40, 1000, 600);
+        var size = new Dimension(560, 300);
+        assertThat(WindowCommandPalette.placed(window, size, new dev.jasper.app.persistence.UiState.PalettePosition(0.5, 0.2), 16))
+            .isEqualTo(new Rectangle(220, 160, 560, 300));
+        assertThat(WindowCommandPalette.placed(window, size, new dev.jasper.app.persistence.UiState.PalettePosition(1, 1), 16))
+            .as("pulled back inside the margin").isEqualTo(new Rectangle(1000 - 16 - 560, 40 + 600 - 16 - 300, 560, 300));
+        assertThat(WindowCommandPalette.placed(new Rectangle(0, 0, 400, 200), size, new dev.jasper.app.persistence.UiState.PalettePosition(0, 0), 16))
+            .as("narrower than the card").isEqualTo(new Rectangle(16, 16, 400 - 32, 200 - 32));
+    }
+    @Test void theDripEasesOutMonotonically() {
+        assertThat(WindowCommandPalette.drip(0)).isZero();
+        assertThat(WindowCommandPalette.drip(1)).isEqualTo(1);
+        double previous = 0, previousStep = Double.MAX_VALUE;
+        for (int i = 1; i <= 20; i++) {
+            double value = WindowCommandPalette.drip(i / 20.0), step = value - previous;
+            assertThat(value).isGreaterThan(previous);
+            assertThat(step).as("each step is smaller than the last").isLessThan(previousStep);
+            previous = value; previousStep = step;
+        }
+    }
+    @Test void disabledAnimationsOpenTheCardFullyAndDisablingMidwayFinishesTheReveal() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                var clock = new java.util.concurrent.atomic.AtomicLong(1_000_000_000L);
+                var palette = owner.commandPalette(); palette.useClock(clock::get);
+                var root = install(owner);
+                owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(palette.revealRunning()).isFalse();
+                assertThat(palette.component().revealedHeight()).isEqualTo(palette.component().getHeight()).isPositive();
+                palette.dismiss();
+
+                owner.setAnimations(dev.jasper.app.config.AnimationSettings.defaults());
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(palette.revealRunning()).isTrue();
+                owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
+                assertThat(palette.revealRunning()).isFalse();
+                assertThat(palette.component().revealedHeight()).isEqualTo(palette.component().getHeight());
+                palette.dismiss();
+
+                owner.setAnimations(dev.jasper.app.config.AnimationSettings.defaults());
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                clock.addAndGet(WindowCommandPalette.REVEAL_MILLIS * 1_000_000L / 3);
+                palette.animate(clock.get());
+                palette.dismiss();
+                assertThat(palette.revealRunning()).as("dismissing stops the reveal").isFalse();
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(palette.revealRunning()).as("every fresh open drips again").isTrue();
+                assertThat(palette.component().revealedHeight()).isZero();
+            }
+        });
+    }
     /** theme.md's shadows are black, never theme colours: a red scrim leaves the palette's shadow neutral. */
     @Test void overlayShadowIsBlackWhateverTheScrim() throws Exception {
         DesktopTestSupport.edt(() -> {
@@ -241,6 +452,7 @@ class WindowCommandPaletteTest {
             try (var owner = new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
                     path -> {}, () -> {}, () -> {}, themes, KeyBindings.defaults(true), new CommandHistory(), true)) {
                 var root = install(owner);
+                owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
                 owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
                 var overlay = (JComponent) owner.commandPalette().component().getParent();
                 var card = owner.commandPalette().component().getBounds();
@@ -362,6 +574,8 @@ class WindowCommandPaletteTest {
                 var fake = new PaletteScopesTest.FakeScope();
                 fake.rows = List.of(new PaletteRow("alpha", "Alpha", "a detail", null, null, true, null));
                 owner.scopes().register(fake);
+                // A settled card: while it drips open, only its shown part takes presses.
+                owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
                 owner.commandPalette().open(fake.id());
                 LayoutTestSupport.layoutTree(root);
                 var palette = owner.commandPalette().component();

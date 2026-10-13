@@ -45,6 +45,20 @@ class HandoffSocketTest {
         assertThat(token()).doesNotExist();
     }
 
+    @Test void theOwnerRecordsItsProcessIdBesideTheTokenUntilItCloses() throws Exception {
+        assertThat(HandoffSocket.ownerPid(token())).as("nothing bound yet").isEqualTo(-1);
+        try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK)) {
+            assertThat(HandoffSocket.ownerPid(token())).isEqualTo(ProcessHandle.current().pid());
+            // The token file itself is unchanged: a launcher from another build still reads it whole.
+            assertThat(Files.readString(token()).strip()).doesNotContain("\n").hasSizeGreaterThan(20);
+            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 7L)).isTrue();
+        }
+        assertThat(HandoffSocket.ownerPid(token())).as("released with the endpoint").isEqualTo(-1);
+        assertThat(dir.resolve("token.pid")).doesNotExist();
+        Files.writeString(dir.resolve("token.pid"), "not a number\n");
+        assertThat(HandoffSocket.ownerPid(token())).isEqualTo(-1);
+    }
+
     @Test void aWrongTokenIsRefusedWithoutReachingTheHandler() throws Exception {
         List<LaunchRequest> seen = new CopyOnWriteArrayList<>();
         try (HandoffSocket endpoint = bind(request -> { seen.add(request); return LaunchRequest.Response.OK; })) {

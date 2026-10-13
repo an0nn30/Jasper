@@ -37,7 +37,7 @@ leading zeroes; major is 1–255, minor is 0–255, and patch is 0–65535. Nati
 package versions require a positive major component. Outputs are under `jasper-app/build/packaging`: the native application is
 in `image/`, and distributions are
 `jasper-app/build/packaging/dist/Jasper-<version>-macos-<aarch64|x64>.dmg`
-or `jasper-app/build/packaging/dist/Jasper-<version>-windows-x64.zip`. The unpacked
+or `jasper-app/build/packaging/dist/Jasper-<version>-windows-<x64|aarch64>.zip`. The unpacked
 image is `jasper-app/build/packaging/image/Jasper.app` on macOS and
 `jasper-app/build/packaging/image/Jasper` on Windows.
 
@@ -100,14 +100,14 @@ manually to choose a version, and download the packages from the run's artifacts
 ## Windows setup wizard
 
 The opt-in `:jasper-app:packageInstaller` task builds
-`jasper-app/build/packaging/dist/Jasper-<version>-windows-x64-setup.exe` from the
+`jasper-app/build/packaging/dist/Jasper-<version>-windows-<x64|aarch64>-setup.exe` from the
 same verified application image as the ZIP. It bundles JBR, installs for the
 current user, offers an installation directory chooser and shortcut choices,
 and registers Jasper with Windows Installed apps for uninstall. No administrator
 installation is requested. The default installation folder is under the user's
 local application data directory. The portable ZIP task remains available.
 
-Build with **JBR SDK 25 x64** and **WiX on PATH**. WiX is a build-time requirement
+Build with a **JBR SDK 25 of the target architecture** (x64 or ARM64) and **WiX on PATH**. WiX is a build-time requirement
 only; users need neither WiX nor Java. This path is verified with the portable
 [WiX 3.14.1 binaries](https://github.com/wixtoolset/wix3/releases/tag/wix3141rtm):
 extract `wix314-binaries.zip` and add the directory containing `candle.exe` and
@@ -115,23 +115,29 @@ extract `wix314-binaries.zip` and add the directory containing `candle.exe` and
 [JDK packaging prerequisites](https://docs.oracle.com/en/java/javase/25/jpackage/packaging-overview.html).
 
 ```powershell
-$env:JAVA_HOME = 'C:\path\to\jbrsdk-25-x64'
+$env:JAVA_HOME = 'C:\path\to\jbrsdk-25-windows-aarch64'   # or -x64
 $env:PATH = "C:\path\to\wix;$env:JAVA_HOME\bin;$env:PATH"
 .\gradlew.bat "-Dorg.gradle.java.installations.paths=$env:JAVA_HOME" `
     '-Dorg.gradle.java.installations.auto-detect=false' :jasper-app:packageInstaller
 ```
 
 `packaging\windows\Build-Installer.ps1` does the same without changing the calling
-shell: it finds an x64 JBR SDK 25 (`JAVA_HOME`, `~\.jdks`, `~\.gradle\jdks`) and WiX
-3 (PATH, Tauri's `%LOCALAPPDATA%\tauri\WixTools314`, the WiX v3 installer), and
-rejects an ARM64 SDK. Options: `-Package Dist` builds the ZIP instead,
-`-Version 1.0.1`, `-JavaHome` and `-WixPath` override discovery.
+shell: it finds a JBR SDK 25 of the build machine's own architecture (`JAVA_HOME`,
+`~\.jdks`, `~\.gradle\jdks`) and WiX 3 (PATH, Tauri's `%LOCALAPPDATA%\tauri\WixTools314`,
+the WiX v3 installer). Options: `-Architecture x64|aarch64` picks the target instead,
+`-Package Dist` builds the ZIP instead, `-Version 1.0.1`, `-JavaHome` and `-WixPath`
+override discovery.
 
-Selecting the x64 SDK explicitly matters when both ARM64 and x64 SDKs are installed.
-On Windows ARM64 the x64 build tools run under Windows emulation and still produce
-an **x64** installer, not a native ARM64 package. The Gradle JVM and selected JBR
-toolchain must both be x64. The task is not part of `check` and never opens the app
-or installs it on the build machine.
+The package's architecture is the Gradle JVM's and the selected JBR toolchain's, which
+must match. On Windows on Arm, build the **ARM64** package for that machine: an x64
+Jasper there runs entirely under Windows' x64 emulation, including the code the JVM
+compiles as it runs, which makes every launch and every new window markedly slower
+(a bare launch of the same build: about 150 ms native, 250 ms emulated). Build an x64 package on an ARM64 machine only for x64 machines
+(`-Architecture x64`; Gradle then runs under emulation too). `verifyPackage` reads the
+launcher's, `java.exe`'s and `jvm.dll`'s PE headers and fails if any is not the
+target architecture. Both architectures share the upgrade identity below, so an ARM64
+setup replaces an existing x64 installation. The task is not part of `check` and
+never opens the app or installs it on the build machine.
 
 Use `-PjasperVersion=1.0.1` (and increasing three-part versions thereafter) to build
 upgrades. Keep the `upgradeUuid` in `gradle/packaging.gradle` unchanged across releases.
@@ -329,7 +335,7 @@ acceptance remain unexecuted on macOS.
 - [ ] Install a higher version over an existing installation; confirm one Installed apps entry and preserved settings, Vault data, and plugins.
 - [ ] Uninstall through Windows Installed apps; confirm program files and shortcuts are removed while Jasper's user data remains.
 - [ ] Build on Windows with a JBR 25 x64 SDK, extract the entire ZIP to a path containing spaces, and launch `Jasper.exe` from Explorer.
-- [ ] Confirm `app\native\` holds FlatLaf's DLL, `jnidispatch.dll` and pty4j's `win\x86-64` files, and that launching Jasper creates no `flatlaf-windows-*` file, `jna*.tmp` file or `pty4j` folder under `%TEMP%`.
+- [ ] Confirm `app\native\` holds FlatLaf's DLL, `jnidispatch.dll` and pty4j's `win\x86-64` (x64) or `win\aarch64` (ARM64) files, and that launching Jasper creates no `flatlaf-windows-*` file, `jna*.tmp` file or `pty4j` folder under `%TEMP%`.
 - [ ] Confirm the Ember Jasper icon in Explorer, the taskbar, Alt+Tab and titlebar at 100%, 150% and 200% display scale.
 - [ ] Confirm PowerShell/PTY input and resize behavior, including Unicode text.
 - [ ] Confirm clipboard operations and tab shortcuts.
@@ -342,7 +348,10 @@ acceptance remain unexecuted on macOS.
 - [ ] Confirm links, working-directory status, and broken-config reporting.
 - [ ] Confirm the packaged app runs without a separately installed Java runtime.
 - [ ] Confirm `AF_UNIX` sockets work: with the default configuration, confirm a second `Jasper.exe` launch reveals a window and the second process exits rather than opening its own window.
-- [ ] Confirm the `Jasper` value appears under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, sign out and back in, and confirm Jasper is resident.
+- [ ] With a resident Jasper and no window, click Jasper in the Start menu while another application is in front: the new window opens **in front, focused**. With a Jasper window open behind another application, click it again: that window comes forward (at worst about 300 ms later, the raise's retry) rather than only flashing on the taskbar.
+- [ ] On Windows on Arm, confirm Task Manager's Architecture column (Details tab) shows `ARM64` for `Jasper.exe`, not `x64`.
+- [ ] Leave a resident Jasper with no window for a few hours, then open one: the log's `Window (handoff)` line ends with `no window for … before, … page faults until shown, working set … to … MB`, and the log has `Resident Jasper keeps a soft working-set floor of … MB` from start-up. Many thousands of page faults with a much smaller starting working set mean Windows trimmed the resident despite the floor.
+- [ ] Confirm the `Jasper` value appears under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, sign out and back in, and confirm Jasper is resident. Also start Jasper by hand during sign-in: the `--background` launch then finds it resident and exits at once (`Started with --background while a resident Jasper is running; exiting`), instead of starting its plugins first.
 - [ ] Confirm Quit exits completely, that the notification-area icon appears only once start-up has settled (the first output painted, a finished `--background` warm-up, or 2 s after the first paint) rather than at launch, and that setting `run_in_background = false` removes the Run value.
 
 ### Linux

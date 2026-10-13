@@ -86,6 +86,8 @@ public final class StartupTrace {
     private final AtomicBoolean settling = new AtomicBoolean();
     private volatile boolean settled;
     private volatile JvmStatus jvm;
+    private volatile Supplier<MemoryReading> memory = () -> null;
+    private volatile long idleSince = UNSET;
 
     StartupTrace(Environment environment) {
         this.environment = Objects.requireNonNull(environment, "environment");
@@ -179,9 +181,36 @@ public final class StartupTrace {
         }
     }
 
+    /**
+     * Reads this process's memory for the line of a window opened after a spell with none (see {@link #windowsClosed}),
+     * on systems that have the figures; such a window reads it on the EDT when requested and again when shown, so it
+     * must be cheap by then. {@code reader} returns null when it cannot read them. A first window never reads it.
+     */
+    public void readMemoryWith(Supplier<MemoryReading> reader) {
+        memory = Objects.requireNonNull(reader, "reader");
+    }
+
+    /** The last window has closed: the next window's line reports how long the process sat with none. */
+    public void windowsClosed() {
+        idleSince = environment.nanos().getAsLong();
+    }
+
+    /** This process's memory now, or null. Never throws. */
+    MemoryReading memory() {
+        try {
+            return memory.get();
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
+    }
+
     /** Starts timing a window requested now; it gives up 10 s later if it never paints output. */
     public WindowTrace window(String trigger) {
-        WindowTrace trace = new WindowTrace(this, trigger, environment.nanos().getAsLong());
+        long now = environment.nanos().getAsLong();
+        long idle = idleSince;
+        idleSince = UNSET;
+        WindowTrace trace = idle == UNSET ? new WindowTrace(this, trigger, now, UNSET, null)
+            : new WindowTrace(this, trigger, now, now - idle, memory());
         synchronized (windowsLock) {
             windows.addLast(trace);
             while (windows.size() > WINDOW_LIMIT) windows.removeFirst();

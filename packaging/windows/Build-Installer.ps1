@@ -2,12 +2,15 @@ param(
     [ValidateSet('Installer', 'Dist')][string]$Package = 'Installer',
     [string]$Version,
     [string]$JavaHome,
-    [string]$WixPath
+    [string]$WixPath,
+    [ValidateSet('x64', 'aarch64')][string]$Architecture
 )
 
-# Build the Windows setup wizard (or portable ZIP) with an x64 JBR SDK 25 and WiX 3.
-# Gradle itself must run on the x64 SDK: on Windows ARM64 it runs under emulation and
-# still produces an x64 package. Settings apply to this build only, not the calling shell.
+# Build the Windows setup wizard (or portable ZIP) with a JBR SDK 25 of the target architecture
+# and WiX 3. Gradle runs on that SDK, so the package matches it: by default this machine's own
+# architecture. An x64 package on Windows on Arm runs entirely under emulation, JIT-compiled code
+# included, so build one there only for x64 machines (-Architecture x64).
+# Settings apply to this build only, not the calling shell.
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 
@@ -18,8 +21,13 @@ function Get-SdkArchitecture([string]$SdkHome) {
     if ($line) { $line.Matches[0].Groups[1].Value } else { $null }
 }
 
-function Test-X64JbrSdk([string]$SdkHome) {
-    (Get-SdkArchitecture $SdkHome) -in @('x86_64', 'amd64', 'x64') -and
+if (-not $Architecture) {
+    $Architecture = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64') { 'aarch64' } else { 'x64' }
+}
+$architectureNames = if ($Architecture -eq 'aarch64') { @('aarch64', 'arm64') } else { @('x86_64', 'amd64', 'x64') }
+
+function Test-JbrSdk([string]$SdkHome) {
+    (Get-SdkArchitecture $SdkHome) -in $architectureNames -and
         (Test-Path -LiteralPath (Join-Path $SdkHome 'bin\jpackage.exe')) -and
         (Select-String -LiteralPath (Join-Path $SdkHome 'release') -Pattern '^JAVA_VERSION="25' -Quiet) -and
         (Select-String -LiteralPath (Join-Path $SdkHome 'release') -Pattern '^IMPLEMENTOR="JetBrains' -Quiet)
@@ -30,12 +38,12 @@ if (-not $JavaHome) {
         Get-ChildItem -Path (Join-Path $env:USERPROFILE '.jdks'), (Join-Path $env:USERPROFILE '.gradle\jdks') `
             -Directory -Filter 'jbrsdk*' -ErrorAction SilentlyContinue |
             Sort-Object Name -Descending | ForEach-Object FullName)
-    $JavaHome = $candidates | Where-Object { $_ -and (Test-X64JbrSdk $_) } | Select-Object -First 1
+    $JavaHome = $candidates | Where-Object { $_ -and (Test-JbrSdk $_) } | Select-Object -First 1
     if (-not $JavaHome) {
-        throw 'No x64 JBR SDK 25 found in JAVA_HOME, ~\.jdks or ~\.gradle\jdks; pass -JavaHome'
+        throw "No $Architecture JBR SDK 25 found in JAVA_HOME, ~\.jdks or ~\.gradle\jdks; pass -JavaHome"
     }
-} elseif (-not (Test-X64JbrSdk $JavaHome)) {
-    throw "$JavaHome is not an x64 JBR SDK 25 with jpackage (OS_ARCH: $(Get-SdkArchitecture $JavaHome))"
+} elseif (-not (Test-JbrSdk $JavaHome)) {
+    throw "$JavaHome is not a $Architecture JBR SDK 25 with jpackage (OS_ARCH: $(Get-SdkArchitecture $JavaHome))"
 }
 
 if ($Package -eq 'Installer') {
@@ -60,7 +68,7 @@ $arguments = @(
     $task)
 if ($Version) { $arguments = @("-PjasperVersion=$Version") + $arguments }
 
-Write-Host "JBR SDK: $JavaHome"
+Write-Host "JBR SDK: $JavaHome ($Architecture)"
 if ($WixPath) { Write-Host "WiX:     $WixPath" }
 Write-Host "Task:    $task"
 

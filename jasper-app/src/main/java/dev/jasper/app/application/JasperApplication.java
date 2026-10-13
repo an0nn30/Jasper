@@ -83,6 +83,8 @@ public final class JasperApplication {
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
     /** Workspace glass exists only on macOS; elsewhere plugins see {@code GlassSource.NONE} and windows make no glass requests. */
     private static final boolean WORKSPACE_GLASS = com.formdev.flatlaf.util.SystemInfo.isMacOS;
+    /** The trigger of a window another launch asked for through the handoff endpoint. */
+    public static final String HANDOFF = "handoff";
     private final List<Runnable> glassListeners = new ArrayList<>();
     /** Whether an open terminal window has been activated since the first of them opened; see {@link #presence}. */
     private boolean activatedSinceOpen;
@@ -1135,6 +1137,8 @@ public final class JasperApplication {
         boolean pluginWindowsOpen = auxiliary != null && !auxiliary.open().isEmpty();
         if (windows.isEmpty() && !resident && !pluginWindowsOpen) requestShutdown();
         else {
+            // The next terminal window's timing says how long this process sat without one.
+            if (windows.isEmpty()) trace.windowsClosed();
             updateBuddyActions();
             updateDock();
         }
@@ -1171,7 +1175,6 @@ public final class JasperApplication {
             : windows.isEmpty() ? null : windows.iterator().next();
         if (target != null) target.toFront();
     }
-
     /**
      * Brings a terminal window to the front for a click on an OS notification: the notification's own window while it
      * is open, else the one used last, and with none open a new one. Names the window; empty while Jasper quits.

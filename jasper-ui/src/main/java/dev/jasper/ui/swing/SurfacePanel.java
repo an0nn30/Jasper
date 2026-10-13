@@ -57,9 +57,11 @@ public class SurfacePanel extends JPanel {
         case POPUP -> DesignMetrics.Role.PALETTE_CORNER_ARC;
         default -> DesignMetrics.Role.WORKSPACE_SURFACE_ARC;
     }); }
+    /** The height the surface's shape (fill, outline, child clip and hit area) covers: all of it unless an owner reveals less. */
+    protected int surfaceHeight() { return getHeight(); }
     private Shape shape(int inset) {
         return new RoundRectangle2D.Double(inset,surfaceTop()+inset,Math.max(0,getWidth()-2*inset),
-            Math.max(0,getHeight()-surfaceTop()-2*inset),Math.max(0,arc()-2*inset),Math.max(0,arc()-2*inset));
+            Math.max(0,surfaceHeight()-surfaceTop()-2*inset),Math.max(0,arc()-2*inset),Math.max(0,arc()-2*inset));
     }
     @Override protected boolean isPaintingOrigin() { return true; }
     @Override public boolean contains(int x,int y) {

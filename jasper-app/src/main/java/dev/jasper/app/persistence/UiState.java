@@ -22,8 +22,8 @@ import org.tomlj.TomlParseResult;
 import org.tomlj.TomlTable;
 
 /**
- * Application-owned layout state: where each panel docks, the dock's sizes, Zen mode, whether the stripes show, and where
- * main and auxiliary windows were. It is not user configuration. Caller-thread-confined. A bad panel or window entry or dock
+ * Application-owned layout state: where each panel docks, the dock's sizes, Zen mode, whether the stripes show, where
+ * main and auxiliary windows were, and where the command palette was dragged. It is not user configuration. Caller-thread-confined. A bad panel or window entry or dock
  * key falls back alone; an unreadable file or an unknown version falls back to defaults rather than blocking
  * startup, and failed writes are only logged. Version 1 files (a region and a size per panel) are migrated on read;
  * saving writes version 2.
@@ -84,6 +84,20 @@ public final class UiState {
         public Chooser { recent = List.copyOf(recent); pinned = List.copyOf(pinned); }
     }
 
+    /**
+     * Where the command palette was dragged, as fractions of the window: its centre across and its top down.
+     *
+     * @param centerX the card's horizontal centre, 0 (left edge) to 1 (right edge)
+     * @param top the card's top edge, 0 (top) to 1 (bottom)
+     */
+    public record PalettePosition(double centerX, double top) {
+        public PalettePosition {
+            if (!fraction(centerX) || !fraction(top)) throw new IllegalArgumentException("Palette position must be 0 to 1: " + centerX + ", " + top);
+        }
+
+        static boolean fraction(double value) { return value >= 0 && value <= 1; }
+    }
+
     private static final System.Logger LOG = System.getLogger(UiState.class.getName());
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_.-]{0,127}");
     private static final int MAX_BYTES = 256 * 1024;
@@ -96,6 +110,7 @@ public final class UiState {
     private MainWindow mainWindow;
     private static final int MAX_CHOOSER_PATHS = 50;
     private Chooser chooser = Chooser.DEFAULT;
+    private PalettePosition palettePosition;
 
     private UiState(Path file) { this.file = file; }
 
@@ -110,7 +125,7 @@ public final class UiState {
         } catch (IOException | RuntimeException invalid) {
             LOG.log(System.Logger.Level.WARNING, "Ignoring unreadable UI state " + file, invalid);
             state.panels.clear(); state.windows.clear(); state.railVisible = true; state.dock = Dock.DEFAULT;
-            state.chooser = Chooser.DEFAULT; state.mainWindow = null; state.zenMode = false;
+            state.chooser = Chooser.DEFAULT; state.mainWindow = null; state.zenMode = false; state.palettePosition = null;
         }
         return state;
     }
@@ -133,6 +148,10 @@ public final class UiState {
                 int extended = number(table, "extended_state").filter(value -> (value & ~6) == 0).orElse(0);
                 mainWindow = new MainWindow(bounds, extended);
             });
+        if (toml.get(List.of("palette")) instanceof TomlTable table
+                && table.get(List.of("center_x")) instanceof Number x && PalettePosition.fraction(x.doubleValue())
+                && table.get(List.of("top")) instanceof Number top && PalettePosition.fraction(top.doubleValue()))
+            palettePosition = new PalettePosition(x.doubleValue(), top.doubleValue());
         if (toml.get(List.of("chooser")) instanceof TomlTable table)
             chooser = new Chooser(strings(table, "recent"), strings(table, "pinned"),
                 Boolean.TRUE.equals(table.get(List.of("preview"))), !Boolean.FALSE.equals(table.get(List.of("show_hidden"))));
@@ -235,6 +254,10 @@ public final class UiState {
     public boolean zenMode() { return zenMode; }
     public void setZenMode(boolean value) { zenMode = value; }
     public Chooser chooser() { return chooser; }
+    /** Where the command palette was dragged; empty while it keeps its default place. */
+    public Optional<PalettePosition> palettePosition() { return Optional.ofNullable(palettePosition); }
+    /** Null forgets the dragged place. */
+    public void setPalettePosition(PalettePosition value) { palettePosition = value; }
     public void setChooser(Chooser value) { chooser = Objects.requireNonNull(value); }
 
     /** Writes version 2. Ids are restricted to characters that need no TOML escaping. */
@@ -255,6 +278,8 @@ public final class UiState {
                 .append("\nwidth = ").append(bounds.width()).append("\nheight = ").append(bounds.height())
                 .append("\nextended_state = ").append(mainWindow.extendedState()).append('\n');
         }
+        if (palettePosition != null)
+            text.append("\n[palette]\ncenter_x = ").append(palettePosition.centerX()).append("\ntop = ").append(palettePosition.top()).append('\n');
         if (!chooser.equals(Chooser.DEFAULT))
             text.append("\n[chooser]\nrecent = ").append(array(chooser.recent())).append("\npinned = ").append(array(chooser.pinned()))
                 .append("\npreview = ").append(chooser.preview()).append("\nshow_hidden = ").append(chooser.showHidden()).append('\n');

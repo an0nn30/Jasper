@@ -1,5 +1,13 @@
 # Jasper — Status and Handoff
 
+**`main` merged into `codex/theme-engine` — 2026-10-13.** Seven `main` commits since 2026-10-05: the command palette's
+drag (snap guides that are felt, not drawn; a remembered place; re-attach by dragging to the title field; double click
+resets) and its drip-open reveal behind `ui.animations.enabled`, plus Windows ARM64 packaging and resident relaunch.
+Only the palette conflicted: the reveal now drives the kit popup surface's shape (`SurfacePanel.surfaceHeight`), so its
+fill, outline, corners and hit area follow the revealed edge; the drag's window margin is `PALETTE_WINDOW_MARGIN` and its
+shadow `NativeChromePainting.popupShadow` over the revealed part. Full `./gradlew check`: 9,730 tests, 0 failures,
+8 skips. Not pushed.
+
 **Theme engine Plan 3 complete (headless) — 2026-10-12.** Claude finished the surface refactor and mock matching on
 `codex/theme-engine` (not pushed, not merged to `main`). Six parallel workstreams in their own worktrees were merged after
 review: forms (Vault hero dialogs, Add Host, New File Server, the anchored picker, the Vault manager, add menu and sheets),
@@ -892,6 +900,26 @@ are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.m
   may need explicit semantic adjustment during Plan 2 visual acceptance, so full vendor visual parity
   is not claimed. Plans 2–3 consumer/surface migration remain unexecuted. Native acceptance
   and user review of gallery/calibration artifacts remain user-run before Plan 2. No GUI/benchmark/AOT/push/merge.
+
+- **Windows residency follow-up** (2026-10-10; `claude/windows-residency`): updated to
+  `origin/main` `b8beca9d`, preserving the four in-progress fixes without conflicts.
+  Windows packaging accepts ARM64 and stages architecture-matched FlatLaf/JNA/pty4j natives;
+  build helper defaults to the machine architecture and package verification checks PE headers.
+  Login launches exit early when an endpoint already serves. A resident publishes `token.pid`;
+  a Windows launcher grants foreground permission before sending its handoff (replaces the earlier
+  asynchronous grant and delayed focus retry, which had a race). Settled residents request a soft
+  working-set floor and opt out of speed throttling; warm-window logs include idle duration,
+  page-fault delta and working-set readings. These are best-effort policies; speed gains remain
+  unmeasured. GUI, benchmark and AOT acceptance stay user-run. Full Windows check exposes failures
+  in unchanged theme/migration, symlink, macOS-path and Settings tests. Serial focused verification
+  passed: 38 tests, 0 failures/errors, 1 platform skip, plus verifyPackagingSupport. Full check
+  completed with failures in app (73), Editor (3), File Server (7), Project Index (19), and Remote (7);
+  architecture and documentation gates passed. ARM64 packageDist/verifyPackage passed with native
+  JBR and matching libraries: jasper-app/build/packaging/dist/Jasper-1.0.12-windows-aarch64.zip.
+  ARM64 setup installer rebuilt and verified; opened in Explorer for user installation.
+  Logs are under jasper-app/build/reports/windows-residency/. User authorized merge to main and push;
+  pre-merge focused tests and packaging-support checks passed again against origin/main b8beca9d.
+  Independent final review has not run (no subagent reviewer available in this session).
 
 - **Project Index, plan B (remote)** (2026-10-05; `claude/file-indexer`, worktree `.worktrees/file-indexer`):
   [plan B](superpowers/plans/2026-10-05-project-index-b-remote.md). Remote 0.12.0 exports `dev.jasper.remote.api`

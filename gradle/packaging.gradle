@@ -74,9 +74,9 @@ def nativeContext = {
     String packageVersion = validatedVersion()
     def host = normalizedHost()
     if (!(host.os == 'macos' && host.architecture in ['aarch64', 'x64']) &&
-            !(host.os == 'windows' && host.architecture == 'x64') &&
+            !(host.os == 'windows' && host.architecture in ['aarch64', 'x64']) &&
             !(host.os == 'linux' && host.architecture in ['aarch64', 'x64'])) {
-        throw new GradleException("Native packaging supports only macOS aarch64/x64, Windows x64 and Linux aarch64/x64; this host is ${System.getProperty('os.name')} ${System.getProperty('os.arch')}")
+        throw new GradleException("Native packaging supports only macOS, Windows and Linux on aarch64/x64; this host is ${System.getProperty('os.name')} ${System.getProperty('os.arch')}")
     }
     def selectedLauncher = launcher.get()
     File sdkHome = selectedLauncher.metadata.installationPath.asFile
@@ -433,7 +433,7 @@ def verifyPackage = tasks.register('verifyPackage') {
         String nativeArchitecture = context.host.architecture == 'aarch64' ? 'aarch64' : 'x86-64'
         def nativePrefixes = [
             macos: [pty: 'resources/com/pty4j/native/darwin/', jna: "com/sun/jna/darwin-${nativeArchitecture}/"],
-            windows: [pty: 'resources/com/pty4j/native/win/x86-64/', jna: 'com/sun/jna/win32-x86-64/'],
+            windows: [pty: "resources/com/pty4j/native/win/${nativeArchitecture}/", jna: "com/sun/jna/win32-${nativeArchitecture}/"],
             linux: [pty: "resources/com/pty4j/native/linux/${nativeArchitecture}/", jna: "com/sun/jna/linux-${nativeArchitecture}/"],
         ][context.host.os]
         [[jar: ptyJar, prefix: nativePrefixes.pty], [jar: jnaJar, prefix: nativePrefixes.jna]].each { expected ->
@@ -525,6 +525,22 @@ def verifyPackage = tasks.register('verifyPackage') {
             }
         }
         if (context.host.os == 'windows') {
+            // Read the PE header rather than trusting the toolchain: an x64 image on Windows on Arm runs under
+            // emulation, JIT-compiled code included. IMAGE_FILE_HEADER.Machine is 0x8664 for x64, 0xAA64 for ARM64.
+            int expectedMachine = context.host.architecture == 'aarch64' ? 0xAA64 : 0x8664
+            [nativeLauncher, new File(runtimeHome, 'bin/java.exe'), new File(runtimeHome, 'bin/server/jvm.dll')].each { binary ->
+                byte[] header = new byte[4096]
+                int read = binary.withInputStream { it.readNBytes(header, 0, header.length) }
+                ByteBuffer pe = ByteBuffer.wrap(header, 0, read).order(ByteOrder.LITTLE_ENDIAN)
+                int offset = read >= 0x40 ? pe.getInt(0x3C) : -1
+                boolean valid = read >= 2 && header[0] == ('M' as char) && header[1] == ('Z' as char) &&
+                    offset >= 0 && offset + 6 <= read && pe.getInt(offset) == 0x00004550
+                int machine = valid ? (pe.getShort(offset + 4) & 0xFFFF) : -1
+                if (machine != expectedMachine) {
+                    throw new GradleException(String.format(Locale.ROOT,
+                        'Package verification failed: %s is not a %s PE binary (machine 0x%04X)', binary, context.host.architecture, machine))
+                }
+            }
             // jpackage embeds the ICO's PNG frames in the executable's native resources.
             // Inspect bytes without running the launcher or depending on image-conversion tools.
             byte[] ico = Files.readAllBytes(nativeIcon.get().toPath())
@@ -631,12 +647,12 @@ if (normalizedHost().os == 'windows') {
         inputs.file(installerVerifier).withPathSensitivity(PathSensitivity.RELATIVE)
         inputs.property('version', version)
         inputs.property('upgradeUuid', upgradeUuid)
-        outputs.file(version.map { new File(distributionDirectory.get().asFile, "Jasper-${it}-windows-x64-setup.exe") })
+        outputs.file(version.map { new File(distributionDirectory.get().asFile, "Jasper-${it}-windows-${normalizedHost().architecture}-setup.exe") })
         doLast {
             def context = nativeContext()
             File distDir = distributionDirectory.get().asFile
             distDir.mkdirs()
-            File artifact = new File(distDir, "Jasper-${context.version}-windows-x64-setup.exe")
+            File artifact = new File(distDir, "Jasper-${context.version}-windows-${context.host.architecture}-setup.exe")
             File temporary = new File(packagingRoot.get().asFile, 'installer-work')
             delete(artifact, temporary)
             temporary.mkdirs()
@@ -675,7 +691,7 @@ if (normalizedHost().os == 'windows') {
         group = 'distribution'
         description = 'Creates the portable Windows distribution after verifying its image.'
         dependsOn(verifyPackage)
-        archiveFileName = version.map { "Jasper-${it}-windows-x64.zip" }
+        archiveFileName = version.map { "Jasper-${it}-windows-${normalizedHost().architecture}.zip" }
         destinationDirectory = distributionDirectory
         from(imageDirectory)
         preserveFileTimestamps = false

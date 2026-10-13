@@ -117,6 +117,48 @@ class StartupTraceTest {
             .containsEntry("SHOWN", 1_140.0).containsEntry("OUTPUT_PAINTED", 1_195.0);
     }
 
+    @Test void aWindowAfterAnIdleSpellReportsTheSpellAndItsMemoryUntilShown() {
+        var fixture = new Fixture();
+        StartupTrace trace = fixture.trace();
+        var readings = new java.util.ArrayDeque<>(List.of(new MemoryReading(1_000, 120L << 20), new MemoryReading(41_000, 300L << 20)));
+        trace.readMemoryWith(readings::poll);
+        fixture.at(1_000);
+        trace.windowsClosed();
+        fixture.at(1_000 + TimeUnit.MINUTES.toMillis(170));
+        WindowTrace window = trace.window("handoff");
+        fixture.at(1_000 + TimeUnit.MINUTES.toMillis(170) + 900);
+        window.mark(WindowTrace.Milestone.SHOWN);
+        window.mark(WindowTrace.Milestone.SHOWN);
+        window.mark(WindowTrace.Milestone.OUTPUT_PAINTED);
+        assertThat(fixture.log).containsExactly("Window (handoff): shown 900 ms, output painted 900 ms after the request;"
+            + " no window for 2 h 50 min before, 40000 page faults until shown, working set 120 to 300 MB");
+        assertThat(readings).as("read once when requested and once when shown").isEmpty();
+        // The idle spell belongs to that window only.
+        trace.window("menu").mark(WindowTrace.Milestone.OUTPUT_PAINTED);
+        assertThat(fixture.log.getLast()).isEqualTo("Window (menu): output painted 0 ms after the request");
+    }
+
+    @Test void aWindowWithoutAnIdleSpellBeforeItNeverReadsMemory() {
+        var fixture = new Fixture();
+        StartupTrace trace = fixture.trace();
+        trace.readMemoryWith(() -> { throw new AssertionError("a first or further window pays nothing for the reading"); });
+        WindowTrace first = trace.window("cold");
+        first.mark(WindowTrace.Milestone.SHOWN);
+        first.mark(WindowTrace.Milestone.OUTPUT_PAINTED);
+        assertThat(fixture.log).containsExactly("Window (cold): shown 0 ms, output painted 0 ms after the request");
+    }
+
+    @Test void anUnreadableMemoryReadingLeavesTheLineAsItWas() {
+        var fixture = new Fixture();
+        StartupTrace trace = fixture.trace();
+        trace.readMemoryWith(() -> { throw new IllegalStateException("no counters"); });
+        trace.windowsClosed();
+        fixture.at(45_000);
+        trace.window("reopen").mark(WindowTrace.Milestone.OUTPUT_PAINTED);
+        assertThat(fixture.log).containsExactly("Window (reopen): output painted 0 ms after the request; no window for 45 s before");
+        assertThat(WindowTrace.duration(TimeUnit.MINUTES.toNanos(90))).isEqualTo("90 min");
+    }
+
     @Test void aWindowThatNeverPrintsGivesUpAtTheCap() {
         var fixture = new Fixture();
         StartupTrace trace = fixture.trace();

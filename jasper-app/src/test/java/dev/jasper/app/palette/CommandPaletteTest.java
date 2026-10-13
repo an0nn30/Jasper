@@ -387,6 +387,39 @@ class CommandPaletteTest {
         });
     }
 
+    @Test void aPartialRevealShowsOnlyTheTopOfTheCardWithoutMovingItsRows() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var kit = KitTestSupport.context();
+            var palette = palette(kit, true, new ArrayList<>());
+            palette.setEntries(List.of(item(COMMANDS, "a"), item(COMMANDS, "b"), item(COMMANDS, "c")), null, null);
+            palette.setSize(palette.getPreferredSize());
+            layoutTree(palette);
+            Rectangle field = palette.fieldRow().getBounds(), hint = palette.hintBar().getBounds();
+            int height = palette.getHeight(), middle = palette.getWidth() / 2;
+
+            palette.setReveal(0.5);
+            layoutTree(palette);
+            assertThat(palette.revealedHeight()).isEqualTo((int) Math.ceil(height * 0.5));
+            assertThat(palette.fieldRow().getBounds()).as("rows keep their full-height layout").isEqualTo(field);
+            assertThat(palette.hintBar().getBounds()).isEqualTo(hint);
+            assertThat(palette.contains(middle, height / 4)).isTrue();
+            assertThat(palette.contains(middle, height * 3 / 4)).as("presses below the edge reach the overlay").isFalse();
+            var image = paint(palette);
+            assertThat(image.getRGB(middle, height / 4) >>> 24).as("revealed content").isEqualTo(255);
+            assertThat(image.getRGB(middle, height * 3 / 4) >>> 24).as("unrevealed content").isZero();
+            assertPixel(image, new Point(middle, palette.revealedHeight() - 1), kit.theme().semantic().color(SemanticColor.BORDER_MENU), "the edge carries the border");
+
+            palette.setReveal(0);
+            assertThat(palette.revealedHeight()).isZero();
+            image = paint(palette);
+            assertThat(image.getRGB(middle, 0) >>> 24).as("nothing shows before the reveal starts").isZero();
+
+            palette.setReveal(1);
+            assertThat(palette.revealedHeight()).isEqualTo(height);
+            assertThat(palette.contains(middle, height * 3 / 4)).isTrue();
+        });
+    }
+
     @Test void everySurfaceTakesItsColourFromTheTheme() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             for (boolean dark : new boolean[]{false, true}) {

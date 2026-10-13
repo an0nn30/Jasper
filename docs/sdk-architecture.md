@@ -132,7 +132,8 @@ parents `FileDialog` to the actual frame or dialog and always disposes it. The t
 selections through `FakePluginHost.queueFileSelection`; an empty queue models cancellation.
 
 `persistence.UiState` (`ui-state.toml`, version 2) holds each panel's slot, order and visibility,
-the dock's per-side sizes and ratios, stripe visibility and auxiliary window bounds. It is
+the dock's per-side sizes and ratios, stripe visibility, auxiliary window bounds and the dragged
+command palette's place. It is
 application state, not configuration: a bad panel or window entry or dock key falls back alone,
 an unreadable file falls back to defaults, writes are atomic, and a version 1 file migrates on read.
 The process stays alive while a plugin window is open.

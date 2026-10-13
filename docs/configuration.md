@@ -268,6 +268,15 @@ all of them, up to 200 rows in total; only when that total cuts a scope short do
 as `palette.visible_rows` with a warning; Migrate Config renames it. Changes apply live, including to
 an open palette.
 
+The palette can be dragged by its empty areas: the padding around the search box, the hint bar and an
+empty result list. Near the window's vertical centre line or one fifth down from its top, it snaps to that
+line; the lines are never drawn, only felt. Releasing saves the place, as fractions of the window, in `ui-state.toml`'s
+`[palette]` table (`center_x`, `top`), and every window opens the palette there; a dragged palette keeps the
+560-pixel activated width in both view modes. In Normal mode, dragging the palette back to the title-bar field
+(near its usual place across, at or above its usual height) snaps it home, and releasing there re-attaches it.
+Double-clicking a draggable area also forgets the place: Normal mode hangs the palette from the title-bar field
+again and Compact mode centres it.
+
 ### Finished-command notifications
 
 `notifications.long_command_seconds` sets how long a command must run before it is worth telling you about.
@@ -798,6 +807,10 @@ use the same `ui.animations.enabled` policy. Tab content and keyboard focus chan
 Tab motion follows the [Alacritty reference](design/alacritty-tabs.md): first reveal takes 490 ms,
 subsequent opening 475 ms and closing 425 ms. Selection and hiding the last remaining tab
 bar are immediate. A single workspace tab has no visible tab bar.
+
+The command palette drips open: over 300 ms its bottom edge eases down from the top of the card (quartic ease-out,
+fast then slow) while its rows stay in place, so the query field takes typing at once. Only a fresh open animates;
+switching scopes or changing results does not, and dismissing or disabling animations shows the card's final state.
 The temporary **Open tab duration**, **Close tab duration**, and **Switch tab duration** tuning fields have been removed.
 Existing `ui.animations.tab_open_ms`, `ui.animations.tab_close_ms`, and `ui.animations.tab_switch_ms` values are
 ignored silently and left in the configuration file; they no longer affect motion. Other unknown animation keys

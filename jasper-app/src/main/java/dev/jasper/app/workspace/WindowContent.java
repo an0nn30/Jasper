@@ -685,6 +685,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return SwingUtilities.convertRectangle(field.getParent(), field.getBounds(), target);
     }
     WindowChrome chrome() { return chrome; }
+    UiState uiState() { return uiState; }
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }
     boolean statusVisible() { return statusVisible; }
@@ -1321,7 +1322,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     void setAnimations(dev.jasper.app.config.AnimationSettings settings) {
-        if (!closed && windowTabs != null) windowTabs.setAnimations(settings);
+        if (closed) return;
+        if (windowTabs != null) windowTabs.setAnimations(settings);
+        commandPalette.setAnimations(settings);
     }
 
     void setTabHeight(int height) {
