@@ -181,3 +181,7 @@ links architecture and maintenance guides for each module. The [app architecture
 and [maintenance recipes](docs/app-maintenance.md) explain feature ownership, lifecycle and
 where to add commands, settings, providers and notices. [STATUS](docs/STATUS.md) records
 verified checkpoints and remaining manual acceptance.
+
+## License
+
+Jasper is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
