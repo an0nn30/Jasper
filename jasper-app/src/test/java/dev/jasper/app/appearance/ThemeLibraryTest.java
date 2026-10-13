@@ -99,4 +99,25 @@ class ThemeLibraryTest {
             assertThat(problem.message()).isEqualTo("Objects nested more than 8 deep");
         });
     }
+
+    @Test void aFileItMayNotReadIsReportedWithTheReasonNotThePath() throws Exception {
+        var secret = Files.writeString(themes().resolve("secret.json"), terminalTheme("Secret"));
+        org.junit.jupiter.api.Assumptions.assumeTrue(java.nio.file.FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
+        Files.setPosixFilePermissions(secret, java.util.Set.of());
+        try {
+            org.junit.jupiter.api.Assumptions.assumeFalse(Files.isReadable(secret), "running as a user who reads everything");
+            var library = ThemeLibrary.read(themes(), ThemeLibrary.bundledOnly());
+            assertThat(library.problems()).singleElement().satisfies(problem ->
+                assertThat(problem.message()).isEqualTo("Could not read this file: permission denied."));
+        } finally {
+            Files.setPosixFilePermissions(secret, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+        }
+    }
+
+    @Test void aReadFailureWithoutAMessageStillSaysSomething() {
+        assertThat(ThemeLibrary.reason(new java.io.IOException((String) null))).isEqualTo("Could not read this file (IOException).");
+        assertThat(ThemeLibrary.reason(new java.io.IOException("Theme files are at most 1 MiB."))).isEqualTo("Theme files are at most 1 MiB.");
+        assertThat(ThemeLibrary.reason(new java.nio.file.FileSystemException("/x/secret.json", null, "Input/output error")))
+            .isEqualTo("Could not read this file: Input/output error.");
+    }
 }

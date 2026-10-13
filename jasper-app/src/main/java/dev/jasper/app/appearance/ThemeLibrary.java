@@ -6,11 +6,15 @@ import dev.jasper.ui.theme.TerminalScheme;
 import dev.jasper.ui.theme.ThemeFileException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -83,7 +87,9 @@ public final class ThemeLibrary {
                 listing.filter(path -> path.getFileName().toString().endsWith(".json") && Files.isRegularFile(path))
                     .sorted(Comparator.comparing(path -> path.getFileName().toString())).forEach(files::add);
             } catch (IOException failure) {
-                problems.add(new Problem(folder, 0, "Could not list the themes folder: " + failure.getMessage()));
+                problems.add(new Problem(folder, 0, "Could not list the themes folder: " + reason(failure)));
+            } catch (UncheckedIOException failure) {
+                problems.add(new Problem(folder, 0, "Could not list the themes folder: " + reason(failure.getCause())));
             }
         }
         var imported = new ArrayList<JasperTheme>();
@@ -101,7 +107,7 @@ public final class ThemeLibrary {
             }
             String text;
             try { text = readText(file); }
-            catch (IOException failure) { problems.add(new Problem(file, 0, failure.getMessage())); continue; }
+            catch (IOException failure) { problems.add(new Problem(file, 0, reason(failure))); continue; }
             var reused = previous.theme(id).filter(theme -> text.equals(previous.texts.get(id)));
             try {
                 imported.add(reused.orElseGet(() -> JasperTheme.parse(text, id)));
@@ -133,6 +139,16 @@ public final class ThemeLibrary {
         } catch (CharacterCodingException failure) {
             throw new IOException("A theme file is UTF-8 text.");
         }
+    }
+
+    /** Why a file could not be read: the reader's own reasons as they are, otherwise what failed, never the bare path. */
+    static String reason(IOException failure) {
+        if (failure instanceof AccessDeniedException) return "Could not read this file: permission denied.";
+        if (failure instanceof NoSuchFileException) return "Could not read this file: it disappeared while being read.";
+        if (failure instanceof FileSystemException system)
+            return "Could not read this file" + (system.getReason() == null ? " (" + system.getClass().getSimpleName() + ")" : ": " + system.getReason()) + ".";
+        String message = failure.getMessage();
+        return message == null || message.isBlank() ? "Could not read this file (" + failure.getClass().getSimpleName() + ")." : message;
     }
 
     /** Slate Steel, then the imported themes in order. */
