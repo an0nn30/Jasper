@@ -66,6 +66,28 @@ Settings › Appearance › **Imported themes** lists every imported theme with 
   of its schemes, saved or staged, returns to its default (`slate-steel` or `match`): saved ones are written at once,
   and other staged changes stay staged. If the file cannot be deleted, nothing changes and the reason shows.
 
+## Converting Alacritty and IntelliJ themes
+
+`tools/themes/jasper_theme.py` (in a checkout of Jasper; Python 3.11 or later and nothing else) turns themes made for
+other programs into Jasper theme files:
+
+```bash
+python3 tools/themes/jasper_theme.py Dracula.jar gruvbox_dark.toml -o ~/Desktop/themes
+```
+
+- An **Alacritty** theme (`.toml`) becomes a terminal-only theme: one scheme, named after the file
+  (`gruvbox_dark.toml` is "Gruvbox Dark") and keyed `dark` or `light` by its background.
+- An **IntelliJ** theme (a `.theme.json`, a plugin `.jar`, or a `.zip` downloaded from the JetBrains Marketplace)
+  becomes a UI theme with its one variant, Dark or Light: its colours resolved through its parent themes (IntelliJ's
+  own, in `tools/themes/intellij/`), its console colours as its terminal scheme and its editor scheme's colours for the
+  Editor. Every theme in a plugin is written; `--list` shows them and `--theme NAME` converts one.
+- `--name` sets the display name, `--scheme FILE` gives a loose `.theme.json` its editor scheme, `--force` overwrites
+  existing files and `--verbose` prints where each UI role came from (IntelliJ themes).
+
+Each theme is written as `<id>.json`, its name lower-cased with dashes, so the file can go straight into the themes
+folder. A conversion prints a summary such as `Dracula (dark): 41 roles from the theme, 12 from Darcula, 4 derived;
+editor 22 of 23 from the scheme`; "derived" roles had no IntelliJ key and follow a rule instead.
+
 ## The Jasper theme format
 
 A Jasper theme is one UTF-8 JSON file; `slate-steel.json` is the complete example.

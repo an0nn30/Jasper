@@ -1,5 +1,14 @@
 # Theme import Plan 1: the format and the runtime — Implementation Plan
 
+> **Status (2026-10-13): executed on `claude/theme-import` (e76bd6ab..6a49da4a).** Review fixes beyond this plan's
+> text: a prerequisite commit makes AppDocumentationTest strip fenced code the CommonMark way (a fence closes only on
+> a line of at least as many backticks) and check example snippets in the current guides only; `JasperTheme` checks
+> the `jasper-theme` marker before it reports unknown entries; `ThemeJson` refuses objects nested more than 8 deep;
+> `ThemeLibrary` says why a file could not be read and survives a failed folder listing; a Settings row with
+> companion settings stages only the settings an edit changed (`SchemaPage.edited`), so picking a theme no longer
+> writes `appearance`; README.md, docs/README.md, docs/ui-architecture.md, docs/sdk-architecture.md and
+> docs/plugin-ui.md describe installed themes.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 > **Deviation from the spec's section 8 (recorded here and in `docs/STATUS.md`):** the spec puts the Dark theme and

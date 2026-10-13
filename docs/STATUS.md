@@ -1,5 +1,17 @@
 # Jasper — Status and Handoff
 
+**Theme import Plan 3: the theme converter — 2026-10-13** (`claude/theme-import`;
+[spec](superpowers/specs/2026-10-13-jasper-theme-import-design.md),
+[plan](superpowers/plans/2026-10-13-theme-import-3-converter.md)). `tools/themes/jasper_theme.py` (Python 3.11+,
+standard library) converts Alacritty `.toml` themes into terminal-only Jasper themes and IntelliJ themes (`.theme.json`,
+plugin `.jar`, Marketplace `.zip`) into UI themes with their console colours as the terminal scheme and their editor
+scheme's syntax colours, resolving parents against IntelliJ's own themes vendored in `tools/themes/intellij/` (restored
+from `c1e968ee^`). `checkThemeTool` runs its tests under `:jasper-ui:check` and needs Python 3.11+ on the PATH (CI
+installs it); `ConvertedThemesTest` loads its golden files with the Java loader. The mapping departs from the spec's
+section 5.4 starting table in four recorded ways (the plan's header). `./gradlew check --continue`:
+**9,817 tests, 0 failures, 0 errors, 8 skipped**. Review fixes beyond the plan's text are in its status banner. No GUI launched. For the user: convert a favourite theme and import it (Plan 2) or copy it into
+the themes folder. Not merged or pushed.
+
 **Theme import Plan 2: Import… and Remove — 2026-10-13** (`claude/theme-import`;
 [spec](superpowers/specs/2026-10-13-jasper-theme-import-design.md),
 [plan](superpowers/plans/2026-10-13-theme-import-2-import-and-remove.md)). Settings › Appearance › Imported themes
@@ -8,7 +20,7 @@ the theme (`gruvbox-dark.json`), asks before replacing one and copies it into `<
 failures show under the button. Remove asks, deletes the file, and returns the theme's saved picks (written at once)
 and staged ones to their defaults. `appearance.ThemeFolder` does the file work; `SchemaPage.Part` is a new, generic
 page section; the application asks with `pluginmanager.ConfirmView`. `./gradlew check --continue`: **9,815 tests,
-0 failures, 0 errors, 8 skipped**. No GUI launched. GUI checks for the user: Import… with the real chooser, the Replace
+0 failures, 0 errors, 8 skipped**. Review fixes beyond the plan's text are in its status banner. No GUI launched. GUI checks for the user: Import… with the real chooser, the Replace
 and Remove sheets over Settings, and the dropdowns after each. Not merged or pushed.
 
 **Theme import Plan 1: the format and the runtime — 2026-10-13** (`claude/theme-import`;
@@ -21,7 +33,7 @@ every forced or changed configuration read; `ui.theme.dark` and `ui.theme.light`
 configuration warnings. Settings › Appearance has Dark theme and Light theme dropdowns and a Terminal scheme dropdown
 over the installed schemes; the palette's "Terminal: …" commands follow them. Deviation: the spec's section 8 put the
 dropdowns in Plan 2; they are here (Plan 2 is Import… and Remove). `./gradlew check --continue`: **9,801 tests, 0 failures,
-0 errors, 8 skipped**. No GUI launched. For the user: copy a theme file into the themes folder, Reload config, pick it.
+0 errors, 8 skipped**. Review fixes beyond the plan's text are in its status banner. No GUI launched. For the user: copy a theme file into the themes folder, Reload config, pick it.
 Not merged or pushed.
 
 **Clear Terminal in the terminal context menu — 2026-10-13** (`claude/clear-terminal`, worktree

@@ -1,5 +1,13 @@
 # Theme import Plan 2: Import… and Remove in Settings — Implementation Plan
 
+> **Status (2026-10-13): executed on `claude/theme-import` (69ae4628..0b9a7249).** Review fixes beyond this plan's
+> text: `ThemeFolder`'s Javadoc writes the message prefix as `{@code}` (doclint), a source that cannot be read is
+> reported through `ThemeLibrary.reason`, and the byte-order mark in `ThemeFolderTest` is an escape;
+> `ImportedThemesSection` words install, Remove and save failures ("permission denied.", "the file is no longer
+> there.") instead of showing a path; `AppearancePageTest` passes the sixth `AppearanceChoices` argument;
+> docs/app-maintenance.md names the palette's `view.terminal_scheme.match` and `view.terminal_scheme.<theme>.<key>`
+> commands.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Settings › Appearance gets an **Imported themes** group: Import… copies a checked Jasper theme file into

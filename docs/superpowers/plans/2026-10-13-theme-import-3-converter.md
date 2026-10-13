@@ -1,5 +1,16 @@
 # Theme import Plan 3: the theme converter — Implementation Plan
 
+> **Status (2026-10-13): executed on `claude/theme-import`.** Task 1's review added a fix round beyond the code
+> embedded below: bad input (a corrupt archive member, a file of the wrong shape or nested too deeply, an output
+> path that cannot be written) ends in `error: <input>: …` and exit status 1 with the other inputs still written;
+> `--theme` resolves parents against every theme in the plugin; an archive with no themes, and a theme whose file
+> would be `slate-steel.json`, are refused; `--list` resolves Dark or Light through the parent chain; files are
+> written through a temporary file; the by-name editor-scheme scan skips XML that is not a scheme; the entry limit
+> counts nested jars together, and the `--scheme` file and a loose `.theme.json` are capped at 4 MiB; `--verbose`
+> is described as printing where each UI role came from. The suite has 55 tests; the golden files are unchanged.
+> Task 2's review added the golden files to `:jasper-ui:test`'s inputs, so a regenerated golden file reruns
+> `ConvertedThemesTest`.
+
 > **Deviations from the spec's section 5.4 (recorded here and in `docs/STATUS.md`), found while checking the table
 > against IntelliJ's own themes, as 5.4 asks:** (1) IntelliJ themes set most colours through `*.` wildcards, and a
 > child theme's value can be something that is not a colour, so a lookup walks the parent chain one theme at a time
