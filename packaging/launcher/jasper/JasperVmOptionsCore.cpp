@@ -40,7 +40,7 @@ std::string value(const Environment& env, const char* name) {
 }
 
 bool isAbsolute(Os os, const std::string& path) {
-    if (os != Os::WINDOWS) {
+    if (os != Os::Windows) {
         return startsWith(path, "/");
     }
     if (startsWith(path, "\\\\") || startsWith(path, "//")) {
@@ -56,10 +56,10 @@ std::string join(Os os, const std::string& directory, const std::string& child) 
         return child;
     }
     const char last = directory[directory.size() - 1];
-    if (last == '/' || (os == Os::WINDOWS && last == '\\')) {
+    if (last == '/' || (os == Os::Windows && last == '\\')) {
         return directory + child;
     }
-    return directory + (os == Os::WINDOWS ? "\\" : "/") + child;
+    return directory + (os == Os::Windows ? "\\" : "/") + child;
 }
 
 std::string inJasperDirectory(Os os, const std::string& configurationRoot) {
@@ -120,7 +120,7 @@ std::string userFilePath(Os os, const Environment& env, const std::string& worki
     if (!home.empty()) {
         return join(os, isAbsolute(os, home) ? home : join(os, workingDirectory, home), FILE_NAME);
     }
-    if (os == Os::WINDOWS) {
+    if (os == Os::Windows) {
         const std::string appData = value(env, "APPDATA");
         if (isAbsolute(os, appData)) {
             return inJasperDirectory(os, appData);
@@ -129,7 +129,7 @@ std::string userFilePath(Os os, const Environment& env, const std::string& worki
         return profile.empty() ? std::string()
                                : inJasperDirectory(os, join(os, join(os, profile, "AppData"), "Roaming"));
     }
-    if (os == Os::LINUX) {
+    if (os == Os::Linux) {
         const std::string xdg = value(env, "XDG_CONFIG_HOME");
         if (isAbsolute(os, xdg)) {
             return inJasperDirectory(os, xdg);

@@ -238,6 +238,18 @@ def testLauncherCore = tasks.register('testLauncherCore') {
         String output = runLauncherTool([test.absolutePath, new File(launcherTestSource, 'digest-vectors.txt').absolutePath],
             null, null, "the launcher's options tests")
         logger.lifecycle(output.trim())
+        // The JDK's defines are macros in every source (-DLINUX, /DWINDOWS). Check the core and its test once more with
+        // the other hosts' defines, so a name that collides with one fails here, not only on that host's CI.
+        def host = launcherHost()
+        if (host.os != 'windows') {
+            List<String> compiler = host.os == 'macos' ? ['/usr/bin/xcrun', 'clang++'] : ['g++']
+            ['macos', 'linux', 'windows'].findAll { it != host.os }.each { String other ->
+                runLauncherTool(compiler + ['-std=c++14', '-fsyntax-only', '-Wall', '-Wextra', '-Werror'] +
+                    launcherDefines(other).collect { "-D${it}".toString() } + ["-I${jasperNative.absolutePath}".toString()] +
+                    sources.collect { it.absolutePath }, null, null, "checking the options logic with ${other}'s defines",
+                    launcherToolchainHint(host.os))
+            }
+        }
         new File(work, 'passed').text = output
     }
 }

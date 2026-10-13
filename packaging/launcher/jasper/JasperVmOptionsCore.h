@@ -11,7 +11,7 @@
 namespace jasper {
 namespace vmoptions {
 
-enum class Os { MAC, LINUX, WINDOWS };
+enum class Os { Mac, Linux, Windows };
 
 /** Environment variables by name, UTF-8; a missing key is an unset variable. */
 typedef std::map<std::string, std::string> Environment;

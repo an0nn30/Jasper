@@ -49,36 +49,36 @@ std::function<bool(const std::string&)> existing(const std::vector<std::string>&
 
 void location() {
     const auto none = existing({});
-    expectText(vm::userFilePath(Os::MAC, {{"HOME", "/Users/a"}}, "/", none),
+    expectText(vm::userFilePath(Os::Mac, {{"HOME", "/Users/a"}}, "/", none),
         "/Users/a/.config/jasper/jasper.vmoptions", "macOS default");
-    expectText(vm::userFilePath(Os::MAC, {{"HOME", "/Users/a"}, {"XDG_CONFIG_HOME", "/xdg"}}, "/", none),
+    expectText(vm::userFilePath(Os::Mac, {{"HOME", "/Users/a"}, {"XDG_CONFIG_HOME", "/xdg"}}, "/", none),
         "/Users/a/.config/jasper/jasper.vmoptions", "macOS ignores XDG_CONFIG_HOME");
-    expectText(vm::userFilePath(Os::LINUX, {{"HOME", "/home/a"}, {"XDG_CONFIG_HOME", "/xdg"}}, "/", none),
+    expectText(vm::userFilePath(Os::Linux, {{"HOME", "/home/a"}, {"XDG_CONFIG_HOME", "/xdg"}}, "/", none),
         "/xdg/jasper/jasper.vmoptions", "Linux absolute XDG_CONFIG_HOME");
-    expectText(vm::userFilePath(Os::LINUX, {{"HOME", "/home/a"}, {"XDG_CONFIG_HOME", "relative"}}, "/", none),
+    expectText(vm::userFilePath(Os::Linux, {{"HOME", "/home/a"}, {"XDG_CONFIG_HOME", "relative"}}, "/", none),
         "/home/a/.config/jasper/jasper.vmoptions", "Linux ignores a relative XDG_CONFIG_HOME");
-    expectText(vm::userFilePath(Os::WINDOWS, {{"APPDATA", "C:\\Users\\a\\AppData\\Roaming"}}, "C:\\", none),
+    expectText(vm::userFilePath(Os::Windows, {{"APPDATA", "C:\\Users\\a\\AppData\\Roaming"}}, "C:\\", none),
         "C:\\Users\\a\\AppData\\Roaming\\jasper\\jasper.vmoptions", "Windows APPDATA");
-    expectText(vm::userFilePath(Os::WINDOWS, {{"APPDATA", "relative"}, {"USERPROFILE", "C:\\Users\\a"}}, "C:\\", none),
+    expectText(vm::userFilePath(Os::Windows, {{"APPDATA", "relative"}, {"USERPROFILE", "C:\\Users\\a"}}, "C:\\", none),
         "C:\\Users\\a\\AppData\\Roaming\\jasper\\jasper.vmoptions", "Windows falls back to USERPROFILE");
-    expectText(vm::userFilePath(Os::WINDOWS, {}, "C:\\", none), "", "Windows without APPDATA or USERPROFILE");
-    expectText(vm::userFilePath(Os::MAC, {}, "/", none), "", "macOS without HOME");
-    expectText(vm::userFilePath(Os::MAC, {{"JASPER_HOME", " /opt/jh "}, {"HOME", "/Users/a"}}, "/", none),
+    expectText(vm::userFilePath(Os::Windows, {}, "C:\\", none), "", "Windows without APPDATA or USERPROFILE");
+    expectText(vm::userFilePath(Os::Mac, {}, "/", none), "", "macOS without HOME");
+    expectText(vm::userFilePath(Os::Mac, {{"JASPER_HOME", " /opt/jh "}, {"HOME", "/Users/a"}}, "/", none),
         "/opt/jh/jasper.vmoptions", "JASPER_HOME, trimmed");
-    expectText(vm::userFilePath(Os::LINUX, {{"JASPER_HOME", "/opt/jh/"}}, "/", none),
+    expectText(vm::userFilePath(Os::Linux, {{"JASPER_HOME", "/opt/jh/"}}, "/", none),
         "/opt/jh/jasper.vmoptions", "JASPER_HOME with a trailing separator");
-    expectText(vm::userFilePath(Os::LINUX, {{"JASPER_HOME", "jh"}}, "/work", none),
+    expectText(vm::userFilePath(Os::Linux, {{"JASPER_HOME", "jh"}}, "/work", none),
         "/work/jh/jasper.vmoptions", "a relative JASPER_HOME resolves from the working directory");
-    expectText(vm::userFilePath(Os::WINDOWS, {{"JASPER_HOME", "jh"}}, "C:\\work", none),
+    expectText(vm::userFilePath(Os::Windows, {{"JASPER_HOME", "jh"}}, "C:\\work", none),
         "C:\\work\\jh\\jasper.vmoptions", "a relative JASPER_HOME on Windows");
-    expectText(vm::userFilePath(Os::MAC, {{"JASPER_HOME", "   "}, {"HOME", "/Users/a"}}, "/", none),
+    expectText(vm::userFilePath(Os::Mac, {{"JASPER_HOME", "   "}, {"HOME", "/Users/a"}}, "/", none),
         "/Users/a/.config/jasper/jasper.vmoptions", "a blank JASPER_HOME is ignored");
     const Environment chosen = {{"JASPER_VM_OPTIONS", "/tmp/mine.vmoptions"}, {"JASPER_HOME", "/opt/jh"}};
-    expectText(vm::userFilePath(Os::MAC, chosen, "/", existing({"/tmp/mine.vmoptions"})),
+    expectText(vm::userFilePath(Os::Mac, chosen, "/", existing({"/tmp/mine.vmoptions"})),
         "/tmp/mine.vmoptions", "JASPER_VM_OPTIONS naming a file");
-    expectText(vm::userFilePath(Os::MAC, chosen, "/", none),
+    expectText(vm::userFilePath(Os::Mac, chosen, "/", none),
         "/opt/jh/jasper.vmoptions", "JASPER_VM_OPTIONS naming no file falls through");
-    expectText(vm::userFilePath(Os::MAC, {{"JASPER_VM_OPTIONS", "  "}, {"HOME", "/Users/a"}}, "/", existing({"  "})),
+    expectText(vm::userFilePath(Os::Mac, {{"JASPER_VM_OPTIONS", "  "}, {"HOME", "/Users/a"}}, "/", existing({"  "})),
         "/Users/a/.config/jasper/jasper.vmoptions", "a blank JASPER_VM_OPTIONS is ignored");
 }
 
