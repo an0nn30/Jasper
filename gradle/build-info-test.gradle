@@ -1,7 +1,9 @@
 import java.time.OffsetDateTime
 
 // Fixtures for gradle/build-info.gradle in the style of packaging-support-test.gradle: the pure helpers, then a throwaway
-// git repository walked through clean, tagged, ahead-of-tag, dirty and detached states. Needs git; no network.
+// git repository walked through clean, tagged, ahead-of-tag, dirty and detached states. The repository part needs git 2.32
+// or later (GIT_CONFIG_GLOBAL; init -b needs 2.28) and is skipped when git is missing, as gitFacts degrades to empty
+// facts there; no network.
 def verifyBuildInfo = tasks.register('verifyBuildInfoSupport') {
     group = 'verification'
     description = 'Checks the build-information helpers with fixtures and a temporary git repository.'
@@ -29,6 +31,10 @@ def verifyBuildInfo = tasks.register('verifyBuildInfoSupport') {
             "commit=${'a' * 40}".toString(), 'branch=claude/über', 'commitDate=2026-10-13T14:02:11-04:00', 'dirty=true',
             'headTags=v1.2.0', 'describe=v1.2.0-0-gaaaaaaa']
         assert buildInfoText([branch: 'a\\b']).readLines().contains('branch=a\\\\b')
+        def hookEnvironment = new ProcessBuilder('git')
+        hookEnvironment.environment().put('GIT_INDEX_FILE', 'elsewhere')
+        applyEnvironment(hookEnvironment, [GIT_INDEX_FILE: null, LC_ALL: 'C'])
+        assert !hookEnvironment.environment().containsKey('GIT_INDEX_FILE') && hookEnvironment.environment().get('LC_ALL') == 'C'
         // What gradle/packaging.gradle asks for, on this checkout: a valid X.Y.Z, and the same as packaging's own provider.
         String here = packageVersion(providers.gradleProperty('jasperVersion').orNull, buildFacts.get())
         assert here ==~ /[1-9][0-9]{0,2}\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,4})/
@@ -40,6 +46,19 @@ tasks.named('check') { dependsOn(verifyBuildInfo) }
 
 verifyBuildInfo.configure {
     doLast {
+        boolean gitAvailable
+        try {
+            def probe = new ProcessBuilder('git', '--version').redirectErrorStream(true).start()
+            probe.outputStream.close()
+            probe.inputStream.getText('UTF-8')
+            gitAvailable = probe.waitFor() == 0
+        } catch (IOException ignored) {
+            gitAvailable = false
+        }
+        if (!gitAvailable) {
+            logger.lifecycle('Skipped the temporary git repository checks: git is not available')
+            return
+        }
         File root = new File(temporaryDir, 'git')
         root.deleteDir()
         root.mkdirs()
@@ -47,15 +66,18 @@ verifyBuildInfo.configure {
         // It turns on the settings that would pollute the facts, to prove gitFacts turns them off.
         File global = new File(root, 'gitconfig')
         global.text = '[log]\n\tshowSignature = true\n[color]\n\tui = always\n[user]\n\tname = Fixture\n\temail = fixture@example.invalid\n' +
-            '[commit]\n\tgpgSign = false\n[tag]\n\tgpgSign = false\n'
+            '[commit]\n\tgpgSign = false\n[tag]\n\tgpgSign = false\n[status]\n\tshowUntrackedFiles = no\n'
+        // Run from a git hook, this build inherits GIT_DIR, GIT_INDEX_FILE and friends, which would send the fixture's git
+        // commands to the real repository: every inherited GIT_ variable is removed before the fixture's own are added.
         // The ceiling keeps git from finding Jasper's own repository above the fixture.
-        Map<String, String> environment = [GIT_CONFIG_GLOBAL: global.absolutePath, GIT_CONFIG_NOSYSTEM: '1',
+        Map<String, String> environment = System.getenv().keySet().findAll { it.regionMatches(true, 0, 'GIT_', 0, 4) }
+            .collectEntries { [(it): null] } + [GIT_CONFIG_GLOBAL: global.absolutePath, GIT_CONFIG_NOSYSTEM: '1',
             GIT_CEILING_DIRECTORIES: root.absolutePath, LC_ALL: 'C']
         File repo = new File(root, 'repo')
         repo.mkdirs()
         def run = { List<String> arguments ->
             def builder = new ProcessBuilder(['git'] + arguments).directory(repo).redirectErrorStream(true)
-            builder.environment().putAll(environment)
+            applyEnvironment(builder, environment)
             def process = builder.start()
             String output = process.inputStream.getText('UTF-8')
             assert process.waitFor() == 0 : "git ${arguments.join(' ')} failed:\n${output}"
@@ -74,6 +96,11 @@ verifyBuildInfo.configure {
         assert first.headTags == '' && first.describe == ''
         assert OffsetDateTime.parse(first.commitDate) != null
         assert packageVersion(null, first) == '1.0.0'
+        // A folder inside a repository that is not itself one (a source archive unpacked under another checkout) is no
+        // repository: the outer one's commit, tags and state are not its facts.
+        File nested = new File(repo, 'nested')
+        nested.mkdirs()
+        assert gitFacts(nested, environment) == [commit: '', branch: '', commitDate: '', dirty: 'false', headTags: '', describe: '']
 
         run(['tag', 'v1.2.0'])
         run(['tag', 'nightly'])
@@ -92,6 +119,13 @@ verifyBuildInfo.configure {
         assert gitFacts(repo, environment).dirty == 'true'
         run(['checkout', '-q', '--detach', 'HEAD'])
         assert gitFacts(repo, environment).branch == 'HEAD'
+
+        // A linked worktree has a .git file, not a folder; it is still its own repository.
+        File linked = new File(root, 'linked')
+        run(['worktree', 'add', '-q', '--detach', linked.absolutePath, 'HEAD'])
+        def inLinked = gitFacts(linked, environment)
+        assert inLinked.commit ==~ /[0-9a-f]{40}/ && inLinked.branch == 'HEAD' && inLinked.dirty == 'false'
+        assert inLinked.headTags == '' && inLinked.describe ==~ /v1\.2\.0-1-g[0-9a-f]+/
         logger.lifecycle('Verified build facts from a temporary git repository')
     }
 }

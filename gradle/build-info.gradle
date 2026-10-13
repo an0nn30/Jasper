@@ -4,14 +4,30 @@ import java.util.concurrent.TimeUnit
 // (dev.jasper.app.platform) derives the release and development labels from them; gradle/packaging.gradle derives the
 // package version. gradle/build-info-test.gradle checks these helpers with fixtures (verifyBuildInfoSupport, part of check).
 
-// The six facts, each command's output trimmed, or '' when git is missing, fails or this is no repository. A developer's
-// own settings must not change the output, so signatures and colour are off; stderr is discarded.
+// Overrides a child process's environment: a null value removes the variable.
+ext.applyEnvironment = { ProcessBuilder builder, Map<String, String> environment ->
+    environment.each { String name, String value ->
+        if (value == null) builder.environment().remove(name) else builder.environment().put(name, value)
+    }
+}
+
+// The six facts, each command's output trimmed, or '' when git is missing, fails or this is no repository. Only a
+// repository whose top level is directory itself counts: a source tree unpacked inside another checkout has no facts of
+// its own, so git may not look above directory. A developer's own settings must not change the output, so signatures
+// and colour are off; stderr is discarded. environment overrides the child's (a null value removes a variable).
 ext.gitFacts = { File directory, Map<String, String> environment = [:] ->
+    File parent = directory.absoluteFile.parentFile
     def git = { List<String> arguments ->
         try {
             def builder = new ProcessBuilder(['git', '-c', 'log.showSignature=false', '-c', 'color.ui=never'] + arguments)
                 .directory(directory).redirectError(ProcessBuilder.Redirect.DISCARD)
-            builder.environment().putAll(environment)
+            applyEnvironment(builder, environment)
+            if (parent != null) {
+                // git stops looking for a repository at a ceiling folder; the folder it starts in is never excluded.
+                String ceilings = builder.environment().get('GIT_CEILING_DIRECTORIES')
+                builder.environment().put('GIT_CEILING_DIRECTORIES',
+                    ceilings ? ceilings + File.pathSeparator + parent.absolutePath : parent.absolutePath)
+            }
             def process = builder.start()
             process.outputStream.close()
             String output = process.inputStream.getText('UTF-8')
@@ -30,7 +46,8 @@ ext.gitFacts = { File directory, Map<String, String> environment = [:] ->
     [commit    : commit,
      branch    : git(['rev-parse', '--abbrev-ref', 'HEAD']),
      commitDate: git(['log', '-1', '--format=%cI', 'HEAD']),
-     dirty     : String.valueOf(!git(['status', '--porcelain']).isEmpty()),
+     // Untracked files count whatever status.showUntrackedFiles says, and a build never takes index.lock.
+     dirty     : String.valueOf(!git(['--no-optional-locks', 'status', '--porcelain', '--untracked-files=normal']).isEmpty()),
      headTags  : git(['tag', '--points-at', 'HEAD']).readLines()*.trim().findAll { !it.isEmpty() }.sort().join(' '),
      describe  : git(['describe', '--tags', '--long', '--match', 'v[0-9]*.[0-9]*.[0-9]*', '--exclude', 'v*[!0-9.]*', 'HEAD'])]
 }
