@@ -26,7 +26,7 @@ class ThemeFolderTest {
 
     @Test void aGoodFileIsCopiedInUnderItsIdWithItsOriginalBytes() throws Exception {
         var folder = new ThemeFolder(home.resolve("themes"));
-        String text = "﻿" + ThemeTestSupport.terminalThemeJson("Gruvbox Dark");
+        String text = "\uFEFF" + ThemeTestSupport.terminalThemeJson("Gruvbox Dark");
         var file = source("anything.json", text);
         var candidate = folder.prepare(file);
         assertThat(candidate.id()).isEqualTo("gruvbox-dark");
@@ -51,7 +51,10 @@ class ThemeFolderTest {
             .hasMessage("The theme's name has no letters or digits Jasper can use for a file name");
         var huge = Files.write(home.resolve("downloads/huge.json"), new byte[ThemeLibrary.MAX_BYTES + 1]);
         assertThatThrownBy(() -> folder.prepare(huge)).hasMessage("Theme files are at most 1 MiB.");
-        assertThatThrownBy(() -> folder.prepare(home.resolve("downloads/missing.json"))).isInstanceOf(ThemeFolder.ImportFailure.class);
+        var missing = home.resolve("downloads/missing.json");
+        assertThatThrownBy(() -> folder.prepare(missing)).isInstanceOf(ThemeFolder.ImportFailure.class)
+            .hasMessage(ThemeLibrary.reason(new java.nio.file.NoSuchFileException(missing.toString())))
+            .hasMessageNotContaining(missing.toString());
         assertThat(home.resolve("themes")).doesNotExist();
     }
 

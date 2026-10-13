@@ -22,7 +22,7 @@ public final class ThemeFolder {
         @Override public byte[] bytes() { return bytes.clone(); }
     }
 
-    /** Why a file cannot be imported, in words Settings shows after "Could not import <file>: ". */
+    /** Why a file cannot be imported, in words Settings shows after {@code "Could not import <file>: "}. */
     public static final class ImportFailure extends Exception {
         ImportFailure(String message) { super(message); }
     }
@@ -53,7 +53,7 @@ public final class ThemeFolder {
             text = ThemeLibrary.readText(source);
             bytes = Files.readAllBytes(source);
         } catch (IOException failure) {
-            throw new ImportFailure(failure.getMessage());
+            throw new ImportFailure(ThemeLibrary.reason(failure));
         }
         JasperTheme theme;
         try {
