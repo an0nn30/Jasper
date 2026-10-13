@@ -214,7 +214,6 @@ Plan plan(const std::vector<std::string>& bundled, const std::string& path, cons
     Plan result;
     result.javaOptions = bundled;
     const std::string* skip = variable(env, SKIP_VARIABLE);
-    result.removeSkipVariable = skip != nullptr;
     const std::string reason = skip == nullptr ? std::string() : trim(*skip);
     const bool applied = reason.empty() && !path.empty() && file != nullptr && !file->corrupted && !file->lines.empty();
     if (applied) {

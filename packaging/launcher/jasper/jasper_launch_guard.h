@@ -9,7 +9,8 @@
 extern "C" {
 #endif
 
-/* Arms the guard when argv carries -Djasper.vmOptionsDigest= (the user's options were applied). Idempotent. */
+/* Removes JASPER_VM_OPTIONS_SKIP from the environment, then arms the guard when argv carries
+   -Djasper.vmOptionsDigest= (the user's options were applied). Idempotent. */
 void jasperGuardBeforeLaunch(int argc, char** argv);
 
 /* Records that JLI_Launch returned: the JVM was created and has finished. */

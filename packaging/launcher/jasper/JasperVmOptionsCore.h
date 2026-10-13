@@ -43,10 +43,9 @@ std::vector<std::string> merge(const std::vector<std::string>& bundled, const st
 /** FNV-1a 64 over each line's bytes followed by '\n', as 16 lowercase hex digits. */
 std::string digest(const std::vector<std::string>& lines);
 
-/** The JVM options to launch with, and whether to remove JASPER_VM_OPTIONS_SKIP from the environment first. */
+/** The JVM options to launch with. */
 struct Plan {
     std::vector<std::string> javaOptions;
-    bool removeSkipVariable = false;
 };
 
 /** The whole decision. file is null when the file does not exist or cannot be read. */

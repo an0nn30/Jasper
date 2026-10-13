@@ -212,7 +212,7 @@ def nativeBuild = { Map spec ->
             break
         default:
             link = [msvcTool('cl.exe'), '/nologo'] + objects + (spec.resources ?: []).collect { it.absolutePath } +
-                ["/Fe${output.absolutePath}".toString(), '/link', '/OPT:REF', '/INCREMENTAL:NO', '/STACK:1048576'] +
+                ["/Fe${output.absolutePath}".toString(), '/link', '/OPT:REF', '/INCREMENTAL:NO', '/MANIFEST:NO', '/STACK:1048576'] +
                 (spec.subsystem ? ["/SUBSYSTEM:${spec.subsystem}".toString()] : []) + (spec.libraries ?: [])
     }
     runLauncherTool(link, host.os == 'windows' ? msvc() : null, work, "linking ${output.name}", hint)

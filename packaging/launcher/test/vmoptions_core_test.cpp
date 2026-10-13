@@ -155,7 +155,6 @@ void planning() {
 
     Plan p = vm::plan(bundled, "", nullptr, {});
     expectLines(p.javaOptions, bundled, "no location: only the bundled options");
-    check(!p.removeSkipVariable, "nothing to remove without the skip variable");
     expectLines(vm::plan(bundled, path, nullptr, {}).javaOptions, {"-Xmx2048m", "-XX:+UseG1GC", file},
         "a missing file is still reported");
     expectLines(vm::plan(bundled, path, &empty, {}).javaOptions, {"-Xmx2048m", "-XX:+UseG1GC", file},
@@ -168,9 +167,7 @@ void planning() {
     p = vm::plan(bundled, path, &lines, {{"JASPER_VM_OPTIONS_SKIP", " launch-failed "}});
     expectLines(p.javaOptions, {"-Xmx2048m", "-XX:+UseG1GC", file, "-Djasper.vmOptionsSkipped=launch-failed"},
         "the skip variable skips the file");
-    check(p.removeSkipVariable, "the skip variable is removed before the JVM starts");
     p = vm::plan(bundled, path, &lines, {{"JASPER_VM_OPTIONS_SKIP", "  "}});
-    check(p.removeSkipVariable, "a blank skip variable is removed too");
     check(p.javaOptions.back() == "-Djasper.vmOptionsDigest=" + vm::digest(lines.lines),
         "a blank skip variable skips nothing");
     expectLines(vm::plan(bundled, "", &lines, {{"JASPER_VM_OPTIONS_SKIP", "manual"}}).javaOptions,

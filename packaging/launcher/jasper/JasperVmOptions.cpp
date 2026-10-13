@@ -13,10 +13,7 @@
 #include "SysInfo.h"
 #include "tstrings.h"
 
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <stdlib.h>
+#ifndef _WIN32
 #include <sys/stat.h>
 #endif
 
@@ -55,15 +52,15 @@ vmoptions::Environment environment() {
     return env;
 }
 
-// Exists and is not a directory (stat follows symbolic links, as upstream's isFileExists does). Upstream defines
-// FileUtils::isDirectory on Windows only.
+// A regular file: not a directory, FIFO or device (stat follows symbolic links, as upstream's isFileExists does).
+// Upstream defines FileUtils::isDirectory on Windows only.
 bool isRegularFile(const std::string& path) {
 #ifdef _WIN32
     const tstring value = native(path);
     return FileUtils::isFileExists(value) && !FileUtils::isDirectory(value);
 #else
     struct stat info;
-    return stat(path.c_str(), &info) == 0 && !S_ISDIR(info.st_mode);
+    return stat(path.c_str(), &info) == 0 && S_ISREG(info.st_mode);
 #endif
 }
 
@@ -90,14 +87,6 @@ bool readBytes(const std::string& path, std::string& bytes) {
     return !failed;
 }
 
-void removeVariable(const char* name) {
-#ifdef _WIN32
-    SetEnvironmentVariableW(native(name).c_str(), nullptr);
-#else
-    unsetenv(name);
-#endif
-}
-
 } // namespace
 
 void applyUserVmOptions(CfgFile& cfgFile) {
@@ -120,9 +109,6 @@ void applyUserVmOptions(CfgFile& cfgFile) {
             file = vmoptions::parse(bytes);
         }
         const vmoptions::Plan plan = vmoptions::plan(bundled, path, exists ? &file : nullptr, env);
-        if (plan.removeSkipVariable) {
-            removeVariable(vmoptions::SKIP_VARIABLE);
-        }
         tstring_array merged;
         for (const std::string& option : plan.javaOptions) {
             merged.push_back(native(option));
@@ -130,7 +116,10 @@ void applyUserVmOptions(CfgFile& cfgFile) {
         cfgFile.setPropertyValue(SectionName::JavaOptions, PropertyName::javaOptions, merged);
         LOG_TRACE(tstrings::any() << "Jasper VM options file: " << native(path));
     } catch (...) {
-        LOG_ERROR(tstrings::any() << "Jasper: the user's VM options were ignored after an error");
+        try {
+            LOG_ERROR(tstrings::any() << "Jasper: the user's VM options were ignored after an error");
+        } catch (...) {
+        }
     }
 }
 

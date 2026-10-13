@@ -206,6 +206,13 @@ static void registerExitHandler(void) {
 
 void jasperGuardBeforeLaunch(int argc, char** argv) {
     int i;
+    /* The process that starts the JVM removes the skip variable, so the JVM and its children never inherit it. On Linux
+       the cfg is read in a forked child, and on Windows possibly in a restart wrapper, so the wrapper cannot do it. */
+#ifdef _WIN32
+    SetEnvironmentVariableA(JASPER_SKIP_VARIABLE, NULL);
+#else
+    unsetenv(JASPER_SKIP_VARIABLE);
+#endif
     for (i = 0; i < argc; ++i) {
         if (argv[i] != NULL && strncmp(argv[i], JASPER_DIGEST_PREFIX, sizeof(JASPER_DIGEST_PREFIX) - 1) == 0) {
             armed = 1;

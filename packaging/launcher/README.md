@@ -62,7 +62,8 @@ On macOS libjli calls the launcher's `main` again on a new thread; that second c
   re-spawns the launcher with `JASPER_VM_OPTIONS_SKIP=launch-failed` when `JLI_Launch` never returned and the loaded
   libjvm's own `JNI_GetCreatedJavaVMs` reports no JVM; with no libjvm loaded it does nothing. On Windows it also
   registers with `ucrtbase.dll`'s `_crt_atexit`, because `jli.dll` calls the shared UCRT's `exit()`. HotSpot's own
-  initialization failures end with `_exit` and never reach it.
+  initialization failures end with `_exit` and never reach it. It also removes `JASPER_VM_OPTIONS_SKIP` just before
+  `JLI_Launch`, in the process that starts the JVM.
 
 ## Build
 
