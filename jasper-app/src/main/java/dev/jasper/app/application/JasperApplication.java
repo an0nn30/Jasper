@@ -794,7 +794,7 @@ public final class JasperApplication {
             Optional.empty(), invocation -> openSettings(null, dev.jasper.app.shortcuthelp.KeymapPage.ID));
         contributions.addAction("app.memory", "Change Memory Settings…", null, List.of("memory", "heap", "xmx", "jvm", "java", "vm options"),
             Optional.empty(), invocation -> openSettings(invocation.windowId(), "system#vm.heap"));
-        contributions.addAction("app.vmoptions", "Edit Custom VM Options…", null, List.of("vm options", "vmoptions", "jvm", "java", "heap", "memory"),
+        contributions.addAction("app.vmoptions", "Edit Custom VM Options…", null, List.of("memory", "heap", "xmx", "jvm", "java", "vm options", "vmoptions"),
             Optional.empty(), invocation -> {
                 if (vmOptions.editable()) vmOptions.editCustomOptions();
                 else openSettings(invocation.windowId(), "system");
