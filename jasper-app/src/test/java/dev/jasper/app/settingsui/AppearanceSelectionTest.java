@@ -24,7 +24,7 @@ class AppearanceSelectionTest {
     static SettingsDraft draft(String config) { return new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), config, true).values()); }
     static AppearanceSelection editor(SettingsDraft draft) {
         return new AppearanceSelection(new AppearanceChoices(100f, false, () -> Optional.of(false),
-            ignored -> new dev.jasper.app.lifecycle.Subscription(() -> {}), () -> THEMES), draft);
+            ignored -> new dev.jasper.app.lifecycle.Subscription(() -> {}), () -> THEMES, Optional.empty()), draft);
     }
     static List<Nodes.Node> parts(AppearanceSelection editor) {
         return ((Nodes.Stack) editor.node("ui.appearance", ControlState.READY)).children();

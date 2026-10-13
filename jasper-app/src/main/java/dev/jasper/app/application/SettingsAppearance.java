@@ -27,7 +27,7 @@ final class SettingsAppearance {
                 var current = library.get();
                 if (cache.from != current) { cache.themes = themeChoices(current); cache.from = current; }
                 return cache.themes;
-            });
+            }, Optional.empty());
     }
 
     /** What the Appearance page offers from {@code library}: its themes for each appearance and its schemes, with their labels. */

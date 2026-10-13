@@ -54,7 +54,7 @@ class AppearancePageTest {
         InstalledThemes.slateSteel(AppearanceFixtures.preview(true), AppearanceFixtures.preview(false)).schemes());
     /** The Appearance page over {@code themes}, built on the test's draft. */
     private SchemaPage pageWith(InstalledThemes themes) {
-        var choices = new AppearanceChoices(100f, false, Optional::empty, ignored -> new Subscription(() -> { }), () -> themes);
+        var choices = new AppearanceChoices(100f, false, Optional::empty, ignored -> new Subscription(() -> { }), () -> themes, Optional.empty());
         var appearanceSpec = CorePages.specs(choices, system, ShellChoices.NONE, id -> { }).stream()
             .filter(spec -> spec.id().equals("appearance")).findFirst().orElseThrow();
         return appearanceSpec.build(context);

@@ -17,17 +17,19 @@ import java.util.function.Supplier;
  * @param systemDark the operating system's appearance, empty when unavailable
  * @param onChanged runs its argument whenever the operating system's appearance changes
  * @param themes the installed themes and schemes, read again whenever the page refreshes
+ * @param imports the Imported themes group's hooks; empty shows no group
  */
 public record AppearanceChoices(float opacity, boolean blur, Supplier<Optional<Boolean>> systemDark,
-                                Function<Runnable, Subscription> onChanged, Supplier<InstalledThemes> themes) {
+                                Function<Runnable, Subscription> onChanged, Supplier<InstalledThemes> themes,
+                                Optional<ThemeImports> imports) {
     public AppearanceChoices {
         Objects.requireNonNull(systemDark, "systemDark"); Objects.requireNonNull(onChanged, "onChanged");
-        Objects.requireNonNull(themes, "themes");
+        Objects.requireNonNull(themes, "themes"); Objects.requireNonNull(imports, "imports");
     }
 
     /** Fixed previews, Slate Steel alone, an opaque workspace and no system appearance, for pages built without an application. */
     public static AppearanceChoices of(Option.Palette dark, Option.Palette light) {
         var themes = InstalledThemes.slateSteel(dark, light);
-        return new AppearanceChoices(100f, false, Optional::empty, ignored -> new Subscription(() -> { }), () -> themes);
+        return new AppearanceChoices(100f, false, Optional::empty, ignored -> new Subscription(() -> { }), () -> themes, Optional.empty());
     }
 }
