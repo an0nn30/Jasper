@@ -1,7 +1,7 @@
 # Jasper custom VM options
 
-Status: **Draft for the user's review, 2026-10-13.** The design was approved section by section in conversation; the
-written spec awaits review before implementation planning.
+Status: **Approved on 2026-10-13** (the user: "spec approved"). Plan 1 (launcher) written:
+[`2026-10-13-jasper-custom-vm-options-1-launcher.md`](../plans/2026-10-13-jasper-custom-vm-options-1-launcher.md).
 Branch: `claude/custom-vm-options`, from `main` at `13cc10ca`.
 
 ## 1. Intent and decisions
