@@ -78,3 +78,18 @@ errors. Outputs go to `build/launcher/resources/jdk/jpackage/internal/resources/
 | macOS | Xcode command line tools (`xcrun clang`), minimum macOS 11.0, linked against the installed SDK | `jpackageapplauncher` |
 | Linux | `gcc` and `g++`; the library links libstdc++ and libgcc statically | `jpackageapplauncher`, `libjpackageapplauncheraux.so` |
 | Windows | MSVC from `vswhere` and `vcvarsall.bat`, with `version.rc` and `java.manifest` embedded | `jpackageapplauncher.exe`, `jpackageapplauncherw.exe` |
+
+## Tests
+
+All in `check`, on every OS:
+
+- `verifyLauncherSources`: `upstream/` against `SHA256SUMS` and the hooked-file list.
+- `testLauncherCore`: native tests of the core (`test/vmoptions_core_test.cpp`), including the digest vectors in
+  `test/digest-vectors.txt`, which the application's tests read too.
+- `testLauncherGuard`: `test/guard_harness.c` arms the guard and runs the toolchain JDK's real `JLI_Launch` with
+  `test/GuardProbe.java`. A malformed `-Xmx` and conflicting collectors re-spawn; `System.exit`, a normal return, a
+  throwing `main`, an unarmed launch and a launch that fails before any libjvm loads do not.
+- `verifyLauncherImage`: packages `test/LauncherProbe.java` with Jasper's launcher (`jpackage
+  -J--patch-module=jdk.jpackage=…`) and checks the location rules, the merge order and filters, a corrupted file, the
+  skip variable, the fallback start with the arguments intact, a directory in the file's place and a non-ASCII home.
+  On Windows it also checks the windowed launcher.

@@ -423,3 +423,184 @@ def buildLauncher = tasks.register('buildLauncher') {
         logger.lifecycle("Built Jasper's launcher: ${binaries*.name.sort().join(', ')}")
     }
 }
+
+// ---- End to end: a probe app packaged with Jasper's launcher ----
+
+def launcherProbeJar = tasks.register('launcherProbeJar', Jar) {
+    description = "Packs the launcher image test's probe application."
+    from(compileLauncherProbes)
+    include('LauncherProbe*.class')
+    archiveFileName.set('launcher-probe.jar')
+    destinationDirectory.set(launcherBuild.map { it.dir('probe-input') })
+}
+
+def verifyLauncherImage = tasks.register('verifyLauncherImage') {
+    group = 'verification'
+    description = "Packages a probe app with Jasper's launcher and checks jasper.vmoptions end to end, headlessly."
+    dependsOn(buildLauncher, launcherProbeJar)
+    inputs.dir(launcherResources).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(launcherProbeJar.flatMap { it.archiveFile })
+    outputs.file(launcherBuild.map { it.file('image-test/passed') })
+    doLast {
+        def host = launcherHost()
+        File work = launcherBuild.get().dir('image-test').asFile
+        project.delete(work)
+        work.mkdirs()
+        File images = new File(work, 'images')
+        File probeInput = launcherProbeJar.get().archiveFile.get().asFile.parentFile
+        String jpackage = new File(launcherSdk.get(), host.os == 'windows' ? 'bin/jpackage.exe' : 'bin/jpackage').absolutePath
+        // Bundled options the user's lines can replace: -Xmx256m and -XX:+UseSerialGC, plus IntelliJ's ignore flag.
+        def image = { String name, boolean console ->
+            List<String> command = [jpackage, jpackageLauncherOption(), '--type', 'app-image', '--name', name,
+                '--dest', images.absolutePath, '--input', probeInput.absolutePath, '--main-jar', 'launcher-probe.jar',
+                '--main-class', 'LauncherProbe', '--add-modules', 'java.base,java.management',
+                '--java-options', '-Xmx256m', '--java-options', '-XX:+UseSerialGC', '--java-options', '-XX:+IgnoreUnrecognizedVMOptions']
+            if (host.os == 'macos') command += ['--mac-package-identifier', "dev.jasper.${name.toLowerCase(Locale.ROOT)}".toString()]
+            if (host.os == 'windows' && console) command += ['--win-console']
+            runLauncherTool(command, null, null, "jpackage ${name}")
+            host.os == 'macos' ? new File(images, "${name}.app/Contents/MacOS/${name}")
+                : (host.os == 'windows' ? new File(images, "${name}/${name}.exe") : new File(images, "${name}/bin/${name}"))
+        }
+        File console = image('LauncherProbe', true)
+
+        // The build's environment without anything that steers the launcher or the JVM, plus the scenario's variables.
+        def environment = { Map<String, String> extra ->
+            Map<String, String> result = new LinkedHashMap<String, String>(System.getenv())
+            ['JASPER_HOME', 'JASPER_VM_OPTIONS', 'JASPER_VM_OPTIONS_SKIP', 'JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS',
+                'JDK_JAVA_OPTIONS', 'XDG_CONFIG_HOME'].each { result.remove(it) }
+            result.putAll(extra)
+            result
+        }
+        // Runs the launcher; returns the single report the probe appended (key -> values). Waits for a re-spawned start.
+        def launch = { String scenario, File launcher, Map<String, String> env, List<String> arguments = [] ->
+            File report = new File(work, "${scenario}.report")
+            File log = new File(work, "${scenario}.log")
+            def builder = new ProcessBuilder([launcher.absolutePath] + arguments).redirectErrorStream(true).redirectOutput(log)
+            builder.environment().clear()
+            builder.environment().putAll(env)
+            builder.environment().put('PROBE_OUTPUT', report.absolutePath)
+            Process process = builder.start()
+            if (!process.waitFor(60, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                throw new GradleException("verifyLauncherImage: ${scenario}: the launcher did not exit\n${log.text}")
+            }
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60)
+            while (!(report.isFile() && report.getText('UTF-8').contains('end\n'))) {
+                if (System.nanoTime() > deadline) {
+                    throw new GradleException("verifyLauncherImage: ${scenario}: no report (exit ${process.exitValue()})\n${log.text}")
+                }
+                Thread.sleep(100)
+            }
+            Thread.sleep(500) // a second report would mean a second start
+            String text = report.getText('UTF-8')
+            int reports = text.readLines().count { it == 'end' }
+            if (reports != 1) throw new GradleException("verifyLauncherImage: ${scenario}: ${reports} reports\n${text}")
+            Map<String, List<String>> values = [:]
+            text.readLines().findAll { it != 'end' }.each { String line ->
+                int equals = line.indexOf('=')
+                values.computeIfAbsent(line.substring(0, equals)) { [] } << line.substring(equals + 1)
+            }
+            values
+        }
+        def one = { Map<String, List<String>> report, String key -> report[key] ? report[key][0] : null }
+        List<String> failures = []
+        def expect = { String scenario, boolean condition, String message, Map report ->
+            if (!condition) failures << "${scenario}: ${message}\n  report: ${report}".toString()
+        }
+        def home = { String name, String content ->
+            File directory = new File(work, name)
+            directory.mkdirs()
+            if (content != null) new File(directory, 'jasper.vmoptions').setText(content, 'UTF-8')
+            directory
+        }
+        def file = { File directory -> new File(directory, 'jasper.vmoptions').absolutePath }
+
+        File none = home('no-file', null)
+        def report = launch('no-file', console, environment([JASPER_HOME: none.absolutePath]))
+        expect('no file', one(report, 'vmOptionsFile') == file(none), 'reports the Jasper home file', report)
+        expect('no file', one(report, 'digest') == 'null' && report.input.contains('-Xmx256m'), 'only the bundled options', report)
+
+        File ordered = home('ordered', '# heap\r\n\r\n  -Xmx300m  \r\n-Dprobe.marker=a b\r\n')
+        report = launch('ordered', console, environment([JASPER_HOME: ordered.absolutePath]))
+        List<String> sequence = ['-Xmx256m', '-Xmx300m', '-Dprobe.marker=a b', "-Djasper.vmOptionsFile=${file(ordered)}".toString(),
+            '-Djasper.vmOptionsDigest=f88af5c65b6cd728']
+        List<Integer> positions = sequence.collect { report.input.indexOf(it) }
+        expect('ordered', one(report, 'digest') == 'f88af5c65b6cd728', 'the digest of the applied lines', report)
+        expect('ordered', one(report, 'marker') == 'a b', 'a -D value keeps its space', report)
+        expect('ordered', !positions.contains(-1) && positions == positions.toSorted(),
+            "bundled options, then the user's lines, then the bookkeeping properties: ${sequence}", report)
+
+        File collector = home('collector', '-XX:+UseParallelGC\n')
+        report = launch('collector', console, environment([JASPER_HOME: collector.absolutePath]))
+        expect('collector', one(report, 'skipped') == 'null' && !report.input.contains('-XX:+UseSerialGC') &&
+            report.gc.any { it.startsWith('PS ') }, "the user's collector replaces the bundled one", report)
+
+        File percentage = home('percentage', '-XX:MaxRAMPercentage=10\n')
+        report = launch('percentage', console, environment([JASPER_HOME: percentage.absolutePath]))
+        expect('percentage', !report.input.contains('-Xmx256m') && report.input.contains('-XX:MaxRAMPercentage=10'),
+            'MaxRAMPercentage replaces the bundled -Xmx', report)
+
+        File corrupted = home('corrupted', '-Xmx300m\n\u0000\n')
+        report = launch('corrupted', console, environment([JASPER_HOME: corrupted.absolutePath]))
+        expect('corrupted', one(report, 'corrupted') == 'true' && one(report, 'digest') == 'null' &&
+            !report.input.contains('-Xmx300m'), 'a NUL character makes the launcher ignore the file', report)
+
+        File chosen = home('chosen-home', '-Dprobe.marker=home\n')
+        File other = new File(work, 'other.vmoptions')
+        other.setText('-Dprobe.marker=other\n', 'UTF-8')
+        report = launch('chosen', console, environment([JASPER_HOME: chosen.absolutePath, JASPER_VM_OPTIONS: other.absolutePath]))
+        expect('JASPER_VM_OPTIONS', one(report, 'vmOptionsFile') == other.absolutePath && one(report, 'marker') == 'other',
+            'JASPER_VM_OPTIONS names the file', report)
+        report = launch('chosen-missing', console, environment([JASPER_HOME: chosen.absolutePath,
+            JASPER_VM_OPTIONS: new File(work, 'missing.vmoptions').absolutePath]))
+        expect('missing JASPER_VM_OPTIONS', one(report, 'vmOptionsFile') == file(chosen) && one(report, 'marker') == 'home',
+            'a JASPER_VM_OPTIONS naming no file falls back to the Jasper home', report)
+
+        File user = new File(work, 'user-home')
+        File defaultFile = host.os == 'windows' ? new File(user, 'jasper\\jasper.vmoptions') : new File(user, '.config/jasper/jasper.vmoptions')
+        defaultFile.parentFile.mkdirs()
+        defaultFile.setText('-Dprobe.marker=default\n', 'UTF-8')
+        report = launch('default', console, environment(host.os == 'windows' ? [APPDATA: user.absolutePath] : [HOME: user.absolutePath]))
+        expect('default location', one(report, 'vmOptionsFile') == defaultFile.absolutePath && one(report, 'marker') == 'default',
+            "the OS default in the Jasper home", report)
+
+        File skipped = home('skipped', '-Xmx300m\n')
+        report = launch('skipped', console, environment([JASPER_HOME: skipped.absolutePath, JASPER_VM_OPTIONS_SKIP: 'manual']))
+        expect('JASPER_VM_OPTIONS_SKIP', one(report, 'skipped') == 'manual' && one(report, 'skipVariable') == 'null' &&
+            !report.input.contains('-Xmx300m'), 'skips the file and keeps the variable from the JVM', report)
+
+        File rejected = home('rejected', '-Xmx3q\n')
+        report = launch('rejected', console, environment([JASPER_HOME: rejected.absolutePath]), ['alpha', 'with space'])
+        expect('rejected options', one(report, 'skipped') == 'launch-failed' && one(report, 'skipVariable') == 'null' &&
+            !report.input.contains('-Xmx3q'), 'one more start without the options', report)
+        expect('rejected options', report.argument == ['alpha', 'with space'], 'the arguments survive the second start', report)
+
+        File directory = home('directory', null)
+        new File(directory, 'jasper.vmoptions').mkdirs()
+        report = launch('directory', console, environment([JASPER_HOME: directory.absolutePath]))
+        expect('directory', one(report, 'digest') == 'null' && one(report, 'vmOptionsFile') == file(directory),
+            'a directory named jasper.vmoptions counts as no file', report)
+
+        // A home with a space and a non-ASCII letter. POSIX passes the name in the build's file-name encoding.
+        if (host.os == 'windows' || System.getProperty('sun.jnu.encoding', '').equalsIgnoreCase('UTF-8')) {
+            File unicode = home('J\u00fcrgen home', '-Dprobe.marker=unicode\n')
+            report = launch('unicode', console, environment([JASPER_HOME: unicode.absolutePath]))
+            expect('non-ASCII home', one(report, 'marker') == 'unicode', 'the file is read', report)
+            // Windows hands the JVM its options in the ANSI code page, so only POSIX compares the reported path.
+            if (host.os != 'windows') expect('non-ASCII home', one(report, 'vmOptionsFile') == file(unicode), 'the path is reported', report)
+        } else {
+            logger.lifecycle("verifyLauncherImage: skipped the non-ASCII home (file names are ${System.getProperty('sun.jnu.encoding')})")
+        }
+
+        if (host.os == 'windows') {
+            File windowed = image('LauncherProbeGui', false)
+            report = launch('windowed-rejected', windowed, environment([JASPER_HOME: rejected.absolutePath]), ['alpha'])
+            expect('windowed launcher', one(report, 'skipped') == 'launch-failed' && report.argument == ['alpha'],
+                'the windowed launcher starts once more without the options', report)
+        }
+
+        if (failures) throw new GradleException('verifyLauncherImage:\n' + failures.join('\n'))
+        new File(work, 'passed').text = 'passed\n'
+    }
+}
+tasks.named('check') { dependsOn(verifyLauncherImage) }
