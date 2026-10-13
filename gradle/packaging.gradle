@@ -12,6 +12,7 @@ apply from: rootProject.file('gradle/mac-launcher-identity.gradle')
 apply from: rootProject.file('gradle/mac-launcher-identity-test.gradle')
 apply from: rootProject.file('gradle/packaging-support.gradle')
 apply from: rootProject.file('gradle/packaging-support-test.gradle')
+apply from: rootProject.file('gradle/launcher.gradle')
 
 def app = extensions.getByType(JavaApplication)
 def toolchains = extensions.getByType(JavaToolchainService)

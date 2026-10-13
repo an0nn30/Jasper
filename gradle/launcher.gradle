@@ -1,0 +1,59 @@
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.security.MessageDigest
+
+// Jasper's build of jpackage's native application launcher (packaging/launcher/README.md), applied by
+// gradle/packaging.gradle. Blocks are in dependency order: later tasks use the helpers defined above them.
+
+def launcherSource = rootProject.file('packaging/launcher')
+def upstreamRoot = new File(launcherSource, 'upstream')
+def launcherBuild = layout.buildDirectory.dir('launcher')
+// Vendored files that carry Jasper's hook lines (each such line contains JASPER-HOOK); every other file is upstream's.
+def launcherHookedFiles = [] as Set<String>
+
+// A vendored file as upstream ships it: Jasper's hook lines removed, CRLF read as LF. ISO-8859-1 keeps every byte.
+def upstreamText = { File file ->
+    new String(Files.readAllBytes(file.toPath()), StandardCharsets.ISO_8859_1).replace('\r\n', '\n')
+        .replaceAll('(?m)^[^\n]*JASPER-HOOK[^\n]*\n', '')
+}
+
+def verifyLauncherSources = tasks.register('verifyLauncherSources') {
+    group = 'verification'
+    description = 'Checks packaging/launcher/upstream against SHA256SUMS: upstream bytes apart from JASPER-HOOK lines.'
+    inputs.dir(upstreamRoot).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(launcherBuild.map { it.file('sources-verified') })
+    doLast {
+        File sums = new File(upstreamRoot, 'SHA256SUMS')
+        if (!sums.isFile()) throw new GradleException("verifyLauncherSources: ${sums} is missing")
+        Map<String, String> expected = [:]
+        sums.readLines('UTF-8').findAll { it.trim() && !it.startsWith('#') }.each { String line ->
+            def match = line =~ /^([0-9a-f]{64})  (\S.*)$/
+            if (!match.matches()) throw new GradleException("verifyLauncherSources: malformed line in ${sums}: ${line}")
+            expected[match.group(2)] = match.group(1)
+        }
+        Set<String> present = [] as Set
+        upstreamRoot.eachFileRecurse(groovy.io.FileType.FILES) { File file ->
+            String path = upstreamRoot.toPath().relativize(file.toPath()).toString().replace('\\', '/')
+            if (path != 'SHA256SUMS') present << path
+        }
+        List<String> problems = []
+        (expected.keySet() - present).sort().each { problems << "missing: ${it}".toString() }
+        (present - expected.keySet()).sort().each { problems << "not in SHA256SUMS: ${it}".toString() }
+        Set<String> hooked = [] as Set
+        expected.keySet().intersect(present).sort().each { String path ->
+            File file = new File(upstreamRoot, path)
+            if (new String(Files.readAllBytes(file.toPath()), StandardCharsets.ISO_8859_1).contains('JASPER-HOOK')) hooked << path
+            String actual = MessageDigest.getInstance('SHA-256')
+                .digest(upstreamText(file).getBytes(StandardCharsets.ISO_8859_1)).encodeHex().toString()
+            if (actual != expected[path]) problems << "differs from upstream beyond JASPER-HOOK lines: ${path}".toString()
+        }
+        if (hooked != launcherHookedFiles) {
+            problems << "files with JASPER-HOOK lines: ${hooked.sort()}; expected ${launcherHookedFiles.sort()}".toString()
+        }
+        if (problems) throw new GradleException('verifyLauncherSources:\n' + problems.join('\n'))
+        File marker = launcherBuild.get().file('sources-verified').asFile
+        marker.parentFile.mkdirs()
+        marker.text = "${expected.size()} files\n"
+    }
+}
+tasks.named('check') { dependsOn(verifyLauncherSources) }
