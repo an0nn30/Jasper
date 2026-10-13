@@ -652,10 +652,13 @@ installed scheme, noted "Colors for terminal panes". A saved pick that is not in
 installed)". `AppearanceChoices` carries `InstalledThemes` (the theme options with previews and the schemes, read again
 on every refresh), the workspace glass defaults and the system-appearance observation from application wiring
 (`application.SettingsAppearance`, over the controller's live library), so settingsui reads jasper-ui only through
-`ui.model` and `ui.swing`. The Match System tile names the observed appearance, or says it is unavailable
+`ui.model` and `ui.swing`. When the application supplies `ThemeImports`, the Imported themes group follows the Theme
+section as a `SchemaPage.Part` (`settingsui.ImportedThemesSection`): Import… and Remove run `appearance.ThemeFolder`'s
+file work on a worker, come back on the EDT and reload the configuration, and Remove returns the removed theme's saved
+and staged picks to their defaults; the application asks its questions with `pluginmanager.ConfirmView`. The Match System tile names the observed appearance, or says it is unavailable
 and Dark is used. Terminal › Font & Colors links to the section.
 
-The command palette's `view.terminal_scheme.<name>` commands save `terminal.scheme` for every window
+The command palette's `view.terminal_scheme.match` and `view.terminal_scheme.<theme>.<key>` commands save `terminal.scheme` for every window
 (`WindowContent.selectTerminalScheme`); "Themes…" opens Appearance.
 
 Headless checks: AppearancePageTest, AppearanceSelectionTest, SettingsDialogTest, TerminalSchemeCommandsTest,

@@ -1,5 +1,16 @@
 # Jasper — Status and Handoff
 
+**Theme import Plan 2: Import… and Remove — 2026-10-13** (`claude/theme-import`;
+[spec](superpowers/specs/2026-10-13-jasper-theme-import-design.md),
+[plan](superpowers/plans/2026-10-13-theme-import-2-import-and-remove.md)). Settings › Appearance › Imported themes
+lists each imported theme with what it offers. Import… (Jasper's chooser, `.json`) checks a theme file, names it after
+the theme (`gruvbox-dark.json`), asks before replacing one and copies it into `<home>/themes/` through a temporary file;
+failures show under the button. Remove asks, deletes the file, and returns the theme's saved picks (written at once)
+and staged ones to their defaults. `appearance.ThemeFolder` does the file work; `SchemaPage.Part` is a new, generic
+page section; the application asks with `pluginmanager.ConfirmView`. `./gradlew check --continue`: **9,815 tests,
+0 failures, 0 errors, 8 skipped**. No GUI launched. GUI checks for the user: Import… with the real chooser, the Replace
+and Remove sheets over Settings, and the dropdowns after each. Not merged or pushed.
+
 **Theme import Plan 1: the format and the runtime — 2026-10-13** (`claude/theme-import`;
 [spec](superpowers/specs/2026-10-13-jasper-theme-import-design.md),
 [plan](superpowers/plans/2026-10-13-theme-import-1-format-and-runtime.md)). One public theme format: jasper-ui's

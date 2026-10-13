@@ -37,8 +37,8 @@ opens it; the palette's **Terminal: …** commands choose a scheme. Choices stay
 
 ## Installed themes
 
-The themes folder is `themes/` in Jasper's home, next to `config.toml`. It holds one Jasper theme file per theme,
-named after the theme's id: lowercase letters and digits in dash-separated words, at most 64 characters, so
+The themes folder is `themes/` in Jasper's home, next to `config.toml`; Settings imports into it (below) and files can
+be copied in by hand. It holds one Jasper theme file per theme, named after the theme's id: lowercase letters and digits in dash-separated words, at most 64 characters, so
 `dracula.json` is the theme `dracula`. Jasper reads the folder at start-up, on Reload config, when Settings saves and
 when `config.toml` changes; a theme changed on disk is shown again then. `slate-steel` is the built-in theme's id, so a
 `slate-steel.json` in the folder is ignored. Dropdowns list Slate Steel first, then the installed themes by name; two
@@ -51,6 +51,20 @@ Tabs, the tab strip, the area around panes, the editor, panels and dialogs stay 
 text area and the active tab meet seamlessly; with High Contrast the text area is black and the tab keeps the theme's
 terminal surface. Workspace opacity and blur apply to the terminal area. The editor always follows the shown theme's
 editor scheme.
+
+## Importing and removing themes
+
+Settings › Appearance › **Imported themes** lists every imported theme with what it offers ("UI theme · Dark",
+"Terminal scheme", …) and a **Remove** button, under an **Import…** button. Both act at once, outside Apply.
+
+- **Import…** opens Jasper's file chooser for a `.json` file, checks it and copies it into the themes folder as
+  `<id>.json`, the id coming from the theme's name ("Gruvbox Dark" is `gruvbox-dark`). Its variants and schemes then
+  appear in the dropdowns; nothing is selected. A file Jasper cannot use is not copied, and the reason shows under the
+  button, for example `Could not import dracula.json: ui.dark: Missing colour "accent"`. Importing a theme whose id an
+  imported theme already has asks before replacing it; Slate Steel cannot be replaced.
+- **Remove** asks first and says what will change. The file is deleted, and every setting that names the theme or one
+  of its schemes, saved or staged, returns to its default (`slate-steel` or `match`): saved ones are written at once,
+  and other staged changes stay staged. If the file cannot be deleted, nothing changes and the reason shows.
 
 ## The Jasper theme format
 
