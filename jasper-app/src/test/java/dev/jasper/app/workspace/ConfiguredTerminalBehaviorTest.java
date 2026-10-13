@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.application.ConfigurationTestSupport;
 import dev.jasper.app.config.ConfigService;
@@ -41,7 +42,7 @@ class ConfiguredTerminalBehaviorTest {
         service = new ConfigService(file, false);
         var pending = new ArrayDeque<Runnable>();
         edt(() -> {
-            var themes = new ThemeController();
+            var themes = ThemeTestSupport.controller(true);
             controller = new ConfigurationTestSupport(themes, service);
             var launcher = new ShellLauncher(pending::add, path -> {
                 try {

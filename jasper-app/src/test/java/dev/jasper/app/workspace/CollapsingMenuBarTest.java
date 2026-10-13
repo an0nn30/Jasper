@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Dimension;
@@ -15,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(EdtTestExtension.class)
 class CollapsingMenuBarTest {
-    @BeforeAll static void theme() throws Exception { SwingUtilities.invokeAndWait(() -> ThemeTestSupport.install(Theme.DARK)); }
+    @BeforeAll static void theme() throws Exception { SwingUtilities.invokeAndWait(() -> ThemeTestSupport.install(true)); }
 
     private static JMenu menu(String name, int width) {
         var menu = new JMenu(name);

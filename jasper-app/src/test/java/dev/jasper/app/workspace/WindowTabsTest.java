@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.commands.ActionId;
 import java.awt.*;
 import java.awt.event.MouseEvent;
@@ -121,19 +120,16 @@ class WindowTabsTest {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             owner.currentTab().rename("other"); owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
-            for (Theme chrome : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                owner.selectTheme(chrome);
+            for (boolean chromeDark : new boolean[]{true, false}) {
+                owner.selectVariant(chromeDark);
                 for (var scheme : dev.jasper.app.config.TerminalSchemeChoice.values()) {
                     owner.selectTerminalScheme(scheme);
                     var strip = owner.windowTabs(); layout(strip, 800, 38);
-                    assertThat(strip.getBackground()).as("%s UI, %s terminal", chrome, scheme).isEqualTo(owner.theme().surface());
+                    assertThat(strip.getBackground()).as("%s UI, %s terminal", (chromeDark ? "dark" : "light"), scheme).isEqualTo(owner.theme().surface());
                     for (boolean active : new boolean[]{true, false}) {
                         owner.setActive(active);
                         Color text = named(strip, "select:other").getForeground();
-                        if (!owner.theme().matching())
-                            assertThat(text).as("inactive title uses workspace TEXT_MUTED, active %s", active)
-                                .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.ui.theme.Token.TEXT_MUTED));
-                        assertThat(contrast(text, pixel(strip, 10, 4))).as("%s UI, %s terminal, active %s", chrome, scheme, active)
+                        assertThat(contrast(text, pixel(strip, 10, 4))).as("%s UI, %s terminal, active %s", (chromeDark ? "dark" : "light"), scheme, active)
                             .isGreaterThanOrEqualTo(3);
                     }
                 }
@@ -163,7 +159,7 @@ class WindowTabsTest {
             owner.reorderTab(1, 0);
             assertThat(owner.currentTab()).isSameAs(second);
             first.rename("<html>literal title"); owner.update();
-            owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            owner.selectVariant(false);
             assertThat(named(strip, "select:<html>literal title")).isSameAs(control);
             assertThat(control.getClientProperty("html.disable")).isEqualTo(true);
             assertThat(control.getToolTipText()).startsWith("<html>literal title");

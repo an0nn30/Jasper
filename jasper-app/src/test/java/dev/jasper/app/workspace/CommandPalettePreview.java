@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.palette.*;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
@@ -146,7 +147,7 @@ public final class CommandPalettePreview {
                     sessions.add(session);
                     return session;
                 }, "sh");
-                var themes = new ThemeController();
+                var themes = ThemeTestSupport.controller(true);
                 var history = new CommandHistory();
                 var owner = new WindowContent(launcher, DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
                     themes, KeyBindings.defaults(true), history, true);
@@ -193,11 +194,11 @@ public final class CommandPalettePreview {
                 .append("Swing UI scale: ").append(UIScale.getUserScaleFactor()).append("\n")
                 .append("Pixel output scales: 1x, 2x\n\n");
             for (Scenario scenario : Scenario.values()) {
-                for (Theme theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                    configure(scenario, theme);
+                for (boolean themeDark : new boolean[]{true, false}) {
+                    configure(scenario, themeDark);
                     assertScenario(scenario);
                     for (int pixelScale : List.of(1, 2)) {
-                        String name = scenario.slug + "-" + themeSlug(theme) + "-"
+                        String name = scenario.slug + "-" + themeSlug(themeDark) + "-"
                             + scenario.width + "x" + scenario.height + "-" + pixelScale + "x.png";
                         Path file = output.resolve(name);
                         capture(root, file, scenario.width, scenario.height, pixelScale);
@@ -212,12 +213,6 @@ public final class CommandPalettePreview {
         void renderTask9c(Path output) throws Exception {
             Path home=Files.createTempDirectory("jasper-palette9c-");
             try {
-                Files.createDirectories(home.resolve("themes"));
-                try(var in=CommandPalettePreview.class.getResourceAsStream("/dev/jasper/app/appearance/desktop-palette.toml")) {
-                    Files.copy(in,home.resolve("themes/palette.toml"));
-                }
-                var catalog=dev.jasper.app.appearance.ThemeCatalog.beside(home.resolve("config.toml"));catalog.scan();
-                var calibration=catalog.latest().find("Desktop Palette").orElseThrow();
                 SwingUtilities.invokeAndWait(() -> {
                     // Every execution hook is inert. These source labels never run commands or contact hosts.
                     var rows=List.of(
@@ -253,13 +248,13 @@ public final class CommandPalettePreview {
                     var entries=PaletteTestSupport.entries(owner.commandPalette().component());
                     if(!entries.get(0).equals("# Recently used")||!entries.get(3).equals("# Most used"))throw new AssertionError(entries);
                 });
-                for(var theme:List.of(calibration,Theme.DARK,Theme.JASPER_LIGHT))for(float font:List.of(13f,32f)) {
+                for(boolean dark:new boolean[]{true,false})for(float font:List.of(13f,32f)) {
                     for(var size:List.of(new Dimension(791,712),new Dimension(400,520),new Dimension(791,260))) for(int deviceScale:List.of(1,2)) {
                         SwingUtilities.invokeAndWait(()->{
-                            themes.configure(theme,new dev.jasper.app.config.UiFontConfig("system",font));
+                            themes.configure(dark,dev.jasper.app.config.TerminalSchemeChoice.MATCH,new dev.jasper.app.config.UiFontConfig("system",font));
                             owner.commandPalette().refreshTheme();
                         });
-                        Path file=output.resolve(theme.id().replaceAll("[^a-zA-Z0-9.-]","_")+"-"+font+"-"+size.width+"x"+size.height+(deviceScale==1?"-1x":"")+".png");
+                        Path file=output.resolve((dark?"dark":"light")+"-"+font+"-"+size.width+"x"+size.height+(deviceScale==1?"-1x":"")+".png");
                         capture(root,file,size.width,size.height,deviceScale);
                         SwingUtilities.invokeAndWait(()->{
                             var palette=owner.commandPalette().component();var query=PaletteTestSupport.query(palette);
@@ -283,9 +278,9 @@ public final class CommandPalettePreview {
             } finally {try(var paths=Files.walk(home)){for(var path:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(path);}}
         }
 
-        private void configure(Scenario scenario, Theme theme) throws Exception {
+        private void configure(Scenario scenario, boolean dark) throws Exception {
             SwingUtilities.invokeAndWait(() -> {
-                themes.configure(theme);
+                themes.configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
                 while (owner.commandPalette().stepOpen()) owner.commandPalette().escape();
                 if (!scenario.scope.equals(owner.commandPalette().activeScopeId())) owner.commandPalette().open(scenario.scope);
                 dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component()).setText(scenario.query);
@@ -315,7 +310,7 @@ public final class CommandPalettePreview {
         }
 
         void verifyUiScale(Path output, int expectedScale) throws Exception {
-            configure(Scenario.LONG_LABELS, Theme.DARK);
+            configure(Scenario.LONG_LABELS, true);
             SwingUtilities.invokeAndWait(() -> {
                 int actualUnit = UIScale.scale(1);
                 var palette = owner.commandPalette().component();
@@ -361,8 +356,8 @@ public final class CommandPalettePreview {
             System.out.print(report);
         }
 
-        private static String themeSlug(Theme theme) {
-            return theme.dark() ? "dark" : "light";
+        private static String themeSlug(boolean dark) {
+            return dark ? "dark" : "light";
         }
 
         @Override public void close() {

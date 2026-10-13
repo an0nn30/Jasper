@@ -13,23 +13,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(EdtTestExtension.class)
 class WorkspaceRolesTest {
     @Test void nativeSearchKeepsItsDocumentCaretAndSelectionAcrossAnAppearanceRefresh() {
-        ThemeManager.install(Theme.DARK);
+        ThemeTestSupport.install(true);
         var field = new JTextField("pending query");
         dev.jasper.ui.swing.NativeControlStyles.borderlessField(field, () -> dev.jasper.app.platform.ThemeZone.theme(field));
         var document = field.getDocument(); field.select(2, 7);
-        ThemeManager.install(Theme.JASPER_LIGHT);
+        ThemeTestSupport.install(false);
         SwingUtilities.updateComponentTreeUI(field);
         assertThat(field.getDocument()).isSameAs(document);
         assertThat(field.getText()).isEqualTo("pending query");
         assertThat(field.getSelectionStart()).isEqualTo(2); assertThat(field.getSelectionEnd()).isEqualTo(7);
-        assertThat(field.getBackground()).isEqualTo(ThemeManager.generated(Theme.JASPER_LIGHT).semantic().color(SemanticColor.SURFACE_INPUT));
+        assertThat(field.getBackground()).isEqualTo(ThemeTestSupport.generated(false).semantic().color(SemanticColor.SURFACE_INPUT));
     }
 
     @Test void liveModuleSnapshotSurvivesReinstallAndTransactionalRollback() throws Exception {
-        ThemeManager.install(Theme.DARK);
-        var dark = ThemeManager.generated(Theme.DARK); var light = ThemeManager.generated(Theme.JASPER_LIGHT);
+        ThemeTestSupport.install(true);
+        var dark = ThemeTestSupport.generated(true); var light = ThemeTestSupport.generated(false);
         var laf = UIManager.getLookAndFeel();
-        ThemeManager.install(Theme.JASPER_LIGHT);
+        ThemeTestSupport.install(false);
         UIManager.setLookAndFeel(laf);
         assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(dark);
         try (var binding = new ThemeBinding(new ThemePair(dark, dark), failure -> { throw new AssertionError(failure); });
@@ -70,19 +70,13 @@ class WorkspaceRolesTest {
     }
 
     @Test void canonicalChromeRolesWinWithoutChangingSearchContextOnThemeSwitch() {
-        var source = Theme.DARK.source().document();
-        var document = new ThemeDocument(source.origin(), source.name(), source.dark(), source.parent(), source.parentLine(),
-            source.uiComplete(), source.metadata(), source.seeds(), source.ansi(), source.tokens(), source.syntax(), source.ui(), source.icons(), source.workspace(),
-            Map.of(SemanticColor.SURFACE_APP, new Color(0x123456)));
-        var generated = ThemeGenerator.generate(document);
-        var theme = new Theme("role-test", "Role test", true, TerminalPaletteAdapter.toTerminal(generated.terminal()),
-            new Theme.UserFile(java.nio.file.Path.of("role-test.toml"), document));
+        var theme = ThemeTestSupport.recolored(ThemeTestSupport.generated(true), Map.of(SemanticColor.SURFACE_APP, new Color(0x123456)));
         var search = new TitleSearchField(() -> {}, () -> "shortcut");
         search.setContext("pending context", "tooltip", null);
-        ThemeManager.install(theme);
+        ThemeTestSupport.install(theme);
         var area = new ToolWindowArea(new JPanel(), new dev.jasper.app.dock.DockState());
         assertThat(area.getBackground()).isEqualTo(new Color(0x123456));
-        ThemeManager.install(Theme.JASPER_LIGHT);
+        ThemeTestSupport.install(false);
         SwingUtilities.updateComponentTreeUI(search);
         assertThat(search.contextText()).isEqualTo("pending context");
     }

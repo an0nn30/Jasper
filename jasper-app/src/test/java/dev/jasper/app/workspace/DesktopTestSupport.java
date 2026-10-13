@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.config.KeyBindings;
@@ -51,14 +52,14 @@ public final class DesktopTestSupport {
     }
     /** A window with one platform's keymap and shortcut text, whatever the host is. */
     public static WindowContent content(ShellLauncher launcher, boolean macOs) {
-        WindowContent owner = new WindowContent(launcher, HOME, path -> {}, () -> {}, () -> {}, new ThemeController(),
+        WindowContent owner = new WindowContent(launcher, HOME, path -> {}, () -> {}, () -> {}, ThemeTestSupport.controller(true),
             KeyBindings.defaults(macOs), new CommandHistory(), macOs);
         OWNERS.add(owner);
         return owner;
     }
     /** A window like a new one from the application: its tab starts where a new shell starts, not in a named directory. */
     public static WindowContent content(ShellLauncher launcher, java.util.function.Consumer<Path> newWindow) {
-        WindowContent owner = new WindowContent(launcher, null, false, newWindow, () -> {}, () -> {}, new ThemeController(),
+        WindowContent owner = new WindowContent(launcher, null, false, newWindow, () -> {}, () -> {}, ThemeTestSupport.controller(true),
             KeyBindings.defaults(false), new CommandHistory(), false);
         OWNERS.add(owner);
         return owner;
@@ -73,7 +74,7 @@ public final class DesktopTestSupport {
     }
     /** Real title/status owners at source allocations, mounted around the actual staged Remote content. */
     public static void captureIconOwners(WindowContent owner,String theme,int width,int height) {
-        owner.selectTheme(theme.equals("dark")?dev.jasper.app.appearance.Theme.DARK:dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+        owner.selectVariant(theme.equals("dark"));
         // Standalone owners may already hold this theme while another fixture changed the installed chrome.
         dev.jasper.ui.swing.FlatLafInstaller.install(owner.theme().chrome());
         owner.connectConfiguration(() -> {}, () -> {}, () -> {});

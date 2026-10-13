@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.config.ToolbarMode;
 import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
@@ -65,7 +66,7 @@ class WindowChromeContributionsTest {
         edt(() -> {
             var model = new Contributions();
             List<Contributions.Invocation> seen = new ArrayList<>();
-            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.Theme.DARK));
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), ThemeTestSupport.controller(true));
             List<String> before = buttons(owner);
             owner.connectContributions(model);
             ActionEntry run = model.addAction("dev.x.run", "Run Tool", null, List.of(), Optional.empty(), seen::add);
@@ -190,7 +191,7 @@ class WindowChromeContributionsTest {
 
     @Test void sharedManagedIconsSizePerPlacementInMultipleWindows() throws Exception {
         edt(() -> {
-            var theme = new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            var theme = ThemeTestSupport.controller(false);
             try {
                 var icon = dev.jasper.app.platform.AppIcons.semantic("search");
                 var custom = new javax.swing.ImageIcon(new java.awt.image.BufferedImage(19,19,java.awt.image.BufferedImage.TYPE_INT_ARGB));
@@ -225,7 +226,7 @@ class WindowChromeContributionsTest {
                 }
                 assertThat(model.action("dev.x.lock").orElseThrow().icon()).isSameAs(icon);
                 assertThat(icon.getIconWidth()).isEqualTo(16);
-            } finally { new dev.jasper.app.appearance.ThemeController(); }
+            } finally { ThemeTestSupport.controller(true); }
         });
     }
 }

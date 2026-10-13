@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.KeyBindings;
@@ -20,7 +21,7 @@ class TabShortcutsTest {
         for (boolean mac : new boolean[]{true, false}) edt(() -> {
             var keys = KeyBindings.defaults(mac);
             var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {},
-                    new ThemeController(), keys);
+                    ThemeTestSupport.controller(true), keys);
             try {
                 int modifier = mac ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
                 KeyStroke next = keys.strokeFor(ActionId.NEXT_TAB).orElseThrow();
@@ -58,7 +59,7 @@ class TabShortcutsTest {
         edt(() -> {
             var bindings = KeyBindings.withOverrides(false, Map.of("previous_tab", "alt+{", "next_tab", "alt+}"));
             try (var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {},
-                    new ThemeController(), bindings)) {
+                    ThemeTestSupport.controller(true), bindings)) {
                 var first = owner.currentTab(); owner.newTab(HOME);
                 assertThat(owner.dispatchShortcut(KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET,
                     InputEvent.ALT_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK), owner)).isTrue();

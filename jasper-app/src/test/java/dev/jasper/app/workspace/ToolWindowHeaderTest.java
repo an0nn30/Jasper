@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EdtTestExtension;
@@ -21,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(EdtTestExtension.class)
 class ToolWindowHeaderTest {
     @org.junit.jupiter.api.BeforeEach void installModuleTheme() throws Exception {
-        javax.swing.SwingUtilities.invokeAndWait(() -> dev.jasper.app.appearance.ThemeManager.install(dev.jasper.app.appearance.Theme.DARK));
+        javax.swing.SwingUtilities.invokeAndWait(() -> dev.jasper.app.appearance.ThemeTestSupport.install(true));
     }
 
     /**
@@ -29,8 +30,8 @@ class ToolWindowHeaderTest {
      * the tool window surface, in a dark and a light theme (it replaces main's fixed 0x38ba54/0x248943 reference).
      */
     @Test void connectedHeaderDotIsTheReadableSuccessStatusInDarkAndLight() {
-        for (var theme : List.of(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.appearance.Theme.JASPER_LIGHT)) {
-            assertThat(dev.jasper.app.appearance.ThemeManager.install(theme)).isTrue();
+        for (boolean themeDark : new boolean[]{true, false}) {
+            assertThat(dev.jasper.app.appearance.ThemeTestSupport.install(themeDark)).isTrue();
             var header = new ToolWindowHeader("SFTP", JPopupMenu::new, () -> {});
             header.presentation(new dev.jasper.app.contributions.PanelHeaderState("prod", true, List.of()));
             var detail = descendants(header).stream().filter(c -> c instanceof javax.swing.JLabel label && "prod".equals(label.getText()))
@@ -42,13 +43,13 @@ class ToolWindowHeaderTest {
             var dot = new java.awt.Color(image.getRGB(middle, middle), true);
             var palette = dev.jasper.app.platform.ThemeZone.theme(header).semantic();
             var surface = palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR);
-            assertThat(dot).as(theme.id()).isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(palette,
+            assertThat(dot).as((themeDark ? "dark" : "light")).isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(palette,
                 dev.jasper.ui.theme.SemanticColor.STATUS_SUCCESS, dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR,
                 dev.jasper.ui.theme.SurfaceContrast.INDICATOR));
-            assertThat(dev.jasper.ui.theme.ColorMath.contrast(dot, surface)).as(theme.id()).isGreaterThanOrEqualTo(3);
-            assertThat(dot.getGreen()).as("%s: a green status", theme.id()).isGreaterThan(Math.max(dot.getRed(), dot.getBlue()));
+            assertThat(dev.jasper.ui.theme.ColorMath.contrast(dot, surface)).as((themeDark ? "dark" : "light")).isGreaterThanOrEqualTo(3);
+            assertThat(dot.getGreen()).as("%s: a green status", (themeDark ? "dark" : "light")).isGreaterThan(Math.max(dot.getRed(), dot.getBlue()));
             assertThat(detail.getForeground()).as("detail uses the kit header's count colour")
-                .isEqualTo(palette.color(dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
+                .isEqualTo(palette.color(dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
         }
     }
 

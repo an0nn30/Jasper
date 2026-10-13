@@ -1,7 +1,6 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
-import dev.jasper.app.appearance.ThemeCatalog;
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.config.AnimationSettings;
@@ -65,25 +64,16 @@ public final class WorkspaceSurfacePreview {
         String filter = args.length > 1 ? args[1] : "";
         Path home = Path.of(System.getProperty("user.home"));
         Path screenshots = Files.createDirectories(home.resolve("Desktop/Screenshots"));
-        Path themesHome = Files.createTempDirectory("jasper-workspace-preview-");
         try {
-            Files.createDirectories(themesHome.resolve("themes"));
-            try (var in = WorkspaceSurfacePreview.class.getResourceAsStream("/dev/jasper/app/appearance/desktop-workspace.toml")) {
-                Files.copy(in, themesHome.resolve("themes/workspace.toml"));
-            }
-            var catalog = ThemeCatalog.beside(themesHome.resolve("config.toml"));
-            catalog.scan();
-            Theme calibration = catalog.latest().find("Desktop Workspace Calibration").orElseThrow();
             var manifest = new StringBuilder("# Workspace surface captures\nprovenance=actual WindowContent + MacTitleBar header "
                 + "(no native window controls) + staged Vault/Remote/File Server; controlled /bin/sh prompt; headless\n"
                 + "uiScale=" + UIScale.getUserScaleFactor() + "\n\n");
-            if (wanted(filter, "tabs")) plain(output, screenshots, calibration, manifest);
-            if (wanted(filter, "rails") || wanted(filter, "integrated")) integrated(output, home, screenshots, calibration, manifest, filter);
+            if (wanted(filter, "tabs")) plain(output, screenshots, true, manifest);
+            if (wanted(filter, "rails") || wanted(filter, "integrated")) integrated(output, home, screenshots, true, manifest, filter);
             Files.writeString(output.resolve("manifest.txt"), manifest);
         } finally {
             DesktopTestSupport.closeOwners();
             for (TerminalSession session : SESSIONS) session.exitFuture().get(5, TimeUnit.SECONDS);
-            try (var paths = Files.walk(themesHome)) { for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path); }
         }
         System.out.println(output);
     }
@@ -93,13 +83,13 @@ public final class WorkspaceSurfacePreview {
     /** One actual window with its title bar installed; the caller owns closing. */
     private record Window(WindowContent owner, JRootPane root, MacTitleBar bar, ThemeController themes) { }
 
-    private static Window window(Path screenshots, Theme theme, int prompts) throws Exception {
+    private static Window window(Path screenshots, boolean dark, int prompts) throws Exception {
         Queue<Runnable> pending = new ArrayDeque<>();
         Window[] result = new Window[1];
         edt(() -> {
             var launcher = new ShellLauncher(pending::add, directory -> shell(screenshots, prompts), "zsh");
-            var themes = new ThemeController();
-            themes.configure(theme);
+            var themes = ThemeTestSupport.controller(true);
+            themes.configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
             var owner = new WindowContent(launcher, screenshots, path -> { }, () -> { }, () -> { }, themes,
                 KeyBindings.defaults(true), new CommandHistory(), true);
             owner.applyConfiguration(fixtureConfiguration(), true);
@@ -160,39 +150,36 @@ public final class WorkspaceSurfacePreview {
         return Files.isExecutable(Path.of("/bin/zsh")) ? List.of("/bin/zsh", "-f", "-c", script) : List.of("/bin/sh", "-c", script);
     }
 
-    private static void plain(Path output, Path screenshots, Theme calibration, StringBuilder manifest) throws Exception {
-        var window = window(screenshots, calibration, 1);
+    private static void plain(Path output, Path screenshots, boolean dark, StringBuilder manifest) throws Exception {
+        var window = window(screenshots, dark, 1);
         try {
             edt(() -> window.owner().setStatusVisible(false));
-            capture(window, output.resolve("tabs/calibration-791x712.png"), 791, 712, 2, manifest);
-            capture(window, output.resolve("tabs/calibration-791x712-1x.png"), 791, 712, 1, manifest);
-            capture(window, output.resolve("tabs/calibration-narrow-460x320.png"), 460, 320, 2, manifest);
+            capture(window, output.resolve("tabs/dark-791x712.png"), 791, 712, 2, manifest);
+            capture(window, output.resolve("tabs/dark-791x712-1x.png"), 791, 712, 1, manifest);
+            capture(window, output.resolve("tabs/dark-narrow-460x320.png"), 460, 320, 2, manifest);
             // Enlarged user UI font: chrome text grows with it and must not clip in the 34 px title row or the tabs.
-            edt(() -> window.themes().configure(calibration, new dev.jasper.app.config.UiFontConfig("system", 20f)));
-            capture(window, output.resolve("tabs/calibration-font20-791x712.png"), 791, 712, 2, manifest);
-            edt(() -> window.themes().configure(calibration, new dev.jasper.app.config.UiFontConfig("system", 13f)));
-            for (Theme theme : List.of(Theme.DARK, Theme.JASPER_LIGHT)) {
-                edt(() -> window.themes().configure(theme));
-                capture(window, output.resolve("tabs/" + slug(theme) + "-791x712.png"), 791, 712, 2, manifest);
+            edt(() -> window.themes().configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system", 20f)));
+            capture(window, output.resolve("tabs/dark-font20-791x712.png"), 791, 712, 2, manifest);
+            edt(() -> window.themes().configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system", 13f)));
+            for (boolean themeDark : new boolean[]{true, false}) {
+                edt(() -> window.themes().configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH));
+                capture(window, output.resolve("tabs/" + slug(themeDark) + "-791x712.png"), 791, 712, 2, manifest);
             }
             capture(window, output.resolve("tabs/light-791x712-1x.png"), 791, 712, 1, manifest);
-            // Mixed: light chrome around a dark workspace (Settings > Appearance workspace theme).
-            edt(() -> window.themes().configureWorkspace(new dev.jasper.app.config.WorkspaceThemeChoice(Theme.DARK.name()), Theme.DARK));
-            capture(window, output.resolve("tabs/mixed-light-chrome-dark-workspace-791x712.png"), 791, 712, 2, manifest);
         } finally { close(window); }
         // A long working directory and tab title clip inside the command centre and the equal-width slots.
         Path deep = Files.createDirectories(screenshots.resolve("with/a/deliberately/long/working/directory/for/clipping"));
-        var longWindow = window(deep, calibration, 1);
+        var longWindow = window(deep, dark, 1);
         try {
             edt(() -> { longWindow.owner().setStatusVisible(true);
                 longWindow.owner().currentTab().rename("A deliberately long terminal tab title that must clip inside its equal-width slot"); });
-            capture(longWindow, output.resolve("tabs/calibration-long-titles-791x712.png"), 791, 712, 2, manifest);
-            capture(longWindow, output.resolve("tabs/calibration-long-titles-narrow-520x360.png"), 520, 360, 2, manifest);
+            capture(longWindow, output.resolve("tabs/dark-long-titles-791x712.png"), 791, 712, 2, manifest);
+            capture(longWindow, output.resolve("tabs/dark-long-titles-narrow-520x360.png"), 520, 360, 2, manifest);
         } finally { close(longWindow); }
     }
 
-    private static void integrated(Path output, Path home, Path screenshots, Theme calibration, StringBuilder manifest, String filter) throws Exception {
-        var window = window(screenshots, calibration, 2);
+    private static void integrated(Path output, Path home, Path screenshots, boolean dark, StringBuilder manifest, String filter) throws Exception {
+        var window = window(screenshots, dark, 2);
         ResolvedThemeHolder holder = new ResolvedThemeHolder();
         edt(() -> holder.value = window.themes().current());
         Path pluginHome = Files.createTempDirectory(Files.createDirectories(home.resolve("plugin-homes")), "run-");
@@ -208,10 +195,10 @@ public final class WorkspaceSurfacePreview {
             WorkspacePanelsFixture.settle();
             arrange(window.owner(), panels, false);
             if (wanted(filter, "rails")) {
-                capture(window, output.resolve("rails/calibration-791x712.png"), 791, 712, 2, manifest);
-                capture(window, output.resolve("rails/calibration-791x712-1x.png"), 791, 712, 1, manifest);
+                capture(window, output.resolve("rails/dark-791x712.png"), 791, 712, 2, manifest);
+                capture(window, output.resolve("rails/dark-791x712-1x.png"), 791, 712, 1, manifest);
                 edt(() -> window.owner().setRailVisible(false));
-                capture(window, output.resolve("rails/calibration-hidden-rails-791x712.png"), 791, 712, 2, manifest);
+                capture(window, output.resolve("rails/dark-hidden-rails-791x712.png"), 791, 712, 2, manifest);
                 edt(() -> window.owner().setRailVisible(true));
             }
             if (wanted(filter, "integrated")) {
@@ -219,10 +206,10 @@ public final class WorkspaceSurfacePreview {
                 arrange(window.owner(), panels, true);
                 until(() -> panels.select(window.owner().id(), WorkspacePanelsFixture.SELECTED));
                 WorkspacePanelsFixture.settle();
-                capture(window, output.resolve("integrated/calibration-1342x858.png"), 1342, 858, 2, manifest);
-                capture(window, output.resolve("integrated/calibration-1342x858-1x.png"), 1342, 858, 1, manifest);
+                capture(window, output.resolve("integrated/dark-1342x858.png"), 1342, 858, 2, manifest);
+                capture(window, output.resolve("integrated/dark-1342x858-1x.png"), 1342, 858, 1, manifest);
                 edt(() -> window.owner().setRailVisible(false));
-                capture(window, output.resolve("integrated/calibration-hidden-rails-1342x858.png"), 1342, 858, 2, manifest);
+                capture(window, output.resolve("integrated/dark-hidden-rails-1342x858.png"), 1342, 858, 2, manifest);
                 edt(() -> window.owner().setRailVisible(true));
                 edt(() -> {
                     window.owner().dock().hide(WorkspacePanelsFixture.SFTP);
@@ -230,17 +217,17 @@ public final class WorkspaceSurfacePreview {
                     window.owner().dock().hide(WorkspacePanelsFixture.TUNNELS);
                     window.owner().area().sync();
                 });
-                capture(window, output.resolve("integrated/calibration-collapsed-1342x858.png"), 1342, 858, 2, manifest);
+                capture(window, output.resolve("integrated/dark-collapsed-1342x858.png"), 1342, 858, 2, manifest);
                 arrange(window.owner(), panels, true);
                 edt(window.owner()::toggleZenMode);
-                capture(window, output.resolve("integrated/calibration-zen-1342x858.png"), 1342, 858, 2, manifest);
+                capture(window, output.resolve("integrated/dark-zen-1342x858.png"), 1342, 858, 2, manifest);
                 edt(window.owner()::toggleZenMode);
-                for (Theme theme : List.of(Theme.DARK, Theme.JASPER_LIGHT)) {
-                    edt(() -> window.themes().configure(theme));
+                for (boolean themeDark : new boolean[]{true, false}) {
+                    edt(() -> window.themes().configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH));
                     edt(() -> holder.value = window.themes().current());
                     panels.theme(holder.value);
                     WorkspacePanelsFixture.settle();
-                    capture(window, output.resolve("integrated/" + slug(theme) + "-1342x858.png"), 1342, 858, 2, manifest);
+                    capture(window, output.resolve("integrated/" + slug(themeDark) + "-1342x858.png"), 1342, 858, 2, manifest);
                 }
             }
         } finally {
@@ -276,7 +263,7 @@ public final class WorkspaceSurfacePreview {
         WorkspacePanelsFixture.settle();
     }
 
-    private static String slug(Theme theme) { return theme.dark() ? "dark" : "light"; }
+    private static String slug(boolean dark) { return dark ? "dark" : "light"; }
 
     private static void close(Window window) throws Exception {
         edt(() -> { if (window.bar() != null) window.bar().close(); window.owner().close(); window.themes().close(); });

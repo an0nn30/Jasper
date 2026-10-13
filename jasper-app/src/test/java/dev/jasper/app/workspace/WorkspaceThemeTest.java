@@ -2,9 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.*;
 import dev.jasper.ui.theme.*;
-import dev.jasper.ui.themeio.*;
 import dev.jasper.app.config.*;
-import dev.jasper.app.config.TerminalColors;
 import java.util.ArrayDeque;
 import javax.swing.*;
 import org.junit.jupiter.api.AfterEach;
@@ -13,139 +11,17 @@ import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class WorkspaceThemeTest {
-    @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> new ThemeController()); }
-
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-    void completeThemeCanCreateAndRefreshWindowWithOptionalToolWindowBackground(boolean authored) throws Exception {
-        edt(() -> {
-            var base = dev.jasper.app.appearance.ThemeFixtures.DARCULA.source().document();
-            var ui = new java.util.LinkedHashMap<>(base.ui());
-            ui.remove("ToolWindow.background");
-            ui.put("Panel.background", "#17232f");
-            if (authored) ui.put("ToolWindow.background", "#314159");
-            var document = new ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), 0,
-                base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), base.tokens(), base.syntax(), ui, base.icons());
-            var generated = ThemeGenerator.generate(document);
-            var chrome = new Theme("optional-tool-window-" + authored, generated.name(), generated.dark(),
-                dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(generated.terminal()), new Theme.UserFile(java.nio.file.Path.of("optional-tool-window.toml"), document));
-            var themes = new ThemeController(chrome);
-            var background = new java.awt.Color(authored ? 0x314159 : 0x17232f);
-            var sidebar = authored ? background : base.tokens().get(Token.SIDEBAR);
-            assertThat(generated.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR))
-                .as("an authored ToolWindow.background reaches the canonical sidebar role").isEqualTo(sidebar);
-            var toolWindow = new JPanel();
-            ToolWindowSurface.apply(toolWindow);
-            assertThat(toolWindow.getBackground()).as("tool windows paint theme.md's tool-window body, not the sidebar")
-                .isEqualTo(generated.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
-            var owner = content(launcher(new ArrayDeque<>()), themes);
-            owner.newTab(HOME);
-            owner.setAnimations(new AnimationSettings(false, 0, 0, 0));
-            assertStripSurfaces(owner);
-            themes.configure(chrome, new WorkspaceThemeChoice("Jasper Light"), Theme.JASPER_LIGHT, UiFontConfig.defaults());
-            assertStripSurfaces(owner);
-            themes.configure(chrome, WorkspaceThemeChoice.MATCH, null, UiFontConfig.defaults());
-            owner.update();
-            assertStripSurfaces(owner);
-            owner.windowTabs().setSize(600, 32);
-            owner.windowTabs().doLayout();
-            var image = new java.awt.image.BufferedImage(600, 32, java.awt.image.BufferedImage.TYPE_INT_RGB);
-            var graphics = image.createGraphics();
-            try { owner.windowTabs().paint(graphics); }
-            finally { graphics.dispose(); }
-        });
-    }
-
-    private static void assertStripSurfaces(WindowContent owner) {
-        var strip = owner.windowTabs(); WindowTabsTest.layout(strip, 600, 30);
-        var image = new java.awt.image.BufferedImage(600, 30, java.awt.image.BufferedImage.TYPE_INT_RGB);
-        var g = image.createGraphics();
-        try { strip.paint(g); } finally { g.dispose(); }
-        var viewport = (java.awt.Container) WindowTabsTest.named(strip, "tabViewport");
-        java.awt.Container entry = null;
-        for (var child : viewport.getComponents()) {
-            var candidate = (java.awt.Container) child;
-            for (var control : candidate.getComponents())
-                if (control instanceof AbstractButton button && button.isSelected()) entry = candidate;
-        }
-        assertThat(entry).as("one real selected tab").isNotNull();
-        var selected = new java.awt.Color(image.getRGB(entry.getX() + entry.getWidth() / 2, 4));
-        var base = owner.theme().palette().background();
-        assertThat(Math.abs(selected.getRed() - base.getRed())).isLessThanOrEqualTo(31);
-        assertThat(Math.abs(selected.getGreen() - base.getGreen())).isLessThanOrEqualTo(31);
-        assertThat(Math.abs(selected.getBlue() - base.getBlue())).isLessThanOrEqualTo(31);
-        int otherX = entry.getX() == 0 ? 500 : 10;
-        assertThat(image.getRGB(otherX, 4)).as("inactive cell has its own workspace-derived surface")
-            .isNotEqualTo(selected.getRGB());
-        assertThat(strip.getBackground()).isEqualTo(base);
-    }
-
-    @Test void independentWorkspaceMarksNewTabsAndPaintsStripWithoutChangingChrome() throws Exception {
-        edt(() -> {
-            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            var owner = content(launcher(new ArrayDeque<>()), themes);
-            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
-            owner.newTab(HOME);
-            var root = owner.currentPane();
-            assertThat(root.getClientProperty("Jasper.workspaceTheme")).isSameAs(themes.current().workspace());
-            assertThat(((JLabel) root.getComponent(0)).getForeground()).isEqualTo(themes.current().palette().foreground());
-            assertStripSurfaces(owner);
-            assertThat(owner.toolbar().getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, SemanticColor.SURFACE_APP));
-            assertThat(new JPopupMenu().getBackground()).isEqualTo(UIManager.getColor("PopupMenu.background"));
-            themes.configureTerminal(TerminalColors.MATCH);
-            assertThat(root.getClientProperty("Jasper.zone")).isEqualTo("workspace");
-            assertThat(root.getClientProperty("Jasper.workspaceTheme")).isNull();
-            assertThat(root.getClientProperty("Jasper.workspace.dark")).isNull();
-        });
-    }
-    @Test void titleSidebarStatusAndDialogContentKeepCapturedChromeDefaults() throws Exception {
-        edt(() -> {
-            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            var owner = content(launcher(new ArrayDeque<>()), themes);
-            var titleBackground = dev.jasper.app.platform.ThemeZone.color(null, SemanticColor.SURFACE_APP);
-            var statusBackground = UIManager.getColor("StatusBar.background");
-            var panelBackground = UIManager.getColor("Panel.background");
-            var labelForeground = UIManager.getColor("Label.foreground");
-            var fieldBackground = UIManager.getColor("TextField.background");
-            var fieldForeground = UIManager.getColor("TextField.foreground");
-            var dialogBackground = UIManager.getColor("OptionPane.background");
-            var root = new JRootPane();
-            try (var title = WindowContent.installTitleBar(root, owner, true, text -> {})) {
-                owner.installRootBindings(root);
-                themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
-                assertThat(themes.current().workspace().dark()).isTrue();
-                assertThat(com.formdev.flatlaf.FlatLaf.isLafDark()).isFalse();
-                title.setSize(400, 30);
-                var image = new java.awt.image.BufferedImage(400, 30, java.awt.image.BufferedImage.TYPE_INT_RGB);
-                var graphics = image.createGraphics(); title.paint(graphics); graphics.dispose();
-                assertThat(new java.awt.Color(image.getRGB(0, 2))).as("rendered title bar").isEqualTo(titleBackground);
-                assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameAqua");
-                assertThat(owner.leftStripe().getBackground()).as("left stripe").isEqualTo(titleBackground);
-                assertThat(owner.rightStripe().getBackground()).as("right stripe").isEqualTo(titleBackground);
-                assertThat(owner.status().getBackground()).as("status bar").isEqualTo(statusBackground);
-                // Build effective dialog contents without constructing a top-level window in headless mode.
-                var dialogRoot = new JRootPane();
-                var dialogPanel = new JPanel(); var label = new JLabel("Dialog"); var field = new JTextField("Value");
-                var optionPane = new JOptionPane("Message");
-                dialogPanel.add(label); dialogPanel.add(field); dialogPanel.add(optionPane);
-                dialogRoot.setContentPane(dialogPanel);
-                assertThat(dialogPanel.getBackground()).isEqualTo(panelBackground);
-                assertThat(label.getForeground()).isEqualTo(labelForeground);
-                assertThat(field.getBackground()).isEqualTo(fieldBackground);
-                assertThat(field.getForeground()).isEqualTo(fieldForeground);
-                assertThat(optionPane.getBackground()).isEqualTo(dialogBackground);
-            }
-        });
-    }
+    @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> ThemeTestSupport.controller(true)); }
 
     @Test void lookupFollowsReparentingButStopsAtChromePopupAndWindowRoots() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
-            var workspace = new JPanel(); WorkspaceTheme.apply(workspace, themes.current());
+            ThemeTestSupport.controller(false);
+            // A dark workspace inside the light chrome, as hosting code may receive any pair (Decision 5).
+            var split = ThemeTestSupport.mixed(ThemeTestSupport.generated(false), ThemeTestSupport.generated(true));
+            var workspace = new JPanel(); WorkspaceTheme.apply(workspace, split);
             var child = new JLabel(); workspace.add(child);
             assertThat(dev.jasper.app.platform.ThemeZone.color(child, SemanticColor.TEXT_PRIMARY))
-                .isEqualTo(themes.current().workspace().tokens().get(Token.TEXT));
+                .isEqualTo(split.workspace().semantic().color(SemanticColor.TEXT_PRIMARY));
             var chrome = new JPanel(); chrome.putClientProperty("Jasper.zone", "chrome"); workspace.add(chrome); chrome.add(child);
             assertThat(dev.jasper.app.platform.ThemeZone.color(child, SemanticColor.TEXT_PRIMARY)).isEqualTo(UIManager.getColor("Label.foreground"));
             var popup = new JPopupMenu(); popup.setInvoker(workspace); popup.add(child);
@@ -159,14 +35,11 @@ class WorkspaceThemeTest {
 
     @Test void hostedContentIsMarkedOnMountAndClearedOnRemovalWithoutChangingItsOwnStyle() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            var themes = ThemeTestSupport.controller(false);
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
             var model = new dev.jasper.app.contributions.Contributions(); owner.connectContributions(model);
             var panel = new JPanel(); panel.putClientProperty("FlatLaf.style", "arc: 7");
             var entry = model.content().open("test", "file", "File", owner.id(), panel);
-            assertThat(panel.getClientProperty("Jasper.workspaceTheme")).isSameAs(themes.current().workspace());
-            themes.configureTerminal(TerminalColors.MATCH);
             assertThat(panel.getClientProperty("Jasper.zone")).isEqualTo("workspace");
             assertThat(panel.getClientProperty("Jasper.workspaceTheme")).isNull();
             model.content().remove(entry);
@@ -178,32 +51,31 @@ class WorkspaceThemeTest {
 
     @Test void dividerPaintUsesWorkspaceColorWhileChromeDefaultsStayLight() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            var themes = ThemeTestSupport.controller(false);
             var chromeDivider = dev.jasper.app.platform.ThemeZone.color(null, SemanticColor.BORDER_SUBTLE);
-            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
-            var split = new JSplitPane(); WorkspaceTheme.apply(split, themes.current());
+            var pair = ThemeTestSupport.mixed(ThemeTestSupport.generated(false), ThemeTestSupport.generated(true));
+            var split = new JSplitPane(); WorkspaceTheme.apply(split, pair);
             split.setSize(400, 300); split.setDividerLocation(180); split.doLayout();
             var divider = ((javax.swing.plaf.basic.BasicSplitPaneUI) split.getUI()).getDivider();
             var image = new java.awt.image.BufferedImage(divider.getWidth(), divider.getHeight(), java.awt.image.BufferedImage.TYPE_INT_RGB);
             var graphics = image.createGraphics(); divider.paint(graphics); graphics.dispose();
             assertThat(new java.awt.Color(image.getRGB(divider.getWidth() / 2, 1)))
-                .isEqualTo(themes.current().workspace().tokens().get(Token.DIVIDER));
+                .isEqualTo(pair.workspace().semantic().color(SemanticColor.BORDER_WINDOW));
             assertThat(dev.jasper.app.platform.ThemeZone.color(null, SemanticColor.BORDER_SUBTLE)).isEqualTo(chromeDivider);
         });
     }
 
     @Test void movingHostedContentReplacesItsWorkspaceZoneAndRetainsTheDocument() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            var themes = ThemeTestSupport.controller(false);
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
             var model = new dev.jasper.app.contributions.Contributions(); owner.connectContributions(model);
             try (var detached = new WindowContent(launcher(new ArrayDeque<>()), null, path -> {}, () -> {}, () -> {},
-                    new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT))) {
+                    ThemeTestSupport.controller(false))) {
                 detached.connectContributions(model); model.content().setFactory(separate -> detached.id());
                 var text = new JTextArea("retained document"); var document = text.getDocument();
                 var entry = model.content().open("test", "move", "Move", owner.id(), text);
-                assertThat(text.getClientProperty("Jasper.workspaceTheme")).isSameAs(themes.current().workspace());
+                assertThat(text.getClientProperty("Jasper.zone")).isEqualTo("workspace");
                 model.content().move(entry, true);
                 assertThat(detached.selectedContent()).isSameAs(entry);
                 assertThat(text.getClientProperty("Jasper.zone")).isEqualTo("workspace");
@@ -211,7 +83,7 @@ class WorkspaceThemeTest {
                 assertThat(text.getDocument()).isSameAs(document);
                 model.content().move(entry, false);
                 assertThat(owner.selectedContent()).isSameAs(entry);
-                assertThat(text.getClientProperty("Jasper.workspaceTheme")).isSameAs(themes.current().workspace());
+                assertThat(text.getClientProperty("Jasper.zone")).isEqualTo("workspace");
             }
         });
     }
@@ -220,10 +92,10 @@ class WorkspaceThemeTest {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owner = new WindowContent[1];
         edt(() -> {
-            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            var themes = ThemeTestSupport.controller(false);
             owner[0] = content(new dev.jasper.app.launch.ShellLauncher(pending::add,
                 path -> { throw new IllegalStateException("expected launch failure"); }, "fixture"), themes);
-            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
         });
         pending.remove().run();
         edt(() -> {

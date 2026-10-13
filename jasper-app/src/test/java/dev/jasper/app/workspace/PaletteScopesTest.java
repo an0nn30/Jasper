@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.CommandSearch;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.palette.PaletteContext;
@@ -505,7 +506,7 @@ class PaletteScopesTest {
     @Test void aStepReplacesTheListCompletesWithValuesAndReopensWhereTheScopeAsks() throws Exception {
         edt(() -> {
             try (var owner = new WindowContent(DesktopTestSupport.launcher(new java.util.ArrayDeque<>()), DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
-                new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT),
+                ThemeTestSupport.controller(false),
                 dev.jasper.app.config.KeyBindings.defaults(true), new dev.jasper.app.commands.CommandHistory(), true)) {
                 var root = install(owner); var fake = new FakeScope(); owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
@@ -544,14 +545,14 @@ class PaletteScopesTest {
                 assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.COMMANDS_ID);
                 assertThat(PaletteTestSupport.selectedRow(card).id()).isEqualTo("new_tab");
                 assertThat(dev.jasper.app.palette.PaletteTestSupport.query(card).getText()).isEmpty();
-            } finally { new dev.jasper.app.appearance.ThemeController(); }
+            } finally { ThemeTestSupport.controller(true); }
         });
     }
 
     @Test void escapeLeavesAStepWithTheQueryIntactAndScopeShortcutsOrDoneDismissIt() throws Exception {
         edt(() -> {
             try (var owner = new WindowContent(DesktopTestSupport.launcher(new java.util.ArrayDeque<>()), DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
-                new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT),
+                ThemeTestSupport.controller(false),
                 dev.jasper.app.config.KeyBindings.defaults(true), new dev.jasper.app.commands.CommandHistory(), true)) {
                 install(owner); var fake = new FakeScope(); owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
@@ -578,7 +579,7 @@ class PaletteScopesTest {
                 palette.enterPressed(0);
                 assertThat(palette.isOpen()).isFalse();
                 assertThat(fake.completed).hasSize(1);
-            } finally { new dev.jasper.app.appearance.ThemeController(); }
+            } finally { ThemeTestSupport.controller(true); }
         });
     }
 

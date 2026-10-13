@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.terminal.config.GridSize;
@@ -60,15 +59,15 @@ public final class FlatTabsPreview {
                 owner.connectContributions(contributions);
                 var document = contributions.content().open("preview.editor", "config", "config.yml", owner.id(), new javax.swing.JTextArea("key: value"));
                 document.presentation("config.yml", "", dev.jasper.app.platform.AppIcons.named("FILE"), false, "config.yml", "");
-                for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                    owner.selectTheme(theme);
-                    String name = theme.dark() ? "dark" : "light";
+                for (boolean themeDark : new boolean[]{true, false}) {
+                    owner.selectVariant(themeDark);
+                    String name = themeDark ? "dark" : "light";
                     owner.selectTab(owner.terminalTabs().get(0)); render(root, owner, output, name + "-first", 1040);
                     owner.selectTab(owner.terminalTabs().get(1)); render(root, owner, output, name + "-middle", 1040);
                     document.select(); render(root, owner, output, name + "-document", 1040);
                     owner.selectTab(owner.terminalTabs().get(1)); render(root, owner, output, name + "-overflow", 350);
                 }
-                owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT); owner.selectTerminalScheme(dev.jasper.app.config.TerminalSchemeChoice.SLATE_STEEL_DARK);
+                owner.selectVariant(false); owner.selectTerminalScheme(dev.jasper.app.config.TerminalSchemeChoice.SLATE_STEEL_DARK);
                 owner.selectTab(owner.terminalTabs().get(1)); render(root, owner, output, "light-chrome-dark-workspace", 1040);
                 owner.applyBackgroundOpacity(.5); render(root, owner, output, "glass", 1040);
             });

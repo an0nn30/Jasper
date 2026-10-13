@@ -1,8 +1,9 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigLoader;
-import dev.jasper.app.appearance.Theme;
+
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.application.ConfigurationTestSupport;
 import dev.jasper.app.launch.ShellLauncher;
@@ -115,7 +116,7 @@ class ShellExitBehaviorTest {
         TerminalPane retained = owner.currentPane(); TerminalView retainedView = retained.view();
         edt(() -> { exit(retained, 0); owner.newTab(directory); }); deliver();
         TerminalPane running = owner.currentPane();
-        edt(() -> { running.view().setFontSize(23f); running.applyTheme(new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT).current()); });
+        edt(() -> { running.view().setFontSize(23f); running.applyTheme(ThemeTestSupport.controller(false).current()); });
         var options = running.view().options(); var session = running.session();
         reload("close_on_success");
         edt(() -> {
@@ -124,7 +125,7 @@ class ShellExitBehaviorTest {
             assertThat(running.view().options()).isSameAs(options);
             assertThat(running.session()).isSameAs(session);
             assertThat(running.view().fontSize()).isEqualTo(23f);
-            assertThat(running.view().palette()).isEqualTo(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette());
+            assertThat(running.view().palette()).isEqualTo(ThemeTestSupport.terminal(false));
             exit(running, 0);
         });
         until(() -> owner.tabStrip().getTabCount() == 1);
@@ -250,7 +251,7 @@ class ShellExitBehaviorTest {
         Files.writeString(directory.resolve("config.toml"), "terminal.on_exit='" + policy + "'");
         service = new ConfigService(directory.resolve("config.toml"), false);
         edt(() -> {
-            ThemeController themes = new ThemeController();
+            ThemeController themes = ThemeTestSupport.controller(true);
             controller = new ConfigurationTestSupport(themes, service);
             ShellLauncher launcher = new ShellLauncher(pending::add, path -> {
                 if (launchFailure && launches.incrementAndGet() > launchesBeforeFailure) throw new IllegalStateException("controlled launch failure");

@@ -1,12 +1,11 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.ui.theme.GlassLevels;
-import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.GlassSettings;
 import dev.jasper.app.config.WorkspaceBlur;
-import dev.jasper.app.config.WorkspaceThemeChoice;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.LayoutTestSupport;
@@ -26,7 +25,7 @@ import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class WorkspaceGlassTest {
-    @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); edt(() -> new ThemeController()); }
+    @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); edt(() -> ThemeTestSupport.controller(true)); }
 
     private static BufferedImage render(JComponent root) {
         var image = new BufferedImage(root.getWidth(), root.getHeight(), BufferedImage.TYPE_INT_ARGB);
@@ -185,11 +184,9 @@ class WorkspaceGlassTest {
 
     @Test void tabSurfacesRetainWorkspaceAlphaWhetherOpaqueOrGlass() throws Exception {
         edt(() -> {
-            var themes = new ThemeController();
-            // Clear Dark's generated tab-bar colour differs from its terminal background, so the colour check bites.
-            var clear = ThemeCatalog.builtIn().scan().find("Clear Dark").orElseThrow();
-            themes.configureWorkspace(new WorkspaceThemeChoice("Clear Dark"), clear);
-            assertThat(themes.current().workspace().tokens().get(dev.jasper.ui.theme.Token.TAB_BAR))
+            var themes = ThemeTestSupport.controller(true);
+            // The tab strip's surface differs from the terminal background, so the colour check bites.
+            assertThat(themes.current().workspace().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_TABSTRIP))
                 .isNotEqualTo(themes.current().palette().background());
             WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes);
             owner.newTab(DesktopTestSupport.HOME);
@@ -342,27 +339,23 @@ class WorkspaceGlassTest {
 
     @Test void requestsCombineSavedSettingsWithTheWorkspaceTheme() throws Exception {
         edt(() -> {
-            var themes = new ThemeController();
+            var themes = ThemeTestSupport.controller(true);
             WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes);
             var requests = new ArrayList<GlassLevels>();
             var dark = new ArrayList<Boolean>();
             owner.setGlassRequests((levels, isDark) -> { requests.add(levels); dark.add(isDark); });
             assertThat(requests.getLast()).isEqualTo(GlassLevels.OPAQUE);
 
-            var clear = ThemeCatalog.builtIn().scan().find("Clear Dark").orElseThrow();
-            themes.configureWorkspace(new WorkspaceThemeChoice("Clear Dark"), clear);
-            assertThat(requests.getLast()).isEqualTo(new GlassLevels(0.95, true));
-            assertThat(dark.getLast()).as("Clear Dark is a dark workspace").isTrue();
+            assertThat(dark.getLast()).as("Slate Steel Dark is a dark workspace").isTrue();
 
             owner.applyConfiguration(ConfigSnapshot.defaults().toBuilder()
                 .glass(new GlassSettings(80f, WorkspaceBlur.OFF)).build(), true);
             assertThat(requests.getLast()).isEqualTo(new GlassLevels(0.8, false));
             assertThat(dark.getLast()).isTrue();
 
-            var light = ThemeCatalog.builtIn().scan().find("Clear Light").orElseThrow();
-            themes.configureWorkspace(new WorkspaceThemeChoice("Clear Light"), light);
+            themes.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
             assertThat(requests.getLast()).isEqualTo(new GlassLevels(0.8, false));
-            assertThat(dark.getLast()).as("Clear Light is a light workspace").isFalse();
+            assertThat(dark.getLast()).as("Slate Steel Light is a light workspace").isFalse();
         });
     }
 }

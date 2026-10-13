@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
+import dev.jasper.app.appearance.ThemeTestSupport;
+
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeManager;
 import dev.jasper.app.commands.ActionId;
@@ -35,14 +36,14 @@ class NativeSearchThemeSwitchTest {
     @AfterEach void reset() throws Exception {
         edt(() -> KeyboardFocusManager.setCurrentKeyboardFocusManager(null));
         closeOwners();
-        edt(() -> new ThemeController());
+        edt(() -> ThemeTestSupport.controller(true));
     }
 
     @Test void focusedFindQueryAndTitleSearchSurviveALiveChromeThemeSwitch() throws Exception {
         Queue<Runnable> pending = new ArrayDeque<>();
         var themes = new ThemeController[1];
         var owner = new WindowContent[1];
-        edt(() -> { themes[0] = new ThemeController(Theme.DARK); owner[0] = content(launcher(pending), themes[0]); });
+        edt(() -> { themes[0] = ThemeTestSupport.controller(true); owner[0] = content(launcher(pending), themes[0]); });
         pending.remove().run();
         var focus = new Focus();
         edt(() -> {
@@ -61,11 +62,11 @@ class NativeSearchThemeSwitchTest {
             KeyboardFocusManager.setCurrentKeyboardFocusManager(focus);
             focus.focus(query);
             assertThat(query.isFocusOwner()).as("precondition: the query owns focus").isTrue();
-            assertThat(query.getBackground()).isEqualTo(ThemeManager.generated(Theme.DARK).semantic().color(SemanticColor.SURFACE_INPUT));
+            assertThat(query.getBackground()).isEqualTo(ThemeTestSupport.generated(true).semantic().color(SemanticColor.SURFACE_INPUT));
 
-            themes[0].configure(Theme.JASPER_LIGHT);
+            themes[0].configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
 
-            var light = ThemeManager.generated(Theme.JASPER_LIGHT).semantic();
+            var light = ThemeTestSupport.generated(false).semantic();
             assertThat(pane.findBar()).isSameAs(bar);
             assertThat(bar.queryField()).isSameAs(query);
             assertThat(query.getParent()).isSameAs(parent);

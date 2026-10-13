@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.ToolbarMode;
 
@@ -62,7 +63,7 @@ class ApplicationActionsTest {
         Queue<Runnable> pending = new ArrayDeque<>();
         edt(() -> {
             var original = UIManager.getLookAndFeel();
-            dev.jasper.app.appearance.ThemeTestSupport.install(dev.jasper.app.appearance.Theme.DARK);
+            dev.jasper.app.appearance.ThemeTestSupport.install(true);
             try {
                 WindowContent owner = content(launcher(pending));
                 BindingRoot root = new BindingRoot(); root.setContentPane(owner);

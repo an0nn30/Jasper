@@ -97,8 +97,8 @@ class BarHeightTest {
     @Test void statusContentsAreCenteredBetweenWorkspaceSurfacesAndWindowBottom() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
-            for (var theme : java.util.List.of(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                owner.selectTheme(theme);
+            for (boolean themeDark : new boolean[]{true, false}) {
+                owner.selectVariant(themeDark);
                 for (int height : new int[]{20, 24, 48}) {
                     owner.setStatusBarHeight(height); owner.setSize(1000, 600);
                     dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);

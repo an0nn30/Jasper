@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.application.ApplicationTestSupport;
 import dev.jasper.app.palette.PaletteTestSupport;
@@ -29,7 +30,7 @@ class WindowCommandPaletteTest {
     }
     static WindowContent owner(CommandHistory history) {
         return new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
-            path -> {}, () -> {}, () -> {}, new ThemeController(), KeyBindings.defaults(true), history, true);
+            path -> {}, () -> {}, () -> {}, ThemeTestSupport.controller(true), KeyBindings.defaults(true), history, true);
     }
     static Command command(String id, Runnable run) {
         return new Command(id, new AbstractAction(id) {
@@ -235,20 +236,20 @@ class WindowCommandPaletteTest {
     /** theme.md's shadows are black, never theme colours: a red scrim leaves the palette's shadow neutral. */
     @Test void overlayShadowIsBlackWhateverTheScrim() throws Exception {
         DesktopTestSupport.edt(() -> {
-            try (var owner = owner(new CommandHistory())) {
+            var themes = ThemeTestSupport.controller(true);
+            try (var owner = new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
+                    path -> {}, () -> {}, () -> {}, themes, KeyBindings.defaults(true), new CommandHistory(), true)) {
                 var root = install(owner);
                 owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
                 var overlay = (JComponent) owner.commandPalette().component().getParent();
                 var card = owner.commandPalette().component().getBounds();
                 try {
-                    var base = dev.jasper.app.appearance.Theme.DARK.source().document();
-                    var document = new dev.jasper.ui.theme.ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), base.parentLine(),
-                        base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), base.tokens(), base.syntax(), base.ui(), base.icons(), base.workspace(),
-                        java.util.Map.of(dev.jasper.ui.theme.SemanticColor.SURFACE_SCRIM, Color.RED));
-                    var generated = dev.jasper.ui.theme.ThemeGenerator.generate(document);
-                    owner.selectTheme(new dev.jasper.app.appearance.Theme("shadow-test", "Shadow test", true,
-                        dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(generated.terminal()),
-                        new dev.jasper.app.appearance.Theme.UserFile(java.nio.file.Path.of("shadow.toml"), document)));
+                    // A red scrim, and a red popup shadow key, in the window's binding and the installed look.
+                    var red = ThemeTestSupport.withUiKeys(ThemeTestSupport.recolored(ThemeTestSupport.generated(true),
+                        java.util.Map.of(dev.jasper.ui.theme.SemanticColor.SURFACE_SCRIM, Color.RED)), java.util.Map.of("Popup.dropShadowColor", "#ff0000"));
+                    ThemeTestSupport.install(red);
+                    themes.appearance().binding().publish(new dev.jasper.ui.theme.ThemePair(red, red));
+                    owner.commandPalette().refreshTheme();
                     var image = new BufferedImage(overlay.getWidth(), overlay.getHeight(), BufferedImage.TYPE_INT_ARGB);
                     var graphics = image.createGraphics();
                     try {
@@ -327,7 +328,7 @@ class WindowCommandPaletteTest {
             assertThat(toggle.get()).isEqualTo("Hide Status Bar");
             owner.setStatusVisible(false);
             assertThat(toggle.get()).isEqualTo("Show Status Bar");
-            owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT); assertThat(owner.commandPalette().isOpen()).isTrue();
+            owner.selectVariant(false); assertThat(owner.commandPalette().isOpen()).isTrue();
             var overlay = owner.commandPalette().component().getParent(); owner.close();
             assertThat(overlay.getParent()).isNull(); assertThat(root.getComponentListeners().length).isLessThan(listeners);
             assertThat(owner.commands().entries()).isEmpty();
@@ -416,7 +417,7 @@ class WindowCommandPaletteTest {
                 WindowContent[] content = new WindowContent[1];
                 content[0] = new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
                     path -> {}, () -> { content[0].close(); application.quit(); },
-                    () -> { content[0].close(); ApplicationTestSupport.windowClosed(application, null); }, new ThemeController(),
+                    () -> { content[0].close(); ApplicationTestSupport.windowClosed(application, null); }, ThemeTestSupport.controller(true),
                     KeyBindings.defaults(true), history[0], true);
                 install(content[0]); content[0].commandPalette().toggle();
                 dev.jasper.app.palette.PaletteTestSupport.query(content[0].commandPalette().component()).setText(quit ? "quit" : "close tab");

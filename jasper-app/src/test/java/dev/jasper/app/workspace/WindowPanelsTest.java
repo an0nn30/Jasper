@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
@@ -39,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WindowPanelsTest {
     @TempDir Path dir;
 
-    @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); edt(() -> new dev.jasper.app.appearance.ThemeController()); }
+    @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); edt(() -> ThemeTestSupport.controller(true)); }
 
     private static WindowContent window() { return DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>())); }
 
@@ -198,7 +199,7 @@ class WindowPanelsTest {
             var model = new Contributions();
             WindowContent owner = window();
             owner.connectContributions(model, UiState.inMemory());
-            var theme = dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.Theme.DARK);
+            var theme = dev.jasper.app.appearance.ThemeTestSupport.generated(true);
             try (var bindings = new dev.jasper.app.appearance.AppearanceBindings(new dev.jasper.ui.theme.ThemePair(theme, theme),
                     failure -> { throw new AssertionError(failure); }, () -> false)) {
                 var calls = new ArrayList<String>();
@@ -476,7 +477,7 @@ class WindowPanelsTest {
 
     @Test void hiddenPanelKeepsItsComponentAndHandlersAcrossADelegateThemeUpdate() throws Exception {
         edt(() -> {
-            var themes = new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.Theme.DARK);
+            var themes = ThemeTestSupport.controller(true);
             var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes);
             var model = new Contributions(); owner.connectContributions(model, UiState.inMemory());
             var clicks = new java.util.concurrent.atomic.AtomicInteger();

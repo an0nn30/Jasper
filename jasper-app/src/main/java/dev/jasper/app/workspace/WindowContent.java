@@ -183,7 +183,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty) {
-        this(launcher, directory, newWindow, quit, onEmpty, new ThemeController());
+        this(launcher, directory, newWindow, quit, onEmpty, new ThemeController(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH));
     }
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,

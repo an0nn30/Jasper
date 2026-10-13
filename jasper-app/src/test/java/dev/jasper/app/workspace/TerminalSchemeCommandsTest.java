@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,7 +18,7 @@ import org.junit.jupiter.api.condition.OS;
 
 /** The command palette's terminal-scheme commands: every pane and window follows, the UI variant stays. */
 class TerminalSchemeCommandsTest {
-    @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> new ThemeController()); }
+    @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> ThemeTestSupport.controller(true)); }
 
     static dev.jasper.terminal.config.Palette palette(TerminalScheme scheme) {
         return TerminalPaletteAdapter.toTerminal(SlateSteel.bundled().terminal(scheme));

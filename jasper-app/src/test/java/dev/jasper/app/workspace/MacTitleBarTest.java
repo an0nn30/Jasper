@@ -1,7 +1,8 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.platform.MacTitleBar;
-import dev.jasper.app.appearance.Theme;
+
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.workspace.WindowContent;
 import dev.jasper.app.workspace.WindowTabsTest;
@@ -89,8 +90,8 @@ class MacTitleBarTest {
             DockTestSupport.show(owner, dev.jasper.app.dock.Slot.RIGHT_TOP, right, 200);
             try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                 root.setSize(1400, 600);
-                for (Theme theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                    owner.selectTheme(theme);
+                for (boolean themeDark : new boolean[]{true, false}) {
+                    owner.selectVariant(themeDark);
                     for (int height : new int[] {28, 30, 64}) {
                         owner.setToolbarHeight(height); layoutTree(root);
                         var tabs = WindowTabsTest.named(owner, "windowTabs");
@@ -139,7 +140,7 @@ class MacTitleBarTest {
         });
     }
 
-    @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> new dev.jasper.app.appearance.ThemeController()); }
+    @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> ThemeTestSupport.controller(true)); }
 
     @Test void supportedRootHidesOnlyNativeDrawingAndRetainsTitleMetadata() throws Exception {
         edt(() -> {
@@ -171,7 +172,7 @@ class MacTitleBarTest {
             assertThat(root.getClientProperty("apple.awt.fullWindowContent")).isNull();
             assertThat(root.getClientProperty("apple.awt.transparentTitleBar")).isNull();
             assertThat(root.getClientProperty("apple.awt.windowTitleVisible")).isNull();
-            owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            owner.selectVariant(false);
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isNull();
             owner.currentTab().rename("plain window"); owner.update();
             assertThat(metadata.get()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
@@ -221,13 +222,13 @@ class MacTitleBarTest {
                 assertThat(bar).isNotNull();
                 owner.installRootBindings(root);
                 bar.setSize(400, 28);
-                assertThat(pixel(bar)).isEqualTo(new Color(0x25292e));
-                assertThat(label(bar).getForeground()).isEqualTo(new Color(0xa7b2bf));
+                assertThat(pixel(bar)).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.color(true, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
+                assertThat(label(bar).getForeground()).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.color(true, dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
                 bar.setActive(false);
-                assertThat(label(bar).getForeground()).isEqualTo(new Color(0xa7b2bf));
-                owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+                assertThat(label(bar).getForeground()).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.color(true, dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
+                owner.selectVariant(false);
                 assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameAqua");
-                assertThat(pixel(bar)).isEqualTo(new Color(0xf2f2f2));
+                assertThat(pixel(bar)).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.color(false, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
                 assertThat(label(bar).getForeground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
                 bar.setActive(true);
                 assertThat(label(bar).getForeground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
@@ -252,25 +253,25 @@ class MacTitleBarTest {
             owner.onMinimumSizeChanged = changed::incrementAndGet;
             root.putClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle(100, 80));
             assertThat(changed.get()).isZero();
-            owner.onThemeChanged.accept(new ResolvedTheme(dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT), dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)));
+            owner.onThemeChanged.accept(new ResolvedTheme(dev.jasper.app.appearance.ThemeTestSupport.generated(false), dev.jasper.app.appearance.ThemeTestSupport.generated(false)));
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameDarkAqua");
         });
     }
 
     @Test void titleOnlyHeaderDoesNotPaintThePlaceholderOverItsBackground() throws Exception {
         edt(() -> {
-            var themes = new dev.jasper.app.appearance.ThemeController();
+            var themes = ThemeTestSupport.controller(true);
             var root = new JRootPane();
             try (var bar = MacTitleBar.install(root, new JPanel(), () -> { }, true)) {
                 bar.setTitle("Credential Vault");
-                for (Theme theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                    themes.configure(theme); SwingUtilities.updateComponentTreeUI(root);
-                    bar.setLight(theme == dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT); bar.setSize(800, 28); bar.doLayout();
+                for (boolean themeDark : new boolean[]{true, false}) {
+                    themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH); SwingUtilities.updateComponentTreeUI(root);
+                    bar.setLight(!themeDark); bar.setSize(800, 28); bar.doLayout();
                     var image = new BufferedImage(800, 28, BufferedImage.TYPE_INT_RGB);
                     var graphics = image.createGraphics();
                     try { bar.paint(graphics); } finally { graphics.dispose(); }
                     for (int x : new int[] {5, 119, 121, 350, 795})
-                        assertThat(new Color(image.getRGB(x, 2))).as("header pixel %s in %s", x, theme)
+                        assertThat(new Color(image.getRGB(x, 2))).as("header pixel %s in %s", x, (themeDark ? "dark" : "light"))
                             .isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
                 }
             }

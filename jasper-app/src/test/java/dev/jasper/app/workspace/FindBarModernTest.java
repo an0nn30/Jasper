@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.Theme;
 import com.formdev.flatlaf.FlatClientProperties;
 import dev.jasper.app.appearance.ThemeController;
@@ -22,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @DisabledOnOs(OS.WINDOWS)
 class FindBarModernTest {
-    @AfterEach void reset() throws Exception { edt(() -> new ThemeController()); }
+    @AfterEach void reset() throws Exception { edt(() -> ThemeTestSupport.controller(true)); }
 
     @Test void escapeResolvesTheCloseActionAndHidesTheBar() throws Exception {
         try (TerminalSession session = shell(HOME)) {
@@ -44,7 +45,7 @@ class FindBarModernTest {
     @Test void modernBarIsOneRowWithInFieldTogglesAndIconOnlyNavigation() throws Exception {
         try (TerminalSession session = shell(HOME)) {
             edt(() -> {
-                new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+                ThemeTestSupport.controller(false);
                 var bar = new FindBar(new TerminalView(session, TerminalOptions.defaults()));
                 var query = bar.queryField();
                 assertThat(query.getAccessibleContext().getAccessibleName()).isEqualTo("Find in terminal");
@@ -85,7 +86,7 @@ class FindBarModernTest {
             until(() -> session.title().equals("ready"));
             FindBar[] bar = new FindBar[1];
             edt(() -> {
-                new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+                ThemeTestSupport.controller(false);
                 var view = new TerminalView(session, TerminalOptions.defaults());
                 view.setSize(view.getPreferredSize());
                 bar[0] = attached(view); bar[0].open();
@@ -96,26 +97,25 @@ class FindBarModernTest {
             edt(() -> {
                 var query = bar[0].queryField();
                 assertThat(query.getClientProperty(FlatClientProperties.OUTLINE)).isEqualTo(FlatClientProperties.OUTLINE_ERROR);
-                assertThat(query.getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.theme(null).tokens().get(dev.jasper.ui.theme.Token.ERROR_BACKGROUND));
+                assertThat(query.getBackground()).isEqualTo(errorTint(dev.jasper.app.platform.ThemeZone.theme(null)));
                 assertThat(bar[0].countLabel().getText()).isEqualTo("0 results");
                 assertThat(bar[0].countLabel().getFont()).isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.LABEL));
                 SwingUtilities.updateComponentTreeUI(bar[0]);
                 assertThat(query.getBackground()).as("a theme switch keeps the no-match tint")
-                    .isEqualTo(dev.jasper.app.platform.ThemeZone.theme(null).tokens().get(dev.jasper.ui.theme.Token.ERROR_BACKGROUND));
-                var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-                themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new dev.jasper.app.config.WorkspaceThemeChoice("Jasper Dark"),
-                    Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults());
-                WorkspaceTheme.apply(bar[0], themes.current()); bar[0].refreshTheme();
-                var tokens = themes.current().workspace().tokens();
-                assertThat(query.getBackground()).isEqualTo(tokens.get(dev.jasper.ui.theme.Token.ERROR_BACKGROUND));
-                assertThat(query.getForeground()).isEqualTo(tokens.get(dev.jasper.ui.theme.Token.TEXT));
-                assertThat(query.getSelectionColor()).isEqualTo(themes.current().workspace().semantic().color(dev.jasper.ui.theme.SemanticColor.SELECTION_BG));
-                assertThat(bar[0].getBackground()).isEqualTo(tokens.get(dev.jasper.ui.theme.Token.SURFACE));
+                    .isEqualTo(errorTint(dev.jasper.app.platform.ThemeZone.theme(null)));
+                var themes = ThemeTestSupport.controller(false);
+                // A dark workspace inside the light chrome, as hosting code may receive any pair (Decision 5).
+                var split = ThemeTestSupport.mixed(ThemeTestSupport.generated(false), ThemeTestSupport.generated(true));
+                WorkspaceTheme.apply(bar[0], split); bar[0].refreshTheme();
+                var roles = split.workspace().semantic();
+                assertThat(query.getBackground()).isEqualTo(errorTint(split.workspace()));
+                assertThat(query.getForeground()).isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
+                assertThat(query.getSelectionColor()).isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.SELECTION_BG));
+                assertThat(bar[0].getBackground()).isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
                 assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.STYLE)).isEqualTo(ghostStyle(bar[0].caseButton()));
                 assertThat(query.getClientProperty(FlatClientProperties.STYLE)).isEqualTo("borderWidth: 0; focusWidth: 0; innerFocusWidth: 0");
-                themes.configureTerminal(dev.jasper.app.config.TerminalColors.MATCH);
                 WorkspaceTheme.apply(bar[0], themes.current()); bar[0].refreshTheme();
-                assertThat(query.getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.theme(null).tokens().get(dev.jasper.ui.theme.Token.ERROR_BACKGROUND));
+                assertThat(query.getBackground()).isEqualTo(errorTint(dev.jasper.app.platform.ThemeZone.theme(null)));
                 assertThat(query.getForeground()).isEqualTo(UIManager.getColor("TextField.foreground"));
                 assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.STYLE)).isEqualTo(ghostStyle(bar[0].caseButton()));
                 assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.BUTTON_TYPE)).isEqualTo(FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
@@ -167,6 +167,11 @@ class FindBarModernTest {
         return java.util.Map.of(
             "toolbar.hoverBackground", dev.jasper.ui.theme.ColorMath.opacity(palette.color(dev.jasper.ui.theme.SemanticColor.HOVER_OVERLAY), .08),
             "toolbar.pressedBackground", palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL_HOVER),
-            "toolbar.selectedBackground", palette.color(dev.jasper.ui.theme.SemanticColor.SEGMENT_SELECTED_BG));
+            "toolbar.selectedBackground", palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL_SELECTED));
+    }
+    /** The find bar's no-match tint (UiColorKeys.errorTint from Task 7): the error border laid lightly over the input surface. */
+    private static java.awt.Color errorTint(dev.jasper.ui.theme.GeneratedTheme theme) {
+        var p = theme.semantic();
+        return dev.jasper.ui.theme.ColorMath.mix(p.color(dev.jasper.ui.theme.SemanticColor.BORDER_ERROR), p.color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT), .16);
     }
 }

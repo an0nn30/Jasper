@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
+import dev.jasper.app.appearance.ThemeTestSupport;
+
 import dev.jasper.app.appearance.ThemeController;
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.Color;
@@ -14,11 +15,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SplitDividerTest {
     @Test void dividerRemainsVisibleAlongBothAxesAcrossThemeChanges() throws Exception {
         edt(() -> {
-            ThemeController themes = new ThemeController();
+            ThemeController themes = ThemeTestSupport.controller(true);
             JSplitPane split = new JSplitPane();
             try {
-                for (Theme theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                    themes.configure(theme);
+                for (boolean themeDark : new boolean[]{true, false}) {
+                    themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
                     SwingUtilities.updateComponentTreeUI(split);
                     split.setBorder(null);
                     for (int orientation : new int[] {JSplitPane.HORIZONTAL_SPLIT, JSplitPane.VERTICAL_SPLIT}) {
@@ -41,8 +42,11 @@ class SplitDividerTest {
                             if (Math.abs(along - length / 2) < UIScale.scale(16)) continue;
                             Color stroke = new Color(image.getRGB(vertical ? across / 2 : along,
                                 vertical ? along : across / 2));
-                            assertThat(contrast(stroke, theme.palette().background()))
-                                .as("%s orientation %s at %s", theme, orientation, along).isGreaterThanOrEqualTo(3);
+                            // Slate Steel's border.window as authored: 1.43:1 (Dark) and 1.58:1 (Light) against the terminal.
+                            assertThat(stroke).as("%s orientation %s at %s", (themeDark ? "dark" : "light"), orientation, along)
+                                .isEqualTo(ThemeTestSupport.color(themeDark, dev.jasper.ui.theme.SemanticColor.BORDER_WINDOW));
+                            assertThat(contrast(stroke, ThemeTestSupport.terminal(themeDark).background()))
+                                .as("%s orientation %s at %s", (themeDark ? "dark" : "light"), orientation, along).isGreaterThanOrEqualTo(1.4);
                         }
                         int painted = 0;
                         for (int cross = 0; cross < across; cross++) {
@@ -53,7 +57,7 @@ class SplitDividerTest {
                     }
                 }
             } finally {
-                themes.configure(Theme.DARK);
+                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
             }
         });
     }

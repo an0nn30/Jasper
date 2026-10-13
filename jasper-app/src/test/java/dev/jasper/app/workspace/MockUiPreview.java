@@ -1,7 +1,8 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.testsupport.LayoutTestSupport;
-import dev.jasper.app.appearance.Theme;
+
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.launch.ShellLauncher;
@@ -65,7 +66,7 @@ public final class MockUiPreview {
                         sessions.add(session); return session;
                     } catch (Exception failure) { throw new CompletionException(failure); }
                 }, "bash");
-                themes[0] = new ThemeController();
+                themes[0] = ThemeTestSupport.controller(true);
                 owner[0] = content(launcher, themes[0]);
                 owner[0].newTab(HOME);
                 owner[0].currentTab().rename("jasper");
@@ -87,9 +88,9 @@ public final class MockUiPreview {
                 until(() -> owner[0].currentPane().running()
                     && sessions.stream().allMatch(session -> session.title().equals("dustin")));
             }
-            for (Theme theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
+            for (boolean themeDark : new boolean[]{true, false}) {
                 edt(() -> {
-                    owner[0].selectTheme(theme);
+                    owner[0].selectVariant(themeDark);
                     root[0].setSize(958, 958); LayoutTestSupport.layoutTree(root[0]);
                 });
                 edt(() -> { LayoutTestSupport.layoutTree(root[0]); owner[0].update(); });
@@ -101,7 +102,7 @@ public final class MockUiPreview {
                         root[0].printAll(g);
                         paintDividers(root[0], g);
                     } finally { g.dispose(); }
-                    Path file = output.resolve("mock-ui-" + theme.name().toLowerCase(Locale.ROOT) + ".png");
+                    Path file = output.resolve("mock-ui-" + (themeDark ? "dark" : "light").toLowerCase(Locale.ROOT) + ".png");
                     try { ImageIO.write(image, "png", file.toFile()); }
                     catch (java.io.IOException failure) { throw new CompletionException(failure); }
                     System.out.println(file.toAbsolutePath());

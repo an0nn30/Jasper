@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Color;
 import java.util.ArrayDeque;
@@ -14,9 +13,9 @@ import static org.assertj.core.api.Assertions.*;
 @ExtendWith(EdtTestExtension.class)
 class GraphiteChromeTest {
     @Test void hiddenRailLetsTheTerminalReachEveryWorkspaceEdge() throws Exception {
-        for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
+        for (boolean themeDark : new boolean[]{true, false}) {
             try (var owner = content(launcher(new ArrayDeque<>()))) {
-                owner.selectTheme(theme);
+                owner.selectVariant(themeDark);
                 var root = new javax.swing.JRootPane();
                 try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                     showRail(owner);
@@ -38,12 +37,12 @@ class GraphiteChromeTest {
                         try { area.paint(g); } finally { g.dispose(); }
                         int terminal = owner.theme().palette().background().getRGB();
                         for (int x : new int[]{0, image.getWidth() - 1}) for (int y : new int[]{0, image.getHeight() - 1}) {
-                            assertThat(image.getRGB(x, y)).as("square workspace corner (%s,%s), %s", x, y, theme)
+                            assertThat(image.getRGB(x, y)).as("square workspace corner (%s,%s), %s", x, y, (themeDark ? "dark" : "light"))
                                 .isEqualTo(y == 0 && x > 0 ? owner.windowTabs().getBackground().getRGB() : terminal);
                             assertThat(column.getParent().contains(x, y)).as("edge receives input").isTrue();
                         }
                         var output = java.nio.file.Path.of("build/render-preview"); java.nio.file.Files.createDirectories(output);
-                        javax.imageio.ImageIO.write(image, "png", output.resolve("hidden-rail-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
+                        javax.imageio.ImageIO.write(image, "png", output.resolve("hidden-rail-" + (themeDark ? "dark" : "light") + ".png").toFile());
                     }
                 }
             }
@@ -57,9 +56,9 @@ class GraphiteChromeTest {
     }
 
     @Test void partialRepaintsKeepAllFourWorkspaceCornersRounded() throws Exception {
-        for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
+        for (boolean themeDark : new boolean[]{true, false}) {
             try (var owner = content(launcher(new ArrayDeque<>()))) {
-                owner.selectTheme(theme);
+                owner.selectVariant(themeDark);
                 showRail(owner);
                 var root = new javax.swing.JRootPane();
                 try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
@@ -83,7 +82,7 @@ class GraphiteChromeTest {
                         } finally { g.dispose(); }
                         int x = corner[0] == left ? left : right;
                         int y = corner[1] == top ? top : bottom;
-                        assertThat(image.getRGB(x, y)).as("partial repaint corner (%s,%s), %s", x, y, theme).isEqualTo(chrome);
+                        assertThat(image.getRGB(x, y)).as("partial repaint corner (%s,%s), %s", x, y, (themeDark ? "dark" : "light")).isEqualTo(chrome);
                     }
                 }
             }
@@ -92,20 +91,21 @@ class GraphiteChromeTest {
 
     @Test void graphiteContentSurfacesContrastWithChromeAndSettingsHasOneHome() {
         try (var owner = content(launcher(new ArrayDeque<>()))) {
-            owner.selectTheme(Theme.DARK);
-            assertThat(owner.theme().palette().background()).isEqualTo(new Color(0x191c20));
-            assertThat(UIManager.getColor("ToolWindow.background")).isEqualTo(new Color(0x191c20));
-            assertThat(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP)).isEqualTo(new Color(0x25292e));
-            assertThat(UIManager.getColor("Jasper.tabUnderline")).isEqualTo(new Color(0x8eb8d2));
+            owner.selectVariant(true);
+            assertThat(owner.theme().palette().background()).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.terminal(true).background());
+            assertThat(UIManager.getColor("ToolWindow.background")).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.color(true, dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR));
+            assertThat(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP)).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.color(true, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
+            assertThat(UIManager.getColor("Jasper.tabUnderline")).isEqualTo(UIManager.getColor("Jasper.semantic.accent"))
+                .isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.color(true, dev.jasper.ui.theme.SemanticColor.ACCENT));
             assertThat(java.util.Arrays.stream(owner.leftStripe().getComponents())
                 .filter(javax.swing.JButton.class::isInstance)
                 .map(child -> ((javax.swing.JButton) child).getToolTipText())).doesNotContain("Settings");
         }
     }
     @Test void terminalBottomCornersRoundOutsideTheCellGridAndOnlyTheGridFollowsTheScheme() throws Exception {
-        for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
+        for (boolean themeDark : new boolean[]{true, false}) {
             try (var owner = content(launcher(new ArrayDeque<>()))) {
-                owner.selectTheme(theme);
+                owner.selectVariant(themeDark);
                 showRail(owner);
                 var root = new javax.swing.JRootPane();
                 try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
@@ -129,9 +129,9 @@ class GraphiteChromeTest {
         }
     }
     @Test void roundedWorkspaceSurfacesMeetContinuousChromeWithoutRules() throws Exception {
-        for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
+        for (boolean themeDark : new boolean[]{true, false}) {
             try (var owner = content(launcher(new ArrayDeque<>()))) {
-                owner.selectTheme(theme);
+                owner.selectVariant(themeDark);
                 owner.newTab(HOME);
                 var root = new javax.swing.JRootPane();
                 try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
@@ -158,9 +158,9 @@ class GraphiteChromeTest {
                     assertThat(image.getRGB(corner.x, corner.y)).as("rounded tab-strip shoulder").isEqualTo(chrome);
                     var quiet = javax.swing.SwingUtilities.convertPoint(strip, strip.getWidth() - 50, strip.getHeight() - 1, root);
                     assertThat(image.getRGB(quiet.x, quiet.y)).as("the flat strip has a subtle baseline separator")
-                        .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.ui.theme.Token.BORDER).getRGB());
+                        .isEqualTo(owner.theme().workspace().semantic().color(dev.jasper.ui.theme.SemanticColor.BORDER_WINDOW).getRGB());
                     var output = java.nio.file.Path.of("build/render-preview"); java.nio.file.Files.createDirectories(output);
-                    javax.imageio.ImageIO.write(image, "png", output.resolve("fluid-workspace-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
+                    javax.imageio.ImageIO.write(image, "png", output.resolve("fluid-workspace-" + (themeDark ? "dark" : "light") + ".png").toFile());
                 }
             }
         }

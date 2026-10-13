@@ -18,10 +18,10 @@ import org.junit.jupiter.api.Test;
 class Task9cHistoryEvidenceTest {
     @Test void historyUsesTheActualToolWindowSurface() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var themes=new ThemeController();
+            var themes=ThemeTestSupport.controller(true);
             try {
-                for(var theme:List.of(Theme.DARK,Theme.JASPER_LIGHT))for(float font:List.of(13f,20f,32f)) {
-                    themes.configure(theme,new UiFontConfig("system",font));
+                for (boolean themeDark : new boolean[]{true, false}) for(float font:List.of(13f,20f,32f)) {
+                    themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system",font));
                     var center=new NotificationCenter(Runnable::run,Clock.fixed(Instant.parse("2026-10-05T12:00:00Z"),ZoneOffset.UTC),()->Delivery.Presence.FOCUSED);
                     var group=new NotificationGroup("fixture.history","Synthetic history","jasper",DisplayMode.CARD);center.register(group);
                     var site=new PanelSite(UUID.randomUUID(),()->{},()->{},()->true);
@@ -29,7 +29,7 @@ class Task9cHistoryEvidenceTest {
                     var area=new ToolWindowArea(new JPanel(),new DockState());
                     try {
                         DockTestSupport.show(area,Slot.RIGHT_TOP,history,360);area.setContent(DockTestSupport.id(Slot.RIGHT_TOP),"Notifications",history);area.sync();site.notifyVisibility(true);
-                        String family=(theme.dark()?"dark":"light")+"-"+font;
+                        String family=(themeDark?"dark":"light")+"-"+font;
                         SurfaceEvidence.save(Path.of("build/theme-surfaces9c/history-host",family,"empty.png"),area,1000,600,2);
                         center.post(NotificationRequest.of(group.id(),Severity.WARNING,"A long literal history notification")
                             .withContent("Synthetic content with <html> literal text and a second line.\nExisting tool-window surface behind this transparent owner.")
@@ -41,7 +41,7 @@ class Task9cHistoryEvidenceTest {
                         SurfaceEvidence.save(Path.of("build/theme-surfaces9c/history-host",family,"earlier.png"),area,1000,600,2);
                     } finally {site.notifyClosed();area.close();}
                 }
-            } finally {themes.configure(Theme.DARK,UiFontConfig.defaults());themes.close();}
+            } finally {themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());themes.close();}
         });
     }
 }

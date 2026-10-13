@@ -6,7 +6,7 @@ import dev.jasper.app.application.ApplicationTestSupport;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.application.ConfigurationTestSupport;
 import dev.jasper.app.application.JasperApplication;
-import dev.jasper.app.appearance.Theme;
+
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.AppearanceMode;
@@ -186,7 +186,7 @@ class ConfigurationControllerTest {
         service = new ConfigService(file, false);
         var opened = new java.util.concurrent.LinkedBlockingQueue<Path>();
         edt(() -> {
-            themes = new ThemeController();
+            themes = ThemeTestSupport.controller(true);
             controller = new ConfigurationTestSupport(themes, service, path -> {
                 assertThat(SwingUtilities.isEventDispatchThread()).isFalse(); opened.add(path);
             });
@@ -221,7 +221,7 @@ class ConfigurationControllerTest {
         service = new ConfigService(directory.resolve("config.toml"), false);
         var errors = new java.util.concurrent.LinkedBlockingQueue<String>();
         edt(() -> {
-            themes = new ThemeController();
+            themes = ThemeTestSupport.controller(true);
             controller = new ConfigurationTestSupport(themes, service, path -> { throw new IllegalStateException("Editor unavailable"); });
             var owner = owner();
             owner.onError = (title, message) -> { assertThat(SwingUtilities.isEventDispatchThread()).isTrue(); errors.add(title + ": " + message); };
@@ -349,7 +349,7 @@ class ConfigurationControllerTest {
             assertThat(field(retained.view(), "inactiveDim")).isEqualTo(.65f);
             first.setActive(false);
             assertThat(field(first.currentPane().view(), "inactiveDim")).isEqualTo(.65f);
-            first.selectTheme(Theme.JASPER_LIGHT);
+            first.selectVariant(false);
             assertThat(field(retained.view(), "inactiveDim")).isEqualTo(.65f);
             first.setActive(true);
             assertThat(field(first.currentPane().view(), "inactiveDim")).isEqualTo(0f);
@@ -362,7 +362,7 @@ class ConfigurationControllerTest {
     void typographyAndBehaviorChangesPreserveManualSizeAndThemeUntilSavedSizeChanges() throws Exception {
         start("[terminal.font]\nsize=18\n"); edt(this::owner); launchAll();
         var owner = owners.getFirst(); var pane = owner.currentPane();
-        edt(() -> { pane.view().setFontSize(27); owner.selectTheme(Theme.JASPER_LIGHT); });
+        edt(() -> { pane.view().setFontSize(27); owner.selectVariant(false); });
         reload(liveSettings(18));
         edt(() -> {
             assertThat(pane.view().fontSize()).isEqualTo(27);
@@ -446,7 +446,7 @@ class ConfigurationControllerTest {
             assertThat(field(pane.view(), "inactiveDim")).isEqualTo(.7f);
             owner.setActive(true);
             assertThat(field(pane.view(), "inactiveDim")).isEqualTo(0f);
-            owner.setActive(false); owner.selectTheme(Theme.JASPER_LIGHT);
+            owner.setActive(false); owner.selectVariant(false);
             assertThat(field(pane.view(), "inactiveDim")).isEqualTo(.7f);
         });
         reload("[terminal]\ndim_inactive_panes=0.2\n");
@@ -566,7 +566,7 @@ class ConfigurationControllerTest {
             assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateSteel(false, TerminalScheme.SLATE_STEEL_LIGHT));
             assertThat(attempts).containsExactly(dark, light, light);
             assertThat(errors).hasSize(1);
-            owners.getFirst().selectTheme(Theme.DARK);
+            owners.getFirst().selectVariant(true);
             owners.getFirst().invoke(ActionId.RELOAD_CONFIG);
         });
         configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
@@ -575,7 +575,7 @@ class ConfigurationControllerTest {
         edt(() -> {
             // A reload re-applies the configured theme over a window's own choice.
             assertThat(themes.current().chrome()).isSameAs(light);
-            assertThat(attempts).containsExactly(dark, light, light, dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK), light);
+            assertThat(attempts).containsExactly(dark, light, light, dev.jasper.app.appearance.ThemeTestSupport.generated(true), light);
         });
     }
 

@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.terminals.PaneSnapshot;
 import dev.jasper.app.terminals.RemoteLocation;
@@ -46,8 +45,8 @@ class PathBreadcrumbsTest {
                 pane(Optional.of(HOME.resolve("projects/moray/plugins/remote/src")), Optional.empty(), false),
                 pane(Optional.empty(), Optional.of(new RemoteLocation("ssh.example", "/srv/moray/src")), true),
                 pane(Optional.empty(), Optional.empty(), true));
-            for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                ThemeTestSupport.install(theme); SwingUtilities.updateComponentTreeUI(status); status.refreshTheme();
+            for (boolean themeDark : new boolean[]{true, false}) {
+                ThemeTestSupport.install(themeDark); SwingUtilities.updateComponentTreeUI(status); status.refreshTheme();
                 var preview = new BufferedImage(1000, 144, BufferedImage.TYPE_INT_ARGB);
                 var graphics = preview.createGraphics();
                 for (int i = 0; i < panes.size(); i++) {
@@ -61,7 +60,7 @@ class PathBreadcrumbsTest {
                     if (i > 0) assertThat(status.getText()).doesNotContain(HOME.toString());
                 }
                 graphics.dispose(); Files.createDirectories(Path.of("build/render-preview"));
-                ImageIO.write(preview, "png", Path.of("build/render-preview/status-breadcrumbs-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
+                ImageIO.write(preview, "png", Path.of("build/render-preview/status-breadcrumbs-" + (themeDark ? "dark" : "light") + ".png").toFile());
             }
             UIManager.put("Label.font", UIManager.getFont("Label.font").deriveFont(40f));
             status.refreshTheme();
@@ -78,8 +77,8 @@ class PathBreadcrumbsTest {
             var breadcrumbs = new PathBreadcrumbs();
             var location = PathBreadcrumbs.Location.local(HOME.resolve("projects/a-very-long-workspace/plugins/remote/src"), HOME);
             breadcrumbs.setLocation(location);
-            for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                ThemeTestSupport.install(theme); SwingUtilities.updateComponentTreeUI(breadcrumbs); breadcrumbs.refreshTheme();
+            for (boolean themeDark : new boolean[]{true, false}) {
+                ThemeTestSupport.install(themeDark); SwingUtilities.updateComponentTreeUI(breadcrumbs); breadcrumbs.refreshTheme();
                 breadcrumbs.setSize(240, 28); breadcrumbs.doLayout();
                 var visible = java.util.Arrays.stream(breadcrumbs.getComponents()).filter(Component::isVisible)
                     .filter(JLabel.class::isInstance).map(JLabel.class::cast).map(JLabel::getText).filter(java.util.Objects::nonNull).toList();
@@ -96,7 +95,7 @@ class PathBreadcrumbsTest {
                 var image = new BufferedImage(600, 40, 2); var g = image.createGraphics();
                 g.setColor(UIManager.getColor("StatusBar.background")); g.fillRect(0, 0, 600, 40); breadcrumbs.paint(g); g.dispose();
                 Files.createDirectories(Path.of("build/render-preview"));
-                ImageIO.write(image, "png", Path.of("build/render-preview/breadcrumbs-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
+                ImageIO.write(image, "png", Path.of("build/render-preview/breadcrumbs-" + (themeDark ? "dark" : "light") + ".png").toFile());
             }
         } finally { UIManager.setLookAndFeel(original); }
     }

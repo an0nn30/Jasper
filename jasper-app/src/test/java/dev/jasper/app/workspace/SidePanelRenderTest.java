@@ -61,26 +61,26 @@ class SidePanelRenderTest {
     @Test void aSidePanelShowsTheThemesToolWindowFieldButtonAndListColours() throws Exception {
         var original = UIManager.getLookAndFeel();
         try {
-            ThemeTestSupport.install(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            ThemeTestSupport.install(false);
             var panel = new HostsLike();
             var area = new ToolWindowArea(new JPanel(), new DockState());
             DockTestSupport.show(area, Slot.LEFT_TOP, panel.root, 280);
-            assertThemeColours(area, panel, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            assertThemeColours(area, panel, false);
 
-            ThemeTestSupport.install(Theme.DARK);
+            ThemeTestSupport.install(true);
             SwingUtilities.updateComponentTreeUI(area);
             area.refreshTheme();
-            assertThemeColours(area, panel, Theme.DARK);
+            assertThemeColours(area, panel, true);
         } finally { UIManager.setLookAndFeel(original); }
     }
 
-    private static void assertThemeColours(ToolWindowArea area, HostsLike panel, Theme theme) {
+    private static void assertThemeColours(ToolWindowArea area, HostsLike panel, boolean dark) {
         area.setSize(900, 400);
         LayoutTestSupport.layoutTree(area);
         var image = new BufferedImage(area.getWidth(), area.getHeight(), BufferedImage.TYPE_INT_ARGB);
         var graphics = image.createGraphics();
         try { area.paint(graphics); } finally { graphics.dispose(); }
-        String name = theme.name() + " ";
+        String name = (dark ? "dark" : "light") + " ";
         int gutter = com.formdev.flatlaf.util.UIScale.scale(6);
         var header = area.headerOf(Slot.LEFT_TOP);
         assertThat(panel.root.getX()).as(name + "retains its gutter after theme changes").isEqualTo(gutter);

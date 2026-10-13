@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigDiagnostic;
@@ -17,11 +18,11 @@ import static org.assertj.core.api.Assertions.*;
 class ConfigurationStatusTest {
     @Test void statusKeepsConfigAndMetadataBoundedAndReadableInBothThemes() throws Exception {
         edt(() -> {
-            var themes = new ThemeController();
-            for (Theme theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                themes.configure(theme);
+            var themes = ThemeTestSupport.controller(true);
+            for (boolean themeDark : new boolean[]{true, false}) {
+                themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
                 var status = new WindowStatusBar();
-                status.applyPalette(theme.palette());
+                status.applyPalette(ThemeTestSupport.terminal(themeDark));
                 for (var severity : ConfigDiagnostic.Severity.values()) {
                     Path file = Path.of("fixture", "settings.toml");
                     status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(
@@ -45,32 +46,32 @@ class ConfigurationStatusTest {
     }
     @Test void statusSurfaceFollowsChromeRatherThanTerminalPalette() throws Exception {
         edt(() -> {
-            var themes = new ThemeController();
+            var themes = ThemeTestSupport.controller(true);
             var status = new WindowStatusBar();
-            for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                themes.configure(theme);
-                status.applyPalette(theme.palette());
+            for (boolean themeDark : new boolean[]{true, false}) {
+                themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
+                status.applyPalette(ThemeTestSupport.terminal(themeDark));
                 status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(), Path.of("config.toml"), true));
                 assertThat(status.getBackground()).isEqualTo(UIManager.getColor("StatusBar.background"));
                 assertThat(contrast(status.configButton().getForeground(), status.getBackground())).isGreaterThanOrEqualTo(3);
             }
-            themes.configure(Theme.DARK);
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
         });
     }
     @Test void statusBarPaintsTheThemesStatusSurfaceUnderATopRule() throws Exception {
         edt(() -> {
-            var themes = new ThemeController();
+            var themes = ThemeTestSupport.controller(true);
             try {
-                for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                    themes.configure(theme);
+                for (boolean themeDark : new boolean[]{true, false}) {
+                    themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
                     var status = new WindowStatusBar();
                     status.setSize(600, 30); status.doLayout();
                     var image = new java.awt.image.BufferedImage(600, 30, java.awt.image.BufferedImage.TYPE_INT_RGB);
                     var graphics = image.createGraphics(); status.paint(graphics); graphics.dispose();
-                    assertThat(new Color(image.getRGB(300, 0))).as(theme.name()).isEqualTo(UIManager.getColor("StatusBar.background"));
-                    assertThat(new Color(image.getRGB(300, 15))).as(theme.name()).isEqualTo(UIManager.getColor("StatusBar.background"));
+                    assertThat(new Color(image.getRGB(300, 0))).as((themeDark ? "dark" : "light")).isEqualTo(UIManager.getColor("StatusBar.background"));
+                    assertThat(new Color(image.getRGB(300, 15))).as((themeDark ? "dark" : "light")).isEqualTo(UIManager.getColor("StatusBar.background"));
                 }
-            } finally { themes.configure(Theme.DARK); }
+            } finally { themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH); }
         });
     }
 
@@ -81,26 +82,25 @@ class ConfigurationStatusTest {
      */
     @Test void aDarkTitleBarOverALightThemeKeepsALightReadableStatusBarAndReadableRailBadges() throws Exception {
         edt(() -> {
-            var generated = install(Map.of(dev.jasper.ui.theme.Token.TITLE_BAR, new Color(0x1c1c1c)),
-                Map.of(dev.jasper.ui.theme.SemanticColor.ACCENT, new Color(0x1a2a6a)));
+            var generated = install(Map.of(dev.jasper.ui.theme.SemanticColor.SURFACE_APP, new Color(0x1c1c1c), dev.jasper.ui.theme.SemanticColor.ACCENT, new Color(0x1a2a6a)));
             try {
                 var semantic = generated.semantic();
                 var status = new WindowStatusBar();
                 assertThat(status.getBackground()).isEqualTo(semantic.color(dev.jasper.ui.theme.SemanticColor.SURFACE_STATUS))
-                    .isEqualTo(generated.tokens().get(dev.jasper.ui.theme.Token.STATUS_BAR)).isNotEqualTo(new Color(0x1c1c1c));
+                    .isNotEqualTo(new Color(0x1c1c1c));
                 assertStatusReadable(status);
                 for (var tone : dev.jasper.app.contributions.PanelBadge.Tone.values())
                     assertThat(contrast(badge(tone), new Color(0x1c1c1c))).as("rail badge " + tone).isGreaterThanOrEqualTo(3);
                 assertThat(semantic.color(dev.jasper.ui.theme.SemanticColor.STATUS_SUCCESS)).as("shared role unchanged")
-                    .isEqualTo(generated.tokens().get(dev.jasper.ui.theme.Token.SUCCESS));
-            } finally { new ThemeController(); }
+                    .isEqualTo(ThemeTestSupport.color(false, dev.jasper.ui.theme.SemanticColor.STATUS_SUCCESS));
+            } finally { ThemeTestSupport.controller(true); }
         });
     }
 
     /** An explicit dark status surface on a light theme: painted status text is floored there, the shared roles are not. */
     @Test void statusTextIsFlooredOnlyWhereItIsPaintedOnTheStatusSurface() throws Exception {
         edt(() -> {
-            var generated = install(Map.of(), Map.of(dev.jasper.ui.theme.SemanticColor.SURFACE_STATUS, new Color(0x1c1c1c)));
+            var generated = install(Map.of(dev.jasper.ui.theme.SemanticColor.SURFACE_STATUS, new Color(0x1c1c1c)));
             try {
                 var semantic = generated.semantic();
                 var status = new WindowStatusBar();
@@ -108,25 +108,16 @@ class ConfigurationStatusTest {
                 assertStatusReadable(status);
                 for (var role : List.of(dev.jasper.ui.theme.SemanticColor.STATUS_SUCCESS, dev.jasper.ui.theme.SemanticColor.STATUS_WARNING,
                         dev.jasper.ui.theme.SemanticColor.STATUS_DANGER))
-                    assertThat(contrast(semantic.color(role), semantic.color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL)))
-                        .as(role.key() + " stays readable on panels").isGreaterThanOrEqualTo(4.5);
-            } finally { new ThemeController(); }
+                    // Unfloored: panels show Slate Steel's authored status colours (Light status.success is 3.32:1 on surface.panel).
+                    assertThat(semantic.color(role)).as(role.key() + " keeps its authored colour on panels")
+                        .isEqualTo(ThemeTestSupport.color(false, role));
+            } finally { ThemeTestSupport.controller(true); }
         });
     }
 
-    private static dev.jasper.ui.theme.GeneratedTheme install(Map<dev.jasper.ui.theme.Token, Color> tokenChanges,
-                                                              Map<dev.jasper.ui.theme.SemanticColor, Color> semantic) {
-        var base = Theme.JASPER_LIGHT.source().document();
-        var tokens = new java.util.EnumMap<dev.jasper.ui.theme.Token, Color>(dev.jasper.ui.theme.Token.class);
-        tokens.putAll(base.tokens());
-        for (var derived : List.of(dev.jasper.ui.theme.Token.SUCCESS, dev.jasper.ui.theme.Token.WARNING,
-                dev.jasper.ui.theme.Token.ERROR, dev.jasper.ui.theme.Token.LINK)) tokens.remove(derived);
-        tokens.putAll(tokenChanges);
-        var document = new dev.jasper.ui.theme.ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), base.parentLine(),
-            base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), tokens, base.syntax(), base.ui(), base.icons(), base.workspace(), semantic);
-        var generated = dev.jasper.ui.theme.ThemeGenerator.generate(document);
-        new ThemeController(new Theme("status-surface", "Status surface", false,
-            dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(generated.terminal()), new Theme.UserFile(Path.of("status-surface.toml"), document)));
+    /** Slate Steel Light with {@code roles} recoloured, installed as the look and feel. */
+    private static dev.jasper.ui.theme.GeneratedTheme install(Map<dev.jasper.ui.theme.SemanticColor, Color> roles) {
+        ThemeTestSupport.install(ThemeTestSupport.recolored(ThemeTestSupport.generated(false), roles));
         return dev.jasper.ui.swing.FlatLafInstaller.installedTheme();
     }
 

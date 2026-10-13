@@ -1,7 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.testsupport.LayoutTestSupport;
-import dev.jasper.app.appearance.Theme;
+
 import java.util.ArrayDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.*;
@@ -36,7 +36,7 @@ class TabHeightTest {
                 assertThat(header.getHeight()).isEqualTo(30);
                 assertThat(owner.windowTabs().getHeight()).isEqualTo(44);
                 assertThat(root.getMinimumSize().height).isEqualTo(originalMinimum + 14);
-                owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT); LayoutTestSupport.layoutTree(root);
+                owner.selectVariant(false); LayoutTestSupport.layoutTree(root);
                 assertThat(header.getHeight()).isEqualTo(30);
                 assertThat(owner.windowTabs().getHeight()).isEqualTo(44);
                 assertThat(owner.currentTab()).isSameAs(tab);

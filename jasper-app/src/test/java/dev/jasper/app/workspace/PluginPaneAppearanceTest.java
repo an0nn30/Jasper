@@ -2,9 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.*;
 import dev.jasper.ui.theme.*;
-import dev.jasper.ui.themeio.*;
 import dev.jasper.app.config.*;
-import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.contributions.Contributions;
 import java.util.ArrayDeque;
 import javax.swing.*;
@@ -14,7 +12,7 @@ import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PluginPaneAppearanceTest {
-    @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> new ThemeController()); }
+    @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> ThemeTestSupport.controller(true)); }
 
     @Test void failureWhilePublishingZoneAlsoRollsBackMount() throws Exception {
         edt(() -> {
@@ -40,8 +38,8 @@ class PluginPaneAppearanceTest {
 
     @Test void newHostedContentUsesCurrentWorkspaceImmediately() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.JASPER_LIGHT);
-            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            var themes = ThemeTestSupport.controller(false);
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var contributions = new Contributions(); owner.connectContributions(contributions);
             var panel = new JPanel(); var list = new JList<>(new String[] {"entry"}); panel.add(list);
@@ -56,14 +54,14 @@ class PluginPaneAppearanceTest {
 
     @Test void sameDarknessUpdatePublishesToRetainedRoutes() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.JASPER_LIGHT);
+            var themes = ThemeTestSupport.controller(false);
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var contributions = new Contributions(); owner.connectContributions(contributions);
             var panel = new JPanel(); var list = new JList<>(new String[] {"entry"}); panel.add(list);
             contributions.content().open("fixture", "pane", "Pane", owner.id(), panel);
-            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             assertThat(dev.jasper.app.platform.ThemeZone.theme(list)).isSameAs(themes.current().workspace());
-            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA, UiFontConfig.defaults());
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             assertThat(dev.jasper.app.platform.ThemeZone.theme(list)).isSameAs(themes.current().workspace());
             assertThat(list.getClientProperty("FlatLaf.style")).isNull();
             assertThat(list.getClientProperty("Jasper.workspaceStyle")).isNull();
@@ -72,8 +70,8 @@ class PluginPaneAppearanceTest {
 
     @Test void themePublicationCanRemovePaneWithoutRestylingDisposedOwner() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.JASPER_LIGHT);
-            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            var themes = ThemeTestSupport.controller(false);
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var contributions = new Contributions(); owner.connectContributions(contributions);
             var removed = new JPanel(); var removedList = new JList<>(new String[] {"remove"}); removed.add(removedList);
@@ -84,24 +82,26 @@ class PluginPaneAppearanceTest {
             removed.addPropertyChangeListener("Jasper.workspaceTheme", event -> {
                 if (armed[0]) { armed[0] = false; contributions.content().remove(entry); }
             });
-            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA, UiFontConfig.defaults());
+            // A light workspace inside the dark chrome, as hosting code may receive any pair (Decision 5).
+            var split = ThemeTestSupport.mixed(ThemeTestSupport.generated(true), ThemeTestSupport.generated(false));
+            owner.applyTheme(split, true);
             assertThat(contributions.content().entries()).doesNotContain(entry);
             assertThat(removed.getClientProperty("Jasper.zone")).isNull();
             assertThat(removed.getClientProperty("Jasper.workspaceTheme")).isNull();
             assertThat(removed.getClientProperty("Jasper.workspace.dark")).isNull();
             assertThat(removed.getClientProperty("Jasper.workspace.foreground")).isNull();
             assertThat(removedList.getClientProperty("Jasper.workspaceStyle")).isNull();
-            assertThat(dev.jasper.app.platform.ThemeZone.theme(retainedList)).isSameAs(themes.current().workspace());
+            assertThat(dev.jasper.app.platform.ThemeZone.theme(retainedList)).isSameAs(split.workspace());
         });
     }
 
     @Test void themePublicationCanMovePaneWithoutOverwritingDestinationZone() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.JASPER_LIGHT);
-            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            var themes = ThemeTestSupport.controller(false);
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var detached = new WindowContent(launcher(new ArrayDeque<>()), null, path -> {}, () -> {}, () -> {},
-                new ThemeController(Theme.JASPER_LIGHT));
+                ThemeTestSupport.controller(true));
             var contributions = new Contributions(); owner.connectContributions(contributions);
             detached.connectContributions(contributions);
             contributions.content().setFactory(separate -> detached.id());
@@ -113,25 +113,28 @@ class PluginPaneAppearanceTest {
             moved.addPropertyChangeListener("Jasper.workspaceTheme", event -> {
                 if (armed[0]) { armed[0] = false; contributions.content().move(entry, true); }
             });
-            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA, UiFontConfig.defaults());
+            // A light workspace inside the dark chrome, as hosting code may receive any pair (Decision 5).
+            var split = ThemeTestSupport.mixed(ThemeTestSupport.generated(true), ThemeTestSupport.generated(false));
+            owner.applyTheme(split, true);
             assertThat(entry.window()).isEqualTo(detached.id());
             assertThat(moved.getClientProperty("Jasper.zone")).isEqualTo("workspace");
             assertThat(moved.getClientProperty("Jasper.workspaceTheme")).isNull();
             assertThat(moved.getClientProperty("Jasper.workspace.dark")).isNull();
             assertThat(moved.getClientProperty("Jasper.workspace.foreground")).isNull();
             assertThat(movedList.getClientProperty("Jasper.workspaceStyle")).isNull();
-            assertThat(dev.jasper.app.platform.ThemeZone.theme(retainedList)).isSameAs(themes.current().workspace());
+            assertThat(dev.jasper.app.platform.ThemeZone.theme(retainedList)).isSameAs(split.workspace());
             detached.close();
         });
     }
 
     @Test void movingContentBetweenWindowsReplacesRouteAndRetainsDocument() throws Exception {
         edt(() -> {
-            var firstTheme = new ThemeController(Theme.JASPER_LIGHT);
-            firstTheme.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            var firstTheme = ThemeTestSupport.controller(false);
+            firstTheme.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             var first = content(launcher(new ArrayDeque<>()), firstTheme);
             var second = new WindowContent(launcher(new ArrayDeque<>()), null, path -> {}, () -> {}, () -> {},
-                new ThemeController(Theme.JASPER_LIGHT));
+                // One installed look per process: the second window shows the same variant.
+                ThemeTestSupport.controller(true));
             var contributions = new Contributions(); first.connectContributions(contributions); second.connectContributions(contributions);
             contributions.content().setFactory(separate -> second.id());
             var text = new JTextArea("before"); var document = text.getDocument();
@@ -152,32 +155,10 @@ class PluginPaneAppearanceTest {
         });
     }
 
-    @Test void completeChromeWithoutOptionalToolWindowKeyStillRoutesHostedPane() throws Exception {
-        edt(() -> {
-            var base = dev.jasper.app.appearance.ThemeFixtures.DARCULA.source().document();
-            var ui = new java.util.LinkedHashMap<>(base.ui());
-            ui.remove("ToolWindow.background");
-            ui.put("Panel.background", "#17232f");
-            var document = new ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), 0,
-                base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), base.tokens(), base.syntax(), ui, base.icons());
-            var chrome = new Theme("optional-pane", "Optional Pane", true, dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(ThemeGenerator.generate(document).terminal()),
-                new Theme.UserFile(java.nio.file.Path.of("optional-pane.toml"), document));
-            var themes = new ThemeController(chrome);
-            themes.configure(chrome, new WorkspaceThemeChoice("Jasper Light"), Theme.JASPER_LIGHT, UiFontConfig.defaults());
-            var owner = content(launcher(new ArrayDeque<>()), themes);
-            var contributions = new Contributions(); owner.connectContributions(contributions);
-            var panel = new JPanel(); var list = new JList<>(new String[] {"entry"}); panel.add(list);
-            contributions.content().open("fixture", "pane", "Pane", owner.id(), panel);
-            assertThat(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR)).isNotNull();
-            assertThat(dev.jasper.app.platform.ThemeZone.theme(list)).isSameAs(themes.current().workspace());
-            assertThat(list.getClientProperty("FlatLaf.style")).isNull();
-        });
-    }
-
     @Test void pluginStopAndWindowCloseReleaseRoutes() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.JASPER_LIGHT);
-            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            var themes = ThemeTestSupport.controller(false);
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var contributions = new Contributions(); owner.connectContributions(contributions);
             var panel = new JPanel(); var list = new JList<>(new String[] {"entry"}); panel.add(list);
@@ -188,32 +169,34 @@ class PluginPaneAppearanceTest {
             owner.close();
             assertThat(panel.getClientProperty("Jasper.zone")).isNull();
             assertThat(list.getClientProperty("Jasper.workspaceStyle")).isNull();
-            themes.configure(Theme.JASPER_LIGHT, WorkspaceThemeChoice.MATCH, null, UiFontConfig.defaults());
+            themes.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             assertThat(list.getClientProperty("Jasper.workspaceStyle")).isNull();
         });
     }
 
     @Test void chromeRebuildThenMatchUsesCurrentChrome() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.JASPER_LIGHT);
+            var themes = ThemeTestSupport.controller(false);
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var contributions = new Contributions(); owner.connectContributions(contributions);
             var panel = new JPanel(); var list = new JList<>(new String[] {"entry"}); panel.add(list);
             contributions.content().open("fixture", "pane", "Pane", owner.id(), panel);
-            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
-            themes.configure(Theme.DARK, new WorkspaceThemeChoice("Jasper Light"), Theme.JASPER_LIGHT, UiFontConfig.defaults());
-            themes.configure(Theme.DARK, WorkspaceThemeChoice.MATCH, null, UiFontConfig.defaults());
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
+            themes.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             assertThat(list.getClientProperty("Jasper.workspaceStyle")).isNull();
-            assertThat(list.getSelectionBackground()).isEqualTo(UIManager.getColor("List.selectionBackground"));
+            // An unfocused list shows the look and feel's inactive selection, as a fresh list does.
+            assertThat(list.getSelectionBackground()).isEqualTo(new JList<>(new String[] {"entry"}).getSelectionBackground());
         });
     }
 
     @Test void sidebarAndAuxiliaryContentRemainChrome() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.JASPER_LIGHT);
+            var themes = ThemeTestSupport.controller(false);
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var railBackground = owner.leftStripe().getBackground();
-            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            // A dark workspace inside the light chrome (Decision 5): the rails stay chrome.
+            owner.applyTheme(ThemeTestSupport.mixed(ThemeTestSupport.generated(false), ThemeTestSupport.generated(true)), true);
             for (var stripe : java.util.List.of(owner.leftStripe(), owner.rightStripe())) {
                 assertThat(stripe.getClientProperty("Jasper.workspaceStyle")).isNull();
                 assertThat(stripe.getBackground()).isEqualTo(railBackground);
@@ -227,8 +210,8 @@ class PluginPaneAppearanceTest {
 
     @Test void hostedDescendantsKeepTheirOwnPresentationWithoutExemption() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.JASPER_LIGHT);
-            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            var themes = ThemeTestSupport.controller(false);
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var contributions = new Contributions(); owner.connectContributions(contributions);
             var root = new JPanel(); var editor = new JPanel(); editor.putClientProperty("Jasper.workspace.exempt", true);

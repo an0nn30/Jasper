@@ -15,8 +15,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(EdtTestExtension.class)
 class ToolWindowKitPanelTest {
     @Test void kitPanelRetainsOneHeaderAndHostActionsAcrossHideAndRemount() {
-        ThemeManager.install(Theme.DARK);
-        var theme = ThemeManager.generated(Theme.DARK);
+        ThemeTestSupport.install(true);
+        var theme = ThemeTestSupport.generated(true);
         try (var bindings = new AppearanceBindings(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }, () -> false);
              var view = new KitView(bindings.context(ThemeRoute.CHROME), spec(), event -> { throw new AssertionError("Host action leaked"); })) {
             var area = new ToolWindowArea(new JPanel(), new DockState());
@@ -51,8 +51,8 @@ class ToolWindowKitPanelTest {
         }
     }
     @Test void everyHostActionRunsExactlyOnceAndOneTitleAndCountRowShows() {
-        ThemeManager.install(Theme.DARK);
-        var theme = ThemeManager.generated(Theme.DARK);
+        ThemeTestSupport.install(true);
+        var theme = ThemeTestSupport.generated(true);
         try (var bindings = new AppearanceBindings(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }, () -> false);
              var view = new KitView(bindings.context(ThemeRoute.CHROME), spec(), event -> { throw new AssertionError("Host action leaked"); })) {
             var area = new ToolWindowArea(new JPanel(), new DockState());
@@ -81,8 +81,8 @@ class ToolWindowKitPanelTest {
     }
 
     @Test void contentOnlyUpdatesKeepTheBorrowedHeaderWithoutRelayingOutTheDock() {
-        ThemeManager.install(Theme.DARK);
-        var theme = ThemeManager.generated(Theme.DARK);
+        ThemeTestSupport.install(true);
+        var theme = ThemeTestSupport.generated(true);
         try (var bindings = new AppearanceBindings(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }, () -> false);
              var view = new KitView(bindings.context(ThemeRoute.CHROME), spec(), event -> {})) {
             var area = new ToolWindowArea(new JPanel(), new DockState());
@@ -137,8 +137,8 @@ class ToolWindowKitPanelTest {
 
     /** SDK 0.14.2 PanelHost.setHeader on a kit panel: main's native header detail, dot and actions in the one borrowed row. */
     @Test void panelHeaderMetadataShowsInTheBorrowedKitHeaderBeforeTheHostActions() {
-        ThemeManager.install(Theme.DARK);
-        var theme = ThemeManager.generated(Theme.DARK);
+        ThemeTestSupport.install(true);
+        var theme = ThemeTestSupport.generated(true);
         try (var bindings = new AppearanceBindings(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }, () -> false);
              var view = new KitView(bindings.context(ThemeRoute.CHROME), spec(), event -> { throw new AssertionError("Header action leaked"); })) {
             var area = new ToolWindowArea(new JPanel(), new DockState());
@@ -181,8 +181,8 @@ class ToolWindowKitPanelTest {
     }
 
     @Test void panelHeaderMetadataIsReleasedOnHideReappliedOnReshowAndReplacementAndClearedOnClose() {
-        ThemeManager.install(Theme.DARK);
-        var theme = ThemeManager.generated(Theme.DARK);
+        ThemeTestSupport.install(true);
+        var theme = ThemeTestSupport.generated(true);
         try (var bindings = new AppearanceBindings(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }, () -> false);
              var view = new KitView(bindings.context(ThemeRoute.CHROME), spec(), event -> {})) {
             var area = new ToolWindowArea(new JPanel(), new DockState());
@@ -240,9 +240,9 @@ class ToolWindowKitPanelTest {
     }
 
     @Test void aThemeChangeRestylesTheBorrowedHeaderDetailAndKeepsItsActions() {
-        ThemeManager.install(Theme.DARK);
-        var dark = ThemeManager.generated(Theme.DARK);
-        var light = ThemeManager.generated(Theme.JASPER_LIGHT);
+        ThemeTestSupport.install(true);
+        var dark = ThemeTestSupport.generated(true);
+        var light = ThemeTestSupport.generated(false);
         try (var bindings = new AppearanceBindings(new ThemePair(dark, dark), failure -> { throw new AssertionError(failure); }, () -> false);
              var view = new KitView(bindings.context(ThemeRoute.CHROME), spec(), event -> {})) {
             var area = new ToolWindowArea(new JPanel(), new DockState());

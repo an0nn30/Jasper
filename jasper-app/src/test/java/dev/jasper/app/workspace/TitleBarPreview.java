@@ -28,23 +28,23 @@ public final class TitleBarPreview {
                     dev.jasper.app.platform.AppIcons.named("SERVER"), "Sessions", java.util.List.of("preview.ssh")));
                 var root = new JRootPane();
                 try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
-                    for (Theme theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                        owner.selectTheme(theme);
+                    for (boolean themeDark : new boolean[]{true, false}) {
+                        owner.selectVariant(themeDark);
                         while (owner.tabStrip().getTabCount() > 1) owner.closeTab(owner.currentTab());
                         owner.currentTab().rename("zsh");
-                        render(root, owner, bar, output, theme, "single", 830);
+                        render(root, owner, bar, output, themeDark, "single", 830);
                         owner.newTab(HOME); owner.currentTab().rename("zsh");
-                        render(root, owner, bar, output, theme, "shell-tabs", 830);
+                        render(root, owner, bar, output, themeDark, "shell-tabs", 830);
                         owner.currentTab().rename("Reviewing the notification implementation");
                         owner.selectTab((TerminalTab) owner.tabStrip().getComponentAt(0));
                         owner.currentTab().rename("tmux");
                         owner.chrome().search().setContext("Claude Code — Reviewing the notification implementation", "Claude Code — Reviewing the notification implementation", dev.jasper.app.platform.AppIcons.named("TERMINAL"));
-                        render(root, owner, bar, output, theme, "tmux-tabs", 830);
-                        render(root, owner, bar, output, theme, "narrow", 450);
+                        render(root, owner, bar, output, themeDark, "tmux-tabs", 830);
+                        render(root, owner, bar, output, themeDark, "narrow", 450);
                         owner.chrome().search().setContext("staging-01:/srv/app : make test", "staging-01:/srv/app : make test",
                             dev.jasper.app.platform.AppIcons.named("SERVER"));
-                        render(root, owner, bar, output, theme, "remote", 830);
-                        render(root, owner, bar, output, theme, "remote-narrow", 450);
+                        render(root, owner, bar, output, themeDark, "remote", 830);
+                        render(root, owner, bar, output, themeDark, "remote-narrow", 450);
                         owner.update();
                     }
                 }
@@ -53,7 +53,7 @@ public final class TitleBarPreview {
         System.out.println(output);
     }
 
-    private static void render(JRootPane root, WindowContent owner, MacTitleBar bar, Path output, Theme theme, String name, int logicalWidth) {
+    private static void render(JRootPane root, WindowContent owner, MacTitleBar bar, Path output, boolean dark, String name, int logicalWidth) {
         int width = com.formdev.flatlaf.util.UIScale.scale(logicalWidth);
         int height = bar.getPreferredSize().height;
         WindowTabsTest.layout(root, width, com.formdev.flatlaf.util.UIScale.scale(620));
@@ -78,7 +78,7 @@ public final class TitleBarPreview {
         var graphics = image.createGraphics();
         try { graphics.scale(2, 2); bar.printAll(graphics); }
         finally { graphics.dispose(); }
-        try { ImageIO.write(image, "png", output.resolve(theme.name().toLowerCase(Locale.ROOT) + "-" + name + ".png").toFile()); }
+        try { ImageIO.write(image, "png", output.resolve((dark ? "slate-steel-dark" : "slate-steel-light") + "-" + name + ".png").toFile()); }
         catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
         // Tabs are owned below the titlebar. Preserve their actual region separately from the strip.
         var tabs = owner.windowTabs();
@@ -87,7 +87,7 @@ public final class TitleBarPreview {
         var tabGraphics = tabImage.createGraphics();
         try { tabGraphics.scale(2, 2); tabs.printAll(tabGraphics); }
         finally { tabGraphics.dispose(); }
-        try { ImageIO.write(tabImage, "png", output.resolve(theme.name().toLowerCase(Locale.ROOT) + "-" + name + "-window-tabs.png").toFile()); }
+        try { ImageIO.write(tabImage, "png", output.resolve((dark ? "slate-steel-dark" : "slate-steel-light") + "-" + name + "-window-tabs.png").toFile()); }
         catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
     }
 }

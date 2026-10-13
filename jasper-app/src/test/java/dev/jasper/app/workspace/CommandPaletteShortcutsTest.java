@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
@@ -168,7 +169,7 @@ class CommandPaletteShortcutsTest {
         edt(() -> {
             var previous = KeyboardFocusManager.getCurrentKeyboardFocusManager();
             var laf = UIManager.getLookAndFeel();
-            dev.jasper.app.appearance.ThemeTestSupport.install(dev.jasper.app.appearance.Theme.DARK);
+            dev.jasper.app.appearance.ThemeTestSupport.install(true);
             try (var owner = owner(System.getProperty("os.name").startsWith("Mac"))) {
                 var root = install(owner); owner.commandPalette().toggle();
                 var field = dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component());
@@ -232,7 +233,7 @@ class CommandPaletteShortcutsTest {
                         } catch (java.io.IOException failure) { throw new java.util.concurrent.CompletionException(failure); }
                     }, "controlled input fixture");
                     owner[0] = new WindowContent(launcher, directory, path -> {}, () -> {}, () -> {},
-                        new ThemeController(), KeyBindings.defaults(mac), new CommandHistory(), mac);
+                        ThemeTestSupport.controller(true), KeyBindings.defaults(mac), new CommandHistory(), mac);
                     install(owner[0]);
                 });
                 pending.remove().run();
@@ -294,7 +295,7 @@ class CommandPaletteShortcutsTest {
     static int primary(boolean mac) { return mac ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK; }
     static WindowContent owner(boolean mac) {
         return new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {},
-            new ThemeController(), KeyBindings.defaults(mac), new CommandHistory(), mac);
+            ThemeTestSupport.controller(true), KeyBindings.defaults(mac), new CommandHistory(), mac);
     }
     static JRootPane install(WindowContent owner) {
         var root = new JRootPane(); root.setContentPane(owner); owner.installRootBindings(root);

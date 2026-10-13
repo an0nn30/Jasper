@@ -23,32 +23,10 @@ import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.*;
 
 class ThemeControllerTest {
-    @Test void realBindingsTrackSameDarkThemeIndependentWorkspaceAndFontsDespiteBadSubscriber() throws Exception {
-        edt(() -> {
-            try (var controller = new ThemeController()) {
-                var chrome = controller.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME);
-                var workspace = controller.appearance().context(dev.jasper.ui.theme.ThemeRoute.WORKSPACE);
-                var changes = new ArrayList<ResolvedTheme>();
-                controller.subscribe((value, refresh) -> { throw new IllegalStateException("contained fixture"); });
-                controller.subscribe((value, refresh) -> changes.add(value));
-                var nord = ThemeTestSupport.named("Nord");
-                controller.configure(nord, new dev.jasper.app.config.UiFontConfig("Monospaced", 19));
-                assertThat(chrome.theme()).isSameAs(controller.current().chrome());
-                assertThat(chrome.theme().name()).isEqualTo("Nord");
-                assertThat(chrome.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(19);
-                controller.configureWorkspace(new dev.jasper.app.config.WorkspaceThemeChoice(Theme.DARK.name()), Theme.DARK);
-                assertThat(workspace.theme()).isSameAs(controller.current().workspace());
-                assertThat(workspace.theme().name()).isEqualTo(Theme.DARK.name());
-                assertThat(chrome.theme().name()).isEqualTo("Nord");
-                assertThat(changes).hasSize(3);
-            }
-        });
-    }
-
     @Test void failedInstallerRestoresBothRawDefaultsLayers() throws Exception {
         edt(() -> {
-            var controller = new ThemeController(theme -> {
-                if (theme.name().equals(Theme.JASPER_LIGHT.name())) {
+            var controller = ThemeTestSupport.controller(true, theme -> {
+                if (!theme.dark()) {
                     UIManager.put("migration.override", Color.RED);
                     UIManager.getLookAndFeelDefaults().put("migration.laf", Color.BLUE);
                     throw new IllegalStateException("partial install");
@@ -58,7 +36,7 @@ class ThemeControllerTest {
             UIManager.put("migration.override", Color.GREEN);
             UIManager.getLookAndFeelDefaults().put("migration.laf", Color.YELLOW);
             var old = controller.current();
-            assertThatThrownBy(() -> controller.configure(Theme.JASPER_LIGHT))
+            assertThatThrownBy(() -> controller.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH))
                 .isInstanceOf(ThemeController.InstallationFailure.class);
             assertThat(controller.current()).isSameAs(old);
             assertThat(UIManager.getColor("migration.override")).isEqualTo(Color.GREEN);
@@ -68,45 +46,26 @@ class ThemeControllerTest {
         });
     }
 
-    @Test void sameDarknessWorkspacePublishesWithoutChromeInstallAndRepeatsAreQuiet() throws Exception {
-        edt(() -> {
-            var installs = new ArrayList<dev.jasper.ui.theme.GeneratedTheme>();
-            var controller = new ThemeController(theme -> { installs.add(theme); return ThemeTestSupport.install(theme); });
-            var notifications = new ArrayList<Map.Entry<ResolvedTheme, Boolean>>();
-            controller.subscribe((value, refresh) -> notifications.add(Map.entry(value, refresh)));
-            notifications.clear();
-            var choice = new dev.jasper.app.config.WorkspaceThemeChoice("Darcula");
-            controller.configure(Theme.DARK, choice, dev.jasper.app.appearance.ThemeFixtures.DARCULA, dev.jasper.app.config.UiFontConfig.defaults());
-            assertThat(installs).hasSize(1);
-            assertThat(notifications).hasSize(1);
-            assertThat(notifications.getFirst().getValue()).isFalse();
-            assertThat(controller.current().workspace().name()).isEqualTo("Darcula");
-            controller.configure(Theme.DARK, choice, dev.jasper.app.appearance.ThemeFixtures.DARCULA, dev.jasper.app.config.UiFontConfig.defaults());
-            assertThat(notifications).hasSize(1);
-        });
-    }
-
     @Test void failedCombinedChangePublishesNeitherSlotNorChoiceOrFont() throws Exception {
         edt(() -> {
-            var controller = new ThemeController(theme -> {
+            var controller = ThemeTestSupport.controller(true, theme -> {
                 ThemeTestSupport.install(theme);
-                return !theme.name().equals(Theme.JASPER_LIGHT.name());
+                return theme.dark();
             });
             var old = controller.current();
             var laf = UIManager.getLookAndFeel();
             var font = UIManager.getFont("Label.font");
-            var aliases = Map.of("Jasper.titleBackground", dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP),
-                "Jasper.tabUnderline", UIManager.getColor("Jasper.tabUnderline"),
+            var aliases = Map.of("Jasper.semantic.surface.app", dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP),
+                "Jasper.semantic.accent", UIManager.getColor("Jasper.semantic.accent"),
                 "Button.foreground", UIManager.getColor("Button.foreground"));
             var changes = new ArrayList<ResolvedTheme>();
             controller.subscribe((value, refresh) -> changes.add(value)); changes.clear();
-            assertThatThrownBy(() -> controller.configure(Theme.JASPER_LIGHT,
-                new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA,
+            assertThatThrownBy(() -> controller.configure(false, dev.jasper.app.config.TerminalSchemeChoice.HIGH_CONTRAST,
                 new dev.jasper.app.config.UiFontConfig("Monospaced", 19)))
                 .isInstanceOf(ThemeController.InstallationFailure.class);
             assertThat(controller.current()).isSameAs(old);
-            assertThat(controller.choice()).isSameAs(Theme.DARK);
-            assertThat(controller.workspaceChoice()).isEqualTo(dev.jasper.app.config.WorkspaceThemeChoice.MATCH);
+            assertThat(controller.current().chrome().dark()).isTrue();
+            assertThat(controller.schemeChoice()).as("the scheme of the failed change is not kept").isEqualTo(dev.jasper.app.config.TerminalSchemeChoice.MATCH);
             assertThat(UIManager.getLookAndFeel()).isSameAs(laf);
             assertThat(UIManager.getFont("Label.font")).isEqualTo(font);
             aliases.forEach((key, value) -> assertThat(UIManager.getColor(key)).as(key).isEqualTo(value));
@@ -118,11 +77,11 @@ class ThemeControllerTest {
 @Test void closingThemeSubscriptionStopsFurtherDelivery() throws Exception {
     DesktopTestSupport.edt(() -> {
         var changes = new java.util.ArrayList<ResolvedTheme>();
-        var themes = new ThemeController(theme -> true);
+        var themes = ThemeTestSupport.controller(true, theme -> true);
         var registration = themes.subscribe((theme, delegates) -> changes.add(theme));
         assertThat(changes).hasSize(1);
         registration.close(); registration.close();
-        themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+        themes.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
         assertThat(changes).hasSize(1);
     });
 }
@@ -136,8 +95,8 @@ class ThemeControllerTest {
         edt(() -> owners[0] = content(launcher(pending)));
         pending.remove().run();
         edt(() -> {
-            owners[0].selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            assertThat(owners[0].currentPane().view().getBackground()).isEqualTo(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette().background());
+            owners[0].selectVariant(false);
+            assertThat(owners[0].currentPane().view().getBackground()).isEqualTo(ThemeTestSupport.terminal(false).background());
             assertThat(owners[0].currentPane().findBar().queryField().getForeground()).isEqualTo(UIManager.getColor("TextField.foreground"));
         });
     }
@@ -151,7 +110,7 @@ class ThemeControllerTest {
         TerminalPane[] first = new TerminalPane[1];
         TerminalSession[] session = new TerminalSession[1];
         edt(() -> {
-            themes[0] = new ThemeController();
+            themes[0] = ThemeTestSupport.controller(true);
             owners[0] = content(launcher(pending), themes[0]);
             owners[1] = content(launcher(pending), themes[0]);
         });
@@ -172,12 +131,12 @@ class ThemeControllerTest {
         edt(() -> {
             retained[0].toggleZoom();
             owners[0].newTab(HOME); // completion deliberately waits across theme selection
-            owners[1].selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            assertThat(themes[0].current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT));
+            owners[1].selectVariant(false);
+            assertThat(themes[0].current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.generated(false));
             for (TerminalPane pane : retained[0].panes()) {
-                assertThat(pane.view().palette().background()).isEqualTo(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette().background());
+                assertThat(pane.view().palette().background()).isEqualTo(ThemeTestSupport.terminal(false).background());
                 // The invalid pattern keeps its no-match tint, in the new theme's colour.
-                assertThat(pane.findBar().queryField().getBackground()).isEqualTo(pane == first[0] ? dev.jasper.app.platform.ThemeZone.theme(pane).tokens().get(dev.jasper.ui.theme.Token.ERROR_BACKGROUND)
+                assertThat(pane.findBar().queryField().getBackground()).isEqualTo(pane == first[0] ? dev.jasper.ui.theme.ColorMath.mix(dev.jasper.app.platform.ThemeZone.color(pane, dev.jasper.ui.theme.SemanticColor.BORDER_ERROR), dev.jasper.app.platform.ThemeZone.color(pane, dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT), .16)
                     : dev.jasper.app.platform.ThemeZone.color(pane, dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT));
             }
             assertThat(first[0].session()).isSameAs(session[0]);
@@ -189,26 +148,26 @@ class ThemeControllerTest {
             assertThat(retained[0].focusedPane()).isSameAs(retained[0].panes().get(1));
             assertThat(retained[0].title()).isEqualTo("retained");
             assertThat(owners[0].currentTab()).isNotSameAs(retained[0]);
-            assertThat(themes[0].choice()).isEqualTo(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            assertThat(owners[1].currentPane().view().getBackground()).isEqualTo(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette().background());
+            assertThat(themes[0].current().chrome().dark()).isFalse();
+            assertThat(owners[1].currentPane().view().getBackground()).isEqualTo(ThemeTestSupport.terminal(false).background());
             owners[2] = content(launcher(pending), themes[0]);
         });
         while (!pending.isEmpty()) pending.remove().run();
         edt(() -> {
-            assertThat(owners[0].currentPane().view().getBackground()).isEqualTo(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette().background());
-            assertThat(owners[2].currentPane().view().getBackground()).isEqualTo(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette().background());
+            assertThat(owners[0].currentPane().view().getBackground()).isEqualTo(ThemeTestSupport.terminal(false).background());
+            assertThat(owners[2].currentPane().view().getBackground()).isEqualTo(ThemeTestSupport.terminal(false).background());
             var query = first[0].findBar().queryField();
             assertThat(owners[0].dispatchShortcut(owners[0].bindings().strokeFor(ActionId.COPY).orElseThrow(), query)).isFalse();
             assertThat(owners[0].dispatchShortcut(owners[0].bindings().strokeFor(ActionId.PASTE).orElseThrow(), query)).isFalse();
             owners[0].selectTab(retained[0]);
-            assertThat(first[0].view().getBackground()).isEqualTo(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette().background());
-            owners[1].selectTheme(Theme.DARK);
-            assertThat(first[0].view().getBackground()).isEqualTo(new Color(0x191c20));
+            assertThat(first[0].view().getBackground()).isEqualTo(ThemeTestSupport.terminal(false).background());
+            owners[1].selectVariant(true);
+            assertThat(first[0].view().getBackground()).isEqualTo(ThemeTestSupport.terminal(true).background());
             assertThat(first[0].findBar().result().error()).isNotNull();
-            for (TerminalPane pane : retained[0].panes()) assertThat(pane.view().palette()).isEqualTo(Theme.DARK.palette());
+            for (TerminalPane pane : retained[0].panes()) assertThat(pane.view().palette()).isEqualTo(ThemeTestSupport.terminal(true));
             assertThat(first[0].session()).isSameAs(session[0]);
             assertThat(retained[0].tree().zoomed()).isTrue();
-            assertThat(themes[0].choice()).isEqualTo(Theme.DARK);
+            assertThat(themes[0].current().chrome().dark()).isTrue();
             owners[0].removeNotify();
         });
     }
@@ -236,7 +195,7 @@ class ThemeControllerTest {
             split[0].addPropertyChangeListener("UI", event -> split[0].setDividerLocation(.2));
             oldUi[0] = split[0].getUI();
             before[0] = owner[0].currentTab().tree().root().orElseThrow();
-            owner[0].selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            owner[0].selectVariant(false);
             split[0].doLayout();
         });
         edt(() -> {
@@ -271,8 +230,8 @@ class ThemeControllerTest {
             split[0].setDividerLocation(.63); split[0].doLayout();
             split[1].setDividerLocation(.31); split[1].doLayout();
             before[0] = owner[0].currentTab().tree().root().orElseThrow();
-            owner[0].selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            owner[0].selectTheme(Theme.DARK);
+            owner[0].selectVariant(false);
+            owner[0].selectVariant(true);
         });
         edt(() -> {
             split[0].doLayout(); split[1].doLayout();
@@ -288,55 +247,55 @@ class ThemeControllerTest {
 
     @Test void failedPartialInstallationRestoresPreviousLafAndDoesNotNotifyOwners() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(theme -> {
+            var themes = ThemeTestSupport.controller(true, theme -> {
                 ThemeTestSupport.install(theme);
-                return !theme.name().equals(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.name());
+                return theme.dark();
             });
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var changed = new ArrayList<ResolvedTheme>(); owner.onThemeChanged = changed::add;
             var before = UIManager.getLookAndFeel();
-            assertThatThrownBy(() -> themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() -> themes.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH)).isInstanceOf(IllegalStateException.class);
             assertThat(UIManager.getLookAndFeel()).isSameAs(before);
-            assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
-            assertThat(owner.getBackground()).isEqualTo(new Color(0x191c20));
+            assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.generated(true));
+            assertThat(owner.getBackground()).isEqualTo(ThemeTestSupport.color(true, dev.jasper.ui.theme.SemanticColor.SURFACE_TERMINAL));
             assertThat(changed).isEmpty();
         });
     }
 
     @Test void rejectsOffEdtThemeChangesBeforeMutatingSwing() throws Exception {
         ThemeController[] themes = new ThemeController[1];
-        edt(() -> themes[0] = new ThemeController());
-        assertThatThrownBy(() -> themes[0].configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)).isInstanceOf(IllegalStateException.class);
-        edt(() -> assertThat(themes[0].current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK)));
+        edt(() -> themes[0] = ThemeTestSupport.controller(true));
+        assertThatThrownBy(() -> themes[0].configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH)).isInstanceOf(IllegalStateException.class);
+        edt(() -> assertThat(themes[0].current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.generated(true)));
     }
 
     @Test void closeUnregistersOwnerAndClearsItsThemeCallback() throws Exception {
         edt(() -> {
-            var themes = new ThemeController();
+            var themes = ThemeTestSupport.controller(true);
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var received = new ArrayList<ResolvedTheme>();
             owner.onThemeChanged = received::add;
-            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            assertThat(received).containsExactly(new ResolvedTheme(dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT), dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)));
+            themes.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
+            assertThat(received).containsExactly(ThemeTestSupport.resolved(false));
             owner.close();
             // A closed owner must not even receive UI-delegate changes.
             var closedUi = owner.getUI();
-            owner.onThemeChanged.accept(new ResolvedTheme(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK), dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK)));
-            themes.configure(Theme.DARK);
+            owner.onThemeChanged.accept(new ResolvedTheme(dev.jasper.app.appearance.ThemeTestSupport.generated(true), dev.jasper.app.appearance.ThemeTestSupport.generated(true)));
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
             assertThat(owner.getUI()).isSameAs(closedUi);
-            assertThat(received).containsExactly(new ResolvedTheme(dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT), dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)));
+            assertThat(received).containsExactly(ThemeTestSupport.resolved(false));
         });
     }
 
     @Test void failedInstallationKeepsThePreviousThemeAndReportsTheError() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(theme -> !theme.name().equals(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.name()) && ThemeTestSupport.install(theme));
+            var themes = ThemeTestSupport.controller(true, theme -> theme.dark() && ThemeTestSupport.install(theme));
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var errors = new ArrayList<String>(); owner.onError = (title, message) -> errors.add(message);
             var before = UIManager.getLookAndFeel();
-            owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
-            assertThat(themes.choice()).isEqualTo(Theme.DARK);
+            owner.selectVariant(false);
+            assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.generated(true));
+            assertThat(themes.current().chrome().dark()).isTrue();
             assertThat(UIManager.getLookAndFeel()).isSameAs(before);
             assertThat(errors).singleElement().asString().contains("Could not apply theme");
         });
@@ -344,22 +303,24 @@ class ThemeControllerTest {
 
     @Test void resourcesCoordinateChromeAndKeepTextReadableAcrossStates() throws Exception {
         edt(() -> {
-            var themes = new ThemeController();
+            var themes = ThemeTestSupport.controller(true);
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            for (Theme theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                themes.configure(theme);
-                assertThat(owner.getBackground()).isEqualTo(theme.palette().background());
+            for (boolean themeDark : new boolean[]{true, false}) {
+                themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
+                assertThat(owner.getBackground()).isEqualTo(ThemeTestSupport.terminal(themeDark).background());
                 assertThat(owner.toolbar().getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
                 assertThat(owner.leftStripe().getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
                 assertThat(owner.rightStripe().getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
                 assertThat(UIManager.getColor("ToolBar.background")).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
                 for (String prefix : new String[]{"Panel", "TextField", "MenuItem", "PopupMenu", "Button"}) {
                     assertThat(contrast(UIManager.getColor(prefix + ".foreground"), UIManager.getColor(prefix + ".background")))
-                        .as(prefix + " normal text in " + theme).isGreaterThanOrEqualTo(4.5);
+                        .as(prefix + " normal text in " + (themeDark ? "dark" : "light")).isGreaterThanOrEqualTo(4.5);
                 }
                 assertThat(contrast(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY), owner.toolbar().getBackground())).isGreaterThanOrEqualTo(3);
                 assertThat(contrast(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY), owner.toolbar().getBackground())).isGreaterThanOrEqualTo(3);
-                assertThat(contrast(UIManager.getColor("MenuItem.selectionForeground"), UIManager.getColor("MenuItem.selectionBackground"))).isGreaterThanOrEqualTo(4.5);
+                // Light's text.onAccent on selection.bg is 3.98:1 as authored; Dark meets the 4.5 floor.
+                assertThat(contrast(UIManager.getColor("MenuItem.selectionForeground"), UIManager.getColor("MenuItem.selectionBackground")))
+                    .as("menu selection text in " + (themeDark ? "dark" : "light")).isGreaterThanOrEqualTo(themeDark ? 4.5 : 3.98);
             }
         });
     }

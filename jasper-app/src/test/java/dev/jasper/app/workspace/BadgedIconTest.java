@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
@@ -19,11 +20,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(EdtTestExtension.class)
 class BadgedIconTest {
-    @AfterEach void resetTheme() throws Exception { SwingUtilities.invokeAndWait(ThemeController::new); }
+    @AfterEach void resetTheme() throws Exception { SwingUtilities.invokeAndWait(() -> ThemeTestSupport.controller(true)); }
 
     @Test void theDotTakesItsToneColourInDarkAndLightThemes() {
-        for (Theme theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-            new ThemeController(theme);
+        for (boolean themeDark : new boolean[]{true, false}) {
+            ThemeTestSupport.controller(themeDark);
             for (PanelBadge.Tone tone : PanelBadge.Tone.values()) {
                 var icon = new BadgedIcon(new ImageIcon(new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB)), tone);
                 var image = new BufferedImage(icon.getIconWidth(), icon.getIconHeight(), BufferedImage.TYPE_INT_ARGB);
@@ -37,10 +38,10 @@ class BadgedIconTest {
                     ? dev.jasper.ui.theme.SemanticColor.STATUS_DANGER : dev.jasper.ui.theme.SemanticColor.ACCENT,
                     dev.jasper.ui.theme.SemanticColor.SURFACE_APP, dev.jasper.ui.theme.SurfaceContrast.INDICATOR);
                 Color painted = new Color(image.getRGB(icon.getIconWidth() - dot / 2 - 1, dot / 2), true);
-                assertThat(painted).as("%s %s", theme, tone).isEqualTo(new Color(expected.getRGB()));
+                assertThat(painted).as("%s %s", (themeDark ? "dark" : "light"), tone).isEqualTo(new Color(expected.getRGB()));
                 assertThat(dev.jasper.ui.theme.ColorMath.contrast(painted, palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP)))
-                    .as("%s %s on the rail", theme, tone).isGreaterThanOrEqualTo(3);
-                if (theme == Theme.DARK) assertThat(expected).isEqualTo(palette.color(tone == PanelBadge.Tone.ERROR
+                    .as("%s %s on the rail", (themeDark ? "dark" : "light"), tone).isGreaterThanOrEqualTo(3);
+                if (themeDark) assertThat(expected).isEqualTo(palette.color(tone == PanelBadge.Tone.ERROR
                     ? dev.jasper.ui.theme.SemanticColor.STATUS_DANGER : dev.jasper.ui.theme.SemanticColor.ACCENT));
             }
         }

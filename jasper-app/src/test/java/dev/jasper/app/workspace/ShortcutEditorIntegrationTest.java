@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.application.ConfigurationTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
@@ -40,7 +41,7 @@ class ShortcutEditorIntegrationTest {
             int[] opened = {0};
             try {
                 edt(() -> {
-                    var themes = new ThemeController();
+                    var themes = ThemeTestSupport.controller(true);
                     config[0] = new ConfigurationTestSupport(themes, service);
                     var contributions = new Contributions();
                     page[0] = new KeymapPage(new KeymapPage.Hooks(contributions, () -> config[0].snapshot().keybindings(), Map::of, true,

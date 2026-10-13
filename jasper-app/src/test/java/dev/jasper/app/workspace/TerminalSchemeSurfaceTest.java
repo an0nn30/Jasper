@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.*;
 
@@ -16,7 +17,7 @@ import org.junit.jupiter.api.condition.OS;
 
 /** spec 5.3, Review Focus 3: a High Contrast terminal under the Light UI: only the text area is black. */
 class TerminalSchemeSurfaceTest {
-    @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> new ThemeController()); }
+    @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> ThemeTestSupport.controller(true)); }
 
     @Test @DisabledOnOs(OS.WINDOWS)
     void aSchemeColoursTheTextAreaAndTheWindowStaysOnTheUiVariant() throws Exception {

@@ -1,7 +1,7 @@
 package dev.jasper.app.workspace;
 
 import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.app.appearance.Theme;
+
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.dock.DockGeometry;
 import dev.jasper.app.dock.DockState;
@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(EdtTestExtension.class)
 class ToolWindowAreaTest {
     @org.junit.jupiter.api.BeforeEach void installModuleTheme() throws Exception {
-        javax.swing.SwingUtilities.invokeAndWait(() -> dev.jasper.app.appearance.ThemeManager.install(dev.jasper.app.appearance.Theme.DARK));
+        javax.swing.SwingUtilities.invokeAndWait(() -> dev.jasper.app.appearance.ThemeTestSupport.install(true));
     }
 
     private static Rectangle in(ToolWindowArea area, Component component) {
@@ -213,8 +213,8 @@ class ToolWindowAreaTest {
             DockTestSupport.show(area, Slot.LEFT_TOP, panel, 250);
             List<DockState.Change> changes = new ArrayList<>();
             state.addListener(changes::add);
-            for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                ThemeTestSupport.install(theme);
+            for (boolean themeDark : new boolean[]{true, false}) {
+                ThemeTestSupport.install(themeDark);
                 SwingUtilities.updateComponentTreeUI(area);
                 area.refreshTheme();
                 layout(area);
@@ -226,7 +226,7 @@ class ToolWindowAreaTest {
                 assertThat(gap).isEqualTo(new Rectangle(250, 0, 6, 600));
                 int chrome = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP).getRGB();
                 for (int x = gap.x; x < gap.x + gap.width; x++) for (int y = gap.y; y < gap.y + gap.height; y += 7)
-                    assertThat(image.getRGB(x, y)).as("the gap has no border or grip, %s", theme).isEqualTo(chrome);
+                    assertThat(image.getRGB(x, y)).as("the gap has no border or grip, %s", (themeDark ? "dark" : "light")).isEqualTo(chrome);
                 assertThat(divider.getCursor().getType()).isEqualTo(Cursor.E_RESIZE_CURSOR);
             }
 

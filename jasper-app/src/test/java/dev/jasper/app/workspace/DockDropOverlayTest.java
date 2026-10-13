@@ -235,15 +235,8 @@ class DockDropOverlayTest {
 
     private void installDragTheme(Color accent, Map<String, Object> colors) {
         if (originalLookAndFeel == null) originalLookAndFeel = UIManager.getLookAndFeel();
-        var base = Theme.DARK.source().document();
-        var ui = new java.util.LinkedHashMap<>(base.ui());
-        ui.remove("DragAndDrop.areaBackground"); ui.remove("DragAndDrop.borderColor"); ui.putAll(colors);
-        var document = new dev.jasper.ui.theme.ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), base.parentLine(),
-            base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), base.tokens(), base.syntax(), ui, base.icons(), base.workspace(),
-            Map.of(dev.jasper.ui.theme.SemanticColor.ACCENT, accent));
-        var generated = dev.jasper.ui.theme.ThemeGenerator.generate(document);
-        ThemeTestSupport.install(new Theme("drag-test", "Drag test", true, dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(generated.terminal()),
-            new Theme.UserFile(java.nio.file.Path.of("drag.toml"), document)));
+        ThemeTestSupport.install(ThemeTestSupport.withUiKeys(ThemeTestSupport.recolored(ThemeTestSupport.generated(true),
+            Map.of(dev.jasper.ui.theme.SemanticColor.ACCENT, accent)), colors));
     }
 
     @Test void theGhostFollowsTheCursorAndClearRemovesEverything() {

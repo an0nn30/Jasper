@@ -33,8 +33,8 @@ class FolderTabScaleTest {
                 assertThat(image.getRGB(entry.getX() + UIScale.scale(10), strip.getHeight() - UIScale.scale(2)))
                     .as("selected surface has no underline").isEqualTo(body);
                 assertThat(image.getRGB(UIScale.scale(400) - 1, UIScale.scale(4)))
-                    .as("vertical separator follows scale").isEqualTo(owner.theme().workspace().tokens()
-                        .get(dev.jasper.ui.theme.Token.BORDER).getRGB());
+                    .as("vertical separator follows scale").isEqualTo(owner.theme().workspace().semantic()
+                        .color(dev.jasper.ui.theme.SemanticColor.BORDER_WINDOW).getRGB());
                 assertThat(WindowTabsTest.named(strip, "newTab")).isNull();
                 assertThat(WindowTabsTest.named(strip, "close:second").getHeight()).isGreaterThanOrEqualTo(UIScale.scale(16));
             }

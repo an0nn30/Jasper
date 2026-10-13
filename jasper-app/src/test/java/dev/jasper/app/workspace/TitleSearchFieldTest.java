@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Color;
@@ -17,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(EdtTestExtension.class)
 class TitleSearchFieldTest {
     @BeforeAll static void theme() throws Exception {
-        javax.swing.SwingUtilities.invokeAndWait(() -> ThemeTestSupport.install(Theme.DARK));
+        javax.swing.SwingUtilities.invokeAndWait(() -> ThemeTestSupport.install(true));
     }
 
     @Test void showsTheContextWithAFallbackAndATooltipThatIsNeverHtml() {
