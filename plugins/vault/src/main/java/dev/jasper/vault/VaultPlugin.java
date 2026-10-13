@@ -3,8 +3,6 @@ package dev.jasper.vault;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
-import dev.jasper.sdk.notifications.DisplayMode;
-import dev.jasper.sdk.notifications.GroupSpec;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
@@ -26,6 +24,7 @@ import dev.jasper.vault.store.DeviceSecrets;
 import dev.jasper.vault.store.FileStore;
 import dev.jasper.vault.store.KeychainStore;
 import dev.jasper.vault.store.VaultFile;
+import dev.jasper.vault.ui.CopyCards;
 import dev.jasper.vault.ui.GrantPanel;
 import dev.jasper.vault.ui.PasswordPanel;
 import dev.jasper.vault.ui.PickerPanel;
@@ -127,8 +126,7 @@ public class VaultPlugin implements Plugin {
         lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock"))
             .withDefaultBinding("cmd+shift+l"), invoked -> lock.lock());
         lockAction.setEnabled(false);
-        var copies = context.notifications().group(new GroupSpec(VaultScope.COPIES, "Vault copies", DisplayMode.CARD));
-        scope = new VaultScope(lock, service, context.platform(), copies, this::open, this::unlockThenSearch);
+        scope = new VaultScope(lock, service, CopyCards.declare(context), this::open, this::unlockThenSearch);
         context.palette().register(scope);
         manager = new VaultManager(lock, context.background(), ui, this::vaultChanged);
         managerWindow = new VaultManagerWindow(context, lock, manager, service, this::managerStatus, this::showGenerator);

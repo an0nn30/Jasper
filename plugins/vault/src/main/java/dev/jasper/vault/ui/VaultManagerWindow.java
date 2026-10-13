@@ -11,6 +11,7 @@ import dev.jasper.vault.api.LockState;
 import dev.jasper.vault.lock.LockManager;
 import dev.jasper.vault.model.Account;
 import dev.jasper.vault.model.Note;
+import dev.jasper.vault.model.ManagedSshKey;
 import dev.jasper.vault.model.SshKey;
 import dev.jasper.vault.service.UnlockPrompt;
 import dev.jasper.vault.service.VaultService;
@@ -36,6 +37,7 @@ public final class VaultManagerWindow implements AutoCloseable {
     private final Supplier<Status> status;
     private final Runnable generate;
     private final EntryPresenter editors;
+    private final CopyCards copies;
     private PluginWindow window;
     private WindowHandle owner;
     private UnlockPrompt unlockPrompt;
@@ -46,6 +48,7 @@ public final class VaultManagerWindow implements AutoCloseable {
                               VaultService service, Supplier<Status> status, Runnable generate) {
         this.context = context; this.lock = lock; this.manager = manager; this.service = service;
         this.status = status; this.generate = generate;this.editors=new EntryPresenter(context);
+        this.copies = CopyCards.declare(context);
     }
     public boolean isOpen() { return window != null; }
     /** The plugin's kit, for the forms this window owns. */
@@ -57,7 +60,7 @@ public final class VaultManagerWindow implements AutoCloseable {
             var shown = new ManagerPanel(context.kit(), manager::entry, this::add, this::edit, this::delete, this::copyPublic,
                 grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, lock::lock,
                 () -> service.requestUnlock(this.owner), this::close);
-            shown.secretClipboard(text -> context.platform().copySecret(text));
+            shown.copies(copies);
             panel = shown;
             window.setContent(shown.view());
             window.setTitleActions(Optional.of(shown.titleActions()));
@@ -153,7 +156,12 @@ public final class VaultManagerWindow implements AutoCloseable {
         }));
     }
     private void copyPublic(UUID id) {
-        CompletableFuture<Void> copied = manager.publicKey(id).thenAccept(text -> context.platform().copy(text));
+        String name = manager.entry(id).map(entry -> switch (entry) {
+            case SshKey key -> key.name();
+            case ManagedSshKey key -> key.name();
+            default -> "";
+        }).orElse("");
+        CompletableFuture<Void> copied = manager.publicKey(id).thenAccept(text -> copies.plain("public key", name, text));
         report("Could not copy the public key", copied);
     }
     private void report(String title, CompletableFuture<Void> operation) {
