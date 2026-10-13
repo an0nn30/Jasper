@@ -1,5 +1,14 @@
 # Jasper — Status and Handoff
 
+**Copy cards in the Vault manager — 2026-10-13** (`claude/vault-manager-copy-cards`, worktree
+`.claude/worktrees/vault-manager-copy-cards`; bounded change, design approved in chat, no spec or plan). The manager's
+Username, Password and Secure note copy buttons post the palette's card ("Copied the password for prod" / "Copied to
+Clipboard for 30 seconds"; a note reads "Copied the note for <name>"), and Copy Public Key posts "Copied the public key
+for <name>" with no second line, since a public key is an ordinary copy that Jasper does not clear. All go in the Vault
+copies group. The wording lives in one place, `dev.jasper.vault.ui.CopyCards`, which the palette scope and the manager
+share. `./gradlew check --continue`: **9,778 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched. GUI check for the user: copy each of the four from
+the manager and read the cards. Merged to `main`.
+
 **Tool windows in Zen, and more plugin commands — 2026-10-13** (`claude/zen-panels-actions`, worktree
 `.claude/worktrees/zen-panels-actions`; design agreed in chat, no spec). Zen now hides the showing tool windows through
 the dock and remembers them: a panel opened in Zen (shortcut, View › Tool Windows, palette, plugin command) shows in

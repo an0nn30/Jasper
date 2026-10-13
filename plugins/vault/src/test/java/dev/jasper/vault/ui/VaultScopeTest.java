@@ -1,8 +1,6 @@
 package dev.jasper.vault.ui;
 
 import dev.jasper.sdk.PluginInfo;
-import dev.jasper.sdk.notifications.DisplayMode;
-import dev.jasper.sdk.notifications.GroupSpec;
 import dev.jasper.sdk.palette.PaletteQuery;
 import dev.jasper.sdk.palette.PaletteRow;
 import dev.jasper.sdk.terminal.TabHandle;
@@ -64,8 +62,7 @@ class VaultScopeTest {
         lock = new LockManager(new VaultFile(dir.resolve("vault.jv")), new DeviceSecrets(keychain, new FileStore(dir.resolve("device.secret"))), Runnable::run, Runnable::run, state -> { });
         var service = new VaultService(lock, () -> Optional.of(window), prompt -> { }, prompt -> { }, prompt -> { },
             notifications.group("dev.jasper.vault"));
-        var copies = context.notifications().group(new GroupSpec(VaultScope.COPIES, "Vault copies", DisplayMode.CARD));
-        scope = new VaultScope(lock, service, context.platform(), copies, (owner, id) -> opened.add(id.map(UUID::toString).orElse("-")),
+        scope = new VaultScope(lock, service, CopyCards.declare(context), (owner, id) -> opened.add(id.map(UUID::toString).orElse("-")),
             owner -> searched.add(owner == window ? "window" : "other"));
         return scope;
     }
