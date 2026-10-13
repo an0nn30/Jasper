@@ -91,7 +91,8 @@ on_exit = "keep_open"
 # New panes only. "auto" loads Jasper's shell integration script (zsh, bash, fish) after your startup files;
 # "manual" only exports JASPER_SHELL_INTEGRATION for you to source; "off" does neither.
 shell_integration = "auto"
-# Colors for terminal panes, live: "match" follows the UI appearance; or "slate-steel-dark", "slate-steel-light", "high-contrast".
+# Colors for terminal panes, live: "match" uses the shown theme's own scheme; or a scheme id, <theme id>/<scheme key>,
+# such as "slate-steel/dark", "slate-steel/light" or "slate-steel/high-contrast".
 scheme = "match"
 
 [terminal.shell]
@@ -124,8 +125,14 @@ blink = true
 
 [ui]
 # The UI appearance, live across windows: "system" follows the operating system's light or dark setting;
-# "dark" or "light" chooses Slate Steel Dark or Light.
+# "dark" or "light" chooses one. [ui.theme] names the theme each shows.
 appearance = "system"
+
+[ui.theme]
+# The themes the Dark and Light appearances show, live: "slate-steel" or an imported theme's id (its file name in the
+# themes folder without .json). A theme without that variant is reported and Slate Steel is used.
+dark = "slate-steel"
+light = "slate-steel"
 
 [ui.font]
 # Live UI font for app chrome and plugin controls, independent of [terminal.font].

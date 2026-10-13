@@ -5,7 +5,10 @@ import dev.jasper.app.commands.Command;
 import dev.jasper.app.commands.CommandRegistry;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.config.TerminalSchemeChoice;
 import dev.jasper.app.config.ToolbarMode;
+import dev.jasper.ui.theme.JasperTheme;
+import dev.jasper.ui.theme.TerminalScheme;
 
 import java.awt.event.ActionEvent;
 import java.util.ArrayList;
@@ -62,14 +65,10 @@ final class WindowCommands implements AutoCloseable {
         add(registry, "view.rail", "Rail", "Hide Rail", () -> owner.setRailVisible(!owner.railVisible()), List.of("panels", "sidebar"));
         add(registry, "view.buddy", "Show Jasper", "Hide Jasper", () -> { owner.onToggleBuddy.run(); owner.updateActions(); },
             List.of("jasper", "mascot", "turtle", "desk buddy"));
-        for (var scheme : dev.jasper.app.config.TerminalSchemeChoice.values()) {
-            String label = switch (scheme) {
-                case MATCH -> "Same as UI theme";
-                case SLATE_STEEL_DARK -> "Slate Steel Dark";
-                case SLATE_STEEL_LIGHT -> "Slate Steel Light";
-                case HIGH_CONTRAST -> "High Contrast";
-            };
-            add(registry, "view.terminal_scheme." + scheme.name().toLowerCase(java.util.Locale.ROOT), "Terminal: " + label,
+        for (var scheme : schemeChoices()) {
+            String label = scheme.scheme().flatMap(id -> JasperTheme.bundled().scheme(id.key())).map(TerminalScheme::name)
+                .orElse("Same as UI theme");
+            add(registry, schemeCommandId(scheme), "Terminal: " + label,
                 "Terminal Scheme: " + label, () -> owner.selectTerminalScheme(scheme), List.of("terminal", "scheme", "colors", "palette"));
         }
         add(registry, "view.themes", "Themes…", "Themes…", owner::openThemesSettings, List.of("theme", "appearance", "dark", "light", "terminal scheme"));
@@ -98,6 +97,18 @@ final class WindowCommands implements AutoCloseable {
 
     Action view(String id) { return views.get(id); }
 
+    /** "Same as UI theme", then Slate Steel's schemes. */
+    private static List<TerminalSchemeChoice> schemeChoices() {
+        var choices = new ArrayList<TerminalSchemeChoice>(List.of(TerminalSchemeChoice.MATCH));
+        for (var scheme : JasperTheme.bundled().schemes()) choices.add(TerminalSchemeChoice.of(scheme.id()));
+        return choices;
+    }
+
+    /** The command that chooses {@code choice}: {@code view.terminal_scheme.match} or {@code view.terminal_scheme.<theme>.<key>}. */
+    static String schemeCommandId(TerminalSchemeChoice choice) {
+        return "view.terminal_scheme." + choice.scheme().map(id -> id.theme() + "." + id.key()).orElse("match");
+    }
+
     void refresh() {
         boolean zen = owner.zenMode();
         owner.action(ActionId.TOGGLE_ZEN_MODE).putValue(Action.SELECTED_KEY, zen);
@@ -117,8 +128,8 @@ final class WindowCommands implements AutoCloseable {
             var action = view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT));
             action.putValue(Action.SELECTED_KEY, owner.toolbarMode() == mode);
         }
-        for (var scheme : dev.jasper.app.config.TerminalSchemeChoice.values()) {
-            var action = view("view.terminal_scheme." + scheme.name().toLowerCase(java.util.Locale.ROOT));
+        for (var scheme : schemeChoices()) {
+            var action = view(schemeCommandId(scheme));
             action.putValue(Action.SELECTED_KEY, owner.terminalSchemeSelected(scheme));
             action.setEnabled(true);
         }

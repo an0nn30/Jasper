@@ -230,14 +230,24 @@ public final class CoreSettings {
             AppearanceMode.SYSTEM)
         .label("Appearance").keywords("appearance", "theme", "dark", "light", "system", "slate steel", "look")
         .description("The UI appearance: \"system\" (the default) follows the operating system's light or dark setting;\n"
-            + "\"dark\" or \"light\" chooses Slate Steel Dark or Light. Switches live across windows.").build();
-    public static final Setting<TerminalSchemeChoice> TERMINAL_SCHEME = Setting.of("terminal.scheme", SettingKind.choice(List.of(
-            Map.entry("match", TerminalSchemeChoice.MATCH), Map.entry("slate-steel-dark", TerminalSchemeChoice.SLATE_STEEL_DARK),
-            Map.entry("slate-steel-light", TerminalSchemeChoice.SLATE_STEEL_LIGHT), Map.entry("high-contrast", TerminalSchemeChoice.HIGH_CONTRAST))),
-            TerminalSchemeChoice.MATCH)
+            + "\"dark\" or \"light\" chooses one. [ui.theme] names the theme each shows. Switches live across windows.").build();
+    static final String THEME_ID = "Use a theme id such as \"slate-steel\"; using the default.";
+    public static final Setting<String> UI_THEME_DARK = Setting.of("ui.theme.dark",
+            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.BUNDLED_ID)
+        .label("Dark theme").keywords("theme", "dark", "appearance", "slate steel", "imported")
+        .description("The theme the Dark appearance shows: \"slate-steel\" (the default) or an imported theme's id, its file name\n"
+            + "in the themes folder without .json. A theme without a Dark variant is reported and Slate Steel is used. Switches live.").build();
+    public static final Setting<String> UI_THEME_LIGHT = Setting.of("ui.theme.light",
+            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.BUNDLED_ID)
+        .label("Light theme").keywords("theme", "light", "appearance", "slate steel", "imported")
+        .description("The theme the Light appearance shows: \"slate-steel\" (the default) or an imported theme's id, its file name\n"
+            + "in the themes folder without .json. A theme without a Light variant is reported and Slate Steel is used. Switches live.").build();
+    static final String SCHEME_ID = "Use \"match\" or a scheme id such as \"slate-steel/high-contrast\"; using the default.";
+    public static final Setting<String> TERMINAL_SCHEME = Setting.of("terminal.scheme",
+            SettingKind.string(text -> TerminalSchemeChoice.parse(text).isPresent(), SCHEME_ID), TerminalSchemeChoice.MATCH.key())
         .label("Terminal scheme").keywords("terminal", "scheme", "colors", "colours", "palette", "high contrast", "slate steel")
-        .description("Colors for terminal panes: \"match\" (the default) follows the UI appearance; \"slate-steel-dark\",\n"
-            + "\"slate-steel-light\" or \"high-contrast\" chooses one. Only the terminal text area changes; updates live.").build();
+        .description("Colors for terminal panes: \"match\" (the default) uses the shown theme's own scheme; a scheme id,\n"
+            + "<theme id>/<scheme key> such as \"slate-steel/high-contrast\", chooses one. Only the terminal text area changes; updates live.").build();
     public static final Setting<Boolean> UI_ANIMATIONS_ENABLED = Setting.of("ui.animations.enabled", SettingKind.bool(), true)
         .label("Enable animations").keywords("animations", "motion", "transitions", "reduce motion")
         .description("Enable animations throughout the app. Disabling finishes running transitions immediately. Updates live in every window.").build();
@@ -257,7 +267,7 @@ public final class CoreSettings {
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_SCHEME, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
-            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_APPEARANCE, UI_FONT_FAMILY, UI_FONT_SIZE,
+            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_APPEARANCE, UI_THEME_DARK, UI_THEME_LIGHT, UI_FONT_FAMILY, UI_FONT_SIZE,
             UI_WORKSPACE_OPACITY, UI_WORKSPACE_BLUR, UI_ANIMATIONS_ENABLED),
         Set.of(List.of("keybindings"), List.of("plugins"), List.of("palette", "scopes")),
         Map.ofEntries(
@@ -271,6 +281,7 @@ public final class CoreSettings {
             Map.entry(List.of("terminal", "shell"), "The shell new panes start."),
             Map.entry(List.of("terminal", "cursor"), "The cursor a program sees until it chooses its own."),
             Map.entry(List.of("ui"), "The interface: its appearance, fonts, workspace glass and animations."),
+            Map.entry(List.of("ui", "theme"), "The theme each appearance shows: slate-steel or an imported theme's id."),
             Map.entry(List.of("ui", "font"), "Interface typography, independent of the terminal font."),
             Map.entry(List.of("ui", "workspace"), "Translucent terminal and editor backgrounds on macOS; omitted values keep the terminal area opaque."),
             Map.entry(List.of("ui", "animations"), "App-wide animation policy. Changes apply live.")));

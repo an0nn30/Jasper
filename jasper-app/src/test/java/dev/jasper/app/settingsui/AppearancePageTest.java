@@ -107,7 +107,7 @@ class AppearancePageTest {
         assertThat(items(box)).containsExactly("Same as UI theme", "Slate Steel Dark", "Slate Steel Light", "High Contrast");
         assertThat(selected(box)).isEqualTo("Same as UI theme");
         pick(box, "High Contrast");
-        assertThat(draft.value(CoreSettings.TERMINAL_SCHEME)).isEqualTo(dev.jasper.app.config.TerminalSchemeChoice.HIGH_CONTRAST);
+        assertThat(draft.value(CoreSettings.TERMINAL_SCHEME)).isEqualTo("slate-steel/high-contrast");
         assertThat(page.searchTerms()).contains("Terminal scheme", "Same as UI theme", "Slate Steel", "Match System").doesNotContain("Import theme…");
     }
 }

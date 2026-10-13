@@ -109,7 +109,7 @@ class GraphiteChromeTest {
                 showRail(owner);
                 var root = new javax.swing.JRootPane();
                 try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
-                    for (var scheme : dev.jasper.app.config.TerminalSchemeChoice.values()) {
+                    for (var scheme : dev.jasper.app.appearance.ThemeTestSupport.SCHEME_CHOICES) {
                         owner.selectTerminalScheme(scheme);
                         root.setSize(1000, 640); layoutTree(root); layoutTree(root);
                         var grid = owner.tabStrip();

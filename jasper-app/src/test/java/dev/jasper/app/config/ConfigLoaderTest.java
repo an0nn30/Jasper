@@ -424,7 +424,8 @@ class ConfigLoaderTest {
         var result = parse("[ui.theme]\nname = \"Nord\"\nfollow_system = true\nworkspace = \"Nord\"\n[terminal]\ncolors = \"light\"\n");
         assertThat(result.rejected()).isFalse();
         assertThat(result.snapshot()).isEqualTo(ConfigSnapshot.defaults());
-        assertThat(result.diagnostics()).extracting(ConfigDiagnostic::key).containsExactlyInAnyOrder("ui.theme", "terminal.colors");
+        assertThat(result.diagnostics()).extracting(ConfigDiagnostic::key)
+            .containsExactlyInAnyOrder("ui.theme.name", "ui.theme.follow_system", "ui.theme.workspace", "terminal.colors");
         assertThat(result.diagnostics()).allSatisfy(d -> {
             assertThat(d.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
             assertThat(d.message()).isEqualTo("Unknown setting or table; ignored.");
@@ -432,15 +433,33 @@ class ConfigLoaderTest {
     }
 
     @Test void appearanceAndTerminalSchemeReadTheirChoicesAndDefault() {
-        var chosen = parse("[ui]\nappearance = \"light\"\n[terminal]\nscheme = \"high-contrast\"\n");
+        var chosen = parse("[ui]\nappearance = \"light\"\n[terminal]\nscheme = \"slate-steel/high-contrast\"\n");
         assertThat(chosen.diagnostics()).isEmpty();
         assertThat(chosen.snapshot().appearance()).isEqualTo(AppearanceMode.LIGHT);
-        assertThat(chosen.snapshot().terminalScheme()).isEqualTo(TerminalSchemeChoice.HIGH_CONTRAST);
+        assertThat(chosen.snapshot().terminalScheme()).isEqualTo(TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow());
         var defaults = parse("");
         assertThat(defaults.snapshot().appearance()).isEqualTo(AppearanceMode.SYSTEM);
         assertThat(defaults.snapshot().terminalScheme()).isEqualTo(TerminalSchemeChoice.MATCH);
-        for (var scheme : TerminalSchemeChoice.values())
+        for (var scheme : dev.jasper.app.appearance.ThemeTestSupport.SCHEME_CHOICES)
             assertThat(parse("[terminal]\nscheme = \"" + scheme.key() + "\"\n").snapshot().terminalScheme()).isEqualTo(scheme);
+    }
+
+    @Test void theThemePicksReadAnyThemeIdAndRejectOthers() {
+        var chosen = parse("[ui.theme]\ndark = \"ocean\"\nlight = \"ocean-dawn\"\n");
+        assertThat(chosen.diagnostics()).isEmpty();
+        assertThat(chosen.snapshot().darkTheme()).isEqualTo("ocean");
+        assertThat(chosen.snapshot().lightTheme()).isEqualTo("ocean-dawn");
+        var bad = parse("[ui.theme]\ndark = \"Ocean Theme\"\n");
+        assertThat(bad.snapshot().darkTheme()).isEqualTo("slate-steel");
+        assertDiagnostic(bad, "ui.theme.dark", 2, 1, ConfigDiagnostic.Severity.ERROR);
+        assertThat(bad.diagnostics().getFirst().message()).isEqualTo("Use a theme id such as \"slate-steel\"; using the default.");
+    }
+
+    @Test void anOldSchemeValueIsUnknownNow() {
+        var result = parse("[terminal]\nscheme = \"high-contrast\"\n");
+        assertThat(result.snapshot().terminalScheme()).isEqualTo(TerminalSchemeChoice.MATCH);
+        assertThat(result.diagnostics().getFirst().message())
+            .isEqualTo("Use \"match\" or a scheme id such as \"slate-steel/high-contrast\"; using the default.");
     }
 
     @Test void anUnknownAppearanceOrSchemeUsesTheDefaultAndSaysSo() {

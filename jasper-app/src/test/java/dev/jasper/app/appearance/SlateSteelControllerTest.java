@@ -26,7 +26,7 @@ class SlateSteelControllerTest {
     }
 
     @Test void oneVariantServesChromeAndWorkspaceAndTheSchemeColoursTheTerminalOnly() {
-        var controller = new ThemeController(false, TerminalSchemeChoice.HIGH_CONTRAST, theme -> true);
+        var controller = new ThemeController(false, TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow(), theme -> true);
         var current = controller.current();
         assertThat(current.chrome()).isSameAs(STEEL.generated(false)).isSameAs(current.workspace());
         var scheme = STEEL.scheme("high-contrast").orElseThrow();
@@ -34,7 +34,7 @@ class SlateSteelControllerTest {
         assertThat(current.palette().boldForeground()).isEqualTo(scheme.boldForeground());
         assertThat(current.surface()).as("around panes and under tabs: the UI variant")
             .isEqualTo(STEEL.palette(false).color(SemanticColor.SURFACE_TERMINAL));
-        assertThat(controller.schemeChoice()).isEqualTo(TerminalSchemeChoice.HIGH_CONTRAST);
+        assertThat(controller.schemeChoice()).isEqualTo(TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow());
     }
 
     @Test void matchFollowsTheVariantAndASchemeChangeKeepsTheChrome() {
@@ -44,14 +44,14 @@ class SlateSteelControllerTest {
         var chromeChanges = new ArrayList<Boolean>();
         controller.subscribe((theme, chrome) -> chromeChanges.add(chrome));
         chromeChanges.clear();
-        controller.configure(true, TerminalSchemeChoice.HIGH_CONTRAST);
+        controller.configure(true, TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow());
         assertThat(chromeChanges).containsExactly(false);
         assertThat(installs).hasSize(1);
         controller.configure(false, TerminalSchemeChoice.MATCH);
         assertThat(chromeChanges).containsExactly(false, true);
         assertThat(installs).hasSize(2).last().isSameAs(STEEL.generated(false));
         assertThat(controller.current().palette().background()).isEqualTo(STEEL.matching(false).colors().background());
-        controller.configureScheme(TerminalSchemeChoice.SLATE_STEEL_DARK);
+        controller.configureScheme(TerminalSchemeChoice.parse("slate-steel/dark").orElseThrow());
         assertThat(controller.current().chrome()).as("the UI stays Light").isSameAs(STEEL.generated(false));
     }
 
@@ -64,7 +64,7 @@ class SlateSteelControllerTest {
     }
 
     @Test void everySchemeChoiceNamesABundledScheme() {
-        for (var choice : TerminalSchemeChoice.values())
+        for (var choice : dev.jasper.app.appearance.ThemeTestSupport.SCHEME_CHOICES)
             for (boolean dark : new boolean[] {true, false})
                 assertThat(ThemeController.scheme(dark, choice)).isNotNull();
         assertThat(ThemeController.scheme(false, TerminalSchemeChoice.MATCH)).isEqualTo(JasperTheme.bundled().matching(false));

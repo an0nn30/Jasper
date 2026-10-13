@@ -87,15 +87,11 @@ public final class ThemeController implements AutoCloseable {
         platformLabelSize = UIManager.getFont("Label.font").getSize2D();
     }
 
-    /** The bundled scheme for a UI variant: the choice's, or with {@code MATCH} the variant's own. */
+    /** The bundled scheme for a UI variant: the choice's, or with {@code MATCH} (or a scheme Slate Steel lacks) the variant's own. */
     public static TerminalScheme scheme(boolean dark, TerminalSchemeChoice choice) {
         var bundled = JasperTheme.bundled();
-        return switch (choice) {
-            case MATCH -> bundled.matching(dark);
-            case SLATE_STEEL_DARK -> bundled.matching(true);
-            case SLATE_STEEL_LIGHT -> bundled.matching(false);
-            case HIGH_CONTRAST -> bundled.scheme("high-contrast").orElseThrow();
-        };
+        return choice.scheme().filter(id -> id.theme().equals(bundled.id())).flatMap(id -> bundled.scheme(id.key()))
+            .orElseGet(() -> bundled.matching(dark));
     }
     private static ResolvedTheme resolve(Slate slate) {
         return ResolvedTheme.slateSteel(slate.dark(), scheme(slate.dark(), slate.scheme()));

@@ -16,6 +16,10 @@ import java.util.function.Predicate;
 
 /** Package-local test access, excluded from production artifacts. */
 public final class ThemeTestSupport {
+    /** "Same as UI theme" and Slate Steel's three schemes, in the dropdown's order. */
+    public static final java.util.List<TerminalSchemeChoice> SCHEME_CHOICES = java.util.List.of(TerminalSchemeChoice.MATCH,
+        TerminalSchemeChoice.parse("slate-steel/dark").orElseThrow(), TerminalSchemeChoice.parse("slate-steel/light").orElseThrow(),
+        TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow());
     /** Slate Steel's variant on both routes. */
     public static dev.jasper.ui.theme.ThemePair pair(boolean dark) {
         var theme = generated(dark);

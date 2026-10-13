@@ -139,6 +139,12 @@ public final class Editors {
     /** The terminal scheme entry for {@code match}. */
     static final String SAME_AS_UI_THEME = "Same as UI theme";
 
+    /** {@code terminal.scheme}: "Same as UI theme", then the installed schemes {@code appearance} lists, read again on refresh. */
+    public static Factory<String> schemeChoice(AppearanceChoices appearance) {
+        return new Factory<>((setting, context) -> new SchemePick(setting.label(), () -> appearance.themes().get().schemes()),
+            List.of(SAME_AS_UI_THEME, "Slate Steel Dark", "Slate Steel Light", "High Contrast"));
+    }
+
     /** The Dark / Light / Match System tiles, then the Theme row with its one entry, Slate Steel. */
     public static Factory<AppearanceMode> appearance(AppearanceChoices choices) {
         return new Factory<>((setting, context) -> new AppearanceSelection(choices),

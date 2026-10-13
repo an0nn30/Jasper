@@ -171,11 +171,13 @@ family = "system"
 | `terminal.dim_inactive_panes` | `0.3` | Finite number 0–1; 0 disables dimming, 1 fully dims | Live |
 | `terminal.copy_on_select` | `false` | Boolean | Live |
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
-| `terminal.scheme` | `"match"` | `"match"`, `"slate-steel-dark"`, `"slate-steel-light"`, `"high-contrast"`: the terminal panes' colors ([Themes](themes.md)) | Live |
+| `terminal.scheme` | `"match"` | `"match"` or a scheme id such as `"slate-steel/high-contrast"`: the terminal panes' colors ([Themes](themes.md)) | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately | Live |
 | `ui.appearance` | `"system"` | `"system"` (the operating system's light or dark), `"dark"`, `"light"` | Live |
+| `ui.theme.dark` | `"slate-steel"` | A theme id: the theme the Dark appearance shows ([Themes](themes.md)) | Live |
+| `ui.theme.light` | `"slate-steel"` | A theme id: the theme the Light appearance shows ([Themes](themes.md)) | Live |
 | `ui.workspace.opacity` | Opaque (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
 | `ui.workspace.blur` | `"theme"` | `"theme"` (Slate Steel's: no blur), `"on"`, `"off"`; macOS only, ignored elsewhere | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
@@ -759,21 +761,20 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 ## Theme
 
-Jasper's theme is Slate Steel, in Dark and Light.
+Jasper's built-in theme is Slate Steel, in Dark and Light; imported themes live in the themes folder ([Themes](themes.md)).
 
-`ui.appearance` chooses the UI appearance: `"dark"` or `"light"` for Slate Steel Dark or Light, or `"system"`
-(the default) to follow the operating system's light or dark setting live. When the operating system's appearance is
-unavailable, `"system"` uses Dark. An operating-system change never writes `config.toml`.
+`ui.appearance` chooses the UI appearance: `"dark"`, `"light"`, or `"system"` (the default) to follow the operating
+system's light or dark setting live. When the operating system's appearance is unavailable, `"system"` uses Dark. An
+operating-system change never writes `config.toml`. `ui.theme.dark` and `ui.theme.light` name the theme each
+appearance shows, `"slate-steel"` by default.
 
-`terminal.scheme` chooses the terminal panes' colours: `"match"` (the default) uses Slate Steel Dark with the Dark
-appearance and Slate Steel Light with the Light one; `"slate-steel-dark"`, `"slate-steel-light"` and
-`"high-contrast"` choose one. Only the terminal text area changes: tabs, the tab strip, the editor and panels stay on
-the UI appearance.
+`terminal.scheme` chooses the terminal panes' colours: `"match"` (the default) uses the shown theme's own scheme; a
+scheme id such as `"slate-steel/high-contrast"` chooses one. Only the terminal text area changes: tabs, the tab strip,
+the editor and panels stay on the UI appearance.
 
 Appearance and scheme changes keep shells, scrollback, split ratios and font choices. A failed installation keeps the
-current appearance, is reported as a warning on `ui.appearance`, and can be retried with Reload config. The former
-`[ui.theme]` table (`name`, `source`, `follow_system`, `workspace`), `terminal.colors` and the `[colors]` table are
-no longer read: each is reported as an unknown setting and ignored.
+current appearance, is reported as a warning on `ui.appearance`, and can be retried with Reload config.
+`terminal.colors` and the `[colors]` table are no longer read: each is reported as an unknown setting and ignored.
 
 ### Interface typography
 

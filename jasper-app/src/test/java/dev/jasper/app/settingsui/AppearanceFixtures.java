@@ -14,7 +14,8 @@ public final class AppearanceFixtures {
     public static final AppearanceChoices CHOICES = choices(Optional::empty);
 
     public static AppearanceChoices choices(Supplier<Optional<Boolean>> systemDark) {
-        return new AppearanceChoices(preview(true), preview(false), 100f, false, systemDark, ignored -> new Subscription(() -> { }));
+        var themes = InstalledThemes.slateSteel(preview(true), preview(false));
+        return new AppearanceChoices(preview(true), preview(false), 100f, false, systemDark, ignored -> new Subscription(() -> { }), () -> themes);
     }
 
     /** A Slate Steel variant's preview, as the application builds it. */

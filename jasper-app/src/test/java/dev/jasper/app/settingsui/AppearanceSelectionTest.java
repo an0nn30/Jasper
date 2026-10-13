@@ -18,7 +18,8 @@ class AppearanceSelectionTest {
     }
 
     @Test void theTilesPreviewBothVariantsAndTheThemeRowOffersOnlySlateSteel() {
-        var editor = new AppearanceSelection(new AppearanceChoices(DARK, LIGHT, 100f, false, () -> Optional.of(false), ignored -> new dev.jasper.app.lifecycle.Subscription(() -> {})));
+        var editor = new AppearanceSelection(new AppearanceChoices(DARK, LIGHT, 100f, false, () -> Optional.of(false), ignored -> new dev.jasper.app.lifecycle.Subscription(() -> {}),
+            () -> InstalledThemes.slateSteel(DARK, LIGHT)));
         editor.show(AppearanceMode.SYSTEM);
         var tiles = (Nodes.Choice) parts(editor).get(0);
         assertThat(tiles.id()).isEqualTo("ui.appearance:policy");
@@ -53,6 +54,7 @@ class AppearanceSelectionTest {
         var system = new CorePages.SystemActions(() -> java.nio.file.Path.of("config.toml"), () -> { }, () -> { }, () -> { }, () -> { }, () -> true);
         var specs = CorePages.specs(AppearanceChoices.of(DARK, LIGHT), system, ShellChoices.NONE, ignored -> { }, false);
         var appearance = specs.getFirst();
-        assertThat(appearance.settings()).startsWith(CoreSettings.UI_APPEARANCE, CoreSettings.TERMINAL_SCHEME);
+        assertThat(appearance.settings()).startsWith(CoreSettings.UI_APPEARANCE, CoreSettings.UI_THEME_DARK, CoreSettings.UI_THEME_LIGHT,
+            CoreSettings.TERMINAL_SCHEME);
     }
 }

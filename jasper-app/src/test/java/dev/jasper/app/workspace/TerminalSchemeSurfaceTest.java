@@ -24,7 +24,7 @@ class TerminalSchemeSurfaceTest {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owner = new WindowContent[1];
         edt(() -> {
-            owner[0] = content(launcher(pending), new ThemeController(false, TerminalSchemeChoice.HIGH_CONTRAST));
+            owner[0] = content(launcher(pending), new ThemeController(false, TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow()));
             owner[0].currentTab().rename("other"); owner[0].newTab(HOME); owner[0].currentTab().rename("selected");
             owner[0].update();
         });

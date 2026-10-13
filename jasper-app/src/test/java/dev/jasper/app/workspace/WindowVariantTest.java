@@ -23,14 +23,14 @@ class WindowVariantTest {
     void selectingAVariantRethemesTheWindowAndKeepsTheSchemeAndSessions() throws Exception {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owner = new WindowContent[1];
-        edt(() -> owner[0] = content(launcher(pending), new ThemeController(true, TerminalSchemeChoice.HIGH_CONTRAST)));
+        edt(() -> owner[0] = content(launcher(pending), new ThemeController(true, TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow())));
         while (!pending.isEmpty()) pending.remove().run();
         until(() -> owner[0].currentPane().view() != null);
         edt(() -> {
             var session = owner[0].currentPane().session();
             owner[0].selectVariant(false);
             assertThat(owner[0].theme().chrome()).isSameAs(JasperTheme.bundled().generated(false));
-            assertThat(owner[0].terminalSchemeSelected(TerminalSchemeChoice.HIGH_CONTRAST)).as("the scheme stays").isTrue();
+            assertThat(owner[0].terminalSchemeSelected(TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow())).as("the scheme stays").isTrue();
             assertThat(owner[0].currentPane().session()).as("the shell keeps running").isSameAs(session);
             assertThat(owner[0].getBackground()).isEqualTo(ThemeTestSupport.color(false, SemanticColor.SURFACE_TERMINAL));
             assertThat(owner[0].currentPane().view().palette()).isEqualTo(ThemeTestSupport.terminal(JasperTheme.bundled().scheme("high-contrast").orElseThrow()));

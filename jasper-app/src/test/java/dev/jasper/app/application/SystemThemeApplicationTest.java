@@ -46,13 +46,13 @@ class SystemThemeApplicationTest {
     }
 
     @Test void anExplicitAppearanceIgnoresTheOperatingSystemAndTheSchemeApplies() throws Exception {
-        Path file = home.resolve("config.toml"); Files.writeString(file, "[ui]\nappearance = 'dark'\n[terminal]\nscheme = 'high-contrast'\n");
+        Path file = home.resolve("config.toml"); Files.writeString(file, "[ui]\nappearance = 'dark'\n[terminal]\nscheme = 'slate-steel/high-contrast'\n");
         var service = java.util.concurrent.CompletableFuture.supplyAsync(() -> new ConfigService(file, true)).get();
         var themes = new ThemeController(false, TerminalSchemeChoice.MATCH);
         var controller = new ConfigurationController(themes, service, path -> {}, Observation.light());
         try {
             assertThat(themes.current().chrome()).isSameAs(STEEL.generated(true));
-            assertThat(themes.schemeChoice()).isEqualTo(TerminalSchemeChoice.HIGH_CONTRAST);
+            assertThat(themes.schemeChoice()).isEqualTo(TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow());
             controller.systemAppearanceChanged(Observation.dark());
             controller.systemAppearanceChanged(Observation.light());
             assertThat(themes.current().chrome()).isSameAs(STEEL.generated(true));

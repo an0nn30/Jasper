@@ -28,7 +28,7 @@ class CoreSettingsTest {
     }
 
     @Test void everySettingIsDescribedAndItsTemplateValueRoundTrips() {
-        assertThat(CoreSettings.SCHEMA.settings()).hasSize(41);
+        assertThat(CoreSettings.SCHEMA.settings()).hasSize(43);
         for (Setting<?> setting : CoreSettings.SCHEMA.settings()) {
             assertThat(setting.label()).as(setting.name()).isNotBlank();
             assertThat(setting.description()).as(setting.name()).isNotBlank();
@@ -66,14 +66,17 @@ class CoreSettingsTest {
             .put(CoreSettings.TERMINAL_FONT_SIZE, 20f, CoreSettings.TERMINAL_FONT_SIZE.key())
             .put(CoreSettings.SYSTEM_RUN_IN_BACKGROUND, true, CoreSettings.SYSTEM_RUN_IN_BACKGROUND.key())
             .put(CoreSettings.UI_APPEARANCE, AppearanceMode.LIGHT, CoreSettings.UI_APPEARANCE.key())
-            .put(CoreSettings.TERMINAL_SCHEME, TerminalSchemeChoice.HIGH_CONTRAST, CoreSettings.TERMINAL_SCHEME.key())
+            .put(CoreSettings.TERMINAL_SCHEME, "slate-steel/high-contrast", CoreSettings.TERMINAL_SCHEME.key())
+            .put(CoreSettings.UI_THEME_DARK, "ocean", CoreSettings.UI_THEME_DARK.key())
             .put(CoreSettings.TERMINAL_ENV, Map.of("A", "1"), CoreSettings.TERMINAL_ENV.key())
             .put(CoreSettings.WINDOW_STATUS_BAR_HEIGHT, 30, CoreSettings.WINDOW_STATUS_BAR_HEIGHT.key()).build();
         var snapshot = ConfigSnapshot.from(values, Map.of("copy", "none"), Map.of());
         assertThat(snapshot.fontSize()).isEqualTo(20f);
         assertThat(snapshot.backgroundEnabled()).isTrue();
         assertThat(snapshot.appearance()).isEqualTo(AppearanceMode.LIGHT);
-        assertThat(snapshot.terminalScheme()).isEqualTo(TerminalSchemeChoice.HIGH_CONTRAST);
+        assertThat(snapshot.terminalScheme()).isEqualTo(TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow());
+        assertThat(snapshot.darkTheme()).isEqualTo("ocean");
+        assertThat(snapshot.lightTheme()).isEqualTo("slate-steel");
         assertThat(snapshot.terminal().env()).containsExactly(Map.entry("A", "1"));
         assertThat(snapshot.statusBarHeight()).isEqualTo(30);
         assertThat(snapshot.keybindings()).containsExactly(Map.entry("copy", "none"));

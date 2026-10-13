@@ -40,7 +40,7 @@ class TerminalSchemeCommandsTest {
             var owner = owners[0];
             hidden[0] = owner.currentPane();
             owner.newTab(HOME);
-            owner.selectTerminalScheme(TerminalSchemeChoice.HIGH_CONTRAST);
+            owner.selectTerminalScheme(TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow());
             assertThat(com.formdev.flatlaf.FlatLaf.isLafDark()).as("the UI stays light").isFalse();
             assertThat(hidden[0].view().palette()).as("a background tab").isEqualTo(palette(JasperTheme.bundled().scheme("high-contrast").orElseThrow()));
             assertThat(owners[1].currentPane().view().palette()).as("another window").isEqualTo(palette(JasperTheme.bundled().scheme("high-contrast").orElseThrow()));
@@ -62,13 +62,13 @@ class TerminalSchemeCommandsTest {
         edt(() -> {
             var themes = new ThemeController(true, TerminalSchemeChoice.MATCH);
             var owner = content(launcher(new ArrayDeque<>()), themes); owner.setActive(true);
-            for (var scheme : TerminalSchemeChoice.values()) {
-                var command = owner.windowCommands().view("view.terminal_scheme." + scheme.name().toLowerCase(Locale.ROOT));
+            for (var scheme : dev.jasper.app.appearance.ThemeTestSupport.SCHEME_CHOICES) {
+                var command = owner.windowCommands().view(WindowCommands.schemeCommandId(scheme));
                 command.actionPerformed(new java.awt.event.ActionEvent(owner, 0, ""));
                 assertThat(themes.schemeChoice()).isEqualTo(scheme);
                 assertThat(owner.terminalSchemeSelected(scheme)).isTrue();
             }
-            assertThat(owner.windowCommands().view("view.terminal_scheme.high_contrast").getValue(dev.jasper.app.commands.Command.TITLE))
+            assertThat(owner.windowCommands().view("view.terminal_scheme.slate-steel.high-contrast").getValue(dev.jasper.app.commands.Command.TITLE))
                 .isEqualTo("Terminal Scheme: High Contrast");
         });
     }

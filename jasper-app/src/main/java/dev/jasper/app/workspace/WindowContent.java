@@ -1130,13 +1130,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /** View \u203a Terminal Scheme: saved for every window; applied to this window's themes when no configuration is connected. */
     void selectTerminalScheme(dev.jasper.app.config.TerminalSchemeChoice scheme) {
-        choose(dev.jasper.app.config.CoreSettings.TERMINAL_SCHEME, scheme, () -> {
+        choose(dev.jasper.app.config.CoreSettings.TERMINAL_SCHEME, scheme.key(), () -> {
             themes.configureScheme(scheme);
             chrome.refreshTheme();
         });
     }
 
-    boolean terminalSchemeSelected(dev.jasper.app.config.TerminalSchemeChoice scheme) { return themes.schemeChoice() == scheme; }
+    boolean terminalSchemeSelected(dev.jasper.app.config.TerminalSchemeChoice scheme) { return themes.schemeChoice().equals(scheme); }
 
     /** View \u203a Toolbar. */
     void chooseToolbarMode(ToolbarMode mode) {

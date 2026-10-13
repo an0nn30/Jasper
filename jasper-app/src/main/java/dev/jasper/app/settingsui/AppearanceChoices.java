@@ -18,16 +18,20 @@ import java.util.function.Supplier;
  * @param blur whether the theme blurs a translucent workspace
  * @param systemDark the operating system's appearance, empty when unavailable
  * @param onChanged runs its argument whenever the operating system's appearance changes
+ * @param themes the installed themes and schemes, read again whenever the page refreshes
  */
 public record AppearanceChoices(Option.Palette dark, Option.Palette light, float opacity, boolean blur,
-                                Supplier<Optional<Boolean>> systemDark, Function<Runnable, Subscription> onChanged) {
+                                Supplier<Optional<Boolean>> systemDark, Function<Runnable, Subscription> onChanged,
+                                Supplier<InstalledThemes> themes) {
     public AppearanceChoices {
         Objects.requireNonNull(dark, "dark"); Objects.requireNonNull(light, "light");
         Objects.requireNonNull(systemDark, "systemDark"); Objects.requireNonNull(onChanged, "onChanged");
+        Objects.requireNonNull(themes, "themes");
     }
 
-    /** Fixed previews, an opaque workspace and no system appearance, for pages built without an application. */
+    /** Fixed previews, Slate Steel alone, an opaque workspace and no system appearance, for pages built without an application. */
     public static AppearanceChoices of(Option.Palette dark, Option.Palette light) {
-        return new AppearanceChoices(dark, light, 100f, false, Optional::empty, ignored -> new Subscription(() -> { }));
+        var themes = InstalledThemes.slateSteel(dark, light);
+        return new AppearanceChoices(dark, light, 100f, false, Optional::empty, ignored -> new Subscription(() -> { }), () -> themes);
     }
 }

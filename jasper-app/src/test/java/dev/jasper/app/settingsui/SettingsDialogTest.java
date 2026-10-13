@@ -224,7 +224,7 @@ class SettingsDialogTest {
         edt(() -> {
             dialog.open(null, "appearance");
             dialog.draft().stage(CoreSettings.UI_APPEARANCE, Optional.of(dev.jasper.app.config.AppearanceMode.LIGHT));
-            dialog.draft().stage(CoreSettings.TERMINAL_SCHEME, Optional.of(dev.jasper.app.config.TerminalSchemeChoice.HIGH_CONTRAST));
+            dialog.draft().stage(CoreSettings.TERMINAL_SCHEME, Optional.of("slate-steel/high-contrast"));
             dialog.apply();
         });
         edt(() -> {});
@@ -233,13 +233,13 @@ class SettingsDialogTest {
             assertThat(saved.getFirst().changes()).containsKeys(CoreSettings.UI_APPEARANCE, CoreSettings.TERMINAL_SCHEME);
             assertThat(dialog.draft().modified()).isTrue();
         });
-        state = state("ui.appearance='light'\nterminal.scheme='high-contrast'\n"); saveResult = CompletableFuture.completedFuture(state);
+        state = state("ui.appearance='light'\nterminal.scheme='slate-steel/high-contrast'\n"); saveResult = CompletableFuture.completedFuture(state);
         edt(dialog::apply); edt(() -> {});
         edt(() -> {
             assertThat(saved).hasSize(2); assertThat(dialog.draft().modified()).isFalse();
-            dialog.draft().stage(CoreSettings.TERMINAL_SCHEME, Optional.of(dev.jasper.app.config.TerminalSchemeChoice.SLATE_STEEL_DARK)); dialog.cancel();
+            dialog.draft().stage(CoreSettings.TERMINAL_SCHEME, Optional.of("slate-steel/dark")); dialog.cancel();
             assertThat(dialog.isOpen()).isFalse(); dialog.open(null,"appearance");
-            assertThat(dialog.draft().value(CoreSettings.TERMINAL_SCHEME)).isEqualTo(dev.jasper.app.config.TerminalSchemeChoice.HIGH_CONTRAST); dialog.cancel();
+            assertThat(dialog.draft().value(CoreSettings.TERMINAL_SCHEME)).isEqualTo("slate-steel/high-contrast"); dialog.cancel();
         });
     }
 

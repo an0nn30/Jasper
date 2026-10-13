@@ -656,7 +656,7 @@ class ConfigurationControllerTest {
     }
 
     @Test void savedTerminalSchemeAppliesLiveOnStartAndReloadWithoutARestartNotice() throws Exception {
-        start("[ui]\nappearance='light'\n[terminal]\nscheme='slate-steel-dark'\n");
+        start("[ui]\nappearance='light'\n[terminal]\nscheme='slate-steel/dark'\n");
         edt(() -> assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateSteel(false, JasperTheme.bundled().matching(true))));
         reload("[ui]\nappearance='light'\n[terminal]\nscheme='match'\n");
         edt(() -> {
@@ -758,13 +758,13 @@ class ConfigurationControllerTest {
         until(() -> !seen.isEmpty() && seen.getLast().values().get(dev.jasper.app.config.CoreSettings.WINDOW_TOOLBAR) == ToolbarMode.HIDDEN);
         edt(() -> first.windowCommands().view("view.status_bar").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
         until(() -> Boolean.FALSE.equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.WINDOW_STATUS_BAR)));
-        edt(() -> first.windowCommands().view("view.terminal_scheme.slate_steel_dark").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
-        until(() -> dev.jasper.app.config.TerminalSchemeChoice.SLATE_STEEL_DARK == seen.getLast().values().get(dev.jasper.app.config.CoreSettings.TERMINAL_SCHEME));
+        edt(() -> first.windowCommands().view("view.terminal_scheme.slate-steel.dark").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
+        until(() -> "slate-steel/dark".equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.TERMINAL_SCHEME)));
         edt(() -> {
             for (var owner : List.of(first, second)) {
                 assertThat(owner.toolbar().isVisible()).isFalse();
                 assertThat(owner.status().isVisible()).isFalse();
-                assertThat(owner.terminalSchemeSelected(dev.jasper.app.config.TerminalSchemeChoice.SLATE_STEEL_DARK)).isTrue();
+                assertThat(owner.terminalSchemeSelected(dev.jasper.app.config.TerminalSchemeChoice.parse("slate-steel/dark").orElseThrow())).isTrue();
             }
         });
         assertThat(Files.readString(directory.resolve("config.toml"))).contains("tab_height = 44");
