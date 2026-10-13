@@ -35,13 +35,11 @@ public final class Settings9bPreview {
         var themes=new ThemeController[1];var runtime=new PluginRuntime[1];var manager=new PluginManager[1];var contributions=new Contributions();
         try {
             if(!allPages)Files.writeString(home.resolve("plugins.toml"),"version = 1\n[plugins.\"dev.jasper.sample\"]\nenabled = false\nconsented = []\n");
-            Path file=home.resolve("config.toml");Files.writeString(file,SettingsSurfacePreview.CONFIG);Files.createDirectories(home.resolve("themes"));
-            try(var in=Settings9bPreview.class.getResourceAsStream("/dev/jasper/app/appearance/desktop-settings.toml")){Files.copy(in,home.resolve("themes/slate-steel.toml"));}
-            Files.writeString(home.resolve("themes/custom.toml"),Files.readString(home.resolve("themes/slate-steel.toml")).replace("Slate Steel","Copper Night").replace("#4e7db4","#bc784d"));
-            var catalog=ThemeCatalog.beside(file);catalog.scan();var parsed=ConfigLoader.parse(file,SettingsSurfacePreview.CONFIG,true);
+            Path file=home.resolve("config.toml");Files.writeString(file,SettingsSurfacePreview.CONFIG);
+           var parsed=ConfigLoader.parse(file,SettingsSurfacePreview.CONFIG,true);
             var state=new ConfigService.State(parsed.snapshot(),parsed.diagnostics(),file,true,parsed.legacyKeys(),parsed.deadTables(),parsed.values(),false);
             SwingUtilities.invokeAndWait(()->{
-                themes[0]=new ThemeController();
+                themes[0]=ThemeTestSupport.controller(true);
                 runtime[0]=new PluginRuntime(new PluginRuntime.Options(Path.of(System.getProperty("jasper.stagedPlugins")),home.resolve("plugins"),null,false,home.resolve("plugins.toml"),home.resolve("plugins.lock")),new ActivityNotifier(new BuddyTestSupport().companion(),()->{}),PluginRuntime.SettingsReports.IGNORED,contributions,windows,new TerminalRegistry());runtime[0].start(Map.of(),true);
                 // The application's own contributed entries, registered as JasperApplication registers them.
                 contributions.addAction("plugins.manage","Manage Plugins…",null,List.of("plugins","extensions","install","safe mode"),Optional.empty(),invocation->{});
@@ -49,11 +47,10 @@ public final class Settings9bPreview {
                 var restarts=new RestartFlow(ResidentControl.NONE,mode->true,Runnable::run,Runnable::run,Duration.ofMillis(20),Duration.ofMillis(1));
                 manager[0]=new PluginManager(runtime[0],windows,new PluginManager.Hooks(surface->Optional.empty(),restarts,()->{},ResidentControl.NONE,false,Runnable::run,path->{},path->{},uri->{}));
             });
-            for(String family:List.of("calibration","dark","light","custom"))for(int font:List.of(0,20)) {
+            for(String family:List.of("dark","light"))for(int font:List.of(0,20)) {
                 var dialog=new SettingsDialog[1];
-                Theme theme=switch(family){case "dark"->Theme.DARK;case "light"->Theme.JASPER_LIGHT;case "custom"->catalog.latest().find("Copper Night").orElseThrow();default->catalog.latest().find("Slate Steel").orElseThrow();};
                 SwingUtilities.invokeAndWait(()->{
-                    themes[0].configure(theme,new UiFontConfig("system",font));
+                    themes[0].configure(family.startsWith("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system",font));
                     var groups=List.of(group(runtime[0],"jasper.general","Jasper","Jasper","jasper"),group(runtime[0],"jasper.commands","Long-running commands","Jasper","jasper"),group(runtime[0],"dev.jasper.editor","Editor","Editor","dev.jasper.editor"),group(runtime[0],"dev.jasper.editor.files","Files","Editor","dev.jasper.editor"));
                     // One saved override (fixture) so a section shows its modified mark, as the reference does.
                     var hooks=new KeymapPage.Hooks(contributions,()->Map.of("toggle_zen_mode","ctrl+cmd+f"),()->Map.of("dev.jasper.editor","Editor"),true,edits->CompletableFuture.completedFuture(null));

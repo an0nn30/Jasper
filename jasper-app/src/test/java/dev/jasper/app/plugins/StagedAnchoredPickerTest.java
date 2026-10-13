@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.ui.swing.KitView;
 import java.awt.*;
@@ -22,10 +23,9 @@ import static org.assertj.core.api.Assertions.*;
 class StagedAnchoredPickerTest {
  @TempDir Path root;
  @Test void sixCompactStatesAndRealCreationRenderFromTheMountedImportRoute()throws Exception{
-  var theme=onEdtValue(dev.jasper.app.appearance.ThemeController::new);
-  var themeDocument=dev.jasper.ui.themeio.ThemeToml.parse(Files.readString(Path.of(System.getProperty("jasper.repoRoot"),"jasper-app/src/test/resources/dev/jasper/app/plugins/desktop-picker.toml")),"picker-calibration");
-  var reference=dev.jasper.ui.theme.ThemeGenerator.generate(dev.jasper.ui.theme.ThemeResolver.resolve(themeDocument));
-  var pair=new dev.jasper.app.appearance.ResolvedTheme(reference,reference);
+  var theme=onEdtValue(() -> ThemeTestSupport.controller(true));
+  // Slate Steel Dark; the menu switches to Light and back while it keeps its query and selection.
+  var pair=ThemeTestSupport.resolved(true);
   var appearance=onEdtValue(()->new WorkspaceAppearanceFixture(pair));
   try(var vault=new StagedVaultHost(root.resolve("home"),true,appearance)){
    vault.createVault("synthetic-preview-password");onEdt(()->vault.surface("Credential Vault").close());
@@ -49,7 +49,7 @@ class StagedAnchoredPickerTest {
      var menu=menu(vault);assertThat(((dev.jasper.ui.model.Nodes.PickerMenu)menu.spec().root()).query()).isEqualTo("staging");
      search(menu,"");key(menu,"down");
      var field=(JTextField)named(menu,"credential.menu.search");var document=field.getDocument();
-     var light=dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.Theme.JASPER_LIGHT);appearance.setPair(new dev.jasper.app.appearance.ResolvedTheme(light,light));appearance.setPair(pair);
+     appearance.setPair(ThemeTestSupport.resolved(false));appearance.setPair(pair);
      var defaults=new HashMap<Object,Object>();UIManager.getDefaults().forEach(defaults::put);try{UIManager.put("defaultFont",new Font("Dialog",Font.PLAIN,20));}finally{UIManager.put("defaultFont",defaults.get("defaultFont"));}
      assertThat(field.getDocument()).isSameAs(document);assertThat(((dev.jasper.ui.model.Nodes.PickerItem)((JList<?>)named(menu,"credential.menu.rows")).getSelectedValue()).label()).isEqualTo("fixture login");
      enter(field);
@@ -58,7 +58,7 @@ class StagedAnchoredPickerTest {
     onEdt(()->{capture("selected",kitView(form));KitView menu;
      click(form,"import.choose.0.input");menu=menu(vault);capture("open",menu);capture("open-face",kitView(form));
      var field=(JTextField)named(menu,"credential.menu.search");var document=field.getDocument();field.setText("fixt");field.setCaretPosition(2);capture("filtering",menu);
-     var light=dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+     var light=dev.jasper.app.appearance.ThemeTestSupport.generated(false);
      appearance.setPair(new dev.jasper.app.appearance.ResolvedTheme(light,light));capture("filtering-light",menu);
      appearance.setPair(theme.current());capture("filtering-default-theme",menu);appearance.setPair(pair);
      var raw=new HashMap<Object,Object>();UIManager.getDefaults().forEach(raw::put);var font=raw.get("defaultFont");try{UIManager.put("defaultFont",new Font("Dialog",Font.PLAIN,20));capture("filtering-enlarged",menu);capture("selected-enlarged",kitView(form));assertFooterLabelsFit(kitView(form));}finally{UIManager.put("defaultFont",font);}

@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.notifications.Delivery;
 import dev.jasper.app.notifications.NotificationCenter;
@@ -126,7 +127,7 @@ class BundledSamplePluginTest {
         var deck = new BuddyTestSupport();
         var contributions = new dev.jasper.app.contributions.Contributions();
         onEdt(() -> {
-            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            ThemeTestSupport.controller(false);
             runtime.set(new PluginRuntime(new PluginRuntime.Options(remoteOnly, root.resolve("user"), null, false,
                 root.resolve("plugins.toml"), root.resolve("plugins.lock")), new ActivityNotifier(deck.companion(), () -> {}),
                 PluginRuntime.SettingsReports.IGNORED, contributions, AppContractTest.headlessWindows(),
@@ -158,7 +159,7 @@ class BundledSamplePluginTest {
             var pending = new AtomicReference<List<CompletableFuture<?>>>();
             onEdt(() -> pending.set(runtime.get().stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
-            onEdt(() -> new dev.jasper.app.appearance.ThemeController());
+            onEdt(() -> ThemeTestSupport.controller(true));
         }
     }
 

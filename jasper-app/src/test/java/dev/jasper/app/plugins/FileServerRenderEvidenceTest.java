@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import com.formdev.flatlaf.util.UIScale;
 
 import dev.jasper.app.contributions.Contributions;
@@ -45,8 +46,8 @@ class FileServerRenderEvidenceTest {
     }
 
     private void capture(String theme) throws Exception {
-        var controller = onEdtValue(dev.jasper.app.appearance.ThemeController::new);
-        onEdt(() -> controller.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT));
+        var controller = onEdtValue(() -> ThemeTestSupport.controller(true));
+        onEdt(() -> controller.configure(theme.equals("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH));
         Path data = Files.createDirectories(root.resolve(theme));
         Path home = Files.createDirectories(data.resolve("synthetic-home"));
         var contributions = onEdtValue(Contributions::new);
@@ -135,7 +136,7 @@ class FileServerRenderEvidenceTest {
                 onEdt(auxiliary::close);
                 DesktopTestSupport.closeOwners();
             }
-        } finally { onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); }); }
+        } finally { onEdt(() -> { controller.close(); ThemeTestSupport.controller(true); }); }
     }
 
     /** Fixture-only seed: drive the mounted panel's existing bounded activity source without opening a listener. */

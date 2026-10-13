@@ -34,12 +34,10 @@ public final class PluginManagerStatesPreview {
         String id="dev.example.review";
         try {
             PluginJars.build(home.resolve("plugins").resolve(id).resolve("jars"),"main.jar",PluginJars.descriptor(id,"1.0.0","fix.Main")+"capabilities = [\"terminal.observe\"]\n",Map.of(),List.of());
-            Path config=home.resolve("config.toml");Files.writeString(config,"");Files.createDirectories(home.resolve("themes"));
-            try(var in=PluginManagerStatesPreview.class.getResourceAsStream("/dev/jasper/app/appearance/desktop-settings.toml")){Files.copy(in,home.resolve("themes/slate-steel.toml"));}
-            Files.writeString(home.resolve("themes/custom.toml"),Files.readString(home.resolve("themes/slate-steel.toml")).replace("Slate Steel","Copper Night").replace("#4e7db4","#bc784d"));
-            var catalog=ThemeCatalog.beside(config);catalog.scan();
+            Path config=home.resolve("config.toml");Files.writeString(config,"");
+           
             SwingUtilities.invokeAndWait(()->{
-                controller[0]=new ThemeController();
+                controller[0]=ThemeTestSupport.controller(true);
                 windows[0]=new AuxiliaryWindows(UiState.inMemory(),surface->new AuxiliarySurface.Shell(()->{},()->{},()->{},title->{},()->new Rectangle(0,0,744,600),(title,initial)->Optional.empty()));
                 runtime[0]=new PluginRuntime(new PluginRuntime.Options(null,home.resolve("plugins"),null,true,home.resolve("plugins.toml"),home.resolve("plugins.lock")),new ActivityNotifier(new BuddyTestSupport().companion(),()->{}),PluginRuntime.SettingsReports.IGNORED,new Contributions(),windows[0],new TerminalRegistry());runtime[0].start(Map.of(),true);
                 var resident=new ResidentControl(()->true,()->false);
@@ -50,10 +48,9 @@ public final class PluginManagerStatesPreview {
                 host.setContent(page[0].component());page[0].selected();
             });
             var ready=new CompletableFuture<Void>();runtime[0].snapshot(outcome->ready.complete(null));ready.get(10,TimeUnit.SECONDS);
-            for(String family:List.of("calibration","dark","light","custom"))for(int font:List.of(0,20)) {
-                Theme theme=switch(family){case "dark"->Theme.DARK;case "light"->Theme.JASPER_LIGHT;case "custom"->catalog.latest().find("Copper Night").orElseThrow();default->catalog.latest().find("Slate Steel").orElseThrow();};
+            for(String family:List.of("dark","light"))for(int font:List.of(0,20)) {
                 SwingUtilities.invokeAndWait(()->{
-                    controller[0].configure(theme,new UiFontConfig("system",font));var m=manager[0];var panel=m.panel();Path dir=output.resolve(family+"-"+font);
+                    controller[0].configure(family.startsWith("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system",font));var m=manager[0];var panel=m.panel();Path dir=output.resolve(family+"-"+font);
                     panel.select(id);save(panel,dir.resolve("safe-mode-notice.png"),744,600);
                     var menu=PluginKit.rowMenu(panel,id);save(menu,dir.resolve("row-menu.png"),menu.getPreferredSize().width,menu.getPreferredSize().height);
                     PluginKit.press(panel.detailsPane().header(),PluginDetails.PRIMARY);

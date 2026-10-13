@@ -22,13 +22,13 @@ class Task9cChooserEvidenceTest {
         Files.write(home.resolve("binary.bin"),new byte[]{0,1,2,3});
         Files.createDirectories(home.resolve("a-long-directory-name").resolve("another-long-component"));
         SwingUtilities.invokeAndWait(()->{
-            var themes=new ThemeController();
+            var themes=ThemeTestSupport.controller(true);
             try {
-                for(var theme:List.of(Theme.DARK,Theme.JASPER_LIGHT))for(float font:List.of(13f,20f,32f)) {
-                    themes.configure(theme,new UiFontConfig("system",font));
+                for (boolean themeDark : new boolean[]{true, false})for(float font:List.of(13f,20f,32f)) {
+                    themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system",font));
                     var sourceKit=themes.appearance().context(ThemeRoute.CHROME);
                     var kit=new dev.jasper.ui.swing.KitContext(sourceKit.binding(),sourceKit.route(),sourceKit.metrics(),sourceKit.icons(),()->false);
-                    String family=(theme.dark()?"dark":"light")+"-"+font;
+                    String family=(themeDark?"dark":"light")+"-"+font;
                     for(var mode:ChooserRequest.Mode.values()) {
                         var request=new ChooserRequest("Synthetic chooser",mode,mode==ChooserRequest.Mode.OPEN,Location.local(home),Optional.empty(),Optional.of("example.txt"),Optional.empty(),Optional.empty());
                         var prefs=new ChooserPrefs(UiState.inMemory());
@@ -42,12 +42,12 @@ class Task9cChooserEvidenceTest {
                             save(panel,family,mode+"-narrow-short-scrolled",600,320);
                             if(mode==ChooserRequest.Mode.SAVE) {
                                 var input=panel.nameInput().orElseThrow();var document=input.getDocument();input.select(1,4);
-                                themes.configure(theme.dark()?Theme.JASPER_LIGHT:Theme.DARK,new UiFontConfig("system",font));
+                                themes.configure(!themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH,new UiFontConfig("system",font));
                                 assertThat(panel.nameInput().orElseThrow().getDocument()).isSameAs(document);
                                 assertThat(input.getSelectedText()).isEqualTo("xam");
                                 panel.approve();assertThat(replace).hasValue(1);assertThat(completed).isEmpty();
                                 save(panel,family,"SAVE-replace-declined",920,560);
-                                themes.configure(theme,new UiFontConfig("system",font));
+                                themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system",font));
                             }
                             model.setFilter("no matching fixture");save(panel,family,mode+"-filtered-empty",920,560);
                             assertThat(panel.centerMessage()).isPresent();model.setFilter("");
@@ -109,7 +109,7 @@ class Task9cChooserEvidenceTest {
                         panel.close();model.close();attempts.getLast().completeExceptionally(new IllegalStateException("late synthetic failure"));
                     } finally {panel.close();model.close();}
                 }
-            } finally {themes.configure(Theme.DARK,UiFontConfig.defaults());themes.close();}
+            } finally {themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());themes.close();}
         });
     }
     private static void save(JComponent panel,String theme,String state,int width,int height) {

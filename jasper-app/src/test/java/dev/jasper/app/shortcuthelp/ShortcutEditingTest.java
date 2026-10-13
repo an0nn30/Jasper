@@ -1,5 +1,6 @@
 package dev.jasper.app.shortcuthelp;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.testsupport.KitTestSupport;
 import java.awt.event.InputEvent;
@@ -131,7 +132,7 @@ class ShortcutEditingTest {
             var prior=javax.swing.UIManager.getLookAndFeel();
             try {
                 if(flat) {
-                    assertThat(dev.jasper.app.appearance.ThemeManager.install(dev.jasper.app.appearance.Theme.DARK)).isTrue();
+                    assertThat(dev.jasper.app.appearance.ThemeTestSupport.install(true)).isTrue();
                     assertThat(javax.swing.UIManager.getLookAndFeel().getClass().getName()).contains("SnapshotLaf");
                 } else javax.swing.UIManager.setLookAndFeel(new javax.swing.plaf.metal.MetalLookAndFeel());
                 scenario.run();

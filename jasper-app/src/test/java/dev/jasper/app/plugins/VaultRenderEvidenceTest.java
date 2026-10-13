@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import com.formdev.flatlaf.util.UIScale;
 
 import dev.jasper.app.windows.AuxiliarySurface;
@@ -30,17 +31,11 @@ class VaultRenderEvidenceTest {
         for (String theme : List.of("dark", "light")) capture(theme, root.resolve(theme));
     }
 
-    @Test void actualCompanionFormsRenderInDarkLightCustomAndEnlargedThemes() throws Exception {
-        for (String theme : List.of("dark", "light", "custom", "enlarged")) {
-            var controller=onEdtValue(dev.jasper.app.appearance.ThemeController::new);
+    @Test void actualCompanionFormsRenderInDarkLightAndEnlargedThemes() throws Exception {
+        for (String theme : List.of("dark", "light", "enlarged")) {
+            var controller=onEdtValue(() -> ThemeTestSupport.controller(true));
             try {
-                var selected=theme.equals("light")?dev.jasper.app.appearance.Theme.JASPER_LIGHT:dev.jasper.app.appearance.Theme.DARK;
-                if(theme.equals("custom")) {
-                    Path file=Path.of("src/test/resources/dev/jasper/app/appearance/custom-hero.toml");
-                    selected=dev.jasper.app.appearance.Theme.of("companion-custom",new dev.jasper.app.appearance.Theme.UserFile(file,dev.jasper.ui.themeio.ThemeToml.parse(Files.readString(file),file.toString())));
-                }
-                var installed=selected;
-                onEdt(()->controller.configure(installed,theme.equals("enlarged")?new dev.jasper.app.config.UiFontConfig("system",20f):dev.jasper.app.config.UiFontConfig.defaults()));
+                onEdt(()->controller.configure(!theme.equals("light"), dev.jasper.app.config.TerminalSchemeChoice.MATCH, theme.equals("enlarged")?new dev.jasper.app.config.UiFontConfig("system",20f):dev.jasper.app.config.UiFontConfig.defaults()));
                 var appearance=onEdtValue(()->new WorkspaceAppearanceFixture(controller.current()));
                 try(var vault=new StagedVaultHost(root.resolve("companions-"+theme),!theme.equals("light"),appearance)) {
                     vault.createVault("synthetic-companion-password");
@@ -75,7 +70,7 @@ class VaultRenderEvidenceTest {
                     vault.invoke("dev.jasper.vault.lock");onEdt(()->click(manager,"unlock"));natural(theme,"inline-unlock",manager);
                     assertThat(vault.problems).isEmpty();
                 }
-            } finally {onEdt(()->{controller.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());controller.close();});}
+            } finally {onEdt(()->{controller.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());controller.close();});}
         }
     }
     private static Object reflect(Class<?> type,Object target,String name,Class<?>[] parameters,Object... arguments) {
@@ -94,8 +89,8 @@ class VaultRenderEvidenceTest {
     }
 
     private void capture(String theme, Path data) throws Exception {
-        var controller = onEdtValue(dev.jasper.app.appearance.ThemeController::new);
-        onEdt(() -> controller.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT));
+        var controller = onEdtValue(() -> ThemeTestSupport.controller(true));
+        onEdt(() -> controller.configure(theme.equals("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH));
         try (var vault = new StagedVaultHost(data, theme.equals("dark"))) {
             vault.invoke("dev.jasper.vault.open");
             var create = vault.surface("Create Vault");
@@ -125,7 +120,7 @@ class VaultRenderEvidenceTest {
             onEdt(() -> unlock.requestClose());
             assertThat(vault.problems).isEmpty();
         } finally {
-            onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); });
+            onEdt(() -> { controller.close(); ThemeTestSupport.controller(true); });
         }
     }
 

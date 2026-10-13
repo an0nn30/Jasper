@@ -77,8 +77,8 @@ class NotificationCardTest {
             try (var card = card(kit, notification, false)) {
                 var count = Arrays.stream(card.getComponents()).filter(TextBlock.class::isInstance).map(TextBlock.class::cast)
                     .filter(text -> text.text().equals("×2")).findFirst().orElseThrow();
-                for (String name : List.of("Clear Light", "Jasper Light", "Nord", "Clear Dark", "Jasper Dark")) {
-                    var theme = dev.jasper.ui.theme.ThemeGenerator.generate(ThemeTestSupport.named(name).source().document());
+                for (boolean dark : new boolean[]{true, false}) {
+                    var theme = ThemeTestSupport.generated(dark); String name = dark ? "Dark" : "Light";
                     var raw = theme.semantic().color(SemanticColor.TEXT_SECONDARY);
                     binding.publish(new dev.jasper.ui.theme.ThemePair(theme, theme));
                     assertThat(dev.jasper.ui.theme.ColorMath.contrast(count.getForeground(), theme.semantic().color(SemanticColor.SURFACE_CARD)))

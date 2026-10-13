@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import java.awt.Dimension;
 import java.nio.file.Path;
 import javax.swing.*;
@@ -14,7 +15,7 @@ class VaultNativeCompositionTest {
     @TempDir Path directory;
     @Test void titleActionsOpenAttachedEditorsAndLockWithoutDuplicatingBodyControls() throws Exception {
         var previousLaf = AppContractTest.onEdtValue(UIManager::getLookAndFeel);
-        onEdt(() -> assertThat(dev.jasper.app.appearance.ThemeManager.install(dev.jasper.app.appearance.Theme.DARK)).isTrue());
+        onEdt(() -> assertThat(dev.jasper.app.appearance.ThemeTestSupport.install(true)).isTrue());
         try (var vault = new StagedVaultHost(directory, true)) {
             vault.createVault("synthetic-pass");var manager = vault.surface("Credential Vault");
             onEdt(() -> {

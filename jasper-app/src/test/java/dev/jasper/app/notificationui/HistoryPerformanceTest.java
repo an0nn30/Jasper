@@ -1,5 +1,6 @@
 package dev.jasper.app.notificationui;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.contributions.PanelSite;
@@ -21,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class HistoryPerformanceTest {
     @Test void fiveHundredEntriesRetainRowsThroughLiveThemeChanges() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            try (var controller = new ThemeController()) {
+            try (var controller = ThemeTestSupport.controller(true)) {
                 var center = new NotificationCenter(Runnable::run, Clock.systemUTC(), () -> Delivery.Presence.FOCUSED);
                 center.register(new NotificationGroup("perf", "Performance fixture", "jasper", DisplayMode.CARD));
                 for (int i = 0; i < 500; i++) center.post(NotificationRequest.of("perf", Severity.INFO, "Fixture notification " + i)
@@ -38,8 +39,8 @@ class HistoryPerformanceTest {
                     int views = count(panel);
                     assertThat(views).isGreaterThanOrEqualTo(1500);
                     var timings = new java.util.ArrayList<Double>();
-                    for (var theme : List.of(Theme.JASPER_LIGHT, Theme.DARK, Theme.JASPER_LIGHT, Theme.DARK)) {
-                        long start = System.nanoTime(); controller.configure(theme); paint(panel);
+                    for (boolean themeDark : new boolean[]{false, true, false, true}) {
+                        long start = System.nanoTime(); controller.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH); paint(panel);
                         timings.add((System.nanoTime() - start) / 1_000_000.0);
                         assertThat(center.history().stream().map(n -> panel.row(n.id())).toList()).containsExactlyElementsOf(retained);
                     }

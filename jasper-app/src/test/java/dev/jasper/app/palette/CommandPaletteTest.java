@@ -718,14 +718,14 @@ class CommandPaletteTest {
 
     @Test void enlargedQueryAndResultInkFitsItsActualMountedAllocation() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var themes = new ThemeController();
+            var themes = ThemeTestSupport.controller(true);
             var palette = palette(themes.appearance().context(ThemeRoute.CHROME), true, new ArrayList<>());
             try {
                 palette.setEntries(List.of(new PaletteEntry.Header("Recently used"), item(COMMANDS, "AgjyÉ")), null, null);
                 var query = PaletteTestSupport.query(palette);
                 query.setText("AgjyÉ"); query.select(1, 3);
                 var document = query.getDocument();
-                themes.configure(Theme.DARK, new UiFontConfig("system", 32f));
+                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system", 32f));
                 palette.refreshTheme();
                 palette.setSize(palette.getPreferredSize()); layoutTree(palette);
                 var frc = new java.awt.font.FontRenderContext(null, true, true);
@@ -740,18 +740,18 @@ class CommandPaletteTest {
                 assertThat(query.getSelectionStart()).isEqualTo(1);
                 assertThat(query.getSelectionEnd()).isEqualTo(3);
                 assertThat(palette.selectedKey()).isEqualTo(COMMANDS.id() + "/AgjyÉ");
-            } finally { themes.configure(Theme.DARK, UiFontConfig.defaults()); palette.close(); themes.close(); }
+            } finally { themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults()); palette.close(); themes.close(); }
         });
     }
 
     @Test void liveTypographyKeepsNominalMinimumsAndGrowsForRealContent() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var themes = new ThemeController();
+            var themes = ThemeTestSupport.controller(true);
             var palette = palette(themes.appearance().context(ThemeRoute.CHROME), true, new ArrayList<>());
             palette.setEntries(List.of(new PaletteEntry.Header("Commands"), item(COMMANDS, "a")), null, null);
             try {
                 for (float size : new float[]{18, 32, 12}) {
-                    themes.configure(Theme.DARK, new UiFontConfig("system", size));
+                    themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system", size));
                     palette.refreshTheme();
                     palette.setSize(palette.getPreferredSize());
                     layoutTree(palette);
@@ -760,7 +760,7 @@ class CommandPaletteTest {
                     assertThat(palette.hintBar().getHeight()).isGreaterThanOrEqualTo(UIScale.scale(26));
                     assertThat(PaletteTestSupport.fieldRow(palette).getHeight()).isGreaterThanOrEqualTo(UIScale.scale(44));
                 }
-            } finally { themes.configure(Theme.DARK, UiFontConfig.defaults()); palette.close(); }
+            } finally { themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults()); palette.close(); }
         });
     }
 
@@ -811,18 +811,18 @@ class CommandPaletteTest {
 
     @Test void renderPaletteResultsAndFormsAtBothScales() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            for (var choice : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                var themes = new ThemeController(choice);
+            for (boolean choiceDark : new boolean[]{true, false}) {
+                var themes = ThemeTestSupport.controller(choiceDark);
                 var card = palette(themes.appearance().context(ThemeRoute.CHROME), true, new ArrayList<>());
                 try {
                     card.setEntries(List.of(new PaletteEntry.Header("Commands"), item(COMMANDS, "new_tab"), item(COMMANDS, "settings")), null, null);
                     var host = new javax.swing.JPanel(new java.awt.GridBagLayout()); host.add(card);
-                    for (int scale : new int[]{1, 2}) saveRender(host, choice.name() + "-palette-" + scale, scale);
+                    for (int scale : new int[]{1, 2}) saveRender(host, (choiceDark ? "dark" : "light") + "-palette-" + scale, scale);
                     card.showStep("Connect", List.of(new PaletteStep.Field("host", "Host", "example.org"), new PaletteStep.Field("user", "Username", "dustin")));
-                    for (int scale : new int[]{1, 2}) saveRender(host, choice.name() + "-palette-form-" + scale, scale);
+                    for (int scale : new int[]{1, 2}) saveRender(host, (choiceDark ? "dark" : "light") + "-palette-form-" + scale, scale);
                 } finally { card.close(); }
             }
-            new ThemeController();
+            ThemeTestSupport.controller(true);
         });
     }
 

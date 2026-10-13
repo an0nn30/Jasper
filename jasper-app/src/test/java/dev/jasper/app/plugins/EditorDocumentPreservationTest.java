@@ -1,8 +1,8 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.appearance.Theme;
-import dev.jasper.app.appearance.ThemeManager;
 import dev.jasper.sdk.ui.UiView;
 import dev.jasper.ui.swing.KitView;
 import dev.jasper.ui.theme.ThemeRoute;
@@ -34,11 +34,10 @@ class EditorDocumentPreservationTest {
     @Test @Timeout(value=60,unit=TimeUnit.SECONDS)
     void sameDarkChangeAndRelocationKeepTheDocumentFindOptionsUndoPinAndCloseGuard() throws Exception {
         var appearance=onEdtValue(WorkspaceAppearanceFixture::new);
-        var chrome=onEdtValue(() -> ThemeManager.generated(Theme.JASPER_LIGHT));
-        var first=onEdtValue(() -> ThemeManager.generated(Theme.DARK));
-        var next=onEdtValue(() -> ThemeManager.generated(ThemeManager.builtIns().stream()
-            .filter(theme -> theme.dark() && !theme.equals(Theme.DARK)).findFirst().orElseThrow()));
-        onEdt(() -> appearance.setPair(new ResolvedTheme(chrome,first)));
+        var chrome=onEdtValue(() -> ThemeTestSupport.generated(false));
+        var first=onEdtValue(() -> ThemeTestSupport.generated(true));
+        var next=sameDarkness(first);
+        onEdt(() -> appearance.setPair(ThemeTestSupport.mixed(chrome,first)));
         try(var editor=new StagedEditorHost(root,true,appearance)) {
             var state=onEdtValue(() -> {
                 call(editor.editorWindow(),"newUntitled");
@@ -77,7 +76,7 @@ class EditorDocumentPreservationTest {
                 assertThat(editor.context.appearance().workspaceVariant()).isEqualTo(dev.jasper.sdk.Variant.DARK);
                 return new Object[]{area,document,tab,view,keyword};
             });
-            onEdt(() -> appearance.setPair(new ResolvedTheme(chrome,next)));
+            onEdt(() -> appearance.setPair(ThemeTestSupport.mixed(chrome,next)));
             onEdt(() -> {
                 var area=(JTextArea)state[0]; var tab=(dev.jasper.sdk.ui.ContentTab)state[2]; var view=(KitView)state[3];
                 assertThat(area.getDocument()).isSameAs(state[1]);
@@ -94,7 +93,7 @@ class EditorDocumentPreservationTest {
                 assertThat(named(view,"find.replacement.input",JTextComponent.class).getText()).isEqualTo("bar");
                 for(var id:List.of("find.case","find.word","find.regex"))assertThat(named(view,id,AbstractButton.class).isSelected()).isTrue();
                 assertThat(named(view,"find.bar",javax.swing.JComponent.class).isVisible()).isTrue();
-                assertThat(named(view,"find.status",JLabel.class).getForeground()).isEqualTo(next.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
+                assertThat(named(view,"find.status",JLabel.class).getForeground()).as("a caption").isEqualTo(next.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
                 tab.move(false);assertThat(opacity(editor)).isEqualTo(.8);
                 call(area,"undoLastAction");assertThat(area.getText()).isEqualTo("int foo = 42;\nfoo += 1;\n");
                 call(area,"redoLastAction");
@@ -129,7 +128,7 @@ class EditorDocumentPreservationTest {
                 var tab=editor.selectedTab();var area=editor.documentText();var view=editor.documentView();
                 var before=area.getCaretColor();var style=call(area,"getSyntaxEditingStyle");
                 view.close();
-                appearance.setPair(new ResolvedTheme(ThemeManager.generated(Theme.JASPER_LIGHT),ThemeManager.generated(Theme.JASPER_LIGHT)));
+                appearance.setPair(ThemeTestSupport.resolved(false));
                 call(call(tab,"session"),"setStyle",new Class<?>[]{String.class},"text/java");
                 assertThat(area.getCaretColor()).isEqualTo(before);
                 assertThat(call(area,"getSyntaxEditingStyle")).isEqualTo(style);
@@ -164,10 +163,10 @@ class EditorDocumentPreservationTest {
     }
 
     @Test void theActualDocumentCornerKeepsWorkspaceGlassAndNativeTracksSurviveReparentingUnderLightChrome() throws Exception {
-        var controller=onEdtValue(dev.jasper.app.appearance.ThemeController::new);
-        onEdt(() -> controller.configure(Theme.JASPER_LIGHT));
+        var controller=onEdtValue(() -> ThemeTestSupport.controller(true));
+        onEdt(() -> controller.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH));
         var appearance=onEdtValue(WorkspaceAppearanceFixture::new);
-        onEdt(() -> appearance.setPair(new ResolvedTheme(ThemeManager.generated(Theme.JASPER_LIGHT),ThemeManager.generated(Theme.DARK))));
+        onEdt(() -> appearance.setPair(ThemeTestSupport.mixed(ThemeTestSupport.generated(false),ThemeTestSupport.generated(true))));
         try(var editor=new StagedEditorHost(root,true,appearance)) {
             onEdt(() -> {
                 call(editor.editorWindow(),"newUntitled");var area=editor.documentText();
@@ -199,17 +198,16 @@ class EditorDocumentPreservationTest {
                 editor.contentTab().close();
             });
             assertThat(editor.problems).isEmpty();
-        } finally {onEdt(() -> {controller.close();new dev.jasper.app.appearance.ThemeController();});}
+        } finally {onEdt(() -> {controller.close();ThemeTestSupport.controller(true);});}
     }
 
     @Test @Timeout(value=60,unit=TimeUnit.SECONDS)
     void vimFeedbackUsesTheHostedKitAndKeepsCommandAndOutputThroughThemeAndMove() throws Exception {
         var appearance=onEdtValue(WorkspaceAppearanceFixture::new);
-        var chrome=onEdtValue(() -> ThemeManager.generated(Theme.JASPER_LIGHT));
-        var first=onEdtValue(() -> ThemeManager.generated(Theme.DARK));
-        var next=onEdtValue(() -> ThemeManager.generated(ThemeManager.builtIns().stream()
-            .filter(theme -> theme.dark() && !theme.equals(Theme.DARK)).findFirst().orElseThrow()));
-        onEdt(() -> appearance.setPair(new ResolvedTheme(chrome,first)));
+        var chrome=onEdtValue(() -> ThemeTestSupport.generated(false));
+        var first=onEdtValue(() -> ThemeTestSupport.generated(true));
+        var next=sameDarkness(first);
+        onEdt(() -> appearance.setPair(ThemeTestSupport.mixed(chrome,first)));
         try(var editor=new StagedEditorHost(root,true,appearance)) {
             Object[] state=onEdtValue(() -> {
                 call(editor.editorWindow(),"newUntitled");
@@ -240,7 +238,7 @@ class EditorDocumentPreservationTest {
                 output.getViewport().setViewPosition(new java.awt.Point(0,0));
                 return new Object[]{vim,view,document,output};
             });
-            onEdt(() -> appearance.setPair(new ResolvedTheme(chrome,next)));
+            onEdt(() -> appearance.setPair(ThemeTestSupport.mixed(chrome,next)));
             onEdt(() -> {
                 var view=(KitView)state[1];var output=(javax.swing.JScrollPane)state[3];
                 assertThat(editor.documentText().getDocument()).isSameAs(state[2]);
@@ -261,7 +259,7 @@ class EditorDocumentPreservationTest {
                 feed(editor,state[0],"/line<Left>");
                 var command=(dev.jasper.sdk.ui.Nodes.Text)findNode(editor.documentView().spec().root(),"vim.status");
                 assertThat(command.caret()).hasValue(4);
-                appearance.setPair(new ResolvedTheme(chrome,first));
+                appearance.setPair(ThemeTestSupport.mixed(chrome,first));
                 assertThat(findNode(editor.documentView().spec().root(),"vim.status")).isEqualTo(command);
                 assertThat(named(view,"vim.status",JLabel.class).getForeground()).isEqualTo(first.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
                 dev.jasper.sdk.contracts.ThemeMigrationCapture.save("editor-hosted","dark","document-vim-command-after-theme",view,1100,520);
@@ -307,5 +305,15 @@ class EditorDocumentPreservationTest {
             refresh.setAccessible(true);refresh.invoke(area,graphics);
             var flag=type.getDeclaredField("metricsNeverRefreshed");flag.setAccessible(true);flag.setBoolean(area,false);
         } catch(ReflectiveOperationException failure) {throw new AssertionError(failure);}finally {graphics.dispose();}
+    }
+
+    /** Another palette of the same darkness, delivered through the hosting appearance (Decision 5): plum accent, panel and keywords. */
+    private static dev.jasper.ui.theme.GeneratedTheme sameDarkness(dev.jasper.ui.theme.GeneratedTheme first) {
+        var plum = new java.awt.Color(0x7a3fa0);
+        var keyword = first.syntax().get(dev.jasper.ui.theme.SyntaxRole.KEYWORD);
+        return ThemeTestSupport.withSyntax(ThemeTestSupport.recolored(first, java.util.Map.of(dev.jasper.ui.theme.SemanticColor.ACCENT, plum,
+                dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL, dev.jasper.ui.theme.ColorMath.mix(plum,
+                    first.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL), .2))),
+            java.util.Map.of(dev.jasper.ui.theme.SyntaxRole.KEYWORD, new dev.jasper.ui.theme.SyntaxStyle(plum.brighter(), keyword.bold(), keyword.italic())));
     }
 }

@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import com.formdev.flatlaf.util.UIScale;
 
 import dev.jasper.app.windows.AuxiliarySurface;
@@ -38,8 +39,8 @@ class EditorRenderEvidenceTest {
     }
 
     private void capture(String theme, Path data) throws Exception {
-        var controller = onEdtValue(dev.jasper.app.appearance.ThemeController::new);
-        onEdt(() -> controller.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT));
+        var controller = onEdtValue(() -> ThemeTestSupport.controller(true));
+        onEdt(() -> controller.configure(theme.equals("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH));
         try (var editor = new StagedEditorHost(data, theme.equals("dark"))) {
             onEdt(() -> editor.ask("Unsaved changes", "Save changes to example.txt?", List.of("Save", "Don't Save", "Cancel"), false, answer -> { }));
             var unsaved = editor.awaitSurface("Unsaved changes");
@@ -87,7 +88,7 @@ class EditorRenderEvidenceTest {
             assertThat(waited.get(10, TimeUnit.SECONDS)).isTrue();
             assertThat(editor.problems).isEmpty();
         } finally {
-            onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); });
+            onEdt(() -> { controller.close(); ThemeTestSupport.controller(true); });
         }
     }
 

@@ -1,7 +1,6 @@
 package dev.jasper.app.settingsui;
 
-import dev.jasper.app.appearance.Theme;
-import dev.jasper.app.appearance.ThemeCatalog;
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigLoader;
 import dev.jasper.app.config.ConfigService;
@@ -41,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Plan 3 Task 8: the actual Settings pages of the Editor, Sample, Project Index and Shell History plugins, through the
  * real SettingsDialog and plugin runtime with the application's appearance wiring (as JasperApplication passes it), at
- * device scale 2 in the calibration, dark and light themes and with an enlarged font. The plugins' own pages (Sample,
+ * device scale 2 in Slate Steel Dark and Light and with an enlarged font. The plugins' own pages (Sample,
  * Project Index) and the generated ones (Editor, Shell History) read as one design system: the same section labels,
  * settings cards and card colour, at the same card position, in every theme. Output goes to
  * build/theme-migration-evidence/editor-hosted-2x/settings/&lt;family&gt;/.
@@ -58,14 +57,13 @@ class PluginSettingsPagesEvidenceTest {
         var themes = new ThemeController[1]; var runtime = new PluginRuntime[1]; var manager = new PluginManager[1]; var contributions = new Contributions();
         Object[] priorCaps = new Object[1];
         try {
-            Path file = home.resolve("config.toml"); Files.writeString(file, SettingsSurfacePreview.CONFIG); Files.createDirectories(home.resolve("themes"));
-            try (var in = PluginSettingsPagesEvidenceTest.class.getResourceAsStream("/dev/jasper/app/appearance/desktop-settings.toml")) { Files.copy(in, home.resolve("themes/slate-steel.toml")); }
-            var catalog = ThemeCatalog.beside(file); catalog.scan(); var parsed = ConfigLoader.parse(file, SettingsSurfacePreview.CONFIG, true);
+            Path file = home.resolve("config.toml"); Files.writeString(file, SettingsSurfacePreview.CONFIG);
+            var parsed = ConfigLoader.parse(file, SettingsSurfacePreview.CONFIG, true);
             var state = new ConfigService.State(parsed.snapshot(), parsed.diagnostics(), file, true, parsed.legacyKeys(), parsed.deadTables(), parsed.values(), false);
             SwingUtilities.invokeAndWait(() -> {
                 priorCaps[0] = javax.swing.UIManager.get("PasswordField.showCapsLock");
                 javax.swing.UIManager.put("PasswordField.showCapsLock", false);
-                themes[0] = new ThemeController();
+                themes[0] = ThemeTestSupport.controller(true);
                 runtime[0] = new PluginRuntime(new PluginRuntime.Options(Path.of(System.getProperty("jasper.stagedPlugins")), home.resolve("plugins"), null, false,
                     home.resolve("plugins.toml"), home.resolve("plugins.lock")), new ActivityNotifier(new BuddyTestSupport().companion(), () -> { }),
                     PluginRuntime.SettingsReports.IGNORED, contributions, windows, new TerminalRegistry());
@@ -77,13 +75,10 @@ class PluginSettingsPagesEvidenceTest {
                     false, Runnable::run, path -> { }, path -> { }, uri -> { }));
             });
             var lines = new ArrayList<String>();
-            for (String family : List.of("calibration", "dark", "light", "dark-font20")) {
+            for (String family : List.of("dark", "light", "dark-font20")) {
                 var dialog = new SettingsDialog[1];
-                Theme theme = switch (family) {
-                    case "light" -> Theme.JASPER_LIGHT; case "calibration" -> catalog.latest().find("Slate Steel").orElseThrow(); default -> Theme.DARK;
-                };
                 SwingUtilities.invokeAndWait(() -> {
-                    themes[0].configure(theme, new UiFontConfig("system", family.endsWith("font20") ? 20 : 0));
+                    themes[0].configure(family.startsWith("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system", family.endsWith("font20") ? 20 : 0));
                     var hooks = new KeymapPage.Hooks(contributions, Map::of, () -> Map.of("dev.jasper.editor", "Editor"), true, edits -> CompletableFuture.completedFuture(null));
                     var pages = new CorePages.Pages(context -> new KeymapPage(hooks, context), context -> manager[0].page(context), context -> runtime[0].settingsPages(context));
                     dialog[0] = new SettingsDialog(windows, CorePages.pages(AppearanceFixtures.choices(() -> Optional.of(false)),
@@ -111,7 +106,7 @@ class PluginSettingsPagesEvidenceTest {
                 });
             }
             Files.writeString(output.resolve("cards.txt"), String.join("\n", lines) + "\n");
-            for (String family : List.of("calibration", "dark", "light", "dark-font20")) {
+            for (String family : List.of("dark", "light", "dark-font20")) {
                 var rows = lines.stream().filter(line -> line.startsWith(family + " ")).toList();
                 assertThat(rows).hasSize(PLUGINS.size());
                 assertThat(rows).extracting(line -> line.replaceAll(".* card x=(\\d+) width=\\d+ ", "x=$1 "))
@@ -125,7 +120,7 @@ class PluginSettingsPagesEvidenceTest {
             if (runtime[0] != null) { var done = new CompletableFuture<List<CompletableFuture<?>>>(); SwingUtilities.invokeAndWait(() -> done.complete(runtime[0].stop()));
                 CompletableFuture.allOf(done.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS); }
             SwingUtilities.invokeAndWait(() -> { windows.close(); if (themes[0] != null) themes[0].close();
-                javax.swing.UIManager.put("PasswordField.showCapsLock", priorCaps[0]); new ThemeController(); });
+                javax.swing.UIManager.put("PasswordField.showCapsLock", priorCaps[0]); ThemeTestSupport.controller(true); });
             try (var paths = Files.walk(home)) { for (var path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path); }
         }
     }

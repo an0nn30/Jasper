@@ -10,14 +10,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Explicit host adapters preserve the engine palettes through independent theme selection. */
+/** Explicit host adapters preserve the engine palettes through variant changes (token reads until Task 7). */
 @ExtendWith(EdtTestExtension.class)
 class LegacyPalettePublicationTest {
-    @Test void dynamicWorkspaceEditorAndSyntaxReadersTrackIndependentSelectionAndMatch() {
-        try (var themes = new ThemeController(Theme.JASPER_LIGHT)) {
+    @Test void dynamicWorkspaceEditorAndSyntaxReadersTrackTheVariant() {
+        try (var themes = ThemeTestSupport.controller(false)) {
             var component = new JPanel(); component.putClientProperty("Jasper.zone", "workspace");
-            for (Theme workspace : java.util.List.of(Theme.DARK, Theme.JASPER_LIGHT, Theme.DARK)) {
-                themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice(workspace.name()), workspace, UiFontConfig.defaults());
+            for (boolean dark : new boolean[]{true, false, true}) {
+                themes.configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
                 var expected = themes.current().workspace();
                 assertThat(HostedPalettes.workspace(themes.current().workspace()).text()).isEqualTo(expected.tokens().get(Token.TEXT));
                 assertThat(HostedPalettes.workspace(themes.current().workspace()).background()).isEqualTo(expected.tokens().get(Token.SURFACE));
@@ -31,7 +31,6 @@ class LegacyPalettePublicationTest {
                 assertThat(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP))
                     .isEqualTo(themes.current().chrome().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
             }
-            themes.configureTerminal(TerminalColors.MATCH);
             assertThat(HostedPalettes.workspace(themes.current().workspace()).text()).isEqualTo(themes.current().chrome().tokens().get(Token.TEXT));
         }
     }

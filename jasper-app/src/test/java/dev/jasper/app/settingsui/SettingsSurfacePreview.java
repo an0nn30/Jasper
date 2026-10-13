@@ -46,22 +46,19 @@ public final class SettingsSurfacePreview {
     public static void capture(Path output) throws Exception {
         Path home=Files.createTempDirectory("jasper-settings9a-");
         try {
-            Path file=home.resolve("config.toml");Files.writeString(file,CONFIG);Files.createDirectories(home.resolve("themes"));
-            try(var in=SettingsSurfacePreview.class.getResourceAsStream("/dev/jasper/app/appearance/desktop-settings.toml")){Files.copy(in,home.resolve("themes/slate-steel.toml"));}
-            Files.writeString(home.resolve("themes/custom.toml"),Files.readString(home.resolve("themes/slate-steel.toml")).replace("Slate Steel","Copper Night").replace("#4e7db4","#bc784d"));
-            var catalog=ThemeCatalog.beside(file);catalog.scan();var parsed=ConfigLoader.parse(file,CONFIG,true);
+            Path file=home.resolve("config.toml");Files.writeString(file,CONFIG);
+           var parsed=ConfigLoader.parse(file,CONFIG,true);
             var state=new ConfigService.State(parsed.snapshot(),parsed.diagnostics(),file,true,parsed.legacyKeys(),parsed.deadTables(),parsed.values(),false);
             var views=new JComponent[1];var windows=new AuxiliaryWindows(UiState.inMemory(),surface->{views[0]=surface.holder();return new AuxiliarySurface.Shell(()->{},()->{},()->{},title->{},()->new Rectangle(0,0,980,681),(title,initial)->Optional.empty());});
             var controller=new ThemeController[1];var runtime=new PluginRuntime[1];
             SwingUtilities.invokeAndWait(()->{
-                controller[0]=new ThemeController();
+                controller[0]=ThemeTestSupport.controller(true);
                 runtime[0]=new PluginRuntime(new PluginRuntime.Options(Path.of(System.getProperty("jasper.stagedPlugins")),home.resolve("plugins"),null,false,home.resolve("plugins.toml"),home.resolve("plugins.lock")),new ActivityNotifier(new BuddyTestSupport().companion(),()->{}),PluginRuntime.SettingsReports.IGNORED,new Contributions(),windows,new TerminalRegistry());runtime[0].start(Map.of(),true);
             });
             try {
-                for(String family:List.of("calibration","dark","light","custom"))for(int font:List.of(0,20)) {
-                    Theme theme=switch(family){case "dark"->Theme.DARK;case "light"->Theme.JASPER_LIGHT;case "custom"->catalog.latest().find("Copper Night").orElseThrow();default->catalog.latest().find("Slate Steel").orElseThrow();};
+                for(String family:List.of("dark","light"))for(int font:List.of(0,20)) {
                     SwingUtilities.invokeAndWait(()->{
-                        controller[0].configure(theme,new UiFontConfig("system",font));
+                        controller[0].configure(family.startsWith("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system",font));
                         var groups=List.of(group("jasper.general","Jasper","card","Jasper","jasper","appearance"),group("jasper.config","Configuration","sticky","Jasper","jasper","appearance"),group("jasper.plugins","Plugin problems","card","Jasper","jasper","appearance"),group("jasper.internal","Internal errors","sticky","Jasper","jasper","appearance"),group("jasper.commands","Long-running commands","card","Jasper","jasper","appearance"),group("dev.jasper.editor","Editor","card","Editor","dev.jasper.editor","edit"),group("dev.jasper.editor.files","Files","card","Editor","dev.jasper.editor","edit"));
                         var pages=new CorePages.Pages(context->new GroupPage("keymap","Keymap",Optional.empty(),false,List::of,context),context->new GroupPage("plugins","Plugins",Optional.empty(),false,List::of,context),context->runtime[0].settingsPages(context));
                         var systemDark=new java.util.concurrent.atomic.AtomicReference<>(Optional.of(false));

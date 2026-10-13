@@ -1,7 +1,8 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ResolvedTheme;
-import dev.jasper.app.appearance.Theme;
+
 import dev.jasper.app.appearance.ThemeManager;
 import dev.jasper.sdk.ui.*;
 import dev.jasper.ui.swing.KitView;
@@ -38,8 +39,8 @@ class WorkspaceContentRouteTest {
 
     @Test void aContentTabTakesTheWorkspaceSlotOverAnOpaqueSurfaceWhileWindowsKeepChrome() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var chrome = ThemeManager.generated(Theme.JASPER_LIGHT); var workspace = ThemeManager.generated(Theme.DARK);
-            var mixed = new ResolvedTheme(chrome, workspace);
+            var chrome = ThemeTestSupport.generated(false); var workspace = ThemeTestSupport.generated(true);
+            var mixed = ThemeTestSupport.mixed(chrome, workspace);
             var containment = new Containment(() -> true); var model = new dev.jasper.app.contributions.Contributions();
             var main = java.util.UUID.randomUUID(); var separate = java.util.UUID.randomUUID();
             var mainHolder = new JPanel(); var separateHolder = new JPanel();
@@ -97,8 +98,8 @@ class WorkspaceContentRouteTest {
     /** A mixed light-chrome, dark-workspace host whose main content host adds the component and then fails. */
     @Test void aFailedPublicationReturnsTheViewAndItsContentToChromeAndTheCaller() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var chrome = ThemeManager.generated(Theme.JASPER_LIGHT); var workspace = ThemeManager.generated(Theme.DARK);
-            var mixed = new ResolvedTheme(chrome, workspace);
+            var chrome = ThemeTestSupport.generated(false); var workspace = ThemeTestSupport.generated(true);
+            var mixed = ThemeTestSupport.mixed(chrome, workspace);
             var containment = new Containment(() -> true); var model = new dev.jasper.app.contributions.Contributions();
             var main = java.util.UUID.randomUUID(); var holder = new JPanel();
             model.content().addHost(new dev.jasper.app.contributions.ContentHost(main, false,
@@ -123,8 +124,8 @@ class WorkspaceContentRouteTest {
 
     @Test void aRouteChangeAloneRefreshesRegisteredContent() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var chrome = ThemeManager.generated(Theme.JASPER_LIGHT); var workspace = ThemeManager.generated(Theme.DARK);
-            var mixed = new ResolvedTheme(chrome, workspace);
+            var chrome = ThemeTestSupport.generated(false); var workspace = ThemeTestSupport.generated(true);
+            var mixed = ThemeTestSupport.mixed(chrome, workspace);
             var containment = new Containment(() -> true);
             var ui = new HostedUi("test.kit", new dev.jasper.app.contributions.Contributions(), containment, Runnable::run, () -> true, () -> true, getClass().getClassLoader(),
                 () -> dev.jasper.sdk.Variant.LIGHT, h -> () -> {}, AppContractTest.headlessWindows(), null, () -> mixed, h -> new dev.jasper.app.lifecycle.Subscription(() -> {}), GlassSource.NONE);

@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import static dev.jasper.app.plugins.AppContractTest.onEdt;
 import static dev.jasper.app.plugins.AppContractTest.onEdtValue;
 import static org.assertj.core.api.Assertions.*;
@@ -334,7 +335,7 @@ class PluginPanelPageTest {
             settings.page(rows -> { throw new IllegalStateException("<html>boom"); });
         });
         onEdt(() -> {
-            try (var themes = new dev.jasper.app.appearance.ThemeController()) {
+            try (var themes = ThemeTestSupport.controller(true)) {
                 var live = new PageContext(null, id -> {}, Runnable::run, (title, initial) -> Optional.empty(), () -> {}, () -> null,
                     () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
                 var page = (PluginPanelPage) host.settingsPages(live).getFirst();
@@ -343,8 +344,8 @@ class PluginPanelPageTest {
                     var body = page.component(); var stopped = stub.component();
                     var failure = (JLabel) StagedVaultHost.named(page.content(), "plugin-page-text");
                     var reason = (JLabel) StagedVaultHost.named(stopped, "plugin-stub.reason");
-                    for (var theme : List.of(dev.jasper.app.appearance.Theme.JASPER_LIGHT, dev.jasper.app.appearance.Theme.DARK)) {
-                        themes.configure(theme, new dev.jasper.app.config.UiFontConfig("system", 24));
+                    for (boolean themeDark : new boolean[]{false, true}) {
+                        themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system", 24));
                         assertThat(page.component()).isSameAs(body);
                         assertThat(stub.component()).isSameAs(stopped);
                         assertThat(failure.getText()).isEqualTo("This page could not be shown: <html>boom");
@@ -353,8 +354,8 @@ class PluginPanelPageTest {
                         assertThat(failure.getForeground()).isEqualTo(live.kit().get().theme().semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
                         assertThat(reason.getForeground()).isEqualTo(live.kit().get().theme().semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
                         assertThat(failure.getFont().getSize2D()).isGreaterThanOrEqualTo(24);
-                        dev.jasper.sdk.contracts.ThemeMigrationCapture.save("plugin-settings-host",theme.id(),"failed",body,640,360);
-                        dev.jasper.sdk.contracts.ThemeMigrationCapture.save("plugin-settings-host",theme.id(),"stopped",stopped,640,360);
+                        dev.jasper.sdk.contracts.ThemeMigrationCapture.save("plugin-settings-host",themeDark ? "dark" : "light","failed",body,640,360);
+                        dev.jasper.sdk.contracts.ThemeMigrationCapture.save("plugin-settings-host",themeDark ? "dark" : "light","stopped",stopped,640,360);
                     }
                 } finally { page.dispose(); stub.dispose(); }
                 assertThat(((dev.jasper.ui.swing.KitView) page.content()).isClosed()).isTrue();

@@ -1,5 +1,6 @@
 package dev.jasper.app.shortcuthelp;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.KeyContext;
 import dev.jasper.app.config.KeyBindings;
@@ -141,14 +142,14 @@ class ShortcutHelpTest {
 
     @Test void themedRowsGrowWithTypographyAndSearchControlsRemainUsable() throws Exception {
         edt(() -> {
-            var themes = new dev.jasper.app.appearance.ThemeController();
+            var themes = ThemeTestSupport.controller(true);
             var panel = panel(true, changes -> { throw new AssertionError("Unexpected save"); });
             try {
                 panel.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true));
                 panel.setSize(1000, 640);
                 dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(panel);
                 int normal = rowHeight(panel);
-                themes.configure(dev.jasper.app.appearance.Theme.DARK, new dev.jasper.app.config.UiFontConfig("system", 18));
+                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system", 18));
                 javax.swing.SwingUtilities.updateComponentTreeUI(panel);
                 dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(panel);
                 assertThat(rowHeight(panel)).isGreaterThan(normal);
@@ -158,7 +159,7 @@ class ShortcutHelpTest {
                 assertThat(search(panel).getHeight()).as("the search text is never squeezed").isGreaterThanOrEqualTo(search(panel).getPreferredSize().height);
             } finally {
                 panel.close();
-                themes.configure(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults());
+                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());
             }
         });
     }

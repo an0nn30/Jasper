@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.KeyContext;
 import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
@@ -54,20 +55,27 @@ class HostedUiTest {
     { ui.kit(kit); }
     private dev.jasper.sdk.ui.UiView view(){return kit.create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body",dev.jasper.sdk.ui.ControlState.READY,"Content",dev.jasper.sdk.ui.Nodes.TextRole.BODY)),e -> {});}
 
+    /** Slate Steel Dark with a plum accent and panel: another workspace of the same darkness, for hosting code that takes any pair (Decision 5). */
+    private static dev.jasper.ui.theme.GeneratedTheme recolouredDark() {
+        var plum = new java.awt.Color(0x7a3fa0);
+        return ThemeTestSupport.recolored(ThemeTestSupport.generated(true), java.util.Map.of(
+            dev.jasper.ui.theme.SemanticColor.ACCENT, plum, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL, dev.jasper.ui.theme.ColorMath.mix(plum,
+                ThemeTestSupport.color(true, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL), .2)));
+    }
+
     @Test void workspaceChangesPublishRichValuesWithoutChangingChromeAndDisposeListeners() {
-        var themes = new dev.jasper.app.appearance.ThemeController();
+        // HostedUi takes any pair: a recoloured Dark workspace under the Dark chrome is a workspace-only change.
+        var themes = new WorkspaceAppearanceFixture();
         var hosted = new HostedUi("dev.x.tool", model, containment, Runnable::run,
             javax.swing.SwingUtilities::isEventDispatchThread, open::get, getClass().getClassLoader(), () -> Variant.DARK,
             handler -> { themeHandlers.add(handler); return () -> themeHandlers.remove(handler); }, auxiliary, terminals,
-            themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
+            themes::current, themes::subscribe);
         var appearance = hosted.appearance();
         var seen = new ArrayList<dev.jasper.sdk.ui.WorkspacePalette>();
         appearance.onWorkspaceChanged(value -> { seen.add(appearance.workspacePalette());
             assertThat(appearance.syntaxPalette()).isEqualTo(HostedPalettes.syntax(themes.current().workspace())); });
         assertThat(seen).isEmpty();
-        themes.configure(dev.jasper.app.appearance.Theme.DARK,
-            new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA,
-            dev.jasper.app.config.UiFontConfig.defaults());
+        themes.setPair(ThemeTestSupport.mixed(ThemeTestSupport.generated(true), recolouredDark()));
         assertThat(seen).hasSize(1);
         assertThat(appearance.variant()).isEqualTo(Variant.DARK);
         assertThat(appearance.workspaceVariant()).isEqualTo(Variant.DARK);
@@ -77,13 +85,12 @@ class HostedUiTest {
         assertThatThrownBy(() -> java.util.concurrent.CompletableFuture.supplyAsync(appearance::workspacePalette).join())
             .hasCauseInstanceOf(IllegalStateException.class);
         hosted.closeAll();
-        themes.configure(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.config.WorkspaceThemeChoice.MATCH, null,
-            dev.jasper.app.config.UiFontConfig.defaults());
+        themes.setPair(ThemeTestSupport.resolved(true));
         assertThat(seen).hasSize(1);
     }
 
     @Test void workspaceOpacityFollowsTheGlassSourceAndItsChangesAreWorkspaceChanges() {
-        var themes = new dev.jasper.app.appearance.ThemeController();
+        var themes = ThemeTestSupport.controller(true);
         double[] value = {0.6};
         var listeners = new ArrayList<Runnable>();
         var glass = new GlassSource(component -> value[0], listener -> {
@@ -120,14 +127,14 @@ class HostedUiTest {
     }
 
     @Test void bothVariantsReadThePublishedNativeSnapshotInsideWorkspaceCallbacks() {
-        var themes = new dev.jasper.app.appearance.ThemeController();
+        var themes = ThemeTestSupport.controller(true);
         var hosted = new HostedUi("dev.x.tool", model, containment, Runnable::run,
             javax.swing.SwingUtilities::isEventDispatchThread, open::get, getClass().getClassLoader(), () -> Variant.DARK,
             handler -> () -> {}, auxiliary, terminals, themes::current,
             handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         var seen = new ArrayList<Variant>();
         hosted.appearance().onWorkspaceChanged(value -> seen.add(hosted.appearance().variant()));
-        themes.configure(dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+        themes.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
         assertThat(seen).containsExactly(Variant.LIGHT);
         assertThat(java.util.concurrent.CompletableFuture.supplyAsync(() -> hosted.appearance().variant()).join())
             .isEqualTo(Variant.LIGHT);
@@ -136,41 +143,29 @@ class HostedUiTest {
         hosted.closeAll();
     }
 
-    @Test void semanticDefaultsSurviveChromeRebuildAndMatchKeepsRichSyntax() {
-        var themes = new dev.jasper.app.appearance.ThemeController();
+    @Test void matchKeepsRichSyntaxAndARejectedInstallLeavesThePalettes() {
+        var themes = ThemeTestSupport.controller(true);
         var match = themes.current().chrome();
         assertThat(HostedPalettes.syntax(themes.current().workspace())).isEqualTo(HostedPalettes.syntax(match));
         assertThat(HostedPalettes.syntax(themes.current().workspace()).style(dev.jasper.sdk.ui.SyntaxRole.KEYWORD).color())
             .isNotEqualTo(HostedPalettes.editor(themes.current().workspace()).foreground());
-        themes.configure(dev.jasper.app.appearance.Theme.DARK,
-            new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA,
-            dev.jasper.app.config.UiFontConfig.defaults());
-        var workspace = HostedPalettes.workspace(themes.current().workspace());
-        var editor = HostedPalettes.editor(themes.current().workspace());
-        var syntax = HostedPalettes.syntax(themes.current().workspace());
-        themes.configure(dev.jasper.app.appearance.Theme.JASPER_LIGHT);
-        assertThat(HostedPalettes.workspace(themes.current().workspace())).isEqualTo(workspace);
-        assertThat(HostedPalettes.editor(themes.current().workspace())).isEqualTo(editor);
-        assertThat(HostedPalettes.syntax(themes.current().workspace())).isEqualTo(syntax);
-        var rejected = new dev.jasper.app.appearance.ThemeController(value -> value.name().equals(dev.jasper.app.appearance.Theme.DARK.name()));
+        var rejected = ThemeTestSupport.controller(true, value -> value.dark() && ThemeTestSupport.install(value));
         var before = HostedPalettes.workspace(themes.current().workspace());
-        assertThatThrownBy(() -> rejected.configure(dev.jasper.app.appearance.Theme.JASPER_LIGHT))
+        assertThatThrownBy(() -> rejected.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH))
             .isInstanceOf(dev.jasper.app.appearance.ThemeController.InstallationFailure.class);
         assertThat(HostedPalettes.workspace(themes.current().workspace())).isEqualTo(before);
     }
 
     @Test void closingWorkspaceSubscriptionOffThreadSuppressesDeliveryBeforeQueuedRemoval() {
-        var themes = new dev.jasper.app.appearance.ThemeController();
+        var themes = new WorkspaceAppearanceFixture();
         var hosted = new HostedUi("dev.x.tool", model, containment, javax.swing.SwingUtilities::invokeLater,
             javax.swing.SwingUtilities::isEventDispatchThread, open::get, getClass().getClassLoader(), () -> Variant.DARK,
             handler -> () -> {}, auxiliary, terminals, themes::current,
-            handler -> themes.subscribe((value, changed) -> handler.accept(value)));
+            themes::subscribe);
         var calls = new java.util.concurrent.atomic.AtomicInteger();
         var subscription = hosted.appearance().onWorkspaceChanged(value -> calls.incrementAndGet());
         java.util.concurrent.CompletableFuture.runAsync(subscription::close).join();
-        themes.configure(dev.jasper.app.appearance.Theme.DARK,
-            new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA,
-            dev.jasper.app.config.UiFontConfig.defaults());
+        themes.setPair(ThemeTestSupport.mixed(ThemeTestSupport.generated(true), recolouredDark()));
         assertThat(calls).hasValue(0);
         hosted.closeAll();
     }

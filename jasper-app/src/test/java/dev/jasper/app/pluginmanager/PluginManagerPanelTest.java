@@ -1,5 +1,6 @@
 package dev.jasper.app.pluginmanager;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.plugins.PluginRuntime;
@@ -41,8 +42,8 @@ class PluginManagerPanelTest {
     private JButton primary() { return PluginKit.button(panel.detailsPane().header(), PluginDetails.PRIMARY); }
 
     @Test void actualSourceCopyUsesTwoReadableOverviewLinesAtTheSourceAllocation() throws Exception {
-        var themes=new dev.jasper.app.appearance.ThemeController();
-        themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
+        var themes=ThemeTestSupport.controller(true);
+        themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());
         var actual=new PluginManagerPanel(themes.appearance().context(ThemeRoute.CHROME),handlers);
         try {
             String copy="Accounts, SSH keys and secure notes in one encrypted file bound to this device; other plugins fetch credentials under per-plugin grants.";
@@ -57,8 +58,8 @@ class PluginManagerPanelTest {
     }
 
     @Test void anUnbrokenPathWrapsInsideTheViewportInsteadOfWideningTheText() throws Exception {
-        var themes=new dev.jasper.app.appearance.ThemeController();
-        themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
+        var themes=ThemeTestSupport.controller(true);
+        themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());
         var actual=new PluginManagerPanel(themes.appearance().context(ThemeRoute.CHROME),handlers);
         try {
             String path="/Users/someone/Library/Application Support/Jasper/plugins/dev.jasper.example.with.a.long.identifier/jars/example-plugin-1.0.0-all-dependencies.jar";
@@ -76,19 +77,19 @@ class PluginManagerPanelTest {
     }
 
     @Test void nativeDescriptionUsesExactlyOnceKitFontAndRetainsItsDocument() {
-        var themes=new dev.jasper.app.appearance.ThemeController();
-        themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
+        var themes=ThemeTestSupport.controller(true);
+        themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());
         var actual=new PluginManagerPanel(themes.appearance().context(ThemeRoute.CHROME),handlers);
         try {
             actual.show(snapshot(TestRows.plugin("a.font","Font fixture").description("Literal plugin overview").row()));
             var text=actual.detailsPane().textArea();var document=text.getDocument();text.select(1,4);
             for(float size:List.of(20f,32f,13f)) {
-                themes.configure(dev.jasper.app.appearance.Theme.DARK,new dev.jasper.app.config.UiFontConfig(size==32?"Serif":"system",size));
+                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig(size==32?"Serif":"system",size));
                 if(size==32)assertThat(text.getFont().getFamily()).isEqualTo(java.awt.Font.SERIF);
                 assertThat(text.getFont().getSize2D()).isEqualTo(size);
                 assertThat(text.getDocument()).isSameAs(document);assertThat(text.getSelectedText()).isEqualTo("ite");
             }
-        }finally{actual.close();themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());themes.close();}
+        }finally{actual.close();themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());themes.close();}
     }
 
     @Test void narrowViewportPreservesReadableDetailAndRevealsFocusedActionsBothWays() {

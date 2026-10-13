@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import com.formdev.flatlaf.util.UIScale;
 
 import dev.jasper.app.windows.AuxiliarySurface;
@@ -41,14 +42,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RemoteRenderEvidenceTest {
     @Test void capturesOriginalIconOwnersAtCalibratedAllocations() throws Exception {
         for(String theme:List.of("dark","light")) {
-            var controller=onEdtValue(dev.jasper.app.appearance.ThemeController::new);
-            onEdt(()->controller.configure(theme.equals("dark")?dev.jasper.app.appearance.Theme.DARK:dev.jasper.app.appearance.Theme.JASPER_LIGHT));
+            var controller=onEdtValue(() -> ThemeTestSupport.controller(true));
+            onEdt(()->controller.configure(theme.equals("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH));
             try(var remote=new StagedRemoteHost(root.resolve("icon-owners-"+theme),theme.equals("dark"))) {
                 remote.openTunnels();
                 for(int[] allocation:new int[][]{{903,824},{1454,970},{500,824}}) {
                     onEdt(()->dev.jasper.app.workspace.DesktopTestSupport.captureIconOwners(remote.window,theme,allocation[0],allocation[1]));
                 }
-            }finally{onEdt(()->{controller.close();new dev.jasper.app.appearance.ThemeController();});}
+            }finally{onEdt(()->{controller.close();ThemeTestSupport.controller(true);});}
         }
     }
     static final String FAMILY = "remote-hosted";
@@ -61,8 +62,8 @@ class RemoteRenderEvidenceTest {
     }
 
     private void capture(String theme, Path data) throws Exception {
-        var controller = onEdtValue(dev.jasper.app.appearance.ThemeController::new);
-        onEdt(() -> controller.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT));
+        var controller = onEdtValue(() -> ThemeTestSupport.controller(true));
+        onEdt(() -> controller.configure(theme.equals("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH));
         try (var remote = new StagedRemoteHost(data, theme.equals("dark"))) {
             Files.writeString(remote.ssh.resolve("config"), "Host fixture\n HostName fixture.example.invalid\n User fixture-user\nHost broken\n User fixture-user\n IdentityFile %x\n");
             remote.openSessions();
@@ -125,7 +126,7 @@ class RemoteRenderEvidenceTest {
             onEdt(() -> overlay.get().close());
             assertThat(remote.problems).isEmpty();
         } finally {
-            onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); });
+            onEdt(() -> { controller.close(); ThemeTestSupport.controller(true); });
         }
     }
 
@@ -141,8 +142,8 @@ class RemoteRenderEvidenceTest {
     }
 
     private void captureTunnels(String theme, Path data) throws Exception {
-        var controller = onEdtValue(dev.jasper.app.appearance.ThemeController::new);
-        onEdt(() -> controller.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT));
+        var controller = onEdtValue(() -> ThemeTestSupport.controller(true));
+        onEdt(() -> controller.configure(theme.equals("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH));
         try (var remote = new StagedRemoteHost(data, theme.equals("dark"))) {
             remote.openTunnels();
             save(theme, "tunnels-empty", remote.window, 900, 560);
@@ -190,7 +191,7 @@ class RemoteRenderEvidenceTest {
             onEdt(() -> forward.get().close());
             assertThat(remote.problems).isEmpty();
         } finally {
-            onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); });
+            onEdt(() -> { controller.close(); ThemeTestSupport.controller(true); });
         }
     }
 
@@ -205,8 +206,8 @@ class RemoteRenderEvidenceTest {
     }
 
     private void captureSftp(String theme, Path data) throws Exception {
-        var controller = onEdtValue(dev.jasper.app.appearance.ThemeController::new);
-        onEdt(() -> controller.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT));
+        var controller = onEdtValue(() -> ThemeTestSupport.controller(true));
+        onEdt(() -> controller.configure(theme.equals("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH));
         try (var remote = new StagedRemoteHost(data, theme.equals("dark"))) {
             remote.openSftp();
             save(theme, "sftp-disconnected", remote.window, 900, 560);
@@ -238,7 +239,7 @@ class RemoteRenderEvidenceTest {
             onEdt(() -> existing.get().close());
             assertThat(remote.problems).isEmpty();
         } finally {
-            onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); });
+            onEdt(() -> { controller.close(); ThemeTestSupport.controller(true); });
         }
     }
 

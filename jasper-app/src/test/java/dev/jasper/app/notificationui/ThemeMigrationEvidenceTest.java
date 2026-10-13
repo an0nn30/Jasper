@@ -1,5 +1,6 @@
 package dev.jasper.app.notificationui;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.notifications.Capture;
 import dev.jasper.app.notifications.IncidentReport;
 import dev.jasper.app.notifications.Incidents;
@@ -14,8 +15,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ThemeMigrationEvidenceTest {
     @Test void capturesRealErrorsEmptyPopulatedAndCleared() throws Exception {
         ThemeMigrationCapture.themes(theme -> {
-            var controller = new dev.jasper.app.appearance.ThemeController();
-            controller.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+            var controller = ThemeTestSupport.controller(true);
+            controller.configure(theme.equals("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH);
             var kit = controller.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME);
             var center = new dev.jasper.app.notifications.NotificationCenter(Runnable::run, Clock.fixed(Instant.parse("2026-10-05T12:00:00Z"), ZoneOffset.UTC), () -> dev.jasper.app.notifications.Delivery.Presence.FOCUSED);
             var group = new dev.jasper.app.notifications.NotificationGroup("fixture.cards", "Fixture", "jasper", dev.jasper.app.notifications.DisplayMode.CARD);

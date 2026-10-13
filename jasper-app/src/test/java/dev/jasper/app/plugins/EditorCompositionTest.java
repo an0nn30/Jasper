@@ -1,8 +1,7 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ResolvedTheme;
-import dev.jasper.app.appearance.Theme;
-import dev.jasper.app.appearance.ThemeManager;
 import dev.jasper.ui.swing.KitView;
 import java.awt.Component;
 import java.awt.event.InputEvent;
@@ -46,13 +45,16 @@ class EditorCompositionTest {
     private void findAndReplace(String theme, Path data) throws Exception {
         boolean dark = theme.equals("dark");
         var appearance = onEdtValue(WorkspaceAppearanceFixture::new);
-        var first = onEdtValue(() -> ThemeManager.generated(dark ? Theme.DARK : Theme.JASPER_LIGHT));
-        var next = onEdtValue(() -> ThemeManager.generated(ThemeManager.builtIns().stream()
-            .filter(candidate -> candidate.dark() == dark && !candidate.equals(dark ? Theme.DARK : Theme.JASPER_LIGHT)).findFirst().orElseThrow()));
-        onEdt(() -> appearance.setPair(new ResolvedTheme(first, first)));
-        var controller = onEdtValue(dev.jasper.app.appearance.ThemeController::new);
+        var first = ThemeTestSupport.generated(dark);
+        // Another palette of the same darkness, delivered through the hosting appearance (Decision 5).
+        var plum = new java.awt.Color(0x7a3fa0);
+        var next = ThemeTestSupport.recolored(first, java.util.Map.of(dev.jasper.ui.theme.SemanticColor.ACCENT, plum,
+            dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL, dev.jasper.ui.theme.ColorMath.mix(plum,
+                first.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL), .2)));
+        onEdt(() -> appearance.setPair(ThemeTestSupport.resolved(dark)));
+        var controller = onEdtValue(() -> ThemeTestSupport.controller(true));
         // The look and feel follows the same theme, as the application's chrome does (native scroll bar tracks).
-        onEdt(() -> controller.configure(dark ? Theme.DARK : Theme.JASPER_LIGHT));
+        onEdt(() -> controller.configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH));
         try (var editor = new StagedEditorHost(data, dark, appearance)) {
             Object[] state = onEdtValue(() -> {
                 call(editor.editorWindow(), "newUntitled");
@@ -92,7 +94,7 @@ class EditorCompositionTest {
                 return new Object[]{area, area.getDocument(), view, call(area, "canUndo"), call(call(editor.selectedTab(), "session"), "dirty")};
             });
             // A theme change during editing keeps the document and the bar's own state.
-            onEdt(() -> appearance.setPair(new ResolvedTheme(next, next)));
+            onEdt(() -> appearance.setPair(ThemeTestSupport.mixed(next, next)));
             onEdt(() -> {
                 var area = (JTextArea) state[0]; var view = (KitView) state[2];
                 EditorEvidence.capture(theme, "find-replace-after-theme", view, WIDTH, HEIGHT, FIND_ANCHORS);
@@ -103,7 +105,7 @@ class EditorCompositionTest {
                 assertCompactAlignedBars(view);
             });
             // Enlarged interface font: the rows grow with their content and nothing clips.
-            onEdt(() -> controller.configure(dark ? Theme.DARK : Theme.JASPER_LIGHT, new dev.jasper.app.config.UiFontConfig("system", 20)));
+            onEdt(() -> controller.configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system", 20)));
             onEdt(() -> {
                 var view = (KitView) state[2];
                 EditorEvidence.capture(theme, "find-replace-font20", view, WIDTH, HEIGHT, FIND_ANCHORS);
@@ -118,7 +120,7 @@ class EditorCompositionTest {
                 assertThat(bounds(view, named(view, "find.replacement", JComponent.class)).x).isEqualTo(bounds(view, named(view, "find.query", JComponent.class)).x);
                 assertDocumentKept(editor, (JTextArea) state[0], state);
             });
-            onEdt(() -> controller.configure(dark ? Theme.DARK : Theme.JASPER_LIGHT, dev.jasper.app.config.UiFontConfig.defaults()));
+            onEdt(() -> controller.configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults()));
             onEdt(() -> {
                 var area = (JTextArea) state[0]; var view = (KitView) state[2];
                 var query = named(view, "find.query.input", JTextComponent.class);
@@ -135,7 +137,7 @@ class EditorCompositionTest {
             });
             assertThat(editor.problems).isEmpty();
         } finally {
-            onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); });
+            onEdt(() -> { controller.close(); ThemeTestSupport.controller(true); });
         }
     }
 
@@ -152,10 +154,9 @@ class EditorCompositionTest {
     private void documentStates(String theme, Path data) throws Exception {
         boolean dark = theme.equals("dark");
         var appearance = onEdtValue(WorkspaceAppearanceFixture::new);
-        var first = onEdtValue(() -> ThemeManager.generated(dark ? Theme.DARK : Theme.JASPER_LIGHT));
-        onEdt(() -> appearance.setPair(new ResolvedTheme(first, first)));
-        var controller = onEdtValue(dev.jasper.app.appearance.ThemeController::new);
-        onEdt(() -> controller.configure(dark ? Theme.DARK : Theme.JASPER_LIGHT));
+        onEdt(() -> appearance.setPair(ThemeTestSupport.resolved(dark)));
+        var controller = onEdtValue(() -> ThemeTestSupport.controller(true));
+        onEdt(() -> controller.configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH));
         java.nio.file.Files.createDirectories(data);
         Path file = java.nio.file.Files.writeString(data.resolve("notes.yaml"), "a: 1\nb: 2\n");
         try (var editor = new StagedEditorHost(data, dark, appearance)) {
@@ -226,7 +227,7 @@ class EditorCompositionTest {
             });
             assertThat(editor.problems).isEmpty();
         } finally {
-            onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); });
+            onEdt(() -> { controller.close(); ThemeTestSupport.controller(true); });
         }
     }
 
@@ -237,8 +238,8 @@ class EditorCompositionTest {
     }
 
     private void dialogs(String theme, Path data) throws Exception {
-        var controller = onEdtValue(dev.jasper.app.appearance.ThemeController::new);
-        onEdt(() -> controller.configure(theme.equals("dark") ? Theme.DARK : Theme.JASPER_LIGHT));
+        var controller = onEdtValue(() -> ThemeTestSupport.controller(true));
+        onEdt(() -> controller.configure(theme.equals("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH));
         try (var editor = new StagedEditorHost(data, theme.equals("dark"))) {
             onEdt(() -> editor.ask("Unsaved changes", "Save changes to example.txt?", List.of("Save", "Don't Save", "Cancel"), false, answer -> { }));
             var unsaved = editor.awaitSurface("Unsaved changes");
@@ -297,7 +298,7 @@ class EditorCompositionTest {
             assertThat(waited.get(10, TimeUnit.SECONDS)).isTrue();
             assertThat(editor.problems).isEmpty();
         } finally {
-            onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); });
+            onEdt(() -> { controller.close(); ThemeTestSupport.controller(true); });
         }
     }
 

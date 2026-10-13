@@ -1,6 +1,6 @@
 package dev.jasper.app.windows;
 
-import dev.jasper.app.appearance.Theme;
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.SurfaceFixtures;
 import dev.jasper.app.config.UiFontConfig;
@@ -19,35 +19,25 @@ import static org.assertj.core.api.Assertions.*;
 class VaultSheetRenderTest {
     @TempDir Path home;
     @Test void mountedTitleMenuAndAttachedFormsRenderAcrossThemesFontsAndShortOwners() throws Exception {
-        var controller = SurfaceFixtures.edt(ThemeController::new);
+        var controller = SurfaceFixtures.edt(() -> ThemeTestSupport.controller(true));
         try {
-            for (String state : List.of("calibration", "dark", "light", "custom", "enlarged", "short")) {
-                Theme selected = state.equals("light") ? Theme.JASPER_LIGHT : Theme.DARK;
-                if (state.equals("calibration")) {
-                    Path file = Path.of("src/test/resources/dev/jasper/app/appearance/desktop-vault.toml");
-                    selected = Theme.of("task4-vault", new Theme.UserFile(file, dev.jasper.ui.themeio.ThemeToml.parse(Files.readString(file), file.toString())));
-                }
-                if (state.equals("custom")) {
-                    Path file = Path.of("src/test/resources/dev/jasper/app/appearance/custom-hero.toml");
-                    selected = Theme.of("task4-custom", new Theme.UserFile(file, dev.jasper.ui.themeio.ThemeToml.parse(Files.readString(file), file.toString())));
-                }
-                Theme install = selected;
-                SurfaceFixtures.edt(() -> {controller.configure(install, state.equals("enlarged") ? new UiFontConfig("system",20f) : UiFontConfig.defaults()); return null;});
+            for (String state : List.of("dark", "light", "enlarged", "short")) {
+                SurfaceFixtures.edt(() -> {controller.configure(!state.equals("light"), dev.jasper.app.config.TerminalSchemeChoice.MATCH, state.equals("enlarged") ? new UiFontConfig("system",20f) : UiFontConfig.defaults()); return null;});
                 for (String id : List.of("vault-manager", "vault-login", "vault-key")) {
                     try(var fixture = new KitViewTestAccess(home.resolve(state+"-"+id), id, SurfaceFixtures.edt(controller::current))) {
                         SurfaceFixtures.edt(() -> {render(fixture.surface(),state,id);return null;});
                     }
                 }
             }
-        } finally { SurfaceFixtures.edt(() -> {controller.configure(Theme.DARK,UiFontConfig.defaults());controller.close();return null;}); }
+        } finally { SurfaceFixtures.edt(() -> {controller.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());controller.close();return null;}); }
     }
     /** Unlock and Create are modal overlays inside the asking window: centred over its dimmed content. */
     @Test void unlockAndCreateAreModalOverlaysCentredOverTheDimmedWindow() throws Exception {
-        var controller = SurfaceFixtures.edt(ThemeController::new);
+        var controller = SurfaceFixtures.edt(() -> ThemeTestSupport.controller(true));
         try {
             for (String state : List.of("dark", "light")) {
                 // At rest: the motion itself is the kit's ModalOverlayTest.
-                SurfaceFixtures.edt(() -> {controller.configure(state.equals("light") ? Theme.JASPER_LIGHT : Theme.DARK, UiFontConfig.defaults());
+                SurfaceFixtures.edt(() -> {controller.configure(!state.equals("light"), dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
                     controller.configureAnimations(false); return null;});
                 for (String id : List.of("vault-unlock", "vault-create")) {
                     try (var fixture = new KitViewTestAccess(home.resolve("overlay-" + state + "-" + id), id, SurfaceFixtures.edt(controller::current))) {
@@ -78,13 +68,13 @@ class VaultSheetRenderTest {
                     }
                 }
             }
-        } finally { SurfaceFixtures.edt(() -> {controller.configure(Theme.DARK, UiFontConfig.defaults()); controller.close(); return null;}); }
+        } finally { SurfaceFixtures.edt(() -> {controller.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults()); controller.close(); return null;}); }
     }
     @Test void populatedManagerKeepsFullActionsReachableAtNarrowAndEnlargedWidths() throws Exception {
-        var controller=SurfaceFixtures.edt(ThemeController::new);
+        var controller=SurfaceFixtures.edt(() -> ThemeTestSupport.controller(true));
         try {
             for(boolean enlarged:new boolean[]{false,true}) {
-                SurfaceFixtures.edt(()->{controller.configure(Theme.DARK,enlarged?new UiFontConfig("system",20f):UiFontConfig.defaults());return null;});
+                SurfaceFixtures.edt(()->{controller.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, enlarged?new UiFontConfig("system",20f):UiFontConfig.defaults());return null;});
                 try(var fixture=new KitViewTestAccess(home.resolve("narrow-"+enlarged),"vault-manager",SurfaceFixtures.edt(controller::current))) {
                     SurfaceFixtures.edt(()->{
                         var surface=fixture.surface();var root=new JRootPane();
@@ -128,7 +118,7 @@ class VaultSheetRenderTest {
                                 }
                                 capture("fix1-"+(enlarged?"enlarged":"normal"),"manager-width-"+width,root,null,null,"actual populated manager; Delete/Edit full bounds, focusability, keyboard activation binding and focus-owner scroll reveal asserted; no native traversal peer");
                             }
-                            controller.configure(Theme.JASPER_LIGHT,UiFontConfig.defaults());fixture.theme(controller.current());
+                            controller.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());fixture.theme(controller.current());
                             root.setSize(900,555+chrome.bar().getPreferredSize().height);layout(root);
                             assertThat(find(surface.holder(),"edit")).isSameAs(edit);assertThat(find(surface.holder(),"delete")).isSameAs(delete);
                             assertThat(search.getDocument()).isSameAs(document);assertThat(search.getText()).isEqualTo(" ");
@@ -140,7 +130,7 @@ class VaultSheetRenderTest {
                     });
                 }
             }
-        }finally{SurfaceFixtures.edt(()->{controller.configure(Theme.DARK,UiFontConfig.defaults());controller.close();return null;});}
+        }finally{SurfaceFixtures.edt(()->{controller.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());controller.close();return null;});}
     }
     private static void render(AuxiliarySurface surface,String state,String id) {
         boolean editor = surface.attachedSheet();var manager = editor ? surface.ownerSurface().orElseThrow() : surface;

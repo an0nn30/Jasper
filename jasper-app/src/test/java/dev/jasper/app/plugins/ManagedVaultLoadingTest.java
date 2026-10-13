@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.testing.FakePluginHost;
@@ -36,7 +37,7 @@ class ManagedVaultLoadingTest {
             Plugin plugin = (Plugin) loader.loadClass("dev.jasper.vault.VaultPlugin").getConstructor().newInstance();
             var api = new AtomicReference<Object>(); var owner = new AtomicReference<WindowHandle>();
             onEdt(() -> {
-                new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+                ThemeTestSupport.controller(false);
                 UnboundVault.settings(host); // the staged no-arg plugin uses the platform keychain for bound vaults only
                 host.start(new PluginInfo("dev.jasper.vault", "Credential Vault", "0.2.0", Set.of(dev.jasper.sdk.Capabilities.PALETTE_CONTRIBUTE)), Set.of(), Set.of(), plugin);
                 var consumer = host.start(new PluginInfo("dev.jasper.remote", "Remote", "0.2.0", Set.of()), Set.of("dev.jasper.vault"), Set.of(), context -> api.set(context.services().require(apiType)));
@@ -103,7 +104,7 @@ class ManagedVaultLoadingTest {
                 assertThat(((dev.jasper.sdk.ui.Nodes.ItemList) node(manager.spec().root(), "rows")).items()).hasSize(1);
                 assertThat(host.failures()).isEmpty();
             });
-        } finally { onEdt(() -> new dev.jasper.app.appearance.ThemeController()); }
+        } finally { onEdt(() -> ThemeTestSupport.controller(true)); }
     }
     static List<Path> jars(Path directory) throws Exception { try (var files = Files.list(directory)) { return files.filter(p -> p.toString().endsWith(".jar")).toList(); } }
     static void settle(FakePluginHost host) throws Exception { for (int i = 0; i < 8; i++) { host.runBackground(); onEdt(host::flush); } }

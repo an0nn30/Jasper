@@ -1,5 +1,6 @@
 package dev.jasper.app.windows;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.platform.WindowBody;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.*;
@@ -45,7 +46,7 @@ class SheetOwnershipTest {
         root.setContentPane(new JPanel());assertThat(replacement.boundsInRoot()).isEmpty();replacement.close();
     }
     @Test void realFormRewrapsAtConstrainedWidthAndKeepsFooterInsideTheSheet() {
-        var controller = new dev.jasper.app.appearance.ThemeController();
+        var controller = ThemeTestSupport.controller(true);
         var theme = controller.current();var binding = new dev.jasper.ui.theme.ThemeBinding(theme.pair(), failure -> {throw new AssertionError(failure);});
         var icons = new dev.jasper.ui.icons.IconRegistry();var context = new dev.jasper.ui.swing.KitContext(binding, dev.jasper.ui.theme.ThemeRoute.CHROME,dev.jasper.ui.metrics.DesignMetrics.DEFAULT,icons,()->false);
         var node = new dev.jasper.ui.model.Nodes.Form("sheet",dev.jasper.ui.model.ControlState.READY,dev.jasper.ui.model.Nodes.FormKind.SHEET,"Add item",Optional.empty(),java.util.List.of(
@@ -69,7 +70,7 @@ class SheetOwnershipTest {
     }
 
     @Test void replacementFormReceivesTheUnchangedOwnerHeightConstraint() {
-        var controller = new dev.jasper.app.appearance.ThemeController();
+        var controller = ThemeTestSupport.controller(true);
         var binding = new dev.jasper.ui.theme.ThemeBinding(controller.current().pair(), failure -> { throw new AssertionError(failure); });
         var icons = new dev.jasper.ui.icons.IconRegistry();
         var context = new dev.jasper.ui.swing.KitContext(binding, dev.jasper.ui.theme.ThemeRoute.CHROME, dev.jasper.ui.metrics.DesignMetrics.DEFAULT, icons, () -> false);
@@ -93,8 +94,8 @@ class SheetOwnershipTest {
     }
 
     @Test void maximumFontOnAScreenShorterThanFooterRevealsEveryActionAndRecovers() {
-        var controller = new dev.jasper.app.appearance.ThemeController();
-        controller.configure(dev.jasper.app.appearance.Theme.DARK, new dev.jasper.app.config.UiFontConfig("system", 32f));
+        var controller = ThemeTestSupport.controller(true);
+        controller.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system", 32f));
         var binding = new dev.jasper.ui.theme.ThemeBinding(controller.current().pair(), failure -> {throw new AssertionError(failure);});
         var icons = new dev.jasper.ui.icons.IconRegistry();
         var context = new dev.jasper.ui.swing.KitContext(binding, dev.jasper.ui.theme.ThemeRoute.CHROME,dev.jasper.ui.metrics.DesignMetrics.DEFAULT,icons,()->false);
@@ -126,10 +127,10 @@ class SheetOwnershipTest {
                 assertThat(sheet.fallback()).isFalse();assertThat(scroll.getVerticalScrollBar().isVisible()).isFalse();
                 assertThat(save.getParent()).isSameAs(parent);assertThat(draft.getDocument()).isSameAs(document);assertThat(draft.getText()).isEqualTo("preserved draft");
             }
-        } finally {binding.close();icons.close();controller.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());controller.close();}
+        } finally {binding.close();icons.close();controller.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());controller.close();}
     }
     @Test void unchangedNativeBoundsDoNotLeaveTheFooterAtMeasurementHeight() {
-        var controller = new dev.jasper.app.appearance.ThemeController();
+        var controller = ThemeTestSupport.controller(true);
         var binding = new dev.jasper.ui.theme.ThemeBinding(controller.current().pair(), failure -> { throw new AssertionError(failure); });
         var icons = new dev.jasper.ui.icons.IconRegistry();
         var context = new dev.jasper.ui.swing.KitContext(binding, dev.jasper.ui.theme.ThemeRoute.CHROME,

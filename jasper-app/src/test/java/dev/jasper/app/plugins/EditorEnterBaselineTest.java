@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import java.awt.Component;
 import java.nio.file.Path;
 import java.util.List;
@@ -35,12 +36,12 @@ class EditorEnterBaselineTest {
 
     /** The application's FlatLaf theme, so buttons and fields carry the look and feel's own key bindings, as at baseline. */
     @org.junit.jupiter.api.BeforeEach void theme() {
-        controller = onEdtValue(dev.jasper.app.appearance.ThemeController::new);
-        onEdt(() -> controller.configure(dev.jasper.app.appearance.Theme.DARK));
+        controller = onEdtValue(() -> ThemeTestSupport.controller(true));
+        onEdt(() -> controller.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH));
         assertThat(onEdtValue(() -> javax.swing.UIManager.getLookAndFeel().getClass().getName())).as("a FlatLaf-based look and feel").containsIgnoringCase("laf");
     }
 
-    @org.junit.jupiter.api.AfterEach void restore() { onEdt(() -> { controller.close(); new dev.jasper.app.appearance.ThemeController(); }); }
+    @org.junit.jupiter.api.AfterEach void restore() { onEdt(() -> { controller.close(); ThemeTestSupport.controller(true); }); }
 
     @Test @Timeout(value = 60, unit = TimeUnit.SECONDS)
     void theQuestionsDefaultTakesEnterFromAnywhereSpacePressesTheFocusedButtonAndEscapeDismisses() throws Exception {
@@ -203,7 +204,7 @@ class EditorEnterBaselineTest {
     @Test @Timeout(value = 60, unit = TimeUnit.SECONDS)
     void languageKeepsItsPackedHeightWhileFilteredEmptyAndClearedInDarkAndLight() throws Exception {
         for (boolean dark : List.of(true, false)) {
-            onEdt(() -> controller.configure(dark ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT));
+            onEdt(() -> controller.configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH));
             try (var editor = new StagedEditorHost(root.resolve(dark ? "height-dark" : "height-light"), dark)) {
                 List<String> chosen = new CopyOnWriteArrayList<>();
                 onEdt(() -> editor.language("text/python", chosen::add));

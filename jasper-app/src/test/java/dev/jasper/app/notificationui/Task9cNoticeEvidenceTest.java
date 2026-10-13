@@ -17,11 +17,11 @@ import static org.assertj.core.api.Assertions.*;
 class Task9cNoticeEvidenceTest {
     @Test void noticeAndHistoryStatesUseInertActionsAndActualControllers() throws Exception {
         SwingUtilities.invokeAndWait(()->{
-            var themes=new ThemeController();
+            var themes=ThemeTestSupport.controller(true);
             try {
-                for(var theme:List.of(Theme.DARK,Theme.JASPER_LIGHT))for(float font:List.of(13f,20f,32f)) {
-                    themes.configure(theme,new UiFontConfig("system",font));var kit=themes.appearance().context(ThemeRoute.CHROME);
-                    String family=(theme.dark()?"dark":"light")+"-"+font;
+                for (boolean themeDark : new boolean[]{true, false})for(float font:List.of(13f,20f,32f)) {
+                    themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system",font));var kit=themes.appearance().context(ThemeRoute.CHROME);
+                    String family=(themeDark?"dark":"light")+"-"+font;
                     var clock=Clock.fixed(Instant.parse("2026-10-05T12:00:00Z"),ZoneOffset.UTC);
                     var center=new NotificationCenter(Runnable::run,clock,()->Delivery.Presence.FOCUSED);
                     var group=new NotificationGroup("fixture.cards","Synthetic fixture","jasper",DisplayMode.CARD);center.register(group);
@@ -74,7 +74,7 @@ class Task9cNoticeEvidenceTest {
                         incidents.clear();save(errors,family,"errors-cleared",900,540);
                     } finally {errors.close();}
                 }
-            } finally {themes.configure(Theme.DARK,UiFontConfig.defaults());themes.close();}
+            } finally {themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());themes.close();}
         });
     }
     private static void save(JComponent panel,String theme,String state,int width,int height) {

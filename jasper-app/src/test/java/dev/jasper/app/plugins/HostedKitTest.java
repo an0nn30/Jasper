@@ -1,4 +1,5 @@
 package dev.jasper.app.plugins;
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.sdk.ui.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.*;
@@ -7,9 +8,11 @@ import static org.assertj.core.api.Assertions.*;
 class HostedKitTest {
  static ViewSpec custom(Nodes.CustomKind kind,String content){return new ViewSpec(new Nodes.Custom("node",ControlState.READY,content,kind,"Document"));}
  @Test void presentationIconsFollowTheirPaintRouteAndSameVariantThemeChanges() throws Exception {SwingUtilities.invokeAndWait(() -> {
-  var light=dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.Theme.JASPER_LIGHT);
-  var dark=dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.Theme.DARK);
-  var other=dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.DARCULA);
+  var light=dev.jasper.app.appearance.ThemeTestSupport.generated(false);
+  var dark=dev.jasper.app.appearance.ThemeTestSupport.generated(true);
+  // Another Dark theme: Slate Steel Dark with plum text, so the same-variant change repaints the glyph.
+  var other=ThemeTestSupport.recolored(dark,java.util.Map.of(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY,new java.awt.Color(0xc9a0e8),
+   dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY,new java.awt.Color(0xa77fc4)));
   var themes=new java.util.concurrent.atomic.AtomicReference<>(new dev.jasper.ui.theme.ThemePair(light,dark));
   var kit=new HostedKit("owner",() -> true,themes::get,null,new Containment(java.awt.EventQueue::isDispatchThread));
   dev.jasper.ui.swing.FlatLafInstaller.install(light);
@@ -23,7 +26,7 @@ class HostedKitTest {
    assertThat(pixels(icon,workspace)).containsExactly(pixels(registry.icon("add",other.semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,16),workspace));
    assertThat(pixels(icon,workspace)).isNotEqualTo(before);
    kit.close();
-  } finally {new dev.jasper.app.appearance.ThemeController();}
+  } finally {ThemeTestSupport.controller(true);}
  });}
  @Test void customPresentationSnapshotsOutliveTheSenderAndBelongToReceivingViews() throws Exception {SwingUtilities.invokeAndWait(() -> {
   var pair=dev.jasper.app.appearance.ThemeTestSupport.pair(false);
@@ -42,7 +45,7 @@ class HostedKitTest {
    // History may remount an expired record after its original plugin stopped: only the immutable path crosses.
    assertThat(receiver.name(icon)).contains("owner:custom");
    var first=pixels(context.icons().icon("owner:custom",context.theme().semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,16),new JPanel());
-   var other=dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.DARCULA);
+   var other=dev.jasper.app.appearance.ThemeTestSupport.generated(true);
    binding.publish(new dev.jasper.ui.theme.ThemePair(pair.chrome(),other));
    var next=pixels(context.icons().icon("owner:custom",context.theme().semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,16),new JPanel());
    assertThat(next).isNotEqualTo(first);
@@ -124,7 +127,7 @@ class HostedKitTest {
   view.update(custom(Nodes.CustomKind.PREVIEW,"other"));assertThat(closed.get()).isEqualTo(1);view.close();kit.close();assertThat(closed.get()).isEqualTo(1);
  });}
  @Test void sameVariantThemeAndGlassRefreshPreserveEditorDocumentCaretAndSyntax() throws Exception {SwingUtilities.invokeAndWait(() -> {
-  var current=new java.util.concurrent.atomic.AtomicReference<>(new dev.jasper.app.appearance.ThemeController().current());
+  var current=new java.util.concurrent.atomic.AtomicReference<>(ThemeTestSupport.controller(true).current());
   var updates=new java.util.ArrayList<java.util.function.Consumer<dev.jasper.app.appearance.ResolvedTheme>>();var glass=new java.util.ArrayList<Runnable>();double[] opacity={1};
   var containment=new Containment(java.awt.EventQueue::isDispatchThread);
   var ui=new HostedUi("editor",new dev.jasper.app.contributions.Contributions(),containment,Runnable::run,java.awt.EventQueue::isDispatchThread,() -> true,getClass().getClassLoader(),() -> dev.jasper.sdk.Variant.DARK,h -> () -> {},null,null,current::get,h -> {updates.add(h);return new dev.jasper.app.lifecycle.Subscription(() -> updates.remove(h));},new GlassSource(c -> opacity[0],h -> {glass.add(h);return new dev.jasper.app.lifecycle.Subscription(() -> glass.remove(h));}));
@@ -176,7 +179,7 @@ class HostedKitTest {
   SwingUtilities.invokeAndWait(() -> {var worker=new Thread(kit[0]::close);worker.start();try{worker.join();}catch(InterruptedException e){throw new AssertionError(e);}view[0].dispatch(new UiEvent.Action("stale"));assertThat(delivered.get()).isZero();});
  }
  @Test void chromeOnlyChangesRefreshContentAndDisposeBothAppearanceSubscriptions() throws Exception {SwingUtilities.invokeAndWait(() -> {
-  var current=new java.util.concurrent.atomic.AtomicReference<>(new dev.jasper.app.appearance.ThemeController().current());
+  var current=new java.util.concurrent.atomic.AtomicReference<>(ThemeTestSupport.controller(true).current());
   var workspace=current.get().workspace();var updates=new java.util.ArrayList<java.util.function.Consumer<dev.jasper.app.appearance.ResolvedTheme>>();
   var glass=new java.util.ArrayList<Runnable>();double[] opacity={1};var themeSubscriptions=new AtomicInteger();var workspaceSubscriptions=new AtomicInteger();
   var containment=new Containment(java.awt.EventQueue::isDispatchThread);

@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.contributions.Contributions;
@@ -38,7 +39,7 @@ class SampleSurfacesEvidenceTest {
     @Test @Timeout(value = 90, unit = TimeUnit.SECONDS)
     void samplePanelWindowAndSheetUseTheCanonicalComponents() throws Exception {
         var holders = new java.util.LinkedHashMap<AuxiliarySurface, StagedRemoteHost.PackedDialog>();
-        var themes = onEdtValue(ThemeController::new);
+        var themes = onEdtValue(() -> ThemeTestSupport.controller(true));
         var contributions = onEdtValue(Contributions::new);
         var runtime = new AtomicReference<PluginRuntime>();
         AuxiliaryWindows windows = onEdtValue(() -> new AuxiliaryWindows(dev.jasper.app.persistence.UiState.inMemory(), surface -> {
@@ -59,7 +60,7 @@ class SampleSurfacesEvidenceTest {
                 runtime.get().start(Map.of("dev.jasper.sample", Map.<String, Object>of("demo_ui", true, "demo_step_millis", 0L)), true);
             });
             for (String theme : List.of("dark", "light")) {
-                onEdt(() -> themes.configure(theme.equals("dark") ? Theme.DARK : Theme.JASPER_LIGHT));
+                onEdt(() -> themes.configure(theme.equals("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH));
                 onEdt(() -> {
                     var entry = contributions.panels().stream().filter(panel -> panel.id().equals("dev.jasper.sample.panel")).findFirst().orElseThrow();
                     var panel = (JComponent) entry.factory().apply(new PanelSite(UUID.randomUUID(), () -> { }, () -> { }, () -> true));
@@ -86,7 +87,7 @@ class SampleSurfacesEvidenceTest {
             var done = new CompletableFuture<List<CompletableFuture<?>>>();
             onEdt(() -> done.complete(runtime.get() == null ? List.of() : runtime.get().stop()));
             CompletableFuture.allOf(done.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
-            onEdt(() -> { windows.close(); themes.close(); new ThemeController(); });
+            onEdt(() -> { windows.close(); themes.close(); ThemeTestSupport.controller(true); });
         }
     }
 

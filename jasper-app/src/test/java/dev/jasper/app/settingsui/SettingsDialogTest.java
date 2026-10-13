@@ -1,5 +1,6 @@
 package dev.jasper.app.settingsui;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static dev.jasper.app.workspace.DesktopTestSupport.until;
 import static org.assertj.core.api.Assertions.*;
@@ -139,8 +140,8 @@ class SettingsDialogTest {
 
     @Test void narrowEnlargedToolbarModesKeepTheirFullVisibleMeaning() throws Exception {
         edt(() -> {
-            try (var themes = new dev.jasper.app.appearance.ThemeController()) {
-                themes.configure(dev.jasper.app.appearance.Theme.DARK, new dev.jasper.app.config.UiFontConfig("system", 20));
+            try (var themes = ThemeTestSupport.controller(true)) {
+                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system", 20));
                 var dialog = new SettingsDialog(windows, CorePages.pages(AppearanceFixtures.CHOICES,
                     new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false), page -> fake,
                     page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)),
@@ -159,7 +160,7 @@ class SettingsDialogTest {
                     }
                 } finally {
                     dialog.cancel();
-                    themes.configure(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults());
+                    themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());
                 }
             }
         });

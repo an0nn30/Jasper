@@ -1,5 +1,6 @@
 package dev.jasper.app.windows;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Dimension;
@@ -17,7 +18,7 @@ class NativeShellsChromeTest {
     }
 
     @Test void compactHeroPackingUsesContentWidthAndUnifiedUntitledChrome() {
-        var controller = new ThemeController();
+        var controller = ThemeTestSupport.controller(true);
         var resolved = controller.current();
         var binding = new dev.jasper.ui.theme.ThemeBinding(resolved.pair(), failure -> { throw new AssertionError(failure); });
         var icons = new dev.jasper.ui.icons.IconRegistry();
@@ -73,7 +74,7 @@ class NativeShellsChromeTest {
      * Settings draws its own title row, so its window shows no strip and the controls centre on the content's row.
      */
     @Test void titleRowsFollowTheReferencesForWindowsDialogsAndContentThatDrawsItsOwn() {
-        var controller = new ThemeController();
+        var controller = ThemeTestSupport.controller(true);
         try {
             var semantic = controller.current().chrome().semantic();
             int line = com.formdev.flatlaf.util.UIScale.scale(1);
@@ -87,7 +88,9 @@ class NativeShellsChromeTest {
                 assertThat(bar.controlsHeight()).isEqualTo(bar.getHeight());
                 var title = (JLabel) bar.getComponent(0);
                 assertThat(title.getY() + title.getHeight() / 2).isEqualTo((bar.getHeight() - line) / 2);
-                assertThat(row(bar, bar.getHeight() - line)).as("the rule").isEqualTo(semantic.color(dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE));
+                // border.subtle carries alpha: the rule shows it over the bar.
+                assertThat(row(bar, bar.getHeight() - line)).as("the rule")
+                    .isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.over(semantic.color(dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE), bar.getBackground()));
             }
             var dialog = new AuxiliarySurface("", "Add Host", AuxiliarySurface.Kind.DIALOG, true,
                 new Dimension(500, 700), null, null, ignored -> { throw new AssertionError(); });
@@ -129,7 +132,7 @@ class NativeShellsChromeTest {
     }
 
     private void verifyChrome(AuxiliarySurface.Kind kind) {
-        new ThemeController();
+        ThemeTestSupport.controller(true);
         var surface = new AuxiliarySurface("dev.test.window", "Plugin editor", kind, true,
             new Dimension(400, 300), null, null, ignored -> { throw new AssertionError("No native shell in tests"); });
         var content = new JPanel(); surface.setContent(content);

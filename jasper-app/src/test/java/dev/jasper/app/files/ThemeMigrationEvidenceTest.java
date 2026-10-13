@@ -1,5 +1,6 @@
 package dev.jasper.app.files;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.sdk.contracts.ThemeMigrationCapture;
 import java.nio.file.Files;
@@ -16,8 +17,8 @@ class ThemeMigrationEvidenceTest {
         Files.createDirectory(directory.resolve("examples"));
         Files.writeString(directory.resolve("example.txt"), "Fixture data\n");
         ThemeMigrationCapture.themes(theme -> {
-            var themes = new dev.jasper.app.appearance.ThemeController();
-            themes.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+            var themes = ThemeTestSupport.controller(true);
+            themes.configure(theme.equals("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH);
             var request = new ChooserRequest("Choose fixture file", ChooserRequest.Mode.OPEN, false, Location.local(directory),
                 Optional.of(Location.local(directory)), Optional.empty(), Optional.empty(), Optional.empty());
             var prefs = new ChooserPrefs(UiState.inMemory());

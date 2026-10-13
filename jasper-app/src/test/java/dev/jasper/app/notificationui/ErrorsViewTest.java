@@ -1,5 +1,6 @@
 package dev.jasper.app.notificationui;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.notifications.Capture;
 import dev.jasper.app.notifications.Incident;
 import dev.jasper.app.notifications.IncidentReport;
@@ -59,15 +60,15 @@ class ErrorsViewTest {
     }
 
     @Test void enlargedNarrowFooterKeepsAllActionsSeparateAndListUsable() {
-        var themes = new dev.jasper.app.appearance.ThemeController();
-        themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
+        var themes = ThemeTestSupport.controller(true);
+        themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());
         var view = new ErrorsView(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),incidents,
             new ErrorsView.Hooks(id->"Plugin",id->"",HERE,copied::add,disabled::add,()->{}),ZoneOffset.UTC,()->{});
         try {
             var incident=record("dev.fixture","operation",new IllegalStateException("failure"));
             var originalTrace=view.traceArea();var document=originalTrace.getDocument();originalTrace.select(1,4);
             view.setSize(900,560);for(int i=0;i<5;i++)dev.jasper.app.testsupport.KitTestSupport.layout(view);
-            themes.configure(dev.jasper.app.appearance.Theme.DARK,new dev.jasper.app.config.UiFontConfig("system",32));
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system",32));
             view.setSize(600,320);for(int i=0;i<5;i++)dev.jasper.app.testsupport.KitTestSupport.layout(view);
             var heading=List.of(view.disableButton(),view.copyButton());
             var footer=List.of(view.logFolderButton(),view.clearButton(),view.doneButton());
@@ -87,17 +88,17 @@ class ErrorsViewTest {
                 reveal(action);
                 assertThat(action.getVisibleRect().height).isEqualTo(action.getHeight());
             }
-            themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());
+            themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());
             view.setSize(900,560);for(int i=0;i<5;i++)dev.jasper.app.testsupport.KitTestSupport.layout(view);
             assertThat(view.selected()).map(Incident::id).contains(incident.id());assertThat(view.traceArea()).isSameAs(originalTrace);
             assertThat(originalTrace.getDocument()).isSameAs(document);assertThat(originalTrace.getSelectionStart()).isEqualTo(1);
             assertThat(detailScroll(view).getVerticalScrollBar().isVisible()).as("the default window shows the whole detail").isFalse();
-        } finally {view.close();themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());themes.close();}
+        } finally {view.close();themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());themes.close();}
     }
 
     @Test void freshEnlargedSplitLeavesTraceViewportReachable() {
-        var themes=new dev.jasper.app.appearance.ThemeController();
-        themes.configure(dev.jasper.app.appearance.Theme.DARK,new dev.jasper.app.config.UiFontConfig("system",32));
+        var themes=ThemeTestSupport.controller(true);
+        themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system",32));
         var view=new ErrorsView(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),incidents,
             new ErrorsView.Hooks(id->"Plugin",id->"",HERE,copied::add,disabled::add,()->{}),ZoneOffset.UTC,()->{});
         try {
@@ -110,7 +111,7 @@ class ErrorsViewTest {
             reveal(viewport.getParent());
             trace.scrollRectToVisible(new java.awt.Rectangle(0,0,30,trace.getFontMetrics(trace.getFont()).getHeight()));
             assertThat(trace.getVisibleRect().height).as("trace %s viewport %s visible %s outer %s",trace.getBounds(),viewport.getBounds(),trace.getVisibleRect(),outer.getViewport().getViewRect()).isGreaterThanOrEqualTo(trace.getFontMetrics(trace.getFont()).getHeight());
-        } finally {view.close();themes.configure(dev.jasper.app.appearance.Theme.DARK,dev.jasper.app.config.UiFontConfig.defaults());themes.close();}
+        } finally {view.close();themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());themes.close();}
     }
 
     @Test void incidentsAreListedNewestFirstWithSummarySourceAndTime() {

@@ -1,5 +1,6 @@
 package dev.jasper.app.palette;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.sdk.contracts.ThemeMigrationCapture;
 import java.util.List;
 import java.util.Optional;
@@ -10,8 +11,8 @@ public final class ThemeMigrationPaletteCapture {
     private ThemeMigrationPaletteCapture() { }
     public static void capture(List<PaletteScope> scopes) throws Exception {
         ThemeMigrationCapture.themes(theme -> {
-            var themes = new dev.jasper.app.appearance.ThemeController();
-            themes.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+            var themes = ThemeTestSupport.controller(true);
+            themes.configure(theme.equals("dark"), dev.jasper.app.config.TerminalSchemeChoice.MATCH);
             var kit = themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME);
             for (String family : List.of("history", "snippets")) {
                 var scope = scopes.stream().filter(value -> value.id().startsWith("dev.jasper." + family)).findFirst().orElseThrow();

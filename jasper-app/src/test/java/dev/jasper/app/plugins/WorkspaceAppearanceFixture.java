@@ -2,7 +2,6 @@ package dev.jasper.app.plugins;
 
 import dev.jasper.app.appearance.*;
 import dev.jasper.ui.theme.*;
-import dev.jasper.ui.themeio.*;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.ui.WorkspacePalette;
@@ -13,7 +12,7 @@ import java.util.function.Consumer;
 /** Native source for the same appearance contract exercised by the fake. */
 final class WorkspaceAppearanceFixture {
     private ResolvedTheme current;
-    WorkspaceAppearanceFixture() { this(new ThemeController().current()); }
+    WorkspaceAppearanceFixture() { this(ThemeTestSupport.resolved(true)); }
     WorkspaceAppearanceFixture(ResolvedTheme initial) { current = initial; }
     private final List<Consumer<ResolvedTheme>> listeners = new ArrayList<>();
     ResolvedTheme current() { return current; }
@@ -23,10 +22,7 @@ final class WorkspaceAppearanceFixture {
     }
     void setPair(ResolvedTheme value) { current=value; for(var listener:List.copyOf(listeners))listener.accept(current); }
     void setVariant(Variant variant) {
-        var old = current.chrome();
-        var chrome = new GeneratedTheme(old.name(), variant == Variant.DARK, old.author(), old.tokens(), old.syntax(),
-            old.terminal(), old.uiKeys(), old.icons(), old.glass(), old.semantic());
-        current = new ResolvedTheme(chrome, current.matching() ? chrome : current.workspace());
+        current = ThemeTestSupport.resolved(variant == Variant.DARK);
         for (var listener : List.copyOf(listeners)) listener.accept(current);
     }
     void set(Variant variant, WorkspacePalette palette, EditorPalette editor, dev.jasper.sdk.ui.SyntaxPalette syntax) {

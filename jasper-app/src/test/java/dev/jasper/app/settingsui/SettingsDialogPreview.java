@@ -1,5 +1,6 @@
 package dev.jasper.app.settingsui;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeManager;
 import dev.jasper.app.config.ConfigLoader;
@@ -82,7 +83,7 @@ public final class SettingsDialogPreview {
         var manager = new PluginManager[1];
         var previewPlugins = new dev.jasper.app.plugins.PluginPreviewSupport[1];
         SwingUtilities.invokeAndWait(() -> {
-            themes[0] = new ThemeController();
+            themes[0] = ThemeTestSupport.controller(true);
             runtime[0] = new PluginRuntime(new PluginRuntime.Options(Path.of(System.getProperty("jasper.stagedPlugins")), home.resolve("plugins"), null, false,
                 home.resolve("plugins.toml"), home.resolve("plugins.lock")), new ActivityNotifier(new BuddyTestSupport().companion(), () -> { }),
                 PluginRuntime.SettingsReports.IGNORED, contributions, windows, new TerminalRegistry());
@@ -95,8 +96,8 @@ public final class SettingsDialogPreview {
         });
         var keymapHooks = new KeymapPage.Hooks(new Contributions(), Map::of, Map::of, true, edits -> CompletableFuture.completedFuture(null));
         try {
-            for (var theme : ThemeManager.builtIns()) for (int size : new int[]{0, 18}) {
-                String suffix = theme.id() + "-" + size + ".png";
+            for (boolean dark : new boolean[]{true, false}) for (int size : new int[]{0, 18}) {
+                String suffix = (dark ? "dark" : "light") + "-" + size + ".png";
                 var keymap = new KeymapPage[1];
                 var dialog = new SettingsDialog(windows, CorePages.pages(AppearanceFixtures.CHOICES,
                     new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false),
@@ -109,7 +110,7 @@ public final class SettingsDialogPreview {
                         listener -> new Subscription(() -> { }), () -> { }, () -> { }, uri -> { }, (parent, count) -> true,
                         () -> themes[0].appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME)));
                 SwingUtilities.invokeAndWait(() -> {
-                    themes[0].configure(theme, new UiFontConfig("system", size));
+                    themes[0].configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system", size));
                     dialog.open(null, "appearance");
                     render(holder[0], output.resolve("appearance-" + suffix));
                     dialog.select("window");

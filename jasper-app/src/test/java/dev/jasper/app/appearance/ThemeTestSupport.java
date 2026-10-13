@@ -64,6 +64,13 @@ public final class ThemeTestSupport {
         return new GeneratedTheme(base.name(), base.dark(), base.author(), base.tokens(), base.syntax(), base.terminal(),
             merged, base.icons(), base.glass(), base.semantic());
     }
+    /** {@code base} with these syntax styles replaced. */
+    public static GeneratedTheme withSyntax(GeneratedTheme base, Map<dev.jasper.ui.theme.SyntaxRole, dev.jasper.ui.theme.SyntaxStyle> styles) {
+        var merged = new EnumMap<dev.jasper.ui.theme.SyntaxRole, dev.jasper.ui.theme.SyntaxStyle>(dev.jasper.ui.theme.SyntaxRole.class);
+        merged.putAll(base.syntax()); merged.putAll(styles);
+        return new GeneratedTheme(base.name(), base.dark(), base.author(), base.tokens(), merged, base.terminal(),
+            base.uiKeys(), base.icons(), base.glass(), base.semantic());
+    }
     /** {@code base} with its workspace glass replaced. */
     public static GeneratedTheme withGlass(GeneratedTheme base, GlassLevels glass) {
         return new GeneratedTheme(base.name(), base.dark(), base.author(), base.tokens(), base.syntax(), base.terminal(),
