@@ -1,0 +1,39 @@
+name: sdk-release
+
+# Attaches the SDK and testkit jars an external plugin builds against to a published GitHub release, after building
+# docs/examples/external-plugin from those exact jars. A manual run builds the same jars as a workflow artifact.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  jars:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: jetbrains
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Build the SDK jars
+        run: ./gradlew sdkRelease verifySdkRelease --stacktrace
+      - name: Build the example plugin from them
+        run: ./gradlew -p docs/examples/external-plugin -PjasperSdkDir="$PWD/build/sdk-release" check pluginZip --stacktrace
+      - name: Attach the jars to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: gh release upload "$TAG" build/sdk-release/*.jar --clobber --repo "$REPOSITORY"
+      - name: Keep the jars as a workflow artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: jasper-sdk-jars
+          path: build/sdk-release/*.jar
