@@ -117,6 +117,16 @@ final class SplitViews {
             return h;
         }
 
+        /** DOCUMENT: the bars at their height and the fill at its own minimum, so a long document never sets the window's. */
+        @Override
+        public Dimension minimumLayoutSize(Container p) {
+            if (!owner.document()) return Composition.WidthLayout.super.minimumLayoutSize(p);
+            var children = visible(p); Component fill = fill(children);
+            int width = Math.max(1, p.getWidth()), h = 0;
+            for (Component c : children) h += c == fill ? c.getMinimumSize().height : Composition.height(c, width);
+            return new Dimension(0, h);
+        }
+
         @Override
         public Dimension preferredLayoutSize(Container p) {
             if (owner.document()) {
