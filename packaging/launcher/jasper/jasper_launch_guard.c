@@ -37,20 +37,37 @@ static volatile int registered;
 static volatile int returned;
 static void (*respawnReplacement)(void);
 
-/* The number of created Java VMs, or -1 when it cannot be told (libjvm is not loaded). */
+/* The loaded libjvm's own JNI_GetCreatedJavaVMs, or NULL when no libjvm is loaded. Asked of that image only: macOS's
+   libjli exports a wrapper of the same name that would load the default libjvm on demand. */
+static CreatedJavaVmsFunction loadedJvmFunction(void) {
+#if defined(_WIN32)
+    HMODULE jvm = GetModuleHandleW(L"jvm.dll");
+    return jvm == NULL ? NULL : (CreatedJavaVmsFunction) GetProcAddress(jvm, "JNI_GetCreatedJavaVMs");
+#elif defined(__APPLE__)
+    static const char suffix[] = "/libjvm.dylib";
+    const size_t suffixLength = sizeof(suffix) - 1;
+    uint32_t images = _dyld_image_count();
+    uint32_t i;
+    for (i = 0; i < images; ++i) {
+        const char* name = _dyld_get_image_name(i);
+        size_t length = name == NULL ? 0 : strlen(name);
+        if (length >= suffixLength && strcmp(name + length - suffixLength, suffix) == 0) {
+            void* jvm = dlopen(name, RTLD_LAZY | RTLD_NOLOAD);
+            return jvm == NULL ? NULL : (CreatedJavaVmsFunction) dlsym(jvm, "JNI_GetCreatedJavaVMs");
+        }
+    }
+    return NULL;
+#else
+    void* jvm = dlopen("libjvm.so", RTLD_LAZY | RTLD_NOLOAD);
+    return jvm == NULL ? NULL : (CreatedJavaVmsFunction) dlsym(jvm, "JNI_GetCreatedJavaVMs");
+#endif
+}
+
+/* The number of created Java VMs, or -1 when it cannot be told (no libjvm is loaded). */
 static int createdJavaVms(void) {
-    CreatedJavaVmsFunction function;
+    CreatedJavaVmsFunction function = loadedJvmFunction();
     JavaVM* vms[1];
     jsize count = 0;
-#ifdef _WIN32
-    HMODULE jvm = GetModuleHandleW(L"jvm.dll");
-    if (jvm == NULL) {
-        return -1;
-    }
-    function = (CreatedJavaVmsFunction) GetProcAddress(jvm, "JNI_GetCreatedJavaVMs");
-#else
-    function = (CreatedJavaVmsFunction) dlsym(RTLD_DEFAULT, "JNI_GetCreatedJavaVMs");
-#endif
     if (function == NULL || function(vms, 1, &count) != JNI_OK) {
         return -1;
     }
