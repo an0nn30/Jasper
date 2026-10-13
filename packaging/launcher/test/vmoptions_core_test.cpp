@@ -192,9 +192,9 @@ void planning() {
     p = vm::plan(bundled, path, &lines, {{"JASPER_VM_OPTIONS_SKIP", " launch-failed "}});
     expectLines(p.javaOptions, {"-Xmx2048m", "-XX:+UseG1GC", file, "-Djasper.vmOptionsSkipped=launch-failed"},
         "the skip variable skips the file");
-    p = vm::plan(bundled, path, &lines, {{"JASPER_VM_OPTIONS_SKIP", "  "}});
-    check(p.javaOptions.back() == "-Djasper.vmOptionsDigest=" + vm::digest(lines.lines),
-        "a blank skip variable skips nothing");
+    expectLines(vm::plan(bundled, path, &lines, {{"JASPER_VM_OPTIONS_SKIP", "  "}}).javaOptions,
+        {"-Xmx2048m", "-XX:+UseG1GC", file, "-Djasper.vmOptionsSkipped=environment"},
+        "a blank skip variable is set too, as the guard sees it");
     expectLines(vm::plan(bundled, "", &lines, {{"JASPER_VM_OPTIONS_SKIP", "manual"}}).javaOptions,
         {"-Xmx2048m", "-XX:+UseG1GC", "-Djasper.vmOptionsSkipped=manual"}, "skipping without a location");
     expectLines(vm::plan(bundled, "", &lines, {}).javaOptions, bundled, "no location applies no lines");

@@ -240,16 +240,18 @@ Plan plan(const std::vector<std::string>& bundled, const std::string& path, cons
     Plan result;
     result.javaOptions = bundled;
     const std::string* skip = variable(env, SKIP_VARIABLE);
-    const std::string reason = skip == nullptr ? std::string() : trim(*skip);
-    const bool applied = reason.empty() && !path.empty() && file != nullptr && !file->corrupted && !file->lines.empty();
+    const bool skipped = skip != nullptr;
+    const bool applied = !skipped && !path.empty() && file != nullptr && !file->corrupted && !file->lines.empty();
     if (applied) {
         result.javaOptions = merge(bundled, file->lines);
     }
     if (!path.empty()) {
         result.javaOptions.push_back("-Djasper.vmOptionsFile=" + path);
     }
-    if (!reason.empty()) {
-        result.javaOptions.push_back("-Djasper.vmOptionsSkipped=" + reason);
+    if (skipped) {
+        // A blank value is set too: the guard tests presence, so both agree that this launch is a fallback start.
+        const std::string reason = trim(*skip);
+        result.javaOptions.push_back("-Djasper.vmOptionsSkipped=" + (reason.empty() ? std::string("environment") : reason));
     } else if (!path.empty() && file != nullptr && file->corrupted) {
         result.javaOptions.push_back("-Djasper.vmOptionsFile.corrupted=true");
     } else if (applied) {
