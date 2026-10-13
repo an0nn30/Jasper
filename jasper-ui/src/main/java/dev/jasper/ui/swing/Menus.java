@@ -475,7 +475,17 @@ final class Menus {
             int inset = ThemePainting.metric(context, DesignMetrics.Role.MENU_ITEM_PADDING);
             setBorder(new EmptyBorder(0, inset, 0, inset));
             setIcon(item.icon().isBlank() ? null : tile(false));
+            shortcutText = context.shortcut(item.shortcut());
             revalidate(); repaint();
+        }
+
+        /** A menu resolves its rows' bindings each time it opens, so a rebinding shows at the next open. */
+        @Override public void addNotify() {
+            super.addNotify();
+            if (descriptor != null) {
+                String next = context.shortcut(descriptor.shortcut());
+                if (!next.equals(shortcutText)) { shortcutText = next; revalidate(); }
+            }
         }
 
         javax.swing.Icon tile(boolean highlighted) {

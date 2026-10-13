@@ -182,4 +182,11 @@ class KeyBindingsTest {
         assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_F13, 0))).contains(ActionId.NEW_TAB);
         assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_F24, 0))).contains(ActionId.NEW_WINDOW);
     }
+
+    @Test void displayWritesTheMacGlyphsInOrderAndNamesElsewhere() {
+        var stroke = KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK);
+        assertThat(KeyBindings.display(stroke, true)).isEqualTo("\u21e7\u2318H");
+        assertThat(KeyBindings.display(KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK), false)).isEqualTo("Ctrl+Shift+H");
+        assertThat(KeyBindings.display(null, true)).isEmpty();
+    }
 }

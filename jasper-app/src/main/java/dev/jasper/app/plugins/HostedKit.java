@@ -19,6 +19,7 @@ final class HostedKit implements UiKit,AutoCloseable {
     final Appearance appearance;
     private final BooleanSupplier open;
     private final BooleanSupplier animations;
+    private final java.util.function.Function<String,String> shortcuts;
     private final Supplier<ThemePair> themes;
     private final Set<HostedKitView> views=new LinkedHashSet<>();
     private final AtomicBoolean closed=new AtomicBoolean();
@@ -27,7 +28,9 @@ final class HostedKit implements UiKit,AutoCloseable {
     private ThemeBinding binding;
     private Subscription updates;
     HostedKit(String owner,BooleanSupplier open,Supplier<ThemePair> themes,Appearance appearance,Containment containment){this(owner,open,themes,appearance,containment,() -> true);}
-    HostedKit(String owner,BooleanSupplier open,Supplier<ThemePair> themes,Appearance appearance,Containment containment,BooleanSupplier animations){this.owner=owner;this.open=open;this.themes=themes;this.appearance=appearance;this.containment=containment;this.animations=Objects.requireNonNull(animations);}
+    HostedKit(String owner,BooleanSupplier open,Supplier<ThemePair> themes,Appearance appearance,Containment containment,BooleanSupplier animations){this(owner,open,themes,appearance,containment,animations,action -> "");}
+    /** {@code shortcuts} maps an action id to the binding text the plugin's menus show beside it. */
+    HostedKit(String owner,BooleanSupplier open,Supplier<ThemePair> themes,Appearance appearance,Containment containment,BooleanSupplier animations,java.util.function.Function<String,String> shortcuts){this.owner=owner;this.open=open;this.themes=themes;this.appearance=appearance;this.containment=containment;this.animations=Objects.requireNonNull(animations);this.shortcuts=Objects.requireNonNull(shortcuts);}
     boolean animationsEnabled(){return animations.getAsBoolean();}
     void validateIcon(String name){if(name != null && !icons.names().contains(name))throw new IllegalArgumentException("Unknown icon: " + name);}
     void validateIcons(ViewSpec spec) {
@@ -51,7 +54,7 @@ final class HostedKit implements UiKit,AutoCloseable {
     void refresh(){guard();if(binding!=null){binding.publish(themes.get());for(var view:List.copyOf(views))view.updated.run();}}
     void failed(){KitDiagnostics.failure(containment,owner);}
     void removed(HostedKitView view){views.remove(view);}
-    @Override public HostedKitView create(ViewSpec spec,Consumer<UiEvent> events){initialize();validateIcons(spec);var view=new HostedKitView(this,new KitContext(binding,ThemeRoute.CHROME,DesignMetrics.DEFAULT,icons,animations),spec,events);views.add(view);return view;}
+    @Override public HostedKitView create(ViewSpec spec,Consumer<UiEvent> events){initialize();validateIcons(spec);var view=new HostedKitView(this,new KitContext(binding,ThemeRoute.CHROME,DesignMetrics.DEFAULT,icons,animations,shortcuts),spec,events);views.add(view);return view;}
     @Override public Subscription registerIcon(IconAsset asset) {
         initialize(); Objects.requireNonNull(asset);
         if(!asset.name().startsWith(owner+":"))throw new IllegalArgumentException("Foreign icon namespace");

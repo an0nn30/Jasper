@@ -913,4 +913,11 @@ dialog.show();
 `SURFACE_TABSTRIP`, `SURFACE_EMPTY_TILE`, `BORDER_FIELD_RAISED`, `BORDER_FIELD_RAISED_HOVER`,
 `TEXT_STRONG_SECONDARY`, `TEXT_FIELD_RAISED`, `SEGMENT_TRACK` and `BUTTON_SECONDARY_BORDER`. Read them with
 `context.appearance().color(role)` like any other role; the kit already paints its controls with them. Declare
-`sdk = ">=0.15.5, <0.16"` to use them; every bundled manifest does.
+`sdk = ">=0.15.5"` or later to use them.
+
+### Menu shortcuts (SDK 0.16.0)
+
+A menu item can show the current binding of an action beside its label:
+`new MenuItem(...).withShortcut("dev.example.open")`. Name an action your plugin contributes (or an app action such as
+`new_tab`); the host shows its binding in the platform's glyphs, follows the user's rebinding, and shows nothing when
+the action is unbound. Declare `sdk = ">=0.16.0, <0.17"` to use it; every bundled manifest does.

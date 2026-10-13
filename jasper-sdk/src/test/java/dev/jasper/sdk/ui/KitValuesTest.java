@@ -249,4 +249,13 @@ class KitValuesTest {
             new Empty("empty", ControlState.READY, text("icon"), "Nothing", "", List.of(new Panel("p", ControlState.READY, header, Optional.of(filter), languages, Optional.empty())))));
         assertThat(new ViewSpec(inEmpty).root()).isSameAs(inEmpty);
     }
+
+    @Test void aMenuItemNamesItsShortcutSourceOrNone() {
+        var plain = new MenuItem("open", "Open", "", "open", true, false);
+        assertThat(plain.shortcut()).isEmpty();
+        assertThat(plain.withShortcut("dev.jasper.sample.open").shortcut()).isEqualTo("dev.jasper.sample.open");
+        assertThat(new MenuItem("open", "Open", "", "open", true, false, Hue.BLUE).shortcut()).isEmpty();
+        assertThatThrownBy(() -> plain.withShortcut(" ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatNullPointerException().isThrownBy(() -> new MenuItem("open", "Open", "", "open", true, false, Hue.BLUE, null));
+    }
 }

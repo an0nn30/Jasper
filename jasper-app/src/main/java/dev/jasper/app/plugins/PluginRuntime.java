@@ -364,6 +364,12 @@ public final class PluginRuntime {
     }
 
     private java.util.function.BooleanSupplier animations = () -> true;
+    private java.util.function.Function<String, String> shortcuts = action -> "";
+    /** Supplies the live keymap text plugin menus show beside an item's action, before plugin startup. */
+    public void shortcuts(java.util.function.Function<String, String> labels) {
+        if(host!=null)throw new IllegalStateException("Plugins have already started");
+        shortcuts = Objects.requireNonNull(labels);
+    }
     /** Supplies the live application motion policy before plugin startup. */
     public void animations(java.util.function.BooleanSupplier enabled) {
         if(host!=null)throw new IllegalStateException("Plugins have already started");
@@ -551,6 +557,7 @@ public final class PluginRuntime {
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notifications, editor, settingsFiles, reports.clear(), profiles,
             dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass));
         created.animations = animations;
+        created.shortcuts = shortcuts;
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         connectionBridge = created.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, this::forwardConnection);

@@ -92,24 +92,6 @@ public final class CommandsScope implements PaletteScope {
 
     /** Moved from the palette renderer: "⇧⌘P" on macOS, "Ctrl+Shift+P" elsewhere, "" for anything but a KeyStroke. */
     public static String shortcutText(Object value, boolean macOs) {
-        if (!(value instanceof KeyStroke stroke)) return "";
-        int modifiers = stroke.getModifiers();
-        String key = stroke.getKeyCode() == 0
-            ? String.valueOf(stroke.getKeyChar()) : KeyEvent.getKeyText(stroke.getKeyCode());
-        if (macOs) {
-            var text = new StringBuilder();
-            if ((modifiers & InputEvent.CTRL_DOWN_MASK) != 0) text.append("⌃");
-            if ((modifiers & InputEvent.ALT_DOWN_MASK) != 0) text.append("⌥");
-            if ((modifiers & InputEvent.SHIFT_DOWN_MASK) != 0) text.append("⇧");
-            if ((modifiers & InputEvent.META_DOWN_MASK) != 0) text.append("⌘");
-            return text.append(key).toString();
-        }
-        var names = new ArrayList<String>();
-        if ((modifiers & InputEvent.CTRL_DOWN_MASK) != 0) names.add("Ctrl");
-        if ((modifiers & InputEvent.ALT_DOWN_MASK) != 0) names.add("Alt");
-        if ((modifiers & InputEvent.SHIFT_DOWN_MASK) != 0) names.add("Shift");
-        if ((modifiers & InputEvent.META_DOWN_MASK) != 0) names.add("Meta");
-        names.add(key);
-        return String.join("+", names);
+        return value instanceof KeyStroke stroke ? dev.jasper.app.config.KeyBindings.display(stroke, macOs) : "";
     }
 }

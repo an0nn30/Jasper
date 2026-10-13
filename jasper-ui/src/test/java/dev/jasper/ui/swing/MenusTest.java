@@ -268,4 +268,25 @@ class MenusTest {
         });
     }
 
+    @Test void aRowShowsItsActionsCurrentBindingRightAlignedAndNothingWhenUnbound() {
+        Edt.run(() -> {
+            var bindings = new java.util.HashMap<String, String>(java.util.Map.of("dev.jasper.sample.open", "\u21e7\u2318O"));
+            var base = KitFixtures.context();
+            var context = new KitContext(base.binding(), base.route(), base.metrics(), base.icons(), base.animationsEnabled(), id -> bindings.getOrDefault(id, ""));
+            var popup = new Menus.Popup(context);
+            var open = new Menus.Item(context); open.describe(new MenuItem("o", "Open", "", "o", true, false).withShortcut("dev.jasper.sample.open"));
+            var other = new Menus.Item(context); other.describe(new MenuItem("u", "Unbound", "", "u", true, false).withShortcut("dev.jasper.sample.none"));
+            popup.add(open); popup.add(other);
+            assertThat(open.shortcutText).isEqualTo("\u21e7\u2318O");
+            assertThat(other.shortcutText).isEmpty();
+            var fm = open.getFontMetrics(open.getFont());
+            assertThat(open.getPreferredSize().width).isEqualTo(open.labelX() + fm.stringWidth("Open")
+                + s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_SHORTCUT_GAP)) + fm.stringWidth("\u21e7\u2318O") + open.getInsets().right);
+            bindings.put("dev.jasper.sample.open", "\u2325\u2318O");
+            open.addNotify();
+            assertThat(open.shortcutText).as("a rebinding shows at the next open").isEqualTo("\u2325\u2318O");
+            open.removeNotify();
+            release(base);
+        });
+    }
 }
