@@ -29,6 +29,12 @@ class StagedFileServerFormTest {
             var vault=owner.vault();var form=owner.surface();
             onEdt(()->{
                 captureServer("anonymous",kitView(form),540,690);
+                // The Access card needs no "Login" label: its segments span the card, centred, with their help line below.
+                var access=require(form,"server.access.card");var track=require(form,"server.login.input");var help=require(form,"server.login.help");
+                var card=SwingUtilities.convertRectangle(access.getParent(),access.getBounds(),kitView(form));var segments=SwingUtilities.convertRectangle(track.getParent(),track.getBounds(),kitView(form));
+                assertThat((segments.x-card.x)-(card.x+card.width-segments.x-segments.width)).as("Login segments centred in the Access card").isBetween(-1,1);
+                assertThat(segments.x-card.x).as("no label column beside them").isLessThan(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH));
+                assertThat(SwingUtilities.convertPoint(help.getParent(),help.getX(),0,kitView(form)).x).as("the help line starts under the segments").isEqualTo(segments.x);
                 assertThat(require(form,"server.require-tls.row.title").getX()-require(form,"server.tls.row.title").getX()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_DEPENDENT_INDENT));
                 assertThat(((Nodes.Form)kitView(form).spec().root()).submission()).isEqualTo(Nodes.FormSubmission.NONE);
                 assertThat(node(form,"server.save").state().enabled()).isFalse();
