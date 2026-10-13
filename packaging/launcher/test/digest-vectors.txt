@@ -1,5 +1,5 @@
-# FNV-1a 64 digests of option lines (packaging/launcher/README.md): a vector's lines, then "= <digest>".
-# Read by the launcher's native tests and by the application's tests; keep both implementations in step.
+# FNV-1a 64 digests (packaging/launcher/README.md): a vector's lines as written in jasper.vmoptions, then "= <digest>"
+# of the lines the launcher applies. Read by the launcher's native tests and by the application's tests; keep both in step.
 = cbf29ce484222325
 -Xmx2048m
 = c758526d21c369d0
@@ -11,3 +11,7 @@
 -XX:+UseZGC
 -Xmx3q
 = 1514f6a9887c4cca
+Xmx300m
+-Xmx1g
+-version
+= fddaccd35c87b989

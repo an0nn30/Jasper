@@ -9,7 +9,7 @@ and starts once more without them when the JVM rejects them. The design is the s
 
 `upstream/` holds the launcher sources of JetBrains Runtime tag `jbr-release-25.0.4.1b583.48` (commit
 `868e6eaecc700d03b903fcb3b723d30c17d64de4`) at their upstream paths, and that repository's `LICENSE`. The vendored files
-are GPL version 2 with the Classpath Exception, as each header says; Jasper's changes to them are the lines marked
+are GPL version 2 with the Classpath Exception, as the file headers say; Jasper's changes to them are the lines marked
 `JASPER-HOOK`, published here.
 
 `upstream/SHA256SUMS` records every vendored file as upstream ships it (LF line endings, no `JASPER-HOOK` lines).
@@ -37,7 +37,8 @@ rm -rf packaging/launcher/upstream && mkdir -p packaging/launcher/upstream
 python3 packaging/launcher/sha256sums.py
 ```
 
-Then re-apply the hook lines below, update the tag and commit in this file, and run `./gradlew :jasper-app:check`.
+Then re-apply the hook lines below, update the tag and commit in this file and `launcherUpstreamVersion` in
+`gradle/launcher.gradle`, and run `./gradlew :jasper-app:check`.
 
 ## Hooks
 
@@ -63,7 +64,7 @@ On macOS libjli calls the launcher's `main` again on a new thread; that second c
   libjvm's own `JNI_GetCreatedJavaVMs` reports no JVM; with no libjvm loaded it does nothing. On Windows it also
   registers with `ucrtbase.dll`'s `_crt_atexit`, because `jli.dll` calls the shared UCRT's `exit()`. HotSpot's own
   initialization failures end with `_exit` and never reach it. It also removes `JASPER_VM_OPTIONS_SKIP` just before
-  `JLI_Launch`, in the process that starts the JVM.
+  `JLI_Launch`, in the process that starts the JVM. A fallback start (the skip variable set) never arms.
 
 ## Build
 
@@ -88,8 +89,9 @@ All in `check`, on every OS:
   `test/digest-vectors.txt`, which the application's tests read too.
 - `testLauncherGuard`: `test/guard_harness.c` arms the guard and runs the toolchain JDK's real `JLI_Launch` with
   `test/GuardProbe.java`. A malformed `-Xmx` and conflicting collectors re-spawn; `System.exit`, a normal return, a
-  throwing `main`, an unarmed launch and a launch that fails before any libjvm loads do not.
+  throwing `main`, an unarmed launch, a launch that fails before any libjvm loads and a fallback start (the skip
+  variable set) do not.
 - `verifyLauncherImage`: packages `test/LauncherProbe.java` with Jasper's launcher (`jpackage
   -J--patch-module=jdk.jpackage=…`) and checks the location rules, the merge order and filters, a corrupted file, the
-  skip variable, the fallback start with the arguments intact, a directory in the file's place, a home with a space
-  and a non-ASCII home. On Windows it also checks the windowed launcher.
+  skip variable, an ignored line without a dash, the fallback start with the arguments intact, a directory in the
+  file's place, a home with a space and a non-ASCII home. On Windows it also checks the windowed launcher.

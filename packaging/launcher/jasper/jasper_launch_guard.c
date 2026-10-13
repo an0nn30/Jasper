@@ -35,6 +35,7 @@ typedef jint (JNICALL *CreatedJavaVmsFunction)(JavaVM**, jsize, jsize*);
 static volatile int armed;
 static volatile int registered;
 static volatile int returned;
+static volatile int skippedLaunch;
 static void (*respawnReplacement)(void);
 
 /* The loaded libjvm's own JNI_GetCreatedJavaVMs, or NULL when no libjvm is loaded. Asked of that image only: macOS's
@@ -123,7 +124,8 @@ static int executablePath(char* path, size_t size) {
 
 extern char** environ;
 
-/* The original command line, read from /proc; arguments beyond 64 KiB or 1023 entries are dropped. */
+/* The original command line, read from /proc: up to 64 KiB and 1023 arguments. Arguments beyond that are dropped, and a
+   last argument cut by the 64 KiB limit is passed on truncated. */
 static char** processArguments(void) {
     static char buffer[65536];
     static char* arguments[1024];
@@ -207,12 +209,22 @@ static void registerExitHandler(void) {
 void jasperGuardBeforeLaunch(int argc, char** argv) {
     int i;
     /* The process that starts the JVM removes the skip variable, so the JVM and its children never inherit it. On Linux
-       the cfg is read in a forked child, and on Windows possibly in a restart wrapper, so the wrapper cannot do it. */
+       the cfg is read in a forked child, and on Windows possibly in a restart wrapper, so the wrapper cannot do it. A
+       launch that found it set is a fallback start and never arms, whatever argv holds. */
 #ifdef _WIN32
+    if (GetEnvironmentVariableA(JASPER_SKIP_VARIABLE, NULL, 0) > 0) {
+        skippedLaunch = 1;
+    }
     SetEnvironmentVariableA(JASPER_SKIP_VARIABLE, NULL);
 #else
+    if (getenv(JASPER_SKIP_VARIABLE) != NULL) {
+        skippedLaunch = 1;
+    }
     unsetenv(JASPER_SKIP_VARIABLE);
 #endif
+    if (skippedLaunch) {
+        return;
+    }
     for (i = 0; i < argc; ++i) {
         if (argv[i] != NULL && strncmp(argv[i], JASPER_DIGEST_PREFIX, sizeof(JASPER_DIGEST_PREFIX) - 1) == 0) {
             armed = 1;

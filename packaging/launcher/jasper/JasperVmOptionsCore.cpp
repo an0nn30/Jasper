@@ -66,6 +66,15 @@ std::string inJasperDirectory(Os os, const std::string& configurationRoot) {
     return join(os, join(os, configurationRoot, "jasper"), FILE_NAME);
 }
 
+// libjli's own launcher options. As JVM options they end option parsing, select a mode or take the next argument, so
+// the JVM would start without running the application (spec 3.2).
+const char* const LAUNCHER_OPTIONS[] = {
+    "-version", "--version", "-help", "--help", "-h", "-?", "-X", "--help-extra", "--dry-run", "--list-modules",
+    "-d", "--describe-module", "--validate-modules", "-jar", "-m", "--module", "-cp", "-classpath", "--class-path",
+    "--source", "--add-opens", "--add-exports", "--add-reads", "--add-modules", "--limit-modules", "--module-path", "-p",
+    "--upgrade-module-path", "--patch-module", "--enable-native-access" };
+const char* const LAUNCHER_OPTION_PREFIXES[] = { "--describe-module=", "--module=", "--class-path=", "--source=" };
+
 bool isValidUtf8(const std::string& bytes) {
     std::string::size_type i = 0;
     while (i < bytes.size()) {
@@ -139,6 +148,23 @@ std::string userFilePath(Os os, const Environment& env, const std::string& worki
     return userHome.empty() ? std::string() : inJasperDirectory(os, join(os, userHome, ".config"));
 }
 
+bool isApplicable(const std::string& line) {
+    if (line.empty() || line[0] != '-') {
+        return false;
+    }
+    for (const char* option : LAUNCHER_OPTIONS) {
+        if (line == option) {
+            return false;
+        }
+    }
+    for (const char* prefix : LAUNCHER_OPTION_PREFIXES) {
+        if (startsWith(line, prefix)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 UserFile parse(const std::string& bytes) {
     UserFile result;
     std::string text = bytes;
@@ -157,7 +183,7 @@ UserFile parse(const std::string& bytes) {
         }
         const std::string line = trim(text.substr(start, end - start));
         if (!line.empty() && line[0] != '#') {
-            result.lines.push_back(line);
+            (isApplicable(line) ? result.lines : result.ignored).push_back(line);
         }
         start = end + 1;
     }

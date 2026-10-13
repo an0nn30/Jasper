@@ -9,11 +9,12 @@
 extern "C" {
 #endif
 
-/* Removes JASPER_VM_OPTIONS_SKIP from the environment, then arms the guard when argv carries
-   -Djasper.vmOptionsDigest= (the user's options were applied). Idempotent. */
+/* Removes JASPER_VM_OPTIONS_SKIP from the environment. Unless it was set (a fallback start never arms), arms the guard
+   when argv carries -Djasper.vmOptionsDigest= (the user's options were applied). Idempotent. */
 void jasperGuardBeforeLaunch(int argc, char** argv);
 
-/* Records that JLI_Launch returned: the JVM was created and has finished. */
+/* Records that JLI_Launch returned: after the application finished, or without a JVM when libjli rejected its
+   arguments - neither is a VM-options failure. */
 void jasperGuardAfterLaunch(void);
 
 /* Tests only: replaces the re-spawn of this executable. */

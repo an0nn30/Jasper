@@ -232,7 +232,7 @@ def testLauncherCore = tasks.register('testLauncherCore') {
     outputs.file(launcherBuild.map { it.file('core-test/passed') })
     doLast {
         File work = launcherBuild.get().dir('core-test').asFile
-        project.delete(work)
+        delete(work)
         List<File> sources = [new File(launcherTestSource, 'vmoptions_core_test.cpp'), new File(jasperNative, 'JasperVmOptionsCore.cpp')]
         File test = nativeBuild(kind: 'executable', exportAll: true, sources: sources, strict: sources, includes: [jasperNative],
             output: new File(work, launcherHost().os == 'windows' ? 'vmoptions-core-test.exe' : 'vmoptions-core-test'),
@@ -279,7 +279,7 @@ def testLauncherGuard = tasks.register('testLauncherGuard') {
     doLast {
         def host = launcherHost()
         File work = launcherBuild.get().dir('guard-test').asFile
-        project.delete(work)
+        delete(work)
         List<File> sources = [new File(launcherTestSource, 'guard_harness.c'), new File(jasperNative, 'jasper_launch_guard.c')]
         File harness = nativeBuild(kind: 'executable', exportAll: true, sources: sources, strict: sources, includes: [jasperNative],
             libraries: host.os == 'linux' ? ['-ldl'] : [],
@@ -297,6 +297,7 @@ def testLauncherGuard = tasks.register('testLauncherGuard') {
             [name: 'main throws', arguments: [armed, '-cp', probes, 'GuardProbe', 'throw'], respawn: false, exit: 1],
             [name: 'unarmed malformed heap value', arguments: ['-Xmx3q', '-cp', probes, 'GuardProbe'], respawn: false, exit: null],
             [name: 'no libjvm loaded', arguments: ['-XXaltjvm=/nonexistent/jvm', armed, '-cp', probes, 'GuardProbe'], respawn: false, exit: null],
+            [name: 'fallback start never arms', arguments: ['-Xmx3q', armed, '-cp', probes, 'GuardProbe'], skip: true, respawn: false, exit: null],
         ]
         List<String> failures = []
         scenarios.eachWithIndex { Map scenario, int index ->
@@ -306,6 +307,7 @@ def testLauncherGuard = tasks.register('testLauncherGuard') {
             ['JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS', 'CLASSPATH'].each { builder.environment().remove(it) }
             builder.environment().put('GUARD_HARNESS_JLI', jli.absolutePath)
             builder.environment().put('GUARD_HARNESS_MARKER', marker.absolutePath)
+            if (scenario.skip) builder.environment().put('JASPER_VM_OPTIONS_SKIP', 'launch-failed')
             Process process = builder.start()
             boolean exited = process.waitFor(60, TimeUnit.SECONDS)
             if (!exited) process.destroyForcibly()
@@ -372,11 +374,11 @@ def buildLauncher = tasks.register('buildLauncher') {
     outputs.dir(launcherResources)
     doLast {
         def host = launcherHost()
-        project.delete(launcherResources.get().asFile)
+        delete(launcherResources.get().asFile)
         File output = new File(launcherResources.get().asFile, 'jdk/jpackage/internal/resources')
         output.mkdirs()
         File work = launcherBuild.get().dir('objects').asFile
-        project.delete(work)
+        delete(work)
         File core = new File(jasperNative, 'JasperVmOptionsCore.cpp')
         File guard = new File(jasperNative, 'jasper_launch_guard.c')
         List<File> jasperSources = [new File(jasperNative, 'JasperVmOptions.cpp'), core, guard]
@@ -444,7 +446,7 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
     doLast {
         def host = launcherHost()
         File work = launcherBuild.get().dir('image-test').asFile
-        project.delete(work)
+        delete(work)
         work.mkdirs()
         File images = new File(work, 'images')
         File probeInput = launcherProbeJar.get().archiveFile.get().asFile.parentFile
@@ -540,6 +542,11 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
         report = launch('percentage', console, environment([JASPER_HOME: percentage.absolutePath]))
         expect('percentage', !report.input.contains('-Xmx256m') && report.input.contains('-XX:MaxRAMPercentage=10'),
             'MaxRAMPercentage replaces the bundled -Xmx', report)
+
+        File typo = home('typo', 'Xmx300m\n-Dprobe.marker=typo\n')
+        report = launch('typo', console, environment([JASPER_HOME: typo.absolutePath]))
+        expect('ignored line', one(report, 'marker') == 'typo' && one(report, 'digest') == '01aca14713a53a67' &&
+            !report.input.contains('Xmx300m'), 'a line without a dash is ignored and Jasper still starts', report)
 
         File corrupted = home('corrupted', '-Xmx300m\n\u0000\n')
         report = launch('corrupted', console, environment([JASPER_HOME: corrupted.absolutePath]))

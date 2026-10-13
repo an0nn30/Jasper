@@ -25,6 +25,20 @@ Use `--config <path>` to select a different file. Relative paths resolve from th
 
 The first command launches the desktop and a shell. `--help` prints usage without opening a window or reading configuration. Missing, duplicate and unknown arguments fail before desktop startup.
 
+### Custom VM options
+
+The installed app reads JVM options from `jasper.vmoptions` in Jasper's home (next to `config.toml`), the way IntelliJ
+reads its `.vmoptions` file. Each line is one option, passed unchanged after the bundled options (`-Xmx2048m` and
+`-XX:+IgnoreUnrecognizedVMOptions`), so `-Xmx4g` raises the heap limit. Blank lines and lines starting with `#` are
+skipped; a line that does not start with `-`, or that names one of the `java` launcher's own options (such as
+`-version` or `-cp`), is ignored. `JASPER_VM_OPTIONS=<file>` reads another file instead. Changes take effect at the next
+launch.
+
+If the JVM rejects the options (a malformed value such as `-Xmx3q`, or conflicting garbage collectors), Jasper starts
+once more without them. Failures inside the JVM's own start-up (`-Xms` above `-Xmx`, a missing agent, a module that
+cannot be resolved) stop it instead; setting `JASPER_VM_OPTIONS_SKIP=1` in the environment starts Jasper without the
+file so you can fix it. `./gradlew :jasper-app:run` does not read the file.
+
 ## Settings dialog
 
 **Settings** (Cmd+, on macOS, or Jasper › Settings…) edits every setting in this guide without opening the file.

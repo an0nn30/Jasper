@@ -24,6 +24,7 @@ const char* const HOME_VARIABLE = "JASPER_HOME";
 /** The user's options file, parsed. */
 struct UserFile {
     std::vector<std::string> lines;
+    std::vector<std::string> ignored;
     bool corrupted = false;
 };
 
@@ -34,7 +35,13 @@ struct UserFile {
 std::string userFilePath(Os os, const Environment& env, const std::string& workingDirectory,
                          const std::function<bool(const std::string&)>& isRegularFile);
 
-/** One option per line, trimmed; blank and '#' lines skipped; a leading BOM skipped; NUL or bad UTF-8 corrupts. */
+/** Whether a line is passed to the JVM: it starts with '-' and is not one of libjli's own launcher options. */
+bool isApplicable(const std::string& line);
+
+/**
+ * One option per line, trimmed; blank and '#' lines skipped; a leading BOM skipped; NUL or bad UTF-8 corrupts. A kept
+ * line goes to lines when isApplicable, otherwise to ignored.
+ */
 UserFile parse(const std::string& bytes);
 
 /** The bundled options without those the user's lines replace, then the user's lines. */

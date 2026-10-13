@@ -52,6 +52,16 @@ vmoptions::Environment environment() {
     return env;
 }
 
+// The working directory, needed only for a relative JASPER_HOME; empty when it cannot be determined (a failing getcwd
+// must not cost the file when JASPER_HOME is absolute or unset).
+std::string workingDirectory() {
+    try {
+        return utf8(FileUtils::toAbsolutePath(tstring()));
+    } catch (...) {
+        return std::string();
+    }
+}
+
 // A regular file: not a directory, FIFO or device (stat follows symbolic links, as upstream's isFileExists does).
 // Upstream defines FileUtils::isDirectory on Windows only.
 bool isRegularFile(const std::string& path) {
@@ -100,8 +110,7 @@ void applyUserVmOptions(CfgFile& cfgFile) {
             }
         }
         const vmoptions::Environment env = environment();
-        const std::string path = vmoptions::userFilePath(hostOs(), env, utf8(FileUtils::toAbsolutePath(tstring())),
-            isRegularFile);
+        const std::string path = vmoptions::userFilePath(hostOs(), env, workingDirectory(), isRegularFile);
         std::string bytes;
         vmoptions::UserFile file;
         const bool exists = !path.empty() && readBytes(path, bytes);

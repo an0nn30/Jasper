@@ -257,7 +257,9 @@ denied under the old **Moray** permission, with no Jasper prompt or Settings ent
 signing, `packageApp` now gives the launcher an app-specific
 UUID derived from the bundle identifier and Jasper's compiled launcher bytes.
 Identical inputs produce the same UUID; other app identifiers and launcher templates produce
-different UUIDs. `verifyPackage` verifies this identity and the final bundle signature.
+different UUIDs. Because the seed is Jasper's compiled launcher, rebuilding it with a different
+Xcode or changed launcher sources gives a new UUID, and macOS asks for Local Network access once
+more after such an update. `verifyPackage` verifies this identity and the final bundle signature.
 `./gradlew check` includes portable binary regression checks, without launching an app.
 
 Development images still have an ad-hoc signature. Apple recommends an **Apple-issued signing

@@ -98,6 +98,30 @@ void parsing() {
     check(vm::parse("-D=\xC0\xAF\n").corrupted, "overlong UTF-8 corrupts the file");
     check(vm::parse("-D=\xED\xA0\x80\n").corrupted, "a UTF-8 surrogate corrupts the file");
     check(vm::parse("-D=\xE2\x82").corrupted, "truncated UTF-8 corrupts the file");
+    const UserFile filtered = vm::parse("Xmx300m\n\"-Dfoo=a b\"\n// heap\n-version\n--add-opens\n-Xmx1g\n"
+        "--add-opens=java.base/java.lang=ALL-UNNAMED\n--class-path=/x\n-Xshare:auto\n");
+    expectLines(filtered.lines, {"-Xmx1g", "--add-opens=java.base/java.lang=ALL-UNNAMED", "-Xshare:auto"},
+        "only option lines are applied");
+    expectLines(filtered.ignored, {"Xmx300m", "\"-Dfoo=a b\"", "// heap", "-version", "--add-opens", "--class-path=/x"},
+        "lines without a dash and the launcher's own options are ignored");
+    check(!filtered.corrupted, "ignored lines do not corrupt the file");
+}
+
+void applicability() {
+    check(vm::isApplicable("-Xmx1g"), "-Xmx1g is applicable");
+    check(!vm::isApplicable("-X"), "-X is a launcher option");
+    check(vm::isApplicable("-XshowSettings"), "-XshowSettings is applicable");
+    check(!vm::isApplicable("-cp"), "-cp is a launcher option");
+    check(!vm::isApplicable("-classpath"), "-classpath is a launcher option");
+    check(!vm::isApplicable("--class-path=/x"), "--class-path=/x is a launcher option");
+    check(vm::isApplicable("--module-path=/x"), "--module-path=/x is applicable");
+    check(!vm::isApplicable("--module-path"), "--module-path alone takes the next argument");
+    check(vm::isApplicable("--enable-native-access=ALL-UNNAMED"), "--enable-native-access=... is applicable");
+    check(!vm::isApplicable("--enable-native-access"), "--enable-native-access alone takes the next argument");
+    check(vm::isApplicable("-Dfoo=bar"), "-Dfoo=bar is applicable");
+    check(!vm::isApplicable("Xmx1g"), "a line without a dash is not applicable");
+    check(!vm::isApplicable(""), "an empty line is not applicable");
+    check(vm::isApplicable("-"), "a lone dash is applicable");
 }
 
 void merging() {
@@ -122,7 +146,7 @@ void merging() {
 void digests(const char* vectorsPath) {
     std::ifstream input(vectorsPath, std::ios::binary);
     check(static_cast<bool>(input), std::string("cannot read ") + vectorsPath);
-    std::vector<std::string> lines;
+    std::string lines;
     std::string line;
     int vectors = 0;
     while (std::getline(input, line)) {
@@ -133,14 +157,15 @@ void digests(const char* vectorsPath) {
             continue;
         }
         if (line.compare(0, 2, "= ") == 0) {
-            expectText(vm::digest(lines), line.substr(2), "digest of " + show(lines));
+            const std::vector<std::string> applied = vm::parse(lines).lines;
+            expectText(vm::digest(applied), line.substr(2), "digest of the applied lines " + show(applied));
             lines.clear();
             ++vectors;
         } else {
-            lines.push_back(line);
+            lines += line + "\n";
         }
     }
-    check(vectors >= 5, "the vectors file holds at least five vectors");
+    check(vectors >= 6, "the vectors file holds at least six vectors");
 }
 
 void planning() {
@@ -184,6 +209,7 @@ int main(int argc, char** argv) {
     }
     location();
     parsing();
+    applicability();
     merging();
     digests(argv[1]);
     planning();
