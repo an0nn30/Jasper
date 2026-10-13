@@ -1,5 +1,20 @@
 # Jasper — Status and Handoff
 
+**About screen, build information and licenses — 2026-10-13** (`claude/about-screen`, worktree
+`.claude/worktrees/about-screen`; [spec](superpowers/specs/2026-10-13-about-screen-design.md),
+[plan](superpowers/plans/2026-10-13-about-screen.md)). `:jasper-app:buildInfo` records the commit's git facts in
+`dev/jasper/app/build-info.properties` inside the jar (ignored by test up-to-date checks); `BuildInfo` calls a clean
+`vX.Y.Z`-tagged commit a release and anything else a development build ("1.2.0 + 14 commits", "main @ 8ba67ed3,
+modified"); packaging takes its version from the release tag unless `-PjasperVersion` is given. Jasper is licensed under
+PolyForm Noncommercial 1.0.0 (`LICENSE.md`); `notices.toml` lists the 23 third-party components it ships and
+`verifyThirdPartyNotices` keeps that complete. About Jasper (palette; Help on Windows/Linux; the macOS application menu)
+shows the icon, version, chip, commit, date and license with Licenses… and Copy; error reports name the build the same
+way. Deviations from the spec are listed in the plan's status banner. `./gradlew check --continue`: **9,804 tests,
+0 failures, 0 errors, 8 skipped**. No GUI launched. GUI checks for the user: Jasper › About Jasper on macOS; Help ›
+About Jasper on Windows and Linux; About and Licenses in Dark and Light; Copy (and "Copied" for two seconds); the
+Licenses list and texts; the sharpness of the About icon; a long branch name's fit in the commit line. Not merged or
+pushed.
+
 **SDK release jars for external plugins — 2026-10-13** (`claude/sdk-release`, worktree `.claude/worktrees/sdk-release`;
 [spec](superpowers/specs/2026-10-13-sdk-release-jars-design.md), [plan](superpowers/plans/2026-10-13-sdk-release-jars.md)).
 `./gradlew sdkRelease` writes `jasper-sdk-<v>.jar` (with `-sources` and `-javadoc`) and `jasper-sdk-testkit-<v>.jar`

@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** not started. Branch `claude/about-screen`, worktree `.claude/worktrees/about-screen`, from `origin/main`
+**Status:** complete. Branch `claude/about-screen`, worktree `.claude/worktrees/about-screen`, from `origin/main`
 `b9f6b848`; spec committed as `bb05af8a`. Baseline `./gradlew check --continue` in the worktree: 9,763 tests,
-0 failures, 0 errors, 8 skipped.
+0 failures, 0 errors, 8 skipped. After Task 9: BUILD SUCCESSFUL, 9,804 tests, 0 failures, 0 errors, 8 skipped.
 
 **Deviations from the spec, decided while planning (record any new ones here and in `docs/STATUS.md`):**
 
@@ -22,6 +22,18 @@
    Noncommercial text, EPL-1.0 (pty4j's `LICENSE`) and ANTLR's `LICENSE.txt`.
 7. A failed Copy (busy clipboard) posts "Could not copy the build information" and leaves the label as "Copy".
 8. The license text area caps its visible rows with the Errors window's `ERRORS_TRACE_ROWS` metric and scrolls beyond it.
+9. Task 1 Step 7's dirty-tree probe only changes the facts on a clean tree; it was re-run after the commit:
+   `:jasper-app:buildInfo` and `jar` ran and `:jasper-app:test` stayed UP-TO-DATE.
+10. `BuildInfo.commitLine`'s Javadoc writes `{@code <hash>}` (doclint rejects a bare `<hash>`).
+11. `verifyThirdPartyNotices` splits the index on `[[component]]` at line starts (`split(Regex("(?m)^\\[\\[component]]"))`):
+    the index's header comment contains the literal `[[component]]`, so the plan's plain `split("[[component]]")` could
+    never pass.
+12. `AboutView.IconCanvas` overrides `getAccessibleContext()` (an `AccessibleJComponent` with role ICON): a bare
+    `JComponent` has no accessible context, so the plan's constructor threw.
+13. `docs/design/theme-engine/migration.csv` gained rows for the seven new Swing/kit sources
+    (`ThemeMigrationCoverageTest` requires one per source); `AboutView` and `LicensesView` carry `ErrorsView`'s
+    theme-plan task numbers because the test requires numbers there.
+14. `README.md`'s package-version lines were corrected for the release-tag rule.
 
 **Goal:** An About Jasper window (icon, name, version, development-build marking, commit, license) with a Copy button and
 a Licenses window listing Jasper's PolyForm Noncommercial license and every third-party component Jasper ships.

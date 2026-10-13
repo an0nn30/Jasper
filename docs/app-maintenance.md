@@ -312,6 +312,20 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 ./gradlew :jasper-app:test --tests "*SessionLaunchCoordinatorTest" --tests "*ApplicationShutdownTest" --tests "*JasperApplicationShutdownTest" --tests "*ShellLauncherTest"
 ```
 
+## Cutting a release
+
+Tag the release commit `vX.Y.Z` (no leading zeroes, major 1–255) on a clean tree and package from it: `packageDist`
+takes the version from the tag, and About shows "Jasper X.Y.Z" without the Development build chip. Any other commit,
+or a tree with changes or untracked files, is a development build named after the latest release tag behind it.
+`gradle/build-info.gradle` records the git facts in the jar and `BuildInfo` derives the labels.
+
+## Adding or bumping a dependency
+
+Every external jar Jasper or a bundled plugin ships needs its exact `group:artifact:version` in a component of
+`jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml`, with its license text (and its NOTICE, when
+the project publishes one) beside it; `verifyThirdPartyNotices` (part of `check`) names any jar without one and any
+entry that no longer ships. Read the new version's license before updating the entry.
+
 ## Review checklist
 
 Preserve established behavior and owner lifetimes. Run the focused regression, full

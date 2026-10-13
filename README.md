@@ -56,13 +56,13 @@ Run this **on macOS**, with a JBR SDK matching the build architecture: Apple Sil
 
 This compiles Jasper, runs the headless tests, creates `Jasper.app` with its own trimmed JBR runtime, launches it once for a few seconds (no Dock icon) to train its start-up cache, verifies the application image, and builds and verifies the DMG. See [start-up performance](docs/packaging.md#start-up-performance).
 
-With the default package version `1.0.0`, the outputs are:
+Without `-PjasperVersion`, the package version is the commit's `vX.Y.Z` release tag, else the latest release tag behind it, else `1.0.0`. The outputs are:
 
 | Output | Path |
 |---|---|
 | Application | `jasper-app/build/packaging/image/Jasper.app` |
-| Apple Silicon DMG | `jasper-app/build/packaging/dist/Jasper-1.0.0-macos-aarch64.dmg` |
-| Intel DMG | `jasper-app/build/packaging/dist/Jasper-1.0.0-macos-x64.dmg` |
+| Apple Silicon DMG | `jasper-app/build/packaging/dist/Jasper-<version>-macos-aarch64.dmg` |
+| Intel DMG | `jasper-app/build/packaging/dist/Jasper-<version>-macos-x64.dmg` |
 
 Each build produces the DMG for its own architecture. Open the DMG and drag `Jasper.app` to Applications to install it. The packaged app needs no separately installed Java runtime. Current development builds are ad-hoc signed; Developer ID signing and notarization are not included.
 
@@ -104,7 +104,7 @@ Run this **on Windows x64 or ARM64**, with a JBR SDK 25 of the same architecture
 .\gradlew.bat check :jasper-app:packageDist
 ```
 
-The default output is `jasper-app\build\packaging\dist\Jasper-1.0.0-windows-<x64|aarch64>.zip`. Extract the complete `Jasper` folder and run `Jasper.exe`; keep the launcher, `app` and `runtime` together. No external Java or WiX installation is needed to use the ZIP; building it requires the JBR SDK. The unpacked build image is at `jasper-app\build\packaging\image\Jasper`.
+The default output is `jasper-app\build\packaging\dist\Jasper-<version>-windows-<x64|aarch64>.zip`. Extract the complete `Jasper` folder and run `Jasper.exe`; keep the launcher, `app` and `runtime` together. No external Java or WiX installation is needed to use the ZIP; building it requires the JBR SDK. The unpacked build image is at `jasper-app\build\packaging\image\Jasper`.
 
 `jpackage` builds packages on their target operating system; the Mac build cannot produce the Windows ZIP. Windows packaging and desktop behavior still need manual verification on Windows. See the [packaging guide](docs/packaging.md) for the separate macOS and Windows acceptance checklists.
 
