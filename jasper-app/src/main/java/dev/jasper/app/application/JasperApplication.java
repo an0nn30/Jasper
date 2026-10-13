@@ -139,6 +139,7 @@ public final class JasperApplication {
     private ActionEntry migrateAction;
     private dev.jasper.app.settingsui.SettingsDialog settings;
     private boolean preferencesHandlerInstalled;
+    private boolean aboutHandlerInstalled;
     private UiState uiState = UiState.inMemory();
     private AuxiliaryWindows auxiliary;
     private NativeShells shells;
@@ -168,6 +169,8 @@ public final class JasperApplication {
     private final IncidentNotices incidentNotices;
     /** Built once plugins start, with the auxiliary windows it opens in. */
     private ErrorsWindow errorsWindow;
+    /** Built with the errors window, once plugins start. */
+    private AboutWindows aboutWindows;
     /** Where Open Log Folder points, known once plugins start. */
     private Path logFolder;
     /** The clipboard Jasper and its plugins share. */
@@ -282,6 +285,11 @@ public final class JasperApplication {
         if (supports(Desktop.Action.APP_PREFERENCES)) {
             Desktop.getDesktop().setPreferencesHandler(event -> SwingUtilities.invokeLater(() -> openSettings(null, null)));
             preferencesHandlerInstalled = true;
+        }
+        // Jasper › About Jasper: this window instead of AWT's default panel.
+        if (supports(Desktop.Action.APP_ABOUT)) {
+            Desktop.getDesktop().setAboutHandler(event -> SwingUtilities.invokeLater(this::showAbout));
+            aboutHandlerInstalled = true;
         }
         } catch (RuntimeException | Error failure) {
             systemAppearanceListening.run();
@@ -732,6 +740,9 @@ public final class JasperApplication {
             id -> plugins == null ? "" : plugins.pluginVersions().getOrDefault(id, ""), IncidentReport.Environment.current(),
             this::copyReport, incidentNotices::disablePlugin, this::openLogFolder), notificationCenter.clock().getZone(),
             () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
+        aboutWindows = new AboutWindows(contributions, auxiliary, () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),
+            new AboutWindows.Hooks(dev.jasper.app.platform.BuildInfo.current(), IncidentReport.Environment.current(),
+                notificationCenter.clock().getZone(), this::copyBuildInformation, this::browse, JasperApplication::afterDelay));
         plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
             developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock()), activityNotifier,
             new PluginRuntime.SettingsReports(
@@ -778,7 +789,7 @@ public final class JasperApplication {
                     .map(ActionEntry::extension).toList()));
         contributions.addAction("app.shortcuts", "Keyboard Shortcuts…", null, List.of("help", "keys", "bindings", "keymap", "edit shortcuts", "keyboard settings"),
             Optional.empty(), invocation -> openSettings(null, dev.jasper.app.shortcuthelp.KeymapPage.ID));
-        contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(List.of(new MenuEntry.Item("app.shortcuts")));
+        contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(AboutWindows.helpEntries(macOs));
         if (configuration != null) {
             var system = new dev.jasper.app.settingsui.CorePages.SystemActions(() -> configuration.state().file(),
                 this::openConfigFile, this::revealConfigFile, () -> configuration.reload(), this::migrateConfiguration,
@@ -933,11 +944,27 @@ public final class JasperApplication {
         if (errorsWindow != null && !quitting && !stopped) errorsWindow.show(Optional.of(incident));
     }
 
+    /** Jasper › About Jasper on macOS: the About window, once the auxiliary windows exist. */
+    private void showAbout() {
+        if (aboutWindows != null && !quitting && !stopped) aboutWindows.showAbout();
+    }
+
     private void copyReport(String text) {
         try {
             clipboard.copy(text);
         } catch (RuntimeException failure) {
             notificationViews.error("Could not copy the report", failure.getMessage());
+        }
+    }
+
+    /** About's Copy; false (after saying so) when the clipboard refused. */
+    private boolean copyBuildInformation(String text) {
+        try {
+            clipboard.copy(text);
+            return true;
+        } catch (RuntimeException failure) {
+            notificationViews.error("Could not copy the build information", failure.getMessage());
+            return false;
         }
     }
 
@@ -1470,6 +1497,7 @@ public final class JasperApplication {
         if (configuration != null) configuration.close();
         if (quitHandlerInstalled) { Desktop.getDesktop().setQuitHandler(null); quitHandlerInstalled = false; }
         if (preferencesHandlerInstalled) { Desktop.getDesktop().setPreferencesHandler(null); preferencesHandlerInstalled = false; }
+        if (aboutHandlerInstalled) { Desktop.getDesktop().setAboutHandler(null); aboutHandlerInstalled = false; }
         if (reopenListener != null) { Desktop.getDesktop().removeAppEventListener(reopenListener); reopenListener = null; }
         // Cross-process locks and socket probes must not hold up Swing or the exit deadline.
         List<CompletableFuture<?>> pending = new ArrayList<>(launches.pendingExits());

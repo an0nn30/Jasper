@@ -47,6 +47,17 @@ class ShortcutHelpTest {
         });
     }
 
+    @Test void theApplicationsOwnActionsShareTheApplicationGroup() throws Exception {
+        edt(() -> {
+            var contributions = new Contributions();
+            for (String id : List.of("plugins.manage", "app.shortcuts", "app.about"))
+                contributions.addAction(id, id, null, List.of(), Optional.empty(), ignored -> {});
+            var rows = ShortcutCatalog.rows(KeyBindings.defaults(true), contributions.actions(), Map.of(), true);
+            assertThat(rows).filteredOn(row -> List.of("plugins.manage", "app.shortcuts", "app.about").contains(row.id()))
+                .extracting(ShortcutEntry::group).containsOnly("Application").hasSize(3);
+        });
+    }
+
     @Test void catalogDropsResultShortcutsAndDescribesTabAsSwitchingTabs() throws Exception {
         edt(() -> {
             var rows = ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true);

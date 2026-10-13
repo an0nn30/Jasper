@@ -682,7 +682,7 @@ Plugin actions are bound by their quoted id, for example:
 A plugin may suggest a default shortcut; yours always wins, and Jasper's built-in shortcuts win
 over a plugin's suggestion. A binding for an action that no installed plugin provides is
 reported as a configuration warning. Every panel also has a `<panel id>.toggle` action you can
-bind the same way. `"plugins.manage"` opens Settings at Plugins and `"app.shortcuts"` at Keymap; neither has a default shortcut.
+bind the same way. `"plugins.manage"` opens Settings at Plugins, `"app.shortcuts"` at Keymap and `"app.about"` the About window; none has a default shortcut.
 
 ## Command palette shortcuts
 
