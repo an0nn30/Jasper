@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -99,7 +100,10 @@ public final class VmOptionsCheck {
         return outcome;
     }
 
-    /** Runs {@code command} as a process with its output merged, without the variables that add JVM options. */
+    /**
+     * Runs {@code command} as a process with its output merged, without the variables that add JVM options. An interrupt
+     * kills the process, restores the interrupt and throws {@link InterruptedIOException}.
+     */
     public static Outcome runProcess(List<String> command, Duration limit) throws IOException {
         var builder = new ProcessBuilder(command).redirectErrorStream(true);
         builder.environment().keySet().removeAll(List.of("JAVA_TOOL_OPTIONS", "_JAVA_OPTIONS", "JDK_JAVA_OPTIONS"));
@@ -121,7 +125,7 @@ public final class VmOptionsCheck {
         } catch (InterruptedException interrupted) {
             process.destroyForcibly();
             Thread.currentThread().interrupt();
-            return new Outcome(-1, "", true);
+            throw new InterruptedIOException("The VM options check was interrupted");
         }
         synchronized (output) {
             return new Outcome(process.exitValue(), output.toString(StandardCharsets.UTF_8), false);

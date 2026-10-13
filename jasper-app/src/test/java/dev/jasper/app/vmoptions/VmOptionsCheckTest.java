@@ -1,8 +1,10 @@
 package dev.jasper.app.vmoptions;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -86,5 +88,16 @@ class VmOptionsCheckTest {
         assertThat(findings.fatal()).contains(new VmOptionsCheck.Fatal("Invalid maximum heap size: -Xmx3q", true));
         assertThat(check.check(parsed("-Xms1g\n")).fatal())
             .contains(new VmOptionsCheck.Fatal("Initial heap size set to a larger value than the maximum heap size", false));
+    }
+
+    @Test void anInterruptStopsTheCheck() {
+        Thread.currentThread().interrupt();
+        try {
+            assertThatThrownBy(() -> VmOptionsCheck.runProcess(List.of(VmOptionsCheck.runtimeJava().toString(), "-version"), Duration.ofSeconds(30)))
+                .isInstanceOf(InterruptedIOException.class);
+            assertThat(Thread.interrupted()).as("the interrupt is restored for the caller").isTrue();
+        } finally {
+            Thread.interrupted();
+        }
     }
 }
