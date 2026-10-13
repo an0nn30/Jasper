@@ -322,7 +322,8 @@ boundaries; this refactor promises no plugin loading, binary compatibility or pe
 
 ## Themes
 
-Jasper has one theme, Slate Steel, in Dark and Light ([themes](themes.md)). Its colours live only in jasper-ui's
+Jasper's built-in theme is Slate Steel, in Dark and Light; installed themes are theme files in `<home>/themes/`
+([themes](themes.md)). Slate Steel's colours live only in jasper-ui's
 `slate-steel.json`, the machine-readable block of [the Slate Steel record](design/theme-engine/slate-steel.md) (a test
 keeps the two identical). `JasperTheme` reads the file once: the semantic palettes, the terminal schemes (`TerminalScheme`),
 the derived editor schemes and syntax styles, and one `GeneratedTheme` per variant whose FlatLaf UI keys
@@ -644,11 +645,14 @@ expanded and editing states in both themes and larger UI type without opening a 
 ### Maintaining the Appearance section
 
 The Appearance page's Theme section is `Editors.appearance(AppearanceChoices)`: `settingsui.AppearanceSelection` edits
-`ui.appearance` with the Dark / Light / Match System tiles, a read-only Theme row whose one entry is "Slate Steel", and
-a Reset button shown when the value is not `system`; `terminal.scheme` is an ordinary `Editors.choice` row noted
-"Colors for terminal panes". `AppearanceChoices` carries the two tile previews, the workspace glass defaults and the
-system-appearance observation from application wiring (`application.SettingsAppearance`), so settingsui reads jasper-ui
-only through `ui.model` and `ui.swing`. The Match System tile names the observed appearance, or says it is unavailable
+`ui.appearance` with the Dark / Light / Match System tiles, each previewing its pick, and stages `ui.theme.dark` and
+`ui.theme.light` from the Dark theme and Light theme dropdowns as companions (their rows are hidden); one Reset returns
+all three to their defaults. `terminal.scheme` is `Editors.schemeChoice`'s `SchemePick`, "Same as UI theme" then every
+installed scheme, noted "Colors for terminal panes". A saved pick that is not installed shows as "<id> (not
+installed)". `AppearanceChoices` carries `InstalledThemes` (the theme options with previews and the schemes, read again
+on every refresh), the workspace glass defaults and the system-appearance observation from application wiring
+(`application.SettingsAppearance`, over the controller's live library), so settingsui reads jasper-ui only through
+`ui.model` and `ui.swing`. The Match System tile names the observed appearance, or says it is unavailable
 and Dark is used. Terminal › Font & Colors links to the section.
 
 The command palette's `view.terminal_scheme.<name>` commands save `terminal.scheme` for every window

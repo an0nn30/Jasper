@@ -6,8 +6,8 @@ and library APIs into these values; plugins use SDK contracts and host adapters.
 
 The engine is `dev.jasper.ui.theme`: `JasperTheme` reads a Jasper theme file (the bundled Slate Steel is `slate-steel.json`) and gives
 each variant's semantic palette, terminal and editor schemes, syntax styles, glass levels and FlatLaf UI keys
-(`UiColorKeys`, from the roles) as an immutable `GeneratedTheme`. There are no other themes and no theme files to
-parse. The app and plugins use this authority; [completion evidence](../docs/design/theme-engine/completion.md)
+(`UiColorKeys`, from the roles) as an immutable `GeneratedTheme`; the app reads installed theme files with the same
+loader. The app and plugins use this authority; [completion evidence](../docs/design/theme-engine/completion.md)
 separates source migration from Plan 3 composition.
 
 `TerminalColors` takes background before foreground and defensively copies exactly

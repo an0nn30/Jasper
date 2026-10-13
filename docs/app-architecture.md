@@ -225,21 +225,27 @@ icon values or identities, and their painting and text sizes come from `NativeCh
 
 ## Themes
 
-The installed theme is Slate Steel; there are no other themes, no theme files and no themes folder.
+The built-in theme is Slate Steel; installed themes are Jasper theme files in `<home>/themes/` ([themes](themes.md)).
 `ThemeManager.install` installs a variant through jasper-ui's `FlatLafInstaller` (FlatLaf's IntelliJ-format input from
 the theme's UI keys, which `UiColorKeys` derives from the semantic roles, then the `Jasper.semantic.*` role keys and
 the popup shadow) and adds the app's native defaults: the split divider border by class name and the centred title.
 Tool windows paint `surface.panel` (theme.md's tool-window body) through `ToolWindowSurface`, their headers included; the stripes stay chrome.
 
-`JasperTheme.bundled()` (jasper-ui) supplies one `GeneratedTheme` per variant and the terminal schemes. `ThemeController.configure(dark, scheme, font)` installs the variant for chrome and workspace and
-resolves the scheme's palette for terminal panes (`ResolvedTheme.slateSteel`); `ResolvedTheme.surface()`, the
+`JasperTheme` (jasper-ui) reads a theme file into one `GeneratedTheme` per variant and its terminal schemes;
+`JasperTheme.bundled()` is Slate Steel. `appearance.ThemeLibrary` holds Slate Steel and every valid
+`<home>/themes/*.json`, reusing the parsed theme of an unchanged file, and keeps a problem for each file it skips.
+`appearance.ThemeSelection` is the Dark and Light theme picks and the scheme choice from one library; its `of` replaces
+a pick the library cannot honour by its default and reports it. `ThemeController.configure(dark, selection, font)`
+installs the shown variant for chrome and workspace and resolves the scheme's palette for terminal panes
+(`ResolvedTheme.of`); `ResolvedTheme.surface()`, the
 workspace's `surface.terminal`, is what the window behind panes, tab backgrounds and the tab strip use, so a scheme
 colours only the text area. `ConfigurationController` resolves `ui.appearance` with `AppearancePolicy` against the
-live `SystemAppearance` observation; an installation failure keeps the current appearance and is a warning on
-`ui.appearance`.
-
-Nothing reads a themes folder or converts, imports or migrates a theme; an older install's `themes` and
-`terminal-themes` folders are left as they are. Plugins receive the roles and the editor scheme through
+live `SystemAppearance` observation and builds the selection from `ui.theme.dark`, `ui.theme.light` and
+`terminal.scheme`. It reads the themes folder again through `ConfigService.watchWith` on the configuration worker,
+before each forced or changed state is published, so Reload config, a Settings save or a `config.toml` change picks up
+theme files. Skipped files, unusable picks and an installation failure are its theme problems, shown with the
+configuration's diagnostics; an installation failure keeps the current appearance. Each window's `WindowCommands`
+rebuilds the "Terminal: …" commands when the library changes. Plugins receive the roles and the editor scheme through
 `plugins.HostedPalettes`.
 
 ## Hosted workspace styling

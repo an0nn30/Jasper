@@ -1,5 +1,18 @@
 # Jasper — Status and Handoff
 
+**Theme import Plan 1: the format and the runtime — 2026-10-13** (`claude/theme-import`;
+[spec](superpowers/specs/2026-10-13-jasper-theme-import-design.md),
+[plan](superpowers/plans/2026-10-13-theme-import-1-format-and-runtime.md)). One public theme format: jasper-ui's
+`JasperTheme` reads any Jasper theme file and `slate-steel.json` is one (`"jasper-theme": 1`, variants `dark`/`light`,
+named schemes, literal editor colours). `appearance.ThemeLibrary` reads `<home>/themes/*.json` at start-up and with
+every forced or changed configuration read; `ui.theme.dark` and `ui.theme.light` pick the theme each appearance shows,
+`terminal.scheme` is `match` or a scheme id (`slate-steel/high-contrast`); unusable picks and skipped files are
+configuration warnings. Settings › Appearance has Dark theme and Light theme dropdowns and a Terminal scheme dropdown
+over the installed schemes; the palette's "Terminal: …" commands follow them. Deviation: the spec's section 8 put the
+dropdowns in Plan 2; they are here (Plan 2 is Import… and Remove). `./gradlew check --continue`: **9801 tests, 0 failures,
+0 errors, 8 skipped**. No GUI launched. For the user: copy a theme file into the themes folder, Reload config, pick it.
+Not merged or pushed.
+
 **Clear Terminal in the terminal context menu — 2026-10-13** (`claude/clear-terminal`, worktree
 `.claude/worktrees/clear-terminal`; bounded change, design approved in chat, no spec or plan). Right-click › Clear
 Terminal (after Find) erases scrollback and the live screen; the cursor's line moves to the top with the cursor, and
