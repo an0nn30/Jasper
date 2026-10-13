@@ -59,6 +59,18 @@ class ConfigurationControllerTest {
         service = new ConfigService(directory.resolve("config.toml"), false);
         edt(() -> { themes = new ThemeController(true, TerminalSchemeChoice.MATCH); controller = new ConfigurationTestSupport(themes, service); });
     }
+    /** As {@link #start}, with imported themes read from {@code themes/} next to config.toml. */
+    void startWithThemes(String text) throws Exception {
+        Files.writeString(directory.resolve("config.toml"), text);
+        service = new ConfigService(directory.resolve("config.toml"), false);
+        var folder = directory.resolve("themes");
+        edt(() -> {
+            var library = dev.jasper.app.appearance.ThemeLibrary.read(folder, dev.jasper.app.appearance.ThemeLibrary.bundledOnly());
+            themes = new ThemeController(true, dev.jasper.app.appearance.ThemeSelection.of(library, "slate-steel", "slate-steel",
+                TerminalSchemeChoice.MATCH, (key, message) -> { }));
+            controller = new ConfigurationTestSupport(themes, service, folder);
+        });
+    }
     WindowContent owner() { return owner(launcher(pending)); }
     WindowContent owner(ShellLauncher launcher) {
         var result = new WindowContent(launcher, HOME, path -> {}, () -> {}, () -> {}, themes);
@@ -662,6 +674,36 @@ class ConfigurationControllerTest {
         edt(() -> {
             assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateSteel(false, JasperTheme.bundled().matching(false)));
             assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().startsWith("ui.") || d.key().startsWith("terminal."));
+        });
+    }
+
+    @Test void aSavedImportedThemeShowsAndAnUnknownOneIsReported() throws Exception {
+        var folder = Files.createDirectories(directory.resolve("themes"));
+        Files.writeString(folder.resolve("ocean.json"), ThemeTestSupport.uiThemeJson("Ocean"));
+        startWithThemes("[ui]\nappearance='dark'\n[ui.theme]\ndark='ocean'\n");
+        edt(() -> {
+            assertThat(themes.current().chrome().name()).isEqualTo("Ocean");
+            assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().startsWith("ui.theme"));
+        });
+        reload("[ui]\nappearance='dark'\n[ui.theme]\ndark='nord'\n");
+        edt(() -> {
+            assertThat(themes.current().chrome()).isSameAs(JasperTheme.bundled().generated(true));
+            assertThat(controller.shown().diagnostics()).filteredOn(d -> d.key().equals("ui.theme.dark")).singleElement()
+                .satisfies(d -> assertThat(d.message()).startsWith("\"nord\" is not an installed theme."));
+        });
+    }
+
+    @Test void reloadReadsTheThemesFolderAgainAndReportsAFileItSkips() throws Exception {
+        startWithThemes("[ui]\nappearance='dark'\n[ui.theme]\ndark='ocean'\n");
+        edt(() -> assertThat(themes.current().chrome()).isSameAs(JasperTheme.bundled().generated(true)));
+        var folder = Files.createDirectories(directory.resolve("themes"));
+        Files.writeString(folder.resolve("ocean.json"), ThemeTestSupport.uiThemeJson("Ocean"));
+        Files.writeString(folder.resolve("broken.json"), "{ \"jasper-theme\": 1 }");
+        service.reload().get(); edt(() -> {});
+        edt(() -> {
+            assertThat(themes.current().chrome().name()).isEqualTo("Ocean");
+            assertThat(controller.shown().diagnostics()).filteredOn(d -> d.file().getFileName().toString().equals("broken.json"))
+                .singleElement().satisfies(d -> assertThat(d.formatted()).endsWith("broken.json: warning: Missing entry \"name\""));
         });
     }
 

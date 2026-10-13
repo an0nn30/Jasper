@@ -17,10 +17,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 class SlateSteelControllerTest {
     static final JasperTheme STEEL = JasperTheme.bundled();
 
-    @Test void aFailureNamesTheVariantOnlyForSlateSteelItself() {
+    @Test void aFailureNamesTheThemeAndItsVariant() {
         var copy = ThemeTestSupport.recolored(STEEL.generated(true), java.util.Map.of());
         assertThat(new ThemeController.InstallationFailure(copy, new IllegalStateException("x")).getMessage())
-            .isEqualTo("Could not apply theme: Slate Steel");
+            .isEqualTo("Could not apply theme: Slate Steel Dark");
         assertThat(new ThemeController.InstallationFailure(STEEL.generated(false), new IllegalStateException("x")).getMessage())
             .isEqualTo("Could not apply theme: Slate Steel Light");
     }
@@ -63,10 +63,12 @@ class SlateSteelControllerTest {
         assertThat(controller.current().palette().background()).isEqualTo(STEEL.matching(true).colors().background());
     }
 
-    @Test void everySchemeChoiceNamesABundledScheme() {
-        for (var choice : dev.jasper.app.appearance.ThemeTestSupport.SCHEME_CHOICES)
+    @Test void everySchemeChoiceShowsABundledScheme() {
+        for (var choice : ThemeTestSupport.SCHEME_CHOICES)
             for (boolean dark : new boolean[] {true, false})
-                assertThat(ThemeController.scheme(dark, choice)).isNotNull();
-        assertThat(ThemeController.scheme(false, TerminalSchemeChoice.MATCH)).isEqualTo(JasperTheme.bundled().matching(false));
+                assertThat(ThemeSelection.slateSteel(choice).terminal(dark)).isNotNull();
+        assertThat(ThemeSelection.slateSteel(TerminalSchemeChoice.MATCH).terminal(false)).isEqualTo(STEEL.matching(false));
+        assertThat(ThemeSelection.slateSteel(TerminalSchemeChoice.parse("ocean/dark").orElseThrow()).scheme())
+            .as("a scheme Slate Steel lacks becomes match").isEqualTo(TerminalSchemeChoice.MATCH);
     }
 }

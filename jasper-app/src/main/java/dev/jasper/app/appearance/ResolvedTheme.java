@@ -12,7 +12,13 @@ import java.util.Objects;
 public record ResolvedTheme(GeneratedTheme chrome, GeneratedTheme workspace, Palette palette) {
     public ResolvedTheme { Objects.requireNonNull(chrome); Objects.requireNonNull(workspace); Objects.requireNonNull(palette); }
 
-    /** Slate Steel: one variant for chrome and workspace, and the terminal scheme's palette. */
+    /** The theme {@code selection} shows with the Dark or Light appearance, for chrome and workspace, and its terminal scheme's palette. */
+    public static ResolvedTheme of(boolean dark, ThemeSelection selection) {
+        var theme = selection.theme(dark).generated(dark);
+        return new ResolvedTheme(theme, theme, TerminalPaletteAdapter.toTerminal(selection.terminal(dark)));
+    }
+
+    /** Slate Steel: one variant for chrome and workspace, and {@code scheme}'s palette. */
     public static ResolvedTheme slateSteel(boolean dark, TerminalScheme scheme) {
         var theme = JasperTheme.bundled().generated(dark);
         return new ResolvedTheme(theme, theme, TerminalPaletteAdapter.toTerminal(scheme));

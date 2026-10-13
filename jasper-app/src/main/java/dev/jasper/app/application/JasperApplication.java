@@ -213,6 +213,12 @@ public final class JasperApplication {
      */
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate, Path shellIntegrationDir) {
+        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellIntegrationDir, null);
+    }
+
+    /** As above; {@code themesFolder} holds the imported themes, or is null for the built-in theme alone. */
+    public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
+                      Runnable terminate, Path shellIntegrationDir, Path themesFolder) {
         dev.jasper.app.platform.BundledFonts.register();
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
         startupViewMode = startup.viewMode();
@@ -221,7 +227,12 @@ public final class JasperApplication {
         boolean dark = AppearancePolicy.dark(startup.appearance(), systemAppearance.current());
         // First Swing work: every later component may read the installed snapshot. A variant that cannot be installed
         // never stops start-up; the configuration reports it.
-        themes = ThemeController.startup(dark, startup.terminalScheme(),
+        var library = themesFolder == null ? dev.jasper.app.appearance.ThemeLibrary.bundledOnly()
+            : dev.jasper.app.appearance.ThemeLibrary.read(themesFolder, dev.jasper.app.appearance.ThemeLibrary.bundledOnly());
+        // The configuration reports unusable picks; start-up only replaces them.
+        var selection = dev.jasper.app.appearance.ThemeSelection.of(library, startup.darkTheme(), startup.lightTheme(),
+            startup.terminalScheme(), (key, message) -> { });
+        themes = ThemeController.startup(dark, selection,
             failure -> LOG.log(System.Logger.Level.WARNING, "Starting in Slate Steel Dark: " + failure.getMessage(), failure));
         // App-native menus show each item's action binding from the live keymap.
         themes.appearance().shortcuts(this::shortcutLabel);
@@ -244,7 +255,8 @@ public final class JasperApplication {
         buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome().dark()));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
             buddy.companion(), notificationCenter, buddy.companion()::setWorking, JasperApplication::afterDelay);
-        configuration = service == null ? null : new ConfigurationController(themes, service, new dev.jasper.app.platform.ConfigEditor()::open, systemAppearance.current());
+        configuration = service == null ? null : new ConfigurationController(themes, service, new dev.jasper.app.platform.ConfigEditor()::open,
+            systemAppearance.current(), themesFolder);
         if (configuration != null) systemAppearanceListening = systemAppearance.subscribe(configuration::systemAppearanceChanged);
         Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
         shellProfiles = ShellProfileCatalog.system(savedShell);

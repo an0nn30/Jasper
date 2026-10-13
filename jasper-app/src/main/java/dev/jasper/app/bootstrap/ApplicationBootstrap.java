@@ -159,7 +159,7 @@ public final class ApplicationBootstrap {
                     "Shell integration scripts could not be installed; integration is off", failure);
             }
             var application = new JasperApplication(service, null, history, dirs.buddyState(),
-                () -> System.exit(0), integrationDir);
+                () -> System.exit(0), integrationDir, dirs.themes());
             Path source = HandoffSocket.codeSource();
             application.residentControl(new ResidentControl(() -> HandoffSocket.live(dirs.daemonSocket()),
                 () -> HandoffSocket.retire(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source))),

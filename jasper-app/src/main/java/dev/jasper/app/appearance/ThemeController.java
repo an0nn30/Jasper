@@ -4,7 +4,6 @@ import dev.jasper.app.config.TerminalSchemeChoice;
 import dev.jasper.app.config.UiFontConfig;
 import dev.jasper.ui.theme.GeneratedTheme;
 import dev.jasper.ui.theme.JasperTheme;
-import dev.jasper.ui.theme.TerminalScheme;
 import java.awt.Font;
 import javax.swing.plaf.FontUIResource;
 import java.util.LinkedHashSet;
@@ -17,8 +16,8 @@ import java.util.function.Predicate;
 import javax.swing.*;
 
 /**
- * Application-owned, EDT-confined theme selection and value subscriptions. The application shows Slate Steel: one
- * variant for chrome and workspace, and the terminal scheme's palette in the terminal panes.
+ * Application-owned, EDT-confined theme selection and value subscriptions. The shown theme's variant serves chrome and
+ * workspace, and the terminal scheme's palette the terminal panes.
  */
 public final class ThemeController implements AutoCloseable {
     private AppearanceBindings appearance;
@@ -29,18 +28,16 @@ public final class ThemeController implements AutoCloseable {
 
     public static final class InstallationFailure extends IllegalStateException {
         InstallationFailure(GeneratedTheme theme, RuntimeException cause) {
-            super("Could not apply theme: " + theme.name()
-                + (theme == JasperTheme.bundled().generated(theme.dark()) ? (theme.dark() ? " Dark" : " Light") : ""), cause);
+            super("Could not apply theme: " + theme.name() + (theme.dark() ? " Dark" : " Light"), cause);
         }
     }
 
-    /** The Slate Steel selection: the UI variant and the terminal scheme chosen. */
-    private record Slate(boolean dark, TerminalSchemeChoice scheme) { }
+    /** What is shown: the appearance in effect and the selection. */
+    private record Shown(boolean dark, ThemeSelection selection) { }
 
     private final Set<BiConsumer<ResolvedTheme, Boolean>> listeners = new LinkedHashSet<>();
     private final Predicate<GeneratedTheme> installer;
-    /** The Slate Steel selection. */
-    private Slate slate;
+    private Shown shown;
     private ResolvedTheme current;
     private UiFontConfig uiFont = UiFontConfig.defaults();
     private final Font platformFont;
@@ -49,74 +46,86 @@ public final class ThemeController implements AutoCloseable {
         "PasswordField.font", "FormattedTextField.font", "TextArea.font", "ComboBox.font", "Button.font");
 
     /**
-     * Start-up selection: Slate Steel in {@code dark}, or Dark when that cannot be installed. A failed attempt is rolled
-     * back completely, and the fallback is installed before this returns, so nothing can read the installed snapshot
-     * (ThemeZone, named icons, native chrome) before one exists. The fallback's own failure propagates.
+     * Start-up selection: {@code selection} in {@code dark}, or Slate Steel Dark when that cannot be installed. A failed
+     * attempt is rolled back completely, and the fallback is installed before this returns, so nothing can read the
+     * installed snapshot (ThemeZone, named icons, native chrome) before one exists. The fallback's own failure propagates.
      */
+    public static ThemeController startup(boolean dark, ThemeSelection selection, java.util.function.Consumer<InstallationFailure> fallingBack) {
+        return startup(dark, selection, ThemeManager::install, fallingBack);
+    }
+    /** As {@link #startup(boolean, ThemeSelection, java.util.function.Consumer)} for Slate Steel with {@code scheme}. */
     public static ThemeController startup(boolean dark, TerminalSchemeChoice scheme, java.util.function.Consumer<InstallationFailure> fallingBack) {
-        return startup(dark, scheme, ThemeManager::install, fallingBack);
+        return startup(dark, ThemeSelection.slateSteel(scheme), fallingBack);
     }
     static ThemeController startup(boolean dark, TerminalSchemeChoice scheme, Predicate<GeneratedTheme> installer,
                                    java.util.function.Consumer<InstallationFailure> fallingBack) {
-        try { return new ThemeController(dark, scheme, installer); }
+        return startup(dark, ThemeSelection.slateSteel(scheme), installer, fallingBack);
+    }
+    static ThemeController startup(boolean dark, ThemeSelection selection, Predicate<GeneratedTheme> installer,
+                                   java.util.function.Consumer<InstallationFailure> fallingBack) {
+        try { return new ThemeController(new Shown(dark, selection), installer); }
         catch (InstallationFailure failure) {
             fallingBack.accept(failure);
-            return new ThemeController(true, scheme, installer);
+            var steel = JasperTheme.bundled();
+            return new ThemeController(new Shown(true, new ThemeSelection(selection.library(), steel, steel, selection.scheme())), installer);
         }
     }
 
     /** Slate Steel in {@code dark} with {@code scheme}. */
     public ThemeController(boolean dark, TerminalSchemeChoice scheme) { this(dark, scheme, ThemeManager::install); }
     ThemeController(boolean dark, TerminalSchemeChoice scheme, Predicate<GeneratedTheme> installer) {
-        this(new Slate(dark, Objects.requireNonNull(scheme)), installer);
+        this(new Shown(dark, ThemeSelection.slateSteel(Objects.requireNonNull(scheme))), installer);
     }
-    private ThemeController(Slate slate, Predicate<GeneratedTheme> installer) {
+    /** {@code selection} in {@code dark}. */
+    public ThemeController(boolean dark, ThemeSelection selection) { this(new Shown(dark, Objects.requireNonNull(selection)), ThemeManager::install); }
+    ThemeController(boolean dark, ThemeSelection selection, Predicate<GeneratedTheme> installer) {
+        this(new Shown(dark, Objects.requireNonNull(selection)), installer);
+    }
+    private ThemeController(Shown shown, Predicate<GeneratedTheme> installer) {
         requireEdt();
         this.installer = Objects.requireNonNull(installer);
-        this.slate = slate;
+        this.shown = shown;
         // Swing otherwise tries the component's plugin loader for third-party LAF delegates.
         // Only UI delegate lookup belongs to the app; plugin class visibility stays isolated.
         UIManager.put("ClassLoader", ThemeController.class.getClassLoader());
         FORM_FONTS.forEach(key -> UIManager.put(key, null));
         UIManager.put("defaultFont", null);
         UIManager.put("Jasper.uiFontFamilyOverride", false);
-        current = resolve(slate);
+        current = ResolvedTheme.of(shown.dark(), shown.selection());
         appearance = new AppearanceBindings(current.pair(), ThemeController::reportFailure, () -> animationsEnabled);
         new dev.jasper.ui.swing.AppearanceTransaction(appearance.binding(), ignored -> installOrThrow(current.chrome()), ignored -> {}).apply(current.pair());
         platformFont = UIManager.getFont("defaultFont") != null ? UIManager.getFont("defaultFont") : UIManager.getFont("Label.font");
         platformLabelSize = UIManager.getFont("Label.font").getSize2D();
     }
 
-    /** The bundled scheme for a UI variant: the choice's, or with {@code MATCH} (or a scheme Slate Steel lacks) the variant's own. */
-    public static TerminalScheme scheme(boolean dark, TerminalSchemeChoice choice) {
-        var bundled = JasperTheme.bundled();
-        return choice.scheme().filter(id -> id.theme().equals(bundled.id())).flatMap(id -> bundled.scheme(id.key()))
-            .orElseGet(() -> bundled.matching(dark));
-    }
-    private static ResolvedTheme resolve(Slate slate) {
-        return ResolvedTheme.slateSteel(slate.dark(), scheme(slate.dark(), slate.scheme()));
-    }
-
     public ResolvedTheme current() { requireEdt(); return current; }
     /** The terminal scheme chosen. */
-    public TerminalSchemeChoice schemeChoice() { requireEdt(); return slate.scheme(); }
+    public TerminalSchemeChoice schemeChoice() { requireEdt(); return shown.selection().scheme(); }
+    /** The themes picked and the library they come from. */
+    public ThemeSelection selection() { requireEdt(); return shown.selection(); }
+    /** The installed themes the selection comes from. */
+    public ThemeLibrary library() { requireEdt(); return shown.selection().library(); }
 
-    /** Slate Steel in {@code dark} with {@code scheme} and {@code font}. */
-    public void configure(boolean dark, TerminalSchemeChoice scheme, UiFontConfig font) {
+    /** {@code selection} in {@code dark} with {@code font}. */
+    public void configure(boolean dark, ThemeSelection selection, UiFontConfig font) {
         requireEdt();
-        var next = new Slate(dark, Objects.requireNonNull(scheme));
-        apply(next, resolve(next), Objects.requireNonNull(font));
+        var next = new Shown(dark, Objects.requireNonNull(selection));
+        apply(next, ResolvedTheme.of(dark, selection), Objects.requireNonNull(font));
+    }
+    /** The current themes in {@code dark} with {@code scheme} and {@code font}. */
+    public void configure(boolean dark, TerminalSchemeChoice scheme, UiFontConfig font) {
+        requireEdt(); configure(dark, shown.selection().withScheme(Objects.requireNonNull(scheme)), font);
     }
     public void configure(boolean dark, TerminalSchemeChoice scheme) { requireEdt(); configure(dark, scheme, uiFont); }
-    /** Changes only the terminal scheme; the UI variant and font stay. */
+    /** Changes only the terminal scheme; the appearance, themes and font stay. */
     public void configureScheme(TerminalSchemeChoice scheme) {
-        requireEdt(); configure(slate.dark(), scheme, uiFont);
+        requireEdt(); configure(shown.dark(), scheme, uiFont);
     }
 
-    private void apply(Slate nextSlate, ResolvedTheme next, UiFontConfig font) {
+    private void apply(Shown nextShown, ResolvedTheme next, UiFontConfig font) {
         ResolvedTheme previous = current;
         boolean chromeChanged = previous.chrome() != next.chrome() || !uiFont.equals(font);
-        boolean selectionChanged = !Objects.equals(slate, nextSlate);
+        boolean selectionChanged = !Objects.equals(shown, nextShown);
         if (applying) throw new IllegalStateException("Theme configuration cannot re-enter");
         applying = true;
         try {
@@ -127,7 +136,7 @@ public final class ThemeController implements AutoCloseable {
                 }
                 UIManager.put("Jasper.uiFontFamilyOverride", !font.family().equalsIgnoreCase("system"));
                 uiFont = font;
-                slate = nextSlate;
+                shown = nextShown;
                 current = next;
             }, ignored -> {}).apply(next.pair());
             if (chromeChanged || !previous.equals(next) || selectionChanged) {
