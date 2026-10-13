@@ -19,6 +19,9 @@ jobs:
         with:
           distribution: jetbrains
           java-version: '25'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
       - uses: gradle/actions/setup-gradle@v6
       - name: Check
         shell: bash
