@@ -23,3 +23,8 @@ jobs:
       - name: Check
         shell: bash
         run: ./gradlew check --continue --stacktrace
+      # check built the release jars; the example plugin must keep building from them.
+      - name: Example external plugin
+        if: runner.os == 'Linux'
+        shell: bash
+        run: ./gradlew -p docs/examples/external-plugin -PjasperSdkDir="$PWD/build/sdk-release" check pluginZip --stacktrace

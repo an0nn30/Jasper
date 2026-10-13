@@ -1,5 +1,19 @@
 # Jasper — Status and Handoff
 
+**SDK release jars for external plugins — 2026-10-13** (`claude/sdk-release`, worktree `.claude/worktrees/sdk-release`;
+[spec](superpowers/specs/2026-10-13-sdk-release-jars-design.md), [plan](superpowers/plans/2026-10-13-sdk-release-jars.md)).
+`./gradlew sdkRelease` writes `jasper-sdk-<v>.jar` (with `-sources` and `-javadoc`) and `jasper-sdk-testkit-<v>.jar`
+(with `-sources`) to `build/sdk-release/`, named from `JasperSdk.VERSION`; `verifySdkRelease` (part of `:jasper-sdk:check`)
+pins their names, contents and manifest versions (plan deviation: a jar dropped into `build/sdk-release/` by hand makes
+`verifySdkRelease` fail rather than being removed; `./gradlew sdkRelease --rerun` recovers). `VersionRangeTest` keeps the
+example's SDK range and default version on this SDK. `docs/examples/external-plugin/` is a separate Gradle build that
+links those jars as files, tests a Tools command that copies a greeting, and zips the plugin. `.github/workflows/sdk-release.yml`
+builds the jars and the example, then attaches the jars to a published release (a manual run keeps them as a workflow
+artifact); CI builds the example on Linux. Official publishing (Maven coordinates, a Gradle plugin) is left for later.
+`./gradlew check --continue`: **9,763 tests, 0 failures, 0 errors, 8 skipped**; the example builds from the
+fresh jars. No GUI launched. For the user: publish a release (or dispatch sdk-release) and confirm the five jars are
+attached. Not merged or pushed.
+
 **SDK 0.16.1: clipboard and Tools menu — 2026-10-13** (`claude/sdk-clipboard`, worktree
 `.claude/worktrees/sdk-clipboard`; [spec](superpowers/specs/2026-10-13-sdk-clipboard-and-tools-menu-design.md),
 [plan](superpowers/plans/2026-10-13-sdk-clipboard-and-tools-menu.md)). `Platform.copy`, `copySecret` and

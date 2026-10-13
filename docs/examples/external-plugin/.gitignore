@@ -1,0 +1,4 @@
+# The Jasper SDK and testkit jars you download from a Jasper release.
+libs/
+build/
+.gradle/

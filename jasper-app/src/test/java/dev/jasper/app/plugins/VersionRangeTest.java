@@ -17,7 +17,8 @@ class VersionRangeTest {
     @Test void everySdkRangeThePluginGuidesTellAuthorsToDeclareAdmitsThisSdk() throws Exception {
         var root = java.nio.file.Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();
         var sdk = Version.parse(dev.jasper.sdk.JasperSdk.VERSION);
-        for (String guide : new String[]{"docs/plugin-authoring.md", "jasper-sdk/README.md", "docs/sdk-icons.md"}) {
+        for (String guide : new String[]{"docs/plugin-authoring.md", "jasper-sdk/README.md", "docs/sdk-icons.md",
+                "docs/examples/external-plugin/src/main/resources/plugin.toml"}) {
             var declared = java.util.regex.Pattern.compile("sdk = \"([^\"]+)\"").matcher(java.nio.file.Files.readString(root.resolve(guide)));
             int found = 0;
             while (declared.find()) {
@@ -26,6 +27,16 @@ class VersionRangeTest {
             }
             assertThat(found).as(guide).isPositive();
         }
+    }
+
+    /** The example external plugin is what a developer copies: its default jars are this SDK's release jars. */
+    @Test void theExampleExternalPluginBuildsAgainstThisSdkByDefault() throws Exception {
+        var root = java.nio.file.Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();
+        String build = java.nio.file.Files.readString(root.resolve("docs/examples/external-plugin/build.gradle.kts"));
+        var version = java.util.regex.Pattern.compile("gradleProperty\\(\"jasperSdkVersion\"\\)\\.getOrElse\\(\"([^\"]+)\"\\)").matcher(build);
+        assertThat(version.find()).as("the example's jasperSdkVersion default").isTrue();
+        assertThat(version.group(1)).as("docs/examples/external-plugin/build.gradle.kts jasperSdkVersion default")
+            .isEqualTo(dev.jasper.sdk.JasperSdk.VERSION);
     }
 
     @Test void rangesCombineComparators() {
