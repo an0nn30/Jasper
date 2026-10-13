@@ -17,7 +17,8 @@ The user's decisions (2026-10-13):
    two-stage start.
 2. The assumptions stated before the approach was chosen stand: packaged builds on macOS, Windows and Linux;
    `:jasper-app:run` out of scope; changes apply on restart; a maximum-heap control plus free-form flags; the flags
-   live in their own file in the Jasper home, not `config.toml`; **a bad flag never leaves Jasper unable to start**.
+   live in their own file in the Jasper home, not `config.toml`; **a bad flag never leaves Jasper unable to start**
+   (within the limits of section 4.5).
 3. In scope beyond the core: Help menu and palette actions, a status bar memory indicator and a low-memory warning.
 4. Jasper ships an **explicit default heap**, `-Xmx2048m`, as IntelliJ does.
 5. The modified launcher is GPLv2 with the Classpath Exception; publishing its source in the repository is acceptable.
@@ -40,6 +41,11 @@ doubt.
   `atexit` handler, `JNI_GetCreatedJavaVMs` reports **0** after a creation failure (malformed value, conflicting
   collectors), **1** when the application called `System.exit`, and **0** after a normal return, which is the only case
   where `JLI_Launch` returned first. Verified on macOS; Windows and Linux share `java.c`.
+- macOS's libjli exports its own `JNI_GetCreatedJavaVMs`, a compatibility wrapper that loads the default libjvm on
+  demand, so a `dlsym(RTLD_DEFAULT, …)` lookup can answer for the wrong libjvm (found in Task 3's review).
+- HotSpot's own initialization failures (`vm_exit_during_initialization`: `-Xms` above `-Xmx`, a missing `-agentlib` or
+  `-javaagent`, an unusable CDS archive) end the process with `_exit`, which runs no exit handlers (verified on macOS
+  in Task 3's review).
 - With `-XX:+IgnoreUnrecognizedVMOptions`, unknown `-XX:`, `-X…` and `--…` options are ignored. Still fatal:
   malformed values (`Invalid maximum heap size: -Xmx3q`), conflicting collectors, a heap that cannot be reserved.
 - `jpackage -J--patch-module=jdk.jpackage=<dir>` with `<dir>/jdk/jpackage/internal/resources/jpackageapplauncher`
@@ -133,8 +139,10 @@ Beyond IntelliJ, which shows a dead-end dialog:
    created when `JLI_Launch` has not returned and `JNI_GetCreatedJavaVMs` reports no VM. It then starts the launcher's
    own executable again with the same arguments and `JASPER_VM_OPTIONS_SKIP=launch-failed` added to the environment,
    and lets the failing process exit.
-   - `JNI_GetCreatedJavaVMs`: `dlsym(RTLD_DEFAULT, …)` on macOS and Linux (libjli loads libjvm `RTLD_GLOBAL`);
-     `GetProcAddress(GetModuleHandleW(L"jvm.dll"), …)` on Windows.
+   - `JNI_GetCreatedJavaVMs` of the loaded libjvm only: on macOS the image whose path ends in `/libjvm.dylib`, found
+     with `_dyld_image_count`/`_dyld_get_image_name` and opened with `dlopen(…, RTLD_NOLOAD)`; on Linux
+     `dlopen("libjvm.so", RTLD_NOLOAD)`; on Windows `GetProcAddress(GetModuleHandleW(L"jvm.dll"), …)`. With no libjvm
+     loaded there is no re-spawn.
    - Own executable: `_NSGetExecutablePath`, `/proc/self/exe`, `GetModuleFileNameW`. Start: `posix_spawn` with the
      current environment plus the marker; `CreateProcessW` with `GetCommandLineW()` on Windows.
    - On macOS the replacement is started directly rather than through LaunchServices, as Jasper's restart already does.
@@ -147,6 +155,10 @@ Beyond IntelliJ, which shows a dead-end dialog:
    message (for example `Invalid maximum heap size: -Xmx3q`) and an **Edit Custom VM Options…** button. A run skipped
    for any other reason shows no notification; the System Settings section notes it.
 4. If the replacement also fails (a failure unrelated to the user's lines), it exits as Jasper does today.
+5. **Scope.** The launcher recovers from options the JVM rejects while creating itself: unrecognised options, malformed
+   values, conflicting collectors. HotSpot's initialization failures (section 2) exit with `_exit` and are not
+   recovered at launch; the System Settings check (section 5.1) reports them before the user restarts, and setting
+   `JASPER_VM_OPTIONS_SKIP` by hand starts Jasper without the file.
 
 ## 5. User interface
 

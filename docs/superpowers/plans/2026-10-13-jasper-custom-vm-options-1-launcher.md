@@ -57,11 +57,15 @@ Recorded here and, when the plan completes, in `docs/STATUS.md`:
    headers, so it compiles at upstream's level; the core, the guard and the tests are strict.
 3. **Windows exit hook.** `jli.dll` and `jvm.dll` call the shared UCRT's `exit()`, which never runs a statically linked
    launcher's own `atexit` table, so on Windows the guard also registers through `ucrtbase.dll`'s `_crt_atexit`.
-4. **Unknown means no.** The guard re-spawns only when `JNI_GetCreatedJavaVMs` can be called and reports 0; when libjvm
-   is not loaded it does nothing, so an ordinary exit can never turn into a restart.
+4. **Unknown means no.** The guard asks only the loaded libjvm (macOS's libjli exports a same-named wrapper that would
+   load the default libjvm) and re-spawns only when it reports 0; with no libjvm loaded it does nothing, so an ordinary
+   exit can never turn into a restart (spec 4.1, amended in Task 3's review).
 5. **Benchmark isolation.** `StartupRuns` gives the launcher an empty options file whenever it isolates the home, for
    the same reason `trainAotCache` does (spec 6.3).
 6. **Byte order mark.** A UTF-8 BOM at the start of the file is skipped (the spec is silent; Notepad writes one).
+7. **Recovery scope.** HotSpot's initialization failures (`-Xms` above `-Xmx`, a missing agent, an unusable CDS archive)
+   end with `_exit`, which runs no exit handler, so the launcher cannot recover from them (spec 4.5, added in Task 3's
+   review); plan 2's System Settings check reports them before a restart.
 
 ## Review Focus
 
@@ -1297,19 +1301,22 @@ def testLauncherGuard = tasks.register('testLauncherGuard') {
             [name: 'normal return', arguments: [armed, '-cp', probes, 'GuardProbe'], respawn: false, exit: 0],
             [name: 'main throws', arguments: [armed, '-cp', probes, 'GuardProbe', 'throw'], respawn: false, exit: 1],
             [name: 'unarmed malformed heap value', arguments: ['-Xmx3q', '-cp', probes, 'GuardProbe'], respawn: false, exit: null],
+            [name: 'no libjvm loaded', arguments: ['-XXaltjvm=/nonexistent/jvm', armed, '-cp', probes, 'GuardProbe'], respawn: false, exit: null],
         ]
         List<String> failures = []
         scenarios.eachWithIndex { Map scenario, int index ->
             File marker = new File(work, "respawn-${index}")
-            def builder = new ProcessBuilder([harness.absolutePath] + scenario.arguments).redirectErrorStream(true)
+            File log = new File(work, "output-${index}.txt")
+            def builder = new ProcessBuilder([harness.absolutePath] + scenario.arguments).redirectErrorStream(true).redirectOutput(log)
             ['JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS', 'CLASSPATH'].each { builder.environment().remove(it) }
             builder.environment().put('GUARD_HARNESS_JLI', jli.absolutePath)
             builder.environment().put('GUARD_HARNESS_MARKER', marker.absolutePath)
             Process process = builder.start()
-            String output = new String(process.inputStream.readAllBytes(), StandardCharsets.UTF_8)
-            if (!process.waitFor(60, TimeUnit.SECONDS)) {
-                process.destroyForcibly()
-                failures << "${scenario.name}: the harness did not exit\n${output}".toString()
+            boolean exited = process.waitFor(60, TimeUnit.SECONDS)
+            if (!exited) process.destroyForcibly()
+            String output = log.getText('UTF-8')
+            if (!exited) {
+                failures << "${scenario.name}: the harness did not exit within 60 s\n${output}".toString()
                 return
             }
             int exit = process.exitValue()
@@ -1375,20 +1382,37 @@ static volatile int registered;
 static volatile int returned;
 static void (*respawnReplacement)(void);
 
-/* The number of created Java VMs, or -1 when it cannot be told (libjvm is not loaded). */
+/* The loaded libjvm's own JNI_GetCreatedJavaVMs, or NULL when no libjvm is loaded. Asked of that image only: macOS's
+   libjli exports a wrapper of the same name that would load the default libjvm on demand. */
+static CreatedJavaVmsFunction loadedJvmFunction(void) {
+#if defined(_WIN32)
+    HMODULE jvm = GetModuleHandleW(L"jvm.dll");
+    return jvm == NULL ? NULL : (CreatedJavaVmsFunction) GetProcAddress(jvm, "JNI_GetCreatedJavaVMs");
+#elif defined(__APPLE__)
+    static const char suffix[] = "/libjvm.dylib";
+    const size_t suffixLength = sizeof(suffix) - 1;
+    uint32_t images = _dyld_image_count();
+    uint32_t i;
+    for (i = 0; i < images; ++i) {
+        const char* name = _dyld_get_image_name(i);
+        size_t length = name == NULL ? 0 : strlen(name);
+        if (length >= suffixLength && strcmp(name + length - suffixLength, suffix) == 0) {
+            void* jvm = dlopen(name, RTLD_LAZY | RTLD_NOLOAD);
+            return jvm == NULL ? NULL : (CreatedJavaVmsFunction) dlsym(jvm, "JNI_GetCreatedJavaVMs");
+        }
+    }
+    return NULL;
+#else
+    void* jvm = dlopen("libjvm.so", RTLD_LAZY | RTLD_NOLOAD);
+    return jvm == NULL ? NULL : (CreatedJavaVmsFunction) dlsym(jvm, "JNI_GetCreatedJavaVMs");
+#endif
+}
+
+/* The number of created Java VMs, or -1 when it cannot be told (no libjvm is loaded). */
 static int createdJavaVms(void) {
-    CreatedJavaVmsFunction function;
+    CreatedJavaVmsFunction function = loadedJvmFunction();
     JavaVM* vms[1];
     jsize count = 0;
-#ifdef _WIN32
-    HMODULE jvm = GetModuleHandleW(L"jvm.dll");
-    if (jvm == NULL) {
-        return -1;
-    }
-    function = (CreatedJavaVmsFunction) GetProcAddress(jvm, "JNI_GetCreatedJavaVMs");
-#else
-    function = (CreatedJavaVmsFunction) dlsym(RTLD_DEFAULT, "JNI_GetCreatedJavaVMs");
-#endif
     if (function == NULL || function(vms, 1, &count) != JNI_OK) {
         return -1;
     }
@@ -1551,7 +1575,7 @@ void jasperGuardSetRespawn(void (*replacement)(void)) {
 - [ ] **Step 4: Run the test to see it pass**
 
 Run: `./gradlew :jasper-app:testLauncherGuard`
-Expected: BUILD SUCCESSFUL (6 scenarios). The two failing JVMs print `Invalid maximum heap size: -Xmx3q` and
+Expected: BUILD SUCCESSFUL (7 scenarios). The two failing JVMs print `Invalid maximum heap size: -Xmx3q` and
 `Conflicting collector combinations…` into the captured output; that is expected.
 
 - [ ] **Step 5: Commit**
@@ -1977,9 +2001,10 @@ On macOS libjli calls the launcher's `main` again on a new thread; that second c
 - `jasper/JasperVmOptions.{h,cpp}`: reads the environment and the file with jpackage's helpers and rewrites the cfg's
   `java-options`; it never throws, and on any error the bundled options stand.
 - `jasper/jasper_launch_guard.{h,c}`: armed when the JVM arguments carry `-Djasper.vmOptionsDigest=`. Its exit handler
-  re-spawns the launcher with `JASPER_VM_OPTIONS_SKIP=launch-failed` when `JLI_Launch` never returned and
-  `JNI_GetCreatedJavaVMs` reports no JVM; when that count cannot be read it does nothing. On Windows it also registers
-  with `ucrtbase.dll`'s `_crt_atexit`, because `jli.dll` calls the shared UCRT's `exit()`.
+  re-spawns the launcher with `JASPER_VM_OPTIONS_SKIP=launch-failed` when `JLI_Launch` never returned and the loaded
+  libjvm's own `JNI_GetCreatedJavaVMs` reports no JVM; with no libjvm loaded it does nothing. On Windows it also
+  registers with `ucrtbase.dll`'s `_crt_atexit`, because `jli.dll` calls the shared UCRT's `exit()`. HotSpot's own
+  initialization failures end with `_exit` and never reach it.
 
 ## Build
 
@@ -2290,7 +2315,7 @@ All in `check`, on every OS:
   `test/digest-vectors.txt`, which the application's tests read too.
 - `testLauncherGuard`: `test/guard_harness.c` arms the guard and runs the toolchain JDK's real `JLI_Launch` with
   `test/GuardProbe.java`. A malformed `-Xmx` and conflicting collectors re-spawn; `System.exit`, a normal return, a
-  throwing `main` and an unarmed launch do not.
+  throwing `main`, an unarmed launch and a launch that fails before any libjvm loads do not.
 - `verifyLauncherImage`: packages `test/LauncherProbe.java` with Jasper's launcher (`jpackage
   -J--patch-module=jdk.jpackage=…`) and checks the location rules, the merge order and filters, a corrupted file, the
   skip variable, the fallback start with the arguments intact, a directory in the file's place and a non-ASCII home.
