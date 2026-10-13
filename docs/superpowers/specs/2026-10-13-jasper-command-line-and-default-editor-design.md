@@ -1,6 +1,6 @@
 # Jasper command line and default editor
 
-Status: **Draft, awaiting the user's review (2026-10-13).** Branch: `claude/default-editor`, from `main` at `15d97d5d`.
+Status: **Approved on 2026-10-13** (the user: "spec approved"). Branch: `claude/default-editor`, from `main` at `15d97d5d`.
 
 ## 1. Intent and decisions
 
