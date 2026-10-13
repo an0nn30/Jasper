@@ -10,8 +10,10 @@ import io
 import json
 import os
 import pathlib
+import struct
 import tempfile
 import unittest
+import unittest.mock
 import zipfile
 
 import jasper_theme as tool
@@ -45,6 +47,69 @@ def marketplace_zip(target: pathlib.Path, jar: pathlib.Path) -> pathlib.Path:
     """A Marketplace download: the plugin jar under <name>/lib/."""
     with zipfile.ZipFile(target, "w") as archive:
         archive.write(jar, "Ocean/lib/ocean.jar")
+    return target
+
+
+def theme_jar(target: pathlib.Path, themes: dict, extra: dict | None = None) -> pathlib.Path:
+    """A plugin jar whose plugin.xml declares each theme of {id: theme dict}; extra maps more paths to their bytes."""
+    providers = "".join(f'<themeProvider id="{theme_id}" path="/themes/{theme_id}.theme.json"/>' for theme_id in themes)
+    with zipfile.ZipFile(target, "w") as archive:
+        archive.writestr("META-INF/plugin.xml", f"<idea-plugin><extensions>{providers}</extensions></idea-plugin>")
+        for theme_id, theme in themes.items():
+            archive.writestr(f"themes/{theme_id}.theme.json", json.dumps(theme))
+        for path, data in (extra or {}).items():
+            archive.writestr(path, data)
+    return target
+
+
+def loose_file(directory, name: str, text: str) -> pathlib.Path:
+    path = pathlib.Path(directory) / name
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def listing(directory) -> list:
+    return sorted(p.name for p in pathlib.Path(directory).iterdir())
+
+
+BASE = {"name": "Base Theme", "dark": True, "ui": {"ToolWindow.background": "#102030"}}
+CHILD = {"name": "Child Theme", "parentTheme": "Base Theme"}
+MEMBER = "themes/Bad.theme.json"
+
+
+# Damage to the one member of a jar made by damaged_jar: (raw jar bytes, the member's ZipInfo, where its data starts,
+# where its central directory header starts).
+def flip_a_data_byte(raw, info, data, header):
+    raw[data] ^= 0xFF
+
+
+def garble_the_deflate_stream(raw, info, data, header):
+    raw[data:data + info.compress_size] = b"\xff" * info.compress_size
+
+
+def mark_encrypted(raw, info, data, header):
+    raw[header + 8] |= 1
+
+
+def claim_an_unsupported_method(raw, info, data, header):
+    struct.pack_into("<H", raw, header + 10, 99)
+
+
+def claim_a_smaller_size(raw, info, data, header):
+    struct.pack_into("<I", raw, header + 24, 5)
+
+
+def damaged_jar(target: pathlib.Path, method: int, damage) -> pathlib.Path:
+    """A jar whose only member, themes/Bad.theme.json, is damaged by ``damage``."""
+    content = json.dumps({"name": "Bad", "dark": True, "pad": "x" * 200}).encode("utf-8")
+    with zipfile.ZipFile(target, "w", method) as archive:
+        archive.writestr(MEMBER, content)
+    with zipfile.ZipFile(target) as archive:
+        info = archive.getinfo(MEMBER)
+    raw = bytearray(target.read_bytes())
+    local_extra = struct.unpack_from("<H", raw, info.header_offset + 28)[0]
+    damage(raw, info, info.header_offset + 30 + len(MEMBER) + local_extra, raw.rindex(b"PK\x01\x02"))
+    target.write_bytes(raw)
     return target
 
 
@@ -123,6 +188,19 @@ class Alacritty(unittest.TestCase):
     def test_title_names(self):
         self.assertEqual(tool.title_name("gruvbox_dark"), "Gruvbox Dark")
         self.assertEqual(tool.title_name("paper-light"), "Paper Light")
+
+
+class AlacrittyNames(unittest.TestCase):
+    def test_a_file_name_with_no_letters_or_digits_needs_name(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            blank = pathlib.Path(scratch) / "_.toml"
+            blank.write_bytes((DATA / "alacritty" / "gruvbox_dark.toml").read_bytes())
+            out = pathlib.Path(scratch) / "out"
+            status, _, stderr = run(blank, "-o", out)
+            self.assertEqual(status, 1)
+            self.assertIn("use --name", stderr)
+            self.assertNotIn("internal", stderr)
+            self.assertEqual(run(blank, "--name", "Gruvbox", "-o", out)[0], 0)
 
 
 class IntelliJ(unittest.TestCase):
@@ -227,6 +305,39 @@ class Refusals(unittest.TestCase):
                     with self.assertRaisesRegex(tool.ConversionError, message):
                         tool.plugin_themes(tool.Files.archive(jar))
 
+    def test_entries_are_counted_across_the_archive_and_its_nested_jars(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            inner = io.BytesIO()
+            with zipfile.ZipFile(inner, "w") as archive:
+                for index in range(3):
+                    archive.writestr(f"f{index}.txt", "x")
+            download = pathlib.Path(scratch) / "Pack.zip"
+            with zipfile.ZipFile(download, "w") as outer:
+                outer.writestr("Pack/lib/a.jar", inner.getvalue())
+                outer.writestr("Pack/lib/b.jar", inner.getvalue())
+            with unittest.mock.patch.object(tool, "MAX_ENTRIES", 8):  # 2 + 3 + 3 entries in all
+                tool.Files.archive(download)
+            with unittest.mock.patch.object(tool, "MAX_ENTRIES", 7):
+                with self.assertRaisesRegex(tool.ConversionError, "more than 10,000 entries"):
+                    tool.Files.archive(download)
+
+    def test_a_scheme_file_and_a_loose_theme_are_capped_like_archive_members(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            out = pathlib.Path(scratch) / "out"
+            tiny = loose_file(scratch, "Tiny.theme.json", '{ "name": "Tiny", "dark": true }')
+            big_scheme = loose_file(scratch, "big.xml", "<scheme>" + " " * 200 + "</scheme>")
+            big_theme = loose_file(scratch, "Big.theme.json", '{ "name": "Big", "pad": "' + "x" * 200 + '" }')
+            beside = loose_file(scratch, "Beside.theme.json", '{ "name": "Beside", "editorScheme": "Aside.xml" }')
+            loose_file(scratch, "Aside.xml", "<scheme>" + " " * 200 + "</scheme>")
+            with unittest.mock.patch.object(tool, "MAX_FILE", 100):
+                for args, message in (((tiny, "--scheme", big_scheme), "error: big.xml: larger than"),
+                                      ((big_theme,), "error: Big.theme.json: larger than"),
+                                      ((beside,), "error: Aside.xml: larger than")):
+                    with self.subTest(message):
+                        status, _, stderr = run(*args, "-o", out)
+                        self.assertEqual(status, 1, stderr)
+                        self.assertIn(message, stderr)
+
     def test_a_file_that_is_not_a_zip(self):
         with tempfile.TemporaryDirectory() as scratch:
             bad = pathlib.Path(scratch) / "bad.jar"
@@ -286,6 +397,17 @@ class Inputs(unittest.TestCase):
             self.assertIn("would both be written to gruvbox-dark.json", stderr)
             self.assertEqual([p.name for p in out.iterdir()], ["gruvbox-dark.json"])
 
+    def test_verbose_prints_where_each_ui_role_came_from_for_an_intellij_theme_only(self):
+        with tempfile.TemporaryDirectory() as out:
+            status, stdout, _ = run(DATA / "intellij" / "loose" / "Ocean.theme.json", "-o", out, "--verbose")
+            self.assertEqual(status, 0)
+            self.assertIn("  surface.panel: #16242F from ", stdout)
+            status, stdout, _ = run(DATA / "alacritty" / "gruvbox_dark.toml", "-o", out, "--verbose")
+            self.assertEqual(stdout.splitlines(), ["gruvbox-dark.json: Gruvbox Dark (terminal scheme, dark)"])
+        status, stdout, _ = run("--help")
+        self.assertEqual(status, 0)
+        self.assertIn("print where each UI role came from (IntelliJ themes)", " ".join(stdout.split()))
+
     def test_output_is_byte_stable(self):
         with tempfile.TemporaryDirectory() as out:
             run(DATA / "alacritty" / "gruvbox_dark.toml", "-o", out)
@@ -323,6 +445,78 @@ class Plugins(unittest.TestCase):
             doc = tool.convert_intellij_theme(next(t for t in themes if t.id == "ocean-dawn"), themes, None).doc
         self.assertEqual(doc["terminal"]["light"]["bg"], "#0B141C", "Ocean.xml's console background")
 
+    def test_theme_resolves_parents_among_all_the_plugins_themes(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            jar = theme_jar(pathlib.Path(scratch) / "family.jar", {"base": BASE, "child": CHILD})
+            out = pathlib.Path(scratch) / "out"
+            status, _, stderr = run(jar, "--theme", "Child Theme", "-o", out)
+            self.assertEqual(status, 0, stderr)
+            self.assertNotIn("not one Jasper knows", stderr)
+            self.assertEqual(listing(out), ["child-theme.json"])
+            doc = json.loads((out / "child-theme.json").read_text(encoding="utf-8"))
+        self.assertEqual(list(doc["ui"]), ["dark"], "dark, as its parent is")
+        self.assertEqual(doc["ui"]["dark"]["surface.panel"], "#102030", "the parent's colour")
+
+    def test_list_resolves_dark_and_light_through_the_parent_chain(self):
+        themes = {"base": BASE, "child": CHILD, "night": {"name": "Night", "parentTheme": "Darcula"},
+                  "plain": {"name": "Plain"}}
+        with tempfile.TemporaryDirectory() as scratch:
+            status, stdout, stderr = run("--list", theme_jar(pathlib.Path(scratch) / "family.jar", themes))
+        self.assertEqual(status, 0, stderr)
+        self.assertEqual(stdout.splitlines(), ["family.jar: Base Theme (id base, Dark)",
+                                               "family.jar: Child Theme (id child, Dark)",
+                                               "family.jar: Night (id night, Dark)",
+                                               "family.jar: Plain (id plain, Light)"])
+
+    def test_an_archive_without_themes_is_an_error(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = pathlib.Path(scratch)
+            with zipfile.ZipFile(root / "empty.jar", "w"):
+                pass
+            theme_jar(root / "none.jar", {})
+            inner = io.BytesIO()
+            with zipfile.ZipFile(inner, "w") as archive:
+                archive.writestr("themes/A.theme.json", '{ "name": "A", "dark": true }')
+            with zipfile.ZipFile(root / "Outside.zip", "w") as archive:
+                archive.writestr("Outside/extra/inner.jar", inner.getvalue())
+            for name in ("empty.jar", "none.jar", "Outside.zip"):
+                with self.subTest(name):
+                    out = root / "out"
+                    status, _, stderr = run(root / name, "-o", out)
+                    self.assertEqual(status, 1, stderr)
+                    self.assertIn(f"error: {name}: no themes found", stderr)
+                    self.assertFalse(out.exists() and listing(out), "nothing is written")
+                    status, _, stderr = run("--list", root / name)
+                    self.assertEqual(status, 1, stderr)
+                    self.assertIn(f"error: {name}: no themes found", stderr)
+
+    def test_the_by_name_scheme_scan_skips_other_xml_and_parses_each_file_once(self):
+        ocean = (DATA / "intellij" / "plugin" / "themes" / "Ocean.xml").read_bytes()
+        by_name = {"name": "A", "dark": True, "editorScheme": "Ocean"}
+        extra = {"aaa/Unrelated.xml": '<!DOCTYPE x [<!ENTITY a "b">]><x>&a;</x>', "aab/Other.xml": "<not-a-scheme/>",
+                 "aac/Broken.xml": "<scheme", "schemes/Ocean.xml": ocean}
+        with tempfile.TemporaryDirectory() as scratch:
+            jar = theme_jar(pathlib.Path(scratch) / "scan.jar", {"a": by_name, "b": {**by_name, "name": "B"}}, extra)
+            out = pathlib.Path(scratch) / "out"
+            with unittest.mock.patch.object(tool, "parse_xml", wraps=tool.parse_xml) as parse:
+                status, _, stderr = run(jar, "-o", out)
+            self.assertEqual(status, 0, stderr)
+            for name in ("a.json", "b.json"):
+                doc = json.loads((out / name).read_text(encoding="utf-8"))
+                self.assertEqual(doc["terminal"]["dark"]["bg"], "#0B141C", "Ocean.xml's console background")
+        labels = [call.args[1] for call in parse.call_args_list if call.args[1].startswith("scan.jar!")]
+        self.assertEqual(sorted(labels), sorted(set(labels)), "no file is parsed twice")
+        self.assertIn("scan.jar!schemes/Ocean.xml", labels)
+
+    def test_a_theme_with_an_empty_name_needs_name(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            out = pathlib.Path(scratch) / "out"
+            theme = loose_file(scratch, "Empty.theme.json", '{ "name": "", "dark": true }')
+            status, _, stderr = run(theme, "-o", out)
+            self.assertEqual(status, 1)
+            self.assertIn("error: Empty.theme.json: the theme has no name; use --name", stderr)
+            self.assertEqual(run(theme, "--name", "Filled", "-o", out)[0], 0)
+
     def test_a_name_with_no_usable_characters_needs_name(self):
         with tempfile.TemporaryDirectory() as scratch:
             night = pathlib.Path(scratch) / "night.theme.json"
@@ -331,6 +525,204 @@ class Plugins(unittest.TestCase):
             self.assertEqual(status, 1)
             self.assertIn("the name has no letters or digits for a file name; use --name", stderr)
             self.assertEqual(run(night, "--name", "Night", "-o", pathlib.Path(scratch) / "out")[0], 0)
+
+
+PRIMARY = '[colors.primary]\nbackground = "#000000"\nforeground = "#ffffff"\n'
+NORMAL = "[colors.normal]\n" + "".join(f'{name} = "#101010"\n' for name in tool.ANSI)
+
+
+class Failures(unittest.TestCase):
+    """Bad input is a message and a status, never a traceback, and never costs another input its output."""
+
+    def test_a_damaged_zip_member_is_a_message(self):
+        cases = (("a bad CRC", zipfile.ZIP_STORED, flip_a_data_byte),
+                 ("a corrupt deflate stream", zipfile.ZIP_DEFLATED, garble_the_deflate_stream),
+                 ("an encrypted member", zipfile.ZIP_STORED, mark_encrypted),
+                 ("an unsupported method", zipfile.ZIP_STORED, claim_an_unsupported_method),
+                 ("a header that declares less than the real size", zipfile.ZIP_STORED, claim_a_smaller_size))
+        for case, method, damage in cases:
+            with self.subTest(case), tempfile.TemporaryDirectory() as scratch:
+                jar = damaged_jar(pathlib.Path(scratch) / "bad.jar", method, damage)
+                out = pathlib.Path(scratch) / "out"
+                status, _, stderr = run(jar, "-o", out)
+                self.assertEqual(status, 1, stderr)
+                self.assertIn(f"error: bad.jar!{MEMBER}: cannot be read", stderr)
+                self.assertNotIn("Traceback", stderr)
+                self.assertEqual(listing(out), [])
+                status, _, stderr = run("--list", jar)
+                self.assertEqual(status, 1, stderr)
+                self.assertIn(f"error: bad.jar!{MEMBER}: cannot be read", stderr)
+
+    def test_a_member_that_ends_early_is_a_message(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            jar = damaged_jar(pathlib.Path(scratch) / "bad.jar", zipfile.ZIP_STORED, lambda *damage: None)
+            with unittest.mock.patch.object(zipfile.ZipFile, "open", side_effect=EOFError("ended early")):
+                status, _, stderr = run(jar, "-o", pathlib.Path(scratch) / "out")
+        self.assertEqual(status, 1)
+        self.assertIn(f"error: bad.jar!{MEMBER}: cannot be read: ended early", stderr)
+
+    def test_a_wrong_typed_key_is_a_message_naming_the_key_and_the_file(self):
+        cases = (("colors", []), ("ui", []), ("ui", "x"), ("parentTheme", ["a"]), ("editorScheme", 5),
+                 ("editorScheme", ["x"]), ("dark", "yes"), ("name", 5))
+        with tempfile.TemporaryDirectory() as scratch:
+            for key, value in cases:
+                with self.subTest(f"{key} = {value!r}"):
+                    theme = loose_file(scratch, "Wrong.theme.json", json.dumps({"name": "Wrong", "dark": True, key: value}))
+                    status, _, stderr = run(theme, "-o", pathlib.Path(scratch) / "out")
+                    self.assertEqual(status, 1, stderr)
+                    self.assertIn(f'error: Wrong.theme.json: "{key}" must be', stderr)
+                    self.assertNotIn("Traceback", stderr)
+            jar = theme_jar(pathlib.Path(scratch) / "bad.jar", {"x": {"name": "X", "ui": []}})
+            status, _, stderr = run(jar, "-o", pathlib.Path(scratch) / "out")
+            self.assertEqual(status, 1)
+            self.assertIn('error: bad.jar!themes/x.theme.json: "ui" must be an object', stderr)
+            self.assertEqual(listing(pathlib.Path(scratch) / "out"), [])
+
+    def test_a_null_is_the_same_as_an_absent_key(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            nulls = {"name": "Nulls", "dark": None, "parentTheme": None, "editorScheme": None, "colors": None, "ui": None}
+            theme = loose_file(scratch, "Nulls.theme.json", json.dumps(nulls))
+            status, _, stderr = run(theme, "-o", pathlib.Path(scratch) / "out")
+            self.assertEqual(status, 0, stderr)
+            self.assertEqual(listing(pathlib.Path(scratch) / "out"), ["nulls.json"])
+
+    def test_a_wrong_typed_toml_table_is_a_message(self):
+        cases = (("general", "general = 5\n" + PRIMARY + NORMAL),
+                 ("colors.primary", "[colors]\nprimary = 5\n" + NORMAL),
+                 ("colors.cursor", '[colors]\ncursor = ["cursor"]\n' + PRIMARY + NORMAL),
+                 ("colors.selection", "[colors]\nselection = 5\n" + PRIMARY + NORMAL),
+                 ("colors.normal", '[colors]\nnormal = "x"\n' + PRIMARY),
+                 ("colors.bright", "[colors]\nbright = 1\n" + PRIMARY + NORMAL))
+        with tempfile.TemporaryDirectory() as scratch:
+            valid = loose_file(scratch, "Valid.toml", PRIMARY + NORMAL)
+            self.assertEqual(run(valid, "-o", pathlib.Path(scratch) / "out")[0], 0, "the base file converts")
+            for key, text in cases:
+                with self.subTest(key):
+                    wrong = loose_file(scratch, "Wrong.toml", text)
+                    status, _, stderr = run(wrong, "-o", pathlib.Path(scratch) / "out")
+                    self.assertEqual(status, 1, stderr)
+                    self.assertIn(f"error: Wrong.toml: {key} must be a table", stderr)
+                    self.assertNotIn("Traceback", stderr)
+
+    def test_deeply_nested_input_is_a_message(self):
+        depth = 100_000
+        nested_ui = '{ "name": "Deep", "dark": true, "ui": ' + '{ "a": ' * 2000 + '"#ffffff"' + " }" * 2000 + " }"
+        with tempfile.TemporaryDirectory() as scratch:
+            for name, text in (("Deep.theme.json", "[" * depth + "]" * depth), ("Ui.theme.json", nested_ui),
+                               ("Deep.toml", "a = " + "[" * depth + "]" * depth + "\n")):
+                with self.subTest(name):
+                    status, _, stderr = run(loose_file(scratch, name, text), "-o", pathlib.Path(scratch) / "out")
+                    self.assertEqual(status, 1, stderr)
+                    self.assertIn(f"error: {name}: ", stderr)
+                    self.assertIn("nested too deeply", stderr)
+                    self.assertNotIn("Traceback", stderr)
+
+    def test_a_number_with_too_many_digits_is_a_message(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            status, _, stderr = run(loose_file(scratch, "Big.theme.json", '{ "name": "Big", "n": ' + "1" * 5000 + " }"),
+                                    "-o", pathlib.Path(scratch) / "out")
+        self.assertEqual(status, 1)
+        self.assertIn("error: Big.theme.json: not a JSON file", stderr)
+
+    def test_a_broken_input_does_not_lose_the_next_one(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            jar = damaged_jar(pathlib.Path(scratch) / "bad.jar", zipfile.ZIP_STORED, flip_a_data_byte)
+            out = pathlib.Path(scratch) / "out"
+            status, stdout, stderr = run(jar, DATA / "alacritty" / "gruvbox_dark.toml", "-o", out)
+            self.assertEqual(status, 1)
+            self.assertIn(f"error: bad.jar!{MEMBER}: cannot be read", stderr)
+            self.assertEqual(listing(out), ["gruvbox-dark.json"])
+
+    def test_an_unexpected_exception_is_reported_for_its_input_and_the_others_are_written(self):
+        real = tool.convert_alacritty
+
+        def convert(path, name=None):
+            if path.name == "gruvbox_dark.toml":
+                raise KeyError("boom")
+            return real(path, name)
+        with tempfile.TemporaryDirectory() as out, unittest.mock.patch.object(tool, "convert_alacritty", convert):
+            status, _, stderr = run(DATA / "alacritty" / "gruvbox_dark.toml", DATA / "alacritty" / "paper-light.toml", "-o", out)
+            self.assertEqual(status, 1)
+            self.assertIn("error: gruvbox_dark.toml: internal error: KeyError: 'boom'", stderr)
+            self.assertNotIn("Traceback", stderr)
+            self.assertEqual(listing(out), ["paper-light.json"])
+
+    def test_an_output_that_is_a_file_or_a_directory_at_the_target_is_a_message(self):
+        source = DATA / "alacritty" / "gruvbox_dark.toml"
+        with tempfile.TemporaryDirectory() as scratch:
+            plain = loose_file(scratch, "plain", "not a folder")
+            status, _, stderr = run(source, "-o", plain)
+            self.assertEqual(status, 1)
+            self.assertIn(f"error: {plain}: ", stderr)
+            self.assertNotIn("Traceback", stderr)
+            out = pathlib.Path(scratch) / "out"
+            (out / "gruvbox-dark.json").mkdir(parents=True)
+            status, _, stderr = run(source, "-o", out, "--force")
+            self.assertEqual(status, 1)
+            self.assertIn(f"error: {out / 'gruvbox-dark.json'}: ", stderr)
+            self.assertNotIn("Traceback", stderr)
+            self.assertEqual(listing(out), ["gruvbox-dark.json"], "the directory stays and no temporary file is left")
+            self.assertTrue((out / "gruvbox-dark.json").is_dir())
+
+    def test_an_output_directory_that_cannot_be_written_or_searched_is_a_message(self):
+        for mode in (0o500, 0o000):
+            with self.subTest(oct(mode)), tempfile.TemporaryDirectory() as scratch:
+                locked = pathlib.Path(scratch) / "locked"
+                locked.mkdir()
+                locked.chmod(mode)
+                try:
+                    if os.access(locked, os.W_OK if mode == 0o500 else os.X_OK):
+                        self.skipTest("this account can use a directory whatever its mode")
+                    status, _, stderr = run(DATA / "alacritty" / "gruvbox_dark.toml", "-o", locked)
+                finally:
+                    locked.chmod(0o700)
+                self.assertEqual(status, 1)
+                self.assertIn(f"error: {locked / 'gruvbox-dark.json'}: ", stderr)
+                self.assertNotIn("Traceback", stderr)
+
+
+class Writes(unittest.TestCase):
+    def test_a_lone_surrogate_in_a_name_fails_before_any_file_exists_and_force_keeps_a_good_file(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            theme = loose_file(scratch, "Bad.theme.json", '{ "name": "Bad\\ud800", "dark": true }')
+            out = pathlib.Path(scratch) / "out"
+            status, _, stderr = run(theme, "-o", out)
+            self.assertEqual(status, 1)
+            self.assertIn("error: Bad.theme.json: ", stderr)
+            self.assertEqual(listing(out), [], "nothing was created")
+            (out / "bad.json").write_text("GOOD", encoding="utf-8")
+            status, _, stderr = run(theme, "-o", out, "--force")
+            self.assertEqual(status, 1)
+            self.assertEqual((out / "bad.json").read_text(encoding="utf-8"), "GOOD", "--force never truncates a good file")
+            self.assertEqual(listing(out), ["bad.json"])
+
+    def test_a_failed_replace_keeps_the_good_file_and_leaves_no_temporary_file(self):
+        source = DATA / "alacritty" / "gruvbox_dark.toml"
+        with tempfile.TemporaryDirectory() as out:
+            self.assertEqual(run(source, "-o", out)[0], 0)
+            good = (pathlib.Path(out) / "gruvbox-dark.json").read_bytes()
+            with unittest.mock.patch("os.replace", side_effect=PermissionError(13, "Permission denied")):
+                status, _, stderr = run(source, "-o", out, "--force")
+            self.assertEqual(status, 1)
+            self.assertIn(f"error: {pathlib.Path(out) / 'gruvbox-dark.json'}: Permission denied", stderr)
+            self.assertEqual((pathlib.Path(out) / "gruvbox-dark.json").read_bytes(), good)
+            self.assertEqual(listing(out), ["gruvbox-dark.json"])
+
+    def test_the_built_in_theme_name_is_refused(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            out = pathlib.Path(scratch) / "out"
+            theme = loose_file(scratch, "Steel.theme.json", '{ "name": "Slate Steel", "dark": true }')
+            alacritty = pathlib.Path(scratch) / "slate_steel.toml"
+            alacritty.write_bytes((DATA / "alacritty" / "gruvbox_dark.toml").read_bytes())
+            for source in (theme, alacritty):
+                with self.subTest(source.name):
+                    status, _, stderr = run(source, "-o", out)
+                    self.assertEqual(status, 1)
+                    self.assertIn(f'error: {source.name}: "slate-steel" is Jasper\'s built-in theme; choose another name '
+                                  "with --name", stderr)
+                    self.assertEqual(listing(out), [])
+            self.assertEqual(run(theme, "--name", "Slate Steel Two", "-o", out)[0], 0)
+            self.assertEqual(listing(out), ["slate-steel-two.json"])
 
 
 class Format(unittest.TestCase):
@@ -369,8 +761,6 @@ class Format(unittest.TestCase):
         tool.validate(doc, "slate-steel.json")
         self.assertEqual(list(doc["editor"]["dark"]), tool.EDITOR_SURFACES + tool.SYNTAX_ROLES)
 
-
-import unittest.mock  # noqa: E402  (used by Refusals)
 
 if __name__ == "__main__":
     unittest.main()

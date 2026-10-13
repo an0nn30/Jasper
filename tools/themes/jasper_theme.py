@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import os
 import pathlib
 import re
 import sys
@@ -64,6 +65,7 @@ EDITOR_REFERENCES = {
     "operator": "text.secondary", "punctuation": "text.secondary", "tag": "terminal.ansi.red",
     "attribute": "terminal.ansi.yellow", "regex": "terminal.ansi.cyan", "error": "terminal.ansi.red",
 }
+BUILT_IN = "slate-steel"  # Import refuses a theme file with the built-in theme's id
 KEY = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 HEX = re.compile(r"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?")
 EDITOR_VALUE = re.compile(r"(#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9.]*)( @ \d{1,3}%)?(, italic)?(, bold)?")
@@ -212,19 +214,29 @@ class Result:
     sources: list[str] = field(default_factory=list)
 
 
+def toml_table(parent: dict, key: str, label: str, name: str) -> dict:
+    """``parent[key]`` as a table (an absent one is empty); ``name`` is its dotted name in the message."""
+    value = parent.get(key, {})
+    if not isinstance(value, dict):
+        raise ConversionError(f"{label}: {name} must be a table")
+    return value
+
+
 def convert_alacritty(path: pathlib.Path, name: str | None = None) -> Result:
     label = path.name
     try:
         data = tomllib.loads(path.read_text(encoding="utf-8"))
-    except (tomllib.TOMLDecodeError, UnicodeDecodeError) as failure:
+    except RecursionError:
+        raise ConversionError(f"{label}: nested too deeply") from None
+    except ValueError as failure:  # a TOMLDecodeError, a UnicodeDecodeError or too many digits in a number
         raise ConversionError(f"{label}: not a TOML file: {failure}") from None
     warnings = []
-    if "import" in data or "import" in data.get("general", {}):
+    if "import" in data or "import" in toml_table(data, "general", label, "general"):
         warnings.append(f"{label}: ignoring import; colours from imported files are missing")
     colors = data.get("colors")
     if not isinstance(colors, dict):
         raise ConversionError(f"{label}: no [colors] table")
-    primary = colors.get("primary", {})
+    primary = toml_table(colors, "primary", label, "colors.primary")
     for required in ("background", "foreground"):
         if required not in primary:
             raise ConversionError(f"{label}: colors.primary.{required} is missing")
@@ -232,12 +244,14 @@ def convert_alacritty(path: pathlib.Path, name: str | None = None) -> Result:
     fg = alacritty_colour(primary["foreground"], f"{label}: colors.primary.foreground")
     bold = alacritty_colour(primary["bright_foreground"], f"{label}: colors.primary.bright_foreground") \
         if "bright_foreground" in primary else fg
-    cursor_table, selection_table = colors.get("cursor", {}), colors.get("selection", {})
+    cursor_table = toml_table(colors, "cursor", label, "colors.cursor")
+    selection_table = toml_table(colors, "selection", label, "colors.selection")
     cursor = alacritty_colour(cursor_table["cursor"], f"{label}: colors.cursor.cursor", fg, bg) \
         if "cursor" in cursor_table else fg
     selection = alacritty_colour(selection_table["background"], f"{label}: colors.selection.background", fg, bg) \
         if "background" in selection_table else mix(bg, fg, 0.25)
-    normal, bright = colors.get("normal", {}), colors.get("bright", {})
+    normal = toml_table(colors, "normal", label, "colors.normal")
+    bright = toml_table(colors, "bright", label, "colors.bright")
     ansi = []
     for colour in ANSI:
         if colour not in normal:
@@ -247,6 +261,8 @@ def convert_alacritty(path: pathlib.Path, name: str | None = None) -> Result:
         ansi.append(alacritty_colour(bright[colour], f"{label}: colors.bright.{colour}") if colour in bright
                     else ansi[index])
     display = name or title_name(path.stem)
+    if not display:
+        raise ConversionError(f"{label}: no theme name can be made from the file name; use --name")
     key = "dark" if luminance(bg) < luminance(fg) else "light"
     scheme = {"name": display}
     for k, colour in zip(TERMINAL_KEYS, [bg, fg, bold, cursor, selection] + ansi):
@@ -268,6 +284,15 @@ MAX_THEMES = 64
 MAX_INFLATED = 256 << 20
 
 
+def read_file(path: pathlib.Path, label: str) -> bytes:
+    """A local file's bytes, refused when larger than an archive member may be."""
+    with path.open("rb") as stream:
+        data = stream.read(MAX_FILE + 1)
+    if len(data) > MAX_FILE:
+        raise ConversionError(f"{label}: larger than {MAX_FILE >> 20} MiB")
+    return data
+
+
 class Files:
     """A plugin's files, read in memory within the limits; paths are archive paths without a leading '/'."""
 
@@ -276,6 +301,8 @@ class Files:
         self.entries: dict[str, tuple[zipfile.ZipFile, zipfile.ZipInfo]] = {}
         self.loose: dict[str, bytes] = {}
         self.inflated = 0
+        self.counted = 0  # entries in the archive and its nested jars together
+        self._schemes: dict[str, ElementTree.Element] | None = None
 
     @staticmethod
     def archive(path: pathlib.Path) -> "Files":
@@ -298,8 +325,9 @@ class Files:
         except zipfile.BadZipFile:
             raise ConversionError(f"{label}: not a zip or jar file") from None
         infos = archive.infolist()
-        if len(infos) > MAX_ENTRIES:
-            raise ConversionError(f"{label}: more than 10,000 entries")
+        self.counted += len(infos)
+        if self.counted > MAX_ENTRIES:
+            raise ConversionError(f"{label}: more than 10,000 entries in all")
         for info in infos:
             if not info.is_dir():
                 self.entries.setdefault(info.filename.lstrip("/"), (archive, info))
@@ -308,8 +336,11 @@ class Files:
     def read_entry(self, archive, info, limit: int, label: str) -> bytes:
         if info.file_size > limit:
             raise ConversionError(f"{label}: larger than {limit >> 20} MiB")
-        with archive.open(info) as stream:
-            data = stream.read(limit + 1)
+        try:
+            with archive.open(info) as stream:
+                data = stream.read(limit + 1)
+        except Exception as failure:  # the decompressors raise many kinds of error for a damaged member
+            raise ConversionError(f"{label}: cannot be read: {failure}") from None
         if len(data) > limit:
             raise ConversionError(f"{label}: larger than {limit >> 20} MiB")
         self.inflated += len(data)
@@ -328,6 +359,24 @@ class Files:
             return None
         archive, info = self.entries[name]
         return self.read_entry(archive, info, MAX_FILE, f"{self.label}!{name}")
+
+    def schemes(self) -> dict[str, ElementTree.Element]:
+        """The editor schemes in the plugin by name (the first of a name wins), each file parsed once; an .xml or
+        .icls that does not parse or is not a scheme is skipped."""
+        if self._schemes is None:
+            found: dict[str, ElementTree.Element] = {}
+            for name in self.names():
+                if not name.endswith((".xml", ".icls")) or name.endswith("plugin.xml"):
+                    continue
+                data = self.read(name)
+                try:
+                    root = parse_xml(data, f"{self.label}!{name}")
+                except ConversionError:
+                    continue
+                if root.tag == "scheme":
+                    found.setdefault(root.get("name"), root)
+            self._schemes = found
+        return self._schemes
 
 
 def parse_xml(data: bytes, label: str) -> ElementTree.Element:
@@ -352,7 +401,9 @@ def parse_xml(data: bytes, label: str) -> ElementTree.Element:
 def parse_json(data: bytes, label: str) -> dict:
     try:
         value = json.loads(data.decode("utf-8-sig"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as failure:
+    except RecursionError:
+        raise ConversionError(f"{label}: nested too deeply") from None
+    except ValueError as failure:  # a JSONDecodeError, a UnicodeDecodeError or too many digits in a number
         raise ConversionError(f"{label}: not a JSON file: {failure}") from None
     if not isinstance(value, dict):
         raise ConversionError(f"{label}: expected a JSON object")
@@ -366,6 +417,29 @@ class ThemeFile:
     path: str
     data: dict
     files: Files | None  # None for vendored themes
+
+    @property
+    def where(self) -> str:
+        """The file as a message names it: ``plugin.jar!themes/A.theme.json``, or a loose file's own name."""
+        if self.files is None or self.path == self.files.label:
+            return self.path
+        return f"{self.files.label}!{self.path}"
+
+
+# The keys of a theme the converter reads, with the type each must have.
+THEME_KEYS = {"name": (str, "a string"), "dark": (bool, "true or false"), "parentTheme": (str, "a string"),
+              "editorScheme": (str, "a string"), "colors": (dict, "an object"), "ui": (dict, "an object")}
+
+
+def check_types(theme: ThemeFile) -> None:
+    """Raises ConversionError for a key of the wrong type; a null counts as an absent key."""
+    for key, (kind, expected) in THEME_KEYS.items():
+        if key not in theme.data:
+            continue
+        if theme.data[key] is None:
+            del theme.data[key]
+        elif not isinstance(theme.data[key], kind):
+            raise ConversionError(f'{theme.where}: "{key}" must be {expected}')
 
 
 def plugin_themes(files: Files) -> list[ThemeFile]:
@@ -451,14 +525,16 @@ def flatten(prefix: str, value: dict, out: dict) -> None:
             out[name] = item
 
 
-def resolve(theme: ThemeFile, siblings: list[ThemeFile], warnings: list[str], scheme_file: pathlib.Path | None,
-            loose_dir: pathlib.Path | None) -> Effective:
+def theme_chain(theme: ThemeFile, siblings: list[ThemeFile], warnings: list[str]) -> list[ThemeFile]:
+    """The theme, then its parents (a sibling in the plugin, else one of IntelliJ's own), then its base."""
     chain: list[ThemeFile] = []
     current = theme
     while current is not None:
         if any(current is seen for seen in chain) or len(chain) > 16:
             raise ConversionError(f"{theme.path}: parentTheme loops")
         chain.append(current)
+        if current.files is not None:
+            check_types(current)
         parent = current.data.get("parentTheme")
         if not parent:
             if current.files is not None:
@@ -468,12 +544,23 @@ def resolve(theme: ThemeFile, siblings: list[ThemeFile], warnings: list[str], sc
         sibling = next((t for t in siblings if t is not current and parent in (t.id, t.data.get("name"))), None)
         found = sibling or vendored_theme(parent)
         if found is None:
-            dark = bool(next((t.data["dark"] for t in chain if "dark" in t.data), False))
+            dark = is_dark(chain)
             warnings.append(f"{theme.path}: parent theme \"{parent}\" is not one Jasper knows; "
                             f"using {'Darcula' if dark else 'IntelliJ'}")
             found = vendored_theme("Darcula" if dark else "IntelliJ")
         current = found
-    dark = next((bool(t.data["dark"]) for t in chain if "dark" in t.data), False)
+    return chain
+
+
+def is_dark(chain: list[ThemeFile]) -> bool:
+    """Whether the theme is dark: its own ``dark`` key, else the nearest parent's."""
+    return next((bool(t.data["dark"]) for t in chain if "dark" in t.data), False)
+
+
+def resolve(theme: ThemeFile, siblings: list[ThemeFile], warnings: list[str], scheme_file: pathlib.Path | None,
+            loose_dir: pathlib.Path | None) -> Effective:
+    chain = theme_chain(theme, siblings, warnings)
+    dark = is_dark(chain)
     colors: dict[str, str] = {}
     for item in reversed(chain):
         for key, value in item.data.get("colors", {}).items():
@@ -482,7 +569,10 @@ def resolve(theme: ThemeFile, siblings: list[ThemeFile], warnings: list[str], sc
     levels = []
     for item in chain:
         flat: dict = {}
-        flatten("", item.data.get("ui", {}), flat)
+        try:
+            flatten("", item.data.get("ui", {}), flat)
+        except RecursionError:
+            raise ConversionError(f'{item.where}: "ui" is nested too deeply') from None
         levels.append(("theme" if item is theme else str(item.data.get("name", item.id)), flat))
     scheme, scheme_from = find_scheme(chain, theme, warnings, scheme_file, loose_dir, dark)
     return Effective(dark, colors, levels, scheme, scheme_from, [str(t.data.get("name", t.id)) for t in chain])
@@ -490,7 +580,7 @@ def resolve(theme: ThemeFile, siblings: list[ThemeFile], warnings: list[str], sc
 
 def find_scheme(chain, theme, warnings, scheme_file, loose_dir, dark):
     if scheme_file is not None:
-        return parse_xml(scheme_file.read_bytes(), scheme_file.name), "theme"
+        return parse_xml(read_file(scheme_file, scheme_file.name), scheme_file.name), "theme"
     for item in chain:
         reference = item.data.get("editorScheme")
         if not reference:
@@ -500,18 +590,14 @@ def find_scheme(chain, theme, warnings, scheme_file, loose_dir, dark):
             data = item.files.read(reference)
             if data is None and loose_dir is not None:
                 candidate = loose_dir / pathlib.PurePosixPath(reference).name
-                data = candidate.read_bytes() if candidate.is_file() else None
+                data = read_file(candidate, candidate.name) if candidate.is_file() else None
             if data is not None:
                 return parse_xml(data, f"{item.files.label}!{reference}"), source
             warnings.append(f"{theme.path}: editor scheme {reference} is not in the plugin; "
                             f"using {'Darcula' if dark else 'Default'}")
             break
-        if item.files is not None:
-            for name in item.files.names():
-                if name.endswith((".xml", ".icls")) and not name.endswith("plugin.xml"):
-                    root = parse_xml(item.files.read(name), f"{item.files.label}!{name}")
-                    if root.tag == "scheme" and root.get("name") == reference:
-                        return root, source
+        if item.files is not None and reference in item.files.schemes():
+            return item.files.schemes()[reference], source
         if reference in vendored_schemes():
             return vendored_schemes()[reference], source
         warnings.append(f"{theme.path}: editor scheme \"{reference}\" is not one Jasper knows; "
@@ -810,6 +896,8 @@ def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: st
     warnings: list[str] = []
     effective = resolve(theme, siblings, warnings, scheme_file, loose_dir)
     display = name or str(theme.data.get("name") or theme.id)
+    if not display:
+        raise ConversionError(f"{theme.where}: the theme has no name; use --name")
     variant = "dark" if effective.dark else "light"
     scheme = Scheme(effective.scheme, warnings, theme.path)
     terminal = terminal_scheme(scheme, display)
@@ -837,9 +925,12 @@ def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: st
 def themes_in(path: pathlib.Path) -> tuple[list[ThemeFile], pathlib.Path | None]:
     """The IntelliJ themes in an input, and the directory a loose .theme.json's scheme is looked up in."""
     if path.suffix.lower() in (".jar", ".zip"):
-        return plugin_themes(Files.archive(path)), None
+        themes = plugin_themes(Files.archive(path))
+        if not themes:
+            raise ConversionError(f"{path.name}: no themes found")
+        return themes, None
     loose = Files(path.name)
-    loose.loose[path.name] = path.read_bytes()
+    loose.loose[path.name] = read_file(path, path.name)
     data = parse_json(loose.loose[path.name], path.name)
     return [ThemeFile(str(data.get("name", path.stem)), path.name, data, loose)], path.parent
 
@@ -851,12 +942,96 @@ def convert(path: pathlib.Path, args) -> list[Result]:
     if suffix not in (".jar", ".zip", ".json"):
         raise ConversionError(f"{path.name}: unknown input type; expected .toml, .theme.json, .jar or .zip")
     themes, loose_dir = themes_in(path)
+    selected = themes  # parents are resolved among all the plugin's themes, whichever are converted
     if args.theme:
-        themes = [t for t in themes if t.id in args.theme or t.data.get("name") in args.theme]
-        if not themes:
+        selected = [t for t in themes if t.id in args.theme or t.data.get("name") in args.theme]
+        if not selected:
             raise ConversionError(f"{path.name}: no theme named {', '.join(args.theme)}")
     scheme = pathlib.Path(args.scheme) if args.scheme else None
-    return [convert_intellij_theme(t, themes, args.name, scheme, loose_dir) for t in themes]
+    return [convert_intellij_theme(t, themes, args.name, scheme, loose_dir) for t in selected]
+
+
+def reason(failure: OSError) -> str:
+    return failure.strerror or str(failure)
+
+
+def describe(failure: Exception, path: pathlib.Path) -> str:
+    """The text after "error: " for an input that failed; a ConversionError already names its file."""
+    if isinstance(failure, ConversionError):
+        return str(failure)
+    if isinstance(failure, OSError):
+        return f"{failure.filename or path.name}: {reason(failure)}"
+    return f"{path.name}: internal error: {type(failure).__name__}: {failure}"
+
+
+def write_theme(target: pathlib.Path, text: str) -> None:
+    """Writes ``target`` through a temporary file beside it, so a failure leaves any existing file as it was."""
+    data = text.encode("utf-8")  # before anything is opened: a lone surrogate fails here
+    temporary = target.with_name(f".{target.name}.{os.getpid()}.tmp")
+    stream = open(temporary, "xb")  # a failure here has created nothing to remove
+    try:
+        with stream:
+            stream.write(data)
+        os.replace(temporary, target)
+    except BaseException:
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def write_results(results: list[tuple[str, Result]], args) -> int:
+    """Writes each converted theme (input name, result) to the output folder; 1 when any could not be written."""
+    output = pathlib.Path(args.output)
+    try:
+        output.mkdir(parents=True, exist_ok=True)
+    except OSError as failure:
+        print(f"error: {output}: " + ("exists and is not a directory" if isinstance(failure, FileExistsError)
+                                      else reason(failure)), file=sys.stderr)
+        return 1
+    status = 0
+    written: dict[str, str] = {}
+    for input_name, result in results:
+        name = result.doc["name"]
+        file_name = slug(name)
+        if not file_name:
+            print(f"error: {name}: the name has no letters or digits for a file name; use --name", file=sys.stderr)
+            status = 1
+            continue
+        if file_name == BUILT_IN:
+            print(f"error: {input_name}: \"{BUILT_IN}\" is Jasper's built-in theme; choose another name with --name",
+                  file=sys.stderr)
+            status = 1
+            continue
+        target = output / f"{file_name}.json"
+        if file_name in written:
+            print(f"error: {name} and {written[file_name]} would both be written to {target.name}", file=sys.stderr)
+            status = 1
+            continue
+        try:
+            if target.exists() and not args.force:
+                print(f"error: {target} exists; use --force to overwrite it", file=sys.stderr)
+                status = 1
+                continue
+            write_theme(target, dump(result.doc))
+        except UnicodeEncodeError:
+            print(f"error: {input_name}: {name!r} cannot be written: it has a lone surrogate, which is not valid Unicode",
+                  file=sys.stderr)
+            status = 1
+            continue
+        except OSError as failure:
+            print(f"error: {target}: {reason(failure)}", file=sys.stderr)
+            status = 1
+            continue
+        written[file_name] = name
+        for warning in result.warnings:
+            print(f"warning: {warning}", file=sys.stderr)
+        print(f"{target.name}: {result.summary}")
+        if args.verbose:
+            for line in result.sources:
+                print(f"  {line}")
+    return status
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -869,64 +1044,37 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--theme", action="append", metavar="NAME", help="convert only this plugin theme (repeatable)")
     parser.add_argument("--name", help="the display name (only when one theme is converted)")
     parser.add_argument("--scheme", metavar="FILE", help="the editor scheme for a loose .theme.json")
-    parser.add_argument("--verbose", action="store_true", help="print where every colour came from")
+    parser.add_argument("--verbose", action="store_true", help="print where each UI role came from (IntelliJ themes)")
     args = parser.parse_args(argv)
     paths = [pathlib.Path(name) for name in args.inputs]
     for path in paths:
         if not path.is_file():
             parser.error(f"{path}: no such file")
+    status = 0
     if args.list:
-        status = 0
         for path in paths:
             try:
                 if path.suffix.lower() == ".toml":
                     print(f"{path.name}: {title_name(path.stem)} (Alacritty terminal scheme)")
                     continue
-                for theme in themes_in(path)[0]:
-                    variant = "Dark" if theme.data.get("dark") else "Light"
+                themes = themes_in(path)[0]
+                for theme in themes:
+                    variant = "Dark" if is_dark(theme_chain(theme, themes, [])) else "Light"
                     print(f"{path.name}: {theme.data.get('name', theme.id)} (id {theme.id}, {variant})")
-            except ConversionError as failure:
-                print(f"error: {failure}", file=sys.stderr)
+            except Exception as failure:  # one input's failure does not stop the others
+                print(f"error: {describe(failure, path)}", file=sys.stderr)
                 status = 1
         return status
-    status, results = 0, []
+    results: list[tuple[str, Result]] = []
     for path in paths:
         try:
-            results.extend(convert(path, args))
-        except (ConversionError, OSError) as failure:
-            print(f"error: {failure}", file=sys.stderr)
+            results.extend((path.name, result) for result in convert(path, args))
+        except Exception as failure:  # one input's failure does not stop the others
+            print(f"error: {describe(failure, path)}", file=sys.stderr)
             status = 1
     if args.name and len(results) > 1:
         parser.error("--name needs exactly one theme; this run converts " + str(len(results)))
-    output = pathlib.Path(args.output)
-    output.mkdir(parents=True, exist_ok=True)
-    written: dict[str, str] = {}
-    for result in results:
-        file_name = slug(result.doc["name"])
-        if not file_name:
-            print(f"error: {result.doc['name']}: the name has no letters or digits for a file name; use --name",
-                  file=sys.stderr)
-            status = 1
-            continue
-        target = output / f"{file_name}.json"
-        if file_name in written:
-            print(f"error: {result.doc['name']} and {written[file_name]} would both be written to {target.name}",
-                  file=sys.stderr)
-            status = 1
-            continue
-        if target.exists() and not args.force:
-            print(f"error: {target} exists; use --force to overwrite it", file=sys.stderr)
-            status = 1
-            continue
-        target.write_text(dump(result.doc), encoding="utf-8", newline="\n")
-        written[file_name] = result.doc["name"]
-        for warning in result.warnings:
-            print(f"warning: {warning}", file=sys.stderr)
-        print(f"{target.name}: {result.summary}")
-        if args.verbose:
-            for line in result.sources:
-                print(f"  {line}")
-    return status
+    return max(status, write_results(results, args))
 
 
 if __name__ == "__main__":
