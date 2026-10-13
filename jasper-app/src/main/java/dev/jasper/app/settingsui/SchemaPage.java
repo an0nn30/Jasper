@@ -323,7 +323,8 @@ public final class SchemaPage implements SettingsPage {
         Optional<String> problem = row.setting.kind().check(value);
         if (problem.isPresent()) { invalid(row, problem.get()); return; }
         var changes=new java.util.LinkedHashMap<Setting<?>,Optional<?>>();
-        changes.put(row.setting,Optional.of(value));
+        // A row with companions stages its own value only when it changes it, so picking a companion leaves the row as saved.
+        if (row.editor.relatedSettings().isEmpty() || !Objects.equals(value, context.draft().value(row.setting))) changes.put(row.setting,Optional.of(value));
         try { changes.putAll(row.editor.companionValues()); } catch(RuntimeException unreadable) {invalid(row,"Not a valid value.");return;}
         valid(row);
         context.draft().stageAll(changes);

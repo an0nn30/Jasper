@@ -38,9 +38,6 @@ final class SettingsAppearance {
             .map(scheme -> new InstalledThemes.SchemeOption(scheme.id().toString(), library.label(scheme))).toList());
     }
 
-    /** A Slate Steel variant's preview. */
-    static Option.Palette preview(boolean dark) { return preview(JasperTheme.bundled(), dark); }
-
     /** A theme variant's preview: its input, sidebar and app surfaces, text and accent. */
     static Option.Palette preview(JasperTheme theme, boolean dark) {
         var palette = theme.palette(dark);
