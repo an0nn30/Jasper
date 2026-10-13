@@ -32,6 +32,7 @@
 #include "Toolbox.h"
 #include "SysInfo.h"
 #include "FileUtils.h"
+#include "JasperVmOptions.h" // JASPER-HOOK
 
 
 AppLauncher::AppLauncher() {
@@ -145,6 +146,7 @@ Jvm* AppLauncher::createJvmLauncher() const {
             (*jvm).addArgument(*argIt);
         }
     } else {
+        jasper::applyUserVmOptions(cfgFile); // JASPER-HOOK: merge jasper.vmoptions (packaging/launcher/README.md)
         (*jvm).initFromConfigFile(cfgFile);
     }
 

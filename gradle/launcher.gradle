@@ -13,7 +13,8 @@ def launcherSource = rootProject.file('packaging/launcher')
 def upstreamRoot = new File(launcherSource, 'upstream')
 def launcherBuild = layout.buildDirectory.dir('launcher')
 // Vendored files that carry Jasper's hook lines (each such line contains JASPER-HOOK); every other file is upstream's.
-def launcherHookedFiles = [] as Set<String>
+def launcherHookedFiles = ['src/jdk.jpackage/share/native/applauncher/AppLauncher.cpp',
+    'src/jdk.jpackage/share/native/applauncher/JvmLauncherLib.c'] as Set<String>
 
 // A vendored file as upstream ships it: Jasper's hook lines removed, CRLF read as LF. ISO-8859-1 keeps every byte.
 def upstreamText = { File file ->
@@ -325,3 +326,100 @@ def testLauncherGuard = tasks.register('testLauncherGuard') {
     }
 }
 tasks.named('check') { dependsOn(testLauncherGuard) }
+
+// ---- Jasper's launcher for this host ----
+
+def launcherResources = launcherBuild.map { it.dir('resources') }
+ext.launcherResources = launcherResources
+// jpackage's own option that makes it copy Jasper's launcher instead of its built-in one.
+ext.jpackageLauncherOption = { -> "-J--patch-module=jdk.jpackage=${launcherResources.get().asFile.absolutePath}".toString() }
+def jpackageNative = new File(upstreamRoot, 'src/jdk.jpackage')
+def nativeDirectory = { String os, String kind -> new File(jpackageNative, "${os}/native/${kind}") }
+// Every C and C++ source directly in the directories, as the JDK's make compiles them.
+def sourcesIn = { List<File> directories ->
+    directories.collectMany { File directory -> (directory.listFiles() ?: []).findAll { it.name.endsWith('.c') || it.name.endsWith('.cpp') } }
+        .sort { it.absolutePath }
+}
+String launcherUpstreamVersion = '25.0.4.1'
+
+def windowsVersionResource = { File work ->
+    work.mkdirs()
+    File resource = new File(work, 'version.res')
+    runLauncherTool([msvcTool('rc.exe'), '/nologo', '/fo', resource.absolutePath, '/DJDK_FTYPE=0x1L',
+        "/DJDK_FVER=${launcherUpstreamVersion.replace('.', ',')}".toString(), "/DJDK_VER=${launcherUpstreamVersion}".toString(),
+        "/DJDK_VERSION_STRING=${launcherUpstreamVersion}".toString(), '/DJDK_COMPANY=Jasper', '/DJDK_NAME=Jasper',
+        '/DJDK_FILEDESC=Jasper', '/DJDK_COPYRIGHT=Jasper', '/DJDK_INTERNAL_NAME=jpackageapplauncher',
+        '/DJDK_FNAME=jpackageapplauncher.exe', new File(upstreamRoot, 'src/java.base/windows/native/common/version.rc').absolutePath],
+        msvc(), work, 'rc version.rc', launcherToolchainHint('windows'))
+    resource
+}
+
+def embedWindowsManifest = { File exe, String name ->
+    runLauncherTool([msvcTool('mt.exe'), '-nologo', '-manifest',
+        new File(upstreamRoot, 'src/java.base/windows/native/launcher/java.manifest').absolutePath,
+        "-identity:${name}.exe, version=${launcherUpstreamVersion}".toString(), "-outputresource:${exe.absolutePath};#1".toString()],
+        msvc(), exe.parentFile, "mt ${name}.exe", launcherToolchainHint('windows'))
+}
+
+def buildLauncher = tasks.register('buildLauncher') {
+    group = 'build'
+    description = "Builds Jasper's jpackage launcher for this host into build/launcher/resources."
+    dependsOn(verifyLauncherSources)
+    inputs.dir(upstreamRoot).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(jasperNative).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.property('sdk', launcherSdk.map { it.absolutePath })
+    inputs.property('host', providers.provider { launcherHost().toString() })
+    outputs.dir(launcherResources)
+    doLast {
+        def host = launcherHost()
+        project.delete(launcherResources.get().asFile)
+        File output = new File(launcherResources.get().asFile, 'jdk/jpackage/internal/resources')
+        output.mkdirs()
+        File work = launcherBuild.get().dir('objects').asFile
+        project.delete(work)
+        File core = new File(jasperNative, 'JasperVmOptionsCore.cpp')
+        File guard = new File(jasperNative, 'jasper_launch_guard.c')
+        List<File> jasperSources = [new File(jasperNative, 'JasperVmOptions.cpp'), core, guard]
+        List<File> strict = [core, guard]
+        switch (host.os) {
+            case 'macos':
+                List<File> directories = [nativeDirectory('macosx', 'applauncher'), nativeDirectory('share', 'applauncher'),
+                    nativeDirectory('macosx', 'common'), nativeDirectory('unix', 'common'), nativeDirectory('share', 'common')]
+                nativeBuild(kind: 'executable', output: new File(output, 'jpackageapplauncher'), work: new File(work, 'macos'),
+                    sources: sourcesIn(directories) + jasperSources, strict: strict, includes: directories + [jasperNative],
+                    libraries: ['-framework', 'Cocoa'], rpaths: ['@executable_path/../Frameworks/', '@executable_path/../PlugIns/'])
+                break
+            case 'linux':
+                List<File> launcherDirectories = [nativeDirectory('linux', 'applauncher'), nativeDirectory('share', 'applauncher'),
+                    nativeDirectory('linux', 'common'), nativeDirectory('unix', 'common'), nativeDirectory('share', 'common')]
+                nativeBuild(kind: 'executable', output: new File(output, 'jpackageapplauncher'), work: new File(work, 'linux-launcher'),
+                    sources: sourcesIn(launcherDirectories).findAll { it.name.endsWith('.c') } + [guard], strict: [guard],
+                    includes: launcherDirectories + [jasperNative], libraries: ['-ldl', '-lpthread'])
+                List<File> libraryDirectories = [nativeDirectory('linux', 'libapplauncher')] + launcherDirectories
+                nativeBuild(kind: 'shared', output: new File(output, 'libjpackageapplauncheraux.so'), work: new File(work, 'linux-library'),
+                    sources: sourcesIn(libraryDirectories).findAll { !(it.name in ['LinuxLauncher.c', 'LinuxPackage.c']) } + jasperSources,
+                    strict: strict, includes: libraryDirectories + [jasperNative], libraries: ['-ldl', '-lpthread'])
+                break
+            default:
+                List<File> directories = [nativeDirectory('windows', 'applauncher'), nativeDirectory('share', 'applauncher'),
+                    nativeDirectory('windows', 'common'), nativeDirectory('share', 'common')]
+                File resource = windowsVersionResource(new File(work, 'resources'))
+                [[name: 'jpackageapplauncher', subsystem: 'CONSOLE', defines: []],
+                 [name: 'jpackageapplauncherw', subsystem: 'WINDOWS', defines: ['JP_LAUNCHERW']]].each { Map variant ->
+                    File exe = new File(output, "${variant.name}.exe")
+                    nativeBuild(kind: 'executable', output: exe, work: new File(work, variant.name),
+                        sources: sourcesIn(directories) + jasperSources, strict: strict, includes: directories + [jasperNative],
+                        defines: variant.defines, subsystem: variant.subsystem, resources: [resource],
+                        libraries: ['msi.lib', 'ole32.lib', 'shell32.lib', 'shlwapi.lib', 'user32.lib', 'advapi32.lib', 'kernel32.lib'])
+                    embedWindowsManifest(exe, variant.name)
+                }
+        }
+        List<File> binaries = (output.listFiles() ?: []).findAll { it.isFile() }
+        binaries.each { File binary ->
+            if (!new String(Files.readAllBytes(binary.toPath()), StandardCharsets.ISO_8859_1).contains('JASPER_VM_OPTIONS_SKIP')) {
+                throw new GradleException("buildLauncher: ${binary.name} lacks Jasper's hook")
+            }
+        }
+        logger.lifecycle("Built Jasper's launcher: ${binaries*.name.sort().join(', ')}")
+    }
+}

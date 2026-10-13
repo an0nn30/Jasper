@@ -37,4 +37,43 @@ rm -rf packaging/launcher/upstream && mkdir -p packaging/launcher/upstream
 python3 packaging/launcher/sha256sums.py
 ```
 
-Then re-apply the `JASPER-HOOK` lines, update the tag and commit in this file, and run `./gradlew :jasper-app:check`.
+Then re-apply the hook lines below, update the tag and commit in this file, and run `./gradlew :jasper-app:check`.
+
+## Hooks
+
+Two upstream files carry Jasper's lines, each marked `JASPER-HOOK` (`launcherHookedFiles` in `gradle/launcher.gradle`):
+
+- `share/native/applauncher/AppLauncher.cpp`: `#include "JasperVmOptions.h"`, and in `createJvmLauncher`, just before
+  `(*jvm).initFromConfigFile(cfgFile)`, the call `jasper::applyUserVmOptions(cfgFile)`.
+- `share/native/applauncher/JvmLauncherLib.c`: `#include "jasper_launch_guard.h"`, and around the `JLI_Launch` call in
+  `jvmLauncherStartJvm`, `jasperGuardBeforeLaunch(jvmArgs->jliLaunchArgc, jvmArgs->jliLaunchArgv)` before and
+  `jasperGuardAfterLaunch()` after.
+
+On macOS libjli calls the launcher's `main` again on a new thread; that second call also goes through
+`jvmLauncherStartJvm`, so the guard sees `JLI_Launch` return on every platform.
+
+## Jasper's code
+
+- `jasper/JasperVmOptionsCore.{h,cpp}`: the options file's location, format, IntelliJ's merge, the digest and the skip
+  variable, as pure functions over UTF-8 strings.
+- `jasper/JasperVmOptions.{h,cpp}`: reads the environment and the file with jpackage's helpers and rewrites the cfg's
+  `java-options`; it never throws, and on any error the bundled options stand.
+- `jasper/jasper_launch_guard.{h,c}`: armed when the JVM arguments carry `-Djasper.vmOptionsDigest=`. Its exit handler
+  re-spawns the launcher with `JASPER_VM_OPTIONS_SKIP=launch-failed` when `JLI_Launch` never returned and the loaded
+  libjvm's own `JNI_GetCreatedJavaVMs` reports no JVM; with no libjvm loaded it does nothing. On Windows it also
+  registers with `ucrtbase.dll`'s `_crt_atexit`, because `jli.dll` calls the shared UCRT's `exit()`. HotSpot's own
+  initialization failures end with `_exit` and never reach it.
+
+## Build
+
+`buildLauncher` (`gradle/launcher.gradle`) compiles the launcher for the host with the flags of the JDK's
+`make/modules/jdk.jpackage/Lib.gmk`: C++14 and C11, `-O2` (MSVC `/O1`), the JDK's defines, hidden visibility, and on
+Windows the static CRT. Upstream files compile at the JDK's warning level; the core and the guard with warnings as
+errors. Outputs go to `build/launcher/resources/jdk/jpackage/internal/resources/`, where
+`jpackage -J--patch-module=jdk.jpackage=build/launcher/resources` takes them instead of its own:
+
+| Host | Compiler | Outputs |
+|---|---|---|
+| macOS | Xcode command line tools (`xcrun clang`), minimum macOS 11.0, linked against the installed SDK | `jpackageapplauncher` |
+| Linux | `gcc` and `g++`; the library links libstdc++ and libgcc statically | `jpackageapplauncher`, `libjpackageapplauncheraux.so` |
+| Windows | MSVC from `vswhere` and `vcvarsall.bat`, with `version.rc` and `java.manifest` embedded | `jpackageapplauncher.exe`, `jpackageapplauncherw.exe` |

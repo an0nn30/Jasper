@@ -31,6 +31,7 @@
 #endif
 
 #include "JvmLauncher.h"
+#include "jasper_launch_guard.h" /* JASPER-HOOK */
 
 
 typedef int (JNICALL *JLI_LaunchFuncType)(int argc, char ** argv,
@@ -118,6 +119,7 @@ int jvmLauncherStartJvm(JvmlLauncherData* jvmArgs, void* JLI_Launch) {
 #endif
     }
 
+    jasperGuardBeforeLaunch(jvmArgs->jliLaunchArgc, jvmArgs->jliLaunchArgv); /* JASPER-HOOK */
     exitCode = (*((JLI_LaunchFuncType)JLI_Launch))(
         jvmArgs->jliLaunchArgc, jvmArgs->jliLaunchArgv,
         0, 0,
@@ -130,6 +132,7 @@ int jvmLauncherStartJvm(JvmlLauncherData* jvmArgs, void* JLI_Launch) {
         JNI_FALSE,
         JNI_FALSE,
         0);
+    jasperGuardAfterLaunch(); /* JASPER-HOOK */
 
     return exitCode;
 }
