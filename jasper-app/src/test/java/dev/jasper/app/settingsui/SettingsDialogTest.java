@@ -568,7 +568,7 @@ class SettingsDialogTest {
         });
     }
 
-    @Test void theTreeNavigatesAndRemembersClosedGroupsThroughKitEvents() throws Exception {
+    @Test void theTreeNavigatesThroughKitEventsAndKeepsEveryGroupOpen() throws Exception {
         var dialog = dialog();
         edt(() -> {
             dialog.open(null, "window");
@@ -584,15 +584,11 @@ class SettingsDialogTest {
             assertThat(dialog.view().breadcrumb()).isEqualTo("Terminal › Cursor");
             assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).selectedIds()).containsExactly("terminal.cursor");
             dialog.select("window");
-            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).expandedIds()).contains("terminal");
-            var collapse = KitTestSupport.require(tree, "@tree/pages/terminal/expand", javax.swing.JButton.class);
-            collapse.doClick();
-            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).expandedIds()).as("closed by the user").doesNotContain("terminal");
+            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).expandedIds()).contains("appearance-behavior", "terminal");
+            assertThat(SettingsView.find(tree, "@tree/pages/terminal/expand", javax.swing.JButton.class)).as("a group heading has no disclosure button").isNull();
             dialog.search("ligatures");
-            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).expandedIds()).as("a search opens everything").contains("terminal");
             dialog.search("");
-            dialog.select("window");
-            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).expandedIds()).as("and clearing it restores the user's choice").doesNotContain("terminal");
+            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).expandedIds()).contains("appearance-behavior", "terminal");
         });
     }
 
