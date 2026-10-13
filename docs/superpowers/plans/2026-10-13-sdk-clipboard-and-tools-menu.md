@@ -1933,4 +1933,4 @@ EOF
 - Report the `./gradlew check` totals.
 - Ask the user before merging `claude/sdk-clipboard` into `main` or pushing; hand over the STATUS GUI checks.
 - Then the next pieces agreed with the user: publishing the SDK with a `dev.jasper.plugin` Gradle convention, and moving
-  the external THD Crypto plugin to 0.16.1 (it would use `copySecret` for decrypted values and `StandardMenu.TOOLS`).
+  the external encrypt/decrypt plugin to 0.16.1 (it would use `copySecret` for decrypted values and `StandardMenu.TOOLS`).
