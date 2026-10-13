@@ -114,8 +114,8 @@ Toggle SSH Hosts (Cmd+Shift+S), Connect to SSH Host… (Cmd+Shift+H) and Toggle 
 Settings › Keymap like any other action; `cmd` means Command on macOS and Ctrl+Shift elsewhere. A `[shortcuts]`
 table from an older Remote is reported as unknown; delete it and rebind in Keymap.
 
-The actions are `dev.jasper.remote.connect`, `dev.jasper.remote.hosts`, `dev.jasper.remote.split` and
-`dev.jasper.remote.import`, plus `dev.jasper.remote.sessions.manage`; bind them like other
+The actions are `dev.jasper.remote.connect`, `dev.jasper.remote.hosts`, `dev.jasper.remote.split`,
+`dev.jasper.remote.hosts.new` and `dev.jasper.remote.import`, plus `dev.jasper.remote.sessions.manage`; bind them like other
 contributed actions. Tunnels have their own section at the end of this guide.
 
 ## Native acceptance

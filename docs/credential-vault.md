@@ -12,7 +12,7 @@ and type. Double-click a row or press Enter to edit it. The icon actions add, ed
 public key and lock the vault; each has a tooltip and accessible name.
 
 The **+** menu adds a login, imports an SSH key, adds a secure note, or generates a new SSH key. The palette's
-**Add Login...**, **Add SSH Key...** and **Add Secure Note...** open the manager on the same sheets, unlocking first.
+**Add Login...**, **Add SSH Key...** and **Add Secure Note...** open the manager on the same sheets, creating or unlocking the vault first.
 **File → Vault Plugin Grants...** (or the palette) opens the manager on the saved plugin grants, and **File → Change
 Vault Master Password...** asks for a new master password over it; both unlock first. Grant revocation has a **Back to
 entries** button. **Cancel** and **Okay** both close the manager; changes made in
@@ -72,9 +72,10 @@ keys_directory = ""              # empty uses this plugin's data/keys directory
 bind_new_vaults_to_device = true  # initial state of the create checkbox
 ```
 
-The nine actions are `dev.jasper.vault.search` (Cmd+\\), `dev.jasper.vault.open` (Cmd+Shift+\\), `dev.jasper.vault.lock`, `dev.jasper.vault.generate_key`,
-`dev.jasper.vault.change_password`, `dev.jasper.vault.grants`, `dev.jasper.vault.add_login`, `dev.jasper.vault.add_key` and
-`dev.jasper.vault.add_note`. Configure their shortcuts like other contributed actions.
+The nine actions are `dev.jasper.vault.search` (Cmd+\\), `dev.jasper.vault.open` (Cmd+Shift+\\), `dev.jasper.vault.lock`
+(Cmd+Shift+L), `dev.jasper.vault.generate_key`, `dev.jasper.vault.change_password`, `dev.jasper.vault.grants`,
+`dev.jasper.vault.add_login`, `dev.jasper.vault.add_key` and `dev.jasper.vault.add_note`. Configure their shortcuts like
+other contributed actions.
 
 ## Native acceptance
 

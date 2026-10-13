@@ -1,5 +1,20 @@
 # Jasper — Status and Handoff
 
+**Tool windows in Zen, and more plugin commands — 2026-10-13** (`claude/zen-panels-actions`, worktree
+`.claude/worktrees/zen-panels-actions`; design agreed in chat, no spec). Zen now hides the showing tool windows through
+the dock and remembers them: a panel opened in Zen (shortcut, View › Tool Windows, palette, plugin command) shows in
+its slot without the rails, and leaving Zen closes it and restores the earlier ones. The saved layout keeps the pre-Zen
+visibility; moves and resizes in Zen are saved. New unbound commands: Remote New Host... and Start or Stop a Tunnel...
+(both in the SSH menu), Vault Add Login.../Add SSH Key.../Add Secure Note..., File Server Show TLS Certificate
+Fingerprint…/Show SFTP Host Key Fingerprint…, Edit Snippets File, Remove Current Project from Index…. No SDK change.
+`./gradlew check --continue`: **9,771 tests, 0 failures, 0 errors, 8 skipped**. `SftpChooseSessionTest`'s
+choose-session test is timing-sensitive in the sandbox (an immediate "SSH agent not available" can beat "Connecting…");
+it failed on the untouched base too and passed in the full run. An independent review found one Important issue (the
+last panel restored in Zen was saved as hidden until the next dock change), fixed with a regression test, and doc nits,
+fixed. No GUI launched. GUI checks for the user: in Zen, Cmd+Alt+1 and View › Tool Windows show a panel with no rail
+(frame corners and insets as with View › Rail hidden); a divider drag in Zen; leaving Zen restores the earlier layout;
+quitting and relaunching in Zen; the new commands from the palette. Not merged or pushed.
+
 **Enter's verb in the palette hint bar — 2026-10-13** (`claude/palette-enter-hint`, worktree
 `.claude/worktrees/palette-enter-hint`; bounded change, design approved in chat, no spec or plan). In a scope with two or
 three verbs the hint bar now lists every verb with its key, Enter's first ("Copy password ⏎ · Copy username ⌘⏎ · Open
