@@ -89,6 +89,15 @@ class RemotePluginTest {
                 assertThat(host.failures()).isEmpty();
                 assertThat(host.windows()).containsExactly("dialog|Add Host|true");
                 assertThat(plugin.hostsPanel(window)).as("the Sessions panel stays closed").isNull();
+                name(plugin.currentEditor(), "new"); hostname(plugin.currentEditor(), "new.invalid"); agentAuth(plugin.currentEditor());
+                username(plugin.currentEditor(), "root");
+                saveAndConnect(plugin.currentEditor());
+                settle(host);
+                assertThat(plugin.store().hosts()).extracting(RemoteHost::name).containsExactly("new");
+                assertThat(host.windows()).as("Add and Connect closes the form and connects to the saved host")
+                    .containsExactly("overlay|Connecting to new|true");
+                host.stopAll();
+                assertThat(host.failures()).isEmpty();
             }
         });
     }

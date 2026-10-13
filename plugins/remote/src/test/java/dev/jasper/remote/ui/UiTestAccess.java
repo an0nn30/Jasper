@@ -44,6 +44,7 @@ public final class UiTestAccess {
     public static void username(HostEditor editor, String text) { type(editor.view(), HostEditor.USERNAME, text); }
     public static void agentAuth(HostEditor editor) { emit(editor.view(), new UiEvent.Selected(HostEditor.AUTH, Set.of(HostEditor.AGENT))); }
     public static void save(HostEditor editor) { click(editor.view(), HostEditor.SAVE); }
+    public static void saveAndConnect(HostEditor editor) { click(editor.view(), HostEditor.SAVE_CONNECT); }
 
     public static void chooseCredential(ImportPanel panel, int row) { emit(panel.view(),new UiEvent.Action(ImportPanel.choose(row))); }
     public static void refreshImport(ImportPanel panel) { click(panel.view(), ImportPanel.REFRESH); }

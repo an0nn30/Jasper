@@ -7,13 +7,17 @@ its slot without the rails, and leaving Zen closes it and restores the earlier o
 visibility; moves and resizes in Zen are saved. New unbound commands: Remote New Host... and Start or Stop a Tunnel...
 (both in the SSH menu), Vault Add Login.../Add SSH Key.../Add Secure Note..., File Server Show TLS Certificate
 Fingerprint…/Show SFTP Host Key Fingerprint…, Edit Snippets File, Remove Current Project from Index…. No SDK change.
-`./gradlew check --continue`: **9,771 tests, 0 failures, 0 errors, 8 skipped**. `SftpChooseSessionTest`'s
-choose-session test is timing-sensitive in the sandbox (an immediate "SSH agent not available" can beat "Connecting…");
-it failed on the untouched base too and passed in the full run. An independent review found one Important issue (the
+Remote's Add Host form gains **Add and Connect** (secondary, beside the primary Add Host; adding only): it saves, then
+connects in a new tab as the palette's Connect does. The form's footer was matched to the design mock with two buttons,
+so the [acceptance record](design/theme-engine/acceptance.md)'s Add Host footer measurements are now historical.
+`./gradlew check --continue`: **9,774 tests**; its one failure was `SftpChooseSessionTest`'s choose-session test, which
+is timing-sensitive in the sandbox (an immediate "SSH agent not available" can beat "Connecting…") and failed on the
+untouched base too; the Remote suite then passed on rerun (0 failures, 8 skipped overall). An independent review found one Important issue (the
 last panel restored in Zen was saved as hidden until the next dock change), fixed with a regression test, and doc nits,
 fixed. No GUI launched. GUI checks for the user: in Zen, Cmd+Alt+1 and View › Tool Windows show a panel with no rail
 (frame corners and insets as with View › Rail hidden); a divider drag in Zen; leaving Zen restores the earlier layout;
-quitting and relaunching in Zen; the new commands from the palette. Not merged or pushed.
+quitting and relaunching in Zen; the new commands from the palette; Add and Connect in the Add Host form. Not merged
+or pushed.
 
 **Enter's verb in the palette hint bar — 2026-10-13** (`claude/palette-enter-hint`, worktree
 `.claude/worktrees/palette-enter-hint`; bounded change, design approved in chat, no spec or plan). In a scope with two or

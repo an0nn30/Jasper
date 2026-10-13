@@ -47,7 +47,8 @@ a **Vault credential** (a login with a password, a key or both, or a standalone 
 username) or the **SSH agent** (`SSH_AUTH_SOCK`, or the OpenSSH agent pipe on Windows). Hosts live in
 `plugins/dev.jasper.remote/data/hosts.toml`, which you may edit; Jasper notices the change within a
 second. The file never holds a secret. A jump host makes the connection go through that host first,
-with its own authentication and host-key check.
+with its own authentication and host-key check. In the Add Host form, **Add and Connect** saves the host and then
+connects to it in a new tab, as the palette's Connect does; if the save fails, nothing connects.
 
 **Import** reads `~/.ssh/config` (`Host`, `HostName`, `Port`, `User`, `ProxyJump`, ordered
 `IdentityFile` directives and one level of `Include`). Wildcard hosts and `Match` blocks are
