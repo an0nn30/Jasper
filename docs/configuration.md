@@ -448,7 +448,8 @@ directory, `<Jasper home>/plugins/dev.jasper.snippets/data/`; a `snippets.toml` 
 from before the plugin is moved there on first launch. It is a separate file: it is not part of the
 configuration file and is never read or written by the configuration loader. An empty or missing
 file is an empty scope; disable the plugin in File → Manage Plugins… to remove the scope. Its
-shortcut is the action `"dev.jasper.snippets.open"`. See [Snippets](command-palette.md#snippets) for its format and the fill-in and
+shortcut is the action `"dev.jasper.snippets.open"`. **Edit Snippets File** (`"dev.jasper.snippets.edit"`, unbound by
+default) opens the file in the editor, creating it if missing. See [Snippets](command-palette.md#snippets) for its format and the fill-in and
 name steps.
 
 ### Editor
