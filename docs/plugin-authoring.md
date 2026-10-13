@@ -85,7 +85,7 @@ private static void installUi(PluginContext context, long stepMillis) {
         });
     context.toolbar().add(ToolbarItem.action(DEMO));
     context.menus().create("dev.jasper.sample.menu", "Sample").add(DEMO);
-    context.menus().standard(StandardMenu.VIEW).add(DEMO);
+    context.menus().standard(StandardMenu.TOOLS).add(DEMO);
     context.menus().terminalContext().add(DEMO);
 
     StatusItem status = context.statusBar().add(new StatusItemSpec("dev.jasper.sample.status", Side.RIGHT, 100));

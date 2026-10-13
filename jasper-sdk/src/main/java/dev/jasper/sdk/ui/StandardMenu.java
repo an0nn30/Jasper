@@ -11,5 +11,10 @@ public enum StandardMenu {
     /** The Pane menu. */
     PANE,
     /** The Tab menu. */
-    TAB
+    TAB,
+    /**
+     * The Tools menu, for utility commands. Jasper has none of its own, so it shows only while a plugin has entries in
+     * it, after Tab and before plugins' own menus. @since 0.16.1
+     */
+    TOOLS
 }

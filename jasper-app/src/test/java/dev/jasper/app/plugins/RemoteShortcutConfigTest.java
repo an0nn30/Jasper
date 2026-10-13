@@ -126,7 +126,7 @@ class RemoteShortcutConfigTest {
     private java.util.List<MenuEntry> tools() {
         return contributions.menus().stream().filter(menu -> menu.target().equals(MenuTarget.standard(MenuTarget.Slot.VIEW)))
             .flatMap(menu -> menu.entries().stream())
-            .filter(entry -> entry instanceof MenuEntry.Submenu submenu && submenu.title().equals("Tools"))
+            .filter(entry -> entry instanceof MenuEntry.Submenu submenu && submenu.title().equals("Tool Windows"))
             .flatMap(entry -> ((MenuEntry.Submenu) entry).entries().stream()).toList();
     }
 

@@ -14,7 +14,7 @@ public record MenuTarget(Type type, String key, String title) {
     public enum Type { STANDARD, TOP_LEVEL, CONTEXT }
 
     /** The built-in menus that accept a contributed section. */
-    public enum Slot { FILE, EDIT, VIEW, PANE, TAB }
+    public enum Slot { FILE, EDIT, VIEW, PANE, TAB, TOOLS }
 
     public MenuTarget {
         Objects.requireNonNull(type, "type");

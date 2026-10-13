@@ -595,6 +595,18 @@ public abstract class PluginContractTest {
         assertThat(h.menu("VIEW")).containsExactly("item:test.alpha.run");
     }
 
+    @Test void theToolsMenuTakesSectionsLikeTheOtherStandardMenus() {
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.run", "Run"), invoked -> { });
+            context.menus().standard(StandardMenu.TOOLS).add("test.alpha.run");
+        });
+        h.start(info("test.beta"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.beta.run", "Run"), invoked -> { });
+            context.menus().standard(StandardMenu.TOOLS).add("test.beta.run");
+        });
+        assertThat(h.menu("TOOLS")).containsExactly("item:test.alpha.run", "===", "item:test.beta.run");
+    }
+
     @Test void statusItemsAreOrderedGlobalAndInertAfterClose() {
         var late = new AtomicReference<StatusItem>();
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {

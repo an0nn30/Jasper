@@ -88,6 +88,8 @@ final class WindowChrome {
         standardMenus.put(MenuTarget.Slot.FILE, file); standardMenus.put(MenuTarget.Slot.EDIT, edit);
         standardMenus.put(MenuTarget.Slot.VIEW, view); standardMenus.put(MenuTarget.Slot.PANE, pane);
         standardMenus.put(MenuTarget.Slot.TAB, tab);
+        // Tools holds only plugin entries; rebuildContributedMenus adds it to the bar while it has any.
+        standardMenus.put(MenuTarget.Slot.TOOLS, menu("Tools"));
         JMenu modes = menu("Toolbar");
         for (ToolbarMode mode : ToolbarMode.values()) {
             JRadioButtonMenuItem item = new MenuBarItems.Radio(owner.windowCommands().view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)));
@@ -248,24 +250,30 @@ final class WindowChrome {
         contributedMenus.forEach(menuBar::remove);
         contributedMenus.clear();
         if (contributions != null) {
-            for (MenuSection section : contributions.model().menus()) {
+            var sections = contributions.model().menus();
+            for (MenuSection section : sections) {
+                if (section.target().type() != MenuTarget.Type.STANDARD) continue;
                 List<Component> built = build(section.entries(), MenuBarItems.Item::new);
                 if (built.isEmpty()) continue;
-                switch (section.target().type()) {
-                    case STANDARD -> {
-                        JMenu menu = standardMenus.get(MenuTarget.Slot.valueOf(section.target().key()));
-                        List<Component> added = contributedSections.computeIfAbsent(menu, key -> new ArrayList<>());
-                        var separator = new JPopupMenu.Separator();
-                        menu.add(separator); added.add(separator);
-                        for (Component child : built) { menu.add(child); added.add(child); }
-                    }
-                    case TOP_LEVEL -> {
-                        JMenu menu = observe(new JMenu(section.target().title()));
-                        built.forEach(menu::add);
-                        menuBar.add(menu); contributedMenus.add(menu);
-                    }
-                    case CONTEXT -> { }
+                JMenu menu = standardMenus.get(MenuTarget.Slot.valueOf(section.target().key()));
+                List<Component> added = contributedSections.computeIfAbsent(menu, key -> new ArrayList<>());
+                // Tools has no items of its own, so its first section needs no separator.
+                if (menu.getMenuComponentCount() > 0) {
+                    var separator = new JPopupMenu.Separator();
+                    menu.add(separator); added.add(separator);
                 }
+                for (Component child : built) { menu.add(child); added.add(child); }
+            }
+            // The bar orders menus as they are added: Tools after Tab, then plugins' own menus.
+            JMenu tools = standardMenus.get(MenuTarget.Slot.TOOLS);
+            if (tools.getMenuComponentCount() > 0) { menuBar.add(tools); contributedMenus.add(tools); }
+            for (MenuSection section : sections) {
+                if (section.target().type() != MenuTarget.Type.TOP_LEVEL) continue;
+                List<Component> built = build(section.entries(), MenuBarItems.Item::new);
+                if (built.isEmpty()) continue;
+                JMenu menu = observe(new JMenu(section.target().title()));
+                built.forEach(menu::add);
+                menuBar.add(menu); contributedMenus.add(menu);
             }
         }
         menuBar.revalidate(); menuBar.repaint();

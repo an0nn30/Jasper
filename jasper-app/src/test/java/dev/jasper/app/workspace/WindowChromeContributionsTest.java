@@ -148,6 +148,35 @@ class WindowChromeContributionsTest {
         });
     }
 
+    @Test void toolsAppearsAfterTabOnlyWhileAPluginHasEntriesInIt() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            owner.connectContributions(model);
+            model.addAction("dev.x.run", "Run Tool", null, List.of(), Optional.empty(), invocation -> { });
+            model.addMenuSection(MenuTarget.topLevel("dev.x.menu", "Own")).set(List.of(new MenuEntry.Item("dev.x.run")));
+            assertThat(titles(owner)).as("no entries, no menu").doesNotContain("Tools");
+            MenuSection first = model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS));
+            first.set(List.of(new MenuEntry.Item("dev.x.run")));
+            assertThat(titles(owner)).containsSubsequence("Tab", "Tools", "Own");
+            assertThat(items(tools(owner))).as("no separator before the first section").containsExactly("Run Tool");
+            MenuSection second = model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS));
+            second.set(List.of(new MenuEntry.Item("dev.x.run")));
+            assertThat(items(tools(owner))).containsExactly("Run Tool", "---", "Run Tool");
+            first.close();
+            second.close();
+            assertThat(titles(owner)).as("the last entry gone, the menu goes").doesNotContain("Tools");
+        });
+    }
+
+    private static List<String> titles(WindowContent owner) {
+        return owner.chrome().menuBar().menus().stream().map(JMenu::getText).toList();
+    }
+
+    private static JMenu tools(WindowContent owner) {
+        return owner.chrome().menuBar().menus().stream().filter(menu -> menu.getText().equals("Tools")).findFirst().orElseThrow();
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
     void menuRefreshDuringNativeMenuMutationDoesNotDuplicateTopLevelMenus(boolean onRemoval) throws Exception {
