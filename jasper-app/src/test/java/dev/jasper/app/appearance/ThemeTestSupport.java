@@ -21,6 +21,24 @@ public final class ThemeTestSupport {
         var theme = generated(dark);
         return new dev.jasper.ui.theme.ThemePair(theme, theme);
     }
+    /** A terminal-only theme file named {@code name}, with one scheme keyed {@code dark}. */
+    public static String terminalThemeJson(String name) {
+        return """
+            { "jasper-theme": 1, "name": "%s",
+              "terminal": { "dark": { "name": "%s", "bg": "#282828", "fg": "#EBDBB2", "fg.bold": "#FBF1C7",
+                "cursor": "#D5C4A1", "selection": "#504945", "black": "#282828", "red": "#CC241D", "green": "#98971A",
+                "yellow": "#D79921", "blue": "#458588", "magenta": "#B16286", "cyan": "#689D6A", "white": "#A89984",
+                "bright.black": "#928374", "bright.red": "#FB4934", "bright.green": "#B8BB26", "bright.yellow": "#FABD2F",
+                "bright.blue": "#83A598", "bright.magenta": "#D3869B", "bright.cyan": "#8EC07C", "bright.white": "#EBDBB2" } } }
+            """.formatted(name, name);
+    }
+    /** Slate Steel's file renamed {@code name}: a UI theme with both variants and three schemes. */
+    public static String uiThemeJson(String name) {
+        try (var in = ThemeTestSupport.class.getResourceAsStream("/dev/jasper/ui/theme/slate-steel.json")) {
+            return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
+                .replace("\"name\": \"Slate Steel\"", "\"name\": \"" + name + "\"");
+        } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+    }
     /** Installs a generated theme, as ThemeController's installer does. */
     public static boolean install(GeneratedTheme theme) { return ThemeManager.install(theme); }
 
