@@ -131,6 +131,8 @@ public final class JasperApplication {
     static final Duration DETECTION_WAIT = Duration.ofSeconds(12);
     private final ApplicationShutdown shutdown;
     private final Path shellIntegrationDir;
+    /** The imported themes' folder, or null for the built-in theme alone. */
+    private final Path themesFolder;
     private final BuddyIntegration buddy;
     private final dev.jasper.app.lifecycle.Subscription buddyAppearance;
     private final SystemNotices systemNotices;
@@ -250,6 +252,7 @@ public final class JasperApplication {
         // The exit thread runs this after the bounded cleanup wait, so a replacement never meets this process's endpoint.
         this.shutdown = new ApplicationShutdown(() -> { relaunchIfRequested(); terminate.run(); });
         this.shellIntegrationDir = shellIntegrationDir;
+        this.themesFolder = themesFolder;
         buddy = new BuddyIntegration(buddyStateFile, SystemFonts.system(java.awt.Font.PLAIN, 13f),
             themes.current().chrome().dark(), this::raiseTerminal, this::toggleBuddy, this::owns);
         buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome().dark()));
@@ -798,7 +801,11 @@ public final class JasperApplication {
             var shells = new dev.jasper.app.settingsui.ShellChoices(() -> shellProfiles.current().stream()
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
                 shellProfiles::refresh, shellProfiles::onChanged);
-            var appearanceChoices = SettingsAppearance.choices(systemAppearance, themes::library);
+            Optional<dev.jasper.app.settingsui.ThemeImports> imports = themesFolder == null ? Optional.empty()
+                : Optional.of(SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder), themes::library,
+                    surface -> surface == null ? Optional.empty() : this.shells.chooseFile(surface, "Import Theme", ".json"),
+                    this::confirmOver, configuration::save, configuration::reload));
+            var appearanceChoices = SettingsAppearance.choices(systemAppearance, themes::library, imports);
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
                 dev.jasper.app.settingsui.CorePages.pages(appearanceChoices, system, shells,
                     new dev.jasper.app.settingsui.NotificationGroupChoices(() -> groupChoices(notificationCenter.groups(), this::pluginName, plugins == null ? Map.of() : plugins.pluginIcons())),
@@ -1293,6 +1300,23 @@ public final class JasperApplication {
     NotificationCenter notificationCenter() { return notificationCenter; }
 
     Incidents incidents() { return incidents; }
+
+    /** Asks {@code question} with a kit sheet over {@code surface}, the Settings dialog; its yes runs at most once. */
+    private void confirmOver(dev.jasper.app.windows.AuxiliarySurface surface, dev.jasper.app.settingsui.ThemeImports.Question question) {
+        if (surface == null || auxiliary == null) return;
+        var dialog = auxiliary.dialog(question.title(), true, surface);
+        boolean[] answered = {false};
+        var view = new dev.jasper.app.pluginmanager.ConfirmView(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),
+            question.question(), question.consequence(), question.yes(), () -> {
+                if (answered[0]) return;
+                answered[0] = true;
+                dialog.close();
+                question.onYes().run();
+            }, dialog::close);
+        dialog.onClosed(view::close);
+        dialog.setContent(view.view());
+        dialog.show();
+    }
 
     /** The Plugins page's controller, created the first time Settings builds that page. */
     private PluginManager pluginManager() {
