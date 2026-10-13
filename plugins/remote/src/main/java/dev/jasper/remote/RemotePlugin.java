@@ -68,6 +68,7 @@ import javax.swing.Timer;
  */
 public class RemotePlugin implements Plugin {
     public static final String CONNECT = "dev.jasper.remote.connect", HOSTS = "dev.jasper.remote.hosts", SPLIT = "dev.jasper.remote.split";
+    public static final String NEW_HOST = "dev.jasper.remote.hosts.new";
     public static final String IMPORT = "dev.jasper.remote.import", STATUS = "dev.jasper.remote.status", MENU = "dev.jasper.remote.menu", PANEL = "dev.jasper.remote.panel";
 
     private final Executor ui;
@@ -207,9 +208,11 @@ public class RemotePlugin implements Plugin {
         splitAction = context.actions().register(ActionSpec.of(SPLIT, "Split with Same Host").withKeywords(List.of("ssh", "split"))
             .withContext(dev.jasper.sdk.ui.ShortcutContext.terminal()), invoked -> invoked.pane().ifPresent(this::splitSameHost));
         splitAction.setEnabled(false);
+        context.actions().register(ActionSpec.of(NEW_HOST, "New Host...").withIcon("add").withKeywords(List.of("ssh", "host", "session", "add")),
+            invoked -> editHost(invoked.window(), Optional.empty()));
         context.actions().register(ActionSpec.of(IMPORT, "Import from ~/.ssh/config...").withKeywords(List.of("ssh", "import", "config")), invoked -> importConfig(invoked.window()));
         PluginMenu menu = context.menus().create(MENU, "SSH");
-        menu.add(CONNECT); menu.add(HOSTS); menu.add(SPLIT); menu.addSeparator(); menu.add(IMPORT);
+        menu.add(CONNECT); menu.add(HOSTS); menu.add(SPLIT); menu.addSeparator(); menu.add(NEW_HOST); menu.add(IMPORT);
         menu.addSeparator();menu.add(SFTP);menu.add(dev.jasper.remote.ui.transfers.TransferUi.SHOW);
         tunnelsUi.addToMenu(menu);
         // View > Tool Windows lists HOSTS, SFTP_TOGGLE and the Tunnels toggle: the panels name them as their toggles.

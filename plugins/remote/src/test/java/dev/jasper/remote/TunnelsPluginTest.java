@@ -80,13 +80,22 @@ class TunnelsPluginTest {
             assertThat(host.failures()).isEmpty();
             assertThat(host.notifications().groups()).contains("dev.jasper.remote.tunnels|Tunnels|CARD");
             assertThat(host.actions()).contains(TunnelsUi.TOGGLE + "|Toggle Tunnels|true", TunnelsUi.SHOW + "|Show Tunnels|true",
-                TunnelsUi.NEW + "|New Tunnel...|true", TunnelsUi.FORWARD + "|Forward a Port...|true", TunnelsUi.STOP_ALL + "|Stop All Tunnels|false");
+                TunnelsUi.PICK + "|Start or Stop a Tunnel...|true", TunnelsUi.NEW + "|New Tunnel...|true", TunnelsUi.FORWARD + "|Forward a Port...|true", TunnelsUi.STOP_ALL + "|Stop All Tunnels|false");
             assertThat(host.panels()).contains(TunnelsUi.PANEL + "|Tunnels|LEFT|" + TunnelsUi.TOGGLE);
             assertThat(host.scopes()).contains(TunnelsScope.ID + "|Tunnels|toggle,browse,edit");
-            assertThat(host.menu("top:" + RemotePlugin.MENU)).containsSubsequence("item:" + TunnelsUi.TOGGLE, "item:" + TunnelsUi.NEW,
+            assertThat(host.menu("top:" + RemotePlugin.MENU)).containsSubsequence("item:" + TunnelsUi.TOGGLE, "item:" + TunnelsUi.PICK, "item:" + TunnelsUi.NEW,
                 "item:" + TunnelsUi.FORWARD, "item:" + TunnelsUi.STOP_ALL);
             assertThat(host.menu("context")).contains("item:" + TunnelsUi.FORWARD);
             assertThat(host.status()).as("hidden while nothing runs").isEmpty();
+        }
+    }
+
+    @Test void startOrStopATunnelOpensTheTunnelsScope(@TempDir Path dir) {
+        try (var host = new FakePluginHost()) {
+            host.start(RemotePluginTest.INFO, Set.of(), Set.of(), plugin(dir.resolve("ssh")));
+            UUID window = host.addTerminalWindow();
+            assertThat(host.invoke(TunnelsUi.PICK, window, null)).isTrue();
+            assertThat(host.paletteOpens()).containsExactly(window + " " + TunnelsScope.ID + " - -");
         }
     }
 

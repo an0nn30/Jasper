@@ -76,6 +76,23 @@ class RemotePluginTest {
         }
     }
 
+    @Test void newHostOpensAddHostWithoutTheSessionsPanelAndSitsInTheSshMenu(@TempDir Path dir) throws Exception {
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                RemotePlugin plugin = plugin(dir.resolve("ssh"));
+                host.start(INFO, Set.of(), Set.of(), plugin);
+                settle(host);
+                UUID window = host.addTerminalWindow();
+                assertThat(defaults(host, RemotePlugin.NEW_HOST)).as("unbound until the user binds it").isEqualTo("none|derived|GLOBAL");
+                assertThat(host.menu("top:" + RemotePlugin.MENU)).containsSubsequence("item:" + RemotePlugin.NEW_HOST, "item:" + RemotePlugin.IMPORT);
+                assertThat(host.invoke(RemotePlugin.NEW_HOST, window, null)).isTrue();
+                assertThat(host.failures()).isEmpty();
+                assertThat(host.windows()).containsExactly("dialog|Add Host|true");
+                assertThat(plugin.hostsPanel(window)).as("the Sessions panel stays closed").isNull();
+            }
+        });
+    }
+
     private static String defaults(FakePluginHost host, String actionId) {
         var spec = host.actionSpec(actionId).orElseThrow();
         return spec.defaultBinding().orElse("none") + "|" + spec.otherDefaultBinding().orElse("derived") + "|" + spec.context().kind();

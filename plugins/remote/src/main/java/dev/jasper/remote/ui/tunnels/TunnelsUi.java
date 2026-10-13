@@ -52,7 +52,7 @@ import javax.swing.Timer;
  */
 public final class TunnelsUi implements AutoCloseable {
     public static final String PANEL = "dev.jasper.remote.tunnels.panel", TOGGLE = "dev.jasper.remote.tunnels",
-        SHOW = "dev.jasper.remote.tunnels.show", NEW = "dev.jasper.remote.tunnels.new", FORWARD = "dev.jasper.remote.tunnels.forward",
+        SHOW = "dev.jasper.remote.tunnels.show", PICK = "dev.jasper.remote.tunnels.pick", NEW = "dev.jasper.remote.tunnels.new", FORWARD = "dev.jasper.remote.tunnels.forward",
         STOP_ALL = "dev.jasper.remote.tunnels.stop-all", STATUS = "dev.jasper.remote.tunnels.status";
     /** The notification group for tunnel failures, which the user can mute apart from Remote's own. */
     public static final String NOTIFICATIONS = "dev.jasper.remote.tunnels";
@@ -102,6 +102,9 @@ public final class TunnelsUi implements AutoCloseable {
             .withKeywords(List.of("tunnels", "ports", "forward", "panel", "show", "hide")), invoked -> context.panels().toggle(PANEL, invoked.window()));
         context.actions().register(ActionSpec.of(SHOW, "Show Tunnels").withIcon(icon).withKeywords(List.of("tunnels", "ports")),
             invoked -> reveal(invoked.window()));
+        context.actions().register(ActionSpec.of(PICK, "Start or Stop a Tunnel...").withIcon(icon)
+                .withKeywords(List.of("tunnels", "start", "stop", "ports", "forward")),
+            invoked -> context.palette().open(invoked.window(), TunnelsScope.ID, Optional.empty(), Optional.empty()));
         context.actions().register(ActionSpec.of(NEW, "New Tunnel...").withKeywords(List.of("tunnel", "port", "forward", "ssh", "socks")),
             invoked -> edit(invoked.window(), Optional.empty(), invoked.pane().flatMap(pane -> paneHost.apply(pane.id())).map(RemoteHost::id)));
         context.actions().register(ActionSpec.of(FORWARD, "Forward a Port...").withKeywords(List.of("tunnel", "port", "forward", "ssh")),
@@ -128,6 +131,7 @@ public final class TunnelsUi implements AutoCloseable {
     public void addToMenu(PluginMenu menu) {
         menu.addSeparator();
         menu.add(TOGGLE);
+        menu.add(PICK);
         menu.add(NEW);
         menu.add(FORWARD);
         menu.add(STOP_ALL);
