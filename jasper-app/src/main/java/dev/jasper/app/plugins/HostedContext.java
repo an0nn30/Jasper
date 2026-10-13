@@ -113,6 +113,7 @@ final class HostedContext implements PluginContext {
         ui.closeAll();
         terminals.closeAll();
         notifications.close();
+        host.clipboard.ownerStopped(id);
         List<Subscription> copy;
         synchronized (owned) { copy = new ArrayList<>(owned); owned.clear(); }
         for (int i = copy.size() - 1; i >= 0; i--) copy.get(i).close();
@@ -189,7 +190,39 @@ final class HostedContext implements PluginContext {
                         }
                     });
                 }
+                @Override public boolean copy(String text) {
+                    requireOpen();
+                    requireUi("Platform.copy");
+                    Objects.requireNonNull(text, "text");
+                    return copied(() -> host.clipboard.copy(text));
+                }
+                @Override public boolean copySecret(String text) {
+                    requireOpen();
+                    requireUi("Platform.copySecret");
+                    Objects.requireNonNull(text, "text");
+                    return copied(() -> host.clipboard.copySecret(text, id));
+                }
+                @Override public Optional<String> clipboardText() {
+                    requireOpen();
+                    requireUi("Platform.clipboardText");
+                    gate.require(Capabilities.CLIPBOARD_READ);
+                    Optional<String> text = host.clipboard.text();
+                    gate.audit(Capabilities.CLIPBOARD_READ, "read " + text.map(String::length).orElse(0) + " characters from the clipboard");
+                    return text;
+                }
             };
+        }
+
+        /** Runs a clipboard write; a clipboard that cannot be written is posted in the plugin's group, never thrown. */
+        private boolean copied(Runnable write) {
+            try {
+                write.run();
+                return true;
+            } catch (IllegalStateException | java.awt.HeadlessException unavailable) {
+                log().log(System.Logger.Level.WARNING, "Could not copy to the clipboard", unavailable);
+                notifications.group().error("Could not copy", unavailable);
+                return false;
+            }
         }
 
         /** Only an absolute http or https address opens in a browser. */

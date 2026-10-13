@@ -26,8 +26,13 @@ public final class Capabilities {
      * consents to it when the plugin is installed. @since 0.11.0
      */
     public static final String NETWORK_LISTEN = "network.listen";
+    /**
+     * Reading the text on the clipboard with {@code Platform.clipboardText()}; the clipboard often holds something the
+     * user just copied elsewhere, such as a password. Writing needs no capability. @since 0.16.1
+     */
+    public static final String CLIPBOARD_READ = "clipboard.read";
     /** Every capability this SDK version knows. */
-    public static final List<String> ALL = List.of(TERMINAL_OBSERVE, TERMINAL_SELECTION, TERMINAL_INJECT, TERMINAL_OPEN, SESSION_PROVIDE, PALETTE_CONTRIBUTE, FILES_SOURCE, NETWORK_LISTEN);
+    public static final List<String> ALL = List.of(TERMINAL_OBSERVE, TERMINAL_SELECTION, TERMINAL_INJECT, TERMINAL_OPEN, SESSION_PROVIDE, PALETTE_CONTRIBUTE, FILES_SOURCE, NETWORK_LISTEN, CLIPBOARD_READ);
 
     private Capabilities() { }
 }

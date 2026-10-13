@@ -9,4 +9,8 @@ class CapabilityDescriptionsTest {
             .isEqualTo("Accept connections from other programs or computers, such as serving files (network.listen)");
         assertThat(Capabilities.describe("made.up")).isEqualTo("made.up");
     }
+
+    @Test void clipboardReadIsDescribed() {
+        assertThat(Capabilities.describe("clipboard.read")).isEqualTo("Read text you copied to the clipboard (clipboard.read)");
+    }
 }

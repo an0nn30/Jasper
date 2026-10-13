@@ -1606,6 +1606,73 @@ public abstract class PluginContractTest {
         assertThat(h.browsed()).containsExactly(java.net.URI.create("http://localhost:5432/"));
     }
 
+    @Test void copyPutsTextOnTheClipboardAndReadingNeedsClipboardRead() {
+        var reader = new AtomicReference<PluginContext>();
+        h.start(info("test.reader", Capabilities.CLIPBOARD_READ), Set.of(), Set.of(), reader::set);
+        PluginContext writer = started("test.writer", Set.of());
+        h.ui(() -> {
+            assertThat(writer.platform().copy("line one\nline two")).isTrue();
+            assertThat(reader.get().platform().clipboardText()).contains("line one\nline two");
+            assertThatThrownBy(() -> writer.platform().clipboardText())
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("clipboard.read"));
+            assertThatThrownBy(() -> writer.platform().copy(null)).isInstanceOf(NullPointerException.class);
+            assertThatThrownBy(() -> writer.platform().copySecret(null)).isInstanceOf(NullPointerException.class);
+            assertThat(writer.platform().copy("")).isTrue();
+        });
+        assertThat(h.clipboard()).contains("");
+    }
+
+    @Test void aSecretIsClearedLaterOnlyIfTheClipboardStillHoldsIt() {
+        PluginContext a = started("test.a", Set.of());
+        h.ui(() -> assertThat(a.platform().copySecret("hunter2")).isTrue());
+        assertThat(h.clipboard()).contains("hunter2");
+        h.expireClipboardSecret();
+        assertThat(h.clipboard()).as("cleared after its time").contains("");
+        h.ui(() -> a.platform().copySecret("hunter3"));
+        h.userCopies("something else");
+        h.expireClipboardSecret();
+        assertThat(h.clipboard()).as("a later copy by the user is left alone").contains("something else");
+        h.ui(() -> { a.platform().copySecret("hunter4"); a.platform().copy("not secret"); });
+        h.expireClipboardSecret();
+        assertThat(h.clipboard()).as("a later copy ends the secret").contains("not secret");
+    }
+
+    @Test void stoppingThePluginClearsTheSecretItCopied() {
+        PluginContext a = started("test.a", Set.of());
+        h.ui(() -> a.platform().copySecret("hunter2"));
+        h.stopAll();
+        assertThat(h.clipboard()).contains("");
+    }
+
+    @Test void stoppingThePluginLeavesAPlainCopy() {
+        PluginContext a = started("test.a", Set.of());
+        h.ui(() -> a.platform().copy("kept"));
+        h.stopAll();
+        assertThat(h.clipboard()).contains("kept");
+    }
+
+    @Test void aBusyClipboardIsReportedInsteadOfThrown() {
+        PluginContext a = started("test.a", Set.of());
+        h.clipboardBusy(true);
+        h.ui(() -> assertThat(a.platform().copy("lost")).isFalse());
+        h.flush();
+        h.clipboardBusy(false);
+        assertThat(h.notifications()).hasSize(1)
+            .allSatisfy(line -> assertThat(line).startsWith("test.a|ERROR|Could not copy|").contains("|cause|"));
+        assertThat(h.clipboard()).isEmpty();
+    }
+
+    @Test void aBusyClipboardIsReportedForASecretToo() {
+        PluginContext a = started("test.a", Set.of());
+        h.clipboardBusy(true);
+        h.ui(() -> assertThat(a.platform().copySecret("lost too")).isFalse());
+        h.flush();
+        h.clipboardBusy(false);
+        assertThat(h.notifications()).hasSize(1)
+            .allSatisfy(line -> assertThat(line).startsWith("test.a|ERROR|Could not copy|").contains("|cause|"));
+        assertThat(h.clipboard()).isEmpty();
+    }
+
     @Test void hostedTabsPreserveIdentityAndDeferMovesDuringPromptsAndCloseDecisions() {
         try (var harness = newHarness()) {
             var context = new AtomicReference<PluginContext>();

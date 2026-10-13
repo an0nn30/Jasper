@@ -14,6 +14,7 @@ final class Capabilities {
             case "palette.contribute" -> "Add scopes to the command palette and open it";
             case "files.source" -> "Add places, such as saved hosts, to the file chooser";
             case "network.listen" -> "Accept connections from other programs or computers, such as serving files";
+            case "clipboard.read" -> "Read text you copied to the clipboard";
             default -> null;
         };
         return meaning == null ? capability : meaning + " (" + capability + ")";

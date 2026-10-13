@@ -170,6 +170,8 @@ public final class JasperApplication {
     private ErrorsWindow errorsWindow;
     /** Where Open Log Folder points, known once plugins start. */
     private Path logFolder;
+    /** The clipboard Jasper and its plugins share. */
+    private final dev.jasper.app.platform.HostClipboard clipboard = dev.jasper.app.platform.HostClipboard.system();
     private dev.jasper.app.lifecycle.Subscription pluginTheme;
 
     private int configuredLongCommandSeconds() {
@@ -748,6 +750,7 @@ public final class JasperApplication {
         plugins.reportFailuresTo(failure -> incidentNotices.pluginFailure(failure.pluginId(), failure.operation(), failure.cause()));
         plugins.animations(themes::animationsEnabled);
         plugins.shortcuts(this::shortcutLabel);
+        plugins.clipboard(clipboard);
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
@@ -932,8 +935,7 @@ public final class JasperApplication {
 
     private void copyReport(String text) {
         try {
-            java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
-                .setContents(new java.awt.datatransfer.StringSelection(text), null);
+            clipboard.copy(text);
         } catch (RuntimeException failure) {
             notificationViews.error("Could not copy the report", failure.getMessage());
         }
@@ -1449,6 +1451,8 @@ public final class JasperApplication {
         // Application-owned state first, so none of it depends on plugins behaving.
         history.close();
         List<CompletableFuture<?>> pluginWork = plugins == null ? List.of() : plugins.stop();
+        // Plugins cleared their own secrets as they stopped; this clears anything still pending.
+        clipboard.quit();
         // Plugins closed their own windows while stopping; this is the safety net, and the state's last write.
         if (auxiliary != null) auxiliary.close();
         uiState.save();

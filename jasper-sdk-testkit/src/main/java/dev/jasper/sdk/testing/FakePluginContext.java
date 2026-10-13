@@ -115,7 +115,27 @@ public final class FakePluginContext implements PluginContext {
             return new dev.jasper.sdk.ui.Platform() {
                 @Override public void openInEditor(Path file) { requireOpen(); host.openedInEditor.add(Objects.requireNonNull(file, "file")); }
                 @Override public void browse(java.net.URI uri) { requireOpen(); host.browsed.add(webAddress(uri)); }
+                @Override public boolean copy(String text) { requireOpen(); return copied(text, false); }
+                @Override public boolean copySecret(String text) { requireOpen(); return copied(text, true); }
+                @Override public Optional<String> clipboardText() {
+                    requireOpen();
+                    if (!info.capabilities().contains(dev.jasper.sdk.Capabilities.CLIPBOARD_READ))
+                        throw new dev.jasper.sdk.MissingCapabilityException(info.id(), dev.jasper.sdk.Capabilities.CLIPBOARD_READ);
+                    return host.clipboard.text();
+                }
             };
+        }
+
+        /** As the application: a busy clipboard is posted in the plugin's group, never thrown. */
+        private boolean copied(String text, boolean secret) {
+            Objects.requireNonNull(text, "text");
+            try {
+                host.clipboard.copy(info.id(), text, secret);
+                return true;
+            } catch (IllegalStateException busy) {
+                notifications.group().error("Could not copy", busy);
+                return false;
+            }
         }
 
         /** Only an absolute http or https address opens in a browser. */

@@ -219,4 +219,12 @@ public interface ContractHarness extends AutoCloseable {
         List<java.nio.file.Path> openedInEditor();
         /** Every web address a plugin asked to open in the browser, in request order. */
         List<java.net.URI> browsed();
+        /** What the clipboard holds now; empty when it holds no text. */
+        java.util.Optional<String> clipboard();
+        /** As if the user copied this text in another program. */
+        void userCopies(String text);
+        /** Whether clipboard writes fail, as while another program holds the clipboard. */
+        void clipboardBusy(boolean busy);
+        /** Runs the pending secret's clear now, as its 30 seconds would. */
+        void expireClipboardSecret();
 }
