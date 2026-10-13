@@ -42,11 +42,6 @@ import dev.jasper.vault.api.CredentialDescriptor;
 import dev.jasper.vault.api.LockState;
 import dev.jasper.vault.api.VaultApi;
 import java.awt.Desktop;
-import java.awt.HeadlessException;
-import java.awt.Toolkit;
-import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.StringSelection;
-import java.awt.datatransfer.UnsupportedFlavorException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.DatagramSocket;
@@ -95,10 +90,10 @@ public final class FileServerPlugin implements Plugin {
     private static final long MAX_KEY_FILE = 64 * 1024;
 
     /** What the plugin takes from the machine; tests replace each part. */
-    record Environment(Executor ui, Supplier<List<ServerAddresses.Nic>> nics, IntPredicate portFree, Consumer<String> clipboard,
+    record Environment(Executor ui, Supplier<List<ServerAddresses.Nic>> nics, IntPredicate portFree,
                        Consumer<Path> reveal, Path home, String osName, ZoneId zone, BiFunction<Duration, Runnable, Runnable> every) {
         static Environment system() {
-            return new Environment(SwingUtilities::invokeLater, ServerAddresses::system, FileServerPlugin::portFree, FileServerPlugin::copy,
+            return new Environment(SwingUtilities::invokeLater, ServerAddresses::system, FileServerPlugin::portFree,
                 FileServerPlugin::reveal, Path.of(System.getProperty("user.home")), System.getProperty("os.name", ""), ZoneId.systemDefault(),
                 (interval, task) -> {
                     var timer = new Timer((int) interval.toMillis(), event -> task.run());
@@ -242,8 +237,8 @@ public final class FileServerPlugin implements Plugin {
             id -> toggle(window, id),
             editing -> editing.ifPresentOrElse(id -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)),
                 () -> edit(window, Optional.empty(), false)),
-            this::duplicate, id -> delete(window, id), this::reveal, environment.clipboard(),
-            id -> registry.password(id).ifPresent(environment.clipboard()), registry::clearActivity,
+            this::duplicate, id -> delete(window, id), this::reveal, this::copy,
+            id -> registry.password(id).ifPresent(this::copy), registry::clearActivity,
             id -> showFingerprints(window, id)),
             registry::activity, environment.home(), ServerRows.firewallHint(environment.osName()), environment.zone(),
             "add");
@@ -280,7 +275,7 @@ public final class FileServerPlugin implements Plugin {
         editor[0] = new ServerEditor(context.kit(), store.definitions(), initial, existing, Engines.AVAILABLE, environment.nics().get(), vault.isPresent(),
             this::accountDescriptor, vault.isPresent() ? request -> vault.get().pick(window, request) : null,
             () -> context.windows().chooseDirectory(window, "Folder to share", initial.map(ServerDefinition::folder)),
-            new ServerEditor.KeySources(() -> keyFiles(window), FileServerPlugin::pasted),
+            new ServerEditor.KeySources(() -> keyFiles(window), this::pasted),
             environment.linux(),
             definition -> { saved[0] = definition; return store.put(definition); },
             () -> {
@@ -320,15 +315,8 @@ public final class FileServerPlugin implements Plugin {
         return text.isEmpty() ? Optional.empty() : Optional.of(text.toString());
     }
 
-    /** The clipboard's text; empty when there is none or no clipboard. */
-    static Optional<String> pasted() {
-        try {
-            Object data = Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
-            return data instanceof String text && !text.isBlank() ? Optional.of(text) : Optional.empty();
-        } catch (HeadlessException | IllegalStateException | UnsupportedFlavorException | IOException unavailable) {
-            return Optional.empty();
-        }
-    }
+    /** The clipboard's text, for a key or certificate pasted into the editor; empty when there is none. */
+    private Optional<String> pasted() { return context.platform().clipboardText(); }
 
     private void registerShareAction(PluginMenu menu, Protocol protocol, boolean tls) {
         if (!Engines.AVAILABLE.contains(protocol)) return;
@@ -549,7 +537,7 @@ public final class FileServerPlugin implements Plugin {
             environment.ui().execute(() -> {
                 if (stopped || !window.isOpen()) return;
                 refreshPanels();
-                confirm(window, "Fingerprints", shown, "Copy Fingerprint", "Close", () -> copy.ifPresent(environment.clipboard()), () -> { });
+                confirm(window, "Fingerprints", shown, "Copy Fingerprint", "Close", () -> copy.ifPresent(this::copy), () -> { });
             });
         });
     }
@@ -609,10 +597,7 @@ public final class FileServerPlugin implements Plugin {
         }
     }
 
-    static void copy(String text) {
-        try { Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null); }
-        catch (HeadlessException | IllegalStateException unavailable) { /* nothing to copy to */ }
-    }
+    private void copy(String text) { context.platform().copy(text); }
 
     static void reveal(Path folder) {
         if (!Desktop.isDesktopSupported()) throw new UnsupportedOperationException("This system cannot show folders");

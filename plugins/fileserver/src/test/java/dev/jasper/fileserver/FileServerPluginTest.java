@@ -45,20 +45,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class FileServerPluginTest {
     static final PluginInfo INFO = new PluginInfo("dev.jasper.fileserver", "File Server", "0.4.0",
-        Set.of(Capabilities.NETWORK_LISTEN, Capabilities.TERMINAL_OBSERVE, Capabilities.PALETTE_CONTRIBUTE));
+        Set.of(Capabilities.NETWORK_LISTEN, Capabilities.TERMINAL_OBSERVE, Capabilities.PALETTE_CONTRIBUTE, Capabilities.CLIPBOARD_READ));
     @TempDir Path home;
     @TempDir Path root;
     final TestUi ui = new TestUi();
-    final List<String> copied = new ArrayList<>();
     final List<Path> revealed = new ArrayList<>();
 
     FileServerPlugin plugin() {
-        return new FileServerPlugin(new FileServerPlugin.Environment(ui, List::of, port -> true, copied::add, revealed::add, home,
+        return new FileServerPlugin(new FileServerPlugin.Environment(ui, List::of, port -> true, revealed::add, home,
             "Mac OS X", ZoneOffset.UTC, (interval, task) -> () -> { }));
     }
 
     FileServerPlugin plugin(IntPredicate portFree) {
-        return new FileServerPlugin(new FileServerPlugin.Environment(ui, List::of, portFree, copied::add, revealed::add, home,
+        return new FileServerPlugin(new FileServerPlugin.Environment(ui, List::of, portFree, revealed::add, home,
             "Mac OS X", ZoneOffset.UTC, (interval, task) -> () -> { }));
     }
 
@@ -184,7 +183,7 @@ class FileServerPluginTest {
             assertThat(UiTestAccess.message(plugin.currentConfirm()).getText()).isEqualTo("SSH host key: " + fingerprint);
             UiTestAccess.confirm(plugin.currentConfirm()).doClick();
             settle(host);
-            assertThat(copied).containsExactly(fingerprint);
+            assertThat(host.clipboard().copies()).containsExactly("copy|dev.jasper.fileserver|" + fingerprint);
             plugin.registry().stopAll();
             await(host, () -> plugin.registry().active() == 0, "everything stops");
         }
@@ -264,7 +263,7 @@ class FileServerPluginTest {
             click(UiTestAccess.menuFor(panel, 0), "Copy Address");
             click(UiTestAccess.menuFor(panel, 0), "Reveal Folder");
             settle(host);
-            assertThat(copied).containsExactly("http://127.0.0.1:" + port + "/");
+            assertThat(host.clipboard().copies()).containsExactly("copy|dev.jasper.fileserver|http://127.0.0.1:" + port + "/");
             assertThat(revealed).containsExactly(shared);
             assertThat(host.invoke(FileServerPlugin.STOP_ALL, window, null)).isTrue();
             await(host, () -> plugin.registry().running() == 0, "the server stops");

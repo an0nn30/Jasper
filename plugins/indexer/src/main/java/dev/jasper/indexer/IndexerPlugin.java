@@ -37,9 +37,6 @@ import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.StatusProgress;
 import dev.jasper.sdk.ui.StatusProgressState;
-import java.awt.HeadlessException;
-import java.awt.Toolkit;
-import java.awt.datatransfer.StringSelection;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,7 +53,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import dev.jasper.sdk.ui.ControlState;
@@ -93,12 +89,11 @@ public final class IndexerPlugin implements Plugin {
      * @param ui the UI thread
      * @param clock the current time
      * @param after runs a task on the UI thread after a delay and returns its cancel
-     * @param clipboard the system clipboard
      * @param home the user's home folder
      * @param git the command that runs Git
      * @param confirm asks a yes-or-no question
      */
-    record Environment(Executor ui, Supplier<Instant> clock, BiFunction<Duration, Runnable, Runnable> after, Consumer<String> clipboard,
+    record Environment(Executor ui, Supplier<Instant> clock, BiFunction<Duration, Runnable, Runnable> after,
                        Path home, List<String> git, Predicate<String> confirm) {
         static Environment system() {
             return new Environment(SwingUtilities::invokeLater, Instant::now, (delay, task) -> {
@@ -106,7 +101,7 @@ public final class IndexerPlugin implements Plugin {
                 timer.setRepeats(false);
                 timer.start();
                 return timer::stop;
-            }, IndexerPlugin::copy, Path.of(System.getProperty("user.home")), List.of("git"), null);
+            }, Path.of(System.getProperty("user.home")), List.of("git"), null);
         }
     }
 
@@ -155,7 +150,7 @@ public final class IndexerPlugin implements Plugin {
         cancel.setEnabled(false);
         context.menus().standard(StandardMenu.FILE).add(INDEX_FOLDER);
         context.palette().register(new FilesScope(projects, new FilesScope.Hooks(this::current, this::openBlocked, this::reachable,
-            this::hostLabel, this::connected, this::open, this::terminal, this::copyText, environment.clipboard()), GOTO, icon));
+            this::hostLabel, this::connected, this::open, this::terminal, this::copyText, text -> context.platform().copy(text)), GOTO, icon));
         context.settings().page(new IndexerSettingsPanel(context.kit(), settings, projects, indexer, this::location, this::reachable, this::connected,
             () -> context.terminals().activeWindow().ifPresent(this::indexFolder), this::confirmRemove));
         watcher = new CwdWatcher(projects, indexer, settings, prompts, new CwdWatcher.Hooks(this::detect, this::connectedPlace,
@@ -369,10 +364,5 @@ public final class IndexerPlugin implements Plugin {
         if (progress == null) progress = context.statusBar().addProgress(new StatusItemSpec(PROGRESS, Side.RIGHT, 60));
         progress.update(new StatusProgressState(text.get(), "", text.get(), OptionalDouble.empty(), CANCEL, null));
         progress.setVisible(true);
-    }
-
-    static void copy(String text) {
-        try { Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null); }
-        catch (HeadlessException | IllegalStateException unavailable) { /* nothing to copy to */ }
     }
 }

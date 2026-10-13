@@ -1,7 +1,7 @@
 package dev.jasper.vault.ui;
 
 import dev.jasper.sdk.Subscription;
-import dev.jasper.sdk.notifications.NotificationGroup;
+import dev.jasper.sdk.ui.Platform;
 import dev.jasper.sdk.palette.PaletteQuery;
 import dev.jasper.sdk.palette.PaletteResults;
 import dev.jasper.sdk.palette.PaletteRow;
@@ -34,15 +34,13 @@ public final class VaultScope implements PaletteScope {
 
     private final LockManager lock;
     private final VaultService service;
-    private final SecretClipboard clipboard;
+    private final Platform platform;
     private final BiConsumer<WindowHandle, Optional<UUID>> openManager;
-    private final NotificationGroup notifications;
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
 
-    public VaultScope(LockManager lock, VaultService service, SecretClipboard clipboard,
-                      BiConsumer<WindowHandle, Optional<UUID>> openManager, NotificationGroup notifications) {
-        this.lock = lock; this.service = service; this.clipboard = clipboard; this.openManager = openManager;
-        this.notifications = notifications;
+    /** Copies go to Jasper's clipboard as secrets, so they are cleared after 30 seconds; Jasper reports a failed copy. */
+    public VaultScope(LockManager lock, VaultService service, Platform platform, BiConsumer<WindowHandle, Optional<UUID>> openManager) {
+        this.lock = lock; this.service = service; this.platform = platform; this.openManager = openManager;
     }
 
     @Override public ScopeSpec spec() {
@@ -88,15 +86,13 @@ public final class VaultScope implements PaletteScope {
         if (!(row.token() instanceof CredentialDescriptor descriptor) || lock.state() != LockState.UNLOCKED) return;
         if (verb.equals(OPEN)) { openManager.accept(context.window(), Optional.of(descriptor.id())); return; }
         lock.vault().account(descriptor.id()).ifPresent(account -> {
-            try {
-                if (verb.equals(COPY_USERNAME)) { clipboard.copySecret(account.username()); return; }
-                char[] password = switch (account.auth()) {
-                    case Auth.Password p -> p.password();
-                    case Auth.KeyAndPassword both -> both.password();
-                    case Auth.Key key -> null;
-                };
-                if (password != null) clipboard.copySecret(new String(password));
-            } catch (RuntimeException failure) { notifications.error("Could not copy from the vault", failure); }
+            if (verb.equals(COPY_USERNAME)) { platform.copySecret(account.username()); return; }
+            char[] password = switch (account.auth()) {
+                case Auth.Password p -> p.password();
+                case Auth.KeyAndPassword both -> both.password();
+                case Auth.Key key -> null;
+            };
+            if (password != null) platform.copySecret(new String(password));
         });
     }
 

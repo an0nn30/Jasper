@@ -39,7 +39,6 @@ class IndexerPluginTest {
     Path home;
     final ManualExecutor ui = new ManualExecutor();
     final List<Runnable> scheduled = new ArrayList<>();
-    final List<String> clipboard = new ArrayList<>();
 
     static final class FakeEditor implements Plugin {
         final List<Path> opened = new CopyOnWriteArrayList<>();
@@ -56,7 +55,7 @@ class IndexerPluginTest {
 
     IndexerPlugin plugin() {
         return new IndexerPlugin(new IndexerPlugin.Environment(ui, () -> Instant.parse("2026-10-05T10:00:00Z"),
-            (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, clipboard::add, home,
+            (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, home,
             List.of(home.resolve("no-such-git").toString()), question -> true));
     }
 
@@ -80,7 +79,7 @@ class IndexerPluginTest {
 
     @Test void removalConfirmationUsesAnOwnedKitSheetAndIgnoresLateAnswers() throws Exception {
         var candidate = new IndexerPlugin(new IndexerPlugin.Environment(ui, Instant::now,
-            (delay, task) -> () -> { }, clipboard::add, home, List.of("git"), null));
+            (delay, task) -> () -> { }, home, List.of("git"), null));
         try (var host = host()) {
             host.start(IndexerTesting.INFO, Set.of(), Set.of(), candidate);
             window(host);
@@ -157,7 +156,7 @@ class IndexerPluginTest {
             host.executeInScope(FilesScope.ID, main, "open", window, pane);
             assertThat(editor.opened).containsExactly(app.resolve("src/main.rs"));
             host.executeInScope(FilesScope.ID, main, "copy-path", window, pane);
-            assertThat(clipboard).containsExactly(app.resolve("src/main.rs").toString());
+            assertThat(host.clipboard().copies()).containsExactly("copy|dev.jasper.indexer|" + app.resolve("src/main.rs"));
             host.executeInScope(FilesScope.ID, main, "terminal", window, pane);
             assertThat(host.openRequests()).contains("tab|" + window + "|" + app.resolve("src"));
             assertThat(Files.readString(projectsFile())).contains("manual = false");
@@ -246,7 +245,7 @@ class IndexerPluginTest {
             host.executeInScope(FilesScope.ID, main, "copy-path", window, pane);
             host.executeInScope(FilesScope.ID, main, "terminal", window, pane);
             assertThat(fake.calls).contains("open /srv/app/src/main.rs", "terminal /srv/app/src");
-            assertThat(clipboard).containsExactly("build-01:/srv/app/src/main.rs");
+            assertThat(host.clipboard().copies()).containsExactly("copy|dev.jasper.indexer|build-01:/srv/app/src/main.rs");
             fake.names.remove(buildHost);
             assertThat(host.searchScope(FilesScope.ID, "main", window, pane)).as("a host that is no longer saved")
                 .containsExactly(main + "|main.rs|false");

@@ -1,10 +1,12 @@
 package dev.jasper.vault.ui;
 
+import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.palette.PaletteQuery;
 import dev.jasper.sdk.palette.PaletteRow;
 import dev.jasper.sdk.terminal.TabHandle;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.testing.FakeNotifications;
+import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.vault.lock.LockManager;
 import dev.jasper.vault.model.Account;
 import dev.jasper.vault.model.Auth;
@@ -21,7 +23,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
@@ -43,24 +47,22 @@ class VaultScopeTest {
 
     final WindowHandle window = window();
     final PaletteQuery query = new PaletteQuery(window, Optional.empty(), 5, true);
-    String clipboard = "";
-    final List<Runnable> armed = new ArrayList<>();
+    final FakePluginHost host = new FakePluginHost();
+    final dev.jasper.sdk.ui.Platform platform = host.start(new PluginInfo("dev.jasper.vault", "Vault", "0.2.0", Set.of()),
+        Set.of(), Set.of(), context -> { }).platform();
     final List<String> opened = new ArrayList<>();
     final FakeNotifications notifications = new FakeNotifications();
-    boolean clipboardBroken;
     LockManager lock;
     VaultScope scope;
+
+    @AfterEach void closeHost() { host.close(); }
 
     VaultScope scope(Path dir) {
         var keychain = new KeychainStore("Linux", command -> { throw new UncheckedIOException(new IOException("none")); }, dir.resolve("x"));
         lock = new LockManager(new VaultFile(dir.resolve("vault.jv")), new DeviceSecrets(keychain, new FileStore(dir.resolve("device.secret"))), Runnable::run, Runnable::run, state -> { });
         var service = new VaultService(lock, () -> Optional.of(window), prompt -> { }, prompt -> { }, prompt -> { },
             notifications.group("dev.jasper.vault"));
-        scope = new VaultScope(lock, service, new SecretClipboard(text -> {
-                if (clipboardBroken) throw new IllegalStateException("clipboard busy");
-                clipboard = text;
-            }, () -> Optional.of(clipboard), armed::add),
-            (owner, id) -> opened.add(id.map(UUID::toString).orElse("-")), notifications.group("dev.jasper.vault"));
+        scope = new VaultScope(lock, service, platform, (owner, id) -> opened.add(id.map(UUID::toString).orElse("-")));
         return scope;
     }
 
@@ -92,7 +94,7 @@ class VaultScopeTest {
         lock.lock();
         rows = scope.search("", query).rows();
         assertThat(rows.getFirst().title()).contains("locked");
-        assertThat(clipboard).isEmpty();
+        assertThat(host.clipboard().copies()).isEmpty();
     }
 
     @Test void rowsFilterByNameAndUsernameAndVerbsFollowTheKind(@TempDir Path dir) {
@@ -123,23 +125,25 @@ class VaultScopeTest {
         lock.vault().remove(PROD);
         assertThat(scope.available(saved, VaultScope.COPY_PASSWORD, query)).isFalse();
         scope.execute(saved, VaultScope.COPY_PASSWORD, query);
-        assertThat(clipboard).isEmpty();
+        assertThat(host.clipboard().copies()).isEmpty();
         lock.vault().accounts().add(new Account(PROD, "prod", "deploy", new Auth.Key(Path.of("/k"), null), Instant.EPOCH, Instant.EPOCH));
         assertThat(scope.available(saved, VaultScope.COPY_PASSWORD, query)).isFalse();
         lock.lock();
         assertThat(scope.available(saved, VaultScope.COPY_USERNAME, query)).isFalse();
     }
 
-    @Test void copyingPutsTheSecretOnTheClipboardWithAClearArmedAndOpenSelectsTheRow(@TempDir Path dir) {
+    @Test void copyingPutsASecretOnTheClipboardThatExpiresAndOpenSelectsTheRow(@TempDir Path dir) {
         scope(dir);
         populate();
         List<PaletteRow> all = scope.search("", query).rows();
         scope.execute(row(all, "cred." + PROD), VaultScope.COPY_PASSWORD, query);
-        assertThat(clipboard).isEqualTo("s3cret");
-        assertThat(armed).hasSize(1);
+        assertThat(host.clipboard().text()).contains("s3cret");
         scope.execute(row(all, "cred." + PROD), VaultScope.COPY_USERNAME, query);
-        assertThat(clipboard).isEqualTo("deploy");
-        assertThat(armed).as("usernames expire too").hasSize(2);
+        assertThat(host.clipboard().text()).contains("deploy");
+        assertThat(host.clipboard().copies()).as("usernames expire too")
+            .containsExactly("secret|dev.jasper.vault|s3cret", "secret|dev.jasper.vault|deploy");
+        host.clipboard().expireSecrets();
+        assertThat(host.clipboard().text()).contains("");
         scope.execute(row(all, "cred." + KEY), VaultScope.OPEN, query);
         assertThat(opened).containsExactly(KEY.toString());
         int[] changes = {0};
@@ -148,13 +152,13 @@ class VaultScopeTest {
         assertThat(changes[0]).isEqualTo(1);
     }
 
-    @Test void aCopyThatFailsIsPostedWithItsCause(@TempDir Path dir) {
+    @Test void aCopyThatFailsIsReportedByJasper(@TempDir Path dir) {
         scope(dir);
         populate();
-        clipboardBroken = true;
+        host.clipboard().failWrites(true);
         scope.execute(row(scope.search("", query).rows(), "cred." + PROD), VaultScope.COPY_USERNAME, query);
-        assertThat(notifications.lines()).containsExactly(
-            "dev.jasper.vault|ERROR|Could not copy from the vault|IllegalStateException: clipboard busy|IllegalStateException");
-        assertThat(clipboard).isEmpty();
+        assertThat(host.notifications().lines()).singleElement().asString()
+            .startsWith("dev.jasper.vault|ERROR|Could not copy|").endsWith("|IllegalStateException");
+        assertThat(host.clipboard().text()).isEmpty();
     }
 }
