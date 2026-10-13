@@ -3,12 +3,18 @@ package dev.jasper.app.about;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.KitTestSupport;
 import java.awt.Component;
+import java.awt.Container;
+import java.awt.KeyboardFocusManager;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import javax.swing.AbstractButton;
 import javax.swing.JLabel;
+import javax.swing.JTextArea;
+import javax.swing.KeyStroke;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -62,6 +68,25 @@ class LicensesViewTest {
         view.select(0);
         assertThat(KitTestSupport.find(view, "notice", Component.class)).isNotNull();
         assertThat(view.noticeText()).isEqualTo(ThirdPartyNotices.read("mina.NOTICE.txt"));
+    }
+
+    /** The text UI adds plain Tab to a read-only area's traversal keys; an editable one would keep it for inserting a tab. */
+    @Test void tabLeavesTheNoticeAndTheLicenseText() {
+        var view = view(List.of(WITH_NOTICE));
+        var areas = new ArrayList<JTextArea>();
+        collect(view, areas);
+        assertThat(areas).hasSize(2);
+        for (JTextArea area : areas) {
+            assertThat(area.getFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS))
+                .contains(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0));
+            assertThat(area.getFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS))
+                .contains(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.SHIFT_DOWN_MASK));
+        }
+    }
+
+    private static void collect(Component root, List<JTextArea> into) {
+        if (root instanceof JTextArea area) into.add(area);
+        if (root instanceof Container container) for (Component child : container.getComponents()) collect(child, into);
     }
 
     @Test void theHomepageLinkOpensInTheBrowser() {

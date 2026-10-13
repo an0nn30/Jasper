@@ -5,6 +5,9 @@ import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.KitTestSupport;
 import java.awt.Component;
 import java.awt.Container;
+import java.awt.KeyboardFocusManager;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -13,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import javax.swing.AbstractButton;
 import javax.swing.JTextArea;
+import javax.swing.KeyStroke;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -90,6 +94,15 @@ class AboutViewTest {
         assertThat(location.isEditable()).isFalse();
         location.selectAll();
         assertThat(location.getSelectedText()).isEqualTo("main @ 8ba67ed3");
+    }
+
+    /** The text UI adds plain Tab to a read-only area's traversal keys; an editable one would keep it for inserting a tab. */
+    @Test void tabLeavesTheLocationText() {
+        JTextArea location = first(view(build()), JTextArea.class);
+        assertThat(location.getFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS))
+            .contains(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0));
+        assertThat(location.getFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS))
+            .contains(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.SHIFT_DOWN_MASK));
     }
 
     @Test void theIconIsMountedAtSixtyFourPixels() {
