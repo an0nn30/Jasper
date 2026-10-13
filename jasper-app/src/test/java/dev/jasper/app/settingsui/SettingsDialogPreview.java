@@ -94,7 +94,7 @@ public final class SettingsDialogPreview {
                 String suffix = (dark ? "dark" : "light") + "-" + size + ".png";
                 var keymap = new KeymapPage[1];
                 var dialog = new SettingsDialog(windows, CorePages.pages(AppearanceFixtures.CHOICES,
-                    new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false),
+                    new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()),
                     context -> keymap[0] = new KeymapPage(keymapHooks, context), context -> manager[0].page(context),
                     context -> previewPlugins[0].pages().apply(context)),
                     new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state,

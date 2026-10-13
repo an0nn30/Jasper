@@ -28,9 +28,10 @@ public final class CorePages {
      * @param reload reads it again
      * @param migrate runs Migrate Config
      * @param migratable whether Migrate Config has work
+     * @param vm the Java Virtual Machine section; empty leaves the section out (tests and previews)
      */
     public record SystemActions(Supplier<Path> file, Runnable openInEditor, Runnable reveal, Runnable reload, Runnable migrate,
-                                BooleanSupplier migratable) { }
+                                BooleanSupplier migratable, Optional<VmOptionsHooks> vm) { }
 
 
     /**
@@ -113,16 +114,7 @@ public final class CorePages {
                 .row(PALETTE_VISIBLE_ROWS, Editors.stepper("")),
             SchemaPage.page("desk-buddy", "Desk Buddy").parent("appearance-behavior").anchor("desk-buddy")
                 .row(BUDDY_ENABLED),
-            SchemaPage.page("system", "System Settings").parent("appearance-behavior").anchor("background-residency")
-                .row(SYSTEM_RUN_IN_BACKGROUND)
-                .section("Configuration file")
-                .action("Location", () -> system.file().get().toString(),
-                    new SchemaPage.Button("Open in Editor", system.openInEditor(), () -> true),
-                    new SchemaPage.Button("Reveal", system.reveal(), () -> true))
-                .action("Reload from disk", () -> "Read the file again after editing it elsewhere.",
-                    new SchemaPage.Button("Reload", system.reload(), () -> true))
-                .action("Migrate old settings", () -> "Rewrite old setting names to the current layout; the original is backed up first.",
-                    new SchemaPage.Button("Migrate\u2026", system.migrate(), system.migratable(), "Nothing to migrate")),
+            systemPage(system),
             SchemaPage.page("terminal", "Terminal")
                 .row(TERMINAL_SCROLLBACK, Editors.stepper("lines"))
                 .row(TERMINAL_BELL)
@@ -157,6 +149,29 @@ public final class CorePages {
     /** Program and Args apply only to the Custom profile, which an old program or args setting also selects. */
     static boolean customShell(SettingsDraft draft) {
         return TerminalConfig.Shell.custom(draft.value(TERMINAL_SHELL_PROGRAM), draft.value(TERMINAL_SHELL_ARGS), draft.value(TERMINAL_SHELL_PROFILE));
+    }
+
+    /** System Settings: Run in background, the Java Virtual Machine section when supplied, then the configuration file. */
+    private static SchemaPage.Spec systemPage(SystemActions system) {
+        var page = SchemaPage.page("system", "System Settings").parent("appearance-behavior").anchor("background-residency")
+            .row(SYSTEM_RUN_IN_BACKGROUND);
+        system.vm().ifPresent(vm -> page.section("Java Virtual Machine")
+            .notice("vm.state", vm.state())
+            .external(vm.heap())
+            .action("Custom VM options", vm.file(),
+                new SchemaPage.Button("Edit Custom VM Options\u2026", vm.edit(), vm.editable(), "Custom VM options apply to the installed Jasper app"),
+                new SchemaPage.Button("Reveal", vm.reveal(), vm.editable(), "Custom VM options apply to the installed Jasper app"))
+            .notice("vm.findings", vm.findings())
+            .notice("vm.restart", vm.restart(), new SchemaPage.Button("Restart Now", vm.restartNow(), () -> true))
+            .refreshOn(vm.onChanged()));
+        return page.section("Configuration file")
+            .action("Location", () -> system.file().get().toString(),
+                new SchemaPage.Button("Open in Editor", system.openInEditor(), () -> true),
+                new SchemaPage.Button("Reveal", system.reveal(), () -> true))
+            .action("Reload from disk", () -> "Read the file again after editing it elsewhere.",
+                new SchemaPage.Button("Reload", system.reload(), () -> true))
+            .action("Migrate old settings", () -> "Rewrite old setting names to the current layout; the original is backed up first.",
+                new SchemaPage.Button("Migrate\u2026", system.migrate(), system.migratable(), "Nothing to migrate"));
     }
 
     /** The whole tree with no detected shells. */

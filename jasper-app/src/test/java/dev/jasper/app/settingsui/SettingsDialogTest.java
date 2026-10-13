@@ -71,7 +71,7 @@ class SettingsDialogTest {
         return new SettingsDialog(windows, context -> {
             contexts.add(context);
             return CorePages.pages(AppearanceFixtures.CHOICES, new CorePages.SystemActions(() -> FILE,
-                    () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
+                    () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), page -> fake,
                 page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context);
         }, hooks());
     }
@@ -81,7 +81,7 @@ class SettingsDialogTest {
             var groups = new NotificationGroupChoices(() -> populated
                 ? List.of(new NotificationGroupChoices.Group("configuration", "Configuration", "Jasper", "sticky")) : List.of());
             var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
-                new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false), ShellChoices.NONE,
+                new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false, Optional.empty()), ShellChoices.NONE,
                 groups, new CorePages.Pages(page -> fake, page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page), page -> List.of())).apply(context), hooks());
             try {
                 edt(() -> {
@@ -143,7 +143,7 @@ class SettingsDialogTest {
             try (var themes = ThemeTestSupport.controller(true)) {
                 themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system", 20));
                 var dialog = new SettingsDialog(windows, CorePages.pages(AppearanceFixtures.CHOICES,
-                    new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false), page -> fake,
+                    new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false, Optional.empty()), page -> fake,
                     page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)),
                     new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> {}),
                         () -> {}, () -> {}, uri -> {}, (parent, count) -> true, () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME)));
@@ -187,7 +187,7 @@ class SettingsDialogTest {
     @Test void aFragmentRevealsItsPartBeforeThePageIsSelectedEvenWhenItIsAlreadyShown() throws Exception {
         var revealed = new ArrayList<String>();
         var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
-                new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), ShellChoices.NONE,
+                new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), ShellChoices.NONE,
                 page -> fake, page -> new Revealing(new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page), revealed), page -> List.of()).apply(context), hooks());
         edt(() -> {
             dialog.open(null, "appearance");
@@ -218,7 +218,7 @@ class SettingsDialogTest {
 
     @Test void appearanceAndTerminalSchemeShareOneSaveRetainFailedDraftAndCancelDiscardsThem() throws Exception {
         var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
-            new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false),
+            new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false, Optional.empty()),
             page -> fake, page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context), hooks());
         saveResult = CompletableFuture.failedFuture(new IllegalStateException("Setting changed on disk"));
         edt(() -> {
@@ -622,7 +622,7 @@ class SettingsDialogTest {
         var bindings = new dev.jasper.app.appearance.AppearanceBindings[1];
         edt(() -> bindings[0] = KitTestSupport.bindings(true));
         var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
-            new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
+            new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), page -> fake,
             page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context),
             new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }),
                 () -> { }, () -> { }, uri -> { }, (parent, count) -> true,
@@ -661,7 +661,7 @@ class SettingsDialogTest {
                 var current = new ConfigService.State[]{service.initialState()};
                 var external = new ArrayList<Consumer<ConfigService.State>>();
                 var dialog = new SettingsDialog(windows, CorePages.pages(AppearanceFixtures.CHOICES,
-                    new CorePages.SystemActions(() -> file, () -> {}, () -> {}, () -> {}, () -> {}, () -> false), page -> fake,
+                    new CorePages.SystemActions(() -> file, () -> {}, () -> {}, () -> {}, () -> {}, () -> false, Optional.empty()), page -> fake,
                     page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)),
                     new SettingsDialog.Hooks(edit -> service.save(edit).thenApply(next -> current[0] = next), () -> current[0], listener -> { external.add(listener); return new Subscription(() -> external.remove(listener)); },
                         () -> {}, () -> {}, uri -> {}, (parent, count) -> true, KitTestSupport::context));
@@ -700,7 +700,7 @@ class SettingsDialogTest {
         try (var service = new ConfigService(file, false)) {
             var current = new ConfigService.State[]{service.initialState()};
             var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
-                new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
+                new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), page -> fake,
                 page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context),
                 new SettingsDialog.Hooks(edit -> service.save(edit).thenApply(next -> current[0] = next), () -> current[0],
                     listener -> new Subscription(() -> { }), () -> { }, () -> { }, uri -> { }, (parent, count) -> true, KitTestSupport::context));
@@ -749,7 +749,7 @@ class SettingsDialogTest {
             (title, initial) -> Optional.empty()));
         var holder = new SettingsDialog[1];
         holder[0] = new SettingsDialog(confirming, context -> CorePages.pages(AppearanceFixtures.CHOICES,
-            new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
+            new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), page -> fake,
             page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context),
             new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }),
                 () -> { }, () -> { }, uri -> { }, (parent, count) -> holder[0].askDiscard(parent, count), KitTestSupport::context));

@@ -17,7 +17,7 @@ class NativeThemeNavigationTest {
         assertThat(parsed.diagnostics()).singleElement().satisfies(p -> assertThat(p.key()).isEqualTo("themes.marketplace.unknown"));
     }
     @Test void pagesAndPickersOfferOnlyNativeNamesAndLiveNavigationTargets() {
-        var system = new CorePages.SystemActions(() -> Path.of("config.toml"), () -> {}, () -> {}, () -> {}, () -> {}, () -> false);
+        var system = new CorePages.SystemActions(() -> Path.of("config.toml"), () -> {}, () -> {}, () -> {}, () -> {}, () -> false, java.util.Optional.empty());
         var context = new PageContext(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", false).values()), id -> {}, Runnable::run, (title, initial) -> Optional.empty(), () -> {});
         var pages = CorePages.pages(AppearanceFixtures.CHOICES, system,
             ctx -> new GroupPage("keymap", "Keymap", Optional.empty(), false, List::of, ctx),

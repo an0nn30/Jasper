@@ -82,7 +82,7 @@ class PluginSettingsPagesEvidenceTest {
                     var hooks = new KeymapPage.Hooks(contributions, Map::of, () -> Map.of("dev.jasper.editor", "Editor"), true, edits -> CompletableFuture.completedFuture(null));
                     var pages = new CorePages.Pages(context -> new KeymapPage(hooks, context), context -> manager[0].page(context), context -> runtime[0].settingsPages(context));
                     dialog[0] = new SettingsDialog(windows, CorePages.pages(AppearanceFixtures.choices(() -> Optional.of(false)),
-                        new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), ShellChoices.NONE,
+                        new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), ShellChoices.NONE,
                         new NotificationGroupChoices(List::of), pages),
                         new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }),
                             () -> { }, () -> { }, uri -> { }, (parent, count) -> true, () -> themes[0].appearance().context(ThemeRoute.CHROME)));

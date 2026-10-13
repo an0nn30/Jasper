@@ -50,7 +50,7 @@ class AppearanceSelectionTest {
     }
 
     @Test void theAppearancePageShowsTheTilesThenTheTerminalSchemeRow() {
-        var system = new CorePages.SystemActions(() -> java.nio.file.Path.of("config.toml"), () -> { }, () -> { }, () -> { }, () -> { }, () -> true);
+        var system = new CorePages.SystemActions(() -> java.nio.file.Path.of("config.toml"), () -> { }, () -> { }, () -> { }, () -> { }, () -> true, Optional.empty());
         var specs = CorePages.specs(AppearanceChoices.of(DARK, LIGHT), system, ShellChoices.NONE, ignored -> { }, false);
         var appearance = specs.getFirst();
         assertThat(appearance.settings()).startsWith(CoreSettings.UI_APPEARANCE, CoreSettings.TERMINAL_SCHEME);
