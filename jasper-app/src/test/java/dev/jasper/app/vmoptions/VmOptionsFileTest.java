@@ -45,6 +45,12 @@ class VmOptionsFileTest {
         assertThat(VmOptionsFile.withMaxHeap("# mine\r\n-Xmx1g\r\n", 3072, 2048)).isEqualTo("# mine\r\n-Xmx3072m\r\n");
     }
 
+    @Test void aLeadingByteOrderMarkIsDroppedSoTheHeapLineIsStillFound() {
+        assertThat(VmOptionsFile.withMaxHeap("\uFEFF-Xmx1g\n", 2048, 2048)).isEqualTo("");
+        assertThat(VmOptionsFile.withMaxHeap("\uFEFF# mine\n-Xmx1g\n", 4096, 2048)).isEqualTo("# mine\n-Xmx4096m\n");
+        assertThat(VmOptionsFile.withMaxHeap("\uFEFF-Xmx1g\n", 4096, 2048)).isEqualTo("-Xmx4096m\n");
+    }
+
     @Test void ensureExistsCreatesTheHeaderOnceAndWriteLeavesNoTemporaryFile() throws IOException {
         Path file = home.resolve("nested/jasper.vmoptions");
         VmOptionsFile.ensureExists(file);

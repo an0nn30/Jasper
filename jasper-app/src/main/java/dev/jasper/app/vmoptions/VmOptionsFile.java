@@ -40,11 +40,12 @@ public final class VmOptionsFile {
      * {@code text} with the heap limit set as IntelliJ's {@code VMOptions.setOption} does: the last line starting with
      * {@code -Xmx} becomes {@code -Xmx<mib>m} (losing its indentation), or one is appended, after the header when the
      * text holds nothing yet. {@code bundledMib} instead removes every {@code -Xmx} line, so a later change to the
-     * bundled default reaches the user. Keeps the text's line separator.
+     * bundled default reaches the user. Keeps the text's line separator; a leading byte order mark is dropped.
      */
     public static String withMaxHeap(String text, long mib, long bundledMib) {
-        String separator = text.contains("\r\n") ? "\r\n" : "\n";
-        var lines = new ArrayList<String>(text.isEmpty() ? List.of() : Arrays.asList(text.split("\r?\n", -1)));
+        String body = text.startsWith("\uFEFF") ? text.substring(1) : text;
+        String separator = body.contains("\r\n") ? "\r\n" : "\n";
+        var lines = new ArrayList<String>(body.isEmpty() ? List.of() : Arrays.asList(body.split("\r?\n", -1)));
         if (!lines.isEmpty() && lines.getLast().isEmpty()) lines.removeLast();
         if (mib == bundledMib) {
             lines.removeIf(line -> VmOptionsSyntax.trim(line).startsWith("-Xmx"));
