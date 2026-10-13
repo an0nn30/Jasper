@@ -117,7 +117,10 @@ final class PickerMenus {
                 appliedActive=n.activeId();
             }
             list.setFixedCellHeight(-1);list.setVisibleRowCount(Math.min(9,model.size()));list.setBorder(new EmptyBorder(0,0,metric(context(),DesignMetrics.Role.PICKER_MENU_BOTTOM),0));list.setFont(search.getFont());
-            scroll.setPreferredSize(new Dimension(list.getPreferredSize().width,Math.min(rows.stream().limit(9).mapToInt(item->rowHeight(this,item)).sum()+metric(context(),DesignMetrics.Role.PICKER_MENU_BOTTOM),Math.max(height(context(),DesignMetrics.Role.PICKER_UTILITY_HEIGHT),view.availableHeight()-searchBox.getPreferredSize().height-(n.items().isEmpty()?metric(context(),DesignMetrics.Role.PICKER_EMPTY_HEIGHT):0)))));
+            int bottom=metric(context(),DesignMetrics.Role.PICKER_MENU_BOTTOM),shown=Math.min(rows.stream().limit(9).mapToInt(item->rowHeight(this,item)).sum()+bottom,Math.max(height(context(),DesignMetrics.Role.PICKER_UTILITY_HEIGHT),view.availableHeight()-searchBox.getPreferredSize().height-(n.items().isEmpty()?metric(context(),DesignMetrics.Role.PICKER_EMPTY_HEIGHT):0)));
+            // Rows that scroll leave the widest one its width beside the scrollbar.
+            int bar=rows.stream().mapToInt(item->rowHeight(this,item)).sum()+bottom>shown?scroll.getVerticalScrollBar().getPreferredSize().width:0;
+            scroll.setPreferredSize(new Dimension(list.getPreferredSize().width+bar,shown));
             empty.setBorder(new EmptyBorder(0,0,metric(context(),DesignMetrics.Role.PICKER_EMPTY_TEXT_INSET),0));empty.setText(n.noMatches());empty.setVisible(n.items().isEmpty());empty.setFont(ThemePainting.font(context(),Typography.Role.CAPTION));empty.setForeground(ThemePainting.color(context(),SemanticColor.TEXT_TERTIARY));empty.setPreferredSize(new Dimension(0,metric(context(),DesignMetrics.Role.PICKER_EMPTY_HEIGHT)));
         }finally{applying=false;}component.revalidate();component.repaint();}
     }

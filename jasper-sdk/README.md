@@ -69,7 +69,7 @@ registers a `FileSource` whose roots (for example saved hosts) appear in Jasper'
 when the user opens one and browses it through the plugin's `FileBrowser` on a host worker. `Windows.choose` opens
 the chooser for local places plus the sources the caller names and returns `FileLocation`s. The testkit scripts it
 with `FakePluginHost.queueFileChoice` and drives sources with `fileSources`, `fileRoots`, `locateFile` and
-`connectFileSource`. Plugins declare `sdk = ">=0.10.0, <0.11"`.
+`connectFileSource`. Plugins declare `sdk = ">=0.16.0, <0.17"`.
 
 SDK 0.10.1 lets `FileLocation.Sourced` carry `Sourced.HOME` (`~`), a root's home folder, so a source can locate a pane
 whose folder it does not know yet; `FakePluginHost.connectFileSource` runs scripted background work while it waits.
@@ -86,7 +86,7 @@ programs or computers, such as a file server; the user consents to it like any o
 it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after plugin windows and content tabs;
 a `false` decision cancels, and a guard that throws or fails allows the quit. A resident macOS Jasper that only goes to
 the background on Cmd+Q does not ask them. `FakePluginHost.requestQuit` asks these guards too. Plugins declare
-`sdk = ">=0.15.0, <0.16"`.
+`sdk = ">=0.16.0, <0.17"`.
 
 SDK 0.11.0 also adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
 `global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
@@ -141,7 +141,7 @@ action, an icon or a window. Jasper posts a succeeded or failed activity in `<pl
 `FakePluginHost.notifications()` records posts as `group|SEVERITY|title|content[|Cause]`, lists declared groups and
 runs an action (`runAction`) or the body (`click`); `new FakeNotifications().group(id)` records for a component under
 test. A plugin built for 0.13 that called `notices()` moves to `notifications()` and declares
-`sdk = ">=0.15.0, <0.16"`.
+`sdk = ">=0.16.0, <0.17"`.
 
 ## Workspace opacity (SDK 0.14.1)
 
@@ -158,7 +158,7 @@ unantialiased rectangles (antialiased translucent fills fall back to software re
 lag). Everything above it (viewports, gutters, text areas) must be non-opaque, or it covers the glass. Keep selection,
 carets, find bars and banners solid. `FakePluginHost.setWorkspaceOpacity(double)` scripts the value in tests; it is
 announced on `flush()` and the fake reports it for every component, while the real host reports 1.0 for components
-outside a translucent window. Plugins that use it declare `sdk = ">=0.15.0, <0.16"`.
+outside a translucent window. Plugins that use it declare `sdk = ">=0.16.0, <0.17"`.
 
 ## Panel headers (SDK 0.14.2)
 

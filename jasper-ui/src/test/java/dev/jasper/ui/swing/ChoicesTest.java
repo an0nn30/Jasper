@@ -215,6 +215,26 @@ class ChoicesTest {
         });
     }
 
+    @Test void aScrollingDropdownPopupLeavesItsWidestRowRoomBesideTheScrollbar() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var options = new ArrayList<Option>();
+            for (int i = 0; i < 20; i++) options.add(new Option("o" + i, i == 7 ? "A considerably longer option than its field" : "Option " + i, Optional.empty()));
+            var choice = new Nodes.Choice("mode", ControlState.READY, Nodes.ChoiceKind.DROPDOWN, options, "o0", "Mode", "");
+            try (var view = new KitView(context, stack(choice), e -> { })) {
+                view.setSize(400, 80); InteractiveRowsTest.layout(view);
+                var combo = find(view, "mode.input", Choices.ChoiceCombo.class);
+                var popup = combo.popup;
+                assertThat(combo.getItemCount()).as("precondition: the menu scrolls").isGreaterThan(combo.getMaximumRowCount());
+                int bar = ((JScrollPane) popup.getComponent(0)).getVerticalScrollBar().getPreferredSize().width;
+                assertThat(bar).as("precondition: the bar takes width").isPositive();
+                int rows = popup.getList().getPreferredSize().width + popup.getInsets().left + popup.getInsets().right;
+                assertThat(popup.popupWidth(80)).as("the widest row plus the bar").isEqualTo(rows + bar);
+                assertThat(popup.popupWidth(rows + bar + 50)).as("a wider field still sets it").isEqualTo(rows + bar + 50);
+            } finally { release(context); }
+        });
+    }
+
     @Test void aSettingsSegmentsLabelKeepsItsPaddingFromTheSegmentsEdge() {
         Edt.run(() -> {
             var context = KitFixtures.context();

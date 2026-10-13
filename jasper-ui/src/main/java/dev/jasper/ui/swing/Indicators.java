@@ -15,11 +15,14 @@ final class Indicators {
     static final class ChipControl extends ControlRegistry.Control {
         /** A compact panel row's protocol chip, as the plugin-panel reference measures it; set per row population. */
         boolean panelRow;
+        /** Whether the chip sits on a selected row's accent fill: white text on a white tint; set by the row before each population. */
+        boolean inked;
         ChipControl(KitView view, Nodes.Chip node) { super(view, node, new ChipLabel(view.context())); refresh(); }
         void panelRow(boolean value) { if (panelRow != value) { panelRow = value; ((ChipLabel)component).panelRow = value; refresh(); } }
         @Override void refresh() {
             var chip = (Nodes.Chip)node; state(); var label = (JLabel)component;
-            label.setText(chip.label()); label.setFont(ThemePainting.font(context(), panelRow ? Typography.Role.PANEL_ROW_CHIP : Typography.Role.CHIP)); label.setForeground(Choices.hue(context(), chip.hue())); ((ChipLabel) label).fill = Choices.hueSurface(context(), chip.hue());
+            label.setText(chip.label()); label.setFont(ThemePainting.font(context(), panelRow ? Typography.Role.PANEL_ROW_CHIP : Typography.Role.CHIP)); label.setForeground(inked ? ThemePainting.color(context(), SemanticColor.TEXT_ONACCENT) : Choices.hue(context(), chip.hue()));
+            ((ChipLabel) label).fill = inked ? label.getForeground() : Choices.hueSurface(context(), chip.hue());
             int padding = ThemePainting.metric(context(), panelRow ? DesignMetrics.Role.PANEL_CHIP_PADDING : DesignMetrics.Role.CHIP_PADDING); label.setBorder(new EmptyBorder(0, padding, 0, padding));
             label.getAccessibleContext().setAccessibleName(chip.label()); label.revalidate(); label.repaint();
         }

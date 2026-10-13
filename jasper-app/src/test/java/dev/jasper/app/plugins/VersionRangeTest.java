@@ -13,6 +13,21 @@ class VersionRangeTest {
             assertThatIllegalArgumentException().as(bad).isThrownBy(() -> Version.parse(bad));
     }
 
+    /** A range a guide tells authors to declare must load on this host; the template is what a new plugin copies. */
+    @Test void everySdkRangeThePluginGuidesTellAuthorsToDeclareAdmitsThisSdk() throws Exception {
+        var root = java.nio.file.Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();
+        var sdk = Version.parse(dev.jasper.sdk.JasperSdk.VERSION);
+        for (String guide : new String[]{"docs/plugin-authoring.md", "jasper-sdk/README.md", "docs/sdk-icons.md"}) {
+            var declared = java.util.regex.Pattern.compile("sdk = \"([^\"]+)\"").matcher(java.nio.file.Files.readString(root.resolve(guide)));
+            int found = 0;
+            while (declared.find()) {
+                found++;
+                assertThat(VersionRange.parse(declared.group(1)).contains(sdk)).as(guide + ": " + declared.group()).isTrue();
+            }
+            assertThat(found).as(guide).isPositive();
+        }
+    }
+
     @Test void rangesCombineComparators() {
         VersionRange range = VersionRange.parse(">=0.1, <0.2");
         assertThat(range.contains(Version.parse("0.1.0"))).isTrue();

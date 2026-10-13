@@ -60,8 +60,11 @@ the kit's spacing × 0.8, all from `DesignMetrics` (frozen in `compact-roles.tsv
 rectangle with white text and glyphs; Light `selection.bg` is `#3F6FA8`. Kit and native menus share one look, with
 shortcuts from the live keymap (SDK 0.16.0 `MenuItem.withShortcut`). Dropdown menus are as wide as their fields, and
 the credential picker sizes to its rows. System › Configuration file is one card of settings rows, decimal settings
-are steppers, and a segment's label keeps 10 px from its edge. Deviations are ledgered in
-[the plan](superpowers/plans/2026-10-12-jasper-compact-density.md). Native acceptance is the user's
+are steppers, and a segment's label keeps 10 px from its edge. A whole-branch review found four Important issues,
+all fixed with regressions: a focus bounce back into a row's control, popups that left no room for their scrollbar,
+switches and chips that vanished on a selected row, and plugin guides that still told authors to declare SDK 0.15.
+Secondary text on a selected row stays as authored, below 4.5:1 (a design note awaiting the user's ruling). Deviations
+are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.md). Native acceptance is the user's
 ([record](design/theme-engine/acceptance.md#compact-density-2026-10-12)).
 
 **Task9c fix round1 — scoped re-review pending (2026-10-11).** Review I1 found that table useful-width search crossed the existing numeric-minimum feasibility boundary, where weighted allocation is not monotonic. The shared search now starts where all existing column minima fit, then reserves the useful first-column target; ordinary allocation remains unchanged. A long numeric-cell regression covers the returned minimum and larger/boundary widths with icons, selection modes and scale variants. This repairs the approved minimum contract without a new layout policy; scoped UI/chooser checks, default/controlled owner captures and fresh installDist evidence are recorded in scratch `task-9c-report.md`, preserving final02. Review M1 classifies inherited100JavaDoc warnings and injected native-notification authorization/delivery failures as known gate noise, not failing tests or new9c defects; source-warning cleanup stays final11. Native/pixel acceptance remains open.

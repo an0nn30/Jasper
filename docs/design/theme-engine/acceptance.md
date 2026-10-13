@@ -374,6 +374,11 @@ Design notes:
 - White on Light `selection.bg` (`#3F6FA8`) is 5.18:1 and on Dark (`#2E4664`) 9.65:1; the Light 3.98:1 note and the
   text floor that gave Light selected rows dark text are retired.
 - Menus and the palette highlight with `accent`: white on it is 5.18:1 in Light and 4.27:1 in Dark, as authored.
+- Secondary text on a selected row (subtitles, result tags) is `text.onAccent.secondary`, as authored: Light
+  `#FFFFFFBF` is 3.69:1 on `selection.bg` and on `accent`; Dark `#FFFFFFA6` is 5.15:1 on `selection.bg` and 2.77:1 on
+  `accent` (palette results). Only the primary text meets 4.5:1 there; raising the secondary alpha is a theme change.
+- A switch or chip on a selected row is inked for the fill: an ON track is white around a knob of the fill's colour, an
+  OFF track a white tint, and a chip white text on a white tint (Light's fill is the accent itself).
 
 ### User-run checks (compact density)
 
@@ -391,6 +396,9 @@ At 100% in Dark and Light:
 6. The font size and line height steppers.
 7. Window › Toolbar's segments.
 8. An 18-pt interface font.
+9. Settings › Plugins in Light: select a row with a blue badge, and its switch and badge stay readable on the selection.
+10. A long dropdown (Terminal scheme) and a credential picker with ten or more credentials: the widest row is whole
+    beside the scrollbar.
 
 ## User-run checks still open
 

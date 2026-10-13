@@ -22,6 +22,11 @@
 >   `BasicComboPopup.computePopupBounds` reads screen bounds, so headless tests test the width rule alone.
 > - Task 7: the Settings preview also renders System and Font & Colors.
 >   - No painter needed a fix after inspection.
+> - Final review fixes (each with a regression test):
+>   - Tab or Shift+Tab onto a list forgets the row control it last focused, so focus no longer bounces back to it.
+>   - Dropdown and picker popups whose rows scroll add the scrollbar's width, so the widest row stays whole.
+>   - A switch or chip on a selected row is inked for the fill.
+>   - The plugin guides' manifest ranges admit SDK 0.16.
 
 **Goal:** Make Jasper feel like a compact desktop workstation (IntelliJ classic): smaller radii, tighter spacing and
 rows, rectangular edge-to-edge selection with white ink, one compact menu look with shortcuts, dropdown popups as wide

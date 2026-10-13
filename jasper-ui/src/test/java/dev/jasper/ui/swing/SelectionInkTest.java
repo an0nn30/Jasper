@@ -107,6 +107,40 @@ class SelectionInkTest {
         });
     }
 
+    /** A Plugins-style row: a selected row's ON switch and blue chip stay readable on the accent fill (Light's fill is the accent itself). */
+    @Test void aSelectedRowsSwitchAndChipReadOnTheFillInBothVariants() {
+        Edt.run(() -> {
+            for (var theme : List.of(KitFixtures.dark(), KitFixtures.light())) {
+                var context = KitFixtures.context(theme); String variant = theme.dark() ? "Dark" : "Light";
+                var row = new ListItem("a", Optional.empty(), List.of(new Nodes.Text("a.title", ControlState.READY, "Remote", Nodes.TextRole.BODY)), List.of(),
+                    List.<Nodes.Node>of(new Nodes.Chip("a.kind", ControlState.READY, "Bundled", Nodes.Hue.BLUE),
+                        new Nodes.Toggle("a.on", ControlState.READY, "Enabled", true, "toggle", false)));
+                java.util.function.Function<Set<String>, ViewSpec> spec = selected -> new ViewSpec(new Nodes.ItemList("list", ControlState.READY,
+                    Nodes.ListKind.DOUBLE, List.of(row), selected, "", List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.empty()));
+                try (var view = new KitView(context, spec.apply(Set.of("a")), e -> { })) {
+                    view.setSize(420, 120); InteractiveRowsTest.layout(view);
+                    var semantic = context.theme().semantic();
+                    Color fill = semantic.color(SemanticColor.SELECTION_BG);
+                    var toggle = find(view, "a.on", Switches.SwitchButton.class);
+                    var image = new BufferedImage(toggle.getWidth(), toggle.getHeight(), BufferedImage.TYPE_INT_RGB);
+                    var g = image.createGraphics(); try { g.setColor(fill); g.fillRect(0, 0, image.getWidth(), image.getHeight()); toggle.paint(g); } finally { g.dispose(); }
+                    int w = context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SWITCH_WIDTH), h = context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SWITCH_HEIGHT);
+                    int left = (toggle.getWidth() - UIScale.scale(w)) / 2, middle = toggle.getHeight() / 2;
+                    var track = new Color(image.getRGB(left + UIScale.scale(h) / 2, middle));
+                    var knob = new Color(image.getRGB(left + UIScale.scale(w) - UIScale.scale(h) / 2, middle));
+                    assertThat(ColorMath.contrast(track, fill)).as(variant + " ON track on the fill").isGreaterThanOrEqualTo(3);
+                    assertThat(ColorMath.contrast(knob, track)).as(variant + " knob on the ON track").isGreaterThanOrEqualTo(3);
+                    var chip = find(view, "a.kind", Indicators.ChipLabel.class);
+                    assertThat(chip.getForeground()).as(variant + " chip text").isEqualTo(semantic.color(SemanticColor.TEXT_ONACCENT));
+                    assertThat(chip.fill).as(variant + " chip tile").isEqualTo(semantic.color(SemanticColor.TEXT_ONACCENT));
+                    view.update(spec.apply(Set.of())); InteractiveRowsTest.layout(view);
+                    assertThat(find(view, "a.kind", Indicators.ChipLabel.class).getForeground()).as(variant + " deselected chip").isEqualTo(semantic.color(SemanticColor.HUE_BLUE));
+                    assertThat(find(view, "a.on", Switches.SwitchButton.class).onSelection).as(variant + " deselected switch").isFalse();
+                } finally { release(context); }
+            }
+        });
+    }
+
     @Test void aPanelListTakesThePanelsInsetAsItsGutter() {
         Edt.run(() -> {
             var context = KitFixtures.context();

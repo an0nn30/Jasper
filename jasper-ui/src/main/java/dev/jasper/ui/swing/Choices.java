@@ -245,10 +245,11 @@ final class Choices {
         KitComboPopup(JComboBox<?> combo, KitContext context) { super((JComboBox<Object>) combo); this.context = context; setOpaque(false); }
         @Override protected void paintComponent(Graphics graphics) { Menus.paintSurface(this, graphics, context); }
         @Override protected Rectangle computePopupBounds(int px, int py, int pw, int ph) { return super.computePopupBounds(px, py, popupWidth(pw), ph); }
-        /** The field's width {@code fieldWidth}, or the widest row's with the menu's insets when that is wider. */
+        /** The field's width {@code fieldWidth}, or the widest row's with the menu's insets (and its scrollbar, when the rows scroll) when that is wider. */
         int popupWidth(int fieldWidth) {
             var insets = getInsets();
-            return Math.max(fieldWidth, list.getPreferredSize().width + insets.left + insets.right);
+            int bar = comboBox.getItemCount() > comboBox.getMaximumRowCount() ? scroller.getVerticalScrollBar().getPreferredSize().width : 0;
+            return Math.max(fieldWidth, list.getPreferredSize().width + bar + insets.left + insets.right);
         }
         /** The menu's padding above and below its rows, its 1 px edge beside them. */
         void restyle() {

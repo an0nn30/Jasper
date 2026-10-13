@@ -16,7 +16,7 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.15.0, <0.16"
+sdk = ">=0.16.0, <0.17"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen
 exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
@@ -28,7 +28,7 @@ version = ">=1.0"
 optional = false
 ```
 
-`icon` and `homepage` need Jasper 0.9.3 or later (declare `sdk = ">=0.9.3, <0.10"`); an older Jasper rejects a
+`icon` and `homepage` need Jasper 0.9.3 or later (declare `sdk = ">=0.16.0, <0.17"`); an older Jasper rejects a
 manifest with keys it does not know. An icon that is missing, too large or not an SVG or PNG, and a homepage that is
 not an `http` or `https` address, are ignored: the plugin still loads, with the default icon and no link.
 
@@ -163,7 +163,7 @@ Each `PanelHeader.Action(label, icon, callback)` is an icon-only header button w
 and tooltip. Keep callbacks scoped to that factory's window. Header state survives hiding and moving
 the panel, and callbacks become inert when the instance closes. It works the same for a kit `Panel` view
 registered with `register`: the detail, dot and actions join that panel's own header row. Use `PanelHeader.EMPTY` to clear it;
-do not add a duplicate action row inside the panel. Declare `sdk = ">=0.15.0, <0.16"` when using it.
+do not add a duplicate action row inside the panel. Declare `sdk = ">=0.16.0, <0.17"` when using it.
 
 A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window
 is a frame Jasper builds: icon, macOS title bar, menu bar, theme tracking and remembered bounds are
@@ -312,7 +312,7 @@ private static void installTerminalDemo(PluginContext context) {
   subscribe with `onProfilesChanged` and read the list again. It fires after a detection completes:
   the first one, and each later one whose result differs (a WSL distribution or PowerShell 7
   appearing or disappearing). Edits to the Custom shell settings may not be reported, so read
-  `profiles()` again when the current list matters. Declare `sdk = ">=0.9.1, <0.10"`.
+  `profiles()` again when the current list matters. Declare `sdk = ">=0.16.0, <0.17"`.
 
 ## Providing a session
 
@@ -849,7 +849,7 @@ Settings Tools and notification owner headers. It never recolors SVG/PNG pixels 
 An opaque authored background can cover that tile. Missing or invalid artwork keeps the generic fallback.
 Invalid decorative strings warn and fall back to neutral; nonstring values and unrelated unknown keys are rejected.
 
-Manifests using this key must declare `sdk = ">=0.15.1, <0.16"`. Older hosts reject `icon_hue` as an unknown key
+Manifests using this key must declare `sdk = ">=0.16.0, <0.17"`. Older hosts reject `icon_hue` as an unknown key
 before checking the SDK range; excluding those hosts does not change that parser ordering. To support older hosts,
 omit the key in that release's manifest. Existing manifests without the key continue to use their admitted ranges.
 The runtime checks whether the current host is admitted; it does not parse per-feature comparator policies.
@@ -865,7 +865,7 @@ All bundled monochrome identities opt in consistently; third-party omission rema
 
 Only the exact lowercase tokens `authored` and `foreground` are accepted. Other strings warn and
 fall back to authored; nonstrings are invalid descriptors, and unrelated unknown keys remain invalid.
-Manifests using the key must declare `sdk = ">=0.15.2, <0.16"`. Older strict parsers reject the unknown
+Manifests using the key must declare `sdk = ">=0.16.0, <0.17"`. Older strict parsers reject the unknown
 key before SDK compatibility resolution; a version floor does not make an old parser accept it.
 The host's immutable identity value includes this policy in equality and receiver aliases; same-byte
 metadata updates therefore refresh selected presentation without replacing the plugin's authored art.
@@ -881,7 +881,7 @@ three-argument constructor remains and supplies an empty placeholder.
 
 ### SDK 0.15.3 summary
 
-SDK 0.15.3 adds, for plugins built against it (declare `sdk = ">=0.15.3, <0.16"`): `LayoutRole.ROUTE`; a
+SDK 0.15.3 adds, for plugins built against it (declare `sdk = ">=0.16.0, <0.17"`): `LayoutRole.ROUTE`; a
 `PickerFace` on DROPDOWN choices; the free-entry `ChoiceSearch.placeholder`; `SettingSpec.unit` (shown after a
 bounded integer's Settings stepper); the `border.identity` semantic color; and the icon names `laptop`, `target`,
 `arrow.right`, `import`, `clock`, `lock.keyhole`, `match.word`, `brightness`, `reset`, `expand.all` and
@@ -905,7 +905,7 @@ dialog.show();
 ```
 
 `FakePluginHost.dialogPresentation(pluginId, title)` reports how an open dialog is presented. Declare
-`sdk = ">=0.15.4, <0.16"` or later to use it.
+`sdk = ">=0.16.0, <0.17"` or later to use it.
 
 ### Slate Steel colours (SDK 0.15.5)
 

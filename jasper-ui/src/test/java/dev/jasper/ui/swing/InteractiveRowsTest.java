@@ -137,6 +137,38 @@ class InteractiveRowsTest {
                 });
     }
 
+    /** Shift+Tab from a row's control back to the list leaves focus on the list; only a recycle restores the control. */
+    @Test
+    void traversingBackToTheListForgetsTheRowControl() {
+        Edt.run(
+                () -> {
+                    var context = KitFixtures.context();
+                    try (var view =
+                            new KitView(context, new ViewSpec(list(List.of(item(0), item(1)), Set.of())), e -> {})) {
+                        view.setSize(400, 250);
+                        layout(view);
+                        var owner = (ItemLists.ListControl) view.control("servers");
+                        var run = find(view, "run0", JButton.class);
+                        for (var cause : List.of(java.awt.event.FocusEvent.Cause.TRAVERSAL_BACKWARD,
+                                java.awt.event.FocusEvent.Cause.TRAVERSAL_FORWARD, java.awt.event.FocusEvent.Cause.TRAVERSAL,
+                                java.awt.event.FocusEvent.Cause.UNKNOWN)) {
+                            for (var listener : run.getFocusListeners())
+                                listener.focusGained(new java.awt.event.FocusEvent(run, java.awt.event.FocusEvent.FOCUS_GAINED));
+                            assertThat(owner.focusControl).as("precondition").isEqualTo("run0");
+                            for (var listener : owner.canvas.getFocusListeners())
+                                listener.focusGained(new java.awt.event.FocusEvent(owner.canvas, java.awt.event.FocusEvent.FOCUS_GAINED,
+                                        false, run, cause));
+                            if (cause == java.awt.event.FocusEvent.Cause.UNKNOWN)
+                                assertThat(owner.focusControl).as("a recycle's hand-back keeps the control").isEqualTo("run0");
+                            else assertThat(owner.focusControl).as(cause.name()).isNull();
+                            assertThat(owner.focusItem).as(cause.name()).isEqualTo("item0");
+                        }
+                    } finally {
+                        release(context);
+                    }
+                });
+    }
+
     @Test
     void recycleClosesOldControlListenersAndRestoresLogicalFocusAndConfirmedValue() {
         Edt.run(

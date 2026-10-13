@@ -65,7 +65,12 @@ final class InteractiveRows {
             if (pane instanceof OverlayScrollPane overlay) own(overlay::stop);
             canvas = new Canvas(this);
             FocusListener focusPaint=new FocusAdapter() {
-                @Override public void focusGained(FocusEvent e){sync();canvas.repaint();}
+                @Override public void focusGained(FocusEvent e){
+                    // Tab or Shift+Tab onto the list means the list, not the row control a recycle would hand focus back to.
+                    if (switch (e.getCause()) { case TRAVERSAL, TRAVERSAL_FORWARD, TRAVERSAL_BACKWARD -> true; default -> false; })
+                        focusControl = null;
+                    sync();canvas.repaint();
+                }
                 @Override public void focusLost(FocusEvent e){sync();canvas.repaint();}
             };
             canvas.addFocusListener(focusPaint);
@@ -973,6 +978,8 @@ final class InteractiveRows {
             if (c instanceof Labels.TextControl text) text.inked = inked;
             else if (c instanceof Labels.IconControl icon) icon.inked = inked;
             else if (c instanceof Buttons.ButtonControl button) button.button.onSelection = inked;
+            else if (c instanceof Switches.ToggleControl toggle) toggle.button.onSelection = inked;
+            else if (c instanceof Indicators.ChipControl chip) chip.inked = inked;
             c.update(node);
             boolean enabled = c.interactive();
             var children =

@@ -86,6 +86,19 @@ class PickerMenusTest {
   }finally{release(context);}
  });}
 
+ @Test void aScrollingMenuLeavesItsWidestRowRoomBesideTheScrollbar(){Edt.run(()->{
+  var context=KitFixtures.context();
+  var items=java.util.stream.IntStream.range(0,12).mapToObj(i->new Nodes.PickerItem("k"+i,i==3?"Production database login":"Key "+i,"deploy@prod","key",Nodes.Hue.BLUE,Nodes.PickerItemKind.VALUE)).toList();
+  var menu=new Nodes.PickerMenu("menu",ControlState.READY,"","Search",items,"","k0","No matches","New Credential\u2026","create","cancel");
+  try(var view=new KitView(context,new ViewSpec(menu),e->{})){
+   layout(view);
+   var control=(PickerMenus.MenuControl)view.control("menu");
+   int bar=control.scroll.getVerticalScrollBar().getPreferredSize().width;
+   assertThat(bar).as("precondition: the bar takes width").isPositive();
+   assertThat(control.scroll.getPreferredSize().width).as("thirteen rows scroll: the widest row plus the bar").isEqualTo(control.list.getPreferredSize().width+bar);
+  }finally{release(context);}
+ });}
+
  @Test void theMenuIsSizedByItsWidestRowInTheDefaultFacesType(){Edt.run(()->{
   var context=KitFixtures.context();
   var items=List.of(new Nodes.PickerItem("login","Production database login","deploy@prod","key",Nodes.Hue.BLUE,Nodes.PickerItemKind.VALUE));
