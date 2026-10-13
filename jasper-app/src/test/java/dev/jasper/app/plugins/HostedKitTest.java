@@ -138,9 +138,11 @@ class HostedKitTest {
   domainRefresh.run();var domain=appearance.onWorkspaceChanged(v -> domainRefresh.run());
   var view=kit.create(custom(Nodes.CustomKind.EDITOR,"doc"),e -> {});view.registerContent(new CustomContent("doc",Nodes.CustomKind.EDITOR,scroll,domain::close));
   var before=appearance.color(SemanticColor.ACCENT);var previous=current.get().chrome();
-  var tokens=new java.util.EnumMap<dev.jasper.ui.theme.Token,java.awt.Color>(dev.jasper.ui.theme.Token.class);tokens.putAll(previous.tokens());tokens.put(dev.jasper.ui.theme.Token.ACCENT,java.awt.Color.MAGENTA);tokens.put(dev.jasper.ui.theme.Token.EDITOR_CARET,java.awt.Color.ORANGE);
-  var styles=new java.util.EnumMap<dev.jasper.ui.theme.SyntaxRole,dev.jasper.ui.theme.SyntaxStyle>(dev.jasper.ui.theme.SyntaxRole.class);styles.putAll(previous.syntax());styles.put(dev.jasper.ui.theme.SyntaxRole.COMMENT,new dev.jasper.ui.theme.SyntaxStyle(java.awt.Color.GREEN,false,true));
-  var changed=new dev.jasper.ui.theme.GeneratedTheme(previous.name(),previous.dark(),previous.author(),tokens,styles,previous.terminal(),previous.uiKeys(),previous.icons(),previous.glass(),dev.jasper.ui.theme.SemanticDefaults.resolve(java.util.Map.of(),tokens,previous.terminal()));current.set(dev.jasper.app.appearance.ThemeTestSupport.mixed(changed,changed));
+  var recoloured=ThemeTestSupport.withSyntax(ThemeTestSupport.recolored(previous,java.util.Map.of(dev.jasper.ui.theme.SemanticColor.ACCENT,java.awt.Color.MAGENTA)),
+   java.util.Map.of(dev.jasper.ui.theme.SyntaxRole.COMMENT,new dev.jasper.ui.theme.SyntaxStyle(java.awt.Color.GREEN,false,true)));
+  var e=recoloured.editor();var changed=new dev.jasper.ui.theme.GeneratedTheme(recoloured.name(),recoloured.dark(),recoloured.author(),recoloured.semantic(),recoloured.terminal(),
+   new dev.jasper.ui.theme.EditorColors(e.background(),e.foreground(),java.awt.Color.ORANGE,e.selection(),e.currentLine(),e.gutter(),e.lineNumbers()),recoloured.syntax(),recoloured.uiKeys(),recoloured.glass());
+  current.set(dev.jasper.app.appearance.ThemeTestSupport.mixed(changed,changed));
   var variants=new java.util.ArrayList<dev.jasper.sdk.Variant>();appearance.onChanged(variants::add);for(var update:java.util.List.copyOf(updates))update.accept(current.get());
   assertThat(variants).containsExactly(appearance.variant());assertThat(appearance.color(SemanticColor.ACCENT)).isNotEqualTo(before).isEqualTo(java.awt.Color.MAGENTA);
   assertThat(editor.getCaretColor()).isEqualTo(java.awt.Color.ORANGE);assertThat(syntax.get().style(dev.jasper.sdk.ui.SyntaxRole.COMMENT).color()).isEqualTo(java.awt.Color.GREEN);
@@ -200,9 +202,9 @@ class HostedKitTest {
   var view=kit.create(custom(Nodes.CustomKind.EDITOR,"doc"),e -> {});
   try {
    view.registerContent(new CustomContent("doc",Nodes.CustomKind.EDITOR,scroll,() -> {}));
-   var previous=current.get().chrome();var tokens=new java.util.EnumMap<dev.jasper.ui.theme.Token,java.awt.Color>(dev.jasper.ui.theme.Token.class);tokens.putAll(previous.tokens());
-   tokens.put(dev.jasper.ui.theme.Token.INPUT_BACKGROUND,java.awt.Color.MAGENTA);tokens.put(dev.jasper.ui.theme.Token.TEXT,java.awt.Color.GREEN);
-   var changed=new dev.jasper.ui.theme.GeneratedTheme(previous.name(),previous.dark(),previous.author(),tokens,previous.syntax(),previous.terminal(),previous.uiKeys(),previous.icons(),previous.glass(),dev.jasper.ui.theme.SemanticDefaults.resolve(java.util.Map.of(),tokens,previous.terminal()));
+   var previous=current.get().chrome();
+   var changed=ThemeTestSupport.recolored(previous,java.util.Map.of(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT,java.awt.Color.MAGENTA,
+    dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY,java.awt.Color.GREEN));
    current.set(dev.jasper.app.appearance.ThemeTestSupport.mixed(changed,workspace));for(var update:java.util.List.copyOf(updates))update.accept(current.get());
    assertThat(current.get().workspace()).isSameAs(workspace);assertThat(source.editorPalette()).isEqualTo(HostedPalettes.editor(workspace));assertThat(source.syntaxPalette()).isEqualTo(HostedPalettes.syntax(workspace));
    assertThat(scroll.getBackground()).isEqualTo(source.color(SemanticColor.SURFACE_INPUT));assertThat(scroll.getForeground()).isEqualTo(source.color(SemanticColor.TEXT_PRIMARY));

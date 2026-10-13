@@ -177,7 +177,9 @@ tasks.test {
         rootProject.file("jasper-app/README.md"), rootProject.file("jasper-terminal/README.md"),
         rootProject.file("jasper-buddy/README.md"), rootProject.file("jasper-sdk/README.md"),
         // Sources only: the plugin project's build directory holds other tasks' outputs and must not be an input here.
-        rootProject.fileTree("plugins/sample/src") { include("**/*.java") }, rootProject.fileTree("packaging") { include("**/*.md") })
+        rootProject.fileTree("plugins/sample/src") { include("**/*.java") }, rootProject.fileTree("packaging") { include("**/*.md") },
+        // ColourLiteralScanTest reads every production source and resource.
+        rootProject.fileTree("jasper-ui/src/main"), rootProject.fileTree("plugins") { include("*/src/main/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 

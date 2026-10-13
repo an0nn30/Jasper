@@ -11,11 +11,14 @@ class RemovedThemeLayerTest {
         "dev.jasper.app.appearance.BuiltInThemes", "dev.jasper.app.appearance.ThemeState",
         "dev.jasper.app.config.WorkspaceThemeChoice", "dev.jasper.app.config.TerminalColors",
         "dev.jasper.app.themeimport.ThemeMigration", "dev.jasper.app.themeimport.ConvertThemes",
-        "dev.jasper.app.themesui.ThemeImport");
+        "dev.jasper.app.themesui.ThemeImport", "dev.jasper.ui.theme.Token", "dev.jasper.ui.theme.ThemeGenerator",
+        "dev.jasper.ui.theme.SemanticDefaults", "dev.jasper.ui.theme.ThemeResolver", "dev.jasper.ui.theme.ThemeDocument",
+        "dev.jasper.ui.themeio.ThemeToml", "dev.jasper.ui.themeimport.ThemeConverter");
 
     @Test void theLegacyClassesAndAliasesAreGone() {
         for (String name : REMOVED)
             assertThatThrownBy(() -> Class.forName(name)).as(name).isInstanceOf(ClassNotFoundException.class);
         assertThat(RemovedThemeLayerTest.class.getResource("/dev/jasper/app/themes/legacy-aliases.json")).isNull();
+        assertThat(RemovedThemeLayerTest.class.getResource("/dev/jasper/ui/themeimport/native/index.txt")).isNull();
     }
 }

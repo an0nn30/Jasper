@@ -25,34 +25,30 @@ final class WorkspaceAppearanceFixture {
         current = ThemeTestSupport.resolved(variant == Variant.DARK);
         for (var listener : List.copyOf(listeners)) listener.accept(current);
     }
+    /** A workspace of {@code variant} carrying exactly these plugin-facing palettes, as HostedPalettes reads them back. */
     void set(Variant variant, WorkspacePalette palette, EditorPalette editor, dev.jasper.sdk.ui.SyntaxPalette syntax) {
-        var previous = current.workspace();
-        var tokens = new EnumMap<Token, java.awt.Color>(Token.class); tokens.putAll(previous.tokens());
-        tokens.put(Token.SURFACE, palette.background());
-        tokens.put(Token.SURFACE_RAISED, palette.surfaceRaised());
-        tokens.put(Token.SURFACE_SUNKEN, palette.surfaceSunken());
-        tokens.put(Token.TEXT, palette.text());
-        tokens.put(Token.TEXT_MUTED, palette.textMuted());
-        tokens.put(Token.BORDER, palette.border());
-        tokens.put(Token.SELECTION, palette.selection());
-        tokens.put(Token.SELECTION_TEXT, palette.selectionText());
-        tokens.put(Token.HOVER, palette.hover());
-        tokens.put(Token.ACCENT, palette.accent());
-        tokens.put(Token.SUCCESS, palette.success());
-        tokens.put(Token.WARNING, palette.warning());
-        tokens.put(Token.ERROR, palette.error());
-        tokens.put(Token.EDITOR_BACKGROUND, editor.background());
-        tokens.put(Token.EDITOR_FOREGROUND, editor.foreground());
-        tokens.put(Token.EDITOR_CARET, editor.caret());
-        tokens.put(Token.EDITOR_SELECTION, editor.selection());
-        tokens.put(Token.EDITOR_CURRENT_LINE, editor.currentLine());
-        tokens.put(Token.EDITOR_GUTTER, editor.gutter());
-        tokens.put(Token.EDITOR_LINE_NUMBERS, editor.lineNumbers());
+        boolean dark = variant == Variant.DARK;
+        var roles = new EnumMap<SemanticColor, java.awt.Color>(SemanticColor.class);
+        roles.put(SemanticColor.SURFACE_PANEL, palette.background());
+        roles.put(SemanticColor.SURFACE_PANEL_RAISED, palette.surfaceRaised());
+        roles.put(SemanticColor.SURFACE_CARD, palette.surfaceSunken());
+        roles.put(SemanticColor.TEXT_PRIMARY, palette.text());
+        roles.put(SemanticColor.TEXT_SECONDARY, palette.textMuted());
+        roles.put(SemanticColor.BORDER_WINDOW, palette.border());
+        roles.put(SemanticColor.SELECTION_BG, palette.selection());
+        roles.put(SemanticColor.TEXT_ONACCENT, palette.selectionText());
+        roles.put(SemanticColor.SURFACE_CONTROL_HOVER, palette.hover());
+        roles.put(SemanticColor.ACCENT, palette.accent());
+        roles.put(SemanticColor.STATUS_SUCCESS, palette.success());
+        roles.put(SemanticColor.STATUS_WARNING, palette.warning());
+        roles.put(SemanticColor.STATUS_DANGER, palette.error());
         var styles = new EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);
         syntax.styles().forEach((role, style) -> styles.put(SyntaxRole.valueOf(role.name()),
             new SyntaxStyle(style.color(), style.bold(), style.italic())));
-        var workspace = new GeneratedTheme("Contract", variant == Variant.DARK, "", tokens, styles,
-            previous.terminal(), previous.uiKeys(), previous.icons(), previous.glass(), previous.semantic());
+        var base = ThemeTestSupport.withSyntax(ThemeTestSupport.recolored(ThemeTestSupport.generated(dark), roles), styles);
+        var workspace = new GeneratedTheme("Contract", dark, "", base.semantic(), base.terminal(), new EditorColors(editor.background(),
+            editor.foreground(), editor.caret(), editor.selection(), editor.currentLine(), editor.gutter(), editor.lineNumbers()),
+            base.syntax(), base.uiKeys(), base.glass());
         current = ThemeTestSupport.mixed(current.chrome(), workspace);
         for (var listener : List.copyOf(listeners)) listener.accept(current);
     }

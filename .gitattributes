@@ -1,12 +1,5 @@
-# Check text out with LF on every platform. Bundled SVGs and IntelliJ themes are pinned by
-# SHA-256, and the shell integration scripts must run under bash, zsh and fish, so a CRLF
-# checkout (Git for Windows' default) breaks both the tests and a jar built on Windows.
+# Check text out with LF on every platform. Bundled SVGs are pinned by SHA-256, and the shell
+# integration scripts must run under bash, zsh and fish, so a CRLF checkout (Git for Windows'
+# default) breaks both the tests and a jar built on Windows.
 * text=auto eol=lf
 *.bat -text
-
-# These byte-identical vendored IntelliJ inputs retain upstream trailing spaces for checksum provenance.
-# Restrict the exception to the four files that contain those upstream blank-line spaces.
-jasper-ui/src/main/resources/dev/jasper/ui/themeimport/intellij/darcula.theme.json whitespace=-blank-at-eol
-jasper-ui/src/main/resources/dev/jasper/ui/themeimport/intellij/expUI/expUI_dark.theme.json whitespace=-blank-at-eol
-jasper-ui/src/main/resources/dev/jasper/ui/themeimport/intellij/expUI/expUI_light.theme.json whitespace=-blank-at-eol
-jasper-ui/src/main/resources/dev/jasper/ui/themeimport/intellij/islands/ManyIslandsDarcula.theme.json whitespace=-blank-at-eol

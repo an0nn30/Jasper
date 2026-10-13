@@ -54,31 +54,31 @@ public final class ThemeTestSupport {
     public static GeneratedTheme recolored(GeneratedTheme base, Map<SemanticColor, Color> roles) {
         var colors = new EnumMap<SemanticColor, Color>(SemanticColor.class);
         for (var role : SemanticColor.values()) colors.put(role, roles.getOrDefault(role, base.semantic().color(role)));
-        return new GeneratedTheme(base.name(), base.dark(), base.author(), base.tokens(), base.syntax(), base.terminal(),
-            base.uiKeys(), base.icons(), base.glass(), new SemanticPalette(colors));
+        return new GeneratedTheme(base.name(), base.dark(), base.author(), new SemanticPalette(colors), base.terminal(), base.editor(),
+            base.syntax(), base.uiKeys(), base.glass());
     }
     /** {@code base} with these FlatLaf UI keys added or replaced (values {@code #rrggbb} or FlatLaf values). */
     public static GeneratedTheme withUiKeys(GeneratedTheme base, Map<String, Object> keys) {
         var merged = new LinkedHashMap<>(base.uiKeys()); merged.putAll(keys);
-        return new GeneratedTheme(base.name(), base.dark(), base.author(), base.tokens(), base.syntax(), base.terminal(),
-            merged, base.icons(), base.glass(), base.semantic());
+        return new GeneratedTheme(base.name(), base.dark(), base.author(), base.semantic(), base.terminal(), base.editor(),
+            base.syntax(), merged, base.glass());
     }
     /** {@code base} with these syntax styles replaced. */
     public static GeneratedTheme withSyntax(GeneratedTheme base, Map<dev.jasper.ui.theme.SyntaxRole, dev.jasper.ui.theme.SyntaxStyle> styles) {
         var merged = new EnumMap<dev.jasper.ui.theme.SyntaxRole, dev.jasper.ui.theme.SyntaxStyle>(dev.jasper.ui.theme.SyntaxRole.class);
         merged.putAll(base.syntax()); merged.putAll(styles);
-        return new GeneratedTheme(base.name(), base.dark(), base.author(), base.tokens(), merged, base.terminal(),
-            base.uiKeys(), base.icons(), base.glass(), base.semantic());
+        return new GeneratedTheme(base.name(), base.dark(), base.author(), base.semantic(), base.terminal(), base.editor(),
+            merged, base.uiKeys(), base.glass());
     }
     /** {@code base} with its workspace glass replaced. */
     public static GeneratedTheme withGlass(GeneratedTheme base, GlassLevels glass) {
-        return new GeneratedTheme(base.name(), base.dark(), base.author(), base.tokens(), base.syntax(), base.terminal(),
-            base.uiKeys(), base.icons(), glass, base.semantic());
+        return new GeneratedTheme(base.name(), base.dark(), base.author(), base.semantic(), base.terminal(), base.editor(),
+            base.syntax(), base.uiKeys(), glass);
     }
     /** {@code base} reporting {@code dark}. */
     public static GeneratedTheme withDark(GeneratedTheme base, boolean dark) {
-        return new GeneratedTheme(base.name(), dark, base.author(), base.tokens(), base.syntax(), base.terminal(),
-            base.uiKeys(), base.icons(), base.glass(), base.semantic());
+        return new GeneratedTheme(base.name(), dark, base.author(), base.semantic(), base.terminal(), base.editor(),
+            base.syntax(), base.uiKeys(), base.glass());
     }
 
     /** {@code top} painted over opaque {@code bottom} as Java2D composites it: what an alpha-carrying role shows on a surface. */

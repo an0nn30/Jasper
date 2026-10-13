@@ -21,7 +21,7 @@ val verifyUiArchitecture = tasks.register("verifyUiArchitecture") {
         val output = process.inputStream.bufferedReader().readText()
         check(process.waitFor() == 0) { output }
         val edge = Regex("^\\s*(dev\\.jasper\\.ui\\.\\S+)\\s+->\\s+(\\S+).*$")
-        val pure = setOf("dev.jasper.ui.theme", "dev.jasper.ui.model", "dev.jasper.ui.themeio", "dev.jasper.ui.themeimport")
+        val pure = setOf("dev.jasper.ui.theme", "dev.jasper.ui.model")
         val graph = mutableMapOf<String, MutableSet<String>>()
         output.lineSequence().forEach { line ->
             val match = edge.matchEntire(line) ?: return@forEach

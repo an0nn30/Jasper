@@ -3,7 +3,6 @@ package dev.jasper.ui.swing;
 import com.formdev.flatlaf.FlatLaf;
 import com.formdev.flatlaf.IntelliJTheme;
 import dev.jasper.ui.theme.*;
-import dev.jasper.ui.themeimport.FlatLafThemeData;
 import dev.jasper.ui.metrics.DesignMetrics;
 import java.awt.EventQueue;
 import java.io.ByteArrayInputStream;
@@ -35,7 +34,7 @@ public final class FlatLafInstaller {
     }
     public static void install(GeneratedTheme theme) {
         if (!EventQueue.isDispatchThread()) throw new IllegalStateException("Appearance requires EDT");
-        String json = FlatLafThemeData.json(theme.name(), theme.dark(), theme.author(), theme.uiKeys(), theme.icons());
+        String json = FlatLafThemeData.json(theme.name(), theme.dark(), theme.author(), theme.uiKeys());
         FlatLaf laf;
         try { laf = new SnapshotLaf(new IntelliJTheme(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8))), theme); }
         catch (IOException failure) { throw new UncheckedIOException(failure); }

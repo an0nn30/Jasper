@@ -1,6 +1,5 @@
 package dev.jasper.ui.theme;
 
-import dev.jasper.ui.themeio.ThemeToml;
 import java.awt.Color;
 import java.util.EnumMap;
 import java.util.Map;
@@ -9,49 +8,16 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class SemanticPaletteTest {
-    @Test void identityContourHasAnIndependentOverrideAndFallsBackToFinalControlBorder() {
-        var role=SemanticColor.of("border.identity");assertThat(role).isPresent();
-        var fallback=ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS+"\n[semantic]\n\"border.control\"=\"#11223380\"\n");
-        assertThat(fallback.semantic().color(role.orElseThrow())).isEqualTo(new Color(0x11,0x22,0x33,0x80));
-        var explicit=ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS+"\n[semantic]\n\"border.control\"=\"#112233\"\n\"border.identity\"=\"#4a5360\"\n");
-        assertThat(explicit.semantic().color(role.orElseThrow())).isEqualTo(new Color(0x4a5360));
-    }
 
-    @Test void tileSurfaceDefaultsUseTheFinalHueAndExplicitBasesKeepTheirAlpha() {
-        for(boolean dark:new boolean[]{true,false}) {
-            var theme=ThemeGeneratorTest.generate((dark ? ThemeGeneratorTest.SEEDS : ThemeGeneratorTest.SEEDS.replace("#1e1e2e", "#fafafa").replace("#cdd6f4", "#383a42"))+"\n[semantic]\n\"hue.blue\" = \"#12345680\"\n");
-            var role=SemanticColor.valueOf("HUE_BLUE_SURFACE");
-            assertThat(theme.semantic().color(role)).isEqualTo(theme.semantic().color(SemanticColor.HUE_BLUE));
-            var explicit=ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS+"\n[semantic]\n\"hue.blue\" = \"#123456\"\n\"hue.blue.surface\" = \"#abcdef80\"\n");
-            assertThat(explicit.semantic().color(role)).isEqualTo(new Color(0xab,0xcd,0xef,0x80));
-        }
-    }
 
-    @Test void explicitSwitchColorsKeepPrecedenceAndFallbackUsesFinalAuthoredKnob() {
-        var explicit = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS + """
-            [semantic]
-            "toggle.track.off" = "#eeeeee80"
-            "toggle.knob" = "#eeeeee"
-            """).semantic();
-        assertThat(explicit.color(SemanticColor.TOGGLE_TRACK_OFF)).isEqualTo(new Color(0xee, 0xee, 0xee, 0x80));
-        assertThat(explicit.color(SemanticColor.TOGGLE_KNOB)).isEqualTo(new Color(0xeeeeee));
-        var fallback = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS + """
-            [semantic]
-            "toggle.knob" = "#3d424b"
-            """).semantic();
-        assertThat(fallback.color(SemanticColor.TOGGLE_KNOB)).isEqualTo(new Color(0x3d424b));
-        assertThat(ColorMath.contrast(fallback.color(SemanticColor.TOGGLE_KNOB), fallback.color(SemanticColor.TOGGLE_TRACK_OFF)))
-            .isGreaterThanOrEqualTo(3);
-    }
 
     @Test void authoredSharedTextRemainsRawWhileDedicatedSurfacesApplyTheirFloors() {
-        var palette = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS + """
-            [semantic]
-            "text.placeholder" = "#eeeeee"
-            "text.secondary" = "#eeeeee"
-            "surface.input" = "#ffffff"
-            "surface.card" = "#ffffff"
-            """).semantic();
+        var values = new EnumMap<SemanticColor, Color>(SemanticColor.class);
+        var light = SlateSteel.bundled().palette(false);
+        for (var role : SemanticColor.values()) values.put(role, light.color(role));
+        values.putAll(Map.of(SemanticColor.TEXT_PLACEHOLDER, new Color(0xeeeeee), SemanticColor.TEXT_SECONDARY, new Color(0xeeeeee),
+            SemanticColor.SURFACE_INPUT, Color.WHITE, SemanticColor.SURFACE_CARD, Color.WHITE));
+        var palette = new SemanticPalette(values);
         assertThat(palette.color(SemanticColor.TEXT_PLACEHOLDER)).isEqualTo(new Color(0xeeeeee));
         assertThat(palette.color(SemanticColor.TEXT_SECONDARY)).isEqualTo(new Color(0xeeeeee));
         assertThat(ColorMath.contrast(SurfaceContrast.on(palette, SemanticColor.TEXT_PLACEHOLDER, SemanticColor.SURFACE_INPUT,
@@ -81,77 +47,9 @@ class SemanticPaletteTest {
         assertThatThrownBy(() -> new SemanticPalette(values)).isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test void finalCanonicalParentsDriveDependentDefaults() {
-        var theme = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS + """
-            [tokens]
-            accent = "#ff0000"
-            surface_sunken = "#010203"
-            [semantic]
-            accent = "#00ff00"
-            "surface.card" = "#aabbcc80"
-            "text.primary" = "#000000"
-            "status.danger" = "#123456"
-            "text.link" = "#abcdef"
-            "text.onAccent" = "#ffeedd"
-            """);
-        var p = theme.semantic();
-        assertThat(p.color(SemanticColor.ACCENT)).isEqualTo(Color.GREEN);
-        assertThat(p.color(SemanticColor.BORDER_FOCUS)).isEqualTo(Color.GREEN);
-        assertThat(p.color(SemanticColor.ACCENT_HOVER)).isEqualTo(ColorMath.mix(Color.BLACK, Color.GREEN, .08));
-        assertThat(p.color(SemanticColor.BORDER_ERROR)).isEqualTo(new Color(0x123456));
-        assertThat(p.color(SemanticColor.TEXT_LINK_HOVER)).isEqualTo(ColorMath.mix(Color.BLACK, new Color(0xabcdef), .08));
-        assertThat(p.color(SemanticColor.HOVER_OVERLAY)).isEqualTo(Color.BLACK);
-        assertThat(p.color(SemanticColor.SURFACE_CARD)).isEqualTo(new Color(0xaa, 0xbb, 0xcc, 0x80));
-        assertThat(p.color(SemanticColor.TEXT_ONACCENT_SECONDARY)).isEqualTo(new Color(0xff, 0xee, 0xdd, 153));
-    }
 
-    @Test void dependentOverridesWinAndInheritanceMergesCanonicalKeys() {
-        var parent = ThemeToml.parse(ThemeGeneratorTest.SEEDS + """
-            [semantic]
-            accent = "#ff0000"
-            "border.focus" = "#abcdef80"
-            "surface.card" = "#112233"
-            """, "parent.toml");
-        var child = ThemeToml.parse("""
-            name = "Child"
-            extends = "Mocha"
-            [semantic]
-            accent = "#00ff00"
-            """, "child.toml");
-        var resolved = ThemeResolver.resolve(child, name -> List.of(parent));
-        var palette = ThemeGenerator.generate(resolved).semantic();
-        assertThat(palette.color(SemanticColor.ACCENT)).isEqualTo(Color.GREEN);
-        assertThat(palette.color(SemanticColor.BORDER_FOCUS)).isEqualTo(new Color(0xab, 0xcd, 0xef, 0x80));
-        assertThat(palette.color(SemanticColor.ACCENT_HOVER)).isEqualTo(ColorMath.mix(palette.color(SemanticColor.TEXT_PRIMARY), Color.GREEN, .08));
-        assertThat(palette.color(SemanticColor.SURFACE_CARD)).isEqualTo(new Color(0x112233));
-    }
 
-    @Test void partialLegacyThemesCoverEveryRoleAndKeepPaintAlphaOutOfBaseColors() {
-        var theme = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS.replace("#f38ba8", "#000000"));
-        for (var role : SemanticColor.values()) assertThat(theme.semantic().color(role)).as(role.key()).isNotNull();
-        Color scrim = theme.semantic().color(SemanticColor.SURFACE_SCRIM);
-        // A scrim is painted as given (spec 3.3): a theme that names none gets black at 55% in Dark.
-        assertThat(scrim).isEqualTo(ColorMath.opacity(Color.BLACK, .55));
-        assertThat(scrim.getAlpha()).isEqualTo(140);
-        assertThat(ColorMath.opacity(theme.semantic().color(SemanticColor.HUE_BLUE), .16).getAlpha()).isEqualTo(41);
-        assertThat(ColorMath.opacity(theme.semantic().color(SemanticColor.BORDER_FOCUS), .25).getAlpha()).isEqualTo(64);
-    }
 
-    /** Legacy themes, still installed until Plan 2, give each new role the colour its component paints today. */
-    @Test void legacyThemesGiveTheTenNewRolesTheirCurrentSources() {
-        var theme = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS);
-        var semantic = theme.semantic(); var tokens = theme.tokens();
-        assertThat(semantic.color(SemanticColor.SURFACE_FIELD_RAISED)).isEqualTo(tokens.get(Token.INPUT_BACKGROUND));
-        assertThat(semantic.color(SemanticColor.SURFACE_CONTROL_SELECTED)).isEqualTo(tokens.get(Token.BUTTON_BACKGROUND));
-        assertThat(semantic.color(SemanticColor.SURFACE_EMPTY_TILE)).isEqualTo(tokens.get(Token.BUTTON_BACKGROUND));
-        assertThat(semantic.color(SemanticColor.BORDER_FIELD_RAISED)).isEqualTo(tokens.get(Token.BORDER));
-        assertThat(semantic.color(SemanticColor.BORDER_FIELD_RAISED_HOVER)).isEqualTo(tokens.get(Token.BUTTON_BORDER));
-        assertThat(semantic.color(SemanticColor.TEXT_STRONG_SECONDARY)).isEqualTo(tokens.get(Token.TEXT));
-        assertThat(semantic.color(SemanticColor.TEXT_FIELD_RAISED)).isEqualTo(tokens.get(Token.TEXT));
-        assertThat(semantic.color(SemanticColor.SEGMENT_TRACK)).isEqualTo(tokens.get(Token.INPUT_BACKGROUND));
-        assertThat(semantic.color(SemanticColor.BUTTON_SECONDARY_BORDER)).isEqualTo(tokens.get(Token.BUTTON_BORDER));
-        assertThat(SemanticColor.of("surface.emptyTile")).contains(SemanticColor.SURFACE_EMPTY_TILE);
-    }
 
     /** The selected tab (the terminal surface) and the strip behind the inactive tabs are distinguishable in both variants. */
     @Test void theSelectedTabAndTheStripDifferInBothVariants() {

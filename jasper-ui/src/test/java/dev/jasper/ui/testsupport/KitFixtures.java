@@ -27,8 +27,8 @@ public final class KitFixtures {
 
     /** {@code base} with its semantic palette replaced. */
     public static GeneratedTheme withSemantic(GeneratedTheme base, SemanticPalette palette) {
-        return new GeneratedTheme(base.name(), base.dark(), base.author(), base.tokens(), base.syntax(), base.terminal(),
-            base.uiKeys(), base.icons(), base.glass(), palette);
+        return new GeneratedTheme(base.name(), base.dark(), base.author(), palette, base.terminal(), base.editor(), base.syntax(),
+            base.uiKeys(), base.glass());
     }
 
     /** {@code top} painted over opaque {@code bottom} as Java2D composites it: what an alpha-carrying role shows on a surface. */
@@ -41,8 +41,8 @@ public final class KitFixtures {
 
     /** {@code base} reporting {@code dark}. */
     public static GeneratedTheme withDark(GeneratedTheme base, boolean dark) {
-        return new GeneratedTheme(base.name(), dark, base.author(), base.tokens(), base.syntax(), base.terminal(),
-            base.uiKeys(), base.icons(), base.glass(), base.semantic());
+        return new GeneratedTheme(base.name(), dark, base.author(), base.semantic(), base.terminal(), base.editor(), base.syntax(),
+            base.uiKeys(), base.glass());
     }
 
     /**

@@ -1,5 +1,0 @@
-clear-dark.toml
-clear-light.toml
-jasper-dark.toml
-jasper-light.toml
-nord-nord.toml
