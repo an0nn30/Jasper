@@ -6,7 +6,7 @@ Plan 3 owns final surface composition; the [completion record](design/theme-engi
 
 | Package | Allowed outgoing UI packages | Ownership |
 | --- | --- | --- |
-| `theme` | none | Slate Steel: the bundled file, semantic palettes, terminal and editor schemes, syntax, glass and FlatLaf keys; EDT appearance binding |
+| `theme` | none | Jasper theme files (Slate Steel is bundled), semantic palettes, terminal and editor schemes, syntax, glass and FlatLaf keys; EDT appearance binding |
 | `model` | none | Immutable descriptors and events; no secret values |
 | `metrics` | `theme` | Fixed logical geometry and central typography/motion roles |
 | `icons` | `theme`, `metrics`, `model` | Named artwork and context-scoped tint caches |

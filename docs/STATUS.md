@@ -9,7 +9,7 @@ every forced or changed configuration read; `ui.theme.dark` and `ui.theme.light`
 `terminal.scheme` is `match` or a scheme id (`slate-steel/high-contrast`); unusable picks and skipped files are
 configuration warnings. Settings › Appearance has Dark theme and Light theme dropdowns and a Terminal scheme dropdown
 over the installed schemes; the palette's "Terminal: …" commands follow them. Deviation: the spec's section 8 put the
-dropdowns in Plan 2; they are here (Plan 2 is Import… and Remove). `./gradlew check --continue`: **9801 tests, 0 failures,
+dropdowns in Plan 2; they are here (Plan 2 is Import… and Remove). `./gradlew check --continue`: **9,801 tests, 0 failures,
 0 errors, 8 skipped**. No GUI launched. For the user: copy a theme file into the themes folder, Reload config, pick it.
 Not merged or pushed.
 
