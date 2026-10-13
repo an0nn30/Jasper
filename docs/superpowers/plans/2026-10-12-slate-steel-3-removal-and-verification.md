@@ -25,6 +25,9 @@
 >   a ring's alpha.
 > - Task 9: the calibration column was re-rendered at `f65b40bb` in a temporary worktree; the Light inspection found
 >   illegible selected-row subtitles in lists outside panels, fixed in the kit (`ItemLists`) with a test.
+> - Final review: Task 8 Step 5's heading-rule change applied to every list; heading rules outside the command palette
+>   are `border.subtle` again, the palette's results keep `border.menu`. The subscriber-containment case deleted in Task 4
+>   is restored on Slate Steel (`aFailingSubscriberDoesNotStopTheOthersOrTheChange`).
 
 **Goal:** Delete the legacy theme pipeline, assets, tools and test seams, so Slate Steel is the only theme in code, resources, tests and documentation; prove no colour value exists outside `slate-steel.json`; re-render and record the mock comparisons on Slate Steel; and fold in the review findings deferred from Plans 1 and 2.
 

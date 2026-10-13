@@ -131,6 +131,16 @@ class AppManagerKitTest {
                     assertThat(KitViewTest.find(view, "a.subtitle", javax.swing.JLabel.class).getForeground()).as((dark ? "dark" : "light") + " standalone caption")
                         .isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(p, dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT_SECONDARY,
                             dev.jasper.ui.theme.SemanticColor.SELECTION_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT));
+                    // A variant switch while the row is selected recomputes its text on the new selection.
+                    var flipped = dark ? KitFixtures.light() : KitFixtures.dark();
+                    context.binding().publish(new dev.jasper.ui.theme.ThemePair(flipped, flipped));
+                    for (int i = 0; i < 3; i++) InteractiveRowsTest.layout(view);
+                    assertThat(KitViewTest.find(view, "a.title", javax.swing.JLabel.class).getForeground()).as((dark ? "dark" : "light") + " → other title")
+                        .isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(flipped.semantic(), dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT,
+                            dev.jasper.ui.theme.SemanticColor.SELECTION_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT));
+                    assertThat(KitViewTest.find(view, "a.subtitle", javax.swing.JLabel.class).getForeground()).as((dark ? "dark" : "light") + " → other caption")
+                        .isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(flipped.semantic(), dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT_SECONDARY,
+                            dev.jasper.ui.theme.SemanticColor.SELECTION_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT));
                 } finally { KitViewTest.release(context); }
             }
         });

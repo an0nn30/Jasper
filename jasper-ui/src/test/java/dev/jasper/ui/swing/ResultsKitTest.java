@@ -153,8 +153,9 @@ class ResultsKitTest {
                 assertThat(((InteractiveRows.Row) row(view, "r1")).check.isVisible()).isTrue();
                 var image = paint(view);
                 var rule = SwingUtilities.convertPoint(row(view, "h1"), row(view, "h1").getWidth() / 2, 0, view);
-                assertThat(new Color(image.getRGB(rule.x, rule.y), true)).as("the later heading opens with a hairline in the menu edge colour")
-                    .isEqualTo(context.theme().semantic().color(SemanticColor.BORDER_MENU));
+                // A list outside the palette keeps the subtle row divider; the palette's RESULTS headings take the menu edge.
+                assertThat(new Color(image.getRGB(rule.x, rule.y), true)).as("the later heading opens with a hairline")
+                    .isEqualTo(context.theme().semantic().color(SemanticColor.BORDER_SUBTLE));
                 var top = SwingUtilities.convertPoint(row(view, "h0"), row(view, "h0").getWidth() / 2, 0, view);
                 assertThat(new Color(image.getRGB(top.x, top.y), true)).as("the first heading has none")
                     .isNotEqualTo(context.theme().semantic().color(SemanticColor.BORDER_SUBTLE));

@@ -1207,9 +1207,10 @@ final class InteractiveRows {
         @Override
         protected void paintComponent(Graphics g) {
             if (!owner.dataRow(index)) {
-                // A heading after other rows opens its section with a hairline rule in the menu's edge colour (spec 7).
+                // A heading after other rows opens its section with a hairline rule: a row divider, or the menu's edge in the
+                // palette's results (spec 7).
                 if (index > 0) {
-                    g.setColor(ThemePainting.color(owner.context(), SemanticColor.BORDER_MENU));
+                    g.setColor(ThemePainting.color(owner.context(), owner.resultsLayout() ? SemanticColor.BORDER_MENU : SemanticColor.BORDER_SUBTLE));
                     g.fillRect(0, 0, getWidth(), ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE));
                 }
                 return;

@@ -268,6 +268,23 @@ class ThemeControllerTest {
         edt(() -> assertThat(themes[0].current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.generated(true)));
     }
 
+    /** A subscriber that throws is reported; later subscribers, the look and feel and the font still take the change. */
+    @Test void aFailingSubscriberDoesNotStopTheOthersOrTheChange() throws Exception {
+        edt(() -> {
+            try (var themes = ThemeTestSupport.controller(true)) {
+                var received = new ArrayList<ResolvedTheme>();
+                themes.subscribe((value, chrome) -> { throw new IllegalStateException("a bad subscriber"); });
+                themes.subscribe((value, chrome) -> received.add(value));
+                received.clear();
+                themes.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("Monospaced", 19));
+                assertThat(received).containsExactly(themes.current());
+                assertThat(themes.current().chrome()).isSameAs(ThemeTestSupport.generated(false));
+                assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(ThemeTestSupport.generated(false));
+                assertThat(UIManager.getFont("Label.font").getSize2D()).isEqualTo(19f);
+            } finally { ThemeTestSupport.controller(true); }
+        });
+    }
+
     @Test void closeUnregistersOwnerAndClearsItsThemeCallback() throws Exception {
         edt(() -> {
             var themes = ThemeTestSupport.controller(true);

@@ -155,7 +155,7 @@ class EditorKitTest {
                 var section=control.mounted.get("heading");
                 assertThat(section.title.getWidth()).isPositive();
                 for(var part:List.of(section.leading,section.subtitle,section.trailing))assertThat(part.getBounds()).isEqualTo(new Rectangle());
-                assertThat(rowBackground(section).getRGB(0,0)).as("the menu edge rule").isEqualTo(context.theme().semantic().color(SemanticColor.BORDER_MENU).getRGB());
+                assertThat(rowBackground(section).getRGB(0,0)).as("a row divider, not the menu edge").isEqualTo(context.theme().semantic().color(SemanticColor.BORDER_SUBTLE).getRGB());
                 assertThat(rowBackground(section).getRGB(5,5)).isZero();
                 pointerClick(section,new Point(5,5));assertThat(events).containsExactly(new UiEvent.Action("copy"));
             }finally{release(context);}
