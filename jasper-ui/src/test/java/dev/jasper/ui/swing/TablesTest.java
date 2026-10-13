@@ -145,8 +145,34 @@ class TablesTest {
                 });
     }
 
+    /** Desktop file lists (the SFTP panel, the file chooser) select several rows with Shift and Cmd/Ctrl, not row checkboxes. */
     @Test
-    void numericColumnsAlignWithHeadersAndCheckboxesSelectWithoutActivation() {
+    void aMultipleSelectionTableShowsNoCheckboxes() {
+        Edt.run(
+                () -> {
+                    var context = KitFixtures.context();
+                    var columns = List.of(new Column("name", "Name", TextRole.BODY, false), new Column("size", "Size", TextRole.MONO_SMALL, true));
+                    var rows = List.of(new TableRow("a", Map.of("name", "alpha", "size", "100"), Optional.of("folder")),
+                            new TableRow("b", Map.of("name", "beta", "size", "9"), Optional.of("file")));
+                    var lefts = new ArrayList<Integer>();
+                    for (var mode : List.of(SelectionMode.MULTIPLE, SelectionMode.SINGLE)) {
+                        try (var view = new KitView(context, new ViewSpec(new Table("files", ControlState.READY, columns, rows, Set.of("a"), "open", List.of(), mode)), e -> {})) {
+                            view.setSize(400, 260);
+                            InteractiveRowsTest.layout(view);
+                            var boxes = new ArrayList<javax.swing.JCheckBox>();
+                            new Object() { void walk(java.awt.Component c) { if (c instanceof javax.swing.JCheckBox box && box.isVisible()) boxes.add(box);
+                                if (c instanceof java.awt.Container k) for (var child : k.getComponents()) walk(child); } }.walk(view);
+                            assertThat(boxes).as(mode + " rows").isEmpty();
+                            lefts.add(((Tables.TableControl) view.control("files")).mounted.get("a").title.getX());
+                        }
+                    }
+                    assertThat(lefts.getFirst()).as("a multiple-selection row's content starts where a single-selection row's does").isEqualTo(lefts.getLast());
+                    release(context);
+                });
+    }
+
+    @Test
+    void numericColumnsAlignWithHeadersAndToggledRowsSelectWithoutActivation() {
         Edt.run(
                 () -> {
                     var context = KitFixtures.context();
@@ -188,8 +214,8 @@ class TablesTest {
                         assertThat(number.getHorizontalAlignment())
                                 .isEqualTo(javax.swing.SwingConstants.RIGHT);
                         assertThat(name.getIcon()).isNotNull();
-                        row.check.doClick(0);
-                        owner.mounted.get("b").check.doClick(0);
+                        owner.select("a", true);
+                        owner.select("b", true);
                         assertThat(events)
                                 .containsExactly(
                                         new UiEvent.Selected("files", Set.of("a")),
@@ -256,7 +282,6 @@ class TablesTest {
                                                 List.of(),
                                                 SelectionMode.SINGLE)));
                         assertThat(owner.selected).isEmpty();
-                        assertThat(owner.mounted.get("a").check.isVisible()).isFalse();
                         owner.select("b", false);
                         assertThat(owner.selected).containsExactly("b");
                     } finally {

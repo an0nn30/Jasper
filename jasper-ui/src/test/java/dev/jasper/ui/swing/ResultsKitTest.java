@@ -149,8 +149,6 @@ class ResultsKitTest {
                 assertThat(events.getLast()).isEqualTo(new UiEvent.Selected("results", Set.of("r1")));
                 control.move(-1); control.move(-1);
                 assertThat(events.getLast()).as("and stops at the first row").isEqualTo(new UiEvent.Selected("results", Set.of("r0")));
-                assertThat(((InteractiveRows.Row) row(view, "h1")).check.isVisible()).as("headings have no checkbox").isFalse();
-                assertThat(((InteractiveRows.Row) row(view, "r1")).check.isVisible()).isTrue();
                 var image = paint(view);
                 var rule = SwingUtilities.convertPoint(row(view, "h1"), row(view, "h1").getWidth() / 2, 0, view);
                 // A list outside the palette keeps the subtle row divider; the palette's RESULTS headings take the menu edge.

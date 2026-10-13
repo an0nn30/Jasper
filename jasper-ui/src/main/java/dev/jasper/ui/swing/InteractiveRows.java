@@ -801,7 +801,6 @@ final class InteractiveRows {
         final Map<String, ControlRegistry.Control> controls = new LinkedHashMap<>();
         final Set<String> used = new HashSet<>();
         final JPanel leading = part(), title = part(), subtitle = part(), trailing = part();
-        final JCheckBox check = new JCheckBox();
         String id;
         /** The last press or release opened the context menu, so its click is not a selection. */
         boolean contextPress;
@@ -855,9 +854,6 @@ final class InteractiveRows {
             add(title);
             add(subtitle);
             add(trailing);
-            add(check);
-            check.setOpaque(false);
-            check.addActionListener(e -> owner.select(id, true));
             MouseAdapter mouse =
                     new MouseAdapter() {
                         @Override
@@ -1047,10 +1043,6 @@ final class InteractiveRows {
                     it.remove();
                 }
             }
-            check.setVisible(owner.multiple() && owner.selectable(index));
-            check.setEnabled(owner.interactive());
-            check.setSelected(owner.selected.contains(id));
-            check.getAccessibleContext().setAccessibleName("Select " + id);
             if (Objects.equals(id, owner.focusItem) && owner.focusControl != null) {
                 var target = controls.get(owner.focusControl);
                 Component focused =
@@ -1104,12 +1096,6 @@ final class InteractiveRows {
                         ? ThemePainting.metric(owner.context(), DesignMetrics.Role.KEYCAP_CONTENT_TRAILING)
                         : owner.identityRows() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.IDENTITY_ROW_TRAILING) : pad)),
                     h = getHeight();
-            int checkWidth =
-                    check.isVisible()
-                            ? Math.min(check.getPreferredSize().width, Math.max(0, width - x))
-                            : 0;
-            check.setBounds(x, 0, checkWidth, h);
-            x += checkWidth;
             int tw = Math.min(trailing.getPreferredSize().width, Math.max(0, width - x));
             int actionInset=owner.panelSingle && owner.column < 0 ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_ACTION_INSET) : 0;
             trailing.setBounds(Math.max(x,width - tw - actionInset), 0, tw, h);
@@ -1157,9 +1143,6 @@ final class InteractiveRows {
             boolean halo = trailing.getComponentCount() > 0 && trailing.getComponent(trailing.getComponentCount() - 1) instanceof Switches.SwitchButton;
             int end = getWidth() - ThemePainting.metric(context, DesignMetrics.Role.PANEL_COMPACT_ROW_TRAILING)
                 + (halo ? ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING) : 0);
-            int checkWidth = check.isVisible() ? Math.min(check.getPreferredSize().width, Math.max(0, end - x)) : 0;
-            check.setBounds(x, 0, checkWidth, h);
-            x += checkWidth;
             int tw = Math.min(trailing.getPreferredSize().width, Math.max(0, end - x));
             trailing.setBounds(Math.max(x, end - tw), 0, tw, h);
             int gap = ThemePainting.metric(context, DesignMetrics.Role.PANEL_ROW_TEXT_GAP);
@@ -1186,7 +1169,6 @@ final class InteractiveRows {
         /** A heading shows only its title, inset like the rows below it. */
         void headingLayout() {
             int pad = ThemePainting.metric(owner.context(), owner.resultsLayout() ? DesignMetrics.Role.RESULTS_ROW_PADDING : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : DesignMetrics.Role.ICON_GAP);
-            check.setBounds(0, 0, 0, 0);
             leading.setBounds(0, 0, 0, 0);
             subtitle.setBounds(0, 0, 0, 0);
             trailing.setBounds(0, 0, 0, 0);
@@ -1207,7 +1189,6 @@ final class InteractiveRows {
             int side = ThemePainting.metric(context, DesignMetrics.Role.RESULTS_ROW_PADDING),
                     gap = ThemePainting.metric(context, DesignMetrics.Role.RESULTS_ROW_GAP),
                     icon = ThemePainting.metric(context, DesignMetrics.Role.ICON_RAIL), h = getHeight();
-            check.setBounds(0, 0, 0, 0);
             leading.setBounds(side, 0, icon, h);
             int start = side + icon + gap, end = getWidth() - side;
             int titleWidth = title.getPreferredSize().width;

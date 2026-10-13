@@ -275,7 +275,7 @@ class InteractiveRowsTest {
     }
 
     @Test
-    void multipleCheckboxesAndContextUseCurrentStableSelection() {
+    void multipleSelectionAndContextUseCurrentStableSelection() {
         Edt.run(
                 () -> {
                     var context = KitFixtures.context();
@@ -298,8 +298,8 @@ class InteractiveRowsTest {
                         view.setSize(400, 240);
                         layout(view);
                         var owner = (ItemLists.ListControl) view.control("servers");
-                        owner.mounted.get("item0").check.doClick(0);
-                        owner.mounted.get("item1").check.doClick(0);
+                        owner.select("item0", true);
+                        owner.select("item1", true);
                         assertThat(owner.selected).containsExactlyInAnyOrder("item0", "item1");
                         events.clear();
                         owner.context("item1", owner.canvas, 0, 0);
@@ -309,7 +309,7 @@ class InteractiveRowsTest {
                                 .containsExactly(new UiEvent.Action("delete-selected"));
                         assertThat(owner.selected).containsExactlyInAnyOrder("item0", "item1");
                         owner.select("item0", false);
-                        assertThat(owner.mounted.get("item1").check.isSelected()).isFalse();
+                        assertThat(owner.selected).containsExactly("item0");
                     } finally {
                         release(context);
                     }
@@ -824,7 +824,6 @@ class InteractiveRowsTest {
                                                 SelectionMode.SINGLE,
                                                 Optional.empty())));
                         assertThat(owner.selected).isEmpty();
-                        assertThat(owner.mounted.get("item0").check.isVisible()).isFalse();
                         owner.select("item1", false);
                         assertThat(owner.selected).containsExactly("item1");
                     } finally {
