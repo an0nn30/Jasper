@@ -11,6 +11,8 @@ import static dev.jasper.ui.swing.KitViewTest.*;
 import static org.assertj.core.api.Assertions.*;
 
 class GroupedFormGeometryTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     @Test void fullFormsAccountForCardStrokeAndDependentDescriptionRows() {
         Edt.run(()->{
             var context=KitFixtures.context();
@@ -21,10 +23,10 @@ class GroupedFormGeometryTest {
             try(var view=new KitView(context,new ViewSpec(FormsTest.form(FormKind.FULL,sections)),e->{})) {
                 KitFixtures.render(view,540,690,2);
                 var name=find(view,"name",javax.swing.JComponent.class);var bounds=javax.swing.SwingUtilities.convertRectangle(name.getParent(),name.getBounds(),view);
-                assertThat(bounds).isEqualTo(new Rectangle(147,53,354,28));
+                assertThat(bounds).isEqualTo(new Rectangle((m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SIDES)+m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING)+m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE))+m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH)+m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP),45,540-2*(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SIDES)+m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING)+m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE))-m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH)-m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP),m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT)));
                 var normal=find(view,"plain.title",javax.swing.JComponent.class);var child=find(view,"dependent.title",javax.swing.JComponent.class);
-                assertThat(child.getX()-normal.getX()).isEqualTo(16);
-                assertThat(find(view,"dependent",javax.swing.JComponent.class).getHeight()).isEqualTo(65);
+                assertThat(child.getX()-normal.getX()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_DEPENDENT_INDENT));
+                assertThat(find(view,"dependent",javax.swing.JComponent.class).getHeight()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT)+1);
             }finally{release(context);}
         });
     }
@@ -36,7 +38,7 @@ class GroupedFormGeometryTest {
             var setting=new SettingRow("setting",ControlState.READY,"Allow changes","Clients can upload, rename and delete files",new Toggle("toggle",ControlState.READY,"Changes",false,"toggle",false),false);
             try(var view=new KitView(context,new ViewSpec(new Card("mixed",ControlState.READY,CardKind.MIXED,List.of(form,hidden,setting))),e->{})) {
                 var image=KitFixtures.render(view,492,180,1);var control=find(view,"setting",javax.swing.JComponent.class);
-                var login=find(view,"row",javax.swing.JComponent.class);assertThat(control.getY()-login.getY()-login.getHeight()).isEqualTo(14);
+                var login=find(view,"row",javax.swing.JComponent.class);assertThat(control.getY()-login.getY()-login.getHeight()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING));
                 assertThat(image.getRGB(5,control.getY())).isEqualTo(KitFixtures.over(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE),ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.SURFACE_CARD)));
             }finally{release(context);}
         });
@@ -87,15 +89,15 @@ class GroupedFormGeometryTest {
         });
     }
 
-    @Test void fullFooterUsesThirtyPixelActionsAndTwentyTwoPixelGapWithoutChangingOtherForms() {
+    @Test void fullFooterUsesItsOwnActionHeightAndGapWithoutChangingOtherForms() {
         Edt.run(()->{
             var context=KitFixtures.context();
             try(var view=new KitView(context,new ViewSpec(FormsTest.form(FormKind.FULL,List.of())),e->{})) {
                 for(var kind:List.of(FormKind.FULL,FormKind.SETTINGS,FormKind.HERO,FormKind.FULL)) {
                     view.update(new ViewSpec(FormsTest.form(kind,List.of())));KitFixtures.render(view,540,300,1);
                     var cancel=find(view,"cancel",javax.swing.JButton.class);
-                    assertThat(cancel.getHeight()).as("%s footer action",kind).isEqualTo(kind==FormKind.FULL || kind==FormKind.HERO?30:28);
-                    if(kind==FormKind.FULL)assertThat(((javax.swing.JComponent)cancel.getParent().getParent()).getInsets().top).isEqualTo(22);
+                    assertThat(cancel.getHeight()).as("%s footer action",kind).isEqualTo(kind==FormKind.FULL?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT):kind==FormKind.HERO?m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_BUTTON_HEIGHT):m(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT));
+                    if(kind==FormKind.FULL)assertThat(((javax.swing.JComponent)cancel.getParent().getParent()).getInsets().top).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_FOOTER_TOP));
                 }
             }finally{release(context);}
         });
@@ -107,8 +109,8 @@ class GroupedFormGeometryTest {
             var list=new ItemList("keys",ControlState.READY,ListKind.ORDERED,List.of(item,itemWithId("key2")),java.util.Set.of(),"",List.of(),SelectionMode.SINGLE,
                 Optional.of(new Nodes.Button("add",ControlState.READY,"Add Stored Key…","add",ButtonKind.LINK,"add","")),java.util.OptionalInt.of(2));
             try(var view=new KitView(context,new ViewSpec(list),e->{})) {
-                assertThat(view.getPreferredSize().height).isEqualTo(102);
-                KitFixtures.render(view,354,102,1);assertThat(find(view,"add",javax.swing.JButton.class).getHeight()).isEqualTo(32);
+                assertThat(view.getPreferredSize().height).isEqualTo(2*m(dev.jasper.ui.metrics.DesignMetrics.Role.ORDERED_ROW_HEIGHT) + m(dev.jasper.ui.metrics.DesignMetrics.Role.ORDERED_ADD_HEIGHT));
+                KitFixtures.render(view,354,2*m(dev.jasper.ui.metrics.DesignMetrics.Role.ORDERED_ROW_HEIGHT) + m(dev.jasper.ui.metrics.DesignMetrics.Role.ORDERED_ADD_HEIGHT),1);assertThat(find(view,"add",javax.swing.JButton.class).getHeight()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.ORDERED_ADD_HEIGHT));
             }finally{release(context);}
         });
     }
@@ -123,17 +125,17 @@ class GroupedFormGeometryTest {
                 var image=KitFixtures.render(view,354,102,2);
                 java.util.function.Function<String,Rectangle> at=id->{var c=find(view,id,javax.swing.JComponent.class);return javax.swing.SwingUtilities.convertRectangle(c.getParent(),c.getBounds(),view);};
                 // Source 2x columns: index ink 12.5, glyph 35.5, name 57 logical; commands 31 apart, the last centred 18 from the edge.
-                assertThat(at.apply("@ordered/keys/key/index").x).isEqualTo(12);
+                assertThat(at.apply("@ordered/keys/key/index").x).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.ORDERED_ROW_SIDE));
                 assertThat(at.apply("@ordered/keys/key/index").width).isEqualTo(16);
-                assertThat(at.apply("key.icon").x).isEqualTo(34);
-                assertThat(at.apply("key.name").x).isEqualTo(56);
-                assertThat(at.apply("key.caption").x-at.apply("key.name").x-at.apply("key.name").width).isEqualTo(9);
+                assertThat(at.apply("key.icon").x).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.ORDERED_ROW_SIDE)+16+6);
+                assertThat(at.apply("key.name").x).isEqualTo(at.apply("key.icon").x+at.apply("key.icon").width+m(dev.jasper.ui.metrics.DesignMetrics.Role.ORDERED_TEXT_GAP));
+                assertThat(at.apply("key.caption").x-at.apply("key.name").x-at.apply("key.name").width).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.INLINE_GAP));
                 var up=at.apply("@ordered/keys/key/up");var down=at.apply("@ordered/keys/key/down");var remove=at.apply("@ordered/keys/key/remove");
                 assertThat(java.util.List.of(up.getSize(),down.getSize(),remove.getSize())).containsOnly(new Dimension(24,24));
-                assertThat(down.x-up.x).isEqualTo(31);assertThat(remove.x-down.x).isEqualTo(31);
-                assertThat(354-(remove.x+remove.width/2)).isEqualTo(18);
+                assertThat(down.x-up.x).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.ORDERED_ACTION)+m(dev.jasper.ui.metrics.DesignMetrics.Role.ORDERED_ACTION_GAP));assertThat(remove.x-down.x).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.ORDERED_ACTION)+m(dev.jasper.ui.metrics.DesignMetrics.Role.ORDERED_ACTION_GAP));
+                                assertThat(354-(remove.x+remove.width/2)).isEqualTo(18);
                 var add=find(view,"add",javax.swing.JButton.class);
-                assertThat(add.getInsets().left).isEqualTo(12);assertThat(add.getFont().getSize2D()).isEqualTo(12f);
+                assertThat(add.getInsets().left).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.ORDERED_ROW_SIDE));assertThat(add.getFont().getSize2D()).isEqualTo(12f);
                 // An unfocused ordered list keeps its selection identity without painting a selected fill.
                 var row=at.apply("@ordered/keys/key2/index");
                 assertThat(new Color(image.getRGB(2*200,2*(row.y+row.height/2)),true))
@@ -151,9 +153,12 @@ class GroupedFormGeometryTest {
                 for(var kind:List.of(FormKind.FULL,FormKind.SETTINGS,FormKind.FULL)) {
                     view.update(new ViewSpec(FormsTest.form(kind,List.of(card))));KitFixtures.render(view,540,400,1);
                     boolean full=kind==FormKind.FULL;
-                    assertThat(find(view,"group.choice.input",javax.swing.JComponent.class).getHeight()).as("%s choice",kind).isEqualTo(full?26:28);
-                    assertThat(find(view,"group",javax.swing.JComponent.class).getHeight()).as("%s row",kind).isEqualTo(full?43:44);
-                    assertThat(find(view,"options.card",javax.swing.JComponent.class).getHeight()).as("%s card",kind).isEqualTo(full?43+43+1:44+42);
+                    assertThat(find(view,"group.choice.input",javax.swing.JComponent.class).getHeight()).as("%s choice",kind).isEqualTo(full?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_CHOICE_HEIGHT):m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT));
+                                        // A grouped row is its choice plus its padding: the compact FULL choice, or a field in a Settings form.
+                    int rowHeight=full?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_CHOICE_HEIGHT)+2*m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_GROUP_ROW_PADDING):m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT)+2*m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_VERTICAL_PADDING);
+                    assertThat(find(view,"group",javax.swing.JComponent.class).getHeight()).as("%s row",kind).isEqualTo(rowHeight);
+                    // A FULL card closes with its stroke; a Settings card does not.
+                    assertThat(find(view,"options.card",javax.swing.JComponent.class).getHeight()).as("%s card",kind).isEqualTo(2*rowHeight+(full?1:0));
                 }
             }finally{release(context);}
         });
@@ -224,10 +229,11 @@ class GroupedFormGeometryTest {
             var context=KitFixtures.context();
             var setting=new SettingRow("setting",ControlState.READY,"Option","Short helper",new Toggle("toggle",ControlState.READY,"Enabled",false,"toggle",false),false);
             try(var view=new KitView(context,new ViewSpec(FormsTest.form(FormKind.FULL,List.of(setting))),e->{})) {
-                int[] expected={65,49,54,65};int at=0;
+                // FULL and HERO rows keep their description heights; a SETTINGS row grows to its two lines and padding (44).
+                int[] expected={m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT)+1,44,m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_SETTING_HEIGHT),m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT)+1};int at=0;
                 for(var kind:List.of(FormKind.FULL,FormKind.SETTINGS,FormKind.HERO,FormKind.FULL)) {
                     view.update(new ViewSpec(FormsTest.form(kind,List.of(setting))));KitFixtures.render(view,540,400,1);
-                    assertThat(find(view,"setting",javax.swing.JComponent.class).getInsets().left).isEqualTo(kind==FormKind.FULL?15:13);
+                    assertThat(find(view,"setting",javax.swing.JComponent.class).getInsets().left).isEqualTo(kind==FormKind.FULL?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_SIDE_PADDING):m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_SIDE_PADDING));
                     assertThat(find(view,"setting",javax.swing.JComponent.class).getHeight()).as("%s current context",kind).isEqualTo(expected[at++]);
                 }
             }finally{release(context);}

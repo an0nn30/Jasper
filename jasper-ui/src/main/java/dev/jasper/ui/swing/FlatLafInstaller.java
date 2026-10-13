@@ -40,15 +40,36 @@ public final class FlatLafInstaller {
         catch (IOException failure) { throw new UncheckedIOException(failure); }
         var fixed = new LinkedHashMap<String, String>();
         var metrics = DesignMetrics.DEFAULT;
-        fixed.put("TextComponent.arc", Integer.toString(metrics.value(DesignMetrics.Role.CONTROL_RADIUS) * 2));
-        fixed.put("Button.arc", Integer.toString(metrics.value(DesignMetrics.Role.CONTROL_RADIUS) * 2));
+        String control = Integer.toString(metrics.value(DesignMetrics.Role.CONTROL_RADIUS) * 2);
+        fixed.put("Component.arc", control);
+        fixed.put("TextComponent.arc", control);
+        fixed.put("Button.arc", control);
         fixed.put("Component.focusWidth", Integer.toString(metrics.value(DesignMetrics.Role.FOCUS_RING)));
         fixed.put("Button.minimumHeight", Integer.toString(metrics.value(DesignMetrics.Role.BUTTON_HEIGHT)));
         fixed.put("Component.minimumHeight", Integer.toString(metrics.value(DesignMetrics.Role.FIELD_HEIGHT)));
+        // Buttons as on main: a 14 px label margin and a 72 px minimum width (a window footer's action).
+        int label = metrics.value(DesignMetrics.Role.BUTTON_LABEL_MARGIN), side = metrics.value(DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
+        fixed.put("Button.margin", insets(label, side, label, side));
+        fixed.put("Button.minimumWidth", Integer.toString(metrics.value(DesignMetrics.Role.WINDOW_ACTION_MIN_WIDTH)));
+        // Selection is a plain rectangle, edge to edge.
+        for (var key : java.util.List.of("List", "Tree", "Table", "ComboBox", "MenuItem")) {
+            fixed.put(key + ".selectionArc", "0");
+            fixed.put(key + ".selectionInsets", "0,0,0,0");
+        }
+        // Native menu rows match the kit's: a 22 px row from a 16 px line, 8 px sides, 4 px popup padding, radius 6.
+        int row = metrics.value(DesignMetrics.Role.MENU_ITEM_VERTICAL_PADDING), inset = metrics.value(DesignMetrics.Role.MENU_ITEM_PADDING);
+        for (var key : java.util.List.of("MenuItem", "Menu", "CheckBoxMenuItem", "RadioButtonMenuItem")) fixed.put(key + ".margin", insets(row, inset, row, inset));
+        int padding = metrics.value(DesignMetrics.Role.MENU_PADDING), line = metrics.value(DesignMetrics.Role.HAIRLINE);
+        fixed.put("PopupMenu.borderInsets", insets(padding, line, padding, line));
+        String radius = Integer.toString(metrics.value(DesignMetrics.Role.CARD_RADIUS));
+        fixed.put("Popup.borderCornerRadius", radius);
+        fixed.put("PopupMenu.borderCornerRadius", radius);
         laf.setExtraDefaults(fixed);
         try { UIManager.setLookAndFeel(laf); }
         catch (javax.swing.UnsupportedLookAndFeelException failure) { throw new IllegalStateException("Cannot install generated appearance", failure); }
     }
+
+    private static String insets(int top, int left, int bottom, int right) { return top + "," + left + "," + bottom + "," + right; }
 
     // A LAF reinstall (including rollback) obtains fresh defaults; publish the same immutable snapshot every time.
     private static void publish(javax.swing.UIDefaults defaults, GeneratedTheme theme) {

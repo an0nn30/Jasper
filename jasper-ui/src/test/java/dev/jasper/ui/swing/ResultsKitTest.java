@@ -180,7 +180,7 @@ class ResultsKitTest {
             var context = KitFixtures.context();
             try (var view = new KitView(context, new ViewSpec(results(sections(8), Set.of("r0"), OptionalInt.of(5))), e -> { })) {
                 view.setSize(500, 600); InteractiveRowsTest.layout(view);
-                int rowHeight = UIScale.scale(24), headingHeight = UIScale.scale(22);
+                int rowHeight = UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RESULTS_ROW_HEIGHT)), headingHeight = UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RESULTS_HEADING_HEIGHT));
                 assertThat(row(view, "h0").getHeight()).isEqualTo(headingHeight);
                 assertThat(row(view, "r0").getHeight()).isEqualTo(rowHeight);
                 assertThat(row(view, "r1").getY()).isEqualTo(headingHeight + rowHeight);
@@ -227,7 +227,7 @@ class ResultsKitTest {
             var context = KitFixtures.context();
             var items = List.of(row("r", "Rendered command", "a detail", "Cmd+T"), row("plain", "Plain", null, null));
             try (var view = new KitView(context, new ViewSpec(results(items, Set.of(), OptionalInt.empty())), e -> { })) {
-                int side = UIScale.scale(8), gap = UIScale.scale(8), icon = UIScale.scale(16), width = UIScale.scale(680);
+                int side = UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RESULTS_ROW_PADDING)), gap = UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RESULTS_ROW_GAP)), icon = UIScale.scale(16), width = UIScale.scale(680);
                 view.setSize(width, 200); InteractiveRowsTest.layout(view);
                 var line = (InteractiveRows.Row) row(view, "r");
                 JLabel title = find(view, "r.title", JLabel.class), detail = find(view, "r.detail", JLabel.class), tag = find(view, "r.tag", JLabel.class);
@@ -267,11 +267,11 @@ class ResultsKitTest {
                 };
                 int w = first.getWidth();
                 assertThat(at.apply(first, new Point(w - UIScale.scale(12), UIScale.scale(3)))).as("the palette highlights with the accent").isEqualTo(semantic.color(SemanticColor.ACCENT));
-                assertThat(at.apply(first, new Point(w - UIScale.scale(5), 0)).getAlpha()).as("selected rounded corner").isZero();
-                assertThat(at.apply(first, new Point(UIScale.scale(2), UIScale.scale(12))).getAlpha()).as("inset from the edge").isZero();
+                assertThat(at.apply(first, new Point(w - 1, 0))).as("a square corner").isEqualTo(semantic.color(SemanticColor.ACCENT));
+                assertThat(at.apply(first, new Point(0, UIScale.scale(12)))).as("edge to edge").isEqualTo(semantic.color(SemanticColor.ACCENT));
                 var hover = ColorMath.opacity(semantic.color(SemanticColor.HOVER_OVERLAY), .05);
                 assertThat(at.apply(second, new Point(w - UIScale.scale(12), UIScale.scale(3)))).isEqualTo(over(new Color(0, 0, 0, 0), hover));
-                assertThat(at.apply(second, new Point(w - UIScale.scale(5), 0)).getAlpha()).as("hover rounded corner").isZero();
+                assertThat(at.apply(second, new Point(w - 1, 0))).as("a square hover corner").isEqualTo(over(new Color(0, 0, 0, 0), hover));
                 // AWT reports where the pointer went: outside the row it left.
                 deliver(second, new MouseEvent(second, MouseEvent.MOUSE_EXITED, System.currentTimeMillis(), 0, -1, -1, 0, false));
                 var after = paint(view); var point = SwingUtilities.convertPoint(second, w - UIScale.scale(12), UIScale.scale(3), view);

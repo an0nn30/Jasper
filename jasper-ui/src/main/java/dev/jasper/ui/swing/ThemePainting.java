@@ -16,16 +16,7 @@ final class ThemePainting {
     static int metric(KitContext context, DesignMetrics.Role role) { return UIScale.scale(context.metrics().value(role)); }
     static Font font(KitContext context, Typography.Role role) { return SwingTypography.effective(context.typography().font(role)); }
     static int height(KitContext context, DesignMetrics.Role role, Typography.Role text) {
-        DesignMetrics.Role padding = switch (role) {
-            case PICKER_COMPACT_HEIGHT,PICKER_DEFAULT_HEIGHT,PICKER_SEARCH_HEIGHT,PICKER_ROW_HEIGHT,PICKER_UTILITY_HEIGHT,FORM_SEGMENT_HEIGHT,FULL_SETTING_CHOICE_HEIGHT -> DesignMetrics.Role.PICKER_VERTICAL_PADDING;
-            case PANEL_DETAIL_ACTION -> DesignMetrics.Role.PANEL_DETAIL_ACTION_VERTICAL;
-            case PANEL_SEARCH_HEIGHT -> DesignMetrics.Role.PANEL_SEARCH_VERTICAL_PADDING;
-            case PANEL_HEADER_ACTION -> DesignMetrics.Role.PANEL_HEADER_ACTION_VERTICAL;
-            case RESULTS_ROW_HEIGHT, RESULTS_HEADING_HEIGHT -> DesignMetrics.Role.RESULTS_VERTICAL_PADDING;
-            case FIELD_HEIGHT, HERO_FIELD_HEIGHT, COLUMN_SEARCH_HEIGHT -> DesignMetrics.Role.FIELD_VERTICAL_PADDING;
-            case PANEL_EMPTY_ACTION_HEIGHT, SETTINGS_NAV_HEADING, SETTINGS_NAV_ROW, KEYCAP_TREE_ROW_HEIGHT, IDENTITY_ROW_HEIGHT, IDENTITY_HEADING_HEIGHT, MENU_ITEM_HEIGHT, BUTTON_HEIGHT, HERO_BUTTON_HEIGHT, FULL_FOOTER_BUTTON_HEIGHT, ORDERED_ADD_HEIGHT, PANEL_ACTION, INLINE_ACTION -> DesignMetrics.Role.BUTTON_VERTICAL_PADDING;
-            default -> throw new IllegalArgumentException("Not a content height role: " + role);
-        };
+        DesignMetrics.Role padding = context.metrics().contentPadding(role);
         int line = (int)Math.ceil(font(context, text).getLineMetrics("Ag", new FontRenderContext(null, true, true)).getHeight());
         return Math.max(metric(context, role), line + metric(context, padding));
     }

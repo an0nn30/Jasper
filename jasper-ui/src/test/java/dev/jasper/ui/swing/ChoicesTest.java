@@ -21,8 +21,9 @@ class ChoicesTest {
                     KitFixtures.render(view, 400, 100, 2);
                     var font = ThemePainting.font(context, dev.jasper.ui.metrics.Typography.Role.LABEL);
                     int line = (int)Math.ceil(font.getLineMetrics("Ag", new java.awt.font.FontRenderContext(null, true, true)).getHeight());
-                    // Form segments use the measured 24-logical item, growing with the label line at larger fonts.
-                    int expected = Math.max(com.formdev.flatlaf.util.UIScale.scale(24), line + com.formdev.flatlaf.util.UIScale.scale(4));
+                    // Form segments take the form segment height, growing with the label line at larger fonts.
+                    int expected = Math.max(com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SEGMENT_HEIGHT)),
+                        line + com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_VERTICAL_PADDING)));
                     assertThat(find(view, "choice.option.b", JButton.class).getPreferredSize().height)
                         .as("nonheader form segments keep the measured item height at font %s", size).isEqualTo(expected);
                 }
@@ -91,7 +92,7 @@ class ChoicesTest {
                     var theme=KitFixtures.withSemantic(base, new dev.jasper.ui.theme.SemanticPalette(colors));
                     context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme,theme));
                     assertThat(popup.getList()).isSameAs(list);assertThat(list.getBackground()).isEqualTo(color);
-                    assertThat(list.getFixedCellHeight()).isGreaterThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(28));
+                    assertThat(list.getFixedCellHeight()).isGreaterThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT)));
                     var row=(JComponent)combo.getRenderer().getListCellRendererComponent(list,combo.getItemAt(0),0,true,false);
                     row.setSize(com.formdev.flatlaf.util.UIScale.scale(220),list.getFixedCellHeight());
                     assertThat(ButtonsTest.paint(row).getRGB(com.formdev.flatlaf.util.UIScale.scale(200),list.getFixedCellHeight()/2)).isEqualTo(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT).getRGB());

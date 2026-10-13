@@ -32,6 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * state is also captured at device scale 2 ({@link EditorEvidence}).
  */
 class EditorCompositionTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     static final int WIDTH = 760, HEIGHT = 300, SIDE = 6;
     static final String[] FIND_ANCHORS = {"find.bar", "find.row", "find.query", "find.case", "find.word", "find.regex", "find.status",
         "find.previous", "find.next", "find.close", "find.replace.row", "find.replacement", "find.one", "find.all"};
@@ -267,7 +269,7 @@ class EditorCompositionTest {
                 capture(theme, "go-to-line", editor, line);
                 var row = bounds(line.holder(), EditorEnterBaselineTest.require(line, "go-to-line.row"));
                 var field = bounds(line.holder(), EditorEnterBaselineTest.require(line, "go-to-line.line"));
-                assertThat(field.x - row.x).as("the form row's fixed label column and gap").isEqualTo(96 + 12);
+                assertThat(field.x - row.x).as("the form row's fixed label column and gap").isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH) + m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP));
                 assertThat(field.x + field.width).as("the field takes the control column").isEqualTo(row.x + row.width);
                 assertThat(StagedRemoteHost.labels(line.holder())).contains("Line").noneMatch(label -> label.endsWith(":"));
                 var caption = bounds(line.holder(), EditorEnterBaselineTest.require(line, "go-to-line.row.caption"));
@@ -385,8 +387,9 @@ class EditorCompositionTest {
             assertThat(button.getText()).as("%s is an icon button", id).isEmpty();
             assertThat(button.getIcon()).as(id).isNotNull();
         }
-        assertThat(named(view, "find.query", JComponent.class).getHeight()).isEqualTo(26);
-        assertThat(findRow.getHeight()).isEqualTo(34); assertThat(replaceRow.getHeight()).isEqualTo(34);
+        assertThat(named(view, "find.query", JComponent.class).getHeight()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_SEARCH_HEIGHT));
+        int barRow = m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_SEARCH_HEIGHT) + 2 * m(dev.jasper.ui.metrics.DesignMetrics.Role.DOCUMENT_BAR_VERTICAL_PADDING);
+        assertThat(findRow.getHeight()).isEqualTo(barRow); assertThat(replaceRow.getHeight()).isEqualTo(barRow);
         assertThat(bounds(view, replaceRow).y).as("rows stack without a gap").isEqualTo(bounds(view, findRow).y + findRow.getHeight());
     }
 

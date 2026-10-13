@@ -242,7 +242,7 @@ final class ItemLists {
             for (var item : value().items()) {
                 int middle = slotHeight(item.title()) + slotHeight(item.subtitle());
                 if (middle > 0)
-                    middle += ThemePainting.metric(context(), DesignMetrics.Role.ROW_GAP);
+                    middle += ThemePainting.metric(context(), DesignMetrics.Role.ROW_VERTICAL_PADDING);
                 int side =
                         Math.max(
                                 item.leading().map(this::inlineHeight).orElse(0),

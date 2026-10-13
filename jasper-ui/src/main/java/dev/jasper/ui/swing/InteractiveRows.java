@@ -351,8 +351,9 @@ final class InteractiveRows {
                                     context(),
                                     DesignMetrics.Role.BUTTON_HEIGHT,
                                     Typography.Role.LABEL),
+                            // A row's lines take the one-line row padding (as menus and navigation do), not a form's row gap.
                             line * lines()
-                                    + ThemePainting.metric(context(), DesignMetrics.Role.ROW_GAP));
+                                    + ThemePainting.metric(context(), DesignMetrics.Role.ROW_VERTICAL_PADDING));
             // Manager columns: one-line rows (the rail's, a list column's single-line rows) take the rail row, two-line list rows the item row.
             if (column == 0 || column == 1) rowHeight = Math.max(rowHeight,
                 ThemePainting.metric(context(), column == 0 || lines() < 2 ? DesignMetrics.Role.COLUMN_RAIL_ROW : DesignMetrics.Role.COLUMN_ITEM_ROW));

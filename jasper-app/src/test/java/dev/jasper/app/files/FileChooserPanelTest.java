@@ -33,6 +33,8 @@ import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
 class FileChooserPanelTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     @TempDir Path dir;
     private final UiState state = UiState.inMemory();
     private final ChooserPrefs prefs = new ChooserPrefs(state);
@@ -528,7 +530,7 @@ class FileChooserPanelTest {
         JComponent box = pathBox(panel);
         assertThat(box.isOpaque()).as("it paints its own rounded field").isFalse();
         int height = box.getPreferredSize().height;
-        assertThat(height).isGreaterThanOrEqualTo(new JTextField().getPreferredSize().height);
+        assertThat(height).as("a kit field's height").isGreaterThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT)));
         box.setSize(300, height);
         KitTestSupport.layout(box);
         var image = new java.awt.image.BufferedImage(300, height, java.awt.image.BufferedImage.TYPE_INT_ARGB);

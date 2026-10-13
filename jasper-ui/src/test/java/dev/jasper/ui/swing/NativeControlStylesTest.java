@@ -60,7 +60,7 @@ class NativeControlStylesTest {
                 "toolbar.selectedBackground", palette.color(SemanticColor.SURFACE_CONTROL_SELECTED)));
             var rail = new JButton();
             NativeControlStyles.button(rail, () -> theme, DesignMetrics.Role.RAIL_BUTTON_ARC);
-            assertThat(((Map<?, ?>) rail.getClientProperty("FlatLaf.style")).get("arc")).isEqualTo(10);
+            assertThat(((Map<?, ?>) rail.getClientProperty("FlatLaf.style")).get("arc")).isEqualTo(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RAIL_BUTTON_ARC));
         });
     }
 

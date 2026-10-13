@@ -20,6 +20,8 @@ import static org.assertj.core.api.Assertions.*;
 
 /** Actual FileServerPlugin NEW action, real Vault producer and persistence, never starts a server. */
 class StagedFileServerFormTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     @TempDir Path root;
     @Test void actualGroupedFormAndAnchoredVaultCreationPreserveStateAndGrant() throws Exception {
         var themes=onEdtValue(() -> ThemeTestSupport.controller(true));
@@ -27,7 +29,7 @@ class StagedFileServerFormTest {
             var vault=owner.vault();var form=owner.surface();
             onEdt(()->{
                 captureServer("anonymous",kitView(form),540,690);
-                assertThat(require(form,"server.require-tls.row.title").getX()-require(form,"server.tls.row.title").getX()).isEqualTo(16);
+                assertThat(require(form,"server.require-tls.row.title").getX()-require(form,"server.tls.row.title").getX()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_DEPENDENT_INDENT));
                 assertThat(((Nodes.Form)kitView(form).spec().root()).submission()).isEqualTo(Nodes.FormSubmission.NONE);
                 assertThat(node(form,"server.save").state().enabled()).isFalse();
                 click(form,"server.login.option.vault");click(form,"server.writable");

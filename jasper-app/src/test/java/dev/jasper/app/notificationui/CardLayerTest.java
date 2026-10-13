@@ -68,8 +68,8 @@ class CardLayerTest {
         assertThat(layer.getMouseListeners()).as("clicks beside a card reach the terminal").isEmpty();
         assertThat(layer.isFocusable()).isFalse();
         int margin = margin();
-        assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_STACK_MARGIN)).as("the former margin, named").isEqualTo(12);
-        assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_STACK_GAP)).isEqualTo(8);
+        assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_STACK_MARGIN)).as("the stack margin, named").isEqualTo(10);
+        assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_STACK_GAP)).isEqualTo(6);
         assertThat(layer.getPreferredSize().width).isEqualTo(UIScale.scale(360) + 2 * margin);
         assertThat(NotificationCardTest.focusable(layer)).as("nothing in the layer takes the keyboard").isEmpty();
         assertThat(layer.getPreferredSize().height).isEqualTo(layer.card(a.id()).getPreferredSize().height + 2 * margin);

@@ -13,6 +13,8 @@ import static dev.jasper.app.plugins.StagedRemoteHost.*;
 import static org.assertj.core.api.Assertions.*;
 
 class SessionsCompositionTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     @TempDir Path home;
     @Test void actualLockedVaultAndSavedHostsComposeOneHeaderCountAndPersistentIdentity() throws Exception {
         var calibration=SurfaceFixtures.theme("dark");
@@ -28,10 +30,12 @@ class SessionsCompositionTest {
                 assertThat(labels(header).stream().filter("6"::equals)).hasSize(1);
                 assertThat(names(header)).containsExactly("New session","Import sessions","Options","Hide");
                 assertThat(labels(fixture.view())).contains("Vault locked","amp","ubuntu@100.110.65.45:22");
-                assertThat(bounds(fixture.component("card.identity"),fixture.view()).x).isEqualTo(12);
+                assertThat(bounds(fixture.component("card.identity"),fixture.view()).x).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_PADDING));
                 var before=bounds(fixture.component("sessions.footer-surface"),fixture.view());
-                assertThat(before).isEqualTo(new Rectangle(0,308,260,87));
-                assertThat(bounds(fixture.component("card.connect"),fixture.view())).isEqualTo(new Rectangle(174,358,74,28));
+                // The footer keeps its packed height (82 at the compact scale) at the panel's bottom.
+                assertThat(before).isEqualTo(new Rectangle(0,395-82,260,82));
+                // The detail action keeps its 28 px envelope (22 face + focus reservation), right-aligned in the compact detail inset.
+                assertThat(bounds(fixture.component("card.connect"),fixture.view())).isEqualTo(new Rectangle(180,360,70,28));
                 var shot=fixture.capture(2);
                 int accent=calibration.workspace().semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT).getRGB();
                 // theme.md's white inset line tints the face's top logical row; it is still the face.
@@ -41,9 +45,12 @@ class SessionsCompositionTest {
                 int inset=tint.getRGB(0,0);
                 int left=500,right=0,top=772,bottom=0;
                 for(int y=720;y<772;y++)for(int x=350;x<500;x++)if(shot.getRGB(x,y)==accent||shot.getRGB(x,y)==inset){left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);}
-                assertThat(new Rectangle(left,top,right-left+1,bottom-top+1)).as("exact source2x Connect face; hit/text allocation remains unchanged").isEqualTo(new Rectangle(354,722,136,42));
-                assertThat(shot.getRGB(422,763)).isEqualTo(accent);
-                assertThat(shot.getRGB(422,764)).isNotEqualTo(accent);
+                // At 2x the face is the action's bounds inside its 3 px focus reservation, its bottom row trimmed by 1.
+                var c=bounds(fixture.component("card.connect"),fixture.view());
+                var face=new Rectangle(2*(c.x+3),2*(c.y+3),2*(c.width-6),2*(c.height-6-1));
+                assertThat(new Rectangle(left,top,right-left+1,bottom-top+1)).as("the Connect face at 2x; hit/text allocation remains unchanged").isEqualTo(face);
+                assertThat(shot.getRGB(face.x+face.width/2,face.y+face.height-1)).isEqualTo(accent);
+                assertThat(shot.getRGB(face.x+face.width/2,face.y+face.height)).isNotEqualTo(accent);
                 var list=(JScrollPane)fixture.component("sessions.rows");
                 list.getViewport().setViewPosition(new Point(0,84));
                 assertThat(bounds(fixture.component("sessions.footer-surface"),fixture.view())).isEqualTo(before);

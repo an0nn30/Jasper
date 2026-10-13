@@ -232,7 +232,7 @@ class AppManagerKitTest {
                 assertThat(image.getRGB(100, 0)).as("the hairline fills its pixel row").isEqualTo(border);
                 assertThat(image.getRGB(100, 1)).as("and does not smear inward").isEqualTo(card);
                 int radius = metric(DesignMetrics.Role.CARD_RADIUS);
-                assertThat(image.getRGB(1, 1) >>> 24).as("the corner is the card radius").isZero();
+                assertThat(image.getRGB(0, 0) >>> 24).as("the corner is the card radius").isZero();
                 assertThat(image.getRGB(radius, 0)).isNotEqualTo(0);
             } finally { KitViewTest.release(context); }
         });

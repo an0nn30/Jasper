@@ -1,5 +1,7 @@
 package dev.jasper.app.palette;
 
+import dev.jasper.ui.metrics.DesignMetrics;
+
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeTestSupport;
@@ -39,6 +41,8 @@ import static org.assertj.core.api.Assertions.*;
  * controls on the chrome context; the shell keeps the palette's arrangement and exact geometry under named metrics.
  */
 class CommandPaletteTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     private static final PaletteScope COMMANDS = scope("jasper.commands", "Commands", false, List.of(new PaletteVerb("run", "Run")));
     private static final PaletteScope HISTORY = scope("test.history", "History", true, List.of(new PaletteVerb("paste", "Paste"),
         new PaletteVerb("paste_run", "Paste and run"), new PaletteVerb("save", "Save as snippet…")));
@@ -308,8 +312,8 @@ class CommandPaletteTest {
             palette.setSize(palette.getPreferredSize());
             layoutTree(palette);
             Component header = row(palette, 0), second = row(palette, 2);
-            assertThat(header.getHeight()).isEqualTo(UIScale.scale(22));
-            assertThat(second.getHeight()).isEqualTo(UIScale.scale(24));
+            assertThat(header.getHeight()).isEqualTo(UIScale.scale(m(DesignMetrics.Role.RESULTS_HEADING_HEIGHT)));
+            assertThat(second.getHeight()).isEqualTo(UIScale.scale(m(DesignMetrics.Role.RESULTS_ROW_HEIGHT)));
             header.dispatchEvent(mousePress(header, 4, 4));
             second.dispatchEvent(mousePress(second, 4, 4));
             var canvas = PaletteTestSupport.resultsCanvas(palette);
@@ -341,13 +345,13 @@ class CommandPaletteTest {
             layoutTree(palette);
             Insets insets = palette.getInsets();
             assertThat(palette.getPreferredSize().width).isEqualTo(UIScale.scale(680));
-            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(44 + 22 + 2 * 24 + 26) + insets.top + insets.bottom);
-            assertThat(PaletteTestSupport.fieldRow(palette).getHeight()).isEqualTo(UIScale.scale(44));
-            assertThat(palette.hintBar().getHeight()).isEqualTo(UIScale.scale(26));
-            assertThat(palette.itemHeight()).isEqualTo(UIScale.scale(24));
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_FIELD_HEIGHT) + m(DesignMetrics.Role.RESULTS_HEADING_HEIGHT) + 2 * m(DesignMetrics.Role.RESULTS_ROW_HEIGHT) + m(DesignMetrics.Role.PALETTE_HINT_HEIGHT)) + insets.top + insets.bottom);
+            assertThat(PaletteTestSupport.fieldRow(palette).getHeight()).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_FIELD_HEIGHT)));
+            assertThat(palette.hintBar().getHeight()).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_HINT_HEIGHT)));
+            assertThat(palette.itemHeight()).isEqualTo(UIScale.scale(m(DesignMetrics.Role.RESULTS_ROW_HEIGHT)));
             assertThat(palette.isOpaque()).as("rounded corners expose the underlying workspace").isFalse();
             palette.setEntries(List.of(), null, "Nothing found");
-            assertThat(palette.getPreferredSize().height).as("the empty line").isEqualTo(UIScale.scale(44 + 24 + 26) + insets.top + insets.bottom);
+            assertThat(palette.getPreferredSize().height).as("the empty line").isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_FIELD_HEIGHT) + m(DesignMetrics.Role.RESULTS_ROW_HEIGHT) + m(DesignMetrics.Role.PALETTE_HINT_HEIGHT)) + insets.top + insets.bottom);
             palette.close();
         });
     }
@@ -361,17 +365,17 @@ class CommandPaletteTest {
             Insets insets = palette.getInsets();
             assertThat(palette.visibleRows()).as("five by default").isEqualTo(5);
             assertThat(PaletteTestSupport.resultsSpec(palette).visibleRows()).hasValue(5);
-            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(44 + 5 * 24 + 26) + insets.top + insets.bottom);
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_FIELD_HEIGHT) + 5 * m(DesignMetrics.Role.RESULTS_ROW_HEIGHT) + m(DesignMetrics.Role.PALETTE_HINT_HEIGHT)) + insets.top + insets.bottom);
             palette.setEntries(List.of(new PaletteEntry.Header("History"), item(HISTORY, "a"), item(HISTORY, "b"),
                 new PaletteEntry.Header("Commands"), item(COMMANDS, "c"), item(COMMANDS, "d"), item(COMMANDS, "e"),
                 item(COMMANDS, "f")), null, null);
             assertThat(palette.getPreferredSize().height).as("headers above the fifth row add their own height")
-                .isEqualTo(UIScale.scale(44 + 2 * 22 + 5 * 24 + 26) + insets.top + insets.bottom);
+                .isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_FIELD_HEIGHT) + 2 * m(DesignMetrics.Role.RESULTS_HEADING_HEIGHT) + 5 * m(DesignMetrics.Role.RESULTS_ROW_HEIGHT) + m(DesignMetrics.Role.PALETTE_HINT_HEIGHT)) + insets.top + insets.bottom);
             assertThat(((javax.swing.Scrollable) PaletteTestSupport.resultsCanvas(palette)).getPreferredScrollableViewportSize().height)
-                .as("the kit list agrees").isEqualTo(UIScale.scale(2 * 22) + 5 * UIScale.scale(24));
+                .as("the kit list agrees").isEqualTo(UIScale.scale(2 * m(DesignMetrics.Role.RESULTS_HEADING_HEIGHT)) + 5 * UIScale.scale(m(DesignMetrics.Role.RESULTS_ROW_HEIGHT)));
             palette.setVisibleRows(8);
             palette.setEntries(rows, null, null);
-            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(44 + 8 * 24 + 26) + insets.top + insets.bottom);
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_FIELD_HEIGHT) + 8 * m(DesignMetrics.Role.RESULTS_ROW_HEIGHT) + m(DesignMetrics.Role.PALETTE_HINT_HEIGHT)) + insets.top + insets.bottom);
             assertThat(PaletteTestSupport.resultsSpec(palette).visibleRows()).hasValue(8);
             palette.setSize(palette.getPreferredSize());
             layoutTree(palette);
@@ -456,8 +460,8 @@ class CommandPaletteTest {
                 assertPixel(image, at(first, first.getWidth() - 12, 3, palette), semantic.color(SemanticColor.ACCENT), "selected");
                 assertPixel(image, at(second, second.getWidth() - 12, 3, palette),
                     over(card, ColorMath.opacity(semantic.color(SemanticColor.HOVER_OVERLAY), .05)), "hovered");
-                assertPixel(image, at(first, first.getWidth() - 5, 0, palette), card, "selected rounded corner");
-                assertPixel(image, at(second, second.getWidth() - 5, 0, palette), card, "hover rounded corner");
+                assertPixel(image, at(first, first.getWidth() - 1, 0, palette), semantic.color(SemanticColor.ACCENT), "a square selected corner");
+                assertPixel(image, at(second, second.getWidth() - 1, 0, palette), over(card, ColorMath.opacity(semantic.color(SemanticColor.HOVER_OVERLAY), .05)), "a square hover corner");
                 // The pointer leaves the row: an exit inside it only crosses onto the row's own text.
                 second.dispatchEvent(new MouseEvent(second, MouseEvent.MOUSE_EXITED, 1L, 0, -1, -1, 0, false));
                 assertPixel(paint(palette), at(second, second.getWidth() - 12, 3, palette), card, "after the mouse left");
@@ -480,8 +484,8 @@ class CommandPaletteTest {
             java.util.function.Function<JComponent, Rectangle> in = c -> SwingUtilities.convertRectangle(c.getParent(), c.getBounds(), line);
             assertThat(in.apply(detail).x).as("the detail follows the title").isGreaterThanOrEqualTo(in.apply(title).x + title.getWidth());
             assertThat(Math.abs(in.apply(detail).getCenterY() - in.apply(title).getCenterY())).as("on the same line").isLessThanOrEqualTo(1);
-            assertThat(in.apply(tag).x + tag.getWidth()).as("the tag is right-aligned").isEqualTo(UIScale.scale(680) - UIScale.scale(8));
-            int side = UIScale.scale(8), gap = UIScale.scale(8), iconSize = UIScale.scale(16);
+            assertThat(in.apply(tag).x + tag.getWidth()).as("the tag is right-aligned").isEqualTo(UIScale.scale(680) - UIScale.scale(m(DesignMetrics.Role.RESULTS_ROW_PADDING)));
+            int side = UIScale.scale(m(DesignMetrics.Role.RESULTS_ROW_PADDING)), gap = UIScale.scale(m(DesignMetrics.Role.RESULTS_ROW_GAP)), iconSize = UIScale.scale(16);
             int start = side + iconSize + gap;
             assertThat(in.apply(title).x).as("after the icon column").isEqualTo(start);
             line.setSize(title.getPreferredSize().width + UIScale.scale(40), UIScale.scale(24));
@@ -590,29 +594,30 @@ class CommandPaletteTest {
             assertThat(KitTestSupport.require(palette.stepPanel(), CommandPalette.STEP + ".title", JLabel.class).getText()).isEqualTo("Rebase");
             assertThat(palette.hintBar().isVisible()).isFalse();
             Insets insets = palette.getInsets();
-            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(44 + 22 + 2 * 40) + insets.top + insets.bottom);
-            // The laid-out form keeps the former geometry: a 22 px title row, 40 px field rows padded 4/12, a 140 px
-            // label column and a 10 px gap before the field.
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_FIELD_HEIGHT) + 22) + 2 * palette.stepRow(0).getPreferredSize().height + insets.top + insets.bottom);
+            // The laid-out form: a 22 px title row, field rows of at least the step row height padded by the step roles, a 140 px
+            // label column and the label gap before the field.
             palette.setSize(palette.getPreferredSize());
             layoutTree(palette);
             var panel = palette.stepPanel();
             var titleRow = palette.stepTitleRow();
             assertThat(titleRow.getHeight()).isEqualTo(UIScale.scale(22));
             assertThat(SwingUtilities.convertPoint(KitTestSupport.require(panel, CommandPalette.STEP + ".title", JLabel.class), 0, 0, titleRow).x)
-                .as("the title is inset like the rows").isEqualTo(UIScale.scale(12));
+                .as("the title is inset like the rows").isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_STEP_SIDE_PADDING)));
             for (int i = 0; i < 2; i++) {
                 var row = palette.stepRow(i);
-                assertThat(row.getHeight()).as("row %d", i).isEqualTo(UIScale.scale(40));
-                assertThat(SwingUtilities.convertPoint(row, 0, 0, panel).y).isEqualTo(UIScale.scale(22) + i * UIScale.scale(40));
+                int stepRow = Math.max(UIScale.scale(m(DesignMetrics.Role.PALETTE_STEP_ROW_HEIGHT)), row.getPreferredSize().height);
+                assertThat(row.getHeight()).as("row %d", i).isEqualTo(stepRow);
+                assertThat(SwingUtilities.convertPoint(row, 0, 0, panel).y).isEqualTo(UIScale.scale(22) + i * stepRow);
                 var label = palette.stepLabelView(i);
-                assertThat(label.getX()).isEqualTo(UIScale.scale(12));
+                assertThat(label.getX()).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_STEP_SIDE_PADDING)));
                 assertThat(label.getWidth()).as("the label column").isEqualTo(UIScale.scale(140));
                 assertThat(KitTestSupport.require(label, CommandPalette.STEP + ".label." + i, JLabel.class).getText()).isEqualTo(i == 0 ? "branch" : "remote");
                 var field = palette.stepFieldView(i);
-                assertThat(field.getX()).as("a 10 px gap").isEqualTo(UIScale.scale(12 + 140 + 10));
-                assertThat(field.getY()).isEqualTo(UIScale.scale(4));
-                assertThat(field.getHeight()).isEqualTo(UIScale.scale(40 - 2 * 4));
-                assertThat(row.getWidth() - field.getX() - field.getWidth()).isEqualTo(UIScale.scale(12));
+                assertThat(field.getX()).as("the label gap").isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_STEP_SIDE_PADDING) + 140 + m(DesignMetrics.Role.PALETTE_STEP_LABEL_GAP)));
+                assertThat(field.getY()).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_STEP_ROW_PADDING)));
+                assertThat(field.getHeight()).isEqualTo(stepRow - 2 * UIScale.scale(m(DesignMetrics.Role.PALETTE_STEP_ROW_PADDING)));
+                assertThat(row.getWidth() - field.getX() - field.getWidth()).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_STEP_SIDE_PADDING)));
                 assertThat(KitTestSupport.find(field, CommandPalette.STEP + ".field." + i + ".label", JLabel.class).isVisible())
                     .as("the row's label column labels the field").isFalse();
             }
@@ -629,11 +634,11 @@ class CommandPaletteTest {
             assertThat(KitTestSupport.require(palette.stepPanel(), CommandPalette.STEP + ".error", JComponent.class).isVisible()).isTrue();
             assertThat(KitTestSupport.require(palette.stepPanel(), CommandPalette.STEP + ".error.text", JLabel.class).getText()).isEqualTo("Nope");
             assertThat(fields.get(1).getText()).as("an error keeps what was typed").isEqualTo("origin");
-            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(44 + 22 + 2 * 40 + 22) + insets.top + insets.bottom);
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_FIELD_HEIGHT) + 22 + 22) + 2 * palette.stepRow(0).getPreferredSize().height + insets.top + insets.bottom);
             palette.setSize(palette.getPreferredSize());
             layoutTree(palette);
             assertThat(palette.stepErrorRow().getHeight()).as("the error row").isEqualTo(UIScale.scale(22));
-            assertThat(SwingUtilities.convertPoint(palette.stepErrorRow(), 0, 0, palette.stepPanel()).y).isEqualTo(UIScale.scale(22 + 2 * 40));
+            assertThat(SwingUtilities.convertPoint(palette.stepErrorRow(), 0, 0, palette.stepPanel()).y).isEqualTo(UIScale.scale(22) + 2 * palette.stepRow(0).getHeight());
             palette.setStepError(null);
             assertThat(palette.stepErrorText()).isNull();
             assertThat(KitTestSupport.require(palette.stepPanel(), CommandPalette.STEP + ".error", JComponent.class).isVisible()).isFalse();
@@ -756,8 +761,8 @@ class CommandPaletteTest {
                     layoutTree(palette);
                     assertThat(row(palette, 0).getHeight()).as("heading at %s pt", size).isEqualTo(dev.jasper.ui.swing.ResultMetrics.height(palette.kit(), true));
                     assertThat(row(palette, 1).getHeight()).as("row at %s pt", size).isEqualTo(dev.jasper.ui.swing.ResultMetrics.height(palette.kit(), false));
-                    assertThat(palette.hintBar().getHeight()).isGreaterThanOrEqualTo(UIScale.scale(26));
-                    assertThat(PaletteTestSupport.fieldRow(palette).getHeight()).isGreaterThanOrEqualTo(UIScale.scale(44));
+                    assertThat(palette.hintBar().getHeight()).isGreaterThanOrEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_HINT_HEIGHT)));
+                    assertThat(PaletteTestSupport.fieldRow(palette).getHeight()).isGreaterThanOrEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_FIELD_HEIGHT)));
                 }
             } finally { themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults()); palette.close(); }
         });

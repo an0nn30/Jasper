@@ -81,10 +81,11 @@ class PanelSurfacesTest {
                 KitFixtures.render(view, s(260), s(395), 1);
                 var rows = (InteractiveRows.RowsControl) view.control("rows");
                 assertThat(rows.panelCompact).isTrue();
-                assertThat(rows.rowHeight).isEqualTo(metric(DesignMetrics.Role.PANEL_COMPACT_ROW_HEIGHT));
+                // Two lines with their padding outgrow the one-line compact row.
+                assertThat(rows.rowHeight).isEqualTo(Math.max(metric(DesignMetrics.Role.PANEL_COMPACT_ROW_HEIGHT), rows.compactRowHeight())).isGreaterThan(metric(DesignMetrics.Role.PANEL_COMPACT_ROW_HEIGHT));
                 var scroll = bounds(rows.component, view);
                 assertThat(scroll.x).as("inset from the panel edge").isEqualTo(metric(DesignMetrics.Role.PANEL_ROW_SIDE));
-                assertThat(scroll.y - s(38)).as("a compact gap below the header").isEqualTo(metric(DesignMetrics.Role.PANEL_COMPACT_LIST_TOP));
+                assertThat(scroll.y - metric(DesignMetrics.Role.PANEL_HEADER)).as("a compact gap below the header").isEqualTo(metric(DesignMetrics.Role.PANEL_COMPACT_LIST_TOP));
                 var icon = find(view, "a.folder", JLabel.class);
                 assertThat(icon.getIcon().getIconWidth()).isEqualTo(metric(DesignMetrics.Role.PANEL_COMPACT_ROW_GLYPH));
                 var toggle = find(view, "a.switch", JComponent.class);

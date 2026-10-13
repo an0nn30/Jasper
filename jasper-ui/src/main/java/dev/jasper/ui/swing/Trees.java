@@ -169,9 +169,7 @@ final class Trees {
         }
         /** A keycap tree's section heading: one strong title line, a little shorter than its shortcut rows. */
         private int keycapGroupHeight() {
-            var font=ThemePainting.font(context(),dev.jasper.ui.metrics.Typography.Role.PANEL_TITLE);
-            int line=(int)Math.ceil(font.getLineMetrics("Ag",new java.awt.font.FontRenderContext(null,true,true)).getHeight());
-            return Math.max(ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_GROUP_HEIGHT),line+ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_VERTICAL_PADDING));
+            return ThemePainting.height(context(), dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_GROUP_HEIGHT, dev.jasper.ui.metrics.Typography.Role.PANEL_TITLE);
         }
         /** A manager rail's tree (column 0): its branches are flat section headings, its leaves rail rows. */
         boolean rail(){return column==0 && !settingsNavigation && presentation.isEmpty();}

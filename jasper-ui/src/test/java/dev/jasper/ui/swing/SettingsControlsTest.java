@@ -43,7 +43,7 @@ class SettingsControlsTest {
         try(var view=new KitView(context,new ViewSpec(new Nodes.Stack("joined",ControlState.READY,Nodes.LayoutRole.JOINED_ACTIONS,List.of(back,next))),event->{})) {
             assertThat(view.getPreferredSize()).isEqualTo(new java.awt.Dimension(50,24));
             view.update(new ViewSpec(footer));view.setSize(600,53);layout(view);
-            assertThat(find(view,"ok",JButton.class).getWidth()).isEqualTo(64);
+            assertThat(find(view,"ok",JButton.class).getWidth()).isEqualTo(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ACTION_MIN_WIDTH));
             assertThat(find(view,"help",JButton.class).getWidth()).isEqualTo(24);
         }finally{context.binding().close();context.icons().close();}
     }); }
@@ -57,7 +57,7 @@ class SettingsControlsTest {
         var tree=new Nodes.Tree("tree",ControlState.READY,List.of(group,leaf,next),Set.of("group"),Set.of("child"),"");
         try(var view=new KitView(context,new ViewSpec(new Nodes.Stack("nav",ControlState.READY,Nodes.LayoutRole.SETTINGS_NAVIGATION,List.of(tree))),event->{})) {
             view.setSize(236,500);layout(view);var rows=(Trees.TreeControl)view.control("tree");
-            assertThat(rows.mounted.get("child").getHeight()).isEqualTo(29);
+            assertThat(rows.mounted.get("child").getHeight()).isEqualTo(context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_ROW));
             assertThat(rows.top(2)-rows.top(1)-rows.mounted.get("child").getHeight()).as("an unlabelled root group").isEqualTo(context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_GROUP_GAP));
             assertThat(rows.top(3)-rows.top(2)-rows.mounted.get("leaf").getHeight()).as("a labelled group heading").isEqualTo(context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_HEADING_GAP));
             view.update(new ViewSpec(tree));view.setSize(236,500);layout(view);

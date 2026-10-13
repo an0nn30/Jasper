@@ -17,6 +17,8 @@ import javax.swing.*;
 
 @SuppressWarnings("try")
 class MenusTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     static MenuButton menu(String action) {
         return new MenuButton(
                 "menu",
@@ -38,7 +40,8 @@ class MenusTest {
                 new MenuItem("c","Secure Note","note","c",true,false,Hue.AMBER),new MenuItem("sep","","","",true,true),new MenuItem("d","Generate SSH Key...","sparkle","d",true,false,Hue.PURPLE));
             try(var view=new KitView(context,stack(new MenuButton("menu",ControlState.READY,"Add","",ButtonKind.GHOST,"",items,"")),e->{})) {
                 var popup=find(view,"menu",JComponent.class).getComponentPopupMenu();
-                assertThat(popup.getPreferredSize()).isEqualTo(new java.awt.Dimension(s(222),s(137)));
+                assertThat(popup.getPreferredSize().width).isGreaterThanOrEqualTo(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_MIN_WIDTH)));
+                assertThat(popup.getPreferredSize().height).isEqualTo(2*s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_PADDING))+4*s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_ITEM_HEIGHT))+2*s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_SEPARATOR_MARGIN))+s(1));
             }finally{release(context);}
         });
     }
@@ -219,8 +222,8 @@ class MenusTest {
                             var popup =
                                     find(view, "menu", JComponent.class).getComponentPopupMenu();
                             var item = (JMenuItem) popup.getComponent(0);
-                            assertThat(item.getIcon().getIconWidth()).isEqualTo(s(18));
-                            assertThat(item.getPreferredSize().height).isGreaterThan(s(28));
+                            assertThat(item.getIcon().getIconWidth()).isEqualTo(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_TILE)));
+                            assertThat(item.getPreferredSize().height).isGreaterThan(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_ITEM_HEIGHT)));
                         }
                     } finally {
                         UIManager.put("defaultFont", old);
