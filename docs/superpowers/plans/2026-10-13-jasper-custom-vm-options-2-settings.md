@@ -3022,7 +3022,9 @@ Expected: BUILD SUCCESSFUL.
 `docs/configuration.md`:
 - Change `System Settings shows the file's location with Open in Editor, Reveal, Reload from Disk and Migrate Config.`
   to `System Settings shows the file's location with Open in Editor, Reveal, Reload from Disk and Migrate Config, and a
-  Java Virtual Machine section for the [custom VM options](#custom-vm-options).`
+  Java Virtual Machine section for the custom VM options.`, with the words "custom VM options" made a Markdown link to
+  the in-page anchor `custom-vm-options` (the plan spells the link out in words because `AppDocumentationTest` resolves
+  links in plan files too).
 - At the end of `### Custom VM options`, add the paragraph:
 
 ```markdown
