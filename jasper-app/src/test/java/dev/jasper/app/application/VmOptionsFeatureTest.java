@@ -1,6 +1,7 @@
 package dev.jasper.app.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import dev.jasper.app.notifications.Delivery;
 import dev.jasper.app.notifications.DisplayMode;
@@ -11,6 +12,7 @@ import dev.jasper.app.vmoptions.LauncherImage;
 import dev.jasper.app.vmoptions.VmOptionsCheck;
 import dev.jasper.app.vmoptions.VmOptionsFile;
 import dev.jasper.app.vmoptions.VmOptionsLaunch;
+import dev.jasper.app.vmoptions.VmOptionsSyntax;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,6 +25,8 @@ import java.util.OptionalLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -213,10 +217,63 @@ class VmOptionsFeatureTest {
         var launch = new VmOptionsLaunch(Optional.of(home.resolve("blocker/jasper.vmoptions")), Optional.empty(), false, Optional.empty());
         var result = feature(launch, true).hooks().heap().save().apply(4096);
         assertThat(result).isCompletedExceptionally();
-        assertThat(result.exceptionNow()).hasMessageContaining("Could not save jasper.vmoptions");
+        assertThat(result.exceptionNow()).hasMessage("Could not save jasper.vmoptions: " + home.resolve("blocker") + " is in the way.");
         assertThat(center.history()).singleElement().satisfies(entry -> {
             assertThat(entry.request().title()).isEqualTo("Could not save jasper.vmoptions");
-            assertThat(entry.request().content()).startsWith(home.resolve("blocker/jasper.vmoptions").toString());
+            assertThat(entry.request().content()).isEqualTo(home.resolve("blocker/jasper.vmoptions") + ": " + home.resolve("blocker") + " is in the way.");
         });
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS) void aFolderThatCannotBeWrittenSaysPermissionDenied() throws IOException {
+        Path folder = Files.createDirectory(home.resolve("readonly"));
+        assertThat(folder.toFile().setWritable(false)).isTrue();
+        try {
+            assumeFalse(Files.isWritable(folder), "the user can write anywhere (root)");
+            var launch = new VmOptionsLaunch(Optional.of(folder.resolve("jasper.vmoptions")), Optional.empty(), false, Optional.empty());
+            var result = feature(launch, true).hooks().heap().save().apply(4096);
+            assertThat(result.exceptionNow()).hasMessage("Could not save jasper.vmoptions: permission denied.");
+            assertThat(center.history()).singleElement().satisfies(entry ->
+                assertThat(entry.request().content()).isEqualTo(folder.resolve("jasper.vmoptions") + ": permission denied."));
+        } finally {
+            assertThat(folder.toFile().setWritable(true)).isTrue();
+        }
+    }
+
+    @Test void aCorruptedLaunchWhoseFileIsFixedSaysTheOptionsWereIgnoredAtStartAndAsksForARestart() throws IOException {
+        Files.write(file(), new byte[] {'-', 'X', 'm', 'x', '1', 'g', '\n', 0});
+        var feature = feature(launch(true, Optional.empty()), true);
+        feature.startupSettled();
+        var hooks = feature.hooks();
+        assertThat(hooks.state().get()).hasValueSatisfying(notice -> {
+            assertThat(notice.title()).isEqualTo("Options ignored");
+            assertThat(notice.text()).isEqualTo("jasper.vmoptions contains a NUL character or is not valid UTF-8; fix it to apply your options.");
+        });
+        assertThat(hooks.restart().get()).as("nothing to restart for while the file is unreadable").isEmpty();
+        Files.writeString(file(), "-Xmx3g\n");
+        feature.reload();
+        assertThat(hooks.state().get()).hasValueSatisfying(notice -> {
+            assertThat(notice.title()).isEqualTo("Options ignored at start-up");
+            assertThat(notice.text()).isEqualTo("jasper.vmoptions could not be read when Jasper started, so it started with the bundled options.");
+        });
+        assertThat(hooks.restart().get()).hasValueSatisfying(notice -> assertThat(notice.text()).isEqualTo("Restart Jasper to apply your changes."));
+    }
+
+    @Test void aFileThatBecomesCorruptedWhileRunningOffersNoRestart() throws IOException {
+        Files.writeString(file(), "-Xmx1g\n");
+        var launch = new VmOptionsLaunch(Optional.of(file()), Optional.of(VmOptionsSyntax.digest(List.of("-Xmx1g"))), false, Optional.empty());
+        var feature = feature(launch, true);
+        feature.startupSettled();
+        var hooks = feature.hooks();
+        assertThat(hooks.state().get()).isEmpty();
+        assertThat(hooks.restart().get()).isEmpty();
+        Files.write(file(), new byte[] {'-', 'X', 'm', 'x', '3', 'g', '\n', 0});
+        feature.reload();
+        assertThat(hooks.restart().get()).as("restarting would start Jasper without any of the user's options").isEmpty();
+        assertThat(hooks.state().get()).hasValueSatisfying(notice -> {
+            assertThat(notice.title()).isEqualTo("Options ignored");
+            assertThat(notice.text()).isEqualTo("jasper.vmoptions contains a NUL character or is not valid UTF-8; fix it to apply your options.");
+        });
+        feature.settingsClosed();
+        assertThat(center.history()).isEmpty();
     }
 }

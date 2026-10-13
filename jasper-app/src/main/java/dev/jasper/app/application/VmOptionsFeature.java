@@ -11,7 +11,11 @@ import dev.jasper.app.vmoptions.VmOptionsLaunch;
 import dev.jasper.app.vmoptions.VmOptionsSyntax;
 import dev.jasper.ui.model.Nodes;
 import java.io.IOException;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
+import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -233,9 +237,10 @@ final class VmOptionsFeature {
                 saved = VmOptionsFile.read(file);
                 savedStamp = stamp(file);
             } catch (IOException | RuntimeException failure) {
-                done.completeExceptionally(new IOException("Could not save " + file.getFileName() + ": " + failure.getMessage(), failure));
+                String description = describe(failure);
+                done.completeExceptionally(new IOException("Could not save " + file.getFileName() + ": " + description, failure));
                 // Spec section 7: the row shows the error and a notification names the path.
-                ui.accept(() -> notices.failed("Could not save " + file.getFileName(), file + ": " + failure.getMessage()));
+                ui.accept(() -> notices.failed("Could not save " + file.getFileName(), file + ": " + description));
                 ui.accept(this::reload);
                 return;
             }
@@ -248,6 +253,18 @@ final class VmOptionsFeature {
             });
         });
         return done;
+    }
+
+    /** Why a write failed, in words: the file system's own message is often only a path (often the temporary file's). */
+    private static String describe(Exception failure) {
+        if (failure instanceof AccessDeniedException) return "permission denied.";
+        if (failure instanceof FileSystemException problem) {
+            if ((failure instanceof FileAlreadyExistsException || failure instanceof NotDirectoryException) && problem.getFile() != null) {
+                return problem.getFile() + " is in the way.";
+            }
+            if (problem.getReason() != null) return problem.getReason();
+        }
+        return String.valueOf(failure.getMessage());
     }
 
     private void revealFile() {
@@ -264,7 +281,8 @@ final class VmOptionsFeature {
     }
 
     private boolean restartNeeded() {
-        return launch.launcherManaged() && atStart != null && launch.restartNeeded(contents.parsed(), atStart.parsed());
+        return launch.launcherManaged() && atStart != null && !contents.parsed().corrupted()
+            && launch.restartNeeded(contents.parsed(), atStart.parsed());
     }
 
     private Optional<SchemaPage.Notice> stateNotice() {
@@ -279,9 +297,13 @@ final class VmOptionsFeature {
             return Optional.of(new SchemaPage.Notice("Started without your options",
                 "JASPER_VM_OPTIONS_SKIP is set, so Jasper started without your custom VM options."));
         }
-        if (launch.corrupted() || contents.parsed().corrupted()) {
+        if (contents.parsed().corrupted()) {
             return Optional.of(new SchemaPage.Notice("Options ignored",
                 "jasper.vmoptions contains a NUL character or is not valid UTF-8; fix it to apply your options."));
+        }
+        if (launch.corrupted()) {
+            return Optional.of(new SchemaPage.Notice("Options ignored at start-up",
+                "jasper.vmoptions could not be read when Jasper started, so it started with the bundled options."));
         }
         return Optional.empty();
     }

@@ -797,7 +797,7 @@ public final class JasperApplication {
         contributions.addAction("app.vmoptions", "Edit Custom VM Options…", null, List.of("memory", "heap", "xmx", "jvm", "java", "vm options", "vmoptions"),
             Optional.empty(), invocation -> {
                 if (vmOptions.editable()) vmOptions.editCustomOptions();
-                else openSettings(invocation.windowId(), "system");
+                else openSettings(invocation.windowId(), "system#vm.heap");
             });
         contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(List.of(new MenuEntry.Item("app.shortcuts"),
             new MenuEntry.Separator(), new MenuEntry.Item("app.memory"), new MenuEntry.Item("app.vmoptions")));
