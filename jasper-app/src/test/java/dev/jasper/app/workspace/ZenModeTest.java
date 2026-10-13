@@ -99,9 +99,11 @@ class ZenModeTest {
             var model = new Contributions(); var owner = window(); owner.connectContributions(model);
             owner.setSize(1400, 900);
             Map<String, PanelSite> sites = new java.util.HashMap<>();
+            Map<String, List<Boolean>> heard = new java.util.HashMap<>();
             for (String id : List.of("test.a", "test.b"))
                 model.addPanel(id, id.substring(5).toUpperCase(), new ImageIcon(), id.equals("test.a") ? Slot.LEFT_TOP : Slot.RIGHT_TOP, site -> {
-                    sites.put(id, site); return new JLabel(id.substring(5));
+                    sites.put(id, site); var events = new ArrayList<Boolean>(); heard.put(id, events);
+                    site.onVisibility(events::add); return new JLabel(id.substring(5));
                 });
             show(model, owner, "test.a"); toggle(owner);
             assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
@@ -119,6 +121,8 @@ class ZenModeTest {
             assertThat((JLabel) owner.area().content(Slot.LEFT_TOP)).extracting(JLabel::getText).isEqualTo("a");
             assertThat(owner.area().content(Slot.RIGHT_TOP)).isNull();
             assertThat(sites.get("test.a").visible()).isTrue(); assertThat(sites.get("test.b").visible()).isFalse();
+            assertThat(heard.get("test.a")).containsExactly(true, false, true, false, true);
+            assertThat(heard.get("test.b")).as("opened in Zen, closed on leaving it").containsExactly(true, false);
             assertThat(owner.leftStripe().isVisible()).isTrue();
         });
     }
@@ -236,6 +240,8 @@ class ZenModeTest {
             show(model, first, "test.panel"); toggle(first);
             // Read from disk before close: the toggle itself must save.
             var restored = window(); restored.connectContributions(model, UiState.load(file));
+            assertThat(UiState.load(file).panel("test.panel")).as("restoring in Zen keeps the panel saved as showing")
+                .hasValueSatisfying(panel -> assertThat(panel.visible()).isTrue());
             assertThat(restored.zenMode()).isTrue();
             assertThat(restored.action(zenAction()).getValue(Action.SELECTED_KEY)).isEqualTo(true);
             assertThat(restored.status().isVisible()).isFalse();

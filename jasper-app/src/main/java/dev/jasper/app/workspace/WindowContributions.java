@@ -216,10 +216,11 @@ final class WindowContributions implements AutoCloseable {
             panels.put(entry.id(), new PanelInstance(entry));
             Optional<UiState.Panel> saved = state.panel(entry.id());
             Slot slot = saved.map(UiState.Panel::slot).orElse(entry.defaultSlot());
+            boolean showed = saved.map(UiState.Panel::visible).orElse(false);
+            // Remembered before docking: docking saves, and in Zen the saved visibility is the remembered one.
+            if (showed && beforeZen != null) beforeZen.add(entry.id());
             dock.add(entry.id(), slot, insertionIndex(slot, saved.map(UiState.Panel::order).orElse(UiState.Panel.LAST)));
-            if (!saved.map(UiState.Panel::visible).orElse(false)) continue;
-            if (beforeZen != null) beforeZen.add(entry.id());
-            else dock.show(entry.id());
+            if (showed && beforeZen == null) dock.show(entry.id());
         }
     }
 
