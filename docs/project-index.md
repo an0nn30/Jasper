@@ -60,7 +60,9 @@ when one is cut short.
 
 Indexes are saved and survive restarts. A project is refreshed in the background when a terminal enters it again and
 when a command finishes in it, at most once every **Minutes between background refreshes** (5 by default). Choose
-**Reindex Current Project** from the palette, or **Reindex** in Settings, to refresh at once.
+**Reindex Current Project** from the palette, or **Reindex** in Settings, to refresh at once. **Remove Current Project
+from Index…** (`dev.jasper.indexer.remove`, unbound by default) asks, then forgets the focused terminal's project and
+deletes its saved index, as **Remove** in Settings does.
 
 ## Settings
 

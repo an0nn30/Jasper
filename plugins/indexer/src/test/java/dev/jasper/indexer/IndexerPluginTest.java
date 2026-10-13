@@ -196,6 +196,32 @@ class IndexerPluginTest {
         }
     }
 
+    @Test void removeCurrentProjectAsksThenForgetsTheFocusedPanesProject() throws IOException {
+        Path notes = Files.createDirectories(home.resolve("notes"));
+        Files.writeString(notes.resolve("todo.txt"), "");
+        List<String> questions = new ArrayList<>();
+        var plugin = new IndexerPlugin(new IndexerPlugin.Environment(ui, () -> Instant.parse("2026-10-05T10:00:00Z"),
+            (delay, task) -> () -> { }, home, List.of(home.resolve("no-such-git").toString()), questions::add));
+        try (var host = host()) {
+            UUID window = window(host);
+            host.start(IndexerTesting.INFO, Set.of(), Set.of(), plugin);
+            assertThat(host.actionSpec(IndexerPlugin.REMOVE).orElseThrow().defaultBinding()).as("unbound until the user binds it").isEmpty();
+            host.queueFileChoice(List.of(new FileLocation.Local(notes)));
+            host.invoke(IndexerPlugin.INDEX_FOLDER, window, null);
+            settle(host);
+            assertThat(host.invoke(IndexerPlugin.REMOVE, window, null)).isTrue();
+            assertThat(questions).as("no project, so nothing to confirm").isEmpty();
+            assertThat(host.notifications().lines()).contains("dev.jasper.indexer|INFO|No indexed project here|"
+                + "The focused terminal is not inside an indexed project.");
+            UUID pane = host.addTerminalPane(host.addTerminalTab(window, "zsh"), IndexerTesting.pane(notes));
+            assertThat(host.invoke(IndexerPlugin.REMOVE, window, pane)).isTrue();
+            settle(host);
+            assertThat(questions).containsExactly("Remove notes from Project Index? Its saved index is deleted.");
+            assertThat(host.searchScope(FilesScope.ID, "todo", window, null)).isEmpty();
+            assertThat(Files.readString(projectsFile())).doesNotContain("notes");
+        }
+    }
+
     @Test void aRestartServesSavedIndexesWithoutReindexing() throws IOException {
         Path notes = Files.createDirectories(home.resolve("notes"));
         Files.writeString(notes.resolve("todo.txt"), "");
