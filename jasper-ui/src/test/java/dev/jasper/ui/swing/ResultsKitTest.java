@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
  * selection kept in view), field composition state and unlabelled search fields.
  */
 class ResultsKitTest {
-    @Test void subtitleInkUsesItsReceivingSlotWhileRoleAndExplicitSeveritySurviveSelection() {
+    @Test void subtitleInkUsesItsReceivingSlotOnTheSelection() {
         Edt.run(()->{
             var context=KitFixtures.context();
             for(var role:List.of(TextRole.BODY,TextRole.MONO)) {
@@ -40,7 +40,7 @@ class ResultsKitTest {
                     for(boolean selected:new boolean[]{true,false,true}) {
                         view.update(new ViewSpec(results(List.of(item),selected?Set.of("one"):Set.of(),OptionalInt.empty())));
                         assertThat(find(view,"detail",JLabel.class)).isSameAs(label);assertThat(label.getFont()).isEqualTo(font);
-                        assertThat(label.getForeground()).isEqualTo(selected?dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(),SemanticColor.TEXT_ONACCENT_SECONDARY,SemanticColor.ACCENT,dev.jasper.ui.theme.SurfaceContrast.TEXT):context.theme().semantic().color(SemanticColor.TEXT_TERTIARY));
+                        assertThat(label.getForeground()).isEqualTo(selected?context.theme().semantic().color(SemanticColor.TEXT_ONACCENT_SECONDARY):context.theme().semantic().color(SemanticColor.TEXT_TERTIARY));
                     }
                 }
             }
@@ -253,7 +253,7 @@ class ResultsKitTest {
         });
     }
 
-    @Test void selectedAndHoveredResultsPaintRoundedRoleColours() {
+    @Test void selectedAndHoveredResultsFillTheirWholeRow() {
         Edt.run(() -> {
             var context = KitFixtures.context();
             try (var view = new KitView(context, new ViewSpec(results(List.of(row("a", "A", null, null), row("b", "B", null, null)), Set.of("a"), OptionalInt.empty())), e -> { })) {
@@ -269,6 +269,7 @@ class ResultsKitTest {
                 assertThat(at.apply(first, new Point(w - UIScale.scale(12), UIScale.scale(3)))).as("the palette highlights with the accent").isEqualTo(semantic.color(SemanticColor.ACCENT));
                 assertThat(at.apply(first, new Point(w - 1, 0))).as("a square corner").isEqualTo(semantic.color(SemanticColor.ACCENT));
                 assertThat(at.apply(first, new Point(0, UIScale.scale(12)))).as("edge to edge").isEqualTo(semantic.color(SemanticColor.ACCENT));
+                assertThat(find(view, "a.title", JLabel.class).getForeground()).as("white on the accent").isEqualTo(semantic.color(SemanticColor.TEXT_ONACCENT));
                 var hover = ColorMath.opacity(semantic.color(SemanticColor.HOVER_OVERLAY), .05);
                 assertThat(at.apply(second, new Point(w - UIScale.scale(12), UIScale.scale(3)))).isEqualTo(over(new Color(0, 0, 0, 0), hover));
                 assertThat(at.apply(second, new Point(w - 1, 0))).as("a square hover corner").isEqualTo(over(new Color(0, 0, 0, 0), hover));

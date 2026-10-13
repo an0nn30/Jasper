@@ -179,9 +179,8 @@ final class Choices {
             @Override protected void paintComponent(Graphics graphics) {
                 if (selected) {
                     var g=(Graphics2D)graphics.create();
-                    try { ThemePainting.antialias(g);g.setColor(ThemePainting.color(context,SemanticColor.ACCENT));
-                        int r=ThemePainting.metric(context,DesignMetrics.Role.MENU_ITEM_RADIUS);
-                        g.fillRoundRect(0,0,getWidth(),getHeight(),r*2,r*2);
+                    // A highlighted option is a plain rectangle across the row (spec 2).
+                    try { g.setColor(ThemePainting.color(context,SemanticColor.SELECTION_BG)); g.fillRect(0,0,getWidth(),getHeight());
                     } finally {g.dispose();}
                 }
                 super.paintComponent(graphics);
@@ -191,7 +190,7 @@ final class Choices {
         renderer.setText(text);
         renderer.setFont(ThemePainting.font(context, Typography.Role.BODY));
         renderer.setForeground(ThemePainting.color(context, selected ? SemanticColor.TEXT_ONACCENT : role != null ? role : SemanticColor.TEXT_PRIMARY));
-        renderer.setBackground(ThemePainting.color(context, selected ? SemanticColor.ACCENT : SemanticColor.SURFACE_MENU));
+        renderer.setBackground(ThemePainting.color(context, selected ? SemanticColor.SELECTION_BG : SemanticColor.SURFACE_MENU));
         hue.ifPresent(h -> renderer.setIcon(new HueDot(context, h)));
         int pad = ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
         renderer.setBorder(new EmptyBorder(0, pad, 0, pad)); return renderer;
@@ -302,7 +301,7 @@ final class Choices {
             var list = popup.getList();
             list.setBackground(ThemePainting.color(context, SemanticColor.SURFACE_MENU));
             list.setForeground(ThemePainting.color(context, SemanticColor.TEXT_PRIMARY));
-            list.setSelectionBackground(ThemePainting.color(context, SemanticColor.ACCENT));
+            list.setSelectionBackground(ThemePainting.color(context, SemanticColor.SELECTION_BG));
             list.setSelectionForeground(ThemePainting.color(context, SemanticColor.TEXT_ONACCENT));
             boolean rich=false;for(int i=0;i<getItemCount();i++){var option=getItemAt(i);if(!option.icon().isBlank()||!option.description().isBlank()){rich=true;break;}}
             list.setFixedCellHeight(rich?-1:ThemePainting.height(context, DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.BODY));

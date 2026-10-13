@@ -34,7 +34,7 @@
       "text.tertiary": "#727985", "text.placeholder": "#8E95A0", "text.field.raised": "#4A515C",
       "text.onAccent": "#FFFFFF", "text.onAccent.secondary": "#FFFFFFBF", "text.link": "#3F6FA8",
       "text.link.hover": "#2F5A8C", "text.error": "#B93A33", "text.success": "#2E9A4C",
-      "accent": "#3F6FA8", "accent.hover": "#4A7BB5", "selection.bg": "#5482B9", "hover.overlay": "#000000",
+      "accent": "#3F6FA8", "accent.hover": "#4A7BB5", "selection.bg": "#3F6FA8", "hover.overlay": "#000000",
       "segment.track": "#E4E7EB", "segment.selected.bg": "#FFFFFF", "toggle.track.off": "#C3C8D0", "toggle.knob": "#FFFFFF",
       "button.secondary.bg": "#FFFFFF", "button.secondary.bg.hover": "#F0F2F5", "button.secondary.border": "#C3C8D0",
       "status.success": "#2E9A4C", "status.warning": "#A8740F", "status.danger": "#C8423A", "status.idle": "#A8AEB7",

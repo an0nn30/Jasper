@@ -121,7 +121,7 @@ class CommandPaletteTest {
                 try(var expected=new dev.jasper.ui.icons.IconRegistry()) {
                     expected.register("owner:mark","M 2 14 L 14 2");
                     assertThat(dev.jasper.app.testsupport.IconPixels.of(after)).isNotEqualTo(dev.jasper.app.testsupport.IconPixels.of(before))
-                        .containsExactly(dev.jasper.app.testsupport.IconPixels.of(expected.icon("owner:mark",palette.kit().theme().semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,after.getIconWidth())));
+                        .containsExactly(dev.jasper.app.testsupport.IconPixels.of(expected.icon("owner:mark",palette.kit().theme().semantic(),SemanticColor.TEXT_ONACCENT,after.getIconWidth())));
                 }
             }
         });
@@ -435,7 +435,7 @@ class CommandPaletteTest {
                         assertThat(KitTestSupport.require(palette.hintView(), CommandPalette.VERB + verb, AbstractButton.class).getForeground())
                             .as(name + " verb " + verb).isEqualTo(semantic.color(SemanticColor.TEXT_LINK));
                     layoutTree(palette);
-                    assertThat(label(row(palette, 4), "a detail").getForeground()).as(name).isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(semantic, SemanticColor.TEXT_ONACCENT_SECONDARY, SemanticColor.ACCENT, dev.jasper.ui.theme.SurfaceContrast.TEXT));
+                    assertThat(label(row(palette, 4), "a detail").getForeground()).as(name).isEqualTo(semantic.color(SemanticColor.TEXT_ONACCENT_SECONDARY));
                     assertThat(label(row(palette, 3), "History").getForeground()).as(name).isEqualTo(semantic.color(SemanticColor.TEXT_TERTIARY));
                     palette.close();
                 } finally { bindings.close(); }
@@ -699,7 +699,7 @@ class CommandPaletteTest {
                 palette.setEntries(List.of(new PaletteEntry.Item(HISTORY,new PaletteRow("one","Selected title","selected detail",null,null,true,null))),null,null);
                 palette.setSize(palette.getPreferredSize());layoutTree(palette);
                 var detail=label(row(palette,0),"selected detail");
-                assertThat(detail.getForeground()).isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(palette.kit().theme().semantic(),SemanticColor.TEXT_ONACCENT_SECONDARY,SemanticColor.ACCENT,dev.jasper.ui.theme.SurfaceContrast.TEXT));
+                assertThat(detail.getForeground()).isEqualTo(palette.kit().theme().semantic().color(SemanticColor.TEXT_ONACCENT_SECONDARY));
             }
         });
     }

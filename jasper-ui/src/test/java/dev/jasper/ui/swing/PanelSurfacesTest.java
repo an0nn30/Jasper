@@ -84,15 +84,16 @@ class PanelSurfacesTest {
                 // Two lines with their padding outgrow the one-line compact row.
                 assertThat(rows.rowHeight).isEqualTo(Math.max(metric(DesignMetrics.Role.PANEL_COMPACT_ROW_HEIGHT), rows.compactRowHeight())).isGreaterThan(metric(DesignMetrics.Role.PANEL_COMPACT_ROW_HEIGHT));
                 var scroll = bounds(rows.component, view);
-                assertThat(scroll.x).as("inset from the panel edge").isEqualTo(metric(DesignMetrics.Role.PANEL_ROW_SIDE));
+                assertThat(scroll.x).as("the list reaches the panel edge").isZero();
+                assertThat(rows.gutter).as("its rows keep the panel row inset").isEqualTo(ctx.metrics().value(DesignMetrics.Role.PANEL_ROW_SIDE));
                 assertThat(scroll.y - metric(DesignMetrics.Role.PANEL_HEADER)).as("a compact gap below the header").isEqualTo(metric(DesignMetrics.Role.PANEL_COMPACT_LIST_TOP));
                 var icon = find(view, "a.folder", JLabel.class);
                 assertThat(icon.getIcon().getIconWidth()).isEqualTo(metric(DesignMetrics.Role.PANEL_COMPACT_ROW_GLYPH));
                 var toggle = find(view, "a.switch", JComponent.class);
                 var placed = SwingUtilities.convertRectangle(toggle.getParent(), toggle.getBounds(), rows.component);
                 int track = placed.x + placed.width - metric(DesignMetrics.Role.FOCUS_RING);
-                assertThat(rows.component.getWidth() - track).as("the switch track ends the compact inset from the row")
-                    .isEqualTo(metric(DesignMetrics.Role.PANEL_COMPACT_ROW_TRAILING));
+                assertThat(rows.component.getWidth() - track).as("the switch track ends the compact inset, inside the gutter")
+                    .isEqualTo(metric(DesignMetrics.Role.PANEL_COMPACT_ROW_TRAILING) + metric(DesignMetrics.Role.PANEL_ROW_SIDE));
                 assertThat(find(view, "a.chip", JLabel.class).getFont().getSize2D())
                     .isEqualTo(ThemePainting.font(ctx, dev.jasper.ui.metrics.Typography.Role.PANEL_ROW_CHIP).getSize2D());
             } finally { release(ctx); }

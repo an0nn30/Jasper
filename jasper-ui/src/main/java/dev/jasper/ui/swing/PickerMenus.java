@@ -115,7 +115,7 @@ final class PickerMenus {
                 for(int i=0;i<model.size();i++)if(model.get(i).id().equals(n.activeId())){list.setSelectedIndex(i);break;}
                 appliedActive=n.activeId();
             }
-            list.setFixedCellHeight(-1);list.setVisibleRowCount(Math.min(9,model.size()));list.setBorder(new EmptyBorder(0,pad,metric(context(),DesignMetrics.Role.PICKER_MENU_BOTTOM),pad));list.setFont(search.getFont());
+            list.setFixedCellHeight(-1);list.setVisibleRowCount(Math.min(9,model.size()));list.setBorder(new EmptyBorder(0,0,metric(context(),DesignMetrics.Role.PICKER_MENU_BOTTOM),0));list.setFont(search.getFont());
             scroll.setPreferredSize(new Dimension(metric(context(),DesignMetrics.Role.PICKER_WIDTH),Math.min(rows.stream().limit(9).mapToInt(item->rowHeight(this,item)).sum()+metric(context(),DesignMetrics.Role.PICKER_MENU_BOTTOM),Math.max(height(context(),DesignMetrics.Role.PICKER_UTILITY_HEIGHT),view.availableHeight()-searchBox.getPreferredSize().height-(n.items().isEmpty()?metric(context(),DesignMetrics.Role.PICKER_EMPTY_HEIGHT):0)))));
             empty.setBorder(new EmptyBorder(0,0,metric(context(),DesignMetrics.Role.PICKER_EMPTY_TEXT_INSET),0));empty.setText(n.noMatches());empty.setVisible(n.items().isEmpty());empty.setFont(ThemePainting.font(context(),Typography.Role.PICKER_CAPTION));empty.setForeground(ThemePainting.color(context(),SemanticColor.TEXT_TERTIARY));empty.setPreferredSize(new Dimension(metric(context(),DesignMetrics.Role.PICKER_WIDTH),metric(context(),DesignMetrics.Role.PICKER_EMPTY_HEIGHT)));
         }finally{applying=false;}component.revalidate();component.repaint();}
@@ -129,7 +129,7 @@ final class PickerMenus {
             ThemePainting.antialias(g);boolean footer=item.id().equals(n.footerAction());
             int pad=metric(c,DesignMetrics.Role.PICKER_PADDING),tile=metric(c,DesignMetrics.Role.PICKER_TILE),gap=metric(c,DesignMetrics.Role.PICKER_ROW_GAP);
             int top=footer?metric(c,DesignMetrics.Role.PICKER_FOOTER_TOP):0,rowHeight=getHeight()-top;
-            if(active){g.setColor(ThemePainting.color(c,SemanticColor.ACCENT));int radius=metric(c,DesignMetrics.Role.MENU_ITEM_RADIUS);g.fillRoundRect(0,top+1,getWidth(),rowHeight-2,radius*2,radius*2);}
+            if(active){g.setColor(ThemePainting.color(c,SemanticColor.SELECTION_BG));g.fillRect(0,top,getWidth(),rowHeight);}
             if(item.kind()==Nodes.PickerItemKind.UTILITY){int glyph=metric(c,DesignMetrics.Role.PICKER_GLYPH);c.icons().icon(item.icon(),c.theme().semantic(),active?SemanticColor.TEXT_ONACCENT:footer?SemanticColor.TEXT_LINK:SemanticColor.TEXT_TERTIARY,glyph).paintIcon(this,g,pad+(tile-glyph)/2,top+(rowHeight-glyph)/2);}
             else tile(g,this,c,item.icon(),item.hue(),pad,(getHeight()-tile)/2,tile,active);
             int x=pad+tile+gap;line(g,c,item.label(),item.caption(),x,top,getWidth()-x-pad-tile,rowHeight,active,false,true,footer);

@@ -764,10 +764,11 @@ class RemoteKitTest {
                     assertThat(dirty).contains(rows.canvas);dirty.clear();
                     for(var listener:rows.canvas.getFocusListeners())listener.focusLost(new java.awt.event.FocusEvent(rows.canvas,java.awt.event.FocusEvent.FOCUS_LOST));
                     assertThat(dirty).contains(rows.canvas);dirty.clear();
+                    // A row's repaint redraws its whole band on the canvas, where its fill is painted.
                     for(var listener:button.getFocusListeners())listener.focusGained(new java.awt.event.FocusEvent(button,java.awt.event.FocusEvent.FOCUS_GAINED));
-                    assertThat(dirty).contains(row);dirty.clear();
+                    assertThat(dirty).contains(rows.canvas);dirty.clear();
                     for(var listener:button.getFocusListeners())listener.focusLost(new java.awt.event.FocusEvent(button,java.awt.event.FocusEvent.FOCUS_LOST));
-                    assertThat(dirty).contains(row);
+                    assertThat(dirty).contains(rows.canvas);
                 }finally{RepaintManager.setCurrentManager(manager);}
                 var previous=KeyboardFocusManager.getCurrentKeyboardFocusManager();
                 try {

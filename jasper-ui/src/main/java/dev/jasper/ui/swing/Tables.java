@@ -175,7 +175,7 @@ final class Tables {
             }
             // The header's titles start where the cells' text does: the row inset (a manager column's, else the icon gap).
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP),
-                    side = column >= 0 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_LIST_SIDE) : pad;
+                    side = (column >= 0 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_LIST_SIDE) : pad) + com.formdev.flatlaf.util.UIScale.scale(gutter);
             header.setBorder(
                     BorderFactory.createEmptyBorder(
                             pad,
@@ -203,7 +203,8 @@ final class Tables {
                                 column.role()));
             row.slot(row.title, nodes);
             row.title.setLayout(weights());
-            Color muted = data.muted() ? ThemePainting.color(context(), SemanticColor.TEXT_PLACEHOLDER) : null;
+            // A selected row's cells and glyph are white (row.inked); a muted row keeps its placeholder ink only unselected.
+            Color muted = data.muted() && !row.inked ? ThemePainting.color(context(), SemanticColor.TEXT_PLACEHOLDER) : null;
             for (int i = 0; i < nodes.size(); i++) {
                 var label = (JLabel) row.title.getComponent(i);
                 label.setHorizontalAlignment(
@@ -211,7 +212,10 @@ final class Tables {
                                 ? SwingConstants.RIGHT
                                 : SwingConstants.LEFT);
                 label.setIcon(
-                        i == 0 && data.icon().isPresent()
+                        i == 0 && data.icon().isPresent() && row.inked
+                                ? context().icons().icon(data.icon().get(), context().theme().semantic(), SemanticColor.TEXT_ONACCENT,
+                                        com.formdev.flatlaf.util.UIScale.scale(14))
+                                : i == 0 && data.icon().isPresent()
                                 ? context()
                                         .icons()
                                         .icon(

@@ -77,7 +77,7 @@ The complete color reference for Jasper. It covers:
 |---|---|---|---|
 | `accent` | `#4E7DB4` | `#3F6FA8` | Primary button, toggle on, focus, menu and palette highlight, active tab indicator |
 | `accent.hover` | `#5C8BC2` | `#4A7BB5` | Primary button hover |
-| `selection.bg` | `#2E4664` | `#5482B9` | Selected list row (sessions, vault items, files, settings nav) |
+| `selection.bg` | `#2E4664` | `#3F6FA8` | Selected list row (sessions, vault items, files, settings nav) |
 | `hover.overlay` | `#FFFFFF` (apply 4–8%) | `#000000` (apply 4–8%) | Hover on icon buttons, rows, inactive tabs |
 | `segment.track` | `#1F2228` | `#E4E7EB` | Segmented control track |
 | `segment.selected.bg` | `#474D59` | `#FFFFFF` (plus a soft shadow) | Selected segment |
@@ -244,7 +244,7 @@ Against the editor background, every text role is at least 4.5:1 (lowest: Light 
       "text.tertiary": "#727985", "text.placeholder": "#8E95A0", "text.field.raised": "#4A515C",
       "text.onAccent": "#FFFFFF", "text.onAccent.secondary": "#FFFFFFBF", "text.link": "#3F6FA8",
       "text.link.hover": "#2F5A8C", "text.error": "#B93A33", "text.success": "#2E9A4C",
-      "accent": "#3F6FA8", "accent.hover": "#4A7BB5", "selection.bg": "#5482B9", "hover.overlay": "#000000",
+      "accent": "#3F6FA8", "accent.hover": "#4A7BB5", "selection.bg": "#3F6FA8", "hover.overlay": "#000000",
       "segment.track": "#E4E7EB", "segment.selected.bg": "#FFFFFF", "toggle.track.off": "#C3C8D0", "toggle.knob": "#FFFFFF",
       "button.secondary.bg": "#FFFFFF", "button.secondary.bg.hover": "#F0F2F5", "button.secondary.border": "#C3C8D0",
       "status.success": "#2E9A4C", "status.warning": "#A8740F", "status.danger": "#C8423A", "status.idle": "#A8AEB7",

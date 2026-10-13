@@ -48,9 +48,9 @@ final class RichOptions extends JPanel {
     @Override protected void paintComponent(Graphics graphics){
         var g=(Graphics2D)graphics.create();try{
             ThemePainting.antialias(g);
-            // A Settings menu row keeps one line of spacing below its selection, as the Settings navigation does.
-            int spacing=settings&&popup?ThemePainting.metric(context,DesignMetrics.Role.SETTINGS_NAV_ROW_SPACING):0,h=getHeight()-spacing;
-            if(selected){g.setColor(ThemePainting.color(context,SemanticColor.ACCENT));int r=ThemePainting.metric(context,DesignMetrics.Role.MENU_ITEM_RADIUS);g.fillRoundRect(0,0,getWidth(),h,r*2,r*2);}
+            // A highlighted option is a plain rectangle across the row (spec 2).
+            int h=getHeight();
+            if(selected){g.setColor(ThemePainting.color(context,SemanticColor.SELECTION_BG));g.fillRect(0,0,getWidth(),h);}
             SemanticColor role=selected?SemanticColor.TEXT_ONACCENT:SemanticColor.TEXT_PRIMARY;int x=pad(),right=getWidth()-(popup?pad():ThemePainting.metric(context,DesignMetrics.Role.CHOICE_VALUE_END_PADDING));
             if(!option.icon().isBlank()){var icon=context.icons().icon(option.icon(),context.theme().semantic(),role,glyph());icon.paintIcon(this,g,x,(h-icon.getIconHeight())/2);x+=icon.getIconWidth()+gap();}
             if(popup){if(checked){var icon=context.icons().icon("check",context.theme().semantic(),selected?SemanticColor.TEXT_ONACCENT:SemanticColor.TEXT_LINK,check());icon.paintIcon(this,g,right-check(),(h-check())/2);}right-=check()+gap();}

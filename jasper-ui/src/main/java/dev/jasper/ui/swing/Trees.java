@@ -348,14 +348,14 @@ final class Trees {
             }
             // Emphasis is strong text in the link color (a keycap tree marks a section with its modified dot instead); the text
             // control's own refresh picks its role color first.
-            if (item.emphasized() && (presentation.isEmpty() || item.leaf()))
+            if (!row.inked && item.emphasized() && (presentation.isEmpty() || item.leaf()))
                 row.controls.get(titleId).component.setForeground(ThemePainting.color(context(), dev.jasper.ui.theme.SemanticColor.TEXT_LINK));
             row.slot(row.subtitle, List.of());
             var trailing = new ArrayList<Nodes.Node>();
             if(settingsNavigation&&!item.leaf())trailing.add(new Nodes.Button("@tree/"+node.id()+"/"+item.id()+"/expand",ControlState.READY,"",value().expandedIds().contains(item.id())?"chevron.down":"chevron.right",Nodes.ButtonKind.GHOST,"expand","Expand or collapse "+item.title(),Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED));
             var presented=presentation.get(item.id());
             // A read-only contextual key reads quieter than the rows the user can change.
-            if(presented!=null && presented.locked() && !item.emphasized())
+            if(!row.inked && presented!=null && presented.locked() && !item.emphasized())
                 row.controls.get(titleId).component.setForeground(ThemePainting.color(context(), dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
             for (int i = 0; presented==null && i < item.trailing().size(); i++)
                 trailing.add(new Nodes.Text("@tree/" + node.id() + "/" + item.id() + "/trailing/" + i,

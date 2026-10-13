@@ -174,7 +174,8 @@ final class ViewReconciler implements AutoCloseable {
     }
     private void applySettingsNavigation(Nodes.Node node,Map<String,ControlRegistry.Control> next,boolean inherited) {
         boolean navigation=inherited||node instanceof Nodes.Stack stack&&stack.role()==Nodes.LayoutRole.SETTINGS_NAVIGATION;
-        if(next.get(node.id()) instanceof Trees.TreeControl tree)tree.settingsNavigation=navigation;
+        // The Settings navigation's side inset is its rows' gutter, so a selected row fills the sidebar edge to edge (spec 2).
+        if(next.get(node.id()) instanceof Trees.TreeControl tree){tree.settingsNavigation=navigation;tree.gutter(navigation?tree.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_INSET):0);}
         ControlRegistry.children(node).forEach(child->applySettingsNavigation(child,next,navigation));
     }
     /**

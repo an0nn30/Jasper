@@ -40,7 +40,8 @@ public final class SettingsShell extends JPanel implements AutoCloseable {
         int searchHeight = search.getPreferredSize().height;
         search.setBounds(inset, top, Math.max(0, left - 2 * inset), searchHeight);
         int navTop = top + searchHeight + metric(DesignMetrics.Role.SETTINGS_SEARCH_GAP);
-        navigation.setBounds(metric(DesignMetrics.Role.SETTINGS_NAV_INSET), navTop, Math.max(0, left - 2 * metric(DesignMetrics.Role.SETTINGS_NAV_INSET)), Math.max(0, getHeight() - bottom - navTop));
+        // The navigation spans the sidebar; its rows keep the navigation inset as their gutter (ViewReconciler).
+        navigation.setBounds(0, navTop, left, Math.max(0, getHeight() - bottom - navTop));
         header.setBounds(left + metric(DesignMetrics.Role.SETTINGS_PAGE_INSET), 0, Math.max(0, width - 2 * metric(DesignMetrics.Role.SETTINGS_PAGE_INSET)), top);
         int bannerHeight = banner.isVisible() ? banner.getPreferredSize().height : 0;
         banner.setBounds(left, top, width, bannerHeight);

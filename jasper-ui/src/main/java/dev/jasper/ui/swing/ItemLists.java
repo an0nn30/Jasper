@@ -5,7 +5,6 @@ import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.model.*;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.theme.SemanticColor;
-import dev.jasper.ui.theme.SurfaceContrast;
 
 import java.awt.Container;
 import java.util.*;
@@ -415,7 +414,7 @@ final class ItemLists {
                 ((Labels.LiteralLabel) number.component).columnWidth = ThemePainting.metric(context(), DesignMetrics.Role.ORDERED_INDEX_WIDTH);
             }
             if (item.leading().orElse(null) instanceof Nodes.Icon icon && (icon.size() == Nodes.IconSize.RAIL || icon.size() == Nodes.IconSize.HERO) && icon.hue() != Nodes.Hue.NONE) {
-                ((Labels.IconControl)row.controls.get(icon.id())).tile(context().metrics().value(value().kind() == Nodes.ListKind.DOUBLE ? DesignMetrics.Role.CATEGORY_ROW_TILE : DesignMetrics.Role.CATEGORY_RAIL_TILE), column != 0 && selected.contains(item.id()));
+                ((Labels.IconControl)row.controls.get(icon.id())).tile(context().metrics().value(value().kind() == Nodes.ListKind.DOUBLE ? DesignMetrics.Role.CATEGORY_ROW_TILE : DesignMetrics.Role.CATEGORY_RAIL_TILE), selected.contains(item.id()));
             } else if (item.leading().orElse(null) instanceof Nodes.Icon icon && row.controls.get(icon.id()) instanceof Labels.IconControl glyph)
                 // A compact panel row draws its leading glyph at the panel-row size; elsewhere the icon's size role holds.
                 glyph.glyph(panelCompact ? context().metrics().value(DesignMetrics.Role.PANEL_COMPACT_ROW_GLYPH) : 0);
@@ -423,36 +422,29 @@ final class ItemLists {
             for(var control:row.controls.values()) if(control instanceof Indicators.ChipControl chip) chip.panelRow(panelCompact);
             row.slot(row.title, item.title());
             if(panelSingle)for(int i=1;i<item.title().size();i++)if(item.title().get(i) instanceof Nodes.Text text && text.role()==Nodes.TextRole.BODY && row.controls.get(text.id()).component instanceof javax.swing.JLabel label)label.setFont(ThemePainting.font(context(),Typography.Role.PANEL_ROW_SECONDARY));
-            if (panelSingle && selected.contains(item.id())) {
-                for(int i=0;i<item.title().size();i++) if(item.title().get(i) instanceof Nodes.Text text && row.controls.get(text.id()).component instanceof javax.swing.JLabel label) {
-                    label.setForeground(SurfaceContrast.on(context().theme().semantic(),
-                        i==0 ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_ONACCENT_SECONDARY,SemanticColor.SELECTION_BG,SurfaceContrast.TEXT));
-                    if(i==0 && text.role()==Nodes.TextRole.BODY)label.setFont(ThemePainting.font(context(),Typography.Role.PANEL_ROW_SELECTED));
-                }
-            }
+            // A selected panel row's name takes the selected face; its ink comes from the row (InteractiveRows.Row.inked).
+            if (panelSingle && selected.contains(item.id()) && !item.title().isEmpty() && item.title().getFirst() instanceof Nodes.Text text
+                    && text.role()==Nodes.TextRole.BODY && row.controls.get(text.id()).component instanceof javax.swing.JLabel label)
+                label.setFont(ThemePainting.font(context(),Typography.Role.PANEL_ROW_SELECTED));
             // RESULTS section headings use their own caption size, smaller than the rows they introduce.
             if (results() && item.heading())
                 for (var node : item.title()) if (node instanceof Nodes.Text && row.controls.get(node.id()).component instanceof JLabel label)
                     label.setFont(ThemePainting.font(context(), Typography.Role.RESULTS_HEADING));
             row.slot(row.subtitle, item.subtitle());
             row.slot(row.trailing, trailing);
-            // A selected row on selection.bg (every list but a rail, results and an ordered list's focus-only selection), as a
-            // selected panel row: its text takes the on-accent roles.
-            if (column != 0 && !panelSingle && !results() && value().kind() != Nodes.ListKind.ORDERED && selected.contains(item.id())) {
-                for (int i = 0; i < item.title().size(); i++)
-                    if (item.title().get(i) instanceof Nodes.Text text && row.controls.get(text.id()).component instanceof JLabel label)
-                        label.setForeground(SurfaceContrast.on(context().theme().semantic(), i == 0 ? SemanticColor.TEXT_ONACCENT
-                            : SemanticColor.TEXT_ONACCENT_SECONDARY, SemanticColor.SELECTION_BG, SurfaceContrast.TEXT));
-                for (var node : item.subtitle()) onSelection(row, node);
+            // On a selected row the subtitle (and a result's tag) reads as supporting text on the fill, whatever its role.
+            if (row.inked) {
+                for (var node : item.subtitle()) supportingInk(row, node);
+                if (results()) for (var node : item.trailing()) supportingInk(row, node);
             }
             if(results() && !item.heading() && !selected.contains(item.id()))
                 for(var node:item.subtitle())if(node instanceof Nodes.Text text && text.severity().isEmpty()
                         && row.controls.get(text.id()).component instanceof JLabel label)
                     label.setForeground(ThemePainting.color(context(),SemanticColor.TEXT_TERTIARY));
             if (results() && !item.heading() && selected.contains(item.id())) {
-                resultSelection(row, item.title(), SemanticColor.TEXT_ONACCENT, true);
-                resultSelection(row, item.subtitle(), SemanticColor.TEXT_ONACCENT_SECONDARY, true);
-                resultSelection(row, item.trailing(), SemanticColor.TEXT_ONACCENT_SECONDARY, false);
+                resultSelection(row, item.title(), true);
+                resultSelection(row, item.subtitle(), true);
+                resultSelection(row, item.trailing(), false);
             }
             for(var control:row.controls.values())if(control instanceof Buttons.ButtonControl button)button.button.panelRow=panelSingle;
             row.tooltip(item.tooltip());
@@ -472,20 +464,18 @@ final class ItemLists {
             }
         }
 
-        /** A selected row's secondary text, inline stacks included, on selection.bg; a text with a severity keeps its colour. */
-        private void onSelection(InteractiveRows.Row row, Nodes.Node node) {
-            if (node instanceof Nodes.Stack stack) for (var child : stack.children()) onSelection(row, child);
+        /** A selected row's supporting text, inline stacks included, in the secondary on-accent role; a severity keeps white. */
+        private void supportingInk(InteractiveRows.Row row, Nodes.Node node) {
+            if (node instanceof Nodes.Stack stack) for (var child : stack.children()) supportingInk(row, child);
             else if (node instanceof Nodes.Text text && text.severity().isEmpty() && row.controls.get(text.id()) != null
                     && row.controls.get(text.id()).component instanceof JLabel label)
-                label.setForeground(SurfaceContrast.on(context().theme().semantic(), SemanticColor.TEXT_ONACCENT_SECONDARY,
-                    SemanticColor.SELECTION_BG, SurfaceContrast.TEXT));
+                label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ONACCENT_SECONDARY));
         }
 
-        private void resultSelection(InteractiveRows.Row row, List<Nodes.Node> nodes, SemanticColor ink, boolean strong) {
+        /** A selected result's strong face; its ink comes from the row (InteractiveRows.Row.inked). */
+        private void resultSelection(InteractiveRows.Row row, List<Nodes.Node> nodes, boolean strong) {
             for (var node : nodes) if (node instanceof Nodes.Text text
                     && row.controls.get(text.id()).component instanceof JLabel label) {
-                label.setForeground(SurfaceContrast.on(context().theme().semantic(), ink,
-                    SemanticColor.ACCENT, SurfaceContrast.TEXT));
                 label.setFont(SwingTypography.effective(context().typography().resultFont(
                     Typography.Role.valueOf(text.role().name()), strong)));
             }

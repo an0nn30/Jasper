@@ -223,7 +223,9 @@ class MenusTest {
                                     find(view, "menu", JComponent.class).getComponentPopupMenu();
                             var item = (JMenuItem) popup.getComponent(0);
                             assertThat(item.getIcon().getIconWidth()).isEqualTo(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_TILE)));
-                            assertThat(item.getPreferredSize().height).isGreaterThan(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_ITEM_HEIGHT)));
+                            // The row grows with its line: at least the line plus the one-line row padding, never below the row height.
+                            int line = (int) Math.ceil(item.getFont().getLineMetrics("Ag", new java.awt.font.FontRenderContext(null, true, true)).getHeight());
+                            assertThat(item.getPreferredSize().height).isGreaterThanOrEqualTo(Math.max(s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_ITEM_HEIGHT)), line + s(m(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_VERTICAL_PADDING))));
                         }
                     } finally {
                         UIManager.put("defaultFont", old);

@@ -94,7 +94,8 @@ class SettingsKitTest {
                 view.update(stack(setting("a", false), setting("b", true)));
                 image = KitFixtures.render(view, w, h, 1);
                 assertThat(find(view, "a", JComponent.class)).as("identity kept").isSameAs(a);
-                assertThat(share(image, view, a, light.semantic().color(SemanticColor.SELECTION_BG))).isLessThan(0.01);
+                // Light's selection.bg is its accent, which the row's own control also paints: well under the highlight's share.
+                assertThat(share(image, view, a, light.semantic().color(SemanticColor.SELECTION_BG))).isLessThan(0.05);
                 assertThat(share(image, view, b, light.semantic().color(SemanticColor.SELECTION_BG))).isGreaterThan(0.5);
             } finally { release(context); }
         });

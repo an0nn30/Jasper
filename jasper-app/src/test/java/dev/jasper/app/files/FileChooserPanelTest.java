@@ -519,8 +519,9 @@ class FileChooserPanelTest {
             assertThat(previewToggle(panel).isSelected()).isTrue();
             assertThat(search.getText()).isEmpty();
             assertThat(panel.getBackground()).as("the dialog surface follows the theme").isEqualTo(light.chrome().semantic().color(SemanticColor.SURFACE_DIALOG));
+            // The selected row's name is white on the selection (spec 2).
             assertThat(KitTestSupport.require(panel, "@table/files/" + table(panel).rows().get(row).id() + "/name", JLabel.class).getForeground())
-                .isEqualTo(light.chrome().semantic().color(SemanticColor.TEXT_PRIMARY));
+                .isEqualTo(light.chrome().semantic().color(SemanticColor.TEXT_ONACCENT));
             panel.close();
         } finally { bindings.close(); }
     }

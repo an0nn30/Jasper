@@ -86,7 +86,7 @@ class FormsTest {
         });
     }
 
-    @Test void threeColumnPanelsUseInsetRailAndListRowsAndAFullBleedDivider() {
+    @Test void threeColumnPanelsUseGutteredRailAndListRowsAndAFullBleedDivider() {
         Edt.run(() -> {
             var context=KitFixtures.context();
             java.util.function.BiFunction<String,ListKind,Nodes.Panel> panel=(id,kind)->new Nodes.Panel(id,ControlState.READY,
@@ -98,10 +98,13 @@ class FormsTest {
             try(var view=new KitView(context,new ViewSpec(spec),e->{})) {
                 view.setSize(s(900),s(555));layout(view);
                 var rail=(Panels.PanelControl)view.control("rail");var list=(Panels.PanelControl)view.control("list");
-                assertThat(rail.content.getInsets().left).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_LIST_SIDE));
+                // A list body runs edge to edge: the column's side inset is its rows' gutter.
+                assertThat(rail.content.getInsets().left).isZero();
+                assertThat(((InteractiveRows.RowsControl)view.control("rail.rows")).gutter).isEqualTo(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_LIST_SIDE));
                 // Source 2x: rail fill top 10.5 logical, 31 pitch; list rows 45 below a 30-logical search.
                 assertThat(rail.content.getInsets().top).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_RAIL_TOP));
-                assertThat(list.content.getInsets().left).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_LIST_SIDE));
+                assertThat(list.content.getInsets().left).isZero();
+                assertThat(((InteractiveRows.RowsControl)view.control("list.rows")).gutter).isEqualTo(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_LIST_SIDE));
                 // A row is its role's height, or its lines plus the one-line row padding when that is taller.
                 int line=((InteractiveRows.RowsControl)view.control("rail.rows")).canvas.getFontMetrics(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.BODY)).getHeight();
                 assertThat(((InteractiveRows.RowsControl)view.control("rail.rows")).rowHeight).isEqualTo(Math.max(m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_RAIL_ROW), line + m(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_VERTICAL_PADDING)));

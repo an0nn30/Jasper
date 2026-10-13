@@ -207,7 +207,7 @@ class SearchableChoiceTest {
                     assertThat(row.getInsets().left).as(theme.name()).isEqualTo(stockRow.getInsets().left);
                     assertThat(row.getInsets().right).as(theme.name()).isEqualTo(stockRow.getInsets().right);
                     assertThat(list.getFont()).as(theme.name()).isEqualTo(f.combo().getFont());
-                    assertThat(row.getBackground()).as("the highlight is the kit's").isEqualTo(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT));
+                    assertThat(row.getBackground()).as("the highlight is the kit's").isEqualTo(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SELECTION_BG));
                 }
             }
         });
