@@ -54,7 +54,7 @@ class ToolWindowAreaTest {
     @Test void theCenterKeepsItsRoundedFrameWhenPanelsOpenAndClose() {
         var deck = new JPanel();
         var area = new ToolWindowArea(deck, new DockState());
-        area.setStripesVisible(true);
+        area.setStripesVisible(true, true);
         deck.setMinimumSize(new Dimension(420, 320));
         assertThat(area.getMinimumSize()).as("terminal minimum plus the top and bottom gutters and the lower inset")
             .isEqualTo(new Dimension(420, 340));
@@ -85,7 +85,7 @@ class ToolWindowAreaTest {
     @Test void theBottomAreaSpansTheFullWidthUnderTheSides() {
         var deck = new JPanel();
         var area = new ToolWindowArea(deck, new DockState());
-        area.setStripesVisible(true);
+        area.setStripesVisible(true, true);
         var left = new JLabel("left"); var right = new JLabel("right"); var bottom = new JLabel("bottom");
         DockTestSupport.show(area, Slot.LEFT_TOP, left, 200);
         DockTestSupport.show(area, Slot.RIGHT_TOP, right, 300);
@@ -111,7 +111,7 @@ class ToolWindowAreaTest {
 
     @Test void bothSlotsOfASideStackWithTheirOwnHeadersAndGutters() {
         var area = new ToolWindowArea(new JPanel(), new DockState());
-        area.setStripesVisible(true);
+        area.setStripesVisible(true, true);
         var upper = new JLabel("sessions"); var lower = new JLabel("sftp");
         DockTestSupport.show(area, Slot.LEFT_TOP, upper, 260);
         DockTestSupport.show(area, Slot.LEFT_BOTTOM, lower, 260);
@@ -197,7 +197,7 @@ class ToolWindowAreaTest {
         assertThat(bottom.getParent().getInsets()).isEqualTo(new Insets(0, 6, 6, 6));
         assertThat(deck.getParent().getInsets()).isEqualTo(new Insets(0, 0, 0, 0));
         assertThat(in(area, deck)).as("no lower inset either").isEqualTo(in(area, deck.getParent()));
-        area.setStripesVisible(true); area.setHeaderVisible(true); area.setStatusVisible(true);
+        area.setStripesVisible(true, true); area.setHeaderVisible(true); area.setStatusVisible(true);
         assertThat(left.getParent().getInsets()).isEqualTo(new Insets(0, 0, 0, 0));
         assertThat(bottom.getParent().getInsets()).isEqualTo(new Insets(0, 0, 0, 0));
         assertThat(((javax.swing.JComponent) left.getParent()).getClientProperty("Jasper.zone")).isEqualTo("chrome");

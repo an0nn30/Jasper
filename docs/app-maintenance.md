@@ -510,9 +510,11 @@ these defaults; upstream theme assets should not be edited to duplicate them.
 
 
 Workspace rounding belongs to `ToolWindowArea.Host`: 8px-radius tool window frames and,
-while the stripes are visible, matching rounded corners for the terminal/tab column. With
-the stripes hidden or empty, the terminal/tab column has square corners, no exterior
-gutters and no lower corner spacer: it fills the available workspace edge to edge.
+while a stripe is visible, matching rounded corners for the terminal/tab column, square on
+the side of a hidden stripe, where the column meets the window edge borderless. Each stripe
+shows only while it is not empty (`WindowContent.syncRailVisibility`). With both stripes
+hidden, the terminal/tab column has square corners, no exterior gutters and no lower corner
+spacer: it fills the available workspace edge to edge.
 Where frames go is `DockGeometry`'s job, never the area's: change the geometry and its
 tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree, with one exception
 on purpose: the guide for a second slot (Left Bottom, Right Bottom, Bottom Right) is always that slot's half, as if its
@@ -523,7 +525,9 @@ bottom edges (each distance a share of the workspace's own width or height, so t
 at any aspect ratio), a side split into its top and bottom slot at half of the side panels' visible height
 (`DockDrag.sideSplit`: above the bottom area while it shows, else the workspace's half) and the bottom at half
 its width; a side wins a tie. `DockDrag` previews no area for a stripe drop of a hidden window, which stays
-hidden. Change the zones in the resolver and its tests first; the window tests aim with
+hidden. While the rails are enabled, an empty hidden stripe still takes drops: `DockDrag.standAtEdge` gives it
+bounds over the workspace's edge for the drag without showing it, and `DockDrag.areaAfter` lays the guide out for
+the stripes that show or hide after the drop, so it follows `syncRailVisibility`'s rule. Change the zones in the resolver and its tests first; the window tests aim with
 `DockTestSupport.zone(workspace, slot)`.
 Dock drags use plain mouse events (`DockDrag`), never AWT drag and drop. Drag sources are the
 components `DockDrag.install` was given: stripe window buttons (`ToolStripe.dragSource`) and
@@ -542,11 +546,11 @@ column non-opaque: otherwise Swing considers partial tab repaints fully obscured
 skips the host background, leaving square corner pixels behind the clipped children.
 Corner regressions must exercise clipped `paint` calls as well as full-window previews.
 Exterior gutters are 6px, except
-beside the visible stripes: each stripe supplies its own balanced spacing, so the adjacent
-frames and the terminal column have no additional side gutter. Hiding or emptying the
-stripes restores that gutter on tool window frames without reparenting their content.
-The following gutter and lower-inset rules apply to the terminal column only while
-the stripes are visible. A visible status bar
+beside a visible stripe: each stripe supplies its own balanced spacing, so the adjacent
+frames and the terminal column have no additional side gutter. On a side whose stripe is
+hidden, tool window frames get that gutter back without reparenting their content, and the
+terminal column has none. The following gutter and lower-inset rules apply to the terminal
+column only while a stripe is visible. A visible status bar
 likewise supplies the lower spacing: exterior bottom gutters are omitted so the status
 contents stay visually centered between the surfaces and window bottom. Hiding the
 status bar restores the 6px bottom gutter. A visible toolbar or unified native header

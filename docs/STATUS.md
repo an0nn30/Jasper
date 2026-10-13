@@ -10,14 +10,21 @@ Fingerprint…/Show SFTP Host Key Fingerprint…, Edit Snippets File, Remove Cur
 Remote's Add Host form gains **Add and Connect** (secondary, beside the primary Add Host; adding only): it saves, then
 connects in a new tab as the palette's Connect does. The form's footer was matched to the design mock with two buttons,
 so the [acceptance record](design/theme-engine/acceptance.md)'s Add Host footer measurements are now historical.
-`./gradlew check --continue`: **9,774 tests**; its one failure was `SftpChooseSessionTest`'s choose-session test, which
-is timing-sensitive in the sandbox (an immediate "SSH agent not available" can beat "Connecting…") and failed on the
-untouched base too; the Remote suite then passed on rerun (0 failures, 8 skipped overall). An independent review found one Important issue (the
+Each rail now shows only while it holds something (they used to show together, an empty right rail included); on a
+hidden rail's side the terminal is borderless and square, as in Zen, while tool window frames keep their gutter. A dock
+drag still drops onto an empty hidden rail at its window edge: `DockDrag.standAtEdge` gives it bounds there without
+showing it, so only the placeholder marks it and the terminal does not move, and `DockDrag.areaAfter` lays the guide
+out for the rails that show or hide after the drop. A second review found a mid-drag resize left that edge stale (fixed
+with a test) and stale `app-maintenance.md` rules (fixed).
+`./gradlew check --continue`: **9,781 tests, 0 failures, 0 errors, 8 skipped**. An earlier run's only failure was
+`SftpChooseSessionTest`'s choose-session test, which is timing-sensitive in the sandbox (an immediate "SSH agent not
+available" can beat "Connecting…") and failed on the untouched base too. An independent review found one Important issue (the
 last panel restored in Zen was saved as hidden until the next dock change), fixed with a regression test, and doc nits,
 fixed. No GUI launched. GUI checks for the user: in Zen, Cmd+Alt+1 and View › Tool Windows show a panel with no rail
 (frame corners and insets as with View › Rail hidden); a divider drag in Zen; leaving Zen restores the earlier layout;
-quitting and relaunching in Zen; the new commands from the palette; Add and Connect in the Add Host form. Not merged
-or pushed.
+quitting and relaunching in Zen; the new commands from the palette; Add and Connect in the Add Host form; one rail
+hidden (the borderless, square side), the placeholder over the terminal's edge while dragging to an empty side, and a
+drop there showing the rail. Not merged or pushed.
 
 **Enter's verb in the palette hint bar — 2026-10-13** (`claude/palette-enter-hint`, worktree
 `.claude/worktrees/palette-enter-hint`; bounded change, design approved in chat, no spec or plan). In a scope with two or

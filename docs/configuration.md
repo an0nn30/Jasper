@@ -647,6 +647,10 @@ is saved. Panel instances are retained while hidden and receive visibility notif
 
 View groups Toolbar, Status Bar and Rail under **Show/Hide**, and font controls under **Font Size**.
 The contributed **Tools** submenu remains available. Status/rail controls are disabled during Zen; leave Zen to use them. Toolbar controls stay available.
+Each rail shows only while it holds a tool window (or, on the left, a plugin's rail button); on a side without one the
+terminal meets the window edge without a border, as in Zen. To put a tool window on
+an empty side's rail, drag it to that window edge: the drop guide marks where its button goes, and the rail appears
+once it lands.
 
 Zen has no default shortcut. Assign **Zen** in Settings › Keymap, or add a binding to `[keybindings]`:
 
