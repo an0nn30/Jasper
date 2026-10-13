@@ -173,8 +173,6 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `plugins` | The plugin runtime: descriptors, locked consent state, resolution, per-plugin classloaders, the queued EDT event bus, activities, the service registry and plugin lifetimes. Application owns and stops PluginRuntime; it is the only package that may reference the SDK. Declared plugin settings (DeclaredSettings) are read with the plugin's own schema and saved through PluginSettingsFiles. PluginRuntime.settingsPages gives Settings a page per plugin under Tools. |
 | `shortcuthelp` | The Settings dialog's Keymap page: effective shortcut catalog, expandable searchable sections, staged binding edits saved on Apply and a window-scoped key recorder. SettingsDialog owns each KeymapPage; disposing it closes its subscription and capture. |
 | `pluginmanager` | The Settings dialog's Plugins page: passive view, consent view and an EDT controller over PluginRuntime's public records. Application owns the PluginManager; SettingsDialog owns each PluginsPage, whose consent and confirm dialogs open over Settings. |
-| `themeimport` | Offline bounded conversion, deterministic vendoring, frozen import plans and locked file operations; no config/application dependency. No production caller since Slate Steel Plan 2 (nothing converts or migrates themes at start-up); Plan 3 removes it. |
-| `themesui` | The former Import theme…: a serial import worker and its dialogs. Nothing wires it since Slate Steel Plan 2; Plan 3 removes it. |
 | `restart` | Pure restart planning, the ResidentControl seam and the RestartFlow state machine. No owner; worker threads are daemons. |
 | `lifecycle` | Owner-thread-confined once-only cancellation. The subscriber closes the handle; no background worker or global state. |
 | `startup` | Start-up timing (`StartupTrace`, `WindowTrace`, `StartupTraceFile`); JDK-only, depended on by bootstrap, application, plugins and benchmark. Safe from any thread; `mark` and `phase` are non-blocking and run on the caller's thread; settling, logging and file writes run on virtual threads, never on the EDT. |
@@ -187,8 +185,8 @@ list is documented in each package-info file and verified from compiled bytecode
 
 ## Resources and verification
 
-Theme files and shell scripts keep their classpath paths. `ThemeManager.APP_DEFAULTS` names
-`SplitDividerBorder` by class name, so it must track package moves. Icons use absolute paths;
+Shell scripts keep their classpath paths. `ThemeManager.install` names `SplitDividerBorder` by class name, so it
+must track package moves. Icons use absolute paths;
 Buddy loads its sprite relative to BuddySprite in its own jar. Artifact tests open actual
 jars, decode the PNG, resolve the configured divider class and reject test fixtures.
 
@@ -221,39 +219,22 @@ icon values or identities, and their painting and text sizes come from `NativeCh
 
 ## Themes
 
-Every theme is generated into IntelliJ-format keys (resources under `dev/jasper/app/themes/`) and installed by one
-path in `ThemeManager`:
-1. `ThemeLoader` resolves the `parentTheme` chain (parent entries first, the child's replacing
-   them in its order, so FlatLaf's in-order wildcards match IntelliJ's precedence), resolves the
-   `colors` table and drops IntelliJ implementation classes.
-2. FlatLaf's `IntelliJTheme` builds the look and feel with `ThemeManager.APP_DEFAULTS` (form
-   typography, split divider) as extra defaults.
-3. The manager puts back the explicit colours FlatLaf skips (IntelliJ-only namespaces such as
-   `SearchEverywhere.*`, `EditorTabs.*`, `ToolWindow.*`, `StatusBar.*`).
-4. `ChromeKeys` fills each `Jasper.*` chrome key the theme did not set from IntelliJ keys, with
-   contrast floors for derived text.
-
-Restored and derived keys are also recorded as the instance's extra defaults, so a rollback to it
-keeps them. Every theme is generated from a Jasper theme document (`ThemeToml` → `ThemeResolver` for `extends` →
-`ThemeGenerator`): the cursor, selection and bright colours (background, foreground, accent and the eight normal
-colours are required), the 48 tokens and the syntax roles are derived with contrast floors, and
-`UiTemplate` maps tokens onto FlatLaf, IntelliJ and `Jasper.*` keys under the theme's own `[ui]` keys. The generated
-keys install through the IntelliJ path above. The four classic singleton built-ins are `Theme.DARK` (`themes/jasper-dark.toml`),
-`Theme.JASPER_LIGHT` (`themes/jasper-light.toml`), and `Theme.INTELLIJ_LIGHT` and `Theme.DARCULA`, converted from the
-vendored IntelliJ files by `IntellijConversion` as `ui_complete` documents (their own keys install unchanged).
+The installed theme is Slate Steel; there are no other themes, no theme files and no themes folder.
+`ThemeManager.install` installs a variant through jasper-ui's `FlatLafInstaller` (FlatLaf's IntelliJ-format input from
+the theme's UI keys, which `UiColorKeys` derives from the semantic roles, then the `Jasper.semantic.*` role keys and
+the popup shadow) and adds the app's native defaults: the split divider border by class name and the centred title.
 Tool windows paint `surface.panel` (theme.md's tool-window body) through `ToolWindowSurface`, their headers included; the stripes stay chrome.
 
-The installed theme is Slate Steel. `SlateSteel.bundled()` (jasper-ui) supplies one `GeneratedTheme` per variant and
-the terminal schemes. `ThemeController.configure(dark, scheme, font)` installs the variant for chrome and workspace and
+`SlateSteel.bundled()` (jasper-ui) supplies one `GeneratedTheme` per variant and the terminal schemes. `ThemeController.configure(dark, scheme, font)` installs the variant for chrome and workspace and
 resolves the scheme's palette for terminal panes (`ResolvedTheme.slateSteel`); `ResolvedTheme.surface()`, the
 workspace's `surface.terminal`, is what the window behind panes, tab backgrounds and the tab strip use, so a scheme
 colours only the text area. `ConfigurationController` resolves `ui.appearance` with `AppearancePolicy` against the
 live `SystemAppearance` observation; an installation failure keeps the current appearance and is a warning on
 `ui.appearance`.
 
-`ThemeCatalog`, the native TOML themes and `themeimport` (converters, offline generation, import operations and the
-migration journal) remain only as test seams: no production code reads a themes folder or converts, imports or
-migrates a theme, and nothing runs before `ConfigService` construction for themes. Slate Steel Plan 3 removes them.
+Nothing reads a themes folder or converts, imports or migrates a theme; an older install's `themes` and
+`terminal-themes` folders are left as they are. Plugins receive the roles and the editor scheme through
+`plugins.HostedPalettes`.
 
 ## Hosted workspace styling
 

@@ -245,12 +245,12 @@ public final class CoreSettings {
             GlassSettings.UNSET_OPACITY)
         .example(95f).label("Opacity").keywords("opacity", "transparency", "translucent", "glass", "workspace", "background")
         .description("macOS only (ignored on other platforms), live: the terminal and editor background opacity, 10-100 percent.\n"
-            + "Omit to use the workspace theme's value (opaque unless the theme sets one).").build();
+            + "Omit to keep the terminal area opaque.").build();
     public static final Setting<WorkspaceBlur> UI_WORKSPACE_BLUR = Setting.of("ui.workspace.blur", SettingKind.choice(List.of(
             Map.entry("theme", WorkspaceBlur.THEME), Map.entry("on", WorkspaceBlur.ON), Map.entry("off", WorkspaceBlur.OFF))),
             WorkspaceBlur.THEME)
         .label("Blur").keywords("blur", "frosted", "glass", "workspace", "background")
-        .description("macOS only (ignored on other platforms), live: blur the desktop behind a translucent workspace. \"theme\" follows the workspace theme.").build();
+        .description("macOS only (ignored on other platforms), live: blur the desktop behind a translucent workspace. \"theme\" follows Slate Steel, which does not blur.").build();
     public static final SettingsSchema SCHEMA = SettingsSchema.of(List.<Setting<?>>of(
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT,
             WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, WINDOW_VIEW_MODE, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, NOTIFICATIONS_GROUPS, SYSTEM_RUN_IN_BACKGROUND,
@@ -272,6 +272,6 @@ public final class CoreSettings {
             Map.entry(List.of("terminal", "cursor"), "The cursor a program sees until it chooses its own."),
             Map.entry(List.of("ui"), "The interface: its appearance, fonts, workspace glass and animations."),
             Map.entry(List.of("ui", "font"), "Interface typography, independent of the terminal font."),
-            Map.entry(List.of("ui", "workspace"), "Translucent terminal and editor backgrounds on macOS; omitted values follow the workspace theme."),
+            Map.entry(List.of("ui", "workspace"), "Translucent terminal and editor backgrounds on macOS; omitted values keep the terminal area opaque."),
             Map.entry(List.of("ui", "animations"), "App-wide animation policy. Changes apply live.")));
 }

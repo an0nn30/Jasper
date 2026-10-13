@@ -11,7 +11,7 @@ registration, lifetimes and threading.
 | You describe | The host decides |
 | --- | --- |
 | Which surface (form kind, panel, split), its sections, rows and controls, their order and stable ids | Every size, inset, gap, radius, font and icon geometry |
-| Text, values, options, enabled/visible/busy/error state, the one primary action | Colors, from the active theme's semantic roles, in light, dark and imported themes |
+| Text, values, options, enabled/visible/busy/error state, the one primary action | Colors, from the active theme's semantic roles, in Slate Steel Dark and Light |
 | What an event means for your domain, and the next spec | Focus, keyboard (Enter, Escape, Tab, arrows), validation placement, popups, scrolling, accessibility names |
 
 Do not paint, choose colors or fonts, or set pixel sizes for ordinary controls; there is no API for it, and the
@@ -192,7 +192,8 @@ the ten Slate Steel roles of SDK 0.15.5: raised fields, the selected control, th
 track, strong secondary text and the secondary button edge), or the
 `editorPalette()`, `workspacePalette()` and `syntaxPalette()` for document widgets, and repaint in
 `appearance().onChanged(...)` (chrome) or `onWorkspaceChanged(...)` (workspace content, including opacity). Never cache
-a color across a change. Content in the workspace area of a translucent window paints its background with
+a color across a change. A role that carries opacity is painted as given; the kit applies treatments such as focus
+rings and hovers on top. Content in the workspace area of a translucent window paints its background with
 `workspaceOpacity(component)`.
 
 ## Testing

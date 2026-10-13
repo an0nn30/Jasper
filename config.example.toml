@@ -136,10 +136,10 @@ family = "system"
 # size = 14.0
 
 [ui.workspace]
-# macOS only (ignored on other platforms), live: translucent terminal and editor backgrounds. Omit opacity to use the workspace theme's value.
+# macOS only (ignored on other platforms), live: translucent terminal and editor backgrounds. Omit opacity to keep the terminal area opaque.
 # Opacity: 10-100 percent.
 # opacity = 95
-# Blur behind a translucent workspace: "theme", "on" or "off".
+# Blur behind a translucent workspace: "theme" (Slate Steel does not blur), "on" or "off".
 blur = "theme"
 
 [ui.animations]

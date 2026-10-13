@@ -89,8 +89,8 @@ updating reflective class names in `.properties` files.
 The app runs on Slate Steel only. `ui.appearance` (system, dark, light) picks Slate Steel Dark or Light and
 `terminal.scheme` the terminal panes' colours; `application.ConfigurationController` applies both through
 `appearance.ThemeController`, with `application.AppearancePolicy` resolving `system` against the operating system.
-No themes folder is read and nothing is converted or upgraded at start-up. The native TOML themes, `themeimport` and
-`themesui` remain only as test seams until Slate Steel Plan 3 removes them. See [themes](../docs/themes.md) and
+No themes folder is read and nothing is converted or upgraded at start-up; there is no other theme and no theme
+import. See [themes](../docs/themes.md) and
 [maintenance](../docs/app-maintenance.md#themes).
 
 The [Plan 2 completion audit](../docs/design/theme-engine/completion.md) records SDK 0.15 migration,

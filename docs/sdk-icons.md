@@ -12,7 +12,7 @@ status.setIcon("lock");
 
 The host validates every name against the plugin's scoped registry. Unknown and foreign names
 are rejected. Host and fake enforce the same rule. Retained host icons resolve the current theme
-at paint time, including independent workspace themes and changes within the same dark/light variant.
+at paint time, including a change between Slate Steel Dark and Light.
 
 For original artwork, register a constrained monochrome path in a 16-unit coordinate space:
 

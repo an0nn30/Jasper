@@ -134,21 +134,29 @@ roles the colour their component painted before, so the app looks as it did exce
 legacy tab strip is the terminal background sunk 30% toward black in a dark theme and 6% in a light one, as the strip
 painted before, so the selected tab stays the lighter slot; tool windows move from the sidebar to the panel surface).
 
-- Opacity is applied once: scrims are painted as their token gives them (legacy default black at 55%/25%); the focus ring
-  applies 32%/25% of `border.focus`, the error ring 22%, tiles and chips 17%/13% of their hue surface.
-- The title bar's command field is a raised field (hover changes only its edge); selected toolbar actions, rail items and
-  manager-rail rows take `surface.control.selected`; tool windows sit on `surface.panel`.
-- The tab strip is `surface.tabstrip`, the selected tab `surface.terminal`, at the window's alpha; hovered inactive tabs
-  take the hover overlay.
-- Secondary buttons take `button.secondary.border` and `text.strong.secondary`; the segmented track `segment.track` with a
-  `border.input` edge; panel empty tiles `surface.emptyTile`.
-- Captions, counts, table headers and row subtitles are `text.tertiary`; Settings row titles and the current breadcrumb
-  `text.strong.secondary`; empty picker values `text.placeholder`; the idle status dot `status.idle`.
-- The command palette is a `surface.menu` card with a `border.menu` hint rule and an accent highlight; menus highlight with
-  the accent; highlighted subtitles take `text.onAccent.secondary`, checkmarks `text.link`; the Settings body is
-  `surface.dialog` and the file chooser's Places `surface.sidebar`.
+- Opacity is applied once: scrims are painted as their token gives them (legacy default black at 55%/25%) (was
+  `surface.scrim` at 40% for the modal overlay and 35% for sheets); the focus ring applies 32%/25% of `border.focus` (was
+  25% in both), the error ring 22% (unchanged), tiles and chips 17%/13% of their hue surface (was 18% or 16% of the hue).
+- The title bar's command field is a raised field (hover changes only its edge) (was `surface.input` with a `border.input`
+  edge, `surface.control.hover` on hover); selected toolbar actions, rail items and manager-rail rows take
+  `surface.control.selected` (was `segment.selected.bg`, and `surface.control` for rail rows); tool windows sit on
+  `surface.panel` (was `surface.sidebar`).
+- The tab strip is `surface.tabstrip`, the selected tab `surface.terminal` (was the `TAB_BAR` and `TAB_ACTIVE` tokens), at
+  the window's alpha; hovered inactive tabs take the hover overlay (was none).
+- Secondary buttons take `button.secondary.border` and `text.strong.secondary` (was `border.control` and `text.primary`);
+  the segmented track `segment.track` with a `border.input` edge (was `surface.input` with `border.subtle`); panel empty
+  tiles `surface.emptyTile` (was `surface.control`).
+- Captions, counts, table headers and row subtitles are `text.tertiary` (was `text.secondary`); Settings row titles and
+  the current breadcrumb `text.strong.secondary` (was `text.tertiary` and `text.primary`); empty picker values
+  `text.placeholder` (was `text.tertiary`); the idle status dot `status.idle` (was `text.secondary`).
+- The command palette is a `surface.menu` card with a `border.menu` hint rule and an accent highlight (was a
+  `surface.card` card with a `border.subtle` rule and a `selection.bg` highlight); menus highlight with the accent (was
+  `selection.bg`); highlighted subtitles take `text.onAccent.secondary` (was `text.onAccent`), checkmarks `text.link` (was
+  `accent`); the Settings body is `surface.dialog` (was `surface.app`) and the file chooser's Places `surface.sidebar` (was
+  the window surface).
 - theme.md's shadows, black: the modal overlay's card, the palette, FlatLaf menus, the Light selected segment and the
-  primary button (a white inset line on its top row and a 1 px drop below the face).
+  primary button (a white inset line on its top row and a 1 px drop below the face) (was the scrim colour for the overlay
+  card's shadow, FlatLaf's default popup shadow and no button or segment shadow).
 
 Decisions the plan recorded for review:
 
@@ -207,6 +215,36 @@ Decisions the plan recorded for review:
 Plan [`2026-10-12-slate-steel-3-removal-and-verification.md`](../../superpowers/plans/2026-10-12-slate-steel-3-removal-and-verification.md)
 of the [Slate Steel specification](../../superpowers/specs/2026-10-12-jasper-slate-steel-themes-design.md): the legacy
 themes, their layer and their test seams are gone; every test, preview and render runs Slate Steel Dark and Light.
+
+- Removed from the app: `Theme`, `ThemeCatalog`, `BuiltInThemes`, `ThemeState`, `config.WorkspaceThemeChoice`,
+  `config.TerminalColors`, the `themeimport` and `themesui` packages (theme import, conversion and the one-time
+  migration with its aliases), `ThemeManager`'s legacy install and `ThemeController`'s legacy constructors and
+  `configure` overloads, the `convertThemes` and `themeMigrationPreview` tasks. An older install's `themes` and
+  `terminal-themes` folders are neither read nor changed.
+- Removed from jasper-ui: `Token`, `SemanticDefaults`, `ThemeResolver`, `ThemeDocument`, `ThemeGenerator`,
+  `AuthoredUiColors`, `RuntimePlatform`, `Seed`, `UiTemplate`, `UiTokenKeys`, `WorkspaceGlass`, the `themeio` and
+  `themeimport` packages and their resources, and the `tomlj` dependency; from the repository, `third_party/themes`,
+  `tools/themes` and `THIRD-PARTY-THEMES.md`. `GeneratedTheme` is `(name, dark, author, semantic, terminal, editor,
+  syntax, uiKeys, glass)`; FlatLaf's keys come from the roles (`UiColorKeys`), and plugins' palettes from the roles and
+  the editor scheme (`HostedPalettes`).
+- The scan: `ColourLiteralScanTest` fails on any colour literal in production code or resources of jasper-ui, the app
+  and the plugins outside `slate-steel.json`; `RemovedThemeLayerTest` pins the removal.
+- Tests run on `ThemeTestSupport` and `KitFixtures` (Slate Steel's variants, recoloured copies where a test needs
+  another theme).
+
+Decisions this plan recorded for review:
+
+1. **Scan scope.** The colour-literal scan covers production Java and text resources of `jasper-ui`, `jasper-app` and `plugins/*`. It excludes SVG artwork (the kit's JetBrains icons are SHA-256-pinned and painted as drawn; plugin icons are plugin-owned ink by contract), and the independent libraries `jasper-terminal` (its built-in default palettes for embedders that set none), `jasper-buddy` (the desk buddy's own artwork, JDK-only) and the test library `jasper-sdk-testkit`.
+2. **Scan pattern.** It matches the spec's hex forms: `#RRGGBB`/`#RRGGBBAA` in Java string literals and text resources, and hex integers given to `new Color(`, `new ColorUIResource(` or `Color.decode(`. Decimal `new Color(r, g, b)` literals (fully transparent fills; the editor plugin's vim sneak highlight) and the `Color.BLACK`/`Color.WHITE` constants that spec 8's shadow and inset metrics are painted in are not matched.
+3. **The 26 `Jasper.*` UI aliases are dropped** from the FlatLaf keys: nothing reads them (the kit reads the installed `Jasper.semantic.*` roles), so they would be a second, unused colour map.
+4. **`GeneratedTheme` becomes `(name, dark, author, semantic, terminal, editor, syntax, uiKeys, glass)`**: it gains the editor palette spec 4 lists and loses the legacy `tokens` and the always-empty `icons`.
+5. **Route machinery stays** (spec 4): `ThemeRoute` CHROME/WORKSPACE, `ResolvedTheme`'s chrome and workspace, `WorkspaceTheme`/`ThemeZone`/`HostedUi`'s workspace paths. Slate Steel always matches, so tests of a controller that splits chrome and workspace are deleted; tests of hosting code that accepts any `ResolvedTheme` keep a mixed pair from the test helper.
+6. **Calibration and custom renders are retired.** Previews and render tests paint Slate Steel Dark and Light only; `tools/visual/pairs.json` points at the Dark renders. The record's "Before" column is the last recorded value (calibration theme), "After" is Slate Steel Dark; edge agreement may fall where a mock's palette differs, and is recorded as measured.
+7. **A test that needs "another theme" uses a recoloured Slate Steel palette** (`ThemeTestSupport.recolored`, `KitFixtures.custom`), never a test-only theme file.
+8. **`WindowContent.selectVariant(boolean dark)` replaces `selectTheme(Theme)`** as the package-private switch tests and previews use (it configures the window's `ThemeController` as `ui.appearance` does, keeping the terminal scheme).
+9. **`docs/themes.md` keeps a "Native acceptance for this upgrade (user-run)" section**, now Slate Steel's native checks, because `docs/STATUS.md` links its anchor.
+10. **The popup shadow's strength moves from the theme's UI keys to `FlatLafInstaller`**, read from `DesignMetrics` (it duplicated `POPOVER_SHADOW_PERCENT_DARK/LIGHT`); the switch knob's shadow gets a metric.
+11. **`ThemeGenerator` is deleted, not rewritten.** Spec 4 has it "rewritten to assemble a `GeneratedTheme` from the palettes"; `SlateSteel.generate` already does exactly that, so a second assembler would have no caller.
 
 ### The mock comparisons on Slate Steel Dark
 

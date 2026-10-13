@@ -2,6 +2,30 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status: complete on 2026-10-12** on `claude/slate-steel`, executed inline. Deviations from the text below:
+> - Codemods: the shared scripts missed fully qualified constructor calls, loop headers with text before `{`, split
+>   `configure` calls and `cond ? Theme.DARK : Theme.JASPER_LIGHT` ternaries (a ternary rule was added); every residue was
+>   migrated by the rules, including sites the residue scan did not list (two-argument `ResolvedTheme`, the predicate
+>   constructor).
+> - Assertions that pinned a role coinciding in the removed themes now pin the role the code paints (for example
+>   `surface.control.selected` for ghost toolbar selection, `text.tertiary` for captions and inactive titles,
+>   alpha-carrying `border.subtle` composited over its surface).
+> - Contrast floors Slate Steel misses as authored are pinned to the authored values (Light off-switch 1.68:1, Light
+>   `status.success` 3.32:1 on panels, the split divider 1.43:1/1.58:1, Light menu selection text 3.98:1, the status
+>   slash 1.19:1/1.14:1); they are design notes in the acceptance record.
+> - Hosting cases that needed a second theme of the same darkness, or a split chrome/workspace, publish recoloured
+>   Slate Steel copies or `mixed` pairs through the hosting code (`WorkspaceAppearanceFixture`, `applyTheme`), since a
+>   controller publication always matches; `ThemeTestSupport.withSyntax` was added for the editor's keyword case.
+> - Task 6 also deleted SettingsDialogPreview's `--migration` mode with `ThemeMigrationPaletteCapture`, and the six
+>   jasper-ui `themeimport` tests under `jasper-app/src/test/java/dev/jasper/ui/` (they imported the deleted app package).
+> - Task 7: the key generator also carries `UiTemplate`'s text-field loop (127 keys, not 119); jasper-buddy's
+>   down-connection cross read a dropped alias and now reads `Jasper.semantic.status.danger`.
+> - Task 8: the popup shadow is published as look-and-feel defaults rather than string extras (a hex string would trip
+>   the scan); the card-shadow test recolours the scrim red, because Slate Steel's near-black scrim was already black at
+>   a ring's alpha.
+> - Task 9: the calibration column was re-rendered at `f65b40bb` in a temporary worktree; the Light inspection found
+>   illegible selected-row subtitles in lists outside panels, fixed in the kit (`ItemLists`) with a test.
+
 **Goal:** Delete the legacy theme pipeline, assets, tools and test seams, so Slate Steel is the only theme in code, resources, tests and documentation; prove no colour value exists outside `slate-steel.json`; re-render and record the mock comparisons on Slate Steel; and fold in the review findings deferred from Plans 1 and 2.
 
 **Architecture:** Parallel change, so every task leaves `./gradlew check` green. Tasks 1–5 move the tests off the legacy themes onto a Slate Steel test helper while the legacy code still exists (a test that only exercises legacy code stays until its code goes). Task 6 deletes the app's legacy layer. Task 7 rewrites FlatLaf's UI keys onto semantic roles, gives `GeneratedTheme` its final shape, deletes jasper-ui's legacy layer and the repository's theme sources, and adds the colour-literal scan. Task 8 fixes the deferred review findings, Task 9 re-renders the comparisons, Task 10 rewrites the documentation and runs the full check.

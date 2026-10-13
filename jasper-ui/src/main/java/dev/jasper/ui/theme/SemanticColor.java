@@ -2,7 +2,10 @@ package dev.jasper.ui.theme;
 
 import java.util.Optional;
 
-/** Stable canonical theme roles. Paint opacity and geometry belong to the kit. */
+/**
+ * Stable canonical theme roles. A role that carries opacity is painted as given; the kit applies treatments such as
+ * focus rings and hovers on top, and owns all geometry.
+ */
 public enum SemanticColor {
     SURFACE_APP("surface.app"),
     SURFACE_STATUS("surface.status"),

@@ -220,7 +220,7 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 
 ### Workspace glass
 
-A translucent, blurred terminal workspace on macOS. The workspace theme's `[workspace]` table and
+A translucent, blurred terminal workspace on macOS. Slate Steel's glass (opaque, no blur) and
 `ui.workspace.opacity`/`ui.workspace.blur` combine in `GlassLevels.resolve`; `WindowContent.requestGlass` sends the
 result to the window's `WindowGlass` after every theme or configuration change. `WindowGlass` decides, and reports the
 opacity actually in effect to `WindowContent.applyBackgroundOpacity`; painting never reads the raw settings, so any
@@ -240,7 +240,7 @@ failure leaves an opaque window.
   watched through `WindowGlass.Platform.watch`: `WindowGlass` reports opaque at once and re-applies on the next turn,
   and `MacGlass` restores that newer background later.
 - **Blur** is on or off (`WindowGlass.Blur`: `NONE`, `DARK` or `LIGHT`, from the request's blur and whether the
-  workspace theme is dark) and lives in `libjasper-glass.dylib` (`src/main/native/MacGlass.m`, built and tested by
+  appearance is dark) and lives in `libjasper-glass.dylib` (`src/main/native/MacGlass.m`, built and tested by
   `gradle/mac-glass.gradle`). It finds the `NSWindow` whose content-view layer is JAWT's layer or any ancestor of it
   and, on the main thread without waiting, places a public `NSVisualEffectView` behind the content view: material
   `hudWindow` (13) in the dark appearance, or `underWindowBackground` (21) in the light one (`MacGlass.DARK_MATERIAL`
@@ -262,7 +262,7 @@ failure leaves an opaque window.
   its text and gutter backgrounds once each from this value; see the SDK README for the painting rule.
 
 ```sh
-./gradlew :jasper-app:test --tests "*WorkspaceGlassTest" --tests "*WindowGlassTest" --tests "*MacGlassTest" --tests "*ClearThemesTest"
+./gradlew :jasper-app:test --tests "*WorkspaceGlassTest" --tests "*WindowGlassTest" --tests "*MacGlassTest"
 ./gradlew :jasper-app:testMacGlass :jasper-terminal:test --tests "*TerminalPainterTest"
 ```
 
@@ -322,29 +322,23 @@ boundaries; this refactor promises no plugin loading, binary compatibility or pe
 
 ## Themes
 
-Since Slate Steel Plan 2 the app installs only Slate Steel (`slate-steel.json` in jasper-ui, read by `SlateSteel`;
-see [the Slate Steel record](design/theme-engine/slate-steel.md)). The native TOMLs, converters and offline collection
-below are no longer loaded at runtime; Slate Steel Plan 3 removes them.
+Jasper has one theme, Slate Steel, in Dark and Light ([themes](themes.md)). Its colours live only in jasper-ui's
+`slate-steel.json`, the machine-readable block of [the Slate Steel record](design/theme-engine/slate-steel.md) (a test
+keeps the two identical). `SlateSteel` reads the file once: the semantic palettes, the terminal schemes (`TerminalScheme`,
+`SchemeColors`), the derived editor schemes and syntax styles, and one `GeneratedTheme` per variant whose FlatLaf UI keys
+`UiColorKeys.flatLaf` derives from the roles (text selection from the terminal selection, a search miss from
+`UiColorKeys.errorTint`). To change a colour, edit the record's block and the JSON together; to give a component a
+colour, give it a role, never a value.
 
-Edit the hand-written Jasper Light/Dark and Clear Dark/Light TOMLs under
-`jasper-app/src/main/resources/dev/jasper/app/themes/` (`ConvertThemes` copies these four unchanged);
-change shared mappings in `UiTemplate` and derivations in `ThemeGenerator`. The 256 KiB native cap remains.
+`ColourLiteralScanTest` fails on any colour literal in production code or resources (jasper-ui, the app and the
+plugins) outside `slate-steel.json`; `UiColorKeysTest`, `SlateSteelGeneratedTest` and `HostedPalettesTest` pin the
+keys, the variants and the plugins' palettes. `RemovedThemeLayerTest` pins that the former theme layer is gone.
 
-`tools/themes/sources.json` locks every source commit/artifact, variant decision and input hash. Maintainers may
-refresh exact upstream bytes with `tools/themes/fetch-themes.py`; retain each source's full license, SOURCE.md and
-assets.tsv. `./gradlew :jasper-app:convertThemes` verifies all locks and regenerates the five shipped native files (Jasper Light/Dark, Clear Dark/Light and Nord), index, legacy
-aliases and third-party notices entirely offline. The wider source lock remains for import/converter coverage; it does not expand the shipped catalog.
-Normal build/test never fetches. Do not normalize upstream bytes.
-Run `BundledThemeConversionTest` for drift/provenance and `BundledWorkspaceParityTest` for effective LAF/workspace
-colors; preserve golden converter tests for UI ordering, OS tables, syntax styles and icon palettes.
+```sh
+./gradlew :jasper-ui:test --tests "*SlateSteel*" --tests "*UiColorKeysTest"
+./gradlew :jasper-app:test --tests "*ColourLiteralScanTest" --tests "*HostedPalettesTest" --tests "*RemovedThemeLayerTest"
+```
 
-Converters/security fixtures live in `themeimport`; native catalog/installation tests live in `appearance`.
-`ThemeMigrationTest` and `MigrationJournalTest` cover the recovery code, which nothing runs since Slate Steel Plan 2:
-start-up neither migrates themes nor rewrites theme settings. Never fix recovery by overwriting a changed file or
-deleting an equal-byte foreign backup. Keep original data and report the conflict.
-
-The former Import theme… (`themesui.ThemeImport`, over `ThemeImporter`, `ThemeFiles` and `ThemeTomlWriter`) is not
-wired into Settings.
 Run `./gradlew check` and all architecture guards; hand native visual acceptance to the user ([themes](themes.md)).
 
 ## Maintaining SDK icons

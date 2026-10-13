@@ -46,7 +46,7 @@ longer applies). `✕` removes one row; **Clear All** removes them all.
 | Group | Id | What it covers | Shows as |
 |---|---|---|---|
 | Jasper | `jasper.general` | errors and results of Jasper's own commands: a shell that could not start, a theme that could not be applied, Migrate Config | card |
-| Configuration | `jasper.config` | problems in `config.toml`, themes and plugin settings files | sticky card |
+| Configuration | `jasper.config` | problems in `config.toml` and plugin settings files | sticky card |
 | Long-running commands | `jasper.commands` | a command that ran at least `notifications.long_command_seconds` and finished anywhere but the pane you were typing in | card |
 | Plugin problems | `jasper.plugins` | a plugin that failed while Jasper asked it to do something, or that could not be loaded, started or read at launch | card |
 | Internal errors | `jasper.errors` | unexpected errors in Jasper itself | card |

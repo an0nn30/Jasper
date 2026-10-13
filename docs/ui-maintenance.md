@@ -8,17 +8,15 @@ Use Java 25 JetBrains Runtime and the wrapper. All commands here stay headless:
 ./gradlew :jasper-ui:gallery -Pjasper.galleryScale=1
 ./gradlew :jasper-ui:gallery -Pjasper.galleryScale=2
 ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=light
-./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=custom
-./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=calibration
 ./gradlew :jasper-ui:verifyUiDistribution
 ```
 
 The gallery is a test-runtime entry point. It writes individual PNG/JSON captures, six full-resolution
 contact sheets and a manifest under `jasper-ui/build/gallery/<theme>-<scale>x`. `galleryScale` accepts
-1/2; `galleryTheme` accepts dark/light/custom/calibration. JSON records bounds, actual enabled/focus
+1/2; `galleryTheme` accepts dark/light (Slate Steel's variants). JSON records bounds, actual enabled/focus
 state, typed descriptor busy/error/visibility state, route, central font and scale. It excludes values
 and secrets. Coverage tests require all 26 nodes, enum variants, nine originals and real panel
-transitions. Test/gallery classes and calibration colors stay out of the production jar.
+transitions. Test and gallery classes stay out of the production jar.
 
 Install `FlatLafInstaller` before constructing fixtures. Logical sizes go through `UIScale` once;
 the capture's device transform is 1. Do not scale both component geometry and capture graphics.
@@ -28,8 +26,8 @@ suppress the native caps-lock query and supply deterministic focus. Every view/c
 registry and focus/caret lifetime closes in `finally`; the process exits normally.
 
 Compare original crops using [calibration](design/theme-engine/calibration.md). Correct components
-or fixtures when measurements differ; do not loosen thresholds. Active theme captures test routing;
-calibration colors are an explicit fixture theme, never renderer fallbacks. Font rasterization and
+or fixtures when measurements differ; do not loosen thresholds. Captures use Slate Steel Dark or Light (the
+calibration themes are retired); renderers never fall back to fixed colours. Font rasterization and
 native focus/window acceptance remain separate from deterministic geometry tests.
 
 When adding a descriptor, update UI and SDK `Nodes`, `KitValues`, testkit contract coverage and the
@@ -110,6 +108,7 @@ Scoped rereview is complete: all eight original findings addressed, no new Criti
 The known Minor below remains; native/user acceptance and Plans 2–3 completion are not claimed.
 
 
+Historical (the importer, authored UI colours and their heuristics were removed in Slate Steel Plan 3).
 Final-review compatibility ruling: canonical roles honor authored supported UI colors ahead of
 FlatLaf theme-name/author-specific post-JSON heuristics. For example, Carbon's authored Panel
 `#202020` and TextField `#112233` resolve/install `surface.input=#112233`; the foreign heuristic
@@ -142,6 +141,8 @@ passed. The focused 2x geometry/choice/secret/row run passed all 42 tests.
 | **Total** | **9063** | **0** | **0** | **6** |
 
 ## Known Minor expression-parity gap
+
+Historical: `AuthoredUiColors` and its expression grammar were removed in Slate Steel Plan 3.
 
 **Resolved in Plan 2 Tasks 2–3 (2026-10-05), independent review pending:** the three probes
 below now match pinned FlatLaf 3.7 in `AuthoredUiColorsTest`. Spin ignores relative hue scaling;

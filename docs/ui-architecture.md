@@ -1,22 +1,19 @@
 # UI architecture
 
 `jasper-ui` is the independent theme engine and Swing kit. The app composes it with Terminal
-and Buddy; plugins compile against the JDK-only SDK projection. The coordinated Plan 2 migration makes this module the sole algorithm/token authority.
+and Buddy; plugins compile against the JDK-only SDK projection. The coordinated Plan 2 migration makes this module the sole theme and colour authority.
 Plan 3 owns final surface composition; the [completion record](design/theme-engine/completion.md) records the handoff.
 
 | Package | Allowed outgoing UI packages | Ownership |
 | --- | --- | --- |
-| `theme` | none | Immutable documents, terminal/syntax/glass colors; EDT appearance binding |
-| `themeio` | `theme` | Synchronous native TOML parse/write; caller owns files |
-| `themeimport` | `theme`, `themeio` | Bounded offline conversion and pinned parent data |
+| `theme` | none | Slate Steel: the bundled file, semantic palettes, terminal and editor schemes, syntax, glass and FlatLaf keys; EDT appearance binding |
 | `model` | none | Immutable descriptors and events; no secret values |
 | `metrics` | `theme` | Fixed logical geometry and central typography/motion roles |
 | `icons` | `theme`, `metrics`, `model` | Named artwork and context-scoped tint caches |
-| `swing` | `model`, `theme`, `metrics`, `icons`, data-only `themeimport.FlatLafThemeData` | EDT views, delegates, owned controls and registrations |
+| `swing` | `model`, `theme`, `metrics`, `icons` | EDT views, delegates, owned controls, registrations and FlatLaf installation |
 
 `verifyUiArchitecture` checks the acyclic package graph, independence from other Jasper modules,
-JDK-only theme/model boundaries and Swing-free import/parsing. Parser and FlatLaf vendors remain
-implementation dependencies. SDK `ui` values mirror the model without exposing Swing or UI types;
+JDK-only theme/model boundaries. FlatLaf remains an implementation dependency. SDK `ui` values mirror the model without exposing Swing or UI types;
 `dev.jasper.app.plugins.KitValues` is the translation boundary. Host and testkit implement the same
 SDK facade. Plugins never receive the engine jar on their runtime classpath.
 
@@ -28,8 +25,8 @@ var theme = SlateSteel.bundled().generated(true);
 var cardColor = theme.semantic().color(SemanticColor.SURFACE_CARD);
 ```
 
-Theme seeds and semantic overrides supply colors. Geometry, spacing, artwork and typography roles
-come from `DesignMetrics`, `Typography` and `IconRegistry`; theme import discards authored geometry.
+Slate Steel's semantic roles supply colors. Geometry, spacing, artwork and typography roles
+come from `DesignMetrics`, `Typography` and `IconRegistry`.
 `TerminalColors` orders background then foreground; the terminal palette orders foreground then
 background. Translate by meaning. ANSI arrays are defensively copied.
 
@@ -86,8 +83,7 @@ Containers own semantic layout. Forms consume a host-supplied logical available-
 the host owns window chrome, sheet/scrim lifetime and cancellation cleanup.
 
 `ModalOverlay` is the kit's modal overlay, which `DialogSpec.Presentation.OVERLAY` and the SDK's progress
-overlays present: a scrim over a window's whole content (`surface.scrim`, painted as its token gives it; a legacy
-theme that names none gets black at 55% in Dark and 25% in Light) and the content in a centred, outlined, rounded card
+overlays present: a scrim over a window's whole content (`surface.scrim`, painted as its role gives it) and the content in a centred, outlined, rounded card
 with theme.md's dialog shadow (black, `DIALOG_SHADOW_*`). Opening fades
 the scrim in while the card fades from transparent and rises `OVERLAY_RISE` into place over
 `OVERLAY_ENTER_MILLIS`, easing out (cubic); closing is its opposite over `OVERLAY_EXIT_MILLIS`: the card lifts off
@@ -105,10 +101,11 @@ layered pane and owns keyboard routing and focus; the app's `WindowOverlay` stac
 `docs/design/theme-engine/slate-steel.md`'s machine-readable block, kept identical by a test) with the JDK-only
 `ThemeJson` reader: the Dark and Light semantic palettes (roles the file omits follow fixed rules), the terminal
 schemes (`TerminalScheme`, `SchemeColors` with a bold foreground) and the derived editor schemes (`EditorColors`
-and syntax styles, written as token references). `generated(dark)` assembles a full `GeneratedTheme`; until the
-legacy layer is removed it also carries a legacy token view derived from its tokens. Components paint theme.md's
-roles; alpha treatments (focus and error rings, hover, category tiles) apply one kit metric to a base token, and a
-token that carries alpha (the scrim, `border.subtle`) is painted as given. Shadows are black at the kit's shadow
+and syntax styles, written as references into the palettes). `generated(dark)` assembles a full `GeneratedTheme`: the
+palette, the matching terminal scheme, the editor scheme and syntax, FlatLaf's UI keys from the roles (`UiColorKeys`)
+and the glass. Components paint theme.md's roles; alpha treatments (focus and error rings, hover, category tiles)
+apply one kit metric to a base role, and a role that carries alpha (the scrim, `border.subtle`) is painted as given.
+`ColourLiteralScanTest` fails on any colour literal in production code or resources outside `slate-steel.json`. Shadows are black at the kit's shadow
 metrics: `ThemePainting.softShadow` blurs one mask per treatment and nine-slices it across face sizes (a face too
 small to slice gets its own cached mask), and a hollow mask has the face cut out so nothing of the shadow lies under a
 translucent face. It serves the modal overlay's card (hollow, so a fading card does not darken) and the command
@@ -251,11 +248,6 @@ See [maintenance](ui-maintenance.md), [calibration evidence](design/theme-engine
 [module entry point](../jasper-ui/README.md) and [SDK architecture](sdk-architecture.md).
 
 
-Pure generation can take `RuntimePlatform` explicitly. Ordered authored UI literals, OS choices,
-references, aliases and supported deterministic functions reach the semantic snapshot before the
-explicit native-token and canonical override layers. `systemColor` requires a resolvable fallback;
-missing required references/cycles diagnose the source origin/key. Optional references may be null.
-
 Plan 2 Task 9b adds `KitView.selectAll(fieldId)` (SDK UiView/host/fake mirrored): select current live Nodes.Field
 text without Edited or forced focus; unknown/non-Field IDs reject IllegalArgumentException and usual EDT/open guards
 apply. Find explicitly focuses then selects. Specialized EDITOR roots accept multiline text/scroll or nonstandard
@@ -268,17 +260,5 @@ canvas is not a focus stop, and row pointer/key selection and activation are sup
 own enabled behavior and text paints at full opacity. Field.listId keys fall back to the LAF for a passive list.
 Data-row height counting is separate from selection capability. Inline-row reveal waits for first viewport sizing
 through pendingReveal and does not change logical row focus or keyboard focus.
-
-### Authored native override diagnostics
-
-UiColorKeys.nativeOverrideWarning classifies explicit authored keys whose old native consumer is gone:
-Jasper.notification.*, MainToolbar.searchField.*, SearchEverywhere.SearchField.*, EditorTabs.* and the
-inventoried title/toolbar/status/search-shadow/drop-guide keys. Canonical semantic-role mappings and legacy
-chrome aliases stay supported. ThemeToml warnings include file/key/line in ThemeCatalog problems; imported
-colors surface guidance through ConversionResult warnings. These are nonfatal: color-only data and original
-source bytes remain intact. Generated UiTemplate defaults are never passed to the warning classifier.
-FlatLaf still receives color-only data for retained vendor delegates and identity previews; Jasper's native
-controls and kit use canonical roles. SnapshotLaf reapplies that exact policy whenever defaults are rebuilt.
-
 
 Task4b shared composition: `FormKind.WINDOW` requires one content section and no hero; it fills the owner above the shared scrollable footer. `PLAIN_PATH` retains PATH/Browse without a leading icon; `DISCREET_INPUT` retains secret behavior with a stable, focus-aware reveal slot. All are mirrored in SDK/host/fake. Category fill bases `hue.{blue,green,amber,purple,neutral}.surface` resolve from final glyph hue unless explicitly authored. Tile paint multiplies base alpha by18% once; selected tiles use onAccent independently. These native `[semantic]` colors round-trip authored values unchanged. See the Task4b native-composition amendment for measured source calibration and compatibility costs.

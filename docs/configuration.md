@@ -176,8 +176,8 @@ family = "system"
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately | Live |
 | `ui.appearance` | `"system"` | `"system"` (the operating system's light or dark), `"dark"`, `"light"` | Live |
-| `ui.workspace.opacity` | Workspace theme's value (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
-| `ui.workspace.blur` | `"theme"` | `"theme"` (the workspace theme's value), `"on"`, `"off"`; macOS only, ignored elsewhere | Live |
+| `ui.workspace.opacity` | Opaque (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
+| `ui.workspace.blur` | `"theme"` | `"theme"` (Slate Steel's: no blur), `"on"`, `"off"`; macOS only, ignored elsewhere | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Desk buddy

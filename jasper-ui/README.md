@@ -4,24 +4,25 @@ Standalone theme engine and Swing UI kit. `jasper-ui` has no dependency on the
 application, terminal, Buddy, SDK or plugins. The app adapts its configuration
 and library APIs into these values; plugins use SDK contracts and host adapters.
 
-The engine provides immutable theme documents, inheritance resolution,
-terminal color values, syntax styles and workspace glass levels in `dev.jasper.ui.theme`,
-and native TOML parsing in `dev.jasper.ui.themeio`. All migrated app and plugin consumers use this
-authority; [completion evidence](../docs/design/theme-engine/completion.md) separates source migration from Plan 3 composition.
+The engine is Slate Steel (`dev.jasper.ui.theme`): `SlateSteel` reads the bundled `slate-steel.json` once and gives
+each variant's semantic palette, terminal and editor schemes, syntax styles, glass levels and FlatLaf UI keys
+(`UiColorKeys`, from the roles) as an immutable `GeneratedTheme`. There are no other themes and no theme files to
+parse. The app and plugins use this authority; [completion evidence](../docs/design/theme-engine/completion.md)
+separates source migration from Plan 3 composition.
 
 `TerminalColors` takes background before foreground and defensively copies exactly
 16 nonnull ANSI colors. The terminal library's palette constructor takes foreground
 before background; adapters must map these by meaning. `GlassLevels` validates opacity
 from 0.1 to 1; saved app configuration is translated by the app adapter.
 
-Package contracts live in each `package-info.java`. Theme, model and parsing packages
+Package contracts live in each `package-info.java`. Theme and model packages
 never import Swing. Themes supply colors; geometry and typography roles belong to
 the kit. Views and bindings are EDT-confined and their owner closes them.
 
 Use Java 25 on JetBrains Runtime and the repository wrapper:
 
 ```sh
-./gradlew :jasper-ui:test --tests '*ThemeResolverTest'
+./gradlew :jasper-ui:test --tests '*SlateSteel*'
 ./gradlew :jasper-ui:check verifyUiArchitecture
 ```
 
@@ -41,10 +42,11 @@ whole-branch review remains Plan 1 Task 14. Existing consumers migrate in Plans 
 Public usage, package/lifetime boundaries and compiled examples are in
 [UI architecture](../docs/ui-architecture.md). [Maintenance](../docs/ui-maintenance.md)
 documents gallery/distribution checks; [calibration](../docs/design/theme-engine/calibration.md)
-records original crop/scale anchors and the inspected capture matrix.
+records original crop/scale anchors and the inspected capture matrix (its calibration themes are retired; the gallery
+renders Slate Steel Dark or Light).
 
 ```sh
-./gradlew :jasper-ui:gallery -Pjasper.galleryScale=2 -Pjasper.galleryTheme=calibration
+./gradlew :jasper-ui:gallery -Pjasper.galleryScale=2 -Pjasper.galleryTheme=dark
 ./gradlew :jasper-ui:verifyUiDistribution
 ```
 
