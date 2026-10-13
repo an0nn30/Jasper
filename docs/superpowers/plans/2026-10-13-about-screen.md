@@ -34,6 +34,14 @@
     (`ThemeMigrationCoverageTest` requires one per source); `AboutView` and `LicensesView` carry `ErrorsView`'s
     theme-plan task numbers because the test requires numbers there.
 14. `README.md`'s package-version lines were corrected for the release-tag rule.
+15. Git facts are gathered with `ProcessBuilder` in a memoised provider, not `providers.exec` (no effect while the
+    configuration cache is off).
+16. `headTags` is space-separated in the resource, not newline-separated.
+17. Final-review fixes: git facts only from a repository whose top level is the project folder; `--no-optional-locks` and
+    `--untracked-files=normal` on the dirty check; the fixture drops inherited `GIT_*` variables and skips its repository
+    part without git; full-history checkout in the Linux package job; notices for ftplet-api, winpty, Windows Terminal
+    ConPTY and libffi (JNA's is now `jna.NOTICE.txt`; 25 components); read-only text areas already Tab onward, so only
+    tests were added.
 
 **Goal:** An About Jasper window (icon, name, version, development-build marking, commit, license) with a Copy button and
 a Licenses window listing Jasper's PolyForm Noncommercial license and every third-party component Jasper ships.

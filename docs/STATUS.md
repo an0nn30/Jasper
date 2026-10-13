@@ -6,11 +6,11 @@
 `dev/jasper/app/build-info.properties` inside the jar (ignored by test up-to-date checks); `BuildInfo` calls a clean
 `vX.Y.Z`-tagged commit a release and anything else a development build ("1.2.0 + 14 commits", "main @ 8ba67ed3,
 modified"); packaging takes its version from the release tag unless `-PjasperVersion` is given. Jasper is licensed under
-PolyForm Noncommercial 1.0.0 (`LICENSE.md`); `notices.toml` lists the 23 third-party components it ships and
-`verifyThirdPartyNotices` keeps that complete. About Jasper (palette; Help on Windows/Linux; the macOS application menu)
+PolyForm Noncommercial 1.0.0 (`LICENSE.md`); `notices.toml` lists the 25 third-party components it ships (including the
+winpty, ConPTY and libffi binaries inside pty4j and JNA) and `verifyThirdPartyNotices` keeps the jars complete. About Jasper (palette; Help on Windows/Linux; the macOS application menu)
 shows the icon, version, chip, commit, date and license with Licenses… and Copy; error reports name the build the same
-way. Deviations from the spec are listed in the plan's status banner. `./gradlew check --continue`: **9,804 tests,
-0 failures, 0 errors, 8 skipped**. No GUI launched. GUI checks for the user: Jasper › About Jasper on macOS; Help ›
+way. Deviations from the spec are listed in the plan's status banner; the final-review fixes are its entry 17.
+`./gradlew check --continue`: **9,806 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched. GUI checks for the user: Jasper › About Jasper on macOS; Help ›
 About Jasper on Windows and Linux; About and Licenses in Dark and Light; Copy (and "Copied" for two seconds); the
 Licenses list and texts; the sharpness of the About icon; a long branch name's fit in the commit line. Not merged or
 pushed.
