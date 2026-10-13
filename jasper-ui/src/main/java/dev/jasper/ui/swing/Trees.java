@@ -288,7 +288,9 @@ final class Trees {
             item.children().forEach(child -> flatten(child, depth + 1, childrenShown));
         }
 
+        /** Settings navigation's headings stay open. */
         void expandFocused(boolean expanded) {
+            if (settingsNavigation) return;
             int i = indexOf(focusItem);
             if (i >= 0 && !visible.get(i).item().leaf())
                 emit(new UiEvent.Expanded(node.id(), focusItem, expanded));
@@ -331,7 +333,7 @@ final class Trees {
                     "@tree/" + node.id() + "/" + item.id() + "/status", ControlState.READY, status)));
             row.slot(row.leading, leading);
             for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon") && !settingsNavigation && presentation.isEmpty())icon.tile(0,false);
-            if(settingsNavigation || !presentation.isEmpty())for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon"))icon.tile(context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE),context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE),settingsNavigation?context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_GLYPH):context().icons().size(Nodes.IconSize.CONTROL),selected.contains(item.id()));
+            if(settingsNavigation || !presentation.isEmpty())for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon")){int tile=context().metrics().value(settingsNavigation?dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_TILE:dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE);icon.tile(tile,tile,settingsNavigation?context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_GLYPH):context().icons().size(Nodes.IconSize.CONTROL),selected.contains(item.id()));}
             String titleId = "@tree/" + node.id() + "/" + item.id() + "/title";
             row.slot(
                     row.title,
@@ -352,7 +354,6 @@ final class Trees {
                 row.controls.get(titleId).component.setForeground(ThemePainting.color(context(), dev.jasper.ui.theme.SemanticColor.TEXT_LINK));
             row.slot(row.subtitle, List.of());
             var trailing = new ArrayList<Nodes.Node>();
-            if(settingsNavigation&&!item.leaf())trailing.add(new Nodes.Button("@tree/"+node.id()+"/"+item.id()+"/expand",ControlState.READY,"",value().expandedIds().contains(item.id())?"chevron.down":"chevron.right",Nodes.ButtonKind.GHOST,"expand","Expand or collapse "+item.title(),Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED));
             var presented=presentation.get(item.id());
             // A read-only contextual key reads quieter than the rows the user can change.
             if(!row.inked && presented!=null && presented.locked() && !item.emphasized())
@@ -391,7 +392,7 @@ final class Trees {
             // The row, its slots and its passive texts (title, trailing columns, count) show the item's literal tooltip.
             row.tooltip(item.tooltip());
             row.name(List.of(new Nodes.Text("@tree/" + node.id() + "/" + item.id() + "/name", ControlState.READY, item.title(), Nodes.TextRole.BODY)));
-            // A rail's section headings have no disclosure button.
+            // Rail and Settings navigation headings have no disclosure button.
             if (!item.leaf() && row.controls.get("@tree/"+node.id()+"/"+item.id()+"/expand") != null) {
                 var c = (Buttons.ButtonControl) row.controls.get("@tree/"+node.id()+"/"+item.id()+"/expand");
                 if (c.button.getClientProperty("Jasper.treeCommand") == null) {

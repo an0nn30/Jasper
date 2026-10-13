@@ -25,13 +25,13 @@ class SettingsArtworkTest {
                 public JComponent component(){throw new AssertionError("Artwork must not create plugin UI");}public boolean modified(){return false;}public void reset(){}
                 public CompletableFuture<Void> apply(){return CompletableFuture.completedFuture(null);}public void highlight(String value){}public void dispose(){}
             };
-            tree.show(List.of(page),value->true,Map.of(),false);tree.publish(()->{});
+            tree.show(List.of(page),value->true,Map.of());tree.publish(()->{});
             String name=tree.node().roots().getFirst().icon().orElseThrow();assertThat(name).startsWith("received");assertThat(context.icons().names()).contains(name);
             var tile=context.icons().tile(name,context.theme().semantic(),Nodes.Hue.BLUE,28,false);
             var expectedName="test:expected";try(var registration=context.icons().register(expectedName,new dev.jasper.ui.icons.IdentityArtwork(art(),Nodes.Hue.GREEN))) {
                 assertThat(pixels(tile)).isEqualTo(pixels(context.icons().tile(expectedName,context.theme().semantic(),Nodes.Hue.PURPLE,28,false)));
             }
-            tree.show(List.of(page),value->false,Map.of(),true);tree.publish(()->{});assertThat(context.icons().names()).contains(name);
+            tree.show(List.of(page),value->false,Map.of());tree.publish(()->{});assertThat(context.icons().names()).contains(name);
             tree.close();tree.close();assertThat(context.icons().names()).isEqualTo(names);
         }
     }

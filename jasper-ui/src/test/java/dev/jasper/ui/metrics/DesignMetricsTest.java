@@ -48,7 +48,7 @@ class DesignMetricsTest {
         assertThat(m.contentHeight(DesignMetrics.Role.FIELD_HEIGHT, body, frc)).isEqualTo(24);
         assertThat(m.contentHeight(DesignMetrics.Role.MENU_ITEM_HEIGHT, body, frc)).isEqualTo(22);
         assertThat(m.contentHeight(DesignMetrics.Role.PICKER_ROW_HEIGHT, body, frc)).isEqualTo(22);
-        assertThat(m.contentHeight(DesignMetrics.Role.SETTINGS_NAV_ROW, body, frc)).isEqualTo(24);
+        assertThat(m.contentHeight(DesignMetrics.Role.SETTINGS_NAV_ROW, body, frc)).isEqualTo(30);
         assertThat(m.contentHeight(DesignMetrics.Role.SETTINGS_NAV_HEADING, body, frc)).isEqualTo(22);
     }
 
