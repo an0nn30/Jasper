@@ -64,6 +64,11 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                     check(to.startsWith("dev.jasper.app.dock.") || (to.startsWith("java.") && !to.startsWith("java.awt.")) || to in dockAwt) {
                         "dev.jasper.app.dock is JDK-only and holds no Swing or AWT components: $line"
                     }
+                if (module == app && packageOf(from) == "dev.jasper.app.vmoptions")
+                    check(to.startsWith("dev.jasper.app.vmoptions.") || to.startsWith("com.sun.management.")
+                        || (jdk(to) && !to.startsWith("java.awt.") && !to.startsWith("javax.swing."))) {
+                        "dev.jasper.app.vmoptions is JDK-only and holds no Swing or AWT: $line"
+                    }
                 if (to.startsWith(prefix) && packageOf(from) != packageOf(to))
                     graph.getOrPut(packageOf(from)) { linkedSetOf() }.add(packageOf(to))
             }
