@@ -698,7 +698,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     boolean statusVisible() { return statusVisible; }
     boolean zenMode() { return zenMode; }
 
-    /** Saves this window's mode without changing its normal visibility or dock layout. */
+    /** Saves this window's mode; the saved dock layout keeps the windows that showed before Zen. */
     void toggleZenMode() {
         if (closed) return;
         setZenMode(!zenMode());
@@ -710,11 +710,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed || zenMode == enabled) return;
         dockDrag.cancel();
         zenMode = enabled;
+        area.cancelResize();
         refreshChromeVisibility();
-        area.setToolsSuppressed(zenMode());
         syncRailVisibility();
+        if (contributed != null) contributed.zenChanged();
         if (zenMode()) focusSelected();
-        if (contributed != null) contributed.viewModeChanged();
         updateActions();
     }
     ViewMode viewMode() { return viewMode; }

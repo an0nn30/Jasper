@@ -629,17 +629,20 @@ are not recreated by this layout state.
 
 View › View Modes › Zen toggles a workspace-focused view in the current window. It hides the status bar,
 tool windows and their rails. The command palette field, toolbar icons, workspace tabs and native window/menu
-controls remain available; the toolbar keeps its selected style. Toggle Zen again to restore your layout; pane zoom works independently.
+controls remain available; the toolbar keeps its selected style. A tool window opened in Zen (by its shortcut,
+View › Tool Windows, the palette or a plugin command) shows in its usual place, without the rails. Toggle Zen again
+to restore your layout: the tool windows opened in Zen close and the ones that showed before return; pane zoom
+works independently.
 Zen is independent of Appearance's Normal/Compact setting: Compact keeps its native title bar, hidden header
 and floating command palette when Zen is toggled.
 
 Zen is saved immediately as `zen_mode` in `ui-state.toml` and restored before plugin panels are built on launch.
 New windows inherit the saved mode; existing windows retain their own mode. As with the dock layout, the last
 closed window saves its mode for the next launch. Missing or invalid values default to off. Normal status
-visibility, rail visibility, tool-window positions, sizes and split ratios remain intact. Status and panel
-changes made while in Zen take effect when leaving it; toolbar changes apply immediately. Panel show/hide requests still update
-the normal dock layout, but panels remain hidden and newly requested panels are built only when Zen exits.
-Existing panel instances are retained and receive visibility notifications while hidden.
+visibility, rail visibility, tool-window positions, sizes and split ratios remain intact. Status changes made
+while in Zen take effect when leaving it; toolbar changes apply immediately. The saved layout keeps the tool
+windows that showed before Zen, so a window opened in Zen is never saved as showing; moving or resizing one in Zen
+is saved. Panel instances are retained while hidden and receive visibility notifications.
 
 View groups Toolbar, Status Bar and Rail under **Show/Hide**, and font controls under **Font Size**.
 The contributed **Tools** submenu remains available. Status/rail controls are disabled during Zen; leave Zen to use them. Toolbar controls stay available.

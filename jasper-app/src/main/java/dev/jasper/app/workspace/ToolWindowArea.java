@@ -209,8 +209,6 @@ final class ToolWindowArea extends JPanel {
     }
 
     private final DockState state;
-    private final DockState emptyLayout = new DockState();
-    private boolean toolsSuppressed;
     private final Host center = new Host(false);
     private final JPanel lowerInset = new JPanel() {
         @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(SURFACE_ARC / 2)); }
@@ -303,7 +301,7 @@ final class ToolWindowArea extends JPanel {
      */
     void sync() {
         for (Slot slot : Slot.values()) {
-            String id = toolsSuppressed ? null : state.active(slot).orElse(null);
+            String id = state.active(slot).orElse(null);
             Content wanted = id == null ? null : contents.get(id);
             if (wanted != null && wanted.component() instanceof dev.jasper.ui.swing.KitView view && view.isClosed()) wanted = null;
             Host host = hosts.get(slot);
@@ -421,16 +419,15 @@ final class ToolWindowArea extends JPanel {
             if (child instanceof JComponent next) collectHeaderSources(next, sources);
     }
 
-    /** Zen changes the presentation only: no dock mutation, persistence or disposal of plugin content. */
-    void setToolsSuppressed(boolean suppressed) {
-        if (toolsSuppressed == suppressed) return;
-        toolsSuppressed = suppressed;
-        preview = null;
+    /** Ends a divider drag without applying it: entering or leaving Zen changes which windows show mid-drag. */
+    void cancelResize() {
         dividers.values().forEach(divider -> { divider.dragging = null; divider.moved = false; });
-        sync();
+        if (preview == null) return;
+        preview = null;
+        revalidate(); repaint();
     }
 
-    private DockState layoutState() { return toolsSuppressed ? emptyLayout : preview != null ? preview : state; }
+    private DockState layoutState() { return preview != null ? preview : state; }
 
     private ToolWindowHeader header(String id, String title) {
         var header = new ToolWindowHeader(title,
@@ -505,7 +502,7 @@ final class ToolWindowArea extends JPanel {
         });
     }
 
-    private Dimension size(Dimension terminal, boolean preferred) { return size(terminal, toolsSuppressed ? emptyLayout : state, metrics(), preferred); }
+    private Dimension size(Dimension terminal, boolean preferred) { return size(terminal, state, metrics(), preferred); }
 
     /**
      * The area's preferred or minimum size around a terminal column of the given size. Only a split side raises the

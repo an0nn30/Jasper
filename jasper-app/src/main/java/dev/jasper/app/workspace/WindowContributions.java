@@ -17,9 +17,11 @@ import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -59,6 +61,8 @@ final class WindowContributions implements AutoCloseable {
     private final DockState dock;
     private final Consumer<DockState.Change> docked = this::docked;
     private final Map<String, PanelInstance> panels = new LinkedHashMap<>();
+    /** In Zen, the panels that showed before it, which show again when it ends and stay saved as showing; else null. */
+    private Set<String> beforeZen;
     private Subscription panelRequests;
 
     WindowContributions(WindowContent owner, Contributions model, UiState state) {
@@ -66,6 +70,8 @@ final class WindowContributions implements AutoCloseable {
         this.model = model;
         this.state = state;
         this.dock = owner.dock();
+        // A window restored in Zen remembers its saved panels for leaving it instead of showing them.
+        if (owner.zenMode()) beforeZen = new LinkedHashSet<>();
         syncActions();
         owner.chrome().connect(this);
         renderStatus();
@@ -192,7 +198,8 @@ final class WindowContributions implements AutoCloseable {
 
     /**
      * Docks new panels where they were saved (a saved slot wins over the default) or at the end of their default
-     * slot's group, showing those that showed; undocks the panels that left the model and discards their instances.
+     * slot's group, showing those that showed (in Zen, remembering them for when it ends); undocks the panels that left
+     * the model and discards their instances.
      */
     private void syncPanels() {
         Map<String, PanelEntry> current = new LinkedHashMap<>();
@@ -210,7 +217,9 @@ final class WindowContributions implements AutoCloseable {
             Optional<UiState.Panel> saved = state.panel(entry.id());
             Slot slot = saved.map(UiState.Panel::slot).orElse(entry.defaultSlot());
             dock.add(entry.id(), slot, insertionIndex(slot, saved.map(UiState.Panel::order).orElse(UiState.Panel.LAST)));
-            if (saved.map(UiState.Panel::visible).orElse(false)) dock.show(entry.id());
+            if (!saved.map(UiState.Panel::visible).orElse(false)) continue;
+            if (beforeZen != null) beforeZen.add(entry.id());
+            else dock.show(entry.id());
         }
     }
 
@@ -232,32 +241,42 @@ final class WindowContributions implements AutoCloseable {
     private void docked(DockState.Change change) {
         // A dock change mid-drag (a plugin unloading, a panel showing itself) ends the drag: what it drew renders again.
         owner.dockDrag().cancel();
-        if (!owner.zenMode()) for (String id : change.shown()) build(id);
+        for (String id : change.shown()) build(id);
         if (change.layout()) owner.area().sync();
         if (change.stripes()) renderStripes();
         for (String id : change.hidden()) notifyVisibility(id, false);
         // Hiding a window by any route returns focus to the terminal.
         if (!change.hidden().isEmpty()) owner.focusSelected();
-        for (String id : change.shown()) notifyVisibility(id, !owner.zenMode());
+        for (String id : change.shown()) notifyVisibility(id, true);
         persist();
     }
 
-    /** Sends actual visibility to plugins while leaving the normal dock layout (and its saved state) alone. */
-    void viewModeChanged() {
-        if (!owner.zenMode()) {
-            for (String id : List.copyOf(panels.keySet())) if (dock.visible(id)) build(id);
-            owner.area().sync();
+    /**
+     * Entering Zen hides the panels that show and remembers them; any panel opened in Zen then shows in its slot as
+     * usual, without the rail. Leaving Zen hides those and shows the remembered panels again.
+     */
+    void zenChanged() {
+        if (owner.zenMode() == (beforeZen != null)) return;
+        if (owner.zenMode()) {
+            beforeZen = new LinkedHashSet<>();
+            for (Slot slot : Slot.values()) dock.active(slot).ifPresent(beforeZen::add);
+            for (String id : List.copyOf(beforeZen)) dock.hide(id);
+            return;
         }
-        for (String id : List.copyOf(panels.keySet())) notifyVisibility(id, visible(id));
+        Set<String> restore = beforeZen;
+        beforeZen = null;
+        for (Slot slot : Slot.values()) dock.active(slot).filter(id -> !restore.contains(id)).ifPresent(dock::hide);
+        for (String id : restore) showPanel(id);
     }
 
-    private boolean visible(String id) { return !owner.zenMode() && dock.visible(id); }
+    /** Whether the saved layout has the panel showing: in Zen, whether it showed before Zen. */
+    private boolean savedVisible(String id) { return beforeZen != null ? beforeZen.contains(id) : dock.visible(id); }
 
     /** Builds the panel's instance the first time it shows in this window; a failing factory yields a placeholder. */
     private void build(String id) {
         PanelInstance panel = panels.get(id);
         if (panel == null || panel.component != null) return;
-        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> visible(id), header -> owner.area().setHeader(id, header));
+        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> dock.visible(id), header -> owner.area().setHeader(id, header));
         JComponent built = null;
         try { built = panel.entry.factory().apply(panel.site); }
         catch (RuntimeException failure) {
@@ -274,7 +293,7 @@ final class WindowContributions implements AutoCloseable {
     /** Tells the panel only what is still true and not yet told: a listener's own show or hide may have changed it. */
     private void notifyVisibility(String id, boolean visible) {
         PanelInstance panel = panels.get(id);
-        if (panel == null || panel.site == null || visible(id) != visible || panel.notified == visible) return;
+        if (panel == null || panel.site == null || dock.visible(id) != visible || panel.notified == visible) return;
         panel.notified = visible;
         panel.site.notifyVisibility(visible);
     }
@@ -295,7 +314,7 @@ final class WindowContributions implements AutoCloseable {
                 .forEach(entry -> merged.add(Math.min(entry.getValue().order(), merged.size()), entry.getKey()));
             for (int i = 0; i < merged.size(); i++) {
                 String id = merged.get(i);
-                boolean visible = panels.containsKey(id) ? dock.visible(id) : state.panel(id).map(UiState.Panel::visible).orElse(false);
+                boolean visible = panels.containsKey(id) ? savedVisible(id) : state.panel(id).map(UiState.Panel::visible).orElse(false);
                 state.putPanel(id, new UiState.Panel(slot, Math.min(i, UiState.Panel.LAST), visible));
             }
         }
@@ -339,7 +358,7 @@ final class WindowContributions implements AutoCloseable {
     /** Panel content that is not showing is outside the window's component tree and must be updated by hand. */
     void refreshTheme() {
         for (PanelInstance panel : panels.values())
-            if (panel.component != null && !visible(panel.entry.id())) SwingUtilities.updateComponentTreeUI(panel.component);
+            if (panel.component != null && !dock.visible(panel.entry.id())) SwingUtilities.updateComponentTreeUI(panel.component);
     }
 
     private void changed(Contributions.Kind kind) {
