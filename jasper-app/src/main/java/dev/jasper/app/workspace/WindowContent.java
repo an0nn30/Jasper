@@ -661,6 +661,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void requestQuit() { quit.run(); }
 
     CommandRegistry commands() { return commands; }
+    /** The application's theme controller, shared by every window. */
+    ThemeController themes() { return themes; }
     ScopeRegistry scopes() { return scopes; }
     CommandsScope commandsScope() { return commandsScope; }
     void dispatchCommand(Command command) {
