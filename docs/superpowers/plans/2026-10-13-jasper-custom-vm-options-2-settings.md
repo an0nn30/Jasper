@@ -10,6 +10,16 @@ Deviations beyond the seven planned ones, made in review: (R2) the plan's own do
 `VmOptionsFile.withMaxHeap` drops a leading byte order mark so a first-line `-Xmx` is still found; (R4)
 `VmOptionsCheck.runProcess` throws `InterruptedIOException` on an interrupt instead of reporting a timeout; (R5) saving
 the heap reads the file back so the new value shows at once; (R6) saving never rewrites a corrupted file.
+(R7) The R5 test queues EDT turns, because the inline-executor version could not fail.
+(R9) Nine nonvisual-helper rows in `docs/design/theme-engine/migration.csv`, which `ThemeMigrationCoverageTest` requires.
+Spec-text deviation: for skipped or corrupted launches the restart banner compares against the file as Jasper first read
+it, not against the digest property.
+
+Final review: (F1) a launcher path the platform cannot parse leaves the launch unmanaged instead of stopping start-up;
+(F2) Change Memory Settings… focuses the heap field when the dialog first opens; (F3) corruption notices no longer
+contradict the restart banner, and no restart is offered while the file is corrupted; (F4) `VmOptionsFile.setMaxHeap`
+removed; (F5) saving follows a symlinked `jasper.vmoptions`; (F6) a check over its time limit shows no findings; (F7)
+save errors read as sentences; (F8) the read-only Edit Custom VM Options… scrolls to the section.
 
 **Goal:** In the installed app, System Settings gets a Java Virtual Machine section (heap limit, Edit Custom VM
 Options…, the options' check, a restart banner), Help and the palette get the two IntelliJ actions, and Jasper says
@@ -3056,7 +3066,7 @@ so in a notification in the **Memory & VM options** group.
 
 In the spec's status paragraph add `Plan 2 (settings and actions) complete on <today's date>.` at the end. In this
 plan, change `Status: **Not started.**` to `Status: **Complete on <today's date>.**` followed by any deviation beyond the
-six planned ones. In `docs/STATUS.md`, add at the top, filling in the date and the counts from Step 6:
+seven planned ones. In `docs/STATUS.md`, add at the top, filling in the date and the counts from Step 6:
 
 ```markdown
 **Custom VM options plan 2 (settings and actions) complete — <date>.** On `claude/custom-vm-options-settings` (not

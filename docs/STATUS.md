@@ -6,10 +6,13 @@ Reveal, the options' check with the bundled `java`, a restart banner with Restar
 app), Help and the palette have Change Memory Settings… and Edit Custom VM Options…, and Jasper says in the new
 **Memory & VM options** notification group when it started without the user's options or ignored the file. New JDK-only
 package `dev.jasper.app.vmoptions` mirrors the launcher's reading (shared digest vectors). A blank
-`JASPER_VM_OPTIONS_SKIP` now skips too. Deviations: the seven planned ones and five review rulings, listed in the plan's
-banner. Full `./gradlew check`: 9,831 tests, 0 failures, 8 skips. Manual checks pending (the user): in the packaged
-app, set the heap in Settings, see the restart banner, Restart Now, and see the new limit; type an invalid line and see
-the findings; Help menu entries. Plan 3 (memory indicator and low-memory warning) is next.
+`JASPER_VM_OPTIONS_SKIP` now skips too. Deviations: the seven planned ones (in the plan) and the review and final-review
+changes listed in the plan's status banner. Known limitation: on Windows, a Jasper home whose path the ANSI code page
+cannot represent leaves the section read-only, and where Windows maps such characters to look-alikes the app may edit a
+different file than the launcher reads. Full `./gradlew check`: 9,837 tests, 0 failures, 8 skips. Manual checks pending
+(the user): in the packaged app, set the heap in Settings, see the restart banner, Restart Now, and see the new limit;
+type an invalid line and see the findings; Help menu entries; Change Memory Settings… from the Help menu with Settings
+closed puts the cursor in the heap field. Plan 3 (memory indicator and low-memory warning) is next.
 
 **Custom VM options plan 1 (launcher) complete — 2026-10-13.** Merged to local `main` (not pushed): Jasper builds
 jpackage's launcher from vendored JBR 25.0.4.1 sources (`packaging/launcher`) with marked hooks that merge the user's
