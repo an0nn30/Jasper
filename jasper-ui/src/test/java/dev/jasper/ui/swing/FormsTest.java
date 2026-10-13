@@ -213,7 +213,8 @@ class FormsTest {
                 var editor=find(view,"input.input",JTextField.class);var document=editor.getDocument();
                 assertThat(owner.label.getLabelFor()).isSameAs(editor);
                 view.setSize(s(650),s(300));for(int i=0;i<5;i++)layout(view);
-                assertThat(input.getX()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH)+m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP));assertThat(input.getY()).isZero();
+                assertThat(input.getX()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH)+m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP));
+                assertThat(input.getY()).as("centred on its taller label block").isEqualTo(Math.max(0,owner.caption.getY()+owner.caption.getHeight()-owner.label.getY()-input.getHeight())/2);
                 assertThat(editor.getDocument()).isSameAs(document);
                 view.update(new ViewSpec(new FormRow("row",ControlState.READY,row.label(),row.caption(),row.control(),
                     Optional.of(new Field("port",new ControlState(false,true,false,""),FieldKind.PORT,"22","","Port","")))));

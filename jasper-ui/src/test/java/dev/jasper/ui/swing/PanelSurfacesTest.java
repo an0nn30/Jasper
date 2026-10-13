@@ -225,8 +225,8 @@ class PanelSurfacesTest {
                 assertThat(caption.lines(caption.getWidth())).singleElement().satisfies(line -> assertThat(line).endsWith("…"));
                 assertThat(caption.getToolTipText()).isEqualTo("as seen from a-very-long-synthetic-host-name");
                 var input = find(view, "host", JComponent.class);
-                assertThat(find(view, "row", JComponent.class).getHeight()).as("beside an input the row keeps the input's height")
-                    .isLessThanOrEqualTo(Math.max(input.getHeight(), s(30)));
+                assertThat(find(view, "row", JComponent.class).getHeight()).as("beside an input the row holds its label and caption, no more")
+                    .isEqualTo(Math.max(input.getHeight(), caption.getY() + caption.getHeight()));
             } finally { release(ctx); }
         });
     }

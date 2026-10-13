@@ -206,6 +206,23 @@ class GroupedFormGeometryTest {
             }finally{release(context);}
         });
     }
+    /** New Tunnel's Listen On: the label and its caption are taller than the field, so the row holds them and centres the field on them. */
+    @Test void aCaptionedLabelBesideAnInputKeepsItsWholeCaptionInsideItsRow() {
+        Edt.run(()->{
+            var context=KitFixtures.context();
+            var row=new FormRow("listen",ControlState.READY,"Listen On","this computer",
+                new Field("address",ControlState.READY,FieldKind.TEXT,"localhost","","Listen address","",Optional.empty()),
+                Optional.of(new Field("port",ControlState.READY,FieldKind.PORT,"8080","","Listen port","",Optional.empty())));
+            try(var view=new KitView(context,new ViewSpec(new Card("card",ControlState.READY,CardKind.FORM,List.of(row))),e->{})) {
+                KitFixtures.render(view,492,200,1);
+                var shell=find(view,"listen",javax.swing.JComponent.class);var label=find(view,"listen.label",javax.swing.JComponent.class);
+                var caption=find(view,"listen.caption",javax.swing.JComponent.class);var field=find(view,"address",javax.swing.JComponent.class);
+                assertThat(caption.getY()+caption.getHeight()).as("the whole caption inside its row").isLessThanOrEqualTo(shell.getHeight());
+                assertThat(label.getY()).as("and the label").isGreaterThanOrEqualTo(0);
+                assertThat(label.getY()+caption.getY()+caption.getHeight()).as("the label block centred on the field").isCloseTo(2*field.getY()+field.getHeight(),within(1));
+            }finally{release(context);}
+        });
+    }
     @Test void aCaptionedLabelStaysOnTheControlWhenItsTrailingFieldShowsAnError() {
         Edt.run(()->{
             var context=KitFixtures.context();
