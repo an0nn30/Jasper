@@ -1,0 +1,93 @@
+import java.time.OffsetDateTime
+
+// Fixtures for gradle/build-info.gradle in the style of packaging-support-test.gradle: the pure helpers, then a throwaway
+// git repository walked through clean, tagged, ahead-of-tag, dirty and detached states. Needs git; no network.
+def verifyBuildInfo = tasks.register('verifyBuildInfoSupport') {
+    group = 'verification'
+    description = 'Checks the build-information helpers with fixtures and a temporary git repository.'
+    doLast {
+        assert releaseVersions('v1.2.0 v1.10.0 v1.2 v01.2.3 x1.0.0 v1.2.3-rc1 pre-author-rewrite-main') == ['1.2.0', '1.10.0']
+        assert highestVersion(['1.2.0', '1.10.0', '1.9.9']) == '1.10.0'
+        assert highestVersion([]) == null
+        assert describedVersion('v1.2.0-14-g8ba67ed3') == [version: '1.2.0', commits: 14]
+        assert describedVersion('v1.2.0-0-g8ba67ed3') == [version: '1.2.0', commits: 0]
+        assert describedVersion('') == null && describedVersion('v1.2-3-gabc1234') == null
+        assert packageVersion(null, [headTags: '', describe: '']) == '1.0.0'
+        assert packageVersion(null, [headTags: '', describe: 'v1.2.0-3-gabc1234']) == '1.2.0'
+        assert packageVersion(null, [headTags: 'nightly v1.3.0 v1.10.0', describe: 'v1.10.0-0-gabc1234']) == '1.10.0'
+        assert packageVersion('1.4.0', [headTags: '', describe: 'v1.2.0-3-gabc1234']) == '1.4.0'
+        assert packageVersion('1.3.0', [headTags: 'v1.3.0', describe: '']) == '1.3.0'
+        try {
+            packageVersion('1.4.0', [headTags: 'v1.3.0', describe: ''])
+            assert false : 'a -PjasperVersion that disagrees with the release tag must fail'
+        } catch (GradleException expected) {
+            assert expected.message.contains('1.4.0') && expected.message.contains('v1.3.0')
+        }
+        String text = buildInfoText([commit: 'a' * 40, branch: 'claude/über', commitDate: '2026-10-13T14:02:11-04:00',
+            dirty: 'true', headTags: 'v1.2.0', describe: 'v1.2.0-0-gaaaaaaa'])
+        assert text.readLines() == ['# Written by :jasper-app:buildInfo (gradle/build-info.gradle).',
+            "commit=${'a' * 40}".toString(), 'branch=claude/über', 'commitDate=2026-10-13T14:02:11-04:00', 'dirty=true',
+            'headTags=v1.2.0', 'describe=v1.2.0-0-gaaaaaaa']
+        assert buildInfoText([branch: 'a\\b']).readLines().contains('branch=a\\\\b')
+        logger.lifecycle('Verified the build-information helpers')
+    }
+}
+tasks.named('check') { dependsOn(verifyBuildInfo) }
+
+verifyBuildInfo.configure {
+    doLast {
+        File root = new File(temporaryDir, 'git')
+        root.deleteDir()
+        root.mkdirs()
+        // The developer's own git configuration stays out: this global file replaces theirs and there is no system file.
+        // It turns on the settings that would pollute the facts, to prove gitFacts turns them off.
+        File global = new File(root, 'gitconfig')
+        global.text = '[log]\n\tshowSignature = true\n[color]\n\tui = always\n[user]\n\tname = Fixture\n\temail = fixture@example.invalid\n' +
+            '[commit]\n\tgpgSign = false\n[tag]\n\tgpgSign = false\n'
+        // The ceiling keeps git from finding Jasper's own repository above the fixture.
+        Map<String, String> environment = [GIT_CONFIG_GLOBAL: global.absolutePath, GIT_CONFIG_NOSYSTEM: '1',
+            GIT_CEILING_DIRECTORIES: root.absolutePath, LC_ALL: 'C']
+        File repo = new File(root, 'repo')
+        repo.mkdirs()
+        def run = { List<String> arguments ->
+            def builder = new ProcessBuilder(['git'] + arguments).directory(repo).redirectErrorStream(true)
+            builder.environment().putAll(environment)
+            def process = builder.start()
+            String output = process.inputStream.getText('UTF-8')
+            assert process.waitFor() == 0 : "git ${arguments.join(' ')} failed:\n${output}"
+        }
+
+        File outside = new File(root, 'outside')
+        outside.mkdirs()
+        assert gitFacts(outside, environment) == [commit: '', branch: '', commitDate: '', dirty: 'false', headTags: '', describe: '']
+
+        run(['init', '-q', '-b', 'main'])
+        new File(repo, 'a.txt').text = 'one\n'
+        run(['add', 'a.txt'])
+        run(['commit', '-q', '-m', 'one'])
+        def first = gitFacts(repo, environment)
+        assert first.commit ==~ /[0-9a-f]{40}/ && first.branch == 'main' && first.dirty == 'false'
+        assert first.headTags == '' && first.describe == ''
+        assert OffsetDateTime.parse(first.commitDate) != null
+        assert packageVersion(null, first) == '1.0.0'
+
+        run(['tag', 'v1.2.0'])
+        run(['tag', 'nightly'])
+        def tagged = gitFacts(repo, environment)
+        assert tagged.headTags == 'nightly v1.2.0' && tagged.describe ==~ /v1\.2\.0-0-g[0-9a-f]+/
+        assert packageVersion(null, tagged) == '1.2.0'
+
+        new File(repo, 'a.txt').text = 'two\n'
+        assert gitFacts(repo, environment).dirty == 'true'
+        run(['commit', '-q', '-am', 'two'])
+        def ahead = gitFacts(repo, environment)
+        assert ahead.headTags == '' && ahead.dirty == 'false' && ahead.describe ==~ /v1\.2\.0-1-g[0-9a-f]+/
+        assert packageVersion(null, ahead) == '1.2.0' && describedVersion(ahead.describe).commits == 1
+
+        new File(repo, 'untracked.txt').text = 'new\n'
+        assert gitFacts(repo, environment).dirty == 'true'
+        run(['checkout', '-q', '--detach', 'HEAD'])
+        assert gitFacts(repo, environment).branch == 'HEAD'
+        logger.lifecycle('Verified build facts from a temporary git repository')
+    }
+}

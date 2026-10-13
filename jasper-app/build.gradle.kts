@@ -158,6 +158,8 @@ for ((taskName, entryPoint) in listOf(
     }
 }
 
+// The commit this jar is built from (dev/jasper/app/build-info.properties); packaging.gradle reads its version from it.
+apply(from = rootProject.file("gradle/build-info.gradle"))
 apply(from = rootProject.file("gradle/packaging.gradle"))
 
 // Keep API/package contracts in the ordinary headless verification path.
