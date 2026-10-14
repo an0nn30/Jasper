@@ -416,6 +416,7 @@ public final class JasperApplication {
             window.content().onError = (title, details) -> notificationViews.error(title, details, windowId);
             window.content().onInfo = (title, details) -> notificationViews.info(title, details, windowId);
             window.content().onLaunchFailure = (details, cause) -> incidentNotices.launchFailure(windowId, details, cause);
+            window.content().onOpenFile = (file, line) -> openFileAt(file, line, windowId);
             notificationViews.attach(window.content());
             window.content().connectTerminals(terminals, window::toFront);
             if (WORKSPACE_GLASS) window.content().setGlassListener(this::glassChanged);
@@ -521,6 +522,30 @@ public final class JasperApplication {
         var desktop = new dev.jasper.app.platform.ConfigEditor();
         PluginRuntime runtime = plugins;
         if (runtime == null) desktop.open(file); else runtime.open(file, desktop::open);
+    }
+
+    /**
+     * Opens a file that a Cmd-click in window {@code window} named, at {@code line} (0 for none), when it is an existing
+     * regular file: on a virtual thread, through the editor a plugin provides, else the desktop's edit or reveal action.
+     * The file's path is program output, so it is opened for editing only: never the desktop's open action, which runs
+     * programs and scripts. Anything else opens nothing and tells nobody. Reads {@link #plugins} when the thread runs.
+     */
+    void openFileAt(Path file, int line, UUID window) {
+        openFileAt(file, line, window, new dev.jasper.app.platform.ConfigEditor());
+    }
+
+    /** As {@link #openFileAt(Path, int, UUID)}, falling back to {@code desktop}; tests inject its actions. */
+    void openFileAt(Path file, int line, UUID window, dev.jasper.app.platform.ConfigEditor desktop) {
+        Thread.ofVirtual().name("jasper-open-file").start(() -> {
+            try {
+                if (!java.nio.file.Files.isRegularFile(file)) return;
+                PluginRuntime runtime = plugins;
+                if (runtime == null) desktop.editOrReveal(file);
+                else runtime.open(file, line > 0 ? OptionalInt.of(line) : OptionalInt.empty(), Optional.of(window), desktop::editOrReveal);
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "Could not open the clicked file " + file, failure);
+            }
+        });
     }
 
     /** What running plugins add to a new local shell, given Jasper's own environment; nothing before they start. EDT. */

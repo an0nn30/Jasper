@@ -151,12 +151,24 @@ final class FileEditors {
      * @throws IllegalStateException on the UI thread
      */
     void openFromWorker(Path file, Supplier<Optional<UUID>> window, Consumer<Path> desktop) {
+        openFromWorker(file, OptionalInt.empty(), window, desktop);
+    }
+
+    /**
+     * As above, at {@code line}: the editor gets it, and the desktop opens the file without it.
+     *
+     * @return whether the provided editor opened the file; false when the desktop was given it, or nothing opened
+     *         because the worker was interrupted
+     * @throws IllegalStateException on the UI thread
+     */
+    boolean openFromWorker(Path file, OptionalInt line, Supplier<Optional<UUID>> window, Consumer<Path> desktop) {
         Objects.requireNonNull(desktop, "desktop");
-        if (editFromWorker(file, OptionalInt.empty(), window)) return;
+        if (editFromWorker(file, line, window)) return true;
         if (Thread.currentThread().isInterrupted()) {
             LOG.log(System.Logger.Level.INFO, "The worker was interrupted, so the desktop does not open " + file);
-            return;
+            return false;
         }
         desktop.accept(file);
+        return false;
     }
 }

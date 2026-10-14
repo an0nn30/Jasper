@@ -157,4 +157,20 @@ class FileEditorsTest {
         var never = new FileEditors(task -> { throw new AssertionError("nothing to ask"); }, () -> false, containment);
         assertThat(never.editFromWorker(NOTES, OptionalInt.empty(), Optional::empty)).isFalse();
     }
+
+    @Test void aWorkerOpensAtTheLineInTheWindowItWasGiven() {
+        var direct = new FileEditors(Runnable::run, () -> false, containment);
+        UUID window = UUID.randomUUID();
+        List<String> calls = new CopyOnWriteArrayList<>();
+        List<Path> desktop = new CopyOnWriteArrayList<>();
+        var opening = direct.register("dev.x.a", recording("a", calls, true),
+            id -> id.equals(window) ? Optional.of(handle("window")) : Optional.empty());
+        assertThat(direct.openFromWorker(NOTES, OptionalInt.of(42), () -> Optional.of(window), desktop::add)).isTrue();
+        assertThat(direct.openFromWorker(NOTES, OptionalInt.empty(), Optional::empty, desktop::add)).isTrue();
+        opening.close();
+        direct.register("dev.x.b", recording("declining", calls, false), FileEditorsTest::noWindow);
+        assertThat(direct.openFromWorker(NOTES, OptionalInt.of(7), () -> Optional.of(window), desktop::add)).as("the desktop opened it").isFalse();
+        assertThat(calls).containsExactly("a|42|window", "a|-|-", "declining|7|-");
+        assertThat(desktop).as("the desktop gets the file, without its line").containsExactly(NOTES);
+    }
 }

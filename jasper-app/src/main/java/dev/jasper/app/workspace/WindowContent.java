@@ -43,6 +43,7 @@ import javax.swing.text.JTextComponent;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.terminals.SessionRequest;
+import dev.jasper.terminal.view.FileLink;
 
 /** Real window contents, independent of native JFrame construction for headless testing. */
 public final class WindowContent extends JPanel implements AutoCloseable {
@@ -154,6 +155,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final java.util.List<Consumer<WorkspaceActivity.Event>> activityListeners = new ArrayList<>();
     /** Whether any Jasper window has focus; application-supplied, EDT-only. */
     public java.util.function.BooleanSupplier anyWindowActive = () -> true;
+    /**
+     * A Cmd-click (Ctrl-click elsewhere) named a file in one of this window's local panes: the resolved path, and the
+     * line written after it, 0 for none. The application checks the file off the EDT and opens it; by default nothing
+     * opens. EDT.
+     */
+    public java.util.function.BiConsumer<Path, Integer> onOpenFile = (file, line) -> { };
 
     /** Replays existing producers before returning; the listener receives later events until closed. */
     public Subscription activity(Consumer<WorkspaceActivity.Event> listener) {
@@ -982,6 +989,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             JPopupMenu popup = chrome.contextMenu();
             popup.show(pane.view(), event.getX(), event.getY());
         });
+        pane.view().setFileLinkHandler(link -> openFileLink(pane, link));
         if (!firstTerminalSeen) {
             firstTerminalSeen = true;
             try {
@@ -990,6 +998,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 LOG.log(System.Logger.Level.WARNING, "The first-terminal observer failed", failure);
             }
         }
+    }
+
+    /**
+     * A Cmd-click on a file in {@code pane}: resolved against the pane's local directory and given to {@link #onOpenFile}.
+     * A provided session, or a shell that reports a directory on another host, opens nothing.
+     */
+    private void openFileLink(TerminalPane pane, FileLink link) {
+        Optional<Path> local = pane.localDirectory();
+        if (local.isEmpty()) return;
+        FileLinks.resolve(link.path(), local, Path.of(System.getProperty("user.home")),
+                System.getProperty("os.name", "").startsWith("Windows"))
+            .ifPresent(file -> onOpenFile.accept(file, link.line()));
     }
 
     void selectTab(Component tab) {
@@ -1410,7 +1430,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
         onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onLaunchFailure = (details, cause) -> {}; onMinimumSizeChanged = () -> {};
-        onToggleBuddy = () -> {}; buddyEnabled = () -> false;
+        onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {};
         activityListeners.clear();
         anyWindowActive = () -> false;
     }

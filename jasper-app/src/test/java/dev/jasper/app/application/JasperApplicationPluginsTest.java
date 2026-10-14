@@ -473,4 +473,92 @@ class JasperApplicationPluginsTest {
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
     }
+
+    private static final String LINE_EDITOR = """
+        package fix.lines;
+        import dev.jasper.sdk.plugin.Plugin;
+        import dev.jasper.sdk.plugin.PluginContext;
+        import java.nio.file.Files;
+        import java.nio.file.StandardOpenOption;
+        public final class Main implements Plugin {
+            @Override public void start(PluginContext context) {
+                context.platform().editor((file, line, window) -> {
+                    try {
+                        Files.writeString(context.dataDirectory().resolve("edited"),
+                            file.getFileName() + "|" + (line.isPresent() ? String.valueOf(line.getAsInt()) : "-") + "\\n",
+                            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                    } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                    return true;
+                });
+            }
+        }
+        """;
+
+    /** Review Focus 1, the application's half: a clicked file opens at its line when it is an existing regular file. */
+    @Test void aClickedFileOpensAtItsLineOnlyWhenItIsAnExistingRegularFile() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("lines-plugin");
+        PluginJars.build(dev, "lines.jar", PluginJars.descriptor("dev.example.lines", "1.0.0", "fix.lines.Main")
+            + "capabilities = [\"editor.provide\"]\n", Map.of("fix.lines.Main", LINE_EDITOR), List.of());
+        Path file = java.nio.file.Files.writeString(home.resolve("Foo.java"), "class Foo { }\n");
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].startPlugins(null, dev, false, dirs);
+            java.util.UUID window = java.util.UUID.randomUUID();
+            application[0].openFileAt(home.resolve("Missing.java"), 3, window);
+            application[0].openFileAt(home, 4, window);
+            application[0].openFileAt(file, 42, window);
+            application[0].openFileAt(file, 0, window);
+        });
+        Path edited = dirs.plugins().resolve("dev.example.lines/data/edited");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline
+            && (!java.nio.file.Files.exists(edited) || java.nio.file.Files.readAllLines(edited).size() < 2)) Thread.sleep(10);
+        assertThat(java.nio.file.Files.readAllLines(edited)).as("not the missing file, nor the directory")
+            .containsExactlyInAnyOrder("Foo.java|42", "Foo.java|-");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    /**
+     * Ruling 6: the file's path is program output, so the desktop fallback edits or reveals it and never opens it, which
+     * would run a script or program: before the plugins start, and when no plugin provides an editor.
+     */
+    @Test void aClickedFilesDesktopFallbackEditsOrRevealsAndNeverOpens() throws Exception {
+        Path script = java.nio.file.Files.writeString(home.resolve("run.command"), "#!/bin/sh\n");
+        var calls = new CopyOnWriteArrayList<String>();
+        var desktop = new dev.jasper.app.platform.ConfigEditor(
+            path -> { calls.add("edit:" + path.getFileName()); throw new UnsupportedOperationException("no edit action"); },
+            path -> calls.add("open:" + path.getFileName()), path -> calls.add("reveal:" + path.getFileName()));
+        java.util.UUID window = java.util.UUID.randomUUID();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].openFileAt(script, 5, window, desktop);
+        });
+        awaitCalls(calls, 2);
+        assertThat(calls).as("plugins not started").containsExactly("edit:run.command", "reveal:run.command");
+
+        calls.clear();
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("life-plugin");
+        PluginJars.build(dev, "life.jar", PluginJars.descriptor("dev.example.life", "1.0.0", "fix.life.Main"),
+            Map.of("fix.life.Main", FIXTURE), List.of());
+        edt(() -> {
+            application[0].startPlugins(null, dev, false, dirs);
+            application[0].openFileAt(script, 0, window, desktop);
+        });
+        awaitCalls(calls, 2);
+        assertThat(calls).as("plugins running, none provides an editor").containsExactly("edit:run.command", "reveal:run.command");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    private static void awaitCalls(List<String> calls, int count) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline && calls.size() < count) Thread.sleep(10);
+    }
 }

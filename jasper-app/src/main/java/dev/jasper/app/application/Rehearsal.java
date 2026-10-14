@@ -142,6 +142,7 @@ final class Rehearsal {
         content.onError = (title, details) -> report.accept(title + ": " + details);
         content.onInfo = (title, details) -> report.accept(title + ": " + details);
         content.onLaunchFailure = (details, cause) -> report.accept("Could not start the terminal: " + details);
+        content.onOpenFile = (file, line) -> { };
     }
 
     /**

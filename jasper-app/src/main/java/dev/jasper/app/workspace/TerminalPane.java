@@ -490,6 +490,17 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     public Path directory() { return session == null ? launchDirectory : session.workingDirectory().orElse(launchDirectory); }
 
     /**
+     * The local directory a relative path printed in this pane is relative to: the one the shell last reported, else the
+     * one the pane started in. Empty for a provided session, and while the shell reports a directory on another host,
+     * since nothing printed there is a path on this machine.
+     */
+    Optional<Path> localDirectory() {
+        PaneSnapshot now = snapshot();
+        if (now.providerId().isPresent() || now.remoteDirectory().isPresent()) return Optional.empty();
+        return Optional.of(directory());
+    }
+
+    /**
      * Where a split of this pane, or a tab or window opened from it, starts: the directory the shell reported, else
      * the one it was asked to start in; null when it started where a new shell starts and has reported nothing, so
      * the new pane does too (a WSL profile then opens its Linux home, not {@code /mnt/c/Users/NAME}).
@@ -578,7 +589,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         closedHook.run();
         if (findBar != null) findBar.dispose();
         if (view != null) {
-            view.setShortcutHandler(null); view.setContextMenuHandler(null); view.setOnCloseRequest(() -> {});
+            view.setShortcutHandler(null); view.setContextMenuHandler(null); view.setFileLinkHandler(null); view.setOnCloseRequest(() -> {});
         }
         if (attempt != null) attempt.cancel();
         droppedTimer.stop();
