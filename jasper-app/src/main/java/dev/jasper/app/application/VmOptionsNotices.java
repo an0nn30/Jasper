@@ -10,8 +10,8 @@ import java.nio.file.Path;
 import java.util.Optional;
 
 /**
- * Custom VM options notifications (spec sections 4.3, 5.1 and 5.5) in their own group: a fallback start, a corrupted
- * file, a pending restart and failures. EDT only.
+ * Custom VM options notifications (spec sections 4.3, 5.1, 5.4 and 5.5) in their own group: a fallback start, a corrupted
+ * file, a pending restart, failures and low memory. EDT only.
  */
 final class VmOptionsNotices {
     static final NotificationGroup GROUP = new NotificationGroup("jasper.vmoptions", "Memory & VM options", NotificationRequest.JASPER, DisplayMode.CARD);
@@ -57,5 +57,12 @@ final class VmOptionsNotices {
     /** A file operation failed. */
     void failed(String title, String details) {
         center.post(NotificationRequest.of(GROUP.id(), Severity.ERROR, title).withContent(details));
+    }
+
+    /** Jasper's heap stays nearly full, or ran out (spec section 5.4); {@code adjust} opens the heap limit. Any thread. */
+    static NotificationRequest lowMemory(Runnable adjust) {
+        return NotificationRequest.of(GROUP.id(), Severity.WARNING, "Jasper is running low on memory")
+            .withContent("Raise the maximum heap size so Jasper keeps up; the new limit applies after a restart.")
+            .withAction(new NotificationAction("Adjust Memory Settings\u2026", adjust, false));
     }
 }

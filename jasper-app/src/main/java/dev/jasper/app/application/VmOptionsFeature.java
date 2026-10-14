@@ -54,6 +54,7 @@ final class VmOptionsFeature {
     private final Supplier<OptionalLong> physicalMemoryMiB;
     private final Duration watchInterval;
     private final List<Runnable> listeners = new ArrayList<>();
+    private Runnable heapSaved = () -> { };
     private VmOptionsFile.Contents contents = VmOptionsFile.Contents.ABSENT;
     private VmOptionsFile.Contents atStart;
     private VmOptionsCheck.Findings findings = VmOptionsCheck.Findings.NONE;
@@ -94,6 +95,9 @@ final class VmOptionsFeature {
 
     /** Whether jasper.vmoptions applies to this JVM (Jasper's launcher started it). */
     boolean editable() { return launch.launcherManaged(); }
+
+    /** Runs {@code action} after each successful heap save (the low-memory warning may show again). EDT. */
+    void onHeapSaved(Runnable action) { heapSaved = Objects.requireNonNull(action, "action"); }
 
     /** Opens the file in the user's editor, creating it with the header first. EDT. */
     void editCustomOptions() {
@@ -249,6 +253,7 @@ final class VmOptionsFeature {
                 stamp = savedStamp;
                 notifyListeners();
                 done.complete(null);
+                heapSaved.run();
                 reload();
             });
         });

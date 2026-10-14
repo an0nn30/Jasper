@@ -276,4 +276,15 @@ class VmOptionsFeatureTest {
         feature.settingsClosed();
         assertThat(center.history()).isEmpty();
     }
+
+    @Test void aSavedHeapIsReportedSoTheLowMemoryWarningCanShowAgain() throws IOException {
+        var feature = feature(managed(), true);
+        int[] saved = {0};
+        feature.onHeapSaved(() -> saved[0]++);
+        feature.hooks().heap().save().apply(4096).join();
+        assertThat(saved[0]).isEqualTo(1);
+        Files.write(file(), new byte[] {'-', 'X', 'm', 'x', '1', 'g', '\n', 0});
+        assertThat(feature.hooks().heap().save().apply(3072)).isCompletedExceptionally();
+        assertThat(saved[0]).as("a refused save changes nothing").isEqualTo(1);
+    }
 }
