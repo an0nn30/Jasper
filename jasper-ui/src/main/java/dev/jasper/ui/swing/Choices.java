@@ -190,7 +190,7 @@ final class Choices {
         renderer.putClientProperty("html.disable",true); renderer.setOpaque(false);
         renderer.setText(text);
         renderer.setFont(ThemePainting.font(context, Typography.Role.BODY));
-        renderer.setForeground(ThemePainting.color(context, selected ? SemanticColor.TEXT_ONACCENT : role != null ? role : SemanticColor.TEXT_PRIMARY));
+        renderer.setForeground(ThemePainting.color(context, selected ? SemanticColor.TEXT_ONSELECTION : role != null ? role : SemanticColor.TEXT_PRIMARY));
         renderer.setBackground(ThemePainting.color(context, selected ? SemanticColor.SELECTION_BG : SemanticColor.SURFACE_MENU));
         hue.ifPresent(h -> renderer.setIcon(new HueDot(context, h)));
         int pad = ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
@@ -331,7 +331,7 @@ final class Choices {
             list.setBackground(ThemePainting.color(context, SemanticColor.SURFACE_MENU));
             list.setForeground(ThemePainting.color(context, SemanticColor.TEXT_PRIMARY));
             list.setSelectionBackground(ThemePainting.color(context, SemanticColor.SELECTION_BG));
-            list.setSelectionForeground(ThemePainting.color(context, SemanticColor.TEXT_ONACCENT));
+            list.setSelectionForeground(ThemePainting.color(context, SemanticColor.TEXT_ONSELECTION));
             boolean rich=false;for(int i=0;i<getItemCount();i++){var option=getItemAt(i);if(!option.icon().isBlank()||!option.description().isBlank()){rich=true;break;}}
             // Rows are the menu's height in the field's own type (a Settings dropdown shows its value at label size).
             var type = settingsWidth > 0 ? Typography.Role.LABEL : Typography.Role.BODY;

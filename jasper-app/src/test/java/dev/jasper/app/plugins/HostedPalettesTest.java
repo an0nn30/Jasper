@@ -24,7 +24,7 @@ class HostedPalettesTest {
             base.syntax(), base.uiKeys(), base.glass());
         assertThat(HostedPalettes.workspace(theme)).isEqualTo(new WorkspacePalette(roles.get(SURFACE_PANEL), roles.get(SURFACE_PANEL_RAISED),
             roles.get(SURFACE_CARD), roles.get(TEXT_PRIMARY), roles.get(TEXT_SECONDARY), roles.get(BORDER_WINDOW), roles.get(SELECTION_BG),
-            roles.get(TEXT_ONACCENT), roles.get(SURFACE_CONTROL_HOVER), roles.get(ACCENT), roles.get(STATUS_SUCCESS),
+            roles.get(TEXT_ONSELECTION), roles.get(SURFACE_CONTROL_HOVER), roles.get(ACCENT), roles.get(STATUS_SUCCESS),
             roles.get(STATUS_WARNING), roles.get(STATUS_DANGER)));
         assertThat(HostedPalettes.editor(theme)).isEqualTo(new EditorPalette(new java.awt.Color(1, 2, 3), new java.awt.Color(4, 5, 6),
             new java.awt.Color(7, 8, 9), new java.awt.Color(10, 11, 12), new java.awt.Color(13, 14, 15), new java.awt.Color(16, 17, 18),
@@ -37,7 +37,7 @@ class HostedPalettesTest {
             var p = theme.semantic();
             assertThat(HostedPalettes.workspace(theme)).isEqualTo(new WorkspacePalette(p.color(SURFACE_PANEL), p.color(SURFACE_PANEL_RAISED),
                 p.color(SURFACE_CARD), p.color(TEXT_PRIMARY), p.color(TEXT_SECONDARY), p.color(BORDER_WINDOW), p.color(SELECTION_BG),
-                p.color(TEXT_ONACCENT), p.color(SURFACE_CONTROL_HOVER), p.color(ACCENT), p.color(STATUS_SUCCESS),
+                p.color(TEXT_ONSELECTION), p.color(SURFACE_CONTROL_HOVER), p.color(ACCENT), p.color(STATUS_SUCCESS),
                 p.color(STATUS_WARNING), p.color(STATUS_DANGER)));
             var e = JasperTheme.bundled().editor(dark);
             assertThat(theme.editor()).isEqualTo(e);

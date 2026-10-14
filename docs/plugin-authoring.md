@@ -966,3 +966,10 @@ A menu item can show the current binding of an action beside its label:
 `new MenuItem(...).withShortcut("dev.example.open")`. Name an action your plugin contributes (or an app action such as
 `new_tab`); the host shows its binding in the platform's glyphs, follows the user's rebinding, and shows nothing when
 the action is unbound. Declare `sdk = ">=0.16.0, <0.17"` to use it; every bundled manifest does.
+
+### Selection text colours (SDK 0.16.2)
+
+`SemanticColor` gains `TEXT_ONSELECTION` and `TEXT_ONSELECTION_SECONDARY`, the text on `SELECTION_BG` (a selected row,
+a highlighted list or menu entry, selected text). A theme may pair its selection colour and its accent with different
+text, so text on the selection uses these, and `TEXT_ONACCENT` stays for text on `ACCENT`. `WorkspacePalette.selectionText`
+is `TEXT_ONSELECTION`. Declare `sdk = ">=0.16.2, <0.17"` to read them.

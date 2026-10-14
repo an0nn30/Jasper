@@ -2,7 +2,7 @@ package dev.jasper.sdk.ui;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 class KitBoundaryTest {
- @Test void advertisesTheKitCompatibilityBoundary(){assertThat(dev.jasper.sdk.JasperSdk.VERSION).isEqualTo("0.16.1");}
+ @Test void advertisesTheKitCompatibilityBoundary(){assertThat(dev.jasper.sdk.JasperSdk.VERSION).isEqualTo("0.16.2");}
  @Test void onlyOwnedViewsCrossMountBoundaries() throws Exception {
   assertThat(PanelFactory.class.getMethod("create",PanelHost.class).getReturnType()).isEqualTo(UiView.class);
   assertThat(dev.jasper.sdk.settings.SettingsPanel.class.getMethod("create",dev.jasper.sdk.settings.SettingsPanelHost.class).getReturnType()).isEqualTo(UiView.class);

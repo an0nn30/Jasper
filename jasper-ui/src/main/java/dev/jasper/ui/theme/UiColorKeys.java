@@ -51,7 +51,7 @@ public final class UiColorKeys {
         role(keys, "@background", SURFACE_PANEL);
         role(keys, "@foreground", TEXT_PRIMARY);
         role(keys, "@selectionBackground", SELECTION_BG);
-        role(keys, "@selectionForeground", TEXT_ONACCENT);
+        role(keys, "@selectionForeground", TEXT_ONSELECTION);
         role(keys, "@accentBaseColor", ACCENT);
         role(keys, "@disabledBackground", SURFACE_PANEL);
         role(keys, "@disabledForeground", TEXT_PLACEHOLDER);
@@ -64,9 +64,9 @@ public final class UiColorKeys {
         role(keys, "List.background", SURFACE_CARD);
         role(keys, "List.foreground", TEXT_PRIMARY);
         role(keys, "List.selectionBackground", SELECTION_BG);
-        role(keys, "List.selectionForeground", TEXT_ONACCENT);
+        role(keys, "List.selectionForeground", TEXT_ONSELECTION);
         role(keys, "List.selectionInactiveBackground", SURFACE_CONTROL_SELECTED);
-        role(keys, "List.selectionInactiveForeground", TEXT_ONACCENT);
+        role(keys, "List.selectionInactiveForeground", TEXT_ONSELECTION);
         for (String field : new String[] {"TextField", "TextArea", "PasswordField", "FormattedTextField"}) {
             role(keys, field + ".background", SURFACE_INPUT);
             role(keys, field + ".foreground", TEXT_PRIMARY);
@@ -78,7 +78,7 @@ public final class UiColorKeys {
         role(keys, "ComboBox.ArrowButton.iconColor", TEXT_PRIMARY);
         role(keys, "ComboBox.foreground", TEXT_PRIMARY);
         role(keys, "ComboBox.selectionBackground", SELECTION_BG);
-        role(keys, "ComboBox.selectionForeground", TEXT_ONACCENT);
+        role(keys, "ComboBox.selectionForeground", TEXT_ONSELECTION);
         role(keys, "Button.startBackground", BUTTON_SECONDARY_BG);
         role(keys, "Button.endBackground", BUTTON_SECONDARY_BG);
         role(keys, "Button.startBorderColor", BUTTON_SECONDARY_BORDER);

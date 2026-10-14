@@ -68,6 +68,8 @@ final class Switches {
         boolean compact, error, pending;
         /** Whether the switch sits on a selected row's accent fill; set by the row before each population. */
         boolean onSelection;
+        /** The selected row's fill and ink, while {@link #onSelection}. */
+        InteractiveRows.Ink ink = InteractiveRows.Ink.SELECTION;
         SwitchButton(KitContext context) { this.context = context; }
         @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
         @Override public Dimension getPreferredSize() {
@@ -90,10 +92,10 @@ final class Switches {
                 }
                 Color on = ThemePainting.color(context, SemanticColor.ACCENT), off = ThemePainting.color(context, SemanticColor.TOGGLE_TRACK_OFF),
                     knobOn = ThemePainting.color(context, SemanticColor.TOGGLE_KNOB), knobOff = knobOn;
-                // On a selected row's accent fill the ON track turns white around a knob of the fill's colour, the OFF track a white tint.
+                // On a selected row's fill the ON track takes the fill's ink around a knob of the fill's colour, the OFF track a tint of it.
                 if (onSelection) {
-                    on = ThemePainting.color(context, SemanticColor.TEXT_ONACCENT); off = ColorMath.opacity(on, ThemePainting.tileShare(context));
-                    knobOn = ThemePainting.color(context, SemanticColor.SELECTION_BG);
+                    on = ThemePainting.color(context, ink.text); off = ColorMath.opacity(on, ThemePainting.tileShare(context));
+                    knobOn = ThemePainting.color(context, ink.fill);
                 }
                 if (pending) { on = off = ThemePainting.color(context, SemanticColor.STATUS_WARNING); knobOn = knobOff; }
                 Color rgb = ColorMath.mix(on, off, position);
