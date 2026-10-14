@@ -10,8 +10,8 @@ slot by slot, so a showing kit panel moved to an earlier slot (Right Bottom to R
 drag, Options, Hide and metadata to the old frame's release; it now releases every stale frame first. New tests
 `theFirstIconUnderAnEmptyTopGroupDragsStraightUpIntoIt` and `aShowingKitPanelKeepsItsHeaderWhenItMovesToAnEarlierSlot`.
 `./gradlew check --continue`: **10,159 tests, 0 failures, 0 errors, 12 skipped**. No GUI launched. GUI check for the
-user: drag Sessions up into the right rail's top group; move a showing plugin panel up and drag its header. Not merged
-or pushed.
+user: drag Sessions up into the right rail's top group; move a showing plugin panel up and drag its header. Merged to
+main (fast-forward), not pushed.
 
 **Inactive tabs stay clearly darker than the active tab — 2026-10-14** (`claude/inactive-tabs`, worktree
 `.claude/worktrees/inactive-tabs`; bug fix, design and the ΔL* 9 strength chosen by the user). The active tab is
