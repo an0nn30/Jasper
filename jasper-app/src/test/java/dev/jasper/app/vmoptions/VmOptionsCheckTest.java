@@ -3,6 +3,7 @@ package dev.jasper.app.vmoptions;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.nio.charset.StandardCharsets;
@@ -10,8 +11,10 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class VmOptionsCheckTest {
     private static final LauncherImage IMAGE = new LauncherImage(Path.of("/app"), List.of("-Xmx256m", "-XX:+IgnoreUnrecognizedVMOptions"),
@@ -22,6 +25,19 @@ class VmOptionsCheckTest {
         + "Error: A fatal exception has occurred. Program will exit.\n";
     private static final String UNRECOVERABLE = "Error occurred during initialization of VM\n"
         + "Initial heap size set to a larger value than the maximum heap size\n";
+    /** What the installed app printed on 2026-10-14 (start-up recovery spec section 1). */
+    private static final String SEALED = "[0.142s][error][aot               ] java.lang.SecurityException: sealing violation: "
+        + "can't seal package com.jetbrains: already defined\nError occurred during initialization of VM\n"
+        + "Unexpected exception when loading aot-linked classes.\n";
+    private static final VmOptionsCheck.Fatal SEALED_FATAL = new VmOptionsCheck.Fatal(
+        "java.lang.SecurityException: sealing violation: can't seal package com.jetbrains: already defined", false);
+    /** What the test JVM printed on 2026-10-14 for a missing cache with -XX:AOTMode=on. */
+    private static final String MISSING = "[0.005s][error][aot] An error has occurred while processing the AOT cache. Run with -Xlog:aot for details.\n"
+        + "[0.005s][error][aot] Loading static archive failed.\n[0.005s][error][aot] Unable to map shared spaces\n"
+        + "Error occurred during initialization of VM\nUnable to use AOT cache.\n";
+    private static final String CLASSPATH = "/app/jasper-app.jar" + File.pathSeparator + "/app/b.jar";
+
+    @TempDir Path temp;
 
     private final List<List<String>> runs = new ArrayList<>();
 
@@ -60,19 +76,67 @@ class VmOptionsCheckTest {
         assertThat(VmOptionsCheck.fatal("[0.010s][warning][aot] cache mismatch\n" + RECOVERABLE).message()).isEqualTo("Invalid maximum heap size: -Xmx3q");
     }
 
-    @Test void aTrainedImageAlsoChecksTheCache() throws IOException {
+    @Test void aTrainedImageAlsoChecksTheCacheWithTheLineUp() throws IOException {
         var findings = check(TRAINED, command -> command.contains("-XX:AOTMode=on") ? new VmOptionsCheck.Outcome(1, "Unable to use AOT cache.\n", false) : ok())
             .check(parsed("-XX:+UseZGC\n"));
-        assertThat(findings.cacheRejected()).isTrue();
-        assertThat(runs.getLast()).containsSubsequence("-XX:+UseZGC", "-XX:AOTMode=on", "-cp", "/app/jasper-app.jar" + java.io.File.pathSeparator + "/app/b.jar", "-version");
+        assertThat(findings.cache()).contains(new VmOptionsCheck.Fatal("Unable to use AOT cache.", true));
+        assertThat(findings.cacheUsedOptions()).isTrue();
+        assertThat(runs.getLast()).containsSubsequence("-XX:+UseZGC", "-XX:AOTMode=on", "-cp", CLASSPATH, "-version");
         runs.clear();
-        assertThat(check(IMAGE, command -> ok()).check(parsed("-XX:+UseZGC\n")).cacheRejected()).isFalse();
+        var untrained = check(IMAGE, command -> ok()).check(parsed("-XX:+UseZGC\n"));
+        assertThat(untrained.cache()).isEmpty();
+        assertThat(untrained.cacheUsedOptions()).isFalse();
         assertThat(runs).noneMatch(command -> command.contains("-XX:AOTMode=on"));
+    }
+
+    @Test void optionsThatStopTheJvmAreNeverBlamedOnTheCache() throws IOException {
+        var findings = check(TRAINED, command -> command.contains("-Xmx3q") ? new VmOptionsCheck.Outcome(1, RECOVERABLE, false)
+            : command.contains("-XX:AOTMode=on") ? new VmOptionsCheck.Outcome(1, SEALED, false) : ok()).check(parsed("-Xmx3q\n"));
+        assertThat(findings.fatal()).contains(new VmOptionsCheck.Fatal("Invalid maximum heap size: -Xmx3q", true));
+        assertThat(runs.getLast()).as("the cache check runs with the bundled options alone").containsExactly("/java", "-Xmx256m",
+            "-XX:+IgnoreUnrecognizedVMOptions", "-XX:AOTCache=/app/jasper.aot", "-XX:AOTMode=on", "-cp", CLASSPATH, "-version");
+        assertThat(findings.cache()).as("Java's own message").contains(SEALED_FATAL);
+        assertThat(findings.cacheUsedOptions()).isFalse();
+    }
+
+    @Test void aRefusedCacheIsExplainedByTheJvmsOwnAotErrorWhenItNamesTheCause() {
+        assertThat(VmOptionsCheck.cacheFatal(SEALED)).isEqualTo(SEALED_FATAL);
+        assertThat(VmOptionsCheck.cacheFatal(MISSING)).as("no AOT error names an exception: HotSpot's line")
+            .isEqualTo(new VmOptionsCheck.Fatal("Unable to use AOT cache.", false));
+        assertThat(VmOptionsCheck.cacheFatal("[0.1s][warning][aot] java.lang.IllegalStateException: only a warning\nUnable to use AOT cache.\n"))
+            .as("warnings never explain").isEqualTo(new VmOptionsCheck.Fatal("Unable to use AOT cache.", true));
+        assertThat(VmOptionsCheck.cacheFatal("[0.1s][error][aot,load] java.lang.OutOfMemoryError: Java heap space\n"
+            + "Error occurred during initialization of VM\nUnexpected exception when loading aot-linked classes.\n"))
+            .isEqualTo(new VmOptionsCheck.Fatal("java.lang.OutOfMemoryError: Java heap space", false));
+    }
+
+    @Test void afterASkippedCacheTheCacheIsCheckedEvenWithoutCustomOptions() throws IOException {
+        var findings = check(TRAINED, command -> command.contains("-XX:AOTMode=on") ? new VmOptionsCheck.Outcome(1, SEALED, false) : ok())
+            .checkWithCache(parsed("# only a comment\n"));
+        assertThat(runs).singleElement().satisfies(command -> assertThat(command).containsExactly("/java", "-Xmx256m",
+            "-XX:+IgnoreUnrecognizedVMOptions", "-XX:AOTCache=/app/jasper.aot", "-XX:AOTMode=on", "-cp", CLASSPATH, "-version"));
+        assertThat(findings).isEqualTo(new VmOptionsCheck.Findings(List.of(), Optional.empty(), Optional.of(SEALED_FATAL), false));
+        runs.clear();
+        assertThat(check(TRAINED, command -> ok()).checkWithCache(VmOptionsSyntax.parse(new byte[] {'-', 0})))
+            .as("a corrupted file: the bundled options pass").isEqualTo(VmOptionsCheck.Findings.NONE);
+        assertThat(runs).hasSize(1);
+        runs.clear();
+        var withOptions = check(TRAINED, command -> command.contains("-XX:AOTMode=on") ? new VmOptionsCheck.Outcome(1, SEALED, false) : ok())
+            .checkWithCache(parsed("-Xmx1g\n"));
+        assertThat(withOptions.cacheUsedOptions()).as("the options start the JVM, so the cache check uses them").isTrue();
+        assertThat(runs.getLast()).containsSubsequence("-Xmx1g", "-XX:AOTMode=on");
+        runs.clear();
+        assertThat(check(IMAGE, command -> ok()).checkWithCache(parsed(""))).as("no cache to check").isEqualTo(VmOptionsCheck.Findings.NONE);
+        assertThat(runs).isEmpty();
+        assertThat(check(TRAINED, command -> new VmOptionsCheck.Outcome(-1, "", true)).checkWithCache(parsed("")))
+            .as("a cache check over its limit finds nothing").isEqualTo(VmOptionsCheck.Findings.NONE);
     }
 
     @Test void nothingToCheckRunsNothing() throws IOException {
         assertThat(check(IMAGE, command -> ok()).check(parsed("# only\nXmx300m\n"))).isEqualTo(VmOptionsCheck.Findings.NONE);
         assertThat(check(IMAGE, command -> ok()).check(VmOptionsSyntax.parse(new byte[] {'-', 0}))).isEqualTo(VmOptionsCheck.Findings.NONE);
+        assertThat(check(TRAINED, command -> ok()).check(parsed("# only\n"))).as("Settings never checks the cache alone")
+            .isEqualTo(VmOptionsCheck.Findings.NONE);
         assertThat(runs).isEmpty();
     }
 
@@ -99,6 +163,14 @@ class VmOptionsCheckTest {
         assertThat(findings.fatal()).contains(new VmOptionsCheck.Fatal("Invalid maximum heap size: -Xmx3q", true));
         assertThat(check.check(parsed("-Xms1g\n")).fatal())
             .contains(new VmOptionsCheck.Fatal("Initial heap size set to a larger value than the maximum heap size", false));
+    }
+
+    @Test void theRealJvmRefusesACacheItCannotUse() throws IOException {
+        var image = new LauncherImage(temp, List.of("-Xmx256m", "-XX:AOTCache=" + temp.resolve("missing.aot")), List.of(temp.resolve("a.jar").toString()));
+        var findings = new VmOptionsCheck(VmOptionsCheck.runtimeJava(), image, VmOptionsCheck::runProcess, Duration.ofSeconds(30))
+            .checkWithCache(VmOptionsSyntax.Parsed.EMPTY);
+        assertThat(findings.cache()).contains(new VmOptionsCheck.Fatal("Unable to use AOT cache.", false));
+        assertThat(findings.cacheUsedOptions()).isFalse();
     }
 
     @Test void anInterruptStopsTheCheck() {

@@ -39,8 +39,10 @@ class VmOptionsFeatureTest {
     private Function<List<String>, VmOptionsCheck.Outcome> script = command -> new VmOptionsCheck.Outcome(0, "", false);
     private boolean restartWorks = true;
     private int restarts;
+    private boolean trained;
 
     private Path file() { return home.resolve("jasper.vmoptions"); }
+    private Path cacheFile() { return home.resolve("app").resolve("jasper.aot"); }
     private VmOptionsLaunch launch(boolean corrupted, Optional<String> skipped) {
         return new VmOptionsLaunch(Optional.of(file()), Optional.empty(), corrupted, skipped, Optional.empty(), Optional.empty());
     }
@@ -49,7 +51,9 @@ class VmOptionsFeatureTest {
     private VmOptionsFeature feature(VmOptionsLaunch launch, boolean image) { return feature(launch, image, Runnable::run); }
 
     private VmOptionsFeature feature(VmOptionsLaunch launch, boolean image, Consumer<Runnable> ui) {
-        var launcherImage = new LauncherImage(home.resolve("app"), List.of("-Xmx2048m", "-XX:+IgnoreUnrecognizedVMOptions"), List.of());
+        var options = new ArrayList<>(List.of("-Xmx2048m", "-XX:+IgnoreUnrecognizedVMOptions"));
+        if (trained) options.add("-XX:AOTCache=" + cacheFile());
+        var launcherImage = new LauncherImage(home.resolve("app"), options, List.of());
         return new VmOptionsFeature(launch, () -> image ? Optional.of(launcherImage) : Optional.empty(),
             found -> new VmOptionsCheck(Path.of("java"), found, (command, limit) -> script.apply(command), Duration.ofSeconds(10)),
             Runnable::run, ui, center, () -> { restarts++; return restartWorks; }, opened::add, revealed::add,
@@ -205,6 +209,23 @@ class VmOptionsFeatureTest {
                 .contains("Initial heap size set to a larger value than the maximum heap size")
                 .contains("JASPER_VM_OPTIONS_SKIP=1");
         });
+    }
+
+    @Test void theCacheSentenceAppearsOnlyWhenTheFailingCacheCheckUsedTheOptions() throws IOException {
+        trained = true;
+        String refused = "Error occurred during initialization of VM\nUnable to use AOT cache.\n";
+        Files.writeString(file(), "-XX:+UseZGC\n");
+        script = command -> command.contains("-XX:AOTMode=on") ? new VmOptionsCheck.Outcome(1, refused, false) : new VmOptionsCheck.Outcome(0, "", false);
+        var feature = feature(managed(), true);
+        feature.reload();
+        assertThat(feature.hooks().findings().get()).hasValueSatisfying(notice ->
+            assertThat(notice.text()).isEqualTo("These options turn off Jasper's start-up cache; it will start more slowly."));
+        Files.writeString(file(), "-Xmx3q\n");
+        script = command -> command.contains("-Xmx3q") ? new VmOptionsCheck.Outcome(1, "Invalid maximum heap size: -Xmx3q\n", false)
+            : command.contains("-XX:AOTMode=on") ? new VmOptionsCheck.Outcome(1, refused, false) : new VmOptionsCheck.Outcome(0, "", false);
+        feature.reload();
+        assertThat(feature.hooks().findings().get()).as("the cache failed with the bundled options alone").hasValueSatisfying(notice ->
+            assertThat(notice.text()).contains("Invalid maximum heap size: -Xmx3q").doesNotContain("start-up cache"));
     }
 
     @Test void restartNowThatCannotRestartSaysSo() {

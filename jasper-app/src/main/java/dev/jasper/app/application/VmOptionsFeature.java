@@ -322,7 +322,8 @@ final class VmOptionsFeature {
         findings.fatal().ifPresent(fatal -> sentences.add("Jasper can't start with these options: " + fatal.message() + ". "
             + (fatal.recoverable() ? "It will start with the bundled options instead."
                 : "Fix the file before restarting; setting JASPER_VM_OPTIONS_SKIP=1 starts Jasper without it.")));
-        if (findings.cacheRejected()) sentences.add("These options turn off Jasper's start-up cache; it will start more slowly.");
+        // Start-up recovery spec 6.3: only a failing cache check that ran with the options blames them.
+        if (findings.cache().isPresent() && findings.cacheUsedOptions()) sentences.add("These options turn off Jasper's start-up cache; it will start more slowly.");
         if (sentences.isEmpty()) return Optional.empty();
         return Optional.of(new SchemaPage.Notice(findings.fatal().isPresent() ? "Jasper won't start with these options" : "Check your options",
             String.join(" ", sentences)));

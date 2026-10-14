@@ -16,7 +16,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Runs the bundled {@code java} with the user's options (spec sections 5.1 and 6.4): each applied line alone with
- * unrecognized options made fatal, then the line-up as launched, then, in a trained image, with the AOT cache required.
+ * unrecognized options made fatal, then the line-up as launched, then, in a trained image, with the AOT cache required:
+ * with that line-up when it starts, else with the bundled options alone, so a broken option is never blamed on the cache
+ * (start-up recovery spec 6.3); a refused cache is explained by the JVM's own AOT error when it names the cause.
  * Blocking: run it on a worker, never on the EDT.
  */
 public final class VmOptionsCheck {
@@ -44,11 +46,13 @@ public final class VmOptionsCheck {
      *
      * @param unrecognized applied lines the JVM would ignore
      * @param fatal why the JVM would not start with the line-up, if it would not
-     * @param cacheRejected whether the options turn off the trained AOT cache
+     * @param cache why the JVM would not start with the trained AOT cache required, if it would not, in Java's words
+     * @param cacheUsedOptions whether that cache check ran with the custom options; it runs with the bundled options alone
+     *                         when there are none or they stop the JVM, and false when it did not run
      */
-    public record Findings(List<String> unrecognized, Optional<Fatal> fatal, boolean cacheRejected) {
+    public record Findings(List<String> unrecognized, Optional<Fatal> fatal, Optional<Fatal> cache, boolean cacheUsedOptions) {
         /** Nothing found, or nothing checked. */
-        public static final Findings NONE = new Findings(List.of(), Optional.empty(), false);
+        public static final Findings NONE = new Findings(List.of(), Optional.empty(), Optional.empty(), false);
 
         public Findings { unrecognized = List.copyOf(unrecognized); }
     }
@@ -78,25 +82,37 @@ public final class VmOptionsCheck {
      * Checks {@code parsed}'s applied lines; a corrupted file, or one without option lines, is not checked. A run over its
      * time limit ends the check with no findings at all (spec section 7).
      */
-    public Findings check(VmOptionsSyntax.Parsed parsed) throws IOException {
-        if (parsed.corrupted() || parsed.lines().isEmpty()) return Findings.NONE;
+    public Findings check(VmOptionsSyntax.Parsed parsed) throws IOException { return check(parsed, false); }
+
+    /**
+     * {@link #check}, except that a trained image's cache is checked even when {@code parsed} applies no lines: after a
+     * start that skipped the cache because it failed at launch (start-up recovery spec 6.4).
+     */
+    public Findings checkWithCache(VmOptionsSyntax.Parsed parsed) throws IOException { return check(parsed, true); }
+
+    private Findings check(VmOptionsSyntax.Parsed parsed, boolean cacheAlways) throws IOException {
+        boolean custom = !parsed.corrupted() && !parsed.lines().isEmpty();
+        if (!custom && !(cacheAlways && image.hasAotCache())) return Findings.NONE;
         var unrecognized = new ArrayList<String>();
-        for (String line : parsed.lines()) {
-            Outcome alone = run(List.of(java.toString(), "-XX:-IgnoreUnrecognizedVMOptions", line, "-version"));
-            if (alone.timedOut()) return Findings.NONE;
-            if (alone.exit() != 0 && unrecognized(alone.output())) unrecognized.add(line);
+        List<String> options = image.javaOptions();
+        Optional<Fatal> fatal = Optional.empty();
+        if (custom) {
+            for (String line : parsed.lines()) {
+                Outcome alone = run(List.of(java.toString(), "-XX:-IgnoreUnrecognizedVMOptions", line, "-version"));
+                if (alone.timedOut()) return Findings.NONE;
+                if (alone.exit() != 0 && unrecognized(alone.output())) unrecognized.add(line);
+            }
+            options = VmOptionsSyntax.merge(image.javaOptions(), parsed.lines());
+            Outcome merged = run(command(options, List.of("-version")));
+            if (merged.timedOut()) return Findings.NONE;
+            if (merged.exit() != 0) fatal = Optional.of(fatal(merged.output()));
         }
-        List<String> options = VmOptionsSyntax.merge(image.javaOptions(), parsed.lines());
-        Outcome merged = run(command(options, List.of("-version")));
-        if (merged.timedOut()) return Findings.NONE;
-        Optional<Fatal> fatal = merged.exit() != 0 ? Optional.of(fatal(merged.output())) : Optional.empty();
-        boolean cacheRejected = false;
-        if (image.hasAotCache() && fatal.isEmpty()) {
-            Outcome cache = run(command(options, List.of("-XX:AOTMode=on", "-cp", String.join(File.pathSeparator, image.classpath()), "-version")));
-            if (cache.timedOut()) return Findings.NONE;
-            cacheRejected = cache.exit() != 0;
-        }
-        return new Findings(unrecognized, fatal, cacheRejected);
+        if (!image.hasAotCache()) return new Findings(unrecognized, fatal, Optional.empty(), false);
+        boolean usedOptions = custom && fatal.isEmpty();
+        Outcome cache = run(command(usedOptions ? options : image.javaOptions(),
+            List.of("-XX:AOTMode=on", "-cp", String.join(File.pathSeparator, image.classpath()), "-version")));
+        if (cache.timedOut()) return Findings.NONE;
+        return new Findings(unrecognized, fatal, cache.exit() != 0 ? Optional.of(cacheFatal(cache.output())) : Optional.empty(), usedOptions);
     }
 
     /** One run; a run over its limit is logged (spec section 7). */
@@ -153,6 +169,23 @@ public final class VmOptionsCheck {
             .findFirst()
             .orElse("The JVM did not start.");
         return new Fatal(message, true);
+    }
+
+    /**
+     * Why the JVM refused the AOT cache, from its output: the first line that starts with {@code [}, contains
+     * {@code ][error][aot} and whose text after its last {@code "] "} names an {@code Exception} or an {@code Error:},
+     * as that text; otherwise {@link #fatal}'s line. So the sealing failure of 2026-10-14 reads as its
+     * {@code SecurityException} rather than HotSpot's generic last line.
+     */
+    static Fatal cacheFatal(String output) {
+        Fatal fallback = fatal(output);
+        for (String line : output.lines().toList()) {
+            int end = line.lastIndexOf("] ");
+            if (!line.startsWith("[") || !line.contains("][error][aot") || end < 0) continue;
+            String text = line.substring(end + 2).strip();
+            if (text.contains("Exception") || text.contains("Error:")) return new Fatal(text, fallback.recoverable());
+        }
+        return fallback;
     }
 
     private static boolean unrecognized(String output) {
