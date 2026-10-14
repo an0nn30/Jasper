@@ -41,7 +41,7 @@ import javax.swing.text.JTextComponent;
 
 /**
  * Jasper's palette: a query row with an optional scope chip, a one-line result list with section headings (or the
- * empty line, or a step's small form), and a hint bar with the selected row's detail and its scope's other verbs.
+ * empty line, or a step's small form), and a hint bar with the selected row's detail and, when there are several, its scope's verbs.
  * The module supplies its shared surface, outline and measured rows on the chrome {@link KitContext}. Every control
  * remains a retained kit view. The
  * query field keeps focus; the host moves the selection and routes the keys. EDT only.
@@ -244,8 +244,9 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
         var children = new ArrayList<Nodes.Node>();
         children.add(text(HINT + ".text", hintText(), Nodes.TextRole.CAPTION));
         if (selectedEntry() instanceof PaletteEntry.Item item) {
+            // A lone verb is Enter's and goes unlisted; with more, every verb is listed, Enter's first.
             List<PaletteVerb> verbs = item.scope().verbs();
-            for (int verb = 1; verb < Math.min(3, verbs.size()); verb++)
+            for (int verb = 0; verbs.size() > 1 && verb < Math.min(3, verbs.size()); verb++)
                 children.add(new Nodes.Button(VERB + verb, ControlState.READY, verbs.get(verb).label() + " " + keys(verb), "",
                     Nodes.ButtonKind.LINK, VERB + verb, "", Nodes.ButtonPresentation.EMBEDDED));
         }
@@ -489,7 +490,7 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
     }
 
     /** As a click on the {@code index}th hint action. */
-    void clickHintAction(int index) { executeSelected(index + 1); }
+    void clickHintAction(int index) { executeSelected(index); }
 
     private void updateHint() {
         String verbsDescription = "";

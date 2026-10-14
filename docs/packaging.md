@@ -13,6 +13,10 @@ put its `bin` directory on `PATH` (especially on Windows), or set
 because packaging requires `jpackage`. The portable Windows ZIP does not require
 WiX.
 
+Packaging also compiles Jasper's own build of jpackage's launcher ([packaging/launcher](../packaging/launcher/README.md))
+with the host's C/C++ compiler: the Xcode command line tools on macOS, `gcc` and `g++` on Linux, and Visual Studio
+or its Build Tools with the C++ workload on Windows. `./gradlew check` builds and tests it too.
+
 On macOS:
 
 ```bash
@@ -32,7 +36,8 @@ On Windows:
 .\gradlew.bat :jasper-app:verifyPackage
 ```
 
-`jasperVersion` defaults to `1.0.0`. It accepts three decimal components without
+Without `-PjasperVersion`, the version is the commit's `vX.Y.Z` release tag, else the latest release tag behind it,
+else `1.0.0`; on a commit with a release tag, a different `-PjasperVersion` fails the build. It accepts three decimal components without
 leading zeroes; major is 1–255, minor is 0–255, and patch is 0–65535. Native
 package versions require a positive major component. Outputs are under `jasper-app/build/packaging`: the native application is
 in `image/`, and distributions are
@@ -58,7 +63,7 @@ Build on the target architecture with a JBR SDK 25 of that architecture and:
   `rpm2cpio` and `cpio`.
 
 ```bash
-sudo apt-get install fakeroot rpm cpio binutils
+sudo apt-get install fakeroot rpm cpio binutils g++
 ./gradlew :jasper-app:packageDist -PjasperVersion=1.0.1
 ./gradlew :jasper-app:packageDeb    # or packageRpm, for one format only
 ```
@@ -165,15 +170,11 @@ for the macOS ICNS, Windows ICO, Linux PNG/hicolor and runtime PNG assets.
 ## macOS 26 window controls
 
 AppKit draws the macOS 26 window controls only for a process whose main executable was
-built against the macOS 26 SDK or later. The JetBrains Runtime's jpackage launcher stub
-records SDK 13.3, so a plain jpackage image shows the pre-26 flat controls. `packageApp`
-therefore rewrites the launcher's build-version load command with Apple's `vtool` to the
-SDK version `xcrun --show-sdk-version` reports, then re-signs the bundle with the same
-ad-hoc identity; nothing else in the launcher changes. This needs the Xcode command line
-tools with a macOS 26 or later SDK. Without `xcrun` the step logs that it was skipped and
-the image keeps the legacy controls; with an older SDK `verifyPackage` warns. Only the
-packaged app benefits: `./gradlew :jasper-app:run` and `installDist` launch the runtime's
-own `java` binary, which keeps the legacy controls.
+built against the macOS 26 SDK or later. Jasper's launcher is compiled with the installed
+Xcode SDK, so its build-version load command records that SDK; `verifyPackage` checks it
+and warns when the SDK predates macOS 26. Only the packaged app benefits:
+`./gradlew :jasper-app:run` and `installDist` launch the runtime's own `java` binary, which
+keeps the legacy controls.
 
 ## Bundled plugins stay off the classpath
 
@@ -253,11 +254,13 @@ an app's identity or guarantee a prompt.
 
 macOS also uses the main executable's Mach-O `LC_UUID` to attribute network requests. JBR's
 jpackage copies a generic launcher UUID into every app. This caused Jasper's requests to be
-denied under the old **Moray** permission, with no Jasper prompt or Settings entry. After the
-SDK-version update and before signing, `packageApp` now gives the launcher an app-specific
-UUID derived from the bundle identifier and the selected SDK's original launcher bytes.
+denied under the old **Moray** permission, with no Jasper prompt or Settings entry. Before
+signing, `packageApp` now gives the launcher an app-specific
+UUID derived from the bundle identifier and Jasper's compiled launcher bytes.
 Identical inputs produce the same UUID; other app identifiers and launcher templates produce
-different UUIDs. `verifyPackage` verifies this identity and the final bundle signature.
+different UUIDs. Because the seed is Jasper's compiled launcher, rebuilding it with a different
+Xcode or changed launcher sources gives a new UUID, and macOS asks for Local Network access once
+more after such an update. `verifyPackage` verifies this identity and the final bundle signature.
 `./gradlew check` includes portable binary regression checks, without launching an app.
 
 Development images still have an ad-hoc signature. Apple recommends an **Apple-issued signing

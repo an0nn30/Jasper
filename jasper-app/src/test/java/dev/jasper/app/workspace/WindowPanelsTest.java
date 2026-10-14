@@ -88,7 +88,7 @@ class WindowPanelsTest {
             });
             PanelEntry files = model.addPanel("dev.x.files", "Files", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("files"));
             assertThat(owner.leftStripe().isVisible()).isTrue();
-            assertThat(owner.rightStripe().isVisible()).as("an empty right stripe still shows").isTrue();
+            assertThat(owner.rightStripe().isVisible()).as("an empty right stripe hides").isFalse();
             assertThat(tips(owner.leftStripe())).containsExactly("Hosts", "Files");
             assertThat(owner.rightStripe().buttons()).isEmpty();
             assertThat(sites).as("no instance until first shown").isEmpty();
@@ -415,7 +415,7 @@ class WindowPanelsTest {
             model.addRailAction("dev.x.open");
             model.addRailAction("dev.x.never-registered");
             assertThat(owner.leftStripe().isVisible()).isTrue();
-            assertThat(owner.rightStripe().isVisible()).isTrue();
+            assertThat(owner.rightStripe().isVisible()).as("rail actions are on the left; the empty right stripe hides").isFalse();
             assertThat(owner.leftStripe().buttons()).singleElement().satisfies(button -> {
                 assertThat(button.getToolTipText()).isEqualTo("Open Manager");
                 button.doClick();
@@ -429,7 +429,44 @@ class WindowPanelsTest {
             assertThat(state.railVisible()).isFalse();
             owner.setRailVisible(true);
             assertThat(owner.leftStripe().isVisible()).isTrue();
+            assertThat(owner.rightStripe().isVisible()).isFalse();
+        });
+    }
+
+    /** The frame around the terminal column: the area's child that holds the tab strip. */
+    private static Component centerFrame(WindowContent owner) {
+        Component frame = owner.tabStrip();
+        while (frame.getParent() != owner.area()) frame = frame.getParent();
+        return frame;
+    }
+
+    @Test void eachStripeShowsOnlyWhileItHasAWindowAndTheTerminalIsBorderlessOnAHiddenOnesSide() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            model.addPanel("dev.x.logs", "Logs", new ImageIcon(), Slot.BOTTOM_LEFT, site -> new JLabel("logs"));
+            toggle(model, owner, "dev.x.logs");
+            var root = new javax.swing.JRootPane(); root.setContentPane(owner); root.setSize(1200, 800);
+            LayoutTestSupport.layoutTree(root);
+            assertThat(owner.leftStripe().isVisible()).isTrue();
+            assertThat(owner.rightStripe().isVisible()).isFalse();
+            var logs = owner.area().content(Slot.BOTTOM_LEFT).getParent();
+            assertThat(((JComponent) logs).getInsets().left).as("the left stripe supplies the left edge's spacing").isZero();
+            assertThat(((JComponent) logs).getInsets().right).as("no right stripe: a tool window keeps its edge gutter, as in Zen").isPositive();
+            var center = (JComponent) centerFrame(owner);
+            assertThat(center.getInsets().left).isZero();
+            assertThat(center.getInsets().right).as("the terminal is borderless on the hidden stripe's side").isZero();
+
+            owner.dock().move("dev.x.logs", Slot.BOTTOM_RIGHT, 0);
+            LayoutTestSupport.layoutTree(root);
+            assertThat(owner.leftStripe().isVisible()).as("the left stripe emptied").isFalse();
             assertThat(owner.rightStripe().isVisible()).isTrue();
+            logs = owner.area().content(Slot.BOTTOM_RIGHT).getParent();
+            assertThat(((JComponent) logs).getInsets().left).isPositive();
+            assertThat(((JComponent) logs).getInsets().right).isZero();
+            assertThat(center.getInsets().left).isZero();
+            assertThat(center.getInsets().right).isZero();
         });
     }
 
@@ -949,7 +986,8 @@ class WindowPanelsTest {
             assertThat(stripes).as("the stripes appearing tell the window").isNotEmpty();
             assertThat(stripes.getLast()).as("and it last heard with them showing").isTrue();
             var withStripes = minimums.getLast();
-            assertThat(withStripes.width).as("both stripes").isGreaterThanOrEqualTo(bare.width + 2 * UIScale.scale(owner.railWidth()));
+            assertThat(owner.rightStripe().isVisible()).as("nothing on the right").isFalse();
+            assertThat(withStripes.width).as("the left stripe").isGreaterThanOrEqualTo(bare.width + UIScale.scale(owner.railWidth()));
             assertThat(withStripes.height).as("the lower inset").isGreaterThanOrEqualTo(bare.height + UIScale.scale(8));
             assertThat(withStripes).as("what the window heard is what it has").isEqualTo(owner.getMinimumSize());
 

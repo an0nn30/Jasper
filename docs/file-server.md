@@ -92,7 +92,8 @@ account when the Credential Vault is installed and a session password otherwise;
 **Use TLS** on an HTTP server serves HTTPS. HTTPS and FTPS share one self-signed certificate, which File Server
 creates the first time a TLS server starts and keeps in `data/tls/` (owner-only). Browsers warn about a self-signed
 certificate; compare the fingerprint before you accept it. The server card shows the certificate's SHA-256
-fingerprint. **Show Fingerprints…** in a server's menu shows it too, and offers **Regenerate Certificate…**. A new
+fingerprint. **Show Fingerprints…** in a server's menu shows it too, and offers **Regenerate Certificate…**; so does
+the palette's **Show TLS Certificate Fingerprint…** (`dev.jasper.fileserver.tls-fingerprint`, unbound by default). A new
 certificate makes clients that trusted the old one warn again; running servers keep the old one until they restart.
 
 ## SFTP
@@ -107,7 +108,8 @@ WinSCP). It serves file transfer only: no shell, no commands and no port forward
   offered key that isn't authorized doesn't count.
 - **Host key.** File Server creates an Ed25519 host key the first time an SFTP server starts and keeps it in
   `data/hostkey` (owner-only). Clients ask you to trust it on first connection; compare the fingerprint with the
-  server card's "SSH host key SHA256:…" or Show Fingerprints…. If the key file becomes unreadable, a new key replaces
+  server card's "SSH host key SHA256:…", Show Fingerprints… or the palette's **Show SFTP Host Key Fingerprint…**
+  (`dev.jasper.fileserver.host-key-fingerprint`). If the key file becomes unreadable, a new key replaces
   it and clients warn about the change.
 - **The shared folder is a jail.** `..` stops at the top; links that lead outside are invisible, and links can't be
   created or read. A path whose real location is outside the shared folder is refused ("permission denied"), however

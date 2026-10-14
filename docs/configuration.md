@@ -25,6 +25,20 @@ Use `--config <path>` to select a different file. Relative paths resolve from th
 
 The first command launches the desktop and a shell. `--help` prints usage without opening a window or reading configuration. Missing, duplicate and unknown arguments fail before desktop startup.
 
+### Custom VM options
+
+The installed app reads JVM options from `jasper.vmoptions` in Jasper's home (next to `config.toml`), the way IntelliJ
+reads its `.vmoptions` file. Each line is one option, passed unchanged after the bundled options (`-Xmx2048m` and
+`-XX:+IgnoreUnrecognizedVMOptions`), so `-Xmx4g` raises the heap limit. Blank lines and lines starting with `#` are
+skipped; a line that does not start with `-`, or that names one of the `java` launcher's own options (such as
+`-version` or `-cp`), is ignored. `JASPER_VM_OPTIONS=<file>` reads another file instead. Changes take effect at the next
+launch.
+
+If the JVM rejects the options (a malformed value such as `-Xmx3q`, or conflicting garbage collectors), Jasper starts
+once more without them. Failures inside the JVM's own start-up (`-Xms` above `-Xmx`, a missing agent, a module that
+cannot be resolved) stop it instead; setting `JASPER_VM_OPTIONS_SKIP=1` in the environment starts Jasper without the
+file so you can fix it. `./gradlew :jasper-app:run` does not read the file.
+
 ## Settings dialog
 
 **Settings** (Cmd+, on macOS, or Jasper › Settings…) edits every setting in this guide without opening the file.
@@ -436,7 +450,8 @@ directory, `<Jasper home>/plugins/dev.jasper.snippets/data/`; a `snippets.toml` 
 from before the plugin is moved there on first launch. It is a separate file: it is not part of the
 configuration file and is never read or written by the configuration loader. An empty or missing
 file is an empty scope; disable the plugin in File → Manage Plugins… to remove the scope. Its
-shortcut is the action `"dev.jasper.snippets.open"`. See [Snippets](command-palette.md#snippets) for its format and the fill-in and
+shortcut is the action `"dev.jasper.snippets.open"`. **Edit Snippets File** (`"dev.jasper.snippets.edit"`, unbound by
+default) opens the file in the editor, creating it if missing. See [Snippets](command-palette.md#snippets) for its format and the fill-in and
 name steps.
 
 ### Editor
@@ -617,20 +632,27 @@ are not recreated by this layout state.
 
 View › View Modes › Zen toggles a workspace-focused view in the current window. It hides the status bar,
 tool windows and their rails. The command palette field, toolbar icons, workspace tabs and native window/menu
-controls remain available; the toolbar keeps its selected style. Toggle Zen again to restore your layout; pane zoom works independently.
+controls remain available; the toolbar keeps its selected style. A tool window opened in Zen (by its shortcut,
+View › Tool Windows, the palette or a plugin command) shows in its usual place, without the rails. Toggle Zen again
+to restore your layout: the tool windows opened in Zen close and the ones that showed before return; pane zoom
+works independently.
 Zen is independent of Appearance's Normal/Compact setting: Compact keeps its native title bar, hidden header
 and floating command palette when Zen is toggled.
 
 Zen is saved immediately as `zen_mode` in `ui-state.toml` and restored before plugin panels are built on launch.
 New windows inherit the saved mode; existing windows retain their own mode. As with the dock layout, the last
 closed window saves its mode for the next launch. Missing or invalid values default to off. Normal status
-visibility, rail visibility, tool-window positions, sizes and split ratios remain intact. Status and panel
-changes made while in Zen take effect when leaving it; toolbar changes apply immediately. Panel show/hide requests still update
-the normal dock layout, but panels remain hidden and newly requested panels are built only when Zen exits.
-Existing panel instances are retained and receive visibility notifications while hidden.
+visibility, rail visibility, tool-window positions, sizes and split ratios remain intact. Status changes made
+while in Zen take effect when leaving it; toolbar changes apply immediately. The saved layout keeps the tool
+windows that showed before Zen, so a window opened in Zen is never saved as showing; moving or resizing one in Zen
+is saved. Panel instances are retained while hidden and receive visibility notifications.
 
 View groups Toolbar, Status Bar and Rail under **Show/Hide**, and font controls under **Font Size**.
 The contributed **Tools** submenu remains available. Status/rail controls are disabled during Zen; leave Zen to use them. Toolbar controls stay available.
+Each rail shows only while it holds a tool window (or, on the left, a plugin's rail button); on a side without one the
+terminal meets the window edge without a border, as in Zen. To put a tool window on
+an empty side's rail, drag it to that window edge: the drop guide marks where its button goes, and the rail appears
+once it lands.
 
 Zen has no default shortcut. Assign **Zen** in Settings › Keymap, or add a binding to `[keybindings]`:
 
@@ -684,7 +706,7 @@ Plugin actions are bound by their quoted id, for example:
 A plugin may suggest a default shortcut; yours always wins, and Jasper's built-in shortcuts win
 over a plugin's suggestion. A binding for an action that no installed plugin provides is
 reported as a configuration warning. Every panel also has a `<panel id>.toggle` action you can
-bind the same way. `"plugins.manage"` opens Settings at Plugins and `"app.shortcuts"` at Keymap; neither has a default shortcut.
+bind the same way. `"plugins.manage"` opens Settings at Plugins, `"app.shortcuts"` at Keymap and `"app.about"` the About window; none has a default shortcut.
 
 ## Command palette shortcuts
 

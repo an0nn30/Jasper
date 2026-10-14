@@ -151,7 +151,7 @@ public final class PaletteTestSupport {
 
     /** Clicks the {@code index}th hint verb's mounted kit link. */
     public static void clickHintAction(CommandPalette palette, int index) {
-        KitTestSupport.require(palette.hintView(), CommandPalette.VERB + (index + 1), javax.swing.AbstractButton.class).doClick(0);
+        KitTestSupport.require(palette.hintView(), CommandPalette.VERB + index, javax.swing.AbstractButton.class).doClick(0);
     }
 
     public static int itemHeight(CommandPalette palette) { return palette.itemHeight(); }

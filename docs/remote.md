@@ -39,14 +39,16 @@ button. It stays centered on resize and blocks underlying input; Escape and outs
 dismiss it. The tab or split appears once the SSH shell is ready. Failures offer **Retry** and
 **Close**. Reconnect uses the overlay while preserving the existing pane. Host-key and Vault prompts
 remain native dialogs above it. A second connection request in that window focuses the current attempt.
-The **SSH** menu carries the connection commands plus **Import from ~/.ssh/config...**.
+The **SSH** menu carries the connection commands plus **New Host...** (`dev.jasper.remote.hosts.new`, the Sessions
+panel's **+** without opening the panel; unbound by default) and **Import from ~/.ssh/config...**.
 
 A host is a name, hostname, port, username, group, an optional jump host and how it authenticates:
 a **Vault credential** (a login with a password, a key or both, or a standalone key with the host's
 username) or the **SSH agent** (`SSH_AUTH_SOCK`, or the OpenSSH agent pipe on Windows). Hosts live in
 `plugins/dev.jasper.remote/data/hosts.toml`, which you may edit; Jasper notices the change within a
 second. The file never holds a secret. A jump host makes the connection go through that host first,
-with its own authentication and host-key check.
+with its own authentication and host-key check. In the Add Host form, **Add and Connect** saves the host and then
+connects to it in a new tab, as the palette's Connect does; if the save fails, nothing connects.
 
 **Import** reads `~/.ssh/config` (`Host`, `HostName`, `Port`, `User`, `ProxyJump`, ordered
 `IdentityFile` directives and one level of `Include`). Wildcard hosts and `Match` blocks are
@@ -113,8 +115,8 @@ Toggle SSH Hosts (Cmd+Shift+S), Connect to SSH Host… (Cmd+Shift+H) and Toggle 
 Settings › Keymap like any other action; `cmd` means Command on macOS and Ctrl+Shift elsewhere. A `[shortcuts]`
 table from an older Remote is reported as unknown; delete it and rebind in Keymap.
 
-The actions are `dev.jasper.remote.connect`, `dev.jasper.remote.hosts`, `dev.jasper.remote.split` and
-`dev.jasper.remote.import`, plus `dev.jasper.remote.sessions.manage`; bind them like other
+The actions are `dev.jasper.remote.connect`, `dev.jasper.remote.hosts`, `dev.jasper.remote.split`,
+`dev.jasper.remote.hosts.new` and `dev.jasper.remote.import`, plus `dev.jasper.remote.sessions.manage`; bind them like other
 contributed actions. Tunnels have their own section at the end of this guide.
 
 ## Native acceptance
@@ -295,7 +297,7 @@ and it shares the host's SSH connection with any terminals that are open.
 
 Click **+** (or **SSH > New Tunnel...**) to add one: a name, the host to go through, the type, where to listen (port 0
 means any free port) and where to forward to. Start and stop a tunnel with the button at the end of its row, Enter or
-Space. The palette's Tunnels scope (`tunnels >`) lists the same tunnels: Enter starts or stops, Cmd/Ctrl+Enter opens a
+Space. The palette's Tunnels scope (`tunnels >`, or **SSH > Start or Stop a Tunnel...**) lists the same tunnels: Enter starts or stops, Cmd/Ctrl+Enter opens a
 running local tunnel in the browser, Shift+Enter edits a saved tunnel. Double-clicking a saved tunnel edits it. A
 running row shows its open connections, the bytes moved each way and its uptime; right-click for Start or Stop, Open
 in Browser, Copy Address, Edit, Duplicate and Delete. The status bar counts running tunnels and failures. A tunnel
@@ -336,7 +338,7 @@ Edits to the file apply within a second: a running tunnel whose forwarding chang
 A file that does not parse keeps the last good tunnels and shows one error row ("tunnels.toml has errors: …"). While
 the file has entries Remote cannot read (they are reported in the log), saves from Jasper are refused until you fix or
 remove them. The actions are `dev.jasper.remote.tunnels` (Toggle Tunnels), `.tunnels.show` (Show Tunnels),
-`.tunnels.new` (New Tunnel...), `.tunnels.forward` (Forward a Port...) and `.tunnels.stop-all` (Stop All Tunnels),
+`.tunnels.pick` (Start or Stop a Tunnel...), `.tunnels.new` (New Tunnel...), `.tunnels.forward` (Forward a Port...) and `.tunnels.stop-all` (Stop All Tunnels),
 none bound by default.
 
 Native acceptance for tunnels (user-run):

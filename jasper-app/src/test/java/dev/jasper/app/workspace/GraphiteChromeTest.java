@@ -49,10 +49,49 @@ class GraphiteChromeTest {
         }
     }
 
+    /** A window on each stripe, so both show: an empty stripe stays hidden. */
     private static void showRail(WindowContent owner) {
         owner.leftStripe().render(java.util.List.of(new ToolStripe.Button("hosts", "SSH hosts",
             dev.jasper.app.platform.AppIcons.named("SERVER"), dev.jasper.app.dock.Slot.LEFT_TOP, false)), java.util.List.of());
+        owner.rightStripe().render(java.util.List.of(new ToolStripe.Button("notes", "Notes",
+            dev.jasper.app.platform.AppIcons.named("SERVER"), dev.jasper.app.dock.Slot.RIGHT_TOP, false)), java.util.List.of());
         owner.setRailVisible(true);
+    }
+
+    @Test void aHiddenStripesSideIsBorderlessAndSquareWhileTheShowingSideStaysRounded() throws Exception {
+        for (boolean themeDark : new boolean[]{true, false}) {
+            try (var owner = content(launcher(new ArrayDeque<>()))) {
+                owner.selectVariant(themeDark);
+                owner.leftStripe().render(java.util.List.of(new ToolStripe.Button("hosts", "SSH hosts",
+                    dev.jasper.app.platform.AppIcons.named("SERVER"), dev.jasper.app.dock.Slot.LEFT_TOP, false)), java.util.List.of());
+                owner.setRailVisible(true);
+                var root = new javax.swing.JRootPane();
+                try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
+                    root.setSize(1000, 640); layoutTree(root); layoutTree(root);
+                    assertThat(owner.leftStripe().isVisible()).isTrue();
+                    assertThat(owner.rightStripe().isVisible()).as("nothing on the right").isFalse();
+                    var area = owner.area();
+                    var host = (javax.swing.JComponent) owner.windowTabs().getParent().getParent();
+                    var bounds = javax.swing.SwingUtilities.convertRectangle(host.getParent(), host.getBounds(), area);
+                    assertThat(bounds.x).as("the left stripe supplies the left spacing").isZero();
+                    assertThat(bounds.x + bounds.width - host.getInsets().right).as("flush with the window's right edge, as in Zen")
+                        .isEqualTo(area.getWidth());
+                    var inset = host.getInsets();
+                    int left = inset.left, top = inset.top;
+                    int right = host.getWidth() - inset.right - 1, bottom = host.getHeight() - inset.bottom - 1;
+                    int chrome = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP).getRGB();
+                    var image = new java.awt.image.BufferedImage(host.getWidth(), host.getHeight(), 2);
+                    var g = image.createGraphics();
+                    try { host.paint(g); } finally { g.dispose(); }
+                    String theme = themeDark ? "dark" : "light";
+                    assertThat(image.getRGB(left, top)).as("rounded top left, %s", theme).isEqualTo(chrome);
+                    assertThat(image.getRGB(left, bottom)).as("rounded bottom left, %s", theme).isEqualTo(chrome);
+                    assertThat(image.getRGB(right, top)).as("square top right, %s", theme).isNotEqualTo(chrome);
+                    assertThat(image.getRGB(right, bottom)).as("square bottom right, %s", theme).isNotEqualTo(chrome);
+                    assertThat(host.contains(right, top)).as("the square corner receives input").isTrue();
+                }
+            }
+        }
     }
 
     @Test void partialRepaintsKeepAllFourWorkspaceCornersRounded() throws Exception {
@@ -143,8 +182,12 @@ class GraphiteChromeTest {
                     DockTestSupport.show(owner, dev.jasper.app.dock.Slot.LEFT_TOP, panel, 260);
                     owner.leftStripe().render(java.util.List.of(new ToolStripe.Button("hosts", "SSH hosts",
                         dev.jasper.app.platform.AppIcons.named("SERVER"), dev.jasper.app.dock.Slot.LEFT_TOP, true)), java.util.List.of());
+                    // A window on the right too: an empty right stripe hides, and its border is what this checks.
+                    owner.rightStripe().render(java.util.List.of(new ToolStripe.Button("notes", "Notes",
+                        dev.jasper.app.platform.AppIcons.named("SERVER"), dev.jasper.app.dock.Slot.RIGHT_TOP, false)), java.util.List.of());
                     owner.syncRailVisibility();
                     root.setSize(1000, 640); layoutTree(root); layoutTree(root);
+                    assertThat(owner.rightStripe().isVisible()).isTrue();
                     var image = new java.awt.image.BufferedImage(1000, 640, 2);
                     var g = image.createGraphics(); root.printAll(g); g.dispose();
                     int chrome = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP).getRGB();

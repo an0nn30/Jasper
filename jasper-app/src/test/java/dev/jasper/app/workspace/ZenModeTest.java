@@ -94,7 +94,66 @@ class ZenModeTest {
         });
     }
 
-    @Test void panelsRequestedOrReplacedInZenStayHiddenAndAreBuiltOnlyOnExit() throws Exception {
+    @Test void panelsOpenedInZenShowWithoutTheRailAndExitRestoresThePreZenLayout() throws Exception {
+        edt(() -> {
+            var model = new Contributions(); var owner = window(); owner.connectContributions(model);
+            owner.setSize(1400, 900);
+            Map<String, PanelSite> sites = new java.util.HashMap<>();
+            Map<String, List<Boolean>> heard = new java.util.HashMap<>();
+            for (String id : List.of("test.a", "test.b"))
+                model.addPanel(id, id.substring(5).toUpperCase(), new ImageIcon(), id.equals("test.a") ? Slot.LEFT_TOP : Slot.RIGHT_TOP, site -> {
+                    sites.put(id, site); var events = new ArrayList<Boolean>(); heard.put(id, events);
+                    site.onVisibility(events::add); return new JLabel(id.substring(5));
+                });
+            show(model, owner, "test.a"); toggle(owner);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+            show(model, owner, "test.b"); LayoutTestSupport.layoutTree(owner);
+            assertThat((JLabel) owner.area().content(Slot.RIGHT_TOP)).extracting(JLabel::getText).isEqualTo("b");
+            assertThat(owner.area().content(Slot.RIGHT_TOP).getParent().getWidth()).as("laid out in its slot").isPositive();
+            assertThat(sites.get("test.b").visible()).isTrue();
+            assertThat(owner.leftStripe().isVisible()).isFalse(); assertThat(owner.rightStripe().isVisible()).isFalse();
+            assertThat(owner.status().isVisible()).isFalse();
+            item(child(view(owner), "Tool Windows"), "Toggle A").doClick();
+            assertThat((JLabel) owner.area().content(Slot.LEFT_TOP)).extracting(JLabel::getText).isEqualTo("a");
+            model.requestPanel(new Contributions.PanelRequest(owner.id(), "test.a", Contributions.PanelRequest.Op.HIDE));
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull(); assertThat(sites.get("test.a").visible()).isFalse();
+            toggle(owner);
+            assertThat((JLabel) owner.area().content(Slot.LEFT_TOP)).extracting(JLabel::getText).isEqualTo("a");
+            assertThat(owner.area().content(Slot.RIGHT_TOP)).isNull();
+            assertThat(sites.get("test.a").visible()).isTrue(); assertThat(sites.get("test.b").visible()).isFalse();
+            assertThat(heard.get("test.a")).containsExactly(true, false, true, false, true);
+            assertThat(heard.get("test.b")).as("opened in Zen, closed on leaving it").containsExactly(true, false);
+            assertThat(owner.leftStripe().isVisible()).isTrue();
+        });
+    }
+
+    @Test void zenOpenedPanelsAreNeverSavedAsVisibleWhileMovesAndSizesAre() throws Exception {
+        edt(() -> {
+            var file = directory.resolve("ui-state.toml");
+            var model = new Contributions();
+            model.addPanel("test.a", "A", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("a"));
+            model.addPanel("test.b", "B", new ImageIcon(), Slot.RIGHT_TOP, site -> new JLabel("b"));
+            var first = window(); first.connectContributions(model, UiState.load(file));
+            show(model, first, "test.a"); toggle(first); show(model, first, "test.b");
+            first.dock().resize(Side.RIGHT, 333);
+            first.dock().move("test.b", Slot.BOTTOM_LEFT, 0);
+            first.close();
+            var saved = UiState.load(file);
+            assertThat(saved.zenMode()).isTrue();
+            assertThat(saved.panel("test.a")).hasValue(new UiState.Panel(Slot.LEFT_TOP, 0, true));
+            assertThat(saved.panel("test.b")).hasValue(new UiState.Panel(Slot.BOTTOM_LEFT, 0, false));
+            assertThat(saved.dock().rightWidth()).isEqualTo(333);
+            var restored = window(); restored.connectContributions(model, saved);
+            assertThat(restored.area().content(Slot.LEFT_TOP)).isNull();
+            show(model, restored, "test.b");
+            assertThat((JLabel) restored.area().content(Slot.BOTTOM_LEFT)).extracting(JLabel::getText).isEqualTo("b");
+            toggle(restored);
+            assertThat((JLabel) restored.area().content(Slot.LEFT_TOP)).extracting(JLabel::getText).isEqualTo("a");
+            assertThat(restored.area().content(Slot.BOTTOM_LEFT)).isNull();
+        });
+    }
+
+    @Test void aPanelReplacedInZenKeepsItsPreZenVisibilityAndIsBuiltOnlyWhenShown() throws Exception {
         edt(() -> {
             var model = new Contributions(); var owner = window(); owner.connectContributions(model);
             List<PanelSite> sites = new ArrayList<>();
@@ -105,7 +164,6 @@ class ZenModeTest {
             model.addPanel("test.panel", "New", new ImageIcon(), Slot.LEFT_TOP, site -> {
                 sites.add(site); return new JLabel("new");
             });
-            show(model, owner, "test.panel");
             assertThat(sites).hasSize(1); assertThat(sites.getFirst().visible()).isFalse();
             assertThat(owner.area().content(Slot.LEFT_TOP)).isNull(); assertThat(owner.leftStripe().isVisible()).isFalse();
             toggle(owner);
@@ -182,6 +240,8 @@ class ZenModeTest {
             show(model, first, "test.panel"); toggle(first);
             // Read from disk before close: the toggle itself must save.
             var restored = window(); restored.connectContributions(model, UiState.load(file));
+            assertThat(UiState.load(file).panel("test.panel")).as("restoring in Zen keeps the panel saved as showing")
+                .hasValueSatisfying(panel -> assertThat(panel.visible()).isTrue());
             assertThat(restored.zenMode()).isTrue();
             assertThat(restored.action(zenAction()).getValue(Action.SELECTED_KEY)).isEqualTo(true);
             assertThat(restored.status().isVisible()).isFalse();

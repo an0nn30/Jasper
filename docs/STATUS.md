@@ -61,6 +61,91 @@ dropdowns in Plan 2; they are here (Plan 2 is Import… and Remove). `./gradlew 
 0 errors, 8 skipped**. Review fixes beyond the plan's text are in its status banner. No GUI launched. For the user: copy a theme file into the themes folder, Reload config, pick it.
 Not merged or pushed.
 
+**About screen, build information and licenses — 2026-10-13** (`claude/about-screen`, worktree
+`.claude/worktrees/about-screen`; [spec](superpowers/specs/2026-10-13-about-screen-design.md),
+[plan](superpowers/plans/2026-10-13-about-screen.md)). `:jasper-app:buildInfo` records the commit's git facts in
+`dev/jasper/app/build-info.properties` inside the jar (ignored by test up-to-date checks); `BuildInfo` calls a clean
+`vX.Y.Z`-tagged commit a release and anything else a development build ("1.2.0 + 14 commits", "main @ 8ba67ed3,
+modified"); packaging takes its version from the release tag unless `-PjasperVersion` is given. Jasper is licensed under
+PolyForm Noncommercial 1.0.0 (`LICENSE.md`); `notices.toml` lists the 25 third-party components it ships (including the
+winpty, ConPTY and libffi binaries inside pty4j and JNA) and `verifyThirdPartyNotices` keeps the jars complete. About Jasper (palette; Help on Windows/Linux; the macOS application menu)
+shows the icon, version, chip, commit, date and license with Licenses… and Copy; error reports name the build the same
+way. Deviations from the spec are listed in the plan's status banner; the final-review fixes are its entry 17.
+`./gradlew check --continue` after merging `main`: **9,839 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched. GUI checks for the user: Jasper › About Jasper on macOS; Help ›
+About Jasper on Windows and Linux; About and Licenses in Dark and Light; Copy (and "Copied" for two seconds); the
+Licenses list and texts; the sharpness of the About icon; a long branch name's fit in the commit line. Merged to
+`main`.
+
+**Copy cards in the Vault manager — 2026-10-13** (`claude/vault-manager-copy-cards`, worktree
+`.claude/worktrees/vault-manager-copy-cards`; bounded change, design approved in chat, no spec or plan). The manager's
+Username, Password and Secure note copy buttons post the palette's card ("Copied the password for prod" / "Copied to
+Clipboard for 30 seconds"; a note reads "Copied the note for <name>"), and Copy Public Key posts "Copied the public key
+for <name>" with no second line, since a public key is an ordinary copy that Jasper does not clear. All go in the Vault
+copies group. The wording lives in one place, `dev.jasper.vault.ui.CopyCards`, which the palette scope and the manager
+share. `./gradlew check --continue`: **9,778 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched. GUI check for the user: copy each of the four from
+the manager and read the cards. Merged to `main`.
+
+**Tool windows in Zen, and more plugin commands — 2026-10-13** (`claude/zen-panels-actions`, worktree
+`.claude/worktrees/zen-panels-actions`; design agreed in chat, no spec). Zen now hides the showing tool windows through
+the dock and remembers them: a panel opened in Zen (shortcut, View › Tool Windows, palette, plugin command) shows in
+its slot without the rails, and leaving Zen closes it and restores the earlier ones. The saved layout keeps the pre-Zen
+visibility; moves and resizes in Zen are saved. New unbound commands: Remote New Host... and Start or Stop a Tunnel...
+(both in the SSH menu), Vault Add Login.../Add SSH Key.../Add Secure Note..., File Server Show TLS Certificate
+Fingerprint…/Show SFTP Host Key Fingerprint…, Edit Snippets File, Remove Current Project from Index…. No SDK change.
+Remote's Add Host form gains **Add and Connect** (secondary, beside the primary Add Host; adding only): it saves, then
+connects in a new tab as the palette's Connect does. The form's footer was matched to the design mock with two buttons,
+so the [acceptance record](design/theme-engine/acceptance.md)'s Add Host footer measurements are now historical.
+Each rail now shows only while it holds something (they used to show together, an empty right rail included); on a
+hidden rail's side the terminal is borderless and square, as in Zen, while tool window frames keep their gutter. A dock
+drag still drops onto an empty hidden rail at its window edge: `DockDrag.standAtEdge` gives it bounds there without
+showing it, so only the placeholder marks it and the terminal does not move, and `DockDrag.areaAfter` lays the guide
+out for the rails that show or hide after the drop. A second review found a mid-drag resize left that edge stale (fixed
+with a test) and stale `app-maintenance.md` rules (fixed).
+Rebased onto `main` (f8bd2c41) and merged to local `main` (not pushed). `./gradlew check --continue` on b92d5c1f:
+**9,795 tests**, whose only failure was the `SftpChooseSessionTest` flake that `main`'s c6523372 then fixed; after
+rebasing onto that fix, `:jasper-plugin-remote:check` passes (0 failures, 8 skipped overall). An independent review found one Important issue (the
+last panel restored in Zen was saved as hidden until the next dock change), fixed with a regression test, and doc nits,
+fixed. No GUI launched. GUI checks for the user: in Zen, Cmd+Alt+1 and View › Tool Windows show a panel with no rail
+(frame corners and insets as with View › Rail hidden); a divider drag in Zen; leaving Zen restores the earlier layout;
+quitting and relaunching in Zen; the new commands from the palette; Add and Connect in the Add Host form; one rail
+hidden (the borderless, square side), the placeholder over the terminal's edge while dragging to an empty side, and a
+drop there showing the rail. Not pushed.
+
+**Enter's verb in the palette hint bar — 2026-10-13** (`claude/palette-enter-hint`, worktree
+`.claude/worktrees/palette-enter-hint`; bounded change, design approved in chat, no spec or plan). In a scope with two or
+three verbs the hint bar now lists every verb with its key, Enter's first ("Copy password ⏎ · Copy username ⌘⏎ · Open
+in Vault ⇧⏎"), so the Vault's password copy shows a key; a click on Enter's link runs the first verb. Single-verb scopes
+(Commands) still show only the row's detail. This replaces the search-everywhere spec's secondary-verbs-only hint bar
+(user decision). A test pins that the longest bundled set (Files: Open, Copy path, Open terminal here) stays on one line
+at the 560 px anchored minimum on macOS and elsewhere. `./gradlew check --continue`: **9,776 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched.
+GUI check for the user: Cmd+\\, select a login and read the hint bar. Not merged or pushed.
+
+**Custom VM options plan 1 (launcher) complete — 2026-10-13.** Merged to local `main` (not pushed): Jasper builds
+jpackage's launcher from vendored JBR 25.0.4.1 sources (`packaging/launcher`) with marked hooks that merge the user's
+`jasper.vmoptions` (location, format and IntelliJ's merge from the
+[spec](superpowers/specs/2026-10-13-jasper-custom-vm-options-design.md)) and an exit guard that starts once more
+without the user's options when the JVM rejects them. Bundled defaults `-Xmx2048m -XX:+IgnoreUnrecognizedVMOptions`.
+Only option lines apply: a line without a leading `-`, or one of the `java` launcher's own options, is ignored
+(spec 3.2, final review). A fallback start never arms the guard.
+`check` builds the launcher and runs its native tests, a guard test against the real libjli and a probe-image
+end-to-end test on each OS. Deviations: the nine in the plan's banner; also `FileUtils::isDirectory` exists only in
+upstream's Windows sources, so the wrapper uses `stat`/`S_ISREG` elsewhere. Full `./gradlew check` after merging `main`: 9,775 tests,
+0 failures, 8 skips. Known limit (spec 4.5): HotSpot's own initialization failures (`-Xms` above `-Xmx`, a
+missing agent, an unusable CDS archive) end with `_exit` and are not recovered at launch; plan 2's Settings check
+reports them before a restart. Manual checks pending (the user): the packaged app on macOS with a `jasper.vmoptions`
+(`-Xmx3g`, then `-Xmx3q`; expect one new Local Network prompt for the rebuilt launcher), Windows and Linux packages.
+Plans 2 (settings and actions) and 3 (memory) are next.
+
+**Vault logins in the palette — 2026-10-13** (`claude/vault-palette-logins`, worktree
+`.claude/worktrees/vault-palette-logins`; bounded change, design approved in chat, no spec or plan). Vault 0.5.0: the
+Vault scope lists logins only (SSH keys stay in the manager) and its placeholder is "Search logins". New action
+**Search Vault Logins** (`dev.jasper.vault.search`, Cmd+\\) opens the palette on that scope and is its chip shortcut;
+Open Vault... moves to Cmd+Shift+\\. The locked row's Enter unlocks and reopens the palette on the Vault scope (with no
+vault yet it still creates one in the manager). Each copy that worked posts a card naming the login, never the secret,
+in the new `dev.jasper.vault.copies` group ("Vault copies", cards by default). `./gradlew check --continue`: **9,775 tests, 0 failures, 0 errors, 8 skipped**.
+No GUI launched. GUI check for the user: lock the vault, press Cmd+\\, Enter on the locked row, unlock, search, copy a
+password and a username, and see the two cards. Not merged or pushed.
+
 **Clear Terminal in the terminal context menu — 2026-10-13** (`claude/clear-terminal`, worktree
 `.claude/worktrees/clear-terminal`; bounded change, design approved in chat, no spec or plan). Right-click › Clear
 Terminal (after Find) erases scrollback and the live screen; the cursor's line moves to the top with the cursor, and

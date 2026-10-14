@@ -24,6 +24,7 @@ import dev.jasper.vault.store.DeviceSecrets;
 import dev.jasper.vault.store.FileStore;
 import dev.jasper.vault.store.KeychainStore;
 import dev.jasper.vault.store.VaultFile;
+import dev.jasper.vault.ui.CopyCards;
 import dev.jasper.vault.ui.GrantPanel;
 import dev.jasper.vault.ui.PasswordPanel;
 import dev.jasper.vault.ui.PickerPanel;
@@ -52,6 +53,8 @@ import javax.swing.Timer;
 public class VaultPlugin implements Plugin {
     public static final String OPEN = "dev.jasper.vault.open";
     public static final String LOCK = "dev.jasper.vault.lock";
+    /** Opens the palette on the Vault scope. */
+    public static final String SEARCH = "dev.jasper.vault.search";
     public static final String STATUS = "dev.jasper.vault.status";
     private StatusItem status;
     private String locked, unlocked;
@@ -76,6 +79,9 @@ public class VaultPlugin implements Plugin {
     public static final String CHANGE_PASSWORD = "dev.jasper.vault.change_password";
     /** Opens the manager on the saved plugin grants. */
     public static final String GRANTS = "dev.jasper.vault.grants";
+    /** Open the manager and its sheet for a new entry of one type. */
+    public static final String ADD_LOGIN = "dev.jasper.vault.add_login", ADD_KEY = "dev.jasper.vault.add_key",
+        ADD_NOTE = "dev.jasper.vault.add_note";
     private VaultManager manager;
     private VaultManagerWindow managerWindow;
     private PluginDialog createDialog;
@@ -115,12 +121,15 @@ public class VaultPlugin implements Plugin {
         context.services().publishPerConsumer(VaultApi.class, service::forConsumer);
         locked = "lock";
         unlocked = "unlock";
-        context.actions().register(ActionSpec.of(OPEN, "Open Vault...").withIcon(locked).withKeywords(List.of("vault", "credentials", "password", "unlock")).withDefaultBinding("cmd+\\"),
+        context.actions().register(ActionSpec.of(OPEN, "Open Vault...").withIcon(locked).withKeywords(List.of("vault", "credentials", "password", "unlock")).withDefaultBinding("cmd+shift+\\"),
             invoked -> open(invoked.window(), Optional.empty()));
+        context.actions().register(ActionSpec.of(SEARCH, "Search Vault Logins").withKeywords(List.of("vault", "login", "password", "username", "copy"))
+            .withDefaultBinding("cmd+\\"),
+            invoked -> context.palette().open(invoked.window(), VaultScope.ID, Optional.empty(), Optional.empty()));
         lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock"))
             .withDefaultBinding("cmd+shift+l"), invoked -> lock.lock());
         lockAction.setEnabled(false);
-        scope = new VaultScope(lock, service, context.platform(), this::open);
+        scope = new VaultScope(lock, service, CopyCards.declare(context), this::open, this::unlockThenSearch);
         context.palette().register(scope);
         manager = new VaultManager(lock, context.background(), ui, this::vaultChanged);
         managerWindow = new VaultManagerWindow(context, lock, manager, service, this::managerStatus, this::showGenerator);
@@ -134,6 +143,15 @@ public class VaultPlugin implements Plugin {
         context.actions().register(ActionSpec.of(GRANTS, "Vault Plugin Grants...")
             .withKeywords(List.of("vault", "grants", "plugins", "revoke", "permissions")),
             invoked -> openThen(invoked.window(), Optional.empty(), managerWindow::showGrants));
+        context.actions().register(ActionSpec.of(ADD_LOGIN, "Add Login...")
+            .withKeywords(List.of("vault", "login", "password", "credential", "add", "new")),
+            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerWindow.add(VaultManager.Type.LOGIN)));
+        context.actions().register(ActionSpec.of(ADD_KEY, "Add SSH Key...")
+            .withKeywords(List.of("vault", "ssh", "key", "add", "new")),
+            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerWindow.add(VaultManager.Type.SSH_KEY)));
+        context.actions().register(ActionSpec.of(ADD_NOTE, "Add Secure Note...")
+            .withKeywords(List.of("vault", "secure", "note", "add", "new")),
+            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerWindow.add(VaultManager.Type.NOTE)));
         var fileMenu = context.menus().standard(StandardMenu.FILE);
         fileMenu.add(OPEN);
         fileMenu.add(CHANGE_PASSWORD);
@@ -182,6 +200,19 @@ public class VaultPlugin implements Plugin {
             after.run();
         }).exceptionally(failure -> {
             if (!stopped) context.notifications().group().error("Could not open Credential Vault", message(failure), failure);
+            return null;
+        });
+    }
+
+    /** The palette's locked row: unlock, then show the Vault scope again so the search goes on. */
+    private void unlockThenSearch(WindowHandle window) {
+        if (stopped) return;
+        WindowHandle named = owner(window);
+        service.requestUnlock(named).thenAccept(ok -> {
+            if (ok && !stopped && lock.state() == LockState.UNLOCKED && named.isOpen())
+                context.palette().open(named, VaultScope.ID, Optional.empty(), Optional.empty());
+        }).exceptionally(failure -> {
+            if (!stopped) context.notifications().group().error("Could not unlock Credential Vault", message(failure), failure);
             return null;
         });
     }

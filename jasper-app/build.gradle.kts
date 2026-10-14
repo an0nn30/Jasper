@@ -28,9 +28,12 @@ else emptyList()
 
 application {
     mainClass = "dev.jasper.app.Main"
+    // The heap default and IntelliJ's tolerance of outdated flags; a user's jasper.vmoptions overrides them.
     applicationDefaultJvmArgs = listOf(
         "--enable-native-access=ALL-UNNAMED",
         "-Dapple.awt.application.name=Jasper",
+        "-Xmx2048m",
+        "-XX:+IgnoreUnrecognizedVMOptions",
     ) + glassJvmArgs
 }
 
@@ -54,10 +57,18 @@ val stagePlugins = tasks.register<Sync>("stagePlugins") {
 }
 // installDist and the distribution archives carry them beside the application jar, where the runtime looks.
 distributions { main { contents {
+    from(rootProject.file("LICENSE.md"))
     from(stagePlugins) { into("lib/plugins") }
     // Portable distributions expose the same desktop icon set used by Linux windows.
     from(rootProject.file("packaging/icons/linux/hicolor")) { into("share/icons/hicolor") }
 } } }
+// Jasper's own license has one copy, at the root; the Licenses window reads it from the jar.
+tasks.named<ProcessResources>("processResources") {
+    from(rootProject.file("LICENSE.md")) {
+        into("dev/jasper/app/about/licenses")
+        rename { "jasper.md" }
+    }
+}
 // A development launch keeps its own home (plugins, consent, data, history, snippets, logs, socket)
 // under build/, apart from the installed app's ~/.config/jasper. The IntelliJ run configuration in
 // .run/ sets the same two properties. Override with -Pjasper.home=<dir> or the JASPER_HOME variable.
@@ -158,6 +169,8 @@ for ((taskName, entryPoint) in listOf(
     }
 }
 
+// The commit this jar is built from (dev/jasper/app/build-info.properties); packaging.gradle reads its version from it.
+apply(from = rootProject.file("gradle/build-info.gradle"))
 apply(from = rootProject.file("gradle/packaging.gradle"))
 
 // Keep API/package contracts in the ordinary headless verification path.

@@ -79,6 +79,8 @@ public final class IndexerPlugin implements Plugin {
     public static final String INDEX_FOLDER = ID + ".index-folder";
     /** Reindexes the focused pane's project. */
     public static final String REINDEX = ID + ".reindex";
+    /** Asks, then removes the focused pane's project from the index. */
+    public static final String REMOVE = ID + ".remove";
     /** Cancels foreground indexing. */
     public static final String CANCEL = ID + ".cancel";
     static final String PROGRESS = ID + ".progress";
@@ -145,6 +147,9 @@ public final class IndexerPlugin implements Plugin {
             invoked -> indexFolder(invoked.window()));
         context.actions().register(ActionSpec.of(REINDEX, "Reindex Current Project").withKeywords(List.of("index", "refresh", "project")),
             this::reindex);
+        context.actions().register(ActionSpec.of(REMOVE, "Remove Current Project from Index…")
+                .withKeywords(List.of("index", "remove", "forget", "project")),
+            this::removeCurrent);
         cancel = context.actions().register(ActionSpec.of(CANCEL, "Cancel Indexing").withKeywords(List.of("index", "stop")),
             invoked -> indexer.cancelForeground());
         cancel.setEnabled(false);
@@ -352,6 +357,20 @@ public final class IndexerPlugin implements Plugin {
         if (key.isPresent()) indexer.request(key.get(), true, Optional.of(invoked.window()));
         else context.notifications().group().info("No indexed project here",
             "The focused terminal is not inside an indexed project. Use Index Folder… to add one.");
+    }
+
+    /** As Settings' Remove: only the project registered when the user was asked is removed. */
+    private void removeCurrent(ActionContext invoked) {
+        Optional<Projects.Entry> entry = invoked.pane().flatMap(this::projectOf).flatMap(projects::get);
+        if (entry.isEmpty()) {
+            context.notifications().group().info("No indexed project here", "The focused terminal is not inside an indexed project.");
+            return;
+        }
+        var registration = entry.get().project();
+        confirmRemove("Remove " + registration.name() + " from Project Index? Its saved index is deleted.", () -> {
+            if (projects.get(registration.key()).map(current -> current.project() == registration).orElse(false))
+                indexer.remove(registration.key());
+        });
     }
 
     private void progress(Optional<String> text) {

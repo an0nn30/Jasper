@@ -162,12 +162,15 @@ ext.trainingTraceProblem = { Map trace, long pid ->
 }
 
 // The training launch's environment: inherited with JASPER_HOME removed (it would point training at the user's real
-// configuration and data), JDK_JAVA_OPTIONS, _JAVA_OPTIONS and CLASSPATH removed (they would change the JVM options
-// and class path a real launch has) and JAVA_TOOL_OPTIONS replaced by javaToolOptions. Returns a new map.
-ext.aotTrainingEnvironment = { Map<String, String> inherited, String javaToolOptions ->
+// configuration and data), JDK_JAVA_OPTIONS, _JAVA_OPTIONS, CLASSPATH and JASPER_VM_OPTIONS_SKIP removed (they would
+// change the JVM options and class path a real launch has), JAVA_TOOL_OPTIONS replaced by javaToolOptions and
+// JASPER_VM_OPTIONS pointing at vmOptions, an empty file, so the developer's own jasper.vmoptions never shapes the
+// cache. Returns a new map.
+ext.aotTrainingEnvironment = { Map<String, String> inherited, String javaToolOptions, File vmOptions ->
     Map<String, String> environment = new LinkedHashMap<String, String>(inherited)
-    ['JASPER_HOME', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'CLASSPATH'].each { environment.remove(it) }
+    ['JASPER_HOME', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'CLASSPATH', 'JASPER_VM_OPTIONS_SKIP'].each { environment.remove(it) }
     environment.put('JAVA_TOOL_OPTIONS', javaToolOptions)
+    environment.put('JASPER_VM_OPTIONS', vmOptions.absolutePath)
     environment
 }
 
@@ -192,8 +195,11 @@ ext.runAotTraining = { File launcher, File work, Long settleSeconds, Long exitSe
     def builder = new ProcessBuilder(launcher.absolutePath).directory(work).redirectErrorStream(true)
         .redirectOutput(ProcessBuilder.Redirect.to(log))
     Map<String, String> environment = builder.environment()
+    File emptyVmOptions = new File(work, 'empty.vmoptions')
+    emptyVmOptions.text = ''
     Map<String, String> trainingEnvironment = aotTrainingEnvironment(environment, javaToolOptions(["-XX:AOTCacheOutput=${cache.absolutePath}",
-        "-Duser.home=${home.absolutePath}", "-Djasper.startupTrace=${trace.absolutePath}", '-Dapple.awt.UIElement=true']*.toString()))
+        "-Duser.home=${home.absolutePath}", "-Djasper.startupTrace=${trace.absolutePath}", '-Dapple.awt.UIElement=true']*.toString()),
+        emptyVmOptions)
     environment.clear()
     environment.putAll(trainingEnvironment)
     def tail = { log.isFile() ? log.readLines('UTF-8').takeRight(40).join('\n') : '(no output)' }

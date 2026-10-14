@@ -34,12 +34,15 @@ class StartupBenchTest {
     }
 
     @Test void launchesGoThroughLaunchServicesWithTheTraceAndAnIsolatedHome() {
-        String options = StartupRuns.launchOptions(Path.of("/tmp/jsb1/trace-3.json"), Path.of("/tmp/jsb1/home"));
+        Path home = Path.of("/tmp/jsb1/home");
+        String options = StartupRuns.launchOptions(Path.of("/tmp/jsb1/trace-3.json"), home);
         assertThat(options).isEqualTo("-Djasper.startupTrace=/tmp/jsb1/trace-3.json -Duser.home=/tmp/jsb1/home");
         assertThat(StartupRuns.launchOptions(Path.of("/tmp/t.json"), null)).isEqualTo("-Djasper.startupTrace=/tmp/t.json");
-        assertThat(StartupRuns.openCommand(Path.of("/Apps/My Jasper.app"), options, false)).containsExactly(
-            "open", "-n", "-a", "/Apps/My Jasper.app", "--env", "JAVA_TOOL_OPTIONS=" + options);
-        assertThat(StartupRuns.openCommand(Path.of("/A.app"), options, true)).containsExactly(
+        assertThat(StartupRuns.isolatedVmOptions(home)).isEqualTo(Path.of("/tmp/jsb1/home/.config/jasper/jasper.vmoptions"));
+        assertThat(StartupRuns.openCommand(Path.of("/Apps/My Jasper.app"), options, home, false)).containsExactly(
+            "open", "-n", "-a", "/Apps/My Jasper.app", "--env", "JAVA_TOOL_OPTIONS=" + options,
+            "--env", "JASPER_VM_OPTIONS=/tmp/jsb1/home/.config/jasper/jasper.vmoptions");
+        assertThat(StartupRuns.openCommand(Path.of("/A.app"), options, null, true)).containsExactly(
             "open", "-n", "-a", "/A.app", "--env", "JAVA_TOOL_OPTIONS=" + options, "--args", "--background");
         assertThat(StartupRuns.reopenCommand(Path.of("/A.app"))).containsExactly("open", "-a", "/A.app");
     }

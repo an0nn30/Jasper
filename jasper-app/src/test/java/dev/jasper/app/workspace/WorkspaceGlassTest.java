@@ -44,7 +44,7 @@ class WorkspaceGlassTest {
             var deck = new JPanel();
             deck.setOpaque(false);
             var area = new ToolWindowArea(deck, new DockState());
-            area.setStripesVisible(true);
+            area.setStripesVisible(true, true);
             area.setTerminalBackground(new Color(0x212734));
             var side = new JPanel();
             DockTestSupport.show(area, Slot.LEFT_TOP, side, 200);
@@ -89,7 +89,7 @@ class WorkspaceGlassTest {
             var background = new Color(0x212734);
             var deck = translucentDeck(background, 0.5f);
             var area = new ToolWindowArea(deck, new DockState());
-            area.setStripesVisible(true);
+            area.setStripesVisible(true, true);
             area.setTerminalBackground(background);
             area.setSize(1000, 600);
             LayoutTestSupport.layoutTree(area);

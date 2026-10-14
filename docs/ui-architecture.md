@@ -158,7 +158,8 @@ colour while the domain confirms a change; `Button.iconSeverity` tints a button'
 favourite's warning star); and the glyph vocabulary gains `star` and `star.filled`.
 
 Editor capabilities (Plan 2 Task 9-kit): a `SplitKind.DOCUMENT` split stacks its children and lets its first visible
-`Custom` (or `Empty`, a loading or failed state) fill the height the bars leave, so a document keeps its own scrolling;
+`Custom` (or `Empty`, a loading or failed state) fill the height the bars leave, so a document keeps its own scrolling
+(the split's minimum height counts the fill at its own minimum, so a long document never sets the window's);
 fields take Shift+Enter (`alternateAction`) and Escape (`cancelAction`) actions and can drive an item list with their
 arrow and page keys (`listId`) while keeping the focus; a stack's `cancelAction` answers Escape from anything inside it
 (an inline find bar); `Button.selected` makes a ghost or secondary button a toggle (pressed fill, CHECKED for assistive

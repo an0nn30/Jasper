@@ -291,6 +291,14 @@ checks a built image ([start-up performance](packaging.md#start-up-performance))
 - **The AOT cache.** It is trained per build, so it follows class-path changes automatically; never edit a jar inside a
   trained image, rebuild it. Training opens a window: agents ask the user before `packageDist`, `trainAotCache` or
   `-Pjasper.aot=true`.
+- **Jasper's launcher.** `packageApp` builds the image with Jasper's own build of jpackage's launcher
+  (`gradle/launcher.gradle`, [packaging/launcher](../packaging/launcher/README.md)), which merges the user's
+  `jasper.vmoptions` over these options. A JBR update means re-vendoring its launcher sources and re-applying the
+  hook lines; `verifyLauncherSources`, `testLauncherCore`, `testLauncherGuard` and `verifyLauncherImage` (all in
+  `check`) show what changed.
+- **Bundled JVM defaults.** `-Xmx2048m` and `-XX:+IgnoreUnrecognizedVMOptions` are in `applicationDefaultJvmArgs`; a
+  user's `jasper.vmoptions` overrides them. AOT training and the start-up benchmark's isolated home give the launcher
+  an empty options file, so a developer's own flags never shape the cache or the numbers.
 
 ## Session lifecycle change
 
@@ -311,6 +319,22 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 ```sh
 ./gradlew :jasper-app:test --tests "*SessionLaunchCoordinatorTest" --tests "*ApplicationShutdownTest" --tests "*JasperApplicationShutdownTest" --tests "*ShellLauncherTest"
 ```
+
+## Cutting a release
+
+Tag the release commit `vX.Y.Z` (no leading zeroes, major 1–255) on a clean tree and package from it: `packageDist`
+takes the version from the tag, and About shows "Jasper" and "X.Y.Z" on separate lines without the Development build
+chip (only Copy and error reports say "Jasper X.Y.Z"). Any other commit, or a tree with changes or untracked files, is a
+development build named after the latest release tag at or behind it.
+`gradle/build-info.gradle` records the git facts in the jar and `BuildInfo` derives the labels.
+
+## Adding or bumping a dependency
+
+Every external jar Jasper or a bundled plugin ships needs its exact `group:artifact:version` in a component of
+`jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml`, with its license text (and its NOTICE, when
+the project publishes one) beside it; `verifyThirdPartyNotices` (part of `check`) names any jar without one and any
+entry that no longer ships. Read the new version's license before updating the entry, and look inside the jar for bundled
+native binaries (DLLs, executables, shared libraries): their own licenses need components too.
 
 ## Review checklist
 
@@ -503,9 +527,11 @@ these defaults; upstream theme assets should not be edited to duplicate them.
 
 
 Workspace rounding belongs to `ToolWindowArea.Host`: 8px-radius tool window frames and,
-while the stripes are visible, matching rounded corners for the terminal/tab column. With
-the stripes hidden or empty, the terminal/tab column has square corners, no exterior
-gutters and no lower corner spacer: it fills the available workspace edge to edge.
+while a stripe is visible, matching rounded corners for the terminal/tab column, square on
+the side of a hidden stripe, where the column meets the window edge borderless. Each stripe
+shows only while it is not empty (`WindowContent.syncRailVisibility`). With both stripes
+hidden, the terminal/tab column has square corners, no exterior gutters and no lower corner
+spacer: it fills the available workspace edge to edge.
 Where frames go is `DockGeometry`'s job, never the area's: change the geometry and its
 tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree, with one exception
 on purpose: the guide for a second slot (Left Bottom, Right Bottom, Bottom Right) is always that slot's half, as if its
@@ -516,7 +542,9 @@ bottom edges (each distance a share of the workspace's own width or height, so t
 at any aspect ratio), a side split into its top and bottom slot at half of the side panels' visible height
 (`DockDrag.sideSplit`: above the bottom area while it shows, else the workspace's half) and the bottom at half
 its width; a side wins a tie. `DockDrag` previews no area for a stripe drop of a hidden window, which stays
-hidden. Change the zones in the resolver and its tests first; the window tests aim with
+hidden. While the rails are enabled, an empty hidden stripe still takes drops: `DockDrag.standAtEdge` gives it
+bounds over the workspace's edge for the drag without showing it, and `DockDrag.areaAfter` lays the guide out for
+the stripes that show or hide after the drop, so it follows `syncRailVisibility`'s rule. Change the zones in the resolver and its tests first; the window tests aim with
 `DockTestSupport.zone(workspace, slot)`.
 Dock drags use plain mouse events (`DockDrag`), never AWT drag and drop. Drag sources are the
 components `DockDrag.install` was given: stripe window buttons (`ToolStripe.dragSource`) and
@@ -535,11 +563,11 @@ column non-opaque: otherwise Swing considers partial tab repaints fully obscured
 skips the host background, leaving square corner pixels behind the clipped children.
 Corner regressions must exercise clipped `paint` calls as well as full-window previews.
 Exterior gutters are 6px, except
-beside the visible stripes: each stripe supplies its own balanced spacing, so the adjacent
-frames and the terminal column have no additional side gutter. Hiding or emptying the
-stripes restores that gutter on tool window frames without reparenting their content.
-The following gutter and lower-inset rules apply to the terminal column only while
-the stripes are visible. A visible status bar
+beside a visible stripe: each stripe supplies its own balanced spacing, so the adjacent
+frames and the terminal column have no additional side gutter. On a side whose stripe is
+hidden, tool window frames get that gutter back without reparenting their content, and the
+terminal column has none. The following gutter and lower-inset rules apply to the terminal
+column only while a stripe is visible. A visible status bar
 likewise supplies the lower spacing: exterior bottom gutters are omitted so the status
 contents stay visually centered between the surfaces and window bottom. Hiding the
 status bar restores the 6px bottom gutter. A visible toolbar or unified native header

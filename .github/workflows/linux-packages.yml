@@ -8,18 +8,20 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Package version (X.Y.Z)
-        default: 1.0.0
+        description: Package version (X.Y.Z); leave empty to take it from the commit's release tag
+        required: false
   push:
     paths:
       - gradle/packaging.gradle
       - gradle/packaging-support.gradle
+      - gradle/launcher.gradle
       - packaging/**
       - .github/workflows/linux-packages.yml
   pull_request:
     paths:
       - gradle/packaging.gradle
       - gradle/packaging-support.gradle
+      - gradle/launcher.gradle
       - packaging/**
       - .github/workflows/linux-packages.yml
 
@@ -36,11 +38,14 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
+      # The package version comes from the release tag, so the whole history and its tags are needed.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils
+          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils g++
       - uses: actions/setup-java@v6
         with:
           distribution: jetbrains
@@ -48,8 +53,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Package
         env:
-          JASPER_VERSION: ${{ inputs.version || '1.0.0' }}
-        run: ./gradlew :jasper-app:packageDist "-PjasperVersion=$JASPER_VERSION" --continue --stacktrace
+          JASPER_VERSION: ${{ inputs.version }}
+        run: ./gradlew :jasper-app:packageDist ${JASPER_VERSION:+"-PjasperVersion=$JASPER_VERSION"} --continue --stacktrace
       - uses: actions/upload-artifact@v7
         with:
           name: jasper-linux-${{ matrix.arch }}

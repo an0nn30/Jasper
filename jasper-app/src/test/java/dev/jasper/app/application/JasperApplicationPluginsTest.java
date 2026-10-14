@@ -143,9 +143,11 @@ class JasperApplicationPluginsTest {
                 assertThat(section.entries()).containsExactly(new MenuEntry.Item("plugins.manage"));
             });
             assertThat(application[0].contributions().action("app.shortcuts")).isPresent();
+            assertThat(application[0].contributions().action(AboutWindows.ABOUT)).get()
+                .satisfies(action -> assertThat(action.title()).isEqualTo("About Jasper"));
             assertThat(application[0].contributions().menus()).anySatisfy(section -> {
                 assertThat(section.target().title()).isEqualTo("Help");
-                assertThat(section.entries()).contains(new MenuEntry.Item("app.shortcuts"));
+                assertThat(section.entries()).isEqualTo(AboutWindows.helpEntries(System.getProperty("os.name").startsWith("Mac")));
             });
             assertThat(application[0].bindingProblems()).isEmpty();
         });

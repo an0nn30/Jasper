@@ -1,0 +1,117 @@
+import java.util.concurrent.TimeUnit
+
+// The commit jasper-app.jar is built from, as raw git facts in dev/jasper/app/build-info.properties. BuildInfo
+// (dev.jasper.app.platform) derives the release and development labels from them; gradle/packaging.gradle derives the
+// package version. gradle/build-info-test.gradle checks these helpers with fixtures (verifyBuildInfoSupport, part of check).
+
+// Overrides a child process's environment: a null value removes the variable.
+ext.applyEnvironment = { ProcessBuilder builder, Map<String, String> environment ->
+    environment.each { String name, String value ->
+        if (value == null) builder.environment().remove(name) else builder.environment().put(name, value)
+    }
+}
+
+// The six facts, each command's output trimmed, or '' when git is missing, fails or this is no repository. Only a
+// repository whose top level is directory itself counts: a source tree unpacked inside another checkout has no facts of
+// its own, so git may not look above directory. A developer's own settings must not change the output, so signatures
+// and colour are off; stderr is discarded. environment overrides the child's (a null value removes a variable).
+ext.gitFacts = { File directory, Map<String, String> environment = [:] ->
+    File parent = directory.absoluteFile.parentFile
+    def git = { List<String> arguments ->
+        try {
+            def builder = new ProcessBuilder(['git', '-c', 'log.showSignature=false', '-c', 'color.ui=never'] + arguments)
+                .directory(directory).redirectError(ProcessBuilder.Redirect.DISCARD)
+            applyEnvironment(builder, environment)
+            if (parent != null) {
+                // git stops looking for a repository at a ceiling folder; the folder it starts in is never excluded.
+                String ceilings = builder.environment().get('GIT_CEILING_DIRECTORIES')
+                builder.environment().put('GIT_CEILING_DIRECTORIES',
+                    ceilings ? ceilings + File.pathSeparator + parent.absolutePath : parent.absolutePath)
+            }
+            def process = builder.start()
+            process.outputStream.close()
+            String output = process.inputStream.getText('UTF-8')
+            if (!process.waitFor(30, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                return ''
+            }
+            process.exitValue() == 0 ? output.trim() : ''
+        } catch (IOException ignored) {
+            ''
+        }
+    }
+    String commit = git(['rev-parse', 'HEAD'])
+    if (!(commit ==~ /[0-9a-f]{40}([0-9a-f]{24})?/))
+        return [commit: '', branch: '', commitDate: '', dirty: 'false', headTags: '', describe: '']
+    [commit    : commit,
+     branch    : git(['rev-parse', '--abbrev-ref', 'HEAD']),
+     commitDate: git(['log', '-1', '--format=%cI', 'HEAD']),
+     // Untracked files count whatever status.showUntrackedFiles says, and a build never takes index.lock.
+     dirty     : String.valueOf(!git(['--no-optional-locks', 'status', '--porcelain', '--untracked-files=normal']).isEmpty()),
+     headTags  : git(['tag', '--points-at', 'HEAD']).readLines()*.trim().findAll { !it.isEmpty() }.sort().join(' '),
+     describe  : git(['describe', '--tags', '--long', '--match', 'v[0-9]*.[0-9]*.[0-9]*', '--exclude', 'v*[!0-9.]*', 'HEAD'])]
+}
+
+// A release tag is vX.Y.Z without leading zeroes; other tags are ignored.
+ext.releaseVersions = { String tags ->
+    tags.split(/\s+/).findAll { it ==~ /v(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})/ }.collect { it.substring(1) }
+}
+
+// The highest X.Y.Z by number (1.10.0 above 1.2.0), or null for none.
+ext.highestVersion = { List<String> versions ->
+    Comparator<String> numeric = { String a, String b ->
+        List<Integer> x = a.tokenize('.').collect { it as int }
+        List<Integer> y = b.tokenize('.').collect { it as int }
+        for (int i = 0; i < 3; i++) if (x[i] != y[i]) return x[i] <=> y[i]
+        0
+    } as Comparator<String>
+    versions.isEmpty() ? null : versions.max(numeric)
+}
+
+// git describe's "v1.2.0-14-g8ba67ed3": the version and the commits since it, or null.
+ext.describedVersion = { String describe ->
+    def match = describe =~ /^v((?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8}))-([0-9]{1,9})-g[0-9a-f]+$/
+    match.matches() ? [version: match.group(1), commits: Integer.parseInt(match.group(2))] : null
+}
+
+// -PjasperVersion, else the release tag on HEAD (dirty or not), else the latest release tag behind HEAD, else 1.0.0.
+// A -PjasperVersion that disagrees with HEAD's release tag fails.
+ext.packageVersion = { String requested, Map<String, String> facts ->
+    String tagged = highestVersion(releaseVersions(facts.headTags ?: ''))
+    if (requested) {
+        if (tagged != null && requested != tagged)
+            throw new GradleException("-PjasperVersion=${requested} differs from this commit's release tag v${tagged}")
+        return requested
+    }
+    if (tagged != null) return tagged
+    def described = describedVersion(facts.describe ?: '')
+    described != null ? described.version : '1.0.0'
+}
+
+// The resource: the six facts in a fixed order, so the same tree writes the same bytes (no build time).
+ext.buildInfoText = { Map<String, String> facts ->
+    '# Written by :jasper-app:buildInfo (gradle/build-info.gradle).\n' +
+        ['commit', 'branch', 'commitDate', 'dirty', 'headTags', 'describe'].collect { String key ->
+            "${key}=${(facts[key] ?: '').replace('\\', '\\\\')}".toString()
+        }.join('\n') + '\n'
+}
+
+def computedFacts = null
+ext.buildFacts = providers.provider { computedFacts == null ? (computedFacts = gitFacts(rootProject.projectDir)) : computedFacts }
+def buildInfoDirectory = layout.buildDirectory.dir('generated/build-info')
+def buildInfo = tasks.register('buildInfo') {
+    group = 'build'
+    description = 'Records the git commit Jasper is built from in dev/jasper/app/build-info.properties.'
+    inputs.property('facts', buildFacts)
+    outputs.dir(buildInfoDirectory)
+    doLast {
+        File file = buildInfoDirectory.get().file('dev/jasper/app/build-info.properties').asFile
+        file.parentFile.mkdirs()
+        file.setText(buildInfoText(buildFacts.get()), 'UTF-8')
+    }
+}
+sourceSets.main.resources.srcDir(buildInfo)
+// A new commit or a dirty tree changes only this file; it must not make Jasper's tests out of date.
+normalization { runtimeClasspath { ignore 'dev/jasper/app/build-info.properties' } }
+
+apply from: rootProject.file('gradle/build-info-test.gradle')
