@@ -1,9 +1,11 @@
 # Jasper's jpackage launcher
 
 Packaged Jasper starts from jpackage's native application launcher. Jasper builds that launcher itself from the
-JetBrains Runtime's sources, with one addition: it merges the user's `jasper.vmoptions` over the bundled JVM options,
-and starts once more without them when the JVM rejects them. The design is the spec
-`docs/superpowers/specs/2026-10-13-jasper-custom-vm-options-design.md`.
+JetBrains Runtime's sources, with two additions: it merges the user's `jasper.vmoptions` over the bundled JVM options
+and decides whether the JVM uses the start-up cache, and it starts `jasper-watch`, which starts Jasper once more
+without the cache or the user's options when the JVM dies before it exists. The designs are the specs
+`docs/superpowers/specs/2026-10-13-jasper-custom-vm-options-design.md` and
+`docs/superpowers/specs/2026-10-14-jasper-startup-recovery-design.md`.
 
 ## Upstream sources
 
@@ -46,32 +48,50 @@ Two upstream files carry Jasper's lines, each marked `JASPER-HOOK` (`launcherHoo
 
 - `share/native/applauncher/AppLauncher.cpp`: `#include "JasperVmOptions.h"`, and in `createJvmLauncher`, just before
   `(*jvm).initFromConfigFile(cfgFile)`, the call `jasper::applyUserVmOptions(cfgFile)`.
-- `share/native/applauncher/JvmLauncherLib.c`: `#include "jasper_launch_guard.h"`, and around the `JLI_Launch` call in
-  `jvmLauncherStartJvm`, `jasperGuardBeforeLaunch(jvmArgs->jliLaunchArgc, jvmArgs->jliLaunchArgv)` before and
-  `jasperGuardAfterLaunch()` after.
+- `share/native/applauncher/JvmLauncherLib.c`: `#include "jasper_watch_launch.h"`, and around the `JLI_Launch` call in
+  `jvmLauncherStartJvm`, `jasperWatchBeforeLaunch(jvmArgs->jliLaunchArgc, jvmArgs->jliLaunchArgv)` before and
+  `jasperWatchAfterLaunch()` after.
 
 On macOS libjli calls the launcher's `main` again on a new thread; that second call also goes through
-`jvmLauncherStartJvm`, so the guard sees `JLI_Launch` return on every platform.
+`jvmLauncherStartJvm`. The watch module acts on the first call only and sees `JLI_Launch` return on the second.
 
 ## Jasper's code
 
 - `jasper/JasperVmOptionsCore.{h,cpp}`: the options file's location, format, IntelliJ's merge, the digest and the skip
-  variable, as pure functions over UTF-8 strings.
-- `jasper/JasperVmOptions.{h,cpp}`: reads the environment and the file with jpackage's helpers and rewrites the cfg's
-  `java-options`; it never throws, and on any error the bundled options stand.
-- `jasper/jasper_launch_guard.{h,c}`: armed when the JVM arguments carry `-Djasper.vmOptionsDigest=`. Its exit handler
-  re-spawns the launcher with `JASPER_VM_OPTIONS_SKIP=launch-failed` when `JLI_Launch` never returned and the loaded
-  libjvm's own `JNI_GetCreatedJavaVMs` reports no JVM; with no libjvm loaded it does nothing. On Windows it also
-  registers with `ucrtbase.dll`'s `_crt_atexit`, because `jli.dll` calls the shared UCRT's `exit()`. HotSpot's own
-  initialization failures end with `_exit` and never reach it. It also removes `JASPER_VM_OPTIONS_SKIP` just before
-  `JLI_Launch`, in the process that starts the JVM. A fallback start (the skip variable set) never arms.
+  variable, and the start-up cache: the remembered failure `<home>/jasper-aot.failed` (its format and matching, with
+  the vectors in `test/aot-record-vectors.txt`), `JASPER_AOT_CACHE_SKIP` and `-version` for a diagnostic launch
+  (`JASPER_LAUNCH_DIAGNOSE`), as pure functions over UTF-8 strings.
+- `jasper/jasper_launch_rules.{h,c}`: what the core and the watch module must agree on: when the cache is in use, and
+  which skip variable the next start adds.
+- `jasper/JasperVmOptions.{h,cpp}`: reads the environment, the options file, the record and the cache file's size and
+  modification time with jpackage's helpers and rewrites the cfg's `java-options`; it never throws, and on any error
+  the bundled options stand.
+- `jasper/jasper_watch_launch.{h,c}`: the watch module, in the process that starts the JVM. Before the first
+  `JLI_Launch`, unless `JASPER_LAUNCH_DIAGNOSE` is set, it starts `jasper-watch` from beside the launcher with the read
+  end of a pipe and the next start: `JASPER_AOT_CACHE_SKIP=launch-failed` while the cache is in use, else
+  `JASPER_VM_OPTIONS_SKIP=launch-failed` while the user's options apply, else a report. It writes one byte once the
+  loaded libjvm's own `JNI_GetCreatedJavaVMs` reports a VM (asked every 10 ms), when `JLI_Launch` returns with a libjvm
+  loaded, or from an exit handler that finds a VM (on Windows also registered with `ucrtbase.dll`'s `_crt_atexit`,
+  because `jli.dll` calls the shared UCRT's `exit()`). It removes `JASPER_VM_OPTIONS_SKIP`, `JASPER_AOT_CACHE_SKIP` and
+  `JASPER_LAUNCH_DIAGNOSE` just before `JLI_Launch`. Without `jasper-watch`, or when it cannot start, the launch goes
+  on unwatched.
+- `jasper/jasper_watch.c`: `jasper-watch <pipe> retry|report <launcher> [<argument>...]`. After the byte it exits. At
+  end of file without it, `retry` starts the launcher once more with the original arguments and the next start's
+  environment, and `report` runs it once more with `JASPER_LAUNCH_DIAGNOSE=1` for up to 10 seconds and shows "Jasper
+  could not start" with Java's last 1,500 characters (macOS `CFUserNotificationDisplayAlert`, Windows `MessageBoxW`,
+  Linux standard error), or writes the text to the file `JASPER_WATCH_REPORT` names. On Windows a launcher that Ctrl-C
+  ended is left alone.
+
+Setting `JASPER_VM_OPTIONS_SKIP` or `JASPER_AOT_CACHE_SKIP` by hand starts Jasper without the user's options or without
+its start-up cache.
 
 ## Build
 
 `buildLauncher` (`gradle/launcher.gradle`) compiles the launcher for the host with the flags of the JDK's
 `make/modules/jdk.jpackage/Lib.gmk`: C++14 and C11, `-O2` (MSVC `/O1`), the JDK's defines, hidden visibility, and on
-Windows the static CRT. Upstream files compile at the JDK's warning level; the core and the guard with warnings as
-errors. Outputs go to `build/launcher/resources/jdk/jpackage/internal/resources/`, where
+Windows the static CRT. Upstream files compile at the JDK's warning level; Jasper's own files except
+`JasperVmOptions.cpp` with warnings as errors. Outputs go to
+`build/launcher/resources/jdk/jpackage/internal/resources/`, where
 `jpackage -J--patch-module=jdk.jpackage=build/launcher/resources` takes them instead of its own:
 
 | Host | Compiler | Outputs |
@@ -80,18 +100,31 @@ errors. Outputs go to `build/launcher/resources/jdk/jpackage/internal/resources/
 | Linux | `gcc` and `g++`; the library links libstdc++ and libgcc statically | `jpackageapplauncher`, `libjpackageapplauncheraux.so` |
 | Windows | MSVC from `vswhere` and `vcvarsall.bat`, with `version.rc` and `java.manifest` embedded | `jpackageapplauncher.exe`, `jpackageapplauncherw.exe` |
 
+`buildWatcher` builds `jasper-watch` the same way (C11, warnings as errors; macOS links CoreFoundation, Windows
+`user32`) into `build/launcher/watch/`. Packaging puts it beside the launcher: `Contents/MacOS/jasper-watch`,
+`jasper-watch.exe` beside `Jasper.exe`, `bin/jasper-watch` beside `bin/Jasper`.
+
 ## Tests
 
 All in `check`, on every OS:
 
 - `verifyLauncherSources`: `upstream/` against `SHA256SUMS` and the hooked-file list.
-- `testLauncherCore`: native tests of the core (`test/vmoptions_core_test.cpp`), including the digest vectors in
-  `test/digest-vectors.txt`, which the application's tests read too.
-- `testLauncherGuard`: `test/guard_harness.c` arms the guard and runs the toolchain JDK's real `JLI_Launch` with
-  `test/GuardProbe.java`. A malformed `-Xmx` and conflicting collectors re-spawn; `System.exit`, a normal return, a
-  throwing `main`, an unarmed launch, a launch that fails before any libjvm loads and a fallback start (the skip
-  variable set) do not.
+- `testLauncherCore`: native tests of the core and the shared rules (`test/vmoptions_core_test.cpp`), including the
+  digest vectors in `test/digest-vectors.txt` and the remembered-failure vectors in `test/aot-record-vectors.txt`, which
+  the application's tests read too.
+- `testWatcher`: `test/watch_fake_launcher.c` starts the real `jasper-watch` through the watch module and ends after
+  sending the byte, by `exit`, `_exit`, `SIGKILL` or (Windows) Ctrl-C before it, or in report mode; the watcher's
+  retries and diagnostic launches record what they received.
+- `testLauncherWatch`: `test/watch_harness.c` runs the toolchain JDK's real `JLI_Launch` between the watch module's
+  hooks, with `jasper-watch` beside it, and `test/WatchProbe.java`. A malformed `-Xmx`, conflicting collectors, `-Xms`
+  above `-Xmx` and a missing libjvm start once more with the right skip variables; `System.exit`, a normal return and a
+  throwing `main`, with and without the polling thread, do not; a start with nothing left to skip reports Java's
+  message; a diagnostic launch and a launch without a usable watcher start nothing more.
 - `verifyLauncherImage`: packages `test/LauncherProbe.java` with Jasper's launcher (`jpackage
-  -J--patch-module=jdk.jpackage=…`) and checks the location rules, the merge order and filters, a corrupted file, the
-  skip variable, an ignored line without a dash, the fallback start with the arguments intact, a directory in the
-  file's place, a home with a space and a non-ASCII home. On Windows it also checks the windowed launcher.
+  -J--patch-module=jdk.jpackage=…`) and `jasper-watch` and checks the location rules, the merge order and filters, a
+  corrupted file, the skip variable, an ignored line without a dash, the fallback start with the arguments intact for
+  options that end with `exit` and with `_exit`, a launch without the watcher, a relative launcher path, a directory in
+  the file's place, a home with a space and a non-ASCII home, an image that cannot start (the watcher's report), a
+  diagnostic launch, the start-up cache's record and skip variable, and a cache that kills the JVM: `test/sealedprobe`
+  trained into a cache in one directory and run from a copy once that directory is gone, which fails while JBR has
+  JDK-8376576 and needs another such cache once it does not. On Windows it also checks the windowed launcher.

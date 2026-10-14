@@ -53,10 +53,10 @@ skipped; a line that does not start with `-`, or that names one of the `java` la
 `-version` or `-cp`), is ignored. `JASPER_VM_OPTIONS=<file>` reads another file instead. Changes take effect at the next
 launch.
 
-If the JVM rejects the options (a malformed value such as `-Xmx3q`, or conflicting garbage collectors), Jasper starts
-once more without them. Failures inside the JVM's own start-up (`-Xms` above `-Xmx`, a missing agent, a module that
-cannot be resolved) stop it instead; setting `JASPER_VM_OPTIONS_SKIP=1` in the environment starts Jasper without the
-file so you can fix it. `./gradlew :jasper-app:run` does not read the file.
+If the JVM cannot start with the options (a malformed value such as `-Xmx3q`, conflicting garbage collectors, `-Xms`
+above `-Xmx`), Jasper starts once more without them, and when it cannot start at all, a dialog shows what Java
+reported. Setting `JASPER_VM_OPTIONS_SKIP=1` in the environment starts Jasper without the file so you can fix it, and
+`JASPER_AOT_CACHE_SKIP=1` without its start-up cache. `./gradlew :jasper-app:run` does not read the file.
 
 In the installed app, System Settings → Java Virtual Machine sets the maximum heap size (it edits the file's `-Xmx` line;
 the bundled 2048 MiB removes it) and opens the file with **Edit Custom VM Options…**; Help → **Change Memory

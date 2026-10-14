@@ -1,5 +1,22 @@
 # Jasper — Status and Handoff
 
+**Start-up recovery plan 2 (the watcher) complete — 2026-10-14.** On `claude/startup-recovery` (not pushed): Jasper's
+launcher starts `jasper-watch` beside itself before the JVM and sends it one byte once the JVM exists. When the JVM dies
+first (`exit`, `_exit` or a signal), the watcher starts Jasper once more without the start-up cache
+(`JASPER_AOT_CACHE_SKIP=launch-failed`), then without the custom VM options, and at last shows "Jasper could not start"
+with Java's message ([plan](superpowers/plans/2026-10-14-jasper-startup-recovery-2-watcher.md),
+[spec](superpowers/specs/2026-10-14-jasper-startup-recovery-design.md) sections 4, 5 and 7). The cfg hook names
+`<home>/jasper-aot.failed` (`-Djasper.aotCacheRecord`), skips the cache for `JASPER_AOT_CACHE_SKIP` or a matching record
+(`-Djasper.aotCacheSkipped`) and appends `-version` for `JASPER_LAUNCH_DIAGNOSE`; the `atexit` guard is gone.
+`packaging/launcher/test/aot-record-vectors.txt` is shared with plan 3. Deviations: the ten in the plan, and three made
+while executing: `testWatcher` and `testLauncherWatch` wait for a retry or report only in scenarios that start one (the
+planned loops ran to the deadline in every negative scenario); the two unwatched `testLauncherWatch` scenarios have the
+JVM reject its options, so they fail unless the launch goes ahead; the image test's `remember` closure takes `Long size`
+(Groovy 4.0.32). Full `./gradlew check --continue`: 10,165 tests, 0 failures, 12 skips (4 minutes 25 seconds, most test
+tasks up to date; the launcher's `verifyLauncherSources`, `testLauncherCore` (151 checks), `testWatcher`,
+`testLauncherWatch` and `verifyLauncherImage` re-run with `--rerun`, all passing). Manual checks pending (the user): the
+hand-off checks in the plan. Plan 3 (the application) is next.
+
 **Start-up recovery plan 1 (the shipped cache) complete — 2026-10-14** (`claude/startup-recovery`, worktree
 `.claude/worktrees/startup-recovery`; spec `docs/superpowers/specs/2026-10-14-jasper-startup-recovery-design.md`).
 The installed Jasper.app would not start ("sealing violation: can't seal package com.jetbrains"): JBR 25 gives

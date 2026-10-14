@@ -2,7 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: **Not started.** Written 2026-10-14 on `claude/startup-recovery` (spec approved by the user the same day; match
+Status: **Complete on 2026-10-14.** Beyond the ten deviations below: (11) `testWatcher` and `testLauncherWatch` wait for
+the watcher's retry or report only in scenarios that start one, and settle for 3 seconds in the others (the planned
+loops ran to the deadline in every negative scenario); (12) the `watcher not executable` and `no watcher` scenarios of
+`testLauncherWatch` have the JVM reject its options, so they fail unless the launch goes ahead; (13) the image test's
+`remember` closure takes `Long size` (Groovy 4.0.32 rejects two primitive `long` parameters in a closure). Written 2026-10-14 on `claude/startup-recovery` (spec approved by the user the same day; match
 rule and parsing amended by the lead the same day, commit `50d5f583`). Plan 2 of 3: plan 1 (the shipped cache) comes
 first on this branch, plan 3 (the application) after; plan 3 reads this plan's vectors file and properties.
 
