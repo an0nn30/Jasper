@@ -1,5 +1,6 @@
 package dev.jasper.app.application;
 
+import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.StatusEntry;
 import dev.jasper.app.vmoptions.HeapReading;
@@ -20,6 +21,7 @@ final class MemoryIndicator implements AutoCloseable {
     static final String COLLECT = "app.memory.gc";
     static final Duration INTERVAL = Duration.ofSeconds(3);
 
+    private final ActionEntry collectAction;
     private final StatusEntry entry;
     private final Supplier<HeapReading> readings;
     private final Runnable collect;
@@ -27,6 +29,7 @@ final class MemoryIndicator implements AutoCloseable {
     private boolean shown;
     private int windows;
     private Runnable stop;
+    private boolean closed;
 
     /**
      * @param contributions where the entry and its action live
@@ -39,7 +42,7 @@ final class MemoryIndicator implements AutoCloseable {
         this.readings = Objects.requireNonNull(readings, "readings");
         this.collect = Objects.requireNonNull(collect, "collect");
         this.every = Objects.requireNonNull(every, "every");
-        contributions.addAction(COLLECT, "Run Garbage Collection", null,
+        collectAction = contributions.addAction(COLLECT, "Run Garbage Collection", null,
             List.of("memory", "heap", "gc", "garbage collection", "free memory"), Optional.empty(), invocation -> collectNow());
         entry = contributions.addStatus(STATUS_ID, false, Integer.MAX_VALUE);
         entry.setActionId(COLLECT);
@@ -48,25 +51,32 @@ final class MemoryIndicator implements AutoCloseable {
 
     /** Shows or hides the indicator: {@code window.memory_indicator} while the status bar shows. */
     void show(boolean value) {
+        if (closed) return;
         shown = value;
         update();
     }
 
     /** How many windows are open; without one the timer stops. */
     void windows(int count) {
+        if (closed) return;
         windows = count;
         update();
     }
 
-    /** Runs garbage collection, then reads the heap again. */
+    /** Runs garbage collection; the heap is read again only while the indicator is shown. */
     void collectNow() {
+        if (closed) return;
         collect.run();
-        refresh();
+        if (shown) refresh();
     }
 
+    /** Stops the timer and removes the entry and the click action; later calls do nothing. */
     @Override public void close() {
+        if (closed) return;
+        closed = true;
         stopTimer();
         entry.close();
+        collectAction.close();
     }
 
     /** Swing's repeating timer, as a plain function: start a task at an interval, get back the way to stop it. */
@@ -96,6 +106,7 @@ final class MemoryIndicator implements AutoCloseable {
     }
 
     private void refresh() {
+        if (closed) return;
         HeapReading reading = readings.get();
         entry.setText(reading.label());
         entry.setTooltip(reading.tooltip());

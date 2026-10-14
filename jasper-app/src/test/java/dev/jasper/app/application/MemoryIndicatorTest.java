@@ -26,10 +26,16 @@ class MemoryIndicatorTest {
     private final List<Duration> intervals = new ArrayList<>();
     private int stops;
     private int collections;
+    private int reads;
 
     private MemoryIndicator indicator() {
-        return new MemoryIndicator(contributions, () -> readings.size() > 1 ? readings.removeFirst() : readings.getFirst(),
+        return new MemoryIndicator(contributions, this::read,
             () -> collections++, (interval, task) -> { intervals.add(interval); timers.add(task); return () -> stops++; });
+    }
+
+    private HeapReading read() {
+        reads++;
+        return readings.size() > 1 ? readings.removeFirst() : readings.getFirst();
     }
 
     private StatusEntry entry() {
@@ -85,6 +91,15 @@ class MemoryIndicatorTest {
         assertThat(entry().text()).isEqualTo("400 of 2048M");
     }
 
+    @Test void aCollectionWhileHiddenRunsGarbageCollectionAndReadsNoHeap() {
+        indicator();
+        contributions.action(MemoryIndicator.COLLECT).orElseThrow().invoke(new Contributions.Invocation(UUID.randomUUID(), Optional.empty()));
+        assertThat(collections).isEqualTo(1);
+        assertThat(reads).as("a hidden indicator reads no heap").isZero();
+        assertThat(entry().text()).isEmpty();
+        assertThat(entry().visible()).isFalse();
+    }
+
     @Test void closeStopsTheTimerAndRemovesTheEntry() {
         var indicator = indicator();
         indicator.show(true);
@@ -92,5 +107,18 @@ class MemoryIndicatorTest {
         indicator.close();
         assertThat(stops).isEqualTo(1);
         assertThat(contributions.status()).noneMatch(entry -> entry.id().equals(MemoryIndicator.STATUS_ID));
+        assertThat(contributions.action(MemoryIndicator.COLLECT)).as("the click action goes with the entry").isEmpty();
+        int readsAtClose = reads;
+        indicator.show(true);
+        indicator.windows(1);
+        indicator.collectNow();
+        assertThat(timers).as("a closed indicator starts no timer").hasSize(1);
+        assertThat(stops).isEqualTo(1);
+        assertThat(collections).as("a closed indicator collects nothing").isZero();
+        assertThat(reads).as("a closed indicator reads no heap").isEqualTo(readsAtClose);
+        indicator.close();
+        assertThat(stops).as("closing twice stops once").isEqualTo(1);
+        indicator();
+        assertThat(contributions.action(MemoryIndicator.COLLECT)).as("a new indicator registers again").isPresent();
     }
 }
