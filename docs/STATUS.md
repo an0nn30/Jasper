@@ -6,21 +6,25 @@
 chooses the Jasper Editor (the default), an installed editor (Neovim, Vim, vi, nano, micro, Helix, Emacs, VS Code,
 Cursor, Zed, Sublime Text, BBEdit, TextMate, IntelliJ IDEA, Notepad++, Notepad: found on `PATH`, in Homebrew's folder,
 `/usr/local/bin` and `~/.local/bin`, and inside macOS apps), a custom command or the system's default app. Jasper's
-local shells and program tabs get `EDITOR` and `VISUAL` for it (the Jasper Editor's are `<jasper command> editor
---wait`) unless Jasper's own environment has either and `keep_environment_editor` is on; `config.toml`, plugin settings
+local shells and program tabs get `EDITOR` for it (the Jasper Editor's is `<jasper command> editor --wait`), and
+`VISUAL` only to replace one Jasper was started with, unless Jasper's own environment has either and
+`keep_environment_editor` is on; `config.toml`, plugin settings
 files, the VM options file and every plugin's Open in Editor open in it on the UI thread, with the desktop as the
 fallback. Terminal editors run in a program tab that closes on a clean exit; app editors start on their
 own. SDK 0.17.1: `Terminals.environment` (`terminal.environment`), `Platform.editor` with `FileEditor`
 (`editor.provide`), `LocalSpec.command` (`LocalSpec.running`) and `CommandLine.client()`; Editor 0.9.0 requires
 `>=0.17.1, <0.18`, the other bundled plugins keep `>=0.17.0`. The Editor's settings page is its own
 (`EditorSettingsPanel`); plugin pages' standard rows now give `EditorHint.font` the font picker and `EditorHint.file` a
-path with Browse…, as the generated page does (app and testkit), so its Font row is unchanged. Deviations: the thirteen in the plan's Planned deviations. During execution, the Windows custom command became `cmd.exe /d /s /c "<line>"`, so a quoted program path keeps its quotes. `./gradlew check
---continue`: **10,218 tests, 0 failures, 0 errors, 12 skipped**. No GUI launched. GUI checks for
+path with Browse…, as the generated page does (app and testkit), so its Font row is unchanged. Deviations: the thirteen in the plan's Planned deviations. During execution, the Windows custom command became `cmd.exe /d /s /c "<line>"`, so a quoted program path keeps its quotes; after the final review, the Editor sets `EDITOR` always and `VISUAL` only to replace one Jasper was started with, so a startup-file export of `EDITOR` still wins, and custom commands also find programs in Homebrew's folder, `/usr/local/bin` and `~/.local/bin`, and a detached one that fails posts a notification. `./gradlew check
+--continue`: **10,232 tests, 0 failures, 0 errors, 12 skipped**. No GUI launched. GUI checks for
 the user, in the packaged app: `git commit` in a Jasper tab opens the Jasper Editor and returns when its tab closes;
 choose Neovim and `git commit` again (a tab running nvim), then Visual Studio Code (VS Code opens, git waits); System
 Settings › Open in Editor for `config.toml`, with the Jasper Editor and with a terminal editor chosen; and the Editor's
 page after starting Jasper from iTerm with `EDITOR=vim` (the notice, and new shells keeping vim until the setting is
-off). Not merged or pushed. Plan 3 (Cmd-click file paths) is next.
+off); with `export EDITOR=vim` in `~/.zshrc` and Jasper started from the Dock, `git commit` in a Jasper tab opens vim;
+a custom `subl -w` with `custom_in_terminal` off, Jasper started from the Dock, opens Sublime Text; and nvim opened
+from Open in Editor, checking whether its `:!` commands find Homebrew's tools (a known limit: terminal editors keep
+Jasper's own `PATH`). Not merged or pushed. Plan 3 (Cmd-click file paths) is next.
 
 **The jasper command (command line plan 1) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),

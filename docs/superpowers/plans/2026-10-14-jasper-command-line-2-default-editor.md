@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: **Complete on 2026-10-14** (written 2026-10-14 on `claude/default-editor`, from `main` at `af590a97`, plan 1 merged). Execution deviations: (1) on Windows a custom command runs as `cmd.exe /d /s /c "<line>"`, so a quoted program path keeps its quotes (Task 7).
+Status: **Complete on 2026-10-14** (written 2026-10-14 on `claude/default-editor`, from `main` at `af590a97`, plan 1 merged). Execution deviations: (1) on Windows a custom command runs as `cmd.exe /d /s /c "<line>"`, so a quoted program path keeps its quotes (Task 7); (2) the Editor sets EDITOR always and VISUAL only to replace one Jasper was started with, so a startup-file export of EDITOR still wins (final review); (3) custom commands also find programs in Homebrew's folder, /usr/local/bin and ~/.local/bin, and a detached one that fails posts a notification (final review).
 
 **Goal:** Users pick a default editor on the Editor's settings page — the Jasper Editor (the default), an editor
 installed on the machine, a custom command, or the system's — and Jasper's shells get `EDITOR`/`VISUAL` for it, while
