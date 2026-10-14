@@ -20,9 +20,8 @@ names nobody else owns, so `jasper <name>` says it is unavailable (exit 1) rathe
 lists only active plugins; only Linux gives the "not on your PATH" hint after Install; the palette's Uninstall acts only
 when the command is installed; a dangling `jasper` link counts as Jasper's own only when its target ends with
 `Resources/bin/jasper` or `lib/bin/jasper`, any other asking first; `jasper editor` also completes when a tab closes
-while its file is still loading. `./gradlew check --continue`: **9,917 tests, 0 failures, 0 errors, 11 skipped** (its
-first run failed only `ThemeMigrationCoverageTest`, whose ledger lacked rows for the Editor's `EditorArguments` and
-`EditorCommand`; added in 0a23e1e5). No GUI launched. GUI checks for the user: in a dev run's
+while its file is still loading. `./gradlew check --continue`: **9,917 tests, 0 failures, 0 errors, 11 skipped**.
+No GUI launched. GUI checks for the user: in a dev run's
 shell, `jasper-app/build/cli/bin/jasper editor --wait notes.txt` and Ctrl-C; on the packaged macOS app, Install (the
 administrator prompt), then from iTerm `jasper editor --wait notes.txt`, `git config --global core.editor "jasper editor
 --wait"` and `git commit`, with Jasper resident, not resident and not running, `jasper` alone, and `jasper --help`; on
