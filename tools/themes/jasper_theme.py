@@ -780,9 +780,9 @@ def _onaccent(v, dark, ansi):
 
 
 MAPPING = [
-    ("text.primary", ["Label.foreground"], lambda v, dark, ansi: parse_hex("#BBBBBB" if dark else "#000000")),
     ("surface.panel", ["ToolWindow.background", "Panel.background"],
      lambda v, dark, ansi: parse_hex("#3C3F41" if dark else "#F2F2F2")),
+    ("text.primary", ["Label.foreground"], lambda v, dark, ansi: parse_hex("#BBBBBB" if dark else "#000000")),
     ("surface.app", ["StatusBar.background", "MainToolbar.background", "Panel.background"],
      lambda v, dark, ansi: v["surface.panel"]),
     ("hover.overlay", [], lambda v, dark, ansi: WHITE if dark else BLACK),
@@ -935,7 +935,8 @@ def themes_in(path: pathlib.Path) -> tuple[list[ThemeFile], pathlib.Path | None]
     return [ThemeFile(str(data.get("name", path.stem)), path.name, data, loose)], path.parent
 
 
-def convert(path: pathlib.Path, args) -> list[Result]:
+def convert(path: pathlib.Path, args, problems: list[str]) -> list[Result]:
+    """The input's themes; a theme of a plugin that cannot be converted is added to ``problems`` and the others are kept."""
     suffix = path.suffix.lower()
     if suffix == ".toml":
         return [convert_alacritty(path, args.name)]
@@ -948,20 +949,27 @@ def convert(path: pathlib.Path, args) -> list[Result]:
         if not selected:
             raise ConversionError(f"{path.name}: no theme named {', '.join(args.theme)}")
     scheme = pathlib.Path(args.scheme) if args.scheme else None
-    return [convert_intellij_theme(t, themes, args.name, scheme, loose_dir) for t in selected]
+    results = []
+    for theme in selected:
+        try:
+            results.append(convert_intellij_theme(theme, themes, args.name, scheme, loose_dir))
+        except Exception as failure:  # one theme's failure does not stop the plugin's others
+            problems.append(describe(failure, path, theme))
+    return results
 
 
 def reason(failure: OSError) -> str:
     return failure.strerror or str(failure)
 
 
-def describe(failure: Exception, path: pathlib.Path) -> str:
-    """The text after "error: " for an input that failed; a ConversionError already names its file."""
+def describe(failure: Exception, path: pathlib.Path, theme: ThemeFile | None = None) -> str:
+    """The text after "error: " for an input (or one theme of it) that failed; a ConversionError already names its file."""
+    where = theme.where if theme else path.name
     if isinstance(failure, ConversionError):
         return str(failure)
     if isinstance(failure, OSError):
-        return f"{failure.filename or path.name}: {reason(failure)}"
-    return f"{path.name}: internal error: {type(failure).__name__}: {failure}"
+        return f"{failure.filename or where}: {reason(failure)}"
+    return f"{where}: internal error: {type(failure).__name__}: {failure}"
 
 
 def write_theme(target: pathlib.Path, text: str) -> None:
@@ -1046,6 +1054,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--scheme", metavar="FILE", help="the editor scheme for a loose .theme.json")
     parser.add_argument("--verbose", action="store_true", help="print where each UI role came from (IntelliJ themes)")
     args = parser.parse_args(argv)
+    for stream in (sys.stdout, sys.stderr):  # a console that cannot encode a name prints it escaped, not as a traceback
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="backslashreplace")
     paths = [pathlib.Path(name) for name in args.inputs]
     for path in paths:
         if not path.is_file():
@@ -1067,10 +1078,13 @@ def main(argv: list[str] | None = None) -> int:
         return status
     results: list[tuple[str, Result]] = []
     for path in paths:
+        problems: list[str] = []
         try:
-            results.extend((path.name, result) for result in convert(path, args))
+            results.extend((path.name, result) for result in convert(path, args, problems))
         except Exception as failure:  # one input's failure does not stop the others
-            print(f"error: {describe(failure, path)}", file=sys.stderr)
+            problems.append(describe(failure, path))
+        for problem in problems:
+            print(f"error: {problem}", file=sys.stderr)
             status = 1
     if args.name and len(results) > 1:
         parser.error("--name needs exactly one theme; this run converts " + str(len(results)))

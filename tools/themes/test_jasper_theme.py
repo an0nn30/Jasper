@@ -223,6 +223,15 @@ class IntelliJ(unittest.TestCase):
         self.assertEqual(ui["border.menu"], "#616161", "Popup.borderColor is not a colour, so Darcula's is used")
         self.assertEqual(ui["surface.scrim"], "#0000008C", "an opacity role keeps its alpha")
 
+    def test_an_alpha_text_colour_is_laid_over_the_panel(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            path = loose_file(scratch, "Fade.theme.json", json.dumps(
+                {"name": "Fade", "dark": True, "ui": {"Label.foreground": "#FFFFFF80", "ToolWindow.background": "#3C3F41"}}))
+            themes, loose = tool.themes_in(path)
+            ui = tool.convert_intellij_theme(themes[0], themes, None, loose_dir=loose).doc["ui"]["dark"]
+        self.assertEqual(ui["surface.panel"], "#3C3F41")
+        self.assertEqual(ui["text.primary"], "#9E9FA0", "spec 5.3 step 4: #FFFFFF80 over the panel, not over black")
+
     def test_terminal_and_editor_from_the_scheme_chain(self):
         doc = self.ocean()
         terminal, editor = doc["terminal"]["dark"], doc["editor"]["dark"]
@@ -646,6 +655,53 @@ class Failures(unittest.TestCase):
             self.assertIn("error: gruvbox_dark.toml: internal error: KeyError: 'boom'", stderr)
             self.assertNotIn("Traceback", stderr)
             self.assertEqual(listing(out), ["paper-light.json"])
+
+    def test_a_malformed_theme_does_not_lose_the_others_of_its_plugin(self):
+        themes = {"good": {"name": "Good", "dark": True}, "bad": {"name": "Bad", "ui": []}, "fine": {"name": "Fine", "dark": False}}
+        with tempfile.TemporaryDirectory() as scratch:
+            jar = theme_jar(pathlib.Path(scratch) / "family.jar", themes)
+            out = pathlib.Path(scratch) / "out"
+            status, stdout, stderr = run(jar, DATA / "alacritty" / "gruvbox_dark.toml", "-o", out)
+            self.assertEqual(status, 1, stderr)
+            self.assertIn('error: family.jar!themes/bad.theme.json: "ui" must be an object', stderr)
+            self.assertNotIn("Traceback", stderr)
+            self.assertEqual(listing(out), ["fine.json", "good.json", "gruvbox-dark.json"])
+            self.assertIn("good.json: Good (dark)", stdout)
+
+    def test_an_unexpected_exception_in_one_theme_is_reported_for_that_theme_and_its_plugins_others_are_written(self):
+        real = tool.convert_intellij_theme
+
+        def convert(theme, *rest, **named):
+            if theme.id == "bad":
+                raise KeyError("boom")
+            return real(theme, *rest, **named)
+        themes = {"good": {"name": "Good", "dark": True}, "bad": {"name": "Bad", "dark": True}}
+        with tempfile.TemporaryDirectory() as scratch, unittest.mock.patch.object(tool, "convert_intellij_theme", convert):
+            out = pathlib.Path(scratch) / "out"
+            status, _, stderr = run(theme_jar(pathlib.Path(scratch) / "family.jar", themes), "-o", out)
+            self.assertEqual(status, 1)
+            self.assertIn("error: family.jar!themes/bad.theme.json: internal error: KeyError: 'boom'", stderr)
+            self.assertNotIn("Traceback", stderr)
+            self.assertEqual(listing(out), ["good.json"])
+
+    def test_output_that_the_console_cannot_encode_is_escaped_and_the_next_input_is_still_written(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            first = pathlib.Path(scratch) / "\u6771\u4eac_night.toml"
+            first.write_text((DATA / "alacritty" / "gruvbox_dark.toml").read_text(encoding="utf-8"), encoding="utf-8")
+            second = pathlib.Path(scratch) / "zz_paper.toml"
+            second.write_text((DATA / "alacritty" / "paper-light.toml").read_text(encoding="utf-8"), encoding="utf-8")
+            broken = loose_file(scratch, "\u6771\u4eac_broken.toml", "this is not [toml")
+            out = pathlib.Path(scratch) / "out"
+            console = io.TextIOWrapper(io.BytesIO(), encoding="cp1252", errors="strict")
+            problems = io.TextIOWrapper(io.BytesIO(), encoding="cp1252", errors="strict")
+            with contextlib.redirect_stdout(console), contextlib.redirect_stderr(problems):
+                status = tool.main([str(first), str(broken), str(second), "-o", str(out)])
+            console.flush()
+            problems.flush()
+            self.assertEqual(status, 1)
+            self.assertEqual(listing(out), ["night.json", "zz-paper.json"])
+            self.assertIn("\\u6771\\u4eac", console.buffer.getvalue().decode("ascii"))
+            self.assertIn("error: \\u6771\\u4eac_broken.toml: ", problems.buffer.getvalue().decode("ascii"))
 
     def test_an_output_that_is_a_file_or_a_directory_at_the_target_is_a_message(self):
         source = DATA / "alacritty" / "gruvbox_dark.toml"
