@@ -560,7 +560,7 @@ Environment entries overlay the inherited child environment and the variables pl
 - `"close_on_success"` closes the pane only after a normal exit with code 0. Nonzero or abnormal exits retain the output.
 - `"close"` closes the pane after any process exit, including nonzero or abnormal exits.
 
-Only the exited pane closes. Its tab closes when its final pane closes, and its window closes when its final tab closes. Sibling panes and tabs keep running. Reloading this setting applies to future exit deliveries in existing, new and pending panes; it never closes output already retained after an earlier exit. It does not change fonts, palettes or sessions. Launch failures continue to show an error and remove the failed pane. A tab that runs the [default editor](editor.md#default-editor) closes after a code 0 exit and keeps its output otherwise, whatever this setting says.
+Only the exited pane closes. Its tab closes when its final pane closes, and its window closes when its final tab closes. Sibling panes and tabs keep running. Reloading this setting applies to future exit deliveries in existing, new and pending panes; it never closes output already retained after an earlier exit. It does not change fonts, palettes or sessions. Launch failures continue to show an error and remove the failed pane. A tab that runs a program, such as the [default editor](editor.md#default-editor) or one a plugin opens with `LocalSpec.command`, closes after a code 0 exit and keeps its output otherwise, whatever this setting says.
 
 To opt into closing successful exits, add or edit this setting in the existing `[terminal]` table:
 

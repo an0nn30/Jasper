@@ -250,8 +250,9 @@ every discovered plugin's folder, data directory and settings file (seeded from 
 `[plugins."<id>"]` table, else the jar's `settings.toml`, else a header) before loading, and a
 one-second poller re-reads changed files, and each plugin's `DeclaredSettings` updates its handles and runs their listeners;
 a broken file keeps its last good values and is reported under `plugins.<id>`. `PluginRuntime.Row`
-carries the folder, settings file and data directory, which the manager's context menu opens
-through `ConfigEditor`.
+carries the folder, settings file and data directory, which the manager's context menu opens:
+the settings file in the default editor, with `ConfigEditor` as the fallback, the folder and data directory through
+`ConfigEditor`.
 
 `PluginCatalog` is pure: it resolves the disk as it would be after maintenance and compares the
 result with what this process selected at launch. The difference is the "Restart to apply"

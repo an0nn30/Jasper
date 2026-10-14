@@ -9,7 +9,7 @@ Cursor, Zed, Sublime Text, BBEdit, TextMate, IntelliJ IDEA, Notepad++, Notepad: 
 local shells and program tabs get `EDITOR` and `VISUAL` for it (the Jasper Editor's are `<jasper command> editor
 --wait`) unless Jasper's own environment has either and `keep_environment_editor` is on; `config.toml`, plugin settings
 files, the VM options file and every plugin's Open in Editor open in it on the UI thread, with the desktop as the
-fallback. Terminal editors run at the line in a program tab that closes on a clean exit; app editors start on their
+fallback. Terminal editors run in a program tab that closes on a clean exit; app editors start on their
 own. SDK 0.17.1: `Terminals.environment` (`terminal.environment`), `Platform.editor` with `FileEditor`
 (`editor.provide`), `LocalSpec.command` (`LocalSpec.running`) and `CommandLine.client()`; Editor 0.9.0 requires
 `>=0.17.1, <0.18`, the other bundled plugins keep `>=0.17.0`. The Editor's settings page is its own

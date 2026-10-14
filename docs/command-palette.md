@@ -55,7 +55,7 @@ customize `command_palette` and `clear_scrollback` in `[keybindings]`. On Window
 and Linux, `cmd` continues to mean Ctrl+Shift; use literal `ctrl+k` to bind the
 palette to Ctrl+K.
 
-Settings opens the existing configuration file in the OS editor. Split Right
+Settings opens the existing configuration file in the [default editor](editor.md#default-editor). Split Right
 creates side-by-side panes; Split Down creates vertically stacked panes.
 
 To keep Cmd+K for Clear Scrollback on macOS and open the palette with Cmd+P:
@@ -163,8 +163,8 @@ with your search intact. A snippet without placeholders skips the step entirely.
 
 Enter pastes the filled-in command into the pane captured when the palette opened; Cmd+Enter (Ctrl+Enter elsewhere)
 pastes and runs it, the same as a History paste. Shift+Enter is Edit file: it creates
-`snippets.toml` with its header comment if missing, then opens it in the OS editor, the same
-mechanism Settings uses for `config.toml` — there is no in-app editor.
+`snippets.toml` with its header comment if missing, then opens it in the [default editor](editor.md#default-editor), as
+Settings does for `config.toml`.
 
 From the History scope, Shift+Enter is "Save as snippet…": it opens a one-field name step
 prefilled with the command's first word and its first argument (for example `git rebase`),
@@ -287,5 +287,5 @@ reproduction commands](design/command-palette/README.md) cover the headless
 verification, including the mode list, chips, History rows, the Snippets list and
 its fill-in and name steps. Native focus, input methods, accessibility, tab
 rendering on the real title-bar theme, physical-display placement and editing
-`snippets.toml` in the real OS editor remain in the [manual acceptance
+`snippets.toml` in the default editor remain in the [manual acceptance
 checklist](superpowers/plans/2026-09-12-jasper-command-palette-manual-check.md).

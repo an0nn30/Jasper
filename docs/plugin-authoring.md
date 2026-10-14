@@ -654,8 +654,8 @@ A provided session is driven with `host.sessionState(paneId)`, `typeIntoSession`
 and closes inline where Jasper uses its cleanup thread.
 `host.scopes()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep` and `executeInScope`
 drive a contributed scope as the palette would; `paletteOpens()`, `openedInEditor()`
-and `browsed()` record what the plugin asked for. `host.clipboard()` is the clipboard every plugin's `Platform` writes
-to: `copies()` lists `copy|<plugin id>|<text>` and `secret|<plugin id>|<text>`, `text()` and `setText(value)` read and
+(the files no provided editor opened) and `browsed()` record what the plugin asked for. `host.clipboard()` is the
+clipboard every plugin's `Platform` writes to: `copies()` lists `copy|<plugin id>|<text>` and `secret|<plugin id>|<text>`, `text()` and `setText(value)` read and
 set it as the user would, `failWrites(true)` makes it busy, and `expireSecrets()` runs the 30-second clear now. The fake
 does not model the UI thread, so the application's off-thread `IllegalStateException` is not reproduced. `connectionLog()` lists delivered connection events, as
 `activityLog()` does activities. `host.notifications()` records what the plugin posted: `lines()` as
