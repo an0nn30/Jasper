@@ -107,6 +107,8 @@ final class PluginHost {
     private final dev.jasper.sdk.Subscription outcomes;
     final Containment containment;
     final PluginCommands commands;
+    /** What plugins add to new local shells ({@code Terminals.environment}). UI thread. */
+    final ShellContributions shellContributions;
     final EventBus bus;
     final ActivityHub activities;
     final ConnectionHub connections;
@@ -118,6 +120,7 @@ final class PluginHost {
         this.environment = Objects.requireNonNull(environment);
         this.containment = new Containment(environment.onUi(), environment.failures());
         this.commands = new PluginCommands(environment.ui(), containment);
+        this.shellContributions = new ShellContributions(containment);
         this.bus = new EventBus(environment.ui(), containment);
         this.activities = new ActivityHub(bus);
         this.connections = new ConnectionHub(bus);

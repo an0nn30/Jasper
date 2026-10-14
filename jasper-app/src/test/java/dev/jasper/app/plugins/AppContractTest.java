@@ -461,6 +461,9 @@ class AppContractTest extends PluginContractTest {
                         }
                         @Override public void clipboardBusy(boolean busy) { clipboardBusy[0] = busy; }
                         @Override public void expireClipboardSecret() { onEdt(() -> List.copyOf(clipboardClears).forEach(Runnable::run)); }
+            @Override public Map<String, String> shellVariables(Map<String, String> jasperEnvironment) {
+                return onEdtValue(() -> host.shellContributions.variables(jasperEnvironment));
+            }
             @Override public void close() { stopAll(); flush(); }
         };
     }

@@ -544,6 +544,20 @@ public final class PluginRuntime {
         };
     }
 
+    /**
+     * What running plugins add to a new local shell ({@code Terminals.environment}), given Jasper's own environment.
+     * UI thread. Empty before the plugins start and after they stop.
+     *
+     * @param jasperEnvironment Jasper's own environment, untouched
+     * @return the variables, never null
+     * @throws IllegalStateException off the UI thread
+     */
+    public Map<String, String> shellVariables(Map<String, String> jasperEnvironment) {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Shell variables are read on the UI thread");
+        PluginHost current = host;
+        return current == null ? Map.of() : current.shellContributions.variables(jasperEnvironment);
+    }
+
     public void start(Map<String, Map<String, Object>> pluginTables, boolean dark) {
         if (host != null) throw new IllegalStateException("Plugins already started");
         this.dark = dark;

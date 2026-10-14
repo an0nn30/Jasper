@@ -390,7 +390,7 @@ public final class JasperApplication {
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
             (path, settings) -> track(watchOutput(startSession(path, settings))), shellIntegrationDir, shellProfiles::resolve,
-            () -> shellProfiles.awaitDetection(DETECTION_WAIT), this::shellProfileProblem, this::paneVariables);
+            () -> shellProfiles.awaitDetection(DETECTION_WAIT), this::shellProfileProblem, this::paneVariables, this::pluginShellVariables);
         // Back in the Dock before the window exists: macOS gives a window of a hidden application neither Jasper's menu
         // bar nor focus. If composing fails nothing opened, so the presence is worked out again.
         windowOpening();
@@ -502,6 +502,12 @@ public final class JasperApplication {
 
     /** The command socket new local shells are given; null when this Jasper serves none. */
     public Path commandSocket() { return commandSocket; }
+
+    /** What running plugins add to a new local shell, given Jasper's own environment; nothing before they start. EDT. */
+    private Map<String, String> pluginShellVariables(Map<String, String> inherited) {
+        PluginRuntime runtime = plugins;
+        return runtime == null ? Map.of() : runtime.shellVariables(inherited);
+    }
 
     /** What a new local shell in {@code pane} gets last, over everything else. Any thread. */
     Map<String, String> paneVariables(UUID pane) {
@@ -1212,6 +1218,21 @@ public final class JasperApplication {
                                         BiFunction<Optional<String>, TerminalConfig.Shell, ShellProfiles.Resolution> profiles,
                                         BooleanSupplier awaitDetection, Consumer<String> problems,
                                         Function<UUID, Map<String, String>> paneVariables) {
+        return windowLauncher(executor, snapshots, start, integrationDir, profiles, awaitDetection, problems, paneVariables,
+            inherited -> Map.of());
+    }
+
+    /**
+     * As above; a local shell also gets what plugins add ({@code contributions}, given Jasper's own environment, on the
+     * EDT) after Jasper's own variables and before {@code [terminal.env]}. A PowerShell 7 launch confirmed after
+     * detection resolves again, so its contributions are asked twice.
+     */
+    static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
+                                        BiFunction<Path, LaunchSettings, TerminalSession> start, Path integrationDir,
+                                        BiFunction<Optional<String>, TerminalConfig.Shell, ShellProfiles.Resolution> profiles,
+                                        BooleanSupplier awaitDetection, Consumer<String> problems,
+                                        Function<UUID, Map<String, String>> paneVariables,
+                                        Function<Map<String, String>, Map<String, String>> contributions) {
         ConfigSnapshot initial = snapshots.get();
         String os = System.getProperty("os.name");
         Map<String, String> environment = System.getenv();
@@ -1219,7 +1240,8 @@ public final class JasperApplication {
             ConfigSnapshot snapshot = snapshots.get();
             ShellProfiles.Resolution resolution = profiles.apply(requested, snapshot.terminal().shell());
             resolution.warning().ifPresent(problems);
-            return LaunchSettings.resolve(snapshot, resolution.profile(), os, environment, initial.columns(), initial.lines(), integrationDir);
+            return LaunchSettings.resolve(snapshot, resolution.profile(), os, environment, initial.columns(), initial.lines(), integrationDir,
+                contributions);
         };
         BiFunction<Optional<String>, LaunchSettings, LaunchSettings> confirm = (requested, captured) -> {
             ShellProfile profile = captured.profile();

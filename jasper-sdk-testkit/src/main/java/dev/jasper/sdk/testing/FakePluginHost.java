@@ -689,6 +689,7 @@ public final class FakePluginHost implements AutoCloseable {
         context.palette.closeAll();
         context.fileSources.closeAll();
         context.commandLine.closeAll();
+        shellContributors.removeIf(entry -> entry.context() == context);
         for (RunningCall running : List.copyOf(runningCalls))
             if (running.context() == context) running.call().stopped(running.name());
         notifications.stopped(context.plugin().id());
@@ -1582,4 +1583,58 @@ public final class FakePluginHost implements AutoCloseable {
     /** @param tab hosted content handle
      * @return published status descriptors */
     public List<dev.jasper.sdk.ui.ContentStatus> contentStatus(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).status; }
+
+    /** A {@code Terminals.environment} contributor and the plugin that registered it. */
+    record ShellContributor(FakePluginContext context, Function<Map<String, String>, Map<String, String>> contributor) { }
+    final List<ShellContributor> shellContributors = new CopyOnWriteArrayList<>();
+    private static final java.util.regex.Pattern SHELL_NAME = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+    private static final Set<String> RESERVED_SHELL_NAMES = Set.of("TERM", "COLORTERM", "TERM_PROGRAM", "TERM_PROGRAM_VERSION");
+
+    /** Keeps a contributor until its subscription closes or its plugin stops. */
+    Subscription contributeShell(FakePluginContext context, Function<Map<String, String>, Map<String, String>> contributor) {
+        var entry = new ShellContributor(context, contributor);
+        shellContributors.add(entry);
+        Subscription subscription = () -> shellContributors.removeIf(registered -> registered == entry);
+        context.own(subscription);
+        return subscription;
+    }
+
+    /**
+     * What plugins' {@code Terminals.environment} contributors add to a new local shell, merged as the application merges
+     * them: contributors run plugin by plugin in id order, then in registration order, each given a read-only copy of
+     * {@code jasperEnvironment}; one that throws adds nothing (recorded in {@link #failures()}) and a null map counts as
+     * empty. A name outside {@code [A-Za-z_][A-Za-z0-9_]*}, {@code TERM}, {@code COLORTERM}, {@code TERM_PROGRAM},
+     * {@code TERM_PROGRAM_VERSION}, a name starting {@code JASPER_}, a null value and a value holding NUL are dropped, and
+     * the first contributor of a name wins.
+     *
+     * @param jasperEnvironment Jasper's own environment
+     * @return the variables, which the application puts after its own and before {@code [terminal.env]}
+     * @since 0.17.1
+     */
+    public Map<String, String> shellEnvironment(Map<String, String> jasperEnvironment) {
+        Map<String, String> environment = Map.copyOf(jasperEnvironment);
+        List<ShellContributor> ordered = new ArrayList<>(shellContributors);
+        ordered.sort(Comparator.comparing((ShellContributor entry) -> entry.context().plugin().id()));
+        Map<String, String> merged = new LinkedHashMap<>();
+        for (ShellContributor entry : ordered) {
+            String pluginId = entry.context().plugin().id();
+            List<Map.Entry<String, String>> offered = new ArrayList<>();
+            try {
+                Map<String, String> added = entry.contributor().apply(environment);
+                if (added != null) added.forEach((name, value) -> offered.add(new java.util.AbstractMap.SimpleImmutableEntry<>(name, value)));
+            } catch (RuntimeException failure) {
+                failures.add(pluginId + " shell environment: " + failure);
+                continue;
+            }
+            for (Map.Entry<String, String> variable : offered)
+                if (keptShellVariable(variable.getKey(), variable.getValue())) merged.putIfAbsent(variable.getKey(), variable.getValue());
+        }
+        return Map.copyOf(merged);
+    }
+
+    /** Whether the application keeps a contributed entry. */
+    private static boolean keptShellVariable(String name, String value) {
+        return name != null && SHELL_NAME.matcher(name).matches() && !RESERVED_SHELL_NAMES.contains(name) && !name.startsWith("JASPER_")
+            && value != null && value.indexOf('\0') < 0;
+    }
 }

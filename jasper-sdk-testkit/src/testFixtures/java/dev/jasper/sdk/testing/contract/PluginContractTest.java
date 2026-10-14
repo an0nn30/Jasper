@@ -1940,4 +1940,70 @@ public abstract class PluginContractTest {
         call.cancel();
         assertThat(cancelled).as("a stopped plugin's cancellation listener never runs").hasValue(0);
     }
+
+    @Test void shellVariablesNeedTheCapabilityAndTheFirstPluginByIdWins() {
+        var bare = new AtomicReference<PluginContext>();
+        var alpha = new AtomicReference<PluginContext>();
+        var beta = new AtomicReference<PluginContext>();
+        h.start(info("test.bare"), Set.of(), Set.of(), bare::set);
+        h.start(info("test.beta", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), beta::set);
+        h.start(info("test.alpha", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), alpha::set);
+        var seen = new AtomicReference<Map<String, String>>();
+        h.ui(() -> {
+            assertThatThrownBy(() -> bare.get().terminals().environment(environment -> Map.of("A", "1")))
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("terminal.environment"));
+            beta.get().terminals().environment(environment -> Map.of("EDITOR", "beta", "PAGER", "less"));
+            alpha.get().terminals().environment(environment -> {
+                seen.set(environment);
+                return Map.of("EDITOR", "alpha");
+            });
+        });
+        Map<String, String> jasper = new java.util.HashMap<>(Map.of("HOME", "/home/me", "EDITOR", "vim"));
+        assertThat(h.shellVariables(jasper)).as("by plugin id, not by start order").isEqualTo(Map.of("EDITOR", "alpha", "PAGER", "less"));
+        assertThat(seen.get()).as("Jasper's own environment").isEqualTo(Map.of("HOME", "/home/me", "EDITOR", "vim"));
+    }
+
+    @Test void invalidReservedAndNulEntriesAreDroppedAndAFailingContributorAddsNothing() {
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), a::set);
+        Map<String, String> offered = new java.util.HashMap<>();
+        for (String name : List.of("TERM", "COLORTERM", "TERM_PROGRAM", "TERM_PROGRAM_VERSION", "JASPER_PANE", "JASPER_ANYTHING",
+                "1ST", "WITH-DASH", "WITH SPACE", "", "\u00dcBER"))
+            offered.put(name, "x");
+        offered.put(null, "x");
+        offered.put("NO_VALUE", null);
+        offered.put("NUL_VALUE", "a\0b");
+        offered.put("KEPT", "yes");
+        offered.put("_kept_2", "yes");
+        h.ui(() -> {
+            var terminals = a.get().terminals();
+            terminals.environment(environment -> offered);
+            terminals.environment(environment -> { throw new IllegalStateException("broken contributor"); });
+            terminals.environment(environment -> {
+                environment.put("HOME", "/elsewhere");
+                return Map.of("NEVER", "1");
+            });
+            terminals.environment(environment -> null);
+        });
+        Map<String, String> jasper = new java.util.HashMap<>(Map.of("HOME", "/home/me"));
+        assertThat(h.shellVariables(jasper)).isEqualTo(Map.of("KEPT", "yes", "_kept_2", "yes"));
+        assertThat(jasper).as("contributors get a read-only copy").isEqualTo(Map.of("HOME", "/home/me"));
+    }
+
+    @Test void aContributorEndsWithItsRegistrationAndWithItsPlugin() {
+        var a = new AtomicReference<PluginContext>();
+        var b = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), a::set);
+        h.start(info("test.b", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), b::set);
+        var registration = new AtomicReference<Subscription>();
+        h.ui(() -> {
+            registration.set(a.get().terminals().environment(environment -> Map.of("A", "1")));
+            b.get().terminals().environment(environment -> Map.of("B", "2"));
+        });
+        assertThat(h.shellVariables(Map.of())).isEqualTo(Map.of("A", "1", "B", "2"));
+        h.ui(() -> registration.get().close());
+        assertThat(h.shellVariables(Map.of())).isEqualTo(Map.of("B", "2"));
+        h.stopAll();
+        assertThat(h.shellVariables(Map.of())).as("the registration ends with its plugin").isEmpty();
+    }
 }

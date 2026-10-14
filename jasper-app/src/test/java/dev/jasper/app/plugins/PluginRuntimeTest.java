@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 import static dev.jasper.app.plugins.AppContractTest.onEdt;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.tuple;
 
 class PluginRuntimeTest {
@@ -442,5 +443,47 @@ class PluginRuntimeTest {
         });
         assertThat(runtime.statusLines()).anySatisfy(line -> assertThat(line).contains("dev.example.probe", "ACTIVE"));
         onEdt(runtime::stop);
+    }
+
+    static final String ENVIRONMENT = """
+        package fix.environment;
+        public final class Main implements dev.jasper.sdk.plugin.Plugin {
+            @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                context.terminals().environment(jasper -> java.util.Map.of("EDITOR", "probe --wait", "VISUAL", "probe --wait"));
+            }
+        }
+        """;
+
+    static final String FAILING_ENVIRONMENT = """
+        package fix.failing;
+        public final class Main implements dev.jasper.sdk.plugin.Plugin {
+            @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                context.terminals().environment(jasper -> java.util.Map.of("FAILED_PLUGIN", "1"));
+                throw new IllegalStateException("fails after registering");
+            }
+        }
+        """;
+
+    /** Review Focus 4: a plugin that failed or stopped adds nothing to new shells. */
+    @Test void onlyRunningPluginsAddToNewShells() throws Exception {
+        Path bundled = root.resolve("bundled");
+        PluginJars.build(bundled.resolve("dev.example.environment"), "environment.jar",
+            PluginJars.descriptor("dev.example.environment", "1.0.0", "fix.environment.Main") + "capabilities = [\"terminal.environment\"]\n",
+            Map.of("fix.environment.Main", ENVIRONMENT), List.of());
+        PluginJars.build(bundled.resolve("dev.example.failing"), "failing.jar",
+            PluginJars.descriptor("dev.example.failing", "1.0.0", "fix.failing.Main") + "capabilities = [\"terminal.environment\"]\n",
+            Map.of("fix.failing.Main", FAILING_ENVIRONMENT), List.of());
+        PluginRuntime runtime = runtime(bundled, root.resolve("absent"), null, false, new ArrayList<>());
+        assertThat(AppContractTest.onEdtValue(() -> runtime.shellVariables(Map.of()))).as("before the plugins start").isEmpty();
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        assertThat(runtime.statusLines()).anySatisfy(line -> assertThat(line).contains("dev.example.failing", "FAILED"));
+        assertThat(AppContractTest.onEdtValue(() -> runtime.shellVariables(Map.of("EDITOR", "vim"))))
+            .as("the failed plugin's contributor went with it").isEqualTo(Map.of("EDITOR", "probe --wait", "VISUAL", "probe --wait"));
+        assertThatIllegalStateException().as("off the UI thread").isThrownBy(() -> runtime.shellVariables(Map.of()));
+        var pending = new AtomicReference<List<CompletableFuture<?>>>();
+        onEdt(() -> pending.set(runtime.stop()));
+        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        assertThat(AppContractTest.onEdtValue(() -> runtime.shellVariables(Map.of()))).as("after the plugin stopped").isEmpty();
     }
 }

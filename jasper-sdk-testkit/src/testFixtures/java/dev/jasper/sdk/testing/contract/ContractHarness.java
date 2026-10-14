@@ -235,4 +235,9 @@ public interface ContractHarness extends AutoCloseable {
          * once the handler has run.
          */
         ContractCall call(String name, List<String> arguments, java.nio.file.Path workingDirectory, java.util.UUID paneOrNull);
+        /**
+         * What plugins' {@code Terminals.environment} contributors add to a new local shell, given Jasper's own environment;
+         * asked on the UI thread.
+         */
+        java.util.Map<String, String> shellVariables(java.util.Map<String, String> jasperEnvironment);
 }

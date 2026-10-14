@@ -14,9 +14,11 @@ import dev.jasper.sdk.terminal.WindowHandle;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.concurrent.CompletableFuture;
 import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.SessionState;
@@ -214,6 +216,13 @@ final class FakeTerminals implements Terminals {
         Subscription subscription = () -> workspace.profileListeners.remove(entry);
         context.own(subscription);
         return subscription;
+    }
+
+    @Override public Subscription environment(Function<Map<String, String>, Map<String, String>> contributor) {
+        Objects.requireNonNull(contributor, "contributor");
+        require(Capabilities.TERMINAL_ENVIRONMENT);
+        context.requireOpen();
+        return context.host().contributeShell(context, contributor);
     }
 
     /** The default shell, or a profile the test listed; anything else opens nothing, as in the application. */

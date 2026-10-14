@@ -214,4 +214,28 @@ class HostedTerminalsTest {
         assertThat(fixture.opened()).containsExactly("tab|" + window + "|" + Path.of("/tmp").toAbsolutePath(), "split|" + only + "|DOWN|-");
         assertThat(terminals.split(terminals.paneHandle(UUID.randomUUID()), Direction.RIGHT, OpenRequest.local())).isEmpty();
     }
+
+    @Test void anEnvironmentContributorNeedsTheCapabilityAndTheUiThreadAndEndsWithThePlugin() {
+        var contributions = new ShellContributions(new Containment(() -> true));
+        HostedTerminals terminals = new HostedTerminals("dev.x.tool", new CapabilityGate("dev.x.tool", Set.of(Capabilities.TERMINAL_ENVIRONMENT)),
+            fixture.registry, posted::add, onUi::get, open::get,
+            new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null, name -> new javax.swing.ImageIcon()),
+            PluginRuntime.ShellProfiles.NONE, new Containment(() -> true), contributions);
+        assertThatThrownBy(() -> terminals().environment(environment -> java.util.Map.of("A", "1")))
+            .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo(Capabilities.TERMINAL_ENVIRONMENT));
+        onUi.set(false);
+        assertThatIllegalStateException().isThrownBy(() -> terminals.environment(environment -> java.util.Map.of("A", "1")));
+        onUi.set(true);
+        var first = terminals.environment(environment -> java.util.Map.of("A", "1"));
+        terminals.environment(environment -> java.util.Map.of("B", "2"));
+        assertThat(contributions.variables(java.util.Map.of())).isEqualTo(java.util.Map.of("A", "1", "B", "2"));
+        onUi.set(false);
+        first.close();
+        assertThat(contributions.variables(java.util.Map.of())).as("a close off the UI thread is posted to it").containsKey("A");
+        onUi.set(true);
+        List.copyOf(posted).forEach(Runnable::run);
+        assertThat(contributions.variables(java.util.Map.of())).isEqualTo(java.util.Map.of("B", "2"));
+        terminals.closeAll();
+        assertThat(contributions.variables(java.util.Map.of())).as("the plugin stopped").isEmpty();
+    }
 }

@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,6 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import dev.jasper.app.terminals.OpenSpec;
 import dev.jasper.sdk.terminal.RemoteDirectory;
 
@@ -53,6 +55,9 @@ final class HostedTerminals implements Terminals {
     private final Containment containment;
     /** Live {@link #onProfilesChanged} registrations, closed with the plugin. UI thread. */
     private final List<dev.jasper.app.lifecycle.Subscription> profileRegistrations = new ArrayList<>();
+    private final ShellContributions shellContributions;
+    /** Live {@link #environment} registrations, closed with the plugin. UI thread. */
+    private final List<dev.jasper.app.lifecycle.Subscription> environmentRegistrations = new ArrayList<>();
 
     /** A view that lists no shell profiles, for tests that do not need them. */
     HostedTerminals(String pluginId, CapabilityGate gate, TerminalRegistry registry, Consumer<Runnable> ui, BooleanSupplier onUi,
@@ -62,8 +67,16 @@ final class HostedTerminals implements Terminals {
 
     HostedTerminals(String pluginId, CapabilityGate gate, TerminalRegistry registry, Consumer<Runnable> ui, BooleanSupplier onUi,
                     BooleanSupplier open, HostedSessions sessions, PluginRuntime.ShellProfiles shellProfiles, Containment containment) {
+        this(pluginId, gate, registry, ui, onUi, open, sessions, shellProfiles, containment, new ShellContributions(containment));
+    }
+
+    /** As above; {@link #environment} registers into {@code shellContributions}, the host's. */
+    HostedTerminals(String pluginId, CapabilityGate gate, TerminalRegistry registry, Consumer<Runnable> ui, BooleanSupplier onUi,
+                    BooleanSupplier open, HostedSessions sessions, PluginRuntime.ShellProfiles shellProfiles, Containment containment,
+                    ShellContributions shellContributions) {
         this.pluginId = pluginId; this.gate = gate; this.registry = registry; this.ui = ui; this.onUi = onUi; this.open = open;
         this.sessions = sessions; this.shellProfiles = shellProfiles; this.containment = containment;
+        this.shellContributions = shellContributions;
     }
 
     private void requireUi(String what) {
@@ -313,6 +326,21 @@ final class HostedTerminals implements Terminals {
         return new ShellProfileInfo(profile.id(), profile.name(), kind, profile.detail());
     }
 
+    @Override public Subscription environment(Function<Map<String, String>, Map<String, String>> contributor) {
+        Objects.requireNonNull(contributor, "contributor");
+        gate.require(Capabilities.TERMINAL_ENVIRONMENT);
+        requireUi("environment");
+        dev.jasper.app.lifecycle.Subscription registration = shellContributions.register(pluginId, contributor);
+        environmentRegistrations.add(registration);
+        gate.audit(Capabilities.TERMINAL_ENVIRONMENT, "added variables to new shells");
+        var closed = new AtomicBoolean();
+        Runnable removal = () -> { environmentRegistrations.remove(registration); registration.close(); };
+        return () -> {
+            if (!closed.compareAndSet(false, true)) return;
+            if (onUi.getAsBoolean()) removal.run(); else ui.accept(removal);
+        };
+    }
+
     /** A named profile must be one the catalog lists; otherwise nothing opens and the plugin's mistake is logged. */
     private boolean knownProfile(OpenSpec spec) {
         if (!(spec instanceof OpenSpec.Local local) || local.profile().isEmpty()) return true;
@@ -325,11 +353,13 @@ final class HostedTerminals implements Terminals {
     /** A handle that finds its tab lazily, for callers that are not on the UI thread. */
     PaneHandle detachedPaneHandle(UUID id) { return new Pane(id, NOWHERE); }
 
-    /** The plugin is stopping: cancel its sessions and drop its profile listeners. UI thread. */
+    /** The plugin is stopping: cancel its sessions and drop its profile listeners and environment contributors. UI thread. */
     void closeAll() {
         sessions.cancelAll();
-        var registrations = List.copyOf(profileRegistrations);
+        var registrations = new ArrayList<>(profileRegistrations);
+        registrations.addAll(environmentRegistrations);
         profileRegistrations.clear();
+        environmentRegistrations.clear();
         registrations.forEach(dev.jasper.app.lifecycle.Subscription::close);
     }
 }

@@ -70,6 +70,17 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
     /** {@code integrationDir} is the extracted script directory, or null when extraction failed or tests want none. */
     public static LaunchSettings resolve(ConfigSnapshot snapshot, ShellProfile profile, String osName, Map<String, String> inherited,
                                   int windowColumns, int windowLines, Path integrationDir) {
+        return resolve(snapshot, profile, osName, inherited, windowColumns, windowLines, integrationDir, environment -> Map.of());
+    }
+
+    /**
+     * As above, with what plugins add ({@code contributions}, given the untouched {@code inherited} map): after Jasper's
+     * own variables and before {@code [terminal.env]}, so a configured entry, {@code TERM} and {@code COLORTERM} still
+     * win. A WSL profile gets none: only the variables {@code WSLENV} names reach Linux.
+     */
+    public static LaunchSettings resolve(ConfigSnapshot snapshot, ShellProfile profile, String osName, Map<String, String> inherited,
+                                  int windowColumns, int windowLines, Path integrationDir,
+                                  Function<Map<String, String>, Map<String, String>> contributions) {
         TerminalConfig terminal = snapshot.terminal();
         var command = new ArrayList<>(profile.command());
         var environment = new HashMap<>(inherited);
@@ -86,6 +97,7 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
         if (integrationDir != null && terminal.shellIntegration() != ShellIntegrationMode.OFF) {
             environment.put("JASPER_SHELL_INTEGRATION", integrationDir.toString());
         }
+        if (profile.kind() != ShellProfile.Kind.WSL) environment.putAll(contributions.apply(inherited));
         environment.putAll(terminal.env());
         if (osName.toLowerCase(Locale.ROOT).startsWith("mac")
                 && environment.getOrDefault("LANG", "").isBlank()) {

@@ -74,6 +74,9 @@ public final class FakePluginContext implements PluginContext {
         this.notifications = host.notifications.of(info.id(), () -> state != State.CLOSED, name -> kit().validateIcon(name));
     }
 
+    /** The host this context belongs to, for the fakes that keep host-wide registries. */
+    FakePluginHost host() { return host; }
+
     void requireOpen() {
         if (state == State.CLOSED) throw new IllegalStateException("Plugin context is closed: " + info.id());
     }

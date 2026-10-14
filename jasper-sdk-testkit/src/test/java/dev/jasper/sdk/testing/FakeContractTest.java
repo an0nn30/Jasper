@@ -119,6 +119,9 @@ class FakeContractTest extends PluginContractTest {
                     @Override public void cancel() { call.cancel(); }
                 };
             }
+            @Override public java.util.Map<String, String> shellVariables(java.util.Map<String, String> jasperEnvironment) {
+                return host.shellEnvironment(jasperEnvironment);
+            }
             @Override public void close() { host.close(); }
         };
     }
