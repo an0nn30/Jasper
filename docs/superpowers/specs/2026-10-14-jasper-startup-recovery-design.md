@@ -1,6 +1,6 @@
 # Jasper start-up recovery
 
-Status: **Draft for review (2026-10-14).** Branch: `claude/startup-recovery`, from `main` at `4328f02b`. Amends the
+Status: **Approved on 2026-10-14** (the user: "spec approved"). Branch: `claude/startup-recovery`, from `main` at `4328f02b`. Amends the
 [custom VM options design](2026-10-13-jasper-custom-vm-options-design.md): this design's watcher (section 5) replaces
 its section 4 guard, and section 6 extends its sections 3.4 and 6.4.
 
