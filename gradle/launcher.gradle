@@ -626,3 +626,27 @@ def cliTestSource = new File(cliSource, 'test')
 tasks.named('test', Test) {
     inputs.dir(cliTestSource).withPropertyName('commandVectors').withPathSensitivity(PathSensitivity.RELATIVE)
 }
+
+def cliBuild = layout.buildDirectory.dir('cli')
+def cliCore = new File(cliSource, 'src')
+
+def testCommandClientCore = tasks.register('testCommandClientCore') {
+    group = 'verification'
+    description = "Compiles and runs the native tests of the jasper command's core."
+    inputs.dir(cliCore).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(cliTestSource).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(cliBuild.map { it.file('core-test/passed') })
+    doLast {
+        File work = cliBuild.get().dir('core-test').asFile
+        delete(work)
+        List<File> sources = [new File(cliTestSource, 'cli_core_test.c'), new File(cliCore, 'jasper_cli_core.c')]
+        File test = nativeBuild(kind: 'executable', exportAll: true, sources: sources, strict: sources, includes: [cliCore],
+            output: new File(work, launcherHost().os == 'windows' ? 'cli-core-test.exe' : 'cli-core-test'),
+            work: new File(work, 'objects'))
+        String output = runLauncherTool([test.absolutePath, new File(cliTestSource, 'home-vectors.txt').absolutePath,
+            new File(cliTestSource, 'protocol-vectors.txt').absolutePath], null, null, "the jasper command's core tests")
+        logger.lifecycle(output.trim())
+        new File(work, 'passed').text = output
+    }
+}
+tasks.named('check') { dependsOn(testCommandClientCore) }
