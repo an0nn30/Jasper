@@ -128,7 +128,8 @@ public interface ContractHarness extends AutoCloseable {
 
     /**
      * What plugins asked to open: {@code tab|<window id>|<directory or ->} or {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->},
-     * each followed by {@code |<profile id>} when the request named a shell profile.
+     * each followed by {@code |<profile id>} when the request named a shell profile, then by
+     * {@code |run:<the command's words joined by spaces>} when it runs a program.
      */
     List<String> openRequests();
 

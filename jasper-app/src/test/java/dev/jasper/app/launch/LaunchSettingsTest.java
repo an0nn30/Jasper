@@ -404,4 +404,18 @@ class LaunchSettingsTest {
         assertThat(LaunchSettings.resolve(ConfigSnapshot.defaults(), login(), "Linux", Map.of(), 80, 24, null).environment())
             .doesNotContainKey("EDITOR");
     }
+
+    @Test void aProgramKeepsTheShellsEnvironmentAndProfileAndIsNamedAfterItsFile() {
+        var settings = LaunchSettings.resolve(withShell("/bin/zsh", List.of("-l"), ShellIntegrationMode.AUTO), "Mac OS X",
+            Map.of("PATH", "/bin"), 150, 45, Path.of("/opt/jasper/si"));
+        var program = settings.withCommand(List.of("/opt/homebrew/bin/nvim", "+42", "config.toml"));
+        assertThat(program.command()).containsExactly("/opt/homebrew/bin/nvim", "+42", "config.toml");
+        assertThat(program.environment()).isEqualTo(settings.environment());
+        assertThat(program.profile()).isEqualTo(settings.profile());
+        assertThat(program.columns()).isEqualTo(150);
+        assertThat(program.label()).isEqualTo("nvim");
+        assertThat(LaunchSettings.programName("/usr/bin/vim")).isEqualTo("vim");
+        assertThat(LaunchSettings.programName("")).isEqualTo("shell");
+        assertThatIllegalArgumentException().isThrownBy(() -> settings.withCommand(List.of()));
+    }
 }

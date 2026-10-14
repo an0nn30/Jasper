@@ -285,4 +285,87 @@ class ShellExitBehaviorTest {
             assertThat(pane.session().exitFuture().get(5, TimeUnit.SECONDS)).isEqualTo(code);
         } catch (Exception failure) { throw new AssertionError(failure); }
     }
+
+    private static final String PROGRAM_SCRIPT = "stty -echo; printf 'READY\\n'; read code; exit \"$code\"";
+    /** A program tab's command; the trailing word is only the script's $0, which tells the launches apart. */
+    private static final List<String> PROGRAM = List.of("/bin/sh", "-c", PROGRAM_SCRIPT, "program");
+    final List<dev.jasper.app.launch.LaunchSettings> started = new CopyOnWriteArrayList<>();
+
+    /** As {@link #start}, with a launcher that resolves settings, so a tab can run a program; the shell runs the same script. */
+    private void startWithSettings(String policy) throws Exception {
+        Files.writeString(directory.resolve("config.toml"), "terminal.on_exit='" + policy + "'");
+        service = new ConfigService(directory.resolve("config.toml"), false);
+        var shell = dev.jasper.app.testsupport.ConfigTestSupport.snapshot("/bin/sh", List.of("-c", PROGRAM_SCRIPT, "shell"), Map.of(), 100, 80, 24);
+        edt(() -> {
+            ThemeController themes = ThemeTestSupport.controller(true);
+            controller = new ConfigurationTestSupport(themes, service);
+            ShellLauncher launcher = new ShellLauncher(pending::add,
+                requested -> dev.jasper.app.launch.LaunchSettings.resolve(shell, "Linux", System.getenv(), 80, 24),
+                (requested, captured) -> captured, null, (path, settings) -> {
+                    started.add(settings);
+                    try {
+                        var session = TerminalSession.start(SessionLaunchOptions.builder().command(settings.command())
+                            .environment(settings.environment()).workingDirectory(path).grid(new GridSize(80, 24)).scrollback(100).build());
+                        sessions.add(session);
+                        return session;
+                    } catch (Exception failure) { throw new CompletionException(failure); }
+                });
+            owner = new WindowContent(launcher, directory, path -> {}, () -> {}, () -> {
+                assertThat(SwingUtilities.isEventDispatchThread()).isTrue(); empty.incrementAndGet();
+            }, themes);
+            owner.onError = (title, message) -> failures.add(message);
+            controller.register(owner);
+        });
+    }
+
+    @Test void aProgramTabClosesWhenItsProgramSucceedsWhateverOnExitSays() throws Exception {
+        startWithSettings("keep_open"); deliver();
+        TerminalTab shellTab = owner.currentTab();
+        edt(() -> owner.openTab(directory, null, Optional.empty(), Optional.of(PROGRAM))); deliver();
+        TerminalPane program = owner.currentPane();
+        assertThat(started.getLast().command()).isEqualTo(PROGRAM);
+        edt(() -> exit(program, 0));
+        until(() -> owner.tabStrip().getTabCount() == 1);
+        edt(() -> {
+            assertThat(owner.currentTab()).isSameAs(shellTab);
+            assertThat(empty).hasValue(0);
+        });
+    }
+
+    @Test void aFailedProgramStaysOpenAndAnOnExitChangeDoesNotUnpinIt() throws Exception {
+        startWithSettings("keep_open"); deliver();
+        TerminalPane shell = owner.currentPane();
+        edt(() -> owner.openTab(directory, null, Optional.empty(), Optional.of(PROGRAM))); deliver();
+        TerminalPane program = owner.currentPane();
+        reload("close");
+        edt(() -> exit(program, 1));
+        edt(() -> { });
+        edt(() -> {
+            assertThat(owner.tabStrip().getTabCount()).as("terminal.on_exit = close does not reach a program tab").isEqualTo(2);
+            assertThat(program.running()).isFalse();
+            assertThat(program.view().find(new SearchQuery("[process exited with code 1]", false, true)).count()).isEqualTo(1);
+        });
+        edt(() -> exit(shell, 1));
+        until(() -> owner.tabStrip().getTabCount() == 1);
+        edt(() -> assertThat(owner.currentPane()).as("the reload did reach the shell tab").isSameAs(program));
+    }
+
+    @Test void pluginRequestsRunProgramsInTabsAndSplitsThroughTheRegistry() throws Exception {
+        startWithSettings("keep_open");
+        var registry = new java.util.concurrent.atomic.AtomicReference<dev.jasper.app.terminals.TerminalRegistry>();
+        edt(() -> { registry.set(new dev.jasper.app.terminals.TerminalRegistry()); owner.connectTerminals(registry.get(), () -> { }); });
+        deliver();
+        List<String> split = List.of("/bin/sh", "-c", PROGRAM_SCRIPT, "split");
+        edt(() -> assertThat(registry.get().window(owner.id()).orElseThrow().openTab()
+            .apply(new dev.jasper.app.terminals.OpenSpec.Local(Optional.of(directory), Optional.empty(), Optional.of(PROGRAM)))).isPresent());
+        deliver();
+        edt(() -> {
+            var pane = registry.get().window(owner.id()).orElseThrow().selectedTab().get().orElseThrow().focusedPane().get().orElseThrow();
+            assertThat(pane.split().apply(dev.jasper.app.terminals.SplitAxis.RIGHT,
+                new dev.jasper.app.terminals.OpenSpec.Local(Optional.empty(), Optional.empty(), Optional.of(split)))).isPresent();
+        });
+        deliver();
+        assertThat(started).extracting(dev.jasper.app.launch.LaunchSettings::command)
+            .containsExactly(List.of("/bin/sh", "-c", PROGRAM_SCRIPT, "shell"), PROGRAM, split);
+    }
 }

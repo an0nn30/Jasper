@@ -2006,4 +2006,26 @@ public abstract class PluginContractTest {
         h.stopAll();
         assertThat(h.shellVariables(Map.of())).as("the registration ends with its plugin").isEmpty();
     }
+
+    @Test void aTabOrASplitMayRunAProgramAndThatNeedsTerminalOpen() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), only = h.addTerminalPane(tab, "make", Path.of("/src"));
+        var alpha = new AtomicReference<PluginContext>();
+        var bare = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OPEN), Set.of(), Set.of(), alpha::set);
+        h.start(info("test.bare"), Set.of(), Set.of(), bare::set);
+        Path here = Path.of("/tmp").toAbsolutePath();
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            PaneHandle editor = terminals.openTab(terminals.window(window).orElseThrow(),
+                OpenRequest.local(dev.jasper.sdk.terminal.LocalSpec.running(List.of("nvim", "+3", "notes.txt"), Optional.of(here)))).orElseThrow();
+            assertThat(editor.isOpen()).isTrue();
+            terminals.split(terminals.pane(only).orElseThrow(), Direction.RIGHT,
+                OpenRequest.local(dev.jasper.sdk.terminal.LocalSpec.running(List.of("htop"), Optional.empty()))).orElseThrow();
+            var others = bare.get().terminals();
+            assertThatThrownBy(() -> others.openTab(others.window(window).orElseThrow(),
+                    OpenRequest.local(dev.jasper.sdk.terminal.LocalSpec.running(List.of("htop"), Optional.empty()))))
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo(Capabilities.TERMINAL_OPEN));
+        });
+        assertThat(h.openRequests()).containsExactly("tab|" + window + "|" + here + "|run:nvim +3 notes.txt", "split|" + only + "|RIGHT|-|run:htop");
+    }
 }

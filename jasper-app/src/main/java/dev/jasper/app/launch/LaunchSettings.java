@@ -47,6 +47,11 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
         return new LaunchSettings(command, merged, columns, lines, scrollback, profile);
     }
 
+    /** These settings running {@code program} instead of the shell: the same environment, profile and grid. */
+    public LaunchSettings withCommand(List<String> program) {
+        return new LaunchSettings(program, environment, columns, lines, scrollback, profile);
+    }
+
     /** Where a launch runs: the PTY's directory, and the settings with a WSL profile's {@code --cd} argument added. */
     public record Start(Path directory, LaunchSettings settings) { }
 
@@ -273,8 +278,13 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
     /** The tab's name: a Windows shell's or WSL distribution's profile name; a login or Custom shell's program name. */
     String label() {
         if (profile.kind() == ShellProfile.Kind.WSL || profile.kind() == ShellProfile.Kind.LOCAL_SHELL) return profile.name();
+        return programName(command.getFirst());
+    }
+
+    /** A program's name for its tab: the file name of {@code program}, or {@code shell} when it has none. */
+    static String programName(String program) {
         try {
-            Path name = Path.of(command.getFirst()).getFileName();
+            Path name = Path.of(program).getFileName();
             return name == null || name.toString().isBlank() ? "shell" : name.toString();
         } catch (InvalidPathException failure) {
             return "shell";

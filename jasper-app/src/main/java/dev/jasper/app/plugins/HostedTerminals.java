@@ -284,7 +284,7 @@ final class HostedTerminals implements Terminals {
     /** Every request kind names its capability here, before anything else happens. */
     private OpenSpec spec(OpenRequest request) {
         return switch (Objects.requireNonNull(request, "request")) {
-            case OpenRequest.Local local -> { gate.require(Capabilities.TERMINAL_OPEN); yield new OpenSpec.Local(local.spec().workingDirectory(), local.spec().profile()); }
+            case OpenRequest.Local local -> { gate.require(Capabilities.TERMINAL_OPEN); yield new OpenSpec.Local(local.spec().workingDirectory(), local.spec().profile(), local.spec().command()); }
             case OpenRequest.Session session -> { gate.require(Capabilities.SESSION_PROVIDE); yield new OpenSpec.Session(sessions.request(session.spec())); }
         };
     }
