@@ -21,7 +21,8 @@ import java.util.regex.Pattern;
  * Windows; a macOS app started from the Dock has a short {@code PATH}), then, on macOS, as the command-line tool inside
  * its app in {@code /Applications} and {@code ~/Applications}, then, on Windows, in Notepad++'s and Notepad's own
  * folders. On Windows a program name is tried with {@code .exe}, {@code .cmd} and {@code .bat}. Pure apart from
- * {@link Probe#executable()}; it touches the file system, so run it off the UI thread.
+ * {@link Probe#executable()}, which touches the file system: run {@link #detect} off the UI thread; {@link #find} is one
+ * editor's bounded search, a few checks in each folder, which the default editor runs on the UI thread at start.
  */
 public final class Detection {
     private static final List<String> WINDOWS_SUFFIXES = List.of(".exe", ".cmd", ".bat");

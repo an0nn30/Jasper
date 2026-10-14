@@ -428,6 +428,33 @@ class EditorPluginTest {
         }
     }
 
+    /** Final review M4: a development Editor after another plugin's editor still starts, and only that one is not its. */
+    @Test void theEditorStillStartsWhenAnotherPluginProvidesTheEditor() throws Exception {
+        try (var host = host()) {
+            List<Path> askedOther = new ArrayList<>();
+            host.start(new PluginInfo("dev.example.other", "Other", "1.0.0", Set.of("editor.provide")), Set.of(), Set.of(),
+                context -> context.platform().editor((file, line, window) -> askedOther.add(file)));
+            host.start(INFO, Set.of(), Set.of(), detecting());
+            drain(host);
+            assertThat(host.failures()).as("the Editor started").isEmpty();
+            assertThat(host.editorPlugin()).contains("dev.example.other");
+            assertThat(host.settingsPanel("dev.jasper.editor")).as("its page").isPresent();
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            consumer.get().services().require(Editor.class).open(Files.writeString(home.resolve("alpha.txt"), "a\n"));
+            drain(host);
+            assertThat(host.contentTabs()).as("its tabs").hasSize(1);
+            Files.writeString(home.resolve("beta.txt"), "b\n");
+            var call = host.call("editor", List.of("beta.txt"), home);
+            drain(host);
+            assertThat(call.exit()).as("jasper editor").isCompletedWithValue(0);
+            assertThat(host.contentTabs()).hasSize(2);
+            Path notes = Files.writeString(home.resolve("notes.txt"), "n\n");
+            assertThat(host.edit(notes, OptionalInt.empty(), Optional.empty())).isTrue();
+            assertThat(askedOther).as("Jasper's own opens go to the other plugin's editor").containsExactly(notes);
+        }
+    }
+
     @Test void theSettingsPageIsTheEditorsOwn() {
         try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());

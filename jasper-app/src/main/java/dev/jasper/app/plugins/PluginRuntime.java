@@ -561,7 +561,8 @@ public final class PluginRuntime {
     /**
      * Opens a file for editing, on a worker thread: the editor a plugin provides ({@code Platform.editor}), asked on the
      * UI thread with the active terminal window, then {@code desktop} on this thread when no plugin provides one, it
-     * declines or throws, or it does not answer within 30 seconds. Before the plugins start, {@code desktop} alone.
+     * declines or throws, or it does not answer within 30 seconds. Before the plugins start, {@code desktop} alone. Once
+     * they run, an interrupted worker, such as one Jasper's quit interrupts, opens nothing and keeps its interrupt.
      *
      * @param file the file
      * @param desktop the desktop's opener, such as {@code ConfigEditor::open}; its failure propagates
@@ -572,14 +573,18 @@ public final class PluginRuntime {
         Objects.requireNonNull(file, "file");
         Objects.requireNonNull(desktop, "desktop");
         PluginHost current = host;
-        if (current != null && current.fileEditors.editFromWorker(file, java.util.OptionalInt.empty(),
-                () -> terminals.activeWindow().map(dev.jasper.app.terminals.WindowEntry::id))) return;
-        desktop.accept(file);
+        if (current == null) desktop.accept(file);
+        else current.fileEditors.openFromWorker(file, () -> terminals.activeWindow().map(dev.jasper.app.terminals.WindowEntry::id), desktop);
     }
 
     private Optional<Path> commandClient = Optional.empty();
 
-    /** The {@code jasper} command plugins see in {@code CommandLine.client()}; before {@link #start}. */
+    /**
+     * Sets the {@code jasper} command plugins see in {@code CommandLine.client()}; before {@link #start}.
+     *
+     * @param client the command's path; empty when this Jasper names none
+     * @throws IllegalStateException once the plugins have started
+     */
     public void commandClient(Optional<Path> client) {
         if (host != null) throw new IllegalStateException("Plugins have already started");
         commandClient = Objects.requireNonNull(client, "client");

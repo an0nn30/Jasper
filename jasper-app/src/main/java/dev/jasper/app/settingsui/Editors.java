@@ -335,7 +335,8 @@ public final class Editors {
         @Override public String rowLabel(String label){return system?"Font":label;}
         List<String> suggestions() { return offered; }
         @Override public Nodes.Node node(String id, ControlState state) {
-            return fontChoice(id, state, offered, label, system && text.equalsIgnoreCase("system") ? "System" : text);
+            return new Nodes.Choice(id, state, Nodes.ChoiceKind.SEARCHABLE, options(offered), "", label, "", "",
+                Optional.of(new Nodes.ChoiceSearch(0, NO_FONT_MATCHES, Optional.of(system && text.equalsIgnoreCase("system") ? "System" : text))));
         }
         @Override public String value() { return text; }
         @Override public void show(String value) { text = value; }
@@ -345,22 +346,6 @@ public final class Editors {
             return true;
         }
         @Override public void refresh() { offered = List.copyOf(families.get()); }
-    }
-
-    /**
-     * The searchable choice a font family editor shows: the families as options, and the free text entered, which owns
-     * the value. A plugin page's standard row for a font setting is this same control.
-     *
-     * @param id the node id
-     * @param state the control's state
-     * @param families the families offered
-     * @param label the control's accessible label
-     * @param entry the text in the entry
-     * @return the control
-     */
-    public static Nodes.Choice fontChoice(String id, ControlState state, List<String> families, String label, String entry) {
-        return new Nodes.Choice(id, state, Nodes.ChoiceKind.SEARCHABLE, options(families), "", label, "", "",
-            Optional.of(new Nodes.ChoiceSearch(0, NO_FONT_MATCHES, Optional.of(entry))));
     }
 
     private static List<Option> options(List<String> families) {

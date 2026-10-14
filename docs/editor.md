@@ -88,6 +88,7 @@ plain text. TOML uses the Editor's own lexer.
 | `soft_wrap` | false | wrapping for new tabs |
 | `max_file_mib` | 10 | larger files are refused, 1–256 |
 | `vim` | false | Vim mode (below); the Vim status item and Toggle Vim Mode change it |
+| `recent_files_days` | 30 | Recent files not opened for this many days are forgotten, 0–365; 0 keeps none |
 | `default_editor` | `"jasper"` | the [default editor](#default-editor): `jasper`, `system`, `custom` or an installed editor's id |
 | `custom_command` | `""` | for `custom`: the command; the file's path is added at the end |
 | `custom_in_terminal` | true | for `custom`: run it in a terminal tab |

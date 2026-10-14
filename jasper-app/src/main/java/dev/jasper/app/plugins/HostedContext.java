@@ -178,9 +178,8 @@ final class HostedContext implements PluginContext {
                     Objects.requireNonNull(file, "file");
                     background().execute(() -> {
                         try {
-                            if (host.fileEditors.editFromWorker(file, java.util.OptionalInt.empty(),
-                                    () -> host.environment.terminals().activeWindow().map(dev.jasper.app.terminals.WindowEntry::id))) return;
-                            host.environment.editor().accept(file);
+                            host.fileEditors.openFromWorker(file,
+                                () -> host.environment.terminals().activeWindow().map(dev.jasper.app.terminals.WindowEntry::id), host.environment.editor());
                         } catch (RuntimeException failure) {
                             log().log(System.Logger.Level.WARNING, "Could not open " + file + " in an editor", failure);
                             notifications.group().error("Could not open a file in an editor", String.valueOf(file.getFileName()), failure);

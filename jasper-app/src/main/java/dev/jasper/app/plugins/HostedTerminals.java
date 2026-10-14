@@ -264,7 +264,7 @@ final class HostedTerminals implements Terminals {
         if (!knownProfile(spec)) return Optional.empty();
         Optional<WindowEntry> target = registry.window(window.id());
         if (target.isEmpty()) return Optional.empty();
-        gate.audit(capability(request), "opened a tab in window " + window.id());
+        gate.audit(capability(request), "opened a tab in window " + window.id() + running(spec));
         return target.get().openTab().apply(spec).map(Pane::new);
     }
 
@@ -276,7 +276,7 @@ final class HostedTerminals implements Terminals {
         if (!knownProfile(spec)) return Optional.empty();
         Optional<PaneEntry> entry = registry.pane(target.id());
         if (entry.isEmpty()) return Optional.empty();
-        gate.audit(capability(request), "split pane " + target.id());
+        gate.audit(capability(request), "split pane " + target.id() + running(spec));
         return entry.get().split().apply(direction == Direction.RIGHT ? SplitAxis.RIGHT : SplitAxis.DOWN, spec)
             .map(Pane::new);
     }
@@ -287,6 +287,13 @@ final class HostedTerminals implements Terminals {
             case OpenRequest.Local local -> { gate.require(Capabilities.TERMINAL_OPEN); yield new OpenSpec.Local(local.spec().workingDirectory(), local.spec().profile(), local.spec().command()); }
             case OpenRequest.Session session -> { gate.require(Capabilities.SESSION_PROVIDE); yield new OpenSpec.Session(sessions.request(session.spec())); }
         };
+    }
+
+    /** What an audit line adds for a program tab or split: the program's file name, never its folder or arguments. */
+    private static String running(OpenSpec spec) {
+        if (!(spec instanceof OpenSpec.Local local) || local.program().map(List::isEmpty).orElse(true)) return "";
+        String program = local.program().get().getFirst();
+        return " running " + program.substring(Math.max(program.lastIndexOf('/'), program.lastIndexOf('\\')) + 1);
     }
 
     private static String capability(OpenRequest request) {

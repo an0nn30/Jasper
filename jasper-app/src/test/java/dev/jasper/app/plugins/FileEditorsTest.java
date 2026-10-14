@@ -114,6 +114,45 @@ class FileEditorsTest {
         assertThat(calls).containsExactly("a|9|window");
     }
 
+    /**
+     * Final review M2: quitting and a plugin's drain interrupt a worker in the middle of the hop. It then opens nothing,
+     * the desktop included, keeps its interrupt, and the turn it queued asks nothing when it runs late.
+     */
+    @Test void anInterruptedWorkerOpensNothingKeepsItsInterruptAndItsLateTurnAsksNothing() {
+        List<Runnable> queued = new CopyOnWriteArrayList<>();
+        var hop = new FileEditors(queued::add, () -> false, containment, Duration.ofSeconds(5));
+        var asked = new AtomicBoolean();
+        hop.register("dev.x.a", (file, line, window) -> { asked.set(true); return true; }, FileEditorsTest::noWindow);
+        List<Path> desktop = new CopyOnWriteArrayList<>();
+        Thread.currentThread().interrupt();
+        try {
+            hop.openFromWorker(NOTES, Optional::empty, desktop::add);
+            assertThat(Thread.currentThread().isInterrupted()).as("the interrupt is kept").isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+        assertThat(desktop).as("the desktop does not open it").isEmpty();
+        assertThat(queued).as("the hop was queued").hasSize(1);
+        queued.getFirst().run();
+        assertThat(asked).as("the late turn asks nothing").isFalse();
+    }
+
+    @Test void aWorkerOpensWithTheDesktopWhenNoEditorOrADecliningOneAnswers() {
+        var direct = new FileEditors(Runnable::run, () -> false, containment);
+        List<Path> desktop = new CopyOnWriteArrayList<>();
+        direct.openFromWorker(NOTES, Optional::empty, desktop::add);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        var declining = direct.register("dev.x.a", recording("declining", calls, false), FileEditorsTest::noWindow);
+        direct.openFromWorker(NOTES, Optional::empty, desktop::add);
+        declining.close();
+        direct.register("dev.x.b", recording("opening", calls, true), FileEditorsTest::noWindow);
+        direct.openFromWorker(NOTES, Optional::empty, desktop::add);
+        assertThat(desktop).containsExactly(NOTES, NOTES);
+        assertThat(calls).containsExactly("declining|-|-", "opening|-|-");
+        assertThatIllegalStateException().as("the UI thread never waits for itself")
+            .isThrownBy(() -> editors.openFromWorker(NOTES, Optional::empty, desktop::add));
+    }
+
     @Test void withoutAnEditorAWorkerDoesNotHop() {
         var never = new FileEditors(task -> { throw new AssertionError("nothing to ask"); }, () -> false, containment);
         assertThat(never.editFromWorker(NOTES, OptionalInt.empty(), Optional::empty)).isFalse();

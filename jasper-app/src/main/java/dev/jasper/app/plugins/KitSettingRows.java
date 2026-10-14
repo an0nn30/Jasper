@@ -55,13 +55,11 @@ final class KitSettingRows {
     }
     /** As the generated pages' font editor: free text over the installed families, which filter as you type. */
     private static Nodes.Choice font(String id,ControlState state,SettingSpec<?> spec,String text){
-        var families=dev.jasper.app.settingsui.Editors.fontFamilies(PluginSettingsPage.Hint.of(spec)==PluginSettingsPage.Hint.MONOSPACED_FONT);
-        // The generated pages' own control, built once in the application's types: this is the same node in the SDK's.
-        var built=dev.jasper.app.settingsui.Editors.fontChoice(id,KitValues.toModule(state),families,spec.label(),text);
-        var options=built.options().stream().map(option -> new Option(option.id(),option.label(),Optional.empty())).toList();
-        var search=built.search().orElseThrow();
-        return new Nodes.Choice(id,state,Nodes.ChoiceKind.SEARCHABLE,options,built.selectedId(),built.label(),built.action(),built.icon(),
-            Optional.of(new Nodes.ChoiceSearch(search.pinned(),search.noMatches(),search.entry(),search.placeholder())));
+        List<String> families=dev.jasper.app.settingsui.Editors.fontFamilies(PluginSettingsPage.Hint.of(spec)==PluginSettingsPage.Hint.MONOSPACED_FONT);
+        var options=new ArrayList<Option>();
+        for(int i=0;i<families.size();i++)options.add(new Option("family-"+i,families.get(i),Optional.empty()));
+        return new Nodes.Choice(id,state,Nodes.ChoiceKind.SEARCHABLE,options,"",spec.label(),"","",
+            Optional.of(new Nodes.ChoiceSearch(0,dev.jasper.app.settingsui.Editors.NO_FONT_MATCHES,Optional.of(text))));
     }
     /** Where a path's Browse starts: the current path, when the text is one. */
     private static Optional<java.nio.file.Path> initial(String current){

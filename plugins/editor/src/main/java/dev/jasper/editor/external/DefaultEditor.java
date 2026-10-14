@@ -190,7 +190,10 @@ public final class DefaultEditor {
         found.ifPresent(saved -> detected = List.of(saved));
     }
 
-    /** @return what the last detection found, in the known editors' order; empty before the first */
+    /**
+     * @return what the last detection found, in the known editors' order; before the first, the saved editor alone
+     *     when {@link #findSaved} found it, else empty
+     */
     public List<Detected> detected() { return detected; }
 
     /**

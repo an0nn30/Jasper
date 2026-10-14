@@ -81,8 +81,10 @@ public final class CommandInstall {
      * installed app image, else in a development run {@code developmentClient} (the {@code jasper.commandClient}
      * property the build sets), else none.
      *
+     * @param osName the {@code os.name} property, which says where the app image keeps the command
      * @param appPath the launcher's path ({@code jpackage.app-path}); null or blank in a development run
      * @param developmentClient the built client's path, or null or blank
+     * @return the command's path; empty when there is no app image and no usable development client
      */
     public static Optional<Path> client(String osName, String appPath, String developmentClient) {
         Optional<Path> installed = clientIn(osName, appPath);

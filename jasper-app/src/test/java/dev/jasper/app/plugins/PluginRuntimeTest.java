@@ -531,6 +531,24 @@ class PluginRuntimeTest {
         assertThat(Files.readAllLines(edited)).as("a stopped plugin's editor is not asked").containsExactly("during.txt");
     }
 
+    /** Final review M2: quitting interrupts the worker opening a file; the desktop then does not open it either. */
+    @Test void anInterruptedOpenSkipsTheDesktopAndKeepsTheInterrupt() throws Exception {
+        editorPlugin(root.resolve("bundled").resolve("dev.example.editor"), "dev.example.editor");
+        PluginRuntime runtime = runtime(root.resolve("bundled"), root.resolve("absent"), null, false, new ArrayList<>());
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        List<Path> desktop = new CopyOnWriteArrayList<>();
+        Thread.currentThread().interrupt();
+        try {
+            runtime.open(root.resolve("quitting.txt"), desktop::add);
+            assertThat(Thread.currentThread().isInterrupted()).as("the interrupt is kept").isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+        assertThat(desktop).as("the desktop does not open it").isEmpty();
+        onEdt(runtime::stop);
+    }
+
     /** Review Focus 3: Open in Editor creates a missing config.toml from its template, then the provided editor opens it. */
     @Test void aMissingConfigTomlIsCreatedFromTheTemplateAndThenTheProvidedEditorOpensIt() throws Exception {
         editorPlugin(root.resolve("bundled").resolve("dev.example.editor"), "dev.example.editor");

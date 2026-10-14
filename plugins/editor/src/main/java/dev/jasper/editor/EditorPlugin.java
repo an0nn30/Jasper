@@ -117,7 +117,13 @@ public final class EditorPlugin implements Plugin {
         defaults.findSaved();
         defaults.detect();
         context.terminals().environment(defaults::variables);
-        context.platform().editor(defaults::edit);
+        try {
+            context.platform().editor(defaults::edit);
+        } catch (IllegalStateException provided) {
+            // A bundled Editor replaces another plugin's editor; a copy that is not bundled keeps running without it.
+            context.log().log(System.Logger.Level.INFO, "Another plugin provides the editor Jasper opens files with, so the default "
+                + "editor setting does not choose it: " + provided.getMessage());
+        }
         context.settings().page(new EditorSettingsPanel(context.kit(), settings, defaults, System.getenv()));
         context.palette().register(scope);
         PluginMenu file = context.menus().standard(StandardMenu.FILE);

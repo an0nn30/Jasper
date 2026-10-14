@@ -32,8 +32,8 @@ public final class Capabilities {
      */
     public static final String CLIPBOARD_READ = "clipboard.read";
     /**
-     * Adding variables, such as {@code EDITOR}, to the environment of new local shells with
-     * {@code Terminals.environment}. @since 0.17.1
+     * Adding variables, such as {@code EDITOR}, to the environment of new local shells and of the programs that
+     * {@code LocalSpec.command} runs in tabs and splits, with {@code Terminals.environment}. @since 0.17.1
      */
     public static final String TERMINAL_ENVIRONMENT = "terminal.environment";
     /** Being the editor Jasper opens files with, through {@code Platform.editor}. @since 0.17.1 */

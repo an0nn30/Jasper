@@ -484,7 +484,7 @@ name steps.
 ### Editor
 
 The bundled Editor reads `plugins/dev.jasper.editor/dev.jasper.editor.toml` (see [Plugins](#plugins)):
-`font_family`, `font_size`, `tab_size`, `soft_wrap`, `max_file_mib`, `vim` and the [default editor](editor.md#default-editor)'s `default_editor`, `custom_command`, `custom_in_terminal` and `keep_environment_editor`, applied live; they are also on its page under Settings › Tools. See
+`font_family`, `font_size`, `tab_size`, `soft_wrap`, `max_file_mib`, `vim`, `recent_files_days` and the [default editor](editor.md#default-editor)'s `default_editor`, `custom_command`, `custom_in_terminal` and `keep_environment_editor`, applied live; they are also on its page under Settings › Tools. See
 [Editor](editor.md#settings) for defaults and ranges.
 
 ### Live settings and temporary choices

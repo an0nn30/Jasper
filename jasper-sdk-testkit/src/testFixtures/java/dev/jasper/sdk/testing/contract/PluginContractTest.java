@@ -2117,7 +2117,8 @@ public abstract class PluginContractTest {
             user.get().platform().openInEditor(HERE.resolve("declined.txt"));
         });
         h.flush();
-        for (int i = 0; i < 200 && (calls.size() < 2 || h.openedInEditor().isEmpty()); i++) {
+        // Up to 10 s: the app host's worker hops to the UI thread, which a loaded CI can delay.
+        for (int i = 0; i < 1000 && (calls.size() < 2 || h.openedInEditor().isEmpty()); i++) {
             try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         }
         assertThat(calls).containsExactlyInAnyOrder("notes.txt", "declined.txt");

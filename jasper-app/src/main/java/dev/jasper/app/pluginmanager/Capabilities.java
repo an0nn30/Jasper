@@ -9,7 +9,7 @@ final class Capabilities {
             case "terminal.observe" -> "See your terminals: titles, folders, the commands you run and how they end";
             case "terminal.selection" -> "Read the text you select in a terminal";
             case "terminal.inject" -> "Type into your terminals";
-            case "terminal.open" -> "Open terminal tabs, splits and windows";
+            case "terminal.open" -> "Open terminal tabs, splits and windows, and run programs in them";
             case "session.provide" -> "Run its own terminal sessions, such as remote connections";
             case "palette.contribute" -> "Add scopes to the command palette and open it";
             case "files.source" -> "Add places, such as saved hosts, to the file chooser";

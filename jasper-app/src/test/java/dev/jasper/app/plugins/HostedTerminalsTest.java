@@ -5,6 +5,7 @@ import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.MissingCapabilityException;
 import dev.jasper.sdk.terminal.Direction;
+import dev.jasper.sdk.terminal.LocalSpec;
 import dev.jasper.sdk.terminal.OpenRequest;
 import dev.jasper.sdk.terminal.PaneHandle;
 import dev.jasper.sdk.terminal.PaneInfo;
@@ -20,7 +21,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.*;
@@ -213,6 +219,48 @@ class HostedTerminalsTest {
         assertThat(split.tab().id()).isEqualTo(tab);
         assertThat(fixture.opened()).containsExactly("tab|" + window + "|" + Path.of("/tmp").toAbsolutePath(), "split|" + only + "|DOWN|-");
         assertThat(terminals.split(terminals.paneHandle(UUID.randomUUID()), Direction.RIGHT, OpenRequest.local())).isEmpty();
+    }
+
+    /** Final review M3: a program tab's audit line names the program's file name, never its folder or arguments. */
+    @Test void theAuditLineNamesATabOrSplitsProgramByItsFileNameOnly() {
+        HostedTerminals terminals = terminals(Capabilities.TERMINAL_OPEN);
+        UUID window = fixture.addWindow(), tab = fixture.addTab(window, "build"), only = fixture.addPane(tab, "make", Path.of("/src"));
+        List<String> lines = audited(() -> {
+            terminals.openTab(terminals.windowHandle(window), OpenRequest.local(LocalSpec.running(
+                List.of("/opt/homebrew/bin/nvim", "+3", "/Users/dana/secret notes.txt"), Optional.empty())));
+            terminals.split(terminals.paneHandle(only), Direction.DOWN, OpenRequest.local(LocalSpec.running(
+                List.of("C:\\Tools\\hx.exe", "secret.txt"), Optional.empty())));
+            terminals.openTab(terminals.windowHandle(window), OpenRequest.local());
+        });
+        assertThat(lines).containsExactly(
+            "Plugin dev.x.tool used terminal.open: opened a tab in window " + window + " running nvim",
+            "Plugin dev.x.tool used terminal.open: split pane " + only + " running hx.exe",
+            "Plugin dev.x.tool used terminal.open: opened a tab in window " + window);
+    }
+
+    /** What the plugin audit log records while {@code action} runs. */
+    private static List<String> audited(Runnable action) {
+        Logger logger = Logger.getLogger("dev.jasper.app.plugins.audit");
+        Level previousLevel = logger.getLevel();
+        boolean previousParents = logger.getUseParentHandlers();
+        List<String> lines = new CopyOnWriteArrayList<>();
+        Handler handler = new Handler() {
+            @Override public void publish(LogRecord record) { lines.add(record.getMessage()); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        handler.setLevel(Level.ALL);
+        logger.addHandler(handler);
+        logger.setLevel(Level.ALL);
+        logger.setUseParentHandlers(false);
+        try {
+            action.run();
+        } finally {
+            logger.removeHandler(handler);
+            logger.setLevel(previousLevel);
+            logger.setUseParentHandlers(previousParents);
+        }
+        return lines;
     }
 
     @Test void anEnvironmentContributorNeedsTheCapabilityAndTheUiThreadAndEndsWithThePlugin() {

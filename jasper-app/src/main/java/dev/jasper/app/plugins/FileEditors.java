@@ -99,7 +99,9 @@ final class FileEditors {
 
     /**
      * As {@link #edit}, from a worker: hops to the UI thread, reads {@code window} there, and waits at most 30 seconds.
-     * A timeout or an interrupt gives false, with a log line, and a late turn on the UI thread then asks nothing.
+     * A timeout or an interrupt gives false, with a log line, and a late turn on the UI thread then asks nothing. An
+     * interrupt also stays set on the thread, which tells it from a decline: {@link #openFromWorker} then skips the
+     * desktop.
      *
      * @throws IllegalStateException on the UI thread
      */
@@ -131,11 +133,30 @@ final class FileEditors {
         } catch (InterruptedException interrupted) {
             abandoned.set(true);
             Thread.currentThread().interrupt();
-            LOG.log(System.Logger.Level.WARNING, "Interrupted while the plugin editor opened " + file + "; it opens with the desktop");
+            LOG.log(System.Logger.Level.WARNING, "Interrupted while asking the plugin editor to open " + file);
             return false;
         } catch (ExecutionException failure) {
             LOG.log(System.Logger.Level.WARNING, "Could not ask the plugin editor to open " + file, failure.getCause());
             return false;
         }
+    }
+
+    /**
+     * Opens {@code file} from a worker, as Jasper's own opens and {@code Platform.openInEditor} do: {@link #editFromWorker}
+     * without a line, then {@code desktop} when that gives false. An interrupted worker (Jasper quitting, or the asking
+     * plugin's drain) opens nothing more and keeps its interrupt.
+     *
+     * @param window read on the UI thread: the terminal window the open came from
+     * @param desktop the desktop's opener; its failure propagates
+     * @throws IllegalStateException on the UI thread
+     */
+    void openFromWorker(Path file, Supplier<Optional<UUID>> window, Consumer<Path> desktop) {
+        Objects.requireNonNull(desktop, "desktop");
+        if (editFromWorker(file, OptionalInt.empty(), window)) return;
+        if (Thread.currentThread().isInterrupted()) {
+            LOG.log(System.Logger.Level.INFO, "The worker was interrupted, so the desktop does not open " + file);
+            return;
+        }
+        desktop.accept(file);
     }
 }
