@@ -59,10 +59,14 @@ public final class HeapThreshold implements AutoCloseable {
         }
     }
 
-    /** Among {@code pools}, the heap pool with a collection-usage threshold and the largest maximum. */
+    /**
+     * Among {@code pools}, the old generation: the heap pool that supports both usage thresholds (young pools support only
+     * collection-usage thresholds), with the largest maximum.
+     */
     static Optional<MemoryPoolMXBean> pool(List<MemoryPoolMXBean> pools) {
         return pools.stream()
-            .filter(pool -> pool.getType() == MemoryType.HEAP && pool.isCollectionUsageThresholdSupported())
+            .filter(pool -> pool.getType() == MemoryType.HEAP
+                && pool.isUsageThresholdSupported() && pool.isCollectionUsageThresholdSupported())
             .filter(pool -> pool.getUsage() != null && pool.getUsage().getMax() > 0)
             .max(Comparator.comparingLong(pool -> pool.getUsage().getMax()));
     }
