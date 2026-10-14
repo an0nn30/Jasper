@@ -189,9 +189,9 @@ and calls `Palette.open`. `plugins.HostedPalette` adapts an SDK scope: contained
 `PaletteQuery` built from the target's window and pane ids through the plugin's own handles, and
 the plugin's row kept as the app row's token so it comes back unchanged. Every scope gets a tab;
 `ScopeSpec.inAll` (SDK 0.8.0, `withInAll(false)` to opt out) decides whether the All tab searches it
-too, and `HostedPalette` carries it as `PaletteScope.inAll()`. `platform().openInEditor` runs the application's
-`ConfigEditor` on the plugin's executor and posts a failure in the plugin's notification group, and
-`platform().browse` does the same with `platform.Browser` after refusing anything but an http or https address. `PaneInfo.shell` is
+too, and `HostedPalette` carries it as `PaletteScope.inAll()`. `platform().openInEditor` asks the provided file
+editor (SDK 0.17.1, below) and then the application's `ConfigEditor`, from the plugin's executor, and posts a failure
+in the plugin's notification group, and `platform().browse` does the same with `platform.Browser` after refusing anything but an http or https address. `PaneInfo.shell` is
 `PaneSnapshot.shell`, the pane's launcher label. The bundled History and Snippets plugins are the first
 contributors; `stagePlugins` copies each plugin's jar and runtime classpath into `lib/plugins/<id>/`.
 
@@ -287,6 +287,22 @@ subcommand calls: it hops to the UI thread, runs the handler inside containment,
 with the plugin, and `PluginCommands` then ends the plugin's calls still running with exit code 1. The testkit's
 `FakeCommandLine` and `FakeCommandCall` do the same in memory, and `PluginContractTest` holds both hosts to one contract.
 
+## Shell variables, the file editor and program tabs (SDK 0.17.1)
+
+`Terminals.environment` (needs `terminal.environment`) registers a contributor in `plugins.ShellContributions`. For each
+local launch the application asks every contributor on the UI thread, with Jasper's own environment, and merges the
+answers: the first plugin by id keeps a name two set; reserved, malformed and NUL-holding entries are dropped and logged
+once per plugin and name; a contributor that throws adds nothing and counts as a plugin failure. `LaunchSettings` puts
+them after Jasper's own variables and before `[terminal.env]`; WSL profiles and provided sessions get none.
+`Platform.editor` (needs `editor.provide`) registers a `FileEditor` in `plugins.FileEditors`, one at a time, a bundled
+plugin's replacing a non-bundled plugin's. Every editor open in the application (`ConfigEditor`'s callers, the Plugin
+Manager's settings files, the VM options file and `Platform.openInEditor`) runs on a worker, which asks the file editor
+on the UI thread through `FileEditors.editFromWorker`, waits up to 30 s, and otherwise runs the desktop fallback itself.
+`LocalSpec.command` becomes `terminals.OpenSpec.Local.program`; the workspace launches it through `ShellLauncher` with
+the default profile's environment and pins close-on-success over `terminal.on_exit`. `CommandLine.client()` comes from
+`commandline.CommandInstall.client`: the client inside the installed image, or the build's in a development run. The
+testkit's `FakePluginHost` models all four, and `PluginContractTest` holds both hosts to them.
+
 ## Contract suite
 
 `PluginContractTest` states the semantics once. `FakeContractTest` runs it against the
@@ -295,8 +311,7 @@ disagree, the implementation is wrong, not the contract.
 
 ## Not yet implemented
 
-Explicit commands in `LocalSpec`, and a stronger locality signal than the host name, such as a
-per-session token from Jasper's own shell integration.
+A stronger locality signal than the host name, such as a per-session token from Jasper's own shell integration.
 
 ## Semantic presentation icons (SDK 0.15)
 
@@ -472,8 +487,8 @@ does not list logs a warning and makes `openTab` and `split` return empty, rathe
 default shell. An empty profile means what Jasper's own New Tab or Split would start. The catalog
 reaches `dev.jasper.app.plugins` as `PluginRuntime.ShellProfiles`, a supplier and a listener
 registration, so the plugin runtime depends only on the `launch.ShellProfile` value; listener
-registrations close with the plugin. Plugins open only shells the application detected: explicit
-commands in `LocalSpec` remain a separate decision. Remote uses this for its WSL group.
+registrations close with the plugin. A `LocalSpec` names a profile or, since SDK 0.17.1, a
+command, not both. Remote uses profiles for its WSL group.
 
 ### Per-window panel header metadata (SDK 0.14.2)
 

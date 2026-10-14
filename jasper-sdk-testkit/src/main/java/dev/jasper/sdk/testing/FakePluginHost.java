@@ -1554,7 +1554,7 @@ public final class FakePluginHost implements AutoCloseable {
         /** Every {@code Palette.open} call as {@code windowId scopeId query rowId}, with {@code -} for an absent value. */
         public List<String> paletteOpens() { return List.copyOf(paletteOpens); }
 
-        /** Every file a plugin asked to open in the editor. */
+        /** Every file a plugin asked to open in the editor that no provided editor opened (the desktop's share). */
         public List<Path> openedInEditor() { return List.copyOf(openedInEditor); }
 
     /**

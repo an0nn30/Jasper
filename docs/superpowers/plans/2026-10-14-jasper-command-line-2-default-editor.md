@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: **Written 2026-10-14** on `claude/default-editor` (from `main` at `af590a97`, plan 1 merged). Not started.
+Status: **Complete on 2026-10-14** (written 2026-10-14 on `claude/default-editor`, from `main` at `af590a97`, plan 1 merged). Execution deviations: (1) on Windows a custom command runs as `cmd.exe /d /s /c "<line>"`, so a quoted program path keeps its quotes (Task 7).
 
 **Goal:** Users pick a default editor on the Editor's settings page — the Jasper Editor (the default), an editor
 installed on the machine, a custom command, or the system's — and Jasper's shells get `EDITOR`/`VISUAL` for it, while
