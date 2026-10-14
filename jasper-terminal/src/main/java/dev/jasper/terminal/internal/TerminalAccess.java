@@ -96,8 +96,9 @@ public final class TerminalAccess implements AutoCloseable {
     public Optional<String> linkAt(long absoluteRow, int column) { return queries.linkAt(absoluteRow, column); }
     /**
      * The file a click at an absolute row and column names: an OSC 8 or plain-text {@code file} link that this session's
-     * directory rule places on this machine, else a path written in the soft-wrapped line; {@code windows} admits
-     * {@code C:\} and backslash paths. Unsupported module collaboration API.
+     * directory rule places on this machine (a plain-text one with the line and column that end it), else a path
+     * written in the soft-wrapped line; {@code windows} admits {@code C:\} and backslash paths. Unsupported module
+     * collaboration API.
      */
     public Optional<FileTarget> fileLinkAt(long absoluteRow, int column, boolean windows) {
         return queries.fileLinkAt(absoluteRow, column, windows, provenance::localPath);

@@ -176,9 +176,9 @@ public final class PathDetector {
     /**
      * {@code :LINE} or {@code :LINE:COLUMN} at {@code colon}, as {@code {line, column, end}}; null when no line follows.
      * A line or column ends at the token's end or at punctuation; what follows that, such as grep's matched text, is
-     * not part of the match.
+     * not part of the match. {@link LinkDetector#splitPosition} reads a {@code file://} URL's position with the same rule.
      */
-    private static int[] lineAfterColon(String text, int colon, int tokenEnd) {
+    static int[] lineAfterColon(String text, int colon, int tokenEnd) {
         int lineEnd = digits(text, colon + 1, tokenEnd);
         if (lineEnd < 0 || !endsNumber(text, lineEnd, tokenEnd)) return null;
         int line = number(text, colon + 1, lineEnd);

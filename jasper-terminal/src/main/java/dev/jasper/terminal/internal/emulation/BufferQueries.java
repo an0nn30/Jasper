@@ -285,7 +285,8 @@ public final class BufferQueries {
      * The file a click at an absolute row and column names. An OSC 8 link on the cell counts when {@code localFiles}
      * maps it to this machine; a cell with any other OSC 8 target names nothing, whatever its text says. Otherwise the
      * soft-wrapped rows around the row are joined under the lock, as for URLs, and read after it: a plain-text
-     * {@code file://} URL under the column counts the same way, and anything else is left to {@link PathDetector}.
+     * {@code file://} URL under the column counts the same way, with the line and column it ends in, and anything
+     * else is left to {@link PathDetector}.
      *
      * @param absoluteRow the clicked row
      * @param column the clicked column
@@ -308,17 +309,21 @@ public final class BufferQueries {
             buffer.unlock();
         }
         // Match outside the lock, as search does, so a long logical line cannot stall the reader thread.
-        if (link != null) return localFile(link, localFiles);
+        // An OSC 8 target is an exact URI: a colon and digits at its end are part of the path.
+        if (link != null) return localFile(link, 0, 0, localFiles);
         if (wrapped.isEmpty()) return Optional.empty();
         RowText text = wrapped.get().text();
         int at = wrapped.get().column();
         Optional<String> url = LinkDetector.fileUrlAt(text, at);
-        if (url.isPresent()) return localFile(url.get(), localFiles);
+        if (url.isPresent()) {
+            LinkDetector.UrlPosition split = LinkDetector.splitPosition(url.get());
+            return localFile(split.url(), split.line(), split.column(), localFiles);
+        }
         return PathDetector.pathAt(text, at, windows).map(match -> new FileTarget(match.path(), match.line(), match.column()));
     }
 
-    private static Optional<FileTarget> localFile(String uri, Function<String, Optional<Path>> localFiles) {
-        return localFiles.apply(uri).map(path -> new FileTarget(path.toString(), 0, 0));
+    private static Optional<FileTarget> localFile(String uri, int line, int column, Function<String, Optional<Path>> localFiles) {
+        return localFiles.apply(uri).map(path -> new FileTarget(path.toString(), line, column));
     }
 
     /** Soft-wrapped rows joined into one, and the clicked column on it. */

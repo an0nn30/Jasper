@@ -290,6 +290,22 @@ class TerminalViewInteractionTest {
         assertThat(opened).as("a file link is not for the browser").isEmpty();
     }
 
+    /** A plain-text {@code file://} URL as Kotlin prints one carries its line and column; the browser hears nothing. */
+    @Test
+    void aPlainTextFileUrlReachesTheFileLinkHandlerWithItsLineAndColumn() throws Exception {
+        List<FileLink> clicked = new ArrayList<>();
+        List<String> opened = new ArrayList<>();
+        view.setFileLinkHandler(clicked::add);
+        view.setLinkOpener(opened::add);
+        show("e: file:///tmp/Foo.kt:12:5 boom", 1, "t:12:5 boom");
+
+        view.handleMouse(press(5, 0, 1, LINK));
+        view.handleMouse(release(5, 0));
+
+        assertThat(clicked).containsExactly(new FileLink(Path.of("/tmp/Foo.kt").toString(), 12, 5));
+        assertThat(opened).as("a file link is not for the browser").isEmpty();
+    }
+
     /** Review Focus 5: a URL still opens the browser, and the file link handler hears nothing. */
     @Test
     void aUrlStillOpensTheBrowserWhenFileLinksAreHandled() throws Exception {

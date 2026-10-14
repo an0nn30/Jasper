@@ -35,6 +35,29 @@ class LinkDetectorTest {
     }
 
     @Test
+    void aFileUrlGivesUpItsTrailingLineAndColumn() {
+        assertThat(LinkDetector.splitPosition("file:///tmp/Foo.kt:12:5")).isEqualTo(new LinkDetector.UrlPosition("file:///tmp/Foo.kt", 12, 5));
+        assertThat(LinkDetector.splitPosition("file:///tmp/Foo.kt:12")).isEqualTo(new LinkDetector.UrlPosition("file:///tmp/Foo.kt", 12, 0));
+        assertThat(LinkDetector.splitPosition("file:///tmp/Foo.kt")).isEqualTo(new LinkDetector.UrlPosition("file:///tmp/Foo.kt", 0, 0));
+    }
+
+    @Test
+    void aFileUrlKeepsItsTextWhenWhatFollowsTheColonIsNoLine() {
+        assertThat(LinkDetector.splitPosition("file:///tmp/Foo.kt:1234567890")).as("more digits than a line has")
+            .isEqualTo(new LinkDetector.UrlPosition("file:///tmp/Foo.kt:1234567890", 0, 0));
+        assertThat(LinkDetector.splitPosition("file:///tmp/a:12/b.txt")).as("a digit group inside the path")
+            .isEqualTo(new LinkDetector.UrlPosition("file:///tmp/a:12/b.txt", 0, 0));
+        assertThat(LinkDetector.splitPosition("file://localhost:12")).as("a port-like host is no position")
+            .isEqualTo(new LinkDetector.UrlPosition("file://localhost:12", 0, 0));
+    }
+
+    @Test
+    void aDriveColonInAFileUrlIsNoPosition() {
+        assertThat(LinkDetector.splitPosition("file:///C:/x/Foo.kt:12")).isEqualTo(new LinkDetector.UrlPosition("file:///C:/x/Foo.kt", 12, 0));
+        assertThat(LinkDetector.splitPosition("file:///C:/x/Foo.kt")).isEqualTo(new LinkDetector.UrlPosition("file:///C:/x/Foo.kt", 0, 0));
+    }
+
+    @Test
     void textWithoutAUrlFindsNothing() {
         assertThat(LinkDetector.urlAt(row("no links here"), 3)).isEmpty();
     }

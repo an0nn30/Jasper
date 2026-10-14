@@ -212,6 +212,39 @@ class SessionInputTest {
         assertThat(session.internalAccess().fileLinkAt(1, 3, false)).as("another host, and no path either").isEmpty();
     }
 
+    /** Kotlin and Gradle print {@code e: file:///…/Foo.kt:12:5 message}; the URL wraps onto row 1 here. */
+    @Test
+    void aPlainTextFileUrlCarriesItsLineAndColumn() throws Exception {
+        feedAll("e: file:///tmp/Foo.kt:12:5 boom");
+
+        var expected = new FileTarget(Path.of("/tmp/Foo.kt").toString(), 12, 5);
+        assertThat(session.internalAccess().fileLinkAt(0, 5, false)).contains(expected);
+        assertThat(session.internalAccess().fileLinkAt(1, 3, false)).as("a click on the position").contains(expected);
+        assertThat(session.internalAccess().fileLinkAt(1, 8, false)).as("the message after it").isEmpty();
+    }
+
+    @Test
+    void aPlainTextFileUrlWithOnlyALineAndTrailingPunctuationHasThatLine() throws Exception {
+        feedAll("file:///tmp/Bar.kt:7.");
+
+        assertThat(session.internalAccess().fileLinkAt(0, 3, false)).contains(new FileTarget(Path.of("/tmp/Bar.kt").toString(), 7, 0));
+    }
+
+    @Test
+    void aPlainTextFileUrlWithADigitRunTooLongForALineKeepsItsText() throws Exception {
+        feedAll("file:///tmp/Baz.kt:1234567890");
+
+        assertThat(session.internalAccess().fileLinkAt(0, 3, false))
+            .contains(new FileTarget(Path.of("/tmp/Baz.kt:1234567890").toString(), 0, 0));
+    }
+
+    @Test
+    void anOsc8FileLinkTargetIsAnExactUriWithoutAPosition() throws Exception {
+        feedAll("\033]8;;file:///tmp/a:12\007notes\033]8;;\007");
+
+        assertThat(session.internalAccess().fileLinkAt(0, 1, false)).contains(new FileTarget(Path.of("/tmp/a:12").toString(), 0, 0));
+    }
+
     @Test
     void aPathIsAFileLinkWithItsLineAndColumn() throws Exception {
         feedAll("src/A.java:42:5: e");
