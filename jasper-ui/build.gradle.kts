@@ -21,6 +21,7 @@ tasks.test {
     inputs.files(rootProject.fileTree("docs") { include("**/*.md") }, file("README.md"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(rootProject.file("tools/themes/testdata/expected")).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(rootProject.file("tools/themes/testdata/intellij/loose")).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 tasks.register<JavaExec>("gallery") {
     dependsOn(tasks.testClasses)

@@ -96,7 +96,7 @@ class ThemeLibraryTest {
         assertThat(library.imported()).isEmpty();
         assertThat(library.problems()).singleElement().satisfies(problem -> {
             assertThat(problem.file().getFileName().toString()).isEqualTo("deep.json");
-            assertThat(problem.message()).isEqualTo("Objects nested more than 8 deep");
+            assertThat(problem.message()).isEqualTo("Objects and arrays nested more than 8 deep");
         });
     }
 

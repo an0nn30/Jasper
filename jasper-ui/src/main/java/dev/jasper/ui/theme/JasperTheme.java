@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -219,16 +220,17 @@ public final class JasperTheme {
             if (!(values.get(key) instanceof String value)) throw error(where + "." + key + ": Expected a reference");
             return value;
         };
-        Color background = reference(text.apply("background"), dark, palette, null, where + ".background").color();
-        Function<String, Color> surface = key -> {
-            var resolved = reference(text.apply(key), dark, palette, background, where + "." + key);
+        BiFunction<String, Color, Color> surface = (key, under) -> {
+            var resolved = reference(text.apply(key), dark, palette, under, where + "." + key);
             if (resolved.bold() || resolved.italic()) throw error(where + "." + key + ": A surface takes no style");
             return resolved.color();
         };
+        Color background = surface.apply("background", null);
         for (var role : SyntaxRole.values())
             syntax.put(role, reference(text.apply(role.key()), dark, palette, background, where + "." + role.key()));
-        return new EditorColors(background, surface.apply("foreground"), surface.apply("caret"), surface.apply("selection"),
-            surface.apply("currentLine"), surface.apply("gutter"), surface.apply("lineNumbers"));
+        return new EditorColors(background, surface.apply("foreground", background), surface.apply("caret", background),
+            surface.apply("selection", background), surface.apply("currentLine", background), surface.apply("gutter", background),
+            surface.apply("lineNumbers", background));
     }
 
     /**
@@ -237,7 +239,7 @@ public final class JasperTheme {
      * colour and style flags); a share lays the colour over {@code background}.
      */
     private SyntaxStyle reference(String value, boolean dark, SemanticPalette palette, Color background, String where) {
-        String[] parts = value.split(",");
+        String[] parts = value.split(",", -1);
         boolean bold = false, italic = false;
         for (int i = 1; i < parts.length; i++) {
             switch (parts[i].strip()) {

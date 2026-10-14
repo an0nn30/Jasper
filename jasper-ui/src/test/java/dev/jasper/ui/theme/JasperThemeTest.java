@@ -4,10 +4,15 @@ import static org.assertj.core.api.Assertions.*;
 
 import java.awt.Color;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 /** The Jasper theme format (spec section 2): every rule of the file, through the bundled file and small variations. */
 class JasperThemeTest {
+    static final Path THEME_TOOL_DATA = Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize()
+        .resolve("tools/themes/testdata");
+
     static String bundledJson() throws Exception {
         try (var in = JasperThemeTest.class.getResourceAsStream(JasperTheme.RESOURCE)) {
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
@@ -93,7 +98,10 @@ class JasperThemeTest {
             .hasMessageContaining("ui: Unknown variant \"pale\"");
         assertThat(failure(json.replace("\"light\": {\n      \"name\": \"Slate Steel Light\"", "\"pale\": {\n      \"name\": \"Slate Steel Light\"")))
             .hasMessageContaining("ui.light: Missing its matching scheme \"terminal.light\"");
-        assertThat(failure(json.replaceFirst("(?s)\"editor\": \\{.*}\\s*}\\s*$", "\"x\": \"y\" }"))).hasMessageContaining("Unknown entry \"x\"");
+        assertThat(failure(json.replaceFirst("(?s),\\s*\"editor\": \\{.*}\\s*}\\s*$", "\n}"))).as("ui without editor")
+            .hasMessage("t.json: Missing object \"editor\"");
+        assertThat(failure(json.replaceFirst("(?s),\\s*\"light\": \\{\\s*\"background\": \"terminal.bg\"[^}]*}", ""))).as("editor missing a variant")
+            .hasMessage("t.json: editor: Missing variant \"light\"");
         assertThat(failure(GRUVBOX.replace("\"name\": \"Gruvbox Dark\",\n", "\"name\": \"Gruvbox Dark\", \"ui\": {},\n")))
             .hasMessageContaining("ui: Expected \"dark\", \"light\" or both");
         assertThat(failure(GRUVBOX.replace("\"name\": \"Gruvbox Dark\",\n", "\"name\": \"Gruvbox Dark\", \"editor\": {},\n")))
@@ -129,6 +137,72 @@ class JasperThemeTest {
         assertThat(failure(json.replaceFirst("terminal.ansi.bright.black, italic", "terminal.ansi.bright.black, wavy"))).hasMessageContaining("wavy");
         assertThat(failure(GRUVBOX.replace("\"name\": \"Gruvbox Dark\",\n", "\"name\": \"Gruvbox Dark\", \"ui\": \"x\",\n")))
             .hasMessageContaining(": ui: Expected an object");
+    }
+
+    @Test void aSurfaceTakesNoStyleAndAnEmptyStyleIsRefused() throws Exception {
+        String json = bundledJson();
+        assertThat(failure(json.replaceFirst("\"background\": \"terminal.bg\"", "\"background\": \"terminal.bg, bold\"")))
+            .hasMessage("t.json: editor.dark.background: A surface takes no style");
+        assertThat(failure(json.replaceFirst("\"background\": \"terminal.bg\"", "\"background\": \"#101010, italic\"")))
+            .hasMessage("t.json: editor.dark.background: A surface takes no style");
+        assertThat(failure(json.replaceFirst("\"background\": \"terminal.bg\"", "\"background\": \"terminal.bg,\"")))
+            .hasMessage("t.json: editor.dark.background: Unknown style \"\"");
+        assertThat(failure(json.replaceFirst("\"keyword\": \"terminal.ansi.magenta\"", "\"keyword\": \"terminal.ansi.magenta,\"")))
+            .hasMessage("t.json: editor.dark.keyword: Unknown style \"\"");
+        assertThat(failure(json.replaceFirst("\"keyword\": \"terminal.ansi.magenta\"", "\"keyword\": \"terminal.ansi.magenta, bold,\"")))
+            .hasMessage("t.json: editor.dark.keyword: Unknown style \"\"");
+        assertThat(failure(json.replaceFirst("\"keyword\": \"terminal.ansi.magenta\"", "\"keyword\": \"terminal.ansi.magenta,, bold\"")))
+            .hasMessage("t.json: editor.dark.keyword: Unknown style \"\"");
+    }
+
+    @Test void aShareOfALiteralEditorColourLiesOverTheEditorBackground() throws Exception {
+        var theme = JasperTheme.parse(bundledJson().replaceFirst("\"gutter\": \"terminal.bg\"", "\"gutter\": \"#102030 @ 20%\"")
+            .replaceFirst("\"keyword\": \"terminal.ansi.magenta\"", "\"keyword\": \"#FF79C6 @ 50%, bold\""), "t");
+        assertThat(theme.editor(true).gutter()).isEqualTo(ColorMath.mix(new Color(0x102030), theme.editor(true).background(), 0.2));
+        assertThat(theme.syntax(true).get(SyntaxRole.KEYWORD))
+            .isEqualTo(new SyntaxStyle(ColorMath.mix(new Color(0xFF79C6), theme.editor(true).background(), 0.5), true, false));
+    }
+
+    @Test void aUiThemeWithoutAnAuthorHasAnEmptyOne() throws Exception {
+        var theme = JasperTheme.parse(bundledJson().replace("\"author\": \"Jasper\",", ""), "t");
+        assertThat(theme.author()).isEmpty();
+        assertThat(theme.generated(true).author()).isEmpty();
+        assertThat(theme.generated(false).author()).isEmpty();
+        assertThat(JasperTheme.bundled().generated(true).author()).isEqualTo("Jasper");
+    }
+
+    @Test void aFileFromAnotherFormatIsNotAJasperThemeWhateverValuesItHolds() throws Exception {
+        String message = "t.json: Not a Jasper theme: \"jasper-theme\": 1 is missing";
+        assertThat(failure(Files.readString(THEME_TOOL_DATA.resolve("intellij/loose/Ocean.theme.json")))).as("an IntelliJ theme").hasMessage(message);
+        assertThat(failure("""
+            { "name": "Night", "type": "dark", "semanticHighlighting": true, "version": 1.5, "include": null,
+              "colors": { "editor.background": "#1E1E1E" },
+              "tokenColors": [ { "scope": ["comment", "string"], "settings": { "foreground": "#6A9955", "fontStyle": "italic" } } ] }
+            """)).as("a VS Code theme").hasMessage(message);
+        assertThat(failure("{ \"dark\": true, \"jasper-theme-ish\": [] }")).hasMessage(message);
+    }
+
+    @Test void anEntryOfTheWrongKindIsRefusedByNameWhateverItsJsonType() throws Exception {
+        String json = bundledJson();
+        assertThat(failure(json.replaceFirst("\"surface.app\": \"#1E2127\"", "\"surface.app\": true")))
+            .hasMessage("t.json: ui.dark.surface.app: Expected a colour");
+        assertThat(failure(json.replaceFirst("\"surface.app\": \"#1E2127\"", "\"surface.app\": null")))
+            .hasMessage("t.json: ui.dark.surface.app: Expected a colour");
+        assertThat(failure(json.replaceFirst("\"surface.app\": \"#1E2127\"", "\"surface.app\": [\"#1E2127\"]")))
+            .hasMessage("t.json: ui.dark.surface.app: Expected a colour");
+        assertThat(failure(json.replaceFirst("\"keyword\": \"terminal.ansi.magenta\"", "\"keyword\": 1.5")))
+            .hasMessage("t.json: editor.dark.keyword: Expected a reference");
+        assertThat(failure(GRUVBOX.replace("\"bg\": \"#282828\"", "\"bg\": false"))).hasMessage("t.json: terminal.dark.bg: Expected a colour");
+        assertThat(failure(GRUVBOX.replace("\"name\": \"Gruvbox Dark\", \"bg\"", "\"name\": null, \"bg\"")))
+            .hasMessage("t.json: terminal.dark.name: Expected a non-empty string");
+        assertThat(failure(GRUVBOX.replace("\"terminal\": { \"dark\": {", "\"terminal\": { \"dark\": [], \"light\": {")))
+            .hasMessage("t.json: terminal.dark: Expected an object");
+        assertThat(failure(GRUVBOX.replace("\"jasper-theme\": 1", "\"jasper-theme\": true"))).hasMessage("t.json: jasper-theme: Expected the number 1");
+        assertThat(failure(GRUVBOX.replace("\"jasper-theme\": 1", "\"jasper-theme\": 1.0"))).hasMessage("t.json: jasper-theme: Expected the number 1");
+        assertThat(failure(GRUVBOX.replace("\"name\": \"Gruvbox Dark\",\n", "\"name\": \"Gruvbox Dark\", \"author\": null,\n")))
+            .hasMessage("t.json: author: Expected a string");
+        assertThat(failure(GRUVBOX.replace("\"name\": \"Gruvbox Dark\",\n", "\"name\": \"Gruvbox Dark\", \"ui\": [],\n")))
+            .hasMessage("t.json: ui: Expected an object");
     }
 
     @Test void theDetailOmitsTheFileForCallersThatShowItSeparately() throws Exception {
