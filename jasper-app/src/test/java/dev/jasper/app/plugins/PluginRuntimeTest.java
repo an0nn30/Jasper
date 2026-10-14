@@ -263,6 +263,55 @@ class PluginRuntimeTest {
         assertThat(safe.statusLines()).singleElement().asString().contains("DISABLED", "safe mode");
     }
 
+    private static String declaring(String id, String command, String summary) {
+        return PluginJars.descriptor(id, "1.0.0", "fix.probe.Main") + "\n[[subcommands]]\nname = \"" + command + "\"\nsummary = \"" + summary + "\"\n";
+    }
+
+    private static String run(PluginRuntime runtime, String command, int expectedExit) throws Exception {
+        var err = new StringBuffer();
+        var invocation = new dev.jasper.app.commandline.Invocation(List.of(command), Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath(),
+            java.util.Optional.empty(), text -> { }, err::append);
+        assertThat(runtime.commands().dispatch(invocation).toCompletableFuture().get(5, TimeUnit.SECONDS)).as(command).isEqualTo(expectedExit);
+        return err.toString();
+    }
+
+    @Test void aSubcommandOfAPluginThatDoesNotRunIsUnavailableAndNeverUnknown() throws Exception {
+        Path bundled = root.resolve("bundled");
+        Path user = root.resolve("user");
+        PluginJars.build(bundled.resolve("dev.example.alpha"), "alpha.jar", declaring("dev.example.alpha", "alpha", "Runs"),
+            Map.of("fix.probe.Main", FIXTURE), List.of());
+        PluginJars.build(user.resolve("dev.example.beta"), "beta.jar", declaring("dev.example.beta", "beta", "Waits for consent"),
+            Map.of("fix.probe.Main", FIXTURE), List.of());
+        Path list = root.resolve("subcommands.tsv");
+        PluginRuntime runtime = runtime(bundled, user, null, false, new ArrayList<>());
+        onEdt(() -> runtime.subcommandList(list));
+        onEdt(() -> runtime.start(Map.of(), true));
+        assertThat(runtime.statusLines())
+            .anySatisfy(line -> assertThat(line).contains("dev.example.alpha", "ACTIVE"))
+            .anySatisfy(line -> assertThat(line).contains("dev.example.beta", "NEEDS_CONSENT"));
+        assertThat(run(runtime, "beta", 1)).isEqualTo("jasper: beta is unavailable (the dev.example.beta plugin is off)\n");
+        assertThat(run(runtime, "alpha", 1)).as("running, but it never called handle").isEqualTo("jasper: alpha is unavailable (the dev.example.alpha plugin is off)\n");
+        assertThat(run(runtime, "gamma", 2)).isEqualTo("jasper: unknown command gamma; run jasper --help for the list\n");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!Files.exists(list) && System.nanoTime() < deadline) Thread.sleep(10);
+        assertThat(dev.jasper.app.commandline.SubcommandList.read(list)).as("--help lists only what runs").containsExactly(
+            new dev.jasper.app.commandline.SubcommandList.Entry("alpha", "Runs", "dev.example.alpha"));
+        onEdt(runtime::stop);
+    }
+
+    @Test void aSafeModeRunKeepsEverySubcommandNameOwnedAndNoneListed() throws Exception {
+        Path user = root.resolve("user");
+        PluginJars.build(user.resolve("dev.example.beta"), "beta.jar", declaring("dev.example.beta", "beta", "Waits for consent"),
+            Map.of("fix.probe.Main", FIXTURE), List.of());
+        Path list = root.resolve("subcommands.tsv");
+        PluginRuntime safe = runtime(null, user, null, true, new ArrayList<>());
+        onEdt(() -> safe.subcommandList(list));
+        onEdt(() -> safe.start(Map.of(), true));
+        assertThat(safe.statusLines()).singleElement().asString().contains("DISABLED", "safe mode");
+        assertThat(run(safe, "beta", 1)).contains("beta is unavailable");
+        onEdt(safe::stop);
+    }
+
     @Test void aPluginThatCannotLoadIsReportedAndTheRestStillStart() throws Exception {
         Path bundled = root.resolve("bundled");
         probe(bundled, "dev.example.probe");

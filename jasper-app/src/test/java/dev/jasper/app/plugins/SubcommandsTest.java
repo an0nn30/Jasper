@@ -67,6 +67,39 @@ class SubcommandsTest {
             "A plugin command was not added|Second: the subcommand shared is already provided by First");
     }
 
+    @Test void aPluginThatDoesNotLoadStillOwnsANameNobodyElseDeclaresAndNothingIsReported() {
+        var problems = new ArrayList<String>();
+        Subcommands table = Subcommands.choose(
+            List.of(candidate("dev.jasper.history", "History", PluginCandidate.Origin.BUNDLED, "history")),
+            List.of(candidate("dev.jasper.editor", "Editor", PluginCandidate.Origin.BUNDLED, "editor", "history")),
+            (title, details) -> problems.add(title + "|" + details));
+        assertThat(table.owner("editor")).map(Subcommands.Owner::pluginName).contains("Editor");
+        assertThat(table.owner("editor").orElseThrow().summary()).isEqualTo("Summary of editor");
+        assertThat(table.all()).extracting(Subcommands.Owner::name).containsExactly("editor", "history");
+        assertThat(problems).isEmpty();
+    }
+
+    @Test void aPluginThatLoadsKeepsANameAPluginThatDoesNotAlsoDeclaresAndNothingIsReported() {
+        var problems = new ArrayList<String>();
+        Subcommands table = Subcommands.choose(
+            List.of(candidate("zz.user", "Late User", PluginCandidate.Origin.USER, "shared")),
+            List.of(candidate("aa.bundled", "Early Bundled", PluginCandidate.Origin.BUNDLED, "shared")),
+            (title, details) -> problems.add(title + "|" + details));
+        assertThat(table.owner("shared")).map(Subcommands.Owner::pluginId).contains("zz.user");
+        assertThat(problems).isEmpty();
+    }
+
+    @Test void pluginsThatDoNotLoadContestANameInTheSameOrderAsThoseThatDoAndNothingIsReported() {
+        var problems = new ArrayList<String>();
+        Subcommands table = Subcommands.choose(List.of(), List.of(
+            candidate("aa.user", "Early User", PluginCandidate.Origin.USER, "shared"),
+            candidate("zz.bundled", "Late Bundled", PluginCandidate.Origin.BUNDLED, "shared", "other"),
+            candidate("bb.user", "Middle User", PluginCandidate.Origin.USER, "other")), (title, details) -> problems.add(title + "|" + details));
+        assertThat(table.owner("shared")).map(Subcommands.Owner::pluginId).contains("zz.bundled");
+        assertThat(table.owner("other")).map(Subcommands.Owner::pluginId).contains("zz.bundled");
+        assertThat(problems).isEmpty();
+    }
+
     @Test void noPluginsMeansNoSubcommands() {
         assertThat(Subcommands.choose(List.of(), (title, details) -> { }).all()).isEmpty();
         assertThat(Subcommands.NONE.owner("editor")).isEmpty();

@@ -583,7 +583,10 @@ public final class PluginRuntime {
         created.animations = animations;
         created.shortcuts = shortcuts;
         created.clipboard = clipboard;
-        created.commands.declare(Subcommands.choose(resolution.load(), notifications.problem()));
+        Set<String> loadingIds = new HashSet<>();
+        for (PluginCandidate loading : resolution.load()) loadingIds.add(loading.id());
+        List<PluginCandidate> notLoading = byId.values().stream().filter(discovered -> !loadingIds.contains(discovered.id())).toList();
+        created.commands.declare(Subcommands.choose(resolution.load(), notLoading, notifications.problem()));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         connectionBridge = created.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, this::forwardConnection);
