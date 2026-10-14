@@ -1,0 +1,6 @@
+JetBrains Runtime API
+Copyright 2000-2025 JetBrains s.r.o.
+
+Jasper ships jbr-api 1.9.0 with one change to META-INF/MANIFEST.MF: the "Sealed" attribute is removed and the
+attribute "Jasper-Modified: package sealing removed" is added. Classes loaded from Jasper's start-up (AOT) cache
+cannot satisfy package sealing on JetBrains Runtime 25 (OpenJDK bug JDK-8376576). No class or other file is changed.

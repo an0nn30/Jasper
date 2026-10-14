@@ -248,3 +248,88 @@ verifySupport.configure {
         logger.lifecycle('Verified modification-time comparison')
     }
 }
+
+verifySupport.configure {
+    doLast {
+        // Spec 2026-10-14 section 3.1: classes the AOT cache loads get no code source once its training paths are gone,
+        // and a sealed package then refuses its second class, so staging unseals the class path.
+        File jars = new File(temporaryDir, 'sealing')
+        jars.deleteDir()
+        jars.mkdirs()
+        def manifest = new java.util.jar.Manifest()
+        manifest.mainAttributes.putValue('Manifest-Version', '1.0')
+        manifest.mainAttributes.putValue('Sealed', 'true')
+        manifest.mainAttributes.putValue('Multi-Release', 'true')
+        manifest.entries.put('p/', new java.util.jar.Attributes())
+        manifest.entries['p/'].putValue('Sealed', 'true')
+        manifest.entries['p/'].putValue('Implementation-Title', 'P')
+        manifest.entries.put('q/', new java.util.jar.Attributes())
+        manifest.entries['q/'].putValue('Sealed', 'false')
+        long stamp = 1_759_400_000_000L
+        File sealed = new File(jars, 'sealed.jar')
+        sealed.withOutputStream { raw ->
+            new java.util.jar.JarOutputStream(raw, manifest).withCloseable { out ->
+                [['p/', null], ['p/A.class', 'class A'], ['q/B.class', 'class B']].each { String name, String body ->
+                    def entry = new java.util.zip.ZipEntry(name)
+                    entry.time = stamp
+                    if (name == 'q/B.class') entry.comment = 'kept'
+                    out.putNextEntry(entry)
+                    if (body != null) out.write(body.getBytes('UTF-8'))
+                    out.closeEntry()
+                }
+            }
+        }
+        def entries = { File jar ->
+            new java.util.zip.ZipFile(jar).withCloseable { zip ->
+                zip.entries().toList().collect { entry ->
+                    [entry.name, entry.time, entry.comment, entry.directory ? null : zip.getInputStream(entry).bytes.encodeHex().toString()]
+                }
+            }
+        }
+        def before = entries(sealed)
+        assert sealingSections(sealed) == ['main', 'p/', 'q/']
+        assert unsealJar(sealed)
+        assert sealingSections(sealed).isEmpty()
+        def after = entries(sealed)
+        assert after.collect { it[0] } == before.collect { it[0] } : 'entries keep their names and order'
+        assert after.findAll { it[0] != 'META-INF/MANIFEST.MF' } == before.findAll { it[0] != 'META-INF/MANIFEST.MF' } :
+            'every other entry keeps its bytes, time and comment'
+        def rewritten = new java.util.jar.JarFile(sealed).withCloseable { it.manifest }
+        assert rewritten.mainAttributes.getValue('Sealed') == null
+        assert rewritten.mainAttributes.getValue('Multi-Release') == 'true'
+        assert rewritten.mainAttributes.getValue('Jasper-Modified') == 'package sealing removed'
+        assert rewritten.entries.keySet() == ['p/'] as Set : 'a section left empty is dropped'
+        assert rewritten.entries['p/'].getValue('Implementation-Title') == 'P'
+        byte[] once = sealed.bytes
+        assert !unsealJar(sealed) && Arrays.equals(sealed.bytes, once) : 'an unsealed jar is left alone'
+
+        File plain = new File(jars, 'plain.jar')
+        plain.withOutputStream { raw ->
+            new java.util.zip.ZipOutputStream(raw).withCloseable { out ->
+                out.putNextEntry(new java.util.zip.ZipEntry('a.txt'))
+                out.write('a'.getBytes('UTF-8'))
+                out.closeEntry()
+            }
+        }
+        assert sealingSections(plain).isEmpty() && !unsealJar(plain) : 'a jar without a manifest is not sealed'
+
+        File signed = new File(jars, 'signed.jar')
+        signed.withOutputStream { raw ->
+            new java.util.jar.JarOutputStream(raw, manifest).withCloseable { out ->
+                out.putNextEntry(new java.util.zip.ZipEntry('META-INF/SIGNER.SF'))
+                out.write('Signature-Version: 1.0\n'.getBytes('UTF-8'))
+                out.closeEntry()
+            }
+        }
+        byte[] signedBytes = signed.bytes
+        try {
+            unsealJar(signed)
+            assert false : 'a signed, sealed jar must fail the build'
+        } catch (GradleException expected) {
+            assert expected.message.contains('signed.jar') && expected.message.contains('signed;')
+        }
+        assert Arrays.equals(signed.bytes, signedBytes) : 'a signed jar is left untouched'
+        assert !new File(jars, 'signed.jar.unsealing').exists()
+        logger.lifecycle('Verified unsealing of the application class path')
+    }
+}

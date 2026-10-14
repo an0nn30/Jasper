@@ -2,7 +2,14 @@ import groovy.json.JsonException
 import groovy.json.JsonSlurper
 import java.nio.file.Files
 import java.nio.file.LinkOption
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
+import java.util.jar.Attributes
+import java.util.jar.JarFile
+import java.util.jar.Manifest
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 
 // What packaging decides, as pure helpers: the runtime's modules, the native libraries copied into the app, the
 // launcher configuration, the AOT training launch and the DMG detach. gradle/packaging.gradle applies this file;
@@ -277,4 +284,56 @@ ext.modificationTimeMismatches = { File expectedRoot, File actualRoot ->
         }
     }
     mismatches.sort()
+}
+
+// The manifest sections of jar that declare Sealed (any value): 'main' for the main attributes, then the per-entry
+// section names, sorted. Classes the JBR 25 AOT cache loads get no code source once the cache's training paths are gone
+// (JDK-8376576, spec 2026-10-14 section 2), and a package sealed by the manifest then refuses its second class, which
+// stops the JVM; so stagePackage unseals the class path and verifyPackage rejects a sealed jar in the image.
+ext.sealingSections = { File jar ->
+    Manifest manifest = new JarFile(jar, false).withCloseable { it.manifest }
+    if (manifest == null) return []
+    List<String> sections = manifest.entries.findAll { String name, Attributes attributes ->
+        attributes.getValue(Attributes.Name.SEALED) != null
+    }.keySet().sort()
+    manifest.mainAttributes.getValue(Attributes.Name.SEALED) != null ? ['main'] + sections : sections
+}
+
+// Rewrites jar without its manifest's Sealed attributes (main and per-entry; a section left empty is dropped) and adds
+// the main attribute "Jasper-Modified: package sealing removed", the notice Apache-2.0 section 4(b) asks of modified
+// files. Every other entry is copied in order with its bytes, time, comment and extra field. Returns whether it changed
+// the jar. Rewriting the manifest of a signed jar would break its signature, so a signed jar that declares Sealed fails.
+ext.unsealJar = { File jar ->
+    if (sealingSections(jar).isEmpty()) return false
+    Manifest manifest = new JarFile(jar, false).withCloseable { it.manifest }
+    manifest.mainAttributes.remove(Attributes.Name.SEALED)
+    manifest.mainAttributes.put(new Attributes.Name('Jasper-Modified'), 'package sealing removed')
+    manifest.entries.values().each { it.remove(Attributes.Name.SEALED) }
+    manifest.entries.values().removeIf { it.isEmpty() }
+    File rewritten = new File(jar.parentFile, jar.name + '.unsealing')
+    new ZipFile(jar).withCloseable { zip ->
+        List<ZipEntry> entries = zip.entries().toList()
+        if (entries.any { it.name ==~ /(?i)META-INF\/[^\/]+\.(SF|RSA|DSA|EC)/ }) {
+            throw new GradleException("Packaging: ${jar.name} seals packages and is signed; unsealing it would break its signature")
+        }
+        rewritten.withOutputStream { raw ->
+            new ZipOutputStream(raw).withCloseable { out ->
+                entries.each { ZipEntry entry ->
+                    ZipEntry copy = new ZipEntry(entry.name)
+                    copy.time = entry.time
+                    if (entry.comment != null) copy.comment = entry.comment
+                    if (entry.extra != null) copy.extra = entry.extra
+                    out.putNextEntry(copy)
+                    if (entry.name.equalsIgnoreCase(JarFile.MANIFEST_NAME)) {
+                        manifest.write(out)
+                    } else if (!entry.directory) {
+                        zip.getInputStream(entry).withCloseable { out << it }
+                    }
+                    out.closeEntry()
+                }
+            }
+        }
+    }
+    Files.move(rewritten.toPath(), jar.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    true
 }
