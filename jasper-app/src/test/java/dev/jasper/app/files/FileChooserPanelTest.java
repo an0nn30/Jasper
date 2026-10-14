@@ -155,6 +155,36 @@ class FileChooserPanelTest {
         } finally { panel.close(); }
     }
 
+    /**
+     * app-unmocked.md: the column titles sit as the Places heading does, on the dialog surface above their pane (no strip
+     * of their own over the pane's rounded top) and on the first glyph's inset, a multiple-selection listing included:
+     * its rows show no checkboxes, so the titles leave no room for one.
+     */
+    @Test void theColumnTitlesSitOnTheDialogSurfaceAboveTheFirstGlyph() {
+        var request = new ChooserRequest("Choose", OPEN, true, Location.local(dir), Optional.of(Location.local(dir)), Optional.empty(),
+            Optional.empty(), Optional.empty());
+        var model = new ChooserModel(request, List.of(new LocalSource(new LocalBrowser(dir))), Runnable::run, Runnable::run, prefs.showHidden());
+        var panel = new FileChooserPanel(KitTestSupport.context(), model, prefs, dir, finished::add, file -> false, Optional::empty);
+        model.start();
+        try {
+            panel.setSize(820, 400);
+            for (int i = 0; i < 5; i++) KitTestSupport.layout(panel);
+            var files = KitTestSupport.require(panel, "files", javax.swing.JScrollPane.class);
+            var header = files.getColumnHeader();
+            assertThat(header.isOpaque()).isFalse();
+            var image = new java.awt.image.BufferedImage(panel.getWidth(), panel.getHeight(), java.awt.image.BufferedImage.TYPE_INT_RGB);
+            var g = image.createGraphics();
+            try { panel.paint(g); } finally { g.dispose(); }
+            var edge = javax.swing.SwingUtilities.convertPoint(header, 2, header.getHeight() / 2, panel);
+            assertThat(new java.awt.Color(image.getRGB(edge.x, edge.y))).as("the dialog surface shows behind the titles")
+                .isEqualTo(KitTestSupport.context().theme().semantic().color(SemanticColor.SURFACE_DIALOG));
+            var title = KitTestSupport.require(panel, "@table/files/header/name", JLabel.class);
+            var cell = KitTestSupport.require(panel, "@table/files/" + dir.resolve("docs") + "/name", JLabel.class);
+            assertThat(javax.swing.SwingUtilities.convertPoint(title, title.getInsets().left, 0, panel).x).as("Name over the first glyph")
+                .isEqualTo(javax.swing.SwingUtilities.convertPoint(cell, cell.getInsets().left, 0, panel).x);
+        } finally { panel.close(); }
+    }
+
     /** Scrolls every scrolling ancestor of {@code target} until its top is in view, as a user scrolling there would. */
     private static void reveal(java.awt.Component target) {
         for (var parent = target.getParent(); parent != null; parent = parent.getParent())

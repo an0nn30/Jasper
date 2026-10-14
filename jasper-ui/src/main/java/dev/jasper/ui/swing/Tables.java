@@ -46,7 +46,7 @@ final class Tables {
 
         /** Minimum negotiation only: rendering still uses the existing weighted allocation and literal cells. */
         int usableWidth() {
-            int padding=2*ThemePainting.metric(context(),DesignMetrics.Role.ICON_GAP)+(multiple()?new JCheckBox().getPreferredSize().width:0);
+            int padding=2*ThemePainting.metric(context(),DesignMetrics.Role.ICON_GAP);
             if(value().columns().isEmpty())return padding;
             var first=value().columns().getFirst();
             var font=ThemePainting.font(context(),Typography.Role.valueOf(first.role().name()));
@@ -66,6 +66,9 @@ final class Tables {
             super(view, node, pane(view, node));
             header.setOpaque(false);
             scroll.setColumnHeaderView(header);
+            // The titles sit on whatever is behind the table, as a heading does: an opaque header viewport painted its
+            // own strip over a rounded pane's top.
+            scroll.getColumnHeader().setOpaque(false);
             refresh();
         }
 
@@ -176,12 +179,7 @@ final class Tables {
             // The header's titles start where the cells' text does: the row inset (a manager column's, else the icon gap).
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP),
                     side = (column >= 0 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_LIST_SIDE) : pad) + com.formdev.flatlaf.util.UIScale.scale(gutter);
-            header.setBorder(
-                    BorderFactory.createEmptyBorder(
-                            pad,
-                            side + (multiple() ? new JCheckBox().getPreferredSize().width : 0),
-                            pad,
-                            side));
+            header.setBorder(BorderFactory.createEmptyBorder(pad, side, pad, side));
             header.revalidate();
             header.repaint();
         }

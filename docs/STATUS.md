@@ -20,8 +20,11 @@ to the search field; and the chooser's first focus is the name field (Save, Dire
 JFileChooser and the macOS open panel do, not the first enabled toolbar button. Then, the user's pick (option A of
 three rendered): `tools/themes/catppuccin/roles.json` gives the built-ins Slate Steel's dialog/card/sidebar layering in
 Catppuccin's palette (dark: base body, mantle cards, crust sidebar; Latte: mantle, base, crust), so the chooser's Places
-and file list, Settings and the Vault manager have edges; the converter's `roles` parameter applies it. Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
-(the colour patterns are now precompiled). `./gradlew check --continue`: **10,167 tests, 0 failures, 0 errors, 12
+and file list, Settings and the Vault manager have edges; the converter's `roles` parameter applies it. Next, kit
+tables (every theme): the column titles' header viewport is transparent, so they sit on the dialog surface as the Places
+heading does instead of a strip of `surface.card` over the pane's rounded top, and a multiple-selection table no longer
+indents them by a checkbox its rows never show ("Name" now over the first glyph, like "Places"). Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
+(the colour patterns are now precompiled). `./gradlew check --continue`: **10,168 tests, 0 failures, 0 errors, 12
 skipped**. No GUI launched. GUI check for the user: each flavour in Settings › Appearance and the Licenses window (About Jasper › Licenses). Not merged.
 
 **Right rail splits again: two dock fixes — 2026-10-14** (`claude/right-rail-split`, worktree
