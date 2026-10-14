@@ -233,23 +233,28 @@ def testLauncherCore = tasks.register('testLauncherCore') {
     doLast {
         File work = launcherBuild.get().dir('core-test').asFile
         delete(work)
-        List<File> sources = [new File(launcherTestSource, 'vmoptions_core_test.cpp'), new File(jasperNative, 'JasperVmOptionsCore.cpp')]
+        List<File> sources = [new File(launcherTestSource, 'vmoptions_core_test.cpp'), new File(jasperNative, 'JasperVmOptionsCore.cpp'),
+            new File(jasperNative, 'jasper_launch_rules.c')]
         File test = nativeBuild(kind: 'executable', exportAll: true, sources: sources, strict: sources, includes: [jasperNative],
             output: new File(work, launcherHost().os == 'windows' ? 'vmoptions-core-test.exe' : 'vmoptions-core-test'),
             work: new File(work, 'objects'))
-        String output = runLauncherTool([test.absolutePath, new File(launcherTestSource, 'digest-vectors.txt').absolutePath],
-            null, null, "the launcher's options tests")
+        String output = runLauncherTool([test.absolutePath, new File(launcherTestSource, 'digest-vectors.txt').absolutePath,
+            new File(launcherTestSource, 'aot-record-vectors.txt').absolutePath], null, null, "the launcher's options tests")
         logger.lifecycle(output.trim())
         // The JDK's defines are macros in every source (-DLINUX, /DWINDOWS). Check the core and its test once more with
         // the other hosts' defines, so a name that collides with one fails here, not only on that host's CI.
         def host = launcherHost()
         if (host.os != 'windows') {
-            List<String> compiler = host.os == 'macos' ? ['/usr/bin/xcrun', 'clang++'] : ['g++']
+            Map<String, List<String>> compilers = host.os == 'macos'
+                ? [cpp: ['/usr/bin/xcrun', 'clang++', '-std=c++14'], c: ['/usr/bin/xcrun', 'clang', '-std=c11']]
+                : [cpp: ['g++', '-std=c++14'], c: ['gcc', '-std=c11']]
             ['macos', 'linux', 'windows'].findAll { it != host.os }.each { String other ->
-                runLauncherTool(compiler + ['-std=c++14', '-fsyntax-only', '-Wall', '-Wextra', '-Werror'] +
-                    launcherDefines(other).collect { "-D${it}".toString() } + ["-I${jasperNative.absolutePath}".toString()] +
-                    sources.collect { it.absolutePath }, null, null, "checking the options logic with ${other}'s defines",
-                    launcherToolchainHint(host.os))
+                compilers.each { String extension, List<String> compiler ->
+                    runLauncherTool(compiler + ['-fsyntax-only', '-Wall', '-Wextra', '-Werror'] +
+                        launcherDefines(other).collect { "-D${it}".toString() } + ["-I${jasperNative.absolutePath}".toString()] +
+                        sources.findAll { it.name.endsWith('.' + extension) }.collect { it.absolutePath }, null, null,
+                        "checking the options logic with ${other}'s defines", launcherToolchainHint(host.os))
+                }
             }
         }
         new File(work, 'passed').text = output
@@ -380,9 +385,10 @@ def buildLauncher = tasks.register('buildLauncher') {
         File work = launcherBuild.get().dir('objects').asFile
         delete(work)
         File core = new File(jasperNative, 'JasperVmOptionsCore.cpp')
+        File rules = new File(jasperNative, 'jasper_launch_rules.c')
         File guard = new File(jasperNative, 'jasper_launch_guard.c')
-        List<File> jasperSources = [new File(jasperNative, 'JasperVmOptions.cpp'), core, guard]
-        List<File> strict = [core, guard]
+        List<File> jasperSources = [new File(jasperNative, 'JasperVmOptions.cpp'), core, rules, guard]
+        List<File> strict = [core, rules, guard]
         switch (host.os) {
             case 'macos':
                 List<File> directories = [nativeDirectory('macosx', 'applauncher'), nativeDirectory('share', 'applauncher'),
