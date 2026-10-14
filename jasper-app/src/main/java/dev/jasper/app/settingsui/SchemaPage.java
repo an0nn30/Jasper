@@ -240,6 +240,7 @@ public final class SchemaPage implements SettingsPage {
     private final List<ExternalRow> externals = new ArrayList<>();
     private final List<Subscription> refreshing = new ArrayList<>();
     private String revealed;
+    private Integer proposed;
     private final List<Part.Section> parts = new ArrayList<>();
     private KitView view;
     private PageBody body;
@@ -638,8 +639,21 @@ public final class SchemaPage implements SettingsPage {
         if (body != null) showValues();
     }
 
-    /** Remembers the row to focus once the dialog shows this page; {@code fragment} is an external row's id. */
-    @Override public void reveal(String fragment) { revealed = fragment; }
+    /**
+     * Remembers the row to focus once the dialog shows this page. {@code fragment} is an external row's id, optionally
+     * followed by {@code =<integer>}, a value to stage as that row's edit (Adjust Memory Settings… pre-fills the heap).
+     */
+    @Override public void reveal(String fragment) {
+        int equals = fragment.indexOf('=');
+        revealed = equals < 0 ? fragment : fragment.substring(0, equals);
+        proposed = null;
+        if (equals < 0) return;
+        try {
+            proposed = Integer.valueOf(fragment.substring(equals + 1).strip());
+        } catch (NumberFormatException malformed) {
+            // A value that is no integer only reveals the row.
+        }
+    }
 
     /**
      * Focuses the revealed row once the page shows; until then the request waits. A modal dialog selects its first page
@@ -647,6 +661,7 @@ public final class SchemaPage implements SettingsPage {
      */
     @Override public void selected() {
         if (disposed || revealed == null || view == null || view.isClosed()) return;
+        stageProposed();
         if (body.isShowing()) {
             focusRevealed();
         } else if (waiting == null) {
@@ -659,6 +674,21 @@ public final class SchemaPage implements SettingsPage {
                 }
             };
             body.addHierarchyListener(waiting);
+        }
+    }
+
+    /** Stages the value {@link #reveal} named as the revealed external row's edit, once, unless the row is disabled. */
+    private void stageProposed() {
+        Integer value = proposed;
+        proposed = null;
+        if (value == null) return;
+        for (var row : externals) {
+            if (row.id().equals(revealed) && row.value.enabled().getAsBoolean()) {
+                row.editor.show(value);
+                editedExternal(row);
+                render();
+                return;
+            }
         }
     }
 
