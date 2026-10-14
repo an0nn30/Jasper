@@ -296,17 +296,9 @@ static int start_process(const char *program, int count, const char *const *argu
     free(wide_program);
     return ok ? 0 : -1;
 }
-#elif defined(__APPLE__)
-/* Runs a program and waits for it; 0 when it exited with 0. */
-static int run_and_wait(char *const arguments[]) {
-    pid_t child;
-    int status;
-    if (posix_spawn(&child, arguments[0], NULL, NULL, arguments, environ) != 0) return -1;
-    while (waitpid(child, &status, 0) < 0) if (errno != EINTR) return -1;
-    return WIFEXITED(status) && WEXITSTATUS(status) == 0 ? 0 : -1;
-}
 #else
-/* Starts a program away from this terminal: its own session, standard streams on /dev/null. 0 when it started. */
+/* Starts a program away from this terminal: its own session, standard streams on /dev/null; the working directory and
+ * the environment are this program's. 0 when it started. */
 static int spawn_detached(char *const arguments[]) {
     pid_t child = fork();
     if (child < 0) return -1;
@@ -325,45 +317,38 @@ static int spawn_detached(char *const arguments[]) {
     }
     return 0;
 }
+#ifdef __APPLE__
+/* Runs a program and waits for it; 0 when it exited with 0. */
+static int run_and_wait(char *const arguments[]) {
+    pid_t child;
+    int status;
+    if (posix_spawn(&child, arguments[0], NULL, NULL, arguments, environ) != 0) return -1;
+    while (waitpid(child, &status, 0) < 0) if (errno != EINTR) return -1;
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0 ? 0 : -1;
+}
+#endif
 #endif
 
-/* Starts Jasper with these options, detached; new_instance asks macOS for a new process. 0 when it started. */
-static int start_jasper(int count, const char *const *options, int new_instance) {
+/* Finds the app image and its launcher, saying so when there is none. 0 when found. */
+static int locate_app(char *bundle, char *launcher) {
+    if (find_app(bundle, launcher) == 0) return 0;
+    fputs("jasper: can't find Jasper; reinstall the command from Settings\n", stderr);
+    return -1;
+}
+
+/* Starts Jasper's launcher with these options, detached, from this working directory and environment, as running it
+ * from this shell would. 0 when it started. */
+static int start_jasper(int count, const char *const *options) {
     char bundle[JC_MAX_PATH], launcher[JC_MAX_PATH];
-    int started = -1;
+    int started;
     if (count > MAX_OPTIONS) return -1;
-    if (find_app(bundle, launcher) != 0) {
-        fputs("jasper: can't find Jasper; reinstall the command from Settings\n", stderr);
-        return -1;
-    }
+    if (locate_app(bundle, launcher) != 0) return -1;
 #if defined(_WIN32)
-    (void) new_instance;
     started = start_process(launcher, count, options);
-#elif defined(__APPLE__)
-    {
-        /* LaunchServices, so Jasper is not this shell's child. It passes none of this environment, so JASPER_HOME goes along. */
-        static char home[JC_MAX_PATH + 16];
-        char *arguments[MAX_OPTIONS + 10];
-        const char *override = getenv("JASPER_HOME");
-        int n = 0;
-        arguments[n++] = "/usr/bin/open";
-        arguments[n++] = new_instance ? "-n" : "-g";
-        arguments[n++] = "-a";
-        arguments[n++] = bundle;
-        if (override != NULL && override[0] != '\0' && snprintf(home, sizeof home, "JASPER_HOME=%s", override) < (int) sizeof home) {
-            arguments[n++] = "--env";
-            arguments[n++] = home;
-        }
-        arguments[n++] = "--args";
-        for (int i = 0; i < count; i++) arguments[n++] = (char *) options[i];
-        arguments[n] = NULL;
-        started = run_and_wait(arguments);
-    }
 #else
     {
         char *arguments[MAX_OPTIONS + 2];
         int n = 0;
-        (void) new_instance;
         arguments[n++] = launcher;
         for (int i = 0; i < count; i++) arguments[n++] = (char *) options[i];
         arguments[n] = NULL;
@@ -372,6 +357,37 @@ static int start_jasper(int count, const char *const *options, int new_instance)
 #endif
     if (started != 0) fputs("jasper: could not start Jasper\n", stderr);
     return started;
+}
+
+/* Starts Jasper without a window, for the call that found nothing listening. 0 when it started. */
+static int start_without_window(void) {
+#ifdef __APPLE__
+    /* LaunchServices, so Jasper is not this shell's child and does not take the focus. It passes none of this
+     * environment, so JASPER_HOME goes along. */
+    static char home[JC_MAX_PATH + 16];
+    char bundle[JC_MAX_PATH], launcher[JC_MAX_PATH];
+    char *arguments[10];
+    const char *override = getenv("JASPER_HOME");
+    int n = 0;
+    if (locate_app(bundle, launcher) != 0) return -1;
+    arguments[n++] = "/usr/bin/open";
+    arguments[n++] = "-g";
+    arguments[n++] = "-a";
+    arguments[n++] = bundle;
+    if (override != NULL && override[0] != '\0' && snprintf(home, sizeof home, "JASPER_HOME=%s", override) < (int) sizeof home) {
+        arguments[n++] = "--env";
+        arguments[n++] = home;
+    }
+    arguments[n++] = "--args";
+    arguments[n++] = "--no-window";
+    arguments[n] = NULL;
+    if (run_and_wait(arguments) == 0) return 0;
+    fputs("jasper: could not start Jasper\n", stderr);
+    return -1;
+#else
+    static const char *const options[] = { "--no-window" };
+    return start_jasper(1, options);
+#endif
 }
 
 /* Connects to the socket. On failure *nothing_listens says whether starting Jasper could help. */
@@ -572,8 +588,7 @@ static int call(const char *socket_path, int count, const char *const *arguments
         return 1;
     }
     if (client == JC_NO_SOCKET) {
-        static const char *const cold[] = { "--no-window" };
-        if (start_jasper(1, cold, 0) != 0) return 1;
+        if (start_without_window() != 0) return 1;
         for (int waited = 0; client == JC_NO_SOCKET && waited < START_WAIT_MILLIS; waited += POLL_MILLIS) {
             pause_millis(POLL_MILLIS);
             client = connect_to(socket_path, &nothing_listens);
@@ -609,7 +624,7 @@ static int run(int count, const char *const *arguments) {
         return 1;
     }
     if (count > 0 && strcmp(arguments[0], "--help") == 0) return help(socket_path);
-    if (count > 0 && strncmp(arguments[0], "--", 2) == 0) return start_jasper(count, arguments, 1) == 0 ? 0 : 1;
+    if (count > 0 && strncmp(arguments[0], "--", 2) == 0) return start_jasper(count, arguments) == 0 ? 0 : 1;
     return call(socket_path, count, arguments);
 }
 

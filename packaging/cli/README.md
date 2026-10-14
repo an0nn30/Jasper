@@ -33,7 +33,8 @@ line installs it on `PATH`.
 5. The client sends nothing after its request. When it goes away, for example on Ctrl-C, Jasper cancels the call.
 
 `jasper --help` prints the usage and the subcommands Jasper last wrote to `<home>/daemon/subcommands`, without
-contacting Jasper. Any other first argument starting with `--` starts the app with those arguments and exits.
+contacting Jasper. Any other first argument starting with `--` runs the app image's launcher, detached, with those
+arguments in the caller's working directory and environment, and exits.
 
 ## Sources and tests
 

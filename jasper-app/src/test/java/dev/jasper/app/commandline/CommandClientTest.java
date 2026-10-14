@@ -1,6 +1,7 @@
 package dev.jasper.app.commandline;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
@@ -14,6 +15,7 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -52,10 +54,15 @@ class CommandClientTest {
     }
 
     private Process start(Map<String, String> environment, List<String> arguments) throws IOException {
+        return start(CLIENT, dir, environment, arguments);
+    }
+
+    private Process start(String client, Path workingDirectory, Map<String, String> environment, List<String> arguments)
+            throws IOException {
         var command = new ArrayList<String>();
-        command.add(CLIENT);
+        command.add(client);
         command.addAll(arguments);
-        var builder = new ProcessBuilder(command).directory(dir.toFile());
+        var builder = new ProcessBuilder(command).directory(workingDirectory.toFile());
         builder.environment().keySet().removeIf(name -> name.startsWith("JASPER_"));
         builder.environment().putAll(environment);
         Process process = builder.start();
@@ -64,7 +71,12 @@ class CommandClientTest {
     }
 
     private Result run(Map<String, String> environment, List<String> arguments) throws Exception {
-        Process process = start(environment, arguments);
+        return run(CLIENT, dir, environment, arguments);
+    }
+
+    private Result run(String client, Path workingDirectory, Map<String, String> environment, List<String> arguments)
+            throws Exception {
+        Process process = start(client, workingDirectory, environment, arguments);
         var out = CompletableFuture.supplyAsync(() -> read(process.getInputStream()));
         var err = CompletableFuture.supplyAsync(() -> read(process.getErrorStream()));
         assertThat(process.waitFor(30, TimeUnit.SECONDS)).as("the client exits").isTrue();
@@ -181,6 +193,36 @@ class CommandClientTest {
         Result result = run(Map.of("JASPER_COMMAND_SOCKET", deep.toString()), List.of("editor"));
         assertThat(result.exit()).isEqualTo(1);
         assertThat(result.err()).startsWith("jasper: Jasper's command socket path is too long");
+    }
+
+    /** A fake app image whose launcher records its working directory and arguments; Jasper itself never starts. */
+    @Test void anOptionLaunchRunsTheLauncherFromTheCallersFolderWithItsArguments() throws Exception {
+        boolean mac = System.getProperty("os.name").startsWith("Mac");
+        assumeFalse(System.getProperty("os.name").startsWith("Windows"), "Windows starts the launcher with CreateProcess");
+        Path image = dir.resolve(mac ? "Jasper.app" : "image");
+        Path client = image.resolve(mac ? "Contents/Resources/bin/jasper" : "lib/bin/jasper");
+        Path launcher = image.resolve(mac ? "Contents/MacOS/Jasper" : "bin/Jasper");
+        Files.createDirectories(client.getParent());
+        Files.createDirectories(launcher.getParent());
+        Files.copy(Path.of(CLIENT), client, StandardCopyOption.REPLACE_EXISTING);
+        assertThat(client.toFile().setExecutable(true)).isTrue();
+        // The record appears whole, by rename, so the wait below never reads half of it.
+        Files.writeString(launcher, """
+            #!/bin/sh
+            { pwd -P; for argument in "$@"; do printf '%s\\n' "$argument"; done; } > "$RECORD.part" && mv "$RECORD.part" "$RECORD"
+            """);
+        assertThat(launcher.toFile().setExecutable(true)).isTrue();
+        Path folder = Files.createDirectories(dir.resolve("project"));
+        Path record = dir.resolve("record");
+
+        Result result = run(client.toString(), folder,
+            Map.of("RECORD", record.toString(), "JASPER_HOME", dir.toString()), List.of("--config", "jasper.toml", "--safe-mode"));
+
+        assertThat(result).isEqualTo(new Result(0, "", ""));
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+        while (!Files.exists(record) && System.nanoTime() < deadline) Thread.sleep(10);
+        assertThat(Files.readAllLines(record))
+            .containsExactly(folder.toRealPath().toString(), "--config", "jasper.toml", "--safe-mode");
     }
 
     @Test void helpListsTheSubcommandsJasperLastRecorded() throws Exception {
