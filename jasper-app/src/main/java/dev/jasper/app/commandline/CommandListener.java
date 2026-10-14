@@ -28,6 +28,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -44,7 +45,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class CommandListener implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(CommandListener.class.getName());
-    /** macOS caps sun_path at 104 bytes; a long home directory can reach it. */
+    /**
+     * macOS caps sun_path at 104 bytes; a long home directory can reach it. The client's JC_MAX_SOCKET_PATH
+     * (jasper_cli_core.h) is the same, so it explains a longer path on every platform.
+     */
     static final int MAX_SOCKET_PATH_BYTES = 100;
     /** How long a peer may take to send its request line; the client writes it at once. */
     private static final long REQUEST_TIMEOUT_MILLIS = 5_000;
@@ -61,6 +65,8 @@ public final class CommandListener implements AutoCloseable {
     private final Set<SocketChannel> connections = ConcurrentHashMap.newKeySet();
     private final Set<Delivery> deliveries = ConcurrentHashMap.newKeySet();
     private final AtomicInteger active = new AtomicInteger();
+    /** Accepted connections that have not started a call, and calls whose exit code is not known yet. */
+    private final AtomicInteger pending = new AtomicInteger();
     private final List<Runnable> idle = new CopyOnWriteArrayList<>();
     private volatile boolean closed;
 
@@ -137,14 +143,28 @@ public final class CommandListener implements AutoCloseable {
     /** Calls whose exit code is not known yet, including those whose caller went away. */
     public int activeCalls() { return active.get(); }
 
-    /** Runs {@code listener} each time the last running call ends, on the thread that ended it. */
+    /**
+     * Whether a connection is being served or a call is running. A client counts from the moment its connection is
+     * accepted, before it has sent its request.
+     */
+    public boolean busy() { return pending.get() > 0; }
+
+    /** Runs {@code listener} each time the listener stops being {@link #busy}, on the thread that ended its last work. */
     public void onIdle(Runnable listener) { idle.add(Objects.requireNonNull(listener, "listener")); }
 
     private void acceptLoop() {
         while (!closed) {
             try {
                 SocketChannel client = channel.accept();
-                Thread.ofVirtual().name("jasper-command-call").start(() -> serve(client));
+                // From here, so that a client that has connected but not yet sent keeps a non-resident Jasper up.
+                pending.incrementAndGet();
+                try {
+                    Thread.ofVirtual().name("jasper-command-call").start(() -> serve(client));
+                } catch (RuntimeException | Error failure) {
+                    closeQuietly(client);
+                    settle();
+                    throw failure;
+                }
             } catch (ClosedChannelException stopped) {
                 return;
             } catch (IOException | RuntimeException failure) {
@@ -162,6 +182,8 @@ public final class CommandListener implements AutoCloseable {
 
     private void serve(SocketChannel client) {
         connections.add(client);
+        // Set once a call takes this connection's place in pending; the call then settles it when it ends.
+        var called = new AtomicBoolean();
         try {
             // close() may have run between the accept and here, and would have missed this connection.
             if (closed) return;
@@ -179,16 +201,26 @@ public final class CommandListener implements AutoCloseable {
                 reply(client, CommandProtocol.REFUSED);
                 return;
             }
-            call(client, request);
+            call(client, request, called);
         } catch (IOException | RuntimeException failure) {
             if (!closed) LOG.log(System.Logger.Level.DEBUG, "A jasper command connection failed", failure);
         } finally {
             connections.remove(client);
             closeQuietly(client);
+            if (!called.get()) settle();
         }
     }
 
-    private void call(SocketChannel client, CommandProtocol.Request request) {
+    /** One accepted connection or one call is over: when none is left, the idle listeners hear it. */
+    private void settle() {
+        if (pending.decrementAndGet() != 0) return;
+        for (Runnable listener : idle) {
+            try { listener.run(); }
+            catch (RuntimeException broken) { LOG.log(System.Logger.Level.WARNING, "An idle listener failed", broken); }
+        }
+    }
+
+    private void call(SocketChannel client, CommandProtocol.Request request, AtomicBoolean called) {
         // Output and the exit code are only queued; this call's writer puts them on the wire, in order.
         BlockingQueue<Frame> frames = new LinkedBlockingQueue<>();
         Thread writer = Thread.ofVirtual().name("jasper-command-writer").start(() -> write(client, frames));
@@ -200,6 +232,7 @@ public final class CommandListener implements AutoCloseable {
                 text -> frames.add(new Frame(CommandProtocol.err(text), false)));
             var ended = new CompletableFuture<Void>();
             active.incrementAndGet();
+            called.set(true);
             CompletionStage<Integer> stage;
             try {
                 stage = Objects.requireNonNull(dispatcher.dispatch(invocation), "the dispatcher's stage");
@@ -207,17 +240,14 @@ public final class CommandListener implements AutoCloseable {
                 stage = CompletableFuture.failedFuture(failure);
             }
             stage.whenComplete((code, failure) -> {
-                int exit = failure != null ? failed(invocation, failure) : code == null ? 1 : code;
+                // The client takes 0 to 255; this boundary holds that whatever the dispatcher returns.
+                int exit = failure != null ? failed(invocation, failure) : code == null || code < 0 || code > 255 ? 1 : code;
                 invocation.finish();
                 ended.complete(null);
                 frames.add(new Frame(CommandProtocol.exit(exit), true));
                 delivery.exitQueued = true;
-                if (active.decrementAndGet() == 0) {
-                    for (Runnable listener : idle) {
-                        try { listener.run(); }
-                        catch (RuntimeException broken) { LOG.log(System.Logger.Level.WARNING, "An idle listener failed", broken); }
-                    }
-                }
+                active.decrementAndGet();
+                settle();
             });
             // The client sends nothing after its request, so a read returns only once it goes away, the listener
             // closes or the writer closes the connection after the exit frame.

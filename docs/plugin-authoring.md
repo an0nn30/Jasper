@@ -529,9 +529,10 @@ context.commandLine().handle("tool", call -> {
 `call.arguments()` are the words after the name. `call.window()` is the window of the Jasper pane the command ran in,
 when it ran in one. `out` and `err` write to the caller's terminal from any thread. The stage's value is the exit code,
 0 to 255; anything else is 1, and a handler that throws or a stage that fails prints `jasper: <name> failed: ...` and
-exits 1. `call.onCancelled` hears, on the UI thread, that the caller went away (Ctrl-C). When two plugins declare the
-same name, a bundled plugin keeps it, otherwise the first by plugin id, and the other gets a problem notice. In tests,
-`FakePluginHost.declareSubcommand` and `call` drive a handler. Declare `sdk = ">=0.17.0, <0.18"`.
+exits 1. `call.onCancelled` hears, on the UI thread, that the caller went away (Ctrl-C). A call still running when the
+plugin stops ends with exit code 1. When two plugins declare the same name, a bundled plugin keeps it, otherwise the
+first by plugin id, and the other gets a problem notice. In tests, `FakePluginHost.declareSubcommand` and `call` drive a
+handler. Declare `sdk = ">=0.17.0, <0.18"`.
 
 ## Rules that matter
 

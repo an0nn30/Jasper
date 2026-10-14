@@ -189,6 +189,27 @@ class CommandListenerTest {
         }
     }
 
+    @Test void aConnectionThatHasNotSentItsRequestYetKeepsTheListenerBusy() throws Exception {
+        var idle = new AtomicInteger();
+        CommandListener listener = bind(invocation -> CompletableFuture.completedFuture(0));
+        listener.onIdle(idle::incrementAndGet);
+        try (SocketChannel waiting = open()) {
+            until(listener::busy);
+            assertThat(exchange(request(token(), List.of("one")))).isEqualTo(CommandProtocol.exit(0));
+            assertThat(idle).as("another client has connected but not sent its request").hasValue(0);
+            assertThat(listener.busy()).isTrue();
+        }
+        until(() -> idle.get() == 1);
+        assertThat(listener.busy()).isFalse();
+    }
+
+    @Test void anExitCodeOutsideZeroTo255IsSentAsOne() throws Exception {
+        bind(invocation -> CompletableFuture.completedFuture(Integer.parseInt(invocation.arguments().getFirst())));
+        assertThat(exchange(request(token(), List.of("300")))).isEqualTo(CommandProtocol.exit(1));
+        assertThat(exchange(request(token(), List.of("-1")))).isEqualTo(CommandProtocol.exit(1));
+        assertThat(exchange(request(token(), List.of("255")))).isEqualTo(CommandProtocol.exit(255));
+    }
+
     @Test void aDispatcherThatThrowsOrFailsExitsOne() throws Exception {
         bind(invocation -> {
             if (invocation.arguments().getFirst().equals("throw")) throw new IllegalStateException("boom");
@@ -283,5 +304,15 @@ class CommandListenerTest {
     @Test void aSocketPathTooLongForTheOperatingSystemLeavesTheCommandUnavailable() {
         Path deep = dir.resolve("x".repeat(120)).resolve("commands");
         assertThat(CommandListener.bind(deep, invocation -> CompletableFuture.completedFuture(0))).isNull();
+    }
+
+    /** jasper_cli_core.h's JC_MAX_SOCKET_PATH is the same 100 bytes. */
+    @Test void aHundredBytesIsTheLongestSocketPath() {
+        int room = CommandListener.MAX_SOCKET_PATH_BYTES - dir.toString().length() - 1;
+        org.junit.jupiter.api.Assumptions.assumeTrue(room > 0, "the temporary folder leaves room for a name");
+        CommandListener longest = CommandListener.bind(dir.resolve("x".repeat(room)), invocation -> CompletableFuture.completedFuture(0));
+        assertThat(longest).isNotNull();
+        bound.add(longest);
+        assertThat(CommandListener.bind(dir.resolve("y".repeat(room + 1)), invocation -> CompletableFuture.completedFuture(0))).isNull();
     }
 }

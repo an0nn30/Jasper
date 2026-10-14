@@ -78,6 +78,12 @@ public final class FakeCommandCall {
 
     void complete(int code) { exit.complete(code); }
 
+    /** Its plugin stopped before it completed: exit code 1; {@link #cancel} then does nothing, so its listeners never run. */
+    void stopped(String name) {
+        hostError("jasper: " + name + " stopped\n");
+        complete(1);
+    }
+
     void fail(String name, Throwable failure) {
         hostError("jasper: " + name + " failed: " + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()) + "\n");
         complete(1);

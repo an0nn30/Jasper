@@ -116,6 +116,7 @@ final class HostedContext implements PluginContext {
         terminals.closeAll();
         notifications.close();
         host.clipboard.ownerStopped(id);
+        host.commands.stopped(id);
         List<Subscription> copy;
         synchronized (owned) { copy = new ArrayList<>(owned); owned.clear(); }
         for (int i = copy.size() - 1; i >= 0; i--) copy.get(i).close();

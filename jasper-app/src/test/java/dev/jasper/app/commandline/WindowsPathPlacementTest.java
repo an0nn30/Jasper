@@ -36,7 +36,8 @@ class WindowsPathPlacementTest {
         placement.install(false);
         assertThat(stored.get()).contains("%USERPROFILE%\\bin;" + BIN);
         assertThat(placement.state()).isEqualTo(new State(Kind.INSTALLED, "Installed: " + BIN + " is on your Path"));
-        assertThat(placement.hint("")).contains("Open a new terminal to use it");
+        assertThat(placement.hint("")).as("Jasper's own tabs keep its Path until it quits")
+            .contains("Open a new terminal, or quit Jasper completely for its own tabs, to use it");
         placement.uninstall();
         assertThat(stored.get()).contains("%USERPROFILE%\\bin");
     }

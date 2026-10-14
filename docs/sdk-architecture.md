@@ -284,8 +284,8 @@ keeps a contested name, otherwise the first by id, and the other plugin gets a p
 to `daemon/subcommands` for `jasper --help`. `PluginCommands` is the application's `commandline.CommandDispatcher` for
 subcommand calls: it hops to the UI thread, runs the handler inside containment, maps the call's pane to its
 `WindowHandle`, and adapts the application's `Invocation` to `CommandCall`. `HostedUi` tracks each handler, so it ends
-with the plugin. The testkit's `FakeCommandLine` and `FakeCommandCall` do the same in memory, and `PluginContractTest`
-holds both hosts to one contract.
+with the plugin, and `PluginCommands` then ends the plugin's calls still running with exit code 1. The testkit's
+`FakeCommandLine` and `FakeCommandCall` do the same in memory, and `PluginContractTest` holds both hosts to one contract.
 
 ## Contract suite
 

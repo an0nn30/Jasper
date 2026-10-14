@@ -74,7 +74,8 @@ public final class ApplicationBootstrap {
             dev.jasper.ui.icons.IconRegistry.prepareBuiltIns();
             JasperApplication.preparePlugins(dirs);
             SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint, commands));
-            // The posted EDT composition owns service; the process hook owns logging and the endpoint.
+            // The posted EDT composition owns service; the process hook owns logging, the endpoint and the command
+            // listener.
             acquired.transfer();
         } catch (RuntimeException | Error failure) {
             acquired.rollback(failure);
@@ -333,7 +334,8 @@ public final class ApplicationBootstrap {
      * True when a resident process accepted this launch and there is nothing left to do. A standalone
      * launch ({@code --config}, {@code --safe-mode}, {@code --plugin-dir}, {@code --standalone}, an overridden
      * home) never hands off, because the resident process holds a different configuration or plugin set, or is the very
-     * process a recovery launch is escaping; neither does a resident process starting up.
+     * process a recovery launch is escaping; neither does a resident process starting up, nor a {@code --no-window}
+     * launch, which would be handed a window when it is there to serve the {@code jasper} command.
      */
     static boolean handsOff(AppArguments options, AppDirs dirs) {
         if (options.background() || options.noWindow() || options.standaloneLaunch()) return false;
@@ -418,7 +420,7 @@ public final class ApplicationBootstrap {
             application.warmUp(() -> StartupTrace.current().mark(StartupTrace.Milestone.WARMED_UP));
             return;
         }
-        BooleanSupplier busy = () -> commands.activeCalls() > 0;
+        BooleanSupplier busy = commands::busy;
         commands.onIdle(() -> SwingUtilities.invokeLater(() -> application.quitIfUnused(busy)));
         var grace = new javax.swing.Timer(NO_CALL_GRACE_MILLIS, event -> application.quitIfUnused(busy));
         grace.setRepeats(false);

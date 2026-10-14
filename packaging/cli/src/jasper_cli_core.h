@@ -11,6 +11,12 @@
 #define JC_PROTOCOL_VERSION "1"
 /* The longest path the client handles, terminator included. */
 #define JC_MAX_PATH 4096
+/* The longest command socket path, in bytes without the terminator; CommandListener.MAX_SOCKET_PATH_BYTES. */
+#define JC_MAX_SOCKET_PATH 100
+/* The longest request line Jasper reads, newline included; CommandProtocol.MAX_REQUEST_BYTES. */
+#define JC_MAX_REQUEST 1048576
+/* The longest token the client reads, in bytes. */
+#define JC_MAX_TOKEN 255
 
 typedef enum { JC_OS_MAC, JC_OS_LINUX, JC_OS_WINDOWS } jc_os;
 
@@ -52,6 +58,12 @@ int jc_cold_start_keeps(const char *entry);
 
 /* The request line, newline included, in a malloc'd string; NULL when memory runs out. An invalid pane is sent empty. */
 char *jc_request(const char *token, const char *cwd, const char *pane, int count, const char *const *arguments);
+
+/* The length of the request line jc_request builds with a token of token_length bytes, newline included. */
+size_t jc_request_length(size_t token_length, const char *cwd, const char *pane, int count, const char *const *arguments);
+
+/* Whether the request line stays within JC_MAX_REQUEST with any token the client reads; Jasper drops a longer one. */
+int jc_request_fits(const char *cwd, const char *pane, int count, const char *const *arguments);
 
 typedef enum { JC_FRAME_OUT, JC_FRAME_ERR, JC_FRAME_EXIT, JC_FRAME_STALE, JC_FRAME_REFUSED, JC_FRAME_UNKNOWN } jc_frame_kind;
 

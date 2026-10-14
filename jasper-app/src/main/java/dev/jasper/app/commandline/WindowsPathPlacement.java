@@ -52,7 +52,10 @@ final class WindowsPathPlacement implements CommandInstall.Placement {
         if (contains(path, folder)) store(removed(path, folder));
     }
 
-    @Override public Optional<String> hint(String pathVariable) { return Optional.of("Open a new terminal to use it"); }
+    /** Jasper's own new tabs inherit the Path Jasper started with, so they see the change only after a full quit. */
+    @Override public Optional<String> hint(String pathVariable) {
+        return Optional.of("Open a new terminal, or quit Jasper completely for its own tabs, to use it");
+    }
 
     private String current() throws IOException {
         try {

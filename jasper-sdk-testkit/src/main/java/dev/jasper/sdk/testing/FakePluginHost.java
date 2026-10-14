@@ -78,6 +78,9 @@ public final class FakePluginHost implements AutoCloseable {
     record Declared(String pluginId, String name, String summary) { }
     final Map<String, Declared> subcommands = new LinkedHashMap<>();
     final Map<String, FakeCommandLine.Registered> subcommandHandlers = new LinkedHashMap<>();
+    /** A subcommand call a handler took and has not completed. */
+    private record RunningCall(FakePluginContext context, String name, FakeCommandCall call) { }
+    private final List<RunningCall> runningCalls = new CopyOnWriteArrayList<>();
     private final java.util.ArrayDeque<List<dev.jasper.sdk.files.FileLocation>> fileChoiceQueue = new java.util.ArrayDeque<>();
     private final List<dev.jasper.sdk.files.FileChoice> fileChoices = new ArrayList<>();
         final List<String> paletteOpens = new ArrayList<>();
@@ -601,7 +604,8 @@ public final class FakePluginHost implements AutoCloseable {
 
     /**
      * Declares a subcommand as a plugin's {@code [[subcommands]]} would; before that plugin starts. The first
-     * declaration of a name keeps it, as the application keeps it for the first plugin by id.
+     * declaration of a name keeps it. The application keeps a contested name for a bundled plugin first, then for the
+     * lowest plugin id, so declare in that order to match it.
      *
      * @param pluginId the plugin that answers it
      * @param name the subcommand
@@ -666,6 +670,12 @@ public final class FakePluginHost implements AutoCloseable {
             if (failure == null) call.complete(code == null || code < 0 || code > 255 ? 1 : code);
             else call.fail(name, failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null ? failure.getCause() : failure);
         });
+        if (!call.exit().isDone()) {
+            // As the application: a call still running when its plugin stops ends with 1.
+            var running = new RunningCall(registered.context(), name, call);
+            runningCalls.add(running);
+            call.exit().whenComplete((code, failure) -> runningCalls.remove(running));
+        }
         return call;
     }
 
@@ -679,6 +689,8 @@ public final class FakePluginHost implements AutoCloseable {
         context.palette.closeAll();
         context.fileSources.closeAll();
         context.commandLine.closeAll();
+        for (RunningCall running : List.copyOf(runningCalls))
+            if (running.context() == context) running.call().stopped(running.name());
         notifications.stopped(context.plugin().id());
         clipboard.ownerStopped(context.plugin().id());
         String id = context.plugin().id();

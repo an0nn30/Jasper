@@ -261,6 +261,20 @@ char *jc_request(const char *token, const char *cwd, const char *pane, int count
     return buffer.data;
 }
 
+static size_t encoded_length(const char *text) { return 4 * ((strlen(text) + 2) / 3); }
+
+size_t jc_request_length(size_t token_length, const char *cwd, const char *pane, int count, const char *const *arguments) {
+    /* As jc_request: the magic and version, the token, cwd and pane fields, each argument, the newline. */
+    size_t length = strlen("jasper-command\t" JC_PROTOCOL_VERSION "\t") + token_length + 1 + encoded_length(cwd) + 1
+        + (jc_valid_pane(pane) ? strlen(pane) : 0) + 1;
+    for (int i = 0; i < count; i++) length += 1 + encoded_length(arguments[i]);
+    return length;
+}
+
+int jc_request_fits(const char *cwd, const char *pane, int count, const char *const *arguments) {
+    return jc_request_length(JC_MAX_TOKEN, cwd, pane, count, arguments) <= JC_MAX_REQUEST;
+}
+
 jc_frame jc_parse_frame(const char *line) {
     jc_frame frame = { JC_FRAME_UNKNOWN, NULL, 0, 0 };
     if (strcmp(line, "stale") == 0) {

@@ -195,6 +195,28 @@ class CommandClientTest {
         assertThat(result.err()).startsWith("jasper: Jasper's command socket path is too long");
     }
 
+    /** The client and the listener draw the line at the same length, whatever the platform's own limit is. */
+    @Test void aSocketPathOfMoreThanAHundredBytesIsTooLongOnEveryPlatform() throws Exception {
+        int room = CommandListener.MAX_SOCKET_PATH_BYTES - dir.toString().length() - 1;
+        assumeTrue(room > 0, "the temporary folder leaves room for a name");
+        Result longest = run(Map.of("JASPER_COMMAND_SOCKET", dir.resolve("x".repeat(room)).toString()), List.of("editor"));
+        Result over = run(Map.of("JASPER_COMMAND_SOCKET", dir.resolve("x".repeat(room + 1)).toString()), List.of("editor"));
+        assertThat(longest.err()).as("nothing listens there, and there is no app image to start")
+            .isEqualTo("jasper: can't find Jasper; reinstall the command from Settings\n");
+        assertThat(over.exit()).isEqualTo(1);
+        assertThat(over.err()).startsWith("jasper: Jasper's command socket path is too long");
+    }
+
+    /** Checked before connecting, so nothing is started for a call Jasper would refuse. */
+    @Test void aRequestOverTheLimitIsTooLongBeforeAnythingStarts() throws Exception {
+        assumeFalse(System.getProperty("os.name").startsWith("Windows"), "a Windows command line holds 32,767 characters");
+        // About 1.07 MB once encoded; no single argument exceeds Linux's 128 KiB per-argument limit.
+        var arguments = new ArrayList<String>(List.of("editor"));
+        for (int i = 0; i < 8; i++) arguments.add("x".repeat(100_000));
+        Result result = run(atSocket(), arguments);
+        assertThat(result).isEqualTo(new Result(2, "", "jasper: the command is too long\n"));
+    }
+
     /** A fake app image whose launcher records its working directory and arguments; Jasper itself never starts. */
     @Test void anOptionLaunchRunsTheLauncherFromTheCallersFolderWithItsArguments() throws Exception {
         boolean mac = System.getProperty("os.name").startsWith("Mac");

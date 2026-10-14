@@ -131,6 +131,39 @@ static void cold_start(void) {
     check(jc_cold_start_keeps(""), "an empty entry is kept");
 }
 
+/* An argument whose request, with the longest token the client reads, is extra bytes longer than JC_MAX_REQUEST. */
+static void request_limit(void) {
+    /* The request less its argument: "jasper-command\t1\t", the token, "\t", "Lw==" for "/", "\t", no pane, "\t", "\n". */
+    const size_t rest = 17 + JC_MAX_TOKEN + 1 + 4 + 1 + 1 + 1;
+    const size_t encoded = JC_MAX_REQUEST - rest;
+    size_t length = encoded / 4 * 3;
+    char *argument = malloc(length + 2);
+    const char *arguments[1];
+    if (argument == NULL) {
+        check(0, "memory for the longest request");
+        return;
+    }
+    check(encoded % 4 == 0, "the longest request ends on a whole base64 group");
+    memset(argument, 'a', length);
+    argument[length] = '\0';
+    arguments[0] = argument;
+    check(jc_request_length(JC_MAX_TOKEN, "/", "", 1, arguments) == JC_MAX_REQUEST, "the longest request's length");
+    {
+        char token[JC_MAX_TOKEN + 1];
+        char *request;
+        memset(token, 't', JC_MAX_TOKEN);
+        token[JC_MAX_TOKEN] = '\0';
+        request = jc_request(token, "/", "", 1, arguments);
+        check(request != NULL && strlen(request) == JC_MAX_REQUEST, "jc_request builds the longest request at that length");
+        free(request);
+    }
+    check(jc_request_fits("/", "", 1, arguments), "the longest request fits");
+    argument[length] = 'a';
+    argument[length + 1] = '\0';
+    check(!jc_request_fits("/", "", 1, arguments), "one byte more does not");
+    free(argument);
+}
+
 static const char *pairs(const char *name, void *context) {
     const char *const *pair = context;
     for (; pair[0] != NULL; pair += 2) if (strcmp(pair[0], name) == 0) return pair[1];
@@ -179,6 +212,9 @@ typedef struct {
     const char *values[4];
 } vector_environment;
 
+/* The variables a home vector sets, in its field order. */
+static const char *const VECTOR_NAMES[4] = { "JASPER_COMMAND_SOCKET", "JASPER_HOME", "APPDATA", "XDG_CONFIG_HOME" };
+
 static const char *vector_lookup(const char *name, void *context) {
     vector_environment *environment = context;
     for (int i = 0; i < 4; i++) if (strcmp(environment->names[i], name) == 0) return environment->values[i];
@@ -209,9 +245,12 @@ static void home_vectors(const char *path) {
             continue;
         }
         jc_os os = strcmp(fields[0], "mac") == 0 ? JC_OS_MAC : strcmp(fields[0], "linux") == 0 ? JC_OS_LINUX : JC_OS_WINDOWS;
-        vector_environment environment = {
-            { "JASPER_COMMAND_SOCKET", "JASPER_HOME", "APPDATA", "XDG_CONFIG_HOME" },
-            { vector_value(fields[1]), vector_value(fields[2]), vector_value(fields[3]), vector_value(fields[4]) } };
+        /* Filled in field by field: MSVC's C warns about a non-constant aggregate initializer (C4204). */
+        vector_environment environment;
+        for (int i = 0; i < 4; i++) {
+            environment.names[i] = VECTOR_NAMES[i];
+            environment.values[i] = vector_value(fields[i + 1]);
+        }
         int status = jc_socket_path(os, vector_lookup, &environment, fields[5], fields[6], out, sizeof out);
         for (char *c = out; status == 0 && *c != '\0'; c++) if (*c == '\\') *c = '/';
         check(status == 0, fields[7]);
@@ -263,6 +302,8 @@ static void protocol_vectors(const char *path) {
             strcat(expected, "\n");
             char *request = jc_request(token, cwd, pane, count, pointers);
             check_text(request, expected, "a protocol vector");
+            check(request != NULL && jc_request_length(strlen(token), cwd, pane, count, pointers) == strlen(request),
+                "jc_request_length is the vector's length");
             free(request);
             count = 0;
             seen++;
@@ -285,6 +326,7 @@ int main(int argc, char **argv) {
     panes();
     frames();
     cold_start();
+    request_limit();
     home_rules();
     home_vectors(argv[1]);
     protocol_vectors(argv[2]);

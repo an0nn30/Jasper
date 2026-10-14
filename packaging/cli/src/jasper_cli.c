@@ -712,15 +712,22 @@ static int help(const char *socket_path) {
 }
 
 static int call(const char *socket_path, int count, const char *const *arguments) {
-    char token[256];
-    const char *pane;
+    char token[JC_MAX_TOKEN + 1];
+    const char *pane = variable("JASPER_PANE", NULL), *cwd = working_folder();
     char *request;
     int nothing_listens, code;
     jc_socket client;
-    if (strlen(socket_path) >= sizeof(((struct sockaddr_un *) 0)->sun_path)) {
+    if (pane == NULL) pane = "";
+    /* Jasper's own limit, which every platform's sun_path holds. */
+    if (strlen(socket_path) > JC_MAX_SOCKET_PATH) {
         fprintf(stderr, "jasper: Jasper's command socket path is too long (%s); set JASPER_HOME to a shorter folder\n",
             socket_path);
         return 1;
+    }
+    /* Before connecting, so nothing is started for a call Jasper would drop. */
+    if (!jc_request_fits(cwd, pane, count, arguments)) {
+        fputs("jasper: the command is too long\n", stderr);
+        return 2;
     }
     client = connect_to(socket_path, &nothing_listens);
     if (client == JC_NO_SOCKET && !nothing_listens) {
@@ -744,8 +751,7 @@ static int call(const char *socket_path, int count, const char *const *arguments
         return 1;
     }
     allow_foreground(socket_path);
-    pane = variable("JASPER_PANE", NULL);
-    request = jc_request(token, working_folder(), pane == NULL ? "" : pane, count, arguments);
+    request = jc_request(token, cwd, pane, count, arguments);
     if (request == NULL || send_all(client, request, strlen(request)) != 0) {
         fputs("jasper: Jasper quit before the command finished\n", stderr);
         code = 1;

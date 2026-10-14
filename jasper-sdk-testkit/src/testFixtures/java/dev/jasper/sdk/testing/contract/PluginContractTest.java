@@ -1921,4 +1921,23 @@ public abstract class PluginContractTest {
         assertThat(call.out()).isEmpty();
         h.ui(() -> pending.complete(0));
     }
+
+    @Test void aCallStillRunningWhenItsPluginStopsEndsWithOne() {
+        h.declareSubcommand("test.a", "wait", "Waits");
+        var a = new AtomicReference<PluginContext>();
+        var cancelled = new java.util.concurrent.atomic.AtomicInteger();
+        h.start(info("test.a"), Set.of(), Set.of(), a::set);
+        h.ui(() -> a.get().commandLine().handle("wait", call -> {
+            call.onCancelled(cancelled::incrementAndGet);
+            return new java.util.concurrent.CompletableFuture<Integer>();
+        }));
+        ContractCall call = h.call("wait", List.of(), HERE, null);
+        assertThat(call.finished()).isFalse();
+        h.stopAll();
+        assertThat(call.finished()).as("ended as its plugin stopped").isTrue();
+        assertThat(call.exitCode()).isEqualTo(1);
+        assertThat(call.err()).isEqualTo("jasper: wait stopped\n");
+        call.cancel();
+        assertThat(cancelled).as("a stopped plugin's cancellation listener never runs").hasValue(0);
+    }
 }

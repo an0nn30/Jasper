@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -25,15 +26,20 @@ import java.util.function.Function;
 /**
  * Runs {@code jasper <subcommand>} calls in the plugin that answers them. The owners are fixed at start; each owner
  * registers its handler through {@code CommandLine.handle}. A call hops to the UI thread, where its handler runs inside
- * the plugin's containment.
+ * the plugin's containment. A call still running when its plugin stops ends with exit code 1.
  */
 final class PluginCommands implements CommandDispatcher {
     /** A handler, with the pane-to-window lookup of the context that registered it. */
     private record Registered(String pluginId, CommandHandler handler, Function<UUID, Optional<WindowHandle>> windows) { }
 
+    /** A call a handler has taken and not yet completed. */
+    private record Running(String name, Call call, CompletableFuture<Integer> result) { }
+
     private final Consumer<Runnable> ui;
     private final Containment containment;
     private final Map<String, Registered> handlers = new ConcurrentHashMap<>();
+    /** Calls still running, by the plugin whose handler took them. */
+    private final Map<String, Set<Running>> running = new ConcurrentHashMap<>();
     private volatile Subcommands table = Subcommands.NONE;
 
     PluginCommands(Consumer<Runnable> ui, Containment containment) {
@@ -62,6 +68,21 @@ final class PluginCommands implements CommandDispatcher {
         if (handlers.putIfAbsent(name, registered) != null)
             throw new IllegalArgumentException("The subcommand " + name + " already has a handler");
         return () -> handlers.remove(name, registered);
+    }
+
+    /**
+     * The plugin stopped: each of its calls still running ends with exit code 1, and their cancellation listeners no
+     * longer run. UI thread.
+     */
+    void stopped(String pluginId) {
+        Set<Running> calls = running.remove(pluginId);
+        if (calls == null) return;
+        for (Running each : List.copyOf(calls)) {
+            each.call().live.set(false);
+            if (each.result().isDone()) continue;
+            each.call().err("jasper: " + each.name() + " stopped\n");
+            each.result().complete(1);
+        }
     }
 
     @Override public CompletionStage<Integer> dispatch(Invocation invocation) {
@@ -96,7 +117,13 @@ final class PluginCommands implements CommandDispatcher {
             fail(invocation, name, thrown, result);
             return;
         }
+        Set<Running> calls = running.computeIfAbsent(registered.pluginId(), id -> ConcurrentHashMap.newKeySet());
+        var tracked = new Running(name, call, result);
+        calls.add(tracked);
+        result.whenComplete((code, failure) -> calls.remove(tracked));
         stage.get().whenComplete((code, failure) -> {
+            // Already ended because the plugin stopped.
+            if (result.isDone()) return;
             if (failure == null) {
                 result.complete(code == null || code < 0 || code > 255 ? 1 : code);
                 return;
@@ -119,6 +146,8 @@ final class PluginCommands implements CommandDispatcher {
         private final String what;
         private final Invocation invocation;
         private final Optional<WindowOwner> window;
+        /** False once the plugin stopped: its cancellation listeners no longer run. */
+        final AtomicBoolean live = new AtomicBoolean(true);
 
         Call(String pluginId, String what, Invocation invocation, Optional<WindowOwner> window) {
             this.pluginId = pluginId;
@@ -137,7 +166,7 @@ final class PluginCommands implements CommandDispatcher {
             Objects.requireNonNull(listener, "listener");
             var active = new AtomicBoolean(true);
             invocation.onCancelled(() -> ui.accept(() -> {
-                if (active.get()) containment.run(pluginId, what + " cancellation", listener);
+                if (active.get() && live.get()) containment.run(pluginId, what + " cancellation", listener);
             }));
             return () -> active.set(false);
         }

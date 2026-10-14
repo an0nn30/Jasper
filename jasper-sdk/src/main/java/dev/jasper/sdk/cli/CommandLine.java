@@ -10,7 +10,8 @@ import dev.jasper.sdk.Subscription;
 public interface CommandLine {
     /**
      * Handles a subcommand this plugin's {@code plugin.toml} declares. UI thread only. The registration ends with the
-     * plugin; while no handler is registered, {@code jasper <name>} reports the subcommand unavailable.
+     * plugin, and a call still running then ends with exit code 1; while no handler is registered, {@code jasper <name>}
+     * reports the subcommand unavailable.
      *
      * @param name a name the manifest declares under {@code [[subcommands]]}
      * @param handler runs each call

@@ -646,6 +646,21 @@ def testCommandClientCore = tasks.register('testCommandClientCore') {
         String output = runLauncherTool([test.absolutePath, new File(cliTestSource, 'home-vectors.txt').absolutePath,
             new File(cliTestSource, 'protocol-vectors.txt').absolutePath], null, null, "the jasper command's core tests")
         logger.lifecycle(output.trim())
+        // As testLauncherCore: the core and its test once more with the other hosts' defines, so a name that collides
+        // with one fails here, not only on that host's CI. On macOS the client's Linux branch is compiled too, against
+        // this host's POSIX headers; its Windows branch needs the Windows headers, so only Windows compiles it.
+        def host = launcherHost()
+        if (host.os != 'windows') {
+            List<String> compiler = host.os == 'macos' ? ['/usr/bin/xcrun', 'clang'] : ['gcc']
+            ['macos', 'linux', 'windows'].findAll { it != host.os }.each { String other ->
+                boolean linuxBranch = host.os == 'macos' && other == 'linux'
+                List<File> checked = sources + (linuxBranch ? [new File(cliCore, 'jasper_cli.c')] : [])
+                runLauncherTool(compiler + ['-std=c11', '-fsyntax-only', '-Wall', '-Wextra', '-Werror'] +
+                    (linuxBranch ? ['-U__APPLE__'] : []) + launcherDefines(other).collect { "-D${it}".toString() } +
+                    ["-I${cliCore.absolutePath}".toString()] + checked.collect { it.absolutePath }, null, null,
+                    "checking the jasper command with ${other}'s defines", launcherToolchainHint(host.os))
+            }
+        }
         new File(work, 'passed').text = output
     }
 }
