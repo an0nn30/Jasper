@@ -330,7 +330,7 @@ def verifyPackage = tasks.register('verifyPackage') {
     group = 'verification'
     description = 'Verifies the generated native image and bundled runtime without launching Jasper.'
     dependsOn(packageApp)
-    dependsOn(tasks.named('testLauncherCore'), tasks.named('testLauncherGuard'))
+    dependsOn(tasks.named('testLauncherCore'), tasks.named('testLauncherWatch'), tasks.named('testWatcher'))
     // BundledNativesProbe lives in the test sources: verification tooling, never in the application jar.
     if (normalizedHost().os in ['macos', 'windows']) dependsOn(tasks.named('testClasses'))
     inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
@@ -351,7 +351,7 @@ def verifyPackage = tasks.register('verifyPackage') {
         [image, appDir, runtimeHome, nativeLauncher, config].each { candidate ->
             if (!candidate.exists()) throw new GradleException("Package verification failed: missing ${candidate}")
         }
-        // Jasper's launcher (gradle/launcher.gradle), not jpackage's own: its exit guard names the skip variable.
+        // Jasper's launcher (gradle/launcher.gradle), not jpackage's own: its watch module names the skip variable.
         if (!new String(Files.readAllBytes(nativeLauncher.toPath()), StandardCharsets.ISO_8859_1).contains('JASPER_VM_OPTIONS_SKIP')) {
             throw new GradleException("Package verification failed: ${nativeLauncher} is not Jasper's launcher")
         }
