@@ -293,6 +293,36 @@ class ApplicationBootstrapTest {
         return made.get();
     }
 
+    @Test void aLaunchThatFindsAnotherJasperServingTheSharedSocketServesItsOwnShellsPrivately(@TempDir Path dir) throws Exception {
+        AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
+        long pid = ProcessHandle.current().pid();
+        Path own = dirs.commandSocket(pid);
+        CommandListener other = CommandListener.bind(dirs.commandSocket(), invocation -> CompletableFuture.completedFuture(0));
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = application(dir, terminated::countDown);
+        var served = new AtomicReference<CommandListener>();
+        try {
+            assertThat(other).isNotNull();
+            DesktopTestSupport.edt(() -> served.set(
+                ApplicationBootstrap.serveCommands(application, new AppArguments(null, false, false), dirs, new StartupResources())));
+            assertThat(served.get()).as("a listener of its own").isNotNull();
+            assertThat(served.get().socket()).isEqualTo(own);
+            assertThat(CommandListener.live(own)).isTrue();
+            assertThat(application.commandSocket()).as("what its shells' JASPER_COMMAND_SOCKET names").isEqualTo(own);
+            var noWindow = new AppArguments(null, false, false, false, null, false, false, true);
+            assertThat(ApplicationBootstrap.bindCommands(noWindow, dirs, invocation -> CompletableFuture.completedFuture(0)))
+                .as("a --no-window launch exists only to serve the shared socket").isNull();
+            DesktopTestSupport.edt(application::quitNow);
+            assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(own).as("removed at quit, as a private launch's socket is").doesNotExist();
+            assertThat(own.resolveSibling(own.getFileName() + ".lock")).doesNotExist();
+            assertThat(CommandListener.live(dirs.commandSocket())).as("the other Jasper's socket is untouched").isTrue();
+        } finally {
+            if (served.get() != null) served.get().close();
+            if (other != null) other.close();
+        }
+    }
+
     @Test void aNoWindowJasperThatIsNotResidentQuitsOnceItsCallIsServed(@TempDir Path dir) throws Exception {
         var terminated = new CountDownLatch(1);
         JasperApplication application = application(dir, terminated::countDown);

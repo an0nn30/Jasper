@@ -42,7 +42,7 @@ development run cannot install it.
 
 The command looks for Jasper's socket in `JASPER_COMMAND_SOCKET`, else in `daemon/commands` under `JASPER_HOME`, else
 under the default home. A launch with `--config`, `--safe-mode`, `--plugin-dir` or `--standalone` serves a socket of its
-own, which only its own shells reach.
+own, which only its own shells reach, and so does a Jasper started while another serves its home.
 
 ### Custom VM options
 

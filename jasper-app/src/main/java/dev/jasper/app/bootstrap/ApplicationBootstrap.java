@@ -2,6 +2,7 @@ package dev.jasper.app.bootstrap;
 
 import dev.jasper.app.application.DockControl;
 import dev.jasper.app.application.JasperApplication;
+import dev.jasper.app.commandline.CommandDispatcher;
 import dev.jasper.app.commandline.CommandListener;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.commands.CommandHistory;
@@ -201,13 +202,8 @@ public final class ApplicationBootstrap {
             if (!options.privateCommands()) application.subcommandList(dirs.subcommandList());
             application.startPlugins(HandoffSocket.codeSource(), options.pluginDir(), options.safeMode(), dirs);
             // After the plugins started, so a call that arrives first finds its handler.
-            CommandListener listener = CommandListener.bind(commandSocket(options, dirs), application.commands());
-            if (listener != null) {
-                acquired.own(listener);
-                application.onShutdown(listener::close);
-                application.commandSocket(listener.socket());
-                commands.set(listener);
-            }
+            CommandListener listener = serveCommands(application, options, dirs, acquired);
+            if (listener != null) commands.set(listener);
             StartupTrace.current().phase("application", began);
             acquired.transfer();
             return application;
@@ -371,6 +367,35 @@ public final class ApplicationBootstrap {
     /** The command socket a launch serves: its own for a private launch, otherwise its home's shared one. */
     static Path commandSocket(AppArguments options, AppDirs dirs) {
         return options.privateCommands() ? dirs.commandSocket(ProcessHandle.current().pid()) : dirs.commandSocket();
+    }
+
+    /**
+     * Binds the command socket this launch serves ({@link #bindCommands}), owned by {@code acquired} until start-up
+     * completes and closed at quit, and names it in the application's new local shells. Null when none binds. EDT.
+     */
+    static CommandListener serveCommands(JasperApplication application, AppArguments options, AppDirs dirs,
+                                         StartupResources acquired) {
+        CommandListener listener = bindCommands(options, dirs, application.commands());
+        if (listener != null) {
+            acquired.own(listener);
+            application.onShutdown(listener::close);
+            application.commandSocket(listener.socket());
+        }
+        return listener;
+    }
+
+    /**
+     * Binds the command socket this launch serves ({@link #commandSocket}). A launch that finds another Jasper serving
+     * its home's shared socket serves a private one instead, as a private launch does, so that its own shells reach it
+     * rather than the other Jasper; a {@code --no-window} launch exists only to serve the shared socket and does not.
+     * Null when nothing binds.
+     */
+    static CommandListener bindCommands(AppArguments options, AppDirs dirs, CommandDispatcher dispatcher) {
+        CommandListener listener = CommandListener.bind(commandSocket(options, dirs), dispatcher);
+        if (listener != null || options.noWindow() || options.privateCommands() || !CommandListener.live(dirs.commandSocket()))
+            return listener;
+        LOG.log(System.Logger.Level.INFO, "Another Jasper serves the jasper command for this home; this one serves its own shells");
+        return CommandListener.bind(dirs.commandSocket(ProcessHandle.current().pid()), dispatcher);
     }
 
     /** True for a {@code --no-window} launch while another Jasper already serves the command: it would only lose the bind. */

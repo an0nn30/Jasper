@@ -5,8 +5,9 @@
 [plan](superpowers/plans/2026-10-13-jasper-command-line-1-jasper-command.md)). A native `jasper` command
 (`packaging/cli`, C, built with the launcher's toolchain) hands each call to the running Jasper over
 `<home>/daemon/commands` and never starts a JVM; with nothing listening it starts Jasper with `--no-window` and waits up
-to 20 s. Every running Jasper binds the socket after its plugins start (private launches bind `commands-<pid>`); a
-`--no-window` Jasper that is not resident quits once served. Local shells get `JASPER_PANE` and `JASPER_COMMAND_SOCKET`.
+to 20 s. Every running Jasper binds the socket after its plugins start (private launches, and a launch that finds
+another Jasper serving the shared socket, bind `commands-<pid>`); a `--no-window` Jasper that is not resident quits
+once served. Local shells get `JASPER_PANE` and `JASPER_COMMAND_SOCKET`.
 SDK 0.17.0: `PluginContext.commandLine()` and `[[subcommands]]`; bundled ranges `>=0.17.0, <0.18`. Editor 0.8.0:
 `jasper editor [--wait] FILE[:LINE[:COLUMN]]...`. Settings › System Settings › Command line and the palette install the
 command on `PATH`. Deviations: the plan's twelve, plus the `### The jasper command` section of `configuration.md` landing

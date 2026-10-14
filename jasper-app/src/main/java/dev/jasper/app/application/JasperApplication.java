@@ -476,6 +476,9 @@ public final class JasperApplication {
     /** The command socket this Jasper serves, named in each new local shell's {@code JASPER_COMMAND_SOCKET}. */
     public void commandSocket(Path socket) { commandSocket = socket; }
 
+    /** The command socket new local shells are given; null when this Jasper serves none. */
+    public Path commandSocket() { return commandSocket; }
+
     /** What a new local shell in {@code pane} gets last, over everything else. Any thread. */
     Map<String, String> paneVariables(UUID pane) {
         Path socket = commandSocket;
