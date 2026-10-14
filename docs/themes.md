@@ -32,7 +32,7 @@ appearance shows: `slate-steel`, or an installed theme's id. A theme has a Dark 
 
 Settings › Appearance & Behavior › Appearance has the Dark, Light and Match System tiles, each previewing the theme
 picked for it, the **Dark theme** and **Light theme** dropdowns, and the **Terminal scheme** dropdown, whose first
-entry, **Same as UI theme**, is `match`. Terminal › Font & Colors links there, and the command palette's **Themes…**
+entry, **Same as UI theme**, is `match`. A gear beside each dropdown imports and removes themes (below). Terminal › Font & Colors links there, and the command palette's **Themes…**
 opens it; the palette's **Terminal: …** commands choose a scheme. Choices stay staged until Apply or OK.
 
 ## Installed themes
@@ -54,18 +54,22 @@ editor scheme.
 
 ## Importing and removing themes
 
-Settings › Appearance & Behavior › Appearance › **Imported themes** lists every imported theme with what it offers
-("UI theme · Dark", "Terminal scheme", …) and a **Remove** button, under an **Import…** button. Both act at once,
-outside Apply.
+The gear beside the **Dark theme**, **Light theme** and **Terminal scheme** dropdowns on Settings › Appearance &
+Behavior › Appearance has **Import Theme…** and **Remove** for the theme that dropdown shows. Both act at once, outside
+Apply; a failure is shown in a sheet.
 
-- **Import…** opens Jasper's file chooser for a `.json` file, checks it and copies it into the themes folder as
-  `<id>.json`, the id coming from the theme's name ("Gruvbox Dark" is `gruvbox-dark`). Its variants and schemes then
-  appear in the dropdowns; nothing is selected. A file Jasper cannot use is not copied, and the reason shows under the
-  button, for example `Could not import dracula.json: ui.dark: Missing colour "accent"`. Importing a theme whose id an
+- **Import Theme…** opens Jasper's file chooser for a `.json` file, checks it and copies it into the themes folder as
+  `<id>.json`, the id coming from the theme's name ("Gruvbox Dark" is `gruvbox-dark`). The gear's dropdown then picks
+  it: the Dark theme gear its Dark variant, the Light theme gear its Light variant, the Terminal scheme gear its first
+  scheme; the pick stays staged until Apply or OK. A theme with nothing for that dropdown is still imported, and a sheet
+  says where to pick it ("Gruvbox Dark is a terminal scheme; pick it under Terminal scheme."). A file Jasper cannot use is
+  not copied, and the sheet says why, for example `ui.dark: Missing colour "accent"`. Importing a theme whose id an
   imported theme already has asks before replacing it; Slate Steel cannot be replaced.
-- **Remove** asks first and says what will change. The file is deleted, and every setting that names the theme or one
-  of its schemes, saved or staged, returns to its default (`slate-steel` or `match`): saved ones are written at once,
-  and other staged changes stay staged. If the file cannot be deleted, nothing changes and the reason shows.
+- **Remove** removes the theme the dropdown shows; for the Terminal scheme gear, the theme the scheme belongs to. It is
+  unavailable for Slate Steel and Same as UI theme. It asks first and says what will change. The file is deleted, and
+  every setting that names the theme or one of its schemes, saved or staged, returns to its default (`slate-steel` or
+  `match`): saved ones are written at once, and other staged changes stay staged. If the file cannot be deleted,
+  nothing changes and the sheet says why.
 
 ## Converting Alacritty and IntelliJ themes
 

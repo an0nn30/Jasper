@@ -61,6 +61,43 @@ class AppearancePageTest {
         return appearanceSpec.build(context);
     }
 
+    /** {@code target}'s left edge within {@code page}'s body, laid out at a Settings window's width. */
+    private static int left(SchemaPage page, String target) {
+        var body = page.component();
+        var viewport = new javax.swing.JViewport();
+        viewport.setSize(900, 2400);
+        viewport.setView(body);
+        layOut(viewport);
+        return javax.swing.SwingUtilities.convertPoint(kit(page, target, java.awt.Component.class), 0, 0, body).x;
+    }
+    private static void layOut(java.awt.Component component) {
+        if (!(component instanceof java.awt.Container container)) return;
+        container.doLayout();
+        for (var child : container.getComponents()) layOut(child);
+    }
+
+    @Test void theDarkLightAndTerminalDropdownsLineUp() {
+        int dark = left(page, "ui.appearance:dark-theme.input");
+        assertThat(List.of(left(page, "ui.appearance:light-theme.input"), left(page, "terminal.scheme.input")))
+            .as("the Light row keeps the Reset lane the other rows have").containsOnly(dark);
+    }
+
+    @Test void withImportsEachThemeDropdownHasAGearAndTheyLineUp() {
+        var imports = new ThemeImports(new dev.jasper.app.appearance.ThemeFolder(Path.of("themes")), surface -> Optional.empty(),
+            (surface, question) -> { }, (surface, notice) -> { }, edit -> java.util.concurrent.CompletableFuture.completedFuture(null),
+            () -> java.util.concurrent.CompletableFuture.completedFuture(null), Runnable::run, Runnable::run);
+        var withGears = CorePages.specs(new AppearanceChoices(100f, false, Optional::empty, ignored -> new Subscription(() -> { }), () -> TWO_EACH,
+                Optional.of(imports)), system, ShellChoices.NONE, id -> { }).stream()
+            .filter(spec -> spec.id().equals("appearance")).findFirst().orElseThrow().build(context);
+        int dark = left(withGears, "ui.appearance:dark-theme.input");
+        assertThat(List.of(left(withGears, "ui.appearance:light-theme.input"), left(withGears, "terminal.scheme.input"))).containsOnly(dark);
+        int gear = left(withGears, "ui.appearance:dark-gear.main");
+        assertThat(gear).as("the gear follows its dropdown").isGreaterThan(dark);
+        assertThat(List.of(left(withGears, "ui.appearance:light-gear.main"), left(withGears, "terminal.scheme:gear.main"))).containsOnly(gear);
+        assertThatThrownBy(() -> kit(page, "ui.appearance:dark-gear.main", java.awt.Component.class))
+            .as("pages built without an application have no gears").isInstanceOf(Throwable.class);
+    }
+
     @Test void viewModeOffersNormalAndCompact() {
         var box = combo("window.view_mode");
         assertThat(node(page, "window.view_mode")).isInstanceOfSatisfying(Nodes.Choice.class,

@@ -813,9 +813,9 @@ public final class JasperApplication {
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
                 shellProfiles::refresh, shellProfiles::onChanged);
             Optional<dev.jasper.app.settingsui.ThemeImports> imports = themesFolder == null ? Optional.empty()
-                : Optional.of(SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder), themes::library,
+                : Optional.of(SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder),
                     surface -> surface == null ? Optional.empty() : this.shells.chooseFile(surface, "Import Theme", ".json"),
-                    this::confirmOver, configuration::save, configuration::reload));
+                    this::confirmOver, this::informOver, configuration::save, configuration::reload));
             var appearanceChoices = SettingsAppearance.choices(systemAppearance, themes::library, imports);
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
                 dev.jasper.app.settingsui.CorePages.pages(appearanceChoices, system, shells,
@@ -1329,6 +1329,17 @@ public final class JasperApplication {
     Incidents incidents() { return incidents; }
 
     /** Asks {@code question} with a kit sheet over {@code surface}, the Settings dialog; its yes runs at most once. */
+    /** A notice sheet over the Settings dialog's {@code surface}; nothing while that dialog is closed. */
+    private void informOver(dev.jasper.app.windows.AuxiliarySurface surface, dev.jasper.app.settingsui.ThemeImports.Notice notice) {
+        if (surface == null || auxiliary == null) return;
+        var dialog = auxiliary.dialog(notice.title(), true, surface);
+        var view = dev.jasper.app.pluginmanager.ConfirmView.notice(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),
+            notice.title(), notice.message(), dialog::close);
+        dialog.onClosed(view::close);
+        dialog.setContent(view.view());
+        dialog.show();
+    }
+
     private void confirmOver(dev.jasper.app.windows.AuxiliarySurface surface, dev.jasper.app.settingsui.ThemeImports.Question question) {
         if (surface == null || auxiliary == null) return;
         var dialog = auxiliary.dialog(question.title(), true, surface);

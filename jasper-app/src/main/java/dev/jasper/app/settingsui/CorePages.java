@@ -70,16 +70,15 @@ public final class CorePages {
         return specs(appearance, system, shells, navigate, glass, NotificationGroupChoices.NONE);
     }
 
-    /** Settings › Appearance; the Imported themes group follows the Theme section when the application supplies imports. */
+    /** Settings › Appearance. */
     private static SchemaPage.Spec appearance(AppearanceChoices appearance, boolean glass) {
-        var page = SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
+        return SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
             .section("Theme")
             .row(UI_APPEARANCE, Editors.appearance(appearance))
             .row(UI_THEME_DARK).shownWhen(false)
             .row(UI_THEME_LIGHT).shownWhen(false)
-            .row(TERMINAL_SCHEME, Editors.schemeChoice(appearance)).note("Colors for terminal panes");
-        appearance.imports().ifPresent(imports -> page.part(ImportedThemesSection.part(imports)));
-        return page.section("Workspace")
+            .row(TERMINAL_SCHEME, Editors.schemeChoice(appearance)).note("Colors for terminal panes")
+            .section("Workspace")
             .row(UI_WORKSPACE_OPACITY, WorkspaceEditors.opacity(appearance)).shownWhen(glass)
             .row(UI_WORKSPACE_BLUR, WorkspaceEditors.blur(appearance)).shownWhen(glass)
             .section("Interface Font")
