@@ -197,6 +197,26 @@ class CommandListenerTest {
         assertThat(exchange(request(token(), List.of("fail")))).isEqualTo(CommandProtocol.err("jasper: disk full\n") + CommandProtocol.exit(1));
     }
 
+    @Test void aHandlerNeverWaitsForAClientThatHasStoppedReading() throws Exception {
+        // About 2.8 MiB of frames, far more than the socket buffers hold while the client reads nothing.
+        List<String> chunks = new ArrayList<>();
+        for (int i = 0; i < 32; i++) chunks.add("chunk " + i + " " + "x".repeat(64 * 1024) + "\n");
+        var returned = new CompletableFuture<Void>();
+        bind(invocation -> {
+            chunks.forEach(invocation::out);
+            returned.complete(null);
+            return CompletableFuture.completedFuture(3);
+        });
+        try (SocketChannel client = open()) {
+            send(client, request(token(), List.of("flood")));
+            returned.get(5, TimeUnit.SECONDS);
+            String expected = String.join("", chunks.stream().map(CommandProtocol::out).toList()) + CommandProtocol.exit(3);
+            String replies = readAll(client);
+            // Not isEqualTo: a failure would print megabytes.
+            assertThat(replies.equals(expected)).as("every output frame in order, then the exit frame last").isTrue();
+        }
+    }
+
     @Test void closingEndsTheCallsStillRunning() throws Exception {
         var started = new CompletableFuture<Void>();
         CommandListener listener = bind(invocation -> { started.complete(null); return new CompletableFuture<>(); });

@@ -1,5 +1,6 @@
 package dev.jasper.app.commandline;
 
+import dev.jasper.app.platform.OwnerOnlyFiles;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.StandardProtocolFamily;
@@ -14,11 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
-import java.security.SecureRandom;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -26,7 +24,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -37,7 +37,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>The accept loop runs on a <strong>non-daemon</strong> platform thread, so a Jasper started with
  * {@code --no-window} stays up to serve its first call; every quit path ends the process with {@code System.exit}.
  * Each connection is served on its own virtual thread, because a call such as {@code jasper editor --wait} lasts as
- * long as the user edits. Closing ends the accept loop and the connections of calls still running.
+ * long as the user edits. Reply frames are queued for a writer virtual thread of their own, so a handler's output and
+ * a call's completion, which may happen on the UI thread, never wait for a client that has stopped reading. Closing
+ * ends the accept loop and the connections of calls still running.
  */
 public final class CommandListener implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(CommandListener.class.getName());
@@ -81,7 +83,7 @@ public final class CommandListener implements AutoCloseable {
         ServerSocketChannel opened = null;
         try {
             Files.createDirectories(socket.getParent());
-            restrict(socket.getParent(), "rwx------");
+            OwnerOnlyFiles.restrict(socket.getParent(), "rwx------");
             try (FileChannel lockChannel = FileChannel.open(lockFile(socket), StandardOpenOption.CREATE,
                     StandardOpenOption.READ, StandardOpenOption.WRITE);
                  FileLock ignored = lockChannel.lock()) {
@@ -89,8 +91,8 @@ public final class CommandListener implements AutoCloseable {
                     if (live(socket)) return null;
                     Files.deleteIfExists(socket);
                 }
-                String token = writeToken(tokenFile(socket));
-                writeOwner(ownerFile(socket));
+                String token = OwnerOnlyFiles.writeToken(tokenFile(socket));
+                OwnerOnlyFiles.writeProcessId(ownerFile(socket));
                 opened = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
                 opened.bind(UnixDomainSocketAddress.of(socket));
                 var listener = new CommandListener(opened, socket, token, dispatcher);
@@ -164,13 +166,13 @@ public final class CommandListener implements AutoCloseable {
             int version = CommandProtocol.version(line);
             if (version < 0) return;
             if (version != CommandProtocol.VERSION) {
-                send(client, client, CommandProtocol.STALE);
+                reply(client, CommandProtocol.STALE);
                 return;
             }
             CommandProtocol.Request request = CommandProtocol.decode(line);
             if (request == null) return;
             if (!MessageDigest.isEqual(request.token().getBytes(StandardCharsets.UTF_8), token.getBytes(StandardCharsets.UTF_8))) {
-                send(client, client, CommandProtocol.REFUSED);
+                reply(client, CommandProtocol.REFUSED);
                 return;
             }
             call(client, request);
@@ -183,9 +185,12 @@ public final class CommandListener implements AutoCloseable {
     }
 
     private void call(SocketChannel client, CommandProtocol.Request request) {
-        Object writing = new Object();
+        // Output and the exit code are only queued; this call's writer puts them on the wire, in order.
+        BlockingQueue<Frame> frames = new LinkedBlockingQueue<>();
+        Thread writer = Thread.ofVirtual().name("jasper-command-writer").start(() -> write(client, frames));
         var invocation = new Invocation(request.arguments(), request.workingDirectory(), request.pane(),
-            text -> send(client, writing, CommandProtocol.out(text)), text -> send(client, writing, CommandProtocol.err(text)));
+            text -> frames.add(new Frame(CommandProtocol.out(text), false)),
+            text -> frames.add(new Frame(CommandProtocol.err(text), false)));
         var ended = new CompletableFuture<Void>();
         active.incrementAndGet();
         CompletionStage<Integer> stage;
@@ -197,9 +202,8 @@ public final class CommandListener implements AutoCloseable {
         stage.whenComplete((code, failure) -> {
             int exit = failure != null ? failed(invocation, failure) : code == null ? 1 : code;
             invocation.finish();
-            send(client, writing, CommandProtocol.exit(exit));
             ended.complete(null);
-            closeQuietly(client);
+            frames.add(new Frame(CommandProtocol.exit(exit), true));
             if (active.decrementAndGet() == 0) {
                 for (Runnable listener : idle) {
                     try { listener.run(); }
@@ -207,14 +211,26 @@ public final class CommandListener implements AutoCloseable {
                 }
             }
         });
-        // The client sends nothing after its request, so a read returns only once it goes away or the call has ended.
+        // The client sends nothing after its request, so a read returns only once it goes away, the listener closes
+        // or the writer closes the connection after the exit frame.
         ByteBuffer discard = ByteBuffer.allocate(256);
         try {
             while (!ended.isDone() && client.read(discard.clear()) >= 0) { }
         } catch (IOException closedOrGone) {
-            // Closed by the completion above, or the client vanished.
+            // Closed by the writer or by close(), or the client vanished.
         }
-        if (!ended.isDone()) invocation.cancel();
+        if (ended.isDone()) {
+            // The exit frame is queued; let the writer deliver it before the connection is closed.
+            try {
+                writer.join();
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        } else {
+            invocation.cancel();
+            closeQuietly(client);
+            frames.add(Frame.STOP);
+        }
     }
 
     private static int failed(Invocation invocation, Throwable failure) {
@@ -254,15 +270,32 @@ public final class CommandListener implements AutoCloseable {
         }
     }
 
-    private static void send(SocketChannel client, Object lock, String frame) {
-        ByteBuffer bytes = ByteBuffer.wrap(frame.getBytes(StandardCharsets.UTF_8));
-        synchronized (lock) {
-            try {
-                while (bytes.hasRemaining()) client.write(bytes);
-            } catch (IOException gone) {
-                // The client went away; its connection's reader notices.
-            }
+    /** One frame of a call: what to write, and whether it is the last (the exit code, or the end of a call that is over). */
+    private record Frame(String text, boolean last) {
+        static final Frame STOP = new Frame("", true);
+    }
+
+    /** Writes a call's frames in order until its last one, then closes the connection. */
+    private static void write(SocketChannel client, BlockingQueue<Frame> frames) {
+        try {
+            Frame frame;
+            do {
+                frame = frames.take();
+                reply(client, frame.text());
+            } while (!frame.last());
+        } catch (IOException gone) {
+            // The client went away or the listener closed; the call's reader notices.
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        } finally {
+            closeQuietly(client);
         }
+    }
+
+    /** A reply written straight to a connection, for the answers that come before a call starts. */
+    private static void reply(SocketChannel client, String frame) throws IOException {
+        ByteBuffer bytes = ByteBuffer.wrap(frame.getBytes(StandardCharsets.UTF_8));
+        while (bytes.hasRemaining()) client.write(bytes);
     }
 
     private static void closeQuietly(SocketChannel client) {
@@ -296,28 +329,5 @@ public final class CommandListener implements AutoCloseable {
         if (socket.getFileName().toString().startsWith("commands-")) {
             try { Files.deleteIfExists(lockFile(socket)); } catch (IOException ignored) { }
         }
-    }
-
-    // The same owner-only files as HandoffSocket's, kept here so neither package depends on the other.
-    private static String writeToken(Path file) throws IOException {
-        byte[] bytes = new byte[32];
-        new SecureRandom().nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        Files.writeString(file, token + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE,
-            StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
-        restrict(file, "rw-------");
-        return token;
-    }
-
-    private static void writeOwner(Path file) throws IOException {
-        Files.writeString(file, ProcessHandle.current().pid() + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE,
-            StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
-        restrict(file, "rw-------");
-    }
-
-    /** Owner-only where the file system understands it; Windows relies on the per-user directory's ACL. */
-    private static void restrict(Path path, String permissions) throws IOException {
-        if (!path.getFileSystem().supportedFileAttributeViews().contains("posix")) return;
-        Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(permissions));
     }
 }
