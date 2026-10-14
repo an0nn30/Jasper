@@ -28,6 +28,15 @@ class ThirdPartyNoticesTest {
         assertThat(ThirdPartyNotices.listed("").getFirst().title()).isEqualTo("Jasper");
     }
 
+    @Test void theBuiltInCatppuccinThemesAreListedWithTheirMitLicense() {
+        var catppuccin = ThirdPartyNotices.thirdParty().stream().filter(component -> component.name().equals("Catppuccin for JetBrains"))
+            .findFirst().orElseThrow();
+        assertThat(catppuccin.title()).isEqualTo("Catppuccin for JetBrains 3.6.1");
+        assertThat(catppuccin.licenseName()).isEqualTo("MIT License");
+        assertThat(catppuccin.homepage()).isEqualTo("https://github.com/catppuccin/jetbrains");
+        assertThat(ThirdPartyNotices.read(catppuccin.text())).startsWith("MIT License\n\nCopyright (c) 2022 Catppuccin\n");
+    }
+
     @Test void jaspersTextIsTheRootLicense() throws Exception {
         String root = Files.readString(ROOT.resolve("LICENSE.md"));
         assertThat(ThirdPartyNotices.read(ThirdPartyNotices.jasper("").text())).isEqualTo(root);

@@ -61,6 +61,23 @@ class ThemeManagerTest {
 
 
 
+    @Test void everyBuiltInVariantInstallsAsTheLookAndFeel() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        try {
+            for (var builtIn : dev.jasper.ui.theme.JasperTheme.builtIns()) {
+                for (boolean dark : new boolean[] {true, false}) {
+                    if (!builtIn.has(dark)) continue;
+                    var theme = builtIn.generated(dark);
+                    assertThat(ThemeManager.install(theme)).as("%s %s", builtIn.id(), dark ? "dark" : "light").isTrue();
+                    assertThat(UIManager.getLookAndFeel().getName()).isEqualTo(builtIn.name());
+                    assertThat(FlatLaf.isLafDark()).as(builtIn.id()).isEqualTo(dark);
+                    assertThat(UIManager.getColor("Panel.background")).as(builtIn.id())
+                        .isEqualTo(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
+                }
+            }
+        } finally { UIManager.setLookAndFeel(original); }
+    }
+
     private static void assertColours(Map<String, String> expected) {
         expected.forEach((key, value) -> assertThat(hex(UIManager.getColor(key))).as(key).isEqualTo(value));
     }

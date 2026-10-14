@@ -1,5 +1,18 @@
 # Jasper — Status and Handoff
 
+**Catppuccin built in — 2026-10-14** (`claude/catppuccin-themes`, worktree `.claude/worktrees/catppuccin-themes`; asked
+for by the user, who will name tweaks after seeing the port). Catppuccin Latte (Light), Frappé, Macchiato and Mocha
+(Dark) are built-in themes beside Slate Steel, which stays the default and the fallback. They are the converter's
+output, unedited, for the plugin jar vendored in `tools/themes/catppuccin/` (3.6.1, byte-identical to the Marketplace
+zip and to the copy removed in `c1e968ee9`); the Islands variants are left out, as before. `JasperTheme.builtIns()`
+lists them; the library, Import, Remove and the converter refuse every built-in id; the colour-literal scan exempts the
+built-in files; a converter test fails when the bundled files differ from a fresh conversion. The Licenses window lists
+"Catppuccin for JetBrains 3.6.1" (MIT, its LICENSE shipped in jasper-ui). The user's earlier imports
+`catppuccin-frappe.json` and `catppuccin-latte.json` in `~/.config/jasper/themes/` are now reported as built in and
+ignored (they are identical to the built-in files). Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
+(the colour patterns are now precompiled). `./gradlew check --continue`: **10,165 tests, 0 failures, 0 errors, 12
+skipped**. No GUI launched. GUI check for the user: each flavour in Settings › Appearance and the Licenses window (About Jasper › Licenses). Not merged.
+
 **Right rail splits again: two dock fixes — 2026-10-14** (`claude/right-rail-split`, worktree
 `.claude/worktrees/right-rail-split`; bug fix, the drag rule chosen by the user). The user's right rail could show
 only one window: Sessions and Tunnels were both in Right Bottom, and dragging the first icon under the empty top group

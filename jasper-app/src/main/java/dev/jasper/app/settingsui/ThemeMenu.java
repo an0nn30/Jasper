@@ -34,8 +34,6 @@ final class ThemeMenu {
     /** The dropdown a gear sits beside: what Import picks and whose theme Remove removes. */
     enum Target { DARK, LIGHT, TERMINAL }
 
-    /** The built-in theme's id, which no gear removes. */
-    private static final String BUILT_IN = UI_THEME_DARK.defaultValue();
     private final ThemeImports hooks;
     private final Supplier<InstalledThemes> themes;
     private final PageContext context;
@@ -75,7 +73,7 @@ final class ThemeMenu {
     /** The imported theme {@code shown} belongs to, if there is one to remove. */
     private Optional<String> removable(String shown) {
         String theme = target != Target.TERMINAL ? shown : shown.contains("/") ? shown.substring(0, shown.indexOf('/')) : "";
-        return theme.isEmpty() || theme.equals(BUILT_IN) || !themes.get().names().containsKey(theme) ? Optional.empty() : Optional.of(theme);
+        return theme.isEmpty() || ThemeFolder.builtIn(theme) || !themes.get().names().containsKey(theme) ? Optional.empty() : Optional.of(theme);
     }
 
     private String label(String theme) { return themes.get().names().getOrDefault(theme, theme); }

@@ -2,9 +2,11 @@
 
     python3 -m unittest discover -s tools/themes -p 'test_*.py'
 
-Set JASPER_THEME_UPDATE_GOLDEN=1 to rewrite testdata/expected/ from the current output (then review the diff).
+Set JASPER_THEME_UPDATE_GOLDEN=1 to rewrite testdata/expected/ and the built-in Catppuccin themes from the current
+output (then review the diff).
 """
 
+import argparse
 import contextlib
 import io
 import json
@@ -21,6 +23,8 @@ import jasper_theme as tool
 DATA = pathlib.Path(__file__).resolve().parent / "testdata"
 EXPECTED = DATA / "expected"
 UPDATE = os.environ.get("JASPER_THEME_UPDATE_GOLDEN") == "1"
+CATPPUCCIN = pathlib.Path(__file__).resolve().parent / "catppuccin"
+BUILT_IN_THEMES = pathlib.Path(__file__).resolve().parents[2] / "jasper-ui/src/main/resources/dev/jasper/ui/theme"
 
 
 def run(*args):
@@ -774,7 +778,7 @@ class Writes(unittest.TestCase):
                 with self.subTest(source.name):
                     status, _, stderr = run(source, "-o", out)
                     self.assertEqual(status, 1)
-                    self.assertIn(f'error: {source.name}: "slate-steel" is Jasper\'s built-in theme; choose another name '
+                    self.assertIn(f'error: {source.name}: "slate-steel" is a built-in Jasper theme; choose another name '
                                   "with --name", stderr)
                     self.assertEqual(listing(out), [])
             self.assertEqual(run(theme, "--name", "Slate Steel Two", "-o", out)[0], 0)
@@ -816,6 +820,45 @@ class Format(unittest.TestCase):
         doc = json.loads(bundled.read_text(encoding="utf-8"))
         tool.validate(doc, "slate-steel.json")
         self.assertEqual(list(doc["editor"]["dark"]), tool.EDITOR_SURFACES + tool.SYNTAX_ROLES)
+
+
+class BuiltIn(unittest.TestCase):
+    """The built-in themes besides Slate Steel are the converter's output for the vendored Catppuccin plugin."""
+
+    FLAVOURS = ["latte", "frappe", "macchiato", "mocha"]  # the classic themes; the Islands variants are not built in
+
+    def setUp(self):
+        if not BUILT_IN_THEMES.is_dir():
+            self.skipTest("not in the repository")
+
+    def test_the_vendored_catppuccin_plugin_is_the_recorded_release(self):
+        import hashlib
+        jar = CATPPUCCIN / "Catppuccin.Theme-3.6.1.jar"
+        self.assertEqual(hashlib.sha256(jar.read_bytes()).hexdigest(),
+                         "3a1104e0db53ff5ba216c94c9e730a85c7ac2847f4e5fe82d91b99dc91045fff")
+
+    def test_the_built_in_catppuccin_themes_are_the_converters_output(self):
+        ids = [f"com.github.catppuccin.{flavour}.jetbrains" for flavour in self.FLAVOURS]
+        args = argparse.Namespace(name=None, theme=ids, scheme=None)
+        problems = []
+        results = tool.convert(CATPPUCCIN / "Catppuccin.Theme-3.6.1.jar", args, problems)
+        self.assertEqual(problems, [])
+        self.assertEqual([tool.slug(result.doc["name"]) for result in results],
+                         [f"catppuccin-{flavour}" for flavour in self.FLAVOURS])
+        for result in results:
+            name = f"{tool.slug(result.doc['name'])}.json"
+            text = tool.dump(result.doc)
+            target = BUILT_IN_THEMES / name
+            if UPDATE:
+                target.write_text(text, encoding="utf-8")
+            with self.subTest(name):
+                self.assertEqual(text, target.read_text(encoding="utf-8"), name)
+
+    def test_the_built_in_theme_files_are_the_ids_the_converter_refuses(self):
+        self.assertEqual(sorted(path.stem for path in BUILT_IN_THEMES.glob("*.json")), sorted(tool.BUILT_IN))
+
+    def test_the_shipped_catppuccin_license_is_the_vendored_one(self):
+        self.assertEqual((BUILT_IN_THEMES / "catppuccin.LICENSE.txt").read_bytes(), (CATPPUCCIN / "LICENSE").read_bytes())
 
 
 if __name__ == "__main__":

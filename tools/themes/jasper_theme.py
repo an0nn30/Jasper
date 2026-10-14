@@ -66,7 +66,8 @@ EDITOR_REFERENCES = {
     "operator": "text.secondary", "punctuation": "text.secondary", "tag": "terminal.ansi.red",
     "attribute": "terminal.ansi.yellow", "regex": "terminal.ansi.cyan", "error": "terminal.ansi.red",
 }
-BUILT_IN = "slate-steel"  # Import refuses a theme file with the built-in theme's id
+# Import refuses a theme file with a built-in theme's id
+BUILT_IN = ("slate-steel", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha")
 KEY = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 HEX = re.compile(r"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?")
 EDITOR_VALUE = re.compile(r"(#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9.]*)( @ \d{1,3}%)?(, italic)?(, bold)?")
@@ -1015,8 +1016,8 @@ def write_results(results: list[tuple[str, Result]], args) -> int:
             print(f"error: {name}: the name has no letters or digits for a file name; use --name", file=sys.stderr)
             status = 1
             continue
-        if file_name == BUILT_IN:
-            print(f"error: {input_name}: \"{BUILT_IN}\" is Jasper's built-in theme; choose another name with --name",
+        if file_name in BUILT_IN:
+            print(f"error: {input_name}: \"{file_name}\" is a built-in Jasper theme; choose another name with --name",
                   file=sys.stderr)
             status = 1
             continue

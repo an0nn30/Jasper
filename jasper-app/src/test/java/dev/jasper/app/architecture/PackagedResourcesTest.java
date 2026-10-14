@@ -77,7 +77,7 @@ class PackagedResourcesTest {
                 "dev/jasper/app/shell-integration/zsh/.zshrc"
             )) assertThat(jar.getJarEntry(name)).as(name).isNotNull();
             var names = jar.stream().filter(entry -> !entry.isDirectory()).map(java.util.jar.JarEntry::getName).toList();
-            assertThat(names).as("no theme resources: Slate Steel lives in jasper-ui").noneMatch(n -> n.startsWith("dev/jasper/app/themes/"));
+            assertThat(names).as("no theme resources: the built-in themes live in jasper-ui").noneMatch(n -> n.startsWith("dev/jasper/app/themes/"));
             assertThat(names.stream().filter(n -> n.startsWith("dev/jasper/app/icons/intellij/") && n.endsWith(".svg")).toList())
                 .containsExactlyInAnyOrder("dev/jasper/app/icons/intellij/terminal/toolwindow/terminal.svg",
                     "dev/jasper/app/icons/intellij/nodes/pluginLogo.svg", "dev/jasper/app/icons/intellij/nodes/pluginLogo_dark.svg");
@@ -88,9 +88,13 @@ class PackagedResourcesTest {
             assertThat(jar.getJarEntry(border.replace('.', '/') + ".class")).isNotNull();
         }
     }
-    @Test void slateSteelIsTheUiJarsOnlyThemeResource() throws Exception {
+    @Test void theBuiltInThemesAndCatppuccinsLicenseAreTheUiJarsOnlyThemeResources() throws Exception {
         try (var jar = new JarFile(dev.jasper.ui.theme.GeneratedTheme.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath())) {
-            assertThat(jar.getJarEntry("dev/jasper/ui/theme/slate-steel.json")).isNotNull();
+            assertThat(jar.stream().map(java.util.jar.JarEntry::getName)
+                    .filter(name -> name.startsWith("dev/jasper/ui/theme/") && !name.endsWith("/") && !name.endsWith(".class")).toList())
+                .containsExactlyInAnyOrder("dev/jasper/ui/theme/slate-steel.json", "dev/jasper/ui/theme/catppuccin-latte.json",
+                    "dev/jasper/ui/theme/catppuccin-frappe.json", "dev/jasper/ui/theme/catppuccin-macchiato.json",
+                    "dev/jasper/ui/theme/catppuccin-mocha.json", "dev/jasper/ui/theme/catppuccin.LICENSE.txt");
             assertThat(jar.stream().map(java.util.jar.JarEntry::getName).toList())
                 .noneMatch(name -> name.startsWith("dev/jasper/ui/themeimport/") || name.endsWith("THIRD-PARTY-THEMES.md"));
         }

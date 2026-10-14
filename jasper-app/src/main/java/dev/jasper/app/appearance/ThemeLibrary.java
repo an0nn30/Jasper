@@ -28,8 +28,8 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 
 /**
- * The installed themes: the built-in Slate Steel and every valid {@code <home>/themes/<id>.json}. Imported themes are
- * ordered by display name (ignoring case), then id. A file that cannot be used is skipped and kept as a problem.
+ * The installed themes: the built-in themes, Slate Steel first, and every valid {@code <home>/themes/<id>.json}.
+ * Imported themes are ordered by display name (ignoring case), then id. A file that cannot be used is skipped and kept as a problem.
  * Immutable and thread-safe; {@link #read} builds a new library, reusing the parsed themes of unchanged files.
  */
 public final class ThemeLibrary {
@@ -53,7 +53,7 @@ public final class ThemeLibrary {
         this.texts = Map.copyOf(texts);
         this.problems = List.copyOf(problems);
         var all = new ArrayList<JasperTheme>();
-        all.add(JasperTheme.bundled());
+        all.addAll(JasperTheme.builtIns());
         all.addAll(this.imported);
         themes = List.copyOf(all);
         var allSchemes = new ArrayList<TerminalScheme>();
@@ -70,7 +70,7 @@ public final class ThemeLibrary {
                 schemeNames.get(scheme.name().toLowerCase(Locale.ROOT)) > 1 ? scheme.name() + " (" + scheme.id() + ")" : scheme.name());
     }
 
-    /** Only the built-in theme. */
+    /** Only the built-in themes. */
     public static ThemeLibrary bundledOnly() { return BUNDLED; }
 
     /**
@@ -101,8 +101,9 @@ public final class ThemeLibrary {
         for (Path file : files) {
             String fileName = file.getFileName().toString();
             String id = fileName.substring(0, fileName.length() - ".json".length());
-            if (id.equals(JasperTheme.BUNDLED_ID)) {
-                problems.add(new Problem(file, 0, "Slate Steel is built in; this file is ignored."));
+            var builtIn = JasperTheme.builtIn(id);
+            if (builtIn.isPresent()) {
+                problems.add(new Problem(file, 0, builtIn.get().name() + " is built in; this file is ignored."));
                 continue;
             }
             if (!JasperTheme.validId(id)) {
@@ -158,7 +159,7 @@ public final class ThemeLibrary {
         return message == null || message.isBlank() ? "Could not read this file (" + failure.getClass().getSimpleName() + ")." : message;
     }
 
-    /** Slate Steel, then the imported themes in order. */
+    /** The built-in themes, then the imported themes in order. */
     public List<JasperTheme> themes() { return themes; }
     /** The imported themes, in order. */
     public List<JasperTheme> imported() { return imported; }
@@ -166,7 +167,7 @@ public final class ThemeLibrary {
     public List<JasperTheme> themes(boolean dark) { return themes.stream().filter(theme -> theme.has(dark)).toList(); }
     /** The theme with this id. */
     public Optional<JasperTheme> theme(String id) { return themes.stream().filter(theme -> theme.id().equals(id)).findFirst(); }
-    /** Every theme's terminal schemes: Slate Steel's, then each imported theme's, in the files' order. */
+    /** Every theme's terminal schemes: each built-in theme's, then each imported theme's, in the files' order. */
     public List<TerminalScheme> schemes() { return schemes; }
     /** The scheme with this id. */
     public Optional<TerminalScheme> scheme(SchemeId id) { return schemes.stream().filter(scheme -> scheme.id().equals(id)).findFirst(); }

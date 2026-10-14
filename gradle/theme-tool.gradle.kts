@@ -6,7 +6,7 @@ val checkThemeTool = tasks.register("checkThemeTool") {
     group = "verification"
     description = "Runs the theme converter's tests (tools/themes) with Python 3.11 or later."
     inputs.files(fileTree("tools/themes") { exclude("**/__pycache__/**") }).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.file("jasper-ui/src/main/resources/dev/jasper/ui/theme/slate-steel.json").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree("jasper-ui/src/main/resources/dev/jasper/ui/theme")).withPathSensitivity(PathSensitivity.RELATIVE)
     val chosen = providers.gradleProperty("jasper.python")
     inputs.property("python", chosen.orElse(""))
     outputs.file(themeToolPassed)

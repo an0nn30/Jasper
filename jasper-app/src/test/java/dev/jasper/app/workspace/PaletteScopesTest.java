@@ -275,15 +275,20 @@ class PaletteScopesTest {
         edt(() -> {
             try (var owner = owner(true)) {
                 install(owner);
-                owner.scopes().register(new FakeScope());
-                owner.scopes().register(new FakeScope() {
+                // A query no command title holds even as scattered letters ("alph" is in "Terminal: Catppuccin Mocha").
+                var fake = new FakeScope();
+                fake.rows = List.of(PaletteRow.of("kumquat", "Kumquat"), PaletteRow.of("beta", "Beta"));
+                owner.scopes().register(fake);
+                var other = new FakeScope() {
                     @Override public String id() { return "test.other"; }
                     @Override public String label() { return "Other"; }
-                });
+                };
+                other.rows = fake.rows;
+                owner.scopes().register(other);
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
-                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("alph");
-                assertThat(PaletteTestSupport.entries(card)).containsExactly("# Fake", "test.fake/alpha", "# Other", "test.other/alpha");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("kumq");
+                assertThat(PaletteTestSupport.entries(card)).containsExactly("# Fake", "test.fake/kumquat", "# Other", "test.other/kumquat");
                 assertThat(PaletteTestSupport.selectedRowIndex(card)).isZero();
                 palette.moveSelection(1);
                 assertThat(PaletteTestSupport.selectedRowIndex(card)).as("past the Other header").isEqualTo(1);

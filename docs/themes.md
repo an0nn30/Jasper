@@ -1,9 +1,11 @@
 # Themes
 
-Jasper's built-in theme is **Slate Steel**, in Dark and Light, with three terminal colour schemes: **Slate Steel
+Jasper's default theme is **Slate Steel**, in Dark and Light, with three terminal colour schemes: **Slate Steel
 Dark**, **Slate Steel Light** and **High Contrast**. Its colours are defined once, in
-[the Slate Steel colour reference](design/theme-engine/slate-steel.md), and bundled as `slate-steel.json`. Other themes
-are Jasper theme files in the themes folder: a UI theme recolours the whole application and brings its own terminal and
+[the Slate Steel colour reference](design/theme-engine/slate-steel.md), and bundled as `slate-steel.json`. Catppuccin's
+four flavours are built in too, converted from [its IntelliJ plugin](https://github.com/catppuccin/jetbrains) 3.6.1:
+**Catppuccin Latte** (Light), **Catppuccin Frappé**, **Catppuccin Macchiato** and **Catppuccin Mocha** (Dark), each with
+its own terminal scheme. Other themes are Jasper theme files in the themes folder: a UI theme recolours the whole application and brings its own terminal and
 editor schemes; a terminal-only theme adds terminal schemes.
 
 ## Choosing the appearance, the themes and the terminal scheme
@@ -23,12 +25,14 @@ scheme = "match" # or a scheme id such as "slate-steel/high-contrast"
 `ui.appearance` (`system`, `dark`, `light`) chooses Dark or Light, or follows the operating system's light or dark
 setting live; with `system`, Jasper uses Dark when it cannot read the operating system's setting, and an
 operating-system change never writes `config.toml`. `ui.theme.dark` and `ui.theme.light` name, by id, the theme each
-appearance shows: `slate-steel`, or an installed theme's id. A theme has a Dark variant, a Light variant or both; with
+appearance shows: `slate-steel`, another built-in theme's id (`catppuccin-latte`, `catppuccin-frappe`,
+`catppuccin-macchiato`, `catppuccin-mocha`), or an installed theme's id. A theme has a Dark variant, a Light variant or both; with
 `system`, Jasper switches between the two picks as the operating system does.
 
 `terminal.scheme` colours the terminal panes: `match` uses the shown theme's own scheme, and a scheme id,
 `<theme id>/<scheme key>`, chooses one whatever theme is shown: `slate-steel/dark`, `slate-steel/light`,
-`slate-steel/high-contrast`, or any installed theme's scheme, such as `gruvbox-dark/dark`.
+`slate-steel/high-contrast`, a Catppuccin flavour's scheme such as `catppuccin-mocha/dark`, or any installed theme's
+scheme, such as `gruvbox-dark/dark`.
 
 Settings › Appearance & Behavior › Appearance has the Dark, Light and Match System tiles, each previewing the theme
 picked for it, the **Dark theme** and **Light theme** dropdowns, and the **Terminal scheme** dropdown, whose first
@@ -40,9 +44,9 @@ opens it; the palette's **Terminal: …** commands choose a scheme. Choices stay
 The themes folder is `themes/` in Jasper's home, next to `config.toml`; Settings imports into it (below) and files can
 be copied in by hand. It holds one Jasper theme file per theme, named after the theme's id: lowercase letters and digits in dash-separated words, at most 64 characters, so
 `dracula.json` is the theme `dracula`. Jasper reads the folder at start-up, on Reload config, when Settings saves and
-when `config.toml` changes; a theme changed on disk is shown again then. `slate-steel` is the built-in theme's id, so a
-`slate-steel.json` in the folder is ignored. Dropdowns list Slate Steel first, then the installed themes by name; two
-themes with the same name show their ids.
+when `config.toml` changes; a theme changed on disk is shown again then. A file named after a built-in theme's id,
+such as `slate-steel.json` or `catppuccin-mocha.json`, is ignored. Dropdowns list the built-in themes first, Slate Steel
+then the Catppuccin flavours, then the installed themes by name; two themes with the same name show their ids.
 
 ## What the terminal scheme colours
 
@@ -66,9 +70,9 @@ Apply; a failure is shown in a sheet.
   scheme; the pick stays staged until Apply or OK. A theme with nothing for that dropdown is still imported, and a sheet
   says where to pick it ("Gruvbox Dark is a terminal scheme; pick it under Terminal scheme."). A file Jasper cannot use is
   not copied, and the sheet says why, for example `ui.dark: Missing colour "accent"`. Importing a theme whose id an
-  imported theme already has asks before replacing it; Slate Steel cannot be replaced.
+  imported theme already has asks before replacing it; a built-in theme cannot be replaced.
 - **Remove** removes the theme the dropdown shows; for the Terminal scheme gear, the theme the scheme belongs to. It is
-  unavailable for Slate Steel and Same as UI theme. It asks first and says what will change. The file is deleted, and
+  unavailable for a built-in theme and Same as UI theme. It asks first and says what will change. The file is deleted, and
   every setting that names the theme or one of its schemes, saved or staged, returns to its default (`slate-steel` or
   `match`): saved ones are written at once, and other staged changes stay staged. If the file cannot be deleted,
   nothing changes and the sheet says why.
@@ -138,7 +142,7 @@ A Jasper theme is one UTF-8 JSON file; `slate-steel.json` is the complete exampl
 
 Every colour in Jasper's interface code is a semantic role (`surface.panel`, `text.primary`, `accent`, …) read from the
 active variant. A test fails on any hex colour literal (`#RRGGBB`, `0xRRGGBB` given to a colour constructor) in the
-production code or text resources of jasper-ui, the app and the plugins outside `slate-steel.json`. Outside that scan
+production code or text resources of jasper-ui, the app and the plugins outside the built-in theme files. Outside that scan
 are SVG artwork (icons are painted as drawn), the terminal library's default palettes for embedders that set none, the
 desk buddy's own artwork, decimal component literals (transparent fills, the editor's vim sneak highlight) and the
 black and white that shadows and inset lines are painted in. A role that carries opacity (`surface.scrim`,

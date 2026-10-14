@@ -20,7 +20,8 @@ import java.util.regex.Pattern;
 
 /**
  * A Jasper theme file ({@code docs/themes.md}): a name, an optional author, a Dark and/or Light UI variant, terminal
- * schemes and an editor scheme for each UI variant. The bundled theme, Slate Steel, is {@code slate-steel.json}. A UI
+ * schemes and an editor scheme for each UI variant. The built-in themes are {@code <id>.json} beside this class: Slate
+ * Steel, the default, and Catppuccin's flavours, converted from its IntelliJ plugin ({@code tools/themes/catppuccin}). A UI
  * variant lists every role except those that follow fixed rules, never colour values: {@code border.focus} is
  * {@code accent}, {@code surface.status} is {@code surface.app}, {@code border.identity} is {@code border.control} and
  * each {@code hue.<name>.surface} is its hue (the kit applies the tile alpha). A variant's matching terminal scheme is
@@ -28,12 +29,16 @@ import java.util.regex.Pattern;
  * {@link ThemeFileException} naming the file and the entry. Immutable.
  */
 public final class JasperTheme {
-    /** The built-in theme's id, which no installed theme may use. */
+    /** The default theme's id, Slate Steel's. */
     public static final String BUNDLED_ID = "slate-steel";
     /** The format this Jasper reads: {@code "jasper-theme": 1}. */
     public static final long FORMAT = 1;
     static final String RESOURCE = "/dev/jasper/ui/theme/slate-steel.json";
+    /** The built-in themes after Slate Steel, in the order Settings lists them. */
+    static final List<String> CONVERTED = List.of("catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha");
     static final Pattern WORDS = Pattern.compile("[a-z0-9]+(-[a-z0-9]+)*");
+    private static final Pattern RGB = Pattern.compile("#[0-9A-Fa-f]{6}"), RGBA = Pattern.compile("#[0-9A-Fa-f]{8}"),
+        SHARE = Pattern.compile("\\d{1,3}%");
     static final String DARK = "dark", LIGHT = "light";
     private static final List<String> TOP = List.of("jasper-theme", "name", "author", "ui", "terminal", "editor");
     private static final Set<SemanticColor> RULED = Set.of(SemanticColor.BORDER_FOCUS, SemanticColor.SURFACE_STATUS,
@@ -86,17 +91,33 @@ public final class JasperTheme {
         light = ui.containsKey(LIGHT) ? build(false) : null;
     }
 
-    /** The bundled theme, Slate Steel, read once. */
+    /** The default theme, Slate Steel, read once. */
     public static JasperTheme bundled() { return Bundled.THEME; }
 
+    /** Every built-in theme, Slate Steel first, read once on first use; no installed theme may use their ids. */
+    public static List<JasperTheme> builtIns() { return BuiltIns.THEMES; }
+
+    /** The built-in theme with this id. */
+    public static Optional<JasperTheme> builtIn(String id) { return builtIns().stream().filter(theme -> theme.id().equals(id)).findFirst(); }
+
     private static final class Bundled {
-        static final JasperTheme THEME = load();
-        private static JasperTheme load() {
-            try (var in = JasperTheme.class.getResourceAsStream(RESOURCE)) {
-                if (in == null) throw new IllegalStateException("Missing bundled theme " + RESOURCE);
-                return parse(new String(in.readAllBytes(), StandardCharsets.UTF_8), BUNDLED_ID);
-            } catch (IOException failure) { throw new UncheckedIOException(failure); }
+        static final JasperTheme THEME = load(RESOURCE, BUNDLED_ID);
+    }
+
+    private static final class BuiltIns {
+        static final List<JasperTheme> THEMES = read();
+        private static List<JasperTheme> read() {
+            var themes = new ArrayList<JasperTheme>(List.of(bundled()));
+            for (String id : CONVERTED) themes.add(load("/dev/jasper/ui/theme/" + id + ".json", id));
+            return List.copyOf(themes);
         }
+    }
+
+    private static JasperTheme load(String resource, String id) {
+        try (var in = JasperTheme.class.getResourceAsStream(resource)) {
+            if (in == null) throw new IllegalStateException("Missing built-in theme " + resource);
+            return parse(new String(in.readAllBytes(), StandardCharsets.UTF_8), id);
+        } catch (IOException failure) { throw new UncheckedIOException(failure); }
     }
 
     /** The theme in {@code json}, whose file is {@code <id>.json}; errors name that file. */
@@ -253,7 +274,7 @@ public final class JasperTheme {
         String key = shared[0].strip();
         Color base;
         if (key.startsWith("#")) {
-            if (!key.matches("#[0-9A-Fa-f]{6}")) throw error(where + ": Expected #RRGGBB or a reference, got \"" + key + "\"");
+            if (!RGB.matcher(key).matches()) throw error(where + ": Expected #RRGGBB or a reference, got \"" + key + "\"");
             base = color(key, origin, where);
         } else if (key.startsWith("terminal.")) {
             base = terminalReference(key, dark, where);
@@ -263,7 +284,7 @@ public final class JasperTheme {
         if (shared.length == 2) {
             String share = shared[1].strip();
             if (background == null) throw error(where + ": The background cannot be laid over itself");
-            if (!share.matches("\\d{1,3}%")) throw error(where + ": Expected a share such as 5%, got \"" + share + "\"");
+            if (!SHARE.matcher(share).matches()) throw error(where + ": Expected a share such as 5%, got \"" + share + "\"");
             int percent = Integer.parseInt(share.substring(0, share.length() - 1));
             if (percent < 1 || percent > 100) throw error(where + ": A share is from 1% to 100%, got " + share);
             base = ColorMath.mix(base, background, percent / 100.0);
@@ -291,8 +312,8 @@ public final class JasperTheme {
 
     /** {@code #RRGGBB}, or {@code #RRGGBBAA} with alpha; {@code where} names the entry in errors. */
     static Color color(String text, String origin, String where) {
-        if (text.matches("#[0-9A-Fa-f]{6}")) return new Color(Integer.parseInt(text.substring(1), 16));
-        if (text.matches("#[0-9A-Fa-f]{8}")) {
+        if (RGB.matcher(text).matches()) return new Color(Integer.parseInt(text.substring(1), 16));
+        if (RGBA.matcher(text).matches()) {
             long value = Long.parseLong(text.substring(1), 16);
             return new Color((int) (value >> 24) & 0xFF, (int) (value >> 16) & 0xFF, (int) (value >> 8) & 0xFF, (int) value & 0xFF);
         }
