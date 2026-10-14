@@ -8,8 +8,8 @@ import java.util.Optional;
  * starts with {@code ./}, {@code ../} or {@code ~/}, or is relative and has a separator or an extension; {@code C:\}
  * and backslash paths count only on Windows. It ends at whitespace, at {@code <>"'} and the backtick, and before
  * trailing punctuation, and it never contains {@code ://}, so a URL is no path. It starts after the last {@code =} in
- * its word ({@code --config=./x.toml}) and, when a position follows, after the last {@code (} that does not start
- * {@code (LINE)} or {@code (LINE,COLUMN)} ({@code at Bar.baz(Bar.java:42)}). Pure text work: no buffer, lock or file
+ * its word ({@code --config=./x.toml}) and any opener after it, and, when a position follows, after the last
+ * {@code (} that nothing closes in the path ({@code at Bar.baz(Bar.java:42)}). Pure text work: no buffer, lock or file
  * system.
  */
 public final class PathDetector {
@@ -49,11 +49,10 @@ public final class PathDetector {
         while (tokenStart > 0 && !ends(text.charAt(tokenStart - 1))) tokenStart--;
         while (tokenEnd < text.length() && !ends(text.charAt(tokenEnd))) tokenEnd++;
         if (text.substring(tokenStart, tokenEnd).contains("://")) return Optional.empty();
-        int start = tokenStart;
-        while (start < tokenEnd && OPENERS.indexOf(text.charAt(start)) >= 0) start++;
+        int start = skipOpeners(text, tokenStart, tokenEnd);
         Scan scan = scan(text, start, tokenEnd, windows);
         for (int equals = lastEquals(text, start, scan.pathEnd()); equals >= 0; equals = lastEquals(text, start, scan.pathEnd())) {
-            start = equals + 1;
+            start = skipOpeners(text, equals + 1, tokenEnd);
             scan = scan(text, start, tokenEnd, windows);
         }
         int pathEnd = scan.pathEnd();
@@ -64,7 +63,7 @@ public final class PathDetector {
             end = pathEnd;
         } else {
             end = position[2];
-            start = afterLastOpeningParenthesis(text, start, pathEnd, tokenEnd);
+            start = afterLastUnclosedParenthesis(text, start, pathEnd);
         }
         String path = text.substring(start, pathEnd);
         if (clicked < start || clicked >= end || !qualifies(path, windows)) return Optional.empty();
@@ -96,34 +95,30 @@ public final class PathDetector {
         return -1;
     }
 
+    /** The index of the first character at or after {@code from} that is no opening parenthesis, bracket or brace. */
+    private static int skipOpeners(String text, int from, int tokenEnd) {
+        int at = from;
+        while (at < tokenEnd && OPENERS.indexOf(text.charAt(at)) >= 0) at++;
+        return at;
+    }
+
     /**
-     * The index after the last {@code (} in {@code [from, pathEnd)} that does not start {@code (LINE)} or
-     * {@code (LINE,COLUMN)}, as {@code Bar.java} follows the method in {@code at Bar.baz(Bar.java:42)}; {@code from}
-     * when there is none, so {@code tmp/a(1).txt} stays whole.
+     * The index after the last {@code (} in {@code [from, pathEnd)} that no {@code )} closes inside it, as
+     * {@code Bar.java} follows the method in {@code at Bar.baz(Bar.java:42)}; {@code from} when there is none, so
+     * {@code tmp/a(1).txt} and {@code tmp/a(b)/c.txt} stay whole.
      */
-    private static int afterLastOpeningParenthesis(String text, int from, int pathEnd, int tokenEnd) {
+    private static int afterLastUnclosedParenthesis(String text, int from, int pathEnd) {
+        int closers = 0;
         for (int i = pathEnd - 1; i >= from; i--) {
-            if (text.charAt(i) == '(' && !numbersInParentheses(text, i, tokenEnd)) return i + 1;
+            char c = text.charAt(i);
+            if (c == ')') {
+                closers++;
+            } else if (c == '(') {
+                if (closers == 0) return i + 1;
+                closers--;
+            }
         }
         return from;
-    }
-
-    /** Whether {@code (DIGITS)} or {@code (DIGITS,DIGITS)} starts at {@code open}, however long the numbers. */
-    private static boolean numbersInParentheses(String text, int open, int tokenEnd) {
-        int at = digitRunEnd(text, open + 1, tokenEnd);
-        if (at < 0) return false;
-        if (at < tokenEnd && text.charAt(at) == ',') {
-            at = digitRunEnd(text, at + 1, tokenEnd);
-            if (at < 0) return false;
-        }
-        return at < tokenEnd && text.charAt(at) == ')';
-    }
-
-    /** The end of a run of one or more digits at {@code from}, or -1. */
-    private static int digitRunEnd(String text, int from, int tokenEnd) {
-        int end = from;
-        while (end < tokenEnd && text.charAt(end) >= '0' && text.charAt(end) <= '9') end++;
-        return end == from ? -1 : end;
     }
 
     /** The text index whose cells cover {@code column}, or -1. */
@@ -187,8 +182,9 @@ public final class PathDetector {
 
     /** The end of a run of 1 to 9 digits at {@code from}, or -1: a longer run is no line, so a line always fits an int. */
     private static int digits(String text, int from, int tokenEnd) {
-        int end = digitRunEnd(text, from, tokenEnd);
-        return end < 0 || end - from > MAX_DIGITS ? -1 : end;
+        int end = from;
+        while (end < tokenEnd && text.charAt(end) >= '0' && text.charAt(end) <= '9') end++;
+        return end == from || end - from > MAX_DIGITS ? -1 : end;
     }
 
     private static boolean endsNumber(String text, int at, int tokenEnd) {

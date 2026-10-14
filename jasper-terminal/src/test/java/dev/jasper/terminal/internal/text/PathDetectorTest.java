@@ -133,7 +133,7 @@ class PathDetectorTest {
         assertThat(at("./a.txt", 60)).isEmpty();
     }
 
-    /** Ruling 9: with a position found, the path starts after the last parenthesis that is no (LINE) group. */
+    /** Ruling 9: with a position found, the path starts after the last parenthesis that nothing closes in the path. */
     @Test
     void aStackFrameGivesTheFileInParenthesesAndItsLine() {
         String frame = "at com.foo.Bar.baz(Bar.java:42)";
@@ -167,6 +167,18 @@ class PathDetectorTest {
         assertThat(at("x(Foo(1).java:3)", 1)).isEmpty();
     }
 
+    @Test
+    void aParenthesisClosedInsideThePathDoesNotRestartIt() {
+        assertThat(at("tmp/a(b)/c.txt:3", 2)).contains(new PathDetector.Match("tmp/a(b)/c.txt", 3, 0, 0, 16));
+        assertThat(at("tmp/a(b)/c.txt:3", 7)).as("inside the parentheses").contains(new PathDetector.Match("tmp/a(b)/c.txt", 3, 0, 0, 16));
+        assertThat(at("tmp/a(b)/c.txt:3", 12)).contains(new PathDetector.Match("tmp/a(b)/c.txt", 3, 0, 0, 16));
+        assertThat(at("tmp/a(b)/c.txt:3:4", 2)).contains(new PathDetector.Match("tmp/a(b)/c.txt", 3, 4, 0, 18));
+        assertThat(at("tmp/a(b(c)d)/e.txt:3", 2)).as("nested").contains(new PathDetector.Match("tmp/a(b(c)d)/e.txt", 3, 0, 0, 20));
+        assertThat(at("x(tmp/a(b)/c.txt:3)", 8)).as("the unclosed one still restarts it")
+            .contains(new PathDetector.Match("tmp/a(b)/c.txt", 3, 0, 2, 18));
+        assertThat(at("x(tmp/a(b)/c.txt:3)", 1)).isEmpty();
+    }
+
     /** Ruling 10: a path starts after the last equals sign in its word. */
     @Test
     void aPathStartsAfterTheLastEqualsInItsWord() {
@@ -178,6 +190,17 @@ class PathDetectorTest {
             assertThat(at("--config=./x.toml", column)).as("the option name, column " + column).isEmpty();
         }
         assertThat(at("path=/tmp/x.txt;", 15)).as("the semicolon").isEmpty();
+    }
+
+    @Test
+    void leadingOpenersAreDroppedAfterTheEqualsToo() {
+        assertThat(at("files=[a/b.txt]", 8)).contains(new PathDetector.Match("a/b.txt", 0, 0, 7, 14));
+        assertThat(at("x=(./a.txt)", 5)).contains(new PathDetector.Match("./a.txt", 0, 0, 3, 10));
+        assertThat(at("--files=[src/Foo.java:42]", 12)).contains(new PathDetector.Match("src/Foo.java", 42, 0, 9, 24));
+        assertThat(at("k={[(./a.txt", 8)).as("several").contains(new PathDetector.Match("./a.txt", 0, 0, 5, 12));
+        assertThat(at("files=[a/b.txt]", 6)).as("the bracket").isEmpty();
+        assertThat(at("x=(./a.txt)", 2)).as("the parenthesis").isEmpty();
+        assertThat(at("k=[", 2)).as("nothing after the opener").isEmpty();
     }
 
     @Test
