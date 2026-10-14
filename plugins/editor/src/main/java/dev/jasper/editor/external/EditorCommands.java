@@ -80,8 +80,11 @@ public final class EditorCommands {
     }
 
     /**
-     * A custom command with the quoted file added, run by {@code /bin/sh -c}, or {@code cmd.exe /c} on Windows, so the
-     * command line may carry its own arguments and quoting.
+     * A custom command with the quoted file added, run by {@code /bin/sh -c}, or {@code cmd.exe /d /s /c} on Windows, so
+     * the command line may carry its own arguments and quoting. On Windows the whole line is one argument wrapped in one
+     * more pair of quotes: without {@code /s}, {@code cmd /c} strips the first and last quote of a line that starts with
+     * a quote, which splits a quoted program path at its space; with it, cmd strips exactly the outer pair and keeps the
+     * rest literal. {@code /d} skips the AutoRun commands.
      *
      * @param command the command line as written
      * @param file the file, absolute
@@ -90,7 +93,7 @@ public final class EditorCommands {
      */
     public static List<String> custom(String command, Path file, String osName) {
         String line = command + " " + quote(file.toString(), osName);
-        return windows(osName) ? List.of("cmd.exe", "/c", line) : List.of("/bin/sh", "-c", line);
+        return windows(osName) ? List.of("cmd.exe", "/d", "/s", "/c", "\"" + line + "\"") : List.of("/bin/sh", "-c", line);
     }
 
     /**

@@ -90,6 +90,7 @@ class EditorCommandsTest {
             expected.add(FILE.toString());
             assertThat(EditorCommands.openAt(detected(editor.id()), FILE, OptionalInt.empty())).as(editor.id()).isEqualTo(expected);
             assertThat(EditorCommands.openAt(detected(editor.id()), FILE, OptionalInt.of(0))).as(editor.id() + " at line 0").isEqualTo(expected);
+            assertThat(EditorCommands.openAt(detected(editor.id()), FILE, OptionalInt.of(-3))).as(editor.id() + " at line -3").isEqualTo(expected);
         }
         assertThat(EditorCommands.openAt(detected("cursor"), FILE, OptionalInt.empty())).as("no -g without a line").doesNotContain("-g");
     }
@@ -98,7 +99,30 @@ class EditorCommandsTest {
         Path file = ROOT.resolve("notes").resolve("it's \u00fc.txt");
         assertThat(EditorCommands.custom("subl -w", file, MAC))
             .containsExactly("/bin/sh", "-c", "subl -w '" + file.toString().replace("'", "'\\''") + "'");
-        assertThat(EditorCommands.custom("notepad++ -multiInst", file, WINDOWS)).containsExactly("cmd.exe", "/c", "notepad++ -multiInst \"" + file + "\"");
+        assertThat(EditorCommands.custom("notepad++ -multiInst", file, WINDOWS))
+            .containsExactly("cmd.exe", "/d", "/s", "/c", "\"notepad++ -multiInst \"" + file + "\"\"");
+    }
+
+    /** Controller Ruling 8: a line that starts with a quote would lose its first and last quote under {@code cmd /c} alone. */
+    @Test void aWindowsCustomCommandStartingWithAQuotedProgramIsWrappedForCmd() {
+        Path file = ROOT.resolve("Users").resolve("Dana Smith").resolve("notes.txt");
+        String command = "\"C:\\Program Files\\Notepad++\\notepad++.exe\" -multiInst";
+        assertThat(EditorCommands.custom(command, file, WINDOWS)).containsExactly("cmd.exe", "/d", "/s", "/c",
+            "\"\"C:\\Program Files\\Notepad++\\notepad++.exe\" -multiInst \"" + file + "\"\"");
+    }
+
+    @Test void everyKnownEditorsValueIsItsQuotedProgramThenWhatItAlwaysGetsThenWhatMakesItWait() {
+        for (KnownEditor editor : KnownEditors.ALL) {
+            for (String os : List.of(MAC, WINDOWS)) {
+                String quote = os.equals(WINDOWS) ? "\"" : "'";
+                var words = new ArrayList<String>();
+                words.add(quote + bin(editor.executables().getFirst()) + quote);
+                words.addAll(editor.extraArgs());
+                if (editor.kind() == KnownEditor.Kind.APP) words.addAll(editor.waitArgs());
+                assertThat(EditorCommands.variable(new Choice.Installed(detected(editor.id())), os)).as(editor.id() + " on " + os)
+                    .contains(String.join(" ", words));
+            }
+        }
     }
 
     /** Review Focus 2: git prefers VISUAL, so either one in Jasper's environment keeps both, unless the setting is off. */
@@ -149,7 +173,9 @@ class EditorCommandsTest {
         builder.environment().put("RECORD", record.toString());
         Process process = builder.start();
         process.getOutputStream().close();
-        assertThat(process.waitFor(10, TimeUnit.SECONDS)).as("the shell finished").isTrue();
+        boolean finished = process.waitFor(10, TimeUnit.SECONDS);
+        if (!finished) process.destroyForcibly();
+        assertThat(finished).as("the shell finished").isTrue();
         assertThat(process.exitValue()).as(String.join(" ", command)).isZero();
         return Files.readAllLines(record, StandardCharsets.UTF_8);
     }
