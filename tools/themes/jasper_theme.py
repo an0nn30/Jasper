@@ -928,7 +928,10 @@ ISLANDS_CHROME = ["surface.app"]
 
 
 def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: str | None,
-                           scheme_file: pathlib.Path | None = None, loose_dir: pathlib.Path | None = None) -> Result:
+                           scheme_file: pathlib.Path | None = None, loose_dir: pathlib.Path | None = None,
+                           roles: dict[str, str] | None = None) -> Result:
+    """One IntelliJ theme as a Jasper theme. ``roles`` maps a role to the colour it takes instead of its IntelliJ key:
+    ``#RRGGBB`` or a colour of the theme's own palette (hand-picked values, as the built-in Catppuccin themes have)."""
     warnings: list[str] = []
     effective = resolve(theme, siblings, warnings, scheme_file, loose_dir)
     display = name or str(theme.data.get("name") or theme.id)
@@ -948,6 +951,13 @@ def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: st
                     colour, source = found
                     given[role] = (colour, f"{key} ({island_name if source == 'theme' else source})", source)
                     break
+    for role, value in (roles or {}).items():
+        if role not in ROLES:
+            raise ConversionError(f'{theme.where}: unknown role "{role}"')
+        colour = Lookup(effective).colour(value)
+        if colour is None:
+            raise ConversionError(f'{theme.where}: {role}: "{value}" is neither a colour nor one of the theme\'s colours')
+        given[role] = (colour, f"{value} (chosen)", "theme")
     roles, sources, provenance = ui_roles(Lookup(effective), effective.dark, terminal, given)
     editor, from_scheme = editor_scheme(scheme)
     doc = {"jasper-theme": FORMAT, "name": display}

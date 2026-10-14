@@ -17,7 +17,10 @@ as in Islands Catppuccin (the user chose both). The file chooser's toolbar, afte
 related): its navigation view reserves the buttons' focus rings (`SurfacePanel.toolbar`; the room comes out of the
 padding and gap, so nothing moves), so Refresh's ring is no longer clipped to brackets; the path box fills its lane up
 to the search field; and the chooser's first focus is the name field (Save, Directory) or the file list, as
-JFileChooser and the macOS open panel do, not the first enabled toolbar button. Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
+JFileChooser and the macOS open panel do, not the first enabled toolbar button. Then, the user's pick (option A of
+three rendered): `tools/themes/catppuccin/roles.json` gives the built-ins Slate Steel's dialog/card/sidebar layering in
+Catppuccin's palette (dark: base body, mantle cards, crust sidebar; Latte: mantle, base, crust), so the chooser's Places
+and file list, Settings and the Vault manager have edges; the converter's `roles` parameter applies it. Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
 (the colour patterns are now precompiled). `./gradlew check --continue`: **10,167 tests, 0 failures, 0 errors, 12
 skipped**. No GUI launched. GUI check for the user: each flavour in Settings › Appearance and the Licenses window (About Jasper › Licenses). Not merged.
 

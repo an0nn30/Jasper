@@ -15,8 +15,10 @@ Jasper's built-in Catppuccin themes are the converter's output for the jar's fou
 - `themes/mocha.theme.json`, Catppuccin Mocha (Dark): `catppuccin-mocha.json`
 
 The `*-islands.theme.json` variants are not built in, but each classic theme takes its window chrome (`surface.app`,
-crust) from its Islands variant, as the converter does for any plugin that ships one. Each theme's editor colours come
-from the scheme its `editorScheme` names (`themes/<flavour>.xml`, the italic one).
+crust) from its Islands variant, as the converter does for any plugin that ships one. `roles.json` hand-picks the
+dialog body, card and sidebar from each flavour's palette, layered as Slate Steel's are (IntelliJ's Catppuccin paints all
+three mantle): base, mantle and crust in the dark flavours; mantle, base and crust in Latte. Each theme's editor colours
+come from the scheme its `editorScheme` names (`themes/<flavour>.xml`, the italic one).
 
-`test_jasper_theme.py` converts the jar and compares the result with the built-in files byte for byte. After a converter
+`test_jasper_theme.py` converts the jar with `roles.json` and compares the result with the built-in files byte for byte. After a converter
 change, `JASPER_THEME_UPDATE_GOLDEN=1 python3 -m unittest discover -s tools/themes -p 'test_*.py'` rewrites them.

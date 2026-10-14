@@ -6,7 +6,6 @@ Set JASPER_THEME_UPDATE_GOLDEN=1 to rewrite testdata/expected/ and the built-in 
 output (then review the diff).
 """
 
-import argparse
 import contextlib
 import io
 import json
@@ -490,6 +489,21 @@ class Plugins(unittest.TestCase):
         self.assertNotIn("chrome from", own.summary, "an Islands theme keeps its own chrome")
         self.assertEqual(alone.doc["ui"]["dark"]["surface.app"], "#333333", "without an Islands variant")
 
+    def test_chosen_roles_take_a_colour_of_the_themes_own_palette_or_a_hex_colour(self):
+        night = {"name": "Night", "dark": True, "colors": {"deep": "#0A0B0C"},
+                 "ui": {"Panel.background": "#333333", "SidePanel.background": "#333333"}}
+        with tempfile.TemporaryDirectory() as scratch:
+            themes = tool.plugin_themes(tool.Files.archive(theme_jar(pathlib.Path(scratch) / "night.jar", {"night": night})))
+            result = tool.convert_intellij_theme(themes[0], themes, None, roles={"surface.sidebar": "deep", "surface.card": "#123456"})
+            with self.assertRaisesRegex(tool.ConversionError, 'surface.card: "abyss" is neither a colour nor one of the theme\'s colours'):
+                tool.convert_intellij_theme(themes[0], themes, None, roles={"surface.card": "abyss"})
+            with self.assertRaisesRegex(tool.ConversionError, 'unknown role "surface.nowhere"'):
+                tool.convert_intellij_theme(themes[0], themes, None, roles={"surface.nowhere": "deep"})
+        self.assertEqual(result.doc["ui"]["dark"]["surface.sidebar"], "#0A0B0C")
+        self.assertEqual(result.doc["ui"]["dark"]["surface.card"], "#123456")
+        self.assertEqual(result.doc["ui"]["dark"]["surface.dialog"], "#333333", "a role not chosen keeps its IntelliJ key")
+        self.assertIn("surface.sidebar: #0A0B0C from deep (chosen)", result.sources)
+
     def test_list_resolves_dark_and_light_through_the_parent_chain(self):
         themes = {"base": BASE, "child": CHILD, "night": {"name": "Night", "parentTheme": "Darcula"},
                   "plain": {"name": "Plain"}}
@@ -858,11 +872,13 @@ class BuiltIn(unittest.TestCase):
                          "3a1104e0db53ff5ba216c94c9e730a85c7ac2847f4e5fe82d91b99dc91045fff")
 
     def test_the_built_in_catppuccin_themes_are_the_converters_output(self):
-        ids = [f"com.github.catppuccin.{flavour}.jetbrains" for flavour in self.FLAVOURS]
-        args = argparse.Namespace(name=None, theme=ids, scheme=None)
-        problems = []
-        results = tool.convert(CATPPUCCIN / "Catppuccin.Theme-3.6.1.jar", args, problems)
-        self.assertEqual(problems, [])
+        """With roles.json's hand-picked dialog, card and sidebar colours, named from each flavour's palette."""
+        themes = tool.plugin_themes(tool.Files.archive(CATPPUCCIN / "Catppuccin.Theme-3.6.1.jar"))
+        roles = json.loads((CATPPUCCIN / "roles.json").read_text(encoding="utf-8"))
+        results = []
+        for flavour in self.FLAVOURS:
+            theme = next(t for t in themes if t.id == f"com.github.catppuccin.{flavour}.jetbrains")
+            results.append(tool.convert_intellij_theme(theme, themes, None, roles=roles["light" if flavour == "latte" else "dark"]))
         self.assertEqual([tool.slug(result.doc["name"]) for result in results],
                          [f"catppuccin-{flavour}" for flavour in self.FLAVOURS])
         for result in results:
