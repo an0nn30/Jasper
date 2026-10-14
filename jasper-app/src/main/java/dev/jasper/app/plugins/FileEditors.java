@@ -120,23 +120,22 @@ final class FileEditors {
                 catch (Throwable failure) { answer.completeExceptionally(failure); throw failure; }
             });
         } catch (RuntimeException rejected) {
-            LOG.log(System.Logger.Level.WARNING, "Could not ask the plugin editor to open " + file, rejected);
+            LOG.log(System.Logger.Level.WARNING, "Could not ask the plugin editor to open a file", rejected);
             return false;
         }
         try {
             return answer.get(wait.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException late) {
             abandoned.set(true);
-            LOG.log(System.Logger.Level.WARNING, "The plugin editor did not answer within " + wait.toSeconds() + " s; "
-                + file + " opens with the desktop");
+            LOG.log(System.Logger.Level.WARNING, "The plugin editor did not answer within " + wait.toSeconds() + " s; the file opens with the desktop");
             return false;
         } catch (InterruptedException interrupted) {
             abandoned.set(true);
             Thread.currentThread().interrupt();
-            LOG.log(System.Logger.Level.WARNING, "Interrupted while asking the plugin editor to open " + file);
+            LOG.log(System.Logger.Level.WARNING, "Interrupted while asking the plugin editor to open a file");
             return false;
         } catch (ExecutionException failure) {
-            LOG.log(System.Logger.Level.WARNING, "Could not ask the plugin editor to open " + file, failure.getCause());
+            LOG.log(System.Logger.Level.WARNING, "Could not ask the plugin editor to open a file", failure.getCause());
             return false;
         }
     }
@@ -165,7 +164,7 @@ final class FileEditors {
         Objects.requireNonNull(desktop, "desktop");
         if (editFromWorker(file, line, window)) return true;
         if (Thread.currentThread().isInterrupted()) {
-            LOG.log(System.Logger.Level.INFO, "The worker was interrupted, so the desktop does not open " + file);
+            LOG.log(System.Logger.Level.INFO, "The worker was interrupted, so the desktop does not open the file");
             return false;
         }
         desktop.accept(file);

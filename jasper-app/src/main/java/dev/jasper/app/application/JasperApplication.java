@@ -543,7 +543,7 @@ public final class JasperApplication {
                 if (runtime == null) desktop.editOrReveal(file);
                 else runtime.open(file, line > 0 ? OptionalInt.of(line) : OptionalInt.empty(), Optional.of(window), desktop::editOrReveal);
             } catch (RuntimeException failure) {
-                LOG.log(System.Logger.Level.WARNING, "Could not open the clicked file " + file, failure);
+                LOG.log(System.Logger.Level.WARNING, "Could not open a clicked file", failure);
             }
         });
     }
