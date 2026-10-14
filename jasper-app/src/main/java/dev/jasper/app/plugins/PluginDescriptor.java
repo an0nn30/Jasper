@@ -7,7 +7,16 @@ import java.util.Set;
 /** A validated {@code plugin.toml}. */
 record PluginDescriptor(String id, String name, Version version, String entry, VersionRange sdk,
                         String description, String vendor, Set<String> capabilities, Set<String> exports,
-                        List<Requirement> requires, String icon, String homepage, dev.jasper.ui.model.Nodes.Hue iconHue, dev.jasper.ui.icons.IdentityArtwork.SelectedInk iconSelectedInk) {
+                        List<Requirement> requires, String icon, String homepage, dev.jasper.ui.model.Nodes.Hue iconHue,
+                        dev.jasper.ui.icons.IdentityArtwork.SelectedInk iconSelectedInk, List<Subcommand> subcommands) {
+    /** The form that predates subcommands. */
+    PluginDescriptor(String id, String name, Version version, String entry, VersionRange sdk,
+                     String description, String vendor, Set<String> capabilities, Set<String> exports,
+                     List<Requirement> requires, String icon, String homepage, dev.jasper.ui.model.Nodes.Hue iconHue,
+                     dev.jasper.ui.icons.IdentityArtwork.SelectedInk iconSelectedInk) {
+        this(id, name, version, entry, sdk, description, vendor, capabilities, exports, requires, icon, homepage, iconHue,
+            iconSelectedInk, List.of());
+    }
     PluginDescriptor(String id, String name, Version version, String entry, VersionRange sdk,
                      String description, String vendor, Set<String> capabilities, Set<String> exports,
                      List<Requirement> requires, String icon, String homepage, dev.jasper.ui.model.Nodes.Hue iconHue) {
@@ -22,10 +31,14 @@ record PluginDescriptor(String id, String name, Version version, String entry, V
     }
     record Requirement(String id, VersionRange version, boolean optional) { }
 
+    /** A {@code [[subcommands]]} entry: {@code jasper <name>} reaches this plugin; {@code summary} is its help line. */
+    record Subcommand(String name, String summary) { }
+
     PluginDescriptor {
         capabilities = Set.copyOf(capabilities);
         exports = Set.copyOf(exports);
         requires = List.copyOf(requires);
+        subcommands = List.copyOf(subcommands);
     }
 
     PluginInfo info() { return new PluginInfo(id, name, version.toString(), capabilities); }
