@@ -1,5 +1,18 @@
 # Jasper — Status and Handoff
 
+**Right rail splits again: two dock fixes — 2026-10-14** (`claude/right-rail-split`, worktree
+`.claude/worktrees/right-rail-split`; bug fix, the drag rule chosen by the user). The user's right rail could show
+only one window: Sessions and Tunnels were both in Right Bottom, and dragging the first icon under the empty top group
+straight up into it dropped it back where it was, because the drag layout puts that group's drop space over the icon's
+old place, which stayed its own target. `DockDrag` now lets another stripe group's drop space win over the old place
+(a click that drifts past 5 px on that icon can move it up). Second, `ToolWindowArea.sync` released and mounted frames
+slot by slot, so a showing kit panel moved to an earlier slot (Right Bottom to Right Top) lost its borrowed header's
+drag, Options, Hide and metadata to the old frame's release; it now releases every stale frame first. New tests
+`theFirstIconUnderAnEmptyTopGroupDragsStraightUpIntoIt` and `aShowingKitPanelKeepsItsHeaderWhenItMovesToAnEarlierSlot`.
+`./gradlew check --continue`: **10,159 tests, 0 failures, 0 errors, 12 skipped**. No GUI launched. GUI check for the
+user: drag Sessions up into the right rail's top group; move a showing plugin panel up and drag its header. Not merged
+or pushed.
+
 **Inactive tabs stay clearly darker than the active tab — 2026-10-14** (`claude/inactive-tabs`, worktree
 `.claude/worktrees/inactive-tabs`; bug fix, design and the ΔL* 9 strength chosen by the user). The active tab is
 `surface.terminal` and inactive tabs `surface.tabstrip`, but themes set the two close or equal (Slate Steel Dark 1.9 L*
