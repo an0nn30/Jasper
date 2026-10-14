@@ -281,6 +281,30 @@ class DockDragTest {
         assertThat(w.state.ids(Slot.LEFT_TOP)).containsExactly("a", "b");
     }
 
+    @Test void theFirstIconUnderAnEmptyTopGroupDragsStraightUpIntoIt() {
+        var w = window();
+        w.state.move("d", Slot.RIGHT_BOTTOM, 0);
+        w.state.add("e", Slot.RIGHT_BOTTOM);
+        var source = w.button(w.right, "d");
+        Rectangle home = SwingUtilities.convertRectangle(w.right, source.getBounds(), w.content);
+        Point start = w.center(source);
+        w.mouse(source, MouseEvent.MOUSE_PRESSED, start);
+        Point at = new Point(start);
+        while (!w.drag.active()) { at.translate(0, -1); w.mouse(source, MouseEvent.MOUSE_DRAGGED, at); }
+        Rectangle top = SwingUtilities.convertRectangle(w.right, w.right.dropGroups().get(0).bounds(), w.content);
+        int middle = (int) top.getCenterY();
+        assertThat(home.contains(at.x, middle)).as("the drag layout puts the empty top group's drop space over d's old place").isTrue();
+        // Straight up a pixel at a time, as a hand moves, to the middle of that drop space.
+        while (at.y > middle) { at.translate(0, -1); w.mouse(source, MouseEvent.MOUSE_DRAGGED, at); }
+        assertThat(w.drag.target()).as("the drop space the stripe shows wins over d's old place")
+            .hasValue(DockDropResolver.Target.stripe(Slot.RIGHT_TOP, 0));
+        assertThat(w.right.gapBounds()).as("the gap opens in the top group, under the cursor")
+            .hasValueSatisfying(gap -> assertThat(gap.intersects(w.right.dropGroups().get(0).bounds())).isTrue());
+        w.mouse(source, MouseEvent.MOUSE_RELEASED, at);
+        assertThat(w.state.ids(Slot.RIGHT_TOP)).containsExactly("d");
+        assertThat(w.state.ids(Slot.RIGHT_BOTTOM)).containsExactly("e");
+    }
+
     @Test void theHomeOnlyAppliesUntilTheCursorLeavesIt() {
         var w = window();
         var source = w.button(w.left, "b");
