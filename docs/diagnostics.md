@@ -33,11 +33,13 @@ started. A launch that hands off to an already running Jasper, or quits before s
     Startup (cold, AOT cache used, CDS on): main entered 71 ms, config loaded 90 ms, … output painted 512 ms, plugins bound 980 ms | application 210 ms, plugins 280 ms
 
 Times before the `|` are milliseconds since the operating system started the process; after it, each phase is how long
-that piece of work took. Phases overlap (`application` includes `plugins`), so do not add them up. `AOT cache stale` means the cache in the
-package no longer matches its jars (for example after a copy that did not keep modification times) and costs more than
-having none. Each window a running Jasper opens logs `Window (<trigger>): shown …, first paint …, output painted …
-after the request`. With `-Djasper.startupTrace=<file>` the same data is also written as JSON; the start-up benchmark
-uses it.
+that piece of work took. Phases overlap (`application` includes `plugins`), so do not add them up. `AOT cache stale`
+means the cache in the package no longer matches its jars (for example after a copy that did not keep modification
+times) and costs more than having none. `AOT cache skipped: <reason>` means Jasper's launcher started the JVM without
+it: `launch-failed` (it made Java fail at this launch), `remembered` (it did at an earlier one) or `environment`
+(`JASPER_AOT_CACHE_SKIP` is set). Each window a running Jasper opens logs `Window (<trigger>): shown …, first paint …,
+output painted … after the request`. With `-Djasper.startupTrace=<file>` the same data is also written as JSON; the
+start-up benchmark uses it.
 
 ## Start-up cache (packaged macOS app)
 
@@ -49,3 +51,8 @@ also come from JVM options in the environment, not only from a copy that lost mo
 or `JDK_JAVA_OPTIONS` with a heap above about 32 GB, which turns compressed object pointers off, or a different garbage
 collector. The default heap is safe at any RAM size, because the JVM caps it to keep compressed pointers. See
 [keeping the cache valid](packaging.md#keeping-the-cache-valid).
+
+If the cache makes Java fail at launch, Jasper starts again without it, says so once in a **Memory & VM options**
+notification and writes `jasper-aot.failed` in Jasper's home (next to `config.toml`). Jasper starts without the cache
+while that file matches it, until a new Jasper build replaces the cache; delete the file to try the cache again.
+Setting `JASPER_AOT_CACHE_SKIP=1` in the environment also starts Jasper without the cache.

@@ -305,6 +305,8 @@ checks a built image ([start-up performance](packaging.md#start-up-performance))
   an empty options file, so a developer's own flags never shape the cache or the numbers.
   `dev.jasper.app.vmoptions.VmOptionsSyntax` mirrors `packaging/launcher/jasper/JasperVmOptionsCore.cpp`: change both
   together and add a vector to `packaging/launcher/test/digest-vectors.txt`, which both test suites read.
+  `AotCacheRecord` reads the record of a failed start-up cache (`jasper-aot.failed`) with the launcher's rules: change
+  both together and add a vector to `packaging/launcher/test/aot-record-vectors.txt`.
   `LauncherImage.DEFAULT_MAX_HEAP_MIB` follows the bundled `-Xmx` in `jasper-app/build.gradle.kts`.
 
 ## Session lifecycle change

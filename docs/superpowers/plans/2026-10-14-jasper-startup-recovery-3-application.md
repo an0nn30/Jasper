@@ -2,8 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: **Written 2026-10-14** on `claude/startup-recovery` (spec approved by the user the same day). Executes after
-plans 1 (the shipped cache) and 2 (the watcher) of the same spec are on the branch.
+Status: **Complete on 2026-10-14** on `claude/startup-recovery` (spec approved by the user on 2026-10-14). Beyond the
+eleven deviations below: Task 0 (plan 2 carry-over, `b05c2585`) removed `_JPACKAGE_LAUNCHER` from the watcher's Windows
+launches and recorded the watcher's re-exec handling, which resolves plan 2's "plan 3's task 0"; and in Task 1
+`AotCacheRecord.matches` also requires a non-negative modification time, as the launcher's matcher does.
 
 **Goal:** After the launcher recovers from a JVM that died while starting, Jasper says so in its start-up line,
 checks the start-up cache that was skipped, remembers a failing cache in `<home>/jasper-aot.failed` so later launches

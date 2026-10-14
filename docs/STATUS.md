@@ -1,5 +1,22 @@
 # Jasper — Status and Handoff
 
+**Start-up recovery plan 3 (the application) complete — 2026-10-14** (`claude/startup-recovery`, worktree
+`.claude/worktrees/startup-recovery`; spec `docs/superpowers/specs/2026-10-14-jasper-startup-recovery-design.md`).
+After the launcher recovers a start without the AOT cache, the start-up line says why (`AOT cache skipped:
+launch-failed`, `remembered` or `environment`); Jasper checks the cache on its VM options worker, and when the check
+fails writes `<home>/jasper-aot.failed` (the path the launcher names in `jasper.aotCacheRecord`) and posts "Jasper
+started without its start-up cache" in Memory & VM options, once per record. `VmOptionsCheck` runs its cache check
+with the custom options only when they start the JVM, so a broken option is never blamed on the cache, and System
+Settings' "These options turn off Jasper's start-up cache" appears only then. New JDK-only `AotCacheRecord`, checked
+against the launcher's `aot-record-vectors.txt`; matching compares the cache file's size and time and the options,
+not its path. The notification quotes the JVM's own AOT error (for the 2026-10-14 failure, the `SecurityException`).
+Deviations: the eleven planned ones in the plan (among them one notification per record, and a hand-set skip reading
+`environment` in the log), Task 0 (plan 2 carry-over, `b05c2585`: the watcher's Windows launches drop
+`_JPACKAGE_LAUNCHER`, and its re-exec handling is recorded), and `AotCacheRecord.matches` also requiring a non-negative
+modification time, as the launcher's matcher does.
+`./gradlew check --continue`: **10190 tests, 0 failures, 0 errors, 12 skipped** (5 minutes 28 seconds). No GUI
+launched. GUI checks for the user are in the plan's hand-off section.
+
 **Start-up recovery plan 2 (the watcher) complete — 2026-10-14.** On `claude/startup-recovery` (not pushed): Jasper's
 launcher starts `jasper-watch` beside itself before the JVM and sends it one byte once the JVM exists. When the JVM dies
 first (`exit`, `_exit` or a signal), the watcher starts Jasper once more without the start-up cache
