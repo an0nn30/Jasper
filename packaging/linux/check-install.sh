@@ -38,6 +38,8 @@ case "$package" in
 esac
 
 test -x "$root/bin/Jasper"
+test -x "$root/lib/bin/jasper"
+"$root/lib/bin/jasper" --help | grep -q '^Usage: jasper'
 "$root/lib/runtime/bin/java" -version
 
 # The JDK's own libraries find libjvm and each other at run time, so ldd may not resolve those;

@@ -292,6 +292,14 @@ The [Linux packages](#linux-packages) use the 512px `packaging/icons/Jasper.png`
 for their menu entry and do not install the hicolor hierarchy. Validate
 launcher/window appearance on the target desktop environment.
 
+## The jasper command
+
+Each image carries the native `jasper` command ([packaging/cli](../packaging/cli/README.md)) in a `bin` folder of its
+own, because macOS and Windows file systems ignore case: `Jasper.app/Contents/Resources/bin/jasper` (signed ad hoc and
+sealed into the bundle), `bin\jasper.exe` on Windows and `lib/bin/jasper` on Linux. The installers carry it with the
+rest of the image. `verifyPackage` checks that it is there, executable and, on macOS, signed, and that `jasper --help`
+runs; the Linux install check runs it from the installed package.
+
 ## Native acceptance checklist
 
 Perform each checklist outside the repository so source-tree classes or an external
