@@ -5,6 +5,7 @@ import dev.jasper.editor.open.Locations;
 import dev.jasper.editor.api.Editor;
 import dev.jasper.editor.api.EditorDocument;
 import dev.jasper.editor.api.OpenRequest;
+import dev.jasper.editor.command.EditorCommand;
 import dev.jasper.editor.open.Openers;
 import dev.jasper.editor.local.LocalDocument;
 import dev.jasper.editor.recent.RecentFiles;
@@ -90,6 +91,7 @@ public final class EditorPlugin implements Plugin {
         context.actions().register(ActionSpec.of(SHOW, "Show Editor").withKeywords(List.of("editor", "tabs")), invoked -> window().show());
         context.actions().register(ActionSpec.of(RecentFilesScope.ACTION, "Recent Files…").withKeywords(List.of("editor", "recent", "files", "open")),
             invoked -> context.palette().open(invoked.window(), RecentFilesScope.ID, Optional.empty(), Optional.empty()));
+        context.commandLine().handle("editor", new EditorCommand(this::window)::run);
         context.palette().register(scope);
         PluginMenu file = context.menus().standard(StandardMenu.FILE);
         file.add(OPEN);

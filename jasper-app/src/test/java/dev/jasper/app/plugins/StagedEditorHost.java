@@ -47,7 +47,7 @@ import static dev.jasper.app.plugins.AppContractTest.onEdtValue;
  * follow the production {@link DialogFit} rule. No document, file or terminal is touched. Call from the test thread.
  */
 final class StagedEditorHost implements AutoCloseable {
-    static final PluginInfo EDITOR = new PluginInfo("dev.jasper.editor", "Editor", "0.7.0", Set.of(Capabilities.PALETTE_CONTRIBUTE));
+    static final PluginInfo EDITOR = new PluginInfo("dev.jasper.editor", "Editor", "0.8.0", Set.of(Capabilities.PALETTE_CONTRIBUTE));
 
     final Contributions contributions;
     final AuxiliaryWindows auxiliary;
@@ -86,6 +86,8 @@ final class StagedEditorHost implements AutoCloseable {
                 listener -> new dev.jasper.app.lifecycle.Subscription(() -> { })));
         loader = new PluginClassLoader(EDITOR.id(), ManagedVaultLoadingTest.jars(staged), getClass().getClassLoader(), Map.of());
         plugin = (Plugin) loader.loadClass("dev.jasper.editor.EditorPlugin").getConstructor().newInstance();
+        // The staged manifest declares the Editor's subcommand; the application resolves it from plugin.toml.
+        onEdt(() -> host.commands.declare(Subcommands.of(List.of(new Subcommands.Owner("editor", "Open files in Jasper's Editor", EDITOR.id(), EDITOR.name())))));
         onEdt(() -> host.start(new HostedPlugin(EDITOR, Set.of(), Set.of(), Set.of("dev.jasper.editor.api"), loader, () -> plugin)));
         context = onEdtValue(() -> {
             try {

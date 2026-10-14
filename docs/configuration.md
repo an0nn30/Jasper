@@ -25,6 +25,25 @@ Use `--config <path>` to select a different file. Relative paths resolve from th
 
 The first command launches the desktop and a shell. `--help` prints usage without opening a window or reading configuration. Missing, duplicate and unknown arguments fail before desktop startup.
 
+### The jasper command
+
+`jasper` hands a call to the Jasper that is running, starting it first when none is, and never starts a Java process of
+its own, so it returns quickly. Jasper's own shells reach it through `JASPER_COMMAND_SOCKET`; to use it from other
+terminals and programs, choose Settings › System Settings › Command line › Install, or **Install 'jasper' Command in
+PATH** in the command palette. On macOS that makes `/usr/local/bin/jasper`, asking for an administrator's password when
+that folder needs it; on Linux `~/.local/bin/jasper`; on Windows it adds Jasper's `bin` folder to your user `Path`. A
+development run cannot install it.
+
+- `jasper` opens a window, or brings one forward.
+- `jasper --safe-mode`, `--config <path>`, `--plugin-dir <path>` and `--standalone` start Jasper with those options.
+- `jasper editor [--wait] FILE[:LINE[:COLUMN]]...` opens files in the [Editor](editor.md#opening-files);
+  `git config --global core.editor "jasper editor --wait"` edits commit messages there.
+- `jasper --help` lists the commands plugins add, as Jasper last recorded them.
+
+The command looks for Jasper's socket in `JASPER_COMMAND_SOCKET`, else in `daemon/commands` under `JASPER_HOME`, else
+under the default home. A launch with `--config`, `--safe-mode`, `--plugin-dir` or `--standalone` serves a socket of its
+own, which only its own shells reach.
+
 ### Custom VM options
 
 The installed app reads JVM options from `jasper.vmoptions` in Jasper's home (next to `config.toml`), the way IntelliJ
