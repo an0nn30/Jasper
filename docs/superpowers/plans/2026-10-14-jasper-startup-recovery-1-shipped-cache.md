@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: **Written 2026-10-14** on `claude/startup-recovery` (spec approved by the user the same day).
+Status: **Complete on 2026-10-14** on `claude/startup-recovery` (spec approved by the user the same day).
 
 **Goal:** The AOT cache shipped inside `Jasper.app` works wherever Jasper is installed and never depends on the
 repository's build directory, and Jasper finds its own files (bundled plugins, handoff identity, the replaced-on-disk

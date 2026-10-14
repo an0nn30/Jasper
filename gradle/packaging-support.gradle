@@ -181,8 +181,8 @@ ext.aotTrainingEnvironment = { Map<String, String> inherited, String javaToolOpt
     environment
 }
 
-// One training launch of launcher (the image's Contents/MacOS/Jasper, so jpackage's launcher sets everything a real
-// launch has) in work, isolated like startupBench: user.home is work/home with the training configuration, and
+// One training launch of launcher (Contents/MacOS/Jasper of the copy trainInCopy makes, so jpackage's launcher sets
+// everything a real launch has) in work, isolated like startupBench: user.home is work/home with the training configuration, and
 // JAVA_TOOL_OPTIONS asks for the cache, the start-up trace and no Dock icon. Once the trace has settled, SIGTERM; the
 // JVM assembles the cache while it exits, running the runtime's bin/java (whose output lands in the same log, and
 // whose JAVA_TOOL_OPTIONS the JVM replaces). Returns the cache; throws with the log's tail on any failure. The

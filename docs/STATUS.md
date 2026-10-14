@@ -1,5 +1,19 @@
 # Jasper — Status and Handoff
 
+**Start-up recovery plan 1 (the shipped cache) complete — 2026-10-14** (`claude/startup-recovery`, worktree
+`.claude/worktrees/startup-recovery`; spec `docs/superpowers/specs/2026-10-14-jasper-startup-recovery-design.md`).
+The installed Jasper.app would not start ("sealing violation: can't seal package com.jetbrains"): JBR 25 gives
+classes from the AOT cache the code source of the path the cache was trained at (JDK-8376576), so the cache only
+worked while the repository's build image existed, and the installed app read its bundled plugins from it.
+`stagePackage` now removes package sealing (only `jbr-api` declared it; the About notices record the change) and
+`verifyPackage` rejects a sealed jar; `CodeLocation` finds Jasper's own jar from its class resource for plugin
+discovery, handoff and the replaced-on-disk check (`CodeSourceScanTest` keeps code sources out of the class-path
+modules); `trainAotCache` trains in a `ditto` copy deleted before `verifyAotCache`. `./gradlew check --continue`:
+**10,164 tests, 0 failures, 0 errors, 12 skipped**. No GUI launched. GUI check for
+the user: `./gradlew :jasper-app:packageDist`, install the DMG, quit Jasper completely, move the repository's
+`jasper-app/build/packaging/image` aside and start Jasper: the start-up line says `AOT cache used` and the bundled
+plugins are `ACTIVE` with no "Plugin discovery: …/build/…" warning. Plans 2 (watcher) and 3 (application) follow.
+
 **Right rail splits again: two dock fixes — 2026-10-14** (`claude/right-rail-split`, worktree
 `.claude/worktrees/right-rail-split`; bug fix, the drag rule chosen by the user). The user's right rail could show
 only one window: Sessions and Tunnels were both in Right Bottom, and dragging the first icon under the empty top group

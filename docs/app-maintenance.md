@@ -289,8 +289,12 @@ checks a built image ([start-up performance](packaging.md#start-up-performance))
   re-signs it in `packageApp` (so the staged bytes and their ad-hoc signature survive), and listed in `verifyPackage`'s
   bridge check with the JNI symbols it must export. A new bridge needs all three.
 - **The AOT cache.** It is trained per build, so it follows class-path changes automatically; never edit a jar inside a
-  trained image, rebuild it. Training opens a window: agents ask the user before `packageDist`, `trainAotCache` or
-  `-Pjasper.aot=true`.
+  trained image, rebuild it. `trainAotCache` trains in a `ditto` copy of the image that it deletes before
+  `verifyAotCache`, because JBR 25 gives cached classes the code source of the path they were trained at
+  (JDK-8376576): the build machine then runs the trained image as every user's Mac does. For the same reason
+  `stagePackage` removes package sealing from class-path jars (`verifyPackage` rejects a sealed one) and Jasper finds
+  its own files with `CodeLocation`, never a code source. Training opens a window: agents ask the user before
+  `packageDist`, `trainAotCache` or `-Pjasper.aot=true`.
 - **Jasper's launcher.** `packageApp` builds the image with Jasper's own build of jpackage's launcher
   (`gradle/launcher.gradle`, [packaging/launcher](../packaging/launcher/README.md)), which merges the user's
   `jasper.vmoptions` over these options. A JBR update means re-vendoring its launcher sources and re-applying the

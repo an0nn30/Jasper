@@ -910,7 +910,7 @@ if (normalizedHost().os == 'windows') {
     def aotTrainingDirectory = packagingRoot.map { it.dir('aot-training') }
     // Beside aotTrainingDirectory, which runAotTraining clears: the image copy that training launches (trainInCopy).
     def aotTrainingImageDirectory = packagingRoot.map { it.dir('aot-training-image') }
-    // Launches the image once: a Jasper window for a few seconds, without a Dock icon. Agents ask the user first.
+    // Launches a copy of the image once: a Jasper window for a few seconds, without a Dock icon. Agents ask the user first.
     // Training changes packageApp's output, so the next packageApp rebuilds the image from scratch, untrained.
     def trainAotCache = tasks.register('trainAotCache') {
         group = 'distribution'
