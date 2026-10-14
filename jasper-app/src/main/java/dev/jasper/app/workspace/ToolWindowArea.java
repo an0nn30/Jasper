@@ -313,13 +313,13 @@ final class ToolWindowArea extends JPanel {
 
     /**
      * Brings the frames in line with the state: a frame for each slot that shows a window with content, none for the
-     * others. Content leaves the component tree while its window is hidden.
+     * others. Content leaves the component tree while its window is hidden. Every stale frame is released before any
+     * new one mounts: a window that moves keeps its content and a kit view's borrowed header, which its old frame's
+     * release would otherwise take back from the new frame.
      */
     void sync() {
         for (Slot slot : Slot.values()) {
-            String id = state.active(slot).orElse(null);
-            Content wanted = id == null ? null : contents.get(id);
-            if (wanted != null && wanted.component() instanceof dev.jasper.ui.swing.KitView view && view.isClosed()) wanted = null;
+            Content wanted = wanted(slot);
             Host host = hosts.get(slot);
             if (host != null && (wanted == null || host.content != wanted.component()
                     || host.borrowedHeader != kitHeader(wanted.component()))) {
@@ -327,8 +327,12 @@ final class ToolWindowArea extends JPanel {
                 host.releaseHeader.run();
                 host.removeAll();
                 hosts.remove(slot);
-                host = null;
             }
+        }
+        for (Slot slot : Slot.values()) {
+            String id = state.active(slot).orElse(null);
+            Content wanted = wanted(slot);
+            Host host = hosts.get(slot);
             if (wanted != null && host == null) {
                 host = new Host(true);
                 host.id = id;
@@ -364,6 +368,12 @@ final class ToolWindowArea extends JPanel {
         refreshGutters();
         revalidate(); repaint();
         onMinimumSizeChanged.run();
+    }
+
+    /** What the slot's frame should show: its active window's content, or null for none or a closed kit view. */
+    private Content wanted(Slot slot) {
+        Content wanted = state.active(slot).map(contents::get).orElse(null);
+        return wanted != null && wanted.component() instanceof dev.jasper.ui.swing.KitView view && view.isClosed() ? null : wanted;
     }
 
     private static JComponent kitHeader(JComponent component) {
