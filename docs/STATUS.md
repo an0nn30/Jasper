@@ -1,5 +1,34 @@
 # Jasper — Status and Handoff
 
+**The jasper command (command line plan 1) — 2026-10-14** (`claude/default-editor`, worktree
+`.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
+[plan](superpowers/plans/2026-10-13-jasper-command-line-1-jasper-command.md)). A native `jasper` command
+(`packaging/cli`, C, built with the launcher's toolchain) hands each call to the running Jasper over
+`<home>/daemon/commands` and never starts a JVM; with nothing listening it starts Jasper with `--no-window` and waits up
+to 20 s. Every running Jasper binds the socket after its plugins start (private launches bind `commands-<pid>`); a
+`--no-window` Jasper that is not resident quits once served. Local shells get `JASPER_PANE` and `JASPER_COMMAND_SOCKET`.
+SDK 0.17.0: `PluginContext.commandLine()` and `[[subcommands]]`; bundled ranges `>=0.17.0, <0.18`. Editor 0.8.0:
+`jasper editor [--wait] FILE[:LINE[:COLUMN]]...`. Settings › System Settings › Command line and the palette install the
+command on `PATH`. Deviations: the plan's twelve, plus the `### The jasper command` section of `configuration.md` landing
+with Task 10 (its `editor.md` link needs the heading); `WindowsUserPathTest.theUsersOwnPathCanBeRead` asserting that
+`read()` does not throw; `CommandListener` giving each call an outgoing frame queue drained by its own writer virtual
+thread (so a client that stops reading cannot freeze the UI thread; `close()` gives the writers of ended calls up to 1 s in
+total); the owner-only file helpers moved to `dev.jasper.app.platform.OwnerOnlyFiles`, used by `CommandListener` and
+`HandoffSocket`; on macOS `jasper --<option>` launches spawn `Contents/MacOS/Jasper` directly and detached, as on Linux
+(`open -g -a` only for the `--no-window` cold start); a discovered plugin that does not load still owns the subcommand
+names nobody else owns, so `jasper <name>` says it is unavailable (exit 1) rather than unknown (exit 2), and `--help`
+lists only active plugins; only Linux gives the "not on your PATH" hint after Install; the palette's Uninstall acts only
+when the command is installed; a dangling `jasper` link counts as Jasper's own only when its target ends with
+`Resources/bin/jasper` or `lib/bin/jasper`, any other asking first; `jasper editor` also completes when a tab closes
+while its file is still loading. `./gradlew check --continue`: **9,917 tests, 0 failures, 0 errors, 11 skipped** (its
+first run failed only `ThemeMigrationCoverageTest`, whose ledger lacked rows for the Editor's `EditorArguments` and
+`EditorCommand`; added in 0a23e1e5). No GUI launched. GUI checks for the user: in a dev run's
+shell, `jasper-app/build/cli/bin/jasper editor --wait notes.txt` and Ctrl-C; on the packaged macOS app, Install (the
+administrator prompt), then from iTerm `jasper editor --wait notes.txt`, `git config --global core.editor "jasper editor
+--wait"` and `git commit`, with Jasper resident, not resident and not running, `jasper` alone, and `jasper --help`; on
+Windows, Install, a new terminal, and `jasper editor --wait` bringing Jasper to the front. Not merged or pushed. Plans 2
+(default editor) and 3 (Cmd-click file paths) are next.
+
 **Tool windows in Zen, and more plugin commands — 2026-10-13** (`claude/zen-panels-actions`, worktree
 `.claude/worktrees/zen-panels-actions`; design agreed in chat, no spec). Zen now hides the showing tool windows through
 the dock and remembers them: a panel opened in Zen (shortcut, View › Tool Windows, palette, plugin command) shows in

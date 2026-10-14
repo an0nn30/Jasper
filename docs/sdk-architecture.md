@@ -9,7 +9,7 @@ plugin writer's view.
 | --- | --- | --- |
 | `jasper-sdk` | Interfaces and values plugins compile against | JDK |
 | `jasper-sdk-testkit` | `FakePluginHost` and the abstract `PluginContractTest` | JDK, SDK |
-| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `appearance`, `contributions`, `dock`, `files`, `notifications`, `persistence`, `platform`, `terminals`, `windows` |
+| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `appearance`, `commandline`, `contributions`, `dock`, `files`, `notifications`, `persistence`, `platform`, `terminals`, `windows` |
 | `dev.jasper.app.terminals` | App-native registry of terminal windows, tabs and panes: pull-based entries, id-only events, the derived active pane | `lifecycle` |
 | `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections, status entries, panels and rail actions | `dock`, `lifecycle` |
 | `dev.jasper.app.dock` | The tool window dock model: the six slots, each window's `DockState` and the pure `DockGeometry`; JDK-only | none |
@@ -275,6 +275,17 @@ application-owned state, then stops plugins in reverse order on the EDT. Each pl
 executor stops admitting tasks; accepted work drains for 1.5 s and is then interrupted, inside
 the existing 2 s bounded wait. A `stop()` that blocks the EDT cannot be abandoned: the 4 s
 deadline ends the process and logs which callback was running.
+
+## Command-line subcommands (SDK 0.17.0)
+
+`PluginContext.commandLine()` is `plugins.HostedCommandLine`, one per context, over the host's `PluginCommands`. When
+plugins start, `PluginRuntime` builds `Subcommands` from the `[[subcommands]]` of the plugins that load (a bundled plugin
+keeps a contested name, otherwise the first by id, and the other plugin gets a problem notice) and writes the active ones
+to `daemon/subcommands` for `jasper --help`. `PluginCommands` is the application's `commandline.CommandDispatcher` for
+subcommand calls: it hops to the UI thread, runs the handler inside containment, maps the call's pane to its
+`WindowHandle`, and adapts the application's `Invocation` to `CommandCall`. `HostedUi` tracks each handler, so it ends
+with the plugin. The testkit's `FakeCommandLine` and `FakeCommandCall` do the same in memory, and `PluginContractTest`
+holds both hosts to one contract.
 
 ## Contract suite
 

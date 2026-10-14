@@ -1,6 +1,6 @@
 # Jasper command line and default editor
 
-Status: **Approved on 2026-10-13** (the user: "spec approved"). Branch: `claude/default-editor`, from `main` at `15d97d5d`.
+Status: **Approved on 2026-10-13** (the user: "spec approved"). Plan 1 (the `jasper` command) complete on 2026-10-14: [`2026-10-13-jasper-command-line-1-jasper-command.md`](../plans/2026-10-13-jasper-command-line-1-jasper-command.md); its deviations are in the plan's banner. Branch: `claude/default-editor`, from `main` at `15d97d5d`.
 
 ## 1. Intent and decisions
 

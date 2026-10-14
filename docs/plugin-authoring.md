@@ -26,6 +26,10 @@ homepage = "https://example.dev/tool"  # optional, SDK 0.9.3: an http or https l
 id = "dev.example.other"
 version = ">=1.0"
 optional = false
+
+[[subcommands]]                    # optional, SDK 0.17.0: `jasper tool ...` reaches this plugin
+name = "tool"
+summary = "Run the tool"
 ```
 
 `icon` and `homepage` need Jasper 0.9.3 or later (declare `sdk = ">=0.16.1, <0.18"`); an older Jasper rejects a
@@ -508,6 +512,26 @@ Since SDK 0.16.1, `context.platform()` puts text on the clipboard and reads it, 
 
 Plugin code does not use the AWT clipboard (`Toolkit.getSystemClipboard()` or `getSystemSelection()`):
 `verifyPluginArchitecture` rejects both in the bundled plugins, except for the Editor's Vim registers. Declare `sdk = ">=0.16.1, <0.18"` when you use these methods.
+
+## Command-line subcommands
+
+Since SDK 0.17.0 a plugin can answer `jasper <name> ...`. Declare each name under `[[subcommands]]` in `plugin.toml`:
+`name` matches `[a-z][a-z0-9-]*` (`help` and `version` are reserved) and `summary` is the line `jasper --help` shows.
+Then handle it in `start`, on the UI thread:
+
+```java
+context.commandLine().handle("tool", call -> {
+    call.out("Running in " + call.workingDirectory() + "\n");
+    return CompletableFuture.completedFuture(0);
+});
+```
+
+`call.arguments()` are the words after the name. `call.window()` is the window of the Jasper pane the command ran in,
+when it ran in one. `out` and `err` write to the caller's terminal from any thread. The stage's value is the exit code,
+0 to 255; anything else is 1, and a handler that throws or a stage that fails prints `jasper: <name> failed: ...` and
+exits 1. `call.onCancelled` hears, on the UI thread, that the caller went away (Ctrl-C). When two plugins declare the
+same name, a bundled plugin keeps it, otherwise the first by plugin id, and the other gets a problem notice. In tests,
+`FakePluginHost.declareSubcommand` and `call` drive a handler. Declare `sdk = ">=0.17.0, <0.18"`.
 
 ## Rules that matter
 

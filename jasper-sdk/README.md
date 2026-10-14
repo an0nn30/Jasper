@@ -13,6 +13,7 @@ plugins built outside this repository; `./gradlew sdkRelease` builds them into `
 | --- | --- |
 | `dev.jasper.sdk` | `JasperSdk.VERSION`, `PluginInfo`, `Variant`, `Subscription`, `WindowOwner`, `Capabilities`, `MissingCapabilityException` |
 | `dev.jasper.sdk.plugin` | `Plugin` (the entry point), `PluginContext` |
+| `dev.jasper.sdk.cli` | `CommandLine`, `CommandHandler`, `CommandCall`: answering `jasper` subcommands |
 | `dev.jasper.sdk.settings` | `PluginSettings`, `Setting`, `SettingSpec`, `SettingKind`, `Choice`, `EditorHint`, `Applies`, `SettingsPanel`, `SettingsPanelHost` |
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
 | `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent`, `ConnectionSpec`, `ConnectionHandle`, `ConnectionEvent` |
@@ -41,9 +42,17 @@ monochrome paths with `UiKit.registerIcon`; see [icons](../docs/sdk-icons.md).
 Panels and settings factories return `UiView`; window surfaces and tabs mount only `UiView`.
 Settings hosts supply `Nodes.Node` rows. The host owns ordinary controls and their presentation.
 Specialized content retains explicit Appearance palettes and workspace opacity.
-Bundled manifests require `sdk = ">=0.16.0, <0.18"`, or `>=0.16.1` where they use the clipboard or the Tools menu (0.16.1 adds `Platform.copy`, `copySecret`, `clipboardText`, `clipboard.read` and `StandardMenu.TOOLS`; 0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
+Bundled manifests require `sdk = ">=0.17.0, <0.18"` (0.17.0 adds `PluginContext.commandLine()` and `[[subcommands]]`; 0.16.1 adds `Platform.copy`, `copySecret`, `clipboardText`, `clipboard.read` and `StandardMenu.TOOLS`; 0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
 `DialogSpec.Presentation.OVERLAY`; 0.15.0 was the breaking boundary: raw factories,
 Appearance icon loaders, arbitrary Icon arguments and palette fallback readers were removed).
+
+## Command-line subcommands (SDK 0.17.0)
+
+`PluginContext.commandLine().handle(name, handler)` answers `jasper <name> ...` for a name the plugin declares under
+`[[subcommands]]` in `plugin.toml`. The handler runs on the UI thread with a `CommandCall` (its arguments, working
+directory, the window of the pane it ran in, `out`, `err` and `onCancelled`) and completes with the exit code. The
+testkit's `FakePluginHost.declareSubcommand` and `call` return a `FakeCommandCall` with the output and the exit code.
+Plugins that use it declare `sdk = ">=0.17.0, <0.18"`.
 
 ## Clipboard and the Tools menu (SDK 0.16.1)
 
