@@ -243,6 +243,15 @@ public final class FileChooserPanel extends JPanel {
         views.forEach(KitView::close);
     }
 
+    /**
+     * Gives the chooser its first focus, as JFileChooser and the macOS open panel do: the name field the primary acts on
+     * in Save and Directory, otherwise the file list, never the first enabled toolbar button. The dialog calls it the
+     * first time it gains focus.
+     */
+    public void focusInitially() {
+        if (nameView != null) nameView.focus(NAME); else filesView.focus(FILES);
+    }
+
     // Package-private accessors for headless tests.
     /** The name the primary button acts on: the field's text in Save and Directory, the selection's names in Open. */
     String nameText() { return name; }
@@ -268,7 +277,9 @@ public final class FileChooserPanel extends JPanel {
         var bar = dev.jasper.ui.swing.SurfacePanel.toolbar(kit, navigationView, pathView, toolsView);
         bar.setOpaque(false);
         int vertical = metric(DesignMetrics.Role.CHOOSER_TOOLBAR_VERTICAL_PADDING), side = metric(DesignMetrics.Role.CHOOSER_TOOLBAR_SIDE_PADDING);
-        bar.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
+        // The navigation buttons' focus-ring room lies in this padding (SurfacePanel.toolbar), so they keep their places.
+        int ring = metric(DesignMetrics.Role.FOCUS_RING);
+        bar.setBorder(BorderFactory.createEmptyBorder(vertical - ring, side - ring, vertical - ring, side));
         return bar;
     }
 

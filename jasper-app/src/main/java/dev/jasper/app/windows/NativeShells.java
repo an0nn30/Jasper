@@ -433,6 +433,11 @@ public final class NativeShells {
                 bar.attach(dialog);
             }
             panel.installDefaultAction(dialog.getRootPane());
+            // As JOptionPane does: the first focus goes where the user starts, not to the first enabled toolbar button.
+            dialog.addWindowFocusListener(new WindowAdapter() {
+                private boolean focused;
+                @Override public void windowGainedFocus(WindowEvent event) { if (!focused) { focused = true; panel.focusInitially(); } }
+            });
             var size = state.window(CHOOSER_BOUNDS).map(saved -> new java.awt.Dimension(saved.width(), saved.height()))
                 .orElse(new java.awt.Dimension(820, 520));
             dialog.setSize(size);
