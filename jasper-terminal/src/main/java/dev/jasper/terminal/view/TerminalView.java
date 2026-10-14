@@ -86,6 +86,7 @@ public final class TerminalView extends JComponent {
     private Supplier<String> clipboardReader = DesktopServices::readClipboard;
     private Consumer<String> clipboardWriter = DesktopServices::writeClipboard;
     private Consumer<String> linkOpener = DesktopServices::openBrowser;
+    private Consumer<FileLink> fileLinkHandler;
     private final java.util.List<Runnable> afterPaint = new java.util.ArrayList<>();
 
     /** Constructs an EDT-owned view without taking ownership of session shutdown; options and session must be nonnull. */
@@ -107,10 +108,11 @@ public final class TerminalView extends JComponent {
             this::handleShortcut, () -> exited, () -> onCloseRequest.run(), () -> {
                 viewport.follow(); selection.set(null); restartBlink();
             });
-        this.mouseInput = new MouseController(access, selection, viewport, macOs,
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows");
+        this.mouseInput = new MouseController(access, selection, viewport, macOs, windows,
             () -> fonts.cellWidth(), () -> fonts.cellHeight(), () -> this.options.copyOnSelect(),
             this::requestFocusInWindow, this::copySelection, link -> linkOpener.accept(link),
-            event -> contextMenuHandler.accept(event), this::repaint);
+            () -> fileLinkHandler, event -> contextMenuHandler.accept(event), this::repaint);
         Color yellow = palette.ansi().get(3);
         this.matchColor = CellStyle.blend(yellow, palette.background(), 0.7f);
         this.currentMatchColor = CellStyle.blend(yellow, palette.background(), 0.35f);
@@ -275,6 +277,18 @@ public final class TerminalView extends JComponent {
     /** Receives row-state invalidations on the Event Dispatch Thread. */
     public void setFindResultListener(Consumer<FindResult> listener) {
         findResultListener = listener == null ? result -> { } : listener;
+    }
+
+    /**
+     * Receives the file a Cmd-click (macOS) or Ctrl-click (Linux and Windows) names: a path written in the output, such
+     * as {@code src/Foo.java:42} or {@code Foo.cs(42,5)}, following soft wraps, or a {@code file:} link, OSC 8 or plain
+     * text, to this machine. A URL under the pointer still opens in the browser. Without a handler, the default, such a
+     * click starts a selection. Called on the Event Dispatch Thread, so the handler must not block.
+     *
+     * @param handler the receiver, or {@code null} for none
+     */
+    public void setFileLinkHandler(Consumer<FileLink> handler) {
+        fileLinkHandler = handler;
     }
 
     /** Current appearance and behavior, owned by the Event Dispatch Thread. */

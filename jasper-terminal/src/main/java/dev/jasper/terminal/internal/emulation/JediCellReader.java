@@ -105,6 +105,8 @@ final class JediCellReader {
         return column;
     }
     CellAttributes attributes(TextStyle style) {
+        // HyperlinkStyle equality ignores the link: a cached one would give every link in the same colours the first's target.
+        if (style instanceof HyperlinkStyle) return convert(style);
         if (styles.size() > 4096) styles.clear();
         return styles.computeIfAbsent(style, JediCellReader::convert);
     }

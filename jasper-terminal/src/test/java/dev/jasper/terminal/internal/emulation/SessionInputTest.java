@@ -1,5 +1,6 @@
 package dev.jasper.terminal.internal.emulation;
 
+import dev.jasper.terminal.internal.text.FileTarget;
 import dev.jasper.terminal.internal.text.MouseInput;
 import dev.jasper.terminal.session.TerminalSession;
 import dev.jasper.terminal.testsupport.Await;
@@ -8,11 +9,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Path;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SessionInputTest {
     private FakeConnector connector;
     private TerminalSession session;
+    private int feeds;
 
     @BeforeEach
     void start() throws Exception {
@@ -95,8 +99,9 @@ class SessionInputTest {
             + "\033]8;;x-custom://thing\007odd\033]8;;\007");
         Await.until(() -> "calc odd".equals(session.internalAccess().snapshot().lineText(0)), "linked text");
 
-        assertThat(session.internalAccess().linkAt(0, 1)).isEmpty();
+        assertThat(session.internalAccess().linkAt(0, 1)).as("a file link is not for the browser").isEmpty();
         assertThat(session.internalAccess().linkAt(0, 6)).isEmpty();
+        assertThat(session.internalAccess().fileLinkAt(0, 6, false)).as("nor a file").isEmpty();
     }
 
     @Test
@@ -176,5 +181,88 @@ class SessionInputTest {
     private void enableSgrMouse() throws Exception {
         connector.feed("\033[?1000h\033[?1006h");
         Await.until(session.internalAccess()::mouseReporting, "mouse reporting on");
+    }
+
+    @Test
+    void osc8FileLinksToThisMachineAreFileLinks() throws Exception {
+        feedAll("\033]8;;file:///tmp/My%20Notes.txt\007notes\033]8;;\007 "
+            + "\033]8;;file://localhost/tmp/b.txt\007b\033]8;;\007 \033]8;;file://far/tmp/c.txt\007c\033]8;;\007");
+
+        assertThat(session.internalAccess().fileLinkAt(0, 1, false)).contains(new FileTarget(Path.of("/tmp/My Notes.txt").toString(), 0, 0));
+        assertThat(session.internalAccess().fileLinkAt(0, 6, false)).contains(new FileTarget(Path.of("/tmp/b.txt").toString(), 0, 0));
+        assertThat(session.internalAccess().fileLinkAt(0, 8, false)).as("another host").isEmpty();
+        assertThat(session.internalAccess().linkAt(0, 1)).as("not for the browser").isEmpty();
+    }
+
+    @Test
+    void anOsc8LinkOnTheCellComesBeforeThePathInItsText() throws Exception {
+        feedAll("\033]8;;https://example.com\007./a.txt\033]8;;\007 \033]8;;x-custom://thing\007./b.txt\033]8;;\007");
+
+        assertThat(session.internalAccess().linkAt(0, 2)).contains("https://example.com");
+        assertThat(session.internalAccess().fileLinkAt(0, 2, false)).isEmpty();
+        assertThat(session.internalAccess().fileLinkAt(0, 10, false)).as("a refused link is not replaced by its text").isEmpty();
+    }
+
+    @Test
+    void plainTextFileUrlsAreFileLinksForThisMachineOnly() throws Exception {
+        feedAll("file:///tmp/x.txt.\r\nfile://far/y.txt");
+
+        assertThat(session.internalAccess().linkAt(0, 3)).as("not for the browser").isEmpty();
+        assertThat(session.internalAccess().fileLinkAt(0, 3, false)).contains(new FileTarget(Path.of("/tmp/x.txt").toString(), 0, 0));
+        assertThat(session.internalAccess().fileLinkAt(1, 3, false)).as("another host, and no path either").isEmpty();
+    }
+
+    @Test
+    void aPathIsAFileLinkWithItsLineAndColumn() throws Exception {
+        feedAll("src/A.java:42:5: e");
+
+        assertThat(session.internalAccess().fileLinkAt(0, 2, false)).contains(new FileTarget("src/A.java", 42, 5));
+        assertThat(session.internalAccess().fileLinkAt(0, 14, false)).as("a click on the column").contains(new FileTarget("src/A.java", 42, 5));
+        assertThat(session.internalAccess().fileLinkAt(0, 15, false)).as("the trailing colon").isEmpty();
+        assertThat(session.internalAccess().fileLinkAt(0, 17, false)).isEmpty();
+        assertThat(session.internalAccess().fileLinkAt(0, 20, false)).isEmpty();
+        assertThat(session.internalAccess().fileLinkAt(99, 2, false)).isEmpty();
+    }
+
+    /** Review Focus 2: a path soft-wrapped across two rows is one path, from a click on either row. */
+    @Test
+    void aSoftWrappedPathIsOnePathFromEitherRow() throws Exception {
+        feedAll("src/main/java/dev/jasper/Foo.java:3"); // 35 cells on 20 columns: "sper/Foo.java:3" wraps to row 1
+
+        var expected = new FileTarget("src/main/java/dev/jasper/Foo.java", 3, 0);
+        assertThat(session.internalAccess().fileLinkAt(0, 2, false)).contains(expected);
+        assertThat(session.internalAccess().fileLinkAt(1, 5, false)).contains(expected);
+        assertThat(session.internalAccess().fileLinkAt(1, 14, false)).as("the line on the second row").contains(expected);
+    }
+
+    @Test
+    void aUrlIsNoPath() throws Exception {
+        feedAll("https://x.dev/a.txt");
+
+        assertThat(session.internalAccess().linkAt(0, 15)).contains("https://x.dev/a.txt");
+        assertThat(session.internalAccess().fileLinkAt(0, 15, false)).isEmpty();
+    }
+
+    @Test
+    void windowsPathsAreFileLinksOnlyOnWindows() throws Exception {
+        feedAll("C:\\src\\A.cs(3,1): x");
+
+        assertThat(session.internalAccess().fileLinkAt(0, 4, true)).contains(new FileTarget("C:\\src\\A.cs", 3, 1));
+        assertThat(session.internalAccess().fileLinkAt(0, 4, false)).isEmpty();
+    }
+
+    @Test
+    void twoOsc8LinksInTheSameColoursKeepTheirOwnTargets() throws Exception {
+        feedAll("\033]8;;https://one.example\007one\033]8;;\007 \033]8;;https://two.example\007two\033]8;;\007");
+
+        assertThat(session.internalAccess().linkAt(0, 1)).contains("https://one.example");
+        assertThat(session.internalAccess().linkAt(0, 5)).contains("https://two.example");
+    }
+
+    /** Feeds {@code output} and waits for all of it, wrapped rows included: a title set after it arrives last. */
+    private void feedAll(String output) throws Exception {
+        String title = "fed " + ++feeds;
+        connector.feed(output + "\033]0;" + title + "\007");
+        Await.until(() -> session.title().equals(title), "the output before title " + title);
     }
 }

@@ -104,6 +104,11 @@ Mouse routing first decides between local gestures and terminal reports. A
 reported gesture uses geometry only; it must not copy screen rows or trigger a
 local repaint. Ownership and modifiers are captured at press and survive release.
 Shift bypasses application mouse capture. Fractional wheel motion accumulates.
+A Cmd-click (Ctrl-click elsewhere) opens the URL under the pointer in the browser;
+otherwise, once the application set `setFileLinkHandler`, it reports the path or
+local `file:` link there as a `FileLink`; otherwise it starts a selection.
+`internal.text.PathDetector` reads the soft-wrap-joined row, which `BufferQueries`
+captures under the buffer lock and matches after releasing it.
 
 ```mermaid
 sequenceDiagram
@@ -173,7 +178,9 @@ sequenceDiagram
 ```
 
 OSC 7 and 133 are rewritten because the pinned emulator swallows them. OSC 8
-links use the installed hyperlink filter. CSI `q` lacking a space intermediate
+links use the installed hyperlink filter: `http`, `https`, `ftp` and `mailto`
+targets open in the browser, a `file:` target that the OSC 7 host rule places on
+this machine is a file link, and other targets open nothing. CSI `q` lacking a space intermediate
 is dropped so XTVERSION/DECLL cannot override the configured cursor. DECSCUSR 0
 is rewritten to restore configuration. Keep split-chunk parsing and payload
 bounds. Do not infer a command's duration from session exit; commands run inside

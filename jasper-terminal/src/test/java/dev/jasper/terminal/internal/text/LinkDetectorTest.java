@@ -28,8 +28,10 @@ class LinkDetectorTest {
     }
 
     @Test
-    void fileUrlsAreLinks() {
-        assertThat(LinkDetector.urlAt(row("open file:///tmp/x.txt"), 6)).contains("file:///tmp/x.txt");
+    void fileUrlsAreFoundApartFromBrowserUrls() {
+        assertThat(LinkDetector.urlAt(row("open file:///tmp/x.txt"), 6)).as("not for the browser").isEmpty();
+        assertThat(LinkDetector.fileUrlAt(row("open file:///tmp/x.txt."), 6)).contains("file:///tmp/x.txt");
+        assertThat(LinkDetector.fileUrlAt(row("see https://jasper.dev/docs"), 10)).isEmpty();
     }
 
     @Test

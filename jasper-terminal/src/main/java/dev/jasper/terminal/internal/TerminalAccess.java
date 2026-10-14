@@ -5,6 +5,7 @@ import dev.jasper.terminal.internal.emulation.JediTermEngine;
 import dev.jasper.terminal.internal.process.PtyChild;
 import dev.jasper.terminal.internal.rendering.ScreenSnapshot;
 import dev.jasper.terminal.internal.shell.ShellCommandTracker;
+import dev.jasper.terminal.internal.text.FileTarget;
 import dev.jasper.terminal.internal.text.MouseGeometry;
 import dev.jasper.terminal.internal.text.MouseInput;
 import dev.jasper.terminal.internal.text.SelectedCells;
@@ -28,6 +29,7 @@ public final class TerminalAccess implements AutoCloseable {
     private final JediTermEngine engine;
     private final BufferQueries queries;
     private final ShellCommandTracker shell;
+    private final DirectoryProvenance provenance;
     /** Unsupported module collaboration API; used only by terminal owners. */
     public TerminalAccess(PtyChild child, int columns, int rows, int scrollback, JediTermEngine.Events events) {
         this(child, columns, rows, scrollback, Set.of(), events);
@@ -52,6 +54,7 @@ public final class TerminalAccess implements AutoCloseable {
     }
     private TerminalAccess(JediTermEngine engine, JediTermEngine.Events events, LongSupplier clock, DirectoryProvenance provenance) {
         this.engine = engine;
+        this.provenance = provenance;
         queries = engine.queries();
         shell = new ShellCommandTracker(clock, queries::cursor, queries::captureCommand, queries::recordPrompt,
             events.workingDirectoryChanged(), events.commandStarted(), events.commandFinished(),
@@ -91,6 +94,14 @@ public final class TerminalAccess implements AutoCloseable {
      * has no link at all, whatever its text says.
      Unsupported module collaboration API. */
     public Optional<String> linkAt(long absoluteRow, int column) { return queries.linkAt(absoluteRow, column); }
+    /**
+     * The file a click at an absolute row and column names: an OSC 8 or plain-text {@code file} link that this session's
+     * directory rule places on this machine, else a path written in the soft-wrapped line; {@code windows} admits
+     * {@code C:\} and backslash paths. Unsupported module collaboration API.
+     */
+    public Optional<FileTarget> fileLinkAt(long absoluteRow, int column, boolean windows) {
+        return queries.fileLinkAt(absoluteRow, column, windows, provenance::localPath);
+    }
     /** The word at an absolute row and column, as a stream selection. Unsupported module collaboration API. */
     public Selection wordSelection(long row, int column) { return queries.wordSelection(row, column); }
     /** A logical line, bounded by {@link dev.jasper.terminal.internal.text.LogicalLine}'s extreme-line fallback, always including the clicked row. Unsupported module collaboration API. */

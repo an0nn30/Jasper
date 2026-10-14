@@ -25,9 +25,11 @@ public final class PathDetector {
      */
     public record Match(String path, int line, int column, int start, int end) { }
 
-    private static final String ENDS = "<>\"'`";
+    /** Besides whitespace, the characters a path or URL ends at; {@link LinkDetector} ends a URL at the same ones. */
+    static final String ENDS = "<>\"'`";
+    /** The punctuation dropped from the end of a path or URL, in prose or after a position; shared with {@link LinkDetector}. */
+    static final String TRAILING = ".,;:!?)]}'\"";
     private static final String OPENERS = "([{";
-    private static final String TRAILING = ".,;:!?)]}'\"";
     private static final int MAX_DIGITS = 9;
 
     private PathDetector() {
