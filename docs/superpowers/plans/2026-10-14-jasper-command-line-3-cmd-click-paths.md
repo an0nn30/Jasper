@@ -128,6 +128,9 @@ Recorded here and, when the plan completes, in the spec's status line and `docs/
 10. A failure after the existence check (no desktop action, say) is logged at WARNING and shown to nobody.
 11. AGENTS.md's verified JediTerm 3.76 list gains that `HyperlinkStyle` equality ignores the link (Task 4).
 12. Spec 7's "line 1" for `file://` links is met by opening with no line, which every editor reads as the file's start.
+13. A path starts after the last `=` in its word (`--config=./x.toml`), and after a mid-word `(` that does not start a
+    `(LINE[,COLUMN])` group when a position follows (`at com.foo.Bar.baz(Bar.java:42)` gives `Bar.java`, line 42;
+    `tmp/a(1).txt` stays whole). Ruled during Task 1's review.
 
 ## Review Focus
 
