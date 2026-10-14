@@ -2,7 +2,7 @@
 
 Status: **Approved on 2026-10-13** (the user: "spec approved"). Plan 1 (launcher) complete on 2026-10-13:
 [`2026-10-13-jasper-custom-vm-options-1-launcher.md`](../plans/2026-10-13-jasper-custom-vm-options-1-launcher.md).
-Branch: `claude/custom-vm-options`, from `main` at `13cc10ca`.
+Branch: `claude/custom-vm-options`, from `main` at `13cc10ca`. Plan 2 (settings and actions) complete on 2026-10-13.
 
 ## 1. Intent and decisions
 
@@ -156,8 +156,9 @@ Beyond IntelliJ, which shows a dead-end dialog:
    - On macOS the replacement is started directly rather than through LaunchServices, as Jasper's restart already does.
 2. **The skipped launch.** When `JASPER_VM_OPTIONS_SKIP` is set, the launcher removes it from its own environment
    before the JVM starts (so shells and other children never inherit it), applies no user lines, emits no digest (the
-   guard stays disarmed, so there is no loop) and adds `-Djasper.vmOptionsSkipped=<value>`. Setting the variable by
-   hand starts Jasper without custom options; that is the documented manual escape.
+   guard stays disarmed, so there is no loop) and adds `-Djasper.vmOptionsSkipped=<value>` (`environment` when the
+   value is blank, so the launcher and the guard agree that a blank variable is set). Setting the variable by hand
+   starts Jasper without custom options; that is the documented manual escape.
 3. **The explanation.** After the first output paints, a run with `jasper.vmOptionsSkipped=launch-failed` runs the
    check of section 6.2 and shows a notification: "Jasper started without your custom VM options", with the JVM's own
    message (for example `Invalid maximum heap size: -Xmx3q`) and an **Edit Custom VM Options…** button. A run skipped

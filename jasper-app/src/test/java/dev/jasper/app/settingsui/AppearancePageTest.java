@@ -28,7 +28,7 @@ class AppearancePageTest {
     private final SettingsDraft draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
     private final PageContext context = PageKit.context(draft, id -> { }, () -> { });
     private final CorePages.SystemActions system = new CorePages.SystemActions(() -> Path.of("config.toml"),
-        () -> { }, () -> { }, () -> { }, () -> { }, () -> false);
+        () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty());
     private final SchemaPage.Spec spec = CorePages.specs(appearance, system, ShellChoices.NONE, id -> { }).stream()
         .filter(spec -> spec.id().equals("appearance")).findFirst().orElseThrow();
     private final SchemaPage page = spec.build(context);

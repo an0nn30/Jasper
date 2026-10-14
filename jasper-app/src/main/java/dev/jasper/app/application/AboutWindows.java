@@ -67,10 +67,16 @@ final class AboutWindows {
             Optional.empty(), invocation -> showAbout());
     }
 
-    /** Help's entries: Keyboard Shortcuts, then About Jasper except on macOS, where About is in the application menu. */
+    /**
+     * Help's entries: Keyboard Shortcuts; Change Memory Settings… and Edit Custom VM Options… in a section of their own;
+     * then About Jasper except on macOS, where About is in the application menu.
+     */
     static List<MenuEntry> helpEntries(boolean macOs) {
         var shortcuts = new MenuEntry.Item("app.shortcuts");
-        return macOs ? List.of(shortcuts) : List.of(shortcuts, new MenuEntry.Item(ABOUT));
+        var memory = new MenuEntry.Item("app.memory");
+        var vmOptions = new MenuEntry.Item("app.vmoptions");
+        return macOs ? List.of(shortcuts, new MenuEntry.Separator(), memory, vmOptions)
+            : List.of(shortcuts, new MenuEntry.Separator(), memory, vmOptions, new MenuEntry.Separator(), new MenuEntry.Item(ABOUT));
     }
 
     /** Opens About, or brings it forward. A view that fails to build takes its window with it. */

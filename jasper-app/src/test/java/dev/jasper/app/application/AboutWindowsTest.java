@@ -99,8 +99,10 @@ class AboutWindowsTest {
         assertThat(about.aboutSurface()).isPresent();
     }
 
-    @Test void helpListsAboutAfterKeyboardShortcutsExceptOnMacOs() {
-        assertThat(AboutWindows.helpEntries(false)).containsExactly(new MenuEntry.Item("app.shortcuts"), new MenuEntry.Item("app.about"));
-        assertThat(AboutWindows.helpEntries(true)).containsExactly(new MenuEntry.Item("app.shortcuts"));
+    @Test void helpListsTheVmOptionsActionsAfterKeyboardShortcutsAndAboutLastExceptOnMacOs() {
+        assertThat(AboutWindows.helpEntries(false)).containsExactly(new MenuEntry.Item("app.shortcuts"), new MenuEntry.Separator(),
+            new MenuEntry.Item("app.memory"), new MenuEntry.Item("app.vmoptions"), new MenuEntry.Separator(), new MenuEntry.Item("app.about"));
+        assertThat(AboutWindows.helpEntries(true)).containsExactly(new MenuEntry.Item("app.shortcuts"), new MenuEntry.Separator(),
+            new MenuEntry.Item("app.memory"), new MenuEntry.Item("app.vmoptions"));
     }
 }

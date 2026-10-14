@@ -87,7 +87,7 @@ class ThemeMenuTest {
             },
             work -> { if (holdWork) queued.add(work); else work.run(); }, Runnable::run);
         var choices = new AppearanceChoices(100f, false, Optional::empty, ignored -> new Subscription(() -> { }), this::installed, Optional.of(imports));
-        var system = new CorePages.SystemActions(() -> Path.of("config.toml"), () -> { }, () -> { }, () -> { }, () -> { }, () -> false);
+        var system = new CorePages.SystemActions(() -> Path.of("config.toml"), () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty());
         page = CorePages.specs(choices, system, ShellChoices.NONE, id -> { }).stream().filter(spec -> spec.id().equals("appearance"))
             .findFirst().orElseThrow().build(PageKit.context(draft, id -> { }, () -> { }));
         page.component();

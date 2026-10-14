@@ -143,6 +143,14 @@ class JasperApplicationPluginsTest {
                 assertThat(section.entries()).containsExactly(new MenuEntry.Item("plugins.manage"));
             });
             assertThat(application[0].contributions().action("app.shortcuts")).isPresent();
+            assertThat(application[0].contributions().action("app.memory")).get().satisfies(action -> {
+                assertThat(action.title()).isEqualTo("Change Memory Settings…");
+                assertThat(action.keywords()).contains("memory", "heap", "xmx", "jvm", "java", "vm options");
+            });
+            assertThat(application[0].contributions().action("app.vmoptions")).get().satisfies(action -> {
+                assertThat(action.title()).isEqualTo("Edit Custom VM Options…");
+                assertThat(action.keywords()).contains("memory", "heap", "xmx", "jvm", "java", "vm options");
+            });
             assertThat(application[0].contributions().action(AboutWindows.ABOUT)).get()
                 .satisfies(action -> assertThat(action.title()).isEqualTo("About Jasper"));
             assertThat(application[0].contributions().menus()).anySatisfy(section -> {

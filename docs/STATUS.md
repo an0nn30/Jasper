@@ -9,6 +9,20 @@ form dropdown, a Settings dropdown and one with more rows than the menu shows. `
 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched. GUI check for the user: open Settings › Appearance's Dark theme
 dropdown. Not merged or pushed.
 
+**Custom VM options plan 2 (settings and actions) complete — 2026-10-13.** On `claude/custom-vm-options-settings`, merged to
+local `main` (not pushed): System Settings has a Java Virtual Machine section (heap limit in `jasper.vmoptions`, Edit Custom VM Options…,
+Reveal, the options' check with the bundled `java`, a restart banner with Restart Now; read-only outside the installed
+app), Help and the palette have Change Memory Settings… and Edit Custom VM Options…, and Jasper says in the new
+**Memory & VM options** notification group when it started without the user's options or ignored the file. New JDK-only
+package `dev.jasper.app.vmoptions` mirrors the launcher's reading (shared digest vectors). A blank
+`JASPER_VM_OPTIONS_SKIP` now skips too. Deviations: the seven planned ones (in the plan) and the review and final-review
+changes listed in the plan's status banner. Known limitation: on Windows, a Jasper home whose path the ANSI code page
+cannot represent leaves the section read-only, and where Windows maps such characters to look-alikes the app may edit a
+different file than the launcher reads. Full `./gradlew check` after merging main: 9,965 tests, 0 failures, 8 skips. Manual checks pending
+(the user): in the packaged app, set the heap in Settings, see the restart banner, Restart Now, and see the new limit;
+type an invalid line and see the findings; Help menu entries; Change Memory Settings… from the Help menu with Settings
+closed puts the cursor in the heap field. Plan 3 (memory indicator and low-memory warning) is next.
+
 **Theme import final review — 2026-10-13** (`claude/theme-import`). The final whole-branch review's fixes. A Remove whose
 settings cannot be saved now has the application read the themes folder itself, so the removed theme leaves the group,
 the dropdowns and the screen at once (it used to stay listed and shown). A foreign JSON file, such as an IntelliJ

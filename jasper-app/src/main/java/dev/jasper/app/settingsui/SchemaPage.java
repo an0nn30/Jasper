@@ -7,12 +7,17 @@ import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.model.UiEvent;
 import dev.jasper.ui.model.ViewSpec;
 import dev.jasper.ui.swing.KitView;
+import java.awt.event.HierarchyEvent;
+import java.awt.event.HierarchyListener;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
+import java.util.function.IntFunction;
+import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.swing.JComponent;
@@ -27,10 +32,27 @@ public final class SchemaPage implements SettingsPage {
         public Button(String label, Runnable action, BooleanSupplier enabled) { this(label, action, enabled, ""); }
     }
 
-    private sealed interface Item permits RowItem, SectionItem, ActionItem { }
+    /**
+     * A number row whose value lives outside config.toml, read, checked and saved through these hooks (spec section 5.1:
+     * the heap limit in jasper.vmoptions). {@code saved} and {@code defaultValue} are read again on every refresh and
+     * reset; {@code error} blocks Apply while it is non-empty; {@code comment} is the row's description for a value, read
+     * on every render; {@code save} runs on Apply.
+     */
+    public record External(String id, String label, String unit, List<String> keywords, Nodes.Numeric bounds,
+                           IntSupplier saved, IntSupplier defaultValue, IntFunction<String> error, IntFunction<String> comment,
+                           IntFunction<CompletableFuture<Void>> save, BooleanSupplier enabled) {
+        public External { keywords = List.copyOf(keywords); }
+    }
+
+    /** What a notice row shows while present: a title and a text, beside the row's buttons. */
+    public record Notice(String title, String text) { }
+
+    private sealed interface Item permits RowItem, SectionItem, ActionItem, ExternalItem, NoticeItem { }
     private record RowItem(Setting<?> setting, Editors.Factory<?> editor, String note, Predicate<SettingsDraft> enabled, boolean shown) implements Item { }
     private record SectionItem(String title) implements Item { }
     private record ActionItem(String title, Supplier<String> description, List<Button> buttons) implements Item { }
+    private record ExternalItem(External value) implements Item { }
+    private record NoticeItem(String id, Supplier<Optional<Notice>> notice, List<Button> buttons) implements Item { }
 
     /** Starts the spec of a page. */
     public static Spec page(String id, String title) { return new Spec(id, title); }
@@ -42,6 +64,7 @@ public final class SchemaPage implements SettingsPage {
         private String parent;
         private String anchor = "supported-settings";
         private final List<Item> items = new ArrayList<>();
+        private final List<Function<Runnable, Subscription>> refreshers = new ArrayList<>();
 
         private Spec(String id, String title) { this.id = Objects.requireNonNull(id); this.title = Objects.requireNonNull(title); }
 
@@ -81,6 +104,19 @@ public final class SchemaPage implements SettingsPage {
 
         /** A settings row of buttons: {@code title} and {@code description} on the left, the buttons at its end. */
         public Spec action(String title, Supplier<String> description, Button... buttons) { items.add(new ActionItem(title, description, List.of(buttons))); return this; }
+
+        /** A row whose value lives outside config.toml (see {@link External}). */
+        public Spec external(External value) { items.add(new ExternalItem(Objects.requireNonNull(value, "value"))); return this; }
+
+        /** A row shown only while {@code notice} supplies one (read on every render), with {@code buttons} at its end. */
+        public Spec notice(String id, Supplier<Optional<Notice>> notice, Button... buttons) {
+            items.add(new NoticeItem(Objects.requireNonNull(id, "id"), Objects.requireNonNull(notice, "notice"), List.of(buttons)));
+            return this;
+        }
+
+        /** Refreshes the page whenever {@code subscribe}'s listener runs (on the EDT); the page closes the subscription when disposed. */
+        public Spec refreshOn(Function<Runnable, Subscription> subscribe) { refreshers.add(Objects.requireNonNull(subscribe, "subscribe")); return this; }
+
 
         /** Every setting this page shows, in order. */
         public List<Setting<?>> settings() {
@@ -135,12 +171,42 @@ public final class SchemaPage implements SettingsPage {
         String buttonId(int button) { return "action-" + index + "-" + button; }
     }
 
+    /** An external row's state; package-private for tests. */
+    static final class ExternalRow {
+        private final External value;
+        private final Editors.NumberField<Integer> editor;
+        private final String searchText;
+        private Integer pending;
+        private boolean invalid;
+        private String error = "";
+        private boolean highlighted;
+
+        ExternalRow(External value) {
+            this.value = value;
+            editor = new Editors.NumberField<>(value.label(), value.bounds(), value.unit(), Integer::valueOf, Nodes.FieldPresentation.STEPPER);
+            searchText = String.join(" ", value.label(), String.join(" ", value.keywords()));
+        }
+
+        String id() { return value.id(); }
+        String rowId() { return "row:" + value.id(); }
+        String resetId() { return value.id() + ":reset"; }
+        Integer pending() { return pending; }
+        String error() { return error; }
+        boolean highlighted() { return highlighted; }
+        /** The value the row stands for: the pending edit, else the saved value. */
+        int shown() { return pending != null ? pending : value.saved().getAsInt(); }
+    }
+
     private final Spec spec;
     private final PageContext context;
     private final List<Row<?>> rows = new ArrayList<>();
     private final List<ActionRow> actions = new ArrayList<>();
+    private final List<ExternalRow> externals = new ArrayList<>();
+    private final List<Subscription> refreshing = new ArrayList<>();
+    private String revealed;
     private KitView view;
     private PageBody body;
+    private HierarchyListener waiting;
     private Subscription listening;
     private boolean disposed;
 
@@ -160,6 +226,9 @@ public final class SchemaPage implements SettingsPage {
                 terms.add(row.setting().description());
                 terms.add(String.join(" ", row.setting().keywords()));
                 terms.addAll(row.editor().terms());
+            } else if (item instanceof ExternalItem external) {
+                terms.add(external.value().label());
+                terms.add(String.join(" ", external.value().keywords()));
             } else if (item instanceof SectionItem section && sectionShown(section)) terms.add(section.title());
         }
         return List.copyOf(terms);
@@ -174,7 +243,7 @@ public final class SchemaPage implements SettingsPage {
         for (Item item : spec.items) {
             if (!after) { after = item == section; continue; }
             if (item instanceof SectionItem) break;
-            if (item instanceof ActionItem) return true;
+            if (item instanceof ActionItem || item instanceof ExternalItem || item instanceof NoticeItem) return true;
             if (item instanceof RowItem row) { if (row.shown()) return true; anyRow = true; }
         }
         return !anyRow;
@@ -189,6 +258,10 @@ public final class SchemaPage implements SettingsPage {
     }
     /** The page's kit view once built; for tests. */
     KitView view() { return view; }
+    /** The external rows, in page order; for tests. */
+    List<ExternalRow> externals() { return externals; }
+    /** The row {@link #reveal} asked for, until {@link #selected} focuses it; for tests. */
+    String revealed() { return revealed; }
 
     @Override public JComponent component() {
         if (body != null) return body;
@@ -196,8 +269,11 @@ public final class SchemaPage implements SettingsPage {
         for (Item item : spec.items) {
             if (item instanceof RowItem row && row.shown()) addRow(row);
             else if (item instanceof ActionItem action) actions.add(new ActionRow(action, actionIndex++));
+            else if (item instanceof ExternalItem external) externals.add(new ExternalRow(external.value()));
         }
         listening = context.draft().onChanged(this::showValues);
+        for (var subscribe : spec.refreshers) refreshing.add(subscribe.apply(() -> { if (!disposed) refresh(); }));
+        for (var row : externals) row.editor.show(row.shown());
         showValues(false);
         view = new KitView(context.kit().get(), viewSpec(), this::event);
         body = new PageBody(view);
@@ -218,7 +294,7 @@ public final class SchemaPage implements SettingsPage {
         var children = new ArrayList<Nodes.Node>();
         var group = new ArrayList<Nodes.Node>();
         String title = null;
-        int sections = 0, rowIndex = 0, actionIndex = 0;
+        int sections = 0, rowIndex = 0, actionIndex = 0, externalIndex = 0;
         for (Item item : spec.items) {
             switch (item) {
                 case SectionItem section -> {
@@ -238,6 +314,8 @@ public final class SchemaPage implements SettingsPage {
                     }
                 }
                 case ActionItem ignored -> group.add(actionNode(actions.get(actionIndex++)));
+                case ExternalItem ignored -> group.add(externalNode(externals.get(externalIndex++)));
+                case NoticeItem notice -> group.add(noticeNode(notice));
             }
         }
         close(children, group, title, sections);
@@ -274,22 +352,93 @@ public final class SchemaPage implements SettingsPage {
         return new Nodes.SettingRow("action-" + action.index(), ControlState.READY, action.item().title(), action.item().description().get(), control, false, false);
     }
 
+    private Nodes.Node externalNode(ExternalRow row) {
+        boolean enabled = row.value.enabled().getAsBoolean();
+        var state = new ControlState(true, enabled, false, row.error);
+        boolean resettable = enabled && row.shown() != row.value.defaultValue().getAsInt();
+        var reset = new Nodes.Button(row.resetId(), new ControlState(resettable, true, false, ""), "", "reset",
+            Nodes.ButtonKind.GHOST, row.resetId(), "Reset " + row.value.label() + " to default");
+        var control = new Nodes.Stack(row.id() + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING,
+            List.of(row.editor.node(row.id(), state), reset));
+        return new Nodes.SettingRow(row.rowId(), ControlState.READY, row.value.label(), row.value.comment().apply(row.shown()),
+            control, false, row.highlighted);
+    }
+
+    /** A notice row: hidden, with its buttons, while its supplier has nothing to say. */
+    private Nodes.Node noticeNode(NoticeItem item) {
+        Optional<Notice> notice = item.notice().get();
+        var hidden = new ControlState(false, true, false, "");
+        var buttons = new ArrayList<Nodes.Node>();
+        for (int i = 0; i < item.buttons().size(); i++) {
+            var button = item.buttons().get(i);
+            boolean enabled = button.enabled().getAsBoolean();
+            buttons.add(new Nodes.Button(noticeButtonId(item, i), notice.isPresent() ? new ControlState(true, enabled, false, "") : hidden,
+                button.label(), "", Nodes.ButtonKind.SECONDARY, noticeButtonId(item, i), enabled ? "" : button.whenDisabled()));
+        }
+        var control = new Nodes.Stack("notice-" + item.id() + ":buttons", ControlState.READY, Nodes.LayoutRole.INLINE, buttons);
+        // A row's title must not be blank, even hidden: the id stands in.
+        return new Nodes.SettingRow("notice-" + item.id(), notice.isPresent() ? ControlState.READY : hidden,
+            notice.map(Notice::title).orElse(item.id()), notice.map(Notice::text).orElse(""), control, false, false);
+    }
+
+    private static String noticeButtonId(NoticeItem item, int index) { return "notice-" + item.id() + "-" + index; }
+
     private void render() {
         if (view != null && !disposed && !view.isClosed()) view.update(viewSpec());
     }
 
-    /** Routes a kit event to the row or action it names. */
+    /** Routes a kit event to the row, action or notice it names. */
     void event(UiEvent event) {
         if (disposed) return;
         if (event instanceof UiEvent.Action action) {
             for (var row : rows) if (action.id().equals(row.resetId())) { reset(row); return; }
+            for (var row : externals) if (action.id().equals(row.resetId())) { resetExternal(row); return; }
             for (var actionRow : actions)
                 for (int i = 0; i < actionRow.item().buttons().size(); i++)
                     if (action.id().equals(actionRow.buttonId(i))) { actionRow.item().buttons().get(i).action().run(); render(); return; }
+            for (Item item : spec.items)
+                if (item instanceof NoticeItem notice)
+                    for (int i = 0; i < notice.buttons().size(); i++)
+                        if (action.id().equals(noticeButtonId(notice, i))) { notice.buttons().get(i).action().run(); render(); return; }
         }
         for (var row : rows) {
             if (row.editor.event(row.id(), event)) { edited(row); render(); return; }
         }
+        for (var row : externals) {
+            if (row.editor.event(row.id(), event)) { editedExternal(row); render(); return; }
+        }
+        render();
+    }
+
+    private void editedExternal(ExternalRow row) {
+        int value;
+        try {
+            value = row.editor.value();
+        } catch (RuntimeException unreadable) {
+            invalidExternal(row, "Not a valid value.");
+            return;
+        }
+        String problem = row.value.error().apply(value);
+        if (!problem.isEmpty()) { invalidExternal(row, problem); return; }
+        row.invalid = false;
+        row.error = "";
+        row.pending = value == row.value.saved().getAsInt() ? null : value;
+        context.changed().run();
+    }
+
+    private void invalidExternal(ExternalRow row, String message) {
+        row.invalid = true;
+        row.error = message;
+        context.changed().run();
+    }
+
+    private void resetExternal(ExternalRow row) {
+        row.invalid = false;
+        row.error = "";
+        int target = row.value.defaultValue().getAsInt();
+        row.pending = target == row.value.saved().getAsInt() ? null : target;
+        row.editor.show(target);
+        context.changed().run();
         render();
     }
 
@@ -363,41 +512,135 @@ public final class SchemaPage implements SettingsPage {
     }
 
     @Override public boolean modified() {
-        return spec.settings().stream().anyMatch(context.draft()::modified);
+        return spec.settings().stream().anyMatch(context.draft()::modified) || externalModified();
     }
 
-    @Override public boolean valid() { return rows.stream().noneMatch(row -> row.invalid); }
+    /** Whether an external row holds an edit to save; the dialog applies such a page after the draft. */
+    public boolean externalModified() { return externals.stream().anyMatch(row -> row.pending != null); }
+
+    @Override public boolean valid() {
+        return rows.stream().noneMatch(row -> row.invalid) && externals.stream().noneMatch(row -> row.invalid);
+    }
 
     @Override public void reset() {
         for (Row<?> row : rows) { row.invalid = false; row.error = ""; }
+        for (var row : externals) {
+            row.invalid = false;
+            row.error = "";
+            row.pending = null;
+            row.editor.show(row.shown());
+        }
         context.draft().reset(spec.settings());
         showValues();
     }
 
-    @Override public CompletableFuture<Void> apply() { return CompletableFuture.completedFuture(null); }
+    /**
+     * Saves the external rows' edits in page order; config.toml rows are saved by the dialog's draft. A failed save keeps
+     * the edit and shows the failure under its row (spec section 7); the dialog shows it too.
+     */
+    @Override public CompletableFuture<Void> apply() {
+        CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
+        for (var row : externals) {
+            Integer value = row.pending;
+            if (value == null) continue;
+            chain = chain.thenCompose(ignored -> row.value.save().apply(value).whenComplete((saved, failure) -> {
+                if (failure != null) onEdt(() -> { row.error = message(failure); render(); });
+            }));
+        }
+        var done = new CompletableFuture<Void>();
+        chain.whenComplete((ignored, failure) -> onEdt(() -> {
+            if (failure != null) {
+                done.completeExceptionally(failure);
+                return;
+            }
+            for (var row : externals) { row.pending = null; row.error = ""; }
+            refresh();
+            done.complete(null);
+        }));
+        return done;
+    }
+
+    private static String message(Throwable failure) {
+        Throwable cause = failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null ? failure.getCause() : failure;
+        return String.valueOf(cause.getMessage());
+    }
+
+    private static void onEdt(Runnable action) {
+        if (javax.swing.SwingUtilities.isEventDispatchThread()) action.run();
+        else javax.swing.SwingUtilities.invokeLater(action);
+    }
 
     /** Highlights the rows matching {@code query} and scrolls the first into view, leaving focus with the search. */
     @Override public void highlight(String query) {
-        Row<?> first = null;
+        String first = null;
         for (Row<?> row : rows) {
             row.highlighted = SearchText.matches(row.searchText, query);
-            if (row.highlighted && first == null) first = row;
+            if (row.highlighted && first == null) first = row.editor.fullSpan() ? row.editor.revealTarget(row.id()) : row.rowId();
+        }
+        for (var row : externals) {
+            row.highlighted = SearchText.matches(row.searchText, query);
+            if (row.highlighted && first == null) first = row.rowId();
         }
         render();
-        if (first != null && view != null && !view.isClosed()) view.reveal(first.editor.fullSpan() ? first.editor.revealTarget(first.id()) : first.rowId());
+        if (first != null && view != null && !view.isClosed()) view.reveal(first);
     }
 
     @Override public void refresh() {
         for (Row<?> row : rows) row.editor.refresh();
+        for (var row : externals) if (row.pending == null && !row.invalid) row.editor.show(row.value.saved().getAsInt());
         if (body != null) showValues();
+    }
+
+    /** Remembers the row to focus once the dialog shows this page; {@code fragment} is an external row's id. */
+    @Override public void reveal(String fragment) { revealed = fragment; }
+
+    /**
+     * Focuses the revealed row once the page shows; until then the request waits. A modal dialog selects its first page
+     * before it is visible, when the page has no native peer and focus requests are refused.
+     */
+    @Override public void selected() {
+        if (disposed || revealed == null || view == null || view.isClosed()) return;
+        if (body.isShowing()) {
+            focusRevealed();
+        } else if (waiting == null) {
+            waiting = new HierarchyListener() {
+                @Override public void hierarchyChanged(HierarchyEvent event) {
+                    if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) == 0 || !body.isShowing()) return;
+                    stopWaiting();
+                    // After the window's own initial focus; selected() waits again if the page was hidden meanwhile.
+                    javax.swing.SwingUtilities.invokeLater(SchemaPage.this::selected);
+                }
+            };
+            body.addHierarchyListener(waiting);
+        }
+    }
+
+    private void focusRevealed() {
+        String target = revealed;
+        revealed = null;
+        for (var row : externals) {
+            if (row.id().equals(target)) {
+                view.reveal(row.rowId());
+                view.focus(row.id());
+                return;
+            }
+        }
+    }
+
+    private void stopWaiting() {
+        if (waiting == null) return;
+        body.removeHierarchyListener(waiting);
+        waiting = null;
     }
 
     @Override public void dispose() {
         if (disposed) return;
         disposed = true;
+        stopWaiting();
         RuntimeException failure=null;
         var cleanup=new java.util.ArrayList<Runnable>();
         if(listening!=null)cleanup.add(listening::close);
+        for(var subscription:refreshing)cleanup.add(subscription::close);
         if(view!=null)cleanup.add(view::close);
         for(Row<?> row:rows)cleanup.add(row.editor::dispose);
         for(var action:cleanup)try{action.run();}catch(RuntimeException problem){if(failure==null)failure=problem;else failure.addSuppressed(problem);}

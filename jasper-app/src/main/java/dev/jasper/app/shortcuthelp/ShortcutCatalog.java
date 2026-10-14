@@ -68,7 +68,8 @@ final class ShortcutCatalog {
     }
 
     private static String pluginGroup(String id, Map<String, String> plugins) {
-        if (id.equals("plugins.manage") || id.equals("app.shortcuts") || id.equals("app.about")) return "Application";
+        if (id.equals("plugins.manage") || id.equals("app.shortcuts") || id.equals("app.about") || id.equals("app.memory")
+            || id.equals("app.vmoptions")) return "Application";
         return plugins.keySet().stream().filter(plugin -> id.startsWith(plugin + "."))
             .max(Comparator.comparingInt(String::length)).map(plugins::get)
             .orElseGet(() -> id.contains(".") ? id.substring(0, id.lastIndexOf('.')) : "Application");

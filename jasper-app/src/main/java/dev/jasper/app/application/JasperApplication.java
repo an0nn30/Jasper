@@ -140,6 +140,7 @@ public final class JasperApplication {
     private PluginRuntime plugins;
     private ActionEntry migrateAction;
     private dev.jasper.app.settingsui.SettingsDialog settings;
+    private VmOptionsFeature vmOptions;
     private boolean preferencesHandlerInstalled;
     private boolean aboutHandlerInstalled;
     private UiState uiState = UiState.inMemory();
@@ -802,13 +803,33 @@ public final class JasperApplication {
                 : configuration.saveKeybindings(changes, contributions.actions().stream()
                     .filter(a -> KeyBindings.extensionId(a.id()))
                     .map(ActionEntry::extension).toList()));
+        var vmEditor = new dev.jasper.app.platform.ConfigEditor();
+        vmOptions = new VmOptionsFeature(dev.jasper.app.vmoptions.VmOptionsLaunch.current(),
+            () -> dev.jasper.app.vmoptions.LauncherImage.locate(System.getProperty("jpackage.app-path")),
+            image -> new dev.jasper.app.vmoptions.VmOptionsCheck(dev.jasper.app.vmoptions.VmOptionsCheck.runtimeJava(), image,
+                dev.jasper.app.vmoptions.VmOptionsCheck::runProcess, Duration.ofSeconds(10)),
+            work -> Thread.ofVirtual().name("jasper-vmoptions").start(work), SwingUtilities::invokeLater, notificationCenter,
+            () -> restart(RestartMode.SAME), vmEditor::open, vmEditor::reveal,
+            dev.jasper.app.vmoptions.VmOptionsLaunch::runningMaxHeapMiB, dev.jasper.app.vmoptions.VmOptionsLaunch::physicalMemoryMiB,
+            Duration.ofSeconds(2));
+        // Never on the start-up path: the options file is read once the first output shows, the warm-up ends, or 5 s after the first paint.
+        trace.when(StartupTrace.Milestone.OUTPUT_PAINTED, SwingUtilities::invokeLater, vmOptions::startupSettled);
+        trace.when(StartupTrace.Milestone.WARMED_UP, SwingUtilities::invokeLater, vmOptions::startupSettled);
+        trace.when(StartupTrace.Milestone.FIRST_PAINT, SwingUtilities::invokeLater, () -> afterDelay(Duration.ofSeconds(5), vmOptions::startupSettled));
         contributions.addAction("app.shortcuts", "Keyboard Shortcuts…", null, List.of("help", "keys", "bindings", "keymap", "edit shortcuts", "keyboard settings"),
             Optional.empty(), invocation -> openSettings(null, dev.jasper.app.shortcuthelp.KeymapPage.ID));
+        contributions.addAction("app.memory", "Change Memory Settings…", null, List.of("memory", "heap", "xmx", "jvm", "java", "vm options"),
+            Optional.empty(), invocation -> openSettings(invocation.windowId(), "system#vm.heap"));
+        contributions.addAction("app.vmoptions", "Edit Custom VM Options…", null, List.of("memory", "heap", "xmx", "jvm", "java", "vm options", "vmoptions"),
+            Optional.empty(), invocation -> {
+                if (vmOptions.editable()) vmOptions.editCustomOptions();
+                else openSettings(invocation.windowId(), "system#vm.heap");
+            });
         contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(AboutWindows.helpEntries(macOs));
         if (configuration != null) {
             var system = new dev.jasper.app.settingsui.CorePages.SystemActions(() -> configuration.state().file(),
                 this::openConfigFile, this::revealConfigFile, () -> configuration.reload(), this::migrateConfiguration,
-                configuration::migrationAvailable);
+                configuration::migrationAvailable, Optional.of(vmOptions.hooks()));
             var shells = new dev.jasper.app.settingsui.ShellChoices(() -> shellProfiles.current().stream()
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
                 shellProfiles::refresh, shellProfiles::onChanged);
@@ -853,12 +874,17 @@ public final class JasperApplication {
             }));
         }
 
-        /** Opens Settings over the given window, or the active one when null, at a page (the last visited when null). */
+        /**
+         * Opens Settings over the given window, or the active one when null, at a page (the last visited when null). The
+         * dialog is modal, so the first call returns once it closed; then a pending VM-options restart is repeated.
+         */
         void openSettings(java.util.UUID ownerOrNull, String pageOrNull) {
             if (settings == null || quitting || stopped) return;
             java.util.UUID owner = ownerOrNull != null ? ownerOrNull
                 : lastActive != null && windows.contains(lastActive) ? lastActive.content().id() : null;
+            boolean opening = !settings.isOpen();
             settings.open(owner, pageOrNull);
+            if (opening && !settings.isOpen() && vmOptions != null && !quitting && !stopped) vmOptions.settingsClosed();
         }
 
         private void openConfigFile() {

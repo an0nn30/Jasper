@@ -299,6 +299,9 @@ checks a built image ([start-up performance](packaging.md#start-up-performance))
 - **Bundled JVM defaults.** `-Xmx2048m` and `-XX:+IgnoreUnrecognizedVMOptions` are in `applicationDefaultJvmArgs`; a
   user's `jasper.vmoptions` overrides them. AOT training and the start-up benchmark's isolated home give the launcher
   an empty options file, so a developer's own flags never shape the cache or the numbers.
+  `dev.jasper.app.vmoptions.VmOptionsSyntax` mirrors `packaging/launcher/jasper/JasperVmOptionsCore.cpp`: change both
+  together and add a vector to `packaging/launcher/test/digest-vectors.txt`, which both test suites read.
+  `LauncherImage.DEFAULT_MAX_HEAP_MIB` follows the bundled `-Xmx` in `jasper-app/build.gradle.kts`.
 
 ## Session lifecycle change
 
