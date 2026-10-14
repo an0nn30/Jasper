@@ -19,16 +19,25 @@ final class LinkPlacement implements CommandInstall.Placement {
     private final Path link;
     private final Path client;
     private final Consumer<String> elevated;
+    private final boolean hintsAtPath;
+
+    /** A link that hints when its folder is not on {@code PATH}. */
+    LinkPlacement(Path link, Path client, Consumer<String> elevated) {
+        this(link, client, elevated, true);
+    }
 
     /**
      * @param client the command in the installed image; null when there is none
      * @param elevated runs a shell command as an administrator, throwing {@link UncheckedIOException}; null where the
      *     folder is the user's own
+     * @param hintsAtPath whether {@link #hint} may tell the user the folder is missing from {@code PATH}; false on macOS,
+     *     where a Jasper started from Finder or the Dock has launchd's {@code PATH} and not the one terminals have
      */
-    LinkPlacement(Path link, Path client, Consumer<String> elevated) {
+    LinkPlacement(Path link, Path client, Consumer<String> elevated, boolean hintsAtPath) {
         this.link = link;
         this.client = client;
         this.elevated = elevated;
+        this.hintsAtPath = hintsAtPath;
     }
 
     @Override public boolean available() { return client != null; }
@@ -39,7 +48,7 @@ final class LinkPlacement implements CommandInstall.Placement {
             if (Files.isSymbolicLink(link)) {
                 Path target = link.resolveSibling(Files.readSymbolicLink(link)).normalize();
                 if (target.equals(client.normalize()) && Files.exists(client)) return new State(Kind.INSTALLED, "Installed at " + link);
-                if (!Files.exists(link)) return new State(Kind.MISSING_TARGET, link + " points to a missing file");
+                if (!Files.exists(link) && namesJasperCommand(target)) return new State(Kind.MISSING_TARGET, link + " points to a missing file");
                 return new State(Kind.OTHER_PROGRAM, link + " is another program (" + target + ")");
             }
             if (Files.exists(link, LinkOption.NOFOLLOW_LINKS)) return new State(Kind.OTHER_PROGRAM, link + " is another program");
@@ -79,10 +88,21 @@ final class LinkPlacement implements CommandInstall.Placement {
     }
 
     @Override public Optional<String> hint(String pathVariable) {
+        if (!hintsAtPath) return Optional.empty();
         Path folder = link.getParent();
         boolean onPath = Arrays.stream(pathVariable.split(File.pathSeparator))
             .anyMatch(entry -> !entry.isBlank() && Path.of(entry).normalize().equals(folder.normalize()));
         return onPath ? Optional.empty() : Optional.of(folder + " is not on your PATH; add it to use jasper in other terminals");
+    }
+
+    /**
+     * Whether a link's target ends with the last three names of this image's command ({@code Resources/bin/jasper} or
+     * {@code lib/bin/jasper}), which is how a link to a Jasper that has since moved looks; any other dangling link is
+     * someone else's.
+     */
+    private boolean namesJasperCommand(Path target) {
+        int names = Math.min(client.getNameCount(), 3);
+        return names > 0 && target.endsWith(client.subpath(client.getNameCount() - names, client.getNameCount()));
     }
 
     private void elevate(String command) throws IOException {

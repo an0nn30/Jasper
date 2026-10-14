@@ -22,6 +22,14 @@ class CommandInstallTest {
             .contains(Path.of("C:\\Program Files\\Jasper\\bin\\jasper.exe"));
     }
 
+    @Test void onlyLinuxHintsAtPathBecauseAFinderLaunchedJasperHasNoUsefulPath(@TempDir Path home) {
+        String launchdPath = "/usr/bin:/bin:/usr/sbin:/sbin";
+        assertThat(CommandInstall.forThisPlatform("Mac OS X", "/Applications/Jasper.app/Contents/MacOS/Jasper", home).hint(launchdPath))
+            .isEmpty();
+        assertThat(CommandInstall.forThisPlatform("Linux", "/opt/jasper/bin/Jasper", home).hint(launchdPath))
+            .contains(home.resolve(".local").resolve("bin") + " is not on your PATH; add it to use jasper in other terminals");
+    }
+
     @Test void aDevelopmentRunCannotInstall(@TempDir Path home) {
         CommandInstall install = CommandInstall.forThisPlatform(System.getProperty("os.name"), null, home);
         assertThat(install.available()).isFalse();

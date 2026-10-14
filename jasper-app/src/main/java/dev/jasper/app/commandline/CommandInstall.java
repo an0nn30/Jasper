@@ -61,7 +61,7 @@ public final class CommandInstall {
             return new CommandInstall(new LinkPlacement(Path.of("/usr/local/bin/jasper"), client, command -> {
                 try { MacAdministrator.run(command); }
                 catch (IOException failure) { throw new UncheckedIOException(failure); }
-            }));
+            }, false));
         }
         return new CommandInstall(new LinkPlacement(home.resolve(".local").resolve("bin").resolve("jasper"), client, null));
     }

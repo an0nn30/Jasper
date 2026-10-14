@@ -75,6 +75,20 @@ class LinkPlacementTest {
         assertThat(Files.readSymbolicLink(link)).isEqualTo(client);
     }
 
+    @Test void aDanglingLinkThatIsNotJaspersIsAnotherProgramAndInstallLeavesItAlone() throws IOException {
+        Path client = client();
+        Path link = dir.resolve("bin/jasper");
+        Path stranger = dir.resolve("Cellar/tool/bin/jasper");
+        Files.createDirectories(link.getParent());
+        Files.createSymbolicLink(link, stranger);
+        var placement = new LinkPlacement(link, client, null);
+        assertThat(placement.state()).isEqualTo(new State(Kind.OTHER_PROGRAM, link + " is another program (" + stranger + ")"));
+        assertThatIllegalStateException().isThrownBy(() -> placement.install(false));
+        assertThat(Files.readSymbolicLink(link)).isEqualTo(stranger);
+        placement.uninstall();
+        assertThat(Files.readSymbolicLink(link)).isEqualTo(stranger);
+    }
+
     @Test void aFolderItCannotWriteGoesThroughTheAdministratorPrompt() throws IOException {
         Path client = client();
         Path locked = Files.createDirectory(dir.resolve("locked"));
@@ -94,6 +108,13 @@ class LinkPlacementTest {
         assertThat(placement.available()).isFalse();
         assertThat(placement.state()).isEqualTo(new State(Kind.UNAVAILABLE, "Needs an installed Jasper"));
         assertThatThrownBy(() -> placement.install(false)).isInstanceOf(IOException.class);
+    }
+
+    @Test void theMacOsPlacementNeverHintsAtPathWhateverItIs() {
+        var placement = new LinkPlacement(dir.resolve("bin/jasper"), null, null, false);
+        assertThat(placement.hint("/usr/bin:/bin:/usr/sbin:/sbin")).isEmpty();
+        assertThat(placement.hint("")).isEmpty();
+        assertThat(placement.hint("/usr/bin:" + dir.resolve("bin"))).isEmpty();
     }
 
     @Test void theHintNamesAFolderThatIsNotOnPath() {

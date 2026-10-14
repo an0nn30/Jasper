@@ -904,10 +904,15 @@ public final class JasperApplication {
                 "Could not install the jasper Command");
         }
 
-        /** Takes the jasper command off PATH, if Jasper put it there, off the EDT. EDT. */
+        /** Takes the jasper command off PATH, if Jasper put it there, off the EDT; otherwise says it did not. EDT. */
         private void uninstallCommand() {
             CommandInstall install = commandInstall;
             if (install == null || !install.available()) return;
+            CommandInstall.State state = install.state();
+            if (state.kind() != CommandInstall.Kind.INSTALLED) {
+                notificationViews.info("The jasper Command is not installed by Jasper", state.text());
+                return;
+            }
             commandWork(install::uninstall, "Removed the jasper Command", () -> "jasper is no longer on your PATH.",
                 "Could not remove the jasper Command");
         }
