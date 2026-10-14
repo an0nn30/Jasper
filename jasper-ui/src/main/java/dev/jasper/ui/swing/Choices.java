@@ -190,7 +190,7 @@ final class Choices {
         renderer.putClientProperty("html.disable",true); renderer.setOpaque(false);
         renderer.setText(text);
         renderer.setFont(ThemePainting.font(context, Typography.Role.BODY));
-        renderer.setForeground(ThemePainting.color(context, selected ? SemanticColor.TEXT_ONACCENT : role != null ? role : SemanticColor.TEXT_PRIMARY));
+        renderer.setForeground(ThemePainting.color(context, selected ? SemanticColor.TEXT_ONSELECTION : role != null ? role : SemanticColor.TEXT_PRIMARY));
         renderer.setBackground(ThemePainting.color(context, selected ? SemanticColor.SELECTION_BG : SemanticColor.SURFACE_MENU));
         hue.ifPresent(h -> renderer.setIcon(new HueDot(context, h)));
         int pad = ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
@@ -245,6 +245,19 @@ final class Choices {
         KitComboPopup(JComboBox<?> combo, KitContext context) { super((JComboBox<Object>) combo); this.context = context; setOpaque(false); }
         @Override protected void paintComponent(Graphics graphics) { Menus.paintSurface(this, graphics, context); }
         @Override protected Rectangle computePopupBounds(int px, int py, int pw, int ph) { return super.computePopupBounds(px, py, popupWidth(pw), ph); }
+        @Override protected int getPopupHeightForRowCount(int maxRowCount) { return menuHeight(maxRowCount); }
+        /**
+         * The menu's height for up to {@code maxRowCount} rows. Swing adds up its renderer's heights, but plain rows take the
+         * list's fixed height ({@code ChoiceCombo.refreshPopup}), so a menu of plain rows measures those.
+         */
+        int menuHeight(int maxRowCount) {
+            int row = list.getFixedCellHeight(), rows = Math.min(maxRowCount, comboBox.getItemCount());
+            if (row <= 0 || rows == 0) return super.getPopupHeightForRowCount(maxRowCount);
+            int height = rows * row;
+            for (var border : new javax.swing.border.Border[] { scroller.getViewportBorder(), scroller.getBorder() })
+                if (border != null) { var insets = border.getBorderInsets(null); height += insets.top + insets.bottom; }
+            return height;
+        }
         /** The field's width {@code fieldWidth}, or the widest row's with the menu's insets (and its scrollbar, when the rows scroll) when that is wider. */
         int popupWidth(int fieldWidth) {
             var insets = getInsets();
@@ -318,7 +331,7 @@ final class Choices {
             list.setBackground(ThemePainting.color(context, SemanticColor.SURFACE_MENU));
             list.setForeground(ThemePainting.color(context, SemanticColor.TEXT_PRIMARY));
             list.setSelectionBackground(ThemePainting.color(context, SemanticColor.SELECTION_BG));
-            list.setSelectionForeground(ThemePainting.color(context, SemanticColor.TEXT_ONACCENT));
+            list.setSelectionForeground(ThemePainting.color(context, SemanticColor.TEXT_ONSELECTION));
             boolean rich=false;for(int i=0;i<getItemCount();i++){var option=getItemAt(i);if(!option.icon().isBlank()||!option.description().isBlank()){rich=true;break;}}
             // Rows are the menu's height in the field's own type (a Settings dropdown shows its value at label size).
             var type = settingsWidth > 0 ? Typography.Role.LABEL : Typography.Role.BODY;

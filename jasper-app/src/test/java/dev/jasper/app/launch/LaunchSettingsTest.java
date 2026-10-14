@@ -363,4 +363,15 @@ class LaunchSettingsTest {
         LaunchSettings.inject(unknown, unknownEnv, dir);
         assertThat(unknownEnv).isEmpty();
     }
+
+    @Test void variablesAddedLastWinOverEverythingTheSettingsResolved() {
+        var settings = LaunchSettings.resolve(withShell("/bin/zsh", List.of(), ShellIntegrationMode.OFF), "Mac OS X",
+            Map.of("KEEP", "yes"), 150, 45, null);
+        var added = settings.withVariables(Map.of("JASPER_PANE", "p", "KEEP", "replaced"));
+        assertThat(added.environment()).containsEntry("JASPER_PANE", "p").containsEntry("KEEP", "replaced");
+        assertThat(added.command()).isEqualTo(settings.command());
+        assertThat(added.profile()).isEqualTo(settings.profile());
+        assertThat(settings.environment()).doesNotContainKey("JASPER_PANE");
+        assertThat(settings.withVariables(Map.of())).isSameAs(settings);
+    }
 }

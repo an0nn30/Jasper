@@ -35,6 +35,8 @@
       "text.field.raised": "#BBBBBB",
       "text.onAccent": "#BBBBBB",
       "text.onAccent.secondary": "#BBBBBBA6",
+      "text.onSelection": "#DEDEDE",
+      "text.onSelection.secondary": "#DEDEDEA6",
       "text.link": "#589DF6",
       "text.link.hover": "#589DF6",
       "text.error": "#E74848",

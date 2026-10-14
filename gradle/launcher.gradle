@@ -617,3 +617,89 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
     }
 }
 tasks.named('check') { dependsOn(verifyLauncherImage) }
+
+// ---- The jasper command (packaging/cli/README.md) ----
+
+def cliSource = rootProject.file('packaging/cli')
+def cliTestSource = new File(cliSource, 'test')
+// AppDirsTest and CommandProtocolTest read the vectors the command's own native tests use.
+tasks.named('test', Test) {
+    inputs.dir(cliTestSource).withPropertyName('commandVectors').withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+def cliBuild = layout.buildDirectory.dir('cli')
+def cliCore = new File(cliSource, 'src')
+
+def testCommandClientCore = tasks.register('testCommandClientCore') {
+    group = 'verification'
+    description = "Compiles and runs the native tests of the jasper command's core."
+    inputs.dir(cliCore).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(cliTestSource).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(cliBuild.map { it.file('core-test/passed') })
+    doLast {
+        File work = cliBuild.get().dir('core-test').asFile
+        delete(work)
+        List<File> sources = [new File(cliTestSource, 'cli_core_test.c'), new File(cliCore, 'jasper_cli_core.c')]
+        File test = nativeBuild(kind: 'executable', exportAll: true, sources: sources, strict: sources, includes: [cliCore],
+            output: new File(work, launcherHost().os == 'windows' ? 'cli-core-test.exe' : 'cli-core-test'),
+            work: new File(work, 'objects'))
+        String output = runLauncherTool([test.absolutePath, new File(cliTestSource, 'home-vectors.txt').absolutePath,
+            new File(cliTestSource, 'protocol-vectors.txt').absolutePath], null, null, "the jasper command's core tests")
+        logger.lifecycle(output.trim())
+        // As testLauncherCore: the core and its test once more with the other hosts' defines, so a name that collides
+        // with one fails here, not only on that host's CI. On macOS the client's Linux branch is compiled too, against
+        // this host's POSIX headers; its Windows branch needs the Windows headers, so only Windows compiles it.
+        def host = launcherHost()
+        if (host.os != 'windows') {
+            List<String> compiler = host.os == 'macos' ? ['/usr/bin/xcrun', 'clang'] : ['gcc']
+            ['macos', 'linux', 'windows'].findAll { it != host.os }.each { String other ->
+                boolean linuxBranch = host.os == 'macos' && other == 'linux'
+                List<File> checked = sources + (linuxBranch ? [new File(cliCore, 'jasper_cli.c')] : [])
+                runLauncherTool(compiler + ['-std=c11', '-fsyntax-only', '-Wall', '-Wextra', '-Werror'] +
+                    (linuxBranch ? ['-U__APPLE__'] : []) + launcherDefines(other).collect { "-D${it}".toString() } +
+                    ["-I${cliCore.absolutePath}".toString()] + checked.collect { it.absolutePath }, null, null,
+                    "checking the jasper command with ${other}'s defines", launcherToolchainHint(host.os))
+            }
+        }
+        new File(work, 'passed').text = output
+    }
+}
+tasks.named('check') { dependsOn(testCommandClientCore) }
+
+def cliName = { -> launcherHost().os == 'windows' ? 'jasper.exe' : 'jasper' }
+def commandClientFile = cliBuild.map { it.file("bin/${cliName()}") }
+
+def buildCommandClient = tasks.register('buildCommandClient') {
+    group = 'build'
+    description = 'Builds the jasper command for this host.'
+    inputs.dir(cliCore).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.property('host', providers.provider { launcherHost().toString() })
+    outputs.file(commandClientFile)
+    doLast {
+        def host = launcherHost()
+        File work = cliBuild.get().dir('objects').asFile
+        delete(work)
+        List<File> sources = [new File(cliCore, 'jasper_cli.c'), new File(cliCore, 'jasper_cli_core.c')]
+        File client = nativeBuild(kind: 'executable', sources: sources, strict: sources, includes: [cliCore],
+            // userenv and advapi32: a cold start's default environment (CreateEnvironmentBlock, OpenProcessToken).
+            libraries: host.os == 'windows' ? ['ws2_32.lib', 'user32.lib', 'userenv.lib', 'advapi32.lib'] : [],
+            subsystem: host.os == 'windows' ? 'CONSOLE' : null,
+            output: commandClientFile.get().asFile, work: work)
+        // Apple silicon runs only signed code; packaging signs the copy in the bundle again.
+        if (host.os == 'macos') {
+            runLauncherTool(['/usr/bin/codesign', '--force', '--sign', '-', client.absolutePath], null, null,
+                'signing the jasper command')
+        }
+    }
+}
+ext.commandClientBinary = commandClientFile.map { it.asFile }
+
+// CommandClientTest runs the built command; a development run names it for its own shells.
+tasks.named('test', Test) {
+    inputs.files(buildCommandClient).withPropertyName('commandClient').withPathSensitivity(PathSensitivity.NONE)
+    systemProperty('jasper.commandClient', commandClientFile.get().asFile.absolutePath)
+}
+tasks.named('run', JavaExec) {
+    dependsOn(buildCommandClient)
+    systemProperty('jasper.commandClient', commandClientFile.get().asFile.absolutePath)
+}

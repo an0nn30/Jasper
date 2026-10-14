@@ -3,8 +3,10 @@ package dev.jasper.app.launch;
 import dev.jasper.terminal.session.TerminalSession;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -20,6 +22,7 @@ public final class ShellLauncher {
     private final BiFunction<Optional<String>, LaunchSettings, LaunchSettings> confirm;
     private final Supplier<SessionDefaults> defaults;
     private final BiFunction<Path, LaunchSettings, TerminalSession> start;
+    private final Function<UUID, Map<String, String>> variables;
     private final String label;
 
     /**
@@ -36,6 +39,7 @@ public final class ShellLauncher {
         this.confirm = (requested, captured) -> captured;
         this.defaults = null;
         this.start = (directory, captured) -> start.apply(directory);
+        this.variables = pane -> Map.of();
         this.label = label;
     }
 
@@ -60,11 +64,19 @@ public final class ShellLauncher {
     public ShellLauncher(Executor executor, Function<Optional<String>, LaunchSettings> settings,
                   BiFunction<Optional<String>, LaunchSettings, LaunchSettings> confirm, Supplier<SessionDefaults> defaults,
                   BiFunction<Path, LaunchSettings, TerminalSession> start) {
+        this(executor, settings, confirm, defaults, start, pane -> Map.of());
+    }
+
+    /** As above; a pane's shell also gets {@code variables} for that pane, last, over everything else. */
+    public ShellLauncher(Executor executor, Function<Optional<String>, LaunchSettings> settings,
+                  BiFunction<Optional<String>, LaunchSettings, LaunchSettings> confirm, Supplier<SessionDefaults> defaults,
+                  BiFunction<Path, LaunchSettings, TerminalSession> start, Function<UUID, Map<String, String>> variables) {
         this.executor = executor;
         this.settings = Objects.requireNonNull(settings);
         this.confirm = Objects.requireNonNull(confirm);
         this.defaults = defaults;
         this.start = start;
+        this.variables = Objects.requireNonNull(variables);
         this.label = "shell";
     }
 
@@ -105,6 +117,12 @@ public final class ShellLauncher {
      */
     public Launch launch(Optional<Path> directory, Optional<String> profile, Consumer<Launch> replaced,
                          BiConsumer<TerminalSession, Throwable> completion) {
+        return launch(directory, profile, Optional.empty(), replaced, completion);
+    }
+
+    /** As above for {@code pane}, whose shell also gets the pane's variables. */
+    public Launch launch(Optional<Path> directory, Optional<String> profile, Optional<UUID> pane, Consumer<Launch> replaced,
+                         BiConsumer<TerminalSession, Throwable> completion) {
         Objects.requireNonNull(directory, "directory");
         Objects.requireNonNull(replaced, "replaced");
         final LaunchSettings captured;
@@ -132,7 +150,9 @@ public final class ShellLauncher {
                         Launch now = launchOf(chosen);
                         if (!now.equals(launched)) SwingUtilities.invokeLater(() -> replaced.accept(now));
                         LaunchSettings.Start target = chosen.at(directory, home, Files::isDirectory);
-                        session = start.apply(target.directory(), target.settings());
+                        LaunchSettings started = pane.isEmpty() ? target.settings()
+                            : target.settings().withVariables(variables.apply(pane.get()));
+                        session = start.apply(target.directory(), started);
                     }
                 } catch (Exception e) { failure = e; }
                 TerminalSession result = session;

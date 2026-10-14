@@ -15,16 +15,30 @@ import java.util.List;
 import javax.swing.*;
 import org.junit.jupiter.api.Test;
 
-/** Spec 2: a selected row is a rectangle across the list's full width, its kit text and glyphs white. */
+/** Spec 2: a selected row is a rectangle across the list's full width, its kit text and glyphs in the fill's ink. */
 class SelectionInkTest {
     static ListItem item(String id) {
         return new ListItem(id, Optional.of(new Nodes.Icon(id + ".icon", ControlState.READY, "server", Nodes.Hue.NONE, Nodes.IconSize.CONTROL, "Host")),
             List.of(new Nodes.Text(id + ".title", ControlState.READY, "Host " + id, Nodes.TextRole.BODY)),
             List.of(new Nodes.Text(id + ".detail", ControlState.READY, "user@" + id, Nodes.TextRole.CAPTION)), List.of());
     }
-    static ViewSpec list(String selected, Nodes.SelectionMode mode) {
-        return new ViewSpec(new Nodes.ItemList("list", ControlState.READY, Nodes.ListKind.DOUBLE, List.of(item("a"), item("b")), Set.of(selected),
+    static ViewSpec list(String selected, Nodes.SelectionMode mode) { return list(selected, mode, Nodes.ListKind.DOUBLE); }
+    static ViewSpec list(String selected, Nodes.SelectionMode mode, Nodes.ListKind kind) {
+        return new ViewSpec(new Nodes.ItemList("list", ControlState.READY, kind, List.of(item("a"), item("b")), Set.of(selected),
             "", List.of(), mode, Optional.empty(), OptionalInt.empty()));
+    }
+    static final Color ACCENT = new Color(0xCA9EE6), ON_ACCENT = new Color(0x232634), SELECTION = new Color(0x44495D), ON_SELECTION = new Color(0xC6D0F5);
+    /** A theme whose accent takes dark text and whose selection takes light text, as many converted themes do. */
+    static dev.jasper.ui.theme.ThemePair divergent() {
+        var base = KitFixtures.dark();
+        var colors = new EnumMap<SemanticColor, Color>(SemanticColor.class);
+        for (var role : SemanticColor.values()) colors.put(role, base.semantic().color(role));
+        colors.put(SemanticColor.ACCENT, ACCENT);
+        colors.put(SemanticColor.TEXT_ONACCENT, ON_ACCENT);
+        colors.put(SemanticColor.SELECTION_BG, SELECTION);
+        colors.put(SemanticColor.TEXT_ONSELECTION, ON_SELECTION);
+        var theme = KitFixtures.withSemantic(base, new dev.jasper.ui.theme.SemanticPalette(colors));
+        return new dev.jasper.ui.theme.ThemePair(theme, theme);
     }
     /** The colour of an icon's most opaque pixel. */
     static Color ink(Icon icon) {
@@ -34,6 +48,31 @@ class SelectionInkTest {
         for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++)
             if ((image.getRGB(x, y) >>> 24) > (best >>> 24)) best = image.getRGB(x, y);
         return new Color(best & 0xFFFFFF);
+    }
+
+    @Test void textOnTheSelectionTakesTheSelectionsInkAndTextOnTheAccentTheAccents() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            context.binding().publish(divergent());
+            try (var view = new KitView(context, list("a", Nodes.SelectionMode.SINGLE), e -> { })) {
+                view.setSize(320, 200); InteractiveRowsTest.layout(view);
+                assertThat(find(view, "a.title", JLabel.class).getForeground()).as("a selected list row").isEqualTo(ON_SELECTION);
+                assertThat(ink(find(view, "a.icon", JLabel.class).getIcon())).isEqualTo(ON_SELECTION);
+            }
+            try (var view = new KitView(context, list("a", Nodes.SelectionMode.SINGLE, Nodes.ListKind.RESULTS), e -> { })) {
+                view.setSize(320, 200); InteractiveRowsTest.layout(view);
+                assertThat(find(view, "a.title", JLabel.class).getForeground()).as("a selected result on the accent fill").isEqualTo(ON_ACCENT);
+            }
+            try (var view = new KitView(context, stack(ChoicesTest.choice(Nodes.ChoiceKind.DROPDOWN, "a", ControlState.READY)), e -> { })) {
+                var combo = find(view, "choice.input", JComboBox.class);
+                var popup = (javax.swing.plaf.basic.BasicComboPopup) combo.getUI().getAccessibleChild(combo, 0);
+                assertThat(popup.getList().getSelectionBackground()).isEqualTo(SELECTION);
+                assertThat(popup.getList().getSelectionForeground()).isEqualTo(ON_SELECTION);
+                @SuppressWarnings("unchecked") var renderer = (ListCellRenderer<Object>) combo.getRenderer();
+                var row = renderer.getListCellRendererComponent(popup.getList(), combo.getItemAt(1), 1, true, false);
+                assertThat(row.getForeground()).as("a dropdown's highlighted entry").isEqualTo(ON_SELECTION);
+            } finally { release(context); }
+        });
     }
 
     @Test void aSelectedRowFillsTheListsWholeBandAsARectangleWithWhiteInk() {
@@ -52,12 +91,12 @@ class SelectionInkTest {
                 for (var probe : List.of(new Point(0, top.y), new Point(view.getWidth() - 1, top.y),
                         new Point(0, top.y + a.getHeight() - 1), new Point(view.getWidth() - 1, top.y + a.getHeight() - 1)))
                     assertThat(new Color(image.getRGB(probe.x, probe.y))).as("fill at " + probe).isEqualTo(selection);
-                assertThat(find(view, "a.title", JLabel.class).getForeground()).isEqualTo(semantic.color(SemanticColor.TEXT_ONACCENT));
-                assertThat(find(view, "a.detail", JLabel.class).getForeground()).isEqualTo(semantic.color(SemanticColor.TEXT_ONACCENT_SECONDARY));
-                assertThat(ink(find(view, "a.icon", JLabel.class).getIcon())).isEqualTo(semantic.color(SemanticColor.TEXT_ONACCENT));
+                assertThat(find(view, "a.title", JLabel.class).getForeground()).isEqualTo(semantic.color(SemanticColor.TEXT_ONSELECTION));
+                assertThat(find(view, "a.detail", JLabel.class).getForeground()).isEqualTo(semantic.color(SemanticColor.TEXT_ONSELECTION_SECONDARY));
+                assertThat(ink(find(view, "a.icon", JLabel.class).getIcon())).isEqualTo(semantic.color(SemanticColor.TEXT_ONSELECTION));
                 view.update(list("b", Nodes.SelectionMode.SINGLE)); InteractiveRowsTest.layout(view);
                 assertThat(find(view, "a.title", JLabel.class).getForeground()).as("deselected").isEqualTo(semantic.color(SemanticColor.TEXT_PRIMARY));
-                assertThat(ink(find(view, "a.icon", JLabel.class).getIcon())).isNotEqualTo(semantic.color(SemanticColor.TEXT_ONACCENT));
+                assertThat(ink(find(view, "a.icon", JLabel.class).getIcon())).isNotEqualTo(semantic.color(SemanticColor.TEXT_ONSELECTION));
                 var after = ResultsKitTest.paint(view);
                 assertThat(after.getRGB(0, top.y + 1) >>> 24).as("no fill left on the deselected row's band").isZero();
             } finally { release(context); }
@@ -99,7 +138,7 @@ class SelectionInkTest {
                     var rows = (Trees.TreeControl) view.control("tree");
                     var heading = (JLabel) rows.mounted.get("group").controls.get("@tree/tree/group/title").component;
                     var semantic = context.theme().semantic();
-                    assertThat(heading.getForeground()).isEqualTo(semantic.color(SemanticColor.TEXT_ONACCENT));
+                    assertThat(heading.getForeground()).isEqualTo(semantic.color(SemanticColor.TEXT_ONSELECTION));
                     assertThat(ColorMath.contrast(heading.getForeground(), semantic.color(SemanticColor.SELECTION_BG))).isGreaterThanOrEqualTo(4.5);
                     assertThat(rows.gutter).isEqualTo(context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_INSET));
                 } finally { release(context); }
@@ -131,8 +170,8 @@ class SelectionInkTest {
                     assertThat(ColorMath.contrast(track, fill)).as(variant + " ON track on the fill").isGreaterThanOrEqualTo(3);
                     assertThat(ColorMath.contrast(knob, track)).as(variant + " knob on the ON track").isGreaterThanOrEqualTo(3);
                     var chip = find(view, "a.kind", Indicators.ChipLabel.class);
-                    assertThat(chip.getForeground()).as(variant + " chip text").isEqualTo(semantic.color(SemanticColor.TEXT_ONACCENT));
-                    assertThat(chip.fill).as(variant + " chip tile").isEqualTo(semantic.color(SemanticColor.TEXT_ONACCENT));
+                    assertThat(chip.getForeground()).as(variant + " chip text").isEqualTo(semantic.color(SemanticColor.TEXT_ONSELECTION));
+                    assertThat(chip.fill).as(variant + " chip tile").isEqualTo(semantic.color(SemanticColor.TEXT_ONSELECTION));
                     view.update(spec.apply(Set.of())); InteractiveRowsTest.layout(view);
                     assertThat(find(view, "a.kind", Indicators.ChipLabel.class).getForeground()).as(variant + " deselected chip").isEqualTo(semantic.color(SemanticColor.HUE_BLUE));
                     assertThat(find(view, "a.on", Switches.SwitchButton.class).onSelection).as(variant + " deselected switch").isFalse();

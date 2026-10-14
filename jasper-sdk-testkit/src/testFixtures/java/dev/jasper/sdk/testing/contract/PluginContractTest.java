@@ -1816,4 +1816,128 @@ public abstract class PluginContractTest {
         assertThat(vim.get().get()).isTrue();
         assertThat(h.settingsReports("test.wrong")).anySatisfy(line -> assertThat(line).startsWith("vim: "));
     }
+
+    private static final java.nio.file.Path HERE = java.nio.file.Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath();
+
+    @Test void aSubcommandNeedsItsDeclarationAndOneHandler() {
+        h.declareSubcommand("test.a", "greet", "Say hello");
+        h.declareSubcommand("test.b", "other", "Someone else's");
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a"), Set.of(), Set.of(), a::set);
+        h.ui(() -> {
+            dev.jasper.sdk.cli.CommandHandler done = call -> java.util.concurrent.CompletableFuture.completedFuture(0);
+            assertThatIllegalArgumentException().as("undeclared").isThrownBy(() -> a.get().commandLine().handle("undeclared", done));
+            assertThatIllegalArgumentException().as("another plugin's").isThrownBy(() -> a.get().commandLine().handle("other", done));
+            a.get().commandLine().handle("greet", done);
+            assertThatIllegalArgumentException().as("a second handler").isThrownBy(() -> a.get().commandLine().handle("greet", done));
+        });
+    }
+
+    @Test void aCallGetsItsArgumentsAndRelaysOutputAndTheExitCode() {
+        h.declareSubcommand("test.a", "greet", "Say hello");
+        var a = new AtomicReference<PluginContext>();
+        var seen = new AtomicReference<dev.jasper.sdk.cli.CommandCall>();
+        var registration = new AtomicReference<Subscription>();
+        h.start(info("test.a"), Set.of(), Set.of(), a::set);
+        h.ui(() -> registration.set(a.get().commandLine().handle("greet", call -> {
+            seen.set(call);
+            call.out("hello " + call.arguments().getFirst() + "\n");
+            call.err("careful\n");
+            return java.util.concurrent.CompletableFuture.completedFuture(call.arguments().size() == 2 ? 300 : 3);
+        })));
+        assertThat(h.call("greet", List.of("world", "x"), HERE, null).exitCode()).as("outside 0 to 255").isEqualTo(1);
+        ContractCall call = h.call("greet", List.of("you"), HERE, null);
+        assertThat(call.exitCode()).isEqualTo(3);
+        assertThat(call.out()).isEqualTo("hello you\n");
+        assertThat(call.err()).isEqualTo("careful\n");
+        assertThat(seen.get().arguments()).containsExactly("you");
+        assertThat(seen.get().workingDirectory()).isEqualTo(HERE);
+        assertThat(seen.get().window()).isEmpty();
+        h.ui(() -> registration.get().close());
+        ContractCall closed = h.call("greet", List.of(), HERE, null);
+        assertThat(closed.exitCode()).isEqualTo(1);
+        assertThat(closed.err()).contains("greet is unavailable");
+    }
+
+    @Test void aCallFromAPaneGetsThatPanesWindow() {
+        h.declareSubcommand("test.a", "where", "Which window");
+        var a = new AtomicReference<PluginContext>();
+        var window = new AtomicReference<Optional<dev.jasper.sdk.WindowOwner>>();
+        h.start(info("test.a"), Set.of(), Set.of(), a::set);
+        java.util.UUID windowId = h.addTerminalWindow();
+        java.util.UUID pane = h.addTerminalPane(h.addTerminalTab(windowId, "shell"), "shell", HERE);
+        h.ui(() -> a.get().commandLine().handle("where", call -> {
+            window.set(call.window());
+            return java.util.concurrent.CompletableFuture.completedFuture(0);
+        }));
+        assertThat(h.call("where", List.of(), HERE, pane).exitCode()).isZero();
+        h.ui(() -> assertThat(window.get()).get().isInstanceOfSatisfying(dev.jasper.sdk.terminal.WindowHandle.class,
+            handle -> assertThat(handle.id()).isEqualTo(windowId)));
+        assertThat(h.call("where", List.of(), HERE, java.util.UUID.randomUUID()).exitCode()).isZero();
+        assertThat(window.get()).as("a pane that is not open").isEmpty();
+    }
+
+    @Test void unknownFailingAndStoppedSubcommandsAreReported() {
+        h.declareSubcommand("test.a", "boom", "Throws");
+        h.declareSubcommand("test.a", "sour", "Fails");
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a"), Set.of(), Set.of(), a::set);
+        h.ui(() -> {
+            a.get().commandLine().handle("boom", call -> { throw new IllegalStateException("kaboom"); });
+            a.get().commandLine().handle("sour", call -> java.util.concurrent.CompletableFuture.failedFuture(new IllegalStateException("curdled")));
+        });
+        ContractCall unknown = h.call("nothing", List.of(), HERE, null);
+        assertThat(unknown.exitCode()).isEqualTo(2);
+        assertThat(unknown.err()).contains("unknown command nothing");
+        ContractCall boom = h.call("boom", List.of(), HERE, null);
+        assertThat(boom.exitCode()).isEqualTo(1);
+        assertThat(boom.err()).contains("boom failed: kaboom");
+        ContractCall sour = h.call("sour", List.of(), HERE, null);
+        assertThat(sour.exitCode()).isEqualTo(1);
+        assertThat(sour.err()).contains("sour failed: curdled");
+        h.stopAll();
+        ContractCall stopped = h.call("boom", List.of(), HERE, null);
+        assertThat(stopped.exitCode()).isEqualTo(1);
+        assertThat(stopped.err()).contains("boom is unavailable");
+    }
+
+    @Test void cancellingACallTellsTheHandlerAndDropsLaterOutput() {
+        h.declareSubcommand("test.a", "wait", "Waits");
+        var a = new AtomicReference<PluginContext>();
+        var pending = new java.util.concurrent.CompletableFuture<Integer>();
+        var cancelled = new java.util.concurrent.atomic.AtomicInteger();
+        var seen = new AtomicReference<dev.jasper.sdk.cli.CommandCall>();
+        h.start(info("test.a"), Set.of(), Set.of(), a::set);
+        h.ui(() -> a.get().commandLine().handle("wait", call -> {
+            call.onCancelled(cancelled::incrementAndGet);
+            seen.set(call);
+            return pending;
+        }));
+        ContractCall call = h.call("wait", List.of(), HERE, null);
+        assertThat(call.finished()).isFalse();
+        call.cancel();
+        assertThat(cancelled).hasValue(1);
+        h.ui(() -> seen.get().out("too late\n"));
+        assertThat(call.out()).isEmpty();
+        h.ui(() -> pending.complete(0));
+    }
+
+    @Test void aCallStillRunningWhenItsPluginStopsEndsWithOne() {
+        h.declareSubcommand("test.a", "wait", "Waits");
+        var a = new AtomicReference<PluginContext>();
+        var cancelled = new java.util.concurrent.atomic.AtomicInteger();
+        h.start(info("test.a"), Set.of(), Set.of(), a::set);
+        h.ui(() -> a.get().commandLine().handle("wait", call -> {
+            call.onCancelled(cancelled::incrementAndGet);
+            return new java.util.concurrent.CompletableFuture<Integer>();
+        }));
+        ContractCall call = h.call("wait", List.of(), HERE, null);
+        assertThat(call.finished()).isFalse();
+        h.stopAll();
+        assertThat(call.finished()).as("ended as its plugin stopped").isTrue();
+        assertThat(call.exitCode()).isEqualTo(1);
+        assertThat(call.err()).isEqualTo("jasper: wait stopped\n");
+        call.cancel();
+        assertThat(cancelled).as("a stopped plugin's cancellation listener never runs").hasValue(0);
+    }
 }

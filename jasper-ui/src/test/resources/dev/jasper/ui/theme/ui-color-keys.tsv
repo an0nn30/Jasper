@@ -10,7 +10,7 @@
 @background	SURFACE_PANEL
 @foreground	TEXT_PRIMARY
 @selectionBackground	SELECTION_BG
-@selectionForeground	TEXT_ONACCENT
+@selectionForeground	TEXT_ONSELECTION
 @accentBaseColor	ACCENT
 @disabledBackground	SURFACE_PANEL
 @disabledForeground	TEXT_PLACEHOLDER
@@ -23,9 +23,9 @@ Label.disabledForeground	TEXT_PLACEHOLDER
 List.background	SURFACE_CARD
 List.foreground	TEXT_PRIMARY
 List.selectionBackground	SELECTION_BG
-List.selectionForeground	TEXT_ONACCENT
+List.selectionForeground	TEXT_ONSELECTION
 List.selectionInactiveBackground	SURFACE_CONTROL_SELECTED
-List.selectionInactiveForeground	TEXT_ONACCENT
+List.selectionInactiveForeground	TEXT_ONSELECTION
 TextField.background	SURFACE_INPUT
 TextField.foreground	TEXT_PRIMARY
 TextArea.background	SURFACE_INPUT
@@ -41,7 +41,7 @@ ComboBox.ArrowButton.nonEditableBackground	SURFACE_INPUT
 ComboBox.ArrowButton.iconColor	TEXT_PRIMARY
 ComboBox.foreground	TEXT_PRIMARY
 ComboBox.selectionBackground	SELECTION_BG
-ComboBox.selectionForeground	TEXT_ONACCENT
+ComboBox.selectionForeground	TEXT_ONSELECTION
 Button.startBackground	BUTTON_SECONDARY_BG
 Button.endBackground	BUTTON_SECONDARY_BG
 Button.startBorderColor	BUTTON_SECONDARY_BORDER

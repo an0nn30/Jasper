@@ -24,7 +24,7 @@ class AppearanceSelectionTest {
     static SettingsDraft draft(String config) { return new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), config, true).values()); }
     static AppearanceSelection editor(SettingsDraft draft) {
         return new AppearanceSelection(new AppearanceChoices(100f, false, () -> Optional.of(false),
-            ignored -> new dev.jasper.app.lifecycle.Subscription(() -> {}), () -> THEMES, Optional.empty()), draft);
+            ignored -> new dev.jasper.app.lifecycle.Subscription(() -> {}), () -> THEMES, Optional.empty()), PageKit.context(draft, id -> { }, () -> { }));
     }
     static List<Nodes.Node> parts(AppearanceSelection editor) {
         return ((Nodes.Stack) editor.node("ui.appearance", ControlState.READY)).children();
@@ -87,7 +87,7 @@ class AppearanceSelectionTest {
             THEMES.schemes(), java.util.Map.of("slate-steel", "Slate Steel", "ocean", "Ocean", "dawn", "Dawn"));
         var editor = new AppearanceSelection(new AppearanceChoices(100f, false, () -> Optional.of(false),
             ignored -> new dev.jasper.app.lifecycle.Subscription(() -> {}), () -> themes, Optional.empty()),
-            draft("[ui.theme]\ndark = \"dawn\"\nlight = \"ocean\"\n"));
+            PageKit.context(draft("[ui.theme]\ndark = \"dawn\"\nlight = \"ocean\"\n"), id -> { }, () -> { }));
         assertThat(pick(editor, 1).options()).extracting(Option::label).containsExactly("Slate Steel", "Ocean", "Dawn (no Dark variant)");
         assertThat(pick(editor, 1).selectedId()).isEqualTo("dawn");
         assertThat(pick(editor, 2).options()).extracting(Option::label).containsExactly("Slate Steel", "Dawn", "Ocean (no Light variant)");
@@ -102,7 +102,7 @@ class AppearanceSelectionTest {
     }
 
     @Test void choosingATileEditsTheValueAndResetShows() {
-        var editor = new AppearanceSelection(AppearanceChoices.of(DARK, LIGHT), draft(""));
+        var editor = new AppearanceSelection(AppearanceChoices.of(DARK, LIGHT), PageKit.context(draft(""), id -> { }, () -> { }));
         editor.show(AppearanceMode.SYSTEM);
         assertThat(editor.event("ui.appearance", new UiEvent.Selected("ui.appearance:policy", java.util.Set.of("light")))).isTrue();
         assertThat(editor.value()).isEqualTo(AppearanceMode.LIGHT);

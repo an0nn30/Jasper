@@ -48,6 +48,13 @@ class EditorPluginTest {
             owner -> Question::dismissed, owner -> (message, saves) -> saves.getNow(false), settings::current, settings::saveVim, false));
     }
 
+    /** A host that knows the Editor's {@code jasper editor} subcommand, as its manifest declares it. */
+    private FakePluginHost host() {
+        var host = new FakePluginHost(home.resolve("plugins"));
+        host.declareSubcommand("dev.jasper.editor", "editor", "Open files in Jasper's Editor");
+        return host;
+    }
+
     private static final String RECENT = "dev.jasper.editor.recent";
 
     private static List<String> titles(List<String> rows) { return rows.stream().map(row -> row.split("\\|")[1]).toList(); }
@@ -55,7 +62,7 @@ class EditorPluginTest {
     private static void drain(FakePluginHost host) { while (host.runBackground() > 0) { } }
 
     @Test void recentFilesListOpenedFilesReopenThemAndForgetThem() throws Exception {
-        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+        try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             UUID terminal = host.addTerminalWindow();
             assertThat(host.scopes()).contains(RECENT + "|Recent files|open,remove");
@@ -84,7 +91,7 @@ class EditorPluginTest {
     }
 
     @Test void nameMatchesComeBeforeHostAndLocationMatches() throws Exception {
-        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+        try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             UUID terminal = host.addTerminalWindow();
             var consumer = new AtomicReference<PluginContext>();
@@ -99,7 +106,7 @@ class EditorPluginTest {
     }
 
     @Test void otherPluginsMakeTheirKeysReopenableAndOtherKeysAreDimmed() throws Exception {
-        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+        try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             UUID terminal = host.addTerminalWindow();
             var consumer = new AtomicReference<PluginContext>();
@@ -127,7 +134,7 @@ class EditorPluginTest {
     }
 
     @Test void aRecentFileThatCannotBeReopenedIsPostedWithItsCause() throws Exception {
-        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+        try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             UUID terminal = host.addTerminalWindow();
             var consumer = new AtomicReference<PluginContext>();
@@ -144,7 +151,7 @@ class EditorPluginTest {
     }
 
     @Test void openInEditorShowsTheLocalChooserWhenNoOpenerAnswers() throws Exception {
-        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+        try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             UUID terminal = host.addTerminalWindow();
             var consumer = new AtomicReference<PluginContext>();
@@ -164,7 +171,7 @@ class EditorPluginTest {
     }
 
     @Test void anOpenerThatAnswersReplacesTheChooserAndSeesTheActiveEditorTabsKey() throws Exception {
-        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+        try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             UUID terminal = host.addTerminalWindow();
             var consumer = new AtomicReference<PluginContext>();
@@ -184,7 +191,7 @@ class EditorPluginTest {
     }
 
     @Test void registersItsActionsAndPublishesTheEditorService() throws Exception {
-        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+        try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             assertThat(host.actions()).contains("dev.jasper.editor.open|Open in Editor…|true",
                 "dev.jasper.editor.new|New Editor File|true", "dev.jasper.editor.show|Show Editor|true");
@@ -201,7 +208,7 @@ class EditorPluginTest {
     }
 
     @Test void theOpenActionUsesATerminalWindowsChooserAndClosingTheWindowLetsAFreshOneOpen() throws Exception {
-        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+        try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             UUID terminal = host.addTerminalWindow();
             host.queueFileChoice(List.of(new FileLocation.Local(Files.writeString(home.resolve("b.yaml"), "a: 1\n"))));
@@ -219,7 +226,7 @@ class EditorPluginTest {
     }
 
     @Test void sameDarkWorkspaceChangeRecoloursOpenTabsWithoutLosingEdits() throws Exception {
-        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+        try (var host = host()) {
             var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             var consumer = new AtomicReference<PluginContext>();
@@ -250,7 +257,7 @@ class EditorPluginTest {
     }
 
     @Test void badSettingsAreReportedAtStartAndOnEveryChange() {
-        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+        try (var host = host()) {
             host.setSetting("dev.jasper.editor", "font_size", 99L);
             host.start(INFO, Set.of(), Set.of(), plugin());
             assertThat(host.settingsReports("dev.jasper.editor")).containsExactly("font_size: Use a whole number from 8\u201348.");
@@ -260,7 +267,7 @@ class EditorPluginTest {
     }
 
     @Test void openInEditorOffersRegisteredSourcesAndOpensTheirFilesThroughTheResolver() throws Exception {
-        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+        try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             UUID terminal = host.addTerminalWindow();
             var consumer = new AtomicReference<PluginContext>();

@@ -17,7 +17,7 @@ import java.util.function.Supplier;
  * @param systemDark the operating system's appearance, empty when unavailable
  * @param onChanged runs its argument whenever the operating system's appearance changes
  * @param themes the installed themes and schemes, read again whenever the page refreshes
- * @param imports the Imported themes group's hooks; empty shows no group
+ * @param imports the theme gears' hooks; empty shows no gears
  */
 public record AppearanceChoices(float opacity, boolean blur, Supplier<Optional<Boolean>> systemDark,
                                 Function<Runnable, Subscription> onChanged, Supplier<InstalledThemes> themes,

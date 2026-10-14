@@ -210,14 +210,29 @@ apply from: rootProject.file('gradle/mac-native.gradle')
 apply from: rootProject.file('gradle/mac-glass.gradle')
 apply from: rootProject.file('gradle/mac-appearance.gradle')
 
+// The jasper command (packaging/cli/README.md) sits in a bin folder of its own: macOS and Windows file systems ignore
+// case, so it cannot share a folder with the Jasper launcher.
+def commandClientIn = { File image, String os ->
+    new File(image, [macos: 'Contents/Resources/bin/jasper', windows: 'bin/jasper.exe', linux: 'lib/bin/jasper'][os])
+}
+def installCommandClient = { File image, String os ->
+    File target = commandClientIn(image, os)
+    target.parentFile.mkdirs()
+    Files.copy(commandClientBinary.get().toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+    target.setExecutable(true, false)
+    target
+}
+
 def packageApp = tasks.register('packageApp') {
     group = 'distribution'
     description = 'Builds a native Jasper application image for the current host.'
     dependsOn(stage)
     dependsOn(tasks.named('buildLauncher'))
+    dependsOn(tasks.named('buildCommandClient'))
     inputs.dir(launcherResources).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(nativeIcon).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(commandClientBinary).withPropertyName('commandClient').withPathSensitivity(PathSensitivity.NONE)
     if (normalizedHost().os == 'macos') {
         inputs.file(macIconCatalog).withPathSensitivity(PathSensitivity.RELATIVE)
         inputs.file(rootProject.file('gradle/mac-launcher-identity.gradle'))
@@ -284,12 +299,17 @@ def packageApp = tasks.register('packageApp') {
                 Files.copy(new File(inputDirectory.get().asFile, 'libjasper-appearance.dylib').toPath(),
                     new File(image, 'Contents/app/libjasper-appearance.dylib').toPath(),
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                // Signed on its own, as the bridges are; resignImage then seals it into the bundle.
+                File command = installCommandClient(image, 'macos')
+                executeNative(['/usr/bin/codesign', '--force', '--sign', '-', command.absolutePath], 'codesign the jasper command')
                 resignImage(image)
             } else if (context.host.os == 'linux') {
                 removePluginClasspath(new File(imageDir, 'Jasper/lib/app/Jasper.cfg'))
+                installCommandClient(new File(imageDir, 'Jasper'), 'linux')
             } else {
                 removePluginClasspath(new File(imageDir, 'Jasper/app/Jasper.cfg'))
                 installBundledNatives(new File(imageDir, 'Jasper/app'), context.host)
+                installCommandClient(new File(imageDir, 'Jasper'), 'windows')
             }
             marker.text = "${context.version} ${context.host.os} ${context.host.architecture}\n"
         } catch (Exception failure) {
@@ -335,6 +355,17 @@ def verifyPackage = tasks.register('verifyPackage') {
                 throw new GradleException("Package verification failed: ${launcherLibrary} is not Jasper's launcher library")
             }
         }
+        // The jasper command: present, executable, signed on macOS, and runnable here (--help contacts no Jasper).
+        File command = commandClientIn(image, context.host.os)
+        if (!command.isFile()) throw new GradleException("Package verification failed: missing ${command}")
+        if (context.host.os != 'windows' && !command.canExecute()) {
+            throw new GradleException("Package verification failed: ${command} is not executable")
+        }
+        if (context.host.os == 'macos') {
+            executeNative(['/usr/bin/codesign', '--verify', '--strict', command.absolutePath], 'verifying the jasper command')
+        }
+        String help = executeNative([command.absolutePath, '--help'], 'running jasper --help').stdout
+        if (!help.startsWith('Usage: jasper')) throw new GradleException("Package verification failed: jasper --help printed:\n${help}")
         inputDirectory.get().asFile.eachFile { staged ->
             if (staged.isDirectory()) return
             File packaged = new File(appDir, staged.name)

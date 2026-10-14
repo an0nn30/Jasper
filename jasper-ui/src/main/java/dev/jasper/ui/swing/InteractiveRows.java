@@ -249,6 +249,11 @@ final class InteractiveRows {
             return false;
         }
 
+        /** A selected row's fill and the ink of what it holds: the accent fill in a results layout, the selection fill elsewhere. */
+        Ink ink() {
+            return resultsLayout() ? Ink.ACCENT : Ink.SELECTION;
+        }
+
         void measureRows() {
             if (uniformRows()) { tops = null; return; }
             int n = size();
@@ -815,7 +820,7 @@ final class InteractiveRows {
             if (owner instanceof Trees.TreeControl tree && tree.detail != null && tree.detail.itemId.equals(id)) return;
             boolean focusedOnly = Objects.equals(id, owner.focusItem) && owner.canvas.isFocusOwner() && !owner.selected.contains(id);
             Color fill = owner.selectionShown(index)
-                ? ThemePainting.color(owner.context(), owner.resultsLayout() ? SemanticColor.ACCENT : SemanticColor.SELECTION_BG)
+                ? ThemePainting.color(owner.context(), owner.ink().fill)
                 : hover || focusedOnly ? ColorMath.opacity(ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY), .05) : null;
             if (fill == null) return;
             graphics.setColor(fill);
@@ -971,11 +976,12 @@ final class InteractiveRows {
             }
             c.parentEnabled = parentEnabled;
             c.embeddedLabel(true);
-            if (c instanceof Labels.TextControl text) text.inked = inked;
-            else if (c instanceof Labels.IconControl icon) icon.inked = inked;
-            else if (c instanceof Buttons.ButtonControl button) button.button.onSelection = inked;
-            else if (c instanceof Switches.ToggleControl toggle) toggle.button.onSelection = inked;
-            else if (c instanceof Indicators.ChipControl chip) chip.inked = inked;
+            var ink = owner.ink();
+            if (c instanceof Labels.TextControl text) { text.inked = inked; text.ink = ink; }
+            else if (c instanceof Labels.IconControl icon) { icon.inked = inked; icon.ink = ink; }
+            else if (c instanceof Buttons.ButtonControl button) { button.button.onSelection = inked; button.button.ink = ink; }
+            else if (c instanceof Switches.ToggleControl toggle) { toggle.button.onSelection = inked; toggle.button.ink = ink; }
+            else if (c instanceof Indicators.ChipControl chip) { chip.inked = inked; chip.ink = ink; }
             c.update(node);
             boolean enabled = c.interactive();
             var children =
@@ -1234,5 +1240,28 @@ final class InteractiveRows {
                                 action.run();
                             }
                         });
+    }
+
+    /**
+     * A selected fill and the ink of what lies on it: the accent fill takes the on-accent text roles, the selection fill
+     * the on-selection ones. A theme may pair either fill with dark or light text, so content on a selected fill takes
+     * its fill's roles.
+     */
+    enum Ink {
+        ACCENT(SemanticColor.ACCENT, SemanticColor.TEXT_ONACCENT, SemanticColor.TEXT_ONACCENT_SECONDARY),
+        SELECTION(SemanticColor.SELECTION_BG, SemanticColor.TEXT_ONSELECTION, SemanticColor.TEXT_ONSELECTION_SECONDARY);
+
+        /** The fill. */
+        final SemanticColor fill;
+        /** Text and glyphs on the fill. */
+        final SemanticColor text;
+        /** Supporting text on the fill. */
+        final SemanticColor supporting;
+
+        Ink(SemanticColor fill, SemanticColor text, SemanticColor supporting) {
+            this.fill = fill;
+            this.text = text;
+            this.supporting = supporting;
+        }
     }
 }

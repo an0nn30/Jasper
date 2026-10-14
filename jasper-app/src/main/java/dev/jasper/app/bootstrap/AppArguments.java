@@ -5,8 +5,8 @@ import java.nio.file.Path;
 
 /** Startup options parsed before any desktop initialization. */
 record AppArguments(Path configOverride, boolean help, boolean background, boolean safeMode, Path pluginDir,
-                    boolean standalone, boolean homeOverride) {
-    static final String USAGE = "Usage: jasper [--config <path>] [--background] [--safe-mode] "
+                    boolean standalone, boolean homeOverride, boolean noWindow) {
+    static final String USAGE = "Usage: jasper [--config <path>] [--background] [--no-window] [--safe-mode] "
         + "[--plugin-dir <path>] [--standalone] [--help]";
 
     /** The form that predates residency: an ordinary foreground launch. */
@@ -24,9 +24,15 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
         this(configOverride, help, background, safeMode, pluginDir, standalone, false);
     }
 
+    /** The form that predates {@code --no-window}. */
+    AppArguments(Path configOverride, boolean help, boolean background, boolean safeMode, Path pluginDir, boolean standalone,
+                 boolean homeOverride) {
+        this(configOverride, help, background, safeMode, pluginDir, standalone, homeOverride, false);
+    }
+
     /** Records whether the application home was overridden ({@code jasper.home} or {@code JASPER_HOME}). */
     AppArguments withHomeOverride(boolean value) {
-        return new AppArguments(configOverride, help, background, safeMode, pluginDir, standalone, value);
+        return new AppArguments(configOverride, help, background, safeMode, pluginDir, standalone, value, noWindow);
     }
 
     /**
@@ -38,10 +44,18 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
         return configOverride != null || safeMode || pluginDir != null || standalone || homeOverride;
     }
 
+    /**
+     * A launch whose configuration or plugin set is not the installed app's serves its own command socket, which only
+     * its own shells reach. A home override alone does not: its socket already lives in its own home.
+     */
+    boolean privateCommands() {
+        return configOverride != null || safeMode || pluginDir != null || standalone;
+    }
+
     static AppArguments parse(String[] args, Path workingDirectory) {
         Path override = null;
         Path pluginDir = null;
-        boolean help = false, background = false, safeMode = false, standalone = false;
+        boolean help = false, background = false, safeMode = false, standalone = false, noWindow = false;
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--help" -> {
@@ -51,6 +65,10 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
                 case "--background" -> {
                     if (background) throw invalid("Duplicate --background option.");
                     background = true;
+                }
+                case "--no-window" -> {
+                    if (noWindow) throw invalid("Duplicate --no-window option.");
+                    noWindow = true;
                 }
                 case "--safe-mode" -> {
                     if (safeMode) throw invalid("Duplicate --safe-mode option.");
@@ -71,7 +89,8 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
                 default -> throw invalid("Unknown argument.");
             }
         }
-        return new AppArguments(override, help, background, safeMode, pluginDir, standalone);
+        if (noWindow && background) throw invalid("--no-window and --background cannot be combined.");
+        return new AppArguments(override, help, background, safeMode, pluginDir, standalone, false, noWindow);
     }
 
     private static Path path(String[] args, int index, String option, String what, Path workingDirectory) {

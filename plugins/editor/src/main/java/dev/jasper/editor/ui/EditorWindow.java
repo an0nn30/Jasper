@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -208,6 +209,81 @@ public final class EditorWindow {
     private WindowOwner owner(DocumentSession session) { return hosted.entrySet().stream().filter(e -> e.getKey().session() == session).map(e -> (WindowOwner)e.getValue()).findFirst().orElseGet(this::owner); }
     public void openLocal(Path file) { openLocal(file, null); }
     public void openLocal(Path file, WindowOwner owner) { open(new LocalDocument(file, context.background()), owner); }
+
+    /**
+     * Opens a local file for {@code jasper editor}, or selects the tab already showing it, and puts the caret on
+     * {@code line} and {@code column} (1-based; 0 leaves it where loading put it) once the text is there.
+     *
+     * @return completes with the tab's session once it is ready or has failed
+     */
+    public CompletableFuture<DocumentSession> openAt(Path file, int line, int column, WindowOwner owner) {
+        open(new LocalDocument(file, context.background()), owner);
+        DocumentSession session = model.find(LocalDocument.key(file)).orElseThrow();
+        var settled = new CompletableFuture<DocumentSession>();
+        // The session replaces the text before it reports READY, so the caret set here is not reset by the load.
+        Runnable check = () -> {
+            if (settled.isDone()) return;
+            if (session.state() == DocumentSession.State.READY) {
+                moveCaret(session, line, column);
+                settled.complete(session);
+            } else if (session.state() == DocumentSession.State.FAILED) {
+                settled.complete(session);
+            }
+        };
+        check.run();
+        if (!settled.isDone()) {
+            session.addListener(check);
+            // Closing the tab cancels the read, which leaves the session loading for good: its closing settles the call too.
+            closed(session).thenRun(() -> settled.complete(session));
+        }
+        return settled;
+    }
+
+    /**
+     * A tab for {@code file}, which does not exist yet: its first save creates it, as Vim's {@code :e newfile} does.
+     * Selects the tab already open for that path.
+     */
+    public DocumentSession openNew(Path file, WindowOwner owner) {
+        Path target = file.toAbsolutePath().normalize();
+        Optional<DocumentSession> open = model.find(LocalDocument.key(target));
+        if (open.isEmpty()) {
+            open = newFiles.entrySet().stream().filter(entry -> entry.getValue().equals(target))
+                .map(Map.Entry::getKey).findFirst();
+        }
+        if (open.isPresent()) {
+            select(open.get());
+            return open.get();
+        }
+        return newFile(target, owner);
+    }
+
+    /** Completes once the session's tab has closed: when the user closes it, its window closes or the Editor stops. */
+    public CompletableFuture<Void> closed(DocumentSession session) {
+        var done = new CompletableFuture<Void>();
+        var handle = hosted.entrySet().stream().filter(entry -> entry.getKey().session() == session)
+            .map(Map.Entry::getValue).findFirst();
+        if (handle.isEmpty() || handle.get().isClosed()) done.complete(null);
+        else handle.get().onClosed(() -> done.complete(null));
+        return done;
+    }
+
+    private void moveCaret(DocumentSession session, int line, int column) {
+        if (line <= 0) return;
+        hosted.keySet().stream().filter(tab -> tab.session() == session).findFirst().ifPresent(tab -> {
+            var area = tab.area();
+            int index = Math.min(line, area.getLineCount()) - 1;
+            try {
+                int start = area.getLineStartOffset(index);
+                // A line's end offset counts its newline (the last line's, the document's implicit one).
+                int length = Math.max(0, area.getLineEndOffset(index) - start - 1);
+                int offset = start + Math.min(Math.max(column, 1) - 1, length);
+                area.setCaretPosition(Math.min(offset, area.getDocument().getLength()));
+            } catch (BadLocationException impossible) {
+                // The line came from getLineCount, so it exists.
+            }
+        });
+    }
+
     public void openLocalFiles(List<Path> files) { openLocalFiles(files, owner()); }
     public void openLocalFiles(List<Path> files, WindowOwner owner) { for (Path file : files) openLocal(file, owner); }
     public void newUntitled() { newUntitled(owner()); }
@@ -221,7 +297,7 @@ public final class EditorWindow {
     public void dispose() {
         if (disposed) return; disposed = true;
         for (var handle : List.copyOf(hosted.values())) handle.close();
-        closeRegistration.close(); closed();
+        closeRegistration.close(); shutDown();
     }
 
     /** Settings or the theme changed: applies them to every tab. */
@@ -496,7 +572,7 @@ public final class EditorWindow {
         }
     }
 
-    private void closed() {
+    private void shutDown() {
         ticker.stop();
         noticeTimer.stop();
         for (DocumentSession session : model.sessions()) session.cancelLoad();
@@ -553,13 +629,14 @@ public final class EditorWindow {
     }
 
     /** {@code :e newfile}: an empty tab named after the file, which its first save creates. */
-    private void newFile(Path file, WindowOwner owner) {
+    private DocumentSession newFile(Path file, WindowOwner owner) {
         origin = owner;
         var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
         var session = DocumentSession.untitled(String.valueOf(file.getFileName()), sessionEnvironment(ref));
         newFiles.put(session, file);
         add(session, ref);
         select(session);
+        return session;
     }
 
     /** {@code :r}: a local file's text, decoded as the Editor decodes it; empty when it cannot be read. */

@@ -25,7 +25,7 @@ import javax.swing.SwingUtilities;
 final class SettingsAppearance {
     private SettingsAppearance() { }
 
-    /** The choices over {@code library}, the installed themes as they are whenever the page reads them; {@code imports} adds the Imported themes group. */
+    /** The choices over {@code library}, the installed themes as they are whenever the page reads them; {@code imports} adds the theme gears. */
     static AppearanceChoices choices(SystemAppearance system, Supplier<ThemeLibrary> library, Optional<ThemeImports> imports) {
         var glass = JasperTheme.bundled().generated(true).glass();
         var cache = new Object() { ThemeLibrary from; InstalledThemes themes; };
@@ -41,32 +41,12 @@ final class SettingsAppearance {
             }, imports);
     }
 
-    /**
-     * The Imported themes group's hooks: the folder's file work on its own daemon thread, results on the EDT, the
-     * imported themes from {@code library} as it is when the group reads them.
-     */
-    static ThemeImports imports(ThemeFolder folder, Supplier<ThemeLibrary> library, Function<AuxiliarySurface, Optional<Path>> chooseFile,
-                                BiConsumer<AuxiliarySurface, ThemeImports.Question> confirm, Function<SettingsEdit, CompletableFuture<?>> save,
-                                Supplier<CompletableFuture<?>> reload) {
-        return new ThemeImports(folder, () -> imported(library.get()), chooseFile, confirm, save, reload,
+    /** The theme gears' hooks: the folder's file work on its own daemon thread, results on the EDT. */
+    static ThemeImports imports(ThemeFolder folder, Function<AuxiliarySurface, Optional<Path>> chooseFile,
+                                BiConsumer<AuxiliarySurface, ThemeImports.Question> confirm, BiConsumer<AuxiliarySurface, ThemeImports.Notice> inform,
+                                Function<SettingsEdit, CompletableFuture<?>> save, Supplier<CompletableFuture<?>> reload) {
+        return new ThemeImports(folder, chooseFile, confirm, inform, save, reload,
             work -> Thread.ofPlatform().daemon().name("jasper-theme-files").start(work), SwingUtilities::invokeLater);
-    }
-
-    /** The library's imported themes as the group lists them. */
-    static List<ThemeImports.Imported> imported(ThemeLibrary library) {
-        return library.imported().stream().map(theme -> new ThemeImports.Imported(theme.id(), library.label(theme), offers(theme))).toList();
-    }
-
-    /**
-     * What a theme offers: "UI theme · Dark", "UI theme · Light" or "UI theme · Dark and Light", with ", N terminal
-     * schemes" when it has schemes beyond its variants' own; a terminal-only theme is "Terminal scheme" or "Terminal schemes".
-     */
-    static String offers(JasperTheme theme) {
-        int schemes = theme.schemes().size();
-        if (!theme.has(true) && !theme.has(false)) return schemes == 1 ? "Terminal scheme" : "Terminal schemes";
-        String variants = theme.has(true) && theme.has(false) ? "Dark and Light" : theme.has(true) ? "Dark" : "Light";
-        int own = (theme.has(true) ? 1 : 0) + (theme.has(false) ? 1 : 0);
-        return "UI theme \u00b7 " + variants + (schemes > own ? ", " + schemes + " terminal schemes" : "");
     }
 
     /** What the Appearance page offers from {@code library}: its themes for each appearance and its schemes, with their labels. */

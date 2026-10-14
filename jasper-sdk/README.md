@@ -13,6 +13,7 @@ plugins built outside this repository; `./gradlew sdkRelease` builds them into `
 | --- | --- |
 | `dev.jasper.sdk` | `JasperSdk.VERSION`, `PluginInfo`, `Variant`, `Subscription`, `WindowOwner`, `Capabilities`, `MissingCapabilityException` |
 | `dev.jasper.sdk.plugin` | `Plugin` (the entry point), `PluginContext` |
+| `dev.jasper.sdk.cli` | `CommandLine`, `CommandHandler`, `CommandCall`: answering `jasper` subcommands |
 | `dev.jasper.sdk.settings` | `PluginSettings`, `Setting`, `SettingSpec`, `SettingKind`, `Choice`, `EditorHint`, `Applies`, `SettingsPanel`, `SettingsPanelHost` |
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
 | `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent`, `ConnectionSpec`, `ConnectionHandle`, `ConnectionEvent` |
@@ -41,9 +42,17 @@ monochrome paths with `UiKit.registerIcon`; see [icons](../docs/sdk-icons.md).
 Panels and settings factories return `UiView`; window surfaces and tabs mount only `UiView`.
 Settings hosts supply `Nodes.Node` rows. The host owns ordinary controls and their presentation.
 Specialized content retains explicit Appearance palettes and workspace opacity.
-Bundled manifests require `sdk = ">=0.16.0, <0.17"`, or `>=0.16.1` where they use the clipboard or the Tools menu (0.16.1 adds `Platform.copy`, `copySecret`, `clipboardText`, `clipboard.read` and `StandardMenu.TOOLS`; 0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
+Bundled manifests require `sdk = ">=0.17.0, <0.18"` (0.17.0 adds `PluginContext.commandLine()` and `[[subcommands]]`; 0.16.2 adds the `TEXT_ONSELECTION` colours; 0.16.1 adds `Platform.copy`, `copySecret`, `clipboardText`, `clipboard.read` and `StandardMenu.TOOLS`; 0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
 `DialogSpec.Presentation.OVERLAY`; 0.15.0 was the breaking boundary: raw factories,
 Appearance icon loaders, arbitrary Icon arguments and palette fallback readers were removed).
+
+## Command-line subcommands (SDK 0.17.0)
+
+`PluginContext.commandLine().handle(name, handler)` answers `jasper <name> ...` for a name the plugin declares under
+`[[subcommands]]` in `plugin.toml`. The handler runs on the UI thread with a `CommandCall` (its arguments, working
+directory, the window of the pane it ran in, `out`, `err` and `onCancelled`) and completes with the exit code. The
+testkit's `FakePluginHost.declareSubcommand` and `call` return a `FakeCommandCall` with the output and the exit code.
+Plugins that use it declare `sdk = ">=0.17.0, <0.18"`.
 
 ## Clipboard and the Tools menu (SDK 0.16.1)
 
@@ -53,7 +62,7 @@ fails is posted as "Could not copy" in the plugin's group and returns `false`; a
 Jasper quits, in each case only if the clipboard still holds it. Reading needs the new `clipboard.read` capability (`Capabilities.CLIPBOARD_READ`).
 `StandardMenu.TOOLS` is a Tools menu for utility commands, shown after Tab only while a plugin has entries in it; the
 View submenu that lists tool windows is now View › Tool Windows. The testkit models the clipboard with
-`FakePluginHost.clipboard()`. Plugins that use any of these declare `sdk = ">=0.16.1, <0.17"`.
+`FakePluginHost.clipboard()`. Plugins that use any of these declare `sdk = ">=0.16.1, <0.18"`.
 
 ## File workflows and progress (0.7.5)
 
@@ -85,7 +94,7 @@ registers a `FileSource` whose roots (for example saved hosts) appear in Jasper'
 when the user opens one and browses it through the plugin's `FileBrowser` on a host worker. `Windows.choose` opens
 the chooser for local places plus the sources the caller names and returns `FileLocation`s. The testkit scripts it
 with `FakePluginHost.queueFileChoice` and drives sources with `fileSources`, `fileRoots`, `locateFile` and
-`connectFileSource`. Plugins declare `sdk = ">=0.16.0, <0.17"`.
+`connectFileSource`. Plugins declare `sdk = ">=0.16.0, <0.18"`.
 
 SDK 0.10.1 lets `FileLocation.Sourced` carry `Sourced.HOME` (`~`), a root's home folder, so a source can locate a pane
 whose folder it does not know yet; `FakePluginHost.connectFileSource` runs scripted background work while it waits.
@@ -102,7 +111,7 @@ programs or computers, such as a file server; the user consents to it like any o
 it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after plugin windows and content tabs;
 a `false` decision cancels, and a guard that throws or fails allows the quit. A resident macOS Jasper that only goes to
 the background on Cmd+Q does not ask them. `FakePluginHost.requestQuit` asks these guards too. Plugins declare
-`sdk = ">=0.16.0, <0.17"`.
+`sdk = ">=0.16.0, <0.18"`.
 
 SDK 0.11.0 also adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
 `global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
@@ -157,7 +166,7 @@ action, an icon or a window. Jasper posts a succeeded or failed activity in `<pl
 `FakePluginHost.notifications()` records posts as `group|SEVERITY|title|content[|Cause]`, lists declared groups and
 runs an action (`runAction`) or the body (`click`); `new FakeNotifications().group(id)` records for a component under
 test. A plugin built for 0.13 that called `notices()` moves to `notifications()` and declares
-`sdk = ">=0.16.0, <0.17"`.
+`sdk = ">=0.16.0, <0.18"`.
 
 ## Workspace opacity (SDK 0.14.1)
 
@@ -174,7 +183,7 @@ unantialiased rectangles (antialiased translucent fills fall back to software re
 lag). Everything above it (viewports, gutters, text areas) must be non-opaque, or it covers the glass. Keep selection,
 carets, find bars and banners solid. `FakePluginHost.setWorkspaceOpacity(double)` scripts the value in tests; it is
 announced on `flush()` and the fake reports it for every component, while the real host reports 1.0 for components
-outside a translucent window. Plugins that use it declare `sdk = ">=0.16.0, <0.17"`.
+outside a translucent window. Plugins that use it declare `sdk = ">=0.16.0, <0.18"`.
 
 ## Panel headers (SDK 0.14.2)
 

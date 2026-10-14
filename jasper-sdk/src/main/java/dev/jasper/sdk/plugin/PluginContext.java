@@ -2,6 +2,7 @@ package dev.jasper.sdk.plugin;
 
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.activity.Activities;
+import dev.jasper.sdk.cli.CommandLine;
 import dev.jasper.sdk.events.Events;
 import dev.jasper.sdk.services.Services;
 import dev.jasper.sdk.settings.PluginSettings;
@@ -168,6 +169,15 @@ public interface PluginContext {
      * @since 0.14.0
      */
     Notifications notifications();
+
+    /**
+     * This plugin's {@code jasper} subcommands, declared under {@code [[subcommands]]} in {@code plugin.toml}. No
+     * capability is needed.
+     *
+     * @return the command line
+     * @since 0.17.0
+     */
+    CommandLine commandLine();
 
         /** @return desktop integration such as opening a file in the editor */
         Platform platform();

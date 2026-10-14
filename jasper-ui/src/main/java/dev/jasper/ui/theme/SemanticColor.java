@@ -34,6 +34,8 @@ public enum SemanticColor {
     TEXT_PLACEHOLDER("text.placeholder"),
     TEXT_ONACCENT("text.onAccent"),
     TEXT_ONACCENT_SECONDARY("text.onAccent.secondary"),
+    TEXT_ONSELECTION("text.onSelection"),
+    TEXT_ONSELECTION_SECONDARY("text.onSelection.secondary"),
     TEXT_LINK("text.link"),
     TEXT_LINK_HOVER("text.link.hover"),
     TEXT_ERROR("text.error"),

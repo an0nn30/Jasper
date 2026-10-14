@@ -25,6 +25,25 @@ Use `--config <path>` to select a different file. Relative paths resolve from th
 
 The first command launches the desktop and a shell. `--help` prints usage without opening a window or reading configuration. Missing, duplicate and unknown arguments fail before desktop startup.
 
+### The jasper command
+
+`jasper` hands a call to the Jasper that is running, starting it first when none is, and never starts a Java process of
+its own, so it returns quickly. To use it in any terminal or program, choose Settings › System Settings › Command line ›
+Install, or **Install 'jasper' Command in PATH** in the command palette; in Jasper's own shells it then reaches their own
+Jasper through `JASPER_COMMAND_SOCKET`. On macOS that makes `/usr/local/bin/jasper`, asking for an administrator's
+password when that folder needs it; on Linux `~/.local/bin/jasper`; on Windows it adds Jasper's `bin` folder to your
+user `Path`. A development run cannot install it.
+
+- `jasper` opens a window, or brings one forward.
+- `jasper --safe-mode`, `--config <path>`, `--plugin-dir <path>` and `--standalone` start Jasper with those options.
+- `jasper editor [--wait] FILE[:LINE[:COLUMN]]...` opens files in the [Editor](editor.md#opening-files);
+  `git config --global core.editor "jasper editor --wait"` edits commit messages there.
+- `jasper --help` lists the commands plugins add, as Jasper last recorded them.
+
+The command looks for Jasper's socket in `JASPER_COMMAND_SOCKET`, else in `daemon/commands` under `JASPER_HOME`, else
+under the default home. A launch with `--config`, `--safe-mode`, `--plugin-dir` or `--standalone` serves a socket of its
+own, which only its own shells reach, and so does a Jasper started while another serves its home.
+
 ### Custom VM options
 
 The installed app reads JVM options from `jasper.vmoptions` in Jasper's home (next to `config.toml`), the way IntelliJ
@@ -72,7 +91,7 @@ sections holding them, are blue. Click one, press the new keys and click Set; Ap
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
 Appearance holds View mode (Normal or Compact, applied after restart), the Dark, Light and Match System tiles,
-the Dark theme and Light theme dropdowns, the Terminal scheme dropdown and the Imported themes group; Terminal › Font & Colors links there. See
+the Dark theme and Light theme dropdowns and the Terminal scheme dropdown, each with a gear that imports and removes themes; Terminal › Font & Colors links there. See
 [Themes](themes.md).
 
 Tools holds a page for each running plugin that has settings, built from what the plugin declares or by the plugin

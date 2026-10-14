@@ -1,5 +1,6 @@
 package dev.jasper.app.residency;
 
+import dev.jasper.app.platform.OwnerOnlyFiles;
 import java.io.IOException;
 import java.net.StandardProtocolFamily;
 import java.net.URISyntaxException;
@@ -14,11 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
-import java.security.SecureRandom;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -83,7 +81,7 @@ public final class HandoffSocket implements AutoCloseable {
         ServerSocketChannel opened = null;
         try {
             Files.createDirectories(socketPath.getParent());
-            restrict(socketPath.getParent(), "rwx------");
+            OwnerOnlyFiles.restrict(socketPath.getParent(), "rwx------");
             try (FileChannel lockChannel = FileChannel.open(lockPath, StandardOpenOption.CREATE,
                     StandardOpenOption.READ, StandardOpenOption.WRITE);
                  FileLock ignored = lockChannel.lock()) {
@@ -93,8 +91,8 @@ public final class HandoffSocket implements AutoCloseable {
                 }
                 opened = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
                 opened.bind(UnixDomainSocketAddress.of(socketPath));
-                String token = writeToken(tokenPath);
-                writeOwner(tokenPath);
+                String token = OwnerOnlyFiles.writeToken(tokenPath);
+                OwnerOnlyFiles.writeProcessId(ownerPath(tokenPath));
                 var endpoint = new HandoffSocket(opened, socketPath, tokenPath, lockPath, token, handler);
                 endpoint.acceptor.start();
                 return endpoint;
@@ -283,23 +281,6 @@ public final class HandoffSocket implements AutoCloseable {
         }
     }
 
-    private static String writeToken(Path tokenPath) throws IOException {
-        byte[] bytes = new byte[32];
-        new SecureRandom().nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        Files.writeString(tokenPath, token + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE,
-            StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
-        restrict(tokenPath, "rw-------");
-        return token;
-    }
-
-    private static void writeOwner(Path tokenPath) throws IOException {
-        Path owner = ownerPath(tokenPath);
-        Files.writeString(owner, ProcessHandle.current().pid() + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE,
-            StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
-        restrict(owner, "rw-------");
-    }
-
     private static String readToken(Path tokenPath) {
         try {
             String token = Files.readString(tokenPath, StandardCharsets.UTF_8).strip();
@@ -307,12 +288,6 @@ public final class HandoffSocket implements AutoCloseable {
         } catch (IOException | RuntimeException unavailable) {
             return null;
         }
-    }
-
-    /** Owner-only where the filesystem understands it; Windows relies on the per-user directory ACL. */
-    private static void restrict(Path path, String permissions) throws IOException {
-        if (!path.getFileSystem().supportedFileAttributeViews().contains("posix")) return;
-        Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(permissions));
     }
 
     /** Bounded read of one line. A peer that connects and says nothing must not hold the endpoint. */

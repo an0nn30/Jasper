@@ -30,6 +30,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 class EditorDocumentPreservationTest {
     @TempDir Path root;
 
+    /**
+     * Quitting while {@code git commit} waits on {@code jasper editor --wait}: the Editor ends the call itself as it
+     * stops, with 0, before the host ends the calls a plugin leaves running with 1, which would abort the commit.
+     */
+    @Test @Timeout(value=60,unit=TimeUnit.SECONDS)
+    void aWaitingEditorCallEndsWithZeroWhenTheEditorStops() throws Exception {
+        Path file = java.nio.file.Files.writeString(root.resolve("COMMIT_EDITMSG"), "message\n");
+        var err = new StringBuffer();
+        CompletableFuture<Integer> exit;
+        try (var editor = new StagedEditorHost(root.resolve("data"), true)) {
+            var invocation = new dev.jasper.app.commandline.Invocation(List.of("editor", "--wait", file.toString()), root,
+                Optional.empty(), text -> { }, err::append);
+            exit = editor.host.commands.dispatch(invocation).toCompletableFuture();
+            StagedVaultHost.await(() -> onEdtValue(() -> editor.contributions.content().entries().size() == 1), "the file's tab");
+            StagedVaultHost.await(() -> onEdtValue(() -> editor.documentText().getText().equals("message\n")), "the file's text");
+            assertThat(exit).as("waiting for the tab to close").isNotDone();
+        }
+        assertThat(exit.get(5, TimeUnit.SECONDS)).isZero();
+        assertThat(err.toString()).isEmpty();
+    }
+
     @Test @Timeout(value=60,unit=TimeUnit.SECONDS)
     void sameDarkChangeAndRelocationKeepTheDocumentFindOptionsUndoPinAndCloseGuard() throws Exception {
         var appearance=onEdtValue(WorkspaceAppearanceFixture::new);

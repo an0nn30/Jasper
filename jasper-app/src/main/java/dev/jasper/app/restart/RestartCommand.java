@@ -24,6 +24,7 @@ public final class RestartCommand {
         for (String argument : arguments.get()) {
             // Jasper's flags are whole arguments, and no JVM option is spelled like one of them.
             if (argument.equals("--background")) continue;
+            if (argument.equals("--no-window")) continue;
             if (mode != RestartMode.SAME && argument.equals("--safe-mode")) continue;
             line.add(argument);
         }

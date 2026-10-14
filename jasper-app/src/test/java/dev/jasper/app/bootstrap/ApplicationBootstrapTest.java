@@ -1,5 +1,19 @@
 package dev.jasper.app.bootstrap;
 
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CompletableFuture;
+import java.util.Optional;
+import java.util.List;
+import java.nio.charset.StandardCharsets;
+import java.nio.channels.SocketChannel;
+import java.nio.ByteBuffer;
+import java.net.UnixDomainSocketAddress;
+import dev.jasper.app.workspace.DesktopTestSupport;
+import dev.jasper.app.commands.CommandHistory;
+import dev.jasper.app.commandline.CommandProtocol;
+import dev.jasper.app.commandline.CommandListener;
+import dev.jasper.app.application.JasperApplication;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.residency.HandoffSocket;
@@ -238,5 +252,102 @@ class ApplicationBootstrapTest {
         System.clearProperty(key);
         ApplicationBootstrap.configureDesktopProperties();
         assertThat(System.getProperty(key)).isEqualTo("true");
+    }
+
+    @Test void aNoWindowLaunchNeverHandsOffAndStepsAsideWhileAJasperServes(@TempDir Path dir) throws Exception {
+        AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
+        var noWindow = new AppArguments(null, false, false, false, null, false, false, true);
+        try (HandoffSocket endpoint = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(), dirs.daemonLock(),
+                request -> LaunchRequest.Response.OK)) {
+            assertThat(endpoint).isNotNull();
+            assertThat(ApplicationBootstrap.handsOff(noWindow, dirs)).as("a handoff would open a window").isFalse();
+        }
+        assertThat(ApplicationBootstrap.alreadyServing(noWindow, dirs)).isFalse();
+        CommandListener listener = CommandListener.bind(dirs.commandSocket(), invocation -> CompletableFuture.completedFuture(0));
+        try {
+            assertThat(listener).isNotNull();
+            assertThat(ApplicationBootstrap.alreadyServing(noWindow, dirs)).isTrue();
+            assertThat(ApplicationBootstrap.alreadyServing(new AppArguments(null, false, false), dirs)).as("a plain launch").isFalse();
+        } finally {
+            listener.close();
+        }
+    }
+
+    @Test void onlyAPrivateLaunchServesItsOwnCommandSocket(@TempDir Path dir) {
+        AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
+        long pid = ProcessHandle.current().pid();
+        assertThat(ApplicationBootstrap.commandSocket(new AppArguments(null, false, false), dirs)).isEqualTo(dirs.commandSocket());
+        assertThat(ApplicationBootstrap.commandSocket(new AppArguments(null, false, false).withHomeOverride(true), dirs))
+            .isEqualTo(dirs.commandSocket());
+        assertThat(ApplicationBootstrap.commandSocket(new AppArguments(null, false, false, true, null, false), dirs))
+            .isEqualTo(dirs.commandSocket(pid));
+        assertThat(ApplicationBootstrap.commandSocket(new AppArguments(dir.resolve("other.toml"), false, false), dirs))
+            .isEqualTo(dirs.commandSocket(pid));
+    }
+
+    private static JasperApplication application(Path dir, Runnable terminated) throws Exception {
+        var made = new AtomicReference<JasperApplication>();
+        // The initial read is refused on the EDT.
+        var service = new ConfigService(dir.resolve("config.toml"), true);
+        DesktopTestSupport.edt(() -> made.set(new JasperApplication(service, null, new CommandHistory(), null, terminated)));
+        return made.get();
+    }
+
+    @Test void aLaunchThatFindsAnotherJasperServingTheSharedSocketServesItsOwnShellsPrivately(@TempDir Path dir) throws Exception {
+        AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
+        long pid = ProcessHandle.current().pid();
+        Path own = dirs.commandSocket(pid);
+        CommandListener other = CommandListener.bind(dirs.commandSocket(), invocation -> CompletableFuture.completedFuture(0));
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = application(dir, terminated::countDown);
+        var served = new AtomicReference<CommandListener>();
+        try {
+            assertThat(other).isNotNull();
+            DesktopTestSupport.edt(() -> served.set(
+                ApplicationBootstrap.serveCommands(application, new AppArguments(null, false, false), dirs, new StartupResources())));
+            assertThat(served.get()).as("a listener of its own").isNotNull();
+            assertThat(served.get().socket()).isEqualTo(own);
+            assertThat(CommandListener.live(own)).isTrue();
+            assertThat(application.commandSocket()).as("what its shells' JASPER_COMMAND_SOCKET names").isEqualTo(own);
+            var noWindow = new AppArguments(null, false, false, false, null, false, false, true);
+            assertThat(ApplicationBootstrap.bindCommands(noWindow, dirs, invocation -> CompletableFuture.completedFuture(0)))
+                .as("a --no-window launch exists only to serve the shared socket").isNull();
+            DesktopTestSupport.edt(application::quitNow);
+            assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(own).as("removed at quit, as a private launch's socket is").doesNotExist();
+            assertThat(own.resolveSibling(own.getFileName() + ".lock")).doesNotExist();
+            assertThat(CommandListener.live(dirs.commandSocket())).as("the other Jasper's socket is untouched").isTrue();
+        } finally {
+            if (served.get() != null) served.get().close();
+            if (other != null) other.close();
+        }
+    }
+
+    @Test void aNoWindowJasperThatIsNotResidentQuitsOnceItsCallIsServed(@TempDir Path dir) throws Exception {
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = application(dir, terminated::countDown);
+        Path socket = dir.resolve("daemon").resolve("commands");
+        CommandListener listener = CommandListener.bind(socket, invocation -> CompletableFuture.completedFuture(0));
+        try {
+            DesktopTestSupport.edt(() -> ApplicationBootstrap.serveWithoutWindow(application, listener));
+            assertThat(terminated.await(300, TimeUnit.MILLISECONDS)).as("nothing has been served yet").isFalse();
+            String token = Files.readString(CommandListener.tokenFile(socket)).strip();
+            try (SocketChannel client = SocketChannel.open(UnixDomainSocketAddress.of(socket))) {
+                client.write(ByteBuffer.wrap(new CommandProtocol.Request(token, dir, Optional.empty(), List.of("editor"))
+                    .encode().getBytes(StandardCharsets.UTF_8)));
+                ByteBuffer reply = ByteBuffer.allocate(256);
+                while (client.read(reply.clear()) >= 0) { }
+            }
+            assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            listener.close();
+        }
+    }
+
+    @Test void aNoWindowLaunchWithoutTheCommandSocketQuits(@TempDir Path dir) throws Exception {
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = application(dir, terminated::countDown);
+        DesktopTestSupport.edt(() -> ApplicationBootstrap.serveWithoutWindow(application, null));
+        assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
     }
 }

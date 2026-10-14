@@ -74,6 +74,13 @@ public final class FakePluginHost implements AutoCloseable {
     final Map<String, FakeSettingsPanelHost> panelHosts = new java.util.concurrent.ConcurrentHashMap<>();
         final Map<String, FakePalette.Registered> scopes = new LinkedHashMap<>();
     final Map<String, FakeFileSources.Registered> fileSources = new LinkedHashMap<>();
+    /** A {@code [[subcommands]]} declaration. */
+    record Declared(String pluginId, String name, String summary) { }
+    final Map<String, Declared> subcommands = new LinkedHashMap<>();
+    final Map<String, FakeCommandLine.Registered> subcommandHandlers = new LinkedHashMap<>();
+    /** A subcommand call a handler took and has not completed. */
+    private record RunningCall(FakePluginContext context, String name, FakeCommandCall call) { }
+    private final List<RunningCall> runningCalls = new CopyOnWriteArrayList<>();
     private final java.util.ArrayDeque<List<dev.jasper.sdk.files.FileLocation>> fileChoiceQueue = new java.util.ArrayDeque<>();
     private final List<dev.jasper.sdk.files.FileChoice> fileChoices = new ArrayList<>();
         final List<String> paletteOpens = new ArrayList<>();
@@ -595,6 +602,83 @@ public final class FakePluginHost implements AutoCloseable {
         return dataRoot;
     }
 
+    /**
+     * Declares a subcommand as a plugin's {@code [[subcommands]]} would; before that plugin starts. The first
+     * declaration of a name keeps it. The application keeps a contested name for a bundled plugin first, then for the
+     * lowest plugin id, so declare in that order to match it.
+     *
+     * @param pluginId the plugin that answers it
+     * @param name the subcommand
+     * @param summary its help line
+     * @since 0.17.0
+     */
+    public void declareSubcommand(String pluginId, String name, String summary) {
+        subcommands.putIfAbsent(name, new Declared(pluginId, name, summary));
+    }
+
+    /**
+     * Calls a subcommand as {@code jasper name arguments...} would from outside Jasper. The handler has run when this
+     * returns.
+     *
+     * @param name the subcommand
+     * @param arguments the words after it
+     * @param workingDirectory the caller's working directory
+     * @return the call
+     * @since 0.17.0
+     */
+    public FakeCommandCall call(String name, List<String> arguments, Path workingDirectory) {
+        return call(name, arguments, workingDirectory, null);
+    }
+
+    /**
+     * As {@link #call(String, List, Path)}, run in the pane {@code paneId}: the call's window is that pane's window.
+     *
+     * @param name the subcommand
+     * @param arguments the words after it
+     * @param workingDirectory the caller's working directory
+     * @param paneId the pane, or null
+     * @return the call
+     * @since 0.17.0
+     */
+    public FakeCommandCall call(String name, List<String> arguments, Path workingDirectory, UUID paneId) {
+        var call = new FakeCommandCall(arguments, workingDirectory);
+        Declared declared = subcommands.get(name);
+        if (declared == null) {
+            call.hostError("jasper: unknown command " + name + "; run jasper --help for the list\n");
+            call.complete(2);
+            return call;
+        }
+        FakeCommandLine.Registered registered = subcommandHandlers.get(name);
+        if (registered == null) {
+            call.hostError("jasper: " + name + " is unavailable (the " + declared.pluginId() + " plugin is off)\n");
+            call.complete(1);
+            return call;
+        }
+        if (paneId != null) {
+            call.window(workspace.pane(paneId).flatMap(pane -> registered.context().terminals.window(pane.tab.window.id))
+                .map(window -> (dev.jasper.sdk.WindowOwner) window));
+        }
+        java.util.concurrent.CompletionStage<Integer> stage;
+        try {
+            stage = Objects.requireNonNull(registered.handler().run(call.view()), "the handler's stage");
+        } catch (RuntimeException failure) {
+            failures.add(declared.pluginId() + " subcommand " + name + ": " + failure);
+            call.fail(name, failure);
+            return call;
+        }
+        stage.whenComplete((code, failure) -> {
+            if (failure == null) call.complete(code == null || code < 0 || code > 255 ? 1 : code);
+            else call.fail(name, failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null ? failure.getCause() : failure);
+        });
+        if (!call.exit().isDone()) {
+            // As the application: a call still running when its plugin stops ends with 1.
+            var running = new RunningCall(registered.context(), name, call);
+            runningCalls.add(running);
+            call.exit().whenComplete((code, failure) -> runningCalls.remove(running));
+        }
+        return call;
+    }
+
     private void teardown(FakePluginContext context, String reason) {
         closeSettingsPanel(context.plugin().id());
         context.state = FakePluginContext.State.CLOSED;
@@ -604,6 +688,9 @@ public final class FakePluginHost implements AutoCloseable {
         context.ui.closeAll();
         context.palette.closeAll();
         context.fileSources.closeAll();
+        context.commandLine.closeAll();
+        for (RunningCall running : List.copyOf(runningCalls))
+            if (running.context() == context) running.call().stopped(running.name());
         notifications.stopped(context.plugin().id());
         clipboard.ownerStopped(context.plugin().id());
         String id = context.plugin().id();

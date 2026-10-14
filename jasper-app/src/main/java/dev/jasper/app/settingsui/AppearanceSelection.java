@@ -18,20 +18,24 @@ import java.util.Optional;
  * the theme picked for it, then the Dark theme and Light theme rows ({@code ui.theme.dark}, {@code ui.theme.light}),
  * which list the installed themes with that variant; a pick that lacks it shows as {@code Dawn (no Dark variant)}, and one
  * that nothing installed has as {@code dawn (not installed)}. The picks are staged with the tiles; Reset returns all three
- * to their defaults. EDT only.
+ * to their defaults. When the application supplies {@link ThemeImports}, a gear beside each dropdown imports and removes
+ * themes ({@link ThemeMenu}). EDT only.
  */
 final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     private final AppearanceChoices choices;
     private final SettingsDraft draft;
     private final Subscription listening;
+    private final Optional<ThemeMenu> darkMenu, lightMenu;
     private InstalledThemes themes;
     private AppearanceMode value = UI_APPEARANCE.defaultValue();
     private String dark = UI_THEME_DARK.defaultValue(), light = UI_THEME_LIGHT.defaultValue();
     private Runnable render = () -> { };
 
-    AppearanceSelection(AppearanceChoices choices, SettingsDraft draft) {
+    AppearanceSelection(AppearanceChoices choices, PageContext context) {
         this.choices = choices;
-        this.draft = draft;
+        this.draft = context.draft();
+        darkMenu = choices.imports().map(hooks -> new ThemeMenu(hooks, choices.themes(), context, ThemeMenu.Target.DARK, () -> render.run()));
+        lightMenu = choices.imports().map(hooks -> new ThemeMenu(hooks, choices.themes(), context, ThemeMenu.Target.LIGHT, () -> render.run()));
         themes = choices.themes().get();
         listening = choices.onChanged().apply(() -> render.run());
         showRelated();
@@ -59,11 +63,22 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
             UI_THEME_DARK.label(), "");
         var lightPick = new Nodes.Choice(id + ":light-theme", plain, Nodes.ChoiceKind.DROPDOWN, options(false, light), light,
             UI_THEME_LIGHT.label(), "");
-        var darkControls = new Nodes.Stack(id + ":dark-controls", plain, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(darkPick, reset));
-        var lightControls = new Nodes.Stack(id + ":light-controls", plain, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(lightPick));
+        // The Light row holds a hidden copy of Reset, so its dropdown and gear line up with the Dark row's and the Terminal scheme row's.
+        var lane = new Nodes.Button(id + ":light-reset", new ControlState(false, true, false, ""), "", "reset", Nodes.ButtonKind.GHOST,
+            id + ":reset", reset.tooltip());
+        var darkControls = new Nodes.Stack(id + ":dark-controls", plain, Nodes.LayoutRole.SETTINGS_TRAILING,
+            List.of(withGear(id + ":dark", plain, darkPick, darkMenu, dark), reset));
+        var lightControls = new Nodes.Stack(id + ":light-controls", plain, Nodes.LayoutRole.SETTINGS_TRAILING,
+            List.of(withGear(id + ":light", plain, lightPick, lightMenu, light), lane));
         return new Nodes.Stack(id + ":selection", plain, Nodes.LayoutRole.VERTICAL, List.of(tiles,
             new Nodes.SettingRow("row:" + id, plain, UI_THEME_DARK.label(), "", darkControls, false, highlighted),
             new Nodes.SettingRow("row:" + id + ":light", plain, UI_THEME_LIGHT.label(), "", lightControls, false, highlighted)));
+    }
+
+    /** {@code pick}, followed by its gear {@code id + "-gear"} when there is one. */
+    private static Nodes.Node withGear(String id, ControlState state, Nodes.Choice pick, Optional<ThemeMenu> menu, String shown) {
+        return menu.<Nodes.Node>map(gear -> new Nodes.Stack(id + "-pick", state, Nodes.LayoutRole.INLINE,
+            List.of(pick, gear.gear(id + "-gear", shown)))).orElse(pick);
     }
 
     private static Option tile(String id, String label, String caption, Option.Preview preview) {
@@ -102,6 +117,12 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     @Override public AppearanceMode value() { return value; }
     @Override public void show(AppearanceMode value) { this.value = value; }
     @Override public boolean event(String id, UiEvent event) {
+        // A gear's items act at once; they are never an edit of the picks.
+        if (event instanceof UiEvent.Action) {
+            if (!darkMenu.map(menu -> menu.event(id + ":dark-gear", event, dark)).orElse(false))
+                lightMenu.ifPresent(menu -> menu.event(id + ":light-gear", event, light));
+            return false;
+        }
         if (!(event instanceof UiEvent.Selected selected)) return false;
         String picked = selected.ids().stream().findFirst().orElse("");
         if (selected.id().equals(id + ":dark-theme")) {

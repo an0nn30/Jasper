@@ -1,6 +1,8 @@
 package dev.jasper.app.application;
 
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.commandline.CommandDispatcher;
+import dev.jasper.app.commandline.CommandInstall;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -138,7 +140,12 @@ public final class JasperApplication {
     private final SystemNotices systemNotices;
     private final CommandNotifier notifications;
     private PluginRuntime plugins;
+    /** The command socket this Jasper serves; new local shells name it in JASPER_COMMAND_SOCKET. */
+    private volatile Path commandSocket;
+    /** Where {@code jasper --help} reads the subcommands, or null for a private launch. */
+    private Path subcommandList;
     private ActionEntry migrateAction;
+    private CommandInstall commandInstall;
     private dev.jasper.app.settingsui.SettingsDialog settings;
     private VmOptionsFeature vmOptions;
     private final MemoryIndicator memoryIndicator;
@@ -392,7 +399,7 @@ public final class JasperApplication {
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
             (path, settings) -> track(watchOutput(startSession(path, settings))), shellIntegrationDir, shellProfiles::resolve,
-            () -> shellProfiles.awaitDetection(DETECTION_WAIT), this::shellProfileProblem);
+            () -> shellProfiles.awaitDetection(DETECTION_WAIT), this::shellProfileProblem, this::paneVariables);
         // Back in the Dock before the window exists: macOS gives a window of a hidden application neither Jasper's menu
         // bar nor focus. If composing fails nothing opened, so the presence is worked out again.
         windowOpening();
@@ -496,6 +503,48 @@ public final class JasperApplication {
     }
 
     public boolean resident() { return resident; }
+
+    /** Where {@code jasper --help} reads the subcommands; before {@link #startPlugins}. Never set for a private launch. */
+    public void subcommandList(Path file) { subcommandList = file; }
+
+    /** The command socket this Jasper serves, named in each new local shell's {@code JASPER_COMMAND_SOCKET}. */
+    public void commandSocket(Path socket) { commandSocket = socket; }
+
+    /** The command socket new local shells are given; null when this Jasper serves none. */
+    public Path commandSocket() { return commandSocket; }
+
+    /** What a new local shell in {@code pane} gets last, over everything else. Any thread. */
+    Map<String, String> paneVariables(UUID pane) {
+        Path socket = commandSocket;
+        return socket == null ? Map.of("JASPER_PANE", pane.toString())
+            : Map.of("JASPER_PANE", pane.toString(), "JASPER_COMMAND_SOCKET", socket.toString());
+    }
+
+    /**
+     * What the command socket runs: no arguments opens a window or raises one, as a launch would; anything else is a
+     * plugin's subcommand. Called on listener threads.
+     */
+    public CommandDispatcher commands() {
+        return invocation -> {
+            if (invocation.arguments().isEmpty()) {
+                SwingUtilities.invokeLater(() -> openOrRaise(HANDOFF));
+                return CompletableFuture.completedFuture(0);
+            }
+            PluginRuntime runtime = plugins;
+            if (runtime == null) {
+                invocation.err("jasper: Jasper's plugins are not running\n");
+                return CompletableFuture.completedFuture(1);
+            }
+            return runtime.commands().dispatch(invocation);
+        };
+    }
+
+    /** Quits a Jasper that is not resident once nothing keeps it: no terminal or plugin window, and {@code busy} false. EDT. */
+    public void quitIfUnused(BooleanSupplier busy) {
+        if (resident || quitting || stopped) return;
+        boolean pluginWindowsOpen = auxiliary != null && !auxiliary.open().isEmpty();
+        if (windows.isEmpty() && !pluginWindowsOpen && !busy.getAsBoolean()) requestShutdown();
+    }
 
     /**
      * Who shows that this process is resident (the macOS menu bar item, the Windows notification-area icon), given its
@@ -797,11 +846,19 @@ public final class JasperApplication {
         migrateAction = contributions.addAction("config.migrate", "Migrate Config", null,
             List.of("configuration", "settings", "upgrade", "old keys", "config.toml"), Optional.empty(), invocation -> migrateConfiguration());
         updateMigrateAction();
+        commandInstall = CommandInstall.forThisPlatform(System.getProperty("os.name"), System.getProperty("jpackage.app-path"),
+            Path.of(System.getProperty("user.home")));
+        List<String> commandKeywords = List.of("jasper", "command", "shell", "terminal", "path", "cli");
+        contributions.addAction("commandline.install", "Install 'jasper' Command in PATH", null, commandKeywords,
+            Optional.empty(), invocation -> installCommand(false)).setEnabled(commandInstall.available());
+        contributions.addAction("commandline.uninstall", "Uninstall 'jasper' Command from PATH", null, commandKeywords,
+            Optional.empty(), invocation -> uninstallCommand()).setEnabled(commandInstall.available());
         contributions.content().setFactory(separate -> {
             var created = separate ? newWindow(null) : newWindow();
             if (created == null) throw new IllegalStateException("Application is closing");
             return created.content().id();
         });
+        if (subcommandList != null) plugins.subcommandList(subcommandList);
         plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
         new PluginProblemNotices(notificationCenter, incidentNotices,
             () -> openSettings(null, dev.jasper.app.pluginmanager.PluginsPage.ID)).announce(plugins.problems());
@@ -848,16 +905,20 @@ public final class JasperApplication {
             });
         contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(AboutWindows.helpEntries(macOs));
         if (configuration != null) {
+            var commandLine = new dev.jasper.app.settingsui.CorePages.CommandLineActions(() -> commandInstall.state().text(),
+                () -> installCommand(true),
+                () -> commandInstall.state().kind() != CommandInstall.Kind.INSTALLED && commandInstall.available(),
+                this::uninstallCommand, () -> commandInstall.state().kind() == CommandInstall.Kind.INSTALLED);
             var system = new dev.jasper.app.settingsui.CorePages.SystemActions(() -> configuration.state().file(),
                 this::openConfigFile, this::revealConfigFile, () -> configuration.reload(), this::migrateConfiguration,
-                configuration::migrationAvailable, Optional.of(vmOptions.hooks()));
+                configuration::migrationAvailable, Optional.of(vmOptions.hooks()), Optional.of(commandLine));
             var shells = new dev.jasper.app.settingsui.ShellChoices(() -> shellProfiles.current().stream()
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
                 shellProfiles::refresh, shellProfiles::onChanged);
             Optional<dev.jasper.app.settingsui.ThemeImports> imports = themesFolder == null ? Optional.empty()
-                : Optional.of(SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder), themes::library,
+                : Optional.of(SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder),
                     surface -> surface == null ? Optional.empty() : this.shells.chooseFile(surface, "Import Theme", ".json"),
-                    this::confirmOver, configuration::save, configuration::reload));
+                    this::confirmOver, this::informOver, configuration::save, configuration::reload));
             var appearanceChoices = SettingsAppearance.choices(systemAppearance, themes::library, imports);
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
                 dev.jasper.app.settingsui.CorePages.pages(appearanceChoices, system, shells,
@@ -893,6 +954,62 @@ public final class JasperApplication {
                 else notificationViews.error("Migrate Config failed",
                     (failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null ? failure.getCause() : failure).getMessage());
             }));
+        }
+
+        /**
+         * Puts the jasper command on PATH off the EDT. Another program of that name is replaced only after Settings asks;
+         * from the palette, Settings opens instead so the question has a place. EDT.
+         */
+        private void installCommand(boolean fromSettings) {
+            CommandInstall install = commandInstall;
+            if (install == null || !install.available()) return;
+            CommandInstall.State state = install.state();
+            boolean replace = false;
+            if (state.kind() == CommandInstall.Kind.OTHER_PROGRAM) {
+                if (!fromSettings || settings == null) {
+                    openSettings(null, "system");
+                    return;
+                }
+                if (!settings.confirm("Replace the jasper Command?", state.text() + ". Replace it with Jasper's command?", "Replace")) return;
+                replace = true;
+            }
+            boolean replacing = replace;
+            commandWork(() -> install.install(replacing), "Installed the jasper Command",
+                () -> install.state().text() + install.hint(System.getenv().getOrDefault("PATH", "")).map(hint -> ". " + hint).orElse(""),
+                "Could not install the jasper Command");
+        }
+
+        /** Takes the jasper command off PATH, if Jasper put it there, off the EDT; otherwise says it did not. EDT. */
+        private void uninstallCommand() {
+            CommandInstall install = commandInstall;
+            if (install == null || !install.available()) return;
+            CommandInstall.State state = install.state();
+            if (state.kind() != CommandInstall.Kind.INSTALLED) {
+                notificationViews.info("The jasper Command is not installed by Jasper", state.text());
+                return;
+            }
+            commandWork(install::uninstall, "Removed the jasper Command", () -> "jasper is no longer on your PATH.",
+                "Could not remove the jasper Command");
+        }
+
+        private interface CommandWork { void run() throws java.io.IOException; }
+
+        private void commandWork(CommandWork work, String done, Supplier<String> details, String failed) {
+            CompletableFuture.runAsync(() -> {
+                try { work.run(); }
+                catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+            }, task -> Thread.ofPlatform().daemon().name("jasper-command-install").start(task)).whenComplete((ignored, failure) -> {
+                Throwable cause = failure instanceof CompletionException && failure.getCause() != null ? failure.getCause() : failure;
+                if (cause instanceof java.io.UncheckedIOException unchecked) cause = unchecked.getCause();
+                Throwable problem = cause;
+                String text = problem == null ? details.get() : null;
+                SwingUtilities.invokeLater(() -> {
+                    if (problem == null) notificationViews.info(done, text);
+                    else if (problem instanceof CommandInstall.Declined) notificationViews.info(failed, "The administrator prompt was cancelled; nothing changed.");
+                    else notificationViews.error(failed, problem.getMessage());
+                    if (settings != null) settings.refreshPages();
+                });
+            });
         }
 
         /**
@@ -1104,6 +1221,13 @@ public final class JasperApplication {
             () -> false, message -> LOG.log(System.Logger.Level.WARNING, message));
     }
 
+    static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
+                                        BiFunction<Path, LaunchSettings, TerminalSession> start, Path integrationDir,
+                                        BiFunction<Optional<String>, TerminalConfig.Shell, ShellProfiles.Resolution> profiles,
+                                        BooleanSupplier awaitDetection, Consumer<String> problems) {
+        return windowLauncher(executor, snapshots, start, integrationDir, profiles, awaitDetection, problems, pane -> Map.of());
+    }
+
     /**
      * Each request's profile is resolved on the EDT by {@code profiles}, from the requested id (empty: the configured
      * default) and the saved shell settings; {@code problems} hears, on the EDT, why a profile was replaced.
@@ -1118,7 +1242,8 @@ public final class JasperApplication {
     static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
                                         BiFunction<Path, LaunchSettings, TerminalSession> start, Path integrationDir,
                                         BiFunction<Optional<String>, TerminalConfig.Shell, ShellProfiles.Resolution> profiles,
-                                        BooleanSupplier awaitDetection, Consumer<String> problems) {
+                                        BooleanSupplier awaitDetection, Consumer<String> problems,
+                                        Function<UUID, Map<String, String>> paneVariables) {
         ConfigSnapshot initial = snapshots.get();
         String os = System.getProperty("os.name");
         Map<String, String> environment = System.getenv();
@@ -1146,7 +1271,7 @@ public final class JasperApplication {
         return new ShellLauncher(executor, settings, confirm, () -> {
             ConfigSnapshot snapshot = snapshots.get();
             return new ShellLauncher.SessionDefaults(initial.columns(), initial.lines(), snapshot.terminal().scrollback());
-        }, start);
+        }, start, paneVariables);
     }
 
     /**
@@ -1388,6 +1513,17 @@ public final class JasperApplication {
     Incidents incidents() { return incidents; }
 
     /** Asks {@code question} with a kit sheet over {@code surface}, the Settings dialog; its yes runs at most once. */
+    /** A notice sheet over the Settings dialog's {@code surface}; nothing while that dialog is closed. */
+    private void informOver(dev.jasper.app.windows.AuxiliarySurface surface, dev.jasper.app.settingsui.ThemeImports.Notice notice) {
+        if (surface == null || auxiliary == null) return;
+        var dialog = auxiliary.dialog(notice.title(), true, surface);
+        var view = dev.jasper.app.pluginmanager.ConfirmView.notice(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),
+            notice.title(), notice.message(), dialog::close);
+        dialog.onClosed(view::close);
+        dialog.setContent(view.view());
+        dialog.show();
+    }
+
     private void confirmOver(dev.jasper.app.windows.AuxiliarySurface surface, dev.jasper.app.settingsui.ThemeImports.Question question) {
         if (surface == null || auxiliary == null) return;
         var dialog = auxiliary.dialog(question.title(), true, surface);

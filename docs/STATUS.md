@@ -1,6 +1,6 @@
 # Jasper — Status and Handoff
 
-**Custom VM options plan 3 (memory) complete — 2026-10-14.** On `claude/custom-vm-options-memory` (not pushed):
+**Custom VM options plan 3 (memory) complete — 2026-10-14.** On `claude/custom-vm-options-memory`, merged to local `main` (not pushed):
 Settings › Window › Show memory indicator (`window.memory_indicator`, off by default) adds `312 of 2048M` to the status
 bar, refreshed every 3 s by one shared timer while shown with a window open, with a heap and non-heap tooltip; a click
 runs garbage collection (the `app.memory.gc` action, also in the palette). A collection-usage threshold at 95% of the
@@ -8,12 +8,77 @@ old generation feeds `LowMemoryWatch` (one signal per 20 s, more than five in 15
 saved again); an `OutOfMemoryError` warns at once. The warning, "Jasper is running low on memory", is in the Memory &
 VM options group; **Adjust Memory Settings…** opens the heap limit with the running maximum plus 512 MiB staged (only the
 field when a higher heap is already saved).
-Deviations: the eight planned ones and the review and final-review changes, listed in the plan. The branch starts from `main` at
-`7c0a0938`; `main` has moved since, so it needs `main` merged in before it merges. Full `./gradlew check` after the final review: 10,009 tests,
-0 failures, 8 skips. Manual checks pending (the user): turn the indicator on and watch it update; click it; in the
+Deviations: the eight planned ones and the review and final-review changes, listed in the plan. Full `./gradlew check` after merging main: 10,152 tests,
+0 failures, 12 skips. Manual checks pending (the user): turn the indicator on and watch it update; click it; in the
 packaged app with a small heap (`-Xmx600m` in `jasper.vmoptions`), open many large scrollbacks until the warning shows,
 and use Adjust Memory Settings…; with the indicator on, cold-launch timing; Adjust Memory Settings… after saving a larger
 heap without restarting.
+
+**The jasper command (command line plan 1) — 2026-10-14** (`claude/default-editor`, worktree
+`.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
+[plan](superpowers/plans/2026-10-13-jasper-command-line-1-jasper-command.md)). A native `jasper` command
+(`packaging/cli`, C, built with the launcher's toolchain) hands each call to the running Jasper over
+`<home>/daemon/commands` and never starts a JVM; with nothing listening it starts Jasper with `--no-window` and waits up
+to 20 s. Every running Jasper binds the socket after its plugins start (private launches, and a launch that finds
+another Jasper serving the shared socket, bind `commands-<pid>`); a `--no-window` Jasper that is not resident quits
+once served. Local shells get `JASPER_PANE` and `JASPER_COMMAND_SOCKET`.
+SDK 0.17.0: `PluginContext.commandLine()` and `[[subcommands]]`; bundled ranges `>=0.17.0, <0.18`. Editor 0.8.0:
+`jasper editor [--wait] FILE[:LINE[:COLUMN]]...`. Settings › System Settings › Command line and the palette install the
+command on `PATH`. Deviations: the plan's twelve, plus the `### The jasper command` section of `configuration.md` landing
+with Task 10 (its `editor.md` link needs the heading); `WindowsUserPathTest.theUsersOwnPathCanBeRead` asserting that
+`read()` does not throw; `CommandListener` giving each call an outgoing frame queue drained by its own writer virtual
+thread (so a client that stops reading cannot freeze the UI thread; `close()` gives the writers of ended calls up to 1 s in
+total); the owner-only file helpers moved to `dev.jasper.app.platform.OwnerOnlyFiles`, used by `CommandListener` and
+`HandoffSocket`; on macOS `jasper --<option>` launches spawn `Contents/MacOS/Jasper` directly and detached, as on Linux
+(`open -g -a` only for the `--no-window` cold start); a discovered plugin that does not load still owns the subcommand
+names nobody else owns, so `jasper <name>` says it is unavailable (exit 1) rather than unknown (exit 2), and `--help`
+lists only active plugins; only Linux gives the "not on your PATH" hint after Install; the palette's Uninstall acts only
+when the command is installed; a dangling `jasper` link counts as Jasper's own only when its target ends with
+`Resources/bin/jasper` or `lib/bin/jasper`, any other asking first; `jasper editor` also completes when a tab closes
+while its file is still loading; from the final review, the cold start on Linux runs from the home folder without the caller's `GIT_*` variables and on Windows with the user's default environment, the client refuses a request over 1 MiB (exit 2), a plugin that stops ends its calls in flight (exit 1), and connections that end before the first call never make a `--no-window` Jasper quit. Known limits: a relative `JASPER_HOME` resolves against the home folder in a cold start; a shell that outlives its Jasper's `commands-<pid>` socket (tmux) waits on that dead socket. `./gradlew check --continue`: **9,928 tests, 0 failures, 0 errors, 12 skipped**; after merging `main`:
+**10,108 tests, 0 failures, 0 errors, 12 skipped**. No GUI launched. GUI checks for the user: in a dev run's
+shell, `jasper-app/build/cli/bin/jasper editor --wait notes.txt` and Ctrl-C; on the packaged macOS app, Install (the
+administrator prompt), then from iTerm `jasper editor --wait notes.txt`, `git config --global core.editor "jasper editor
+--wait"` and `git commit`, with Jasper resident, not resident and not running, `jasper` alone, and `jasper --help`; on
+Windows, Install, a new terminal, and `jasper editor --wait` bringing Jasper to the front; on Windows and Linux,
+`git commit` from another terminal with Jasper not running, then `env | grep GIT_` and `pwd` in a new Jasper tab. Merged
+to local `main`, not pushed; the Windows (MSVC) and Linux (gcc) builds of the client run first in CI. Plans 2 (default editor) and 3 (Cmd-click file paths) are next.
+
+**Text on the selection gets its own role — 2026-10-14** (`claude/text-on-selection`, worktree
+`.claude/worktrees/text-on-selection`; bug fix, the format change chosen by the user). The kit drew text on
+`selection.bg` (selected list and tree rows, a dropdown's highlighted entry, selected text, Settings' search highlight)
+in `text.onAccent`, the text for the accent fill. Slate Steel uses white for both, but IntelliJ themes pair them
+separately (Catppuccin Frappé: dark `Button.default.foreground` on its light accent, light `*.selectionForeground` on
+its dark selection), so converted themes read dark on dark. New format roles `text.onSelection` and
+`text.onSelection.secondary` (Slate Steel: the same white, so it looks unchanged); content on a selected fill takes that
+fill's ink (`InteractiveRows.Ink`: the accent fill in results layouts, the selection fill elsewhere; kit menus keep
+`text.onAccent` on their accent fill). The converter reads `List.selectionForeground` (`Tree.`, `Table.`) and falls back
+to the more readable of `text.onAccent` and `text.primary`; its golden files gained the two roles. The SDK mirrors them
+(0.16.2, additive; `WorkspacePalette.selectionText` is `text.onSelection`). Theme files without the roles are refused:
+convert and import them again. `./gradlew check --continue`: **9,975 tests**; its one failure, the external plugin
+example's SDK default still at 0.16.1, is fixed and that test passes. No GUI launched. GUI checks for the user: a
+converted Catppuccin theme's dropdowns, lists and selected text. Merged to `main`.
+
+**Theme gears replace the Imported themes group — 2026-10-13** (`claude/theme-gear-menus`, worktree
+`.claude/worktrees/theme-gear-menus`; bounded change, design approved in chat, no spec or plan). The Dark theme, Light
+theme and Terminal scheme dropdowns each have a gear (`settingsui.ThemeMenu`) with Import Theme… and Remove for the
+theme that dropdown shows; the Terminal scheme gear removes the theme its scheme belongs to, and Remove is unavailable for
+Slate Steel and Same as UI theme. An import is staged in its gear's dropdown, or a sheet says where to pick it; failures
+are sheets (`ConfirmView.notice`). The Imported themes group and `SchemaPage.Part` are gone, and the Light row keeps a
+hidden Reset lane so the three dropdowns line up. This replaces spec 2026-10-13 sections 4.1–4.3's Imported themes group,
+and Import now picks the theme (4.2 said it selects nothing). `ThemeMenuTest` (19) and `AppearancePageTest`'s alignment
+tests pin it. `./gradlew check --continue` after merging `main`: **9,974 tests, 0 failures, 0 errors, 8 skipped**. No
+GUI launched. GUI checks for the user: the gears' look and menus, Import and Remove with their sheets, and the three
+dropdowns' alignment. Merged to `main`.
+
+**Dropdown menus as tall as their rows — 2026-10-13** (`claude/dropdown-menu-height`, worktree
+`.claude/worktrees/dropdown-menu-height`; bug fix). Every plain kit dropdown's menu was about a quarter too short and
+scrolled: Swing sizes a combo popup from its renderer's preferred heights (16 px of text), while the kit gives plain rows
+the list's fixed menu-item height (22 px), so two rows got a 34 px menu. `Choices.KitComboPopup.menuHeight` now measures
+the rows it shows when they have a fixed height; rich rows keep their renderer's heights. `ChoicesTest` pins it for a
+form dropdown, a Settings dropdown and one with more rows than the menu shows. `./gradlew check --continue`: **9,904
+tests, 0 failures, 0 errors, 8 skipped**. No GUI launched. GUI check for the user: open Settings › Appearance's Dark theme
+dropdown. Merged to `main`.
 
 **Custom VM options plan 2 (settings and actions) complete — 2026-10-13.** On `claude/custom-vm-options-settings`, merged to
 local `main` (not pushed): System Settings has a Java Virtual Machine section (heap limit in `jasper.vmoptions`, Edit Custom VM Options…,

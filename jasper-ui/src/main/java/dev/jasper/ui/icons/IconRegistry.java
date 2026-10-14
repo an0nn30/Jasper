@@ -173,22 +173,26 @@ public final class IconRegistry implements AutoCloseable {
     public Icon tile(String name, SemanticPalette palette, Nodes.Hue hue, int width, int height, boolean selected) {
         return tile(name, palette, hue, width, height, 0, selected);
     }
-    /** Category tile with explicit glyph extent; zero retains the standard optical sizing policy. */
+    /** Category tile with explicit glyph extent; zero retains the standard optical sizing policy. A selected tile is on the accent fill. */
     public Icon tile(String name, SemanticPalette palette, Nodes.Hue hue, int width, int height, int glyphSize, boolean selected) {
-        return tile(name,palette,null,hue,width,height,glyphSize,selected);
+        return tile(name,palette,null,hue,width,height,glyphSize,selected?SemanticColor.TEXT_ONACCENT:null);
     }
-    /** Identity tiles select the actual receiving-theme sibling; legacy settings/group geometry is preserved. */
-    public Icon tile(String name, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, boolean selected) {
-        return tile(name,theme.semantic(),theme,hue,width,height,glyphSize,selected);
+    /**
+     * Identity tiles select the actual receiving-theme sibling; legacy settings/group geometry is preserved. A selected
+     * tile is drawn in {@code selectedInk}, the ink of the fill it lies on; null draws it unselected.
+     */
+    public Icon tile(String name, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, SemanticColor selectedInk) {
+        return tile(name,theme.semantic(),theme,hue,width,height,glyphSize,selectedInk);
     }
     /** Receiving identity header: normal authored ink with the shared inward semantic contour. */
     public Icon identityHeader(String name, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize) {
-        return tile(name,theme.semantic(),theme,hue,width,height,glyphSize,false,theme.semantic().color(SemanticColor.BORDER_IDENTITY));
+        return tile(name,theme.semantic(),theme,hue,width,height,glyphSize,null,theme.semantic().color(SemanticColor.BORDER_IDENTITY));
     }
-    private Icon tile(String name, SemanticPalette palette, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, boolean selected) {
-        return tile(name,palette,theme,hue,width,height,glyphSize,selected,null);
+    private Icon tile(String name, SemanticPalette palette, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, SemanticColor selectedInk) {
+        return tile(name,palette,theme,hue,width,height,glyphSize,selectedInk,null);
     }
-    private Icon tile(String name, SemanticPalette palette, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, boolean selected, Color outline) {
+    private Icon tile(String name, SemanticPalette palette, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, SemanticColor selectedInk, Color outline) {
+        boolean selected = selectedInk != null;
         if (glyphSize < 0 || glyphSize > Math.min(width, height)) throw new IllegalArgumentException("Invalid tile glyph size");
         boolean selectedForeground;
         synchronized (this) {
@@ -196,7 +200,7 @@ public final class IconRegistry implements AutoCloseable {
             if (identity != null && identity.tileHue() != null) hue = identity.tileHue();
             selectedForeground = selected && identity != null && identity.selectedInk() == IdentityArtwork.SelectedInk.FOREGROUND;
         }
-        Color foreground = selected ? palette.color(SemanticColor.TEXT_ONACCENT) : tint(palette, hue);
+        Color foreground = selected ? palette.color(selectedInk) : tint(palette, hue);
         Color fill = selected ? foreground : palette.color(switch(hue) {
             case BLUE -> SemanticColor.HUE_BLUE_SURFACE; case GREEN -> SemanticColor.HUE_GREEN_SURFACE;
             case AMBER -> SemanticColor.HUE_AMBER_SURFACE; case PURPLE -> SemanticColor.HUE_PURPLE_SURFACE;

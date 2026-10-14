@@ -76,6 +76,24 @@ public record AppDirs(Path root, Path configFile, Path logs, boolean overridden)
         return daemonDir().resolve("lock");
     }
 
+    /** The command socket of every launch but a private one; the {@code jasper} command looks for it here. */
+    public Path commandSocket() {
+        return daemonDir().resolve("commands");
+    }
+
+    /**
+     * A private launch's own command socket ({@code --config}, {@code --safe-mode}, {@code --plugin-dir},
+     * {@code --standalone}), named for its process.
+     */
+    public Path commandSocket(long pid) {
+        return daemonDir().resolve("commands-" + pid);
+    }
+
+    /** The subcommands the last launch offered, which {@code jasper --help} lists. */
+    public Path subcommandList() {
+        return daemonDir().resolve("subcommands");
+    }
+
     /** As {@link #resolve(String, Map, Path, String)} with only the environment override. */
     public static AppDirs resolve(String osName, Map<String, String> env, Path home) {
         return resolve(osName, env, home, null);

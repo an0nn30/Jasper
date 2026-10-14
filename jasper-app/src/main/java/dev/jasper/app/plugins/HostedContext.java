@@ -68,6 +68,7 @@ final class HostedContext implements PluginContext {
     final HostedPalette palette;
     final HostedFileSources fileSources;
     final HostedNotifications notifications;
+    final HostedCommandLine commandLine;
     private boolean observing;
     Plugin plugin;
 
@@ -93,6 +94,7 @@ final class HostedContext implements PluginContext {
         this.fileSources = new HostedFileSources(id, gate, host.environment.contributions(), host.containment, ui, terminals);
         this.notifications = new HostedNotifications(id, hosted.info().name(), host.environment.notifications(), host.containment,
             host.environment.ui(), host.environment.onUi(), ui::icon, ui::validateIcon);
+        this.commandLine = new HostedCommandLine(id, host.commands, ui, terminals);
     }
 
     private javax.swing.Icon uiIcon(String name){return ui.icon(name);}
@@ -114,6 +116,7 @@ final class HostedContext implements PluginContext {
         terminals.closeAll();
         notifications.close();
         host.clipboard.ownerStopped(id);
+        host.commands.stopped(id);
         List<Subscription> copy;
         synchronized (owned) { copy = new ArrayList<>(owned); owned.clear(); }
         for (int i = copy.size() - 1; i >= 0; i--) copy.get(i).close();
@@ -165,6 +168,8 @@ final class HostedContext implements PluginContext {
         @Override public dev.jasper.sdk.files.FileSources fileSources() { return fileSources; }
 
         @Override public Notifications notifications() { return notifications; }
+
+        @Override public dev.jasper.sdk.cli.CommandLine commandLine() { return commandLine; }
 
         @Override public Platform platform() {
             return new Platform() {

@@ -9,6 +9,7 @@ import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
+import dev.jasper.sdk.testing.contract.ContractCall;
 import dev.jasper.sdk.testing.contract.ContractHarness;
 import dev.jasper.sdk.testing.contract.PluginContractTest;
 import java.io.IOException;
@@ -171,6 +172,7 @@ class AppContractTest extends PluginContractTest {
         onEdt(() -> contributions.onPaletteRequest(request -> opens.add(request.windowId() + " " + request.scopeId() + " "
             + request.query().orElse("-") + " " + request.rowId().orElse("-"))));
         Map<String, Map<String, dev.jasper.app.palette.PaletteRow>> lastRows = new java.util.HashMap<>();
+        List<Subcommands.Owner> declared = new java.util.concurrent.CopyOnWriteArrayList<>();
         return new ContractHarness() {
             @Override public void setSetting(String pluginId, String key, Object rawValue) {
                 Path file = files.file(pluginId);
@@ -362,6 +364,31 @@ class AppContractTest extends PluginContractTest {
                 var pending = new AtomicReference<List<CompletableFuture<?>>>(List.of());
                 onEdt(() -> pending.set(host.stop()));
                 CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).join();
+            }
+            @Override public void declareSubcommand(String pluginId, String name, String summary) {
+                declared.add(new Subcommands.Owner(name, summary, pluginId, pluginId));
+                onEdt(() -> host.commands.declare(Subcommands.of(declared)));
+            }
+            @Override public ContractCall call(String name, List<String> arguments, Path workingDirectory, UUID paneOrNull) {
+                var out = new StringBuffer();
+                var err = new StringBuffer();
+                var all = new java.util.ArrayList<String>();
+                all.add(name);
+                all.addAll(arguments);
+                var invocation = new dev.jasper.app.commandline.Invocation(all, workingDirectory,
+                    java.util.Optional.ofNullable(paneOrNull), out::append, err::append);
+                var exit = host.commands.dispatch(invocation).toCompletableFuture();
+                onEdt(() -> { });
+                return new ContractCall() {
+                    @Override public int exitCode() {
+                        try { return exit.get(5, java.util.concurrent.TimeUnit.SECONDS); }
+                        catch (Exception failure) { throw new AssertionError(failure); }
+                    }
+                    @Override public boolean finished() { return exit.isDone(); }
+                    @Override public String out() { return out.toString(); }
+                    @Override public String err() { return err.toString(); }
+                    @Override public void cancel() { invocation.cancel(); onEdt(() -> { }); }
+                };
             }
                         private dev.jasper.app.palette.PaletteScope scope(String scopeId) {
                             return contributions.scopes().stream().filter(scope -> scope.id().equals(scopeId)).findFirst()

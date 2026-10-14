@@ -29,10 +29,28 @@ public final class CorePages {
      * @param migrate runs Migrate Config
      * @param migratable whether Migrate Config has work
      * @param vm the Java Virtual Machine section; empty leaves the section out (tests and previews)
+     * @param commandLine the Command line section, when the application offers one
      */
     public record SystemActions(Supplier<Path> file, Runnable openInEditor, Runnable reveal, Runnable reload, Runnable migrate,
-                                BooleanSupplier migratable, Optional<VmOptionsHooks> vm) { }
+                                BooleanSupplier migratable, Optional<VmOptionsHooks> vm, Optional<CommandLineActions> commandLine) {
+        /** Without the Command line section. */
+        public SystemActions(Supplier<Path> file, Runnable openInEditor, Runnable reveal, Runnable reload, Runnable migrate,
+                             BooleanSupplier migratable, Optional<VmOptionsHooks> vm) {
+            this(file, openInEditor, reveal, reload, migrate, migratable, vm, Optional.empty());
+        }
+    }
 
+    /**
+     * The Command line section: where the {@code jasper} command stands, and installing or removing it.
+     *
+     * @param state the sentence the row shows
+     * @param install puts the command on PATH
+     * @param installable whether Install applies now
+     * @param uninstall takes it off again
+     * @param uninstallable whether Uninstall applies now
+     */
+    public record CommandLineActions(Supplier<String> state, Runnable install, BooleanSupplier installable, Runnable uninstall,
+                                     BooleanSupplier uninstallable) { }
 
     /**
      * The pages the application supplies.
@@ -71,16 +89,15 @@ public final class CorePages {
         return specs(appearance, system, shells, navigate, glass, NotificationGroupChoices.NONE);
     }
 
-    /** Settings › Appearance; the Imported themes group follows the Theme section when the application supplies imports. */
+    /** Settings › Appearance. */
     private static SchemaPage.Spec appearance(AppearanceChoices appearance, boolean glass) {
-        var page = SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
+        return SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
             .section("Theme")
             .row(UI_APPEARANCE, Editors.appearance(appearance))
             .row(UI_THEME_DARK).shownWhen(false)
             .row(UI_THEME_LIGHT).shownWhen(false)
-            .row(TERMINAL_SCHEME, Editors.schemeChoice(appearance)).note("Colors for terminal panes");
-        appearance.imports().ifPresent(imports -> page.part(ImportedThemesSection.part(imports)));
-        return page.section("Workspace")
+            .row(TERMINAL_SCHEME, Editors.schemeChoice(appearance)).note("Colors for terminal panes")
+            .section("Workspace")
             .row(UI_WORKSPACE_OPACITY, WorkspaceEditors.opacity(appearance)).shownWhen(glass)
             .row(UI_WORKSPACE_BLUR, WorkspaceEditors.blur(appearance)).shownWhen(glass)
             .section("Interface Font")
@@ -159,7 +176,10 @@ public final class CorePages {
         return TerminalConfig.Shell.custom(draft.value(TERMINAL_SHELL_PROGRAM), draft.value(TERMINAL_SHELL_ARGS), draft.value(TERMINAL_SHELL_PROFILE));
     }
 
-    /** System Settings: Run in background, the Java Virtual Machine section when supplied, then the configuration file. */
+    /**
+     * System Settings: Run in background, the Java Virtual Machine and Command line sections when supplied, then the
+     * configuration file.
+     */
     private static SchemaPage.Spec systemPage(SystemActions system) {
         var page = SchemaPage.page("system", "System Settings").parent("appearance-behavior").anchor("background-residency")
             .row(SYSTEM_RUN_IN_BACKGROUND);
@@ -172,6 +192,10 @@ public final class CorePages {
             .notice("vm.findings", vm.findings())
             .notice("vm.restart", vm.restart(), new SchemaPage.Button("Restart Now", vm.restartNow(), () -> true))
             .refreshOn(vm.onChanged()));
+        system.commandLine().ifPresent(commandLine -> page.section("Command line")
+            .action("jasper command", commandLine.state(),
+                new SchemaPage.Button("Install", commandLine.install(), commandLine.installable()),
+                new SchemaPage.Button("Uninstall", commandLine.uninstall(), commandLine.uninstallable(), "Not installed by Jasper")));
         return page.section("Configuration file")
             .action("Location", () -> system.file().get().toString(),
                 new SchemaPage.Button("Open in Editor", system.openInEditor(), () -> true),

@@ -1,0 +1,34 @@
+# Request lines both ends must build identically (packaging/cli/README.md): packaging/cli's core tests and the
+# application's CommandProtocolTest read this file. A vector is "token=", "cwd=", "pane=" and any number of "arg="
+# lines, then "expect=": the request's fields separated by single spaces, "-" for an empty field, without the
+# newline. Blank lines and lines starting with # are ignored.
+
+token=abc
+cwd=/tmp
+pane=
+expect=jasper-command 1 abc L3RtcA== -
+
+token=Zm9v-_bar
+cwd=/Users/Jürgen/my project
+pane=123e4567-e89b-12d3-a456-426614174000
+arg=editor
+arg=--wait
+arg=notes ü.txt
+arg=
+expect=jasper-command 1 Zm9v-_bar L1VzZXJzL0rDvHJnZW4vbXkgcHJvamVjdA== 123e4567-e89b-12d3-a456-426614174000 ZWRpdG9y LS13YWl0 bm90ZXMgw7wudHh0 -
+
+token=t
+cwd=C:\Users\ann
+pane=
+arg=editor
+arg=src\Foo.java:42
+expect=jasper-command 1 t QzpcVXNlcnNcYW5u - ZWRpdG9y c3JjXEZvby5qYXZhOjQy
+
+token=t
+cwd=/
+pane=
+arg=a
+arg=bc
+arg=def
+arg=ghij
+expect=jasper-command 1 t Lw== - YQ== YmM= ZGVm Z2hpag==

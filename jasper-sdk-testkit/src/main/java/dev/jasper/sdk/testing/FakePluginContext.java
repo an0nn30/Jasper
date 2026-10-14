@@ -58,6 +58,7 @@ public final class FakePluginContext implements PluginContext {
     final FakeUi ui;
     final FakePalette palette;
     final FakeFileSources fileSources;
+    final FakeCommandLine commandLine;
     final FakePluginSettings settings;
     final dev.jasper.sdk.notifications.Notifications notifications;
 
@@ -68,6 +69,7 @@ public final class FakePluginContext implements PluginContext {
         this.ui = new FakeUi(host, this);
         this.palette = new FakePalette(host, this);
         this.fileSources = new FakeFileSources(host, this);
+        this.commandLine = new FakeCommandLine(host, this);
         this.settings = new FakePluginSettings(host, info.id(), host.dataRoot().resolve(info.id()).resolve(info.id() + ".toml"));
         this.notifications = host.notifications.of(info.id(), () -> state != State.CLOSED, name -> kit().validateIcon(name));
     }
@@ -111,6 +113,7 @@ public final class FakePluginContext implements PluginContext {
         @Override public dev.jasper.sdk.palette.Palette palette() { return palette; }
     @Override public dev.jasper.sdk.files.FileSources fileSources() { return fileSources; }
     @Override public dev.jasper.sdk.notifications.Notifications notifications() { return notifications; }
+    @Override public dev.jasper.sdk.cli.CommandLine commandLine() { return commandLine; }
         @Override public dev.jasper.sdk.ui.Platform platform() {
             return new dev.jasper.sdk.ui.Platform() {
                 @Override public void openInEditor(Path file) { requireOpen(); host.openedInEditor.add(Objects.requireNonNull(file, "file")); }

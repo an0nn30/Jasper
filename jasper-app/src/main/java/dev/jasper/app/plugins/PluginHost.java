@@ -106,6 +106,7 @@ final class PluginHost {
     private final dev.jasper.app.lifecycle.Subscription terminalBridge;
     private final dev.jasper.sdk.Subscription outcomes;
     final Containment containment;
+    final PluginCommands commands;
     final EventBus bus;
     final ActivityHub activities;
     final ConnectionHub connections;
@@ -116,6 +117,7 @@ final class PluginHost {
     PluginHost(Environment environment) {
         this.environment = Objects.requireNonNull(environment);
         this.containment = new Containment(environment.onUi(), environment.failures());
+        this.commands = new PluginCommands(environment.ui(), containment);
         this.bus = new EventBus(environment.ui(), containment);
         this.activities = new ActivityHub(bus);
         this.connections = new ConnectionHub(bus);

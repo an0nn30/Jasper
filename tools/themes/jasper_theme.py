@@ -42,7 +42,8 @@ ROLES = [
     "border.window", "border.subtle", "border.input", "border.field.raised", "border.field.raised.hover",
     "border.control", "border.menu", "border.error",
     "text.primary", "text.secondary", "text.strong.secondary", "text.tertiary", "text.placeholder", "text.field.raised",
-    "text.onAccent", "text.onAccent.secondary", "text.link", "text.link.hover", "text.error", "text.success",
+    "text.onAccent", "text.onAccent.secondary", "text.onSelection", "text.onSelection.secondary",
+    "text.link", "text.link.hover", "text.error", "text.success",
     "accent", "accent.hover", "selection.bg", "hover.overlay",
     "segment.track", "segment.selected.bg", "toggle.track.off", "toggle.knob",
     "button.secondary.bg", "button.secondary.bg.hover", "button.secondary.border",
@@ -779,6 +780,11 @@ def _onaccent(v, dark, ansi):
     return WHITE if contrast(WHITE, v["accent"]) >= contrast(BLACK, v["accent"]) else BLACK
 
 
+def _onselection(v, dark, ansi):
+    """The accent's text or the primary text, whichever reads better on the selection."""
+    return max((v["text.onAccent"], v["text.primary"]), key=lambda color: contrast(color, v["selection.bg"]))
+
+
 MAPPING = [
     ("surface.panel", ["ToolWindow.background", "Panel.background"],
      lambda v, dark, ansi: parse_hex("#3C3F41" if dark else "#F2F2F2")),
@@ -840,6 +846,8 @@ MAPPING = [
     ("text.success", ["Label.successForeground"], lambda v, dark, ansi: v["status.success"]),
     ("selection.bg", ["List.selectionBackground", "Tree.selectionBackground", "Table.selectionBackground"],
      lambda v, dark, ansi: mix(v["accent"], v["surface.panel"], 0.5)),
+    ("text.onSelection", ["List.selectionForeground", "Tree.selectionForeground", "Table.selectionForeground"], _onselection),
+    ("text.onSelection.secondary", [], lambda v, dark, ansi: with_alpha(v["text.onSelection"], 0xA6 if dark else 0xBF)),
     ("segment.track", [], lambda v, dark, ansi: v["surface.input"]),
     ("segment.selected.bg", ["SegmentedButton.selectedButtonColor"],
      lambda v, dark, ansi: v["border.control"] if dark else v["surface.control"]),
@@ -856,7 +864,7 @@ MAPPING = [
     ("hue.purple", [], lambda v, dark, ansi: mix(ansi["magenta"], v["text.primary"], 0.3)),
     ("hue.neutral", [], lambda v, dark, ansi: v["text.strong.secondary"]),
 ]
-OPACITY_ROLES = {"surface.scrim", "border.subtle", "text.onAccent.secondary"}
+OPACITY_ROLES = {"surface.scrim", "border.subtle", "text.onAccent.secondary", "text.onSelection.secondary"}
 
 
 def ui_roles(lookup: Lookup, dark: bool, terminal: dict) -> tuple[dict, dict, list[str]]:

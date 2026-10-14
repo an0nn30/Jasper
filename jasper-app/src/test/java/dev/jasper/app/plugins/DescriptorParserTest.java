@@ -1,6 +1,7 @@
 package dev.jasper.app.plugins;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
@@ -210,5 +211,39 @@ class DescriptorParserTest {
         PluginDescriptor minimal = DescriptorParser.parse(base);
         assertThat(minimal.icon()).isEmpty();
         assertThat(minimal.homepage()).isEmpty();
+    }
+
+    private static final String HEAD = "id = \"a.b\"\nname = \"AB\"\nversion = \"1.0.0\"\nentry = \"a.b.Main\"\nsdk = \">=0.17\"\n";
+
+    @Test void subcommandsAreReadInOrder() throws Exception {
+        PluginDescriptor descriptor = DescriptorParser.parse(HEAD + """
+
+            [[subcommands]]
+            name = "editor"
+            summary = "Open files in Jasper's Editor"
+
+            [[subcommands]]
+            name = "go-to"
+            summary = "Go somewhere"
+            """);
+        assertThat(descriptor.subcommands()).containsExactly(
+            new PluginDescriptor.Subcommand("editor", "Open files in Jasper's Editor"),
+            new PluginDescriptor.Subcommand("go-to", "Go somewhere"));
+        assertThat(DescriptorParser.parse(HEAD).subcommands()).isEmpty();
+    }
+
+    @Test void malformedSubcommandsNameTheirProblem() {
+        Map<String, String> cases = Map.of(
+            "subcommands = \"editor\"\n", "subcommands must be an array of tables",
+            "[[subcommands]]\nname = \"editor\"\nsummary = \"s\"\nicon = \"x\"\n", "subcommands has an unknown key: icon",
+            "[[subcommands]]\nname = \"Editor\"\nsummary = \"s\"\n", "subcommands.name is not a command name: Editor",
+            "[[subcommands]]\nname = \"-x\"\nsummary = \"s\"\n", "subcommands.name is not a command name: -x",
+            "[[subcommands]]\nname = \"help\"\nsummary = \"s\"\n", "subcommands.name is reserved: help",
+            "[[subcommands]]\nname = \"a\"\nsummary = \"s\"\n[[subcommands]]\nname = \"a\"\nsummary = \"t\"\n", "subcommands names a command twice: a",
+            "[[subcommands]]\nname = \"a\"\n", "Missing required key: summary",
+            "[[subcommands]]\nname = \"a\"\nsummary = \"two\\nlines\"\n", "subcommands.summary must be one visible line: a",
+            "[[subcommands]]\nname = \"a\"\nsummary = \"   \"\n", "subcommands.summary must be one visible line: a");
+        cases.forEach((tail, message) -> assertThatThrownBy(() -> DescriptorParser.parse(HEAD + tail)).as(tail)
+            .isInstanceOf(DescriptorParser.InvalidDescriptor.class).hasMessageContaining(message));
     }
 }

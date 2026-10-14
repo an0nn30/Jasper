@@ -464,12 +464,12 @@ final class ItemLists {
             }
         }
 
-        /** A selected row's supporting text, inline stacks included, in the secondary on-accent role; a severity keeps white. */
+        /** A selected row's supporting text, inline stacks included, in its fill's supporting ink; a severity keeps its own. */
         private void supportingInk(InteractiveRows.Row row, Nodes.Node node) {
             if (node instanceof Nodes.Stack stack) for (var child : stack.children()) supportingInk(row, child);
             else if (node instanceof Nodes.Text text && text.severity().isEmpty() && row.controls.get(text.id()) != null
                     && row.controls.get(text.id()).component instanceof JLabel label)
-                label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ONACCENT_SECONDARY));
+                label.setForeground(ThemePainting.color(context(), row.owner.ink().supporting));
         }
 
         /** A selected result's strong face; its ink comes from the row (InteractiveRows.Row.inked). */

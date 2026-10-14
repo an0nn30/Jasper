@@ -141,14 +141,14 @@ public final class Editors {
 
     /** {@code terminal.scheme}: "Same as UI theme", then the installed schemes {@code appearance} lists, read again on refresh. */
     public static Factory<String> schemeChoice(AppearanceChoices appearance) {
-        return new Factory<>((setting, context) -> new SchemePick(setting.label(), () -> appearance.themes().get().schemes()),
-            List.of(SAME_AS_UI_THEME, "Slate Steel Dark", "Slate Steel Light", "High Contrast"));
+        return new Factory<>((setting, context) -> new SchemePick(setting.label(), appearance.themes(), appearance.imports(), context),
+            List.of(SAME_AS_UI_THEME, "Slate Steel Dark", "Slate Steel Light", "High Contrast", "Import theme", "Remove theme"));
     }
 
     /** The Dark / Light / Match System tiles, then the Dark theme and Light theme rows over the installed themes. */
     public static Factory<AppearanceMode> appearance(AppearanceChoices choices) {
-        return new Factory<>((setting, context) -> new AppearanceSelection(choices, context.draft()),
-            List.of("Dark", "Light", "Match System", "Theme", "Dark theme", "Light theme", "Slate Steel"));
+        return new Factory<>((setting, context) -> new AppearanceSelection(choices, context),
+            List.of("Dark", "Light", "Match System", "Theme", "Dark theme", "Light theme", "Slate Steel", "Import theme", "Remove theme"));
     }
 
     /** A path field with Browse…, for a program path. */

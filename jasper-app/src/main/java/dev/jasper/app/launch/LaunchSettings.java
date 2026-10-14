@@ -39,6 +39,14 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
             new ShellProfile(ShellProfiles.CUSTOM, "Custom", ShellProfile.Kind.CUSTOM, Optional.empty(), command));
     }
 
+    /** These settings with {@code variables} added last, over everything they resolved. */
+    public LaunchSettings withVariables(Map<String, String> variables) {
+        if (variables.isEmpty()) return this;
+        var merged = new HashMap<>(environment);
+        merged.putAll(variables);
+        return new LaunchSettings(command, merged, columns, lines, scrollback, profile);
+    }
+
     /** Where a launch runs: the PTY's directory, and the settings with a WSL profile's {@code --cd} argument added. */
     public record Start(Path directory, LaunchSettings settings) { }
 

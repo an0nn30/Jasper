@@ -701,4 +701,48 @@ class EditorWindowTest {
         drain();
         assertThat(Files.readString(copy)).as("back to the local disk").isEqualTo("hello\n");
     }
+
+    @Test void openAtPutsTheCaretOnTheLineAndColumnOnceTheTextHasLoaded() throws Exception {
+        Path file = file("lines.txt", "one\ntwo\nthree\n");
+        var settled = window.openAt(file, 2, 3, null);
+        assertThat(settled).isNotDone();
+        host.runBackground();
+        assertThat(settled).isCompleted();
+        EditorTab tab = window.selected().orElseThrow();
+        assertThat(tab.area().getCaretPosition()).as("line 2, column 3").isEqualTo(6);
+        assertThat(window.openAt(file, 9, 99, null)).as("already loaded").isCompleted();
+        assertThat(tab.area().getCaretPosition()).as("past the end: the end of the last line").isEqualTo(14);
+        window.openAt(file, 1, 0, null);
+        assertThat(tab.area().getCaretPosition()).as("no column: the line's start").isZero();
+    }
+
+    @Test void openAtSettlesWhenTheTabClosesBeforeTheTextHasLoaded() throws Exception {
+        Path file = file("lines.txt", "one\ntwo\n");
+        var settled = window.openAt(file, 2, 1, null);
+        assertThat(settled).isNotDone();
+        host.contentTabs().getFirst().close();
+        assertThat(settled).as("closing cancels the read, which never reports").isCompleted();
+        assertThat(window.sessions()).isEmpty();
+    }
+
+    @Test void openNewMakesOneTabPerPathThatItsFirstSaveCreates() {
+        Path file = home.resolve("new.txt");
+        DocumentSession first = window.openNew(file, null);
+        assertThat(window.openNew(file, null)).isSameAs(first);
+        assertThat(host.contentTabs()).hasSize(1);
+        assertThat(first.untitled()).isTrue();
+        assertThat(file).doesNotExist();
+    }
+
+    @Test void closedCompletesWhenTheTabCloses() throws Exception {
+        Path file = file("a.txt", "a\n");
+        var settled = window.openAt(file, 0, 0, null);
+        host.runBackground();
+        DocumentSession session = settled.join();
+        var closed = window.closed(session);
+        assertThat(closed).isNotDone();
+        host.contentTabs().getFirst().close();
+        assertThat(closed).isCompleted();
+        assertThat(window.closed(session)).as("it has no tab any more").isCompleted();
+    }
 }
