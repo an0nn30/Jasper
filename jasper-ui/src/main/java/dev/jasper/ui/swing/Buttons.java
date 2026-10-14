@@ -161,10 +161,12 @@ final class Buttons {
             return accessibleContext;
         }
         @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
-        /** On a selected row's fill (set by the row before each refresh): a ghost or link button's ink is white. */
+        /** On a selected row's fill (set by the row before each refresh): a ghost or link button takes the fill's ink. */
         boolean onSelection;
+        /** The selected row's fill and ink, while {@link #onSelection}. */
+        InteractiveRows.Ink ink = InteractiveRows.Ink.SELECTION;
         SemanticColor textRole(boolean hover) {
-            if (onSelection && (kind == Nodes.ButtonKind.GHOST || kind == Nodes.ButtonKind.DESTRUCTIVE_GHOST || kind == Nodes.ButtonKind.LINK)) return SemanticColor.TEXT_ONACCENT;
+            if (onSelection && (kind == Nodes.ButtonKind.GHOST || kind == Nodes.ButtonKind.DESTRUCTIVE_GHOST || kind == Nodes.ButtonKind.LINK)) return ink.text;
             if (recorder()) return armed() && getIcon() == null ? SemanticColor.TEXT_PLACEHOLDER : SemanticColor.TEXT_PRIMARY;
             if (toggle && isSelected()) return SemanticColor.TEXT_PRIMARY;
             return switch (kind) {
@@ -178,7 +180,7 @@ final class Buttons {
         Color textColor(boolean hover) { return ThemePainting.color(context, textRole(hover)); }
         /** The glyph's colour: the severity's (as on a kit Icon) when present, otherwise the text colour. */
         SemanticColor iconRole(boolean hover) {
-            if (onSelection) return SemanticColor.TEXT_ONACCENT;
+            if (onSelection) return ink.text;
             return iconSeverity == null ? panel || panelDetail ? SemanticColor.HUE_NEUTRAL : textRole(hover) : Labels.tint(iconSeverity);
         }
         @Override public Dimension getPreferredSize() {
@@ -337,8 +339,8 @@ if(circular)ThemePainting.rounded(g,this,context,fill,ThemePainting.color(contex
                     // Re-tint the same named icon for hover without altering component identity.
                     String name = null;
                     if (getClientProperty("Jasper.button.icon") instanceof String value) name = value;
-                    // On a selected row the glyph is recoloured white whatever its artwork (the palette overload recolours built-ins).
-                    javax.swing.Icon artwork = name != null && onSelection ? context.icons().icon(name, context.theme().semantic(), SemanticColor.TEXT_ONACCENT, getIcon().getIconWidth())
+                    // On a selected row the glyph takes the fill's ink whatever its artwork (the palette overload recolours built-ins).
+                    javax.swing.Icon artwork = name != null && onSelection ? context.icons().icon(name, context.theme().semantic(), ink.text, getIcon().getIconWidth())
                         : name == null || context.icons().authored(name,panel || panelDetail || panelRow) ? getIcon() : panel || panelDetail || panelRow
                         ? context.icons().panel(name, context.theme().semantic(), iconRole(hover), panelRow ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_ACTION_GLYPH) : getIcon().getIconWidth())
                         : context.icons().icon(name, context.theme(), iconRole(hover), getIcon().getIconWidth());

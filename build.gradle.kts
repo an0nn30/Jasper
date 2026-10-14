@@ -125,5 +125,7 @@ apply(from = "gradle/sdk-architecture.gradle.kts")
 apply(from = "gradle/plugin-architecture.gradle.kts")
 apply(from = "gradle/plugin-packaging.gradle.kts")
 apply(from = "gradle/sdk-release.gradle.kts")
+apply(from = "gradle/third-party-notices.gradle.kts")
 
 apply(from = "gradle/ui-architecture.gradle.kts")
+apply(from = "gradle/theme-tool.gradle.kts")

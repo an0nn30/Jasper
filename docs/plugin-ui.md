@@ -11,7 +11,7 @@ registration, lifetimes and threading.
 | You describe | The host decides |
 | --- | --- |
 | Which surface (form kind, panel, split), its sections, rows and controls, their order and stable ids | Every size, inset, gap, radius, font and icon geometry |
-| Text, values, options, enabled/visible/busy/error state, the one primary action | Colors, from the active theme's semantic roles, in Slate Steel Dark and Light |
+| Text, values, options, enabled/visible/busy/error state, the one primary action | Colors, from the active theme's semantic roles |
 | What an event means for your domain, and the next spec | Focus, keyboard (Enter, Escape, Tab, arrows), validation placement, popups, scrolling, accessibility names |
 
 Do not paint, choose colors or fonts, or set pixel sizes for ordinary controls; there is no API for it, and the

@@ -3,7 +3,7 @@ package dev.jasper.app.appearance;
 import dev.jasper.terminal.config.Palette;
 import dev.jasper.ui.theme.GeneratedTheme;
 import dev.jasper.ui.theme.SemanticColor;
-import dev.jasper.ui.theme.SlateSteel;
+import dev.jasper.ui.theme.JasperTheme;
 import dev.jasper.ui.theme.TerminalScheme;
 import java.awt.Color;
 import java.util.Objects;
@@ -12,10 +12,16 @@ import java.util.Objects;
 public record ResolvedTheme(GeneratedTheme chrome, GeneratedTheme workspace, Palette palette) {
     public ResolvedTheme { Objects.requireNonNull(chrome); Objects.requireNonNull(workspace); Objects.requireNonNull(palette); }
 
-    /** Slate Steel: one variant for chrome and workspace, and the terminal scheme's palette. */
+    /** The theme {@code selection} shows with the Dark or Light appearance, for chrome and workspace, and its terminal scheme's palette. */
+    public static ResolvedTheme of(boolean dark, ThemeSelection selection) {
+        var theme = selection.theme(dark).generated(dark);
+        return new ResolvedTheme(theme, theme, TerminalPaletteAdapter.toTerminal(selection.terminal(dark)));
+    }
+
+    /** Slate Steel: one variant for chrome and workspace, and {@code scheme}'s palette. */
     public static ResolvedTheme slateSteel(boolean dark, TerminalScheme scheme) {
-        var theme = SlateSteel.bundled().generated(dark);
-        return new ResolvedTheme(theme, theme, TerminalPaletteAdapter.toTerminal(SlateSteel.bundled().terminal(scheme)));
+        var theme = JasperTheme.bundled().generated(dark);
+        return new ResolvedTheme(theme, theme, TerminalPaletteAdapter.toTerminal(scheme));
     }
 
     public dev.jasper.ui.theme.ThemePair pair() { return new dev.jasper.ui.theme.ThemePair(chrome, workspace); }

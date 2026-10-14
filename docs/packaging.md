@@ -36,7 +36,8 @@ On Windows:
 .\gradlew.bat :jasper-app:verifyPackage
 ```
 
-`jasperVersion` defaults to `1.0.0`. It accepts three decimal components without
+Without `-PjasperVersion`, the version is the commit's `vX.Y.Z` release tag, else the latest release tag behind it,
+else `1.0.0`; on a commit with a release tag, a different `-PjasperVersion` fails the build. It accepts three decimal components without
 leading zeroes; major is 1–255, minor is 0–255, and patch is 0–65535. Native
 package versions require a positive major component. Outputs are under `jasper-app/build/packaging`: the native application is
 in `image/`, and distributions are

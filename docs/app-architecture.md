@@ -173,6 +173,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `files` | Jasper's file chooser: the headless `ChooserModel` over `Location`s, `Browser`s and `ChooserSource`s (the local disk is `LocalSource`/`LocalBrowser`; plugin sources are adapted in `plugins`) and the Swing `FileChooserPanel`. NativeShells shows it in a dialog and owns that dialog's worker; the model applies worker results on the EDT, drops stale ones and closes the browsers it opened. |
 | `notifications` | EDT notification center (groups, the in-memory history, read and expired state, delivery routing) and its values, the incident store with its captures and reports, plus terminal and activity notice production for Buddy. Application owns the center and the incidents and closes notifiers before companion. |
 | `notificationui` | EDT Swing views of the center: each window's CardLayer, the history panel, the Errors window's ErrorsView, and their text, style and focus helpers. Application mounts each layer through WindowContent and closes it with its window; the Errors window closes its view when it closes. |
+| `about` | The About and Licenses windows' views and the third-party notices index read from resources. Application's AboutWindows owns both windows and closes each view with its window. |
 | `residency` | Bounded interprocess protocol and endpoint workers. Bootstrap transfers endpoint close to application shutdown and process-hook backup. |
 | `commandline` | The `jasper` command's side: the command socket's wire format and listener (a reader and a writer virtual thread per call; output is only queued), the calls it dispatches, the subcommand list `jasper --help` reads, and putting the command on `PATH`. Bootstrap binds the listener after plugins start; the application closes it at shutdown. |
 | `platform` | OS adapters, icons, fonts, title-bar paint, logging and system notifications. Callers own registrations and native handles; Swing operations run on EDT, and logging and system notifications each have their own worker. |
@@ -181,6 +182,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `shortcuthelp` | The Settings dialog's Keymap page: effective shortcut catalog, expandable searchable sections, staged binding edits saved on Apply and a window-scoped key recorder. SettingsDialog owns each KeymapPage; disposing it closes its subscription and capture. |
 | `pluginmanager` | The Settings dialog's Plugins page: passive view, consent view and an EDT controller over PluginRuntime's public records. Application owns the PluginManager; SettingsDialog owns each PluginsPage, whose consent and confirm dialogs open over Settings. |
 | `restart` | Pure restart planning, the ResidentControl seam and the RestartFlow state machine. No owner; worker threads are daemons. |
+| `vmoptions` | Custom VM options: the launcher's reading of `jasper.vmoptions` mirrored for the app, editing it, the launch's properties, the bundled `Jasper.cfg` and the check that runs the bundled `java`. JDK-only (`com.sun.management` allowed; `verifyApplicationArchitecture` enforces it); values and pure functions, with file I/O and the check on the caller's thread. |
 | `lifecycle` | Owner-thread-confined once-only cancellation. The subscriber closes the handle; no background worker or global state. |
 | `startup` | Start-up timing (`StartupTrace`, `WindowTrace`, `StartupTraceFile`); JDK-only, depended on by bootstrap, application, plugins and benchmark. Safe from any thread; `mark` and `phase` are non-blocking and run on the caller's thread; settling, logging and file writes run on virtual threads, never on the EDT. |
 | `benchmark` | Explicit opt-in native benchmark orchestration and reports. Benchmarks own and close fixtures; never part of headless check. |
@@ -226,21 +228,27 @@ icon values or identities, and their painting and text sizes come from `NativeCh
 
 ## Themes
 
-The installed theme is Slate Steel; there are no other themes, no theme files and no themes folder.
+The built-in theme is Slate Steel; installed themes are Jasper theme files in `<home>/themes/` ([themes](themes.md)).
 `ThemeManager.install` installs a variant through jasper-ui's `FlatLafInstaller` (FlatLaf's IntelliJ-format input from
 the theme's UI keys, which `UiColorKeys` derives from the semantic roles, then the `Jasper.semantic.*` role keys and
 the popup shadow) and adds the app's native defaults: the split divider border by class name and the centred title.
 Tool windows paint `surface.panel` (theme.md's tool-window body) through `ToolWindowSurface`, their headers included; the stripes stay chrome.
 
-`SlateSteel.bundled()` (jasper-ui) supplies one `GeneratedTheme` per variant and the terminal schemes. `ThemeController.configure(dark, scheme, font)` installs the variant for chrome and workspace and
-resolves the scheme's palette for terminal panes (`ResolvedTheme.slateSteel`); `ResolvedTheme.surface()`, the
+`JasperTheme` (jasper-ui) reads a theme file into one `GeneratedTheme` per variant and its terminal schemes;
+`JasperTheme.bundled()` is Slate Steel. `appearance.ThemeLibrary` holds Slate Steel and every valid
+`<home>/themes/*.json`, reusing the parsed theme of an unchanged file, and keeps a problem for each file it skips.
+`appearance.ThemeSelection` is the Dark and Light theme picks and the scheme choice from one library; its `of` replaces
+a pick the library cannot honour by its default and reports it. `ThemeController.configure(dark, selection, font)`
+installs the shown variant for chrome and workspace and resolves the scheme's palette for terminal panes
+(`ResolvedTheme.of`); `ResolvedTheme.surface()`, the
 workspace's `surface.terminal`, is what the window behind panes, tab backgrounds and the tab strip use, so a scheme
 colours only the text area. `ConfigurationController` resolves `ui.appearance` with `AppearancePolicy` against the
-live `SystemAppearance` observation; an installation failure keeps the current appearance and is a warning on
-`ui.appearance`.
-
-Nothing reads a themes folder or converts, imports or migrates a theme; an older install's `themes` and
-`terminal-themes` folders are left as they are. Plugins receive the roles and the editor scheme through
+live `SystemAppearance` observation and builds the selection from `ui.theme.dark`, `ui.theme.light` and
+`terminal.scheme`. It reads the themes folder again through `ConfigService.watchWith` on the configuration worker,
+before each forced or changed state is published, so Reload config, a Settings save or a `config.toml` change picks up
+theme files. Skipped files, unusable picks and an installation failure are its theme problems, shown with the
+configuration's diagnostics; an installation failure keeps the current appearance. Each window's `WindowCommands`
+rebuilds the "Terminal: …" commands when the library changes. Plugins receive the roles and the editor scheme through
 `plugins.HostedPalettes`.
 
 ## Hosted workspace styling

@@ -17,7 +17,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                       Map<String, Map<String, Object>> plugins, UiFontConfig uiFont,
                       int railWidth, int toolbarHeight, int statusBarHeight, boolean nativeDecorations,
                       ViewMode viewMode, GlassSettings glass, AnimationSettings animations,
-                      AppearanceMode appearance, TerminalSchemeChoice terminalScheme) {
+                      AppearanceMode appearance, TerminalSchemeChoice terminalScheme, String darkTheme, String lightTheme) {
     /** The rail's width in logical pixels without {@code window.rail_width}, and its limits. */
     public static final int DEFAULT_RAIL_WIDTH = 28, MIN_RAIL_WIDTH = 28, MAX_RAIL_WIDTH = 64;
     /** The toolbar (and unified macOS title bar) height in logical pixels without {@code window.toolbar_height}, and its limits. */
@@ -47,6 +47,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         Objects.requireNonNull(animations, "animations");
         Objects.requireNonNull(appearance, "appearance");
         Objects.requireNonNull(terminalScheme, "terminalScheme");
+        Objects.requireNonNull(darkTheme, "darkTheme");
+        Objects.requireNonNull(lightTheme, "lightTheme");
         keybindings = Map.copyOf(keybindings);
         // Plugin tables arrive deeply immutable from the loader; only the outer map is copied here.
         plugins = Map.copyOf(plugins);
@@ -77,7 +79,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         return new ConfigSnapshot(30, ToolbarMode.ICONS_AND_LABELS, true, FontConfig.defaults(), Map.of(), 100, 35, TerminalConfig.defaults(),
             false, PaletteSettings.DEFAULT_VISIBLE_ROWS, 10, CoreSettings.SYSTEM_RUN_IN_BACKGROUND.defaultValue(), Map.of(),
             UiFontConfig.defaults(), DEFAULT_RAIL_WIDTH, DEFAULT_TOOLBAR_HEIGHT, DEFAULT_STATUS_BAR_HEIGHT, false, ViewMode.NORMAL,
-            GlassSettings.UNSET, AnimationSettings.defaults(), AppearanceMode.SYSTEM, TerminalSchemeChoice.MATCH);
+            GlassSettings.UNSET, AnimationSettings.defaults(), AppearanceMode.SYSTEM, TerminalSchemeChoice.MATCH,
+            CoreSettings.UI_THEME_DARK.defaultValue(), CoreSettings.UI_THEME_LIGHT.defaultValue());
     }
 
     /** The snapshot for loaded settings plus the keybindings and legacy plugin tables their own readers produced. */
@@ -102,7 +105,9 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             new GlassSettings(values.get(CoreSettings.UI_WORKSPACE_OPACITY), values.get(CoreSettings.UI_WORKSPACE_BLUR)),
             new AnimationSettings(values.get(CoreSettings.UI_ANIMATIONS_ENABLED), AnimationSettings.DEFAULT_OPEN_MILLIS,
                 AnimationSettings.DEFAULT_CLOSE_MILLIS, AnimationSettings.DEFAULT_SWITCH_MILLIS),
-            values.get(CoreSettings.UI_APPEARANCE), values.get(CoreSettings.TERMINAL_SCHEME));
+            values.get(CoreSettings.UI_APPEARANCE),
+            TerminalSchemeChoice.parse(values.get(CoreSettings.TERMINAL_SCHEME)).orElse(TerminalSchemeChoice.MATCH),
+            values.get(CoreSettings.UI_THEME_DARK), values.get(CoreSettings.UI_THEME_LIGHT));
     }
 
     public KeyBindings bindings(boolean macOs) {
@@ -132,6 +137,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         private AnimationSettings animations;
         private AppearanceMode appearance;
         private TerminalSchemeChoice terminalScheme;
+        private String darkTheme;
+        private String lightTheme;
         private int railWidth;
         private int toolbarHeight;
         private int statusBarHeight;
@@ -156,6 +163,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             animations = source.animations();
             appearance = source.appearance();
             terminalScheme = source.terminalScheme();
+            darkTheme = source.darkTheme();
+            lightTheme = source.lightTheme();
             railWidth = source.railWidth();
             toolbarHeight = source.toolbarHeight();
             statusBarHeight = source.statusBarHeight();
@@ -174,6 +183,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public Builder font(FontConfig value) { font = value; return this; }
         public Builder appearance(AppearanceMode value) { appearance = value; return this; }
         public Builder terminalScheme(TerminalSchemeChoice value) { terminalScheme = value; return this; }
+        public Builder darkTheme(String value) { darkTheme = value; return this; }
+        public Builder lightTheme(String value) { lightTheme = value; return this; }
         public Builder keybindings(Map<String, String> value) { keybindings = Map.copyOf(value); return this; }
         public Builder columns(int value) { columns = value; return this; }
         public Builder lines(int value) { lines = value; return this; }
@@ -188,7 +199,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public ConfigSnapshot build() {
             return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, keybindings, columns, lines, terminal, buddyEnabled,
                 visibleRows, longCommandSeconds, backgroundEnabled, plugins, uiFont, railWidth, toolbarHeight, statusBarHeight,
-                nativeDecorations, viewMode, glass, animations, appearance, terminalScheme);
+                nativeDecorations, viewMode, glass, animations, appearance, terminalScheme, darkTheme, lightTheme);
         }
     }
 }

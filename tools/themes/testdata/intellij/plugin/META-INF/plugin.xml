@@ -1,0 +1,8 @@
+<idea-plugin>
+  <id>dev.jasper.fixture.ocean</id>
+  <name>Ocean Themes</name>
+  <extensions defaultExtensionNs="com.intellij">
+    <themeProvider id="ocean-dark" path="/themes/Ocean.theme.json"/>
+    <themeProvider id="ocean-dawn" path="/themes/Dawn.theme.json"/>
+  </extensions>
+</idea-plugin>

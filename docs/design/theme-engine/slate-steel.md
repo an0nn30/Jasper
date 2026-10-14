@@ -64,8 +64,10 @@ The complete color reference for Jasper. It covers:
 | `text.tertiary` | `#8B919C` | `#727985` | Captions, counts, section labels, row subtitles |
 | `text.placeholder` | `#6D737E` | `#8E95A0` | Input hints, empty picker value |
 | `text.field.raised` | `#CDD2DA` | `#4A515C` | Command field label |
-| `text.onAccent` | `#FFFFFF` | `#FFFFFF` | Primary button, highlighted menu row, selected list row |
-| `text.onAccent.secondary` | `#FFFFFF @ 65%` | `#FFFFFF @ 75%` | Subtitles on selected or highlighted rows |
+| `text.onAccent` | `#FFFFFF` | `#FFFFFF` | Primary button, highlighted menu row, selected result row |
+| `text.onAccent.secondary` | `#FFFFFF @ 65%` | `#FFFFFF @ 75%` | Subtitles on highlighted menu and result rows |
+| `text.onSelection` | `#FFFFFF` | `#FFFFFF` | Selected list row, highlighted dropdown entry, selected text |
+| `text.onSelection.secondary` | `#FFFFFF @ 65%` | `#FFFFFF @ 75%` | Subtitles on selected rows |
 | `text.link` | `#8FB4DE` | `#3F6FA8` | Link buttons ("New Credential…", "Reset All"), selected checkmark |
 | `text.link.hover` | `#B0CBEA` | `#2F5A8C` | Link hover |
 | `text.error` | `#F07F78` | `#B93A33` | Inline validation |
@@ -209,8 +211,9 @@ Against the editor background, every text role is at least 4.5:1 (lowest: Light 
 
 ```json
 {
+  "jasper-theme": 1, "name": "Slate Steel", "author": "Jasper",
   "ui": {
-    "slate-steel-dark": {
+    "dark": {
       "surface.app": "#1E2127", "surface.panel": "#272A31", "surface.panel.raised": "#2D3139",
       "surface.dialog": "#2D3139", "surface.card": "#272A31", "surface.sidebar": "#23262C",
       "surface.input": "#1F2228", "surface.field.raised": "#30343C", "surface.control": "#363B45",
@@ -222,7 +225,8 @@ Against the editor background, every text role is at least 4.5:1 (lowest: Light 
       "border.menu": "#4B515D", "border.error": "#E0605A",
       "text.primary": "#EFF1F4", "text.secondary": "#A7ADB8", "text.strong.secondary": "#D1D5DC",
       "text.tertiary": "#8B919C", "text.placeholder": "#6D737E", "text.field.raised": "#CDD2DA",
-      "text.onAccent": "#FFFFFF", "text.onAccent.secondary": "#FFFFFFA6", "text.link": "#8FB4DE",
+      "text.onAccent": "#FFFFFF", "text.onAccent.secondary": "#FFFFFFA6",
+      "text.onSelection": "#FFFFFF", "text.onSelection.secondary": "#FFFFFFA6", "text.link": "#8FB4DE",
       "text.link.hover": "#B0CBEA", "text.error": "#F07F78", "text.success": "#4FD06C",
       "accent": "#4E7DB4", "accent.hover": "#5C8BC2", "selection.bg": "#2E4664", "hover.overlay": "#FFFFFF",
       "segment.track": "#1F2228", "segment.selected.bg": "#474D59", "toggle.track.off": "#474D59", "toggle.knob": "#FFFFFF",
@@ -230,7 +234,7 @@ Against the editor background, every text role is at least 4.5:1 (lowest: Light 
       "status.success": "#4FD06C", "status.warning": "#F2C55C", "status.danger": "#F07F78", "status.idle": "#5B616C",
       "hue.blue": "#94B4D6", "hue.green": "#72DE8F", "hue.amber": "#F2C55C", "hue.purple": "#C8A4FF", "hue.neutral": "#D1D5DC"
     },
-    "slate-steel-light": {
+    "light": {
       "surface.app": "#E4E7EB", "surface.panel": "#F5F6F8", "surface.panel.raised": "#ECEEF1",
       "surface.dialog": "#F5F6F8", "surface.card": "#FFFFFF", "surface.sidebar": "#ECEEF1",
       "surface.input": "#FFFFFF", "surface.field.raised": "#FFFFFF", "surface.control": "#FFFFFF",
@@ -242,7 +246,8 @@ Against the editor background, every text role is at least 4.5:1 (lowest: Light 
       "border.menu": "#C9CED5", "border.error": "#C8423A",
       "text.primary": "#1C2027", "text.secondary": "#5D6470", "text.strong.secondary": "#383E48",
       "text.tertiary": "#727985", "text.placeholder": "#8E95A0", "text.field.raised": "#4A515C",
-      "text.onAccent": "#FFFFFF", "text.onAccent.secondary": "#FFFFFFBF", "text.link": "#3F6FA8",
+      "text.onAccent": "#FFFFFF", "text.onAccent.secondary": "#FFFFFFBF",
+      "text.onSelection": "#FFFFFF", "text.onSelection.secondary": "#FFFFFFBF", "text.link": "#3F6FA8",
       "text.link.hover": "#2F5A8C", "text.error": "#B93A33", "text.success": "#2E9A4C",
       "accent": "#3F6FA8", "accent.hover": "#4A7BB5", "selection.bg": "#3F6FA8", "hover.overlay": "#000000",
       "segment.track": "#E4E7EB", "segment.selected.bg": "#FFFFFF", "toggle.track.off": "#C3C8D0", "toggle.knob": "#FFFFFF",
@@ -252,22 +257,22 @@ Against the editor background, every text role is at least 4.5:1 (lowest: Light 
     }
   },
   "terminal": {
-    "slate-steel-dark": {
-      "bg": "#23262C", "fg": "#F4F6F8", "fg.bold": "#FFFFFF", "cursor": "#FFFFFF", "selection": "#3D5F8A",
+    "dark": {
+      "name": "Slate Steel Dark", "bg": "#23262C", "fg": "#F4F6F8", "fg.bold": "#FFFFFF", "cursor": "#FFFFFF", "selection": "#3D5F8A",
       "black": "#3A3F4A", "red": "#FF928A", "green": "#5FE88A", "yellow": "#FFD75F",
       "blue": "#6CB6FF", "magenta": "#E99CFF", "cyan": "#4FE0E8", "white": "#D9DEE5",
       "bright.black": "#99A2B1", "bright.red": "#FFC6C0", "bright.green": "#9CF5B6", "bright.yellow": "#FFE89A",
       "bright.blue": "#B2D9FF", "bright.magenta": "#F6C8FF", "bright.cyan": "#98F2F5", "bright.white": "#FFFFFF"
     },
-    "slate-steel-light": {
-      "bg": "#FBFBFC", "fg": "#1C2027", "fg.bold": "#000000", "cursor": "#1C2027", "selection": "#C7D8EE",
+    "light": {
+      "name": "Slate Steel Light", "bg": "#FBFBFC", "fg": "#1C2027", "fg.bold": "#000000", "cursor": "#1C2027", "selection": "#C7D8EE",
       "black": "#1C2027", "red": "#C8302C", "green": "#1F7A35", "yellow": "#8A6200",
       "blue": "#1F5FBF", "magenta": "#9B3FB5", "cyan": "#0F7A8A", "white": "#5D6470",
       "bright.black": "#6B7280", "bright.red": "#B8342F", "bright.green": "#23853C", "bright.yellow": "#946800",
       "bright.blue": "#2867C8", "bright.magenta": "#A847C2", "bright.cyan": "#127F91", "bright.white": "#000000"
     },
     "high-contrast": {
-      "bg": "#000000", "fg": "#FFFFFF", "fg.bold": "#FFFFFF", "cursor": "#FFFFFF", "selection": "#264F9E",
+      "name": "High Contrast", "bg": "#000000", "fg": "#FFFFFF", "fg.bold": "#FFFFFF", "cursor": "#FFFFFF", "selection": "#264F9E",
       "black": "#4D4D4D", "red": "#FF7B72", "green": "#3CFF7A", "yellow": "#FFE14D",
       "blue": "#7CB8FF", "magenta": "#FF8CFF", "cyan": "#4DF0FF", "white": "#E6E6E6",
       "bright.black": "#A6A6A6", "bright.red": "#FFA8A2", "bright.green": "#9DFFBC", "bright.yellow": "#FFF08A",
@@ -275,7 +280,7 @@ Against the editor background, every text role is at least 4.5:1 (lowest: Light 
     }
   },
   "editor": {
-    "slate-steel-dark": {
+    "dark": {
       "background": "terminal.bg", "foreground": "terminal.fg", "caret": "terminal.cursor", "selection": "terminal.selection",
       "currentLine": "hover.overlay @ 5%", "gutter": "terminal.bg", "lineNumbers": "text.tertiary",
       "keyword": "terminal.ansi.magenta", "type": "terminal.ansi.cyan", "function": "terminal.ansi.blue",
@@ -285,7 +290,7 @@ Against the editor background, every text role is at least 4.5:1 (lowest: Light 
       "operator": "text.secondary", "punctuation": "text.secondary", "tag": "terminal.ansi.red",
       "attribute": "terminal.ansi.yellow", "regex": "terminal.ansi.cyan", "error": "terminal.ansi.red"
     },
-    "slate-steel-light": {
+    "light": {
       "background": "terminal.bg", "foreground": "terminal.fg", "caret": "terminal.cursor", "selection": "terminal.selection",
       "currentLine": "hover.overlay @ 5%", "gutter": "terminal.bg", "lineNumbers": "text.tertiary",
       "keyword": "terminal.ansi.magenta", "type": "terminal.ansi.cyan", "function": "terminal.ansi.blue",

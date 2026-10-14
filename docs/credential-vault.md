@@ -46,8 +46,8 @@ shows the remaining inactivity time. Already connected SSH sessions are unaffect
 **Search Vault Logins** (Cmd+\\, or Ctrl+Shift+\\ on Windows and Linux) opens the command palette on the Vault scope;
 `vault >` in the palette does the same. It lists logins, searched by name or username; SSH keys stay in the manager.
 Enter copies a login's password, Cmd/Ctrl+Enter copies its username, and Shift+Enter opens the selected entry in the
-manager. A card confirms each copy, naming the login; turn these off in the **Vault copies** group under **Settings ›
-Notifications › Groups**. While the vault is locked the scope shows one row, whose Enter unlocks the vault and returns
+manager. A card confirms each copy, here and from the manager's copy buttons (username, password, secure note and
+public key), naming the entry; turn these off in the **Vault copies** group under **Settings › Notifications › Groups**. While the vault is locked the scope shows one row, whose Enter unlocks the vault and returns
 to the search; with no vault yet, Enter creates one in the manager. Both password and username
 copies are secret copies to Jasper's clipboard (SDK `Platform.copySecret`): Jasper clears them after 30 seconds (retrying
 briefly while another program holds the clipboard), and tries once when the vault plugin stops and once when Jasper

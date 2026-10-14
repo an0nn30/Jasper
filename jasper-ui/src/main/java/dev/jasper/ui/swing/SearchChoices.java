@@ -331,7 +331,7 @@ final class SearchChoices {
             list.setBackground(ThemePainting.color(context, SemanticColor.SURFACE_MENU));
             list.setForeground(ThemePainting.color(context, SemanticColor.TEXT_PRIMARY));
             list.setSelectionBackground(ThemePainting.color(context, SemanticColor.SELECTION_BG));
-            list.setSelectionForeground(ThemePainting.color(context, SemanticColor.TEXT_ONACCENT));
+            list.setSelectionForeground(ThemePainting.color(context, SemanticColor.TEXT_ONSELECTION));
             search.setFont(ThemePainting.font(context, Typography.Role.BODY));
             search.setForeground(ThemePainting.color(context, SemanticColor.TEXT_PRIMARY));
             search.setCaretColor(search.getForeground());

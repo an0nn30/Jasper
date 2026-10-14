@@ -1,23 +1,18 @@
 package dev.jasper.ui.theme;
 
-import java.util.Optional;
+import java.awt.Color;
+import java.util.Objects;
 
-/** The terminal colour schemes Jasper ships; each UI variant pairs with its own by default. */
-public enum TerminalScheme {
-    SLATE_STEEL_DARK("slate-steel-dark"), SLATE_STEEL_LIGHT("slate-steel-light"), HIGH_CONTRAST("high-contrast");
-
-    private final String key;
-    TerminalScheme(String key) { this.key = key; }
-
-    /** The scheme's key in the theme file and in configuration, for example {@code high-contrast}. */
-    public String key() { return key; }
-
-    /** The scheme with this key. */
-    public static Optional<TerminalScheme> of(String key) {
-        for (var scheme : values()) if (scheme.key.equals(key)) return Optional.of(scheme);
-        return Optional.empty();
+/**
+ * One of a theme's terminal schemes.
+ * @param id its theme's id and its key
+ * @param name the name Settings and the command palette show
+ * @param colors background, foreground, cursor, selection and the 16 ANSI colours
+ * @param boldForeground the default foreground for bold text
+ */
+public record TerminalScheme(SchemeId id, String name, TerminalColors colors, Color boldForeground) {
+    public TerminalScheme {
+        Objects.requireNonNull(id, "id"); Objects.requireNonNull(colors, "colors"); Objects.requireNonNull(boldForeground, "boldForeground");
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("A terminal scheme needs a name");
     }
-
-    /** The scheme that matches a UI variant: Slate Steel Dark with Dark, Slate Steel Light with Light. */
-    public static TerminalScheme matching(boolean dark) { return dark ? SLATE_STEEL_DARK : SLATE_STEEL_LIGHT; }
 }

@@ -36,7 +36,7 @@ final class WorkspaceAppearanceFixture {
         roles.put(SemanticColor.TEXT_SECONDARY, palette.textMuted());
         roles.put(SemanticColor.BORDER_WINDOW, palette.border());
         roles.put(SemanticColor.SELECTION_BG, palette.selection());
-        roles.put(SemanticColor.TEXT_ONACCENT, palette.selectionText());
+        roles.put(SemanticColor.TEXT_ONSELECTION, palette.selectionText());
         roles.put(SemanticColor.SURFACE_CONTROL_HOVER, palette.hover());
         roles.put(SemanticColor.ACCENT, palette.accent());
         roles.put(SemanticColor.STATUS_SUCCESS, palette.success());

@@ -120,7 +120,7 @@ public final class NativeControlStyles {
             text.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));
             text.setCaretColor(palette.color(SemanticColor.TEXT_PRIMARY));
             text.setSelectionColor(palette.color(SemanticColor.SELECTION_BG));
-            text.setSelectedTextColor(palette.color(SemanticColor.TEXT_ONACCENT));
+            text.setSelectedTextColor(palette.color(SemanticColor.TEXT_ONSELECTION));
         });
     }
     /** Native menu presentation (colors and typography); keyboard routing, actions and look-and-feel margins stay with the host. */
@@ -161,7 +161,7 @@ public final class NativeControlStyles {
         field.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));
         field.setCaretColor(palette.color(SemanticColor.TEXT_PRIMARY));
         field.setSelectionColor(palette.color(SemanticColor.SELECTION_BG));
-        field.setSelectedTextColor(palette.color(SemanticColor.TEXT_ONACCENT));
+        field.setSelectedTextColor(palette.color(SemanticColor.TEXT_ONSELECTION));
     }
     /** Reapply native adapter roles after either a LAF refresh or a workspace-only appearance update. */
     public static void refresh(JComponent component) {

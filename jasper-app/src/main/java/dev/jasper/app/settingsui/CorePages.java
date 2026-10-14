@@ -28,14 +28,15 @@ public final class CorePages {
      * @param reload reads it again
      * @param migrate runs Migrate Config
      * @param migratable whether Migrate Config has work
+     * @param vm the Java Virtual Machine section; empty leaves the section out (tests and previews)
      * @param commandLine the Command line section, when the application offers one
      */
     public record SystemActions(Supplier<Path> file, Runnable openInEditor, Runnable reveal, Runnable reload, Runnable migrate,
-                                BooleanSupplier migratable, Optional<CommandLineActions> commandLine) {
+                                BooleanSupplier migratable, Optional<VmOptionsHooks> vm, Optional<CommandLineActions> commandLine) {
         /** Without the Command line section. */
         public SystemActions(Supplier<Path> file, Runnable openInEditor, Runnable reveal, Runnable reload, Runnable migrate,
-                             BooleanSupplier migratable) {
-            this(file, openInEditor, reveal, reload, migrate, migratable, Optional.empty());
+                             BooleanSupplier migratable, Optional<VmOptionsHooks> vm) {
+            this(file, openInEditor, reveal, reload, migrate, migratable, vm, Optional.empty());
         }
     }
 
@@ -88,25 +89,31 @@ public final class CorePages {
         return specs(appearance, system, shells, navigate, glass, NotificationGroupChoices.NONE);
     }
 
+    /** Settings › Appearance. */
+    private static SchemaPage.Spec appearance(AppearanceChoices appearance, boolean glass) {
+        return SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
+            .section("Theme")
+            .row(UI_APPEARANCE, Editors.appearance(appearance))
+            .row(UI_THEME_DARK).shownWhen(false)
+            .row(UI_THEME_LIGHT).shownWhen(false)
+            .row(TERMINAL_SCHEME, Editors.schemeChoice(appearance)).note("Colors for terminal panes")
+            .section("Workspace")
+            .row(UI_WORKSPACE_OPACITY, WorkspaceEditors.opacity(appearance)).shownWhen(glass)
+            .row(UI_WORKSPACE_BLUR, WorkspaceEditors.blur(appearance)).shownWhen(glass)
+            .section("Interface Font")
+            .row(UI_FONT_FAMILY, Editors.interfaceFont())
+            .row(UI_FONT_SIZE, PlatformFontSize.factory())
+            .section("View mode")
+            .row(WINDOW_VIEW_MODE)
+            .section("Animations")
+            .row(UI_ANIMATIONS_ENABLED);
+    }
+
     /** As above, with the notification groups the Notifications page lists. */
     static List<SchemaPage.Spec> specs(AppearanceChoices appearance, SystemActions system, ShellChoices shells,
                                        java.util.function.Consumer<String> navigate, boolean glass, NotificationGroupChoices groups) {
         return List.of(
-            SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
-                .section("Theme")
-                .row(UI_APPEARANCE, Editors.appearance(appearance))
-                .row(TERMINAL_SCHEME, Editors.choice(Map.of("match", Editors.SAME_AS_UI_THEME, "slate-steel-dark", "Slate Steel Dark",
-                    "slate-steel-light", "Slate Steel Light", "high-contrast", "High Contrast"))).note("Colors for terminal panes")
-                .section("Workspace")
-                .row(UI_WORKSPACE_OPACITY, WorkspaceEditors.opacity(appearance)).shownWhen(glass)
-                .row(UI_WORKSPACE_BLUR, WorkspaceEditors.blur(appearance)).shownWhen(glass)
-                .section("Interface Font")
-                .row(UI_FONT_FAMILY, Editors.interfaceFont())
-                .row(UI_FONT_SIZE, PlatformFontSize.factory())
-                .section("View mode")
-                .row(WINDOW_VIEW_MODE)
-                .section("Animations")
-                .row(UI_ANIMATIONS_ENABLED),
+            appearance(appearance, glass),
             SchemaPage.page("window", "Window").parent("appearance-behavior")
                 .section("Toolbar & Status Bar")
                 .row(WINDOW_TOOLBAR, Editors.segments(Map.of("icons_and_labels", "Icons & Labels", "icons", "Icons Only", "hidden", "Hidden")))
@@ -168,6 +175,36 @@ public final class CorePages {
         return TerminalConfig.Shell.custom(draft.value(TERMINAL_SHELL_PROGRAM), draft.value(TERMINAL_SHELL_ARGS), draft.value(TERMINAL_SHELL_PROFILE));
     }
 
+    /**
+     * System Settings: Run in background, the Java Virtual Machine and Command line sections when supplied, then the
+     * configuration file.
+     */
+    private static SchemaPage.Spec systemPage(SystemActions system) {
+        var page = SchemaPage.page("system", "System Settings").parent("appearance-behavior").anchor("background-residency")
+            .row(SYSTEM_RUN_IN_BACKGROUND);
+        system.vm().ifPresent(vm -> page.section("Java Virtual Machine")
+            .notice("vm.state", vm.state())
+            .external(vm.heap())
+            .action("Custom VM options", vm.file(),
+                new SchemaPage.Button("Edit Custom VM Options\u2026", vm.edit(), vm.editable(), "Custom VM options apply to the installed Jasper app"),
+                new SchemaPage.Button("Reveal", vm.reveal(), vm.editable(), "Custom VM options apply to the installed Jasper app"))
+            .notice("vm.findings", vm.findings())
+            .notice("vm.restart", vm.restart(), new SchemaPage.Button("Restart Now", vm.restartNow(), () -> true))
+            .refreshOn(vm.onChanged()));
+        system.commandLine().ifPresent(commandLine -> page.section("Command line")
+            .action("jasper command", commandLine.state(),
+                new SchemaPage.Button("Install", commandLine.install(), commandLine.installable()),
+                new SchemaPage.Button("Uninstall", commandLine.uninstall(), commandLine.uninstallable(), "Not installed by Jasper")));
+        return page.section("Configuration file")
+            .action("Location", () -> system.file().get().toString(),
+                new SchemaPage.Button("Open in Editor", system.openInEditor(), () -> true),
+                new SchemaPage.Button("Reveal", system.reveal(), () -> true))
+            .action("Reload from disk", () -> "Read the file again after editing it elsewhere.",
+                new SchemaPage.Button("Reload", system.reload(), () -> true))
+            .action("Migrate old settings", () -> "Rewrite old setting names to the current layout; the original is backed up first.",
+                new SchemaPage.Button("Migrate\u2026", system.migrate(), system.migratable(), "Nothing to migrate"));
+    }
+
     /** The whole tree with no detected shells. */
     public static Function<PageContext, List<SettingsPage>> pages(AppearanceChoices appearance, SystemActions system,
                                                                    Function<PageContext, SettingsPage> keymap,
@@ -225,22 +262,5 @@ public final class CorePages {
             all.addAll(supplied.tools().apply(context));
             return List.copyOf(all);
         };
-    }
-
-    private static SchemaPage.Spec systemPage(SystemActions system) {
-        var page = SchemaPage.page("system", "System Settings").parent("appearance-behavior").anchor("background-residency")
-            .row(SYSTEM_RUN_IN_BACKGROUND);
-        system.commandLine().ifPresent(commandLine -> page.section("Command line")
-            .action("jasper command", commandLine.state(),
-                new SchemaPage.Button("Install", commandLine.install(), commandLine.installable()),
-                new SchemaPage.Button("Uninstall", commandLine.uninstall(), commandLine.uninstallable(), "Not installed by Jasper")));
-        return page.section("Configuration file")
-            .action("Location", () -> system.file().get().toString(),
-                new SchemaPage.Button("Open in Editor", system.openInEditor(), () -> true),
-                new SchemaPage.Button("Reveal", system.reveal(), () -> true))
-            .action("Reload from disk", () -> "Read the file again after editing it elsewhere.",
-                new SchemaPage.Button("Reload", system.reload(), () -> true))
-            .action("Migrate old settings", () -> "Rewrite old setting names to the current layout; the original is backed up first.",
-                new SchemaPage.Button("Migrate\u2026", system.migrate(), system.migratable(), "Nothing to migrate"));
     }
 }

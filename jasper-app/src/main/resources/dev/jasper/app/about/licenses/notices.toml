@@ -1,0 +1,205 @@
+# Third-party software Jasper ships, for the Licenses window (ThirdPartyNotices) and verifyThirdPartyNotices.
+# One [[component]] per project. modules are the exact group:artifact:version coordinates it covers; the check fails
+# when a shipped jar is in no component or a listed one no longer ships. text and notice are paths relative to this
+# folder, or absolute classpath resources. license is an SPDX id ThirdPartyNotices knows.
+
+[[component]]
+name = "ANTLR 4 Runtime"
+version = "4.11.1"
+license = "BSD-3-Clause"
+homepage = "https://www.antlr.org/"
+modules = ["org.antlr:antlr4-runtime:4.11.1"]
+text = "antlr4.LICENSE.txt"
+
+[[component]]
+name = "Apache FtpServer"
+version = "1.2.1"
+license = "Apache-2.0"
+homepage = "https://mina.apache.org/ftpserver-project/"
+modules = ["org.apache.ftpserver:ftplet-api:1.2.1", "org.apache.ftpserver:ftpserver-core:1.2.1"]
+text = "apache-2.0.txt"
+notice = "ftpserver.NOTICE.txt"
+
+[[component]]
+name = "Apache MINA"
+version = "2.2.4"
+license = "Apache-2.0"
+homepage = "https://mina.apache.org/"
+modules = ["org.apache.mina:mina-core:2.2.4"]
+text = "apache-2.0.txt"
+notice = "mina.NOTICE.txt"
+
+[[component]]
+name = "Apache MINA SSHD"
+version = "2.19.0"
+license = "Apache-2.0"
+homepage = "https://mina.apache.org/sshd-project/"
+modules = ["org.apache.sshd:sshd-common:2.19.0", "org.apache.sshd:sshd-core:2.19.0", "org.apache.sshd:sshd-sftp:2.19.0"]
+text = "apache-2.0.txt"
+notice = "mina-sshd.NOTICE.txt"
+
+[[component]]
+name = "Bouncy Castle"
+version = "1.85"
+license = "MIT"
+homepage = "https://www.bouncycastle.org/"
+modules = ["org.bouncycastle:bcprov-jdk18on:1.85.2", "org.bouncycastle:bcpkix-jdk18on:1.85", "org.bouncycastle:bcutil-jdk18on:1.85"]
+text = "bouncycastle.LICENSE.md"
+
+[[component]]
+name = "Checker Framework Qualifiers"
+version = "3.21.2"
+license = "MIT"
+homepage = "https://checkerframework.org/"
+modules = ["org.checkerframework:checker-qual:3.21.2"]
+text = "checker-qual.LICENSE.txt"
+
+[[component]]
+name = "Cousine"
+version = "1.241"
+license = "OFL-1.1"
+homepage = "https://github.com/googlefonts/cousine"
+text = "/dev/jasper/app/fonts/cousine/OFL.txt"
+notice = "/dev/jasper/app/fonts/cousine/NOTICE.md"
+
+[[component]]
+name = "FlatLaf"
+version = "3.7"
+license = "Apache-2.0"
+homepage = "https://www.formdev.com/flatlaf/"
+modules = ["com.formdev:flatlaf:3.7", "com.formdev:flatlaf-extras:3.7"]
+text = "apache-2.0.txt"
+
+[[component]]
+name = "IntelliJ Platform icons"
+version = ""
+license = "Apache-2.0"
+homepage = "https://github.com/JetBrains/intellij-community"
+text = "/dev/jasper/ui/icons/LICENSE.txt"
+notice = "/dev/jasper/ui/icons/NOTICE.txt"
+
+[[component]]
+name = "JCL over SLF4J"
+version = "1.7.36"
+license = "Apache-2.0"
+homepage = "https://www.slf4j.org/legacy.html"
+modules = ["org.slf4j:jcl-over-slf4j:1.7.36"]
+text = "apache-2.0.txt"
+
+[[component]]
+name = "JediTerm"
+version = "3.76"
+license = "Apache-2.0"
+homepage = "https://github.com/JetBrains/jediterm"
+modules = ["org.jetbrains.jediterm:jediterm-core:3.76"]
+text = "apache-2.0.txt"
+
+[[component]]
+name = "JetBrains Annotations"
+version = "24.0.1"
+license = "Apache-2.0"
+homepage = "https://github.com/JetBrains/java-annotations"
+modules = ["org.jetbrains:annotations:24.0.1"]
+text = "apache-2.0.txt"
+
+[[component]]
+name = "JetBrains Runtime"
+version = "25"
+license = "GPL-2.0-only WITH Classpath-exception-2.0"
+homepage = "https://github.com/JetBrains/JetBrainsRuntime"
+text = "gpl-2.0-classpath-exception.txt"
+
+[[component]]
+name = "JetBrains Runtime API"
+version = "1.9.0"
+license = "Apache-2.0"
+homepage = "https://github.com/JetBrains/JetBrainsRuntimeApi"
+modules = ["org.jetbrains.runtime:jbr-api:1.9.0"]
+text = "apache-2.0.txt"
+
+[[component]]
+name = "JNA"
+version = "5.14.0"
+license = "Apache-2.0"
+homepage = "https://github.com/java-native-access/jna"
+modules = ["net.java.dev.jna:jna:5.14.0", "net.java.dev.jna:jna-platform:5.14.0"]
+text = "apache-2.0.txt"
+notice = "jna.NOTICE.txt"
+
+[[component]]
+name = "jsvg"
+version = "2.0.0"
+license = "MIT"
+homepage = "https://github.com/weisJ/jsvg"
+modules = ["com.github.weisj:jsvg:2.0.0"]
+text = "jsvg.LICENSE.txt"
+
+[[component]]
+name = "Kotlin Standard Library"
+version = "2.4.0"
+license = "Apache-2.0"
+homepage = "https://kotlinlang.org/"
+modules = ["org.jetbrains.kotlin:kotlin-stdlib:2.4.0"]
+text = "apache-2.0.txt"
+
+[[component]]
+name = "Nerd Fonts"
+version = "3.5.1"
+license = "LicenseRef-Nerd-Fonts"
+homepage = "https://www.nerdfonts.com/"
+text = "/dev/jasper/app/fonts/cousine/NERD-FONTS-LICENSE.txt"
+
+[[component]]
+name = "pty4j"
+version = "0.13.10"
+license = "EPL-1.0"
+homepage = "https://github.com/JetBrains/pty4j"
+modules = ["org.jetbrains.pty4j:pty4j:0.13.10"]
+text = "epl-1.0.txt"
+
+[[component]]
+name = "RSyntaxTextArea"
+version = "3.6.0"
+license = "BSD-3-Clause"
+homepage = "https://bobbylight.github.io/RSyntaxTextArea/"
+modules = ["com.fifesoft:rsyntaxtextarea:3.6.0"]
+text = "rsyntaxtextarea.LICENSE.txt"
+
+[[component]]
+name = "SLF4J"
+version = "2.0.13"
+license = "MIT"
+homepage = "https://www.slf4j.org/"
+modules = ["org.slf4j:slf4j-api:2.0.13", "org.slf4j:slf4j-nop:2.0.13", "org.slf4j:slf4j-jdk14:2.0.13"]
+text = "slf4j.LICENSE.txt"
+
+[[component]]
+name = "SQLite JDBC"
+version = "3.53.4.0"
+license = "Apache-2.0"
+homepage = "https://github.com/xerial/sqlite-jdbc"
+modules = ["org.xerial:sqlite-jdbc:3.53.4.0"]
+text = "apache-2.0.txt"
+notice = "sqlite-jdbc.LICENSE.zentus.txt"
+
+[[component]]
+name = "tomlj"
+version = "1.1.1"
+license = "Apache-2.0"
+homepage = "https://github.com/tomlj/tomlj"
+modules = ["org.tomlj:tomlj:1.1.1"]
+text = "apache-2.0.txt"
+
+[[component]]
+name = "Windows Terminal ConPTY"
+version = ""
+license = "MIT"
+homepage = "https://github.com/microsoft/terminal"
+text = "microsoft-terminal.LICENSE.txt"
+
+[[component]]
+name = "winpty"
+version = "0.4.3"
+license = "MIT"
+homepage = "https://github.com/rprichard/winpty"
+text = "winpty.LICENSE.txt"

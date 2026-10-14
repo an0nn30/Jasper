@@ -50,6 +50,7 @@ longer applies). `✕` removes one row; **Clear All** removes them all.
 | Long-running commands | `jasper.commands` | a command that ran at least `notifications.long_command_seconds` and finished anywhere but the pane you were typing in | card |
 | Plugin problems | `jasper.plugins` | a plugin that failed while Jasper asked it to do something, or that could not be loaded, started or read at launch | card |
 | Internal errors | `jasper.errors` | unexpected errors in Jasper itself | card |
+| Memory & VM options | `jasper.vmoptions` | a start without your custom VM options, an options file Jasper had to ignore, a restart that would apply new options, a restart Jasper could not perform, and an options file that could not be opened, saved or revealed | card |
 | *Plugin name*, one per plugin | *plugin id* | the plugin's own messages, such as a host that could not be saved | card |
 | *Plugin name* activities | *plugin id*`.activities` | a plugin's background work that finished or failed, such as a sync or an upload | card |
 | Tunnels | `dev.jasper.remote.tunnels` | Remote's tunnel failures | card |

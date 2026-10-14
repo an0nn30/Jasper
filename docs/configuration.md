@@ -58,6 +58,13 @@ once more without them. Failures inside the JVM's own start-up (`-Xms` above `-X
 cannot be resolved) stop it instead; setting `JASPER_VM_OPTIONS_SKIP=1` in the environment starts Jasper without the
 file so you can fix it. `./gradlew :jasper-app:run` does not read the file.
 
+In the installed app, System Settings → Java Virtual Machine sets the maximum heap size (it edits the file's `-Xmx` line;
+the bundled 2048 MiB removes it) and opens the file with **Edit Custom VM Options…**; Help → **Change Memory
+Settings…** and **Edit Custom VM Options…** lead to the same places. The section checks the options with the bundled
+`java` and says which lines it ignores, which options the JVM does not know, whether Jasper would start with them, and
+when a restart is needed (**Restart Now**). When Jasper had to start without your options, or ignored the file, it says
+so in a notification in the **Memory & VM options** group.
+
 ## Settings dialog
 
 **Settings** (Cmd+, on macOS, or Jasper › Settings…) edits every setting in this guide without opening the file.
@@ -73,13 +80,14 @@ changes shows its name in blue, and a setting that differs from its default has 
 the key from the file. Settings writes `config.toml` in place and keeps your comments; a value the file would
 reject is refused with the same message the file would produce. If `config.toml` has errors, Settings shows a
 banner and saves nothing until the file is fixed; if it uses old setting names, the banner offers Migrate Config.
-System Settings shows the file's location with Open in Editor, Reveal, Reload from Disk and Migrate Config.
+System Settings shows the file's location with Open in Editor, Reveal, Reload from Disk and Migrate Config, and a
+Java Virtual Machine section for the [custom VM options](#custom-vm-options).
 Keymap lists every shortcut, grouped as in the menus; shortcuts that differ from their defaults, and the
 sections holding them, are blue. Click one, press the new keys and click Set; Apply or OK saves every change
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
 Appearance holds View mode (Normal or Compact, applied after restart), the Dark, Light and Match System tiles,
-the Theme row (Slate Steel) and the Terminal scheme dropdown; Terminal › Font & Colors links there. See
+the Dark theme and Light theme dropdowns and the Terminal scheme dropdown, each with a gear that imports and removes themes; Terminal › Font & Colors links there. See
 [Themes](themes.md).
 
 Tools holds a page for each running plugin that has settings, built from what the plugin declares or by the plugin
@@ -204,11 +212,13 @@ family = "system"
 | `terminal.dim_inactive_panes` | `0.3` | Finite number 0–1; 0 disables dimming, 1 fully dims | Live |
 | `terminal.copy_on_select` | `false` | Boolean | Live |
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
-| `terminal.scheme` | `"match"` | `"match"`, `"slate-steel-dark"`, `"slate-steel-light"`, `"high-contrast"`: the terminal panes' colors ([Themes](themes.md)) | Live |
+| `terminal.scheme` | `"match"` | `"match"` or a scheme id such as `"slate-steel/high-contrast"`: the terminal panes' colors ([Themes](themes.md)) | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately | Live |
 | `ui.appearance` | `"system"` | `"system"` (the operating system's light or dark), `"dark"`, `"light"` | Live |
+| `ui.theme.dark` | `"slate-steel"` | A theme id: the theme the Dark appearance shows ([Themes](themes.md)) | Live |
+| `ui.theme.light` | `"slate-steel"` | A theme id: the theme the Light appearance shows ([Themes](themes.md)) | Live |
 | `ui.workspace.opacity` | Opaque (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
 | `ui.workspace.blur` | `"theme"` | `"theme"` (Slate Steel's: no blur), `"on"`, `"off"`; macOS only, ignored elsewhere | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
@@ -723,7 +733,9 @@ Plugin actions are bound by their quoted id, for example:
 A plugin may suggest a default shortcut; yours always wins, and Jasper's built-in shortcuts win
 over a plugin's suggestion. A binding for an action that no installed plugin provides is
 reported as a configuration warning. Every panel also has a `<panel id>.toggle` action you can
-bind the same way. `"plugins.manage"` opens Settings at Plugins and `"app.shortcuts"` at Keymap; neither has a default shortcut.
+bind the same way. `"plugins.manage"` opens Settings at Plugins, `"app.shortcuts"` at Keymap and `"app.about"` the About
+window; `"app.memory"` opens the heap limit in System Settings and `"app.vmoptions"` opens `jasper.vmoptions` in your
+editor; none has a default shortcut.
 
 ## Command palette shortcuts
 
@@ -800,21 +812,20 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 ## Theme
 
-Jasper's theme is Slate Steel, in Dark and Light.
+Jasper's built-in theme is Slate Steel, in Dark and Light; imported themes live in the themes folder ([Themes](themes.md)).
 
-`ui.appearance` chooses the UI appearance: `"dark"` or `"light"` for Slate Steel Dark or Light, or `"system"`
-(the default) to follow the operating system's light or dark setting live. When the operating system's appearance is
-unavailable, `"system"` uses Dark. An operating-system change never writes `config.toml`.
+`ui.appearance` chooses the UI appearance: `"dark"`, `"light"`, or `"system"` (the default) to follow the operating
+system's light or dark setting live. When the operating system's appearance is unavailable, `"system"` uses Dark. An
+operating-system change never writes `config.toml`. `ui.theme.dark` and `ui.theme.light` name the theme each
+appearance shows, `"slate-steel"` by default.
 
-`terminal.scheme` chooses the terminal panes' colours: `"match"` (the default) uses Slate Steel Dark with the Dark
-appearance and Slate Steel Light with the Light one; `"slate-steel-dark"`, `"slate-steel-light"` and
-`"high-contrast"` choose one. Only the terminal text area changes: tabs, the tab strip, the editor and panels stay on
-the UI appearance.
+`terminal.scheme` chooses the terminal panes' colours: `"match"` (the default) uses the shown theme's own scheme; a
+scheme id such as `"slate-steel/high-contrast"` chooses one. Only the terminal text area changes: tabs, the tab strip,
+the editor and panels stay on the UI appearance.
 
 Appearance and scheme changes keep shells, scrollback, split ratios and font choices. A failed installation keeps the
-current appearance, is reported as a warning on `ui.appearance`, and can be retried with Reload config. The former
-`[ui.theme]` table (`name`, `source`, `follow_system`, `workspace`), `terminal.colors` and the `[colors]` table are
-no longer read: each is reported as an unknown setting and ignored.
+current appearance, is reported as a warning on `ui.appearance`, and can be retried with Reload config.
+`terminal.colors` and the `[colors]` table are no longer read: each is reported as an unknown setting and ignored.
 
 ### Interface typography
 

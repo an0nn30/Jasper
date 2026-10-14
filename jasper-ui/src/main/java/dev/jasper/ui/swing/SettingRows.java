@@ -43,9 +43,9 @@ final class SettingRows {
             Composition.style(
                     description, context(), detail ? Typography.Role.BODY : Typography.Role.SETTING_DESCRIPTION, detail ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_SECONDARY);
             if (row.highlighted()) {
-                title.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ONACCENT));
-                description.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ONACCENT_SECONDARY));
-                title.noteColor = ThemePainting.color(context(), SemanticColor.TEXT_ONACCENT_SECONDARY);
+                title.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ONSELECTION));
+                description.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ONSELECTION_SECONDARY));
+                title.noteColor = ThemePainting.color(context(), SemanticColor.TEXT_ONSELECTION_SECONDARY);
             }
             title.setEnabled(component.isEnabled());
             description.setEnabled(component.isEnabled());

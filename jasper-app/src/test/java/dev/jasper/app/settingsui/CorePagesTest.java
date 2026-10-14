@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import javax.swing.JButton;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -19,7 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 class CorePagesTest {
     private final List<String> calls = new ArrayList<>();
     private final CorePages.SystemActions system = new CorePages.SystemActions(() -> Path.of("/home/me/.config/jasper/config.toml"),
-        () -> calls.add("open"), () -> calls.add("reveal"), () -> calls.add("reload"), () -> calls.add("migrate"), () -> true);
+        () -> calls.add("open"), () -> calls.add("reveal"), () -> calls.add("reload"), () -> calls.add("migrate"), () -> true, Optional.empty());
     private static final AppearanceChoices APPEARANCE = AppearanceFixtures.CHOICES;
     private final PageContext context = PageKit.context(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values()),
         id -> { }, () -> { });
@@ -41,7 +43,7 @@ class CorePagesTest {
     }
 
     private static CorePages.SystemActions system() {
-        return new CorePages.SystemActions(() -> Path.of("config.toml"), () -> { }, () -> { }, () -> { }, () -> { }, () -> true);
+        return new CorePages.SystemActions(() -> Path.of("config.toml"), () -> { }, () -> { }, () -> { }, () -> { }, () -> true, Optional.empty());
     }
 
     private static List<Setting<?>> builtSettings(SchemaPage page) {
@@ -159,7 +161,7 @@ class CorePagesTest {
             () -> { calls.add("install"); installed[0] = true; }, () -> !installed[0],
             () -> { calls.add("uninstall"); installed[0] = false; }, () -> installed[0]);
         var withCommand = new CorePages.SystemActions(() -> Path.of("config.toml"), () -> { }, () -> { }, () -> { }, () -> { },
-            () -> true, Optional.of(commandLine));
+            () -> true, Optional.empty(), Optional.of(commandLine));
         var pages = CorePages.pages(APPEARANCE, withCommand, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
         var systemPage = (SchemaPage) pages.stream().filter(page -> page.id().equals("system")).findFirst().orElseThrow();
         systemPage.component();
@@ -174,6 +176,30 @@ class CorePagesTest {
         assertThat(rows).extracting(Nodes.SettingRow::title).containsSubsequence("jasper command", "Location");
         assertThat(rows).filteredOn(row -> row.title().equals("jasper command")).singleElement()
             .satisfies(row -> assertThat(row.description()).isEqualTo("Installed at /usr/local/bin/jasper"));
+    }
+
+    @Test void systemSettingsHasTheJavaVirtualMachineSectionWhenTheApplicationSuppliesIt() {
+        int[] restarted = {0};
+        var vm = new VmOptionsHooks(new SchemaPage.External("vm.heap", "Maximum heap size", "MiB", List.of("memory"),
+                new Nodes.Numeric(512, 1_048_576, 256, 0), () -> 2048, () -> 2048, value -> "", value -> "Current: 2048 MiB.",
+                value -> CompletableFuture.completedFuture(null), () -> false),
+            () -> "Applies to the installed Jasper app.", () -> { }, () -> { }, () -> false,
+            () -> Optional.of(new SchemaPage.Notice("Applies to the installed app", "Custom VM options apply to the installed Jasper app.")),
+            Optional::empty,
+            () -> Optional.of(new SchemaPage.Notice("Restart required", "Restart Jasper to apply your changes.")),
+            () -> restarted[0]++, listener -> new Subscription(() -> { }));
+        var system = new CorePages.SystemActions(() -> Path.of("/fixture/config.toml"), () -> { }, () -> { }, () -> { }, () -> { }, () -> false,
+            Optional.of(vm));
+        var pageContext = PageKit.context(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values()), id -> { }, () -> { });
+        var page = CorePages.specs(AppearanceFixtures.CHOICES, system).stream().filter(spec -> spec.id().equals("system"))
+            .findFirst().orElseThrow().build(pageContext);
+        assertThat(PageKit.sectionTitles(page)).containsSubsequence("Java Virtual Machine", "Configuration file");
+        assertThat(((Nodes.Field) PageKit.node(page, "vm.heap")).state().enabled()).isFalse();
+        assertThat(((Nodes.SettingRow) PageKit.node(page, "notice-vm.state")).description())
+            .isEqualTo("Custom VM options apply to the installed Jasper app.");
+        assertThat(((Nodes.SettingRow) PageKit.node(page, "notice-vm.findings")).state().visible()).isFalse();
+        PageKit.kit(page, "notice-vm.restart-0", JButton.class).doClick();
+        assertThat(restarted[0]).isEqualTo(1);
     }
 
     /** Every node below {@code node}: stacks, cards, sections and a settings row's control. */

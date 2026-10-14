@@ -3,13 +3,13 @@ package dev.jasper.ui.testsupport;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.ui.theme.SemanticColor;
-import dev.jasper.ui.theme.SlateSteel;
+import dev.jasper.ui.theme.JasperTheme;
 import org.junit.jupiter.api.Test;
 
 class KitFixturesTest {
     @Test void theFixturesAreSlateSteelAndCustomDiffersInEveryOpaqueRole() {
-        assertThat(KitFixtures.dark()).isSameAs(SlateSteel.bundled().generated(true));
-        assertThat(KitFixtures.light()).isSameAs(SlateSteel.bundled().generated(false));
+        assertThat(KitFixtures.dark()).isSameAs(JasperTheme.bundled().generated(true));
+        assertThat(KitFixtures.light()).isSameAs(JasperTheme.bundled().generated(false));
         var custom = KitFixtures.custom();
         assertThat(custom.dark()).isTrue();
         for (var role : SemanticColor.values()) {

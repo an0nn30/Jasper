@@ -51,12 +51,12 @@ final class RichOptions extends JPanel {
             // A highlighted option is a plain rectangle across the row (spec 2).
             int h=getHeight();
             if(selected){g.setColor(ThemePainting.color(context,SemanticColor.SELECTION_BG));g.fillRect(0,0,getWidth(),h);}
-            SemanticColor role=selected?SemanticColor.TEXT_ONACCENT:SemanticColor.TEXT_PRIMARY;int x=pad(),right=getWidth()-(popup?pad():ThemePainting.metric(context,DesignMetrics.Role.CHOICE_VALUE_END_PADDING));
+            SemanticColor role=selected?SemanticColor.TEXT_ONSELECTION:SemanticColor.TEXT_PRIMARY;int x=pad(),right=getWidth()-(popup?pad():ThemePainting.metric(context,DesignMetrics.Role.CHOICE_VALUE_END_PADDING));
             if(!option.icon().isBlank()){var icon=context.icons().icon(option.icon(),context.theme().semantic(),role,glyph());icon.paintIcon(this,g,x,(h-icon.getIconHeight())/2);x+=icon.getIconWidth()+gap();}
-            if(popup){if(checked){var icon=context.icons().icon("check",context.theme().semantic(),selected?SemanticColor.TEXT_ONACCENT:SemanticColor.TEXT_LINK,check());icon.paintIcon(this,g,right-check(),(h-check())/2);}right-=check()+gap();}
+            if(popup){if(checked){var icon=context.icons().icon("check",context.theme().semantic(),selected?SemanticColor.TEXT_ONSELECTION:SemanticColor.TEXT_LINK,check());icon.paintIcon(this,g,right-check(),(h-check())/2);}right-=check()+gap();}
             if(!option.description().isBlank()){
                 g.setFont(secondary());var fm=g.getFontMetrics();int width=fm.stringWidth(option.description());
-                g.setColor(ThemePainting.color(context,selected?SemanticColor.TEXT_ONACCENT_SECONDARY:SemanticColor.TEXT_TERTIARY));
+                g.setColor(ThemePainting.color(context,selected?SemanticColor.TEXT_ONSELECTION_SECONDARY:SemanticColor.TEXT_TERTIARY));
                 g.drawString(option.description(),right-width,(h-fm.getHeight())/2+fm.getAscent());right-=width+annotationGap();
             }
             g.setFont(font());g.setColor(ThemePainting.color(context,role));var fm=g.getFontMetrics();var lines=lines(getWidth());int y=(h-fm.getHeight()*lines.size())/2+fm.getAscent();

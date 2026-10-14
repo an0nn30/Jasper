@@ -24,7 +24,7 @@ class SettingsCompositionTest {
     @Test void theRealGroupedNotificationPageFitsTheAvailableViewportWidth() {
         var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
         var groups = new NotificationGroupChoices(() -> List.of(new NotificationGroupChoices.Group("configuration", "Configuration", "Jasper", "sticky"), new NotificationGroupChoices.Group("editor", "Editor", "Editor", "card")));
-        var system = new CorePages.SystemActions(() -> Path.of("config.toml"), ()->{}, ()->{}, ()->{}, ()->{}, ()->false);
+        var system = new CorePages.SystemActions(() -> Path.of("config.toml"), ()->{}, ()->{}, ()->{}, ()->{}, ()->false, java.util.Optional.empty());
         var page = CorePages.specs(AppearanceFixtures.CHOICES, system, ShellChoices.NONE, id->{}, true, groups).stream().filter(spec -> spec.id().equals("notifications")).findFirst().orElseThrow().build(PageKit.context(draft, id->{}, ()->{}));
         try {
             var body = (PageBody)page.component(); var viewport = new JViewport(); viewport.setSize(752, 580); viewport.setView(body); viewport.doLayout();

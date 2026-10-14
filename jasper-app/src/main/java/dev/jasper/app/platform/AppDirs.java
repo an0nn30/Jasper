@@ -36,6 +36,11 @@ public record AppDirs(Path root, Path configFile, Path logs, boolean overridden)
         return root.resolve("plugins");
     }
 
+    /** Imported themes: one Jasper theme file per theme, named after its id. */
+    public Path themes() {
+        return root.resolve("themes");
+    }
+
     /** Enabled flags, consented capabilities and pending removals. */
     public Path pluginState() {
         return root.resolve("plugins.toml");

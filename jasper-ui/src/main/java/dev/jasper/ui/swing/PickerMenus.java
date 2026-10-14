@@ -42,17 +42,17 @@ final class PickerMenus {
     }
     private static void tile(Graphics2D g,JComponent owner,KitContext c,String name,Nodes.Hue hue,int x,int y,int size,boolean active,int glyphSize){
         if(name.isEmpty())return;
-        if(hue!=Nodes.Hue.NONE){g.setColor(ColorMath.opacity(active?ThemePainting.color(c,SemanticColor.TEXT_ONACCENT):Choices.hueSurface(c,hue),ThemePainting.tileShare(c)));int radius=metric(c,DesignMetrics.Role.CHIP_RADIUS);g.fillRoundRect(x,y,size,size,radius*2,radius*2);}
-        SemanticColor role=active?SemanticColor.TEXT_ONACCENT:switch(hue){case BLUE->SemanticColor.HUE_BLUE;case GREEN->SemanticColor.HUE_GREEN;case AMBER->SemanticColor.HUE_AMBER;case PURPLE->SemanticColor.HUE_PURPLE;case NEUTRAL,NONE->SemanticColor.TEXT_TERTIARY;};
+        if(hue!=Nodes.Hue.NONE){g.setColor(ColorMath.opacity(active?ThemePainting.color(c,SemanticColor.TEXT_ONSELECTION):Choices.hueSurface(c,hue),ThemePainting.tileShare(c)));int radius=metric(c,DesignMetrics.Role.CHIP_RADIUS);g.fillRoundRect(x,y,size,size,radius*2,radius*2);}
+        SemanticColor role=active?SemanticColor.TEXT_ONSELECTION:switch(hue){case BLUE->SemanticColor.HUE_BLUE;case GREEN->SemanticColor.HUE_GREEN;case AMBER->SemanticColor.HUE_AMBER;case PURPLE->SemanticColor.HUE_PURPLE;case NEUTRAL,NONE->SemanticColor.TEXT_TERTIARY;};
         int glyph=Math.min(size,glyphSize);
         c.icons().icon(name,c.theme().semantic(),role,glyph).paintIcon(owner,g,x+(size-glyph)/2,y+(size-glyph)/2);
     }
     private static String clipped(FontMetrics fm,String text,int width){if(fm.stringWidth(text)<=width)return text;String ellipsis="…";if(fm.stringWidth(ellipsis)>width)return "";int end=text.length();while(end>0&&fm.stringWidth(text.substring(0,end)+ellipsis)>width)end=text.offsetByCodePoints(end,-1);return text.substring(0,end)+ellipsis;}
     private static void line(Graphics2D g,KitContext c,String label,String caption,int x,int y,int width,int height,boolean active,boolean empty,boolean compact,boolean link){
         g.setFont(ThemePainting.font(c,compact?Typography.Role.PICKER_COMPACT:Typography.Role.BODY));var fm=g.getFontMetrics();int baseline=y+(height-fm.getHeight())/2+fm.getAscent();
-        g.setColor(ThemePainting.color(c,active?SemanticColor.TEXT_ONACCENT:link?SemanticColor.TEXT_LINK:empty?SemanticColor.TEXT_PLACEHOLDER:SemanticColor.TEXT_PRIMARY));
+        g.setColor(ThemePainting.color(c,active?SemanticColor.TEXT_ONSELECTION:link?SemanticColor.TEXT_LINK:empty?SemanticColor.TEXT_PLACEHOLDER:SemanticColor.TEXT_PRIMARY));
         String primary=clipped(fm,label,width);g.drawString(primary,x,baseline);int used=fm.stringWidth(primary)+metric(c,DesignMetrics.Role.PICKER_GAP);
-        if(!caption.isEmpty()&&used<width){g.setFont(ThemePainting.font(c,compact?Typography.Role.PICKER_CAPTION:Typography.Role.CAPTION));g.setColor(ThemePainting.color(c,active?SemanticColor.TEXT_ONACCENT_SECONDARY:SemanticColor.TEXT_TERTIARY));g.drawString(clipped(g.getFontMetrics(),caption,width-used),x+used,baseline);}
+        if(!caption.isEmpty()&&used<width){g.setFont(ThemePainting.font(c,compact?Typography.Role.PICKER_CAPTION:Typography.Role.CAPTION));g.setColor(ThemePainting.color(c,active?SemanticColor.TEXT_ONSELECTION_SECONDARY:SemanticColor.TEXT_TERTIARY));g.drawString(clipped(g.getFontMetrics(),caption,width-used),x+used,baseline);}
     }
     static final class MenuControl extends ControlRegistry.Control {
         final JTextField search;
@@ -141,10 +141,10 @@ final class PickerMenus {
             int pad=metric(c,DesignMetrics.Role.PICKER_PADDING),tile=metric(c,DesignMetrics.Role.PICKER_TILE),gap=metric(c,DesignMetrics.Role.PICKER_ROW_GAP);
             int top=footer?metric(c,DesignMetrics.Role.PICKER_FOOTER_TOP):0,rowHeight=getHeight()-top;
             if(active){g.setColor(ThemePainting.color(c,SemanticColor.SELECTION_BG));g.fillRect(0,top,getWidth(),rowHeight);}
-            if(item.kind()==Nodes.PickerItemKind.UTILITY){int glyph=metric(c,DesignMetrics.Role.PICKER_GLYPH);c.icons().icon(item.icon(),c.theme().semantic(),active?SemanticColor.TEXT_ONACCENT:footer?SemanticColor.TEXT_LINK:SemanticColor.TEXT_TERTIARY,glyph).paintIcon(this,g,pad+(tile-glyph)/2,top+(rowHeight-glyph)/2);}
+            if(item.kind()==Nodes.PickerItemKind.UTILITY){int glyph=metric(c,DesignMetrics.Role.PICKER_GLYPH);c.icons().icon(item.icon(),c.theme().semantic(),active?SemanticColor.TEXT_ONSELECTION:footer?SemanticColor.TEXT_LINK:SemanticColor.TEXT_TERTIARY,glyph).paintIcon(this,g,pad+(tile-glyph)/2,top+(rowHeight-glyph)/2);}
             else tile(g,this,c,item.icon(),item.hue(),pad,(getHeight()-tile)/2,tile,active);
             int x=pad+tile+gap;line(g,c,item.label(),item.caption(),x,top,getWidth()-x-pad-tile,rowHeight,active,false,false,footer);
-            if(item.id().equals(n.checkedId()))c.icons().icon("check",c.theme().semantic(),active?SemanticColor.TEXT_ONACCENT:SemanticColor.TEXT_LINK,metric(c,DesignMetrics.Role.ICON_CAPTION)).paintIcon(this,g,getWidth()-pad-tile,(getHeight()-tile)/2);
+            if(item.id().equals(n.checkedId()))c.icons().icon("check",c.theme().semantic(),active?SemanticColor.TEXT_ONSELECTION:SemanticColor.TEXT_LINK,metric(c,DesignMetrics.Role.ICON_CAPTION)).paintIcon(this,g,getWidth()-pad-tile,(getHeight()-tile)/2);
         }finally{g.dispose();}}
     }
 }

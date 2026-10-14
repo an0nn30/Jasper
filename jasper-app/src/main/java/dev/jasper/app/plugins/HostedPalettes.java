@@ -16,7 +16,7 @@ final class HostedPalettes {
         var p = theme.semantic();
         return new WorkspacePalette(p.color(SemanticColor.SURFACE_PANEL), p.color(SemanticColor.SURFACE_PANEL_RAISED),
             p.color(SemanticColor.SURFACE_CARD), p.color(SemanticColor.TEXT_PRIMARY), p.color(SemanticColor.TEXT_SECONDARY),
-            p.color(SemanticColor.BORDER_WINDOW), p.color(SemanticColor.SELECTION_BG), p.color(SemanticColor.TEXT_ONACCENT),
+            p.color(SemanticColor.BORDER_WINDOW), p.color(SemanticColor.SELECTION_BG), p.color(SemanticColor.TEXT_ONSELECTION),
             p.color(SemanticColor.SURFACE_CONTROL_HOVER), p.color(SemanticColor.ACCENT), p.color(SemanticColor.STATUS_SUCCESS),
             p.color(SemanticColor.STATUS_WARNING), p.color(SemanticColor.STATUS_DANGER));
     }

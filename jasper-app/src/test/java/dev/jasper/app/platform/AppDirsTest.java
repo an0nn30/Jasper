@@ -119,6 +119,7 @@ class AppDirsTest {
         assertThat(byProperty.overridden()).isTrue();
         assertThat(byProperty.configFile()).isEqualTo(home.resolve("prop-home/config.toml"));
         assertThat(byProperty.plugins()).isEqualTo(home.resolve("prop-home/plugins"));
+        assertThat(byProperty.themes()).isEqualTo(home.resolve("prop-home/themes"));
         assertThat(byProperty.pluginState()).isEqualTo(home.resolve("prop-home/plugins.toml"));
         assertThat(byProperty.daemonSocket()).isEqualTo(home.resolve("prop-home/daemon/socket"));
         assertThat(byProperty.logs()).isEqualTo(home.resolve("prop-home/logs"));

@@ -117,8 +117,8 @@ Title-only surfaces hide the unused tab component so the entire header uses `Jas
 The rail and toolbar use that same semantic color in both themes. Dialogs are parented through
 `WindowOwner`, so an SDK type never exposes a frame or needs its own chrome API.
 Ordinary Swing buttons, fields, lists and dropdowns in any plugin layout, including content
-added later, are drawn by FlatLaf in the installed theme's colours: Slate Steel Dark or
-Light. Form text, button labels included, uses the 12-point form font and follows UI font
+added later, are drawn by FlatLaf in the shown theme's colours. Form text, button labels
+included, uses the 12-point form font and follows UI font
 changes. Plugin side panels paint the tool-window body colour (`surface.panel`) behind
 plain containers; a background a plugin sets itself is kept. Toolbar button geometry stays
 independent (30-pixel height, 12-pixel arc).

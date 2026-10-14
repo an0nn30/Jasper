@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.app.appearance.TerminalPaletteAdapter;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.TerminalSchemeChoice;
-import dev.jasper.ui.theme.SlateSteel;
+import dev.jasper.ui.theme.JasperTheme;
 import dev.jasper.ui.theme.TerminalScheme;
 import java.util.ArrayDeque;
 import java.util.Locale;
@@ -21,7 +21,7 @@ class TerminalSchemeCommandsTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> ThemeTestSupport.controller(true)); }
 
     static dev.jasper.terminal.config.Palette palette(TerminalScheme scheme) {
-        return TerminalPaletteAdapter.toTerminal(SlateSteel.bundled().terminal(scheme));
+        return TerminalPaletteAdapter.toTerminal(scheme);
     }
 
     @Test @DisabledOnOs(OS.WINDOWS)
@@ -40,21 +40,44 @@ class TerminalSchemeCommandsTest {
             var owner = owners[0];
             hidden[0] = owner.currentPane();
             owner.newTab(HOME);
-            owner.selectTerminalScheme(TerminalSchemeChoice.HIGH_CONTRAST);
+            owner.selectTerminalScheme(TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow());
             assertThat(com.formdev.flatlaf.FlatLaf.isLafDark()).as("the UI stays light").isFalse();
-            assertThat(hidden[0].view().palette()).as("a background tab").isEqualTo(palette(TerminalScheme.HIGH_CONTRAST));
-            assertThat(owners[1].currentPane().view().palette()).as("another window").isEqualTo(palette(TerminalScheme.HIGH_CONTRAST));
+            assertThat(hidden[0].view().palette()).as("a background tab").isEqualTo(palette(JasperTheme.bundled().scheme("high-contrast").orElseThrow()));
+            assertThat(owners[1].currentPane().view().palette()).as("another window").isEqualTo(palette(JasperTheme.bundled().scheme("high-contrast").orElseThrow()));
             owner.newTab(HOME);
         });
         while (!pending.isEmpty()) pending.remove().run();
         until(() -> owners[0].currentPane().view() != null);
         edt(() -> {
             assertThat(owners[0].currentPane().view().palette()).as("a tab opened after the switch")
-                .isEqualTo(palette(TerminalScheme.HIGH_CONTRAST));
+                .isEqualTo(palette(JasperTheme.bundled().scheme("high-contrast").orElseThrow()));
             var session = hidden[0].session();
             owners[0].selectTerminalScheme(TerminalSchemeChoice.MATCH);
             assertThat(hidden[0].session()).isSameAs(session);
-            assertThat(hidden[0].view().palette()).isEqualTo(palette(TerminalScheme.SLATE_STEEL_LIGHT));
+            assertThat(hidden[0].view().palette()).isEqualTo(palette(JasperTheme.bundled().matching(false)));
+        });
+    }
+
+    @Test void theCommandsFollowTheInstalledSchemes(@org.junit.jupiter.api.io.TempDir java.nio.file.Path home) throws Exception {
+        var folder = java.nio.file.Files.createDirectories(home.resolve("themes"));
+        java.nio.file.Files.writeString(folder.resolve("zenburn.json"), ThemeTestSupport.terminalThemeJson("Zenburn"));
+        edt(() -> {
+            var themes = new ThemeController(true, TerminalSchemeChoice.MATCH);
+            var owner = content(launcher(new ArrayDeque<>()), themes); owner.setActive(true);
+            assertThat(owner.windowCommands().view("view.terminal_scheme.zenburn.dark")).isNull();
+            var library = dev.jasper.app.appearance.ThemeLibrary.read(folder, themes.library());
+            themes.configure(true, dev.jasper.app.appearance.ThemeSelection.of(library, "slate-steel", "slate-steel",
+                TerminalSchemeChoice.MATCH, (key, message) -> { }), dev.jasper.app.config.UiFontConfig.defaults());
+            var zenburn = owner.windowCommands().view("view.terminal_scheme.zenburn.dark");
+            assertThat(zenburn.getValue(javax.swing.Action.NAME)).isEqualTo("Terminal: Zenburn");
+            assertThat(zenburn.getValue(dev.jasper.app.commands.Command.TITLE)).isEqualTo("Terminal Scheme: Zenburn");
+            zenburn.actionPerformed(new java.awt.event.ActionEvent(owner, 0, ""));
+            assertThat(themes.schemeChoice()).isEqualTo(TerminalSchemeChoice.parse("zenburn/dark").orElseThrow());
+            themes.configure(true, dev.jasper.app.appearance.ThemeSelection.slateSteel(TerminalSchemeChoice.MATCH),
+                dev.jasper.app.config.UiFontConfig.defaults());
+            assertThat(owner.windowCommands().view("view.terminal_scheme.zenburn.dark")).isNull();
+            assertThat(owner.commands().find("view.terminal_scheme.zenburn.dark")).isEmpty();
+            assertThat(owner.commands().find("view.terminal_scheme.slate-steel.high-contrast")).isPresent();
         });
     }
 
@@ -62,13 +85,13 @@ class TerminalSchemeCommandsTest {
         edt(() -> {
             var themes = new ThemeController(true, TerminalSchemeChoice.MATCH);
             var owner = content(launcher(new ArrayDeque<>()), themes); owner.setActive(true);
-            for (var scheme : TerminalSchemeChoice.values()) {
-                var command = owner.windowCommands().view("view.terminal_scheme." + scheme.name().toLowerCase(Locale.ROOT));
+            for (var scheme : dev.jasper.app.appearance.ThemeTestSupport.SCHEME_CHOICES) {
+                var command = owner.windowCommands().view(WindowCommands.schemeCommandId(scheme));
                 command.actionPerformed(new java.awt.event.ActionEvent(owner, 0, ""));
                 assertThat(themes.schemeChoice()).isEqualTo(scheme);
                 assertThat(owner.terminalSchemeSelected(scheme)).isTrue();
             }
-            assertThat(owner.windowCommands().view("view.terminal_scheme.high_contrast").getValue(dev.jasper.app.commands.Command.TITLE))
+            assertThat(owner.windowCommands().view("view.terminal_scheme.slate-steel.high-contrast").getValue(dev.jasper.app.commands.Command.TITLE))
                 .isEqualTo("Terminal Scheme: High Contrast");
         });
     }
