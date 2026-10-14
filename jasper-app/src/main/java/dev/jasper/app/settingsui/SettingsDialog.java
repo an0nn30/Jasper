@@ -118,6 +118,36 @@ public final class SettingsDialog {
         return discard[0];
     }
 
+    /** Re-reads what every page shows from the application, for state that changed outside the configuration. */
+    public void refreshPages() {
+        if (!isOpen()) return;
+        pages.forEach(SettingsPage::refresh);
+        refreshNow();
+    }
+
+    /** Asks a yes-or-no question in a sheet over the dialog; false when the dialog is not open. */
+    public boolean confirm(String title, String message, String confirmLabel) {
+        if (!isOpen() || kit == null) return false;
+        boolean[] confirmed = {false};
+        var sheet = windows.dialog(title, true, surface);
+        var sheetView = new KitView(kit, new ViewSpec(new Nodes.Form("confirm-sheet", ControlState.READY, Nodes.FormKind.SHEET,
+            title, Optional.empty(),
+            List.of(new Nodes.Text("confirm-message", ControlState.READY, message, Nodes.TextRole.BODY)), Optional.empty(),
+            List.of(new Nodes.Button("cancel", ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, "cancel", ""),
+                new Nodes.Button("confirm", ControlState.READY, confirmLabel, "", Nodes.ButtonKind.PRIMARY, "confirm", "")), "cancel")),
+            event -> {
+                if (!(event instanceof UiEvent.Action action)) return;
+                if (action.id().equals("confirm")) confirmed[0] = true;
+                if (action.id().equals("confirm") || action.id().equals("cancel")) sheet.close();
+            });
+        sheet.onClosed(sheetView::close);
+        sheet.setContent(sheetView);
+        sheet.show();
+        sheet.close();
+        if (isOpen()) surface.toFront();
+        return confirmed[0];
+    }
+
     public boolean isOpen() { return surface != null && !surface.closed(); }
 
     /**

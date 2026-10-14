@@ -28,10 +28,28 @@ public final class CorePages {
      * @param reload reads it again
      * @param migrate runs Migrate Config
      * @param migratable whether Migrate Config has work
+     * @param commandLine the Command line section, when the application offers one
      */
     public record SystemActions(Supplier<Path> file, Runnable openInEditor, Runnable reveal, Runnable reload, Runnable migrate,
-                                BooleanSupplier migratable) { }
+                                BooleanSupplier migratable, Optional<CommandLineActions> commandLine) {
+        /** Without the Command line section. */
+        public SystemActions(Supplier<Path> file, Runnable openInEditor, Runnable reveal, Runnable reload, Runnable migrate,
+                             BooleanSupplier migratable) {
+            this(file, openInEditor, reveal, reload, migrate, migratable, Optional.empty());
+        }
+    }
 
+    /**
+     * The Command line section: where the {@code jasper} command stands, and installing or removing it.
+     *
+     * @param state the sentence the row shows
+     * @param install puts the command on PATH
+     * @param installable whether Install applies now
+     * @param uninstall takes it off again
+     * @param uninstallable whether Uninstall applies now
+     */
+    public record CommandLineActions(Supplier<String> state, Runnable install, BooleanSupplier installable, Runnable uninstall,
+                                     BooleanSupplier uninstallable) { }
 
     /**
      * The pages the application supplies.
@@ -113,16 +131,7 @@ public final class CorePages {
                 .row(PALETTE_VISIBLE_ROWS, Editors.stepper("")),
             SchemaPage.page("desk-buddy", "Desk Buddy").parent("appearance-behavior").anchor("desk-buddy")
                 .row(BUDDY_ENABLED),
-            SchemaPage.page("system", "System Settings").parent("appearance-behavior").anchor("background-residency")
-                .row(SYSTEM_RUN_IN_BACKGROUND)
-                .section("Configuration file")
-                .action("Location", () -> system.file().get().toString(),
-                    new SchemaPage.Button("Open in Editor", system.openInEditor(), () -> true),
-                    new SchemaPage.Button("Reveal", system.reveal(), () -> true))
-                .action("Reload from disk", () -> "Read the file again after editing it elsewhere.",
-                    new SchemaPage.Button("Reload", system.reload(), () -> true))
-                .action("Migrate old settings", () -> "Rewrite old setting names to the current layout; the original is backed up first.",
-                    new SchemaPage.Button("Migrate\u2026", system.migrate(), system.migratable(), "Nothing to migrate")),
+            systemPage(system),
             SchemaPage.page("terminal", "Terminal")
                 .row(TERMINAL_SCROLLBACK, Editors.stepper("lines"))
                 .row(TERMINAL_BELL)
@@ -216,5 +225,22 @@ public final class CorePages {
             all.addAll(supplied.tools().apply(context));
             return List.copyOf(all);
         };
+    }
+
+    private static SchemaPage.Spec systemPage(SystemActions system) {
+        var page = SchemaPage.page("system", "System Settings").parent("appearance-behavior").anchor("background-residency")
+            .row(SYSTEM_RUN_IN_BACKGROUND);
+        system.commandLine().ifPresent(commandLine -> page.section("Command line")
+            .action("jasper command", commandLine.state(),
+                new SchemaPage.Button("Install", commandLine.install(), commandLine.installable()),
+                new SchemaPage.Button("Uninstall", commandLine.uninstall(), commandLine.uninstallable(), "Not installed by Jasper")));
+        return page.section("Configuration file")
+            .action("Location", () -> system.file().get().toString(),
+                new SchemaPage.Button("Open in Editor", system.openInEditor(), () -> true),
+                new SchemaPage.Button("Reveal", system.reveal(), () -> true))
+            .action("Reload from disk", () -> "Read the file again after editing it elsewhere.",
+                new SchemaPage.Button("Reload", system.reload(), () -> true))
+            .action("Migrate old settings", () -> "Rewrite old setting names to the current layout; the original is backed up first.",
+                new SchemaPage.Button("Migrate\u2026", system.migrate(), system.migratable(), "Nothing to migrate"));
     }
 }

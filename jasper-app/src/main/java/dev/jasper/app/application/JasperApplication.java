@@ -2,6 +2,7 @@ package dev.jasper.app.application;
 
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commandline.CommandDispatcher;
+import dev.jasper.app.commandline.CommandInstall;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -142,6 +143,7 @@ public final class JasperApplication {
     /** Where {@code jasper --help} reads the subcommands, or null for a private launch. */
     private Path subcommandList;
     private ActionEntry migrateAction;
+    private CommandInstall commandInstall;
     private dev.jasper.app.settingsui.SettingsDialog settings;
     private boolean preferencesHandlerInstalled;
     private UiState uiState = UiState.inMemory();
@@ -804,6 +806,13 @@ public final class JasperApplication {
         migrateAction = contributions.addAction("config.migrate", "Migrate Config", null,
             List.of("configuration", "settings", "upgrade", "old keys", "config.toml"), Optional.empty(), invocation -> migrateConfiguration());
         updateMigrateAction();
+        commandInstall = CommandInstall.forThisPlatform(System.getProperty("os.name"), System.getProperty("jpackage.app-path"),
+            Path.of(System.getProperty("user.home")));
+        List<String> commandKeywords = List.of("jasper", "command", "shell", "terminal", "path", "cli");
+        contributions.addAction("commandline.install", "Install 'jasper' Command in PATH", null, commandKeywords,
+            Optional.empty(), invocation -> installCommand(false)).setEnabled(commandInstall.available());
+        contributions.addAction("commandline.uninstall", "Uninstall 'jasper' Command from PATH", null, commandKeywords,
+            Optional.empty(), invocation -> uninstallCommand()).setEnabled(commandInstall.available());
         contributions.content().setFactory(separate -> {
             var created = separate ? newWindow(null) : newWindow();
             if (created == null) throw new IllegalStateException("Application is closing");
@@ -825,9 +834,13 @@ public final class JasperApplication {
             Optional.empty(), invocation -> openSettings(null, dev.jasper.app.shortcuthelp.KeymapPage.ID));
         contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(List.of(new MenuEntry.Item("app.shortcuts")));
         if (configuration != null) {
+            var commandLine = new dev.jasper.app.settingsui.CorePages.CommandLineActions(() -> commandInstall.state().text(),
+                () -> installCommand(true),
+                () -> commandInstall.state().kind() != CommandInstall.Kind.INSTALLED && commandInstall.available(),
+                this::uninstallCommand, () -> commandInstall.state().kind() == CommandInstall.Kind.INSTALLED);
             var system = new dev.jasper.app.settingsui.CorePages.SystemActions(() -> configuration.state().file(),
                 this::openConfigFile, this::revealConfigFile, () -> configuration.reload(), this::migrateConfiguration,
-                configuration::migrationAvailable);
+                configuration::migrationAvailable, Optional.of(commandLine));
             var shells = new dev.jasper.app.settingsui.ShellChoices(() -> shellProfiles.current().stream()
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
                 shellProfiles::refresh, shellProfiles::onChanged);
@@ -866,6 +879,57 @@ public final class JasperApplication {
                 else notificationViews.error("Migrate Config failed",
                     (failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null ? failure.getCause() : failure).getMessage());
             }));
+        }
+
+        /**
+         * Puts the jasper command on PATH off the EDT. Another program of that name is replaced only after Settings asks;
+         * from the palette, Settings opens instead so the question has a place. EDT.
+         */
+        private void installCommand(boolean fromSettings) {
+            CommandInstall install = commandInstall;
+            if (install == null || !install.available()) return;
+            CommandInstall.State state = install.state();
+            boolean replace = false;
+            if (state.kind() == CommandInstall.Kind.OTHER_PROGRAM) {
+                if (!fromSettings || settings == null) {
+                    openSettings(null, "system");
+                    return;
+                }
+                if (!settings.confirm("Replace the jasper Command?", state.text() + ". Replace it with Jasper's command?", "Replace")) return;
+                replace = true;
+            }
+            boolean replacing = replace;
+            commandWork(() -> install.install(replacing), "Installed the jasper Command",
+                () -> install.state().text() + install.hint(System.getenv().getOrDefault("PATH", "")).map(hint -> ". " + hint).orElse(""),
+                "Could not install the jasper Command");
+        }
+
+        /** Takes the jasper command off PATH, if Jasper put it there, off the EDT. EDT. */
+        private void uninstallCommand() {
+            CommandInstall install = commandInstall;
+            if (install == null || !install.available()) return;
+            commandWork(install::uninstall, "Removed the jasper Command", () -> "jasper is no longer on your PATH.",
+                "Could not remove the jasper Command");
+        }
+
+        private interface CommandWork { void run() throws java.io.IOException; }
+
+        private void commandWork(CommandWork work, String done, Supplier<String> details, String failed) {
+            CompletableFuture.runAsync(() -> {
+                try { work.run(); }
+                catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+            }, task -> Thread.ofPlatform().daemon().name("jasper-command-install").start(task)).whenComplete((ignored, failure) -> {
+                Throwable cause = failure instanceof CompletionException && failure.getCause() != null ? failure.getCause() : failure;
+                if (cause instanceof java.io.UncheckedIOException unchecked) cause = unchecked.getCause();
+                Throwable problem = cause;
+                String text = problem == null ? details.get() : null;
+                SwingUtilities.invokeLater(() -> {
+                    if (problem == null) notificationViews.info(done, text);
+                    else if (problem instanceof CommandInstall.Declined) notificationViews.info(failed, "The administrator prompt was cancelled; nothing changed.");
+                    else notificationViews.error(failed, problem.getMessage());
+                    if (settings != null) settings.refreshPages();
+                });
+            });
         }
 
         /** Opens Settings over the given window, or the active one when null, at a page (the last visited when null). */

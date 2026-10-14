@@ -152,6 +152,30 @@ class CorePagesTest {
         assertThat(titles).containsSubsequence("Location", "Reload from disk", "Migrate old settings");
     }
 
+    @Test void systemSettingsOffersTheJasperCommandWhenTheApplicationDoes() {
+        boolean[] installed = {false};
+        var commandLine = new CorePages.CommandLineActions(
+            () -> installed[0] ? "Installed at /usr/local/bin/jasper" : "Not installed",
+            () -> { calls.add("install"); installed[0] = true; }, () -> !installed[0],
+            () -> { calls.add("uninstall"); installed[0] = false; }, () -> installed[0]);
+        var withCommand = new CorePages.SystemActions(() -> Path.of("config.toml"), () -> { }, () -> { }, () -> { }, () -> { },
+            () -> true, Optional.of(commandLine));
+        var pages = CorePages.pages(APPEARANCE, withCommand, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
+        var systemPage = (SchemaPage) pages.stream().filter(page -> page.id().equals("system")).findFirst().orElseThrow();
+        systemPage.component();
+        var buttons = systemPage.actionButtons().stream().map(id -> PageKit.kit(systemPage, id, javax.swing.JButton.class)).toList();
+        assertThat(buttons).extracting(javax.swing.JButton::getText).startsWith("Install", "Uninstall");
+        assertThat(buttons.get(0).isEnabled()).isTrue();
+        assertThat(buttons.get(1).isEnabled()).isFalse();
+        buttons.get(0).doClick();
+        assertThat(calls).containsExactly("install");
+        var rows = new ArrayList<Nodes.SettingRow>();
+        walk(systemPage.viewSpec().root(), node -> { if (node instanceof Nodes.SettingRow row) rows.add(row); });
+        assertThat(rows).extracting(Nodes.SettingRow::title).containsSubsequence("jasper command", "Location");
+        assertThat(rows).filteredOn(row -> row.title().equals("jasper command")).singleElement()
+            .satisfies(row -> assertThat(row.description()).isEqualTo("Installed at /usr/local/bin/jasper"));
+    }
+
     /** Every node below {@code node}: stacks, cards, sections and a settings row's control. */
     static void walk(Nodes.Node node, java.util.function.Consumer<Nodes.Node> visit) {
         visit.accept(node);
