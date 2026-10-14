@@ -650,3 +650,40 @@ def testCommandClientCore = tasks.register('testCommandClientCore') {
     }
 }
 tasks.named('check') { dependsOn(testCommandClientCore) }
+
+def cliName = { -> launcherHost().os == 'windows' ? 'jasper.exe' : 'jasper' }
+def commandClientFile = cliBuild.map { it.file("bin/${cliName()}") }
+
+def buildCommandClient = tasks.register('buildCommandClient') {
+    group = 'build'
+    description = 'Builds the jasper command for this host.'
+    inputs.dir(cliCore).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.property('host', providers.provider { launcherHost().toString() })
+    outputs.file(commandClientFile)
+    doLast {
+        def host = launcherHost()
+        File work = cliBuild.get().dir('objects').asFile
+        delete(work)
+        List<File> sources = [new File(cliCore, 'jasper_cli.c'), new File(cliCore, 'jasper_cli_core.c')]
+        File client = nativeBuild(kind: 'executable', sources: sources, strict: sources, includes: [cliCore],
+            libraries: host.os == 'windows' ? ['ws2_32.lib', 'user32.lib'] : [],
+            subsystem: host.os == 'windows' ? 'CONSOLE' : null,
+            output: commandClientFile.get().asFile, work: work)
+        // Apple silicon runs only signed code; packaging signs the copy in the bundle again.
+        if (host.os == 'macos') {
+            runLauncherTool(['/usr/bin/codesign', '--force', '--sign', '-', client.absolutePath], null, null,
+                'signing the jasper command')
+        }
+    }
+}
+ext.commandClientBinary = commandClientFile.map { it.asFile }
+
+// CommandClientTest runs the built command; a development run names it for its own shells.
+tasks.named('test', Test) {
+    inputs.files(buildCommandClient).withPropertyName('commandClient').withPathSensitivity(PathSensitivity.NONE)
+    systemProperty('jasper.commandClient', commandClientFile.get().asFile.absolutePath)
+}
+tasks.named('run', JavaExec) {
+    dependsOn(buildCommandClient)
+    systemProperty('jasper.commandClient', commandClientFile.get().asFile.absolutePath)
+}
