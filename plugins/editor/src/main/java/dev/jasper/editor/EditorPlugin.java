@@ -16,6 +16,7 @@ import dev.jasper.editor.recent.Reopeners;
 import dev.jasper.editor.syntax.Languages;
 import dev.jasper.editor.ui.EditorEnvironment;
 import dev.jasper.editor.ui.EditorSettings;
+import dev.jasper.editor.ui.EditorSettingsPanel;
 import dev.jasper.editor.ui.EditorWindow;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
@@ -116,6 +117,7 @@ public final class EditorPlugin implements Plugin {
         defaults.detect();
         context.terminals().environment(defaults::variables);
         context.platform().editor(defaults::edit);
+        context.settings().page(new EditorSettingsPanel(context.kit(), settings, defaults, System.getenv()));
         context.palette().register(scope);
         PluginMenu file = context.menus().standard(StandardMenu.FILE);
         file.add(OPEN);

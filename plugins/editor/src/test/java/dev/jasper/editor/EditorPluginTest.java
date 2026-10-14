@@ -414,4 +414,14 @@ class EditorPluginTest {
             assertThat(host.contentTabs()).isEmpty();
         }
     }
+
+    @Test void theSettingsPageIsTheEditorsOwn() {
+        try (var host = host()) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            assertThat(host.settingsPanel("dev.jasper.editor")).isPresent();
+            assertThat(host.settingsPanelView("dev.jasper.editor").orElseThrow().spec().root().id()).isEqualTo("editor.settings");
+            drain(host);
+            assertThat(host.failures()).isEmpty();
+        }
+    }
 }

@@ -31,11 +31,11 @@ public record EditorSettings(String fontFamily, int fontSize, int tabSize, boole
     /** @return the plain editor font */
     public Font font() { return new Font(fontFamily, Font.PLAIN, fontSize); }
 
-    /** The Editor's declared settings; Settings checks their values and reports bad ones. */
+    /** The Editor's declared settings; Settings checks their values and reports bad ones. {@link EditorSettingsPanel} shows them. */
     public static final class Declared {
-        private final Setting<String> fontFamily;
-        private final Setting<Integer> fontSize, tabSize, maxFileMib, recentFilesDays;
-        private final Setting<Boolean> softWrap, vim;
+        final Setting<String> fontFamily;
+        final Setting<Integer> fontSize, tabSize, maxFileMib, recentFilesDays;
+        final Setting<Boolean> softWrap, vim;
         final Setting<String> defaultEditor, customCommand;
         final Setting<Boolean> customInTerminal, keepEnvironmentEditor;
 

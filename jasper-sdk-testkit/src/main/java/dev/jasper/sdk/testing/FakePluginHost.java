@@ -348,7 +348,7 @@ public final class FakePluginHost implements AutoCloseable {
         var existing=panelHosts.get(pluginId);
         if(existing!=null)return java.util.Optional.ofNullable(existing.component);
         return context.settings.panel().map(panel -> {
-            var rows = new FakeSettingsPanelHost(context.settings);
+            var rows = new FakeSettingsPanelHost(context.settings, this::takeFileSelection);
             panelHosts.put(pluginId, rows);
             try {
             var owned=java.util.Objects.requireNonNull(panel.create(rows),"Settings view");
@@ -995,7 +995,8 @@ public final class FakePluginHost implements AutoCloseable {
     private final java.util.ArrayDeque<Optional<Path>> fileSelections = new java.util.ArrayDeque<>();
 
     /**
-     * Queues a response for the next native file chooser. With no queued response, it cancels.
+     * Queues a response for the next native file chooser, including a settings page row's Browse. With no queued response,
+     * it cancels.
      *
      * @param selection chosen file or empty for cancellation
      */

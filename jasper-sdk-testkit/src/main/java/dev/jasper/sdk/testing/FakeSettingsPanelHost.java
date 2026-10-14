@@ -17,6 +17,7 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
     private final Map<FakeSetting<?>, Optional<Object>> draft = new LinkedHashMap<>();
     private final Map<String, Row> rows = new LinkedHashMap<>();
     private final Subscription reloads;
+    private final java.util.function.Supplier<Optional<java.nio.file.Path>> chooseFile;
     int changes;
     private String query = "";
     boolean closed, applied;
@@ -31,8 +32,9 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
         void clear() { invalidText = null; error = ""; }
     }
 
-    FakeSettingsPanelHost(FakePluginSettings settings) {
+    FakeSettingsPanelHost(FakePluginSettings settings, java.util.function.Supplier<Optional<java.nio.file.Path>> chooseFile) {
         this.settings = settings;
+        this.chooseFile = chooseFile;
         reloads = settings.onReloaded(() -> {
             if (EventQueue.isDispatchThread()) rebase(); else EventQueue.invokeLater(this::rebase);
         });
@@ -88,6 +90,21 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
         String id = event.id();
         Row row = rows.get(id);
         if (event instanceof UiEvent.Action) {
+            Row browsed = rows.values().stream().filter(value -> id.equals("settings:" + value.setting.key() + ":browse")
+                && value.setting.spec().editor().orElse(null) instanceof dev.jasper.sdk.settings.EditorHint.File).findFirst().orElse(null);
+            if (browsed != null) {
+                // As the host: Browse asks for a file (the host's next queued file selection); cancelling changes nothing.
+                Optional<java.nio.file.Path> chosen = chooseFile.get();
+                if (chosen.isEmpty()) return true;
+                try { stageValue(browsed.setting, chosen.get().toString()); }
+                catch (RuntimeException invalid) {
+                    browsed.error = invalid.getMessage() == null ? "Enter a valid value." : invalid.getMessage();
+                    browsed.invalidText = chosen.get().toString();
+                }
+                changed();
+                refresh();
+                return true;
+            }
             row = rows.values().stream().filter(value -> id.equals("settings:" + value.setting.key() + ":reset")).findFirst().orElse(null);
             if (row == null) return false;
             row.clear();
