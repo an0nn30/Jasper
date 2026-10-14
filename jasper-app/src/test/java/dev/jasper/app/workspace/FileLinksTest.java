@@ -81,6 +81,28 @@ class FileLinksTest {
     }
 
     /**
+     * Ruling 14: {@code equalsIgnoreCase} folds U+017F (long s) to {@code s}, but Windows does not, so such a name is not
+     * the WSL share: it falls through to SMB and WebDAV name resolution. A host is exempt only when it is all ASCII.
+     * The long s is written as a Java escape.
+     */
+    @Test void onWindowsAHostThatOnlyCaseFoldsToWslIsRefused() {
+        for (String host : List.of("w\u017fl$", "w\u017fl.localhost", "wsl.localho\u017ft", "W\u017fL.LOCALHOST", "wsl.local\u017fhost")) {
+            String backslashes = "\\\\" + host + "\\Ubuntu\\x";
+            String slashes = "//" + host + "/Ubuntu/x";
+            for (String text : List.of(backslashes, slashes, "~/" + backslashes, "~\\" + backslashes, "~/" + slashes)) {
+                assertThat(FileLinks.resolve(text, Optional.of(HERE), HOME, true)).as(text).isEmpty();
+                assertThat(FileLinks.resolve(text, Optional.empty(), HOME, true)).as(text + " without a directory").isEmpty();
+            }
+            Path directory = Path.of(backslashes);
+            assertThat(FileLinks.resolve("a.txt", Optional.of(directory), HOME, true)).as("as a pane directory: " + backslashes).isEmpty();
+            Path home = Path.of(backslashes);
+            assertThat(FileLinks.resolve("~/a.txt", Optional.empty(), home, true)).as("as a home: " + backslashes).isEmpty();
+        }
+        assertThat("w\u017fl$".equalsIgnoreCase("wsl$")).as("the premise: Java folds the long s").isTrue();
+        assertThat(FileLinks.resolve("\\\\wsl$\\Ubuntu\\x", Optional.of(HERE), HOME, true)).as("the real share").isPresent();
+    }
+
+    /**
      * The final path's text is checked too: whatever the branch that built it, a result that names a host is refused. A
      * home directory on a share therefore resolves no {@code ~/} path, as a pane directory on one resolves no relative path.
      */

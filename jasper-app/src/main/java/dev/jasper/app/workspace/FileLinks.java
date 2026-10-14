@@ -22,10 +22,12 @@ public final class FileLinks {
      * a click must never do that for a host that program output names. That text is checked before any {@link Path} is
      * made, so it holds on every OS: the path itself, and what follows {@code ~/}, which {@link Path#resolve} would
      * return as it is when it is absolute. The WSL shares ({@code wsl.localhost} and {@code wsl$}, in any case) are this
-     * machine's own and resolve, but never as {@code .} or {@code ..}, which Windows resolves to another host. The same
-     * rule applies to {@code directory} for a relative path: any program can print an OSC 7 report that becomes a pane's
-     * directory, so the directory is program output too. Finally the resulting path's own text is checked, whichever
-     * branch built it, so a {@code home} on a share resolves no {@code ~/} path either.
+     * machine's own and resolve, but never as {@code .} or {@code ..}, which Windows resolves to another host, and only
+     * when the host is all ASCII: {@link String#equalsIgnoreCase} folds some other characters to ASCII ones that Windows
+     * does not, and such a name would go to name resolution on the network. The same rule applies to {@code directory}
+     * for a relative path: any program can print an OSC 7 report that becomes a pane's directory, so the directory is
+     * program output too. Finally the resulting path's own text is checked, whichever branch built it, so a {@code home}
+     * on a share other than WSL's resolves no {@code ~/} path either.
      *
      * @param path the path as the terminal reported it
      * @param directory the pane's local directory, if it has one; on Windows one that names a UNC host other than a WSL
@@ -70,11 +72,16 @@ public final class FileLinks {
         if (text.length() < 2 || !separator(text.charAt(0)) || !separator(text.charAt(1))) return false;
         int hostEnd = endOfSegment(text, 2);
         String host = text.substring(2, hostEnd);
-        if (!host.equalsIgnoreCase("wsl.localhost") && !host.equalsIgnoreCase("wsl$")) return true;
+        if (!wslHost(host)) return true;
         int share = hostEnd;
         while (share < text.length() && separator(text.charAt(share))) share++;
         String name = text.substring(share, endOfSegment(text, share));
         return name.equals(".") || name.equals("..");
+    }
+
+    /** Whether {@code host} is a WSL share's host: ASCII only, as {@link String#equalsIgnoreCase} would fold other letters in. */
+    private static boolean wslHost(String host) {
+        return host.chars().allMatch(c -> c < 128) && (host.equalsIgnoreCase("wsl.localhost") || host.equalsIgnoreCase("wsl$"));
     }
 
     private static int endOfSegment(String text, int from) {
