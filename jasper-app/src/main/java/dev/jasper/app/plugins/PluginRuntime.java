@@ -558,6 +558,25 @@ public final class PluginRuntime {
         return current == null ? Map.of() : current.shellContributions.variables(jasperEnvironment);
     }
 
+    /**
+     * Opens a file for editing, on a worker thread: the editor a plugin provides ({@code Platform.editor}), asked on the
+     * UI thread with the active terminal window, then {@code desktop} on this thread when no plugin provides one, it
+     * declines or throws, or it does not answer within 30 seconds. Before the plugins start, {@code desktop} alone.
+     *
+     * @param file the file
+     * @param desktop the desktop's opener, such as {@code ConfigEditor::open}; its failure propagates
+     * @throws IllegalStateException on the UI thread
+     */
+    public void open(Path file, Consumer<Path> desktop) {
+        if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor operations require a worker thread");
+        Objects.requireNonNull(file, "file");
+        Objects.requireNonNull(desktop, "desktop");
+        PluginHost current = host;
+        if (current != null && current.fileEditors.editFromWorker(file, java.util.OptionalInt.empty(),
+                () -> terminals.activeWindow().map(dev.jasper.app.terminals.WindowEntry::id))) return;
+        desktop.accept(file);
+    }
+
     public void start(Map<String, Map<String, Object>> pluginTables, boolean dark) {
         if (host != null) throw new IllegalStateException("Plugins already started");
         this.dark = dark;
@@ -601,6 +620,8 @@ public final class PluginRuntime {
         for (PluginCandidate loading : resolution.load()) loadingIds.add(loading.id());
         List<PluginCandidate> notLoading = byId.values().stream().filter(discovered -> !loadingIds.contains(discovered.id())).toList();
         created.commands.declare(Subcommands.choose(resolution.load(), notLoading, notifications.problem()));
+        created.fileEditors.bundled(resolution.load().stream().filter(candidate -> candidate.origin() == PluginCandidate.Origin.BUNDLED)
+            .map(PluginCandidate::id).collect(java.util.stream.Collectors.toSet()));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         connectionBridge = created.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, this::forwardConnection);
@@ -1001,7 +1022,7 @@ public final class PluginRuntime {
         Thread.ofVirtual().name("jasper-plugin-settings-open").start(() -> {
             try {
                 prepareSettings(id);
-                editor.accept(PluginSettingsFiles.file(options.userDirectory(), id));
+                open(PluginSettingsFiles.file(options.userDirectory(), id), editor);
             } catch (IOException | RuntimeException failure) {
                 String name = Optional.ofNullable(launched.get(id)).map(candidate -> candidate.descriptor().name()).orElse(id);
                 String reason = failure.getMessage() == null ? failure.toString() : failure.getMessage();

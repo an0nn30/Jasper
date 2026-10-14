@@ -122,6 +122,10 @@ class FakeContractTest extends PluginContractTest {
             @Override public java.util.Map<String, String> shellVariables(java.util.Map<String, String> jasperEnvironment) {
                 return host.shellEnvironment(jasperEnvironment);
             }
+            @Override public void declareBundled(String pluginId) { host.declareBundled(pluginId); }
+            @Override public boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId) {
+                return host.edit(file, line, windowId);
+            }
             @Override public void close() { host.close(); }
         };
     }

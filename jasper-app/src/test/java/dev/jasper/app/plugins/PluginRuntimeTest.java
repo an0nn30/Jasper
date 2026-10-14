@@ -486,4 +486,84 @@ class PluginRuntimeTest {
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
         assertThat(AppContractTest.onEdtValue(() -> runtime.shellVariables(Map.of()))).as("after the plugin stopped").isEmpty();
     }
+
+    static final String EDITOR = """
+        package fix.editor;
+        import java.nio.file.Files;
+        import java.nio.file.StandardOpenOption;
+        public final class Main implements dev.jasper.sdk.plugin.Plugin {
+            @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                context.platform().editor((file, line, window) -> {
+                    try {
+                        Files.writeString(context.dataDirectory().resolve("edited"), file.getFileName() + "\\n",
+                            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                    } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                    return true;
+                });
+            }
+        }
+        """;
+
+    private static Path editorPlugin(Path directory, String id) throws Exception {
+        return PluginJars.build(directory, id + ".jar",
+            PluginJars.descriptor(id, "1.0.0", "fix.editor.Main") + "capabilities = [\"editor.provide\"]\n",
+            Map.of("fix.editor.Main", EDITOR), List.of());
+    }
+
+    /** Review Focus 4: before the plugins start, and once the providing plugin stopped, files open with the desktop. */
+    @Test void openAsksTheProvidedEditorAndOtherwiseTheDesktop() throws Exception {
+        editorPlugin(root.resolve("bundled").resolve("dev.example.editor"), "dev.example.editor");
+        PluginRuntime runtime = runtime(root.resolve("bundled"), root.resolve("absent"), null, false, new ArrayList<>());
+        List<Path> desktop = new CopyOnWriteArrayList<>();
+        Path before = root.resolve("before.txt"), during = root.resolve("during.txt"), after = root.resolve("after.txt");
+        runtime.open(before, desktop::add);
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        runtime.open(during, desktop::add);
+        Path edited = root.resolve("absent/dev.example.editor/data/edited");
+        assertThat(Files.readAllLines(edited)).containsExactly("during.txt");
+        onEdt(() -> assertThatIllegalStateException().as("never on the UI thread").isThrownBy(() -> runtime.open(during, desktop::add)));
+        var pending = new AtomicReference<List<CompletableFuture<?>>>();
+        onEdt(() -> pending.set(runtime.stop()));
+        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        runtime.open(after, desktop::add);
+        assertThat(desktop).containsExactly(before, after);
+        assertThat(Files.readAllLines(edited)).as("a stopped plugin's editor is not asked").containsExactly("during.txt");
+    }
+
+    /** Review Focus 3: Open in Editor creates a missing config.toml from its template, then the provided editor opens it. */
+    @Test void aMissingConfigTomlIsCreatedFromTheTemplateAndThenTheProvidedEditorOpensIt() throws Exception {
+        editorPlugin(root.resolve("bundled").resolve("dev.example.editor"), "dev.example.editor");
+        PluginRuntime runtime = runtime(root.resolve("bundled"), root.resolve("absent"), null, false, new ArrayList<>());
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        Path config = root.resolve("home").resolve("config.toml");
+        List<Path> desktop = new CopyOnWriteArrayList<>();
+        var service = new dev.jasper.app.config.ConfigService(config, false);
+        try {
+            assertThat(service.openSettings(file -> runtime.open(file, desktop::add)).get(10, TimeUnit.SECONDS)).isEqualTo(config);
+        } finally {
+            service.close();
+        }
+        assertThat(Files.readString(config)).isEqualTo(dev.jasper.app.config.ConfigTemplate.text(false));
+        assertThat(Files.readAllLines(root.resolve("absent/dev.example.editor/data/edited"))).containsExactly("config.toml");
+        assertThat(desktop).isEmpty();
+        onEdt(runtime::stop);
+    }
+
+    @Test void aBundledPluginsEditorReplacesADevelopmentPluginsEditor() throws Exception {
+        editorPlugin(root.resolve("bundled").resolve("dev.example.zeditor"), "dev.example.zeditor");
+        Path dev = root.resolve("dev").resolve("dev.example.aeditor");
+        editorPlugin(dev, "dev.example.aeditor");
+        PluginRuntime runtime = runtime(root.resolve("bundled"), root.resolve("absent"), dev, false, new ArrayList<>());
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        assertThat(runtime.statusLines()).as("the development plugin registered first; the bundled one replaced it")
+            .anySatisfy(line -> assertThat(line).contains("dev.example.aeditor", "ACTIVE"))
+            .anySatisfy(line -> assertThat(line).contains("dev.example.zeditor", "ACTIVE"));
+        runtime.open(root.resolve("notes.txt"), path -> { throw new AssertionError("the bundled editor opens it"); });
+        assertThat(Files.readAllLines(root.resolve("absent/dev.example.zeditor/data/edited"))).containsExactly("notes.txt");
+        assertThat(root.resolve("absent/dev.example.aeditor/data/edited")).doesNotExist();
+        onEdt(runtime::stop);
+    }
 }

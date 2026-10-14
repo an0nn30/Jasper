@@ -690,6 +690,8 @@ public final class FakePluginHost implements AutoCloseable {
         context.fileSources.closeAll();
         context.commandLine.closeAll();
         shellContributors.removeIf(entry -> entry.context() == context);
+        ProvidedEditor provided = providedEditor;
+        if (provided != null && provided.context() == context) providedEditor = null;
         for (RunningCall running : List.copyOf(runningCalls))
             if (running.context() == context) running.call().stopped(running.name());
         notifications.stopped(context.plugin().id());
@@ -1637,4 +1639,75 @@ public final class FakePluginHost implements AutoCloseable {
         return name != null && SHELL_NAME.matcher(name).matches() && !RESERVED_SHELL_NAMES.contains(name) && !name.startsWith("JASPER_")
             && value != null && value.indexOf('\0') < 0;
     }
+
+    /** The editor a plugin provides ({@code Platform.editor}) and the plugin that registered it. */
+    record ProvidedEditor(FakePluginContext context, dev.jasper.sdk.ui.FileEditor editor) { }
+    private volatile ProvidedEditor providedEditor;
+    private final Set<String> bundledPlugins = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Marks a plugin as one that ships with Jasper, before it starts: its {@code Platform.editor} registration replaces
+     * a non-bundled plugin's, as the application's bundled plugins' do.
+     *
+     * @param pluginId the plugin
+     * @since 0.17.1
+     */
+    public void declareBundled(String pluginId) { bundledPlugins.add(Objects.requireNonNull(pluginId, "pluginId")); }
+
+    /** Makes a plugin's editor the one files open with, under the application's one-at-a-time rule. */
+    Subscription provideEditor(FakePluginContext context, dev.jasper.sdk.ui.FileEditor editor) {
+        String pluginId = context.plugin().id();
+        ProvidedEditor current = providedEditor;
+        if (current != null && (!bundledPlugins.contains(pluginId) || bundledPlugins.contains(current.context().plugin().id())))
+            throw new IllegalStateException("The editor is already provided by " + current.context().plugin().id());
+        var provided = new ProvidedEditor(context, editor);
+        providedEditor = provided;
+        Subscription subscription = () -> { if (providedEditor == provided) providedEditor = null; };
+        context.own(subscription);
+        return subscription;
+    }
+
+    /** Asks the provided editor on the caller's thread; false when there is none, or it declined or threw. */
+    boolean editProvided(Path file, OptionalInt line, Optional<dev.jasper.sdk.WindowOwner> window) {
+        ProvidedEditor provided = providedEditor;
+        return provided != null && editWith(provided, file, line, window);
+    }
+
+    private boolean editWith(ProvidedEditor provided, Path file, OptionalInt line, Optional<dev.jasper.sdk.WindowOwner> window) {
+        try {
+            return provided.editor().edit(file, line, window);
+        } catch (RuntimeException failure) {
+            failures.add(provided.context().plugin().id() + " file editor: " + failure);
+            return false;
+        }
+    }
+
+    /**
+     * Opens a file as Jasper's own opens do (Open in Editor, the settings files): with the editor a plugin provides
+     * through {@code Platform.editor}, given that plugin's handle for {@code windowId} while the window is open.
+     *
+     * @param file the file
+     * @param line the line to show, or empty
+     * @param windowId the terminal window the open came from, or empty
+     * @return what the editor answered; false when no plugin provides one, or it threw, which {@link #failures()} records
+     * @since 0.17.1
+     */
+    public boolean edit(Path file, OptionalInt line, Optional<UUID> windowId) {
+        Objects.requireNonNull(file, "file");
+        Objects.requireNonNull(line, "line");
+        Objects.requireNonNull(windowId, "windowId");
+        ProvidedEditor provided = providedEditor;
+        if (provided == null) return false;
+        Optional<dev.jasper.sdk.WindowOwner> window = windowId.flatMap(id -> provided.context().terminals.window(id))
+            .map(handle -> (dev.jasper.sdk.WindowOwner) handle);
+        return editWith(provided, file, line, window);
+    }
+
+    /**
+     * Which plugin provides the editor now.
+     *
+     * @return its id, or empty
+     * @since 0.17.1
+     */
+    public Optional<String> editorPlugin() { return Optional.ofNullable(providedEditor).map(provided -> provided.context().plugin().id()); }
 }

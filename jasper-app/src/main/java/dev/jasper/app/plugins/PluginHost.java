@@ -109,6 +109,8 @@ final class PluginHost {
     final PluginCommands commands;
     /** What plugins add to new local shells ({@code Terminals.environment}). UI thread. */
     final ShellContributions shellContributions;
+    /** The editor a plugin provides ({@code Platform.editor}), which Jasper's own opens ask first. */
+    final FileEditors fileEditors;
     final EventBus bus;
     final ActivityHub activities;
     final ConnectionHub connections;
@@ -121,6 +123,7 @@ final class PluginHost {
         this.containment = new Containment(environment.onUi(), environment.failures());
         this.commands = new PluginCommands(environment.ui(), containment);
         this.shellContributions = new ShellContributions(containment);
+        this.fileEditors = new FileEditors(environment.ui(), environment.onUi(), containment);
         this.bus = new EventBus(environment.ui(), containment);
         this.activities = new ActivityHub(bus);
         this.connections = new ConnectionHub(bus);

@@ -173,6 +173,7 @@ class AppContractTest extends PluginContractTest {
             + request.query().orElse("-") + " " + request.rowId().orElse("-"))));
         Map<String, Map<String, dev.jasper.app.palette.PaletteRow>> lastRows = new java.util.HashMap<>();
         List<Subcommands.Owner> declared = new java.util.concurrent.CopyOnWriteArrayList<>();
+        Set<String> bundled = java.util.concurrent.ConcurrentHashMap.newKeySet();
         return new ContractHarness() {
             @Override public void setSetting(String pluginId, String key, Object rawValue) {
                 Path file = files.file(pluginId);
@@ -463,6 +464,13 @@ class AppContractTest extends PluginContractTest {
                         @Override public void expireClipboardSecret() { onEdt(() -> List.copyOf(clipboardClears).forEach(Runnable::run)); }
             @Override public Map<String, String> shellVariables(Map<String, String> jasperEnvironment) {
                 return onEdtValue(() -> host.shellContributions.variables(jasperEnvironment));
+            }
+            @Override public void declareBundled(String pluginId) {
+                bundled.add(pluginId);
+                onEdt(() -> host.fileEditors.bundled(Set.copyOf(bundled)));
+            }
+            @Override public boolean edit(Path file, java.util.OptionalInt line, Optional<UUID> windowId) {
+                return onEdtValue(() -> host.fileEditors.edit(file, line, windowId));
             }
             @Override public void close() { stopAll(); flush(); }
         };

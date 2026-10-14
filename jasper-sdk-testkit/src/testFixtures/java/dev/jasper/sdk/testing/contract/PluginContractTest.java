@@ -2028,4 +2028,99 @@ public abstract class PluginContractTest {
         });
         assertThat(h.openRequests()).containsExactly("tab|" + window + "|" + here + "|run:nvim +3 notes.txt", "split|" + only + "|RIGHT|-|run:htop");
     }
+
+    /** An editor that records {@code <file name>|<line or ->|<window id or ->} and answers {@code answer}. */
+    private static dev.jasper.sdk.ui.FileEditor recordingEditor(List<String> calls, boolean answer) {
+        return (file, line, window) -> {
+            calls.add(file.getFileName() + "|" + (line.isPresent() ? String.valueOf(line.getAsInt()) : "-") + "|"
+                + window.map(owner -> ((dev.jasper.sdk.terminal.WindowHandle) owner).id().toString()).orElse("-"));
+            return answer;
+        };
+    }
+
+    @Test void providingTheEditorNeedsTheCapabilityAndOnePluginProvidesItAtATime() {
+        var bare = new AtomicReference<PluginContext>();
+        var a = new AtomicReference<PluginContext>();
+        var b = new AtomicReference<PluginContext>();
+        h.start(info("test.bare"), Set.of(), Set.of(), bare::set);
+        h.start(info("test.a", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.b", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), b::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        java.nio.file.Path notes = HERE.resolve("notes.txt");
+        assertThat(h.edit(notes, java.util.OptionalInt.empty(), Optional.empty())).as("no plugin provides one").isFalse();
+        h.ui(() -> {
+            assertThatThrownBy(() -> bare.get().platform().editor(recordingEditor(calls, true)))
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("editor.provide"));
+            a.get().platform().editor(recordingEditor(calls, true));
+            assertThatIllegalStateException().isThrownBy(() -> b.get().platform().editor(recordingEditor(calls, true)))
+                .withMessage("The editor is already provided by test.a");
+            assertThatIllegalStateException().as("the same plugin twice").isThrownBy(() -> a.get().platform().editor(recordingEditor(calls, true)))
+                .withMessage("The editor is already provided by test.a");
+        });
+        assertThat(h.edit(notes, java.util.OptionalInt.of(3), Optional.empty())).isTrue();
+        assertThat(calls).containsExactly("notes.txt|3|-");
+    }
+
+    @Test void aBundledPluginsEditorReplacesAnotherPluginsAndEndsWithItsPlugin() {
+        h.declareBundled("test.z");
+        var a = new AtomicReference<PluginContext>();
+        var z = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.z", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), z::set);
+        List<String> byA = new CopyOnWriteArrayList<>(), byZ = new CopyOnWriteArrayList<>();
+        var replaced = new AtomicReference<Subscription>();
+        java.nio.file.Path notes = HERE.resolve("notes.txt");
+        h.ui(() -> {
+            replaced.set(a.get().platform().editor(recordingEditor(byA, true)));
+            z.get().platform().editor(recordingEditor(byZ, true));
+            assertThatIllegalStateException().isThrownBy(() -> a.get().platform().editor(recordingEditor(byA, true)))
+                .withMessage("The editor is already provided by test.z");
+        });
+        assertThat(h.edit(notes, java.util.OptionalInt.empty(), Optional.empty())).isTrue();
+        h.ui(() -> replaced.get().close());
+        assertThat(h.edit(notes, java.util.OptionalInt.empty(), Optional.empty())).as("closing the replaced registration leaves the bundled one").isTrue();
+        assertThat(byA).isEmpty();
+        assertThat(byZ).containsExactly("notes.txt|-|-", "notes.txt|-|-");
+        h.stopAll();
+        assertThat(h.edit(notes, java.util.OptionalInt.empty(), Optional.empty())).as("the registration ends with its plugin").isFalse();
+    }
+
+    @Test void anEditorThatThrowsGivesFalseAndOneGetsItsPluginsHandleForAnOpenWindow() {
+        UUID window = h.addTerminalWindow();
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), a::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        dev.jasper.sdk.ui.FileEditor recording = recordingEditor(calls, true);
+        h.ui(() -> a.get().platform().editor((file, line, owner) -> {
+            if (file.getFileName().toString().equals("broken.txt")) throw new IllegalStateException("the editor broke");
+            return recording.edit(file, line, owner);
+        }));
+        assertThat(h.edit(HERE.resolve("broken.txt"), java.util.OptionalInt.empty(), Optional.empty())).isFalse();
+        assertThat(h.edit(HERE.resolve("notes.txt"), java.util.OptionalInt.of(7), Optional.of(window))).isTrue();
+        assertThat(h.edit(HERE.resolve("notes.txt"), java.util.OptionalInt.empty(), Optional.of(UUID.randomUUID())))
+            .as("a window that is not open is no window").isTrue();
+        assertThat(calls).containsExactly("notes.txt|7|" + window, "notes.txt|-|-");
+    }
+
+    @Test void openInEditorGoesToTheProvidedEditorFirst() {
+        var a = new AtomicReference<PluginContext>();
+        var user = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.user"), Set.of(), Set.of(), user::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        h.ui(() -> a.get().platform().editor((file, line, window) -> {
+            calls.add(file.getFileName().toString());
+            return !file.getFileName().toString().equals("declined.txt");
+        }));
+        h.ui(() -> {
+            user.get().platform().openInEditor(HERE.resolve("notes.txt"));
+            user.get().platform().openInEditor(HERE.resolve("declined.txt"));
+        });
+        h.flush();
+        for (int i = 0; i < 200 && (calls.size() < 2 || h.openedInEditor().isEmpty()); i++) {
+            try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+        assertThat(calls).containsExactlyInAnyOrder("notes.txt", "declined.txt");
+        assertThat(h.openedInEditor()).as("only the declined file reaches the desktop").containsExactly(HERE.resolve("declined.txt"));
+    }
 }

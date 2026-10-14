@@ -177,8 +177,11 @@ final class HostedContext implements PluginContext {
                     requireOpen();
                     Objects.requireNonNull(file, "file");
                     background().execute(() -> {
-                        try { host.environment.editor().accept(file); }
-                        catch (RuntimeException failure) {
+                        try {
+                            if (host.fileEditors.editFromWorker(file, java.util.OptionalInt.empty(),
+                                    () -> host.environment.terminals().activeWindow().map(dev.jasper.app.terminals.WindowEntry::id))) return;
+                            host.environment.editor().accept(file);
+                        } catch (RuntimeException failure) {
                             log().log(System.Logger.Level.WARNING, "Could not open " + file + " in an editor", failure);
                             notifications.group().error("Could not open a file in an editor", String.valueOf(file.getFileName()), failure);
                         }
@@ -214,6 +217,18 @@ final class HostedContext implements PluginContext {
                     Optional<String> text = host.clipboard.text();
                     gate.audit(Capabilities.CLIPBOARD_READ, "read " + text.map(String::length).orElse(0) + " characters from the clipboard");
                     return text;
+                }
+                @Override public Subscription editor(dev.jasper.sdk.ui.FileEditor editor) {
+                    requireOpen();
+                    requireUi("Platform.editor");
+                    gate.require(Capabilities.EDITOR_PROVIDE);
+                    Objects.requireNonNull(editor, "editor");
+                    dev.jasper.app.lifecycle.Subscription registration = host.fileEditors.register(id, editor,
+                        window -> host.environment.terminals().window(window)
+                            .<dev.jasper.sdk.WindowOwner>map(entry -> terminals.windowHandle(entry.id())));
+                    gate.audit(Capabilities.EDITOR_PROVIDE, "became the editor Jasper opens files with");
+                    // HostedUi.closeAll, which teardown runs, closes it when the plugin stops or fails to start.
+                    return ui.tracked(registration::close);
                 }
             };
         }
