@@ -156,6 +156,10 @@ not in a diagnostic launch:
 - **End of file without a byte**: the launcher ended before its JVM existed, by `exit()`, `_exit` or a signal. With
   `retry`, start `<launcher>` with the arguments and the watcher's environment (POSIX `posix_spawn`; Windows
   `CreateProcessW` with the command line), then exit. With `report`, section 5.3.
+- On POSIX, end of file counts once the launcher is gone: the watcher records its parent at start when that parent runs
+  `<launcher>` (the same file), and on end of file waits up to 1 second for its parent to change; a parent still there
+  has re-executed itself (libjli on Linux), and the watcher exits without starting anything. Every launch the watcher
+  starts gets its environment without `_JPACKAGE_LAUNCHER`, so jpackage's Linux launcher reads `Jasper.cfg` again.
 - On Windows the watcher does nothing when the launcher's exit code is `STATUS_CONTROL_C_EXIT`. On POSIX, Ctrl-C in a
   terminal reaches both processes, as they share a process group.
 

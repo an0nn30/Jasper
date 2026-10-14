@@ -12,9 +12,12 @@ with Java's message ([plan](superpowers/plans/2026-10-14-jasper-startup-recovery
 while executing: `testWatcher` and `testLauncherWatch` wait for a retry or report only in scenarios that start one (the
 planned loops ran to the deadline in every negative scenario); the two unwatched `testLauncherWatch` scenarios have the
 JVM reject its options, so they fail unless the launch goes ahead; the image test's `remember` closure takes `Long size`
-(Groovy 4.0.32). Full `./gradlew check --continue`: 10,165 tests, 0 failures, 12 skips (4 minutes 25 seconds, most test
-tasks up to date; the launcher's `verifyLauncherSources`, `testLauncherCore` (151 checks), `testWatcher`,
-`testLauncherWatch` and `verifyLauncherImage` re-run with `--rerun`, all passing). Manual checks pending (the user): the
+(Groovy 4.0.32). The final review's fixes: the watcher's launches drop `_JPACKAGE_LAUNCHER` (POSIX and Windows), on
+POSIX end of file counts only once the launcher is gone (parent identity, 1 s re-exec wait), Windows attribute-list,
+clock and deadline fixes, the `SIGCHLD` reset, `check-install.sh` checks `bin/jasper-watch`, and an unsigned 64-bit
+vector. Full `./gradlew check --continue`: 10,165 tests, 0 failures, 12 skips (4 minutes 25 seconds, most test tasks up
+to date; the launcher's `verifyLauncherSources`, `testLauncherCore` (152 checks), `testWatcher`, `testLauncherWatch` and
+`verifyLauncherImage` re-run with `--rerun`, all passing). Manual checks pending (the user): the
 hand-off checks in the plan. Plan 3 (the application) is next.
 
 **Start-up recovery plan 1 (the shipped cache) complete — 2026-10-14** (`claude/startup-recovery`, worktree

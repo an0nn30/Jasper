@@ -6,9 +6,10 @@
  *
  * <pipe> is 3 on POSIX. On Windows it is the pipe's read end and a handle to the launcher's process, two decimal handle
  * values separated by a comma, and the one argument is the launcher's whole command line. End of file without the
- * byte means the launcher ended before its JVM existed. Then retry starts <launcher> once more with the arguments and
- * this environment, and report runs it once more with JASPER_LAUNCH_DIAGNOSE=1 and shows what Java reported, or writes
- * it to the file JASPER_WATCH_REPORT names.
+ * byte means the launcher ended before its JVM existed (on POSIX, once the launcher is gone: a launcher that
+ * re-executed itself closes the pipe too). Then retry starts <launcher> once more with the arguments and this
+ * environment, and report runs it once more with JASPER_LAUNCH_DIAGNOSE=1 and shows what Java reported, or writes it
+ * to the file JASPER_WATCH_REPORT names. The launches it starts get its environment without _JPACKAGE_LAUNCHER.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -295,6 +296,8 @@ int wmain(int argc, wchar_t** argv) {
         fputws(L"usage: jasper-watch <pipe>,<process> retry|report <launcher> <command line>\n", stderr);
         return 64;
     }
+    /* jpackage reads _JPACKAGE_LAUNCHER only on Linux; removing it here keeps the launches the same on every OS. */
+    SetEnvironmentVariableW(L"_JPACKAGE_LAUNCHER", NULL);
     readEnd = (HANDLE) (ULONG_PTR) _wcstoui64(argv[1], NULL, 10);
     launcher = (HANDLE) (ULONG_PTR) _wcstoui64(comma + 1, NULL, 10);
     if (receivedByte(readEnd)) {

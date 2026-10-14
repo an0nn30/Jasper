@@ -6,7 +6,11 @@ Status: **Complete on 2026-10-14.** Beyond the ten deviations below: (11) `testW
 the watcher's retry or report only in scenarios that start one, and settle for 3 seconds in the others (the planned
 loops ran to the deadline in every negative scenario); (12) the `watcher not executable` and `no watcher` scenarios of
 `testLauncherWatch` have the JVM reject its options, so they fail unless the launch goes ahead; (13) the image test's
-`remember` closure takes `Long size` (Groovy 4.0.32 rejects two primitive `long` parameters in a closure). Written 2026-10-14 on `claude/startup-recovery` (spec approved by the user the same day; match
+`remember` closure takes `Long size` (Groovy 4.0.32 rejects two primitive `long` parameters in a closure); (14) the
+final review's fixes: `_JPACKAGE_LAUNCHER` removed from the watcher's launches (POSIX, and Windows by plan 3's task 0),
+end of file on POSIX counting only once the launcher is gone (the parent's identity checked at start, 1 s wait for
+`getppid()` to change), the Windows attribute-list, clock and deadline fixes, the `SIGCHLD` reset, `check-install.sh`
+checking `bin/jasper-watch` and an unsigned 64-bit vector (30 vectors, 152 core checks). Written 2026-10-14 on `claude/startup-recovery` (spec approved by the user the same day; match
 rule and parsing amended by the lead the same day, commit `50d5f583`). Plan 2 of 3: plan 1 (the shipped cache) comes
 first on this branch, plan 3 (the application) after; plan 3 reads this plan's vectors file and properties.
 
