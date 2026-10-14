@@ -11,10 +11,11 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 
-// What packaging decides, as pure helpers: the runtime's modules, the native libraries copied into the app, the
-// launcher configuration, the AOT training launch and the DMG detach. gradle/packaging.gradle applies this file;
-// gradle/packaging-support-test.gradle checks it with fixtures (verifyPackagingSupport, part of check). The imports
-// serve helpers further down: Groovy accepts imports only before the first statement.
+// What packaging decides, as pure helpers: the runtime's modules, the native libraries copied into the app, class-path
+// unsealing, the launcher configuration, the AOT training launch in a throwaway copy and the DMG detach.
+// gradle/packaging.gradle applies this file; gradle/packaging-support-test.gradle checks it with fixtures
+// (verifyPackagingSupport, part of check). The imports serve helpers further down: Groovy accepts imports only before
+// the first statement.
 
 // The Java runtime packaged Jasper ships; docs/plugin-authoring.md ("The Java runtime") lists it for plugin authors.
 // jpackage's default for a class-path application is every module, and --bind-services then also bound javac,
@@ -342,10 +343,13 @@ ext.unsealJar = { File jar ->
 // checks them for the class-path jars), and deletes the copy afterwards, also when copier or train throws. The AOT
 // cache then records class-path locations that exist on no machine, so the build machine runs the trained image in
 // the condition every user's machine is in (spec 2026-10-14 section 3.3). A copy left by an earlier, killed training is
-// replaced. Returns what train returns; train receives the copy.
+// replaced. A copy that cannot be deleted fails the build, after the deletion attempt and so never in place of an
+// exception from copier or train, because verifyAotCache would then see the training paths. Returns what train
+// returns; train receives the copy.
 ext.trainInCopy = { File image, File copy, Closure copier, Closure train ->
     copy.deleteDir()
     copy.parentFile.mkdirs()
+    def trained
     try {
         copier(image, copy)
         List<String> changed = modificationTimeMismatches(image, copy)
@@ -353,8 +357,13 @@ ext.trainInCopy = { File image, File copy, Closure copier, Closure train ->
             throw new GradleException("AOT training: the copy of ${image.name} has other modification times for " +
                 "${changed.take(10)}; the JVM would refuse the cache")
         }
-        return train(copy)
+        trained = train(copy)
     } finally {
         copy.deleteDir()
     }
+    if (copy.exists()) {
+        throw new GradleException("AOT training: could not delete the training copy ${copy}; " +
+            'verifyAotCache would see the training paths')
+    }
+    return trained
 }

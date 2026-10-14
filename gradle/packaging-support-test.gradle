@@ -388,6 +388,28 @@ verifySupport.configure {
             assert expected.message == 'training failed'
         }
         assert !copy.exists() : 'a failed training still removes the copy'
+
+        // A copy that cannot be deleted is an error: verifyAotCache would see the training paths in it. A directory
+        // without write permission keeps its entries; root ignores that, so the case is skipped there and on Windows.
+        if (!System.getProperty('os.name').toLowerCase().contains('windows') && System.getProperty('user.name') != 'root') {
+            File locked = null
+            try {
+                trainInCopy(image, copy, keepTimes, { File trainee ->
+                    locked = new File(trainee, 'Contents/locked')
+                    locked.mkdirs()
+                    new File(locked, 'held.txt').text = 'held'
+                    assert locked.setWritable(false, false)
+                    'cache'
+                })
+                assert false : 'a copy that cannot be deleted must fail'
+            } catch (GradleException expected) {
+                assert expected.message.contains('could not delete the training copy') && expected.message.contains(copy.path)
+            } finally {
+                if (locked != null) locked.setWritable(true, false)
+                copy.deleteDir()
+            }
+            assert !copy.exists() : 'the leftover of the locked copy is removed again'
+        }
         logger.lifecycle('Verified training in a throwaway copy')
     }
 }

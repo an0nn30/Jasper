@@ -20,6 +20,16 @@ class CodeLocationTest {
         assertThat(CodeLocation.of(resource, ENTRY)).isEqualTo(jar.toAbsolutePath().normalize());
     }
 
+    @Test void aMultiReleaseJarsVersionedSectionStillNamesTheJar() throws Exception {
+        Path jar = dir.resolve("app/jasper-app.jar");
+        var versioned = URI.create("jar:" + jar.toUri() + "!/META-INF/versions/9/" + ENTRY).toURL();
+        assertThat(CodeLocation.of(versioned, ENTRY)).isEqualTo(jar.toAbsolutePath().normalize());
+        var notAVersion = URI.create("jar:" + jar.toUri() + "!/META-INF/versions/x/" + ENTRY).toURL();
+        assertThat(CodeLocation.of(notAVersion, ENTRY)).as("a prefix that is not a version number").isNull();
+        var otherPrefix = URI.create("jar:" + jar.toUri() + "!/other/" + ENTRY).toURL();
+        assertThat(CodeLocation.of(otherPrefix, ENTRY)).as("another prefix").isNull();
+    }
+
     @Test void aClassesDirectoryResourceNamesTheDirectory() throws Exception {
         Path classes = dir.resolve("build dir/classes/java/main");
         var resource = classes.resolve(ENTRY).toUri().toURL();
