@@ -25,7 +25,7 @@
 # The default editor: jasper (the Jasper Editor), system (your system's default app; Jasper's shells get no EDITOR
 # or VISUAL), custom (custom_command below) or an installed editor's id: nvim, vim, vi, nano, micro, helix, emacs,
 # code, cursor, zed, sublime, bbedit, textmate, idea, notepadpp or notepad. Files Jasper opens, such as config.toml,
-# open in it, and Jasper's shells get EDITOR and VISUAL for it.
+# open in it, and Jasper's shells get EDITOR for it.
 # default_editor = "jasper"
 
 # For custom: the command line; the file's path is added at the end.

@@ -106,6 +106,9 @@ class DefaultEditorTest {
 
     private void choose(String editor) { preference.set(new DefaultEditor.Preference(editor, "", true, true)); }
 
+    /** What a shell gets when Jasper's own environment has no VISUAL to replace. */
+    private static Map<String, String> editorOnly(String value) { return Map.of("EDITOR", value); }
+
     private static Map<String, String> both(String value) { return Map.of("EDITOR", value, "VISUAL", value); }
 
     private String tab(UUID window, String command) { return "tab|" + window + "|" + file.getParent() + "|run:" + command; }
@@ -181,19 +184,20 @@ class DefaultEditorTest {
         assertThat(host.openRequests()).isEmpty();
     }
 
-    @Test void editorAndVisualForEachChoice() {
+    /** Controller Ruling 11: EDITOR only, so a VISUAL or EDITOR exported in a shell startup file still wins. */
+    @Test void editorForEachChoice() {
         Path nvim = install("nvim"), emacs = install("emacs"), code = install("code");
         DefaultEditor defaults = detected(MAC);
-        assertThat(defaults.variables(Map.of())).isEqualTo(both(EditorCommands.quote(client.toString(), MAC) + " editor --wait"));
+        assertThat(defaults.variables(Map.of())).isEqualTo(editorOnly(EditorCommands.quote(client.toString(), MAC) + " editor --wait"));
         assertThat(editor(MAC, Optional.empty()).variables(Map.of())).as("no jasper command").isEmpty();
         choose("nvim");
-        assertThat(defaults.variables(Map.of())).isEqualTo(both(EditorCommands.quote(nvim.toString(), MAC)));
+        assertThat(defaults.variables(Map.of())).isEqualTo(editorOnly(EditorCommands.quote(nvim.toString(), MAC)));
         choose("emacs");
-        assertThat(defaults.variables(Map.of())).isEqualTo(both(EditorCommands.quote(emacs.toString(), MAC) + " -nw"));
+        assertThat(defaults.variables(Map.of())).isEqualTo(editorOnly(EditorCommands.quote(emacs.toString(), MAC) + " -nw"));
         choose("code");
-        assertThat(defaults.variables(Map.of())).isEqualTo(both(EditorCommands.quote(code.toString(), MAC) + " --wait"));
+        assertThat(defaults.variables(Map.of())).isEqualTo(editorOnly(EditorCommands.quote(code.toString(), MAC) + " --wait"));
         preference.set(new DefaultEditor.Preference("custom", "subl -w", true, true));
-        assertThat(defaults.variables(Map.of())).isEqualTo(both("subl -w"));
+        assertThat(defaults.variables(Map.of())).isEqualTo(editorOnly("subl -w"));
         preference.set(new DefaultEditor.Preference("custom", "", true, true));
         assertThat(defaults.variables(Map.of())).isEmpty();
         choose("system");
@@ -206,9 +210,23 @@ class DefaultEditorTest {
         String jasper = EditorCommands.quote(client.toString(), MAC) + " editor --wait";
         assertThat(defaults.variables(Map.of("EDITOR", "vim"))).isEmpty();
         assertThat(defaults.variables(Map.of("VISUAL", "vim"))).isEmpty();
-        assertThat(defaults.variables(Map.of("EDITOR", "", "VISUAL", " "))).as("blank values").isEqualTo(both(jasper));
+        assertThat(defaults.variables(Map.of("EDITOR", "", "VISUAL", " "))).as("blank values: no VISUAL to replace").isEqualTo(editorOnly(jasper));
         preference.set(new DefaultEditor.Preference("jasper", "", true, false));
-        assertThat(defaults.variables(Map.of("EDITOR", "vim"))).isEqualTo(both(jasper));
+        assertThat(defaults.variables(Map.of("EDITOR", "vim", "VISUAL", "nano"))).as("the setting off").isEqualTo(both(jasper));
+    }
+
+    /** Controller Ruling 11: with the setting off, a VISUAL Jasper was started with is replaced along with EDITOR. */
+    @Test void withTheSettingOffAVisualInJaspersEnvironmentIsReplacedToo() {
+        preference.set(new DefaultEditor.Preference("jasper", "", true, false));
+        DefaultEditor defaults = detected(MAC);
+        assertThat(defaults.variables(Map.of("VISUAL", "nano"))).isEqualTo(both(EditorCommands.quote(client.toString(), MAC) + " editor --wait"));
+    }
+
+    /** Controller Ruling 11: with the setting off, an EDITOR alone in Jasper's environment gets EDITOR alone. */
+    @Test void withTheSettingOffAnEditorAloneInJaspersEnvironmentIsReplacedAlone() {
+        preference.set(new DefaultEditor.Preference("jasper", "", true, false));
+        DefaultEditor defaults = detected(MAC);
+        assertThat(defaults.variables(Map.of("EDITOR", "vim"))).isEqualTo(editorOnly(EditorCommands.quote(client.toString(), MAC) + " editor --wait"));
     }
 
     /** Review Focus 5: the saved editor was uninstalled. */
@@ -253,7 +271,7 @@ class DefaultEditorTest {
         DefaultEditor defaults = editor(MAC, Optional.of(client));
         defaults.findSaved();
         assertThat(defaults.choice()).isEqualTo(new Choice.Installed(new Detected(KnownEditors.byId("nvim").orElseThrow(), nvim)));
-        assertThat(defaults.variables(Map.of())).isEqualTo(both(EditorCommands.quote(nvim.toString(), MAC)));
+        assertThat(defaults.variables(Map.of())).isEqualTo(editorOnly(EditorCommands.quote(nvim.toString(), MAC)));
         assertThat(defaults.detected()).extracting(found -> found.editor().id()).as("only the saved editor").containsExactly("nvim");
         assertThat(uiQueue).as("no listener or UI work was needed").isEmpty();
     }

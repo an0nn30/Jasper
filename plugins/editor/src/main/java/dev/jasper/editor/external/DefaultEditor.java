@@ -20,8 +20,8 @@ import java.util.function.Supplier;
 
 /**
  * The default editor: what the Default editor settings choose, as the editor Jasper opens files with ({@link #edit},
- * the {@code Platform.editor} hook) and as the {@code EDITOR} and {@code VISUAL} of Jasper's shells ({@link #variables},
- * the {@code Terminals.environment} contributor). UI thread, except detection's search, which {@link #detect} runs on
+ * the {@code Platform.editor} hook) and as the {@code EDITOR} of Jasper's shells, and their {@code VISUAL} when it
+ * replaces one Jasper was started with ({@link #variables}, the {@code Terminals.environment} contributor). UI thread, except detection's search, which {@link #detect} runs on
  * the background executor before publishing its result on the UI thread.
  *
  * <p>{@link #findSaved} looks for the saved editor at start, before any shell starts, and {@link #detect} looks for all
@@ -185,15 +185,20 @@ public final class DefaultEditor {
     }
 
     /**
-     * The {@code Terminals.environment} contributor.
+     * The {@code Terminals.environment} contributor. {@code VISUAL} is set only to replace one Jasper was started with
+     * (with {@code keep_environment_editor} off), so an {@code EDITOR} or {@code VISUAL} exported in a shell startup
+     * file still wins: programs that prefer {@code VISUAL}, such as git, fall back to {@code EDITOR}.
      *
      * @param jasperEnvironment Jasper's own environment
-     * @return {@code EDITOR} and {@code VISUAL} for the choice; nothing when Jasper's environment keeps its own or the
-     *     choice names none
+     * @return {@code EDITOR} for the choice, and {@code VISUAL} when Jasper's environment has one that is not blank;
+     *     nothing when Jasper's environment keeps its own or the choice names none
      */
     public Map<String, String> variables(Map<String, String> jasperEnvironment) {
         if (EditorCommands.keepsEnvironment(jasperEnvironment, preference.get().keepEnvironment())) return Map.of();
-        return EditorCommands.variable(choice(), osName).map(value -> Map.of("EDITOR", value, "VISUAL", value)).orElse(Map.of());
+        String inherited = jasperEnvironment.get("VISUAL");
+        boolean replacesVisual = inherited != null && !inherited.isBlank();
+        return EditorCommands.variable(choice(), osName)
+            .map(value -> replacesVisual ? Map.of("EDITOR", value, "VISUAL", value) : Map.of("EDITOR", value)).orElse(Map.of());
     }
 
     /**

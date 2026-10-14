@@ -44,7 +44,7 @@ public record EditorSettings(String fontFamily, int fontSize, int tabSize, boole
         /** The {@code default_editor} values besides a known editor's id. */
         static final Set<String> CHOICES = Set.of(JASPER, "system", "custom");
         static final String DEFAULT_EDITOR_LABEL = "Default editor";
-        static final String DEFAULT_EDITOR_DESCRIPTION = "Opens the files Jasper opens, such as config.toml, and is EDITOR and VISUAL "
+        static final String DEFAULT_EDITOR_DESCRIPTION = "Opens the files Jasper opens, such as config.toml, and is EDITOR "
             + "in Jasper's shells, so git commit uses it.";
         static final String COMMAND_LABEL = "Custom command";
         static final String COMMAND_DESCRIPTION = "For Custom command: the command line, run by the shell; the file's path is added at the end.";

@@ -322,7 +322,7 @@ class EditorPluginTest {
         return program;
     }
 
-    @Test void theEditorIsJaspersFileEditorAndNamesItselfInEditorAndVisual() throws Exception {
+    @Test void theEditorIsJaspersFileEditorAndNamesItselfInEditor() throws Exception {
         try (var host = host()) {
             Path client = home.resolve("Jasper Beta.app").resolve("bin").resolve("jasper");
             host.setCommandClient(client);
@@ -334,7 +334,8 @@ class EditorPluginTest {
             drain(host);
             assertThat(host.contentTabs()).hasSize(1);
             String value = EditorCommands.quote(client.toString(), System.getProperty("os.name", "")) + " editor --wait";
-            assertThat(host.shellEnvironment(Map.of())).isEqualTo(Map.of("EDITOR", value, "VISUAL", value));
+            assertThat(host.shellEnvironment(Map.of())).as("no VISUAL, so a startup file's VISUAL or EDITOR still wins")
+                .isEqualTo(Map.of("EDITOR", value));
             assertThat(host.failures()).isEmpty();
             host.stopAll();
             assertThat(host.editorPlugin()).as("stopped").isEmpty();
@@ -354,7 +355,10 @@ class EditorPluginTest {
         }
     }
 
-    /** Review Focus 2, end to end: Jasper started from a terminal with EDITOR=vim keeps it until keep_environment_editor is off. */
+    /**
+     * Review Focus 2 and Controller Ruling 11, end to end: Jasper started from a terminal with EDITOR=vim keeps it until
+     * keep_environment_editor is off; then EDITOR is replaced, and VISUAL only when Jasper was started with one.
+     */
     @Test void anEditorInJaspersOwnEnvironmentStaysUntilTheSettingIsOff() {
         try (var host = host()) {
             host.setCommandClient(home.resolve("jasper"));
@@ -363,7 +367,10 @@ class EditorPluginTest {
             assertThat(host.shellEnvironment(Map.of("EDITOR", "vim"))).as("git keeps vim").isEmpty();
             assertThat(host.shellEnvironment(Map.of("VISUAL", "nvim"))).isEmpty();
             host.setSetting("dev.jasper.editor", "keep_environment_editor", false);
-            assertThat(host.shellEnvironment(Map.of("EDITOR", "vim"))).containsOnlyKeys("EDITOR", "VISUAL");
+            String jasper = EditorCommands.quote(home.resolve("jasper").toString(), System.getProperty("os.name", "")) + " editor --wait";
+            assertThat(host.shellEnvironment(Map.of("EDITOR", "vim"))).as("only EDITOR").isEqualTo(Map.of("EDITOR", jasper));
+            assertThat(host.shellEnvironment(Map.of("VISUAL", "nano"))).as("both replaced")
+                .isEqualTo(Map.of("EDITOR", jasper, "VISUAL", jasper));
         }
     }
 
@@ -395,7 +402,7 @@ class EditorPluginTest {
             host.start(INFO, Set.of(), Set.of(), detecting());
             String os = System.getProperty("os.name", "");
             assertThat(host.shellEnvironment(Map.of())).as("no background task has run yet")
-                .isEqualTo(Map.of("EDITOR", EditorCommands.quote(nvim.toString(), os), "VISUAL", EditorCommands.quote(nvim.toString(), os)));
+                .isEqualTo(Map.of("EDITOR", EditorCommands.quote(nvim.toString(), os)));
             drain(host);
             assertThat(host.failures()).isEmpty();
         }
