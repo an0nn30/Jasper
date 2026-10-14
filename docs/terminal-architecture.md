@@ -223,9 +223,10 @@ whatever runs in the pane: a remote machine that reports this machine's name, `l
 at all is indistinguishable from local. A local working directory stays a hint that may not exist.
 
 A local process may also pass `SessionLaunchOptions.localPathMapper`. It receives the decoded path of
-every report classified as local and returns the directory that path means on this machine, or empty,
-and then the report is ignored and the last directory stays. A mapper that throws or returns null
-counts as empty; it runs on the reader thread and must not block. Remote reports never reach it. The
+every report classified as local, and of every clicked `file:` link classified as local, and returns the
+path that means on this machine, or empty, and then the report is ignored and the last directory stays.
+A mapper that throws or returns null counts as empty; it runs on the reader thread for a report and on
+the EDT for a click, and must not block. Remote reports never reach it. The
 default, `SessionLaunchOptions.DEFAULT_LOCAL_PATHS`, reads the path as a `file` URI path on this
 machine, as before. Jasper's WSL panes map `/mnt/c/...` to `C:\...` and any other path to the
 distribution's `\\wsl.localhost` share, so a Linux path never reaches the local surface as `\home\x`.

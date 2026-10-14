@@ -547,10 +547,14 @@ SDK 0.17.1 adds four hooks. Declare `sdk = ">=0.17.1, <0.18"` when you use them.
   entry is logged. A `[terminal.env]` entry still wins, and when two plugins set one name the first by plugin id wins.
   WSL tabs and provided sessions get none.
 - `context.platform().editor(fileEditor)` (needs `editor.provide`) makes your plugin the editor Jasper opens files with:
-  Open in Editor for `config.toml`, plugin settings files and the VM options file, and every plugin's `openInEditor`.
+  Open in Editor for `config.toml`, plugin settings files and the VM options file, every plugin's `openInEditor`, and a
+  Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local terminal pane, with the path's line and the
+  clicked window. A clicked path comes from program output, and an OSC 8 link's target can differ from the text shown,
+  so edit the file and never run it.
   `FileEditor.edit(file, line, window)` runs on the UI thread and returns whether it opened the file; `false`, or a
-  handler that throws, hands the file to the desktop. One plugin at a time: a bundled plugin's registration replaces
-  a non-bundled plugin's; otherwise a later one throws `IllegalStateException`.
+  handler that throws, hands the file to the desktop, which for a click edits the file or shows it in the file manager
+  instead of opening it. One plugin at a time: a bundled plugin's registration replaces a non-bundled plugin's;
+  otherwise a later one throws `IllegalStateException`.
 - `OpenRequest.local(LocalSpec.running(command, workingDirectory))` opens a tab or split that runs a program instead of
   the shell, with the default shell's environment; it needs `terminal.open`. The tab closes when the program exits with
   status 0 and stays open otherwise, whatever `terminal.on_exit` says. A `LocalSpec` names a profile or a command, not

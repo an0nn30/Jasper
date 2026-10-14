@@ -283,7 +283,8 @@ public final class TerminalView extends JComponent {
      * Receives the file a Cmd-click (macOS) or Ctrl-click (Linux and Windows) names: a path written in the output, such
      * as {@code src/Foo.java:42} or {@code Foo.cs(42,5)}, following soft wraps, or a {@code file:} link, OSC 8 or plain
      * text, to this machine. A URL under the pointer still opens in the browser. Without a handler, the default, such a
-     * click starts a selection. Called on the Event Dispatch Thread, so the handler must not block.
+     * click starts a selection. The path is unauthenticated program output: an OSC 8 link's target can differ from the
+     * text shown. Called on the Event Dispatch Thread, so the handler must not block.
      *
      * @param handler the receiver, or {@code null} for none
      */

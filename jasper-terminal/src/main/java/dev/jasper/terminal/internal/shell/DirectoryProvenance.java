@@ -86,7 +86,7 @@ public final class DirectoryProvenance {
         try {
             mapped = localPaths.apply(path);
         } catch (RuntimeException failure) {
-            // The mapper runs on the reader thread; a broken one must not end the session.
+            // The mapper runs on the reader thread for a report and on the EDT for a clicked link; a broken one must end neither.
             return Optional.empty();
         }
         return mapped == null ? Optional.empty() : mapped.map(Report.Local::new);

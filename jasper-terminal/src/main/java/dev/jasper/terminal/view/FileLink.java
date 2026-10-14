@@ -5,7 +5,8 @@ import java.util.Objects;
 /**
  * A file that a Cmd-click (Ctrl-click on Linux and Windows) named in terminal output, reported to
  * {@link TerminalView#setFileLinkHandler}. The view resolves nothing: what the path means, and whether the file exists
- * and opens, is the application's decision.
+ * and opens, is the application's decision. The path is unauthenticated program output: an OSC 8 link's target can
+ * differ from the text shown.
  *
  * @param path the path as written ({@code ~/}, {@code ./} and relative paths unresolved), or the decoded absolute path
  *             of a {@code file:} link to this machine
