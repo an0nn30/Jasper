@@ -8,8 +8,8 @@ could not be told apart. `NativeChromePainting.tabSurface` now paints inactive t
 `SurfaceContrast.apart(tabstrip, terminal, TAB_LIGHTNESS = 9)`: the theme's colour when it is at least 9 CIE L* from the
 terminal surface, otherwise darkened just until it is (lightened when the terminal surface is near black); no format
 change, so every installed theme is covered. Catppuccin Frappé `#1F212D` under `#303446`, Slate Steel Dark `#121317`
-under `#23262C`, Light `#DDE0E3` under `#FBFBFC`. `./gradlew check --continue`: **10,113 tests, 0 failures, 0 errors,
-12 skipped**. No GUI launched. GUI check for the user: the tab strip in each theme. Merged to `main`.
+under `#23262C`, Light `#DDE0E3` under `#FBFBFC`. `./gradlew check --continue` after merging `main`: **10,157 tests,
+0 failures, 0 errors, 12 skipped**. No GUI launched. GUI check for the user: the tab strip in each theme. Merged to `main`.
 
 **Custom VM options plan 3 (memory) complete — 2026-10-14.** On `claude/custom-vm-options-memory`, merged to local `main` (not pushed):
 Settings › Window › Show memory indicator (`window.memory_indicator`, off by default) adds `312 of 2048M` to the status
