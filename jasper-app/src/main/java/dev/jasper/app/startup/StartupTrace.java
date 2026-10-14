@@ -38,6 +38,8 @@ public final class StartupTrace {
 
     /** {@code -Djasper.startupTrace=<file>} also writes the trace as JSON, for the start-up benchmark. */
     public static final String TRACE_FILE_PROPERTY = "jasper.startupTrace";
+    /** Set by Jasper's launcher when it started this JVM without the AOT cache; the value is the reason. */
+    static final String AOT_CACHE_SKIPPED_PROPERTY = "jasper.aotCacheSkipped";
     static final long CAP_NANOS = TimeUnit.SECONDS.toNanos(10);
     static final int WINDOW_LIMIT = 50;
     static final long UNSET = Long.MIN_VALUE;
@@ -50,11 +52,23 @@ public final class StartupTrace {
                        Path traceFile, Consumer<String> log, Executor background, Supplier<JvmStatus> jvm,
                        BiConsumer<Long, Runnable> timer) { }
 
-    /** Whether this JVM mapped an AOT cache or the default CDS archive. */
+    /** Whether this JVM mapped an AOT cache or the default CDS archive, or why the launcher left the cache out. */
     record JvmStatus(String aotCache, String cds) {
-        static JvmStatus of(String aotCacheOption, boolean sharing) {
+        private static final List<String> SKIP_REASONS = List.of("launch-failed", "remembered", "environment");
+
+        /**
+         * {@code skipped} is {@code jasper.aotCacheSkipped}, which the launcher sets when it starts this JVM without
+         * the cache. {@code launch-failed}, {@code remembered} and {@code environment} are reported as they are; any other
+         * value is a hand-set {@code JASPER_AOT_CACHE_SKIP} and reads {@code environment}, because the log holds no
+         * environment values.
+         */
+        static JvmStatus of(String aotCacheOption, boolean sharing, String skipped) {
+            String cds = sharing ? "on" : "off";
+            if (skipped != null && !skipped.isBlank()) {
+                return new JvmStatus("skipped: " + (SKIP_REASONS.contains(skipped) ? skipped : "environment"), cds);
+            }
             boolean configured = aotCacheOption != null && !aotCacheOption.isEmpty();
-            return new JvmStatus(!configured ? "none" : sharing ? "used" : "stale", sharing ? "on" : "off");
+            return new JvmStatus(!configured ? "none" : sharing ? "used" : "stale", cds);
         }
 
         /** Off the EDT: loads the management classes on first use. */
@@ -67,7 +81,7 @@ public final class StartupTrace {
             } catch (RuntimeException | LinkageError unavailable) {
                 // No management module or no such option: report the cache as not configured.
             }
-            return of(configured, sharing);
+            return of(configured, sharing, System.getProperty(AOT_CACHE_SKIPPED_PROPERTY));
         }
     }
 
@@ -103,7 +117,7 @@ public final class StartupTrace {
     public static StartupTrace detached() {
         long now = System.nanoTime();
         return new StartupTrace(new Environment(System::nanoTime, now, 0, Instant.now(), ProcessHandle.current().pid(),
-            null, line -> { }, Runnable::run, () -> JvmStatus.of("", false), (delay, task) -> { }));
+            null, line -> { }, Runnable::run, () -> JvmStatus.of("", false, null), (delay, task) -> { }));
     }
 
     /** The trace file named by the property; null for a blank or malformed value, because tracing must never stop a launch. */
