@@ -1,5 +1,6 @@
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -261,6 +262,141 @@ def testLauncherCore = tasks.register('testLauncherCore') {
     }
 }
 tasks.named('check') { dependsOn(testLauncherCore) }
+
+// ---- jasper-watch, and the watch module's start of it (packaging/launcher/README.md) ----
+
+def watcherName = { -> launcherHost().os == 'windows' ? 'jasper-watch.exe' : 'jasper-watch' }
+def watcherFile = launcherBuild.map { it.file("watch/${watcherName()}") }
+// The literal packaging verification looks for in jasper-watch: its dialog's title, which it always uses.
+String watcherMarker = 'Jasper could not start'
+
+def buildWatcher = tasks.register('buildWatcher') {
+    group = 'build'
+    description = 'Builds jasper-watch, which starts Jasper once more when its JVM dies before it exists, for this host.'
+    inputs.dir(jasperNative).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.property('sdk', launcherSdk.map { it.absolutePath })
+    inputs.property('host', providers.provider { launcherHost().toString() })
+    outputs.file(watcherFile)
+    doLast {
+        def host = launcherHost()
+        File work = launcherBuild.get().dir('watch-objects').asFile
+        delete(work)
+        File source = new File(jasperNative, 'jasper_watch.c')
+        File watcher = nativeBuild(kind: 'executable', sources: [source], strict: [source], includes: [jasperNative],
+            libraries: host.os == 'macos' ? ['-framework', 'CoreFoundation'] : (host.os == 'windows' ? ['user32.lib'] : []),
+            subsystem: host.os == 'windows' ? 'CONSOLE' : null, output: watcherFile.get().asFile, work: work)
+        // Apple silicon runs only signed code, and strip -S removed the linker's signature; packaging signs its copy again.
+        if (host.os == 'macos') {
+            runLauncherTool(['/usr/bin/codesign', '--force', '--sign', '-', watcher.absolutePath], null, null, 'signing jasper-watch')
+        }
+        if (!new String(Files.readAllBytes(watcher.toPath()), StandardCharsets.ISO_8859_1).contains(watcherMarker)) {
+            throw new GradleException("buildWatcher: ${watcher.name} lacks '${watcherMarker}'")
+        }
+    }
+}
+ext.watcherBinary = watcherFile.map { it.asFile }
+
+// Copies jasper-watch into directory, where the watch module of a program there finds it. Returns the copy.
+def watcherBeside = { File directory ->
+    directory.mkdirs()
+    File copy = new File(directory, watcherName())
+    Files.copy(watcherFile.get().asFile.toPath(), copy.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    copy.setExecutable(true, false)
+    copy
+}
+
+def testWatcher = tasks.register('testWatcher') {
+    group = 'verification'
+    description = 'Checks jasper-watch with a test launcher that ends before, or after, sending its byte.'
+    dependsOn(buildWatcher)
+    inputs.dir(jasperNative).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(launcherTestSource).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(buildWatcher).withPropertyName('watcher').withPathSensitivity(PathSensitivity.NONE)
+    outputs.file(launcherBuild.map { it.file('watcher-test/passed') })
+    doLast {
+        def host = launcherHost()
+        File work = launcherBuild.get().dir('watcher-test').asFile
+        delete(work)
+        File bin = new File(work, 'bin')
+        File watcher = watcherBeside(bin)
+        List<File> sources = [new File(launcherTestSource, 'watch_fake_launcher.c'), new File(jasperNative, 'jasper_watch_launch.c'),
+            new File(jasperNative, 'jasper_launch_rules.c')]
+        File launcher = nativeBuild(kind: 'executable', exportAll: true, sources: sources, strict: sources, includes: [jasperNative],
+            libraries: host.os == 'linux' ? ['-ldl', '-lpthread'] : [],
+            output: new File(bin, host.os == 'windows' ? 'watch-fake-launcher.exe' : 'watch-fake-launcher'),
+            work: new File(work, 'objects'))
+        String intro = 'Jasper could not start, even without its start-up cache and your custom VM options. Reinstalling Jasper may help.'
+        String noError = 'Java reported no error when checked again. Try opening Jasper again.'
+        String noOutput = 'Java exited with an error and printed nothing.'
+        // POSIX passes arguments in the build's file-name encoding, so a non-ASCII one only when that is UTF-8.
+        List<String> arguments = ['alpha', 'with space'] +
+            (host.os != 'windows' && System.getProperty('sun.jnu.encoding', '').equalsIgnoreCase('UTF-8') ? ['J\u00fcrgen'] : [])
+        // retried: the watcher starts the launcher once more; report: the text after the introduction.
+        List<Map> scenarios = [
+            [ending: 'byte', retried: false],
+            [ending: 'exit', retried: true],
+            [ending: '_exit', retried: true],
+            host.os == 'windows' ? [ending: 'ctrl-c', retried: false] : [ending: 'kill', retried: true],
+            [ending: 'report', report: 'Java reported:\nError: fake JVM failure: Invalid maximum heap size: -Xmx3q'],
+            [ending: 'report-pass', report: noError],
+            [ending: 'report-hang', report: noError],
+            [ending: 'report-silent', report: noOutput],
+            [ending: 'report-long', report: 'Java reported:\n' + 'x' * 1492 + 'TAIL-END'],
+        ] + (host.os == 'windows' ? [] : [[ending: 'report-utf8', report: 'Java reported:\n' + '\u00e9' * 1500]])
+        List<String> failures = []
+        scenarios.each { Map scenario ->
+            String name = scenario.ending
+            File record = new File(work, "${name}.record")
+            File report = new File(work, "${name}.report")
+            File log = new File(work, "${name}.log")
+            def builder = new ProcessBuilder([launcher.absolutePath, name] + arguments).redirectErrorStream(true).redirectOutput(log)
+            ['JASPER_VM_OPTIONS_SKIP', 'JASPER_AOT_CACHE_SKIP', 'JASPER_LAUNCH_DIAGNOSE'].each { builder.environment().remove(it) }
+            builder.environment().putAll([WATCH_FAKE_RECORD: record.absolutePath, WATCH_FAKE_KEPT: 'kept value',
+                JASPER_WATCH_REPORT: report.absolutePath])
+            Process process = builder.start()
+            if (!process.waitFor(30, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                failures << "${name}: the test launcher did not exit within 30 s".toString()
+                return
+            }
+            // The watcher acts after the launcher has gone: wait for what it should do, then a little longer for anything else.
+            boolean reports = scenario.report != null
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+            while (System.nanoTime() < deadline && !(reports ? report.isFile() : scenario.retried && record.isFile())) {
+                Thread.sleep(100)
+            }
+            Thread.sleep(reports || scenario.retried ? 1000 : 2000)
+            String received = ([name] + arguments).join('|')
+            List<String> lines = record.isFile() ? record.readLines('UTF-8') : []
+            List<String> expected = reports ? ["diagnose skip=- kept=kept value diagnose=1 args=${received}".toString()]
+                : (scenario.retried ? ["retried skip=launch-failed kept=kept value diagnose=- args=${received}".toString()] : [])
+            if (lines != expected) {
+                failures << "${name}: the watcher started ${lines}, expected ${expected}\n${log.getText('UTF-8')}".toString()
+            }
+            String text = report.isFile() ? report.getText('UTF-8') : null
+            String wanted = reports ? intro + '\n\n' + scenario.report : null
+            if (text != wanted) failures << "${name}: the report was\n${text}\nexpected\n${wanted}".toString()
+        }
+        Process usage = new ProcessBuilder([watcher.absolutePath]).redirectErrorStream(true).start()
+        String usageText = new String(usage.inputStream.readAllBytes(), StandardCharsets.UTF_8)
+        if (!usage.waitFor(10, TimeUnit.SECONDS) || usage.exitValue() != 64 || !usageText.contains('usage: jasper-watch')) {
+            failures << "without arguments: jasper-watch printed ${usageText}".toString()
+        }
+        // As testCommandClientCore: on macOS the POSIX code is compiled once more as Linux's, against this host's headers.
+        if (host.os == 'macos') {
+            File include = new File(launcherSdk.get(), 'include')
+            runLauncherTool(['/usr/bin/xcrun', 'clang', '-std=c11', '-fsyntax-only', '-Wall', '-Wextra', '-Werror', '-U__APPLE__'] +
+                launcherDefines('linux').collect { "-D${it}".toString() } +
+                [jasperNative, include, new File(include, 'darwin')].collect { "-I${it.absolutePath}".toString() } +
+                [new File(jasperNative, 'jasper_watch.c'), new File(jasperNative, 'jasper_watch_launch.c'),
+                 new File(launcherTestSource, 'watch_fake_launcher.c')].collect { it.absolutePath }, null, null,
+                "checking jasper-watch and the watch module with Linux's defines", launcherToolchainHint(host.os))
+        }
+        if (failures) throw new GradleException('testWatcher:\n' + failures.join('\n'))
+        new File(work, 'passed').text = "${scenarios.size()} scenarios\n"
+    }
+}
+tasks.named('check') { dependsOn(testWatcher) }
 
 // ---- The exit guard, against the toolchain JDK's real libjli ----
 
