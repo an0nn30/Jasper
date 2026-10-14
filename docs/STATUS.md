@@ -21,7 +21,7 @@ names nobody else owns, so `jasper <name>` says it is unavailable (exit 1) rathe
 lists only active plugins; only Linux gives the "not on your PATH" hint after Install; the palette's Uninstall acts only
 when the command is installed; a dangling `jasper` link counts as Jasper's own only when its target ends with
 `Resources/bin/jasper` or `lib/bin/jasper`, any other asking first; `jasper editor` also completes when a tab closes
-while its file is still loading. `./gradlew check --continue`: **9,927 tests, 0 failures, 0 errors, 12 skipped**.
+while its file is still loading; from the final review, the cold start on Linux runs from the home folder without the caller's `GIT_*` variables and on Windows with the user's default environment, the client refuses a request over 1 MiB (exit 2), a plugin that stops ends its calls in flight (exit 1), and connections that end before the first call never make a `--no-window` Jasper quit. Known limits: a relative `JASPER_HOME` resolves against the home folder in a cold start; a shell that outlives its Jasper's `commands-<pid>` socket (tmux) waits on that dead socket. `./gradlew check --continue`: **9,928 tests, 0 failures, 0 errors, 12 skipped**.
 No GUI launched. GUI checks for the user: in a dev run's
 shell, `jasper-app/build/cli/bin/jasper editor --wait notes.txt` and Ctrl-C; on the packaged macOS app, Install (the
 administrator prompt), then from iTerm `jasper editor --wait notes.txt`, `git config --global core.editor "jasper editor
