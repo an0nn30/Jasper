@@ -10,8 +10,8 @@ is the binding reference.
   palette, and **Open…** inside the Editor window.
 - **New Editor File**, or **New File** (Cmd/Ctrl+N) inside the Editor window, for an untitled tab.
 - Drop files from the desktop onto the Editor window. Folders are ignored.
-- `jasper editor FILE[:LINE[:COLUMN]]...` from a terminal (Jasper's own shells always have the
-  [jasper command](configuration.md#the-jasper-command); other terminals once it is installed). The caret goes to the
+- `jasper editor FILE[:LINE[:COLUMN]]...` from a terminal, once the
+  [jasper command](configuration.md#the-jasper-command) is installed. The caret goes to the
   line and column. A file that does not exist yet opens as an empty tab and is created when you save it. A folder, or
   a file in a folder that does not exist, is reported and the other files still open. With `--wait` (`-w`) the command
   returns once every tab it opened has closed, so `git config --global core.editor "jasper editor --wait"` edits commit

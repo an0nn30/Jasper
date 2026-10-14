@@ -28,11 +28,11 @@ The first command launches the desktop and a shell. `--help` prints usage withou
 ### The jasper command
 
 `jasper` hands a call to the Jasper that is running, starting it first when none is, and never starts a Java process of
-its own, so it returns quickly. Jasper's own shells reach it through `JASPER_COMMAND_SOCKET`; to use it from other
-terminals and programs, choose Settings › System Settings › Command line › Install, or **Install 'jasper' Command in
-PATH** in the command palette. On macOS that makes `/usr/local/bin/jasper`, asking for an administrator's password when
-that folder needs it; on Linux `~/.local/bin/jasper`; on Windows it adds Jasper's `bin` folder to your user `Path`. A
-development run cannot install it.
+its own, so it returns quickly. To use it in any terminal or program, choose Settings › System Settings › Command line ›
+Install, or **Install 'jasper' Command in PATH** in the command palette; in Jasper's own shells it then reaches their own
+Jasper through `JASPER_COMMAND_SOCKET`. On macOS that makes `/usr/local/bin/jasper`, asking for an administrator's
+password when that folder needs it; on Linux `~/.local/bin/jasper`; on Windows it adds Jasper's `bin` folder to your
+user `Path`. A development run cannot install it.
 
 - `jasper` opens a window, or brings one forward.
 - `jasper --safe-mode`, `--config <path>`, `--plugin-dir <path>` and `--standalone` start Jasper with those options.
