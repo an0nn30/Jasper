@@ -73,11 +73,47 @@ class FileLinksTest {
         assertThat(FileLinks.resolve("//wsl$/Ubuntu/x", Optional.empty(), HOME, true)).contains(Path.of("\\\\wsl$\\Ubuntu\\x"));
     }
 
-    /** A relative path's host comes from the pane's own directory, not from program output, even when that is a share. */
-    @Test void aRelativePathUnderAPanesNetworkShareStillResolvesOnWindows() {
-        Path share = Path.of("\\\\fileserver\\team\\project");
-        assertThat(FileLinks.resolve("a.txt", Optional.of(share), HOME, true)).contains(share.resolve("a.txt"));
-        assertThat(FileLinks.resolve("src\\a.txt", Optional.of(share), HOME, true)).isPresent();
+    /**
+     * Ruling 13: the pane's directory is program output too (any program can print an OSC 7 report that becomes it), so a
+     * relative path under a directory whose text names a host is refused on Windows by the same rule as the path itself.
+     * Textual: these directories keep their text as a {@code Path} on every OS (a POSIX {@code Path} would collapse
+     * {@code //host}, so the forward-slash forms are in the Windows-only test below).
+     */
+    @Test void onWindowsARelativePathUnderADirectoryThatNamesAHostIsRefused() {
+        for (String share : List.of("\\\\fileserver\\team\\project", "\\\\ATTACKER\\x\\y", "\\/attacker/x", "/\\attacker/x")) {
+            Optional<Path> directory = Optional.of(Path.of(share));
+            assertThat(FileLinks.resolve("a.txt", directory, HOME, true)).as("a.txt under " + share).isEmpty();
+            assertThat(FileLinks.resolve("src\\a.txt", directory, HOME, true)).as("src\\a.txt under " + share).isEmpty();
+            assertThat(FileLinks.resolve("./a.txt", directory, HOME, true)).as("./a.txt under " + share).isEmpty();
+        }
+    }
+
+    @Test @EnabledOnOs(OS.WINDOWS) void onWindowsAForwardSlashShareDirectoryIsRefusedToo() {
+        for (String share : List.of("//attacker/share", "//ATTACKER/x/y", "///attacker/share")) {
+            assertThat(FileLinks.resolve("a.txt", Optional.of(Path.of(share)), HOME, true)).as(share).isEmpty();
+        }
+    }
+
+    /** The directory is only consulted for a relative path: {@code ~/} and absolute paths never touch it. */
+    @Test void aDirectoryThatNamesAHostDoesNotAffectPathsThatDoNotUseIt() {
+        Optional<Path> share = Optional.of(Path.of("\\\\fileserver\\team\\project"));
+        Path absolute = HOME.resolve("logs").resolve("x.log");
+        assertThat(FileLinks.resolve("~/a.txt", share, HOME, true)).contains(HOME.resolve("a.txt"));
+        assertThat(FileLinks.resolve(absolute.toString(), share, HOME, true)).contains(absolute);
+    }
+
+    /** A pane in a WSL distribution's share has this machine's own directory, so a relative path under it resolves. */
+    @Test void aRelativePathUnderAWslShareStillResolvesOnWindows() {
+        for (String wsl : List.of("\\\\wsl.localhost\\Ubuntu\\home\\me", "\\\\wsl$\\Ubuntu\\home\\me", "\\\\WSL.LOCALHOST\\Ubuntu\\home")) {
+            Path directory = Path.of(wsl);
+            assertThat(FileLinks.resolve("a.txt", Optional.of(directory), HOME, true)).as(wsl).contains(directory.resolve("a.txt"));
+        }
+    }
+
+    /** Off Windows the directory's text is not a host, however it is written. */
+    @Test void elsewhereADirectoryIsNeverRefusedForItsText() {
+        Path directory = Path.of("\\\\fileserver\\team\\project");
+        assertThat(FileLinks.resolve("a.txt", Optional.of(directory), HOME, false)).contains(directory.resolve("a.txt"));
     }
 
     /** Off Windows two leading slashes are one: {@code //tmp/x} is {@code /tmp/x}, not a host. */
