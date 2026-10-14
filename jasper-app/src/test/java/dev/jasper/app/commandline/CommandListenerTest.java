@@ -203,6 +203,19 @@ class CommandListenerTest {
         assertThat(listener.busy()).isFalse();
     }
 
+    @Test void aConnectionThatEndsBeforeAnyCallHasRunLeavesIdleQuiet() throws Exception {
+        var idle = new AtomicInteger();
+        CommandListener listener = bind(invocation -> CompletableFuture.completedFuture(0));
+        listener.onIdle(idle::incrementAndGet);
+        try (SocketChannel probe = open()) {
+            until(listener::busy);
+        }
+        until(() -> !listener.busy());
+        assertThat(idle).as("another launch's liveness probe, before the first call").hasValue(0);
+        assertThat(exchange(request(token(), List.of("one")))).isEqualTo(CommandProtocol.exit(0));
+        until(() -> idle.get() == 1);
+    }
+
     @Test void anExitCodeOutsideZeroTo255IsSentAsOne() throws Exception {
         bind(invocation -> CompletableFuture.completedFuture(Integer.parseInt(invocation.arguments().getFirst())));
         assertThat(exchange(request(token(), List.of("300")))).isEqualTo(CommandProtocol.exit(1));

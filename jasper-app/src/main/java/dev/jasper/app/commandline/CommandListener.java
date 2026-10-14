@@ -67,6 +67,7 @@ public final class CommandListener implements AutoCloseable {
     private final AtomicInteger active = new AtomicInteger();
     /** Accepted connections that have not started a call, and calls whose exit code is not known yet. */
     private final AtomicInteger pending = new AtomicInteger();
+    private volatile boolean served;
     private final List<Runnable> idle = new CopyOnWriteArrayList<>();
     private volatile boolean closed;
 
@@ -149,7 +150,11 @@ public final class CommandListener implements AutoCloseable {
      */
     public boolean busy() { return pending.get() > 0; }
 
-    /** Runs {@code listener} each time the listener stops being {@link #busy}, on the thread that ended its last work. */
+    /**
+     * Runs {@code listener} each time the listener stops being {@link #busy} once a call has ended, on the thread that
+     * ended its last work. Before the first call ends, a connection that closes (another launch checking the socket)
+     * tells no one.
+     */
     public void onIdle(Runnable listener) { idle.add(Objects.requireNonNull(listener, "listener")); }
 
     private void acceptLoop() {
@@ -213,7 +218,7 @@ public final class CommandListener implements AutoCloseable {
 
     /** One accepted connection or one call is over: when none is left, the idle listeners hear it. */
     private void settle() {
-        if (pending.decrementAndGet() != 0) return;
+        if (pending.decrementAndGet() != 0 || !served) return;
         for (Runnable listener : idle) {
             try { listener.run(); }
             catch (RuntimeException broken) { LOG.log(System.Logger.Level.WARNING, "An idle listener failed", broken); }
@@ -247,6 +252,7 @@ public final class CommandListener implements AutoCloseable {
                 frames.add(new Frame(CommandProtocol.exit(exit), true));
                 delivery.exitQueued = true;
                 active.decrementAndGet();
+                served = true;
                 settle();
             });
             // The client sends nothing after its request, so a read returns only once it goes away, the listener
