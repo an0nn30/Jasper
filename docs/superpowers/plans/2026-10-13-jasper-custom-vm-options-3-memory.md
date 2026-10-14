@@ -2,8 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: **Not started.** Written 2026-10-13 on `claude/custom-vm-options-memory` (from `main` at `7c0a0938`, which holds
+Status: **Complete on 2026-10-14.** Written 2026-10-13 on `claude/custom-vm-options-memory` (from `main` at `7c0a0938`, which holds
 plans 1 and 2).
+
+Deviations beyond the eight planned ones, from the reviews: `HeapThreshold` watches only an old generation (a pool that
+supports both usage and collection-usage thresholds), because a large young generation could otherwise be chosen;
+`MemoryIndicator.collectNow()` refreshes only while the indicator is shown, and `close()` also closes the `app.memory.gc`
+action and makes later calls do nothing.
 
 **Goal:** Jasper can show its heap use in the status bar (`312 of 2048M`, click to collect garbage), warns when the heap
 stays nearly full or runs out, and the warning's **Adjust Memory Settings…** opens the heap limit with 512 MiB more

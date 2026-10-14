@@ -1,5 +1,18 @@
 # Jasper — Status and Handoff
 
+**Custom VM options plan 3 (memory) complete — 2026-10-14.** On `claude/custom-vm-options-memory` (not pushed):
+Settings › Window › Show memory indicator (`window.memory_indicator`, off by default) adds `312 of 2048M` to the status
+bar, refreshed every 3 s by one shared timer while shown with a window open, with a heap and non-heap tooltip; a click
+runs garbage collection (the `app.memory.gc` action, also in the palette). A collection-usage threshold at 95% of the
+old generation feeds `LowMemoryWatch` (one signal per 20 s, more than five in 15 minutes warn, once until the heap is
+saved again); an `OutOfMemoryError` warns at once. The warning, "Jasper is running low on memory", is in the Memory &
+VM options group; **Adjust Memory Settings…** opens the heap limit with the running maximum plus 512 MiB staged.
+Deviations: the eight planned ones and two review changes, listed in the plan. The branch starts from `main` at
+`7c0a0938`; `main` has moved since, so it needs `main` merged in before it merges. Full `./gradlew check`: 9,996 tests,
+0 failures, 8 skips. Manual checks pending (the user): turn the indicator on and watch it update; click it; in the
+packaged app with a small heap (`-Xmx600m` in `jasper.vmoptions`), open many large scrollbacks until the warning shows,
+and use Adjust Memory Settings….
+
 **Custom VM options plan 2 (settings and actions) complete — 2026-10-13.** On `claude/custom-vm-options-settings`, merged to
 local `main` (not pushed): System Settings has a Java Virtual Machine section (heap limit in `jasper.vmoptions`, Edit Custom VM Options…,
 Reveal, the options' check with the bundled `java`, a restart banner with Restart Now; read-only outside the installed

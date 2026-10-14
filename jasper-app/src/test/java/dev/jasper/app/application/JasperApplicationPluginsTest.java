@@ -151,6 +151,12 @@ class JasperApplicationPluginsTest {
                 assertThat(action.title()).isEqualTo("Edit Custom VM Options…");
                 assertThat(action.keywords()).contains("memory", "heap", "xmx", "jvm", "java", "vm options");
             });
+            assertThat(application[0].contributions().action(MemoryIndicator.COLLECT)).get()
+                .satisfies(action -> assertThat(action.title()).isEqualTo("Run Garbage Collection"));
+            assertThat(application[0].contributions().status()).anySatisfy(entry -> {
+                assertThat(entry.id()).isEqualTo(MemoryIndicator.STATUS_ID);
+                assertThat(entry.visible()).as("off by default").isFalse();
+            });
             assertThat(application[0].contributions().action(AboutWindows.ABOUT)).get()
                 .satisfies(action -> assertThat(action.title()).isEqualTo("About Jasper"));
             assertThat(application[0].contributions().menus()).anySatisfy(section -> {
@@ -158,6 +164,21 @@ class JasperApplicationPluginsTest {
                 assertThat(section.entries()).isEqualTo(AboutWindows.helpEntries(System.getProperty("os.name").startsWith("Mac")));
             });
             assertThat(application[0].bindingProblems()).isEmpty();
+        });
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test void anOutOfMemoryErrorWarnsThatJasperIsLowOnMemory() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].startPlugins(null, null, false, dirs);
+            application[0].unexpected(Thread.currentThread(), new RuntimeException("wrapped", new OutOfMemoryError("Java heap space")));
+            assertThat(application[0].notificationCenter().history())
+                .anySatisfy(entry -> assertThat(entry.request().title()).isEqualTo("Jasper is running low on memory"));
         });
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
