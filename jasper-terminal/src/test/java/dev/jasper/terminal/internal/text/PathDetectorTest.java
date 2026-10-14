@@ -7,9 +7,11 @@ import com.jediterm.terminal.model.CharBuffer;
 import com.jediterm.terminal.model.TerminalLine;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class PathDetectorTest {
 
@@ -131,12 +133,148 @@ class PathDetectorTest {
         assertThat(at("./a.txt", 60)).isEmpty();
     }
 
+    /** Ruling 9: with a position found, the path starts after the last parenthesis that is no (LINE) group. */
+    @Test
+    void aStackFrameGivesTheFileInParenthesesAndItsLine() {
+        String frame = "at com.foo.Bar.baz(Bar.java:42)";
+        assertThat(at(frame, 22)).contains(new PathDetector.Match("Bar.java", 42, 0, 19, 30));
+        assertThat(at(frame, 27)).as("the colon").contains(new PathDetector.Match("Bar.java", 42, 0, 19, 30));
+        assertThat(at(frame, 29)).as("the line").contains(new PathDetector.Match("Bar.java", 42, 0, 19, 30));
+        assertThat(at(frame, 5)).as("the qualified method name").isEmpty();
+        assertThat(at(frame, 17)).as("the end of the method name").isEmpty();
+        assertThat(at(frame, 18)).as("the opening parenthesis").isEmpty();
+        assertThat(at(frame, 30)).as("the closing parenthesis").isEmpty();
+        assertThat(at("at Foo.bar(Foo.java:42:5)", 12)).contains(new PathDetector.Match("Foo.java", 42, 5, 11, 24));
+        assertThat(at("(Bar.java:42)", 3)).contains(new PathDetector.Match("Bar.java", 42, 0, 1, 12));
+    }
+
+    @Test
+    void aParenthesisBeforeNoPositionStaysInThePath() {
+        assertThat(at("at Foo.bar(Foo.java)", 12)).as("no position: the whole token, as qualified")
+            .contains(new PathDetector.Match("Foo.bar(Foo.java", 0, 0, 3, 19));
+        assertThat(at("at Foo.bar(Foo.java)", 19)).as("the closing parenthesis").isEmpty();
+    }
+
+    @Test
+    void aLineGroupInsideTheNameDoesNotRestartThePath() {
+        assertThat(at("tmp/a(1).txt:3", 2)).contains(new PathDetector.Match("tmp/a(1).txt", 3, 0, 0, 14));
+        assertThat(at("tmp/a(1).txt:3", 6)).as("inside the group").contains(new PathDetector.Match("tmp/a(1).txt", 3, 0, 0, 14));
+        assertThat(at("tmp/a(1,2).txt:3", 2)).contains(new PathDetector.Match("tmp/a(1,2).txt", 3, 0, 0, 16));
+        assertThat(at("tmp/a(12345678901).txt:3", 2)).as("a group of any length")
+            .contains(new PathDetector.Match("tmp/a(12345678901).txt", 3, 0, 0, 24));
+        assertThat(at("x(Foo(1).java:3)", 8)).as("the last parenthesis that is no group restarts it")
+            .contains(new PathDetector.Match("Foo(1).java", 3, 0, 2, 15));
+        assertThat(at("x(Foo(1).java:3)", 1)).isEmpty();
+    }
+
+    /** Ruling 10: a path starts after the last equals sign in its word. */
+    @Test
+    void aPathStartsAfterTheLastEqualsInItsWord() {
+        assertThat(at("--config=./x.toml", 12)).contains(new PathDetector.Match("./x.toml", 0, 0, 9, 17));
+        assertThat(at("path=/tmp/x.txt;", 8)).contains(new PathDetector.Match("/tmp/x.txt", 0, 0, 5, 15));
+        assertThat(at("k=v/a.txt:5", 4)).contains(new PathDetector.Match("v/a.txt", 5, 0, 2, 11));
+        assertThat(at("a=b=c/d.txt", 8)).as("the last equals sign").contains(new PathDetector.Match("c/d.txt", 0, 0, 4, 11));
+        for (int column = 0; column <= 8; column++) {
+            assertThat(at("--config=./x.toml", column)).as("the option name, column " + column).isEmpty();
+        }
+        assertThat(at("path=/tmp/x.txt;", 15)).as("the semicolon").isEmpty();
+    }
+
+    @Test
+    void anEqualsSignAfterThePathIsNotWhereItStarts() {
+        assertThat(at("src/Foo.java:42:x=5;", 2)).as("grep's matched text").contains(new PathDetector.Match("src/Foo.java", 42, 0, 0, 15));
+        assertThat(at("key=value", 6)).as("a bare word after the equals sign").isEmpty();
+        assertThat(PathDetector.pathAt(row("--config=C:\\x.txt"), 12, true))
+            .contains(new PathDetector.Match("C:\\x.txt", 0, 0, 9, 17));
+        assertThat(PathDetector.pathAt(row("--config=C:\\x.txt"), 12, false)).isEmpty();
+    }
+
+    @Test
+    void eachOfSeveralPathsOnALineIsFoundFromItsOwnClick() {
+        String line = "src/A.java:1 src/B.java:2:3 ./c.txt";
+        assertThat(at(line, 2)).contains(new PathDetector.Match("src/A.java", 1, 0, 0, 12));
+        assertThat(at(line, 20)).contains(new PathDetector.Match("src/B.java", 2, 3, 13, 27));
+        assertThat(at(line, 30)).contains(new PathDetector.Match("./c.txt", 0, 0, 28, 35));
+        assertThat(at(line, 12)).as("the space between").isEmpty();
+        assertThat(at(line, 27)).as("the space between").isEmpty();
+    }
+
+    @Test
+    void aTabSeparatesTokens() {
+        String line = "src/A.java\t./b.txt";
+        assertThat(at(line, 3)).contains(new PathDetector.Match("src/A.java", 0, 0, 0, 10));
+        assertThat(at(line, 14)).contains(new PathDetector.Match("./b.txt", 0, 0, 11, 18));
+        assertThat(at(line, 10)).as("the tab").isEmpty();
+    }
+
+    @Test
+    void aPositionThatNothingEndsIsNoPosition() {
+        assertThat(at("a/b:42abc", 1)).contains(new PathDetector.Match("a/b", 0, 0, 0, 3));
+        for (int column = 3; column <= 8; column++) {
+            assertThat(at("a/b:42abc", column)).as(":42abc, column " + column).isEmpty();
+        }
+    }
+
+    @Test
+    void theColonBetweenAPathAndItsLineIsPartOfIt() {
+        assertThat(at("src/Foo.java:42", 12)).contains(new PathDetector.Match("src/Foo.java", 42, 0, 0, 15));
+        assertThat(at("src/Foo.java:42:5", 12)).contains(new PathDetector.Match("src/Foo.java", 42, 5, 0, 17));
+        assertThat(at("src/Foo.java:42:5", 15)).as("the colon before the column").contains(new PathDetector.Match("src/Foo.java", 42, 5, 0, 17));
+        assertThat(at("Foo.cs(42,5)", 6)).as("the opening parenthesis").contains(new PathDetector.Match("Foo.cs", 42, 5, 0, 12));
+    }
+
+    @Test
+    void squareAndCurlyBracketsAreLeadingOpenersToo() {
+        assertThat(at("[./a.txt]", 3)).contains(new PathDetector.Match("./a.txt", 0, 0, 1, 8));
+        assertThat(at("{./a.txt}", 3)).contains(new PathDetector.Match("./a.txt", 0, 0, 1, 8));
+        assertThat(at("[src/Foo.java:42]", 5)).contains(new PathDetector.Match("src/Foo.java", 42, 0, 1, 16));
+        assertThat(at("[{(./a.txt)}]", 5)).contains(new PathDetector.Match("./a.txt", 0, 0, 3, 10));
+        assertThat(at("[./a.txt]", 0)).as("the bracket").isEmpty();
+        assertThat(at("{./a.txt}", 8)).as("the brace").isEmpty();
+    }
+
+    @Test
+    void aSeparatorWithNoNameIsNoPathWhereverItIsClicked() {
+        String line = "src/ ~/ ./ ../ /";
+        for (int column = 0; column < line.length(); column++) {
+            assertThat(at(line, column)).as("column " + column).isEmpty();
+        }
+    }
+
+    @Test
+    void aVeryLongLineIsReadQuickly() {
+        String line = "word ".repeat(19_990) + "src/Foo.java:42";
+        var found = assertTimeoutPreemptively(Duration.ofSeconds(2),
+            () -> PathDetector.pathAt(plainRow(line), line.length() - 3, false));
+        assertThat(found).contains(new PathDetector.Match("src/Foo.java", 42, 0, line.length() - 15, line.length()));
+    }
+
+    @Test
+    void aGiantTokenIsReadQuickly() {
+        String openings = "a(1,".repeat(25_000);
+        String groups = "(1)".repeat(33_000) + ".txt:3";
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> {
+            assertThat(PathDetector.pathAt(plainRow(openings), 50_000, false)).as("no position, no extension").isEmpty();
+            assertThat(PathDetector.pathAt(plainRow("x/" + openings + ":7"), 50_000, false)).as("restarted after the last parenthesis, nothing is left that names a file").isEmpty();
+            assertThat(PathDetector.pathAt(plainRow(groups), 50_000, false)).map(PathDetector.Match::line).contains(3);
+            assertThat(PathDetector.pathAt(plainRow("Foo.java:" + "1".repeat(100_000)), 2, false))
+                .contains(new PathDetector.Match("Foo.java", 0, 0, 0, 8));
+        });
+    }
+
     private static Optional<PathDetector.Match> at(String text, int column) {
         return PathDetector.pathAt(row(text), column, false);
     }
 
     private static Optional<String> path(String text, int column) {
         return at(text, column).map(PathDetector.Match::path);
+    }
+
+    /** A row of one cell per character, as wide as its text. */
+    private static RowText plainRow(String text) {
+        int[] cells = new int[text.length()];
+        for (int i = 0; i < cells.length; i++) cells[i] = i;
+        return new RowText(text, cells, cells);
     }
 
     private static RowText row(String text) {
