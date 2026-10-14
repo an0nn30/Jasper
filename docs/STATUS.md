@@ -9,7 +9,7 @@ could not be told apart. `NativeChromePainting.tabSurface` now paints inactive t
 terminal surface, otherwise darkened just until it is (lightened when the terminal surface is near black); no format
 change, so every installed theme is covered. Catppuccin Frappé `#1F212D` under `#303446`, Slate Steel Dark `#121317`
 under `#23262C`, Light `#DDE0E3` under `#FBFBFC`. `./gradlew check --continue`: **10,113 tests, 0 failures, 0 errors,
-12 skipped**. No GUI launched. GUI check for the user: the tab strip in each theme. Not merged or pushed.
+12 skipped**. No GUI launched. GUI check for the user: the tab strip in each theme. Merged to `main`.
 
 **The jasper command (command line plan 1) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
