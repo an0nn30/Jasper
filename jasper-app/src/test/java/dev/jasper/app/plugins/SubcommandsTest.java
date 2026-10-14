@@ -36,6 +36,37 @@ class SubcommandsTest {
             "A plugin command was not added|Zed Tool: the subcommand zap is already provided by Early");
     }
 
+    @Test void aBundledPluginWinsEvenWhenItsIdSortsAfterTheOtherPlugins() {
+        var problems = new ArrayList<String>();
+        Subcommands table = Subcommands.choose(List.of(
+            candidate("aa.user", "Early User", PluginCandidate.Origin.USER, "shared"),
+            candidate("zz.bundled", "Late Bundled", PluginCandidate.Origin.BUNDLED, "shared")), (title, details) -> problems.add(title + "|" + details));
+        assertThat(table.owner("shared")).map(Subcommands.Owner::pluginId).contains("zz.bundled");
+        assertThat(table.owner("shared")).map(Subcommands.Owner::pluginName).contains("Late Bundled");
+        assertThat(problems).containsExactly(
+            "A plugin command was not added|Early User: the subcommand shared is already provided by Late Bundled");
+    }
+
+    @Test void aDevPluginLosesToABundledOneEvenWhenItsIdSortsFirst() {
+        var problems = new ArrayList<String>();
+        Subcommands table = Subcommands.choose(List.of(
+            candidate("aa.dev", "Early Dev", PluginCandidate.Origin.DEV, "shared"),
+            candidate("zz.bundled", "Late Bundled", PluginCandidate.Origin.BUNDLED, "shared")), (title, details) -> problems.add(title + "|" + details));
+        assertThat(table.owner("shared")).map(Subcommands.Owner::pluginId).contains("zz.bundled");
+        assertThat(problems).containsExactly(
+            "A plugin command was not added|Early Dev: the subcommand shared is already provided by Late Bundled");
+    }
+
+    @Test void twoBundledPluginsContestingANameGoToTheFirstById() {
+        var problems = new ArrayList<String>();
+        Subcommands table = Subcommands.choose(List.of(
+            candidate("dev.jasper.second", "Second", PluginCandidate.Origin.BUNDLED, "shared"),
+            candidate("dev.jasper.first", "First", PluginCandidate.Origin.BUNDLED, "shared")), (title, details) -> problems.add(title + "|" + details));
+        assertThat(table.owner("shared")).map(Subcommands.Owner::pluginId).contains("dev.jasper.first");
+        assertThat(problems).containsExactly(
+            "A plugin command was not added|Second: the subcommand shared is already provided by First");
+    }
+
     @Test void noPluginsMeansNoSubcommands() {
         assertThat(Subcommands.choose(List.of(), (title, details) -> { }).all()).isEmpty();
         assertThat(Subcommands.NONE.owner("editor")).isEmpty();
