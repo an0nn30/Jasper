@@ -24,7 +24,8 @@ page after starting Jasper from iTerm with `EDITOR=vim` (the notice, and new she
 off); with `export EDITOR=vim` in `~/.zshrc` and Jasper started from the Dock, `git commit` in a Jasper tab opens vim;
 a custom `subl -w` with `custom_in_terminal` off, Jasper started from the Dock, opens Sublime Text; and nvim opened
 from Open in Editor, checking whether its `:!` commands find Homebrew's tools (a known limit: terminal editors keep
-Jasper's own `PATH`). Not merged or pushed. Plan 3 (Cmd-click file paths) is next.
+Jasper's own `PATH`). After merging `main`: **10,283 tests, 0 failures, 0 errors, 12 skipped**. Merged to local `main`, not pushed. Plan 3
+(Cmd-click file paths) is next.
 
 **Right rail splits again: two dock fixes — 2026-10-14** (`claude/right-rail-split`, worktree
 `.claude/worktrees/right-rail-split`; bug fix, the drag rule chosen by the user). The user's right rail could show
