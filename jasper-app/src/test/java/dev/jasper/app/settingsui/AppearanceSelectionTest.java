@@ -19,7 +19,7 @@ class AppearanceSelectionTest {
     static final InstalledThemes THEMES = new InstalledThemes(
         List.of(new InstalledThemes.ThemeOption("slate-steel", "Slate Steel", DARK), new InstalledThemes.ThemeOption("ocean", "Ocean", OCEAN)),
         List.of(new InstalledThemes.ThemeOption("slate-steel", "Slate Steel", LIGHT)),
-        InstalledThemes.slateSteel(DARK, LIGHT).schemes());
+        InstalledThemes.slateSteel(DARK, LIGHT).schemes(), java.util.Map.of("slate-steel", "Slate Steel", "ocean", "Ocean"));
 
     static SettingsDraft draft(String config) { return new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), config, true).values()); }
     static AppearanceSelection editor(SettingsDraft draft) {
@@ -80,6 +80,25 @@ class AppearanceSelectionTest {
         var tiles = (Nodes.Choice) parts(editor).get(0);
         assertThat(tiles.options().get(1).preview()).as("Slate Steel is shown instead").contains(new Option.Preview(LIGHT, Optional.empty()));
         assertThat(tiles.options().get(1).description()).isEqualTo("dawn (not installed)");
+    }
+
+    @Test void aPickedThemeThatLacksTheVariantIsNamedAsSuchNotCalledUninstalled() {
+        var themes = new InstalledThemes(THEMES.dark(), List.of(THEMES.light().getFirst(), new InstalledThemes.ThemeOption("dawn", "Dawn", OCEAN)),
+            THEMES.schemes(), java.util.Map.of("slate-steel", "Slate Steel", "ocean", "Ocean", "dawn", "Dawn"));
+        var editor = new AppearanceSelection(new AppearanceChoices(100f, false, () -> Optional.of(false),
+            ignored -> new dev.jasper.app.lifecycle.Subscription(() -> {}), () -> themes, Optional.empty()),
+            draft("[ui.theme]\ndark = \"dawn\"\nlight = \"ocean\"\n"));
+        assertThat(pick(editor, 1).options()).extracting(Option::label).containsExactly("Slate Steel", "Ocean", "Dawn (no Dark variant)");
+        assertThat(pick(editor, 1).selectedId()).isEqualTo("dawn");
+        assertThat(pick(editor, 2).options()).extracting(Option::label).containsExactly("Slate Steel", "Dawn", "Ocean (no Light variant)");
+        assertThat(pick(editor, 2).selectedId()).isEqualTo("ocean");
+        var tiles = (Nodes.Choice) parts(editor).get(0);
+        assertThat(tiles.options().get(0).description()).isEqualTo("Dawn (no Dark variant)");
+        assertThat(tiles.options().get(1).description()).isEqualTo("Ocean (no Light variant)");
+        assertThat(tiles.options().get(0).preview()).as("Slate Steel is shown instead").contains(new Option.Preview(DARK, Optional.empty()));
+        assertThat(tiles.options().get(1).preview()).contains(new Option.Preview(LIGHT, Optional.empty()));
+        assertThat(editor.companionValues()).as("the picks stay as the file holds them")
+            .containsEntry(CoreSettings.UI_THEME_DARK, Optional.of("dawn")).containsEntry(CoreSettings.UI_THEME_LIGHT, Optional.of("ocean"));
     }
 
     @Test void choosingATileEditsTheValueAndResetShows() {

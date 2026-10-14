@@ -16,8 +16,9 @@ import java.util.Optional;
 /**
  * Settings › Appearance's theme card: the Dark / Light / Match System tiles for {@code ui.appearance}, each previewing
  * the theme picked for it, then the Dark theme and Light theme rows ({@code ui.theme.dark}, {@code ui.theme.light}),
- * which list the installed themes with that variant. The picks are staged with the tiles; Reset returns all three to
- * their defaults. EDT only.
+ * which list the installed themes with that variant; a pick that lacks it shows as {@code Dawn (no Dark variant)}, and one
+ * that nothing installed has as {@code dawn (not installed)}. The picks are staged with the tiles; Reset returns all three
+ * to their defaults. EDT only.
  */
 final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     private final AppearanceChoices choices;
@@ -45,8 +46,8 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
         var darkPreview = preview(themes.dark(), dark);
         var lightPreview = preview(themes.light(), light);
         var tiles = new Nodes.Choice(id + ":policy", plain, Nodes.ChoiceKind.PREVIEWS, List.of(
-            tile("dark", "Dark", label(themes.dark(), dark), new Option.Preview(darkPreview, Optional.empty())),
-            tile("light", "Light", label(themes.light(), light), new Option.Preview(lightPreview, Optional.empty())),
+            tile("dark", "Dark", label(true, dark), new Option.Preview(darkPreview, Optional.empty())),
+            tile("light", "Light", label(false, light), new Option.Preview(lightPreview, Optional.empty())),
             tile("system", "Match System", system.map(isDark -> "System appearance: " + (isDark ? "Dark" : "Light"))
                 .orElse("System appearance unavailable; using Dark"), new Option.Preview(darkPreview, Optional.of(lightPreview)))),
             token(value), "Appearance", "");
@@ -54,9 +55,9 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
             || !light.equals(UI_THEME_LIGHT.defaultValue());
         var reset = new Nodes.Button(id + ":reset", new ControlState(modified, true, false, ""), "",
             "reset", Nodes.ButtonKind.GHOST, id + ":reset", "Reset " + UI_APPEARANCE.label() + " and its themes to their defaults");
-        var darkPick = new Nodes.Choice(id + ":dark-theme", plain, Nodes.ChoiceKind.DROPDOWN, options(themes.dark(), dark), dark,
+        var darkPick = new Nodes.Choice(id + ":dark-theme", plain, Nodes.ChoiceKind.DROPDOWN, options(true, dark), dark,
             UI_THEME_DARK.label(), "");
-        var lightPick = new Nodes.Choice(id + ":light-theme", plain, Nodes.ChoiceKind.DROPDOWN, options(themes.light(), light), light,
+        var lightPick = new Nodes.Choice(id + ":light-theme", plain, Nodes.ChoiceKind.DROPDOWN, options(false, light), light,
             UI_THEME_LIGHT.label(), "");
         var darkControls = new Nodes.Stack(id + ":dark-controls", plain, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(darkPick, reset));
         var lightControls = new Nodes.Stack(id + ":light-controls", plain, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(lightPick));
@@ -69,23 +70,29 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
         return new Option(id, label, Optional.empty(), "", caption, Optional.of(preview));
     }
 
-    /** The installed themes, plus the picked one marked when it is not installed. */
-    private static List<Option> options(List<InstalledThemes.ThemeOption> installed, String picked) {
+    /** The installed themes with the variant, plus the picked one marked when it is not among them. */
+    private List<Option> options(boolean dark, String picked) {
+        var installed = dark ? themes.dark() : themes.light();
         var options = new ArrayList<Option>();
         for (var theme : installed) options.add(new Option(theme.id(), theme.label(), Optional.empty()));
-        if (installed.stream().noneMatch(theme -> theme.id().equals(picked)))
-            options.add(new Option(picked, picked + " (not installed)", Optional.empty()));
+        if (installed.stream().noneMatch(theme -> theme.id().equals(picked))) options.add(new Option(picked, unavailable(dark, picked), Optional.empty()));
         return options;
     }
 
-    /** The picked theme's preview; one that is not installed previews the first, Slate Steel, which is shown instead. */
+    /** The picked theme's preview; one that is not installed, or lacks the variant, previews the first, Slate Steel, which is shown instead. */
     private static Option.Palette preview(List<InstalledThemes.ThemeOption> installed, String picked) {
         return installed.stream().filter(theme -> theme.id().equals(picked)).findFirst().orElse(installed.getFirst()).preview();
     }
 
-    private static String label(List<InstalledThemes.ThemeOption> installed, String picked) {
-        return installed.stream().filter(theme -> theme.id().equals(picked)).findFirst().map(InstalledThemes.ThemeOption::label)
-            .orElse(picked + " (not installed)");
+    private String label(boolean dark, String picked) {
+        return (dark ? themes.dark() : themes.light()).stream().filter(theme -> theme.id().equals(picked)).findFirst()
+            .map(InstalledThemes.ThemeOption::label).orElseGet(() -> unavailable(dark, picked));
+    }
+
+    /** What a pick with no entry in the Dark or Light list is called: the installed theme that lacks the variant, or one that is not installed. */
+    private String unavailable(boolean dark, String picked) {
+        String name = themes.names().get(picked);
+        return name == null ? picked + " (not installed)" : name + " (no " + (dark ? "Dark" : "Light") + " variant)";
     }
 
     private static String token(AppearanceMode mode) {

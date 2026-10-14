@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiFunction;
 
 /**
  * The installed themes: the built-in Slate Steel and every valid {@code <home>/themes/<id>.json}. Imported themes are
@@ -77,7 +78,10 @@ public final class ThemeLibrary {
      * {@code previous}'s parsed theme is reused for a file whose text is unchanged, and {@code previous} itself is
      * returned when nothing changed, so an unchanged folder never reinstalls a theme. Never throws for a bad file.
      */
-    public static ThemeLibrary read(Path folder, ThemeLibrary previous) {
+    public static ThemeLibrary read(Path folder, ThemeLibrary previous) { return read(folder, previous, JasperTheme::parse); }
+
+    /** {@link #read(Path, ThemeLibrary)} with the function that turns a file's text and id into a theme. */
+    static ThemeLibrary read(Path folder, ThemeLibrary previous, BiFunction<String, String, JasperTheme> parser) {
         Objects.requireNonNull(folder, "folder");
         Objects.requireNonNull(previous, "previous");
         var files = new ArrayList<Path>();
@@ -110,10 +114,13 @@ public final class ThemeLibrary {
             catch (IOException failure) { problems.add(new Problem(file, 0, reason(failure))); continue; }
             var reused = previous.theme(id).filter(theme -> text.equals(previous.texts.get(id)));
             try {
-                imported.add(reused.orElseGet(() -> JasperTheme.parse(text, id)));
+                imported.add(reused.orElseGet(() -> parser.apply(text, id)));
                 texts.put(id, text);
             } catch (ThemeFileException failure) {
                 problems.add(new Problem(file, failure.line(), failure.detail()));
+            } catch (RuntimeException failure) {
+                String detail = failure.getMessage();
+                problems.add(new Problem(file, 0, "Could not use this file: " + (detail == null || detail.isBlank() ? failure.getClass().getSimpleName() : detail)));
             }
         }
         imported.sort(Comparator.comparing((JasperTheme theme) -> theme.name().toLowerCase(Locale.ROOT)).thenComparing(JasperTheme::id));

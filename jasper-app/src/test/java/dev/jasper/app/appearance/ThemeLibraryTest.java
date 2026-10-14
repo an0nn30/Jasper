@@ -100,6 +100,22 @@ class ThemeLibraryTest {
         });
     }
 
+    @Test void aParserThatFailsUnexpectedlyMakesThatFileAProblemNotACrash() throws Exception {
+        Files.writeString(themes().resolve("good.json"), terminalTheme("Good"));
+        Files.writeString(themes().resolve("odd.json"), terminalTheme("Odd"));
+        Files.writeString(themes().resolve("silent.json"), terminalTheme("Silent"));
+        var library = ThemeLibrary.read(themes(), ThemeLibrary.bundledOnly(), (text, id) -> {
+            if (id.equals("odd")) throw new IllegalStateException("the parser broke");
+            if (id.equals("silent")) throw new NullPointerException();
+            return JasperTheme.parse(text, id);
+        });
+        assertThat(library.imported()).extracting(JasperTheme::id).containsExactly("good");
+        assertThat(library.problems()).extracting(problem -> problem.file().getFileName().toString()).containsExactly("odd.json", "silent.json");
+        assertThat(library.problems().get(0).line()).isZero();
+        assertThat(library.problems().get(0).message()).isEqualTo("Could not use this file: the parser broke");
+        assertThat(library.problems().get(1).message()).isEqualTo("Could not use this file: NullPointerException");
+    }
+
     @Test void aFileItMayNotReadIsReportedWithTheReasonNotThePath() throws Exception {
         var secret = Files.writeString(themes().resolve("secret.json"), terminalTheme("Secret"));
         org.junit.jupiter.api.Assumptions.assumeTrue(java.nio.file.FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));

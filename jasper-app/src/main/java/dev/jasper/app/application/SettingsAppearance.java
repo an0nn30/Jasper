@@ -74,7 +74,8 @@ final class SettingsAppearance {
         java.util.function.Function<Boolean, java.util.List<InstalledThemes.ThemeOption>> themes = dark -> library.themes(dark).stream()
             .map(theme -> new InstalledThemes.ThemeOption(theme.id(), library.label(theme), preview(theme, dark))).toList();
         return new InstalledThemes(themes.apply(true), themes.apply(false), library.schemes().stream()
-            .map(scheme -> new InstalledThemes.SchemeOption(scheme.id().toString(), library.label(scheme))).toList());
+            .map(scheme -> new InstalledThemes.SchemeOption(scheme.id().toString(), library.label(scheme))).toList(),
+            library.themes().stream().collect(java.util.stream.Collectors.toMap(JasperTheme::id, library::label)));
     }
 
     /** A theme variant's preview: its input, sidebar and app surfaces, text and accent. */

@@ -51,7 +51,8 @@ class AppearancePageTest {
             new InstalledThemes.ThemeOption("ocean", "Ocean", AppearanceFixtures.preview(true))),
         List.of(new InstalledThemes.ThemeOption("slate-steel", "Slate Steel", AppearanceFixtures.preview(false)),
             new InstalledThemes.ThemeOption("dawn", "Dawn", AppearanceFixtures.preview(false))),
-        InstalledThemes.slateSteel(AppearanceFixtures.preview(true), AppearanceFixtures.preview(false)).schemes());
+        InstalledThemes.slateSteel(AppearanceFixtures.preview(true), AppearanceFixtures.preview(false)).schemes(),
+        java.util.Map.of("slate-steel", "Slate Steel", "ocean", "Ocean", "dawn", "Dawn"));
     /** The Appearance page over {@code themes}, built on the test's draft. */
     private SchemaPage pageWith(InstalledThemes themes) {
         var choices = new AppearanceChoices(100f, false, Optional::empty, ignored -> new Subscription(() -> { }), () -> themes, Optional.empty());

@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
 /**
@@ -57,7 +58,7 @@ final class ImportedThemesSection {
         var importButton = new Nodes.Button(id + ":import", new ControlState(true, !busy, busy, ""), "Import…", "",
             Nodes.ButtonKind.SECONDARY, id + ":import", "Import a Jasper theme file");
         rows.add(new Nodes.SettingRow(id + ":import-row", ControlState.READY, entries.isEmpty() ? "No imported themes" : "Jasper theme files",
-            "Convert Alacritty and IntelliJ themes with tools/themes/jasper_theme.py",
+            "Alacritty and IntelliJ themes can be converted with the theme converter in Jasper's source repository (tools/themes).",
             new Nodes.Stack(id + ":import-controls", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(importButton)), false, false));
         if (!message.isEmpty())
             rows.add(new Nodes.Text(id + ":message", ControlState.READY, message, Nodes.TextRole.SUPPORTING,
@@ -96,8 +97,8 @@ final class ImportedThemesSection {
             try {
                 var candidate = hooks.folder().prepare(file);
                 hooks.ui().execute(() -> prepared(fileName, candidate));
-            } catch (ThemeFolder.ImportFailure failure) {
-                hooks.ui().execute(() -> done("Could not import " + fileName + ": " + failure.getMessage(), true));
+            } catch (ThemeFolder.ImportFailure | RuntimeException failure) {
+                hooks.ui().execute(() -> done("Could not import " + fileName + ": " + reason(failure), true));
             }
         });
     }
@@ -115,7 +116,7 @@ final class ImportedThemesSection {
         hooks.worker().execute(() -> {
             try {
                 hooks.folder().install(candidate);
-                hooks.ui().execute(() -> reloaded(hooks.reload().get(), "Imported " + candidate.name() + "."));
+                hooks.ui().execute(() -> reloaded(hooks.reload().get(), "Imported " + candidate.name() + ".", false));
             } catch (IOException | RuntimeException failure) {
                 hooks.ui().execute(() -> done("Could not import " + fileName + ": " + reason(failure), true));
             }
@@ -161,14 +162,22 @@ final class ImportedThemesSection {
         }
         context.changed().run();
         var written = changes.isEmpty() ? hooks.reload().get() : hooks.save().apply(new SettingsEdit(changes, expected));
-        reloaded(written, "Removed " + entry.label() + ".");
+        reloaded(written, "Removed " + entry.label() + ".", !changes.isEmpty());
     }
 
-    private void reloaded(java.util.concurrent.CompletableFuture<?> work, String success) {
+    /**
+     * Shows {@code success} when {@code work} (a save or a reload of the configuration) completes, refreshing the group.
+     * A save that fails reads nothing back, so the application's library would still list a theme whose file is gone:
+     * when {@code saving}, the group has the application read the folder before it shows the failure.
+     */
+    private void reloaded(CompletableFuture<?> work, String success, boolean saving) {
         work.whenComplete((ignored, failure) -> hooks.ui().execute(() -> {
-            refresh();
-            if (failure == null) done(success, false);
-            else done(success + " Its settings were not saved: " + reason(cause(failure)), true);
+            if (failure == null) { refresh(); done(success, false); return; }
+            String failed = success + " Its settings were not saved: " + reason(cause(failure));
+            if (!saving) { refresh(); done(failed, true); return; }
+            CompletableFuture<?> reread;
+            try { reread = hooks.reload().get(); } catch (RuntimeException again) { reread = CompletableFuture.failedFuture(again); }
+            reread.whenComplete((value, problem) -> hooks.ui().execute(() -> { refresh(); done(failed, true); }));
         }));
     }
 

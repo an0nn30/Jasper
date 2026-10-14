@@ -89,4 +89,25 @@ class ThemeSelectionTest {
         assertThat(installs).hasSize(1);
         assertThat(controller.library()).isSameAs(refreshed);
     }
+
+    @Test void aReplacedThemeInUseIsInstalledAgainAfterTheReload() throws Exception {
+        var library = library();
+        var selection = ThemeSelection.of(library, "ocean", "slate-steel", TerminalSchemeChoice.MATCH, (key, message) -> { });
+        var installs = new ArrayList<GeneratedTheme>();
+        var controller = new ThemeController(true, selection, installs::add);
+        var chromeChanges = new ArrayList<Boolean>();
+        controller.subscribe((theme, chrome) -> chromeChanges.add(chrome));
+        chromeChanges.clear();
+        Files.writeString(home.resolve("themes/ocean.json"),
+            ThemeLibraryTest.uiTheme("Ocean").replaceFirst("\"surface.app\": \"#1E2127\"", "\"surface.app\": \"#101820\""));
+        var refreshed = ThemeLibrary.read(home.resolve("themes"), library);
+        var replaced = refreshed.theme("ocean").orElseThrow();
+        assertThat(replaced).as("a changed file is parsed again").isNotSameAs(library.theme("ocean").orElseThrow());
+        controller.configure(true, ThemeSelection.of(refreshed, "ocean", "slate-steel", TerminalSchemeChoice.MATCH, (key, message) -> { }),
+            dev.jasper.app.config.UiFontConfig.defaults());
+        assertThat(installs).hasSize(2);
+        assertThat(installs.get(1)).isSameAs(replaced.generated(true));
+        assertThat(controller.current().chrome()).isSameAs(replaced.generated(true));
+        assertThat(chromeChanges).containsExactly(true);
+    }
 }

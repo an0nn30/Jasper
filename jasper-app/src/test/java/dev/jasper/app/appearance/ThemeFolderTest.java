@@ -58,6 +58,34 @@ class ThemeFolderTest {
         assertThat(home.resolve("themes")).doesNotExist();
     }
 
+    @Test void aMoveThatFailsPropagatesLeavesWhatIsAtTheTargetAndNoTemporaryFile() throws Exception {
+        var folder = new ThemeFolder(home.resolve("themes"));
+        var candidate = folder.prepare(source("z.json", ThemeTestSupport.terminalThemeJson("Zenburn")));
+        var blocker = Files.createDirectories(home.resolve("themes/zenburn.json"));
+        Files.writeString(blocker.resolve("keep.txt"), "kept");
+        assertThatThrownBy(() -> folder.install(candidate)).isInstanceOf(java.io.IOException.class);
+        assertThat(blocker.resolve("keep.txt")).hasContent("kept");
+        try (var listing = Files.list(home.resolve("themes"))) { assertThat(listing).containsExactly(blocker); }
+    }
+
+    @Test void aWriteThatFailsKeepsTheOldFileAndLeavesNoTemporaryFile() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(java.nio.file.FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
+        var themes = home.resolve("themes");
+        var folder = new ThemeFolder(themes);
+        folder.install(folder.prepare(source("z.json", ThemeTestSupport.terminalThemeJson("Zenburn"))));
+        byte[] old = Files.readAllBytes(themes.resolve("zenburn.json"));
+        var newer = folder.prepare(source("z2.json", ThemeTestSupport.terminalThemeJson("Zenburn").replace("#282828", "#1D2021")));
+        Files.setPosixFilePermissions(themes, java.nio.file.attribute.PosixFilePermissions.fromString("r-xr-xr-x"));
+        try {
+            org.junit.jupiter.api.Assumptions.assumeFalse(Files.isWritable(themes), "running as a user who writes everywhere");
+            assertThatThrownBy(() -> folder.install(newer)).isInstanceOf(java.io.IOException.class);
+            assertThat(Files.readAllBytes(themes.resolve("zenburn.json"))).isEqualTo(old);
+            try (var listing = Files.list(themes)) { assertThat(listing.map(path -> path.getFileName().toString())).containsExactly("zenburn.json"); }
+        } finally {
+            Files.setPosixFilePermissions(themes, java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
+        }
+    }
+
     @Test void removingDeletesTheFileAndNeverTouchesSlateSteel() throws Exception {
         var folder = new ThemeFolder(home.resolve("themes"));
         folder.install(folder.prepare(source("z.json", ThemeTestSupport.terminalThemeJson("Zenburn"))));

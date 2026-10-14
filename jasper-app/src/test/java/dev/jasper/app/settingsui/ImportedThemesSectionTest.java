@@ -34,7 +34,9 @@ class ImportedThemesSectionTest {
     final List<ThemeImports.Question> asked = new ArrayList<>();
     final List<SettingsEdit> saved = new ArrayList<>();
     final int[] reloads = new int[1];
-    boolean agree = true, failSaves;
+    boolean agree = true, failSaves, failReloads;
+    /** What the application's library holds: it changes only when the application reads the folder, as after a reload or a saved change. */
+    List<ThemeImports.Imported> library = List.of();
     SettingsDraft draft;
     SchemaPage page;
 
@@ -44,17 +46,30 @@ class ImportedThemesSectionTest {
         return Files.writeString(Files.createDirectories(home.resolve("downloads")).resolve(fileName), text);
     }
 
+    /** The imported themes in the folder now. */
+    List<ThemeImports.Imported> read() {
+        return ThemeLibrary.read(folder(), ThemeLibrary.bundledOnly()).imported().stream()
+            .map(theme -> new ThemeImports.Imported(theme.id(), theme.name(), theme.has(true) ? "UI theme" : "Terminal scheme")).toList();
+    }
+
     /** The page over {@code config}, with hooks that run at once and answer questions with {@link #agree}. */
     SchemaPage page(String config) {
         draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), config, true).values());
-        var imports = new ThemeImports(new ThemeFolder(folder()),
-            () -> ThemeLibrary.read(folder(), ThemeLibrary.bundledOnly()).imported().stream()
-                .map(theme -> new ThemeImports.Imported(theme.id(), theme.name(), theme.has(true) ? "UI theme" : "Terminal scheme")).toList(),
+        library = read();
+        var imports = new ThemeImports(new ThemeFolder(folder()), () -> library,
             surface -> Optional.ofNullable(chosen.poll()),
             (surface, question) -> { asked.add(question); if (agree) question.onYes().run(); },
-            edit -> { saved.add(edit); return failSaves ? CompletableFuture.failedFuture(new java.util.concurrent.CompletionException(
-                new IllegalStateException("config.toml has errors"))) : CompletableFuture.completedFuture(null); },
-            () -> { reloads[0]++; return CompletableFuture.completedFuture(null); },
+            edit -> {
+                saved.add(edit);
+                if (failSaves) return CompletableFuture.failedFuture(new java.util.concurrent.CompletionException(new IllegalStateException("config.toml has errors")));
+                library = read();
+                return CompletableFuture.completedFuture(null);
+            },
+            () -> {
+                reloads[0]++;
+                library = read();
+                return failReloads ? CompletableFuture.failedFuture(new IllegalStateException("the service is closed")) : CompletableFuture.completedFuture(null);
+            },
             Runnable::run, Runnable::run);
         var themes = AppearanceFixtures.CHOICES.themes();
         var choices = new AppearanceChoices(100f, false, Optional::empty, ignored -> new Subscription(() -> { }), themes, Optional.of(imports));
@@ -72,6 +87,8 @@ class ImportedThemesSectionTest {
     @Test void withNothingImportedTheGroupOffersImport() {
         page("");
         assertThat(title("imported-themes:import-row")).isEqualTo("No imported themes");
+        assertThat(((Nodes.SettingRow) node(page, "imported-themes:import-row")).description())
+            .isEqualTo("Alacritty and IntelliJ themes can be converted with the theme converter in Jasper's source repository (tools/themes).");
         assertThat(node(page, "section-imported-themes")).isInstanceOfSatisfying(Nodes.Section.class,
             section -> assertThat(section.title()).isEqualTo("Imported themes"));
         assertThat(page.searchTerms()).contains("Imported themes", "Import theme");
@@ -166,15 +183,63 @@ class ImportedThemesSectionTest {
         assertThat(message().text()).isEqualTo("Removed Zenburn.");
     }
 
-    @Test void aRemovalWhoseSettingsCannotBeSavedSaysSo() throws Exception {
+    @Test void aRemovalWhoseSettingsCannotBeSavedSaysSoAndStillDropsTheThemeFromTheGroup() throws Exception {
         Files.createDirectories(folder());
         Files.writeString(folder().resolve("ocean.json"), ThemeTestSupport.uiThemeJson("Ocean"));
         page("[ui.theme]\ndark = \"ocean\"\n");
         failSaves = true;
         click("imported-themes:remove-0");
         assertThat(folder().resolve("ocean.json")).doesNotExist();
+        assertThat(reloads[0]).as("a failed save reads nothing back, so the group reads the folder itself").isEqualTo(1);
         assertThat(message().text()).isEqualTo("Removed Ocean. Its settings were not saved: config.toml has errors");
         assertThat(message().severity()).contains(Nodes.Severity.DANGER);
+        assertThat(title("imported-themes:import-row")).isEqualTo("No imported themes");
+        assertThatThrownBy(() -> node(page, "imported-themes:theme-0")).hasMessage("No node imported-themes:theme-0");
+        assertThat(kit(page, "imported-themes:import", JButton.class).isEnabled()).as("the group is not left busy").isTrue();
+    }
+
+    @Test void aRemovalWhoseSettingsAndReloadBothFailStillEndsAndSaysSo() throws Exception {
+        Files.createDirectories(folder());
+        Files.writeString(folder().resolve("ocean.json"), ThemeTestSupport.uiThemeJson("Ocean"));
+        page("[ui.theme]\ndark = \"ocean\"\n");
+        failSaves = true;
+        failReloads = true;
+        click("imported-themes:remove-0");
+        assertThat(message().text()).isEqualTo("Removed Ocean. Its settings were not saved: config.toml has errors");
+        assertThat(message().severity()).contains(Nodes.Severity.DANGER);
+        assertThat(kit(page, "imported-themes:import", JButton.class).isEnabled()).as("the group is not left busy").isTrue();
+    }
+
+    @Test void aRemovalWithNothingToSaveThatCannotReloadSaysSoWithoutReloadingAgain() throws Exception {
+        Files.createDirectories(folder());
+        Files.writeString(folder().resolve("zenburn.json"), ThemeTestSupport.terminalThemeJson("Zenburn"));
+        page("");
+        failReloads = true;
+        click("imported-themes:remove-0");
+        assertThat(reloads[0]).isEqualTo(1);
+        assertThat(message().text()).isEqualTo("Removed Zenburn. Its settings were not saved: the service is closed");
+        assertThat(kit(page, "imported-themes:import", JButton.class).isEnabled()).isTrue();
+    }
+
+    /** A path whose file system fails with an unchecked exception, as a broken provider would, but that names a file. */
+    static Path broken(String name) {
+        return (Path) java.lang.reflect.Proxy.newProxyInstance(Path.class.getClassLoader(), new Class<?>[] {Path.class},
+            (proxy, method, args) -> switch (method.getName()) {
+                case "getFileName", "toString" -> method.getName().equals("toString") ? name : Path.of(name);
+                default -> throw new IllegalStateException("the file system failed");
+            });
+    }
+
+    @Test void anUnexpectedFailureWhilePreparingAnImportIsReportedAndLeavesTheGroupUsable() throws Exception {
+        page("");
+        chosen.add(broken("odd.json"));
+        click("imported-themes:import");
+        assertThat(message().text()).isEqualTo("Could not import odd.json: the file system failed");
+        assertThat(message().severity()).contains(Nodes.Severity.DANGER);
+        assertThat(kit(page, "imported-themes:import", JButton.class).isEnabled()).as("Import is not left disabled").isTrue();
+        chosen.add(download("zenburn.json", ThemeTestSupport.terminalThemeJson("Zenburn")));
+        click("imported-themes:import");
+        assertThat(message().text()).isEqualTo("Imported Zenburn.");
     }
 
     @Test void aFailedDeleteIsShownAndChangesNothing() throws Exception {
