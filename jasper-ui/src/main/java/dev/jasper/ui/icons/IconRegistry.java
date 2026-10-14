@@ -319,6 +319,8 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("target", "M 14 8 A 6 6 0 1 1 2 8 A 6 6 0 1 1 14 8 M 11 8 A 3 3 0 1 1 5 8 A 3 3 0 1 1 11 8 M 8 8 H 8.1"),
             Map.entry("arrow.right", "M 1.5 8 H 14.5 M 11 4.5 L 14.5 8 L 11 11.5"),
             Map.entry("preview", "M 1 8 Q 8 1 15 8 Q 8 15 1 8 Z M 10 8 A 2 2 0 1 1 6 8 A 2 2 0 1 1 10 8"),
+            // Hidden items (dotfiles): the preview eye struck through, for the browsers' show-hidden toggle.
+            Map.entry("hidden", "M 1 8 Q 8 1 15 8 Q 8 15 1 8 Z M 10 8 A 2 2 0 1 1 6 8 A 2 2 0 1 1 10 8 M 2.5 13.5 L 13.5 2.5"),
             Map.entry("logout", "M 6 2 H 2 V 14 H 6 M 6 8 H 14 M 11 5 L 14 8 L 11 11"),
             Map.entry("download", "M 8 2 V 11 M 4 7 L 8 11 L 12 7 M 2 10 V 14 H 14 V 10"),
             // Import: an arrow into a corner bracket, as the reference Sessions header shows (not the download tray).

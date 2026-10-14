@@ -445,6 +445,21 @@ class FileChooserPanelTest {
         assertThat(panel.nameText()).isEqualTo("todo.md");
     }
 
+    @Test void theHiddenItemsButtonTogglesThemAndIsPressedWhileTheyShow() throws IOException {
+        Files.writeString(dir.resolve(".env"), "");
+        var panel = panel(OPEN, Optional.empty());
+        var button = kit(panel, FileChooserPanel.HIDDEN, JButton.class);
+        assertThat(button.getToolTipText()).isEqualTo("Show hidden items");
+        assertThat(button.isSelected()).as("pressed: hidden items show").isTrue();
+        button.doClick(0);
+        assertThat(rows(panel)).doesNotContain(".env");
+        assertThat(prefs.showHidden()).as("the same saved choice as Cmd+Shift+.").isFalse();
+        assertThat(kit(panel, FileChooserPanel.HIDDEN, JButton.class).isSelected()).isFalse();
+        kit(panel, FileChooserPanel.HIDDEN, JButton.class).doClick(0);
+        assertThat(rows(panel)).contains(".env");
+        assertThat(prefs.showHidden()).isTrue();
+    }
+
     @Test void thePreviewPaneShowsTheStartOfTheSelectedFile() {
         var panel = panel(OPEN, Optional.empty());
         previewToggle(panel).doClick(0);

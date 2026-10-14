@@ -34,7 +34,8 @@ class SftpPanelTest {
     SftpPanel.Actions actions() {
         return new SftpPanel.Actions(path->commands.add("navigate "+path),()->commands.add("up"),()->commands.add("refresh"),followed::add,
             ()->commands.add("upload"),()->commands.add("upload folder"),()->commands.add("download"),()->commands.add("new folder"),
-            ()->commands.add("delete"),()->commands.add("copy paths"),()->commands.add("copy to host"),()->commands.add("cancel"),pages::add);
+            ()->commands.add("delete"),()->commands.add("copy paths"),()->commands.add("copy to host"),()->commands.add("cancel"),pages::add,
+            shown->commands.add("hidden "+shown));
     }
 
     static SftpPanel panel() { return new SftpPanel(new FakeKit("dev.jasper.remote")); }
@@ -50,6 +51,40 @@ class SftpPanelTest {
             assertThatThrownBy(()->cache.page(0,100_000)).isInstanceOf(IllegalArgumentException.class);
         }
         assertThat(file).doesNotExist();
+    }
+
+    /** The toolbar's hidden-items toggle asks for the other choice and is pressed while hidden items show. */
+    @Test void theHiddenItemsToggleAsksForTheOtherChoiceAndShowsTheCurrentOne() throws Exception {
+        edt(()-> {
+            var panel=panel();panel.actions(actions());
+            panel.showPage("host","/home",List.of(FOLDER,FILE),0,2,false);
+            assertThat(hiddenToggle(panel).tooltip()).isEqualTo("Show hidden items");
+            assertThat(hiddenToggle(panel).selected()).contains(false);
+            panel.handle(new UiEvent.Action(SftpPanel.HIDDEN));
+            assertThat(commands).containsExactly("hidden true");
+            panel.showHidden(true);
+            assertThat(hiddenToggle(panel).selected()).contains(true);
+            panel.handle(new UiEvent.Action(SftpPanel.HIDDEN));
+            assertThat(commands).containsExactly("hidden true","hidden false");
+        });
+    }
+
+    static Nodes.Button hiddenToggle(SftpPanel panel) {
+        return node(panel.view(),SftpPanel.HIDDEN,Nodes.Button.class);
+    }
+
+    /** Hidden items (names starting with a dot) leave the pages and the counts unless shown, folders-only included. */
+    @Test void cachePagesAndCountsLeaveHiddenItemsOutUnlessShown(@TempDir Path root) throws Exception {
+        try(var cache=new DirectoryCache(root)) {
+            cache.append(List.of(new FileEntry(".config",FileEntry.Kind.DIRECTORY,0,1000,0755,""),new FileEntry(".env",FileEntry.Kind.FILE,1,1000,0644,""),
+                new FileEntry("docs",FileEntry.Kind.DIRECTORY,0,1000,0755,""),new FileEntry("notes.toml",FileEntry.Kind.FILE,6,1000,0644,"")));
+            assertThat(cache.page(0,200,false,true)).extracting(FileEntry::name).containsExactly(".config","docs",".env","notes.toml");
+            assertThat(cache.page(0,200,false,false)).extracting(FileEntry::name).containsExactly("docs","notes.toml");
+            assertThat(cache.page(0,200,true,false)).extracting(FileEntry::name).containsExactly("docs");
+            assertThat(cache.page(0,200,true,true)).extracting(FileEntry::name).containsExactly(".config","docs");
+            assertThat(List.of(cache.count(false,true),cache.count(false,false),cache.count(true,false),cache.count(true,true))).containsExactly(4L,2L,1L,2L);
+            assertThat(cache.page(1,200,false,false)).extracting(FileEntry::name).as("paging counts only what shows").containsExactly("notes.toml");
+        }
     }
 
     /** Was rowsUseHostIconsAndTreatHtmlAsLiteralAtLargerFont: glyphs are the kit's, text is literal (kit Text), row height is the kit's. */
@@ -250,7 +285,7 @@ class SftpPanelTest {
         edt(()-> {
             var panel=panel();var seen=new ArrayList<List<String>>();
             panel.actions(new SftpPanel.Actions(p->{},()->{},()->{},f->{},()->{},()->{},()->seen.add(names(panel.selection())),()->{},
-                ()->seen.add(names(panel.selection())),()->seen.add(names(panel.selection())),()->{},()->{},p->{}));
+                ()->seen.add(names(panel.selection())),()->seen.add(names(panel.selection())),()->{},()->{},p->{},shown->{}));
             panel.showPage("host","/srv",List.of(FOLDER,FILE,LINK),0,3,false);
             emit(panel.view(),new UiEvent.Selected(SftpPanel.FILES,Set.of(SftpPanel.ROW+"conf",SftpPanel.ROW+"notes.toml")));
             pressRowItem(panel.view(),"notes.toml","Download selected…");

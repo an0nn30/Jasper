@@ -35,8 +35,14 @@ public final class SftpController implements AutoCloseable {
     private volatile long generation;
     private volatile boolean closed;
     private boolean visible=true,loading,foldersOnly;
+    private volatile boolean showHidden;
     private Consumer<UUID> followRequests=pane->{};
+    private Consumer<Boolean> hiddenChanged=shown->{};
     public void foldersOnly(boolean value) { foldersOnly=value; }
+    /** Whether hidden items (names starting with a dot) show, before the first folder loads. */
+    public void showHidden(boolean shown) { showHidden=shown;panel.showHidden(shown); }
+    /** Receives the user's choice when the panel's toggle shows or hides hidden items. */
+    public void onShowHiddenChanged(Consumer<Boolean> listener) { hiddenChanged=listener; }
     private State state;
     private View displayed;
     private DirectoryCache cache; // worker-confined
@@ -47,7 +53,8 @@ public final class SftpController implements AutoCloseable {
         this.cacheDirectory=cacheDirectory;this.ui=ui;this.opener=opener;this.panel=panel;
         panel.actions(new SftpPanel.Actions(this::manual,this::up,this::refresh,this::following,
             ()->operations.upload().run(),()->operations.uploadFolder().run(),()->operations.download().run(),()->operations.newFolder().run(),
-            ()->operations.delete().run(),()->operations.copyPath().run(),()->operations.copyToHost().run(),()-> { cancel();operations.cancel().run(); },this::page));
+            ()->operations.delete().run(),()->operations.copyPath().run(),()->operations.copyToHost().run(),()-> { cancel();operations.cancel().run(); },this::page,
+            this::hidden));
         panel.navigation(this::back,this::forward);
         background.execute(this::loop);
     }
@@ -145,7 +152,7 @@ public final class SftpController implements AutoCloseable {
                 endpoint.list(directory,entry-> { try { check(token);listingEndpoint.child(directory,entry.name());batch.add(entry);if(batch.size()==256) { writing.append(batch);batch.clear(); } } catch(IOException error) { throw new UncheckedIOException(error); } });
                 if(!batch.isEmpty()) fresh.append(batch);check(token);
                 closeCache();cache=fresh;fresh=null;cachedView=new View(requestedState.identity,directory);
-                var rows=cache.page(0,200,foldersOnly);long count=cache.count(foldersOnly);var view=cachedView;
+                boolean hidden=showHidden;var rows=cache.page(0,200,foldersOnly,hidden);long count=cache.count(foldersOnly,hidden);var view=cachedView;
                 publish(token,()-> { loading=false;displayed=view;requestedState.path=directory;visited(requestedState,directory,historyTarget);panel.showPage(view.identity().host().name(),directory,rows,0,count,focus); });
             } catch(Exception failure) { publish(token,()-> { loading=false;panel.error(message(failure)); }); }
             finally {
@@ -156,8 +163,13 @@ public final class SftpController implements AutoCloseable {
     }
     public void page(long offset) {
         if(closed || loading || displayed==null || state==null || !displayed.identity().equals(state.identity)) return;long token=generation;
-        submit(()-> { try { if(cache==null || cachedView==null) return;var rows=cache.page(offset,200,foldersOnly);var view=cachedView;long count=cache.count(foldersOnly);publish(token,()-> { displayed=view;panel.showPage(view.identity().host().name(),view.path(),rows,offset,count,false); }); }
+        boolean hidden=showHidden;
+        submit(()-> { try { if(cache==null || cachedView==null) return;var rows=cache.page(offset,200,foldersOnly,hidden);var view=cachedView;long count=cache.count(foldersOnly,hidden);publish(token,()-> { displayed=view;panel.showPage(view.identity().host().name(),view.path(),rows,offset,count,false); }); }
             catch(IOException failure) { publish(token,()-> { loading=false;panel.error(message(failure)); }); } });
+    }
+    /** The panel's toggle: the folder shown again from its first page, from the cache, without listing it again. */
+    private void hidden(boolean shown) {
+        if(closed) return;showHidden(shown);hiddenChanged.accept(shown);page(0);
     }
     private void submit(Runnable task) { if(closed) return;pending.set(task);wake.offer(true); }
     private void loop() {

@@ -45,6 +45,25 @@ class SftpControllerTest {
             } finally { SwingUtilities.invokeAndWait(holder[0]::close);holder[0].stopped().get(5,TimeUnit.SECONDS); }
         }
     }
+    /** Hidden items stay out of the listing until the toggle shows them, from the cache, and the choice is reported. */
+    @Test @DisabledOnOs(OS.WINDOWS) void theHiddenItemsToggleShowsDotfilesAndReportsTheChoice() throws Exception {
+        root=root.toRealPath();Path folder=Files.createDirectory(root.resolve("home"));Files.writeString(folder.resolve(".secret"),"s");Files.writeString(folder.resolve("plain"),"p");
+        var holder=new SftpController[1];var panel=new SftpPanel[1];var reported=new CopyOnWriteArrayList<Boolean>();
+        try(var workers=Executors.newVirtualThreadPerTaskExecutor()) {
+            SwingUtilities.invokeAndWait(()-> { panel[0]=new SftpPanel(new dev.jasper.sdk.testing.FakeKit("dev.jasper.remote"));holder[0]=new SftpController(root.resolve("cache"),workers,SwingUtilities::invokeLater,identity->CompletableFuture.completedFuture(new LocalEndpoint()),panel[0]);
+                holder[0].onShowHiddenChanged(reported::add);holder[0].open(UUID.randomUUID(),host("dots"),folder.toString(),true); });
+            try {
+                awaitRows(panel[0],"plain");
+                SwingUtilities.invokeAndWait(()->panel[0].handle(new dev.jasper.sdk.ui.UiEvent.Action(SftpPanel.HIDDEN)));
+                awaitRows(panel[0],".secret","plain");
+                SwingUtilities.invokeAndWait(()->assertThat(panel[0].showHidden()).isTrue());
+                assertThat(reported).containsExactly(true);
+                SwingUtilities.invokeAndWait(()->panel[0].handle(new dev.jasper.sdk.ui.UiEvent.Action(SftpPanel.HIDDEN)));
+                awaitRows(panel[0],"plain");
+                assertThat(reported).containsExactly(true,false);
+            } finally { SwingUtilities.invokeAndWait(holder[0]::close);holder[0].stopped().get(5,TimeUnit.SECONDS); }
+        }
+    }
     @Test void reportsWhichPaneItFollowsAndAsksForItsFolder() throws Exception {
         var identity=host("A");var pane=UUID.randomUUID();var other=UUID.randomUUID();var requests=new ArrayList<UUID>();var holder=new SftpController[1];
         try(var workers=Executors.newVirtualThreadPerTaskExecutor()) {

@@ -67,6 +67,6 @@ class PaletteValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new PaletteQuery(null, Optional.empty(), 5, true));
         assertThat(Capabilities.PALETTE_CONTRIBUTE).isEqualTo("palette.contribute");
         assertThat(Capabilities.ALL).contains("palette.contribute");
-        assertThat(JasperSdk.VERSION).isEqualTo("0.17.0");
+        assertThat(JasperSdk.VERSION).isEqualTo("0.17.1");
     }
 }

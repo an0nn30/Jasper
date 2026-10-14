@@ -27,8 +27,12 @@ indents them by a checkbox its rows never show ("Name" now over the first glyph,
 first failed in the app: the folder loads off the EDT, so the list was hidden when the dialog gained focus and AWT
 focused Refresh (ring shown, cause ACTIVATION). The dialog's traversal policy now has no initial component, and the
 chooser focuses the list when it appears (the search field for an empty or unreadable folder) unless the user
-focused something meanwhile; GUI check pending. Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
-(the colour patterns are now precompiled). `./gradlew check --continue`: **10,168 tests, 0 failures, 0 errors, 12
+focused something meanwhile; GUI check pending. Hidden items (user's ask, both browsers): the chooser's tools row
+has a **Show hidden items** toggle (the saved choice Cmd/Ctrl+Shift+. already toggled); the SFTP browser (and the Copy
+to host picker) gains the choice, off by default, remembered as `sftp_show_hidden` in Remote's `panel-state.toml`,
+filtered in `DirectoryCache` so pages and counts stay right. New kit glyph `hidden`; SDK 0.17.1 (the testkit mirrors
+it). Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
+(the colour patterns are now precompiled). `./gradlew check --continue`: **10,173 tests, 0 failures, 0 errors, 12
 skipped**. No GUI launched. GUI check for the user: each flavour in Settings › Appearance and the Licenses window (About Jasper › Licenses). Not merged.
 
 **Right rail splits again: two dock fixes — 2026-10-14** (`claude/right-rail-split`, worktree

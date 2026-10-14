@@ -76,6 +76,7 @@ public final class FileChooserPanel extends JPanel {
     static final String SEARCH = "search";
     static final String NAME = "name";
     static final String PREVIEW_TOGGLE = "previewToggle";
+    static final String HIDDEN = "hidden";
     private static final String PREVIEW_CONTENT = "chooser.preview";
     private static final String PIN = "pin:";
     private static final DateTimeFormatter MODIFIED = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -473,6 +474,7 @@ public final class FileChooserPanel extends JPanel {
             case "forward" -> model.goForward();
             case "up" -> model.goUp();
             case "refresh" -> model.refresh();
+            case HIDDEN -> toggleHidden();
             case "newFolder" -> newFolder();
             case "open" -> activateSelection();
             case "approve" -> approve();
@@ -646,6 +648,9 @@ public final class FileChooserPanel extends JPanel {
             "Search " + safe(model.name(model.location())), "Search", ""));
         if (model.request().mode() == ChooserRequest.Mode.SAVE)
             children.add(new Nodes.Button("newFolder", ControlState.READY, "New folder", "folder.add", Nodes.ButtonKind.SECONDARY, "newFolder", ""));
+        // Pressed while hidden items show; Cmd/Ctrl+Shift+. toggles the same saved choice.
+        children.add(new Nodes.Button(HIDDEN, ControlState.READY, "", "hidden", Nodes.ButtonKind.GHOST, HIDDEN, "Show hidden items",
+            Nodes.ButtonPresentation.STANDARD, Optional.empty(), Optional.of(model.showHidden())));
         children.add(new Nodes.Icon("preview.icon", ControlState.READY, "preview", Nodes.Hue.NONE, Nodes.IconSize.CONTROL, "Preview pane"));
         children.add(new Nodes.Toggle(PREVIEW_TOGGLE, ControlState.READY, "Preview pane", previewVisible, PREVIEW_TOGGLE, true));
         return new ViewSpec(new Nodes.Stack("tools", ControlState.READY, Nodes.LayoutRole.NAVIGATION, children));
