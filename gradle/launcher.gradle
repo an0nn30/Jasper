@@ -617,3 +617,12 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
     }
 }
 tasks.named('check') { dependsOn(verifyLauncherImage) }
+
+// ---- The jasper command (packaging/cli/README.md) ----
+
+def cliSource = rootProject.file('packaging/cli')
+def cliTestSource = new File(cliSource, 'test')
+// AppDirsTest and CommandProtocolTest read the vectors the command's own native tests use.
+tasks.named('test', Test) {
+    inputs.dir(cliTestSource).withPropertyName('commandVectors').withPathSensitivity(PathSensitivity.RELATIVE)
+}
