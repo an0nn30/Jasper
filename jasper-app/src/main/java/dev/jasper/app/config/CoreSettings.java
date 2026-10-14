@@ -50,6 +50,9 @@ public final class CoreSettings {
             SettingKind.integer(ConfigSnapshot.MIN_STATUS_BAR_HEIGHT, ConfigSnapshot.MAX_STATUS_BAR_HEIGHT, CLAMP), ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT)
         .label("Status bar height").keywords("status bar", "footer", "height")
         .description("Status bar height in logical pixels, 20-48; never shorter than its text. Updates live.").build();
+    public static final Setting<Boolean> WINDOW_MEMORY_INDICATOR = Setting.of("window.memory_indicator", SettingKind.bool(), false)
+        .label("Show memory indicator").keywords("memory", "heap", "indicator", "status bar", "garbage collection")
+        .description("Show the heap in use and its limit in the status bar; click it to run garbage collection. Updates live.").build();
     public static final Setting<Integer> WINDOW_COLUMNS = Setting.of("window.columns", SettingKind.integer(5, 500, DEFAULT), 100)
         .label("Initial columns").keywords("grid", "width", "size", "columns").applies(Applies.NEW_WINDOWS)
         .description("Initial terminal grid for new windows only; existing windows keep their size.\n"
@@ -262,7 +265,7 @@ public final class CoreSettings {
         .label("Blur").keywords("blur", "frosted", "glass", "workspace", "background")
         .description("macOS only (ignored on other platforms), live: blur the desktop behind a translucent workspace. \"theme\" follows Slate Steel, which does not blur.").build();
     public static final SettingsSchema SCHEMA = SettingsSchema.of(List.<Setting<?>>of(
-            WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT,
+            WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT, WINDOW_MEMORY_INDICATOR,
             WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, WINDOW_VIEW_MODE, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, NOTIFICATIONS_GROUPS, SYSTEM_RUN_IN_BACKGROUND,
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_SCHEME, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
