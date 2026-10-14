@@ -25,7 +25,7 @@ import javax.swing.SwingUtilities;
 final class SettingsAppearance {
     private SettingsAppearance() { }
 
-    /** The choices over {@code library}, the installed themes as they are whenever the page reads them; {@code imports} adds the Imported themes group. */
+    /** The choices over {@code library}, the installed themes as they are whenever the page reads them; {@code imports} adds the theme gears. */
     static AppearanceChoices choices(SystemAppearance system, Supplier<ThemeLibrary> library, Optional<ThemeImports> imports) {
         var glass = JasperTheme.bundled().generated(true).glass();
         var cache = new Object() { ThemeLibrary from; InstalledThemes themes; };

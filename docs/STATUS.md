@@ -1,5 +1,17 @@
 # Jasper — Status and Handoff
 
+**Theme gears replace the Imported themes group — 2026-10-13** (`claude/theme-gear-menus`, worktree
+`.claude/worktrees/theme-gear-menus`; bounded change, design approved in chat, no spec or plan). The Dark theme, Light
+theme and Terminal scheme dropdowns each have a gear (`settingsui.ThemeMenu`) with Import Theme… and Remove for the
+theme that dropdown shows; the Terminal scheme gear removes the theme its scheme belongs to, and Remove is unavailable for
+Slate Steel and Same as UI theme. An import is staged in its gear's dropdown, or a sheet says where to pick it; failures
+are sheets (`ConfirmView.notice`). The Imported themes group and `SchemaPage.Part` are gone, and the Light row keeps a
+hidden Reset lane so the three dropdowns line up. This replaces spec 2026-10-13 sections 4.1–4.3's Imported themes group,
+and Import now picks the theme (4.2 said it selects nothing). `ThemeMenuTest` (19) and `AppearancePageTest`'s alignment
+tests pin it. `./gradlew check --continue` after merging `main`: **9,974 tests, 0 failures, 0 errors, 8 skipped**. No
+GUI launched. GUI checks for the user: the gears' look and menus, Import and Remove with their sheets, and the three
+dropdowns' alignment. Merged to `main`.
+
 **Dropdown menus as tall as their rows — 2026-10-13** (`claude/dropdown-menu-height`, worktree
 `.claude/worktrees/dropdown-menu-height`; bug fix). Every plain kit dropdown's menu was about a quarter too short and
 scrolled: Swing sizes a combo popup from its renderer's preferred heights (16 px of text), while the kit gives plain rows
@@ -7,7 +19,7 @@ the list's fixed menu-item height (22 px), so two rows got a 34 px menu. `Choice
 the rows it shows when they have a fixed height; rich rows keep their renderer's heights. `ChoicesTest` pins it for a
 form dropdown, a Settings dropdown and one with more rows than the menu shows. `./gradlew check --continue`: **9,904
 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched. GUI check for the user: open Settings › Appearance's Dark theme
-dropdown. Not merged or pushed.
+dropdown. Merged to `main`.
 
 **Custom VM options plan 2 (settings and actions) complete — 2026-10-13.** On `claude/custom-vm-options-settings`, merged to
 local `main` (not pushed): System Settings has a Java Virtual Machine section (heap limit in `jasper.vmoptions`, Edit Custom VM Options…,
