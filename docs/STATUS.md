@@ -1,5 +1,28 @@
 # Jasper — Status and Handoff
 
+**Cmd-click file paths (command line plan 3) — 2026-10-14** (`claude/default-editor`, worktree
+`.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
+[plan](superpowers/plans/2026-10-14-jasper-command-line-3-cmd-click-paths.md)). Cmd-click on macOS, Ctrl-click
+elsewhere, on a file path in a local pane's output (`PATH`, `PATH:LINE`, `PATH:LINE:COLUMN`, `PATH(LINE)` and
+`PATH(LINE,COLUMN)`; absolute, `./`, `../`, `~/`, or relative with a `/` or an extension; `C:\…` and backslash paths
+on Windows; across soft wraps), or on an OSC 8 or plain-text `file://` link to this machine, opens the file in the
+default editor at the line. `jasper-terminal` finds the path (`internal.text.PathDetector`, matched outside the buffer
+lock) and reports a new supported value, `view.FileLink`, through `TerminalView.setFileLinkHandler`; a URL still opens
+the browser first, and a click on anything else still starts a selection. A plain-text `file://` URL no longer goes to
+the browser. The app resolves the path against the pane's local directory (`workspace.FileLinks`), checks on a virtual
+thread that it is a regular file, and opens it through `PluginRuntime.open` with the line and the clicked pane's
+window; a provided session, or a shell reporting a remote directory, opens nothing. Fixed on the way: `JediCellReader`
+cached cell styles by colour, and JediTerm's `HyperlinkStyle` equality ignores the link, so every OSC 8 link in the
+same colours opened the first one's target. Deviations: the six in the plan's Planned deviations. Execution rulings: when a position follows, a path restarts after an unclosed mid-word `(`, so a Java stack frame `at com.foo.Bar.baz(Bar.java:42)` gives `Bar.java` at line 42, and a path starts after an `=` only when no `/` or `\` comes before it, so `--config=./x.toml` clicks and `/data/dt=2024-01-01/part.parquet` stays whole (Decision 13); on Windows a path, a `~/` remainder or a pane directory that names a UNC host other than `wsl$` or `wsl.localhost` (compared in ASCII only) resolves to nothing, so a click never makes Windows authenticate to a host named by program output; `LinkDetector` and `PathDetector` share one trailing-punctuation set; the view tests also click a soft-wrapped path and an OSC 8 `file://` link. Known limits: where the desktop supports neither edit nor reveal (often on Linux), a click under System default app only logs; the existence check follows a symbolic link, also to a network share; a click just before quitting can still open its file.
+`./gradlew check --continue`: **10,359 tests, 0 failures, 0 errors, 17 skipped**. No GUI
+launched. GUI checks for the user, in the packaged app: Cmd-click on compiler output (`javac`'s `src/Foo.java:42:`,
+`dotnet build`'s `Foo.cs(42,5):`) in a local pane opens the Jasper Editor at the line; in a Remote ssh pane a path
+opens nothing; a path soft-wrapped in a narrow window opens from either row; names from `ls --hyperlink` (GNU) or
+`eza --hyperlink` open by Cmd-click; on Windows and Linux, Ctrl-click, and Ctrl+Shift-click inside a program that uses
+the mouse; with System default app chosen, a click on a `.txt` opens the system's text editor and a click on an `.app`
+or `.command` shows it in Finder without running it; on Windows, a Ctrl-click on a `\\wsl$\…` path in a WSL pane
+opens it. Not merged or pushed.
+
 **The default editor (command line plan 2) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
 [plan](superpowers/plans/2026-10-14-jasper-command-line-2-default-editor.md)). Settings › Tools › Editor › Default editor
