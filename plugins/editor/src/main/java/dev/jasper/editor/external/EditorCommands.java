@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.stream.Collectors;
 
 /**
  * The {@code EDITOR} values and command lines of the default editor. Pure. POSIX shells get single quotes (each
@@ -80,20 +81,44 @@ public final class EditorCommands {
     }
 
     /**
+     * The program a custom command line names, for a notice about it: the first word, without the quotes around it.
+     *
+     * @param command the command line as written
+     * @return its first word; empty for a blank line
+     */
+    public static String program(String command) {
+        String line = command.strip();
+        if (line.isEmpty()) return "";
+        char first = line.charAt(0);
+        if (first == '\'' || first == '"') {
+            int end = line.indexOf(first, 1);
+            return end < 0 ? line.substring(1) : line.substring(1, end);
+        }
+        int end = 0;
+        while (end < line.length() && !Character.isWhitespace(line.charAt(end))) end++;
+        return line.substring(0, end);
+    }
+
+    /**
      * A custom command with the quoted file added, run by {@code /bin/sh -c}, or {@code cmd.exe /d /s /c} on Windows, so
-     * the command line may carry its own arguments and quoting. On Windows the whole line is one argument wrapped in one
-     * more pair of quotes: without {@code /s}, {@code cmd /c} strips the first and last quote of a line that starts with
-     * a quote, which splits a quoted program path at its space; with it, cmd strips exactly the outer pair and keeps the
-     * rest literal. {@code /d} skips the AutoRun commands.
+     * the command line may carry its own arguments and quoting. On POSIX the line first adds
+     * {@link Detection#extraFolders}, each quoted, to Jasper's {@code PATH} ({@code export PATH="$PATH":'<folder>':...;}),
+     * so a Jasper started from the Dock finds the programs the user's shell finds. On Windows the whole line is one
+     * argument wrapped in one more pair of quotes: without {@code /s}, {@code cmd /c} strips the first and last quote of a
+     * line that starts with a quote, which splits a quoted program path at its space; with it, cmd strips exactly the
+     * outer pair and keeps the rest literal. {@code /d} skips the AutoRun commands.
      *
      * @param command the command line as written
      * @param file the file, absolute
+     * @param home the user's home folder, whose {@code .local/bin} is added to {@code PATH}
      * @param osName the {@code os.name} property
      * @return the shell and its arguments
      */
-    public static List<String> custom(String command, Path file, String osName) {
+    public static List<String> custom(String command, Path file, Path home, String osName) {
         String line = command + " " + quote(file.toString(), osName);
-        return windows(osName) ? List.of("cmd.exe", "/d", "/s", "/c", "\"" + line + "\"") : List.of("/bin/sh", "-c", line);
+        if (windows(osName)) return List.of("cmd.exe", "/d", "/s", "/c", "\"" + line + "\"");
+        String folders = Detection.extraFolders(home).stream().map(folder -> quote(folder.toString(), osName)).collect(Collectors.joining(":"));
+        return List.of("/bin/sh", "-c", "export PATH=\"$PATH\":" + folders + "; " + line);
     }
 
     /**

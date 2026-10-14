@@ -47,7 +47,8 @@ public record EditorSettings(String fontFamily, int fontSize, int tabSize, boole
         static final String DEFAULT_EDITOR_DESCRIPTION = "Opens the files Jasper opens, such as config.toml, and is EDITOR "
             + "in Jasper's shells, so git commit uses it.";
         static final String COMMAND_LABEL = "Custom command";
-        static final String COMMAND_DESCRIPTION = "For Custom command: the command line, run by the shell; the file's path is added at the end.";
+        static final String COMMAND_DESCRIPTION = "For Custom command: the command line, run by /bin/sh with Jasper's PATH plus Homebrew's "
+            + "folder, /usr/local/bin and ~/.local/bin, or by cmd on Windows; the file's path is added at the end.";
 
         /**
          * Declares the settings; call while the plugin starts.

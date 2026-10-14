@@ -306,13 +306,18 @@ class EditorPluginTest {
 
     private final Set<Path> programs = new HashSet<>();
     private final List<List<String>> launched = new ArrayList<>();
+    /** The notification group each launcher was given for its failures. */
+    private final List<String> launcherGroups = new ArrayList<>();
 
     /** The Editor over a machine whose programs are {@link #programs}; app editors and detached commands go to {@link #launched}. */
     private EditorPlugin detecting() {
         return new EditorPlugin(Runnable::run, (context, settings) -> new EditorEnvironment(context, Runnable::run,
                 owner -> Question::dismissed, owner -> (message, saves) -> saves.getNow(false), settings::current, settings::saveVim, false),
             () -> new Detection.Probe("Mac OS X", List.of(home.resolve("bin")), home, Map.of(), programs::contains),
-            log -> command -> { launched.add(command); return true; });
+            (log, notices) -> {
+                launcherGroups.add(notices.id());
+                return (command, program) -> { launched.add(command); return true; };
+            });
     }
 
     /** A program detection finds in {@code home/bin}. */
@@ -385,6 +390,7 @@ class EditorPluginTest {
             assertThat(host.shellEnvironment(Map.of())).containsEntry("EDITOR", EditorCommands.quote(code.toString(), os) + " --wait");
             assertThat(host.edit(file, OptionalInt.of(2), Optional.empty())).isTrue();
             assertThat(launched).containsExactly(List.of(code.toString(), "-g", file + ":2"));
+            assertThat(launcherGroups).as("a failed start is posted in the Editor's own group").containsExactly("dev.jasper.editor");
             host.setSetting("dev.jasper.editor", "default_editor", "nvim");
             UUID window = host.addTerminalWindow();
             assertThat(host.edit(file, OptionalInt.of(2), Optional.of(window))).isTrue();

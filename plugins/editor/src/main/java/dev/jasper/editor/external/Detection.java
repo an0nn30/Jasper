@@ -73,17 +73,24 @@ public final class Detection {
             String os = probe.osName().toLowerCase(Locale.ROOT);
             boolean windows = os.startsWith("windows"), mac = os.startsWith("mac");
             Set<Path> folders = new LinkedHashSet<>(probe.path());
-            if (!windows) {
-                folders.add(Path.of("/opt/homebrew/bin"));
-                folders.add(Path.of("/usr/local/bin"));
-                folders.add(probe.home().resolve(".local").resolve("bin"));
-            }
+            if (!windows) folders.addAll(extraFolders(probe.home()));
             List<Path> applications = mac ? List.of(Path.of("/Applications"), probe.home().resolve("Applications")) : List.of();
             return new Places(folders, applications, windows, probe);
         }
     }
 
     private Detection() { }
+
+    /**
+     * The folders searched after {@code PATH}, except on Windows, so that a macOS app started from the Dock, whose
+     * {@code PATH} is short, still finds what the user's shell finds. Custom commands add them to {@code PATH} too.
+     *
+     * @param home the user's home folder
+     * @return {@code /opt/homebrew/bin}, {@code /usr/local/bin} and {@code <home>/.local/bin}, in that order
+     */
+    public static List<Path> extraFolders(Path home) {
+        return List.of(Path.of("/opt/homebrew/bin"), Path.of("/usr/local/bin"), home.resolve(".local").resolve("bin"));
+    }
 
     /**
      * @param probe what to look at

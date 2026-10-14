@@ -95,19 +95,40 @@ class EditorCommandsTest {
         assertThat(EditorCommands.openAt(detected("cursor"), FILE, OptionalInt.empty())).as("no -g without a line").doesNotContain("-g");
     }
 
+    /**
+     * Controller Ruling 12: on POSIX the line first adds detection's extra folders to Jasper's PATH, each quoted, so a
+     * Dock-started Jasper's custom command finds what the user's shell finds; Windows runs the line as written.
+     */
     @Test void aCustomCommandGetsTheQuotedFileThroughTheShell() {
         Path file = ROOT.resolve("notes").resolve("it's \u00fc.txt");
-        assertThat(EditorCommands.custom("subl -w", file, MAC))
-            .containsExactly("/bin/sh", "-c", "subl -w '" + file.toString().replace("'", "'\\''") + "'");
-        assertThat(EditorCommands.custom("notepad++ -multiInst", file, WINDOWS))
+        Path home = ROOT.resolve("Users").resolve("Dana Smith's");
+        String folders = "'" + Path.of("/opt/homebrew/bin") + "':'" + Path.of("/usr/local/bin") + "':'"
+            + home.resolve(".local").resolve("bin").toString().replace("'", "'\\''") + "'";
+        assertThat(EditorCommands.custom("subl -w", file, home, MAC)).containsExactly("/bin/sh", "-c",
+            "export PATH=\"$PATH\":" + folders + "; subl -w '" + file.toString().replace("'", "'\\''") + "'");
+        assertThat(EditorCommands.custom("subl -w", file, home, LINUX).get(2)).as("every POSIX system").startsWith("export PATH=\"$PATH\":" + folders + "; ");
+        assertThat(EditorCommands.custom("notepad++ -multiInst", file, home, WINDOWS))
             .containsExactly("cmd.exe", "/d", "/s", "/c", "\"notepad++ -multiInst \"" + file + "\"\"");
+    }
+
+    /** What a failed custom command's notice names: the program, never its arguments or the file. */
+    @Test void aCustomCommandsProgramIsItsFirstWordWithoutItsQuotes() {
+        assertThat(EditorCommands.program("subl -w")).isEqualTo("subl");
+        assertThat(EditorCommands.program("  code\t--new-window --wait ")).isEqualTo("code");
+        assertThat(EditorCommands.program("'/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl' -w"))
+            .isEqualTo("/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl");
+        assertThat(EditorCommands.program("\"C:\\Program Files\\Notepad++\\notepad++.exe\" -multiInst"))
+            .isEqualTo("C:\\Program Files\\Notepad++\\notepad++.exe");
+        assertThat(EditorCommands.program("'unterminated")).isEqualTo("unterminated");
+        assertThat(EditorCommands.program("emacsclient")).isEqualTo("emacsclient");
+        assertThat(EditorCommands.program("   ")).isEmpty();
     }
 
     /** Controller Ruling 8: a line that starts with a quote would lose its first and last quote under {@code cmd /c} alone. */
     @Test void aWindowsCustomCommandStartingWithAQuotedProgramIsWrappedForCmd() {
         Path file = ROOT.resolve("Users").resolve("Dana Smith").resolve("notes.txt");
         String command = "\"C:\\Program Files\\Notepad++\\notepad++.exe\" -multiInst";
-        assertThat(EditorCommands.custom(command, file, WINDOWS)).containsExactly("cmd.exe", "/d", "/s", "/c",
+        assertThat(EditorCommands.custom(command, file, ROOT.resolve("Users").resolve("Dana Smith"), WINDOWS)).containsExactly("cmd.exe", "/d", "/s", "/c",
             "\"\"C:\\Program Files\\Notepad++\\notepad++.exe\" -multiInst \"" + file + "\"\"");
     }
 
@@ -155,8 +176,24 @@ class EditorCommandsTest {
         String custom = EditorCommands.quote(program.toString(), os) + " --new-window";
         assertThat(shell(temp, EditorCommands.variable(new Choice.Custom(custom, false), os).orElseThrow(), file))
             .containsExactly("--new-window", file.toString());
-        assertThat(run(temp, EditorCommands.custom(custom, file, os))).as("Jasper's own custom launch line")
+        assertThat(run(temp, EditorCommands.custom(custom, file, temp, os))).as("Jasper's own custom launch line")
             .containsExactly("--new-window", file.toString());
+    }
+
+    /**
+     * Controller Ruling 12: a Dock-started Jasper's PATH lacks ~/.local/bin, Homebrew's folder and /usr/local/bin; a
+     * custom command naming a program that lives only in ~/.local/bin (here under a home whose name holds a space and a
+     * quote) still runs. Runs only {@code /bin/sh} and this test's script, which records its arguments.
+     */
+    @Test @DisabledOnOs(value = OS.WINDOWS, disabledReason = "custom commands run by cmd on Windows")
+    void aCustomCommandFindsAProgramInLocalBinThatJaspersPathLacks(@TempDir Path temp) throws Exception {
+        Path home = Files.createDirectories(temp.resolve("Dana Smith's home"));
+        Path bin = Files.createDirectories(home.resolve(".local").resolve("bin"));
+        Path program = Files.writeString(bin.resolve("record-local"), "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$RECORD\"\n");
+        Files.setPosixFilePermissions(program, PosixFilePermissions.fromString("rwx------"));
+        Path file = Files.writeString(temp.resolve("it's \u00fc.txt"), "text\n");
+        assertThat(run(temp, EditorCommands.custom("record-local --wait", file, home, System.getProperty("os.name")), "/usr/bin:/bin"))
+            .containsExactly("--wait", file.toString());
     }
 
     /** What the program got from {@code sh -c "<value> <quoted file>"}, checked against git's form. */
@@ -166,11 +203,15 @@ class EditorCommandsTest {
         return quoted;
     }
 
-    private static List<String> run(Path temp, List<String> command) throws Exception {
+    private static List<String> run(Path temp, List<String> command) throws Exception { return run(temp, command, null); }
+
+    /** As above, with {@code PATH} set to {@code path} when it is not null. */
+    private static List<String> run(Path temp, List<String> command, String path) throws Exception {
         Path record = temp.resolve("arguments.txt");
         Files.deleteIfExists(record);
         var builder = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
         builder.environment().put("RECORD", record.toString());
+        if (path != null) builder.environment().put("PATH", path);
         Process process = builder.start();
         process.getOutputStream().close();
         boolean finished = process.waitFor(10, TimeUnit.SECONDS);

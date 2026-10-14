@@ -28,7 +28,8 @@
 # open in it, and Jasper's shells get EDITOR for it.
 # default_editor = "jasper"
 
-# For custom: the command line; the file's path is added at the end.
+# For custom: the command line, run by /bin/sh with Jasper's PATH plus /opt/homebrew/bin, /usr/local/bin and
+# ~/.local/bin, or by cmd on Windows; the file's path is added at the end.
 # custom_command = ""
 
 # For custom: run the command in a terminal tab; false starts it on its own.

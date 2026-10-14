@@ -54,6 +54,12 @@ class DetectionTest {
             .containsExactly("nvim=" + nvim, "micro=" + micro, "helix=" + hx);
     }
 
+    /** Controller Ruling 12: custom commands add these same folders to PATH. */
+    @Test void theExtraFoldersAreHomebrewsLocalAndTheUsersBinInOrder() {
+        assertThat(Detection.extraFolders(HOME)).containsExactly(Path.of("/opt/homebrew/bin"), Path.of("/usr/local/bin"),
+            HOME.resolve(".local").resolve("bin"));
+    }
+
     @Test void macAppToolsAreFoundOnMacOsOnly() {
         Path code = program("Applications/Visual Studio Code.app/Contents/Resources/app/bin/code");
         Path zed = program("Users/me/Applications/Zed.app/Contents/MacOS/cli");

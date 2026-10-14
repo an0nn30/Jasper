@@ -48,7 +48,7 @@ class EditorSettingsPanelTest {
             defaults = new DefaultEditor(() -> new DefaultEditor.Preference(settings.defaultEditor(), settings.customCommand(),
                     settings.customInTerminal(), settings.keepEnvironmentEditor()),
                 () -> new Detection.Probe("Mac OS X", List.of(bin), home, Map.of(), programs::contains), context.background(), Runnable::run,
-                context.terminals(), (file, line, window) -> false, command -> false, Optional.empty(), "Mac OS X", context.log());
+                context.terminals(), (file, line, window) -> false, (command, program) -> false, Optional.empty(), "Mac OS X", context.log());
             context.settings().page(new EditorSettingsPanel(context.kit(), settings, defaults, environment));
         });
         host.settingsPanel(ID).orElseThrow();

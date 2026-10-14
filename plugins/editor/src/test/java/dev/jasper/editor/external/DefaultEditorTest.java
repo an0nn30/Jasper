@@ -8,7 +8,9 @@ import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.PluginContext;
+import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.terminal.WindowHandle;
+import dev.jasper.sdk.testing.FakeNotifications;
 import dev.jasper.sdk.testing.FakePluginHost;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,12 +22,15 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -48,6 +53,8 @@ class DefaultEditorTest {
     private final AtomicBoolean failing = new AtomicBoolean();
     private final List<Opened> opened = new ArrayList<>();
     private final List<List<String>> launched = new ArrayList<>();
+    /** The program each launch names, for a failure's notice. */
+    private final List<String> named = new ArrayList<>();
     /** Work {@link DefaultEditor} hands to the UI thread; the tests run it when the UI thread would. */
     private final List<Runnable> uiQueue = new ArrayList<>();
     private final AtomicInteger probed = new AtomicInteger();
@@ -72,7 +79,7 @@ class DefaultEditorTest {
             },
             context.background(), uiQueue::add, context.terminals(),
             (path, line, window) -> { opened.add(new Opened(path, line, window)); return true; },
-            command -> { launched.add(command); return starts; }, jasperCommand, osName, context.log());
+            (command, program) -> { launched.add(command); named.add(program); return starts; }, jasperCommand, osName, context.log());
     }
 
     /** The default editor once its first detection has run. */
@@ -112,6 +119,13 @@ class DefaultEditorTest {
     private static Map<String, String> both(String value) { return Map.of("EDITOR", value, "VISUAL", value); }
 
     private String tab(UUID window, String command) { return "tab|" + window + "|" + file.getParent() + "|run:" + command; }
+
+    /** A custom command's {@code sh -c} line on macOS: detection's extra folders added to PATH, then the command and the file. */
+    private String customLine(String command) {
+        return "export PATH=\"$PATH\":" + EditorCommands.quote(Path.of("/opt/homebrew/bin").toString(), MAC) + ":"
+            + EditorCommands.quote(Path.of("/usr/local/bin").toString(), MAC) + ":"
+            + EditorCommands.quote(home.resolve(".local").resolve("bin").toString(), MAC) + "; " + command + " " + EditorCommands.quote(file.toString(), MAC);
+    }
 
     @Test void theJasperEditorOpensTheFileItself() {
         DefaultEditor defaults = detected(MAC);
@@ -153,6 +167,7 @@ class DefaultEditorTest {
         starts = false;
         assertThat(defaults.edit(file, OptionalInt.empty(), Optional.empty())).as("it did not start").isFalse();
         assertThat(launched.getLast()).containsExactly(code.toString(), file.toString());
+        assertThat(named).as("a failure names the program's file name").containsExactly("code", "code");
         assertThat(host.openRequests()).isEmpty();
     }
 
@@ -163,12 +178,44 @@ class DefaultEditorTest {
         DefaultEditor defaults = detected(MAC);
         assertThat(defaults.choice()).isEqualTo(new Choice.Custom("subl -w", true));
         assertThat(defaults.edit(file, OptionalInt.of(9), Optional.empty())).isTrue();
-        assertThat(host.openRequests()).containsExactly(tab(window, "/bin/sh -c subl -w " + EditorCommands.quote(file.toString(), MAC)));
+        assertThat(host.openRequests()).containsExactly(tab(window, "/bin/sh -c " + customLine("subl -w")));
         preference.set(new DefaultEditor.Preference("custom", "subl -w", false, true));
         assertThat(defaults.edit(file, OptionalInt.of(9), Optional.empty())).isTrue();
-        assertThat(launched).containsExactly(List.of("/bin/sh", "-c", "subl -w " + EditorCommands.quote(file.toString(), MAC)));
+        assertThat(launched).containsExactly(List.of("/bin/sh", "-c", customLine("subl -w")));
         assertThat(detected(WINDOWS).edit(file, OptionalInt.empty(), Optional.empty())).isTrue();
         assertThat(launched.getLast()).containsExactly("cmd.exe", "/d", "/s", "/c", "\"subl -w \"" + file + "\"\"");
+        assertThat(named).as("a failure names the command's first word, never the file").containsExactly("subl", "subl");
+    }
+
+    /** Controller Ruling 12: a program started on its own that exits with an error is logged and posted, by its name only. */
+    @Test void aDetachedProgramThatExitsWithAnErrorIsPostedByItsNameOnly() {
+        FakeNotifications notices = new FakeNotifications();
+        NotificationGroup group = notices.group("dev.jasper.editor");
+        var failing = new CompletableFuture<Integer>();
+        var clean = new CompletableFuture<Integer>();
+        DefaultEditor.watch(failing, "subl", context.log(), group);
+        DefaultEditor.watch(clean, "code", context.log(), group);
+        assertThat(notices.lines()).as("nothing before the programs exit; watching never blocks").isEmpty();
+        clean.complete(0);
+        assertThat(notices.lines()).as("a clean exit says nothing").isEmpty();
+        failing.complete(127);
+        assertThat(notices.lines()).containsExactly("dev.jasper.editor|ERROR|Could not open a file in your default editor|subl exited with status 127.");
+    }
+
+    /** Controller Ruling 12, through the production launcher: runs only {@code /bin/sh -c 'exit 3'}. */
+    @Test @DisabledOnOs(value = OS.WINDOWS, disabledReason = "runs /bin/sh")
+    void theDetachedLauncherPostsAProgramThatExitsWithAnError() throws Exception {
+        DefaultEditor.Launcher launcher = DefaultEditor.Launcher.detached(context.log(), context.notifications().group());
+        assertThat(launcher.start(List.of("/bin/sh", "-c", "exit 3"), "subl")).as("it started").isTrue();
+        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(10).toNanos();
+        while (host.notifications().lines().isEmpty() && System.nanoTime() < deadline) Thread.sleep(10);
+        assertThat(host.notifications().lines()).containsExactly("dev.jasper.editor|ERROR|Could not open a file in your default editor|subl exited with status 3.");
+    }
+
+    @Test void theDetachedLauncherReportsAProgramThatCannotStartAsNotStartedAndPostsNothing() {
+        DefaultEditor.Launcher launcher = DefaultEditor.Launcher.detached(context.log(), context.notifications().group());
+        assertThat(launcher.start(List.of(home.resolve("no such program").toString()), "no such program")).isFalse();
+        assertThat(host.notifications().lines()).isEmpty();
     }
 
     @Test void theSystemsAppAndABlankCustomCommandLeaveTheFileToTheDesktop() {

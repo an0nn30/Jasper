@@ -20,6 +20,7 @@ import dev.jasper.editor.ui.EditorSettingsPanel;
 import dev.jasper.editor.ui.EditorWindow;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.ActionSpec;
@@ -47,7 +48,7 @@ public final class EditorPlugin implements Plugin {
     private final Executor ui;
     private final BiFunction<PluginContext, EditorSettings.Declared, EditorEnvironment> environments;
     private final Supplier<Detection.Probe> probes;
-    private final Function<System.Logger, DefaultEditor.Launcher> launchers;
+    private final BiFunction<System.Logger, NotificationGroup, DefaultEditor.Launcher> launchers;
     private EditorEnvironment environment;
     private EditorWindow window;
     private RecentFiles recent;
@@ -63,11 +64,11 @@ public final class EditorPlugin implements Plugin {
     /** For tests: finds no installed editor and starts no program. */
     EditorPlugin(Executor ui, BiFunction<PluginContext, EditorSettings.Declared, EditorEnvironment> environments) {
         this(ui, environments, () -> new Detection.Probe(System.getProperty("os.name", ""), List.of(), Path.of(System.getProperty("user.home")),
-            Map.of(), file -> false), log -> command -> false);
+            Map.of(), file -> false), (log, notices) -> (command, program) -> false);
     }
 
     EditorPlugin(Executor ui, BiFunction<PluginContext, EditorSettings.Declared, EditorEnvironment> environments,
-                 Supplier<Detection.Probe> probes, Function<System.Logger, DefaultEditor.Launcher> launchers) {
+                 Supplier<Detection.Probe> probes, BiFunction<System.Logger, NotificationGroup, DefaultEditor.Launcher> launchers) {
         this.ui = ui;
         this.environments = environments;
         this.probes = probes;
@@ -112,7 +113,7 @@ public final class EditorPlugin implements Plugin {
         DefaultEditor defaults = new DefaultEditor(() -> new DefaultEditor.Preference(settings.defaultEditor(), settings.customCommand(),
                 settings.customInTerminal(), settings.keepEnvironmentEditor()),
             probes, context.background(), ui, context.terminals(), (file, line, owner) -> window().edit(file, line, owner),
-            launchers.apply(context.log()), context.commandLine().client(), System.getProperty("os.name", ""), context.log());
+            launchers.apply(context.log(), context.notifications().group()), context.commandLine().client(), System.getProperty("os.name", ""), context.log());
         defaults.findSaved();
         defaults.detect();
         context.terminals().environment(defaults::variables);

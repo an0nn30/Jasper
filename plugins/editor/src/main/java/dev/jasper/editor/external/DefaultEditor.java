@@ -2,6 +2,7 @@ package dev.jasper.editor.external;
 
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.terminal.LocalSpec;
 import dev.jasper.sdk.terminal.OpenRequest;
 import dev.jasper.sdk.terminal.Terminals;
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
@@ -49,25 +51,31 @@ public final class DefaultEditor {
     public interface Launcher {
         /**
          * @param command the program and its arguments
+         * @param program what a failure names: the program's file name, or a custom command's first word; never the
+         *     file or the arguments
          * @return whether it started
          */
-        boolean start(List<String> command);
+        boolean start(List<String> command, String program);
 
         /**
-         * The production launcher, over {@link ProcessBuilder}. A program that cannot start is logged, by its name
-         * only, and reported as not started.
+         * The production launcher, over {@link ProcessBuilder}. A program that cannot start is logged and reported as
+         * not started; one that starts and later exits with an error is logged and posted in {@code notices}, without
+         * waiting for it. Both name only {@code program}.
          *
          * @param log where a failure goes
+         * @param notices the Editor's notification group, for a program that exits with an error
          * @return the launcher
          */
-        static Launcher detached(System.Logger log) {
-            return command -> {
+        static Launcher detached(System.Logger log, NotificationGroup notices) {
+            Objects.requireNonNull(log, "log");
+            Objects.requireNonNull(notices, "notices");
+            return (command, program) -> {
                 Process process;
                 try {
                     process = new ProcessBuilder(command).redirectOutput(ProcessBuilder.Redirect.DISCARD)
                         .redirectError(ProcessBuilder.Redirect.DISCARD).start();
                 } catch (IOException | RuntimeException failure) {
-                    log.log(System.Logger.Level.WARNING, "Could not start " + (command.isEmpty() ? "an empty command" : command.getFirst()), failure);
+                    log.log(System.Logger.Level.WARNING, "Could not start " + program, failure);
                     return false;
                 }
                 try {
@@ -75,9 +83,35 @@ public final class DefaultEditor {
                 } catch (IOException ignored) {
                     // It started; its input was never going to be used.
                 }
+                watch(process.onExit().thenApply(Process::exitValue), program, log, notices);
                 return true;
             };
         }
+    }
+
+    /** The title of the notice a detached program that exits with an error posts. */
+    static final String FAILED = "Could not open a file in your default editor";
+
+    /**
+     * Once a detached program exits, a non-zero status is logged and posted in {@code notices}, naming only
+     * {@code program}; a clean exit says nothing. Returns at once: the check runs on the thread that ends {@code exit}.
+     *
+     * @param exit the program's exit status, when it exits
+     * @param program the program's name for the notice
+     * @param log where the failure is logged
+     * @param notices where it is posted
+     */
+    static void watch(CompletionStage<Integer> exit, String program, System.Logger log, NotificationGroup notices) {
+        exit.thenAccept(status -> {
+            if (status == 0) return;
+            String detail = program + " exited with status " + status + ".";
+            log.log(System.Logger.Level.WARNING, "The default editor: " + detail);
+            try {
+                notices.error(FAILED, detail);
+            } catch (IllegalStateException closed) {
+                // The Editor stopped while the program ran; the log line stays.
+            }
+        });
     }
 
     private final Supplier<Preference> preference;
@@ -94,12 +128,13 @@ public final class DefaultEditor {
 
     /**
      * @param preference the settings, read at each use
-     * @param probe what detection looks at, read at each detection
+     * @param probe what detection looks at, read at each detection; its home is also the one whose {@code .local/bin}
+     *     a custom command adds to {@code PATH}
      * @param background where detection runs
      * @param ui the UI thread, where detection's result is published
      * @param terminals opens the tabs terminal editors run in
      * @param jasper the Jasper Editor's own file editor
-     * @param launcher starts app editors and custom commands that run on their own
+     * @param launcher starts app editors and custom commands that run on their own; it reports a failure itself
      * @param client the {@code jasper} command, for the Jasper Editor's {@code EDITOR}
      * @param osName the {@code os.name} property: quoting, and how a custom command runs
      * @param log where a failed detection goes
@@ -216,10 +251,11 @@ public final class DefaultEditor {
             case Choice.Jasper _ -> jasper.edit(target, line, window);
             case Choice.Installed installed -> installed.editor().editor().kind() == KnownEditor.Kind.TERMINAL
                 ? inTab(EditorCommands.openAt(installed.editor(), target, line), target, window)
-                : launcher.start(EditorCommands.openAt(installed.editor(), target, line));
-            case Choice.Custom custom -> custom.inTerminal()
-                ? inTab(EditorCommands.custom(custom.command(), target, osName), target, window)
-                : launcher.start(EditorCommands.custom(custom.command(), target, osName));
+                : launcher.start(EditorCommands.openAt(installed.editor(), target, line), installed.editor().executable().getFileName().toString());
+            case Choice.Custom custom -> {
+                List<String> command = EditorCommands.custom(custom.command(), target, probe.get().home(), osName);
+                yield custom.inTerminal() ? inTab(command, target, window) : launcher.start(command, EditorCommands.program(custom.command()));
+            }
             case Choice.System _ -> false;
         };
     }
