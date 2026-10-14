@@ -88,6 +88,8 @@ The complete color reference for Jasper. It covers:
 | `button.secondary.bg` | `#363B45` | `#FFFFFF` | Secondary button (Cancel, Edit, Browse…) |
 | `button.secondary.bg.hover` | `#3E444F` | `#F0F2F5` | Secondary button hover |
 | `button.secondary.border` | `#474D59` | `#C3C8D0` | Secondary button edge |
+| `tab.indicator` | `#4E7DB4` | `#3F6FA8` | Line along the top of the active tab (the accent) |
+| `tab.indicator.inactive` | `#395270` | `#9DB5D2` | The same line while the window is not focused (the accent half over the tab) |
 
 ## Status
 
@@ -231,6 +233,7 @@ Against the editor background, every text role is at least 4.5:1 (lowest: Light 
       "accent": "#4E7DB4", "accent.hover": "#5C8BC2", "selection.bg": "#2E4664", "hover.overlay": "#FFFFFF",
       "segment.track": "#1F2228", "segment.selected.bg": "#474D59", "toggle.track.off": "#474D59", "toggle.knob": "#FFFFFF",
       "button.secondary.bg": "#363B45", "button.secondary.bg.hover": "#3E444F", "button.secondary.border": "#474D59",
+      "tab.indicator": "#4E7DB4", "tab.indicator.inactive": "#395270",
       "status.success": "#4FD06C", "status.warning": "#F2C55C", "status.danger": "#F07F78", "status.idle": "#5B616C",
       "hue.blue": "#94B4D6", "hue.green": "#72DE8F", "hue.amber": "#F2C55C", "hue.purple": "#C8A4FF", "hue.neutral": "#D1D5DC"
     },
@@ -252,6 +255,7 @@ Against the editor background, every text role is at least 4.5:1 (lowest: Light 
       "accent": "#3F6FA8", "accent.hover": "#4A7BB5", "selection.bg": "#3F6FA8", "hover.overlay": "#000000",
       "segment.track": "#E4E7EB", "segment.selected.bg": "#FFFFFF", "toggle.track.off": "#C3C8D0", "toggle.knob": "#FFFFFF",
       "button.secondary.bg": "#FFFFFF", "button.secondary.bg.hover": "#F0F2F5", "button.secondary.border": "#C3C8D0",
+      "tab.indicator": "#3F6FA8", "tab.indicator.inactive": "#9DB5D2",
       "status.success": "#2E9A4C", "status.warning": "#A8740F", "status.danger": "#C8423A", "status.idle": "#A8AEB7",
       "hue.blue": "#3F6FA8", "hue.green": "#2C8A49", "hue.amber": "#A8740F", "hue.purple": "#7B53BF", "hue.neutral": "#5D6470"
     }

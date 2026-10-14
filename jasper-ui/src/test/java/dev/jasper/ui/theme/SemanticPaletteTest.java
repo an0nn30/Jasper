@@ -31,7 +31,7 @@ class SemanticPaletteTest {
     }
 
     @Test void everySemanticNameRoundTrips() {
-        assertThat(SemanticColor.values()).hasSize(66);
+        assertThat(SemanticColor.values()).hasSize(68);
         assertThat(SemanticColor.of("surface.status")).contains(SemanticColor.SURFACE_STATUS);
         for (var role : SemanticColor.values()) assertThat(SemanticColor.of(role.key())).contains(role);
         assertThat(SemanticColor.of("unknown")).isEmpty();

@@ -998,3 +998,9 @@ the action is unbound. Declare `sdk = ">=0.16.0, <0.18"` to use it; every bundle
 a highlighted list or menu entry, selected text). A theme may pair its selection colour and its accent with different
 text, so text on the selection uses these, and `TEXT_ONACCENT` stays for text on `ACCENT`. `WorkspacePalette.selectionText`
 is `TEXT_ONSELECTION`. Declare `sdk = ">=0.16.2, <0.18"` to read them.
+
+### Tab indicator colours and the hidden icon (SDK 0.17.1)
+
+`SemanticColor` gains `TAB_INDICATOR`, the line along the top of the active tab, and `TAB_INDICATOR_INACTIVE`, the
+same line while the window is not focused. The icon `hidden` (an eye struck through) marks a show-hidden-items toggle.
+Declare `sdk = ">=0.17.1, <0.18"` to use them.

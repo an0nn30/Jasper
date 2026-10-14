@@ -93,7 +93,7 @@ class ThemeManagerTest {
             assertThat(UIManager.getColor("Panel.background")).isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
             assertThat(UIManager.getColor("List.background")).isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.SURFACE_CARD));
             assertThat(UIManager.getColor("EditorTabs.underlineColor")).as("a key FlatLaf skips is put back")
-                .isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.ACCENT));
+                .isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.TAB_INDICATOR));
             assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT))
                 .as("native search reads its canonical role directly").isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT));
             assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(2 * dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.CONTROL_RADIUS));

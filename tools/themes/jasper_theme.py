@@ -47,6 +47,7 @@ ROLES = [
     "accent", "accent.hover", "selection.bg", "hover.overlay",
     "segment.track", "segment.selected.bg", "toggle.track.off", "toggle.knob",
     "button.secondary.bg", "button.secondary.bg.hover", "button.secondary.border",
+    "tab.indicator", "tab.indicator.inactive",
     "status.success", "status.warning", "status.danger", "status.idle",
     "hue.blue", "hue.green", "hue.amber", "hue.purple", "hue.neutral",
 ]
@@ -858,6 +859,9 @@ MAPPING = [
     ("button.secondary.bg.hover", [], lambda v, dark, ansi: v["surface.control.hover"]),
     ("button.secondary.border", ["Button.startBorderColor", "Button.borderColor"],
      lambda v, dark, ansi: v["border.control"]),
+    ("tab.indicator", ["EditorTabs.underlineColor"], lambda v, dark, ansi: v["accent"]),
+    ("tab.indicator.inactive", ["EditorTabs.inactiveUnderlineColor"],
+     lambda v, dark, ansi: mix(v["tab.indicator"], v["surface.terminal"], 0.5)),
     ("status.idle", [], lambda v, dark, ansi: mix(v["text.tertiary"], v["surface.panel"], 0.4)),
     ("hue.blue", [], lambda v, dark, ansi: mix(ansi["blue"], v["text.primary"], 0.3)),
     ("hue.green", [], lambda v, dark, ansi: mix(ansi["green"], v["text.primary"], 0.3)),

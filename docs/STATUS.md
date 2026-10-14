@@ -31,8 +31,13 @@ focused something meanwhile; GUI check pending. Hidden items (user's ask, both b
 has a **Show hidden items** toggle (the saved choice Cmd/Ctrl+Shift+. already toggled); the SFTP browser (and the Copy
 to host picker) gains the choice, off by default, remembered as `sftp_show_hidden` in Remote's `panel-state.toml`,
 filtered in `DirectoryCache` so pages and counts stay right. New kit glyph `hidden`; SDK 0.17.1 (the testkit mirrors
-it). Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
-(the colour patterns are now precompiled). `./gradlew check --continue`: **10,173 tests, 0 failures, 0 errors, 12
+it). Then the active-tab line (user's ask): new format roles `tab.indicator` (focused window) and
+`tab.indicator.inactive` (unfocused; the user chose "dim it"), painted 2 px (`TAB_INDICATOR`) along the top of the active
+tab by `NativeChromePainting.tabStrip`; Slate Steel uses its accent and the accent half over the tab; the converter reads
+IntelliJ's `EditorTabs.underlineColor` / `inactiveUnderlineColor` (fallback: the accent, then that mixed half with the
+terminal surface), so Catppuccin's are its mauve (Latte's unfocused line is IntelliJ Light's `#9CA7B8`); also in SDK
+0.17.1. Imported theme files without the roles are refused until reconverted. Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
+(the colour patterns are now precompiled). `./gradlew check --continue`: **10,174 tests, 0 failures, 0 errors, 12
 skipped**. No GUI launched. GUI check for the user: each flavour in Settings › Appearance and the Licenses window (About Jasper › Licenses). Not merged.
 
 **Right rail splits again: two dock fixes — 2026-10-14** (`claude/right-rail-split`, worktree

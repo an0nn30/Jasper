@@ -53,6 +53,8 @@
       "button.secondary.bg": "#414559",
       "button.secondary.bg.hover": "#4F5369",
       "button.secondary.border": "#414559",
+      "tab.indicator": "#CA9EE6",
+      "tab.indicator.inactive": "#7D6996",
       "status.success": "#A6D189",
       "status.warning": "#E5C890",
       "status.danger": "#E78284",

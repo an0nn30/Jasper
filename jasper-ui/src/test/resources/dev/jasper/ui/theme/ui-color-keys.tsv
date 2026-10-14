@@ -97,7 +97,7 @@ TabbedPane.selectedForeground	TEXT_PRIMARY
 TabbedPane.hoverColor	SURFACE_CONTROL_HOVER
 TabbedPane.focusColor	SURFACE_CONTROL_HOVER
 TabbedPane.contentAreaColor	BORDER_WINDOW
-TabbedPane.underlineColor	ACCENT
+TabbedPane.underlineColor	TAB_INDICATOR
 SplitPaneDivider.gripColor	TEXT_PRIMARY
 SplitPaneDivider.hoverColor	SURFACE_CONTROL_HOVER
 SplitPaneDivider.pressedColor	SURFACE_CONTROL_SELECTED
@@ -113,8 +113,8 @@ MainToolbar.foreground	TEXT_PRIMARY
 EditorTabs.underlinedTabBackground	SURFACE_CARD
 EditorTabs.underlinedTabForeground	TEXT_PRIMARY
 EditorTabs.hoverBackground	SURFACE_CONTROL_HOVER
-EditorTabs.underlineColor	ACCENT
-EditorTabs.inactiveUnderlineColor	TEXT_TERTIARY
+EditorTabs.underlineColor	TAB_INDICATOR
+EditorTabs.inactiveUnderlineColor	TAB_INDICATOR_INACTIVE
 ToolWindow.background	SURFACE_SIDEBAR
 ToolWindow.Header.background	SURFACE_APP
 StatusBar.background	SURFACE_STATUS

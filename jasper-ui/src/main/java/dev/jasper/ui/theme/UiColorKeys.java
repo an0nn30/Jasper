@@ -135,7 +135,7 @@ public final class UiColorKeys {
         role(keys, "TabbedPane.hoverColor", SURFACE_CONTROL_HOVER);
         role(keys, "TabbedPane.focusColor", SURFACE_CONTROL_HOVER);
         role(keys, "TabbedPane.contentAreaColor", BORDER_WINDOW);
-        role(keys, "TabbedPane.underlineColor", ACCENT);
+        role(keys, "TabbedPane.underlineColor", TAB_INDICATOR);
         role(keys, "SplitPaneDivider.gripColor", TEXT_PRIMARY);
         role(keys, "SplitPaneDivider.hoverColor", SURFACE_CONTROL_HOVER);
         role(keys, "SplitPaneDivider.pressedColor", SURFACE_CONTROL_SELECTED);
@@ -151,8 +151,8 @@ public final class UiColorKeys {
         role(keys, "EditorTabs.underlinedTabBackground", SURFACE_CARD);
         role(keys, "EditorTabs.underlinedTabForeground", TEXT_PRIMARY);
         role(keys, "EditorTabs.hoverBackground", SURFACE_CONTROL_HOVER);
-        role(keys, "EditorTabs.underlineColor", ACCENT);
-        role(keys, "EditorTabs.inactiveUnderlineColor", TEXT_TERTIARY);
+        role(keys, "EditorTabs.underlineColor", TAB_INDICATOR);
+        role(keys, "EditorTabs.inactiveUnderlineColor", TAB_INDICATOR_INACTIVE);
         role(keys, "ToolWindow.background", SURFACE_SIDEBAR);
         role(keys, "ToolWindow.Header.background", SURFACE_APP);
         role(keys, "StatusBar.background", SURFACE_STATUS);

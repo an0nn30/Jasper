@@ -72,7 +72,9 @@ public enum SemanticColor {
     TEXT_STRONG_SECONDARY("text.strong.secondary"),
     TEXT_FIELD_RAISED("text.field.raised"),
     SEGMENT_TRACK("segment.track"),
-    BUTTON_SECONDARY_BORDER("button.secondary.border");
+    BUTTON_SECONDARY_BORDER("button.secondary.border"),
+    TAB_INDICATOR("tab.indicator"),
+    TAB_INDICATOR_INACTIVE("tab.indicator.inactive");
 
     private final String key;
     SemanticColor(String key) { this.key = key; }
