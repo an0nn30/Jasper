@@ -171,12 +171,14 @@ ext.trainingTraceProblem = { Map trace, long pid ->
 
 // The training launch's environment: inherited with JASPER_HOME removed (it would point training at the user's real
 // configuration and data), JDK_JAVA_OPTIONS, _JAVA_OPTIONS, CLASSPATH and JASPER_VM_OPTIONS_SKIP removed (they would
-// change the JVM options and class path a real launch has), JAVA_TOOL_OPTIONS replaced by javaToolOptions and
-// JASPER_VM_OPTIONS pointing at vmOptions, an empty file, so the developer's own jasper.vmoptions never shapes the
+// change the JVM options and class path a real launch has), JASPER_AOT_CACHE_SKIP, JASPER_LAUNCH_DIAGNOSE and
+// JASPER_WATCH_REPORT removed (the launcher and jasper-watch read them), JAVA_TOOL_OPTIONS replaced by javaToolOptions
+// and JASPER_VM_OPTIONS pointing at vmOptions, an empty file, so the developer's own jasper.vmoptions never shapes the
 // cache. Returns a new map.
 ext.aotTrainingEnvironment = { Map<String, String> inherited, String javaToolOptions, File vmOptions ->
     Map<String, String> environment = new LinkedHashMap<String, String>(inherited)
-    ['JASPER_HOME', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'CLASSPATH', 'JASPER_VM_OPTIONS_SKIP'].each { environment.remove(it) }
+    ['JASPER_HOME', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'CLASSPATH', 'JASPER_VM_OPTIONS_SKIP', 'JASPER_AOT_CACHE_SKIP',
+        'JASPER_LAUNCH_DIAGNOSE', 'JASPER_WATCH_REPORT'].each { environment.remove(it) }
     environment.put('JAVA_TOOL_OPTIONS', javaToolOptions)
     environment.put('JASPER_VM_OPTIONS', vmOptions.absolutePath)
     environment

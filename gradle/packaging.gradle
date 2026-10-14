@@ -230,16 +230,29 @@ def installCommandClient = { File image, String os ->
     target
 }
 
+// jasper-watch (packaging/launcher/README.md) sits beside the launcher, where the launcher looks for it.
+def watcherIn = { File image, String os ->
+    new File(image, [macos: 'Contents/MacOS/jasper-watch', windows: 'jasper-watch.exe', linux: 'bin/jasper-watch'][os])
+}
+def installWatcher = { File image, String os ->
+    File target = watcherIn(image, os)
+    Files.copy(watcherBinary.get().toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+    target.setExecutable(true, false)
+    target
+}
+
 def packageApp = tasks.register('packageApp') {
     group = 'distribution'
     description = 'Builds a native Jasper application image for the current host.'
     dependsOn(stage)
     dependsOn(tasks.named('buildLauncher'))
     dependsOn(tasks.named('buildCommandClient'))
+    dependsOn(tasks.named('buildWatcher'))
     inputs.dir(launcherResources).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(nativeIcon).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(commandClientBinary).withPropertyName('commandClient').withPathSensitivity(PathSensitivity.NONE)
+    inputs.files(watcherBinary).withPropertyName('watcher').withPathSensitivity(PathSensitivity.NONE)
     if (normalizedHost().os == 'macos') {
         inputs.file(macIconCatalog).withPathSensitivity(PathSensitivity.RELATIVE)
         inputs.file(rootProject.file('gradle/mac-launcher-identity.gradle'))
@@ -309,14 +322,18 @@ def packageApp = tasks.register('packageApp') {
                 // Signed on its own, as the bridges are; resignImage then seals it into the bundle.
                 File command = installCommandClient(image, 'macos')
                 executeNative(['/usr/bin/codesign', '--force', '--sign', '-', command.absolutePath], 'codesign the jasper command')
+                File watcher = installWatcher(image, 'macos')
+                executeNative(['/usr/bin/codesign', '--force', '--sign', '-', watcher.absolutePath], 'codesign jasper-watch')
                 resignImage(image)
             } else if (context.host.os == 'linux') {
                 removePluginClasspath(new File(imageDir, 'Jasper/lib/app/Jasper.cfg'))
                 installCommandClient(new File(imageDir, 'Jasper'), 'linux')
+                installWatcher(new File(imageDir, 'Jasper'), 'linux')
             } else {
                 removePluginClasspath(new File(imageDir, 'Jasper/app/Jasper.cfg'))
                 installBundledNatives(new File(imageDir, 'Jasper/app'), context.host)
                 installCommandClient(new File(imageDir, 'Jasper'), 'windows')
+                installWatcher(new File(imageDir, 'Jasper'), 'windows')
             }
             marker.text = "${context.version} ${context.host.os} ${context.host.architecture}\n"
         } catch (Exception failure) {
@@ -373,6 +390,22 @@ def verifyPackage = tasks.register('verifyPackage') {
         }
         String help = executeNative([command.absolutePath, '--help'], 'running jasper --help').stdout
         if (!help.startsWith('Usage: jasper')) throw new GradleException("Package verification failed: jasper --help printed:\n${help}")
+        // jasper-watch: beside the launcher, executable, Jasper's (its dialog's title survives stripping), signed on macOS.
+        File watcher = watcherIn(image, context.host.os)
+        if (!watcher.isFile()) throw new GradleException("Package verification failed: missing ${watcher}")
+        if (context.host.os != 'windows' && !watcher.canExecute()) {
+            throw new GradleException("Package verification failed: ${watcher} is not executable")
+        }
+        if (!new String(Files.readAllBytes(watcher.toPath()), StandardCharsets.ISO_8859_1).contains('Jasper could not start')) {
+            throw new GradleException("Package verification failed: ${watcher} is not Jasper's watcher")
+        }
+        if (context.host.os == 'macos') {
+            executeNative(['/usr/bin/codesign', '--verify', '--strict', watcher.absolutePath], 'verifying jasper-watch')
+            String watcherArchitecture = executeNative(['/usr/bin/lipo', '-archs', watcher.absolutePath], 'jasper-watch architecture').stdout.trim()
+            if (watcherArchitecture != (context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64')) {
+                throw new GradleException("Package verification failed: ${watcher} is built for ${watcherArchitecture}")
+            }
+        }
         inputDirectory.get().asFile.eachFile { staged ->
             if (staged.isDirectory()) return
             File packaged = new File(appDir, staged.name)
@@ -563,7 +596,7 @@ def verifyPackage = tasks.register('verifyPackage') {
             // Read the PE header rather than trusting the toolchain: an x64 image on Windows on Arm runs under
             // emulation, JIT-compiled code included. IMAGE_FILE_HEADER.Machine is 0x8664 for x64, 0xAA64 for ARM64.
             int expectedMachine = context.host.architecture == 'aarch64' ? 0xAA64 : 0x8664
-            [nativeLauncher, new File(runtimeHome, 'bin/java.exe'), new File(runtimeHome, 'bin/server/jvm.dll')].each { binary ->
+            [nativeLauncher, watcher, new File(runtimeHome, 'bin/java.exe'), new File(runtimeHome, 'bin/server/jvm.dll')].each { binary ->
                 byte[] header = new byte[4096]
                 int read = binary.withInputStream { it.readNBytes(header, 0, header.length) }
                 ByteBuffer pe = ByteBuffer.wrap(header, 0, read).order(ByteOrder.LITTLE_ENDIAN)
@@ -597,7 +630,7 @@ def verifyPackage = tasks.register('verifyPackage') {
         if (context.host.os == 'linux') {
             // Read the ELF header rather than trusting `file`: e_machine at offset 18 is 0x3E for x86-64, 0xB7 for AArch64.
             int expectedMachine = context.host.architecture == 'aarch64' ? 0xB7 : 0x3E
-            [nativeLauncher, new File(runtimeHome, 'bin/java')].each { binary ->
+            [nativeLauncher, watcher, new File(runtimeHome, 'bin/java')].each { binary ->
                 byte[] header = new byte[20]
                 binary.withInputStream { it.readNBytes(header, 0, header.length) }
                 boolean elf = header[0] == 0x7F && header[1] == ('E' as char) && header[2] == ('L' as char) && header[3] == ('F' as char)
