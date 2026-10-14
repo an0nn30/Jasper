@@ -80,7 +80,9 @@ On macOS libjli calls the launcher's `main` again on a new thread; that second c
   environment, and `report` runs it once more with `JASPER_LAUNCH_DIAGNOSE=1` for up to 10 seconds and shows "Jasper
   could not start" with Java's last 1,500 characters (macOS `CFUserNotificationDisplayAlert`, Windows `MessageBoxW`,
   Linux standard error), or writes the text to the file `JASPER_WATCH_REPORT` names. On Windows a launcher that Ctrl-C
-  ended is left alone.
+  ended is left alone. On POSIX it acts on end of file only when the launcher's process ended (the watcher gets another
+  parent within a second), since libjli re-executing the launcher on Linux closes the pipe too and the new image starts
+  a watcher of its own.
 
 Setting `JASPER_VM_OPTIONS_SKIP` or `JASPER_AOT_CACHE_SKIP` by hand starts Jasper without the user's options or without
 its start-up cache.

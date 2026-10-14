@@ -26,6 +26,7 @@
 #include <poll.h>
 #include <signal.h>
 #include <spawn.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -35,6 +36,7 @@
 #ifdef __APPLE__
 #include <CoreFoundation/CoreFoundation.h>
 #include <crt_externs.h>
+#include <libproc.h>
 #endif
 
 #define JASPER_WATCH_TITLE "Jasper could not start"
@@ -388,6 +390,45 @@ static int receivedByte(int descriptor) {
     return count == 1;
 }
 
+/* This process's parent while that is still the launcher (its executable is the file launcher names), else 0: the
+   launcher ended before this process started and another process adopted this one, or it cannot be told. */
+static pid_t launcherParent(const char* launcher) {
+    const pid_t parent = getppid();
+    struct stat expected;
+    struct stat actual;
+#ifdef __APPLE__
+    char path[PROC_PIDPATHINFO_MAXSIZE];
+    if (proc_pidpath(parent, path, sizeof(path)) <= 0) {
+        return 0;
+    }
+#else
+    char path[64];
+    snprintf(path, sizeof(path), "/proc/%ld/exe", (long) parent);
+#endif
+    if (stat(launcher, &expected) != 0 || stat(path, &actual) != 0) {
+        return 0;
+    }
+    return expected.st_dev == actual.st_dev && expected.st_ino == actual.st_ino ? parent : 0;
+}
+
+/* End of file without the byte: whether the launcher ended (launcher 0: before this process started). When it dies,
+   the system gives this process another parent. When libjli re-executes it (Linux, for LD_LIBRARY_PATH), the write
+   end closes as well, but the same process lives on as this one's parent and starts a watcher of its own; after a
+   second this one leaves the launch to that. */
+static int launcherEnded(pid_t launcher) {
+    const long deadline = nowMs() + 1000L;
+    if (launcher == 0) {
+        return 1;
+    }
+    while (getppid() == launcher) {
+        if (nowMs() >= deadline) {
+            return 0;
+        }
+        pause10Ms();
+    }
+    return 1;
+}
+
 static int closeOnExec(int fd) {
     int flags = fcntl(fd, F_GETFD);
     return flags < 0 ? -1 : fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
@@ -569,6 +610,7 @@ static int report(char** launch) {
 int main(int argc, char** argv) {
     char* end;
     long descriptor;
+    pid_t launcher;
     if (argc < 4 || (strcmp(argv[2], "retry") != 0 && strcmp(argv[2], "report") != 0)) {
         fputs("usage: jasper-watch <pipe> retry|report <launcher> [<argument>...]\n", stderr);
         return 64;
@@ -578,11 +620,21 @@ int main(int argc, char** argv) {
         fputs("jasper-watch: <pipe> must be a descriptor number\n", stderr);
         return 64;
     }
+    launcher = launcherParent(argv[3]);
+    /* jpackage's Linux launcher sets _JPACKAGE_LAUNCHER to a hash of LD_LIBRARY_PATH and then adds its app directory
+       there. A launch that inherited both would take itself for libjli's re-execution and ignore its cfg file; without
+       the variable it starts afresh and finds the app directory already in LD_LIBRARY_PATH. */
+    unsetenv("_JPACKAGE_LAUNCHER");
+    /* The diagnostic launch is waited for: with SIGCHLD ignored, as a parent may leave it, waitpid finds no child. */
+    signal(SIGCHLD, SIG_DFL);
     closeOtherDescriptors((int) descriptor);
     if (receivedByte((int) descriptor)) {
         return 0;
     }
     close((int) descriptor);
+    if (!launcherEnded(launcher)) {
+        return 0;
+    }
     if (strcmp(argv[2], "retry") == 0) {
         pid_t child;
         /* argv + 3 is <launcher> followed by its arguments and NULL. Nothing else happens when it cannot start. */

@@ -6,13 +6,16 @@
  *   exit     exit(1) before the byte
  *   _exit    _exit(1) before the byte
  *   kill     (POSIX) SIGKILL before the byte
+ *   exec     (POSIX) before the byte, execs itself as exec-waiting, which waits 2 s and exits 0: as libjli does when
+ *            it re-execs the launcher, the same process lives on with the pipe's write end closed
  *   ctrl-c   (Windows) ends with STATUS_CONTROL_C_EXIT before the byte
  *   report*  starts the watcher in report mode and exits 1
  *
  * A start with JASPER_LAUNCH_DIAGNOSE set is the watcher's diagnostic launch, and one with JASPER_VM_OPTIONS_SKIP set
- * its retry: each appends a line about itself to $WATCH_FAKE_RECORD. The diagnostic launch of report prints a JVM
- * error and exits 1, of report-pass exits 0, of report-hang sleeps for a minute, of report-silent exits 1 and prints
- * nothing, of report-long prints 2,000 x and TAIL-END, and of report-utf8 prints 1,600 e-acute; the last two exit 1.
+ * its retry: each appends a line about itself, with _JPACKAGE_LAUNCHER and WATCH_FAKE_KEPT from its environment, to
+ * $WATCH_FAKE_RECORD. The diagnostic launch of report prints a JVM error and exits 1, of report-pass exits 0, of
+ * report-hang sleeps for a minute, of report-silent exits 1 and prints nothing, of report-long prints 2,000 x and
+ * TAIL-END, and of report-utf8 prints 1,600 e-acute; the last two exit 1.
  */
 #include "jasper_launch_rules.h"
 #include "jasper_watch_launch.h"
@@ -39,8 +42,9 @@ static void record(const char* kind, int argc, char** argv) {
     if (file == NULL) {
         return;
     }
-    fprintf(file, "%s skip=%s kept=%s diagnose=%s args=", kind, shown(getenv(JASPER_VM_OPTIONS_SKIP_VARIABLE)),
-        shown(getenv("WATCH_FAKE_KEPT")), shown(getenv(JASPER_LAUNCH_DIAGNOSE_VARIABLE)));
+    fprintf(file, "%s skip=%s kept=%s jpackage=%s diagnose=%s args=", kind,
+        shown(getenv(JASPER_VM_OPTIONS_SKIP_VARIABLE)), shown(getenv("WATCH_FAKE_KEPT")),
+        shown(getenv("_JPACKAGE_LAUNCHER")), shown(getenv(JASPER_LAUNCH_DIAGNOSE_VARIABLE)));
     for (i = 1; i < argc; ++i) {
         fprintf(file, "%s%s", i == 1 ? "" : "|", argv[i]);
     }
@@ -89,6 +93,10 @@ static int diagnose(const char* ending) {
 
 int main(int argc, char** argv) {
     const char* ending = argc > 1 ? argv[1] : "";
+    if (strcmp(ending, "exec-waiting") == 0) {
+        sleepSeconds(2);
+        return 0;
+    }
     if (getenv(JASPER_LAUNCH_DIAGNOSE_VARIABLE) != NULL) {
         record("diagnose", argc, argv);
         return diagnose(ending);
@@ -115,6 +123,12 @@ int main(int argc, char** argv) {
 #else
     if (strcmp(ending, "kill") == 0) {
         kill(getpid(), SIGKILL);
+    }
+    if (strcmp(ending, "exec") == 0) {
+        argv[1] = (char*) "exec-waiting";
+        execv(argv[0], argv);
+        fputs("watch-fake-launcher: cannot exec itself\n", stderr);
+        _exit(71);
     }
 #endif
     exit(1);

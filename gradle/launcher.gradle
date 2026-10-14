@@ -332,28 +332,40 @@ def testWatcher = tasks.register('testWatcher') {
         // POSIX passes arguments in the build's file-name encoding, so a non-ASCII one only when that is UTF-8.
         List<String> arguments = ['alpha', 'with space'] +
             (host.os != 'windows' && System.getProperty('sun.jnu.encoding', '').equalsIgnoreCase('UTF-8') ? ['J\u00fcrgen'] : [])
-        // retried: the watcher starts the launcher once more; report: the text after the introduction.
+        String javaReported = 'Java reported:\nError: fake JVM failure: Invalid maximum heap size: -Xmx3q'
+        // jpackage's Linux launcher puts _JPACKAGE_LAUNCHER in its own environment, which jasper-watch inherits; a launch
+        // that inherits it ignores Jasper.cfg, so neither the retry nor the diagnostic launch may see it.
+        Map<String, String> jpackage = [_JPACKAGE_LAUNCHER: '12345']
+        // retried: the watcher starts the launcher once more; report: the text after the introduction. name (default:
+        // the ending) names the scenario's files; environment is added to the test launcher's.
         List<Map> scenarios = [
             [ending: 'byte', retried: false],
             [ending: 'exit', retried: true],
             [ending: '_exit', retried: true],
+            [name: 'exit-jpackage', ending: 'exit', environment: jpackage, retried: true],
             host.os == 'windows' ? [ending: 'ctrl-c', retried: false] : [ending: 'kill', retried: true],
-            [ending: 'report', report: 'Java reported:\nError: fake JVM failure: Invalid maximum heap size: -Xmx3q'],
+            [ending: 'report', report: javaReported],
+            [name: 'report-jpackage', ending: 'report', environment: jpackage, report: javaReported],
             [ending: 'report-pass', report: noError],
             [ending: 'report-hang', report: noError],
             [ending: 'report-silent', report: noOutput],
             [ending: 'report-long', report: 'Java reported:\n' + 'x' * 1492 + 'TAIL-END'],
-        ] + (host.os == 'windows' ? [] : [[ending: 'report-utf8', report: 'Java reported:\n' + '\u00e9' * 1500]])
+        ] + (host.os == 'windows' ? [] : [[ending: 'report-utf8', report: 'Java reported:\n' + '\u00e9' * 1500],
+            // The launcher execs itself and lives on for 2 s, beyond the watcher's 1 s wait for it to end: no retry.
+            [ending: 'exec', retried: false]])
         List<String> failures = []
         scenarios.each { Map scenario ->
-            String name = scenario.ending
+            String name = scenario.name ?: scenario.ending
             File record = new File(work, "${name}.record")
             File report = new File(work, "${name}.report")
             File log = new File(work, "${name}.log")
-            def builder = new ProcessBuilder([launcher.absolutePath, name] + arguments).redirectErrorStream(true).redirectOutput(log)
-            ['JASPER_VM_OPTIONS_SKIP', 'JASPER_AOT_CACHE_SKIP', 'JASPER_LAUNCH_DIAGNOSE'].each { builder.environment().remove(it) }
+            def builder = new ProcessBuilder([launcher.absolutePath, scenario.ending] + arguments).redirectErrorStream(true)
+                .redirectOutput(log)
+            ['JASPER_VM_OPTIONS_SKIP', 'JASPER_AOT_CACHE_SKIP', 'JASPER_LAUNCH_DIAGNOSE', '_JPACKAGE_LAUNCHER'].each {
+                builder.environment().remove(it)
+            }
             builder.environment().putAll([WATCH_FAKE_RECORD: record.absolutePath, WATCH_FAKE_KEPT: 'kept value',
-                JASPER_WATCH_REPORT: report.absolutePath])
+                JASPER_WATCH_REPORT: report.absolutePath] + (scenario.environment ?: [:]))
             Process process = builder.start()
             if (!process.waitFor(30, TimeUnit.SECONDS)) {
                 process.destroyForcibly()
@@ -367,10 +379,12 @@ def testWatcher = tasks.register('testWatcher') {
                 Thread.sleep(100)
             }
             Thread.sleep(reports || scenario.retried ? 1000 : 3000)
-            String received = ([name] + arguments).join('|')
+            String received = ([scenario.ending] + arguments).join('|')
             List<String> lines = record.isFile() ? record.readLines('UTF-8') : []
-            List<String> expected = reports ? ["diagnose skip=- kept=kept value diagnose=1 args=${received}".toString()]
-                : (scenario.retried ? ["retried skip=launch-failed kept=kept value diagnose=- args=${received}".toString()] : [])
+            // Every start after it sees WATCH_FAKE_KEPT, and none sees _JPACKAGE_LAUNCHER.
+            String passed = 'kept=kept value jpackage=-'
+            List<String> expected = reports ? ["diagnose skip=- ${passed} diagnose=1 args=${received}".toString()]
+                : (scenario.retried ? ["retried skip=launch-failed ${passed} diagnose=- args=${received}".toString()] : [])
             if (lines != expected) {
                 failures << "${name}: the watcher started ${lines}, expected ${expected}\n${log.getText('UTF-8')}".toString()
             }
