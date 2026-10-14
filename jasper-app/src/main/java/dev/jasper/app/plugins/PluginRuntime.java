@@ -577,6 +577,14 @@ public final class PluginRuntime {
         desktop.accept(file);
     }
 
+    private Optional<Path> commandClient = Optional.empty();
+
+    /** The {@code jasper} command plugins see in {@code CommandLine.client()}; before {@link #start}. */
+    public void commandClient(Optional<Path> client) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        commandClient = Objects.requireNonNull(client, "client");
+    }
+
     public void start(Map<String, Map<String, Object>> pluginTables, boolean dark) {
         if (host != null) throw new IllegalStateException("Plugins already started");
         this.dark = dark;
@@ -616,6 +624,7 @@ public final class PluginRuntime {
         created.animations = animations;
         created.shortcuts = shortcuts;
         created.clipboard = clipboard;
+        created.commandClient = commandClient;
         Set<String> loadingIds = new HashSet<>();
         for (PluginCandidate loading : resolution.load()) loadingIds.add(loading.id());
         List<PluginCandidate> notLoading = byId.values().stream().filter(discovered -> !loadingIds.contains(discovered.id())).toList();

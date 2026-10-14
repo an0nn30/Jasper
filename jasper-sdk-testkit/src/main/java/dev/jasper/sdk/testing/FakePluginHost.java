@@ -1710,4 +1710,15 @@ public final class FakePluginHost implements AutoCloseable {
      * @since 0.17.1
      */
     public Optional<String> editorPlugin() { return Optional.ofNullable(providedEditor).map(provided -> provided.context().plugin().id()); }
+
+    volatile Optional<Path> commandClient = Optional.empty();
+
+    /**
+     * Sets the {@code jasper} command {@code CommandLine.client()} names, as the application names its installed or built
+     * client; until then it is empty.
+     *
+     * @param client the client's path
+     * @since 0.17.1
+     */
+    public void setCommandClient(Path client) { commandClient = Optional.of(Objects.requireNonNull(client, "client")); }
 }

@@ -472,6 +472,7 @@ class AppContractTest extends PluginContractTest {
             @Override public boolean edit(Path file, java.util.OptionalInt line, Optional<UUID> windowId) {
                 return onEdtValue(() -> host.fileEditors.edit(file, line, windowId));
             }
+            @Override public void commandClient(Path client) { onEdt(() -> host.commandClient = Optional.of(client)); }
             @Override public void close() { stopAll(); flush(); }
         };
     }

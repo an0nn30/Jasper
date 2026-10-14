@@ -2123,4 +2123,12 @@ public abstract class PluginContractTest {
         assertThat(calls).containsExactlyInAnyOrder("notes.txt", "declined.txt");
         assertThat(h.openedInEditor()).as("only the declined file reaches the desktop").containsExactly(HERE.resolve("declined.txt"));
     }
+
+    @Test void theCommandLineNamesTheClientOnceTheHostKnowsIt() {
+        PluginContext a = started("test.a", Set.of());
+        assertThat(a.commandLine().client()).as("no client yet").isEmpty();
+        java.nio.file.Path client = HERE.resolve("bin").resolve("jasper");
+        h.commandClient(client);
+        assertThat(a.commandLine().client()).as("any thread").contains(client);
+    }
 }

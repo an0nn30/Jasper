@@ -566,4 +566,32 @@ class PluginRuntimeTest {
         assertThat(root.resolve("absent/dev.example.aeditor/data/edited")).doesNotExist();
         onEdt(runtime::stop);
     }
+
+    static final String CLIENT = """
+        package fix.client;
+        import java.nio.file.Files;
+        public final class Main implements dev.jasper.sdk.plugin.Plugin {
+            @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                try {
+                    Files.writeString(context.dataDirectory().resolve("client"),
+                        context.commandLine().client().map(Object::toString).orElse("none"));
+                } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+            }
+        }
+        """;
+
+    @Test void pluginsReadTheClientGivenBeforeTheyStart() throws Exception {
+        Path dev = root.resolve("dev").resolve("dev.example.client");
+        PluginJars.build(dev, "client.jar", PluginJars.descriptor("dev.example.client", "1.0.0", "fix.client.Main"),
+            Map.of("fix.client.Main", CLIENT), List.of());
+        PluginRuntime runtime = runtime(null, root.resolve("absent"), dev, false, new ArrayList<>());
+        Path client = root.resolve("build").resolve("cli").resolve("bin").resolve("jasper");
+        onEdt(() -> runtime.commandClient(java.util.Optional.of(client)));
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        assertThat(root.resolve("absent/dev.example.client/data/client")).hasContent(client.toString());
+        onEdt(() -> assertThatIllegalStateException().isThrownBy(() -> runtime.commandClient(java.util.Optional.empty()))
+            .withMessage("Plugins have already started"));
+        onEdt(runtime::stop);
+    }
 }

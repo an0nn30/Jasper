@@ -248,4 +248,6 @@ public interface ContractHarness extends AutoCloseable {
          * threw. Asked on the UI thread.
          */
         boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId);
+        /** Sets the {@code jasper} command {@code CommandLine.client()} names, as the application names its installed or built one. */
+        void commandClient(java.nio.file.Path client);
 }

@@ -111,6 +111,8 @@ final class PluginHost {
     final ShellContributions shellContributions;
     /** The editor a plugin provides ({@code Platform.editor}), which Jasper's own opens ask first. */
     final FileEditors fileEditors;
+    /** The {@code jasper} command plugins see in {@code CommandLine.client()}; set before plugins start, read on any thread. */
+    volatile Optional<Path> commandClient = Optional.empty();
     final EventBus bus;
     final ActivityHub activities;
     final ConnectionHub connections;

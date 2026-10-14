@@ -94,7 +94,7 @@ final class HostedContext implements PluginContext {
         this.fileSources = new HostedFileSources(id, gate, host.environment.contributions(), host.containment, ui, terminals);
         this.notifications = new HostedNotifications(id, hosted.info().name(), host.environment.notifications(), host.containment,
             host.environment.ui(), host.environment.onUi(), ui::icon, ui::validateIcon);
-        this.commandLine = new HostedCommandLine(id, host.commands, ui, terminals);
+        this.commandLine = new HostedCommandLine(id, host.commands, ui, terminals, () -> host.commandClient);
     }
 
     private javax.swing.Icon uiIcon(String name){return ui.icon(name);}

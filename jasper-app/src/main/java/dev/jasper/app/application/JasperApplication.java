@@ -843,6 +843,8 @@ public final class JasperApplication {
         plugins.animations(themes::animationsEnabled);
         plugins.shortcuts(this::shortcutLabel);
         plugins.clipboard(clipboard);
+        plugins.commandClient(CommandInstall.client(System.getProperty("os.name"), System.getProperty("jpackage.app-path"),
+            System.getProperty("jasper.commandClient")));
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
