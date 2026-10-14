@@ -71,25 +71,32 @@ public final class CorePages {
         return specs(appearance, system, shells, navigate, glass, NotificationGroupChoices.NONE);
     }
 
+    /** Settings › Appearance; the Imported themes group follows the Theme section when the application supplies imports. */
+    private static SchemaPage.Spec appearance(AppearanceChoices appearance, boolean glass) {
+        var page = SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
+            .section("Theme")
+            .row(UI_APPEARANCE, Editors.appearance(appearance))
+            .row(UI_THEME_DARK).shownWhen(false)
+            .row(UI_THEME_LIGHT).shownWhen(false)
+            .row(TERMINAL_SCHEME, Editors.schemeChoice(appearance)).note("Colors for terminal panes");
+        appearance.imports().ifPresent(imports -> page.part(ImportedThemesSection.part(imports)));
+        return page.section("Workspace")
+            .row(UI_WORKSPACE_OPACITY, WorkspaceEditors.opacity(appearance)).shownWhen(glass)
+            .row(UI_WORKSPACE_BLUR, WorkspaceEditors.blur(appearance)).shownWhen(glass)
+            .section("Interface Font")
+            .row(UI_FONT_FAMILY, Editors.interfaceFont())
+            .row(UI_FONT_SIZE, PlatformFontSize.factory())
+            .section("View mode")
+            .row(WINDOW_VIEW_MODE)
+            .section("Animations")
+            .row(UI_ANIMATIONS_ENABLED);
+    }
+
     /** As above, with the notification groups the Notifications page lists. */
     static List<SchemaPage.Spec> specs(AppearanceChoices appearance, SystemActions system, ShellChoices shells,
                                        java.util.function.Consumer<String> navigate, boolean glass, NotificationGroupChoices groups) {
         return List.of(
-            SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
-                .section("Theme")
-                .row(UI_APPEARANCE, Editors.appearance(appearance))
-                .row(TERMINAL_SCHEME, Editors.choice(Map.of("match", Editors.SAME_AS_UI_THEME, "slate-steel-dark", "Slate Steel Dark",
-                    "slate-steel-light", "Slate Steel Light", "high-contrast", "High Contrast"))).note("Colors for terminal panes")
-                .section("Workspace")
-                .row(UI_WORKSPACE_OPACITY, WorkspaceEditors.opacity(appearance)).shownWhen(glass)
-                .row(UI_WORKSPACE_BLUR, WorkspaceEditors.blur(appearance)).shownWhen(glass)
-                .section("Interface Font")
-                .row(UI_FONT_FAMILY, Editors.interfaceFont())
-                .row(UI_FONT_SIZE, PlatformFontSize.factory())
-                .section("View mode")
-                .row(WINDOW_VIEW_MODE)
-                .section("Animations")
-                .row(UI_ANIMATIONS_ENABLED),
+            appearance(appearance, glass),
             SchemaPage.page("window", "Window").parent("appearance-behavior")
                 .section("Toolbar & Status Bar")
                 .row(WINDOW_TOOLBAR, Editors.segments(Map.of("icons_and_labels", "Icons & Labels", "icons", "Icons Only", "hidden", "Hidden")))

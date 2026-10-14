@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.IntFunction;
@@ -47,12 +48,45 @@ public final class SchemaPage implements SettingsPage {
     /** What a notice row shows while present: a title and a text, beside the row's buttons. */
     public record Notice(String title, String text) { }
 
-    private sealed interface Item permits RowItem, SectionItem, ActionItem, ExternalItem, NoticeItem { }
+    /**
+     * A section of a page that is not a setting, such as a list with its own buttons, under {@code title}. {@code build}
+     * runs once, when the page is first shown, with the page's context and a runnable that shows the page again (for
+     * work that finishes later). A part ends the section before it.
+     *
+     * @param id the part's node id prefix, unique on its page
+     * @param title the section's heading
+     * @param build makes the part's {@link Section} from the page's context and its re-render
+     * @param terms extra words the page's search matches
+     */
+    public record Part(String id, String title, BiFunction<PageContext, Runnable, Section> build, List<String> terms) {
+        public Part {
+            Objects.requireNonNull(id, "id"); Objects.requireNonNull(title, "title"); Objects.requireNonNull(build, "build");
+            terms = List.copyOf(terms);
+        }
+
+        /**
+         * A built part, as functions.
+         *
+         * @param node the section's content, given the part's id
+         * @param event takes a kit event first; true when the part handled it (the page then shows itself again)
+         * @param refresh reads again what the part shows; the page calls it on each refresh
+         * @param dispose releases the part when its page is disposed
+         */
+        public record Section(Function<String, Nodes.Node> node, Predicate<UiEvent> event, Runnable refresh, Runnable dispose) {
+            public Section {
+                Objects.requireNonNull(node, "node"); Objects.requireNonNull(event, "event");
+                Objects.requireNonNull(refresh, "refresh"); Objects.requireNonNull(dispose, "dispose");
+            }
+        }
+    }
+
+    private sealed interface Item permits RowItem, SectionItem, ActionItem, ExternalItem, NoticeItem, PartItem { }
     private record RowItem(Setting<?> setting, Editors.Factory<?> editor, String note, Predicate<SettingsDraft> enabled, boolean shown) implements Item { }
     private record SectionItem(String title) implements Item { }
     private record ActionItem(String title, Supplier<String> description, List<Button> buttons) implements Item { }
     private record ExternalItem(External value) implements Item { }
     private record NoticeItem(String id, Supplier<Optional<Notice>> notice, List<Button> buttons) implements Item { }
+    private record PartItem(Part part) implements Item { }
 
     /** Starts the spec of a page. */
     public static Spec page(String id, String title) { return new Spec(id, title); }
@@ -116,6 +150,9 @@ public final class SchemaPage implements SettingsPage {
 
         /** Refreshes the page whenever {@code subscribe}'s listener runs (on the EDT); the page closes the subscription when disposed. */
         public Spec refreshOn(Function<Runnable, Subscription> subscribe) { refreshers.add(Objects.requireNonNull(subscribe, "subscribe")); return this; }
+
+        /** A section that is not a setting; see {@link Part}. */
+        public Spec part(Part part) { items.add(new PartItem(Objects.requireNonNull(part, "part"))); return this; }
 
         /** Every setting this page shows, in order. */
         public List<Setting<?>> settings() {
@@ -203,6 +240,7 @@ public final class SchemaPage implements SettingsPage {
     private final List<ExternalRow> externals = new ArrayList<>();
     private final List<Subscription> refreshing = new ArrayList<>();
     private String revealed;
+    private final List<Part.Section> parts = new ArrayList<>();
     private KitView view;
     private PageBody body;
     private HierarchyListener waiting;
@@ -229,6 +267,7 @@ public final class SchemaPage implements SettingsPage {
                 terms.add(external.value().label());
                 terms.add(String.join(" ", external.value().keywords()));
             } else if (item instanceof SectionItem section && sectionShown(section)) terms.add(section.title());
+            else if (item instanceof PartItem part) { terms.add(part.part().title()); terms.addAll(part.part().terms()); }
         }
         return List.copyOf(terms);
     }
@@ -241,7 +280,7 @@ public final class SchemaPage implements SettingsPage {
         boolean after = false, anyRow = false;
         for (Item item : spec.items) {
             if (!after) { after = item == section; continue; }
-            if (item instanceof SectionItem) break;
+            if (item instanceof SectionItem || item instanceof PartItem) break;
             if (item instanceof ActionItem || item instanceof ExternalItem || item instanceof NoticeItem) return true;
             if (item instanceof RowItem row) { if (row.shown()) return true; anyRow = true; }
         }
@@ -269,6 +308,7 @@ public final class SchemaPage implements SettingsPage {
             if (item instanceof RowItem row && row.shown()) addRow(row);
             else if (item instanceof ActionItem action) actions.add(new ActionRow(action, actionIndex++));
             else if (item instanceof ExternalItem external) externals.add(new ExternalRow(external.value()));
+            else if (item instanceof PartItem part) parts.add(part.part().build().apply(context, this::render));
         }
         listening = context.draft().onChanged(this::showValues);
         for (var subscribe : spec.refreshers) refreshing.add(subscribe.apply(() -> { if (!disposed) refresh(); }));
@@ -293,7 +333,7 @@ public final class SchemaPage implements SettingsPage {
         var children = new ArrayList<Nodes.Node>();
         var group = new ArrayList<Nodes.Node>();
         String title = null;
-        int sections = 0, rowIndex = 0, actionIndex = 0, externalIndex = 0;
+        int sections = 0, rowIndex = 0, actionIndex = 0, externalIndex = 0, partIndex = 0;
         for (Item item : spec.items) {
             switch (item) {
                 case SectionItem section -> {
@@ -315,6 +355,12 @@ public final class SchemaPage implements SettingsPage {
                 case ActionItem ignored -> group.add(actionNode(actions.get(actionIndex++)));
                 case ExternalItem ignored -> group.add(externalNode(externals.get(externalIndex++)));
                 case NoticeItem notice -> group.add(noticeNode(notice));
+                case PartItem part -> {
+                    close(children, group, title, sections++);
+                    title = null;
+                    children.add(new Nodes.Section("section-" + part.part().id(), ControlState.READY, part.part().title(),
+                        parts.get(partIndex++).node().apply(part.part().id())));
+                }
             }
         }
         close(children, group, title, sections);
@@ -389,6 +435,7 @@ public final class SchemaPage implements SettingsPage {
     /** Routes a kit event to the row, action or notice it names. */
     void event(UiEvent event) {
         if (disposed) return;
+        for (var part : parts) if (part.event().test(event)) { render(); return; }
         if (event instanceof UiEvent.Action action) {
             for (var row : rows) if (action.id().equals(row.resetId())) { reset(row); return; }
             for (var row : externals) if (action.id().equals(row.resetId())) { resetExternal(row); return; }
@@ -471,7 +518,8 @@ public final class SchemaPage implements SettingsPage {
         Optional<String> problem = row.setting.kind().check(value);
         if (problem.isPresent()) { invalid(row, problem.get()); return; }
         var changes=new java.util.LinkedHashMap<Setting<?>,Optional<?>>();
-        changes.put(row.setting,Optional.of(value));
+        // A row with companions stages its own value only when it changes it, so picking a companion leaves the row as saved.
+        if (row.editor.relatedSettings().isEmpty() || !Objects.equals(value, context.draft().value(row.setting))) changes.put(row.setting,Optional.of(value));
         try { changes.putAll(row.editor.companionValues()); } catch(RuntimeException unreadable) {invalid(row,"Not a valid value.");return;}
         valid(row);
         context.draft().stageAll(changes);
@@ -586,6 +634,7 @@ public final class SchemaPage implements SettingsPage {
     @Override public void refresh() {
         for (Row<?> row : rows) row.editor.refresh();
         for (var row : externals) if (row.pending == null && !row.invalid) row.editor.show(row.value.saved().getAsInt());
+        for (var part : parts) part.refresh().run();
         if (body != null) showValues();
     }
 
@@ -641,6 +690,7 @@ public final class SchemaPage implements SettingsPage {
         for(var subscription:refreshing)cleanup.add(subscription::close);
         if(view!=null)cleanup.add(view::close);
         for(Row<?> row:rows)cleanup.add(row.editor::dispose);
+        for(var part:parts)cleanup.add(part.dispose());
         for(var action:cleanup)try{action.run();}catch(RuntimeException problem){if(failure==null)failure=problem;else failure.addSuppressed(problem);}
         if(failure!=null)throw failure;
     }

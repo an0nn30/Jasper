@@ -36,6 +36,71 @@ class HostEditorTest {
     static void choose(HostEditor editor, String id, String option) { emit(editor.view(), new UiEvent.Selected(id, Set.of(option))); }
     static void save(HostEditor editor) { click(editor.view(), HostEditor.SAVE); }
 
+    /** The plugin's form: agent authentication (no Vault), persistence it controls, and a connect callback. */
+    HostEditor connecting(Optional<RemoteHost> editing, java.util.function.Function<RemoteHost, CompletableFuture<Void>> persist,
+                          Runnable onSaved, java.util.function.Consumer<RemoteHost> connect) {
+        return new HostEditor(kit, UI, List.of(), editing, false, id -> Optional.empty(), request -> new CompletableFuture<>(),
+            persist, onSaved, () -> { }, connect);
+    }
+
+    static void fill(HostEditor editor) {
+        type(editor.view(), HostEditor.NAME, "prod"); type(editor.view(), HostEditor.HOSTNAME, "api.example");
+        type(editor.view(), HostEditor.USERNAME, "deploy");
+    }
+
+    @Test void addAndConnectSavesThenConnectsToTheSavedHost() throws Exception {
+        edt(() -> {
+            var events = new ArrayList<String>(); var connected = new ArrayList<RemoteHost>(); var persisted = new CompletableFuture<Void>();
+            var editor = connecting(Optional.empty(), host -> { events.add("persist " + host.name()); return persisted; },
+                () -> events.add("saved"), host -> { events.add("connect " + host.name()); connected.add(host); });
+            assertThat(form(editor.view()).actions()).extracting(Nodes.Button::id)
+                .containsExactly(HostEditor.CANCEL, HostEditor.SAVE_CONNECT, HostEditor.SAVE);
+            assertThat(button(editor.view(), HostEditor.SAVE_CONNECT)).satisfies(add -> {
+                assertThat(add.label()).isEqualTo("Add and Connect");
+                assertThat(add.kind()).as("Add Host stays the primary").isEqualTo(Nodes.ButtonKind.SECONDARY);
+                assertThat(add.state().enabled()).as("enabled with Add Host, once the form is valid").isFalse();
+            });
+            fill(editor);
+            assertThat(button(editor.view(), HostEditor.SAVE_CONNECT).state().enabled()).isTrue();
+            click(editor.view(), HostEditor.SAVE_CONNECT);
+            assertThat(events).containsExactly("persist prod");
+            assertThat(button(editor.view(), HostEditor.SAVE_CONNECT).label()).isEqualTo("Saving…");
+            assertThat(button(editor.view(), HostEditor.SAVE)).satisfies(add -> {
+                assertThat(add.label()).isEqualTo("Add Host"); assertThat(add.state().enabled()).isFalse(); });
+            persisted.complete(null);
+            assertThat(events).containsExactly("persist prod", "saved", "connect prod");
+            assertThat(connected).singleElement().satisfies(host -> {
+                assertThat(host.hostname()).isEqualTo("api.example"); assertThat(host.username()).isEqualTo("deploy"); });
+        });
+    }
+
+    @Test void aFailedSaveConnectsNothingAndAddHostStillOnlySaves() throws Exception {
+        edt(() -> {
+            var connected = new ArrayList<RemoteHost>(); var saves = new ArrayList<RemoteHost>();
+            var failing = connecting(Optional.empty(), host -> CompletableFuture.failedFuture(new java.io.IOException("disk full")),
+                () -> { }, connected::add);
+            fill(failing);
+            click(failing.view(), HostEditor.SAVE_CONNECT);
+            assertThat(failing.message()).isEqualTo("disk full");
+            assertThat(button(failing.view(), HostEditor.SAVE_CONNECT).label()).isEqualTo("Add and Connect");
+            var plain = connecting(Optional.empty(), host -> { saves.add(host); return CompletableFuture.completedFuture(null); },
+                () -> { }, connected::add);
+            fill(plain);
+            save(plain);
+            assertThat(saves).hasSize(1);
+            assertThat(connected).isEmpty();
+        });
+    }
+
+    @Test void onlyAddingWithAConnectCallbackOffersAddAndConnect() throws Exception {
+        edt(() -> {
+            var existing = connecting(Optional.of(bastion), host -> CompletableFuture.completedFuture(null), () -> { }, host -> { });
+            assertThat(form(existing.view()).actions()).extracting(Nodes.Button::id).containsExactly(HostEditor.CANCEL, HostEditor.SAVE);
+            var legacy = editor(List.of(), Optional.empty(), false, id -> Optional.empty(), () -> CompletableFuture.completedFuture(Optional.empty()), () -> { });
+            assertThat(form(legacy.view()).actions()).extracting(Nodes.Button::id).containsExactly(HostEditor.CANCEL, HostEditor.SAVE);
+        });
+    }
+
     @Test void createsAHostWithAVaultCredentialAndAJump() throws Exception {
         edt(() -> {
             var editor = editor(List.of(bastion), Optional.empty(), true, id -> id.equals(login.id()) ? Optional.of(login.name()) : Optional.empty(),

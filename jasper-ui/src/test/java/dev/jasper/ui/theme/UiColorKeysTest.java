@@ -45,8 +45,8 @@ class UiColorKeysTest {
 
     @Test void everyKeyIsARolesColour() {
         for (boolean dark : new boolean[]{true, false}) {
-            var p = SlateSteel.bundled().palette(dark);
-            var selection = SlateSteel.bundled().terminal(TerminalScheme.matching(dark)).colors().selection();
+            var p = JasperTheme.bundled().palette(dark);
+            var selection = JasperTheme.bundled().matching(dark).colors().selection();
             var allowed = new HashSet<Object>();
             for (var role : SemanticColor.values()) allowed.add(ColorMath.hex(p.color(role)));
             allowed.add(ColorMath.hex(selection)); allowed.add(ColorMath.hex(UiColorKeys.errorTint(p)));
@@ -57,8 +57,8 @@ class UiColorKeysTest {
 
     @Test void textSelectionAndTheSearchTintKeepTheirSources() {
         for (boolean dark : new boolean[]{true, false}) {
-            var p = SlateSteel.bundled().palette(dark);
-            var selection = SlateSteel.bundled().terminal(TerminalScheme.matching(dark)).colors().selection();
+            var p = JasperTheme.bundled().palette(dark);
+            var selection = JasperTheme.bundled().matching(dark).colors().selection();
             var keys = UiColorKeys.flatLaf(p, selection);
             assertThat(keys.get("*.selectionBackground")).isEqualTo(ColorMath.hex(selection));
             assertThat(keys.get("SearchField.errorBackground")).isEqualTo(ColorMath.hex(UiColorKeys.errorTint(p)));

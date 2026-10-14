@@ -323,6 +323,22 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 ./gradlew :jasper-app:test --tests "*SessionLaunchCoordinatorTest" --tests "*ApplicationShutdownTest" --tests "*JasperApplicationShutdownTest" --tests "*ShellLauncherTest"
 ```
 
+## Cutting a release
+
+Tag the release commit `vX.Y.Z` (no leading zeroes, major 1–255) on a clean tree and package from it: `packageDist`
+takes the version from the tag, and About shows "Jasper" and "X.Y.Z" on separate lines without the Development build
+chip (only Copy and error reports say "Jasper X.Y.Z"). Any other commit, or a tree with changes or untracked files, is a
+development build named after the latest release tag at or behind it.
+`gradle/build-info.gradle` records the git facts in the jar and `BuildInfo` derives the labels.
+
+## Adding or bumping a dependency
+
+Every external jar Jasper or a bundled plugin ships needs its exact `group:artifact:version` in a component of
+`jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml`, with its license text (and its NOTICE, when
+the project publishes one) beside it; `verifyThirdPartyNotices` (part of `check`) names any jar without one and any
+entry that no longer ships. Read the new version's license before updating the entry, and look inside the jar for bundled
+native binaries (DLLs, executables, shared libraries): their own licenses need components too.
+
 ## Review checklist
 
 Preserve established behavior and owner lifetimes. Run the focused regression, full
@@ -333,10 +349,11 @@ boundaries; this refactor promises no plugin loading, binary compatibility or pe
 
 ## Themes
 
-Jasper has one theme, Slate Steel, in Dark and Light ([themes](themes.md)). Its colours live only in jasper-ui's
+Jasper's built-in theme is Slate Steel, in Dark and Light; installed themes are theme files in `<home>/themes/`
+([themes](themes.md)). Slate Steel's colours live only in jasper-ui's
 `slate-steel.json`, the machine-readable block of [the Slate Steel record](design/theme-engine/slate-steel.md) (a test
-keeps the two identical). `SlateSteel` reads the file once: the semantic palettes, the terminal schemes (`TerminalScheme`,
-`SchemeColors`), the derived editor schemes and syntax styles, and one `GeneratedTheme` per variant whose FlatLaf UI keys
+keeps the two identical). `JasperTheme` reads the file once: the semantic palettes, the terminal schemes (`TerminalScheme`),
+the derived editor schemes and syntax styles, and one `GeneratedTheme` per variant whose FlatLaf UI keys
 `UiColorKeys.flatLaf` derives from the roles (text selection from the terminal selection, a search miss from
 `UiColorKeys.errorTint`). To change a colour, edit the record's block and the JSON together; to give a component a
 colour, give it a role, never a value.
@@ -346,7 +363,7 @@ plugins) outside `slate-steel.json`; `UiColorKeysTest`, `SlateSteelGeneratedTest
 keys, the variants and the plugins' palettes. `RemovedThemeLayerTest` pins that the former theme layer is gone.
 
 ```sh
-./gradlew :jasper-ui:test --tests "*SlateSteel*" --tests "*UiColorKeysTest"
+./gradlew :jasper-ui:test --tests "*SlateSteel*" --tests "*JasperTheme*" --tests "*UiColorKeysTest"
 ./gradlew :jasper-app:test --tests "*ColourLiteralScanTest" --tests "*HostedPalettesTest" --tests "*RemovedThemeLayerTest"
 ```
 
@@ -513,9 +530,11 @@ these defaults; upstream theme assets should not be edited to duplicate them.
 
 
 Workspace rounding belongs to `ToolWindowArea.Host`: 8px-radius tool window frames and,
-while the stripes are visible, matching rounded corners for the terminal/tab column. With
-the stripes hidden or empty, the terminal/tab column has square corners, no exterior
-gutters and no lower corner spacer: it fills the available workspace edge to edge.
+while a stripe is visible, matching rounded corners for the terminal/tab column, square on
+the side of a hidden stripe, where the column meets the window edge borderless. Each stripe
+shows only while it is not empty (`WindowContent.syncRailVisibility`). With both stripes
+hidden, the terminal/tab column has square corners, no exterior gutters and no lower corner
+spacer: it fills the available workspace edge to edge.
 Where frames go is `DockGeometry`'s job, never the area's: change the geometry and its
 tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree, with one exception
 on purpose: the guide for a second slot (Left Bottom, Right Bottom, Bottom Right) is always that slot's half, as if its
@@ -526,7 +545,9 @@ bottom edges (each distance a share of the workspace's own width or height, so t
 at any aspect ratio), a side split into its top and bottom slot at half of the side panels' visible height
 (`DockDrag.sideSplit`: above the bottom area while it shows, else the workspace's half) and the bottom at half
 its width; a side wins a tie. `DockDrag` previews no area for a stripe drop of a hidden window, which stays
-hidden. Change the zones in the resolver and its tests first; the window tests aim with
+hidden. While the rails are enabled, an empty hidden stripe still takes drops: `DockDrag.standAtEdge` gives it
+bounds over the workspace's edge for the drag without showing it, and `DockDrag.areaAfter` lays the guide out for
+the stripes that show or hide after the drop, so it follows `syncRailVisibility`'s rule. Change the zones in the resolver and its tests first; the window tests aim with
 `DockTestSupport.zone(workspace, slot)`.
 Dock drags use plain mouse events (`DockDrag`), never AWT drag and drop. Drag sources are the
 components `DockDrag.install` was given: stripe window buttons (`ToolStripe.dragSource`) and
@@ -545,11 +566,11 @@ column non-opaque: otherwise Swing considers partial tab repaints fully obscured
 skips the host background, leaving square corner pixels behind the clipped children.
 Corner regressions must exercise clipped `paint` calls as well as full-window previews.
 Exterior gutters are 6px, except
-beside the visible stripes: each stripe supplies its own balanced spacing, so the adjacent
-frames and the terminal column have no additional side gutter. Hiding or emptying the
-stripes restores that gutter on tool window frames without reparenting their content.
-The following gutter and lower-inset rules apply to the terminal column only while
-the stripes are visible. A visible status bar
+beside a visible stripe: each stripe supplies its own balanced spacing, so the adjacent
+frames and the terminal column have no additional side gutter. On a side whose stripe is
+hidden, tool window frames get that gutter back without reparenting their content, and the
+terminal column has none. The following gutter and lower-inset rules apply to the terminal
+column only while a stripe is visible. A visible status bar
 likewise supplies the lower spacing: exterior bottom gutters are omitted so the status
 contents stay visually centered between the surfaces and window bottom. Hiding the
 status bar restores the 6px bottom gutter. A visible toolbar or unified native header
@@ -655,18 +676,25 @@ expanded and editing states in both themes and larger UI type without opening a 
 ### Maintaining the Appearance section
 
 The Appearance page's Theme section is `Editors.appearance(AppearanceChoices)`: `settingsui.AppearanceSelection` edits
-`ui.appearance` with the Dark / Light / Match System tiles, a read-only Theme row whose one entry is "Slate Steel", and
-a Reset button shown when the value is not `system`; `terminal.scheme` is an ordinary `Editors.choice` row noted
-"Colors for terminal panes". `AppearanceChoices` carries the two tile previews, the workspace glass defaults and the
-system-appearance observation from application wiring (`application.SettingsAppearance`), so settingsui reads jasper-ui
-only through `ui.model` and `ui.swing`. The Match System tile names the observed appearance, or says it is unavailable
+`ui.appearance` with the Dark / Light / Match System tiles, each previewing its pick, and stages `ui.theme.dark` and
+`ui.theme.light` from the Dark theme and Light theme dropdowns as companions (their rows are hidden); one Reset returns
+all three to their defaults. `terminal.scheme` is `Editors.schemeChoice`'s `SchemePick`, "Same as UI theme" then every
+installed scheme, noted "Colors for terminal panes". A saved pick that is not installed shows as "<id> (not
+installed)". `AppearanceChoices` carries `InstalledThemes` (the theme options with previews and the schemes, read again
+on every refresh), the workspace glass defaults and the system-appearance observation from application wiring
+(`application.SettingsAppearance`, over the controller's live library), so settingsui reads jasper-ui only through
+`ui.model` and `ui.swing`. When the application supplies `ThemeImports`, the Imported themes group follows the Theme
+section as a `SchemaPage.Part` (`settingsui.ImportedThemesSection`): Import… and Remove run `appearance.ThemeFolder`'s
+file work on a worker, come back on the EDT and reload the configuration, and Remove returns the removed theme's saved
+and staged picks to their defaults; the application asks its questions with `pluginmanager.ConfirmView`. The Match System tile names the observed appearance, or says it is unavailable
 and Dark is used. Terminal › Font & Colors links to the section.
 
-The command palette's `view.terminal_scheme.<name>` commands save `terminal.scheme` for every window
+The command palette's `view.terminal_scheme.match` and `view.terminal_scheme.<theme>.<key>` commands save `terminal.scheme` for every window
 (`WindowContent.selectTerminalScheme`); "Themes…" opens Appearance.
 
-Headless checks: AppearancePageTest, AppearanceSelectionTest, SettingsDialogTest, TerminalSchemeCommandsTest,
-TerminalSchemeSurfaceTest and JasperApplicationThemesTest. Do not launch the GUI from an unattended agent.
+Headless checks: AppearancePageTest, AppearanceSelectionTest, ImportedThemesSectionTest, SettingsAppearanceTest,
+SettingsDialogTest, TerminalSchemeCommandsTest, TerminalSchemeSurfaceTest, ThemeFolderTest, ThemeLibraryTest,
+ThemeSelectionTest and JasperApplicationThemesTest. Do not launch the GUI from an unattended agent.
 
 ## Consumer migration completion
 

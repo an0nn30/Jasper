@@ -15,6 +15,11 @@ public final class ConfigurationTestSupport {
     public ConfigurationTestSupport(ThemeController themes, ConfigService service, Consumer<Path> editor) {
         controller = new ConfigurationController(themes, service, editor);
     }
+    /** With imported themes in {@code themesFolder}. */
+    public ConfigurationTestSupport(ThemeController themes, ConfigService service, Path themesFolder) {
+        controller = new ConfigurationController(themes, service, path -> { },
+            dev.jasper.app.platform.SystemAppearance.Observation.unavailable("No system appearance in tests."), themesFolder);
+    }
     public ConfigService.State shown() { return controller.shown(); }
     public void register(WindowContent owner) { controller.register(owner); }
     public void unregister(WindowContent owner) { controller.unregister(owner); }

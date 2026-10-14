@@ -9,6 +9,7 @@ import dev.jasper.sdk.testing.FakePluginHost;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
@@ -43,14 +44,17 @@ class SftpChooseSessionTest {
             var window=host.addTerminalWindow();
             Kits.edt(()->host.openPanel(SftpUi.PANEL,window));
             var sidebar=SftpTestAccess.panel(plugin.sftp(),window);
-            var first=RemoteHost.create("<html>first","first.invalid",22,"user",Auth.AGENT,"",Optional.empty());
+            // Without an SSH agent or Vault here, each host's connection attempt fails its own way.
+            var first=RemoteHost.create("<html>first","first.invalid",22,"user",new Auth.Vault(UUID.randomUUID()),"",Optional.empty());
             var second=RemoteHost.create("second","second.invalid",22,"user",Auth.AGENT,"",Optional.empty());
             plugin.store().put(first);plugin.store().put(second);
             RemotePluginTest.settle(host);
             assertThat(SftpTestAccess.sessions(sidebar)).as("literal names, as the store lists them").containsExactlyInAnyOrder("<html>first","second");
-            SftpTestAccess.chooseSession(sidebar,"second");
-            assertThat(SftpTestAccess.texts(sidebar)).as("browsing the chosen host starts here: connecting, or already loading its folder")
+            // Read in the click's own EDT turn: the folder worker reports the attempt's outcome in a later one.
+            var started=Kits.value(()-> { SftpTestAccess.chooseSession(sidebar,"second");return SftpTestAccess.texts(sidebar); });
+            assertThat(started).as("browsing the chosen host starts here: connecting, or already loading its folder")
                 .containsAnyOf("Connecting…","Loading folder…");
+            Kits.await(host,()->Kits.texts(sidebar.view()).contains("SSH agent not available"),"the connection attempt for the chosen host");
             assertThat(Kits.value(()->host.windowView("dev.jasper.remote",CHOOSER))).as("no chooser dialog").isEmpty();
             host.stopAll();
             assertThat(host.failures()).isEmpty();

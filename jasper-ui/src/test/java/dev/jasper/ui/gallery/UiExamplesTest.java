@@ -1,5 +1,7 @@
 package dev.jasper.ui.gallery;
 
+import dev.jasper.ui.theme.JasperTheme;
+
 import dev.jasper.ui.icons.IconRegistry;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.model.*;
@@ -15,10 +17,10 @@ import static org.assertj.core.api.Assertions.*;
 class UiExamplesTest {
     @Test void colorEngineWorksWithoutSwing() {
         // example:palette:start
-        var theme = SlateSteel.bundled().generated(true);
+        var theme = JasperTheme.bundled().generated(true);
         var cardColor = theme.semantic().color(SemanticColor.SURFACE_CARD);
         // example:palette:end
-        assertThat(cardColor).isEqualTo(SlateSteel.bundled().palette(true).color(SemanticColor.SURFACE_CARD));
+        assertThat(cardColor).isEqualTo(JasperTheme.bundled().palette(true).color(SemanticColor.SURFACE_CARD));
     }
     @Test void viewOwnsItsControlsAndCallerOwnsBindingAndIcons() {
         Edt.run(() -> {

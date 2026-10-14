@@ -51,6 +51,43 @@ class SchemaPageTest {
         assertThatThrownBy(page::dispose).isInstanceOf(IllegalStateException.class).satisfies(failure->assertThat(failure.getSuppressed()).hasSize(1));
         page.dispose();assertThat(calls).containsExactly(CoreSettings.TERMINAL_FONT_FAMILY.name(),CoreSettings.UI_FONT_FAMILY.name());
     }
+    @Test void aPartIsItsOwnSectionWithItsEventsRefreshAndDisposal() {
+        var calls = new ArrayList<String>();
+        var shown = new String[] {"none"};
+        Runnable[] render = new Runnable[1];
+        var part = new SchemaPage.Part("extras", "Extras", (pageContext, again) -> {
+            assertThat(pageContext).isSameAs(context);
+            render[0] = again;
+            return new SchemaPage.Part.Section(
+                id -> new Nodes.Stack(id, dev.jasper.ui.model.ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+                    new Nodes.Text(id + ":text", dev.jasper.ui.model.ControlState.READY, "Shown: " + shown[0], Nodes.TextRole.BODY),
+                    new Nodes.Button(id + ":go", dev.jasper.ui.model.ControlState.READY, "Go", "", Nodes.ButtonKind.SECONDARY, id + ":go", ""))),
+                event -> event instanceof dev.jasper.ui.model.UiEvent.Action action && action.id().equals("extras:go") && calls.add("go"),
+                () -> calls.add("refresh"), () -> calls.add("dispose"));
+        }, List.of("extra words"));
+        var page = SchemaPage.page("parts", "Parts").section("Bars").row(CoreSettings.WINDOW_STATUS_BAR).part(part)
+            .row(CoreSettings.WINDOW_TAB_HEIGHT, Editors.integer("px")).build(context);
+        assertThat(page.searchTerms()).contains("Extras", "extra words");
+        page.component();
+        var stack = (Nodes.Stack) page.viewSpec().root();
+        assertThat(stack.children()).as("Bars, then the part, then an untitled card of the rows after it").hasSize(3);
+        assertThat(((Nodes.Section) stack.children().get(0)).title()).isEqualTo("Bars");
+        assertThat(stack.children().get(1)).isInstanceOfSatisfying(Nodes.Section.class, section -> {
+            assertThat(section.id()).isEqualTo("section-extras");
+            assertThat(section.title()).isEqualTo("Extras");
+        });
+        assertThat(stack.children().get(2)).isInstanceOf(Nodes.Card.class);
+        kit(page, "extras:go", JButton.class).doClick();
+        assertThat(calls).containsExactly("go");
+        shown[0] = "later";
+        render[0].run();
+        assertThat(((Nodes.Text) node(page, "extras:text")).text()).isEqualTo("Shown: later");
+        page.refresh();
+        assertThat(calls).containsExactly("go", "refresh");
+        page.dispose();
+        assertThat(calls).containsExactly("go", "refresh", "dispose");
+    }
+
     @Test void rowsShowTheDraftAndStageEdits() {
         var page = page();
         page.component();

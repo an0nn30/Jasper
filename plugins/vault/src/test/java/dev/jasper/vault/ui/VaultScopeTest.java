@@ -1,8 +1,6 @@
 package dev.jasper.vault.ui;
 
 import dev.jasper.sdk.PluginInfo;
-import dev.jasper.sdk.notifications.DisplayMode;
-import dev.jasper.sdk.notifications.GroupSpec;
 import dev.jasper.sdk.palette.PaletteQuery;
 import dev.jasper.sdk.palette.PaletteRow;
 import dev.jasper.sdk.terminal.TabHandle;
@@ -64,8 +62,7 @@ class VaultScopeTest {
         lock = new LockManager(new VaultFile(dir.resolve("vault.jv")), new DeviceSecrets(keychain, new FileStore(dir.resolve("device.secret"))), Runnable::run, Runnable::run, state -> { });
         var service = new VaultService(lock, () -> Optional.of(window), prompt -> { }, prompt -> { }, prompt -> { },
             notifications.group("dev.jasper.vault"));
-        var copies = context.notifications().group(new GroupSpec(VaultScope.COPIES, "Vault copies", DisplayMode.CARD));
-        scope = new VaultScope(lock, service, context.platform(), copies, (owner, id) -> opened.add(id.map(UUID::toString).orElse("-")),
+        scope = new VaultScope(lock, service, CopyCards.declare(context), (owner, id) -> opened.add(id.map(UUID::toString).orElse("-")),
             owner -> searched.add(owner == window ? "window" : "other"));
         return scope;
     }
@@ -166,8 +163,8 @@ class VaultScopeTest {
         scope.execute(row(all, "cred." + PROD), VaultScope.COPY_PASSWORD, query);
         scope.execute(row(all, "cred." + PROD), VaultScope.COPY_USERNAME, query);
         assertThat(host.notifications().lines()).containsExactly(
-            "dev.jasper.vault.copies|INFO|Copied the password for prod|Jasper clears it from the clipboard in 30 seconds.",
-            "dev.jasper.vault.copies|INFO|Copied the username for prod|Jasper clears it from the clipboard in 30 seconds.");
+            "dev.jasper.vault.copies|INFO|Copied the password for prod|Copied to Clipboard for 30 seconds",
+            "dev.jasper.vault.copies|INFO|Copied the username for prod|Copied to Clipboard for 30 seconds");
         assertThat(host.notifications().groups()).contains("dev.jasper.vault.copies|Vault copies|CARD");
     }
 

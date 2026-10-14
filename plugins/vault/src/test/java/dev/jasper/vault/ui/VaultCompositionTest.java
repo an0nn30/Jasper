@@ -1,6 +1,8 @@
 package dev.jasper.vault.ui;
 
+import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakeKit;
+import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.vault.model.Account;
@@ -20,26 +22,30 @@ import static org.assertj.core.api.Assertions.*;
 
 class VaultCompositionTest {
     @Test void detailCopySelectionRemovalLockAndCloseKeepSecretOwnershipBounded() throws Exception {
-        edt(()->{
+        edt(()->{ try (var host=new FakePluginHost()) {
+            var context=host.start(new PluginInfo("dev.jasper.vault","Vault","0.5.0",Set.of()),Set.of(),Set.of(),started->{});
             var login=new Account(UUID.randomUUID(),"Login","user",new Auth.Password("password-draft".toCharArray()),Instant.EPOCH,Instant.EPOCH);
             var note=new Note(UUID.randomUUID(),"Note","line one\nUnicode: \u03bb".toCharArray(),Instant.EPOCH);
             Map<UUID,Object> values=Map.of(login.id(),login,note.id(),note);
-            var copied=new java.util.ArrayList<String>();
             var panel=new ManagerPanel(new FakeKit("dev.jasper.vault"),id->Optional.ofNullable(values.get(id)),t->{},id->{},id->{},id->{},g->{},()->{},()->{},()->{},()->{});
-            panel.secretClipboard(copied::add);
+            panel.copies(CopyCards.declare(context));
             var rows=List.of(new VaultManager.Row(login.id(),login.name(),login.username(),VaultManager.Type.LOGIN),new VaultManager.Row(note.id(),note.name(),"",VaultManager.Type.NOTE));
             var status=new VaultManagerWindow.Status("test","5 min","/synthetic/vault.jv");panel.refresh(rows,List.of(),status,true);panel.select(login.id());
             var view=panel.view();String password="detail.secret."+login.id(),text="detail.secret."+note.id();
             assertThat(secret(view,password)).isEqualTo("password-draft");press(view,"detail.username.copy");press(view,"detail.password.copy");
             panel.select(note.id());assertThatThrownBy(()->view.withSecret(password,c->{})).isInstanceOf(IllegalArgumentException.class);
             assertThat(secret(view,text)).contains("line one\nUnicode:");press(view,"detail.note.copy");
-            assertThat(copied).containsExactly("user","password-draft","line one\nUnicode: \u03bb");
+            assertThat(host.clipboard().copies()).as("secret copies").containsExactly("secret|dev.jasper.vault|user","secret|dev.jasper.vault|password-draft","secret|dev.jasper.vault|line one\nUnicode: \u03bb");
+            assertThat(host.notifications().lines()).as("a card per copy, naming the entry, never the text").containsExactly(
+                "dev.jasper.vault.copies|INFO|Copied the username for Login|Copied to Clipboard for 30 seconds",
+                "dev.jasper.vault.copies|INFO|Copied the password for Login|Copied to Clipboard for 30 seconds",
+                "dev.jasper.vault.copies|INFO|Copied the note for Note|Copied to Clipboard for 30 seconds");
             panel.refresh(List.of(rows.getFirst()),List.of(),status,true);assertThat(panel.selected()).isEmpty();assertThat(all(view)).noneMatch(n->n instanceof Nodes.Secret);
             panel.select(login.id());panel.refresh(rows,List.of(),status,false);assertThat(all(view)).noneMatch(n->n instanceof Nodes.Secret);
             panel.refresh(rows,List.of(),status,true);panel.select(login.id());panel.close();assertThat(closed(view)).isTrue();
             assertThat(login.auth()).isInstanceOfSatisfying(Auth.Password.class,p->assertThat(p.password()).isEqualTo("password-draft".toCharArray()));
             login.auth().zero();note.zero();
-        });
+        } });
     }
 
     @Test void managerProjectsCategoriesMetadataAndSelectedSecretWithoutLeakingItIntoDescriptors() throws Exception {

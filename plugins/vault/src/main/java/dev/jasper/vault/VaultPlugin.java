@@ -3,8 +3,6 @@ package dev.jasper.vault;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
-import dev.jasper.sdk.notifications.DisplayMode;
-import dev.jasper.sdk.notifications.GroupSpec;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
@@ -26,6 +24,7 @@ import dev.jasper.vault.store.DeviceSecrets;
 import dev.jasper.vault.store.FileStore;
 import dev.jasper.vault.store.KeychainStore;
 import dev.jasper.vault.store.VaultFile;
+import dev.jasper.vault.ui.CopyCards;
 import dev.jasper.vault.ui.GrantPanel;
 import dev.jasper.vault.ui.PasswordPanel;
 import dev.jasper.vault.ui.PickerPanel;
@@ -80,6 +79,9 @@ public class VaultPlugin implements Plugin {
     public static final String CHANGE_PASSWORD = "dev.jasper.vault.change_password";
     /** Opens the manager on the saved plugin grants. */
     public static final String GRANTS = "dev.jasper.vault.grants";
+    /** Open the manager and its sheet for a new entry of one type. */
+    public static final String ADD_LOGIN = "dev.jasper.vault.add_login", ADD_KEY = "dev.jasper.vault.add_key",
+        ADD_NOTE = "dev.jasper.vault.add_note";
     private VaultManager manager;
     private VaultManagerWindow managerWindow;
     private PluginDialog createDialog;
@@ -127,8 +129,7 @@ public class VaultPlugin implements Plugin {
         lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock"))
             .withDefaultBinding("cmd+shift+l"), invoked -> lock.lock());
         lockAction.setEnabled(false);
-        var copies = context.notifications().group(new GroupSpec(VaultScope.COPIES, "Vault copies", DisplayMode.CARD));
-        scope = new VaultScope(lock, service, context.platform(), copies, this::open, this::unlockThenSearch);
+        scope = new VaultScope(lock, service, CopyCards.declare(context), this::open, this::unlockThenSearch);
         context.palette().register(scope);
         manager = new VaultManager(lock, context.background(), ui, this::vaultChanged);
         managerWindow = new VaultManagerWindow(context, lock, manager, service, this::managerStatus, this::showGenerator);
@@ -142,6 +143,15 @@ public class VaultPlugin implements Plugin {
         context.actions().register(ActionSpec.of(GRANTS, "Vault Plugin Grants...")
             .withKeywords(List.of("vault", "grants", "plugins", "revoke", "permissions")),
             invoked -> openThen(invoked.window(), Optional.empty(), managerWindow::showGrants));
+        context.actions().register(ActionSpec.of(ADD_LOGIN, "Add Login...")
+            .withKeywords(List.of("vault", "login", "password", "credential", "add", "new")),
+            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerWindow.add(VaultManager.Type.LOGIN)));
+        context.actions().register(ActionSpec.of(ADD_KEY, "Add SSH Key...")
+            .withKeywords(List.of("vault", "ssh", "key", "add", "new")),
+            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerWindow.add(VaultManager.Type.SSH_KEY)));
+        context.actions().register(ActionSpec.of(ADD_NOTE, "Add Secure Note...")
+            .withKeywords(List.of("vault", "secure", "note", "add", "new")),
+            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerWindow.add(VaultManager.Type.NOTE)));
         var fileMenu = context.menus().standard(StandardMenu.FILE);
         fileMenu.add(OPEN);
         fileMenu.add(CHANGE_PASSWORD);

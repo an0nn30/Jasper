@@ -139,7 +139,7 @@ class VaultPluginTest {
             assertThat(host.searchScope("dev.jasper.vault.scope", "pro", window, null)).containsExactly("cred." + id + "|prod|true");
             host.executeInScope("dev.jasper.vault.scope", "cred." + id, "copy_password", window, null);
             assertThat(host.clipboard().text()).contains("s3cret");
-            assertThat(host.notifications().lines()).contains("dev.jasper.vault.copies|INFO|Copied the password for prod|Jasper clears it from the clipboard in 30 seconds.");
+            assertThat(host.notifications().lines()).contains("dev.jasper.vault.copies|INFO|Copied the password for prod|Copied to Clipboard for 30 seconds");
         }
     }); }
 
@@ -280,6 +280,29 @@ class VaultPluginTest {
             host.invoke(VaultPlugin.CHANGE_PASSWORD, window, null);
             assertThat(plugin.currentUnlock()).as("a locked vault asks to unlock before the form").isNotNull();
             assertThat(host.windows()).doesNotContain("dialog|Change Master Password|true");
+            assertThat(host.failures()).isEmpty();
+        }
+    }); }
+
+    @Test void addCommandsOpenTheManagerAndThenTheirSheet() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
+        VaultPlugin plugin = plugin();
+        try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            UUID window = host.addTerminalWindow();
+            plugin.lockManager().create("test-password".toCharArray(), false);
+            host.runBackground();
+            Map<String, String> sheets = Map.of(VaultPlugin.ADD_LOGIN, "Add Login", VaultPlugin.ADD_KEY, "Add SSH Key",
+                VaultPlugin.ADD_NOTE, "Add Secure Note");
+            sheets.forEach((id, title) -> {
+                assertThat(host.actionSpec(id).orElseThrow().defaultBinding()).as("unbound until the user binds it").isEmpty();
+                host.invoke(id, window, null);
+                assertThat(host.windows()).contains("dev.jasper.vault.manager|Credential Vault|true", "dialog|" + title + "|true");
+                host.requestClose("dialog");
+            });
+            plugin.lockManager().lock();
+            host.invoke(VaultPlugin.ADD_LOGIN, window, null);
+            assertThat(plugin.currentUnlock()).as("a locked vault asks to unlock before the sheet").isNotNull();
+            assertThat(host.windows()).doesNotContain("dialog|Add Login|true");
             assertThat(host.failures()).isEmpty();
         }
     }); }

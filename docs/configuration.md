@@ -68,7 +68,7 @@ sections holding them, are blue. Click one, press the new keys and click Set; Ap
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
 Appearance holds View mode (Normal or Compact, applied after restart), the Dark, Light and Match System tiles,
-the Theme row (Slate Steel) and the Terminal scheme dropdown; Terminal › Font & Colors links there. See
+the Dark theme and Light theme dropdowns, the Terminal scheme dropdown and the Imported themes group; Terminal › Font & Colors links there. See
 [Themes](themes.md).
 
 Tools holds a page for each running plugin that has settings, built from what the plugin declares or by the plugin
@@ -193,11 +193,13 @@ family = "system"
 | `terminal.dim_inactive_panes` | `0.3` | Finite number 0–1; 0 disables dimming, 1 fully dims | Live |
 | `terminal.copy_on_select` | `false` | Boolean | Live |
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
-| `terminal.scheme` | `"match"` | `"match"`, `"slate-steel-dark"`, `"slate-steel-light"`, `"high-contrast"`: the terminal panes' colors ([Themes](themes.md)) | Live |
+| `terminal.scheme` | `"match"` | `"match"` or a scheme id such as `"slate-steel/high-contrast"`: the terminal panes' colors ([Themes](themes.md)) | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately | Live |
 | `ui.appearance` | `"system"` | `"system"` (the operating system's light or dark), `"dark"`, `"light"` | Live |
+| `ui.theme.dark` | `"slate-steel"` | A theme id: the theme the Dark appearance shows ([Themes](themes.md)) | Live |
+| `ui.theme.light` | `"slate-steel"` | A theme id: the theme the Light appearance shows ([Themes](themes.md)) | Live |
 | `ui.workspace.opacity` | Opaque (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
 | `ui.workspace.blur` | `"theme"` | `"theme"` (Slate Steel's: no blur), `"on"`, `"off"`; macOS only, ignored elsewhere | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
@@ -456,7 +458,8 @@ directory, `<Jasper home>/plugins/dev.jasper.snippets/data/`; a `snippets.toml` 
 from before the plugin is moved there on first launch. It is a separate file: it is not part of the
 configuration file and is never read or written by the configuration loader. An empty or missing
 file is an empty scope; disable the plugin in File → Manage Plugins… to remove the scope. Its
-shortcut is the action `"dev.jasper.snippets.open"`. See [Snippets](command-palette.md#snippets) for its format and the fill-in and
+shortcut is the action `"dev.jasper.snippets.open"`. **Edit Snippets File** (`"dev.jasper.snippets.edit"`, unbound by
+default) opens the file in the editor, creating it if missing. See [Snippets](command-palette.md#snippets) for its format and the fill-in and
 name steps.
 
 ### Editor
@@ -637,20 +640,27 @@ are not recreated by this layout state.
 
 View › View Modes › Zen toggles a workspace-focused view in the current window. It hides the status bar,
 tool windows and their rails. The command palette field, toolbar icons, workspace tabs and native window/menu
-controls remain available; the toolbar keeps its selected style. Toggle Zen again to restore your layout; pane zoom works independently.
+controls remain available; the toolbar keeps its selected style. A tool window opened in Zen (by its shortcut,
+View › Tool Windows, the palette or a plugin command) shows in its usual place, without the rails. Toggle Zen again
+to restore your layout: the tool windows opened in Zen close and the ones that showed before return; pane zoom
+works independently.
 Zen is independent of Appearance's Normal/Compact setting: Compact keeps its native title bar, hidden header
 and floating command palette when Zen is toggled.
 
 Zen is saved immediately as `zen_mode` in `ui-state.toml` and restored before plugin panels are built on launch.
 New windows inherit the saved mode; existing windows retain their own mode. As with the dock layout, the last
 closed window saves its mode for the next launch. Missing or invalid values default to off. Normal status
-visibility, rail visibility, tool-window positions, sizes and split ratios remain intact. Status and panel
-changes made while in Zen take effect when leaving it; toolbar changes apply immediately. Panel show/hide requests still update
-the normal dock layout, but panels remain hidden and newly requested panels are built only when Zen exits.
-Existing panel instances are retained and receive visibility notifications while hidden.
+visibility, rail visibility, tool-window positions, sizes and split ratios remain intact. Status changes made
+while in Zen take effect when leaving it; toolbar changes apply immediately. The saved layout keeps the tool
+windows that showed before Zen, so a window opened in Zen is never saved as showing; moving or resizing one in Zen
+is saved. Panel instances are retained while hidden and receive visibility notifications.
 
 View groups Toolbar, Status Bar and Rail under **Show/Hide**, and font controls under **Font Size**.
 The contributed **Tools** submenu remains available. Status/rail controls are disabled during Zen; leave Zen to use them. Toolbar controls stay available.
+Each rail shows only while it holds a tool window (or, on the left, a plugin's rail button); on a side without one the
+terminal meets the window edge without a border, as in Zen. To put a tool window on
+an empty side's rail, drag it to that window edge: the drop guide marks where its button goes, and the rail appears
+once it lands.
 
 Zen has no default shortcut. Assign **Zen** in Settings › Keymap, or add a binding to `[keybindings]`:
 
@@ -704,8 +714,9 @@ Plugin actions are bound by their quoted id, for example:
 A plugin may suggest a default shortcut; yours always wins, and Jasper's built-in shortcuts win
 over a plugin's suggestion. A binding for an action that no installed plugin provides is
 reported as a configuration warning. Every panel also has a `<panel id>.toggle` action you can
-bind the same way. `"plugins.manage"` opens Settings at Plugins and `"app.shortcuts"` at Keymap; `"app.memory"` opens the
-heap limit in System Settings and `"app.vmoptions"` opens `jasper.vmoptions` in your editor; none has a default shortcut.
+bind the same way. `"plugins.manage"` opens Settings at Plugins, `"app.shortcuts"` at Keymap and `"app.about"` the About
+window; `"app.memory"` opens the heap limit in System Settings and `"app.vmoptions"` opens `jasper.vmoptions` in your
+editor; none has a default shortcut.
 
 ## Command palette shortcuts
 
@@ -782,21 +793,20 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 ## Theme
 
-Jasper's theme is Slate Steel, in Dark and Light.
+Jasper's built-in theme is Slate Steel, in Dark and Light; imported themes live in the themes folder ([Themes](themes.md)).
 
-`ui.appearance` chooses the UI appearance: `"dark"` or `"light"` for Slate Steel Dark or Light, or `"system"`
-(the default) to follow the operating system's light or dark setting live. When the operating system's appearance is
-unavailable, `"system"` uses Dark. An operating-system change never writes `config.toml`.
+`ui.appearance` chooses the UI appearance: `"dark"`, `"light"`, or `"system"` (the default) to follow the operating
+system's light or dark setting live. When the operating system's appearance is unavailable, `"system"` uses Dark. An
+operating-system change never writes `config.toml`. `ui.theme.dark` and `ui.theme.light` name the theme each
+appearance shows, `"slate-steel"` by default.
 
-`terminal.scheme` chooses the terminal panes' colours: `"match"` (the default) uses Slate Steel Dark with the Dark
-appearance and Slate Steel Light with the Light one; `"slate-steel-dark"`, `"slate-steel-light"` and
-`"high-contrast"` choose one. Only the terminal text area changes: tabs, the tab strip, the editor and panels stay on
-the UI appearance.
+`terminal.scheme` chooses the terminal panes' colours: `"match"` (the default) uses the shown theme's own scheme; a
+scheme id such as `"slate-steel/high-contrast"` chooses one. Only the terminal text area changes: tabs, the tab strip,
+the editor and panels stay on the UI appearance.
 
 Appearance and scheme changes keep shells, scrollback, split ratios and font choices. A failed installation keeps the
-current appearance, is reported as a warning on `ui.appearance`, and can be retried with Reload config. The former
-`[ui.theme]` table (`name`, `source`, `follow_system`, `workspace`), `terminal.colors` and the `[colors]` table are
-no longer read: each is reported as an unknown setting and ignored.
+current appearance, is reported as a warning on `ui.appearance`, and can be retried with Reload config.
+`terminal.colors` and the `[colors]` table are no longer read: each is reported as an unknown setting and ignored.
 
 ### Interface typography
 

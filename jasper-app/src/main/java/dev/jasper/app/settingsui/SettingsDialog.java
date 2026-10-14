@@ -150,7 +150,7 @@ public final class SettingsDialog {
         draftListening = draft.onChanged(this::refreshNow);
         stateListening = hooks.onState().apply(this::accept);
         accept(state);
-        view.tree.show(pages, page -> true, Map.of(), false);
+        view.tree.show(pages, page -> true, Map.of());
         view.tree();
         select(pageOrNull != null ? pageOrNull : lastPage != null ? lastPage : CorePages.DEFAULT_PAGE);
         surface.show();
@@ -162,10 +162,6 @@ public final class SettingsDialog {
         switch (event) {
             case UiEvent.Edited edited when edited.id().equals(SettingsView.SEARCH) -> search(edited.text());
             case UiEvent.Selected selected when selected.id().equals(PageTree.ID) -> selected.ids().stream().findFirst().ifPresent(this::select);
-            case UiEvent.Expanded expanded when expanded.id().equals(PageTree.ID) -> {
-                view.tree.expanded(expanded.itemId(), expanded.expanded());
-                view.tree();
-            }
             case UiEvent.Action action -> {
                 switch (action.id()) {
                     case SettingsView.BACK -> back();
@@ -252,7 +248,7 @@ public final class SettingsDialog {
         query = text == null ? "" : text;
         if (!view.query().equals(query)) view.query(query);
         if (query.isBlank()) {
-            view.tree.show(pages, page -> true, Map.of(), false);
+            view.tree.show(pages, page -> true, Map.of());
             if (current != null) view.tree.select(current);
             view.tree();
         } else {
@@ -261,7 +257,7 @@ public final class SettingsDialog {
                 int matches = (int) page.searchTerms().stream().filter(term -> SearchText.matches(term, query)).count();
                 if (matches > 0) counts.put(page.id(), matches);
             }
-            view.tree.show(pages, page -> counts.containsKey(page.id()), counts, true);
+            view.tree.show(pages, page -> counts.containsKey(page.id()), counts);
             view.tree();
             if (!counts.containsKey(current) && !counts.isEmpty()) {
                 select(counts.keySet().iterator().next());

@@ -122,7 +122,7 @@ class WindowTabsTest {
             owner.currentTab().rename("other"); owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
             for (boolean chromeDark : new boolean[]{true, false}) {
                 owner.selectVariant(chromeDark);
-                for (var scheme : dev.jasper.app.config.TerminalSchemeChoice.values()) {
+                for (var scheme : dev.jasper.app.appearance.ThemeTestSupport.SCHEME_CHOICES) {
                     owner.selectTerminalScheme(scheme);
                     var strip = owner.windowTabs(); layout(strip, 800, 38);
                     assertThat(strip.getBackground()).as("%s UI, %s terminal", (chromeDark ? "dark" : "light"), scheme).isEqualTo(owner.theme().surface());

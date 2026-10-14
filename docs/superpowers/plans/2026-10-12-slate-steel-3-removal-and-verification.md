@@ -1438,7 +1438,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 - [ ] **Step 1: `docs/themes.md`**, whole file:
 
-```markdown
+````markdown
 # Themes
 
 Jasper has one theme, **Slate Steel**, in Dark and Light, and three terminal colour schemes: **Slate Steel Dark**,
@@ -1495,7 +1495,7 @@ Shadows are black at the strengths the colour reference gives. Plugins receive t
 On a Mac, check Dark, Light and Match System (switch the operating system's appearance with Settings and a sheet
 open), each terminal scheme including High Contrast, and compare the mocked pages at 100%; the
 [acceptance record](design/theme-engine/acceptance.md) lists every check.
-```
+````
 
 - [ ] **Step 2: Every other document** in **Files**: remove theme authoring, import, the themes folder, the five old themes, IntelliJ themes, Alacritty themes, workspace schemes and the calibration themes; name `ui.appearance` and `terminal.scheme` (the sentence of Step 1's second paragraph) where a document describes theming; the glass descriptions say "Omit to keep the terminal area opaque" instead of "use the workspace theme's value" (update `CoreSettings`, `config.example.toml` and `docs/configuration.md` together, as `ConfigTemplateTest` checks the template). `docs/app-maintenance.md`'s `## Themes` heading stays (linked); its body describes `slate-steel.json`, `SlateSteel`, `UiColorKeys` and the colour-literal scan. `docs/plugin-ui.md` and both `SemanticColor` JavaDocs gain: "A role that carries opacity is painted as given; the kit applies treatments such as focus rings and hovers on top."
 - [ ] **Step 3: The acceptance record.** In the "Slate Steel Plan 1" section, each bullet gains the role the component used before (from `git show cb2ccec9 6259aee2 7bd98915 da052684` and the Plan 1 plan's audit), as "(was `<role or token>`)". A "Slate Steel Plan 3" section lists what was removed, the scan, the comparisons (Task 9) and this plan's eleven decisions, verbatim.

@@ -1,7 +1,7 @@
 # Jasper — Status and Handoff
 
-**Custom VM options plan 2 (settings and actions) complete — 2026-10-13.** On `claude/custom-vm-options-settings` (not
-pushed): System Settings has a Java Virtual Machine section (heap limit in `jasper.vmoptions`, Edit Custom VM Options…,
+**Custom VM options plan 2 (settings and actions) complete — 2026-10-13.** On `claude/custom-vm-options-settings`, merged to
+local `main` (not pushed): System Settings has a Java Virtual Machine section (heap limit in `jasper.vmoptions`, Edit Custom VM Options…,
 Reveal, the options' check with the bundled `java`, a restart banner with Restart Now; read-only outside the installed
 app), Help and the palette have Change Memory Settings… and Edit Custom VM Options…, and Jasper says in the new
 **Memory & VM options** notification group when it started without the user's options or ignored the file. New JDK-only
@@ -9,10 +9,131 @@ package `dev.jasper.app.vmoptions` mirrors the launcher's reading (shared digest
 `JASPER_VM_OPTIONS_SKIP` now skips too. Deviations: the seven planned ones (in the plan) and the review and final-review
 changes listed in the plan's status banner. Known limitation: on Windows, a Jasper home whose path the ANSI code page
 cannot represent leaves the section read-only, and where Windows maps such characters to look-alikes the app may edit a
-different file than the launcher reads. Full `./gradlew check`: 9,837 tests, 0 failures, 8 skips. Manual checks pending
+different file than the launcher reads. Full `./gradlew check` after merging main: 9,965 tests, 0 failures, 8 skips. Manual checks pending
 (the user): in the packaged app, set the heap in Settings, see the restart banner, Restart Now, and see the new limit;
 type an invalid line and see the findings; Help menu entries; Change Memory Settings… from the Help menu with Settings
 closed puts the cursor in the heap field. Plan 3 (memory indicator and low-memory warning) is next.
+
+**Theme import final review — 2026-10-13** (`claude/theme-import`). The final whole-branch review's fixes. A Remove whose
+settings cannot be saved now has the application read the themes folder itself, so the removed theme leaves the group,
+the dropdowns and the screen at once (it used to stay listed and shown). A foreign JSON file, such as an IntelliJ
+`.theme.json` or a VS Code theme, is refused as "Not a Jasper theme" rather than with a parser error, because the loader
+now reads every valid JSON value (booleans, null, arrays and any other number as opaque values, with the depth limit
+counting arrays) and refuses a value of the wrong kind by its entry name. The converter prints a name the console cannot
+encode escaped instead of ending in a traceback, so later inputs are still written. One malformed theme of a plugin no
+longer stops its plugin's others: it is reported as `error: <input>!<theme path>: <message>` and the rest are written.
+An unexpected failure while preparing an import is reported like any import failure and no longer leaves the group
+busy, and an unexpected failure parsing one theme file becomes a library problem for that file instead of stopping
+start-up. A pick of an installed theme that lacks the variant reads "Dawn (no Dark variant)" (or Light) in the dropdown
+and tile; "(not installed)" stays for an id nothing installed has. The loader refuses a style on
+`editor.<variant>.background` and a reference with an empty style (a trailing comma). The converter lays an alpha
+`Label.foreground` over the panel colour, as spec 5.3 step 4 says, rather than over black or white; the golden files
+are unchanged. Four test gaps are closed: a replaced theme in use is installed again after a reload, a failed install
+keeps the old file and leaves no temporary file, the loader refuses `ui` without `editor` and an `editor` missing a
+variant, and a literal editor colour with a share and a theme without an author load as written. README names Python
+3.11 or later for `build` and `check`; docs/themes.md (the converter's keying, `--theme`, `--name` and summary, the
+Settings path and the diagnostic example), docs/configuration.md, docs/app-maintenance.md and the Plan 1 banner are
+corrected; the empty Imported themes group now says Alacritty and IntelliJ themes can be converted with the theme
+converter in Jasper's source repository (`tools/themes`). Spec 4.3 shows a failed delete under the theme's row; the
+group shows every message under Import… (recorded in Plan 2's banner). Left for later: the controller adopts a new
+library only when installation succeeds, so an installation failure still hides a newly imported theme from Settings.
+`./gradlew check --continue`: **9,833 tests, 0 failures, 0 errors, 8 skipped**; after merging `main`: **9,903 tests, 0 failures,
+0 errors, 8 skipped**. No GUI launched. Merged to `main`.
+
+**Theme import Plan 3: the theme converter — 2026-10-13** (`claude/theme-import`;
+[spec](superpowers/specs/2026-10-13-jasper-theme-import-design.md),
+[plan](superpowers/plans/2026-10-13-theme-import-3-converter.md)). `tools/themes/jasper_theme.py` (Python 3.11+,
+standard library) converts Alacritty `.toml` themes into terminal-only Jasper themes and IntelliJ themes (`.theme.json`,
+plugin `.jar`, Marketplace `.zip`) into UI themes with their console colours as the terminal scheme and their editor
+scheme's syntax colours, resolving parents against IntelliJ's own themes vendored in `tools/themes/intellij/` (restored
+from `c1e968ee^`). `checkThemeTool` runs its tests under `:jasper-ui:check` and needs Python 3.11+ on the PATH (CI
+installs it); `ConvertedThemesTest` loads its golden files with the Java loader. The mapping departs from the spec's
+section 5.4 starting table in four recorded ways (the plan's header). `./gradlew check --continue`:
+**9,817 tests, 0 failures, 0 errors, 8 skipped**. Review fixes beyond the plan's text are in its status banner. No GUI launched. For the user: convert a favourite theme and import it (Plan 2) or copy it into
+the themes folder. Merged to `main`.
+
+**Theme import Plan 2: Import… and Remove — 2026-10-13** (`claude/theme-import`;
+[spec](superpowers/specs/2026-10-13-jasper-theme-import-design.md),
+[plan](superpowers/plans/2026-10-13-theme-import-2-import-and-remove.md)). Settings › Appearance › Imported themes
+lists each imported theme with what it offers. Import… (Jasper's chooser, `.json`) checks a theme file, names it after
+the theme (`gruvbox-dark.json`), asks before replacing one and copies it into `<home>/themes/` through a temporary file;
+failures show under the button. Remove asks, deletes the file, and returns the theme's saved picks (written at once)
+and staged ones to their defaults. `appearance.ThemeFolder` does the file work; `SchemaPage.Part` is a new, generic
+page section; the application asks with `pluginmanager.ConfirmView`. `./gradlew check --continue`: **9,815 tests,
+0 failures, 0 errors, 8 skipped**. Review fixes beyond the plan's text are in its status banner. No GUI launched. GUI checks for the user: Import… with the real chooser, the Replace
+and Remove sheets over Settings, and the dropdowns after each. Merged to `main`.
+
+**Theme import Plan 1: the format and the runtime — 2026-10-13** (`claude/theme-import`;
+[spec](superpowers/specs/2026-10-13-jasper-theme-import-design.md),
+[plan](superpowers/plans/2026-10-13-theme-import-1-format-and-runtime.md)). One public theme format: jasper-ui's
+`JasperTheme` reads any Jasper theme file and `slate-steel.json` is one (`"jasper-theme": 1`, variants `dark`/`light`,
+named schemes, literal editor colours). `appearance.ThemeLibrary` reads `<home>/themes/*.json` at start-up and with
+every forced or changed configuration read; `ui.theme.dark` and `ui.theme.light` pick the theme each appearance shows,
+`terminal.scheme` is `match` or a scheme id (`slate-steel/high-contrast`); unusable picks and skipped files are
+configuration warnings. Settings › Appearance has Dark theme and Light theme dropdowns and a Terminal scheme dropdown
+over the installed schemes; the palette's "Terminal: …" commands follow them. Deviation: the spec's section 8 put the
+dropdowns in Plan 2; they are here (Plan 2 is Import… and Remove). `./gradlew check --continue`: **9,801 tests, 0 failures,
+0 errors, 8 skipped**. Review fixes beyond the plan's text are in its status banner. No GUI launched. For the user: copy a theme file into the themes folder, Reload config, pick it.
+Merged to `main`.
+
+**About screen, build information and licenses — 2026-10-13** (`claude/about-screen`, worktree
+`.claude/worktrees/about-screen`; [spec](superpowers/specs/2026-10-13-about-screen-design.md),
+[plan](superpowers/plans/2026-10-13-about-screen.md)). `:jasper-app:buildInfo` records the commit's git facts in
+`dev/jasper/app/build-info.properties` inside the jar (ignored by test up-to-date checks); `BuildInfo` calls a clean
+`vX.Y.Z`-tagged commit a release and anything else a development build ("1.2.0 + 14 commits", "main @ 8ba67ed3,
+modified"); packaging takes its version from the release tag unless `-PjasperVersion` is given. Jasper is licensed under
+PolyForm Noncommercial 1.0.0 (`LICENSE.md`); `notices.toml` lists the 25 third-party components it ships (including the
+winpty, ConPTY and libffi binaries inside pty4j and JNA) and `verifyThirdPartyNotices` keeps the jars complete. About Jasper (palette; Help on Windows/Linux; the macOS application menu)
+shows the icon, version, chip, commit, date and license with Licenses… and Copy; error reports name the build the same
+way. Deviations from the spec are listed in the plan's status banner; the final-review fixes are its entry 17.
+`./gradlew check --continue` after merging `main`: **9,839 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched. GUI checks for the user: Jasper › About Jasper on macOS; Help ›
+About Jasper on Windows and Linux; About and Licenses in Dark and Light; Copy (and "Copied" for two seconds); the
+Licenses list and texts; the sharpness of the About icon; a long branch name's fit in the commit line. Merged to
+`main`.
+
+**Copy cards in the Vault manager — 2026-10-13** (`claude/vault-manager-copy-cards`, worktree
+`.claude/worktrees/vault-manager-copy-cards`; bounded change, design approved in chat, no spec or plan). The manager's
+Username, Password and Secure note copy buttons post the palette's card ("Copied the password for prod" / "Copied to
+Clipboard for 30 seconds"; a note reads "Copied the note for <name>"), and Copy Public Key posts "Copied the public key
+for <name>" with no second line, since a public key is an ordinary copy that Jasper does not clear. All go in the Vault
+copies group. The wording lives in one place, `dev.jasper.vault.ui.CopyCards`, which the palette scope and the manager
+share. `./gradlew check --continue`: **9,778 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched. GUI check for the user: copy each of the four from
+the manager and read the cards. Merged to `main`.
+
+**Tool windows in Zen, and more plugin commands — 2026-10-13** (`claude/zen-panels-actions`, worktree
+`.claude/worktrees/zen-panels-actions`; design agreed in chat, no spec). Zen now hides the showing tool windows through
+the dock and remembers them: a panel opened in Zen (shortcut, View › Tool Windows, palette, plugin command) shows in
+its slot without the rails, and leaving Zen closes it and restores the earlier ones. The saved layout keeps the pre-Zen
+visibility; moves and resizes in Zen are saved. New unbound commands: Remote New Host... and Start or Stop a Tunnel...
+(both in the SSH menu), Vault Add Login.../Add SSH Key.../Add Secure Note..., File Server Show TLS Certificate
+Fingerprint…/Show SFTP Host Key Fingerprint…, Edit Snippets File, Remove Current Project from Index…. No SDK change.
+Remote's Add Host form gains **Add and Connect** (secondary, beside the primary Add Host; adding only): it saves, then
+connects in a new tab as the palette's Connect does. The form's footer was matched to the design mock with two buttons,
+so the [acceptance record](design/theme-engine/acceptance.md)'s Add Host footer measurements are now historical.
+Each rail now shows only while it holds something (they used to show together, an empty right rail included); on a
+hidden rail's side the terminal is borderless and square, as in Zen, while tool window frames keep their gutter. A dock
+drag still drops onto an empty hidden rail at its window edge: `DockDrag.standAtEdge` gives it bounds there without
+showing it, so only the placeholder marks it and the terminal does not move, and `DockDrag.areaAfter` lays the guide
+out for the rails that show or hide after the drop. A second review found a mid-drag resize left that edge stale (fixed
+with a test) and stale `app-maintenance.md` rules (fixed).
+Rebased onto `main` (f8bd2c41) and merged to local `main` (not pushed). `./gradlew check --continue` on b92d5c1f:
+**9,795 tests**, whose only failure was the `SftpChooseSessionTest` flake that `main`'s c6523372 then fixed; after
+rebasing onto that fix, `:jasper-plugin-remote:check` passes (0 failures, 8 skipped overall). An independent review found one Important issue (the
+last panel restored in Zen was saved as hidden until the next dock change), fixed with a regression test, and doc nits,
+fixed. No GUI launched. GUI checks for the user: in Zen, Cmd+Alt+1 and View › Tool Windows show a panel with no rail
+(frame corners and insets as with View › Rail hidden); a divider drag in Zen; leaving Zen restores the earlier layout;
+quitting and relaunching in Zen; the new commands from the palette; Add and Connect in the Add Host form; one rail
+hidden (the borderless, square side), the placeholder over the terminal's edge while dragging to an empty side, and a
+drop there showing the rail. Not pushed.
+
+**Enter's verb in the palette hint bar — 2026-10-13** (`claude/palette-enter-hint`, worktree
+`.claude/worktrees/palette-enter-hint`; bounded change, design approved in chat, no spec or plan). In a scope with two or
+three verbs the hint bar now lists every verb with its key, Enter's first ("Copy password ⏎ · Copy username ⌘⏎ · Open
+in Vault ⇧⏎"), so the Vault's password copy shows a key; a click on Enter's link runs the first verb. Single-verb scopes
+(Commands) still show only the row's detail. This replaces the search-everywhere spec's secondary-verbs-only hint bar
+(user decision). A test pins that the longest bundled set (Files: Open, Copy path, Open terminal here) stays on one line
+at the 560 px anchored minimum on macOS and elsewhere. `./gradlew check --continue`: **9,776 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched.
+GUI check for the user: Cmd+\\, select a login and read the hint bar. Not merged or pushed.
 
 **Custom VM options plan 1 (launcher) complete — 2026-10-13.** Merged to local `main` (not pushed): Jasper builds
 jpackage's launcher from vendored JBR 25.0.4.1 sources (`packaging/launcher`) with marked hooks that merge the user's

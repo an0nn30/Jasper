@@ -15,7 +15,7 @@ import java.util.function.Predicate;
 
 /**
  * The Settings category tree as a kit tree descriptor: pages with their ancestors, search counts at the row ends, and
- * pages holding unsaved changes emphasized. Remembers which branches the user opened. EDT only.
+ * pages holding unsaved changes emphasized. Every group stays open. EDT only.
  */
 final class PageTree {
     private dev.jasper.ui.icons.ReceivingArtwork artwork;
@@ -34,24 +34,19 @@ final class PageTree {
     }
     void close(){if(artwork!=null)artwork.close();}
     static final String ID = "pages";
-    private final Set<String> expanded = new HashSet<>();
     private final Map<String, SettingsPage> shown = new LinkedHashMap<>();
     private List<SettingsPage> pages = List.of();
     private Map<String, Integer> counts = Map.of();
     private Predicate<String> modified = id -> false;
-    private boolean searching;
     private String selected;
 
     /**
      * Shows the pages {@code visible} accepts, with their ancestors; a page that hides while childless never shows
-     * without children. Searching expands everything; otherwise remembered expansion applies (groups start open).
+     * without children.
      */
-    void show(List<SettingsPage> pages, Predicate<SettingsPage> visible, Map<String, Integer> counts, boolean searching) {
+    void show(List<SettingsPage> pages, Predicate<SettingsPage> visible, Map<String, Integer> counts) {
         this.pages = List.copyOf(pages);
         this.counts = Map.copyOf(counts);
-        this.searching = searching;
-        if (expanded.isEmpty() && !searching)
-            for (SettingsPage page : pages) if (page.parent().isEmpty()) expanded.add(page.id());
         var keep = new HashSet<String>();
         for (SettingsPage page : pages) {
             boolean childless = pages.stream().noneMatch(other -> other.parent().equals(Optional.of(page.id())));
@@ -67,16 +62,9 @@ final class PageTree {
         return pages.stream().filter(page -> page.id().equals(id)).findFirst();
     }
 
-    /** Selects {@code id}; its ancestors show open without being remembered as opened. */
     void select(String id) { selected = id; }
 
     Optional<String> selectedId() { return Optional.ofNullable(selected).filter(shown::containsKey); }
-
-    /** The user opened or closed a branch; remembered unless a search opened everything. */
-    void expanded(String id, boolean open) {
-        if (searching) return;
-        if (open) expanded.add(id); else expanded.remove(id);
-    }
 
     void modifiedBy(Predicate<String> value) { modified = value; }
 
@@ -116,19 +104,12 @@ final class PageTree {
         });
     }
 
-    /** The kit tree: open branches, the selection, counts while searching and emphasis for unsaved pages. */
+    /** The kit tree: every branch open, the selection, counts while searching and emphasis for unsaved pages. */
     Nodes.Tree node() {
         var roots = shown.values().stream().filter(page -> page.parent().isEmpty() || !shown.containsKey(page.parent().get()))
             .map(this::item).toList();
-        var branches = new HashSet<String>();
-        for (var page : shown.values()) if (!children(page.id()).isEmpty()) branches.add(page.id());
         var open = new HashSet<String>();
-        for (String id : branches) if (searching || expanded.contains(id)) open.add(id);
-        Optional<String> current = selectedId();
-        current.ifPresent(id -> {
-            for (String at = find(id).flatMap(SettingsPage::parent).orElse(null); at != null; at = find(at).flatMap(SettingsPage::parent).orElse(null))
-                if (branches.contains(at)) open.add(at);
-        });
-        return new Nodes.Tree(ID, ControlState.READY, roots, open, current.map(Set::of).orElse(Set.of()), "");
+        for (var page : shown.values()) if (!children(page.id()).isEmpty()) open.add(page.id());
+        return new Nodes.Tree(ID, ControlState.READY, roots, open, selectedId().map(Set::of).orElse(Set.of()), "");
     }
 }

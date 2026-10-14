@@ -464,7 +464,7 @@ class CommandPaletteTest {
                     assertThat(palette.hintText()).as(name).isEqualTo("a detail");
                     assertThat(palette.hintActionTexts()).as(name).isNotEmpty();
                     assertThat(label(hintBar, "a detail").getForeground()).as(name).isEqualTo(semantic.color(SemanticColor.TEXT_TERTIARY));
-                    for (int verb = 1; verb <= palette.hintActionTexts().size(); verb++)
+                    for (int verb = 0; verb < palette.hintActionTexts().size(); verb++)
                         assertThat(KitTestSupport.require(palette.hintView(), CommandPalette.VERB + verb, AbstractButton.class).getForeground())
                             .as(name + " verb " + verb).isEqualTo(semantic.color(SemanticColor.TEXT_LINK));
                     layoutTree(palette);
@@ -554,7 +554,7 @@ class CommandPaletteTest {
         });
     }
 
-    @Test void theHintBarShowsTheDetailOrTagAndTheOtherVerbsWithTheirKeys() throws Exception {
+    @Test void theHintBarShowsTheDetailOrTagAndEveryVerbWithItsKey() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var events = new ArrayList<String>();
             var palette = palette(events);
@@ -562,19 +562,50 @@ class CommandPaletteTest {
                 new PaletteEntry.Item(COMMANDS, new PaletteRow("new_tab", "New Tab", null, "⌘T", null, true, null)),
                 new PaletteEntry.More(HISTORY)), null, null);
             assertThat(palette.hintText()).isEqualTo("in ~/src");
-            assertThat(palette.hintActionTexts()).containsExactly("Paste and run ⌘⏎", "Save as snippet… ⇧⏎");
-            assertThat(PaletteTestSupport.hintBarTexts(palette)).containsExactly("in ~/src", "Paste and run ⌘⏎", "Save as snippet… ⇧⏎");
-            PaletteTestSupport.clickHintAction(palette, 1);
-            assertThat(events).containsExactly("test.history/ls:2");
+            assertThat(palette.hintActionTexts()).as("Enter's verb first").containsExactly("Paste ⏎", "Paste and run ⌘⏎", "Save as snippet… ⇧⏎");
+            assertThat(PaletteTestSupport.hintBarTexts(palette)).containsExactly("in ~/src", "Paste ⏎", "Paste and run ⌘⏎", "Save as snippet… ⇧⏎");
+            PaletteTestSupport.clickHintAction(palette, 0);
+            PaletteTestSupport.clickHintAction(palette, 2);
+            assertThat(events).containsExactly("test.history/ls:0", "test.history/ls:2");
             palette.selectRelative(1);
             assertThat(palette.hintText()).as("a command shows its shortcut").isEqualTo("⌘T");
-            assertThat(palette.hintActionTexts()).isEmpty();
+            assertThat(palette.hintActionTexts()).as("a single verb is Enter's, unlisted").isEmpty();
             palette.selectRelative(1);
             assertThat(palette.hintText()).isEqualTo("Show every match in History");
             var elsewhere = palette(KitTestSupport.context(), false, new ArrayList<>());
             elsewhere.setEntries(List.of(item(HISTORY, "ls")), null, null);
-            assertThat(elsewhere.hintActionTexts()).containsExactly("Paste and run Ctrl+Enter", "Save as snippet… Shift+Enter");
+            assertThat(elsewhere.hintActionTexts()).containsExactly("Paste Enter", "Paste and run Ctrl+Enter", "Save as snippet… Shift+Enter");
             palette.close(); elsewhere.close();
+        });
+    }
+
+    @Test void theLongestBundledVerbsFitTheHintBarAtTheAnchoredMinimumWidth() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            // The Files scope's verbs are the longest bundled set; Remote's and Tunnels' are close.
+            var files = scope("test.files", "Files", false, List.of(new PaletteVerb("open", "Open"),
+                new PaletteVerb("copy-path", "Copy path"), new PaletteVerb("terminal", "Open terminal here")));
+            for (boolean macOs : new boolean[]{true, false}) {
+                var palette = palette(KitTestSupport.context(), macOs, new ArrayList<>());
+                palette.setEntries(List.of(new PaletteEntry.Item(files, new PaletteRow("a", "README.md", "src/main/resources/very/long/path", null, null, true, null))), null, null);
+                palette.setSize(UIScale.scale(960), palette.getPreferredSize().height);
+                layoutTree(palette);
+                var hintBar = palette.hintBar();
+                int oneLine = hintBar.getHeight();
+                // WindowCommandPalette.ANCHORED_MINIMUM_WIDTH: the narrowest a dropped palette gets. Too narrow, the bar
+                // wraps its verbs onto further lines and grows.
+                palette.setSize(UIScale.scale(560), palette.getPreferredSize().height);
+                layoutTree(palette);
+                assertThat(hintBar.getHeight()).as(macOs + ": the bar keeps one line").isEqualTo(oneLine);
+                var lines = new java.util.HashSet<Integer>();
+                for (int verb = 0; verb < 3; verb++) {
+                    var button = KitTestSupport.require(palette.hintView(), CommandPalette.VERB + verb, AbstractButton.class);
+                    var bounds = javax.swing.SwingUtilities.convertRectangle(button.getParent(), button.getBounds(), hintBar);
+                    lines.add(bounds.y);
+                    assertThat(bounds.x + bounds.width).as(macOs + " verb " + verb + " inside the bar").isLessThanOrEqualTo(hintBar.getWidth());
+                }
+                assertThat(lines).as(macOs + ": the verbs share one line").hasSize(1);
+                palette.close();
+            }
         });
     }
 

@@ -8,6 +8,7 @@ import dev.jasper.sdk.testing.FakeNotifications;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.vault.model.Note;
+import dev.jasper.vault.model.SshKey;
 import dev.jasper.vault.model.Grant;
 import dev.jasper.vault.service.VaultService;
 import java.nio.file.Path;
@@ -149,6 +150,28 @@ class VaultManagerWindowTest {
                 assertThat(window.isOpen()).isFalse();
                 assertThat(window.panel.visibleRows()).isEmpty();
                 assertThat(closed(view)).isTrue();
+            }
+        });
+    }
+
+    @Test void copyPublicKeyConfirmsWithACardThatHasNoClearingLine() throws Exception {
+        edt(() -> {
+            try (var f = new VaultUiFixture(directory); var host = new FakePluginHost()) {
+                PluginContext context = host.start(INFO, Set.of(), Set.of(), c -> { });
+                host.addTerminalWindow();
+                WindowHandle owner = context.terminals().windows().getFirst();
+                var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
+                var window = new VaultManagerWindow(context, f.lock, f.manager, service,
+                    () -> new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
+                Path pub = java.nio.file.Files.writeString(directory.resolve("laptop.pub"), "ssh-ed25519 AAAAfixture laptop\n");
+                UUID id = UUID.randomUUID();
+                f.lock.vault().keys().add(new SshKey(id, "laptop", "ssh-ed25519", "SHA256:fixture", "", directory.resolve("laptop"), pub, Instant.EPOCH));
+                window.show(owner, Optional.of(id));
+                press(window.panel.view(), ManagerPanel.COPY_PUBLIC);
+                f.drain();
+                assertThat(host.clipboard().copies()).as("a public key is an ordinary copy").containsExactly("copy|dev.jasper.vault|ssh-ed25519 AAAAfixture laptop\n");
+                assertThat(host.notifications().lines()).containsExactly("dev.jasper.vault.copies|INFO|Copied the public key for laptop|");
+                window.close();
             }
         });
     }

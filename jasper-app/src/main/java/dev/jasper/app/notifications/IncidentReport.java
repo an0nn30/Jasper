@@ -10,7 +10,7 @@ public final class IncidentReport {
     /**
      * Where Jasper runs.
      *
-     * @param jasper Jasper's version
+     * @param jasper Jasper's build, as {@link dev.jasper.app.platform.BuildInfo#summary()} gives it
      * @param os the operating system, its version and architecture
      * @param java the Java runtime, its version and vendor
      */
@@ -21,9 +21,9 @@ public final class IncidentReport {
             Objects.requireNonNull(java, "java");
         }
 
-        /** This process's environment: the packaged version, or "development build" from Gradle or an IDE. */
+        /** This process's environment: its build (a release's version, or what a development build was built from). */
         public static Environment current() {
-            return new Environment(System.getProperty("jpackage.app-version", "development build"),
+            return new Environment(dev.jasper.app.platform.BuildInfo.current().summary(),
                 System.getProperty("os.name", "unknown OS") + " " + System.getProperty("os.version", "") + " ("
                     + System.getProperty("os.arch", "") + ")",
                 System.getProperty("java.runtime.name", "Java") + " "

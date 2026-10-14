@@ -31,7 +31,8 @@ import java.util.function.Supplier;
 
 /**
  * Add or edit one host on a host-rendered kit form. Validation is inline; Save hands back a {@link RemoteHost} and the
- * dialog closes it. The visual primary opts out of submission, so Enter saves nothing (the former dialog had
+ * dialog closes it. Add and Connect, offered when adding with a connect callback, saves the same way and then hands the
+ * saved host to that callback. The visual primary opts out of submission, so Enter saves nothing (the former dialog had
  * no default button); Escape cancels. Changing the authentication keeps the chosen credential and keys until Save. A
  * Vault choice completing after {@link #close()} is ignored. UI thread only.
  */
@@ -39,7 +40,7 @@ public final class HostEditor implements AutoCloseable {
     public static final String FORM = "host", NAME = "host.name", HOSTNAME = "host.hostname", PORT = "host.port", USERNAME = "host.username",
         GROUP = "host.group", GROUP_HINT = "host.group.hint", FAVORITE = "host.favorite", FOLLOW = "host.follow", AUTH = "host.auth",
         CREDENTIAL = "host.credential", CHOOSE = "host.choose", KEYS_LABEL = "host.keys.label", KEYS = "host.keys", ADD_KEY = "host.keys.add",
-        JUMP = "host.jump", MESSAGE = "host.message", SAVE = "host.save", CANCEL = "host.cancel";
+        JUMP = "host.jump", MESSAGE = "host.message", SAVE = "host.save", SAVE_CONNECT = "host.save-connect", CANCEL = "host.cancel";
     public static final String VAULT = "vault", AGENT = "agent", NO_JUMP = "none";
 
     private final List<RemoteHost> others;
@@ -52,10 +53,14 @@ public final class HostEditor implements AutoCloseable {
     private final Supplier<CompletableFuture<Optional<CredentialDescriptor>>> legacyPick;
     private final Function<RemoteHost, CompletableFuture<Void>> persist;
     private final Runnable onSaved;
+    /** Connects to a host Add and Connect saved; null when the form offers no Add and Connect. */
+    private final Consumer<RemoteHost> onConnect;
     private final java.util.Map<UUID, CredentialDescriptor> chosenMetadata = new java.util.HashMap<>();
     private PickOperation pending;
     private long pickerRevision;
     private Object saving;
+    /** Whether the save in progress came from Add and Connect. */
+    private boolean connectAfterSave;
     private UUID selectedKey;
     private static final class PickOperation {
         final boolean append;
@@ -78,7 +83,7 @@ public final class HostEditor implements AutoCloseable {
                       Function<UUID, Optional<String>> names, Supplier<CompletableFuture<Optional<CredentialDescriptor>>> pick,
                       Consumer<RemoteHost> onSave, Runnable onCancel) {
         this(kit, ui, others, editing, vaultPresent, names, id -> Optional.empty(), null, pick,
-            host -> { onSave.accept(host); return CompletableFuture.completedFuture(null); }, () -> {}, onCancel);
+            host -> { onSave.accept(host); return CompletableFuture.completedFuture(null); }, () -> {}, onCancel, null);
     }
 
     /** Mounted default-density picker and real persistence. Completion may arrive on any thread. */
@@ -86,18 +91,31 @@ public final class HostEditor implements AutoCloseable {
                       Function<UUID, Optional<CredentialDescriptor>> metadata,
                       Function<CredentialPickRequest, CompletableFuture<CredentialPickResult>> pick,
                       Function<RemoteHost, CompletableFuture<Void>> persist, Runnable onSaved, Runnable onCancel) {
+        this(kit, ui, others, editing, vaultPresent, metadata, pick, persist, onSaved, onCancel, null);
+    }
+
+    /**
+     * As the mounted form, with Add and Connect beside Add Host when adding: after {@code onSaved}, {@code connect}
+     * receives the saved host. Null offers no Add and Connect.
+     */
+    public HostEditor(UiKit kit, Executor ui, List<RemoteHost> others, Optional<RemoteHost> editing, boolean vaultPresent,
+                      Function<UUID, Optional<CredentialDescriptor>> metadata,
+                      Function<CredentialPickRequest, CompletableFuture<CredentialPickResult>> pick,
+                      Function<RemoteHost, CompletableFuture<Void>> persist, Runnable onSaved, Runnable onCancel,
+                      Consumer<RemoteHost> connect) {
         this(kit, ui, others, editing, vaultPresent, vaultPresent ? id -> metadata.apply(id).map(CredentialDescriptor::name) : id -> Optional.empty(), metadata,
-            pick, null, persist, onSaved, onCancel);
+            pick, null, persist, onSaved, onCancel, connect);
     }
 
     private HostEditor(UiKit kit, Executor ui, List<RemoteHost> others, Optional<RemoteHost> editing, boolean vaultPresent,
                        Function<UUID, Optional<String>> names, Function<UUID, Optional<CredentialDescriptor>> metadata,
                        Function<CredentialPickRequest, CompletableFuture<CredentialPickResult>> pick,
                        Supplier<CompletableFuture<Optional<CredentialDescriptor>>> legacyPick,
-                       Function<RemoteHost, CompletableFuture<Void>> persist, Runnable onSaved, Runnable onCancel) {
+                       Function<RemoteHost, CompletableFuture<Void>> persist, Runnable onSaved, Runnable onCancel,
+                       Consumer<RemoteHost> connect) {
         this.others = List.copyOf(others); this.editing = editing; this.vaultPresent = vaultPresent; this.credentialName = names;
         this.metadata = metadata; this.ui = ui; this.pick = pick; this.legacyPick = legacyPick;
-        this.persist = persist; this.onSaved = onSaved;
+        this.persist = persist; this.onSaved = onSaved; this.onConnect = editing.isEmpty() ? connect : null;
         jumps = others.stream().filter(other -> editing.map(host -> !host.id().equals(other.id())).orElse(true)).toList();
         groups = List.copyOf(new TreeSet<>(others.stream().map(RemoteHost::group).filter(g -> !g.isEmpty()).toList()));
         editing.ifPresentOrElse(host -> {
@@ -132,7 +150,8 @@ public final class HostEditor implements AutoCloseable {
                 case UiEvent.Removed removed when removed.id().equals(KEYS) -> remove(UUID.fromString(removed.itemId()));
                 case UiEvent.Action action when action.id().equals(CHOOSE) -> pick(false);
                 case UiEvent.Action action when action.id().equals(ADD_KEY) -> pick(true);
-                case UiEvent.Action action when action.id().equals(SAVE) -> save();
+                case UiEvent.Action action when action.id().equals(SAVE) -> save(false);
+                case UiEvent.Action action when action.id().equals(SAVE_CONNECT) && onConnect != null -> save(true);
                 case UiEvent.Action action when action.id().equals(CANCEL) -> { cancelPick(); onCancel.run(); }
                 default -> { }
             }
@@ -266,18 +285,18 @@ public final class HostEditor implements AutoCloseable {
 
     private boolean ready() { try { draft(); return true; } catch (IllegalArgumentException invalid) { return false; } }
 
-    private void save() {
+    private void save(boolean connect) {
         if (saving != null || closed) return;
         final RemoteHost host;
         try { host = draft(); } catch (IllegalArgumentException invalid) { showError(invalid.getMessage()); return; }
-        Object operation = new Object(); saving = operation; cancelPick();
+        Object operation = new Object(); saving = operation; connectAfterSave = connect; cancelPick();
         if (closed || saving != operation) return;
         message = ""; render();
         try {
             java.util.Objects.requireNonNull(persist.apply(host)).whenComplete((ignored, failure) -> ui.execute(() -> {
                 if (closed || saving != operation) return;
                 saving = null;
-                if (failure == null) { render(); onSaved.run(); }
+                if (failure == null) { render(); onSaved.run(); if (connect) onConnect.accept(host); }
                 else showError(failureMessage(failure));
             }));
         } catch (RuntimeException failure) {
@@ -360,9 +379,12 @@ public final class HostEditor implements AutoCloseable {
                 new Nodes.Toggle(FAVORITE, state(true, editable), "Favorite", favorite, FAVORITE, false), false),
             new Nodes.SettingRow("row." + FOLLOW, ControlState.READY, "Track shell folder", "SFTP follows the terminal's current directory",
                 new Nodes.Toggle(FOLLOW, state(true, editable), "Track shell folder for SFTP follow", followDirectory, FOLLOW, false), false)));
-        var actions = List.of(
-            new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
-            new Nodes.Button(SAVE, new ControlState(true, editable && ready(), !editable, ""), !editable ? "Saving…" : editing.isPresent() ? "Save" : "Add Host", "", Nodes.ButtonKind.PRIMARY, SAVE, ""));
+        boolean savingPlain = !editable && !connectAfterSave, savingConnect = !editable && connectAfterSave;
+        var actions = new ArrayList<Nodes.Button>();
+        actions.add(new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""));
+        if (onConnect != null) actions.add(new Nodes.Button(SAVE_CONNECT, new ControlState(true, editable && ready(), savingConnect, ""),
+            savingConnect ? "Saving…" : "Add and Connect", "", Nodes.ButtonKind.SECONDARY, SAVE_CONNECT, ""));
+        actions.add(new Nodes.Button(SAVE, new ControlState(true, editable && ready(), savingPlain, ""), savingPlain ? "Saving…" : editing.isPresent() ? "Save" : "Add Host", "", Nodes.ButtonKind.PRIMARY, SAVE, ""));
         String command = "ssh " + (username.isBlank() ? "user" : username.strip()) + "@" + (hostname.isBlank() ? "host" : hostname.strip());
         if (!port.strip().equals("22")) command += " -p " + port.strip();
         Nodes.Node preview = message.isEmpty() ? new Nodes.Text("host.preview", ControlState.READY, command, Nodes.TextRole.MONO_CAPTION)

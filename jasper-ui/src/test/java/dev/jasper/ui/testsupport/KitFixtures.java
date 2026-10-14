@@ -1,5 +1,7 @@
 package dev.jasper.ui.testsupport;
 
+import dev.jasper.ui.theme.JasperTheme;
+
 import dev.jasper.ui.icons.IconRegistry;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.swing.KitContext;
@@ -9,9 +11,9 @@ import dev.jasper.ui.theme.*;
 public final class KitFixtures {
     private KitFixtures() {}
 
-    public static GeneratedTheme dark() { return SlateSteel.bundled().generated(true); }
+    public static GeneratedTheme dark() { return JasperTheme.bundled().generated(true); }
 
-    public static GeneratedTheme light() { return SlateSteel.bundled().generated(false); }
+    public static GeneratedTheme light() { return JasperTheme.bundled().generated(false); }
 
     /** A third appearance: Slate Steel Dark with every role 20% plum (alpha kept), so a hard-coded variant colour shows. */
     public static GeneratedTheme custom() {

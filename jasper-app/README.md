@@ -86,11 +86,11 @@ updating reflective class names in `.properties` files.
 
 ## Native theme engine
 
-The app runs on Slate Steel only. `ui.appearance` (system, dark, light) picks Slate Steel Dark or Light and
-`terminal.scheme` the terminal panes' colours; `application.ConfigurationController` applies both through
-`appearance.ThemeController`, with `application.AppearancePolicy` resolving `system` against the operating system.
-No themes folder is read and nothing is converted or upgraded at start-up; there is no other theme and no theme
-import. See [themes](../docs/themes.md) and
+The built-in theme is Slate Steel; installed themes are theme files in `<home>/themes/`, read by
+`appearance.ThemeLibrary`. `ui.appearance` (system, dark, light) picks the appearance, `ui.theme.dark` and
+`ui.theme.light` the theme each shows, and `terminal.scheme` the terminal panes' colours;
+`application.ConfigurationController` applies them through `appearance.ThemeController`, with
+`application.AppearancePolicy` resolving `system` against the operating system. See [themes](../docs/themes.md) and
 [maintenance](../docs/app-maintenance.md#themes).
 
 The [Plan 2 completion audit](../docs/design/theme-engine/completion.md) records SDK 0.15 migration,

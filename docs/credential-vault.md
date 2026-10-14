@@ -11,7 +11,8 @@ fingerprints and narrow the list with **All Types**. Each row shows its name, se
 and type. Double-click a row or press Enter to edit it. The icon actions add, edit, delete, copy a
 public key and lock the vault; each has a tooltip and accessible name.
 
-The **+** menu adds a login, imports an SSH key, adds a secure note, or generates a new SSH key.
+The **+** menu adds a login, imports an SSH key, adds a secure note, or generates a new SSH key. The palette's
+**Add Login...**, **Add SSH Key...** and **Add Secure Note...** open the manager on the same sheets, creating or unlocking the vault first.
 **File → Vault Plugin Grants...** (or the palette) opens the manager on the saved plugin grants, and **File → Change
 Vault Master Password...** asks for a new master password over it; both unlock first. Grant revocation has a **Back to
 entries** button. **Cancel** and **Okay** both close the manager; changes made in
@@ -45,8 +46,8 @@ shows the remaining inactivity time. Already connected SSH sessions are unaffect
 **Search Vault Logins** (Cmd+\\, or Ctrl+Shift+\\ on Windows and Linux) opens the command palette on the Vault scope;
 `vault >` in the palette does the same. It lists logins, searched by name or username; SSH keys stay in the manager.
 Enter copies a login's password, Cmd/Ctrl+Enter copies its username, and Shift+Enter opens the selected entry in the
-manager. A card confirms each copy, naming the login; turn these off in the **Vault copies** group under **Settings ›
-Notifications › Groups**. While the vault is locked the scope shows one row, whose Enter unlocks the vault and returns
+manager. A card confirms each copy, here and from the manager's copy buttons (username, password, secure note and
+public key), naming the entry; turn these off in the **Vault copies** group under **Settings › Notifications › Groups**. While the vault is locked the scope shows one row, whose Enter unlocks the vault and returns
 to the search; with no vault yet, Enter creates one in the manager. Both password and username
 copies are secret copies to Jasper's clipboard (SDK `Platform.copySecret`): Jasper clears them after 30 seconds (retrying
 briefly while another program holds the clipboard), and tries once when the vault plugin stops and once when Jasper
@@ -71,8 +72,10 @@ keys_directory = ""              # empty uses this plugin's data/keys directory
 bind_new_vaults_to_device = true  # initial state of the create checkbox
 ```
 
-The six actions are `dev.jasper.vault.search` (Cmd+\\), `dev.jasper.vault.open` (Cmd+Shift+\\), `dev.jasper.vault.lock`, `dev.jasper.vault.generate_key`,
-`dev.jasper.vault.change_password` and `dev.jasper.vault.grants`. Configure their shortcuts like other contributed actions.
+The nine actions are `dev.jasper.vault.search` (Cmd+\\), `dev.jasper.vault.open` (Cmd+Shift+\\), `dev.jasper.vault.lock`
+(Cmd+Shift+L), `dev.jasper.vault.generate_key`, `dev.jasper.vault.change_password`, `dev.jasper.vault.grants`,
+`dev.jasper.vault.add_login`, `dev.jasper.vault.add_key` and `dev.jasper.vault.add_note`. Configure their shortcuts like
+other contributed actions.
 
 ## Native acceptance
 

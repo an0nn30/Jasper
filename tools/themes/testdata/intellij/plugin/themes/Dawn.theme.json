@@ -1,0 +1,10 @@
+{
+  "name": "Ocean Dawn",
+  "dark": false,
+  "parentTheme": "ExperimentalLight",
+  "editorScheme": "Light",
+  "ui": {
+    "*": { "background": "#FBF7F2" },
+    "Button.default.startBackground": "#C2410C"
+  }
+}

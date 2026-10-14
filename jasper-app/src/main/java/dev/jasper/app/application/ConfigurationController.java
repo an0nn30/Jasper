@@ -5,6 +5,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.appearance.ThemeLibrary;
+import dev.jasper.app.appearance.ThemeSelection;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -35,8 +37,12 @@ final class ConfigurationController implements AutoCloseable {
     private dev.jasper.app.platform.SystemAppearance.Observation systemAppearance;
     private Consumer<ConfigSnapshot> applicationListener = snapshot -> {};
     private final List<ConfigDiagnostic> reported = new java.util.ArrayList<>();
-    /** A Slate Steel variant that could not be installed, from the last state applied. */
+    /** From the last state applied: theme files the library skipped, theme picks it cannot honour, a theme that could not be installed. */
     private List<ConfigDiagnostic> themeProblems = List.of();
+    /** The themes folder, or null for the built-in theme alone. */
+    private final Path themesFolder;
+    /** Read again on the configuration worker before each forced or changed publication; used on the EDT. */
+    private volatile ThemeLibrary library;
     private Predicate<String> pluginSettingsExist = id -> false;
     private final List<Consumer<ConfigService.State>> stateListeners = new java.util.ArrayList<>();
     private Consumer<ConfigService.State> problemListener = state -> {};
@@ -90,9 +96,20 @@ final class ConfigurationController implements AutoCloseable {
     }
     ConfigurationController(ThemeController themes, ConfigService service, Consumer<Path> editor,
                             dev.jasper.app.platform.SystemAppearance.Observation initialAppearance) {
+        this(themes, service, editor, initialAppearance, null);
+    }
+    /**
+     * {@code themesFolder} holds the imported themes; null shows the built-in theme alone. The folder is read again
+     * whenever the configuration is (Reload config, Settings, a change to config.toml), before that state is applied.
+     */
+    ConfigurationController(ThemeController themes, ConfigService service, Consumer<Path> editor,
+                            dev.jasper.app.platform.SystemAppearance.Observation initialAppearance, Path themesFolder) {
         this.systemAppearance = Objects.requireNonNull(initialAppearance);
         requireEdt();
         this.themes = themes; this.service = service; this.editor = editor;
+        this.themesFolder = themesFolder;
+        library = themes.library();
+        if (themesFolder != null) service.watchWith(() -> library = ThemeLibrary.read(themesFolder, library));
         state = service.initialState();
         try { configureThemes(state); }
         catch (ThemeController.InstallationFailure ignored) {
@@ -249,19 +266,27 @@ final class ConfigurationController implements AutoCloseable {
         problemListener.accept(visible);
     }
 
-    /** Applies the saved appearance, terminal scheme and interface font. */
+    /** Applies the saved appearance, themes, terminal scheme and interface font from the current library. */
     private void configureThemes(ConfigService.State next) {
         var snapshot = next.snapshot();
         boolean dark = AppearancePolicy.dark(snapshot.appearance(), systemAppearance);
         themes.configureAnimations(snapshot.animations().enabled());
+        var problems = new java.util.ArrayList<ConfigDiagnostic>();
+        var installed = library;
+        for (var problem : installed.problems())
+            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, problem.file(), problem.line(), problem.line() == 0 ? 0 : 1,
+                "", problem.message()));
+        var selection = ThemeSelection.of(installed, snapshot.darkTheme(), snapshot.lightTheme(), snapshot.terminalScheme(),
+            (key, message) -> problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, key, message)));
         try {
-            themes.configure(dark, snapshot.terminalScheme(), snapshot.uiFont());
-            themeProblems = List.of();
+            themes.configure(dark, selection, snapshot.uiFont());
+            themeProblems = List.copyOf(problems);
         } catch (ThemeController.InstallationFailure failure) {
             Throwable cause = failure.getCause();
-            themeProblems = List.of(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.appearance",
-                "Could not apply Slate Steel " + (dark ? "Dark" : "Light") + ": " + (cause != null ? cause.getMessage() : failure.getMessage())
-                    + "; keeping the current appearance."));
+            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.appearance",
+                "Could not apply " + selection.theme(dark).name() + (dark ? " Dark" : " Light") + ": "
+                    + (cause != null ? cause.getMessage() : failure.getMessage()) + "; keeping the current appearance."));
+            themeProblems = List.copyOf(problems);
             throw failure;
         }
     }

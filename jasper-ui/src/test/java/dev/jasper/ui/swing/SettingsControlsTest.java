@@ -65,6 +65,24 @@ class SettingsControlsTest {
         }finally{context.binding().close();context.icons().close();}
     }); }
 
+    @Test void navigationHeadingsCannotCollapseAndPagesShowTheNavigationTile() { Edt.run(()->{
+        var context=dev.jasper.ui.testsupport.KitFixtures.context();
+        var child=new TreeItem("child","Child",Optional.of("bell"),true,List.of());
+        var group=new TreeItem("group","Group",Optional.empty(),false,List.of(child));
+        var tree=new Nodes.Tree("tree",ControlState.READY,List.of(group),Set.of("group"),Set.of("child"),"");
+        var events=new ArrayList<UiEvent>();
+        try(var view=new KitView(context,new ViewSpec(new Nodes.Stack("nav",ControlState.READY,Nodes.LayoutRole.SETTINGS_NAVIGATION,List.of(tree))),events::add)) {
+            view.setSize(236,500);layout(view);var rows=(Trees.TreeControl)view.control("tree");
+            assertThat(rows.mounted.get("group").controls).as("no disclosure button").doesNotContainKey("@tree/tree/group/expand");
+            var icon=(Labels.IconControl)rows.mounted.get("child").controls.get("@tree/tree/child/icon");
+            assertThat(icon.tileSize).isEqualTo(context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_TILE));
+            assertThat(icon.tileGlyph).isEqualTo(context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_GLYPH));
+            rows.select("group",false);events.clear();
+            rows.canvas.getActionMap().get("LEFT").actionPerformed(new java.awt.event.ActionEvent(rows.canvas,0,""));
+            assertThat(events).as("Left leaves the heading open").noneMatch(UiEvent.Expanded.class::isInstance);
+        }finally{context.binding().close();context.icons().close();}
+    }); }
+
     @Test void identityRowTitleAndMetadataAreOneCenteredBlock() { Edt.run(()->{
         var context=dev.jasper.ui.testsupport.KitFixtures.context();
         var icon=new Nodes.Icon("identity",ControlState.READY,"plugin",Nodes.Hue.BLUE,Nodes.IconSize.CONTROL,"Owner");

@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.*;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.TerminalSchemeChoice;
 import dev.jasper.ui.theme.SemanticColor;
-import dev.jasper.ui.theme.SlateSteel;
+import dev.jasper.ui.theme.JasperTheme;
 import dev.jasper.ui.theme.TerminalScheme;
 import java.util.ArrayDeque;
 import org.junit.jupiter.api.AfterEach;
@@ -24,15 +24,15 @@ class TerminalSchemeSurfaceTest {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owner = new WindowContent[1];
         edt(() -> {
-            owner[0] = content(launcher(pending), new ThemeController(false, TerminalSchemeChoice.HIGH_CONTRAST));
+            owner[0] = content(launcher(pending), new ThemeController(false, TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow()));
             owner[0].currentTab().rename("other"); owner[0].newTab(HOME); owner[0].currentTab().rename("selected");
             owner[0].update();
         });
         while (!pending.isEmpty()) pending.remove().run();
         until(() -> owner[0].currentPane().view() != null);
         edt(() -> {
-            var light = SlateSteel.bundled().palette(false);
-            var black = SlateSteel.bundled().terminal(TerminalScheme.HIGH_CONTRAST).colors().background();
+            var light = JasperTheme.bundled().palette(false);
+            var black = JasperTheme.bundled().scheme("high-contrast").orElseThrow().colors().background();
             assertThat(owner[0].getBackground()).isEqualTo(light.color(SemanticColor.SURFACE_TERMINAL));
             assertThat(owner[0].workspaceSurface()).isEqualTo(light.color(SemanticColor.SURFACE_TERMINAL));
             assertThat(owner[0].windowTabs().getBackground()).as("the tab strip").isEqualTo(light.color(SemanticColor.SURFACE_TERMINAL));

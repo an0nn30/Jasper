@@ -44,8 +44,8 @@ import javax.swing.UIManager;
  * The terminal column with the tool windows docked around it, laid out by {@link DockGeometry} from the window's
  * {@link DockState}: a full-width bottom area under the left side, the terminal column and the right side. Each
  * showing tool window sits in a rounded frame under its {@link ToolWindowHeader}; the gaps between frames are this
- * area's dividers. The terminal column has a rounded frame and exterior gutter only while the stripes are visible;
- * otherwise it fills its area edge to edge. The center frame is painted in the terminal palette's background, never
+ * area's dividers. The terminal column has a rounded frame and exterior gutter while a stripe is visible, and is
+ * borderless and square on the side of a hidden stripe; with neither stripe it fills its area edge to edge. The center frame is painted in the terminal palette's background, never
  * a theme's tool window colour. The area changes the state only when a divider drag ends; whoever changes the state
  * calls {@link #sync} afterwards. EDT only.
  */
@@ -57,7 +57,8 @@ final class ToolWindowArea extends JPanel {
     /** A shared frame around plugin-owned content; gutters belong to the workspace chrome. */
     private static final class Host extends JPanel {
         private final int[] gutters = {-1, -1, -1, -1};
-        private boolean rounded = true;
+        /** Whether each side's corners are rounded; a side that meets the window edge directly is square. */
+        private boolean roundLeft = true, roundRight = true;
         /** The opacity in effect for the surface, 1 being opaque; only the centre host follows the window's glass. */
         private float opacity = 1f;
         private JComponent content;
@@ -81,11 +82,26 @@ final class ToolWindowArea extends JPanel {
             setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(top, left, bottom, right), null));
         }
 
+        void rounded(boolean left, boolean right) {
+            if (roundLeft == left && roundRight == right) return;
+            roundLeft = left;
+            roundRight = right;
+            repaint();
+        }
+
+        private boolean rounded() { return roundLeft || roundRight; }
+
         private java.awt.Shape surface() {
             var insets = getInsets();
             int width = Math.max(0, getWidth() - insets.left - insets.right);
-            int height = Math.max(0, getHeight() - insets.top - insets.bottom), arc = rounded ? UIScale.scale(SURFACE_ARC) : 0;
-            return new RoundRectangle2D.Double(insets.left, insets.top, width, height, arc, arc);
+            int height = Math.max(0, getHeight() - insets.top - insets.bottom), arc = rounded() ? UIScale.scale(SURFACE_ARC) : 0;
+            var round = new RoundRectangle2D.Double(insets.left, insets.top, width, height, arc, arc);
+            if (roundLeft == roundRight) return round;
+            // One side meets the window edge directly: its half is square.
+            var shape = new Area(round);
+            double half = width / 2.0;
+            shape.add(new Area(new java.awt.geom.Rectangle2D.Double(roundLeft ? insets.left + half : insets.left, insets.top, width - half, height)));
+            return shape;
         }
 
         @Override protected boolean isPaintingOrigin() { return true; }
@@ -111,7 +127,7 @@ final class ToolWindowArea extends JPanel {
                     g.setColor(new Color(background.getRed(), background.getGreen(), background.getBlue(),
                         Math.round(255 * opacity)));
                     g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
-                    if (rounded && chrome != null) {
+                    if (rounded() && chrome != null) {
                         var corners = new Area(bounds);
                         corners.subtract(new Area(surface()));
                         g.setComposite(AlphaComposite.SrcOver);
@@ -209,8 +225,6 @@ final class ToolWindowArea extends JPanel {
     }
 
     private final DockState state;
-    private final DockState emptyLayout = new DockState();
-    private boolean toolsSuppressed;
     private final Host center = new Host(false);
     private final JPanel lowerInset = new JPanel() {
         @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(SURFACE_ARC / 2)); }
@@ -222,7 +236,7 @@ final class ToolWindowArea extends JPanel {
     private final EnumMap<DockGeometry.Handle, DividerHandle> dividers = new EnumMap<>(DockGeometry.Handle.class);
     /** A divider drag in progress lays out this copy of the state. */
     private DockState preview;
-    private boolean stripesVisible, statusVisible, headerVisible;
+    private boolean leftStripeVisible, rightStripeVisible, statusVisible, headerVisible;
     /** Runs after every sync, which may have changed which windows show and so the area's minimum size. */
     Runnable onMinimumSizeChanged = () -> { };
     BiConsumer<String, Slot> onMove = (id, slot) -> { };
@@ -303,7 +317,7 @@ final class ToolWindowArea extends JPanel {
      */
     void sync() {
         for (Slot slot : Slot.values()) {
-            String id = toolsSuppressed ? null : state.active(slot).orElse(null);
+            String id = state.active(slot).orElse(null);
             Content wanted = id == null ? null : contents.get(id);
             if (wanted != null && wanted.component() instanceof dev.jasper.ui.swing.KitView view && view.isClosed()) wanted = null;
             Host host = hosts.get(slot);
@@ -421,16 +435,15 @@ final class ToolWindowArea extends JPanel {
             if (child instanceof JComponent next) collectHeaderSources(next, sources);
     }
 
-    /** Zen changes the presentation only: no dock mutation, persistence or disposal of plugin content. */
-    void setToolsSuppressed(boolean suppressed) {
-        if (toolsSuppressed == suppressed) return;
-        toolsSuppressed = suppressed;
-        preview = null;
+    /** Ends a divider drag without applying it: entering or leaving Zen changes which windows show mid-drag. */
+    void cancelResize() {
         dividers.values().forEach(divider -> { divider.dragging = null; divider.moved = false; });
-        sync();
+        if (preview == null) return;
+        preview = null;
+        revalidate(); repaint();
     }
 
-    private DockState layoutState() { return toolsSuppressed ? emptyLayout : preview != null ? preview : state; }
+    private DockState layoutState() { return preview != null ? preview : state; }
 
     private ToolWindowHeader header(String id, String title) {
         var header = new ToolWindowHeader(title,
@@ -460,10 +473,15 @@ final class ToolWindowArea extends JPanel {
         hosts.values().forEach(ToolWindowSurface::apply);
     }
 
-    /** Visible stripes frame the terminal; hiding them lets the terminal fill its available area. */
-    void setStripesVisible(boolean visible) {
-        if (stripesVisible == visible) return;
-        stripesVisible = visible;
+    /**
+     * A visible stripe frames the terminal and supplies its side's spacing. On a side without one the terminal meets
+     * the window edge borderless and square, as in Zen, and tool windows keep their exterior gutter. With neither, the
+     * terminal fills its available area.
+     */
+    void setStripesVisible(boolean left, boolean right) {
+        if (leftStripeVisible == left && rightStripeVisible == right) return;
+        leftStripeVisible = left;
+        rightStripeVisible = right;
         refreshGutters();
         revalidate(); repaint();
     }
@@ -489,23 +507,25 @@ final class ToolWindowArea extends JPanel {
      * status bar already supplies the spacing; facing edges have none, because the 6px divider is the gap.
      */
     private void refreshGutters() {
-        int top = headerVisible ? 0 : GUTTER, edge = stripesVisible ? 0 : GUTTER, bottom = statusVisible ? 0 : GUTTER;
+        int top = headerVisible ? 0 : GUTTER, bottom = statusVisible ? 0 : GUTTER;
+        int left = leftStripeVisible ? 0 : GUTTER, right = rightStripeVisible ? 0 : GUTTER;
+        boolean framed = leftStripeVisible || rightStripeVisible;
         boolean bottomShown = layoutState().showing(Side.BOTTOM);
-        center.rounded = stripesVisible;
-        lowerInset.setVisible(stripesVisible);
-        if (stripesVisible) center.gutters(top, 0, bottomShown ? 0 : bottom, 0);
+        center.rounded(leftStripeVisible, rightStripeVisible);
+        lowerInset.setVisible(framed);
+        if (framed) center.gutters(top, 0, bottomShown ? 0 : bottom, 0);
         else center.gutters(0, 0, 0, 0);
         hosts.forEach((slot, host) -> {
             boolean alone = state.active(slot.partner()).isEmpty(), first = !slot.split();
             if (slot.side() == Side.BOTTOM)
-                host.gutters(0, first || alone ? edge : 0, bottom, !first || alone ? edge : 0);
+                host.gutters(0, first || alone ? left : 0, bottom, !first || alone ? right : 0);
             else
-                host.gutters(first || alone ? top : 0, slot.side() == Side.LEFT ? edge : 0,
-                    (!first || alone) && !bottomShown ? bottom : 0, slot.side() == Side.RIGHT ? edge : 0);
+                host.gutters(first || alone ? top : 0, slot.side() == Side.LEFT ? left : 0,
+                    (!first || alone) && !bottomShown ? bottom : 0, slot.side() == Side.RIGHT ? right : 0);
         });
     }
 
-    private Dimension size(Dimension terminal, boolean preferred) { return size(terminal, toolsSuppressed ? emptyLayout : state, metrics(), preferred); }
+    private Dimension size(Dimension terminal, boolean preferred) { return size(terminal, state, metrics(), preferred); }
 
     /**
      * The area's preferred or minimum size around a terminal column of the given size. Only a split side raises the

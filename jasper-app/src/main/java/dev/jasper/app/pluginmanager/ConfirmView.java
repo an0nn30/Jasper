@@ -12,14 +12,14 @@ import java.util.Optional;
 /**
  * A question with one consequence and two answers, for a removal: a kit sheet whose primary answers yes (Enter) and
  * whose Cancel answers no (Escape). Kit text is literal, so plugin-supplied text is never markup. EDT only; it closes
- * with its dialog.
+ * with its dialog. Settings' Imported themes group asks its questions with it too.
  */
-final class ConfirmView implements AutoCloseable {
+public final class ConfirmView implements AutoCloseable {
     static final String OK = "ok", CANCEL = "cancel";
     private final KitView view;
     private final String question, consequence, okLabel;
 
-    ConfirmView(KitContext kit, String question, String consequence, String okLabel, Runnable onOk, Runnable onCancel) {
+    public ConfirmView(KitContext kit, String question, String consequence, String okLabel, Runnable onOk, Runnable onCancel) {
         this.question = question;
         this.consequence = consequence;
         this.okLabel = okLabel;
@@ -40,7 +40,7 @@ final class ConfirmView implements AutoCloseable {
     /** Shows the answer as busy (it cannot be given again) while the operation runs. */
     void busy(boolean value) { if (!view.isClosed()) view.update(spec(value)); }
 
-    KitView view() { return view; }
+    public KitView view() { return view; }
 
     /** The question and its consequence. */
     String text() { return question + "\n\n" + consequence; }

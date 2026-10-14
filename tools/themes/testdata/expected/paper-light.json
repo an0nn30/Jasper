@@ -1,0 +1,30 @@
+{
+  "jasper-theme": 1,
+  "name": "Paper Light",
+  "terminal": {
+    "light": {
+      "name": "Paper Light",
+      "bg": "#F8F8F4",
+      "fg": "#1C1C1C",
+      "fg.bold": "#1C1C1C",
+      "cursor": "#1C1C1C",
+      "selection": "#1C1C1C",
+      "black": "#1C1C1C",
+      "red": "#B3261E",
+      "green": "#2E7D32",
+      "yellow": "#8A6100",
+      "blue": "#1F5FBF",
+      "magenta": "#8E3FA8",
+      "cyan": "#0F7A8A",
+      "white": "#5D6470",
+      "bright.black": "#1C1C1C",
+      "bright.red": "#B3261E",
+      "bright.green": "#2E7D32",
+      "bright.yellow": "#8A6100",
+      "bright.blue": "#1F5FBF",
+      "bright.magenta": "#8E3FA8",
+      "bright.cyan": "#0F7A8A",
+      "bright.white": "#5D6470"
+    }
+  }
+}

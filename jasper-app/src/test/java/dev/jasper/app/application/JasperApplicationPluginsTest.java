@@ -151,10 +151,11 @@ class JasperApplicationPluginsTest {
                 assertThat(action.title()).isEqualTo("Edit Custom VM Options…");
                 assertThat(action.keywords()).contains("memory", "heap", "xmx", "jvm", "java", "vm options");
             });
+            assertThat(application[0].contributions().action(AboutWindows.ABOUT)).get()
+                .satisfies(action -> assertThat(action.title()).isEqualTo("About Jasper"));
             assertThat(application[0].contributions().menus()).anySatisfy(section -> {
                 assertThat(section.target().title()).isEqualTo("Help");
-                assertThat(section.entries()).containsExactly(new MenuEntry.Item("app.shortcuts"), new MenuEntry.Separator(),
-                    new MenuEntry.Item("app.memory"), new MenuEntry.Item("app.vmoptions"));
+                assertThat(section.entries()).isEqualTo(AboutWindows.helpEntries(System.getProperty("os.name").startsWith("Mac")));
             });
             assertThat(application[0].bindingProblems()).isEmpty();
         });
@@ -353,7 +354,7 @@ class JasperApplicationPluginsTest {
     private static String installedLightLaf() {
         var laf = javax.swing.UIManager.getLookAndFeel();
         assertThat(laf).isInstanceOf(com.formdev.flatlaf.IntelliJTheme.ThemeLaf.class);
-        var light = dev.jasper.ui.theme.SlateSteel.bundled().generated(false);
+        var light = dev.jasper.ui.theme.JasperTheme.bundled().generated(false);
         assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(light);
         assertThat(laf.getDefaults().get("Jasper.installedTheme")).as("the snapshot travels with the LAF itself").isSameAs(light);
         assertThat(laf.getName()).isEqualTo(light.name());

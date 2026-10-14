@@ -6,7 +6,7 @@ Formerly Moray. The app, the Java packages and the Git repository
 ([an0nn30/Jasper](https://github.com/an0nn30/Jasper)) are now Jasper. Existing settings can be
 carried over using the [rebrand migration notes](docs/rebranding.md).
 
-Jasper has its own terminal renderer over JediTerm and pty4j, with ligatures, fallback fonts, truecolor, mouse reporting, scrollback, selection, clipboard, shell integration and links. The Plan 3 application adds multiple windows, tabs, splits, pane zoom/navigation, find controls, menus, toolbar and status. The screenshot UI revision puts tabs beside native macOS window controls, with a horizontal Tabler toolbar below and a status bar that shares the terminal background. One theme, Slate Steel, in Dark and Light, colours the complete window; its terminal schemes are Slate Steel Dark, Slate Steel Light and High Contrast.
+Jasper has its own terminal renderer over JediTerm and pty4j, with ligatures, fallback fonts, truecolor, mouse reporting, scrollback, selection, clipboard, shell integration and links. The Plan 3 application adds multiple windows, tabs, splits, pane zoom/navigation, find controls, menus, toolbar and status. The screenshot UI revision puts tabs beside native macOS window controls, with a horizontal Tabler toolbar below and a status bar that shares the terminal background. The built-in theme, Slate Steel, in Dark and Light, colours the complete window; its terminal schemes are Slate Steel Dark, Slate Steel Light and High Contrast, and installed Jasper theme files add more themes and schemes.
 
 Current progress, limitations and next steps: [docs/STATUS.md](docs/STATUS.md). Desktop acceptance remains user-run: [Plan 3](docs/superpowers/plans/2026-09-11-jasper-plan-3-manual-check.md) and [screenshot UI](docs/superpowers/plans/2026-09-11-jasper-mock-ui-manual-check.md). Passing the headless tests is not the Phase 1 daily-use gate.
 
@@ -22,7 +22,7 @@ concrete lifecycle owners support the current features. Plugins are written agai
 
 ## Requirements
 
-Install the **JetBrains Runtime SDK 25 (JBR SDK)**, including `jpackage`; a JRE or a JDK from another vendor is insufficient. Gradle requires vendor JetBrains and discovers the SDK automatically on the development Mac. If discovery fails, set `JAVA_HOME` to the SDK and add its `bin` directory to `PATH`, or set `org.gradle.java.installations.paths` in Gradle properties. Use the checked-in Gradle wrapper, not a system Gradle installation. The first build downloads Gradle and dependencies.
+Install the **JetBrains Runtime SDK 25 (JBR SDK)**, including `jpackage`; a JRE or a JDK from another vendor is insufficient. Gradle requires vendor JetBrains and discovers the SDK automatically on the development Mac. If discovery fails, set `JAVA_HOME` to the SDK and add its `bin` directory to `PATH`, or set `org.gradle.java.installations.paths` in Gradle properties. Use the checked-in Gradle wrapper, not a system Gradle installation. The first build downloads Gradle and dependencies. `./gradlew build` and `check` also run the theme converter's tests, which need Python 3.11 or later on the `PATH` as `python3` or `python` (the `python3` in Xcode's command line tools is 3.9).
 
 ## Build and run
 
@@ -56,13 +56,13 @@ Run this **on macOS**, with a JBR SDK matching the build architecture: Apple Sil
 
 This compiles Jasper, runs the headless tests, creates `Jasper.app` with its own trimmed JBR runtime, launches it once for a few seconds (no Dock icon) to train its start-up cache, verifies the application image, and builds and verifies the DMG. See [start-up performance](docs/packaging.md#start-up-performance).
 
-With the default package version `1.0.0`, the outputs are:
+Without `-PjasperVersion`, the package version is the commit's `vX.Y.Z` release tag, else the latest release tag behind it, else `1.0.0`. The outputs are:
 
 | Output | Path |
 |---|---|
 | Application | `jasper-app/build/packaging/image/Jasper.app` |
-| Apple Silicon DMG | `jasper-app/build/packaging/dist/Jasper-1.0.0-macos-aarch64.dmg` |
-| Intel DMG | `jasper-app/build/packaging/dist/Jasper-1.0.0-macos-x64.dmg` |
+| Apple Silicon DMG | `jasper-app/build/packaging/dist/Jasper-<version>-macos-aarch64.dmg` |
+| Intel DMG | `jasper-app/build/packaging/dist/Jasper-<version>-macos-x64.dmg` |
 
 Each build produces the DMG for its own architecture. Open the DMG and drag `Jasper.app` to Applications to install it. The packaged app needs no separately installed Java runtime. Current development builds are ad-hoc signed; Developer ID signing and notarization are not included.
 
@@ -104,7 +104,7 @@ Run this **on Windows x64 or ARM64**, with a JBR SDK 25 of the same architecture
 .\gradlew.bat check :jasper-app:packageDist
 ```
 
-The default output is `jasper-app\build\packaging\dist\Jasper-1.0.0-windows-<x64|aarch64>.zip`. Extract the complete `Jasper` folder and run `Jasper.exe`; keep the launcher, `app` and `runtime` together. No external Java or WiX installation is needed to use the ZIP; building it requires the JBR SDK. The unpacked build image is at `jasper-app\build\packaging\image\Jasper`.
+The default output is `jasper-app\build\packaging\dist\Jasper-<version>-windows-<x64|aarch64>.zip`. Extract the complete `Jasper` folder and run `Jasper.exe`; keep the launcher, `app` and `runtime` together. No external Java or WiX installation is needed to use the ZIP; building it requires the JBR SDK. The unpacked build image is at `jasper-app\build\packaging\image\Jasper`.
 
 `jpackage` builds packages on their target operating system; the Mac build cannot produce the Windows ZIP. Windows packaging and desktop behavior still need manual verification on Windows. See the [packaging guide](docs/packaging.md) for the separate macOS and Windows acceptance checklists.
 
@@ -112,7 +112,7 @@ The default output is `jasper-app\build\packaging\dist\Jasper-1.0.0-windows-<x64
 
 On macOS: Cmd+T new tab, Cmd+N new window, Cmd+D split right, Cmd+Shift+D split down, Cmd+Option+arrows focus a pane, Cmd+Shift+Enter zoom, Cmd+F find, F2 rename, Cmd+W close tab, Cmd+Shift+W close pane. Tabs have hover close controls, support middle-click close and drag reorder. On macOS, a single tab is represented by a centered title; multiple tabs share the available title-bar width. Opening and closing tabs animate with a quick eased settle; tab widths adjust as the row changes. Closing stops the shell immediately. A blank rename restores the shell/directory title. Cmd+1–9 selects an existing tab; Cmd+Shift+[ / Cmd+Shift+] moves to the previous/next tab and wraps at the ends.
 
-Cmd+= / Cmd+- / Cmd+0 changes or resets the focused pane's font. Cmd+Shift+K clears history while retaining the live screen; Cmd+K opens the command palette. Menus expose common actions; the command palette provides the full action list. View → View Modes → Zen hides the status bar, tool windows and rails while retaining toolbar icons and the command palette field; toggle it again to restore the layout. Zen is saved in ui-state.toml and restored on launch. Assign the initially unbound `toggle_zen_mode` action in Settings → Keymap. See [View modes](docs/configuration.md#view-modes). View controls toolbar labels/visibility and status visibility. Settings → Appearance chooses Slate Steel Dark, Light or Match System (`ui.appearance`) and the terminal scheme (`terminal.scheme`) for every window and terminal, including hidden panes. Appearance changes retain shells, scrollback, split ratios and font choices. On macOS the tabs share the title surface, with the toolbar immediately below. The title/tab row defaults to 38 logical pixels. Settings → Window lets you change it; the command palette’s Window Settings… command opens that page. Toolbar, status and theme choices are saved to config.toml and apply to every window; Zen is saved in UI state and remains local to each open window. The default terminal font is bundled Cousine Nerd Font Mono at 12 points; Cmd+0 restores the configured size.
+Cmd+= / Cmd+- / Cmd+0 changes or resets the focused pane's font. Cmd+Shift+K clears history while retaining the live screen; Cmd+K opens the command palette. Menus expose common actions; the command palette provides the full action list. View → View Modes → Zen hides the status bar, tool windows and rails while retaining toolbar icons and the command palette field; toggle it again to restore the layout. Zen is saved in ui-state.toml and restored on launch. Assign the initially unbound `toggle_zen_mode` action in Settings → Keymap. See [View modes](docs/configuration.md#view-modes). View controls toolbar labels/visibility and status visibility. Settings → Appearance chooses Dark, Light or Match System (`ui.appearance`), the theme each appearance shows (`ui.theme.dark`, `ui.theme.light`) and the terminal scheme (`terminal.scheme`) for every window and terminal, including hidden panes. Appearance changes retain shells, scrollback, split ratios and font choices. On macOS the tabs share the title surface, with the toolbar immediately below. The title/tab row defaults to 38 logical pixels. Settings → Window lets you change it; the command palette’s Window Settings… command opens that page. Toolbar, status and theme choices are saved to config.toml and apply to every window; Zen is saved in UI state and remains local to each open window. The default terminal font is bundled Cousine Nerd Font Mono at 12 points; Cmd+0 restores the configured size.
 
 Settings opens the TOML configuration, creating a commented template only when absent. Saved tab height, toolbar/status visibility, font family/fallback/size/ligatures/line height, cursor/input/copy/bell options, shell-exit behavior, inactive-pane dimming, theme and shortcuts reload live across windows. Shell command, exact arguments, environment and scrollback defaults apply to new pane requests; columns/lines supply the initial grid for new windows. Existing sessions continue running. Reload config forces a read; the status indicator opens file diagnostics. See [configuration](docs/configuration.md) for the complete settings table, defaults/ranges, paths, `--config`, shell/shortcut examples and error behavior.
 
@@ -131,7 +131,7 @@ cp -n config.example.toml ~/.config/jasper/config.toml
 
 If `config.toml` already exists, `cp -n` leaves it unchanged. Choose another filename to inspect the example separately.
 
-`ui.appearance` (`system`, `dark`, `light`) chooses Slate Steel Dark or Light, or follows the operating system; `terminal.scheme` (`match`, `slate-steel-dark`, `slate-steel-light`, `high-contrast`) colours the terminal panes. Both reload live. `[ui.font]` sets UI typography independently of `[terminal.font]`; its family and optional 8–32-point size update live. See [theme configuration](docs/configuration.md#theme). Native macOS and Windows packaging commands and acceptance checks are in the [packaging guide](docs/packaging.md). Bounded application logs and their privacy rules are described in [application diagnostics](docs/diagnostics.md). Native font/input/audio and initial sizing acceptance is tracked in the [terminal configuration checklist](docs/superpowers/plans/2026-09-12-jasper-plan-4b-manual-check.md).
+`ui.appearance` (`system`, `dark`, `light`) chooses the Dark or Light appearance, or follows the operating system; `ui.theme.dark` and `ui.theme.light` name the theme each appearance shows (`slate-steel` by default, or an installed theme); `terminal.scheme` (`match`, or a scheme id such as `slate-steel/high-contrast`) colours the terminal panes. All three reload live. `[ui.font]` sets UI typography independently of `[terminal.font]`; its family and optional 8–32-point size update live. See [theme configuration](docs/configuration.md#theme). Native macOS and Windows packaging commands and acceptance checks are in the [packaging guide](docs/packaging.md). Bounded application logs and their privacy rules are described in [application diagnostics](docs/diagnostics.md). Native font/input/audio and initial sizing acceptance is tracked in the [terminal configuration checklist](docs/superpowers/plans/2026-09-12-jasper-plan-4b-manual-check.md).
 
 On Linux/Windows, Ctrl+1–9 selects an existing tab and Ctrl+Shift+[ / Ctrl+Shift+] selects the previous/next tab. For other actions, `cmd` maps to Ctrl+Shift. Those defaults written with an additional explicit Shift add Alt to remain distinct (for example split down is Ctrl+Alt+Shift+D). Other ordinary Ctrl combinations remain available to terminal programs. Keybinding overrides also accept `{` and `}` as Shift+[ and Shift+].
 
@@ -181,3 +181,7 @@ links architecture and maintenance guides for each module. The [app architecture
 and [maintenance recipes](docs/app-maintenance.md) explain feature ownership, lifecycle and
 where to add commands, settings, providers and notices. [STATUS](docs/STATUS.md) records
 verified checkpoints and remaining manual acceptance.
+
+## License
+
+Jasper is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
