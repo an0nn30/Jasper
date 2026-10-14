@@ -489,6 +489,19 @@ class Plugins(unittest.TestCase):
         self.assertNotIn("chrome from", own.summary, "an Islands theme keeps its own chrome")
         self.assertEqual(alone.doc["ui"]["dark"]["surface.app"], "#333333", "without an Islands variant")
 
+    def test_a_main_toolbar_apart_from_the_chrome_gives_the_title_bar_its_own_colours(self):
+        """IntelliJ New UI Light's dark header: MainToolbar Gray2 under Gray12 on a light window."""
+        header = {"name": "Day", "dark": False, "parentTheme": "ExperimentalLight", "ui": {"StatusBar.background": "#F7F8FA"}}
+        flat = {"name": "Even", "dark": False, "ui": {"StatusBar.background": "#F7F8FA", "MainToolbar.background": "#F5F6F7"}}
+        with tempfile.TemporaryDirectory() as scratch:
+            themes = tool.plugin_themes(tool.Files.archive(theme_jar(pathlib.Path(scratch) / "day.jar", {"day": header, "even": flat})))
+            day = tool.convert_intellij_theme(themes[0], themes, None).doc["ui"]["light"]
+            even = tool.convert_intellij_theme(themes[1], themes, None).doc["ui"]["light"]
+        self.assertEqual(list(day)[-2:], tool.OPTIONAL_ROLES)
+        self.assertLess(tool.lightness(tool.parse_hex(day["surface.titlebar"])), 30, "the dark header")
+        self.assertGreater(tool.contrast(tool.parse_hex(day["text.titlebar"]), tool.parse_hex(day["surface.titlebar"])), 7)
+        self.assertEqual(list(even), tool.ROLES, "a main toolbar like the chrome adds nothing")
+
     def test_chosen_roles_take_a_colour_of_the_themes_own_palette_or_a_hex_colour(self):
         night = {"name": "Night", "dark": True, "colors": {"deep": "#0A0B0C"},
                  "ui": {"Panel.background": "#333333", "SidePanel.background": "#333333"}}

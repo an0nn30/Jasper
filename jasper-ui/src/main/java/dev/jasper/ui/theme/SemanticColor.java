@@ -74,7 +74,9 @@ public enum SemanticColor {
     SEGMENT_TRACK("segment.track"),
     BUTTON_SECONDARY_BORDER("button.secondary.border"),
     TAB_INDICATOR("tab.indicator"),
-    TAB_INDICATOR_INACTIVE("tab.indicator.inactive");
+    TAB_INDICATOR_INACTIVE("tab.indicator.inactive"),
+    SURFACE_TITLEBAR("surface.titlebar"),
+    TEXT_TITLEBAR("text.titlebar");
 
     private final String key;
     SemanticColor(String key) { this.key = key; }

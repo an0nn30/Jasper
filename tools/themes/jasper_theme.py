@@ -51,6 +51,8 @@ ROLES = [
     "status.success", "status.warning", "status.danger", "status.idle",
     "hue.blue", "hue.green", "hue.amber", "hue.purple", "hue.neutral",
 ]
+# Roles a variant may add after ROLES: the title bar's own colours (left out, they are surface.app and text.primary).
+OPTIONAL_ROLES = ["surface.titlebar", "text.titlebar"]
 ANSI = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]
 TERMINAL_KEYS = ["bg", "fg", "fg.bold", "cursor", "selection"] + ANSI + ["bright." + name for name in ANSI]
 EDITOR_SURFACES = ["background", "foreground", "caret", "selection", "currentLine", "gutter", "lineNumbers"]
@@ -110,6 +112,12 @@ def mix(a, b, share: float):
 
 def with_alpha(color, alpha: int):
     return color[:3] + (alpha,)
+
+
+def lightness(color) -> float:
+    """CIE L*, 0 to 100."""
+    y = luminance(color)
+    return 116 * y ** (1 / 3) - 16 if y > 216 / 24389 else 24389 / 27 * y
 
 
 def luminance(color) -> float:
@@ -173,7 +181,7 @@ def validate(doc: dict, where: str) -> None:
     for variant, roles in ui.items():
         if variant not in terminal:
             fail(f"ui.{variant} has no matching scheme")
-        if list(roles) != ROLES:
+        if list(roles) not in (ROLES, ROLES + OPTIONAL_ROLES):
             fail(f"ui.{variant} roles")
         for role, value in roles.items():
             if not HEX.fullmatch(value):
@@ -931,6 +939,20 @@ def islands_variant(theme: ThemeFile, siblings: list[ThemeFile], dark: bool, loo
 ISLANDS_CHROME = ["surface.app"]
 
 
+def title_bar(lookup: Lookup, roles: dict, dark: bool) -> dict:
+    """surface.titlebar and text.titlebar from IntelliJ's main toolbar, when it stands at least 5 L* apart from the window
+    chrome (New UI Light's dark header); otherwise none, and the title bar is the chrome."""
+    found = lookup.key("MainToolbar.background")
+    if found is None:
+        return {}
+    surface = found[0] if found[0][3] == 255 else over(found[0], BLACK if dark else WHITE)
+    if abs(lightness(surface) - lightness(parse_hex(roles["surface.app"]))) < 5:
+        return {}
+    ink = lookup.key("MainToolbar.foreground")
+    ink = over(ink[0], surface) if ink is not None else WHITE if contrast(WHITE, surface) >= contrast(BLACK, surface) else BLACK
+    return {"surface.titlebar": hex_of(surface), "text.titlebar": hex_of(ink)}
+
+
 def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: str | None,
                            scheme_file: pathlib.Path | None = None, loose_dir: pathlib.Path | None = None,
                            roles: dict[str, str] | None = None) -> Result:
@@ -967,7 +989,7 @@ def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: st
     doc = {"jasper-theme": FORMAT, "name": display}
     if isinstance(theme.data.get("author"), str) and theme.data["author"]:
         doc["author"] = theme.data["author"]
-    doc["ui"] = {variant: roles}
+    doc["ui"] = {variant: roles | title_bar(Lookup(effective), roles, effective.dark)}
     doc["terminal"] = {variant: terminal}
     doc["editor"] = {variant: editor}
     validate(doc, theme.path)

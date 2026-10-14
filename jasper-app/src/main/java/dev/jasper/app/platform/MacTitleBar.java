@@ -112,6 +112,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     public void setHeader(JComponent header, java.util.List<JComponent> dragSurfaces) {
         if (closed || this.header != null) return;
         this.header = header;
+        ThemeZone.titleBar(this);
         this.dragSurfaces = java.util.List.copyOf(dragSurfaces);
         add(header);
         header.addPropertyChangeListener(headerChanged);
@@ -294,7 +295,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     public void setActive(boolean active) { this.active = active; refreshColors(); }
 
     private void refreshColors() {
-        setBackground(ThemeZone.color(null, style == Style.WINDOW ? SemanticColor.SURFACE_APP : SemanticColor.SURFACE_DIALOG));
+        setBackground(ThemeZone.color(this, style == Style.WINDOW ? SemanticColor.SURFACE_APP : SemanticColor.SURFACE_DIALOG));
         title.setFont(SystemFonts.ui(header == null ? Font.BOLD : Font.PLAIN, 13f));
         title.setForeground(ThemeZone.color(this, active ? SemanticColor.TEXT_SECONDARY : SemanticColor.TEXT_TERTIARY));
         repaint();

@@ -36,8 +36,15 @@ it). Then the active-tab line (user's ask): new format roles `tab.indicator` (fo
 tab by `NativeChromePainting.tabStrip`; Slate Steel uses its accent and the accent half over the tab; the converter reads
 IntelliJ's `EditorTabs.underlineColor` / `inactiveUnderlineColor` (fallback: the accent, then that mixed half with the
 terminal surface), so Catppuccin's are its mauve (Latte's unfocused line is IntelliJ Light's `#9CA7B8`); also in SDK
-0.17.1. Imported theme files without the roles are refused until reconverted. Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
-(the colour patterns are now precompiled). `./gradlew check --continue`: **10,174 tests, 0 failures, 0 errors, 12
+0.17.1. Imported theme files without the roles are refused until reconverted. Then the title bar (user's ask; the user
+chose background + ink, header row only, no built-in values): optional format roles `surface.titlebar` and
+`text.titlebar` (left out: `surface.app`, `text.primary`); `TitleBarTheme.of` derives the header's theme (the same object
+unless the variant sets its own: the header's surface, text levels, hover, pressed and search-field fill and borders
+follow, and it is dark when the title bar is); `ThemeZone.titleBar` marks the main window's header (WindowChrome,
+MacTitleBar.setHeader) so its painters and glyphs use it, and the macOS controls follow its darkness. The converter
+writes them from IntelliJ's `MainToolbar.background`/`foreground` when that stands 5 L* or more apart from the chrome
+(New UI Light's dark header); the built-ins are unchanged. SDK 0.17.1 mirrors them. Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
+(the colour patterns are now precompiled). `./gradlew check --continue`: **10,177 tests, 0 failures, 0 errors, 12
 skipped**. No GUI launched. GUI check for the user: each flavour in Settings › Appearance and the Licenses window (About Jasper › Licenses). Not merged.
 
 **Right rail splits again: two dock fixes — 2026-10-14** (`claude/right-rail-split`, worktree

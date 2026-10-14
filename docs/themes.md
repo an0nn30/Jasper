@@ -124,7 +124,9 @@ A Jasper theme is one UTF-8 JSON file; `slate-steel.json` is the complete exampl
 - `jasper-theme` is `1`. `name` is required; `author` is optional.
 - `ui` holds `dark`, `light` or both. Each lists every role `slate-steel.json` lists, as `#RRGGBB` or `#RRGGBBAA`.
   `border.focus`, `surface.status`, `border.identity` and the `hue.*.surface` roles are not listed: they are `accent`,
-  `surface.app`, `border.control` and each hue.
+  `surface.app`, `border.control` and each hue. `surface.titlebar` and `text.titlebar` may be listed to give the
+  window's header row (the title bar) its own background and its own text and icon colour, such as a dark title bar on
+  a light theme; left out, they are `surface.app` and `text.primary`.
 - `terminal` holds one or more schemes, keyed by lowercase words with dashes (at most 32 characters). Each has a
   `name` and exactly 21 colours: `bg`, `fg`, `fg.bold`, `cursor`, `selection`, `black`, `red`, `green`, `yellow`,
   `blue`, `magenta`, `cyan`, `white` and their `bright.` forms. A scheme's id is `<theme id>/<key>`.

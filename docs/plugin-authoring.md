@@ -1002,5 +1002,7 @@ is `TEXT_ONSELECTION`. Declare `sdk = ">=0.16.2, <0.18"` to read them.
 ### Tab indicator colours and the hidden icon (SDK 0.17.1)
 
 `SemanticColor` gains `TAB_INDICATOR`, the line along the top of the active tab, and `TAB_INDICATOR_INACTIVE`, the
-same line while the window is not focused. The icon `hidden` (an eye struck through) marks a show-hidden-items toggle.
+same line while the window is not focused. `SURFACE_TITLEBAR` and `TEXT_TITLEBAR` are the window header's background
+and its text and icon colour (`SURFACE_APP` and `TEXT_PRIMARY` unless the theme gives the title bar its own). The icon
+`hidden` (an eye struck through) marks a show-hidden-items toggle.
 Declare `sdk = ">=0.17.1, <0.18"` to use them.

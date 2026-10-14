@@ -24,7 +24,9 @@ import java.util.regex.Pattern;
  * Steel, the default, and Catppuccin's flavours, converted from its IntelliJ plugin ({@code tools/themes/catppuccin}). A UI
  * variant lists every role except those that follow fixed rules, never colour values: {@code border.focus} is
  * {@code accent}, {@code surface.status} is {@code surface.app}, {@code border.identity} is {@code border.control} and
- * each {@code hue.<name>.surface} is its hue (the kit applies the tile alpha). A variant's matching terminal scheme is
+ * each {@code hue.<name>.surface} is its hue (the kit applies the tile alpha). A variant may leave out the title bar's
+ * own colours, {@code surface.titlebar} and {@code text.titlebar}: they are then {@code surface.app} and
+ * {@code text.primary}. A variant's matching terminal scheme is
  * the scheme with its key, {@code dark} or {@code light}. A missing, unknown or malformed entry fails loading with a
  * {@link ThemeFileException} naming the file and the entry. Immutable.
  */
@@ -44,6 +46,9 @@ public final class JasperTheme {
     private static final Set<SemanticColor> RULED = Set.of(SemanticColor.BORDER_FOCUS, SemanticColor.SURFACE_STATUS,
         SemanticColor.BORDER_IDENTITY, SemanticColor.HUE_BLUE_SURFACE, SemanticColor.HUE_GREEN_SURFACE,
         SemanticColor.HUE_AMBER_SURFACE, SemanticColor.HUE_PURPLE_SURFACE, SemanticColor.HUE_NEUTRAL_SURFACE);
+    /** Roles a variant may leave out, and the role each then is: the title bar's own colours ({@link TitleBarTheme}). */
+    private static final Map<SemanticColor, SemanticColor> OPTIONAL = Map.of(SemanticColor.SURFACE_TITLEBAR, SemanticColor.SURFACE_APP,
+        SemanticColor.TEXT_TITLEBAR, SemanticColor.TEXT_PRIMARY);
 
     /** One UI variant with every value filled in. */
     private record Variant(SemanticPalette palette, EditorColors editor, Map<SyntaxRole, SyntaxStyle> syntax, GeneratedTheme generated) { }
@@ -183,9 +188,10 @@ public final class JasperTheme {
             colors.put(role, color(text, origin, where + "." + key));
         });
         for (var role : SemanticColor.values()) {
-            if (RULED.contains(role)) continue;
+            if (RULED.contains(role) || OPTIONAL.containsKey(role)) continue;
             if (!colors.containsKey(role)) throw error(where + ": Missing colour \"" + role.key() + "\"");
         }
+        OPTIONAL.forEach((role, otherwise) -> colors.putIfAbsent(role, colors.get(otherwise)));
         colors.put(SemanticColor.BORDER_FOCUS, colors.get(SemanticColor.ACCENT));
         colors.put(SemanticColor.SURFACE_STATUS, colors.get(SemanticColor.SURFACE_APP));
         colors.put(SemanticColor.BORDER_IDENTITY, colors.get(SemanticColor.BORDER_CONTROL));

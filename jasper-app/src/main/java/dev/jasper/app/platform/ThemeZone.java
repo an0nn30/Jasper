@@ -12,13 +12,23 @@ import javax.swing.JPopupMenu;
 import javax.swing.JRootPane;
 import javax.swing.JToolTip;
 
-/** Paint-time zone lookup using only JDK client properties. EDT only. */
+/**
+ * Paint-time zone lookup using only JDK client properties. EDT only. A {@code "titlebar"} zone, the main window's
+ * header row ({@link #titleBar}), paints with the installed theme's {@link dev.jasper.ui.theme.TitleBarTheme}.
+ */
 public final class ThemeZone {
     private ThemeZone() {}
+
+    static final String ZONE = "Jasper.zone", TITLE_BAR = "titlebar";
+
+    /** Marks {@code header} as the window's title bar: it and everything in it paint with the title bar's theme. */
+    public static void titleBar(JComponent header) { header.putClientProperty(ZONE, TITLE_BAR); }
 
     /** Live module palette; there is no second cache of installed appearance. */
     public static dev.jasper.ui.theme.GeneratedTheme theme(Component component) {
         JComponent zone = root(component);
+        if (zone != null && TITLE_BAR.equals(zone.getClientProperty(ZONE)))
+            return dev.jasper.ui.theme.TitleBarTheme.of(dev.jasper.ui.swing.FlatLafInstaller.installedTheme());
         if (zone != null && zone.getClientProperty("Jasper.workspaceTheme") instanceof dev.jasper.ui.theme.GeneratedTheme theme)
             return theme;
         return dev.jasper.ui.swing.FlatLafInstaller.installedTheme();
@@ -32,10 +42,14 @@ public final class ThemeZone {
         return NativeControlStyles.font(role);
     }
 
-    public static boolean workspace(Component component) { return root(component) != null; }
+    public static boolean workspace(Component component) {
+        JComponent root = root(component);
+        return root != null && !TITLE_BAR.equals(root.getClientProperty(ZONE));
+    }
 
     public static boolean dark(Component component, boolean chromeDark) {
         JComponent root = root(component);
+        if (root != null && TITLE_BAR.equals(root.getClientProperty(ZONE))) return theme(component).dark();
         return root != null && root.getClientProperty("Jasper.workspace.dark") instanceof Boolean dark
             ? dark : chromeDark;
     }
@@ -51,9 +65,9 @@ public final class ThemeZone {
             if (current instanceof JPopupMenu || current instanceof JToolTip
                     || current instanceof JRootPane || current instanceof Window) return null;
             if (current instanceof JComponent candidate) {
-                Object zone = candidate.getClientProperty("Jasper.zone");
+                Object zone = candidate.getClientProperty(ZONE);
                 if ("chrome".equals(zone)) return null;
-                if ("workspace".equals(zone)) return candidate;
+                if ("workspace".equals(zone) || TITLE_BAR.equals(zone)) return candidate;
             }
         }
         return null;

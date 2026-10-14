@@ -123,8 +123,8 @@ public final class UiColorKeys {
         role(keys, "RadioButtonMenuItem.selectionBackground", ACCENT);
         role(keys, "PopupMenu.background", SURFACE_MENU);
         role(keys, "PopupMenu.borderColor", BORDER_MENU);
-        role(keys, "TitlePane.background", SURFACE_APP);
-        role(keys, "TitlePane.inactiveBackground", SURFACE_APP);
+        role(keys, "TitlePane.background", SURFACE_TITLEBAR);
+        role(keys, "TitlePane.inactiveBackground", SURFACE_TITLEBAR);
         role(keys, "TitlePane.foreground", TEXT_SECONDARY);
         role(keys, "TitlePane.inactiveForeground", TEXT_SECONDARY);
         role(keys, "TitlePane.infoForeground", TEXT_SECONDARY);
@@ -146,8 +146,8 @@ public final class UiColorKeys {
         role(keys, "ToolTip.foreground", TEXT_PRIMARY);
         role(keys, "Tree.background", SURFACE_CARD);
         role(keys, "Table.background", SURFACE_CARD);
-        role(keys, "MainToolbar.background", SURFACE_APP);
-        role(keys, "MainToolbar.foreground", TEXT_PRIMARY);
+        role(keys, "MainToolbar.background", SURFACE_TITLEBAR);
+        role(keys, "MainToolbar.foreground", TEXT_TITLEBAR);
         role(keys, "EditorTabs.underlinedTabBackground", SURFACE_CARD);
         role(keys, "EditorTabs.underlinedTabForeground", TEXT_PRIMARY);
         role(keys, "EditorTabs.hoverBackground", SURFACE_CONTROL_HOVER);
