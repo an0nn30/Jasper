@@ -130,7 +130,9 @@ static int runDiagnostic(const wchar_t* launcher, const wchar_t* commandLine) {
     PROCESS_INFORMATION process;
     wchar_t* line = _wcsdup(commandLine);
     const ULONGLONG deadline = GetTickCount64() + (ULONGLONG) JASPER_WATCH_LIMIT_MS;
+    ULONGLONG now;
     DWORD code = 1;
+    int initialized;
     int started;
     ZeroMemory(&process, sizeof(process));
     if (line == NULL || !SetEnvironmentVariableA(JASPER_LAUNCH_DIAGNOSE_VARIABLE, "1")
@@ -151,15 +153,17 @@ static int runDiagnostic(const wchar_t* launcher, const wchar_t* commandLine) {
     startup.StartupInfo.hStdOutput = writeEnd;
     startup.StartupInfo.hStdError = writeEnd;
     startup.lpAttributeList = list;
-    started = nul != INVALID_HANDLE_VALUE && list != NULL && InitializeProcThreadAttributeList(list, 1, 0, &listSize)
+    initialized = nul != INVALID_HANDLE_VALUE && list != NULL
+        && InitializeProcThreadAttributeList(list, 1, 0, &listSize);
+    started = initialized
         && UpdateProcThreadAttribute(list, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, inherited, sizeof(inherited), NULL,
                NULL)
         && CreateProcessW(launcher, line, NULL, NULL, TRUE, CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT, NULL, NULL,
                &startup.StartupInfo, &process);
-    if (list != NULL) {
+    if (initialized) {
         DeleteProcThreadAttributeList(list);
-        free(list);
     }
+    free(list);
     free(line);
     CloseHandle(writeEnd);
     if (nul != INVALID_HANDLE_VALUE) {
@@ -173,8 +177,8 @@ static int runDiagnostic(const wchar_t* launcher, const wchar_t* commandLine) {
         char buffer[4096];
         DWORD available = 0;
         DWORD count = 0;
-        if (!PeekNamedPipe(readEnd, NULL, 0, NULL, &available, NULL)) {
-            break; /* every writer is gone */
+        if (GetTickCount64() >= deadline || !PeekNamedPipe(readEnd, NULL, 0, NULL, &available, NULL)) {
+            break; /* the limit, or every writer is gone */
         }
         if (available > 0) {
             const DWORD wanted = available < sizeof(buffer) ? available : (DWORD) sizeof(buffer);
@@ -182,19 +186,14 @@ static int runDiagnostic(const wchar_t* launcher, const wchar_t* commandLine) {
                 break;
             }
             keep(buffer, count);
-            continue;
-        }
-        if (GetTickCount64() >= deadline || WaitForSingleObject(process.hProcess, 50) == WAIT_OBJECT_0) {
-            if (WaitForSingleObject(process.hProcess, 0) == WAIT_OBJECT_0
-                    && PeekNamedPipe(readEnd, NULL, 0, NULL, &available, NULL) && available > 0) {
-                continue;
-            }
-            break;
+        } else if (WaitForSingleObject(process.hProcess, 50) == WAIT_OBJECT_0
+                && !(PeekNamedPipe(readEnd, NULL, 0, NULL, &available, NULL) && available > 0)) {
+            break; /* it exited, and whatever still holds the pipe writes nothing */
         }
     }
     CloseHandle(readEnd);
-    if (WaitForSingleObject(process.hProcess,
-            GetTickCount64() >= deadline ? 0 : (DWORD) (deadline - GetTickCount64())) != WAIT_OBJECT_0) {
+    now = GetTickCount64();
+    if (WaitForSingleObject(process.hProcess, now >= deadline ? 0 : (DWORD) (deadline - now)) != WAIT_OBJECT_0) {
         TerminateProcess(process.hProcess, 1);
         CloseHandle(process.hThread);
         CloseHandle(process.hProcess);
