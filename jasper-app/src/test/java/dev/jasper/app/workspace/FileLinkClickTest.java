@@ -85,7 +85,10 @@ class FileLinkClickTest {
         assertThat(opened).as("neither the relative path nor the absolute one").containsExactly(file + ":3");
     }
 
-    /** Review Focus 3: a provided session, such as an ssh plugin's, opens nothing. */
+    /**
+     * Review Focus 3: a provided session, such as an ssh plugin's, opens nothing. The control: the same text, clicked at the
+     * same cells in a local pane, opens, so the clicks above did land on the paths.
+     */
     @Test @DisabledOnOs(OS.WINDOWS) void aProvidedSessionOpensNothing() throws Exception {
         List<SessionAttempt> attempts = Collections.synchronizedList(new ArrayList<>());
         TerminalPane[] pane = new TerminalPane[1];
@@ -100,6 +103,28 @@ class FileLinkClickTest {
         click(pane[0], 2, 1);
 
         assertThat(opened).isEmpty();
+
+        Queue<Runnable> pending = new ArrayDeque<>();
+        ShellLauncher printing = new ShellLauncher(pending::add, path -> {
+            try {
+                return TerminalSession.start(SessionLaunchOptions.builder().command(List.of("/bin/sh", "-c",
+                    "printf '%s\\r\\n./notes.txt\\r\\n\\033]0;ready\\007' \"$1\"; read answer", "sh",
+                    directory.resolve("notes.txt").toString()))
+                    .environment(System.getenv()).workingDirectory(path).grid(new GridSize(200, 24)).scrollback(100).build());
+            } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+        }, "sh");
+        WindowContent[] owner = new WindowContent[1];
+        edt(() -> owner[0] = window(printing));
+        pending.remove().run();
+        until(() -> owner[0].currentPane().view() != null && owner[0].currentPane().session().title().equals("ready"));
+        TerminalPane[] local = new TerminalPane[1];
+        edt(() -> local[0] = owner[0].currentPane());
+
+        click(local[0], 2, 0);
+        click(local[0], 2, 1);
+
+        assertThat(opened).as("the same cells in a local pane").containsExactly(
+            directory.resolve("notes.txt") + ":0", directory.resolve("notes.txt") + ":0");
     }
 
     /** The directory a local shell reported comes before the one the pane started in, and its file: links open too. */
