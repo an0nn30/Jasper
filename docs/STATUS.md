@@ -1,5 +1,20 @@
 # Jasper — Status and Handoff
 
+**Text on the selection gets its own role — 2026-10-14** (`claude/text-on-selection`, worktree
+`.claude/worktrees/text-on-selection`; bug fix, the format change chosen by the user). The kit drew text on
+`selection.bg` (selected list and tree rows, a dropdown's highlighted entry, selected text, Settings' search highlight)
+in `text.onAccent`, the text for the accent fill. Slate Steel uses white for both, but IntelliJ themes pair them
+separately (Catppuccin Frappé: dark `Button.default.foreground` on its light accent, light `*.selectionForeground` on
+its dark selection), so converted themes read dark on dark. New format roles `text.onSelection` and
+`text.onSelection.secondary` (Slate Steel: the same white, so it looks unchanged); content on a selected fill takes that
+fill's ink (`InteractiveRows.Ink`: the accent fill in results layouts, the selection fill elsewhere; kit menus keep
+`text.onAccent` on their accent fill). The converter reads `List.selectionForeground` (`Tree.`, `Table.`) and falls back
+to the more readable of `text.onAccent` and `text.primary`; its golden files gained the two roles. The SDK mirrors them
+(0.16.2, additive; `WorkspacePalette.selectionText` is `text.onSelection`). Theme files without the roles are refused:
+convert and import them again. `./gradlew check --continue`: **9,975 tests**; its one failure, the external plugin
+example's SDK default still at 0.16.1, is fixed and that test passes. No GUI launched. GUI checks for the user: a
+converted Catppuccin theme's dropdowns, lists and selected text. Merged to `main`.
+
 **Theme gears replace the Imported themes group — 2026-10-13** (`claude/theme-gear-menus`, worktree
 `.claude/worktrees/theme-gear-menus`; bounded change, design approved in chat, no spec or plan). The Dark theme, Light
 theme and Terminal scheme dropdowns each have a gear (`settingsui.ThemeMenu`) with Import Theme… and Remove for the
