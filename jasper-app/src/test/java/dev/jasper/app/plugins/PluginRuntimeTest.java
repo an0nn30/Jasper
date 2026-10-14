@@ -309,6 +309,10 @@ class PluginRuntimeTest {
         onEdt(() -> safe.start(Map.of(), true));
         assertThat(safe.statusLines()).singleElement().asString().contains("DISABLED", "safe mode");
         assertThat(run(safe, "beta", 1)).contains("beta is unavailable");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!Files.exists(list) && System.nanoTime() < deadline) Thread.sleep(10);
+        assertThat(list).exists();
+        assertThat(dev.jasper.app.commandline.SubcommandList.read(list)).isEmpty();
         onEdt(safe::stop);
     }
 
