@@ -15,6 +15,8 @@ final class Capabilities {
             case "files.source" -> "Add places, such as saved hosts, to the file chooser";
             case "network.listen" -> "Accept connections from other programs or computers, such as serving files";
             case "clipboard.read" -> "Read text you copied to the clipboard";
+            case "terminal.environment" -> "Set environment variables in new terminal shells";
+            case "editor.provide" -> "Open the files Jasper opens for editing";
             default -> null;
         };
         return meaning == null ? capability : meaning + " (" + capability + ")";
