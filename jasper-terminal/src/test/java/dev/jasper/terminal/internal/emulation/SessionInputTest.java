@@ -8,6 +8,8 @@ import dev.jasper.terminal.testsupport.Await;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.nio.file.Path;
 
@@ -231,6 +233,7 @@ class SessionInputTest {
     }
 
     @Test
+    @DisabledOnOs(value = OS.WINDOWS, disabledReason = "a ':' outside the drive is no Windows path")
     void aPlainTextFileUrlWithADigitRunTooLongForALineKeepsItsText() throws Exception {
         feedAll("file:///tmp/Baz.kt:1234567890");
 
@@ -239,6 +242,7 @@ class SessionInputTest {
     }
 
     @Test
+    @DisabledOnOs(value = OS.WINDOWS, disabledReason = "a ':' outside the drive is no Windows path")
     void anOsc8FileLinkTargetIsAnExactUriWithoutAPosition() throws Exception {
         feedAll("\033]8;;file:///tmp/a:12\007notes\033]8;;\007");
 
