@@ -225,9 +225,12 @@ launcher's native tests and the app's tests both read, as `digest-vectors.txt` d
 
 `VmOptionsCheck` step 3 runs the cache check (`-XX:AOTMode=on -cp <classpath> -version`) with the merged line-up when
 step 2 found no fatal message, and otherwise with the bundled options alone, so a broken custom option is never blamed
-on the cache. `Findings` carries the cache result as an `Optional<Fatal>` with Java's message, in place of
-`cacheRejected`, and whether that check used the custom options. The System Settings sentence "These options turn off
-Jasper's start-up cache; it will start more slowly." appears only when the failing cache check used them.
+on the cache. When it fails with the merged line-up, it runs once more with the bundled options alone, and the failure
+counts as the custom options' only when that run passes; otherwise it is reported with that run's message as not using
+them, so a cache broken on its own is never blamed on the options. `Findings` carries the cache result as an
+`Optional<Fatal>` with Java's message, in place of `cacheRejected`, and whether that check used the custom options. The
+System Settings sentence "These options turn off Jasper's start-up cache; it will start more slowly." appears only when
+the failing cache check used them.
 
 ### 6.4 After a recovered start
 

@@ -14,7 +14,10 @@ Deviations: the eleven planned ones in the plan (among them one notification per
 `environment` in the log), Task 0 (plan 2 carry-over, `b05c2585`: the watcher's Windows launches drop
 `_JPACKAGE_LAUNCHER`, and its re-exec handling is recorded), and `AotCacheRecord.matches` also requiring a non-negative
 modification time, as the launcher's matcher does.
-`./gradlew check --continue`: **10190 tests, 0 failures, 0 errors, 12 skipped** (5 minutes 28 seconds). No GUI
+Final-review fixes: after both skips a check that could not run still posts the custom VM options notice; a cache that
+also fails with the bundled options alone is recorded without the options and System Settings does not blame them;
+Settings runs no cache check while the options stop the JVM; and the AOT message keeps a `] ` inside it.
+`./gradlew check --continue`: **10195 tests, 0 failures, 0 errors, 12 skipped** (4 minutes 27 seconds). No GUI
 launched. GUI checks for the user are in the plan's hand-off section.
 
 **Start-up recovery plan 2 (the watcher) complete — 2026-10-14.** On `claude/startup-recovery` (not pushed): Jasper's

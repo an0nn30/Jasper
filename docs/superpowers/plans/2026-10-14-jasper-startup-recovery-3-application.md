@@ -6,6 +6,13 @@ Status: **Complete on 2026-10-14** on `claude/startup-recovery` (spec approved b
 eleven deviations below: Task 0 (plan 2 carry-over, `b05c2585`) removed `_JPACKAGE_LAUNCHER` from the watcher's Windows
 launches and recorded the watcher's re-exec handling, which resolves plan 2's "plan 3's task 0"; and in Task 1
 `AotCacheRecord.matches` also requires a non-negative modification time, as the launcher's matcher does.
+Final-review fixes: `VmOptionsCheck.check`/`checkWithCache` return `Optional<Findings>` (empty when a run of the options
+timed out) and `Findings` gains `cacheChecked`, so after both skips a check that could not run still posts the custom VM
+options notice and both places log that it could not be checked, and a cache run over its limit keeps the other
+findings; by the controller's ruling a cache that fails with the custom options is checked once more with the bundled
+options alone and counts as theirs only when that run passes (spec 6.3 amended); System Settings runs no cache check
+while the options stop the JVM; `cacheFatal` takes the text after the first `] `, not the last; and the log lines say
+the cache was skipped after a failed launch instead of that it made Java fail.
 
 **Goal:** After the launcher recovers from a JVM that died while starting, Jasper says so in its start-up line,
 checks the start-up cache that was skipped, remembers a failing cache in `<home>/jasper-aot.failed` so later launches

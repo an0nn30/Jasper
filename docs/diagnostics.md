@@ -36,7 +36,7 @@ Times before the `|` are milliseconds since the operating system started the pro
 that piece of work took. Phases overlap (`application` includes `plugins`), so do not add them up. `AOT cache stale`
 means the cache in the package no longer matches its jars (for example after a copy that did not keep modification
 times) and costs more than having none. `AOT cache skipped: <reason>` means Jasper's launcher started the JVM without
-it: `launch-failed` (it made Java fail at this launch), `remembered` (it did at an earlier one) or `environment`
+it: `launch-failed` (Java failed to start with it at this launch), `remembered` (at an earlier one) or `environment`
 (`JASPER_AOT_CACHE_SKIP` is set). Each window a running Jasper opens logs `Window (<trigger>): shown …, first paint …,
 output painted … after the request`. With `-Djasper.startupTrace=<file>` the same data is also written as JSON; the
 start-up benchmark uses it.

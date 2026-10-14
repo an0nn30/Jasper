@@ -273,10 +273,11 @@ class VmOptionsFeatureTest {
         trained = true;
         String refused = "Error occurred during initialization of VM\nUnable to use AOT cache.\n";
         Files.writeString(file(), "-XX:+UseZGC\n");
-        script = command -> command.contains("-XX:AOTMode=on") ? new VmOptionsCheck.Outcome(1, refused, false) : new VmOptionsCheck.Outcome(0, "", false);
+        script = command -> command.contains("-XX:AOTMode=on") && command.contains("-XX:+UseZGC")
+            ? new VmOptionsCheck.Outcome(1, refused, false) : new VmOptionsCheck.Outcome(0, "", false);
         var feature = feature(managed(), true);
         feature.reload();
-        assertThat(feature.hooks().findings().get()).hasValueSatisfying(notice ->
+        assertThat(feature.hooks().findings().get()).as("the cache starts with the bundled options alone").hasValueSatisfying(notice ->
             assertThat(notice.text()).isEqualTo("These options turn off Jasper's start-up cache; it will start more slowly."));
         Files.writeString(file(), "-Xmx3q\n");
         script = command -> command.contains("-Xmx3q") ? new VmOptionsCheck.Outcome(1, "Invalid maximum heap size: -Xmx3q\n", false)
@@ -321,16 +322,67 @@ class VmOptionsFeatureTest {
         assertThat(titles()).containsExactly("Jasper started without its start-up cache");
     }
 
+    @Test void aCacheBrokenOnItsOwnIsNeverBlamedOnTheOptions() throws IOException {
+        installCache();
+        Files.writeString(file(), "-Xmx1g\n");
+        script = command -> command.contains("-XX:AOTMode=on") ? new VmOptionsCheck.Outcome(1, SEALED, false) : new VmOptionsCheck.Outcome(0, "", false);
+        feature(withoutCache("launch-failed", Optional.empty(), Optional.of(VmOptionsSyntax.digest(List.of("-Xmx1g")))), true).startupSettled();
+        assertThat(Files.readString(record())).as("it fails with the bundled options alone too").isEqualTo(recorded(5, ""));
+        assertThat(center.history()).singleElement().satisfies(entry -> assertThat(entry.request().content()).isEqualTo(CACHE_TEXT));
+        var settings = feature(managed(), true);
+        settings.reload();
+        assertThat(settings.hooks().findings().get()).as("no sentence blames the options").isEmpty();
+    }
+
+    @Test void whenBothWereSkippedAndCouldNotBeCheckedTheOptionsNoticeStillAppears() throws IOException {
+        installCache();
+        var both = withoutCache("launch-failed", Optional.of("launch-failed"), Optional.empty());
+        Files.writeString(file(), "-Xms4g\n");
+        script = command -> new VmOptionsCheck.Outcome(-1, "", true);
+        var timedOut = logged(() -> feature(both, true).startupSettled());
+        assertThat(center.history()).as("every run over its limit").singleElement().satisfies(entry -> {
+            assertThat(entry.request().title()).isEqualTo("Jasper started without your custom VM options");
+            assertThat(entry.request().content()).isEqualTo("The JVM rejected them, so Jasper started with the bundled options.");
+        });
+        assertThat(timedOut).extracting(java.util.logging.LogRecord::getMessage).containsExactly(
+            "Jasper started without the custom VM options after failed launches, and they could not be checked",
+            "The start-up cache was skipped after a failed launch and could not be checked; the next start tries it again");
+        assertThat(record()).doesNotExist();
+        newStart();
+        var noImage = logged(() -> feature(both, false).startupSettled());
+        assertThat(titles()).as("no Jasper.cfg found").containsExactly("Jasper started without your custom VM options");
+        assertThat(noImage).extracting(java.util.logging.LogRecord::getMessage).containsExactly(
+            "Jasper started without the custom VM options after failed launches, and they could not be checked",
+            "The start-up cache was skipped after a failed launch and could not be checked; the next start tries it again");
+        assertThat(record()).doesNotExist();
+        newStart();
+        String unrecoverable = "Error occurred during initialization of VM\nInitial heap size set to a larger value than the maximum heap size\n";
+        script = command -> command.contains("-XX:AOTMode=on") ? new VmOptionsCheck.Outcome(-1, "", true)
+            : command.contains("-Xms4g") && !command.contains("-XX:-IgnoreUnrecognizedVMOptions") ? new VmOptionsCheck.Outcome(1, unrecoverable, false)
+            : new VmOptionsCheck.Outcome(0, "", false);
+        var cacheTimedOut = logged(() -> feature(both, true).startupSettled());
+        assertThat(center.history()).as("only the cache check over its limit").singleElement().satisfies(entry ->
+            assertThat(entry.request().content()).isEqualTo("The JVM rejected them: Initial heap size set to a larger value than the maximum heap size"));
+        assertThat(cacheTimedOut).extracting(java.util.logging.LogRecord::getMessage)
+            .containsExactly("The start-up cache was skipped after a failed launch and could not be checked; the next start tries it again");
+        assertThat(record()).doesNotExist();
+    }
+
     @Test void aCacheThatPassesOrCannotBeCheckedIsNeitherRememberedNorAnnounced() throws IOException {
         installCache();
         var passes = logged(() -> feature(withoutCache("launch-failed", Optional.empty(), Optional.empty()), true).startupSettled());
         assertThat(passes).singleElement().satisfies(entry -> {
             assertThat(entry.getLevel()).isEqualTo(java.util.logging.Level.INFO);
-            assertThat(entry.getMessage()).isEqualTo("The start-up cache made Java fail at launch, but its check finds no failure now; the next start tries it again");
+            assertThat(entry.getMessage()).isEqualTo("The start-up cache was skipped after a failed launch, but its check finds no failure now; the next start tries it again");
         });
         script = command -> new VmOptionsCheck.Outcome(-1, "", true);
-        feature(withoutCache("launch-failed", Optional.empty(), Optional.empty()), true).startupSettled();
-        feature(withoutCache("launch-failed", Optional.empty(), Optional.empty()), false).startupSettled();
+        var unchecked = logged(() -> {
+            feature(withoutCache("launch-failed", Optional.empty(), Optional.empty()), true).startupSettled();
+            feature(withoutCache("launch-failed", Optional.empty(), Optional.empty()), false).startupSettled();
+        });
+        assertThat(unchecked).extracting(java.util.logging.LogRecord::getMessage).as("timed out, and no Jasper.cfg found").containsExactly(
+            "The start-up cache was skipped after a failed launch and could not be checked; the next start tries it again",
+            "The start-up cache was skipped after a failed launch and could not be checked; the next start tries it again");
         assertThat(record()).as("timed out, and no Jasper.cfg found").doesNotExist();
         assertThat(center.history()).isEmpty();
     }
@@ -343,7 +395,7 @@ class VmOptionsFeatureTest {
             for (String reason : List.of("remembered", "environment", "1")) feature(withoutCache(reason, Optional.empty(), Optional.empty()), true).startupSettled();
         });
         assertThat(lines).extracting(java.util.logging.LogRecord::getMessage).containsExactly(
-            "Jasper started without its start-up cache, which made Java fail at an earlier launch",
+            "Jasper started without its start-up cache, which failed its check after an earlier failed launch",
             "Jasper started without its start-up cache because JASPER_AOT_CACHE_SKIP is set",
             "Jasper started without its start-up cache because JASPER_AOT_CACHE_SKIP is set");
         assertThat(lines).allSatisfy(entry -> assertThat(entry.getLevel()).isEqualTo(java.util.logging.Level.INFO));
@@ -362,7 +414,7 @@ class VmOptionsFeatureTest {
         assertThat(titles()).containsExactly("Jasper started without its start-up cache");
         assertThat(lines).anySatisfy(entry -> {
             assertThat(entry.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
-            assertThat(entry.getMessage()).isEqualTo("Could not remember the start-up cache that made Java fail at launch; the next start tries it again");
+            assertThat(entry.getMessage()).isEqualTo("Could not remember the start-up cache that fails its check after a failed launch; the next start tries it again");
             assertThat(entry.getThrown()).isInstanceOf(IOException.class);
         });
         newStart();
@@ -385,7 +437,8 @@ class VmOptionsFeatureTest {
         assertThat(record()).doesNotExist();
         newStart();
         Files.writeString(file(), "-Xmx1g\n");
-        script = command -> command.contains("-XX:AOTMode=on") ? new VmOptionsCheck.Outcome(1, SEALED, false) : new VmOptionsCheck.Outcome(0, "", false);
+        script = command -> command.contains("-XX:AOTMode=on") && command.contains("-Xmx1g")
+            ? new VmOptionsCheck.Outcome(1, SEALED, false) : new VmOptionsCheck.Outcome(0, "", false);
         feature(both, true).startupSettled();
         assertThat(titles()).as("the options start the JVM; the cache fails with them").containsExactly("Jasper started without its start-up cache");
         assertThat(Files.readString(record())).as("the next start carries their digest").isEqualTo(recorded(5, VmOptionsSyntax.digest(List.of("-Xmx1g"))));
