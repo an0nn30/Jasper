@@ -70,7 +70,7 @@ editors, detection, the `EDITOR` values and launch lines, the `FileEditor`), fou
   Co-Authored-By: Claude <noreply@anthropic.com>
   ```
 - Source hygiene (AGENTS.md): no raw control, private-use or unpaired surrogate characters in `.java` sources; write
-  escapes (`"ü"`).
+  escapes (`"\u00fc"`).
 
 ## Known editors
 
@@ -134,6 +134,9 @@ Recorded here and, when the plan completes, in the spec's status line and `docs/
     terminal window open, `edit` returns `false` and the desktop opens the file.
 12. **A bundled editor replaces only a non-bundled one** (spec 6.4: "another plugin's"); a second bundled plugin's
     registration throws like any later one. Only the Editor provides one today.
+13. **The saved installed editor is found synchronously when the Editor starts** (a few file checks on the UI thread,
+    for that one editor), so the first shell of a launch already gets its `EDITOR`; the full detection still runs in the
+    background (spec 6.2). Ruled before execution (pre-flight finding 5).
 
 ## Review Focus
 
