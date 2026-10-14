@@ -472,9 +472,10 @@ def testLauncherWatch = tasks.register('testLauncherWatch') {
                 output: inherited, diagnostic: true],
             [name: 'diagnostic launch of a failing JVM', environment: [JASPER_LAUNCH_DIAGNOSE: '1'],
                 arguments: ['-Xmx3q', digest] + probe, diagnostic: true],
-            [name: 'no watcher', directory: directories.bare, arguments: ['-Xmx3q', digest] + probe],
+            [name: 'no watcher', directory: directories.bare, arguments: ['-Xmx3q', digest] + probe, exit: 1,
+                output: 'Invalid maximum heap size: -Xmx3q'],
         ] + (host.os == 'windows' ? [] : [[name: 'watcher not executable', directory: directories.unusable,
-            arguments: ['-Xmx3q', digest] + probe]])
+            arguments: ['-Xmx3q', digest] + probe, exit: 1, output: 'Invalid maximum heap size: -Xmx3q']])
         List<String> failures = []
         scenarios.eachWithIndex { Map scenario, int index ->
             File record = new File(work, "record-${index}.txt")
