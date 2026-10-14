@@ -17,7 +17,7 @@ name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
 sdk = ">=0.17.0, <0.18"
-capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen, clipboard.read
+capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen, clipboard.read, terminal.environment, editor.provide
 exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
 homepage = "https://example.dev/tool"  # optional, SDK 0.9.3: an http or https link on your plugin's page
@@ -259,11 +259,13 @@ equal. Finding things needs no capability. What a handle may do does:
 | `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()`, and subscribe to `TerminalEvents` |
 | `terminal.selection` | read `PaneHandle.selection()` |
 | `terminal.inject` | `sendText`, `sendBytes`, `paste` |
-| `terminal.open` | `Terminals.openTab` and `split` with `OpenRequest.local()` or `localProfile(id)`, and `Terminals.profiles()` and `onProfilesChanged` |
+| `terminal.open` | `Terminals.openTab` and `split` with `OpenRequest.local()`, `localProfile(id)` or a program (`LocalSpec.running`, SDK 0.17.1), and `Terminals.profiles()` and `onProfilesChanged` |
 | `session.provide` | `Terminals.openTab` and `split` with `OpenRequest.session(...)` |
 | `files.source` | `FileSources.register`: add places, such as saved hosts, to the file chooser |
 | `network.listen` | nothing gated: declare it when your plugin accepts connections from other programs or computers, such as serving files |
 | `clipboard.read` | `Platform.clipboardText()`: read the text on the clipboard (SDK 0.16.1) |
+| `terminal.environment` | `Terminals.environment`: add variables to new local shells (SDK 0.17.1) |
+| `editor.provide` | `Platform.editor`: be the editor Jasper opens files with (SDK 0.17.1) |
 
 Declare them in `plugin.toml`; the user is shown the list before your plugin loads. A gated call
 without the capability throws `MissingCapabilityException`. Jasper logs gated calls with your plugin
@@ -490,8 +492,8 @@ sync.error("Could not sync", "prod: connection refused", failure);
 - When one of your activities succeeds or fails, Jasper posts its outcome in `<plugin-id>.activities`; post nothing
   for it yourself.
 
-`context.platform().openInEditor(file)` opens a file with the user's editor (configured editor, then the desktop, then
-revealing the file), in the background; a failure is posted in your plugin's group. `context.platform().browse(uri)`
+`context.platform().openInEditor(file)` opens a file with the user's editor (the plugin editor `Platform.editor` registered,
+normally the Editor's [default editor](editor.md#default-editor), then the desktop, then revealing the file), in the background; a failure is posted in your plugin's group. `context.platform().browse(uri)`
 opens an http or https address in the user's browser the same way (SDK 0.10.2); any other address throws
 `IllegalArgumentException`.
 
@@ -533,6 +535,28 @@ exits 1. `call.onCancelled` hears, on the UI thread, that the caller went away (
 plugin stops ends with exit code 1. When two plugins declare the same name, a bundled plugin keeps it, otherwise the
 first by plugin id, and the other gets a problem notice. In tests, `FakePluginHost.declareSubcommand` and `call` drive a
 handler. Declare `sdk = ">=0.17.0, <0.18"`.
+
+## Shell variables, program tabs and the file editor
+
+SDK 0.17.1 adds four hooks. Declare `sdk = ">=0.17.1, <0.18"` when you use them.
+
+- `context.terminals().environment(contributor)` (needs `terminal.environment`) adds variables to each new local
+  shell and program tab. The contributor runs on the UI thread, must not block or do I/O, and gets Jasper's own
+  environment, read-only. A name matches `[A-Za-z_][A-Za-z0-9_]*`; `TERM`, `COLORTERM`, `TERM_PROGRAM`,
+  `TERM_PROGRAM_VERSION` and names starting `JASPER_` are reserved, and a value holding NUL is dropped; each dropped
+  entry is logged. A `[terminal.env]` entry still wins, and when two plugins set one name the first by plugin id wins.
+  WSL tabs and provided sessions get none.
+- `context.platform().editor(fileEditor)` (needs `editor.provide`) makes your plugin the editor Jasper opens files with:
+  Open in Editor for `config.toml`, plugin settings files and the VM options file, and every plugin's `openInEditor`.
+  `FileEditor.edit(file, line, window)` runs on the UI thread and returns whether it opened the file; `false`, or a
+  handler that throws, hands the file to the desktop. One plugin at a time: a bundled plugin's registration replaces
+  a non-bundled plugin's; otherwise a later one throws `IllegalStateException`.
+- `OpenRequest.local(LocalSpec.running(command, workingDirectory))` opens a tab or split that runs a program instead of
+  the shell, with the default shell's environment; it needs `terminal.open`. The tab closes when the program exits with
+  status 0 and stays open otherwise, whatever `terminal.on_exit` says. A `LocalSpec` names a profile or a command, not
+  both.
+- `context.commandLine().client()` is the `jasper` command's path (inside the installed app, or the build's in a
+  development run), for a value such as `EDITOR`; empty when there is none.
 
 ## Rules that matter
 
@@ -580,7 +604,7 @@ reported as unknown. Declaring after `start` returns throws. SDK 0.9 removed `Pl
 Settings shows a page for your plugin under Tools, generated from your declarations: rows in declaration order, a
 heading wherever `section` changes, the description under each control, and an editor chosen by kind or by
 `editor(EditorHint...)`. An `integer` setting is a stepper and a `number` a decimal field; `unit("min")` (a short unit,
-empty for none) shows after the value of either, on generated pages and in `host.row` rows alike. To build the page yourself, call `context.settings().page(panel)` during `start` with a
+empty for none) shows after the value of either, on generated pages and in `host.row` rows alike, and so do `EditorHint.font` (the font family picker) and `EditorHint.file` (a path with Browse…). To build the page yourself, call `context.settings().page(panel)` during `start` with a
 `SettingsPanel`: `create(host)` builds an owned `UiView`, `host.row(setting)` gives you the standard `Nodes.Node` row for a declared
 setting, and `host.stage(setting, value)` sets a value from a control of your own; Settings saves them on Apply. Use
 `modified`, `apply` and `reset` only for state of your own, and `keywords` and `highlight` for search. Your panel
@@ -618,15 +642,20 @@ try (var host = new FakePluginHost()) {
 `host.openRequests()` show what your plugin did; `commandStarted`, `commandFinished`,
 `titleChanged`, `cwdChanged`, `sessionExited` and `bell` publish terminal events, delivered by
 `flush()`. `host.remoteCwdChanged(paneId, host, path)` reports a remote directory.
-`host.setShellProfiles(list)` scripts the detected shell profiles and runs `onProfilesChanged` listeners; `openRequests()` then ends a line with `|<profile id>` when the request named one. Give the
+`host.setShellProfiles(list)` scripts the detected shell profiles and runs `onProfilesChanged` listeners; `openRequests()` then ends a line with `|<profile id>` when the request named one, and a program tab's or split's
+line with `|run:<command>`, its words joined by spaces. `host.shellEnvironment(jasperEnvironment)` returns what the
+plugins' `Terminals.environment` contributors add for a new shell; `host.edit(file, line, windowId)` calls the
+`Platform.editor` file editor, `host.editorPlugin()` names its plugin and `host.declareBundled(id)`, before that
+plugin starts, makes it bundled; `host.setCommandClient(path)` sets `commandLine().client()`; a settings row's Browse…
+takes the next `host.queueFileSelection`. Give the
 `PluginInfo` you start with the capabilities your `plugin.toml` declares.
 A provided session is driven with `host.sessionState(paneId)`, `typeIntoSession`, `sessionOutput`,
 `cancelSession` and `reconnectSession`; `flush()` notices exits. The fake runs cancellation handlers
 and closes inline where Jasper uses its cleanup thread.
 `host.scopes()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep` and `executeInScope`
 drive a contributed scope as the palette would; `paletteOpens()`, `openedInEditor()`
-and `browsed()` record what the plugin asked for. `host.clipboard()` is the clipboard every plugin's `Platform` writes
-to: `copies()` lists `copy|<plugin id>|<text>` and `secret|<plugin id>|<text>`, `text()` and `setText(value)` read and
+(the files no provided editor opened) and `browsed()` record what the plugin asked for. `host.clipboard()` is the
+clipboard every plugin's `Platform` writes to: `copies()` lists `copy|<plugin id>|<text>` and `secret|<plugin id>|<text>`, `text()` and `setText(value)` read and
 set it as the user would, `failWrites(true)` makes it busy, and `expireSecrets()` runs the 30-second clear now. The fake
 does not model the UI thread, so the application's off-thread `IllegalStateException` is not reproduced. `connectionLog()` lists delivered connection events, as
 `activityLog()` does activities. `host.notifications()` records what the plugin posted: `lines()` as

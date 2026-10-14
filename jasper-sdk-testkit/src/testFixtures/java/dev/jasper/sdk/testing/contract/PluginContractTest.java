@@ -1940,4 +1940,196 @@ public abstract class PluginContractTest {
         call.cancel();
         assertThat(cancelled).as("a stopped plugin's cancellation listener never runs").hasValue(0);
     }
+
+    @Test void shellVariablesNeedTheCapabilityAndTheFirstPluginByIdWins() {
+        var bare = new AtomicReference<PluginContext>();
+        var alpha = new AtomicReference<PluginContext>();
+        var beta = new AtomicReference<PluginContext>();
+        h.start(info("test.bare"), Set.of(), Set.of(), bare::set);
+        h.start(info("test.beta", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), beta::set);
+        h.start(info("test.alpha", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), alpha::set);
+        var seen = new AtomicReference<Map<String, String>>();
+        h.ui(() -> {
+            assertThatThrownBy(() -> bare.get().terminals().environment(environment -> Map.of("A", "1")))
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("terminal.environment"));
+            beta.get().terminals().environment(environment -> Map.of("EDITOR", "beta", "PAGER", "less"));
+            alpha.get().terminals().environment(environment -> {
+                seen.set(environment);
+                return Map.of("EDITOR", "alpha");
+            });
+        });
+        Map<String, String> jasper = new java.util.HashMap<>(Map.of("HOME", "/home/me", "EDITOR", "vim"));
+        assertThat(h.shellVariables(jasper)).as("by plugin id, not by start order").isEqualTo(Map.of("EDITOR", "alpha", "PAGER", "less"));
+        assertThat(seen.get()).as("Jasper's own environment").isEqualTo(Map.of("HOME", "/home/me", "EDITOR", "vim"));
+    }
+
+    @Test void invalidReservedAndNulEntriesAreDroppedAndAFailingContributorAddsNothing() {
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), a::set);
+        Map<String, String> offered = new java.util.HashMap<>();
+        for (String name : List.of("TERM", "COLORTERM", "TERM_PROGRAM", "TERM_PROGRAM_VERSION", "JASPER_PANE", "JASPER_ANYTHING",
+                "1ST", "WITH-DASH", "WITH SPACE", "", "\u00dcBER"))
+            offered.put(name, "x");
+        offered.put(null, "x");
+        offered.put("NO_VALUE", null);
+        offered.put("NUL_VALUE", "a\0b");
+        offered.put("KEPT", "yes");
+        offered.put("_kept_2", "yes");
+        h.ui(() -> {
+            var terminals = a.get().terminals();
+            terminals.environment(environment -> offered);
+            terminals.environment(environment -> { throw new IllegalStateException("broken contributor"); });
+            terminals.environment(environment -> {
+                environment.put("HOME", "/elsewhere");
+                return Map.of("NEVER", "1");
+            });
+            terminals.environment(environment -> null);
+        });
+        Map<String, String> jasper = new java.util.HashMap<>(Map.of("HOME", "/home/me"));
+        assertThat(h.shellVariables(jasper)).isEqualTo(Map.of("KEPT", "yes", "_kept_2", "yes"));
+        assertThat(jasper).as("contributors get a read-only copy").isEqualTo(Map.of("HOME", "/home/me"));
+    }
+
+    @Test void aContributorEndsWithItsRegistrationAndWithItsPlugin() {
+        var a = new AtomicReference<PluginContext>();
+        var b = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), a::set);
+        h.start(info("test.b", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), b::set);
+        var registration = new AtomicReference<Subscription>();
+        h.ui(() -> {
+            registration.set(a.get().terminals().environment(environment -> Map.of("A", "1")));
+            b.get().terminals().environment(environment -> Map.of("B", "2"));
+        });
+        assertThat(h.shellVariables(Map.of())).isEqualTo(Map.of("A", "1", "B", "2"));
+        h.ui(() -> registration.get().close());
+        assertThat(h.shellVariables(Map.of())).isEqualTo(Map.of("B", "2"));
+        h.stopAll();
+        assertThat(h.shellVariables(Map.of())).as("the registration ends with its plugin").isEmpty();
+    }
+
+    @Test void aTabOrASplitMayRunAProgramAndThatNeedsTerminalOpen() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), only = h.addTerminalPane(tab, "make", Path.of("/src"));
+        var alpha = new AtomicReference<PluginContext>();
+        var bare = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OPEN), Set.of(), Set.of(), alpha::set);
+        h.start(info("test.bare"), Set.of(), Set.of(), bare::set);
+        Path here = Path.of("/tmp").toAbsolutePath();
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            PaneHandle editor = terminals.openTab(terminals.window(window).orElseThrow(),
+                OpenRequest.local(dev.jasper.sdk.terminal.LocalSpec.running(List.of("nvim", "+3", "notes.txt"), Optional.of(here)))).orElseThrow();
+            assertThat(editor.isOpen()).isTrue();
+            terminals.split(terminals.pane(only).orElseThrow(), Direction.RIGHT,
+                OpenRequest.local(dev.jasper.sdk.terminal.LocalSpec.running(List.of("htop"), Optional.empty()))).orElseThrow();
+            var others = bare.get().terminals();
+            assertThatThrownBy(() -> others.openTab(others.window(window).orElseThrow(),
+                    OpenRequest.local(dev.jasper.sdk.terminal.LocalSpec.running(List.of("htop"), Optional.empty()))))
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo(Capabilities.TERMINAL_OPEN));
+        });
+        assertThat(h.openRequests()).containsExactly("tab|" + window + "|" + here + "|run:nvim +3 notes.txt", "split|" + only + "|RIGHT|-|run:htop");
+    }
+
+    /** An editor that records {@code <file name>|<line or ->|<window id or ->} and answers {@code answer}. */
+    private static dev.jasper.sdk.ui.FileEditor recordingEditor(List<String> calls, boolean answer) {
+        return (file, line, window) -> {
+            calls.add(file.getFileName() + "|" + (line.isPresent() ? String.valueOf(line.getAsInt()) : "-") + "|"
+                + window.map(owner -> ((dev.jasper.sdk.terminal.WindowHandle) owner).id().toString()).orElse("-"));
+            return answer;
+        };
+    }
+
+    @Test void providingTheEditorNeedsTheCapabilityAndOnePluginProvidesItAtATime() {
+        var bare = new AtomicReference<PluginContext>();
+        var a = new AtomicReference<PluginContext>();
+        var b = new AtomicReference<PluginContext>();
+        h.start(info("test.bare"), Set.of(), Set.of(), bare::set);
+        h.start(info("test.a", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.b", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), b::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        java.nio.file.Path notes = HERE.resolve("notes.txt");
+        assertThat(h.edit(notes, java.util.OptionalInt.empty(), Optional.empty())).as("no plugin provides one").isFalse();
+        h.ui(() -> {
+            assertThatThrownBy(() -> bare.get().platform().editor(recordingEditor(calls, true)))
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("editor.provide"));
+            a.get().platform().editor(recordingEditor(calls, true));
+            assertThatIllegalStateException().isThrownBy(() -> b.get().platform().editor(recordingEditor(calls, true)))
+                .withMessage("The editor is already provided by test.a");
+            assertThatIllegalStateException().as("the same plugin twice").isThrownBy(() -> a.get().platform().editor(recordingEditor(calls, true)))
+                .withMessage("The editor is already provided by test.a");
+        });
+        assertThat(h.edit(notes, java.util.OptionalInt.of(3), Optional.empty())).isTrue();
+        assertThat(calls).containsExactly("notes.txt|3|-");
+    }
+
+    @Test void aBundledPluginsEditorReplacesAnotherPluginsAndEndsWithItsPlugin() {
+        h.declareBundled("test.z");
+        var a = new AtomicReference<PluginContext>();
+        var z = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.z", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), z::set);
+        List<String> byA = new CopyOnWriteArrayList<>(), byZ = new CopyOnWriteArrayList<>();
+        var replaced = new AtomicReference<Subscription>();
+        java.nio.file.Path notes = HERE.resolve("notes.txt");
+        h.ui(() -> {
+            replaced.set(a.get().platform().editor(recordingEditor(byA, true)));
+            z.get().platform().editor(recordingEditor(byZ, true));
+            assertThatIllegalStateException().isThrownBy(() -> a.get().platform().editor(recordingEditor(byA, true)))
+                .withMessage("The editor is already provided by test.z");
+        });
+        assertThat(h.edit(notes, java.util.OptionalInt.empty(), Optional.empty())).isTrue();
+        h.ui(() -> replaced.get().close());
+        assertThat(h.edit(notes, java.util.OptionalInt.empty(), Optional.empty())).as("closing the replaced registration leaves the bundled one").isTrue();
+        assertThat(byA).isEmpty();
+        assertThat(byZ).containsExactly("notes.txt|-|-", "notes.txt|-|-");
+        h.stopAll();
+        assertThat(h.edit(notes, java.util.OptionalInt.empty(), Optional.empty())).as("the registration ends with its plugin").isFalse();
+    }
+
+    @Test void anEditorThatThrowsGivesFalseAndOneGetsItsPluginsHandleForAnOpenWindow() {
+        UUID window = h.addTerminalWindow();
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), a::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        dev.jasper.sdk.ui.FileEditor recording = recordingEditor(calls, true);
+        h.ui(() -> a.get().platform().editor((file, line, owner) -> {
+            if (file.getFileName().toString().equals("broken.txt")) throw new IllegalStateException("the editor broke");
+            return recording.edit(file, line, owner);
+        }));
+        assertThat(h.edit(HERE.resolve("broken.txt"), java.util.OptionalInt.empty(), Optional.empty())).isFalse();
+        assertThat(h.edit(HERE.resolve("notes.txt"), java.util.OptionalInt.of(7), Optional.of(window))).isTrue();
+        assertThat(h.edit(HERE.resolve("notes.txt"), java.util.OptionalInt.empty(), Optional.of(UUID.randomUUID())))
+            .as("a window that is not open is no window").isTrue();
+        assertThat(calls).containsExactly("notes.txt|7|" + window, "notes.txt|-|-");
+    }
+
+    @Test void openInEditorGoesToTheProvidedEditorFirst() {
+        var a = new AtomicReference<PluginContext>();
+        var user = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.user"), Set.of(), Set.of(), user::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        h.ui(() -> a.get().platform().editor((file, line, window) -> {
+            calls.add(file.getFileName().toString());
+            return !file.getFileName().toString().equals("declined.txt");
+        }));
+        h.ui(() -> {
+            user.get().platform().openInEditor(HERE.resolve("notes.txt"));
+            user.get().platform().openInEditor(HERE.resolve("declined.txt"));
+        });
+        h.flush();
+        // Up to 10 s: the app host's worker hops to the UI thread, which a loaded CI can delay.
+        for (int i = 0; i < 1000 && (calls.size() < 2 || h.openedInEditor().isEmpty()); i++) {
+            try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+        assertThat(calls).containsExactlyInAnyOrder("notes.txt", "declined.txt");
+        assertThat(h.openedInEditor()).as("only the declined file reaches the desktop").containsExactly(HERE.resolve("declined.txt"));
+    }
+
+    @Test void theCommandLineNamesTheClientOnceTheHostKnowsIt() {
+        PluginContext a = started("test.a", Set.of());
+        assertThat(a.commandLine().client()).as("no client yet").isEmpty();
+        java.nio.file.Path client = HERE.resolve("bin").resolve("jasper");
+        h.commandClient(client);
+        assertThat(a.commandLine().client()).as("any thread").contains(client);
+    }
 }

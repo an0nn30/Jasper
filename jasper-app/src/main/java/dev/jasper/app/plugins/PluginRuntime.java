@@ -544,6 +544,52 @@ public final class PluginRuntime {
         };
     }
 
+    /**
+     * What running plugins add to a new local shell ({@code Terminals.environment}), given Jasper's own environment.
+     * UI thread. Empty before the plugins start and after they stop.
+     *
+     * @param jasperEnvironment Jasper's own environment, untouched
+     * @return the variables, never null
+     * @throws IllegalStateException off the UI thread
+     */
+    public Map<String, String> shellVariables(Map<String, String> jasperEnvironment) {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Shell variables are read on the UI thread");
+        PluginHost current = host;
+        return current == null ? Map.of() : current.shellContributions.variables(jasperEnvironment);
+    }
+
+    /**
+     * Opens a file for editing, on a worker thread: the editor a plugin provides ({@code Platform.editor}), asked on the
+     * UI thread with the active terminal window, then {@code desktop} on this thread when no plugin provides one, it
+     * declines or throws, or it does not answer within 30 seconds. Before the plugins start, {@code desktop} alone. Once
+     * they run, an interrupted worker, such as one Jasper's quit interrupts, opens nothing and keeps its interrupt.
+     *
+     * @param file the file
+     * @param desktop the desktop's opener, such as {@code ConfigEditor::open}; its failure propagates
+     * @throws IllegalStateException on the UI thread
+     */
+    public void open(Path file, Consumer<Path> desktop) {
+        if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor operations require a worker thread");
+        Objects.requireNonNull(file, "file");
+        Objects.requireNonNull(desktop, "desktop");
+        PluginHost current = host;
+        if (current == null) desktop.accept(file);
+        else current.fileEditors.openFromWorker(file, () -> terminals.activeWindow().map(dev.jasper.app.terminals.WindowEntry::id), desktop);
+    }
+
+    private Optional<Path> commandClient = Optional.empty();
+
+    /**
+     * Sets the {@code jasper} command plugins see in {@code CommandLine.client()}; before {@link #start}.
+     *
+     * @param client the command's path; empty when this Jasper names none
+     * @throws IllegalStateException once the plugins have started
+     */
+    public void commandClient(Optional<Path> client) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        commandClient = Objects.requireNonNull(client, "client");
+    }
+
     public void start(Map<String, Map<String, Object>> pluginTables, boolean dark) {
         if (host != null) throw new IllegalStateException("Plugins already started");
         this.dark = dark;
@@ -583,10 +629,13 @@ public final class PluginRuntime {
         created.animations = animations;
         created.shortcuts = shortcuts;
         created.clipboard = clipboard;
+        created.commandClient = commandClient;
         Set<String> loadingIds = new HashSet<>();
         for (PluginCandidate loading : resolution.load()) loadingIds.add(loading.id());
         List<PluginCandidate> notLoading = byId.values().stream().filter(discovered -> !loadingIds.contains(discovered.id())).toList();
         created.commands.declare(Subcommands.choose(resolution.load(), notLoading, notifications.problem()));
+        created.fileEditors.bundled(resolution.load().stream().filter(candidate -> candidate.origin() == PluginCandidate.Origin.BUNDLED)
+            .map(PluginCandidate::id).collect(java.util.stream.Collectors.toSet()));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         connectionBridge = created.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, this::forwardConnection);
@@ -987,7 +1036,7 @@ public final class PluginRuntime {
         Thread.ofVirtual().name("jasper-plugin-settings-open").start(() -> {
             try {
                 prepareSettings(id);
-                editor.accept(PluginSettingsFiles.file(options.userDirectory(), id));
+                open(PluginSettingsFiles.file(options.userDirectory(), id), editor);
             } catch (IOException | RuntimeException failure) {
                 String name = Optional.ofNullable(launched.get(id)).map(candidate -> candidate.descriptor().name()).orElse(id);
                 String reason = failure.getMessage() == null ? failure.toString() : failure.getMessage();

@@ -35,4 +35,14 @@ class CommandInstallTest {
         assertThat(install.available()).isFalse();
         assertThat(install.state().kind()).isEqualTo(CommandInstall.Kind.UNAVAILABLE);
     }
+
+    @Test void theClientIsTheImagesCommandElseTheBuildsElseNone() {
+        String built = Path.of("/src/jasper-app/build/cli/bin/jasper").toString();
+        assertThat(CommandInstall.client("Mac OS X", "/Applications/Jasper Beta.app/Contents/MacOS/Jasper", built))
+            .as("an installed image's own command wins").contains(Path.of("/Applications/Jasper Beta.app/Contents/Resources/bin/jasper"));
+        assertThat(CommandInstall.client("Linux", "/opt/jasper/bin/Jasper", null)).contains(Path.of("/opt/jasper/lib/bin/jasper"));
+        assertThat(CommandInstall.client("Mac OS X", null, built)).as("a development run's").contains(Path.of(built));
+        assertThat(CommandInstall.client("Linux", "", " ")).isEmpty();
+        assertThat(CommandInstall.client("Linux", null, null)).isEmpty();
+    }
 }

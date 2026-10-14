@@ -65,5 +65,6 @@ class VersionRangeTest {
         assertThat(VersionRange.parse(">=0.15.0, <0.16").contains(host)).isFalse();
         assertThat(VersionRange.parse(">=0.16.0, <0.17").contains(host)).isFalse();
         assertThat(VersionRange.parse(">=0.17.0, <0.18").contains(host)).isTrue();
+        assertThat(VersionRange.parse(">=0.17.1, <0.18").contains(host)).as("the Editor's range").isTrue();
     }
 }

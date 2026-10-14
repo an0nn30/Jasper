@@ -1,5 +1,6 @@
 package dev.jasper.sdk.ui;
 
+import dev.jasper.sdk.Subscription;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Optional;
@@ -10,8 +11,8 @@ import java.util.Optional;
  */
 public interface Platform {
     /**
-     * Opens a file in the user's editor: the configured editor, then the desktop's edit or open
-     * action, then revealing the file. Runs in the background; a failure is posted in the plugin's notification group,
+     * Opens a file in the user's editor: the editor a plugin provides (see {@link #editor}), then the desktop's edit or
+     * open action, then revealing the file. Runs in the background; a failure is posted in the plugin's notification group,
      * never thrown.
      *
      * @param file the file
@@ -62,4 +63,24 @@ public interface Platform {
      * @since 0.16.1
      */
     Optional<String> clipboardText();
+
+    /**
+     * Makes this plugin the editor Jasper opens files with: {@code config.toml}, the plugin settings files, the custom VM
+     * options file and every {@link #openInEditor} go to {@code editor} first, on the UI thread. One at a time: a bundled
+     * plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and any later one, this
+     * plugin's own included, throws. When the editor returns false or throws, when no plugin provides one, and when
+     * Jasper waited 30 seconds for the UI thread's answer, the desktop opens the file as before. Needs
+     * {@code editor.provide}. UI thread only. The registration ends with the plugin.
+     *
+     * @param editor opens a file
+     * @return the registration
+     * @throws IllegalStateException when another plugin already provides the editor
+     *     ({@code The editor is already provided by <plugin id>}), and off the UI thread
+     * @throws dev.jasper.sdk.MissingCapabilityException without {@code editor.provide}
+     * @since 0.17.1
+     */
+    default Subscription editor(FileEditor editor) {
+        java.util.Objects.requireNonNull(editor, "editor");
+        return () -> { };
+    }
 }

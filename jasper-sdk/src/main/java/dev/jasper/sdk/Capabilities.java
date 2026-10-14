@@ -31,8 +31,16 @@ public final class Capabilities {
      * user just copied elsewhere, such as a password. Writing needs no capability. @since 0.16.1
      */
     public static final String CLIPBOARD_READ = "clipboard.read";
+    /**
+     * Adding variables, such as {@code EDITOR}, to the environment of new local shells and of the programs that
+     * {@code LocalSpec.command} runs in tabs and splits, with {@code Terminals.environment}. @since 0.17.1
+     */
+    public static final String TERMINAL_ENVIRONMENT = "terminal.environment";
+    /** Being the editor Jasper opens files with, through {@code Platform.editor}. @since 0.17.1 */
+    public static final String EDITOR_PROVIDE = "editor.provide";
     /** Every capability this SDK version knows. */
-    public static final List<String> ALL = List.of(TERMINAL_OBSERVE, TERMINAL_SELECTION, TERMINAL_INJECT, TERMINAL_OPEN, SESSION_PROVIDE, PALETTE_CONTRIBUTE, FILES_SOURCE, NETWORK_LISTEN, CLIPBOARD_READ);
+    public static final List<String> ALL = List.of(TERMINAL_OBSERVE, TERMINAL_SELECTION, TERMINAL_INJECT, TERMINAL_OPEN, SESSION_PROVIDE, PALETTE_CONTRIBUTE, FILES_SOURCE, NETWORK_LISTEN, CLIPBOARD_READ,
+        TERMINAL_ENVIRONMENT, EDITOR_PROVIDE);
 
     private Capabilities() { }
 }

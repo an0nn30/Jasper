@@ -3,7 +3,9 @@ package dev.jasper.sdk.testing;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.cli.CommandHandler;
 import dev.jasper.sdk.cli.CommandLine;
+import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Optional;
 
 /** One plugin's subcommand handlers, stored in the host; they vanish when the plugin stops. */
 final class FakeCommandLine implements CommandLine {
@@ -34,6 +36,8 @@ final class FakeCommandLine implements CommandLine {
         context.own(subscription);
         return subscription;
     }
+
+    @Override public Optional<Path> client() { return host.commandClient; }
 
     void closeAll() { host.subcommandHandlers.values().removeIf(registered -> registered.context() == context); }
 }

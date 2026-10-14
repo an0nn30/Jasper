@@ -1,6 +1,8 @@
 package dev.jasper.sdk.cli;
 
 import dev.jasper.sdk.Subscription;
+import java.nio.file.Path;
+import java.util.Optional;
 
 /**
  * Answers this plugin's {@code jasper} subcommands. Implemented by the application and by the testkit.
@@ -21,4 +23,13 @@ public interface CommandLine {
      * @throws IllegalStateException off the UI thread, or after the plugin stopped
      */
     Subscription handle(String name, CommandHandler handler);
+
+    /**
+     * The {@code jasper} command of this Jasper, for a plugin that writes it into another program's settings, such as
+     * {@code EDITOR}: the client inside the installed app, or in a development run the one the build made. Any thread.
+     *
+     * @return the client's path; empty when this Jasper has none
+     * @since 0.17.1
+     */
+    default Optional<Path> client() { return Optional.empty(); }
 }

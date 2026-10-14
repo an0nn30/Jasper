@@ -257,6 +257,26 @@ public final class EditorWindow {
         return newFile(target, owner);
     }
 
+    /**
+     * Opens a local file for the default editor ({@code FileEditor.edit}): an existing file with the caret on
+     * {@code line}, a missing one whose folder exists as a tab its first save creates. The tab opens in {@code window}
+     * when that is a terminal window, else in the last main window.
+     *
+     * @return false for a folder or a file whose folder does not exist, which the desktop then opens or reports
+     */
+    public boolean edit(Path file, java.util.OptionalInt line, Optional<WindowOwner> window) {
+        Path target = file.toAbsolutePath().normalize();
+        WindowOwner owner = window.filter(WindowHandle.class::isInstance).orElse(null);
+        if (java.nio.file.Files.isRegularFile(target)) {
+            openAt(target, line.orElse(0), 0, owner);
+            return true;
+        }
+        Path folder = target.getParent();
+        if (java.nio.file.Files.exists(target) || folder == null || !java.nio.file.Files.isDirectory(folder)) return false;
+        openNew(target, owner);
+        return true;
+    }
+
     /** Completes once the session's tab has closed: when the user closes it, its window closes or the Editor stops. */
     public CompletableFuture<Void> closed(DocumentSession session) {
         var done = new CompletableFuture<Void>();

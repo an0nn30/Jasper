@@ -4,6 +4,7 @@ import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakePluginHost;
 import java.awt.Font;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,8 @@ class EditorSettingsTest {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
             assertThat(start(host, Set.of("Menlo", "JetBrains Mono")).current())
                 .isEqualTo(new EditorSettings("JetBrains Mono", 13, 4, false, 10, false));
-            assertThat(host.declared(ID)).containsExactly("font_family", "font_size", "tab_size", "soft_wrap", "vim", "max_file_mib", "recent_files_days");
+            assertThat(host.declared(ID)).containsExactly("font_family", "font_size", "tab_size", "soft_wrap", "vim", "max_file_mib", "recent_files_days",
+                "default_editor", "custom_command", "custom_in_terminal", "keep_environment_editor");
             assertThat(host.settingsReports(ID)).isEmpty();
         }
         try (var host = new FakePluginHost(home.resolve("other"))) {
@@ -65,17 +67,19 @@ class EditorSettingsTest {
     }
 
     /**
-     * Plan 3 Task 8: the generated Settings page shows a section label above a settings card wherever the section
-     * changes, so the declarations group the page as Font, Editing and Files, with the two on/off settings as switches.
+     * Plan 3 Task 8 and the default editor plan: the declarations group the settings as Font, Editing, Files and Default
+     * editor, as the Editor's own page shows them, with the on/off settings as switches.
      */
-    @Test void declaresTheSettingsPageAsFontEditingAndFilesGroups() {
+    @Test void declaresTheSettingsAsFontEditingFilesAndDefaultEditorGroups() {
         var specs = new java.util.ArrayList<dev.jasper.sdk.settings.SettingSpec<?>>();
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
             host.start(INFO, Set.of(), Set.of(), context -> new EditorSettings.Declared(recording(context.settings(), specs), Set.of()));
             assertThat(specs).extracting(spec -> spec.section() + "/" + spec.key()).containsExactly(
-                "Font/font_family", "Font/font_size", "Editing/tab_size", "Editing/soft_wrap", "Editing/vim", "Files/max_file_mib", "Files/recent_files_days");
+                "Font/font_family", "Font/font_size", "Editing/tab_size", "Editing/soft_wrap", "Editing/vim", "Files/max_file_mib", "Files/recent_files_days",
+                "Default editor/default_editor", "Default editor/custom_command", "Default editor/custom_in_terminal",
+                "Default editor/keep_environment_editor");
             assertThat(specs).filteredOn(spec -> spec.kind() instanceof dev.jasper.sdk.settings.SettingKind.Bool)
-                .extracting(dev.jasper.sdk.settings.SettingSpec::key).containsExactly("soft_wrap", "vim");
+                .extracting(dev.jasper.sdk.settings.SettingSpec::key).containsExactly("soft_wrap", "vim", "custom_in_terminal", "keep_environment_editor");
             assertThat(specs).allSatisfy(spec -> {
                 assertThat(spec.label()).as("sentence-case labels without a colon").doesNotEndWith(":").isNotBlank();
                 assertThat(spec.description()).isNotBlank();
@@ -98,6 +102,30 @@ class EditorSettingsTest {
             declared.saveVim(true).join();
             assertThat(host.savedSettings(ID)).containsEntry("vim", true);
             assertThat(declared.current().vim()).isTrue();
+        }
+    }
+
+    @Test void theDefaultEditorIsTheJasperEditorAndOnlyKnownChoicesAreAccepted() {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            var declared = start(host, Set.of());
+            assertThat(declared.defaultEditor()).isEqualTo("jasper");
+            assertThat(declared.customCommand()).isEmpty();
+            assertThat(declared.customInTerminal()).isTrue();
+            assertThat(declared.keepEnvironmentEditor()).isTrue();
+            for (String value : List.of("system", "custom", "nvim", "code", "notepadpp")) {
+                host.setSetting(ID, "default_editor", value);
+                assertThat(declared.defaultEditor()).isEqualTo(value);
+            }
+            host.setSetting(ID, "default_editor", "emacsclient");
+            assertThat(declared.defaultEditor()).isEqualTo("jasper");
+            assertThat(host.settingsReports(ID)).containsExactly("default_editor: Use jasper, system, custom or an editor id such as nvim or code.");
+            host.setSetting(ID, "default_editor", "custom");
+            host.setSetting(ID, "custom_command", "subl -w");
+            host.setSetting(ID, "custom_in_terminal", false);
+            host.setSetting(ID, "keep_environment_editor", false);
+            assertThat(declared.customCommand()).isEqualTo("subl -w");
+            assertThat(declared.customInTerminal()).isFalse();
+            assertThat(declared.keepEnvironmentEditor()).isFalse();
         }
     }
 }

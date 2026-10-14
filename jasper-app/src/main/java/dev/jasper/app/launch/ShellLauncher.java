@@ -3,6 +3,7 @@ package dev.jasper.app.launch;
 import dev.jasper.terminal.session.TerminalSession;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -123,8 +124,24 @@ public final class ShellLauncher {
     /** As above for {@code pane}, whose shell also gets the pane's variables. */
     public Launch launch(Optional<Path> directory, Optional<String> profile, Optional<UUID> pane, Consumer<Launch> replaced,
                          BiConsumer<TerminalSession, Throwable> completion) {
+        return launch(directory, profile, Optional.empty(), pane, replaced, completion);
+    }
+
+    /**
+     * As above; a present {@code program} runs instead of the shell, with the profile's environment and the pane's
+     * variables, in {@code directory} (empty: the user's home), which must exist; a WSL profile's {@code --cd} is not
+     * added. The launch's label is the program's file name. A launcher without settings cannot run a program:
+     * {@code completion} gets an {@link IllegalStateException}.
+     */
+    public Launch launch(Optional<Path> directory, Optional<String> profile, Optional<List<String>> program, Optional<UUID> pane,
+                         Consumer<Launch> replaced, BiConsumer<TerminalSession, Throwable> completion) {
         Objects.requireNonNull(directory, "directory");
+        Objects.requireNonNull(program, "program");
         Objects.requireNonNull(replaced, "replaced");
+        if (program.isPresent() && settings == null) {
+            SwingUtilities.invokeLater(() -> completion.accept(null, new IllegalStateException("This window cannot run a program")));
+            return new Launch(label, Optional.empty());
+        }
         final LaunchSettings captured;
         try {
             captured = settings == null ? null : Objects.requireNonNull(settings.apply(profile));
@@ -132,7 +149,7 @@ public final class ShellLauncher {
             SwingUtilities.invokeLater(() -> completion.accept(null, failure));
             return new Launch(label, Optional.empty());
         }
-        Launch launched = captured == null ? new Launch(label, Optional.empty()) : launchOf(captured);
+        Launch launched = captured == null ? new Launch(label, Optional.empty()) : launchOf(captured, program);
         Path home = Path.of(System.getProperty("user.home"));
         try {
             executor.execute(() -> {
@@ -147,12 +164,22 @@ public final class ShellLauncher {
                         session = start.apply(target, null);
                     } else {
                         LaunchSettings chosen = Objects.requireNonNull(confirm.apply(profile, captured));
-                        Launch now = launchOf(chosen);
+                        Launch now = launchOf(chosen, program);
                         if (!now.equals(launched)) SwingUtilities.invokeLater(() -> replaced.accept(now));
-                        LaunchSettings.Start target = chosen.at(directory, home, Files::isDirectory);
-                        LaunchSettings started = pane.isEmpty() ? target.settings()
-                            : target.settings().withVariables(variables.apply(pane.get()));
-                        session = start.apply(target.directory(), started);
+                        Path where;
+                        LaunchSettings resolved;
+                        if (program.isPresent()) {
+                            // Never at(): a WSL profile's --cd belongs to wsl.exe, not to the program.
+                            where = directory.orElse(home);
+                            if (!Files.isDirectory(where)) throw new IllegalArgumentException("Directory is unavailable: " + where);
+                            resolved = chosen.withCommand(program.get());
+                        } else {
+                            LaunchSettings.Start target = chosen.at(directory, home, Files::isDirectory);
+                            where = target.directory();
+                            resolved = target.settings();
+                        }
+                        LaunchSettings started = pane.isEmpty() ? resolved : resolved.withVariables(variables.apply(pane.get()));
+                        session = start.apply(where, started);
                     }
                 } catch (Exception e) { failure = e; }
                 TerminalSession result = session;
@@ -165,7 +192,8 @@ public final class ShellLauncher {
         return launched;
     }
 
-    private static Launch launchOf(LaunchSettings settings) {
-        return new Launch(settings.label(), Optional.of(settings.profile().id()));
+    private static Launch launchOf(LaunchSettings settings, Optional<List<String>> program) {
+        String name = program.map(command -> LaunchSettings.programName(command.getFirst())).orElseGet(settings::label);
+        return new Launch(name, Optional.of(settings.profile().id()));
     }
 }

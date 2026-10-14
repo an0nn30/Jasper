@@ -200,4 +200,34 @@ class ShellProfileLaunchTest {
         assertThat(warnings).isEmpty();
         assertThat(defaults).containsOnly(new ShellLauncher.SessionDefaults(snapshot.columns(), snapshot.lines(), snapshot.terminal().scrollback()));
     }
+
+    @Test void theWindowLauncherAsksPluginsOnTheEdtAndPutsTheirVariablesBeforeTheConfiguredOnes() throws Exception {
+        var snapshot = ConfigLoader.parse(directory.resolve("config.toml"), "[terminal.env]\nCONFIGURED = 'configured'\n", false).snapshot();
+        var login = new ShellProfile("login", "Login shell", ShellProfile.Kind.LOGIN_SHELL, Optional.empty(), List.of("/bin/zsh", "-l"));
+        var wsl = new ShellProfile("wsl:Ubuntu", "Ubuntu", ShellProfile.Kind.WSL, Optional.of("WSL 2"), List.of("wsl.exe", "-d", "Ubuntu"));
+        Queue<Runnable> pending = new ArrayDeque<>();
+        var started = new ArrayList<LaunchSettings>();
+        var onEdt = new ArrayList<Boolean>();
+        var inheritedMaps = new ArrayList<Map<String, String>>();
+        SwingUtilities.invokeAndWait(() -> {
+            var launcher = JasperApplication.windowLauncher(pending::add, () -> snapshot, (path, settings) -> {
+                started.add(settings);
+                throw new IllegalStateException("controlled launch boundary");
+            }, null, (profile, shell) -> new ShellProfiles.Resolution(profile.isPresent() ? wsl : login, Optional.empty()),
+                () -> false, warning -> { }, pane -> Map.of(), inherited -> {
+                    onEdt.add(SwingUtilities.isEventDispatchThread());
+                    inheritedMaps.add(inherited);
+                    return Map.of("CONTRIBUTED", "plugin", "CONFIGURED", "plugin");
+                });
+            launcher.launch(directory, Optional.empty(), (session, failure) -> { });
+            launcher.launch(directory, Optional.of("wsl:Ubuntu"), (session, failure) -> { });
+        });
+        while (!pending.isEmpty()) pending.remove().run();
+        SwingUtilities.invokeAndWait(() -> { });
+        assertThat(started).hasSize(2);
+        assertThat(started.get(0).environment()).containsEntry("CONTRIBUTED", "plugin").containsEntry("CONFIGURED", "configured");
+        assertThat(started.get(1).environment()).as("a WSL shell gets no plugin variables").doesNotContainKey("CONTRIBUTED");
+        assertThat(onEdt).as("asked once, for the local shell, on the EDT").containsExactly(true);
+        assertThat(inheritedMaps).singleElement().isEqualTo(System.getenv());
+    }
 }

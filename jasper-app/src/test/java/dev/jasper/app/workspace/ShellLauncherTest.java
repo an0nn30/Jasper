@@ -138,4 +138,76 @@ class ShellLauncherTest {
             edt(() -> { if (pane[0] != null) pane[0].close(); });
         }
     }
+
+    @Test void aProgramRunsInsteadOfTheShellWithTheShellsEnvironmentAndThePanesVariables() throws Exception {
+        var configured = snapshot("/bin/zsh", List.of("-l"), Map.of("VALUE", "configured"), 12, 150, 45);
+        var expected = LaunchSettings.resolve(configured, "Mac OS X", Map.of("PATH", "/bin"), 150, 45);
+        Queue<Runnable> pending = new ArrayDeque<>();
+        var received = new ArrayList<Map.Entry<Path, LaunchSettings>>();
+        var errors = new ArrayList<Throwable>();
+        UUID pane = UUID.randomUUID();
+        var launched = new AtomicReference<ShellLauncher.Launch>();
+        ShellLauncher launcher = new ShellLauncher(pending::add, requested -> LaunchSettings.resolve(configured, "Mac OS X", Map.of("PATH", "/bin"), 150, 45),
+            (requested, captured) -> captured, null, (path, settings) -> {
+                received.add(Map.entry(path, settings));
+                throw new IllegalStateException("controlled launch boundary");
+            }, id -> Map.of("JASPER_PANE", id.toString()));
+        edt(() -> launched.set(launcher.launch(Optional.of(directory), Optional.empty(), Optional.of(List.of("/opt/tools/nvim", "+3", "notes.txt")),
+            Optional.of(pane), replaced -> { }, (session, failure) -> errors.add(failure))));
+        while (!pending.isEmpty()) pending.remove().run();
+        edt(() -> { });
+        assertThat(launched.get().label()).as("the tab is named after the program").isEqualTo("nvim");
+        assertThat(launched.get().profile()).as("the default profile, which a split of the pane starts").contains(expected.profile().id());
+        assertThat(received).singleElement().satisfies(entry -> {
+            assertThat(entry.getKey()).isEqualTo(directory);
+            assertThat(entry.getValue().command()).containsExactly("/opt/tools/nvim", "+3", "notes.txt");
+            assertThat(entry.getValue().environment()).containsEntry("VALUE", "configured").containsEntry("PATH", "/bin")
+                .containsEntry("TERM", "xterm-256color").containsEntry("JASPER_PANE", pane.toString());
+        });
+        assertThat(errors).singleElement().satisfies(error -> assertThat(error).hasMessage("controlled launch boundary"));
+    }
+
+    @Test void aProgramStartsInItsDirectoryWithoutAWslProfilesCd() throws Exception {
+        var wsl = new dev.jasper.app.launch.ShellProfile("wsl:Ubuntu", "Ubuntu", dev.jasper.app.launch.ShellProfile.Kind.WSL,
+            Optional.of("WSL 2"), List.of("wsl.exe", "-d", "Ubuntu"));
+        Queue<Runnable> pending = new ArrayDeque<>();
+        var received = new ArrayList<Map.Entry<Path, LaunchSettings>>();
+        ShellLauncher launcher = new ShellLauncher(pending::add,
+            requested -> LaunchSettings.resolve(ConfigSnapshot.defaults(), wsl, "Windows 11", Map.of(), 150, 45, null),
+            (requested, captured) -> captured, null, (path, settings) -> {
+                received.add(Map.entry(path, settings));
+                throw new IllegalStateException("controlled launch boundary");
+            });
+        Path home = Path.of(System.getProperty("user.home"));
+        edt(() -> {
+            launcher.launch(Optional.of(directory), Optional.empty(), Optional.of(List.of("notepad.exe", "notes.txt")), Optional.empty(),
+                replaced -> { }, (session, failure) -> { });
+            launcher.launch(Optional.empty(), Optional.empty(), Optional.of(List.of("notepad.exe")), Optional.empty(),
+                replaced -> { }, (session, failure) -> { });
+        });
+        while (!pending.isEmpty()) pending.remove().run();
+        edt(() -> { });
+        assertThat(received).extracting(Map.Entry::getKey).as("the requested directory, else home").containsExactly(directory, home);
+        assertThat(received).extracting(entry -> entry.getValue().command())
+            .containsExactly(List.of("notepad.exe", "notes.txt"), List.of("notepad.exe"));
+    }
+
+    @Test void aLauncherWithoutSettingsCannotRunAProgramAndAMissingDirectoryFails() throws Exception {
+        Queue<Runnable> pending = new ArrayDeque<>();
+        var errors = new ArrayList<Throwable>();
+        var bare = new ShellLauncher(pending::add, path -> { throw new AssertionError("nothing starts"); }, "sh");
+        edt(() -> assertThat(bare.launch(Optional.of(directory), Optional.empty(), Optional.of(List.of("nvim")), Optional.empty(),
+            replaced -> { }, (session, failure) -> errors.add(failure)).label()).isEqualTo("sh"));
+        edt(() -> { });
+        assertThat(pending).as("nothing was scheduled").isEmpty();
+        assertThat(errors).singleElement().satisfies(error -> assertThat(error).isInstanceOf(IllegalStateException.class)
+            .hasMessage("This window cannot run a program"));
+        var settings = LaunchSettings.resolve(ConfigSnapshot.defaults(), "Linux", Map.of(), 150, 45);
+        edt(() -> new ShellLauncher(pending::add, () -> settings, (p, s) -> { throw new AssertionError("nothing starts"); })
+            .launch(Optional.of(directory.resolve("missing")), Optional.empty(), Optional.of(List.of("nvim")), Optional.empty(),
+                replaced -> { }, (session, failure) -> errors.add(failure)));
+        while (!pending.isEmpty()) pending.remove().run();
+        edt(() -> { });
+        assertThat(errors.getLast()).hasMessageContaining("Directory is unavailable");
+    }
 }

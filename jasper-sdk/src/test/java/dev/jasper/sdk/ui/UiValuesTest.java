@@ -54,4 +54,17 @@ class UiValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new StatusItemSpec("nodot", Side.LEFT, 0));
         assertThatNullPointerException().isThrownBy(() -> new StatusItemSpec("dev.x.lock", null, 0));
     }
+
+    @Test void theEditorHookIsADefaultThatAnOlderHostIgnores() throws Exception {
+        assertThat(Platform.class.getMethod("editor", FileEditor.class).isDefault()).isTrue();
+        Platform older = (Platform) java.lang.reflect.Proxy.newProxyInstance(Platform.class.getClassLoader(), new Class<?>[]{Platform.class},
+            (proxy, method, args) -> method.isDefault() ? java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args) : null);
+        var asked = new java.util.concurrent.atomic.AtomicInteger();
+        older.editor((file, line, window) -> {
+            asked.incrementAndGet();
+            return true;
+        }).close();
+        assertThat(asked).as("an older host never asks").hasValue(0);
+        assertThatNullPointerException().isThrownBy(() -> older.editor(null));
+    }
 }
