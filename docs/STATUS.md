@@ -1,5 +1,14 @@
 # Jasper — Status and Handoff
 
+**Dropdown menus as tall as their rows — 2026-10-13** (`claude/dropdown-menu-height`, worktree
+`.claude/worktrees/dropdown-menu-height`; bug fix). Every plain kit dropdown's menu was about a quarter too short and
+scrolled: Swing sizes a combo popup from its renderer's preferred heights (16 px of text), while the kit gives plain rows
+the list's fixed menu-item height (22 px), so two rows got a 34 px menu. `Choices.KitComboPopup.menuHeight` now measures
+the rows it shows when they have a fixed height; rich rows keep their renderer's heights. `ChoicesTest` pins it for a
+form dropdown, a Settings dropdown and one with more rows than the menu shows. `./gradlew check --continue`: **9,904
+tests, 0 failures, 0 errors, 8 skipped**. No GUI launched. GUI check for the user: open Settings › Appearance's Dark theme
+dropdown. Not merged or pushed.
+
 **Theme import final review — 2026-10-13** (`claude/theme-import`). The final whole-branch review's fixes. A Remove whose
 settings cannot be saved now has the application read the themes folder itself, so the removed theme leaves the group,
 the dropdowns and the screen at once (it used to stay listed and shown). A foreign JSON file, such as an IntelliJ
