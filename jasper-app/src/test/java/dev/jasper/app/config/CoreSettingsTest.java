@@ -28,7 +28,7 @@ class CoreSettingsTest {
     }
 
     @Test void everySettingIsDescribedAndItsTemplateValueRoundTrips() {
-        assertThat(CoreSettings.SCHEMA.settings()).hasSize(43);
+        assertThat(CoreSettings.SCHEMA.settings()).hasSize(44);
         for (Setting<?> setting : CoreSettings.SCHEMA.settings()) {
             assertThat(setting.label()).as(setting.name()).isNotBlank();
             assertThat(setting.description()).as(setting.name()).isNotBlank();
@@ -100,5 +100,11 @@ class CoreSettingsTest {
         assertThat(setting.applies()).isEqualTo(dev.jasper.app.settings.Applies.RESTART);
         assertThat(dev.jasper.app.config.ConfigSnapshot.defaults().nativeDecorations()).isFalse();
         assertThat(dev.jasper.app.config.ConfigSnapshot.defaults().toBuilder().nativeDecorations(true).build().nativeDecorations()).isTrue();
+    }
+
+    @Test void theMemoryIndicatorIsOffByDefault() {
+        assertThat(CoreSettings.WINDOW_MEMORY_INDICATOR.name()).isEqualTo("window.memory_indicator");
+        assertThat(CoreSettings.WINDOW_MEMORY_INDICATOR.defaultValue()).isFalse();
+        assertThat(CoreSettings.WINDOW_MEMORY_INDICATOR.label()).isEqualTo("Show memory indicator");
     }
 }

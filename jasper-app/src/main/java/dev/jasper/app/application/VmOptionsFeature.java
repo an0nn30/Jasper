@@ -54,6 +54,7 @@ final class VmOptionsFeature {
     private final Supplier<OptionalLong> physicalMemoryMiB;
     private final Duration watchInterval;
     private final List<Runnable> listeners = new ArrayList<>();
+    private Runnable heapSaved = () -> { };
     private VmOptionsFile.Contents contents = VmOptionsFile.Contents.ABSENT;
     private VmOptionsFile.Contents atStart;
     private VmOptionsCheck.Findings findings = VmOptionsCheck.Findings.NONE;
@@ -84,7 +85,7 @@ final class VmOptionsFeature {
     /** The System Settings section's hooks. EDT. */
     VmOptionsHooks hooks() {
         var heap = new SchemaPage.External("vm.heap", "Maximum heap size", "MiB", KEYWORDS, new Nodes.Numeric(512, 1_048_576, 256, 0),
-            this::savedHeap, () -> (int) Math.min(Integer.MAX_VALUE, bundledMiB), mib -> mib < 512 ? "Use 512 MiB or more." : "",
+            this::savedHeapMiB, () -> (int) Math.min(Integer.MAX_VALUE, bundledMiB), mib -> mib < 512 ? "Use 512 MiB or more." : "",
             this::heapComment, this::saveHeap, () -> launch.launcherManaged() && !contents.parsed().corrupted());
         return new VmOptionsHooks(heap,
             () -> launch.file().map(Path::toString).orElse("Custom VM options apply to the installed Jasper app."),
@@ -94,6 +95,9 @@ final class VmOptionsFeature {
 
     /** Whether jasper.vmoptions applies to this JVM (Jasper's launcher started it). */
     boolean editable() { return launch.launcherManaged(); }
+
+    /** Runs {@code action} after each successful heap save (the low-memory warning may show again). EDT. */
+    void onHeapSaved(Runnable action) { heapSaved = Objects.requireNonNull(action, "action"); }
 
     /** Opens the file in the user's editor, creating it with the header first. EDT. */
     void editCustomOptions() {
@@ -200,7 +204,8 @@ final class VmOptionsFeature {
 
     private void notifyListeners() { for (Runnable listener : List.copyOf(listeners)) listener.run(); }
 
-    private int savedHeap() {
+    /** The heap limit in the file (else the bundled default), in MiB: what the next start applies. EDT. */
+    int savedHeapMiB() {
         return (int) Math.min(Integer.MAX_VALUE, VmOptionsSyntax.lastMaxHeapMiB(contents.parsed().lines()).orElse(bundledMiB));
     }
 
@@ -249,6 +254,7 @@ final class VmOptionsFeature {
                 stamp = savedStamp;
                 notifyListeners();
                 done.complete(null);
+                heapSaved.run();
                 reload();
             });
         });

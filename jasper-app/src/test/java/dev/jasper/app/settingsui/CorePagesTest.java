@@ -38,6 +38,17 @@ class CorePagesTest {
         assertThat(appearance.settings()).containsSubsequence(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR);
     }
 
+    @Test void theWindowPageOffersTheMemoryIndicatorWhereTheStatusBarShows() {
+        var window = CorePages.specs(APPEARANCE, system).stream().filter(spec -> spec.id().equals("window")).findFirst().orElseThrow();
+        assertThat(window.settings()).containsSubsequence(CoreSettings.WINDOW_STATUS_BAR, CoreSettings.WINDOW_STATUS_BAR_HEIGHT,
+            CoreSettings.WINDOW_MEMORY_INDICATOR, CoreSettings.WINDOW_TAB_HEIGHT);
+        var noStatusBar = PageKit.context(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "[window]\nstatus_bar = false\n", true).values()),
+            id -> { }, () -> { });
+        var page = window.build(noStatusBar);
+        assertThat(PageKit.node(page, "window.memory_indicator").state().enabled()).as("only where the status bar shows").isFalse();
+        assertThat(PageKit.node(window.build(context), "window.memory_indicator").state().enabled()).isTrue();
+    }
+
     private static SchemaPage.Spec appearance(boolean glass) {
         return CorePages.specs(APPEARANCE, system(), ShellChoices.NONE, id -> { }, glass).getFirst();
     }

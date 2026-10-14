@@ -11,6 +11,20 @@ change, so every installed theme is covered. Catppuccin Frappé `#1F212D` under 
 under `#23262C`, Light `#DDE0E3` under `#FBFBFC`. `./gradlew check --continue`: **10,113 tests, 0 failures, 0 errors,
 12 skipped**. No GUI launched. GUI check for the user: the tab strip in each theme. Merged to `main`.
 
+**Custom VM options plan 3 (memory) complete — 2026-10-14.** On `claude/custom-vm-options-memory`, merged to local `main` (not pushed):
+Settings › Window › Show memory indicator (`window.memory_indicator`, off by default) adds `312 of 2048M` to the status
+bar, refreshed every 3 s by one shared timer while shown with a window open, with a heap and non-heap tooltip; a click
+runs garbage collection (the `app.memory.gc` action, also in the palette). A collection-usage threshold at 95% of the
+old generation feeds `LowMemoryWatch` (one signal per 20 s, more than five in 15 minutes warn, once until the heap is
+saved again); an `OutOfMemoryError` warns at once. The warning, "Jasper is running low on memory", is in the Memory &
+VM options group; **Adjust Memory Settings…** opens the heap limit with the running maximum plus 512 MiB staged (only the
+field when a higher heap is already saved).
+Deviations: the eight planned ones and the review and final-review changes, listed in the plan. Full `./gradlew check` after merging main: 10,152 tests,
+0 failures, 12 skips. Manual checks pending (the user): turn the indicator on and watch it update; click it; in the
+packaged app with a small heap (`-Xmx600m` in `jasper.vmoptions`), open many large scrollbacks until the warning shows,
+and use Adjust Memory Settings…; with the indicator on, cold-launch timing; Adjust Memory Settings… after saving a larger
+heap without restarting.
+
 **The jasper command (command line plan 1) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
 [plan](superpowers/plans/2026-10-13-jasper-command-line-1-jasper-command.md)). A native `jasper` command
