@@ -337,3 +337,24 @@ ext.unsealJar = { File jar ->
     Files.move(rewritten.toPath(), jar.toPath(), StandardCopyOption.REPLACE_EXISTING)
     true
 }
+
+// Runs train on a copy of image at copy, made by copier (which must keep modification times, as ditto does: the JVM
+// checks them for the class-path jars), and deletes the copy afterwards, also when copier or train throws. The AOT
+// cache then records class-path locations that exist on no machine, so the build machine runs the trained image in
+// the condition every user's machine is in (spec 2026-10-14 section 3.3). A copy left by an earlier, killed training is
+// replaced. Returns what train returns; train receives the copy.
+ext.trainInCopy = { File image, File copy, Closure copier, Closure train ->
+    copy.deleteDir()
+    copy.parentFile.mkdirs()
+    try {
+        copier(image, copy)
+        List<String> changed = modificationTimeMismatches(image, copy)
+        if (changed) {
+            throw new GradleException("AOT training: the copy of ${image.name} has other modification times for " +
+                "${changed.take(10)}; the JVM would refuse the cache")
+        }
+        return train(copy)
+    } finally {
+        copy.deleteDir()
+    }
+}

@@ -333,3 +333,61 @@ verifySupport.configure {
         logger.lifecycle('Verified unsealing of the application class path')
     }
 }
+
+verifySupport.configure {
+    doLast {
+        // Spec 2026-10-14 section 3.3: training runs in a copy that is gone before the cache is verified.
+        File root = new File(temporaryDir, 'training copy')
+        root.deleteDir()
+        File image = new File(root, 'image/Jasper.app')
+        File copy = new File(root, 'aot-training-image/Jasper.app')
+        File jar = new File(image, 'Contents/app/jasper-app.jar')
+        jar.parentFile.mkdirs()
+        jar.text = 'jar'
+        assert jar.setLastModified(1_759_400_000_000L)
+        def keepTimes = { File from, File to ->
+            from.eachFileRecurse(groovy.io.FileType.FILES) { File source ->
+                File target = new File(to, from.toPath().relativize(source.toPath()).toString())
+                target.parentFile.mkdirs()
+                target.bytes = source.bytes
+                assert target.setLastModified(source.lastModified())
+            }
+        }
+        File stale = new File(copy, 'Contents/app/left-over.jar')
+        stale.parentFile.mkdirs()
+        stale.text = 'from a killed training'
+
+        File seen = null
+        def result = trainInCopy(image, copy, keepTimes, { File trainee ->
+            seen = trainee
+            assert new File(trainee, 'Contents/app/jasper-app.jar').text == 'jar'
+            assert !new File(trainee, 'Contents/app/left-over.jar').exists() : 'a stale copy is replaced'
+            'cache'
+        })
+        assert result == 'cache' && seen == copy
+        assert !copy.exists() : 'the copy is gone once training returns'
+        assert jar.isFile() : 'the image is untouched'
+
+        boolean trained = false
+        def loseTimes = { File from, File to ->
+            keepTimes(from, to)
+            assert new File(to, 'Contents/app/jasper-app.jar').setLastModified(1_800_000_000_000L)
+        }
+        try {
+            trainInCopy(image, copy, loseTimes, { File trainee -> trained = true })
+            assert false : 'a copy with other modification times must fail'
+        } catch (GradleException expected) {
+            assert expected.message.contains('jasper-app.jar') && expected.message.contains('modification times')
+        }
+        assert !trained && !copy.exists()
+
+        try {
+            trainInCopy(image, copy, keepTimes, { File trainee -> throw new GradleException('training failed') })
+            assert false : 'a failed training must propagate'
+        } catch (GradleException expected) {
+            assert expected.message == 'training failed'
+        }
+        assert !copy.exists() : 'a failed training still removes the copy'
+        logger.lifecycle('Verified training in a throwaway copy')
+    }
+}

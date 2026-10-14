@@ -908,6 +908,8 @@ if (normalizedHost().os == 'windows') {
     }
 } else {
     def aotTrainingDirectory = packagingRoot.map { it.dir('aot-training') }
+    // Beside aotTrainingDirectory, which runAotTraining clears: the image copy that training launches (trainInCopy).
+    def aotTrainingImageDirectory = packagingRoot.map { it.dir('aot-training-image') }
     // Launches the image once: a Jasper window for a few seconds, without a Dock icon. Agents ask the user first.
     // Training changes packageApp's output, so the next packageApp rebuilds the image from scratch, untrained.
     def trainAotCache = tasks.register('trainAotCache') {
@@ -921,7 +923,9 @@ if (normalizedHost().os == 'windows') {
             if (config.readLines('UTF-8').contains('java-options=' + aotCacheOption)) {
                 throw new GradleException("${image} already has an AOT cache; packageApp rebuilds the image before training")
             }
-            File cache = runAotTraining(new File(image, 'Contents/MacOS/Jasper'), aotTrainingDirectory.get().asFile, 90, 300)
+            File cache = trainInCopy(image, new File(aotTrainingImageDirectory.get().asFile, 'Jasper.app'),
+                { File from, File to -> executeNative(['/usr/bin/ditto', from.absolutePath, to.absolutePath], 'copying the image for AOT training') },
+                { File copy -> runAotTraining(new File(copy, 'Contents/MacOS/Jasper'), aotTrainingDirectory.get().asFile, 90, 300) })
             Files.copy(cache.toPath(), new File(appDir, 'jasper.aot').toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
             config.setText(withJavaOption(config.getText('UTF-8'), aotCacheOption), 'UTF-8')
             resignImage(image)
