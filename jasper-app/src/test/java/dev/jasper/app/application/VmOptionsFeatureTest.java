@@ -41,7 +41,9 @@ class VmOptionsFeatureTest {
     private int restarts;
 
     private Path file() { return home.resolve("jasper.vmoptions"); }
-    private VmOptionsLaunch launch(boolean corrupted, Optional<String> skipped) { return new VmOptionsLaunch(Optional.of(file()), Optional.empty(), corrupted, skipped); }
+    private VmOptionsLaunch launch(boolean corrupted, Optional<String> skipped) {
+        return new VmOptionsLaunch(Optional.of(file()), Optional.empty(), corrupted, skipped, Optional.empty(), Optional.empty());
+    }
     private VmOptionsLaunch managed() { return launch(false, Optional.empty()); }
 
     private VmOptionsFeature feature(VmOptionsLaunch launch, boolean image) { return feature(launch, image, Runnable::run); }
@@ -149,7 +151,7 @@ class VmOptionsFeatureTest {
     }
 
     @Test void withoutJaspersLauncherTheSectionIsReadOnly() {
-        var feature = feature(new VmOptionsLaunch(Optional.empty(), Optional.empty(), false, Optional.empty()), false);
+        var feature = feature(new VmOptionsLaunch(Optional.empty(), Optional.empty(), false, Optional.empty(), Optional.empty(), Optional.empty()), false);
         var hooks = feature.hooks();
         assertThat(feature.editable()).isFalse();
         assertThat(hooks.heap().enabled().getAsBoolean()).isFalse();
@@ -224,7 +226,8 @@ class VmOptionsFeatureTest {
 
     @Test void aFailedSaveNamesTheFile() throws IOException {
         Files.writeString(home.resolve("blocker"), "not a folder");
-        var launch = new VmOptionsLaunch(Optional.of(home.resolve("blocker/jasper.vmoptions")), Optional.empty(), false, Optional.empty());
+        var launch = new VmOptionsLaunch(Optional.of(home.resolve("blocker/jasper.vmoptions")), Optional.empty(), false, Optional.empty(),
+            Optional.empty(), Optional.empty());
         var result = feature(launch, true).hooks().heap().save().apply(4096);
         assertThat(result).isCompletedExceptionally();
         assertThat(result.exceptionNow()).hasMessage("Could not save jasper.vmoptions: " + home.resolve("blocker") + " is in the way.");
@@ -239,7 +242,8 @@ class VmOptionsFeatureTest {
         assertThat(folder.toFile().setWritable(false)).isTrue();
         try {
             assumeFalse(Files.isWritable(folder), "the user can write anywhere (root)");
-            var launch = new VmOptionsLaunch(Optional.of(folder.resolve("jasper.vmoptions")), Optional.empty(), false, Optional.empty());
+            var launch = new VmOptionsLaunch(Optional.of(folder.resolve("jasper.vmoptions")), Optional.empty(), false, Optional.empty(),
+                Optional.empty(), Optional.empty());
             var result = feature(launch, true).hooks().heap().save().apply(4096);
             assertThat(result.exceptionNow()).hasMessage("Could not save jasper.vmoptions: permission denied.");
             assertThat(center.history()).singleElement().satisfies(entry ->
@@ -270,7 +274,8 @@ class VmOptionsFeatureTest {
 
     @Test void aFileThatBecomesCorruptedWhileRunningOffersNoRestart() throws IOException {
         Files.writeString(file(), "-Xmx1g\n");
-        var launch = new VmOptionsLaunch(Optional.of(file()), Optional.of(VmOptionsSyntax.digest(List.of("-Xmx1g"))), false, Optional.empty());
+        var launch = new VmOptionsLaunch(Optional.of(file()), Optional.of(VmOptionsSyntax.digest(List.of("-Xmx1g"))), false, Optional.empty(),
+            Optional.empty(), Optional.empty());
         var feature = feature(launch, true);
         feature.startupSettled();
         var hooks = feature.hooks();
