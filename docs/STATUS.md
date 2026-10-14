@@ -23,7 +23,11 @@ Catppuccin's palette (dark: base body, mantle cards, crust sidebar; Latte: mantl
 and file list, Settings and the Vault manager have edges; the converter's `roles` parameter applies it. Next, kit
 tables (every theme): the column titles' header viewport is transparent, so they sit on the dialog surface as the Places
 heading does instead of a strip of `surface.card` over the pane's rounded top, and a multiple-selection table no longer
-indents them by a checkbox its rows never show ("Name" now over the first glyph, like "Places"). Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
+indents them by a checkbox its rows never show ("Name" now over the first glyph, like "Places"). The first-focus fix
+first failed in the app: the folder loads off the EDT, so the list was hidden when the dialog gained focus and AWT
+focused Refresh (ring shown, cause ACTIVATION). The dialog's traversal policy now has no initial component, and the
+chooser focuses the list when it appears (the search field for an empty or unreadable folder) unless the user
+focused something meanwhile; GUI check pending. Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
 (the colour patterns are now precompiled). `./gradlew check --continue`: **10,168 tests, 0 failures, 0 errors, 12
 skipped**. No GUI launched. GUI check for the user: each flavour in Settings › Appearance and the Licenses window (About Jasper › Licenses). Not merged.
 

@@ -112,6 +112,8 @@ public final class FileChooserPanel extends JPanel {
     private boolean editingPath;
     private String pathValue = "";
     private boolean previewVisible;
+    /** The first focus waits for the listing (see {@link #focusInitially}). */
+    private boolean focusPending;
     private Optional<String> centerMessage = Optional.empty();
     /** The center state's title over its message (the message is the sentence that says what happened). */
     private String centerTitle = "Loading…";
@@ -246,10 +248,21 @@ public final class FileChooserPanel extends JPanel {
     /**
      * Gives the chooser its first focus, as JFileChooser and the macOS open panel do: the name field the primary acts on
      * in Save and Directory, otherwise the file list, never the first enabled toolbar button. The dialog calls it the
-     * first time it gains focus.
+     * first time it gains focus, when the folder may still be loading: the list then takes focus when it appears (the
+     * search field when the folder turns out empty or unreadable), unless the user has focused something meanwhile.
      */
     public void focusInitially() {
-        if (nameView != null) nameView.focus(NAME); else filesView.focus(FILES);
+        if (nameView != null) { nameView.focus(NAME); return; }
+        focusPending = true;
+        focusListingWhenShown();
+    }
+
+    private void focusListingWhenShown() {
+        if (!focusPending || !isShowing() || model.loading() || model.connectingTo().isPresent()) return;
+        focusPending = false;
+        var owner = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getPermanentFocusOwner();
+        if (owner != null && SwingUtilities.isDescendingFrom(owner, this)) return;
+        if (centerMessage.isEmpty()) filesView.focus(FILES); else toolsView.focus(SEARCH);
     }
 
     // Package-private accessors for headless tests.
@@ -587,6 +600,7 @@ public final class FileChooserPanel extends JPanel {
         centerActionLabel = action;
         render(messageView, messageSpec());
         centerCards.show(center, text.isPresent() ? "message" : "table");
+        focusListingWhenShown();
     }
 
     private ViewSpec navigationSpec() {
