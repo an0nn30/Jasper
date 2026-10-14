@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 import static dev.jasper.app.plugins.AppContractTest.onEdt;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.tuple;
 
 class PluginRuntimeTest {
@@ -441,6 +442,174 @@ class PluginRuntimeTest {
             assertThat(problem.detail()).contains("dev.example.ghost", "name");
         });
         assertThat(runtime.statusLines()).anySatisfy(line -> assertThat(line).contains("dev.example.probe", "ACTIVE"));
+        onEdt(runtime::stop);
+    }
+
+    static final String ENVIRONMENT = """
+        package fix.environment;
+        public final class Main implements dev.jasper.sdk.plugin.Plugin {
+            @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                context.terminals().environment(jasper -> java.util.Map.of("EDITOR", "probe --wait", "VISUAL", "probe --wait"));
+            }
+        }
+        """;
+
+    static final String FAILING_ENVIRONMENT = """
+        package fix.failing;
+        public final class Main implements dev.jasper.sdk.plugin.Plugin {
+            @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                context.terminals().environment(jasper -> java.util.Map.of("FAILED_PLUGIN", "1"));
+                throw new IllegalStateException("fails after registering");
+            }
+        }
+        """;
+
+    /** Review Focus 4: a plugin that failed or stopped adds nothing to new shells. */
+    @Test void onlyRunningPluginsAddToNewShells() throws Exception {
+        Path bundled = root.resolve("bundled");
+        PluginJars.build(bundled.resolve("dev.example.environment"), "environment.jar",
+            PluginJars.descriptor("dev.example.environment", "1.0.0", "fix.environment.Main") + "capabilities = [\"terminal.environment\"]\n",
+            Map.of("fix.environment.Main", ENVIRONMENT), List.of());
+        PluginJars.build(bundled.resolve("dev.example.failing"), "failing.jar",
+            PluginJars.descriptor("dev.example.failing", "1.0.0", "fix.failing.Main") + "capabilities = [\"terminal.environment\"]\n",
+            Map.of("fix.failing.Main", FAILING_ENVIRONMENT), List.of());
+        PluginRuntime runtime = runtime(bundled, root.resolve("absent"), null, false, new ArrayList<>());
+        assertThat(AppContractTest.onEdtValue(() -> runtime.shellVariables(Map.of()))).as("before the plugins start").isEmpty();
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        assertThat(runtime.statusLines()).anySatisfy(line -> assertThat(line).contains("dev.example.failing", "FAILED"));
+        assertThat(AppContractTest.onEdtValue(() -> runtime.shellVariables(Map.of("EDITOR", "vim"))))
+            .as("the failed plugin's contributor went with it").isEqualTo(Map.of("EDITOR", "probe --wait", "VISUAL", "probe --wait"));
+        assertThatIllegalStateException().as("off the UI thread").isThrownBy(() -> runtime.shellVariables(Map.of()));
+        var pending = new AtomicReference<List<CompletableFuture<?>>>();
+        onEdt(() -> pending.set(runtime.stop()));
+        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        assertThat(AppContractTest.onEdtValue(() -> runtime.shellVariables(Map.of()))).as("after the plugin stopped").isEmpty();
+    }
+
+    static final String EDITOR = """
+        package fix.editor;
+        import java.nio.file.Files;
+        import java.nio.file.StandardOpenOption;
+        public final class Main implements dev.jasper.sdk.plugin.Plugin {
+            @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                context.platform().editor((file, line, window) -> {
+                    try {
+                        Files.writeString(context.dataDirectory().resolve("edited"), file.getFileName() + "\\n",
+                            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                    } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                    return true;
+                });
+            }
+        }
+        """;
+
+    private static Path editorPlugin(Path directory, String id) throws Exception {
+        return PluginJars.build(directory, id + ".jar",
+            PluginJars.descriptor(id, "1.0.0", "fix.editor.Main") + "capabilities = [\"editor.provide\"]\n",
+            Map.of("fix.editor.Main", EDITOR), List.of());
+    }
+
+    /** Review Focus 4: before the plugins start, and once the providing plugin stopped, files open with the desktop. */
+    @Test void openAsksTheProvidedEditorAndOtherwiseTheDesktop() throws Exception {
+        editorPlugin(root.resolve("bundled").resolve("dev.example.editor"), "dev.example.editor");
+        PluginRuntime runtime = runtime(root.resolve("bundled"), root.resolve("absent"), null, false, new ArrayList<>());
+        List<Path> desktop = new CopyOnWriteArrayList<>();
+        Path before = root.resolve("before.txt"), during = root.resolve("during.txt"), after = root.resolve("after.txt");
+        runtime.open(before, desktop::add);
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        runtime.open(during, desktop::add);
+        Path edited = root.resolve("absent/dev.example.editor/data/edited");
+        assertThat(Files.readAllLines(edited)).containsExactly("during.txt");
+        onEdt(() -> assertThatIllegalStateException().as("never on the UI thread").isThrownBy(() -> runtime.open(during, desktop::add)));
+        var pending = new AtomicReference<List<CompletableFuture<?>>>();
+        onEdt(() -> pending.set(runtime.stop()));
+        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        runtime.open(after, desktop::add);
+        assertThat(desktop).containsExactly(before, after);
+        assertThat(Files.readAllLines(edited)).as("a stopped plugin's editor is not asked").containsExactly("during.txt");
+    }
+
+    /** Final review M2: quitting interrupts the worker opening a file; the desktop then does not open it either. */
+    @Test void anInterruptedOpenSkipsTheDesktopAndKeepsTheInterrupt() throws Exception {
+        editorPlugin(root.resolve("bundled").resolve("dev.example.editor"), "dev.example.editor");
+        PluginRuntime runtime = runtime(root.resolve("bundled"), root.resolve("absent"), null, false, new ArrayList<>());
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        List<Path> desktop = new CopyOnWriteArrayList<>();
+        Thread.currentThread().interrupt();
+        try {
+            runtime.open(root.resolve("quitting.txt"), desktop::add);
+            assertThat(Thread.currentThread().isInterrupted()).as("the interrupt is kept").isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+        assertThat(desktop).as("the desktop does not open it").isEmpty();
+        onEdt(runtime::stop);
+    }
+
+    /** Review Focus 3: Open in Editor creates a missing config.toml from its template, then the provided editor opens it. */
+    @Test void aMissingConfigTomlIsCreatedFromTheTemplateAndThenTheProvidedEditorOpensIt() throws Exception {
+        editorPlugin(root.resolve("bundled").resolve("dev.example.editor"), "dev.example.editor");
+        PluginRuntime runtime = runtime(root.resolve("bundled"), root.resolve("absent"), null, false, new ArrayList<>());
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        Path config = root.resolve("home").resolve("config.toml");
+        List<Path> desktop = new CopyOnWriteArrayList<>();
+        var service = new dev.jasper.app.config.ConfigService(config, false);
+        try {
+            assertThat(service.openSettings(file -> runtime.open(file, desktop::add)).get(10, TimeUnit.SECONDS)).isEqualTo(config);
+        } finally {
+            service.close();
+        }
+        assertThat(Files.readString(config)).isEqualTo(dev.jasper.app.config.ConfigTemplate.text(false));
+        assertThat(Files.readAllLines(root.resolve("absent/dev.example.editor/data/edited"))).containsExactly("config.toml");
+        assertThat(desktop).isEmpty();
+        onEdt(runtime::stop);
+    }
+
+    @Test void aBundledPluginsEditorReplacesADevelopmentPluginsEditor() throws Exception {
+        editorPlugin(root.resolve("bundled").resolve("dev.example.zeditor"), "dev.example.zeditor");
+        Path dev = root.resolve("dev").resolve("dev.example.aeditor");
+        editorPlugin(dev, "dev.example.aeditor");
+        PluginRuntime runtime = runtime(root.resolve("bundled"), root.resolve("absent"), dev, false, new ArrayList<>());
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        assertThat(runtime.statusLines()).as("the development plugin registered first; the bundled one replaced it")
+            .anySatisfy(line -> assertThat(line).contains("dev.example.aeditor", "ACTIVE"))
+            .anySatisfy(line -> assertThat(line).contains("dev.example.zeditor", "ACTIVE"));
+        runtime.open(root.resolve("notes.txt"), path -> { throw new AssertionError("the bundled editor opens it"); });
+        assertThat(Files.readAllLines(root.resolve("absent/dev.example.zeditor/data/edited"))).containsExactly("notes.txt");
+        assertThat(root.resolve("absent/dev.example.aeditor/data/edited")).doesNotExist();
+        onEdt(runtime::stop);
+    }
+
+    static final String CLIENT = """
+        package fix.client;
+        import java.nio.file.Files;
+        public final class Main implements dev.jasper.sdk.plugin.Plugin {
+            @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                try {
+                    Files.writeString(context.dataDirectory().resolve("client"),
+                        context.commandLine().client().map(Object::toString).orElse("none"));
+                } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+            }
+        }
+        """;
+
+    @Test void pluginsReadTheClientGivenBeforeTheyStart() throws Exception {
+        Path dev = root.resolve("dev").resolve("dev.example.client");
+        PluginJars.build(dev, "client.jar", PluginJars.descriptor("dev.example.client", "1.0.0", "fix.client.Main"),
+            Map.of("fix.client.Main", CLIENT), List.of());
+        PluginRuntime runtime = runtime(null, root.resolve("absent"), dev, false, new ArrayList<>());
+        Path client = root.resolve("build").resolve("cli").resolve("bin").resolve("jasper");
+        onEdt(() -> runtime.commandClient(java.util.Optional.of(client)));
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        assertThat(root.resolve("absent/dev.example.client/data/client")).hasContent(client.toString());
+        onEdt(() -> assertThatIllegalStateException().isThrownBy(() -> runtime.commandClient(java.util.Optional.empty()))
+            .withMessage("Plugins have already started"));
         onEdt(runtime::stop);
     }
 }

@@ -39,7 +39,9 @@ final class PluginPanelPage implements SettingsPage {
     private HostedKit kit;
     private HostedKitView view;
     private final Host rowHost = new Host();
-    private final KitSettingRows kitRows = new KitSettingRows(rowHost, this::settingSpec, rowHost::unset);
+    private final KitSettingRows kitRows = new KitSettingRows(rowHost, this::settingSpec, rowHost::unset, this::chooseFile);
+    /** The dialog's file chooser, for a host row's Browse. */
+    private Optional<java.nio.file.Path> chooseFile(String title, Optional<java.nio.file.Path> initial) { return context.chooseFile().apply(title, initial); }
     private dev.jasper.sdk.settings.SettingSpec<?> settingSpec(dev.jasper.sdk.settings.Setting<?> setting){return declared.handle(setting).spec();}
     void kit(HostedKit value) { kit=value; }
     private void refreshRows(){if(view!=null && !disposed)view.update(view.sourceSpec());}

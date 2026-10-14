@@ -81,9 +81,9 @@ final class PluginSettingsPage implements SettingsPage {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static Editors.Factory editor(DeclaredSetting<?> handle) {
         var spec = handle.spec();
-        EditorHint hint = spec.editor().orElse(null);
-        if (hint instanceof EditorHint.Font font) return Editors.font(font.monospaced());
-        if (hint instanceof EditorHint.File) return Editors.path("Choose a file");
+        Hint hint = Hint.of(spec);
+        if (hint.font()) return Editors.font(hint == Hint.MONOSPACED_FONT);
+        if (hint == Hint.FILE) return Editors.path(Hint.FILE_CHOOSER_TITLE);
         return switch (spec.kind()) {
             case dev.jasper.sdk.settings.SettingKind.OneOf<?> oneOf -> Editors.choice(names(oneOf));
             // A bounded integer is the Settings stepper, as on the core pages, with its declared unit.
@@ -97,6 +97,35 @@ final class PluginSettingsPage implements SettingsPage {
         var names = new LinkedHashMap<String, String>();
         for (Choice<?> choice : oneOf.choices()) names.put(choice.token(), choice.displayName());
         return names;
+    }
+
+    /**
+     * The control a declared setting's editor hint asks for. The generated page ({@link #editor}) and plugin pages'
+     * standard rows ({@code KitSettingRows}) both follow it, so a hinted setting gets the same control on either.
+     * {@code EditorHint.Directory} has none yet: its setting's kind decides.
+     */
+    enum Hint {
+        /** A font family over every installed family. */
+        FONT,
+        /** A font family over the installed monospaced families. */
+        MONOSPACED_FONT,
+        /** A path with Browse, which asks for an existing file. */
+        FILE,
+        /** No hint either page honours: the kind decides. */
+        NONE;
+
+        /** The title of the file chooser a {@link #FILE} setting's Browse opens. */
+        static final String FILE_CHOOSER_TITLE = "Choose a file";
+
+        static Hint of(dev.jasper.sdk.settings.SettingSpec<?> spec) {
+            return switch (spec.editor().orElse(null)) {
+                case EditorHint.Font font -> font.monospaced() ? MONOSPACED_FONT : FONT;
+                case EditorHint.File _ -> FILE;
+                case null, default -> NONE;
+            };
+        }
+
+        boolean font() { return this == FONT || this == MONOSPACED_FONT; }
     }
 
     @Override public String id() { return inner.id(); }

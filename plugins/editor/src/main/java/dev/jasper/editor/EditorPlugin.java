@@ -6,6 +6,8 @@ import dev.jasper.editor.api.Editor;
 import dev.jasper.editor.api.EditorDocument;
 import dev.jasper.editor.api.OpenRequest;
 import dev.jasper.editor.command.EditorCommand;
+import dev.jasper.editor.external.DefaultEditor;
+import dev.jasper.editor.external.Detection;
 import dev.jasper.editor.open.Openers;
 import dev.jasper.editor.local.LocalDocument;
 import dev.jasper.editor.recent.RecentFiles;
@@ -14,9 +16,11 @@ import dev.jasper.editor.recent.Reopeners;
 import dev.jasper.editor.syntax.Languages;
 import dev.jasper.editor.ui.EditorEnvironment;
 import dev.jasper.editor.ui.EditorSettings;
+import dev.jasper.editor.ui.EditorSettingsPanel;
 import dev.jasper.editor.ui.EditorWindow;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.ActionSpec;
@@ -27,12 +31,14 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 
 /** Edits local and remote text files in app-owned workspace tabs; publishes {@link Editor} for other plugins. */
@@ -41,20 +47,32 @@ public final class EditorPlugin implements Plugin {
 
     private final Executor ui;
     private final BiFunction<PluginContext, EditorSettings.Declared, EditorEnvironment> environments;
+    private final Supplier<Detection.Probe> probes;
+    private final BiFunction<System.Logger, NotificationGroup, DefaultEditor.Launcher> launchers;
     private EditorEnvironment environment;
     private EditorWindow window;
     private RecentFiles recent;
     private Openers openers;
     private final Locations locations = new Locations();
 
-    /** The production plugin: Swing's event queue, modal dialogs and running timers. */
+    /** The production plugin: Swing's event queue, modal dialogs, running timers, this machine's editors and real programs. */
     public EditorPlugin() {
-        this(SwingUtilities::invokeLater, (context, settings) -> EditorEnvironment.production(context, SwingUtilities::invokeLater, settings));
+        this(SwingUtilities::invokeLater, (context, settings) -> EditorEnvironment.production(context, SwingUtilities::invokeLater, settings),
+            Detection.Probe::system, DefaultEditor.Launcher::detached);
     }
 
+    /** For tests: finds no installed editor and starts no program. */
     EditorPlugin(Executor ui, BiFunction<PluginContext, EditorSettings.Declared, EditorEnvironment> environments) {
+        this(ui, environments, () -> new Detection.Probe(System.getProperty("os.name", ""), List.of(), Path.of(System.getProperty("user.home")),
+            Map.of(), file -> false), (log, notices) -> (command, program) -> false);
+    }
+
+    EditorPlugin(Executor ui, BiFunction<PluginContext, EditorSettings.Declared, EditorEnvironment> environments,
+                 Supplier<Detection.Probe> probes, BiFunction<System.Logger, NotificationGroup, DefaultEditor.Launcher> launchers) {
         this.ui = ui;
         this.environments = environments;
+        this.probes = probes;
+        this.launchers = launchers;
     }
 
     @Override public void start(PluginContext context) {
@@ -92,6 +110,21 @@ public final class EditorPlugin implements Plugin {
         context.actions().register(ActionSpec.of(RecentFilesScope.ACTION, "Recent Files…").withKeywords(List.of("editor", "recent", "files", "open")),
             invoked -> context.palette().open(invoked.window(), RecentFilesScope.ID, Optional.empty(), Optional.empty()));
         context.commandLine().handle("editor", new EditorCommand(this::window)::run);
+        DefaultEditor defaults = new DefaultEditor(() -> new DefaultEditor.Preference(settings.defaultEditor(), settings.customCommand(),
+                settings.customInTerminal(), settings.keepEnvironmentEditor()),
+            probes, context.background(), ui, context.terminals(), (file, line, owner) -> window().edit(file, line, owner),
+            launchers.apply(context.log(), context.notifications().group()), context.commandLine().client(), System.getProperty("os.name", ""), context.log());
+        defaults.findSaved();
+        defaults.detect();
+        context.terminals().environment(defaults::variables);
+        try {
+            context.platform().editor(defaults::edit);
+        } catch (IllegalStateException provided) {
+            // A bundled Editor replaces another plugin's editor; a copy that is not bundled keeps running without it.
+            context.log().log(System.Logger.Level.INFO, "Another plugin provides the editor Jasper opens files with, so the default "
+                + "editor setting does not choose it: " + provided.getMessage());
+        }
+        context.settings().page(new EditorSettingsPanel(context.kit(), settings, defaults, System.getenv()));
         context.palette().register(scope);
         PluginMenu file = context.menus().standard(StandardMenu.FILE);
         file.add(OPEN);

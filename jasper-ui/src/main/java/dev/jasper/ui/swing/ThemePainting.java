@@ -122,6 +122,32 @@ final class ThemePainting {
     static double tileShare(KitContext context) {
         return context.metrics().value(context.theme().dark() ? DesignMetrics.Role.TILE_PERCENT_DARK : DesignMetrics.Role.TILE_PERCENT_LIGHT) / 100.0;
     }
+    /**
+     * {@code painter} drawn as one layer at {@code opacity}, as CSS {@code opacity} draws a control: the whole face at the
+     * device's resolution first, then laid over what is beneath, so text over the control's own fill keeps the contrast
+     * it has at rest rather than fading a second time over the faded fill.
+     */
+    static void faded(Graphics graphics, Component component, float opacity, java.util.function.Consumer<Graphics2D> painter) {
+        var g = (Graphics2D) graphics.create();
+        try {
+            var transform = g.getTransform();
+            double scaleX = transform.getScaleX(), scaleY = transform.getScaleY();
+            int width = (int) Math.ceil(component.getWidth() * scaleX), height = (int) Math.ceil(component.getHeight() * scaleY);
+            if (width <= 0 || height <= 0) return;
+            var layer = new java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_ARGB_PRE);
+            var face = layer.createGraphics();
+            try {
+                face.setRenderingHints(g.getRenderingHints());
+                face.setFont(g.getFont());
+                face.scale(scaleX, scaleY);
+                painter.accept(face);
+            } finally { face.dispose(); }
+            g.setComposite(AlphaComposite.SrcOver.derive(opacity));
+            g.scale(1 / scaleX, 1 / scaleY);
+            g.drawImage(layer, 0, 0, null);
+        } finally { g.dispose(); }
+    }
+
     static void antialias(Graphics2D g) {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);

@@ -551,4 +551,70 @@ class PluginPanelPageTest {
             host.settingsChanged(changed);
         });
     }
+
+    /**
+     * A plugin page's standard row for a hinted setting is the control the generated page gives that setting: the font
+     * picker for {@code EditorHint.font}, the path with Browse for {@code EditorHint.file}.
+     */
+    @Test void hintedHostRowsAreTheGeneratedPagesFontPickerAndPathWithBrowse() throws Exception {
+        var view = new AtomicReference<HostedKitView>();
+        var rows = new AtomicReference<SettingsPanelHost>();
+        var font = new AtomicReference<Setting<String>>();
+        var log = new AtomicReference<Setting<String>>();
+        var asked = new ArrayList<String>();
+        Path chosen = data.resolve("app.log");
+        var browsing = new PageContext(null, id -> { }, Runnable::run,
+            (title, initial) -> { asked.add(title + "|" + initial.map(Path::toString).orElse("-")); return Optional.of(chosen); },
+            () -> changes[0]++, () -> null, dev.jasper.app.testsupport.KitTestSupport::context);
+        onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID, "Panel", "1.0.0", Set.of()), Set.of(), Set.of(), Set.of(),
+            getClass().getClassLoader(), () -> plugin -> {
+                font.set(plugin.settings().declare(SettingSpec.of("font", SettingKind.text(), "Menlo").label("Font")
+                    .editor(dev.jasper.sdk.settings.EditorHint.font(true))));
+                log.set(plugin.settings().declare(SettingSpec.of("log", SettingKind.text(), "").label("Log file")
+                    .editor(dev.jasper.sdk.settings.EditorHint.file())));
+                plugin.settings().page((SettingsPanel) panelHost -> {
+                    rows.set(panelHost);
+                    var made = (HostedKitView) plugin.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("page",
+                        dev.jasper.sdk.ui.ControlState.READY, dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL,
+                        List.of(panelHost.row(font.get()), panelHost.row(log.get())))), event -> { });
+                    view.set(made);
+                    return made;
+                });
+            })));
+        var page = onEdtValue(() -> (PluginPanelPage) host.settingsPages(browsing).getFirst());
+        onEdt(() -> {
+            page.component();
+            var picker = hostControl(view.get(), 0);
+            var generatedFont = dev.jasper.app.settingsui.Editors.font(true).build().apply(appText("font", "Font"), browsing);
+            generatedFont.show("Menlo");
+            assertThat(KitValues.toModule(picker)).as("the generated page's font picker")
+                .isEqualTo(generatedFont.node("settings:font", KitValues.toModule(picker.state())));
+            var path = hostControl(view.get(), 1);
+            var generatedPath = dev.jasper.app.settingsui.Editors.path("Choose a file").build().apply(appText("log", "Log file"), browsing);
+            generatedPath.show("");
+            assertThat(KitValues.toModule(path)).as("the generated page's path with Browse")
+                .isEqualTo(generatedPath.node("settings:log", KitValues.toModule(path.state())));
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Edited("settings:font", "Courier New"));
+            assertThat(rows.get().pending(font.get())).isEqualTo("Courier New");
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action("settings:log:browse"));
+            assertThat(asked).containsExactly("Choose a file|-");
+            assertThat(rows.get().pending(log.get())).isEqualTo(chosen.toString());
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action("settings:log:browse"));
+            assertThat(asked).as("Browse starts at the current file").containsExactly("Choose a file|-", "Choose a file|" + chosen);
+            assertThat(page.modified()).isTrue();
+        });
+        onEdt(page::dispose);
+    }
+
+    /** The control in the trailing slot of the {@code index}th host row of a page that stacks them. */
+    private static dev.jasper.sdk.ui.Nodes.Node hostControl(HostedKitView view, int index) {
+        var row = (dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Stack) view.spec().root()).children().get(index);
+        return ((dev.jasper.sdk.ui.Nodes.Stack) row.control()).children().getFirst();
+    }
+
+    /** An application text setting labelled as a declared one, to build the generated page's editor beside it. */
+    private static dev.jasper.app.settings.Setting<String> appText(String key, String label) {
+        return dev.jasper.app.settings.Setting.of(key, dev.jasper.app.settings.SettingKind.string(value -> true, "Not an allowed value."), "")
+            .label(label).build();
+    }
 }

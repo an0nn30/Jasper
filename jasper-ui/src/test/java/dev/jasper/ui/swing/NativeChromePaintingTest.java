@@ -43,7 +43,7 @@ class NativeChromePaintingTest {
         var strip = new JPanel(); strip.setSize(300, 28);
         var image = new BufferedImage(300, 28, BufferedImage.TYPE_INT_ARGB);
         var g = image.createGraphics();
-        try { NativeChromePainting.tabStrip(strip, g, theme, base, List.of(new Rectangle(0, 0, 100, 28), new Rectangle(100, 0, 100, 28), new Rectangle(200, 0, 100, 28)), 1, 2); }
+        try { NativeChromePainting.tabStrip(strip, g, theme, base, List.of(new Rectangle(0, 0, 100, 28), new Rectangle(100, 0, 100, 28), new Rectangle(200, 0, 100, 28)), 1, 2, true); }
         finally { g.dispose(); }
         int border = KitFixtures.marker(SemanticColor.BORDER_WINDOW).getRGB();
         int idle = NativeChromePainting.tabSurface(theme, base, false).getRGB();
@@ -53,6 +53,26 @@ class NativeChromePaintingTest {
             .isNotEqualTo(idle);
         assertThat(image.getRGB(99, 10)).as("divider between slots").isEqualTo(border);
         assertThat(image.getRGB(150, 27)).as("lower rule").isEqualTo(border);
+    }
+
+    /** The active tab's indicator: tab.indicator along its top in a focused window, tab.indicator.inactive otherwise. */
+    @Test void theActiveTabCarriesTheIndicatorAlongItsTop() {
+        var theme = KitFixtures.marked();
+        var base = new Color(0x22, 0x26, 0x29);
+        var strip = new JPanel(); strip.setSize(300, 28);
+        int line = NativeControlStyles.metric(DesignMetrics.Role.TAB_INDICATOR);
+        for (boolean active : new boolean[] {true, false}) {
+            var image = new BufferedImage(300, 28, BufferedImage.TYPE_INT_ARGB);
+            var g = image.createGraphics();
+            try { NativeChromePainting.tabStrip(strip, g, theme, base, List.of(new Rectangle(0, 0, 100, 28), new Rectangle(100, 0, 100, 28)), 1, -1, active); }
+            finally { g.dispose(); }
+            int indicator = KitFixtures.marker(active ? SemanticColor.TAB_INDICATOR : SemanticColor.TAB_INDICATOR_INACTIVE).getRGB();
+            assertThat(image.getRGB(150, 0)).as("active=%s: the top row", active).isEqualTo(indicator);
+            assertThat(image.getRGB(150, line - 1)).as("active=%s: %s px deep", active, line).isEqualTo(indicator);
+            assertThat(image.getRGB(150, line)).as("active=%s: then the tab", active).isEqualTo(KitFixtures.marker(SemanticColor.SURFACE_TERMINAL).getRGB());
+            assertThat(image.getRGB(50, 0)).as("active=%s: no line on an inactive tab", active).isNotEqualTo(indicator);
+        }
+        assertThat(line).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(2));
     }
 
     @Test void toolbarActionWidthKeepsItsPaddingIconSpanAndMenuSpace() {

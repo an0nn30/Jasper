@@ -47,6 +47,13 @@ modules = ["org.bouncycastle:bcprov-jdk18on:1.85.2", "org.bouncycastle:bcpkix-jd
 text = "bouncycastle.LICENSE.md"
 
 [[component]]
+name = "Catppuccin for JetBrains"
+version = "3.6.1"
+license = "MIT"
+homepage = "https://github.com/catppuccin/jetbrains"
+text = "/dev/jasper/ui/theme/catppuccin.LICENSE.txt"
+
+[[component]]
 name = "Checker Framework Qualifiers"
 version = "3.21.2"
 license = "MIT"

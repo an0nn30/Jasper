@@ -76,6 +76,7 @@ public final class FileChooserPanel extends JPanel {
     static final String SEARCH = "search";
     static final String NAME = "name";
     static final String PREVIEW_TOGGLE = "previewToggle";
+    static final String HIDDEN = "hidden";
     private static final String PREVIEW_CONTENT = "chooser.preview";
     private static final String PIN = "pin:";
     private static final DateTimeFormatter MODIFIED = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -112,6 +113,8 @@ public final class FileChooserPanel extends JPanel {
     private boolean editingPath;
     private String pathValue = "";
     private boolean previewVisible;
+    /** The first focus waits for the listing (see {@link #focusInitially}). */
+    private boolean focusPending;
     private Optional<String> centerMessage = Optional.empty();
     /** The center state's title over its message (the message is the sentence that says what happened). */
     private String centerTitle = "Loading…";
@@ -243,6 +246,26 @@ public final class FileChooserPanel extends JPanel {
         views.forEach(KitView::close);
     }
 
+    /**
+     * Gives the chooser its first focus, as JFileChooser and the macOS open panel do: the name field the primary acts on
+     * in Save and Directory, otherwise the file list, never the first enabled toolbar button. The dialog calls it the
+     * first time it gains focus, when the folder may still be loading: the list then takes focus when it appears (the
+     * search field when the folder turns out empty or unreadable), unless the user has focused something meanwhile.
+     */
+    public void focusInitially() {
+        if (nameView != null) { nameView.focus(NAME); return; }
+        focusPending = true;
+        focusListingWhenShown();
+    }
+
+    private void focusListingWhenShown() {
+        if (!focusPending || !isShowing() || model.loading() || model.connectingTo().isPresent()) return;
+        focusPending = false;
+        var owner = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getPermanentFocusOwner();
+        if (owner != null && SwingUtilities.isDescendingFrom(owner, this)) return;
+        if (centerMessage.isEmpty()) filesView.focus(FILES); else toolsView.focus(SEARCH);
+    }
+
     // Package-private accessors for headless tests.
     /** The name the primary button acts on: the field's text in Save and Directory, the selection's names in Open. */
     String nameText() { return name; }
@@ -268,7 +291,9 @@ public final class FileChooserPanel extends JPanel {
         var bar = dev.jasper.ui.swing.SurfacePanel.toolbar(kit, navigationView, pathView, toolsView);
         bar.setOpaque(false);
         int vertical = metric(DesignMetrics.Role.CHOOSER_TOOLBAR_VERTICAL_PADDING), side = metric(DesignMetrics.Role.CHOOSER_TOOLBAR_SIDE_PADDING);
-        bar.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
+        // The navigation buttons' focus-ring room lies in this padding (SurfacePanel.toolbar), so they keep their places.
+        int ring = metric(DesignMetrics.Role.FOCUS_RING);
+        bar.setBorder(BorderFactory.createEmptyBorder(vertical - ring, side - ring, vertical - ring, side));
         return bar;
     }
 
@@ -449,6 +474,7 @@ public final class FileChooserPanel extends JPanel {
             case "forward" -> model.goForward();
             case "up" -> model.goUp();
             case "refresh" -> model.refresh();
+            case HIDDEN -> toggleHidden();
             case "newFolder" -> newFolder();
             case "open" -> activateSelection();
             case "approve" -> approve();
@@ -576,6 +602,7 @@ public final class FileChooserPanel extends JPanel {
         centerActionLabel = action;
         render(messageView, messageSpec());
         centerCards.show(center, text.isPresent() ? "message" : "table");
+        focusListingWhenShown();
     }
 
     private ViewSpec navigationSpec() {
@@ -621,6 +648,9 @@ public final class FileChooserPanel extends JPanel {
             "Search " + safe(model.name(model.location())), "Search", ""));
         if (model.request().mode() == ChooserRequest.Mode.SAVE)
             children.add(new Nodes.Button("newFolder", ControlState.READY, "New folder", "folder.add", Nodes.ButtonKind.SECONDARY, "newFolder", ""));
+        // Pressed while hidden items show; Cmd/Ctrl+Shift+. toggles the same saved choice.
+        children.add(new Nodes.Button(HIDDEN, ControlState.READY, "", "hidden", Nodes.ButtonKind.GHOST, HIDDEN, "Show hidden items",
+            Nodes.ButtonPresentation.STANDARD, Optional.empty(), Optional.of(model.showHidden())));
         children.add(new Nodes.Icon("preview.icon", ControlState.READY, "preview", Nodes.Hue.NONE, Nodes.IconSize.CONTROL, "Preview pane"));
         children.add(new Nodes.Toggle(PREVIEW_TOGGLE, ControlState.READY, "Preview pane", previewVisible, PREVIEW_TOGGLE, true));
         return new ViewSpec(new Nodes.Stack("tools", ControlState.READY, Nodes.LayoutRole.NAVIGATION, children));

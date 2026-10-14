@@ -58,6 +58,8 @@ public final class DestinationPanel implements AutoCloseable {
     }
 
     public UiView view() { return view; }
+    /** Whether the browser shows hidden items at first, and who hears the user's choice when it changes. */
+    public void hiddenItems(boolean shown,Consumer<Boolean> changed) { controller.showHidden(shown);controller.onShowHiddenChanged(changed); }
     public void refresh() { controller.refresh(); }
     public void status(boolean busy,String text) { if(!closed) browser.operationStatus(busy,text); }
 

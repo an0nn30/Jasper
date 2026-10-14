@@ -207,17 +207,30 @@ public class SurfacePanel extends JPanel {
         scroll.getViewport().setOpaque(false); return scroll;
     }
 
-    /** Native toolbar: the value keeps a usable lane; constrained action groups pack below it. */
+    /**
+     * Native toolbar: the value fills the lane between the leading group and the trailing actions; constrained action
+     * groups pack below it. The leading group's view reserves its buttons' focus rings on every side, so the view never
+     * clips them: the room lies in the gap after it and, above, below and before it, in the row's padding, which the
+     * caller makes that much smaller.
+     */
     public static JPanel toolbar(KitContext context, JComponent leading, JComponent value, JComponent trailing) {
+        int ring = ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING);
+        leading.setBorder(BorderFactory.createEmptyBorder(ring, ring, ring, ring));
         var valueRow = new JPanel(new Navigation.InlineLayout(context, DesignMetrics.Role.BUTTON_GAP) {
             @Override boolean flexible(Component component) { return component == value; }
+            @Override int gap() { return Math.max(0, super.gap() - ring); }
             @Override public int height(Container parent,int width) {
                 return Math.max(super.height(parent,width),ThemePainting.height(context,DesignMetrics.Role.FIELD_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY));
             }
             @Override public void layoutContainer(Container parent) {
                 boolean narrow = wraps(parent,parent.getWidth());
                 super.layoutContainer(parent);
-                if (!narrow) value.setBounds(value.getX(),0,value.getWidth(),parent.getHeight());
+                if (narrow) return;
+                // The lane is the row without the leading group's ring room.
+                int lane = Math.max(Math.max(leading.getPreferredSize().height - 2 * ring, value.getPreferredSize().height),
+                    ThemePainting.height(context,DesignMetrics.Role.FIELD_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY));
+                lane = Math.min(lane, parent.getHeight());
+                value.setBounds(value.getX(),(parent.getHeight()-lane)/2,Math.max(0,parent.getWidth()-value.getX()),lane);
             }
             @Override int receiverMinimum(Component component) {
                 return ThemePainting.height(context, DesignMetrics.Role.FIELD_HEIGHT, dev.jasper.ui.metrics.Typography.Role.BODY);

@@ -47,6 +47,8 @@ class ThemeFolderTest {
             .hasMessageStartingWith("line 2: ");
         assertThatThrownBy(() -> folder.prepare(source("steel.json", ThemeTestSupport.uiThemeJson("Slate Steel"))))
             .hasMessage("Slate Steel is built in and can't be replaced");
+        assertThatThrownBy(() -> folder.prepare(source("mocha.json", ThemeTestSupport.uiThemeJson("Catppuccin Mocha"))))
+            .hasMessage("Catppuccin Mocha is built in and can't be replaced");
         assertThatThrownBy(() -> folder.prepare(source("night.json", ThemeTestSupport.terminalThemeJson("Ночь"))))
             .hasMessage("The theme's name has no letters or digits Jasper can use for a file name");
         var huge = Files.write(home.resolve("downloads/huge.json"), new byte[ThemeLibrary.MAX_BYTES + 1]);
@@ -93,6 +95,7 @@ class ThemeFolderTest {
         assertThat(home.resolve("themes/zenburn.json")).doesNotExist();
         assertThatThrownBy(() -> folder.remove("zenburn")).isInstanceOf(java.nio.file.NoSuchFileException.class);
         assertThatThrownBy(() -> folder.remove("slate-steel")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> folder.remove("catppuccin-latte")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> folder.remove("../config")).isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -172,7 +172,7 @@ class DescriptorParserTest {
         assertThatThrownBy(() -> DescriptorParser.parse("id = ")).isInstanceOf(DescriptorParser.InvalidDescriptor.class);
         assertThat(DescriptorParser.CAPABILITIES).isEqualTo(Set.of("terminal.observe", "terminal.selection",
             "terminal.inject", "terminal.open", "session.provide", "palette.contribute", "files.source", "network.listen",
-            "clipboard.read"));
+            "clipboard.read", "terminal.environment", "editor.provide"));
     }
 
     @Test void aNameThatShowsNothingIsRejected() {
@@ -245,5 +245,10 @@ class DescriptorParserTest {
             "[[subcommands]]\nname = \"a\"\nsummary = \"   \"\n", "subcommands.summary must be one visible line: a");
         cases.forEach((tail, message) -> assertThatThrownBy(() -> DescriptorParser.parse(HEAD + tail)).as(tail)
             .isInstanceOf(DescriptorParser.InvalidDescriptor.class).hasMessageContaining(message));
+    }
+
+    @Test void acceptsTheEnvironmentAndEditorCapabilities() throws Exception {
+        PluginDescriptor descriptor = DescriptorParser.parse(FULL.replace("\"session.provide\"", "\"terminal.environment\", \"editor.provide\""));
+        assertThat(descriptor.capabilities()).contains("terminal.environment", "editor.provide");
     }
 }

@@ -61,6 +61,23 @@ class ThemeManagerTest {
 
 
 
+    @Test void everyBuiltInVariantInstallsAsTheLookAndFeel() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        try {
+            for (var builtIn : dev.jasper.ui.theme.JasperTheme.builtIns()) {
+                for (boolean dark : new boolean[] {true, false}) {
+                    if (!builtIn.has(dark)) continue;
+                    var theme = builtIn.generated(dark);
+                    assertThat(ThemeManager.install(theme)).as("%s %s", builtIn.id(), dark ? "dark" : "light").isTrue();
+                    assertThat(UIManager.getLookAndFeel().getName()).isEqualTo(builtIn.name());
+                    assertThat(FlatLaf.isLafDark()).as(builtIn.id()).isEqualTo(dark);
+                    assertThat(UIManager.getColor("Panel.background")).as(builtIn.id())
+                        .isEqualTo(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
+                }
+            }
+        } finally { UIManager.setLookAndFeel(original); }
+    }
+
     private static void assertColours(Map<String, String> expected) {
         expected.forEach((key, value) -> assertThat(hex(UIManager.getColor(key))).as(key).isEqualTo(value));
     }
@@ -76,7 +93,7 @@ class ThemeManagerTest {
             assertThat(UIManager.getColor("Panel.background")).isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
             assertThat(UIManager.getColor("List.background")).isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.SURFACE_CARD));
             assertThat(UIManager.getColor("EditorTabs.underlineColor")).as("a key FlatLaf skips is put back")
-                .isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.ACCENT));
+                .isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.TAB_INDICATOR));
             assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT))
                 .as("native search reads its canonical role directly").isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT));
             assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(2 * dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.CONTROL_RADIUS));

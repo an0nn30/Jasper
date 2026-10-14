@@ -159,22 +159,22 @@ class EditorDocumentPreservationTest {
         }
     }
 
-    @Test void cancellingTheActualEditorsGeneratedSettingsPageDiscardsInputAndKeepsDocumentConfiguration() throws Exception {
+    @Test void cancellingTheActualEditorsSettingsPageDiscardsInputAndKeepsDocumentConfiguration() throws Exception {
         try(var editor=new StagedEditorHost(root,true)) {
             onEdt(() -> {
                 call(editor.editorWindow(),"newUntitled");
                 var area=editor.documentText();int size=area.getFont().getSize();
                 var pageContext=new dev.jasper.app.settingsui.PageContext(null,id -> { },Runnable::run,(title,path) -> Optional.empty(),
                     () -> { },() -> null,dev.jasper.app.testsupport.KitTestSupport::context);
-                var page=(PluginSettingsPage)editor.host.settingsPages(pageContext).getFirst();
+                var page=(PluginPanelPage)editor.host.settingsPages(pageContext).getFirst();
                 var component=page.component();
-                named(component,"font_size.input",JTextComponent.class).setText("27");
+                named(component,"settings:font_size.input",JTextComponent.class).setText("27");
                 assertThat(page.modified()).isTrue();
                 page.dispose(); // Settings Cancel closes pages without Apply.
                 assertThat(area.getFont().getSize()).isEqualTo(size);
                 assertThat(java.nio.file.Files.exists(editor.host.environment.settingsFiles().file("dev.jasper.editor"))).isFalse();
-                var reopened=(PluginSettingsPage)editor.host.settingsPages(pageContext).getFirst();
-                assertThat(named(reopened.component(),"font_size.input",JTextComponent.class).getText()).isEqualTo(Integer.toString(size));
+                var reopened=(PluginPanelPage)editor.host.settingsPages(pageContext).getFirst();
+                assertThat(named(reopened.component(),"settings:font_size.input",JTextComponent.class).getText()).isEqualTo(Integer.toString(size));
                 assertThat(reopened.modified()).isFalse();reopened.dispose();
                 editor.contentTab().close();
             });

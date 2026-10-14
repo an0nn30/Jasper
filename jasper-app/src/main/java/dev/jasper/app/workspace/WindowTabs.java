@@ -145,7 +145,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             if (slot.entry != null && slot.entry.hovered) hovered = bounds.size();
             bounds.add(slot.bounds);
         }
-        NativeChromePainting.tabStrip(this, graphics, owner.theme().workspace(), owner.workspaceSurface(), bounds, chosen, hovered);
+        NativeChromePainting.tabStrip(this, graphics, owner.theme().workspace(), owner.workspaceSurface(), bounds, chosen, hovered, active);
     }
 
     private Color surface(boolean selected) {

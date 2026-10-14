@@ -2,7 +2,8 @@
 
     python3 -m unittest discover -s tools/themes -p 'test_*.py'
 
-Set JASPER_THEME_UPDATE_GOLDEN=1 to rewrite testdata/expected/ from the current output (then review the diff).
+Set JASPER_THEME_UPDATE_GOLDEN=1 to rewrite testdata/expected/ and the built-in Catppuccin themes from the current
+output (then review the diff).
 """
 
 import contextlib
@@ -21,6 +22,8 @@ import jasper_theme as tool
 DATA = pathlib.Path(__file__).resolve().parent / "testdata"
 EXPECTED = DATA / "expected"
 UPDATE = os.environ.get("JASPER_THEME_UPDATE_GOLDEN") == "1"
+CATPPUCCIN = pathlib.Path(__file__).resolve().parent / "catppuccin"
+BUILT_IN_THEMES = pathlib.Path(__file__).resolve().parents[2] / "jasper-ui/src/main/resources/dev/jasper/ui/theme"
 
 
 def run(*args):
@@ -466,6 +469,54 @@ class Plugins(unittest.TestCase):
         self.assertEqual(list(doc["ui"]), ["dark"], "dark, as its parent is")
         self.assertEqual(doc["ui"]["dark"]["surface.panel"], "#102030", "the parent's colour")
 
+    def test_a_classic_theme_takes_its_chrome_from_the_plugins_islands_variant_of_it(self):
+        """Jasper's tool windows are islands: a plugin's Islands variant says which chrome they stand on."""
+        night = {"name": "Night", "dark": True, "ui": {"ToolWindow.background": "#333333", "StatusBar.background": "#333333"}}
+        islands = {"name": "Islands Night", "dark": True, "parentTheme": "Islands Dark",
+                   "ui": {"ToolWindow.background": "#333333", "StatusBar.background": "#111111"}}
+        other = {"name": "Islands Day", "dark": True, "parentTheme": "Islands Dark", "ui": {"StatusBar.background": "#222222"}}
+        with tempfile.TemporaryDirectory() as scratch:
+            jar = theme_jar(pathlib.Path(scratch) / "night.jar", {"night": night, "islands": islands, "day": other})
+            themes = tool.plugin_themes(tool.Files.archive(jar))
+            classic = tool.convert_intellij_theme(themes[0], themes, None)
+            own = tool.convert_intellij_theme(themes[1], themes, None)
+            alone = tool.convert_intellij_theme(themes[0], themes[:1], None)
+        self.assertEqual(classic.doc["ui"]["dark"]["surface.app"], "#111111", "the Islands variant's chrome")
+        self.assertEqual(classic.doc["ui"]["dark"]["surface.panel"], "#333333", "the classic theme's own tool windows")
+        self.assertIn("surface.app: #111111 from StatusBar.background (Islands Night)", classic.sources)
+        self.assertTrue(classic.summary.endswith("; chrome from Islands Night"), classic.summary)
+        self.assertEqual(own.doc["ui"]["dark"]["surface.app"], "#111111")
+        self.assertNotIn("chrome from", own.summary, "an Islands theme keeps its own chrome")
+        self.assertEqual(alone.doc["ui"]["dark"]["surface.app"], "#333333", "without an Islands variant")
+
+    def test_a_main_toolbar_apart_from_the_chrome_gives_the_title_bar_its_own_colours(self):
+        """IntelliJ New UI Light's dark header: MainToolbar Gray2 under Gray12 on a light window."""
+        header = {"name": "Day", "dark": False, "parentTheme": "ExperimentalLight", "ui": {"StatusBar.background": "#F7F8FA"}}
+        flat = {"name": "Even", "dark": False, "ui": {"StatusBar.background": "#F7F8FA", "MainToolbar.background": "#F5F6F7"}}
+        with tempfile.TemporaryDirectory() as scratch:
+            themes = tool.plugin_themes(tool.Files.archive(theme_jar(pathlib.Path(scratch) / "day.jar", {"day": header, "even": flat})))
+            day = tool.convert_intellij_theme(themes[0], themes, None).doc["ui"]["light"]
+            even = tool.convert_intellij_theme(themes[1], themes, None).doc["ui"]["light"]
+        self.assertEqual(list(day)[-2:], tool.OPTIONAL_ROLES)
+        self.assertLess(tool.lightness(tool.parse_hex(day["surface.titlebar"])), 30, "the dark header")
+        self.assertGreater(tool.contrast(tool.parse_hex(day["text.titlebar"]), tool.parse_hex(day["surface.titlebar"])), 7)
+        self.assertEqual(list(even), tool.ROLES, "a main toolbar like the chrome adds nothing")
+
+    def test_chosen_roles_take_a_colour_of_the_themes_own_palette_or_a_hex_colour(self):
+        night = {"name": "Night", "dark": True, "colors": {"deep": "#0A0B0C"},
+                 "ui": {"Panel.background": "#333333", "SidePanel.background": "#333333"}}
+        with tempfile.TemporaryDirectory() as scratch:
+            themes = tool.plugin_themes(tool.Files.archive(theme_jar(pathlib.Path(scratch) / "night.jar", {"night": night})))
+            result = tool.convert_intellij_theme(themes[0], themes, None, roles={"surface.sidebar": "deep", "surface.card": "#123456"})
+            with self.assertRaisesRegex(tool.ConversionError, 'surface.card: "abyss" is neither a colour nor one of the theme\'s colours'):
+                tool.convert_intellij_theme(themes[0], themes, None, roles={"surface.card": "abyss"})
+            with self.assertRaisesRegex(tool.ConversionError, 'unknown role "surface.nowhere"'):
+                tool.convert_intellij_theme(themes[0], themes, None, roles={"surface.nowhere": "deep"})
+        self.assertEqual(result.doc["ui"]["dark"]["surface.sidebar"], "#0A0B0C")
+        self.assertEqual(result.doc["ui"]["dark"]["surface.card"], "#123456")
+        self.assertEqual(result.doc["ui"]["dark"]["surface.dialog"], "#333333", "a role not chosen keeps its IntelliJ key")
+        self.assertIn("surface.sidebar: #0A0B0C from deep (chosen)", result.sources)
+
     def test_list_resolves_dark_and_light_through_the_parent_chain(self):
         themes = {"base": BASE, "child": CHILD, "night": {"name": "Night", "parentTheme": "Darcula"},
                   "plain": {"name": "Plain"}}
@@ -774,7 +825,7 @@ class Writes(unittest.TestCase):
                 with self.subTest(source.name):
                     status, _, stderr = run(source, "-o", out)
                     self.assertEqual(status, 1)
-                    self.assertIn(f'error: {source.name}: "slate-steel" is Jasper\'s built-in theme; choose another name '
+                    self.assertIn(f'error: {source.name}: "slate-steel" is a built-in Jasper theme; choose another name '
                                   "with --name", stderr)
                     self.assertEqual(listing(out), [])
             self.assertEqual(run(theme, "--name", "Slate Steel Two", "-o", out)[0], 0)
@@ -816,6 +867,47 @@ class Format(unittest.TestCase):
         doc = json.loads(bundled.read_text(encoding="utf-8"))
         tool.validate(doc, "slate-steel.json")
         self.assertEqual(list(doc["editor"]["dark"]), tool.EDITOR_SURFACES + tool.SYNTAX_ROLES)
+
+
+class BuiltIn(unittest.TestCase):
+    """The built-in themes besides Slate Steel are the converter's output for the vendored Catppuccin plugin."""
+
+    FLAVOURS = ["latte", "frappe", "macchiato", "mocha"]  # the classic themes; the Islands variants are not built in
+
+    def setUp(self):
+        if not BUILT_IN_THEMES.is_dir():
+            self.skipTest("not in the repository")
+
+    def test_the_vendored_catppuccin_plugin_is_the_recorded_release(self):
+        import hashlib
+        jar = CATPPUCCIN / "Catppuccin.Theme-3.6.1.jar"
+        self.assertEqual(hashlib.sha256(jar.read_bytes()).hexdigest(),
+                         "3a1104e0db53ff5ba216c94c9e730a85c7ac2847f4e5fe82d91b99dc91045fff")
+
+    def test_the_built_in_catppuccin_themes_are_the_converters_output(self):
+        """With roles.json's hand-picked dialog, card and sidebar colours, named from each flavour's palette."""
+        themes = tool.plugin_themes(tool.Files.archive(CATPPUCCIN / "Catppuccin.Theme-3.6.1.jar"))
+        roles = json.loads((CATPPUCCIN / "roles.json").read_text(encoding="utf-8"))
+        results = []
+        for flavour in self.FLAVOURS:
+            theme = next(t for t in themes if t.id == f"com.github.catppuccin.{flavour}.jetbrains")
+            results.append(tool.convert_intellij_theme(theme, themes, None, roles=roles["light" if flavour == "latte" else "dark"]))
+        self.assertEqual([tool.slug(result.doc["name"]) for result in results],
+                         [f"catppuccin-{flavour}" for flavour in self.FLAVOURS])
+        for result in results:
+            name = f"{tool.slug(result.doc['name'])}.json"
+            text = tool.dump(result.doc)
+            target = BUILT_IN_THEMES / name
+            if UPDATE:
+                target.write_text(text, encoding="utf-8")
+            with self.subTest(name):
+                self.assertEqual(text, target.read_text(encoding="utf-8"), name)
+
+    def test_the_built_in_theme_files_are_the_ids_the_converter_refuses(self):
+        self.assertEqual(sorted(path.stem for path in BUILT_IN_THEMES.glob("*.json")), sorted(tool.BUILT_IN))
+
+    def test_the_shipped_catppuccin_license_is_the_vendored_one(self):
+        self.assertEqual((BUILT_IN_THEMES / "catppuccin.LICENSE.txt").read_bytes(), (CATPPUCCIN / "LICENSE").read_bytes())
 
 
 if __name__ == "__main__":

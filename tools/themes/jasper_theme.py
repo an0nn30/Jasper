@@ -47,9 +47,12 @@ ROLES = [
     "accent", "accent.hover", "selection.bg", "hover.overlay",
     "segment.track", "segment.selected.bg", "toggle.track.off", "toggle.knob",
     "button.secondary.bg", "button.secondary.bg.hover", "button.secondary.border",
+    "tab.indicator", "tab.indicator.inactive",
     "status.success", "status.warning", "status.danger", "status.idle",
     "hue.blue", "hue.green", "hue.amber", "hue.purple", "hue.neutral",
 ]
+# Roles a variant may add after ROLES: the title bar's own colours (left out, they are surface.app and text.primary).
+OPTIONAL_ROLES = ["surface.titlebar", "text.titlebar"]
 ANSI = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]
 TERMINAL_KEYS = ["bg", "fg", "fg.bold", "cursor", "selection"] + ANSI + ["bright." + name for name in ANSI]
 EDITOR_SURFACES = ["background", "foreground", "caret", "selection", "currentLine", "gutter", "lineNumbers"]
@@ -66,7 +69,8 @@ EDITOR_REFERENCES = {
     "operator": "text.secondary", "punctuation": "text.secondary", "tag": "terminal.ansi.red",
     "attribute": "terminal.ansi.yellow", "regex": "terminal.ansi.cyan", "error": "terminal.ansi.red",
 }
-BUILT_IN = "slate-steel"  # Import refuses a theme file with the built-in theme's id
+# Import refuses a theme file with a built-in theme's id
+BUILT_IN = ("slate-steel", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha")
 KEY = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 HEX = re.compile(r"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?")
 EDITOR_VALUE = re.compile(r"(#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9.]*)( @ \d{1,3}%)?(, italic)?(, bold)?")
@@ -108,6 +112,12 @@ def mix(a, b, share: float):
 
 def with_alpha(color, alpha: int):
     return color[:3] + (alpha,)
+
+
+def lightness(color) -> float:
+    """CIE L*, 0 to 100."""
+    y = luminance(color)
+    return 116 * y ** (1 / 3) - 16 if y > 216 / 24389 else 24389 / 27 * y
 
 
 def luminance(color) -> float:
@@ -171,7 +181,7 @@ def validate(doc: dict, where: str) -> None:
     for variant, roles in ui.items():
         if variant not in terminal:
             fail(f"ui.{variant} has no matching scheme")
-        if list(roles) != ROLES:
+        if list(roles) not in (ROLES, ROLES + OPTIONAL_ROLES):
             fail(f"ui.{variant} roles")
         for role, value in roles.items():
             if not HEX.fullmatch(value):
@@ -857,6 +867,9 @@ MAPPING = [
     ("button.secondary.bg.hover", [], lambda v, dark, ansi: v["surface.control.hover"]),
     ("button.secondary.border", ["Button.startBorderColor", "Button.borderColor"],
      lambda v, dark, ansi: v["border.control"]),
+    ("tab.indicator", ["EditorTabs.underlineColor"], lambda v, dark, ansi: v["accent"]),
+    ("tab.indicator.inactive", ["EditorTabs.inactiveUnderlineColor"],
+     lambda v, dark, ansi: mix(v["tab.indicator"], v["surface.terminal"], 0.5)),
     ("status.idle", [], lambda v, dark, ansi: mix(v["text.tertiary"], v["surface.panel"], 0.4)),
     ("hue.blue", [], lambda v, dark, ansi: mix(ansi["blue"], v["text.primary"], 0.3)),
     ("hue.green", [], lambda v, dark, ansi: mix(ansi["green"], v["text.primary"], 0.3)),
@@ -867,22 +880,23 @@ MAPPING = [
 OPACITY_ROLES = {"surface.scrim", "border.subtle", "text.onAccent.secondary", "text.onSelection.secondary"}
 
 
-def ui_roles(lookup: Lookup, dark: bool, terminal: dict) -> tuple[dict, dict, list[str]]:
+def ui_roles(lookup: Lookup, dark: bool, terminal: dict, given: dict | None = None) -> tuple[dict, dict, list[str]]:
     """The UI roles in the format's order, each role's source ("theme", a parent's name, or "derived"), and one
-    provenance line per role."""
+    provenance line per role; ``given`` maps a role to the (colour, provenance, source) it takes instead."""
     ansi = {name: parse_hex(terminal[name]) for name in ANSI}
     ansi["bg"] = parse_hex(terminal["bg"])
     values: dict = {}
     sources: dict[str, str] = {}
     provenance: list[str] = []
     for role, keys, rule in MAPPING:
-        found = None
-        for key in keys:
-            found = lookup.key(key)
-            if found is not None:
-                colour, source = found
-                found = (colour, f"{key} ({source})", source)
-                break
+        found = (given or {}).get(role)
+        if found is None:
+            for key in keys:
+                found = lookup.key(key)
+                if found is not None:
+                    colour, source = found
+                    found = (colour, f"{key} ({source})", source)
+                    break
         if found is None and rule is not None:
             found = (rule(values, dark, ansi), "derived", "derived")
         if found is None:
@@ -899,8 +913,51 @@ def ui_roles(lookup: Lookup, dark: bool, terminal: dict) -> tuple[dict, dict, li
     return {role: hex_of(values[role]) for role in ROLES}, sources, provenance
 
 
+def is_islands(effective: Effective) -> bool:
+    """Whether a theme is drawn for IntelliJ's Islands UI, which marks it with "Islands": 1 (inherited from a parent)."""
+    return any(ui.get("Islands") == 1 for _, ui in effective.levels)
+
+
+def islands_variant(theme: ThemeFile, siblings: list[ThemeFile], dark: bool, loose_dir: pathlib.Path | None):
+    """The plugin's Islands variant of a classic theme, (name, effective theme): an Islands theme of the same variant
+    whose name without the word "Islands" is the theme's; None when there is none."""
+    def plain(item: ThemeFile) -> str:
+        return " ".join(word for word in str(item.data.get("name", item.id)).split() if word.casefold() != "islands").casefold()
+    for sibling in siblings:
+        if sibling is theme or plain(sibling) != plain(theme) or not isinstance(sibling.data.get("name"), str):
+            continue
+        try:
+            effective = resolve(sibling, siblings, [], None, loose_dir)
+        except ConversionError:
+            continue  # its own conversion reports it
+        if is_islands(effective) and effective.dark == dark:
+            return sibling.data["name"], effective
+    return None
+
+
+# The roles a classic theme takes from its plugin's Islands variant: the chrome Jasper's tool-window islands stand on.
+ISLANDS_CHROME = ["surface.app"]
+
+
+def title_bar(lookup: Lookup, roles: dict, dark: bool) -> dict:
+    """surface.titlebar and text.titlebar from IntelliJ's main toolbar, when it stands at least 5 L* apart from the window
+    chrome (New UI Light's dark header); otherwise none, and the title bar is the chrome."""
+    found = lookup.key("MainToolbar.background")
+    if found is None:
+        return {}
+    surface = found[0] if found[0][3] == 255 else over(found[0], BLACK if dark else WHITE)
+    if abs(lightness(surface) - lightness(parse_hex(roles["surface.app"]))) < 5:
+        return {}
+    ink = lookup.key("MainToolbar.foreground")
+    ink = over(ink[0], surface) if ink is not None else WHITE if contrast(WHITE, surface) >= contrast(BLACK, surface) else BLACK
+    return {"surface.titlebar": hex_of(surface), "text.titlebar": hex_of(ink)}
+
+
 def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: str | None,
-                           scheme_file: pathlib.Path | None = None, loose_dir: pathlib.Path | None = None) -> Result:
+                           scheme_file: pathlib.Path | None = None, loose_dir: pathlib.Path | None = None,
+                           roles: dict[str, str] | None = None) -> Result:
+    """One IntelliJ theme as a Jasper theme. ``roles`` maps a role to the colour it takes instead of its IntelliJ key:
+    ``#RRGGBB`` or a colour of the theme's own palette (hand-picked values, as the built-in Catppuccin themes have)."""
     warnings: list[str] = []
     effective = resolve(theme, siblings, warnings, scheme_file, loose_dir)
     display = name or str(theme.data.get("name") or theme.id)
@@ -909,12 +966,30 @@ def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: st
     variant = "dark" if effective.dark else "light"
     scheme = Scheme(effective.scheme, warnings, theme.path)
     terminal = terminal_scheme(scheme, display)
-    roles, sources, provenance = ui_roles(Lookup(effective), effective.dark, terminal)
+    islands = None if is_islands(effective) else islands_variant(theme, siblings, effective.dark, loose_dir)
+    given = {}
+    if islands is not None:
+        island_name, island = islands[0], Lookup(islands[1])
+        for role in ISLANDS_CHROME:
+            for key in next(keys for mapped, keys, _ in MAPPING if mapped == role):
+                found = island.key(key)
+                if found is not None:
+                    colour, source = found
+                    given[role] = (colour, f"{key} ({island_name if source == 'theme' else source})", source)
+                    break
+    for role, value in (roles or {}).items():
+        if role not in ROLES:
+            raise ConversionError(f'{theme.where}: unknown role "{role}"')
+        colour = Lookup(effective).colour(value)
+        if colour is None:
+            raise ConversionError(f'{theme.where}: {role}: "{value}" is neither a colour nor one of the theme\'s colours')
+        given[role] = (colour, f"{value} (chosen)", "theme")
+    roles, sources, provenance = ui_roles(Lookup(effective), effective.dark, terminal, given)
     editor, from_scheme = editor_scheme(scheme)
     doc = {"jasper-theme": FORMAT, "name": display}
     if isinstance(theme.data.get("author"), str) and theme.data["author"]:
         doc["author"] = theme.data["author"]
-    doc["ui"] = {variant: roles}
+    doc["ui"] = {variant: roles | title_bar(Lookup(effective), roles, effective.dark)}
     doc["terminal"] = {variant: terminal}
     doc["editor"] = {variant: editor}
     validate(doc, theme.path)
@@ -923,7 +998,8 @@ def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: st
     inherited = len(ROLES) - own - derived
     parent = effective.chain[1] if len(effective.chain) > 1 else "its base"
     summary = (f"{display} ({variant}): {own} roles from the theme, {inherited} from {parent}, {derived} derived; "
-               f"editor {from_scheme} of {len(EDITOR_SURFACES) + len(SYNTAX_ROLES)} from the scheme")
+               f"editor {from_scheme} of {len(EDITOR_SURFACES) + len(SYNTAX_ROLES)} from the scheme"
+               + (f"; chrome from {islands[0]}" if islands is not None else ""))
     return Result(doc, summary, warnings, provenance)
 
 
@@ -1015,8 +1091,8 @@ def write_results(results: list[tuple[str, Result]], args) -> int:
             print(f"error: {name}: the name has no letters or digits for a file name; use --name", file=sys.stderr)
             status = 1
             continue
-        if file_name == BUILT_IN:
-            print(f"error: {input_name}: \"{BUILT_IN}\" is Jasper's built-in theme; choose another name with --name",
+        if file_name in BUILT_IN:
+            print(f"error: {input_name}: \"{file_name}\" is a built-in Jasper theme; choose another name with --name",
                   file=sys.stderr)
             status = 1
             continue

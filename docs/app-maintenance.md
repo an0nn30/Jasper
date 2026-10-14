@@ -356,8 +356,11 @@ boundaries; this refactor promises no plugin loading, binary compatibility or pe
 
 ## Themes
 
-Jasper's built-in theme is Slate Steel, in Dark and Light; installed themes are theme files in `<home>/themes/`
-([themes](themes.md)). Slate Steel's colours live only in jasper-ui's
+Jasper's built-in themes are Slate Steel, in Dark and Light, and Catppuccin's four flavours; installed themes are theme
+files in `<home>/themes/` ([themes](themes.md)). `JasperTheme.builtIns()` lists the built-in files. The Catppuccin
+files are the theme converter's output for the plugin jar vendored in `tools/themes/catppuccin/`, with the
+hand-picked roles in its `roles.json` (its `SOURCE.md` says how to regenerate them); a converter test fails when they
+differ. Slate Steel's colours live only in jasper-ui's
 `slate-steel.json`, the machine-readable block of [the Slate Steel record](design/theme-engine/slate-steel.md) (a test
 keeps the two identical). `JasperTheme` reads the file once: the semantic palettes, the terminal schemes (`TerminalScheme`),
 the derived editor schemes and syntax styles, and one `GeneratedTheme` per variant whose FlatLaf UI keys
@@ -366,7 +369,7 @@ the derived editor schemes and syntax styles, and one `GeneratedTheme` per varia
 colour, give it a role, never a value.
 
 `ColourLiteralScanTest` fails on any colour literal in production code or resources (jasper-ui, the app and the
-plugins) outside `slate-steel.json`; `UiColorKeysTest`, `SlateSteelGeneratedTest` and `HostedPalettesTest` pin the
+plugins) outside the built-in theme files; `UiColorKeysTest`, `SlateSteelGeneratedTest` and `HostedPalettesTest` pin the
 keys, the variants and the plugins' palettes. `RemovedThemeLayerTest` pins that the former theme layer is gone.
 
 ```sh

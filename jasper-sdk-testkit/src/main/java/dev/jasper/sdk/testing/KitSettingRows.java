@@ -23,6 +23,13 @@ final class KitSettingRows {
                 if (option.value().equals(value)) selected = option.token();
             }
             input = new Nodes.Choice(id, state, Nodes.ChoiceKind.DROPDOWN, options, selected, spec.label(), id);
+        } else if (spec.kind() instanceof SettingKind.Text && spec.editor().orElse(null) instanceof EditorHint.Font font) {
+            // As the host: free text over the installed families, which filter as you type.
+            List<String> families = font.monospaced() ? InstalledFonts.MONOSPACED : InstalledFonts.ALL;
+            var options = new ArrayList<Option>();
+            for (int i = 0; i < families.size(); i++) options.add(new Option("family-" + i, families.get(i), Optional.empty()));
+            input = new Nodes.Choice(id, state, Nodes.ChoiceKind.SEARCHABLE, options, "", spec.label(), "", "",
+                Optional.of(new Nodes.ChoiceSearch(0, "No installed font matches", Optional.of(invalidText != null ? invalidText : String.valueOf(value)))));
         } else {
             var numeric = spec.kind() instanceof SettingKind.IntegerRange range ? Optional.of(new Nodes.Numeric(range.min(), range.max(), 1, 0))
                 : spec.kind() instanceof SettingKind.NumberRange range ? Optional.of(new Nodes.Numeric(range.min(), range.max(), 0.1, 2)) : Optional.<Nodes.Numeric>empty();
@@ -31,7 +38,9 @@ final class KitSettingRows {
             String text = invalidText != null ? invalidText : value instanceof List<?> items
                 ? String.join("\n", items.stream().map(Object::toString).toList()) : String.valueOf(value);
             // As the host: a bounded integer is the Settings stepper, a bounded decimal a number field, both with the unit.
-            input = new Nodes.Field(id, state, kind, text, numeric.isPresent() ? spec.unit() : "", spec.label(), "", numeric,
+            // As the host: a path ends with Browse.
+            input = new Nodes.Field(id, state, kind, text, numeric.isPresent() ? spec.unit() : "", spec.label(),
+                kind == Nodes.FieldKind.PATH ? id + ":browse" : "", numeric,
                 spec.kind() instanceof SettingKind.IntegerRange ? Nodes.FieldPresentation.STEPPER : Nodes.FieldPresentation.STANDARD);
         }
         // As the host: the settings control slot, then the icon-only Reset, shown while the value differs from the default.
@@ -42,6 +51,26 @@ final class KitSettingRows {
             Nodes.ButtonKind.GHOST, id + ":reset", "Reset " + spec.label() + " to default");
         return new Nodes.SettingRow(id + ":row", state, spec.label(), spec.description(),
             new Nodes.Stack(id + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(input, reset)), false);
+    }
+
+    /** The installed families a font setting's row offers, read once: all, and those that draw 'i' and 'W' alike. */
+    private static final class InstalledFonts {
+        static final List<String> ALL = List.of(java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames());
+        static final List<String> MONOSPACED = monospaced();
+
+        private static List<String> monospaced() {
+            var graphics = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB).createGraphics();
+            try {
+                var fixed = new ArrayList<String>();
+                for (String family : ALL) {
+                    var metrics = graphics.getFontMetrics(new java.awt.Font(family, java.awt.Font.PLAIN, 12));
+                    if (metrics.charWidth('i') == metrics.charWidth('W')) fixed.add(family);
+                }
+                return List.copyOf(fixed);
+            } finally {
+                graphics.dispose();
+            }
+        }
     }
 
     static boolean matches(SettingSpec<?> spec, String query) {

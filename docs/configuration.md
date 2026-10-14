@@ -1,6 +1,6 @@
 # Configuration
 
-Jasper reads UTF-8 TOML at startup and watches it for changes once per second. Reading configuration does not create the config file. Normal desktop startup can create application data: logs, extracted shell-integration scripts, and (when enabled) residency files. Click **Settings** to create a commented template if the file is absent, then open it in your operating system's editor. Jasper tries Edit, then Open, then revealing the file in Finder/Explorer when supported. If all attempts fail, Jasper shows the error. Existing files are never overwritten by Settings.
+Jasper reads UTF-8 TOML at startup and watches it for changes once per second. Reading configuration does not create the config file. Normal desktop startup can create application data: logs, extracted shell-integration scripts, and (when enabled) residency files. Click **Settings** to create a commented template if the file is absent, then open it in the [default editor](editor.md#default-editor), the Jasper Editor unless you choose another. When that editor does not open it, Jasper tries your operating system's Edit, then Open, then revealing the file in Finder/Explorer when supported. If all attempts fail, Jasper shows the error. Existing files are never overwritten by Settings.
 
 For a copyable starting point, use the root [config.example.toml](../config.example.toml). It lists app settings with their built-in defaults, an empty environment table and optional platform-specific shortcut examples. UI font size stays commented because its default depends on the platform. Plugin settings belong in their separate [plugin files](#plugins).
 
@@ -491,7 +491,7 @@ name steps.
 ### Editor
 
 The bundled Editor reads `plugins/dev.jasper.editor/dev.jasper.editor.toml` (see [Plugins](#plugins)):
-`font_family`, `font_size`, `tab_size`, `soft_wrap`, `max_file_mib` and `vim`, applied live; they are also on its page under Settings › Tools. See
+`font_family`, `font_size`, `tab_size`, `soft_wrap`, `max_file_mib`, `vim`, `recent_files_days` and the [default editor](editor.md#default-editor)'s `default_editor`, `custom_command`, `custom_in_terminal` and `keep_environment_editor`, applied live; they are also on its page under Settings › Tools. See
 [Editor](editor.md#settings) for defaults and ranges.
 
 ### Live settings and temporary choices
@@ -557,7 +557,7 @@ PROJECT_LABEL = "a value with spaces"
 
 Arguments containing spaces stay single arguments, and an empty string remains an empty argument. To ask a shell to interpret a command, explicitly name that shell and pass its command flag and command text as separate arguments. Nested tables above and inline tables such as `shell = { program = "/bin/zsh", args = ["-l"] }` under `[terminal]` are both supported; the same applies to `cursor` and `env`.
 
-Environment entries overlay the inherited child environment. Desktop launches remove the exact inherited terminal identity variables `TERM_PROGRAM`, `TERM_PROGRAM_VERSION`, `TERM_SESSION_ID`, `TMUX`, and `TMUX_PANE`, plus variables matching `ITERM_*`, before applying this overlay, so configured values intentionally override them. On macOS, `LANG` defaults to `en_US.UTF-8` only when absent or blank; `LC_*` values are preserved. This table does not change which default login shell is selected: setting `SHELL` here only changes the child's environment. `TERM` and `COLORTERM` are reserved; configured entries warn and are ignored. Jasper always passes `TERM=xterm-256color` and `COLORTERM=truecolor`. Invalid environment entries are omitted individually. Diagnostics do not echo environment values or shell arguments. Setting scrollback to zero disables retained history for future sessions.
+Environment entries overlay the inherited child environment and the variables plugins add, such as the Editor's `EDITOR` for the [default editor](editor.md#default-editor), which reach local shells and the editors' terminal tabs, not WSL tabs or plugin sessions. Desktop launches remove the exact inherited terminal identity variables `TERM_PROGRAM`, `TERM_PROGRAM_VERSION`, `TERM_SESSION_ID`, `TMUX`, and `TMUX_PANE`, plus variables matching `ITERM_*`, before applying this overlay, so configured values intentionally override them. On macOS, `LANG` defaults to `en_US.UTF-8` only when absent or blank; `LC_*` values are preserved. This table does not change which default login shell is selected: setting `SHELL` here only changes the child's environment. `TERM` and `COLORTERM` are reserved; configured entries warn and are ignored. Jasper always passes `TERM=xterm-256color` and `COLORTERM=truecolor`. Invalid environment entries are omitted individually. Diagnostics do not echo environment values or shell arguments. Setting scrollback to zero disables retained history for future sessions.
 
 ### Shell exit behavior
 
@@ -567,7 +567,7 @@ Environment entries overlay the inherited child environment. Desktop launches re
 - `"close_on_success"` closes the pane only after a normal exit with code 0. Nonzero or abnormal exits retain the output.
 - `"close"` closes the pane after any process exit, including nonzero or abnormal exits.
 
-Only the exited pane closes. Its tab closes when its final pane closes, and its window closes when its final tab closes. Sibling panes and tabs keep running. Reloading this setting applies to future exit deliveries in existing, new and pending panes; it never closes output already retained after an earlier exit. It does not change fonts, palettes or sessions. Launch failures continue to show an error and remove the failed pane.
+Only the exited pane closes. Its tab closes when its final pane closes, and its window closes when its final tab closes. Sibling panes and tabs keep running. Reloading this setting applies to future exit deliveries in existing, new and pending panes; it never closes output already retained after an earlier exit. It does not change fonts, palettes or sessions. Launch failures continue to show an error and remove the failed pane. A tab that runs a program, such as the [default editor](editor.md#default-editor) or one a plugin opens with `LocalSpec.command`, closes after a code 0 exit and keeps its output otherwise, whatever this setting says.
 
 To opt into closing successful exits, add or edit this setting in the existing `[terminal]` table:
 
@@ -819,7 +819,8 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 ## Theme
 
-Jasper's built-in theme is Slate Steel, in Dark and Light; imported themes live in the themes folder ([Themes](themes.md)).
+Jasper's built-in themes are Slate Steel, in Dark and Light, and Catppuccin Latte, Frappé, Macchiato and Mocha; imported
+themes live in the themes folder ([Themes](themes.md)).
 
 `ui.appearance` chooses the UI appearance: `"dark"`, `"light"`, or `"system"` (the default) to follow the operating
 system's light or dark setting live. When the operating system's appearance is unavailable, `"system"` uses Dark. An

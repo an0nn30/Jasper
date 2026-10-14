@@ -170,6 +170,8 @@ public class RemotePlugin implements Plugin {
         });
         transferUi=new dev.jasper.remote.ui.transfers.TransferUi(context,transfers,ui,window->sftpUi.reveal(window));
         sftpUi=new dev.jasper.remote.ui.sftp.SftpUi(context,ui,transferBackground,connections,endpoints,()->transfers,store::hosts,this::sftpPane,transferUi::strip,transferUi::release);
+        sftpUi.hiddenItems(panelState.sftpShowHidden(),shown-> { try { panelState.saveSftpShowHidden(shown); }
+            catch(IOException failure) { context.log().log(System.Logger.Level.WARNING,"panel state: {0}",failure.getMessage()); } });
         tunnelStore = new dev.jasper.remote.tunnels.TunnelStore(context.dataDirectory().resolve("tunnels.toml"), context.background(), ui);
         tunnelsUi = new dev.jasper.remote.ui.tunnels.TunnelsUi(context, ui, tunnelStore,
             new dev.jasper.remote.tunnels.TunnelManager(connections, () -> settings.connection().connectTimeout(), context.background(), ui),

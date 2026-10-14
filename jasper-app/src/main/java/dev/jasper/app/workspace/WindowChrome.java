@@ -58,6 +58,7 @@ final class WindowChrome {
             new ActionEvent(owner, ActionEvent.ACTION_PERFORMED, "titleSearch")),
             owner::paletteShortcut);
         header = new WindowHeader(search, toolbar);
+        dev.jasper.app.platform.ThemeZone.titleBar(header);
         header.setOpaque(true);
         // In the Windows and Linux title bar the toolbar's blank space drags the window; its buttons stay clickable.
         toolbar.putClientProperty(com.formdev.flatlaf.FlatClientProperties.COMPONENT_TITLE_BAR_CAPTION,
@@ -407,9 +408,9 @@ final class WindowChrome {
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }
     void refreshTheme() {
-        header.setBackground(ThemeZone.color(null, SemanticColor.SURFACE_APP));
+        header.setBackground(ThemeZone.color(header, SemanticColor.SURFACE_APP));
         search.repaint();
-        toolbar.setBackground(ThemeZone.color(null, SemanticColor.SURFACE_APP));
+        toolbar.setBackground(ThemeZone.color(toolbar, SemanticColor.SURFACE_APP));
         for (Component child : toolbar.getComponents())
             if (child instanceof ReferenceButton button) button.setFont(button.chromeFont());
         status.refreshTheme();

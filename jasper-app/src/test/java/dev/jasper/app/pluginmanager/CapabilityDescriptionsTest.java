@@ -13,4 +13,16 @@ class CapabilityDescriptionsTest {
     @Test void clipboardReadIsDescribed() {
         assertThat(Capabilities.describe("clipboard.read")).isEqualTo("Read text you copied to the clipboard (clipboard.read)");
     }
+
+    /** Final review M3: terminal.open also runs programs in what it opens. */
+    @Test void terminalOpenSaysItRunsPrograms() {
+        assertThat(Capabilities.describe("terminal.open"))
+            .isEqualTo("Open terminal tabs, splits and windows, and run programs in them (terminal.open)");
+    }
+
+    @Test void theEnvironmentAndEditorCapabilitiesAreDescribed() {
+        assertThat(Capabilities.describe("terminal.environment"))
+            .isEqualTo("Set environment variables in new terminal shells (terminal.environment)");
+        assertThat(Capabilities.describe("editor.provide")).isEqualTo("Open the files Jasper opens for editing (editor.provide)");
+    }
 }

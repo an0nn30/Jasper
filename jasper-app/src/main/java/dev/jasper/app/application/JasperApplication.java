@@ -139,7 +139,7 @@ public final class JasperApplication {
     private final dev.jasper.app.lifecycle.Subscription buddyAppearance;
     private final SystemNotices systemNotices;
     private final CommandNotifier notifications;
-    private PluginRuntime plugins;
+    private volatile PluginRuntime plugins;
     /** The command socket this Jasper serves; new local shells name it in JASPER_COMMAND_SOCKET. */
     private volatile Path commandSocket;
     /** Where {@code jasper --help} reads the subcommands, or null for a private launch. */
@@ -271,7 +271,7 @@ public final class JasperApplication {
         buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome().dark()));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
             buddy.companion(), notificationCenter, buddy.companion()::setWorking, JasperApplication::afterDelay);
-        configuration = service == null ? null : new ConfigurationController(themes, service, new dev.jasper.app.platform.ConfigEditor()::open,
+        configuration = service == null ? null : new ConfigurationController(themes, service, this::openForEditing,
             systemAppearance.current(), themesFolder);
         if (configuration != null) systemAppearanceListening = systemAppearance.subscribe(configuration::systemAppearanceChanged);
         Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
@@ -399,7 +399,7 @@ public final class JasperApplication {
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
             (path, settings) -> track(watchOutput(startSession(path, settings))), shellIntegrationDir, shellProfiles::resolve,
-            () -> shellProfiles.awaitDetection(DETECTION_WAIT), this::shellProfileProblem, this::paneVariables);
+            () -> shellProfiles.awaitDetection(DETECTION_WAIT), this::shellProfileProblem, this::paneVariables, this::pluginShellVariables);
         // Back in the Dock before the window exists: macOS gives a window of a hidden application neither Jasper's menu
         // bar nor focus. If composing fails nothing opened, so the presence is worked out again.
         windowOpening();
@@ -512,6 +512,22 @@ public final class JasperApplication {
 
     /** The command socket new local shells are given; null when this Jasper serves none. */
     public Path commandSocket() { return commandSocket; }
+
+    /**
+     * Opens a file for editing on a worker thread: the editor a plugin provides, else the desktop's edit or open action,
+     * else revealing the file. Reads {@link #plugins} at call time, so openers built before the plugins start use it too.
+     */
+    private void openForEditing(Path file) {
+        var desktop = new dev.jasper.app.platform.ConfigEditor();
+        PluginRuntime runtime = plugins;
+        if (runtime == null) desktop.open(file); else runtime.open(file, desktop::open);
+    }
+
+    /** What running plugins add to a new local shell, given Jasper's own environment; nothing before they start. EDT. */
+    private Map<String, String> pluginShellVariables(Map<String, String> inherited) {
+        PluginRuntime runtime = plugins;
+        return runtime == null ? Map.of() : runtime.shellVariables(inherited);
+    }
 
     /** What a new local shell in {@code pane} gets last, over everything else. Any thread. */
     Map<String, String> paneVariables(UUID pane) {
@@ -837,6 +853,8 @@ public final class JasperApplication {
         plugins.animations(themes::animationsEnabled);
         plugins.shortcuts(this::shortcutLabel);
         plugins.clipboard(clipboard);
+        plugins.commandClient(CommandInstall.client(System.getProperty("os.name"), System.getProperty("jpackage.app-path"),
+            System.getProperty("jasper.commandClient")));
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
@@ -876,7 +894,7 @@ public final class JasperApplication {
             image -> new dev.jasper.app.vmoptions.VmOptionsCheck(dev.jasper.app.vmoptions.VmOptionsCheck.runtimeJava(), image,
                 dev.jasper.app.vmoptions.VmOptionsCheck::runProcess, Duration.ofSeconds(10)),
             work -> Thread.ofVirtual().name("jasper-vmoptions").start(work), SwingUtilities::invokeLater, notificationCenter,
-            () -> restart(RestartMode.SAME), vmEditor::open, vmEditor::reveal,
+            () -> restart(RestartMode.SAME), this::openForEditing, vmEditor::reveal,
             dev.jasper.app.vmoptions.VmOptionsLaunch::runningMaxHeapMiB, dev.jasper.app.vmoptions.VmOptionsLaunch::physicalMemoryMiB,
             Duration.ofSeconds(2));
         memoryWarnings = new MemoryWarnings(new dev.jasper.app.vmoptions.LowMemoryWatch(java.time.Clock.systemUTC()),
@@ -1244,6 +1262,21 @@ public final class JasperApplication {
                                         BiFunction<Optional<String>, TerminalConfig.Shell, ShellProfiles.Resolution> profiles,
                                         BooleanSupplier awaitDetection, Consumer<String> problems,
                                         Function<UUID, Map<String, String>> paneVariables) {
+        return windowLauncher(executor, snapshots, start, integrationDir, profiles, awaitDetection, problems, paneVariables,
+            inherited -> Map.of());
+    }
+
+    /**
+     * As above; a local shell also gets what plugins add ({@code contributions}, given Jasper's own environment, on the
+     * EDT) after Jasper's own variables and before {@code [terminal.env]}. A PowerShell 7 launch confirmed after
+     * detection resolves again, so its contributions are asked twice.
+     */
+    static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
+                                        BiFunction<Path, LaunchSettings, TerminalSession> start, Path integrationDir,
+                                        BiFunction<Optional<String>, TerminalConfig.Shell, ShellProfiles.Resolution> profiles,
+                                        BooleanSupplier awaitDetection, Consumer<String> problems,
+                                        Function<UUID, Map<String, String>> paneVariables,
+                                        Function<Map<String, String>, Map<String, String>> contributions) {
         ConfigSnapshot initial = snapshots.get();
         String os = System.getProperty("os.name");
         Map<String, String> environment = System.getenv();
@@ -1251,7 +1284,8 @@ public final class JasperApplication {
             ConfigSnapshot snapshot = snapshots.get();
             ShellProfiles.Resolution resolution = profiles.apply(requested, snapshot.terminal().shell());
             resolution.warning().ifPresent(problems);
-            return LaunchSettings.resolve(snapshot, resolution.profile(), os, environment, initial.columns(), initial.lines(), integrationDir);
+            return LaunchSettings.resolve(snapshot, resolution.profile(), os, environment, initial.columns(), initial.lines(), integrationDir,
+                contributions);
         };
         BiFunction<Optional<String>, LaunchSettings, LaunchSettings> confirm = (requested, captured) -> {
             ShellProfile profile = captured.profile();
@@ -1550,7 +1584,7 @@ public final class JasperApplication {
             var editor = new dev.jasper.app.platform.ConfigEditor();
             pluginManager = new PluginManager(plugins, auxiliary, new PluginManager.Hooks(
                 surface -> shells.chooseFile(surface, "Install Plugin", ".zip"), flow, this::quit, residentControl, standaloneNotice, worker,
-                editor::open, editor::reveal, this::browse));
+                this::openForEditing, editor::reveal, this::browse));
         }
         return pluginManager;
     }

@@ -51,10 +51,13 @@ class ThemeSelectionTest {
         assertThat(selection.theme(false)).isSameAs(JasperTheme.bundled());
         assertThat(selection.scheme()).isEqualTo(TerminalSchemeChoice.MATCH);
         assertThat(problems).containsExactly(
-            Map.entry("ui.theme.dark", "\"zenburn\" has no Dark variant. Use one of \"slate-steel\", \"ocean\"; using the default."),
-            Map.entry("ui.theme.light", "\"nord\" is not an installed theme. Use one of \"slate-steel\", \"ocean\"; using the default."),
+            Map.entry("ui.theme.dark", "\"zenburn\" has no Dark variant. Use one of \"slate-steel\", \"catppuccin-frappe\", "
+                + "\"catppuccin-macchiato\", \"catppuccin-mocha\", \"ocean\"; using the default."),
+            Map.entry("ui.theme.light", "\"nord\" is not an installed theme. Use one of \"slate-steel\", \"catppuccin-latte\", \"ocean\"; "
+                + "using the default."),
             Map.entry("terminal.scheme", "\"nord/dark\" is not an installed scheme. Use \"match\" or one of \"slate-steel/dark\", "
-                + "\"slate-steel/light\", \"slate-steel/high-contrast\", \"ocean/dark\", \"ocean/light\", \"ocean/high-contrast\", "
+                + "\"slate-steel/light\", \"slate-steel/high-contrast\", \"catppuccin-latte/light\", \"catppuccin-frappe/dark\", "
+                + "\"catppuccin-macchiato/dark\", \"catppuccin-mocha/dark\", \"ocean/dark\", \"ocean/light\", \"ocean/high-contrast\", "
                 + "\"zenburn/dark\"; using the default."));
         assertThat(selection.withScheme(TerminalSchemeChoice.parse("nord/dark").orElseThrow()).scheme()).isEqualTo(TerminalSchemeChoice.MATCH);
     }

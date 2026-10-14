@@ -47,12 +47,13 @@ import java.util.function.Consumer;
 public final class SftpPanel implements AutoCloseable {
     public record Actions(Consumer<String> navigate,Runnable up,Runnable refresh,Consumer<Boolean> follow,
                           Runnable upload,Runnable uploadFolder,Runnable download,Runnable newFolder,
-                          Runnable delete,Runnable copyPath,Runnable copyToHost,Runnable cancel,Consumer<Long> page) {}
+                          Runnable delete,Runnable copyPath,Runnable copyToHost,Runnable cancel,Consumer<Long> page,
+                          Consumer<Boolean> hidden) {}
     /** What double-click, Enter and Open in Editor do with files and links; set only when the Editor is installed. */
     public record Editing(Consumer<FileEntry> activate,Runnable open) {}
 
     public static final String ROOT="sftp", HEADER="sftp.header", NAVIGATION="sftp.navigation", TOOLS="sftp.tools", BACK="sftp.back",
-        FORWARD="sftp.forward", REFRESH="sftp.refresh", UPLOAD="sftp.upload", NEW_FOLDER="sftp.new-folder", PATH="sftp.path",
+        FORWARD="sftp.forward", REFRESH="sftp.refresh", HIDDEN="sftp.hidden", UPLOAD="sftp.upload", NEW_FOLDER="sftp.new-folder", PATH="sftp.path",
         FILES="sftp.files", EMPTY="sftp.empty", CHOOSE="sftp.choose", FOOTER="sftp.footer", PAGING="sftp.paging", PAGE="sftp.page",
         PREVIOUS="sftp.previous", NEXT="sftp.next", STATUS="sftp.status", MESSAGE="sftp.message", CANCEL="sftp.cancel",
         RESULT="sftp.result", FOLLOW="sftp.follow", FOLLOW_ROW="sftp.follow-row", BROWSER="sftp.browser";
@@ -73,7 +74,7 @@ public final class SftpPanel implements AutoCloseable {
     private List<RemoteHost> sessions=List.of();
     private Consumer<PanelHeader> headerChanged=header->{};
     private TransferStrip transfers;
-    private boolean canBack,canForward,working,browsingEnabled=true,loaded,following=true,editingPath,closed;
+    private boolean canBack,canForward,working,browsingEnabled=true,loaded,following=true,showHidden,editingPath,closed;
     private String host=NO_HOST,directory="",message="",result="",pathValue="";
     private List<FileEntry> entries=List.of();
     private Set<String> selected=Set.of();
@@ -128,6 +129,9 @@ public final class SftpPanel implements AutoCloseable {
     public String directory() { return directory; }
     public boolean following() { return following; }
     public void following(boolean value) { following=value;render(); }
+    /** Whether hidden items (names starting with a dot) show; the toolbar's toggle is pressed while they do. */
+    public boolean showHidden() { return showHidden; }
+    public void showHidden(boolean value) { showHidden=value;render(); }
 
     public void showPage(String hostname,String directory,List<FileEntry> values,long offset,long total,boolean focus) {
         if(closed) return;
@@ -199,6 +203,7 @@ public final class SftpPanel implements AutoCloseable {
             case BACK -> { if(ready) back(); }
             case FORWARD -> { if(ready) forward(); }
             case REFRESH -> { if(ready && browsingEnabled) actions.refresh().run(); }
+            case HIDDEN -> { if(ready && browsingEnabled) actions.hidden().accept(!showHidden); }
             case UPLOAD -> { if(ready) actions.upload().run(); }
             case NEW_FOLDER -> { if(ready) actions.newFolder().run(); }
             case CANCEL -> { if(actions!=null) actions.cancel().run(); }
@@ -322,6 +327,8 @@ public final class SftpPanel implements AutoCloseable {
         tools.add(tool(BACK,"back","Back",browsingEnabled && ready && canBack));
         tools.add(tool(FORWARD,"forward","Forward",browsingEnabled && ready && canForward));
         tools.add(tool(REFRESH,"refresh","Refresh",browsingEnabled && ready));
+        tools.add(new Nodes.Button(HIDDEN,state(true,browsingEnabled && ready),"","hidden",Nodes.ButtonKind.GHOST,HIDDEN,"Show hidden items",
+            Nodes.ButtonPresentation.STANDARD,Optional.empty(),Optional.of(showHidden)));
         if(destination) tools.add(tool(NEW_FOLDER,"folder.add","New folder",ready));
         else tools.add(new Nodes.MenuButton(UPLOAD,state(true,ready),"","upload",Nodes.ButtonKind.GHOST,UPLOAD,menu(MENU,"",selection()),"Upload files"));
         var crumbs=new ArrayList<Crumb>();var steps=crumbs();

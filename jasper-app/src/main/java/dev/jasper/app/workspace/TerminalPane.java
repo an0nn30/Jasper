@@ -48,6 +48,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     /** The profile this local pane asked for (empty: the user's default), and the one its launch resolved to. */
     private final Optional<String> requestedProfile;
     private Optional<String> launchedProfile = Optional.empty();
+    /** The program this local pane runs instead of the shell; such a pane closes when it exits with status 0. */
+    private final Optional<java.util.List<String>> program;
     private final ShellLauncher launcher;
     private final AtomicBoolean updateQueued = new AtomicBoolean();
     private volatile String shellLabel;
@@ -187,11 +189,22 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
      * {@code directory} means nobody asked for one: the pane starts where a new shell starts.
      */
     TerminalPane(Path directory, ShellLauncher launcher, SessionRequest requestOrNull, Optional<String> profile) {
+        this(directory, launcher, requestOrNull, profile, Optional.empty());
+    }
+
+    /**
+     * As above; {@code program} runs instead of a local pane's shell. Such a pane closes when its program exits with
+     * status 0 and stays open otherwise, whatever {@code terminal.on_exit} says.
+     */
+    TerminalPane(Path directory, ShellLauncher launcher, SessionRequest requestOrNull, Optional<String> profile,
+                 Optional<java.util.List<String>> program) {
         super(new BorderLayout());
         this.defaultDirectory = directory == null || requestOrNull != null;
         this.launchDirectory = directory == null ? Path.of(System.getProperty("user.home")) : directory;
         this.launcher = launcher;
         this.requestedProfile = java.util.Objects.requireNonNull(profile, "profile");
+        this.program = java.util.Objects.requireNonNull(program, "program");
+        if (program.isPresent()) onExit = ShellExitBehavior.CLOSE_ON_SUCCESS;
         this.request = requestOrNull;
         this.shellLabel = requestOrNull == null ? launcher.label() : requestOrNull.title();
         if (requestOrNull != null) reportedTitle = requestOrNull.title();
@@ -231,7 +244,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     void start() {
         if (request != null) { connect(); return; }
         ShellLauncher.Launch launched = launcher.launch(defaultDirectory ? Optional.empty() : Optional.of(launchDirectory),
-                requestedProfile, Optional.of(id), replaced -> {
+                requestedProfile, program, Optional.of(id), replaced -> {
             // Detection showed the profile resolved before it completed is missing: the default starts instead.
             if (closed) return;
             shellLabel = replaced.label();
@@ -509,9 +522,13 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         if (view != null) view.setInactiveDim(selected ? 0 : configuredDim);
     }
 
-    /** Only future exit deliveries use this policy; retained output is never closed retroactively. */
+    /**
+     * Only future exit deliveries use this policy; retained output is never closed retroactively. A program pane keeps
+     * its close-on-success policy.
+     */
     void setShellExitBehavior(ShellExitBehavior behavior) {
-        onExit = java.util.Objects.requireNonNull(behavior);
+        java.util.Objects.requireNonNull(behavior);
+        if (program.isEmpty()) onExit = behavior;
     }
 
     void setConfiguredDim(float amount) {

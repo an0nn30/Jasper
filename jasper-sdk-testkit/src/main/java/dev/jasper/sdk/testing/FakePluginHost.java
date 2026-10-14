@@ -348,7 +348,7 @@ public final class FakePluginHost implements AutoCloseable {
         var existing=panelHosts.get(pluginId);
         if(existing!=null)return java.util.Optional.ofNullable(existing.component);
         return context.settings.panel().map(panel -> {
-            var rows = new FakeSettingsPanelHost(context.settings);
+            var rows = new FakeSettingsPanelHost(context.settings, this::takeFileSelection);
             panelHosts.put(pluginId, rows);
             try {
             var owned=java.util.Objects.requireNonNull(panel.create(rows),"Settings view");
@@ -689,6 +689,9 @@ public final class FakePluginHost implements AutoCloseable {
         context.palette.closeAll();
         context.fileSources.closeAll();
         context.commandLine.closeAll();
+        shellContributors.removeIf(entry -> entry.context() == context);
+        ProvidedEditor provided = providedEditor;
+        if (provided != null && provided.context() == context) providedEditor = null;
         for (RunningCall running : List.copyOf(runningCalls))
             if (running.context() == context) running.call().stopped(running.name());
         notifications.stopped(context.plugin().id());
@@ -992,7 +995,8 @@ public final class FakePluginHost implements AutoCloseable {
     private final java.util.ArrayDeque<Optional<Path>> fileSelections = new java.util.ArrayDeque<>();
 
     /**
-     * Queues a response for the next native file chooser. With no queued response, it cancels.
+     * Queues a response for the next native file chooser, including a settings page row's Browse. With no queued response,
+     * it cancels.
      *
      * @param selection chosen file or empty for cancellation
      */
@@ -1214,7 +1218,7 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * What plugins asked to open or raise, in order.
      *
-     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} (each followed by {@code |<profile id>} when the request named a shell profile) or {@code front|<window id>}
+     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} (each followed by {@code |<profile id>} when the request named a shell profile, then by {@code |run:<the command's words joined by spaces>} when it runs a program) or {@code front|<window id>}
      */
     public List<String> openRequests() { return List.copyOf(workspace.openRequests); }
 
@@ -1550,7 +1554,7 @@ public final class FakePluginHost implements AutoCloseable {
         /** Every {@code Palette.open} call as {@code windowId scopeId query rowId}, with {@code -} for an absent value. */
         public List<String> paletteOpens() { return List.copyOf(paletteOpens); }
 
-        /** Every file a plugin asked to open in the editor. */
+        /** Every file a plugin asked to open in the editor that no provided editor opened (the desktop's share). */
         public List<Path> openedInEditor() { return List.copyOf(openedInEditor); }
 
     /**
@@ -1582,4 +1586,140 @@ public final class FakePluginHost implements AutoCloseable {
     /** @param tab hosted content handle
      * @return published status descriptors */
     public List<dev.jasper.sdk.ui.ContentStatus> contentStatus(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).status; }
+
+    /** A {@code Terminals.environment} contributor and the plugin that registered it. */
+    record ShellContributor(FakePluginContext context, Function<Map<String, String>, Map<String, String>> contributor) { }
+    final List<ShellContributor> shellContributors = new CopyOnWriteArrayList<>();
+    private static final java.util.regex.Pattern SHELL_NAME = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+    private static final Set<String> RESERVED_SHELL_NAMES = Set.of("TERM", "COLORTERM", "TERM_PROGRAM", "TERM_PROGRAM_VERSION");
+
+    /** Keeps a contributor until its subscription closes or its plugin stops. */
+    Subscription contributeShell(FakePluginContext context, Function<Map<String, String>, Map<String, String>> contributor) {
+        var entry = new ShellContributor(context, contributor);
+        shellContributors.add(entry);
+        Subscription subscription = () -> shellContributors.removeIf(registered -> registered == entry);
+        context.own(subscription);
+        return subscription;
+    }
+
+    /**
+     * What plugins' {@code Terminals.environment} contributors add to a new local shell, merged as the application merges
+     * them: contributors run plugin by plugin in id order, then in registration order, each given a read-only copy of
+     * {@code jasperEnvironment}; one that throws adds nothing (recorded in {@link #failures()}) and a null map counts as
+     * empty. A name outside {@code [A-Za-z_][A-Za-z0-9_]*}, {@code TERM}, {@code COLORTERM}, {@code TERM_PROGRAM},
+     * {@code TERM_PROGRAM_VERSION}, a name starting {@code JASPER_}, a null value and a value holding NUL are dropped, and
+     * the first contributor of a name wins.
+     *
+     * @param jasperEnvironment Jasper's own environment
+     * @return the variables, which the application puts after its own and before {@code [terminal.env]}
+     * @since 0.17.1
+     */
+    public Map<String, String> shellEnvironment(Map<String, String> jasperEnvironment) {
+        Map<String, String> environment = Map.copyOf(jasperEnvironment);
+        List<ShellContributor> ordered = new ArrayList<>(shellContributors);
+        ordered.sort(Comparator.comparing((ShellContributor entry) -> entry.context().plugin().id()));
+        Map<String, String> merged = new LinkedHashMap<>();
+        for (ShellContributor entry : ordered) {
+            String pluginId = entry.context().plugin().id();
+            List<Map.Entry<String, String>> offered = new ArrayList<>();
+            try {
+                Map<String, String> added = entry.contributor().apply(environment);
+                if (added != null) added.forEach((name, value) -> offered.add(new java.util.AbstractMap.SimpleImmutableEntry<>(name, value)));
+            } catch (RuntimeException failure) {
+                failures.add(pluginId + " shell environment: " + failure);
+                continue;
+            }
+            for (Map.Entry<String, String> variable : offered)
+                if (keptShellVariable(variable.getKey(), variable.getValue())) merged.putIfAbsent(variable.getKey(), variable.getValue());
+        }
+        return Map.copyOf(merged);
+    }
+
+    /** Whether the application keeps a contributed entry. */
+    private static boolean keptShellVariable(String name, String value) {
+        return name != null && SHELL_NAME.matcher(name).matches() && !RESERVED_SHELL_NAMES.contains(name) && !name.startsWith("JASPER_")
+            && value != null && value.indexOf('\0') < 0;
+    }
+
+    /** The editor a plugin provides ({@code Platform.editor}) and the plugin that registered it. */
+    record ProvidedEditor(FakePluginContext context, dev.jasper.sdk.ui.FileEditor editor) { }
+    private volatile ProvidedEditor providedEditor;
+    private final Set<String> bundledPlugins = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Marks a plugin as one that ships with Jasper, before it starts: its {@code Platform.editor} registration replaces
+     * a non-bundled plugin's, as the application's bundled plugins' do.
+     *
+     * @param pluginId the plugin
+     * @since 0.17.1
+     */
+    public void declareBundled(String pluginId) { bundledPlugins.add(Objects.requireNonNull(pluginId, "pluginId")); }
+
+    /** Makes a plugin's editor the one files open with, under the application's one-at-a-time rule. */
+    Subscription provideEditor(FakePluginContext context, dev.jasper.sdk.ui.FileEditor editor) {
+        String pluginId = context.plugin().id();
+        ProvidedEditor current = providedEditor;
+        if (current != null && (!bundledPlugins.contains(pluginId) || bundledPlugins.contains(current.context().plugin().id())))
+            throw new IllegalStateException("The editor is already provided by " + current.context().plugin().id());
+        var provided = new ProvidedEditor(context, editor);
+        providedEditor = provided;
+        Subscription subscription = () -> { if (providedEditor == provided) providedEditor = null; };
+        context.own(subscription);
+        return subscription;
+    }
+
+    /** Asks the provided editor on the caller's thread; false when there is none, or it declined or threw. */
+    boolean editProvided(Path file, OptionalInt line, Optional<dev.jasper.sdk.WindowOwner> window) {
+        ProvidedEditor provided = providedEditor;
+        return provided != null && editWith(provided, file, line, window);
+    }
+
+    private boolean editWith(ProvidedEditor provided, Path file, OptionalInt line, Optional<dev.jasper.sdk.WindowOwner> window) {
+        try {
+            return provided.editor().edit(file, line, window);
+        } catch (RuntimeException failure) {
+            failures.add(provided.context().plugin().id() + " file editor: " + failure);
+            return false;
+        }
+    }
+
+    /**
+     * Opens a file as Jasper's own opens do (Open in Editor, the settings files): with the editor a plugin provides
+     * through {@code Platform.editor}, given that plugin's handle for {@code windowId} while the window is open.
+     *
+     * @param file the file
+     * @param line the line to show, or empty
+     * @param windowId the terminal window the open came from, or empty
+     * @return what the editor answered; false when no plugin provides one, or it threw, which {@link #failures()} records
+     * @since 0.17.1
+     */
+    public boolean edit(Path file, OptionalInt line, Optional<UUID> windowId) {
+        Objects.requireNonNull(file, "file");
+        Objects.requireNonNull(line, "line");
+        Objects.requireNonNull(windowId, "windowId");
+        ProvidedEditor provided = providedEditor;
+        if (provided == null) return false;
+        Optional<dev.jasper.sdk.WindowOwner> window = windowId.flatMap(id -> provided.context().terminals.window(id))
+            .map(handle -> (dev.jasper.sdk.WindowOwner) handle);
+        return editWith(provided, file, line, window);
+    }
+
+    /**
+     * Which plugin provides the editor now.
+     *
+     * @return its id, or empty
+     * @since 0.17.1
+     */
+    public Optional<String> editorPlugin() { return Optional.ofNullable(providedEditor).map(provided -> provided.context().plugin().id()); }
+
+    volatile Optional<Path> commandClient = Optional.empty();
+
+    /**
+     * Sets the {@code jasper} command {@code CommandLine.client()} names, as the application names its installed or built
+     * client; until then it is empty.
+     *
+     * @param client the client's path
+     * @since 0.17.1
+     */
+    public void setCommandClient(Path client) { commandClient = Optional.of(Objects.requireNonNull(client, "client")); }
 }

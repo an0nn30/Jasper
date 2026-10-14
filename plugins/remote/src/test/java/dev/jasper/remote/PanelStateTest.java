@@ -17,6 +17,22 @@ class PanelStateTest {
         assertThatIllegalArgumentException().isThrownBy(() -> reloaded.renameDefaultGroup("  "));
     }
 
+    @Test void theSftpHiddenItemsChoiceIsOffUntilSavedAndOtherSavesKeepIt(@TempDir Path dir) throws Exception {
+        var path = dir.resolve("panel-state.toml");
+        var state = new PanelState(path);
+        assertThat(state.sftpShowHidden()).isFalse();
+        state.saveSftpShowHidden(true);
+        assertThat(new PanelState(path).sftpShowHidden()).isTrue();
+        state.save(Set.of("Production"), true);
+        state.renameDefaultGroup("Mine");
+        assertThat(new PanelState(path).sftpShowHidden()).as("saving the groups keeps it").isTrue();
+        assertThat(new PanelState(path).collapsed()).containsExactly("Production");
+        state.saveSftpShowHidden(false);
+        assertThat(new PanelState(path).sftpShowHidden()).isFalse();
+        assertThat(new PanelState(path).wslCollapsed()).as("and it keeps the rest").isTrue();
+        assertThat(new PanelState(path).defaultGroup()).isEqualTo("Mine");
+    }
+
     @Test void theWslGroupsCollapsedFlagIsKeptApartFromHostGroups(@TempDir Path dir) throws Exception {
         var path = dir.resolve("panel-state.toml");
         Files.writeString(path, "default_group = \"Other\"\ncollapsed = [\"wsl\", \"Production\"]\n");

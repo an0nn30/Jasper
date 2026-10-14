@@ -14,7 +14,14 @@ final class KitSettingRows {
     private final Map<String, Setting<?>> controls = new LinkedHashMap<>();
     private final Map<String, String> errors = new HashMap<>(), edits = new HashMap<>();
     private String query = "";
-    KitSettingRows(SettingsPanelHost host, Function<Setting<?>, SettingSpec<?>> specs, java.util.function.Consumer<Setting<?>> unset) { this.host=host;this.specs=specs;this.unset=unset; }
+    /** A path's Browse action is its row id followed by this. */
+    static final String BROWSE=":browse";
+    private final java.util.function.BiFunction<String,Optional<java.nio.file.Path>,Optional<java.nio.file.Path>> chooseFile;
+    /** @param chooseFile asks for an existing file, as the generated page's Browse does: title and initial path in, choice out */
+    KitSettingRows(SettingsPanelHost host, Function<Setting<?>, SettingSpec<?>> specs, java.util.function.Consumer<Setting<?>> unset,
+                   java.util.function.BiFunction<String,Optional<java.nio.file.Path>,Optional<java.nio.file.Path>> chooseFile) {
+        this.host=host;this.specs=specs;this.unset=unset;this.chooseFile=chooseFile;
+    }
     boolean valid(){return errors.isEmpty();}
     void staged(Setting<?> setting){String id="settings:"+setting.key();errors.remove(id);edits.remove(id);}
     void reset(){errors.clear();edits.clear();}
@@ -28,19 +35,36 @@ final class KitSettingRows {
             var options=choices.choices().stream().map(c -> new Option(c.token(),c.displayName(),Optional.empty())).toList();
             String selected=choices.choices().stream().filter(c -> c.value().equals(value)).findFirst().orElseThrow().token();
             control=new Nodes.Choice(id,state,Nodes.ChoiceKind.DROPDOWN,options,selected,spec.label(),id);
+        }else if(PluginSettingsPage.Hint.of(spec).font() && spec.kind() instanceof SettingKind.Text){
+            // As the generated pages: free text over the installed families, which filter as you type.
+            control=font(id,state,spec,edits.getOrDefault(id,value.toString()));
         }else {
             // A decimal is stored as a float: show it at that precision, not its widened double digits.
             String text=value instanceof List<?> list?String.join("\n",list.stream().map(Object::toString).toList())
                 :spec.kind() instanceof SettingKind.NumberRange && value instanceof Number number?Float.toString(number.floatValue()):value.toString();
             var numeric=numeric(spec);
-            var kind=numeric.isPresent()?Nodes.FieldKind.NUMBER:spec.kind() instanceof SettingKind.StringList?Nodes.FieldKind.TEXTAREA:spec.editor().orElse(null) instanceof EditorHint.File?Nodes.FieldKind.PATH:Nodes.FieldKind.TEXT;
+            var kind=numeric.isPresent()?Nodes.FieldKind.NUMBER:spec.kind() instanceof SettingKind.StringList?Nodes.FieldKind.TEXTAREA:PluginSettingsPage.Hint.of(spec)==PluginSettingsPage.Hint.FILE?Nodes.FieldKind.PATH:Nodes.FieldKind.TEXT;
             // As the generated pages: a bounded integer is the Settings stepper, a bounded decimal a number field;
             // both show the declared unit after the value.
-            control=new Nodes.Field(id,state,kind,edits.getOrDefault(id,text),numeric.isPresent()?spec.unit():"",spec.label(),"",numeric,
+            // As the generated pages: a path ends with Browse.
+            control=new Nodes.Field(id,state,kind,edits.getOrDefault(id,text),numeric.isPresent()?spec.unit():"",spec.label(),kind==Nodes.FieldKind.PATH?id+BROWSE:"",numeric,
                 spec.kind() instanceof SettingKind.IntegerRange?Nodes.FieldPresentation.STEPPER:Nodes.FieldPresentation.STANDARD);
         }
         boolean resettable=!sameValue(value,spec.defaultValue())||edits.containsKey(id)||errors.containsKey(id);
         return new Nodes.SettingRow(id+":row",state,spec.label(),spec.description(),trailing(id,spec,resettable,control),false);
+    }
+    /** As the generated pages' font editor: free text over the installed families, which filter as you type. */
+    private static Nodes.Choice font(String id,ControlState state,SettingSpec<?> spec,String text){
+        List<String> families=dev.jasper.app.settingsui.Editors.fontFamilies(PluginSettingsPage.Hint.of(spec)==PluginSettingsPage.Hint.MONOSPACED_FONT);
+        var options=new ArrayList<Option>();
+        for(int i=0;i<families.size();i++)options.add(new Option("family-"+i,families.get(i),Optional.empty()));
+        return new Nodes.Choice(id,state,Nodes.ChoiceKind.SEARCHABLE,options,"",spec.label(),"","",
+            Optional.of(new Nodes.ChoiceSearch(0,dev.jasper.app.settingsui.Editors.NO_FONT_MATCHES,Optional.of(text))));
+    }
+    /** Where a path's Browse starts: the current path, when the text is one. */
+    private static Optional<java.nio.file.Path> initial(String current){
+        if(current.isBlank())return Optional.empty();
+        try{return Optional.of(java.nio.file.Path.of(current));}catch(java.nio.file.InvalidPathException notAPath){return Optional.empty();}
     }
     /** The bounds of a numeric setting; decimals show two places and step by a tenth, as the generated pages do. */
     static Optional<Nodes.Numeric> numeric(SettingSpec<?> spec){
@@ -67,12 +91,20 @@ final class KitSettingRows {
     @SuppressWarnings({"unchecked","rawtypes"})
     boolean event(UiEvent event){
         boolean reset=event instanceof UiEvent.Action && event.id().endsWith(":reset");
-        String id=reset?event.id().substring(0,event.id().length()-6):event.id();
+        boolean browse=event instanceof UiEvent.Action && event.id().endsWith(BROWSE);
+        String id=reset?event.id().substring(0,event.id().length()-6):browse?event.id().substring(0,event.id().length()-BROWSE.length()):event.id();
         var setting=controls.get(id);if(setting==null)return false;
         var spec=specs.apply(setting);
         try{
             Object value;
             if(reset){unset.accept(setting);host.changed();return true;}
+            else if(browse){
+                if(PluginSettingsPage.Hint.of(spec)!=PluginSettingsPage.Hint.FILE)return false;
+                // As the generated pages: Browse asks for an existing file, starting at the current one; cancelling changes nothing.
+                var chosen=chooseFile.apply(PluginSettingsPage.Hint.FILE_CHOOSER_TITLE,initial(String.valueOf(host.pending(setting))));
+                if(chosen.isEmpty())return true;
+                value=chosen.get().toString();
+            }
             else if(event instanceof UiEvent.Toggled toggle && spec.kind() instanceof SettingKind.Bool)value=toggle.checked();
             else if(event instanceof UiEvent.Selected selected && spec.kind() instanceof SettingKind.OneOf<?> choice)
                 value=choice.choices().stream().filter(c -> selected.ids().contains(c.token())).findFirst().orElseThrow().value();

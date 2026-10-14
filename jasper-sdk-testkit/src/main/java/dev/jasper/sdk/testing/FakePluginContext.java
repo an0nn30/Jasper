@@ -74,6 +74,9 @@ public final class FakePluginContext implements PluginContext {
         this.notifications = host.notifications.of(info.id(), () -> state != State.CLOSED, name -> kit().validateIcon(name));
     }
 
+    /** The host this context belongs to, for the fakes that keep host-wide registries. */
+    FakePluginHost host() { return host; }
+
     void requireOpen() {
         if (state == State.CLOSED) throw new IllegalStateException("Plugin context is closed: " + info.id());
     }
@@ -116,7 +119,19 @@ public final class FakePluginContext implements PluginContext {
     @Override public dev.jasper.sdk.cli.CommandLine commandLine() { return commandLine; }
         @Override public dev.jasper.sdk.ui.Platform platform() {
             return new dev.jasper.sdk.ui.Platform() {
-                @Override public void openInEditor(Path file) { requireOpen(); host.openedInEditor.add(Objects.requireNonNull(file, "file")); }
+                @Override public void openInEditor(Path file) {
+                    requireOpen();
+                    Objects.requireNonNull(file, "file");
+                    // As the application: the editor a plugin provides first, here on the caller's thread and with no window.
+                    if (!host.editProvided(file, java.util.OptionalInt.empty(), Optional.empty())) host.openedInEditor.add(file);
+                }
+                @Override public Subscription editor(dev.jasper.sdk.ui.FileEditor editor) {
+                    requireOpen();
+                    if (!info.capabilities().contains(dev.jasper.sdk.Capabilities.EDITOR_PROVIDE))
+                        throw new dev.jasper.sdk.MissingCapabilityException(info.id(), dev.jasper.sdk.Capabilities.EDITOR_PROVIDE);
+                    Objects.requireNonNull(editor, "editor");
+                    return host.provideEditor(FakePluginContext.this, editor);
+                }
                 @Override public void browse(java.net.URI uri) { requireOpen(); host.browsed.add(webAddress(uri)); }
                 @Override public boolean copy(String text) { requireOpen(); return copied(text, false); }
                 @Override public boolean copySecret(String text) { requireOpen(); return copied(text, true); }

@@ -374,4 +374,48 @@ class LaunchSettingsTest {
         assertThat(settings.environment()).doesNotContainKey("JASPER_PANE");
         assertThat(settings.withVariables(Map.of())).isSameAs(settings);
     }
+
+    private static ShellProfile login() {
+        return new ShellProfile("login", "zsh", ShellProfile.Kind.LOGIN_SHELL, Optional.of("zsh"), List.of("/bin/zsh", "-l"));
+    }
+
+    @Test void pluginVariablesComeAfterJaspersOwnAndBeforeTheConfiguredOnes() {
+        var config = snapshot("", List.of(), Map.of("EDITOR", "configured"), 100, 80, 24);
+        Map<String, String> inherited = Map.of("EDITOR", "inherited", "PAGER", "less", "TERM_PROGRAM", "iTerm.app");
+        var given = new ArrayList<Map<String, String>>();
+        var settings = LaunchSettings.resolve(config, login(), "Mac OS X", inherited, 80, 24, null, environment -> {
+            given.add(environment);
+            return Map.of("EDITOR", "plugin", "VISUAL", "plugin", "PAGER", "more", "TERM", "dumb", "COLORTERM", "no");
+        });
+        assertThat(given).singleElement().as("the untouched inherited map").isSameAs(inherited);
+        assertThat(settings.environment()).containsEntry("EDITOR", "configured").containsEntry("VISUAL", "plugin")
+            .containsEntry("PAGER", "more").containsEntry("TERM", "xterm-256color").containsEntry("COLORTERM", "truecolor")
+            .containsEntry("TERM_PROGRAM", "Jasper");
+    }
+
+    @Test void aWslProfileGetsNoPluginVariablesAndTheOtherOverloadsAddNone() {
+        var asked = new java.util.concurrent.atomic.AtomicInteger();
+        var settings = LaunchSettings.resolve(ConfigSnapshot.defaults(), wsl(), "Windows 11", Map.of(), 80, 24, null, environment -> {
+            asked.incrementAndGet();
+            return Map.of("EDITOR", "plugin");
+        });
+        assertThat(settings.environment()).doesNotContainKey("EDITOR");
+        assertThat(asked).as("only WSLENV's variables reach Linux").hasValue(0);
+        assertThat(LaunchSettings.resolve(ConfigSnapshot.defaults(), login(), "Linux", Map.of(), 80, 24, null).environment())
+            .doesNotContainKey("EDITOR");
+    }
+
+    @Test void aProgramKeepsTheShellsEnvironmentAndProfileAndIsNamedAfterItsFile() {
+        var settings = LaunchSettings.resolve(withShell("/bin/zsh", List.of("-l"), ShellIntegrationMode.AUTO), "Mac OS X",
+            Map.of("PATH", "/bin"), 150, 45, Path.of("/opt/jasper/si"));
+        var program = settings.withCommand(List.of("/opt/homebrew/bin/nvim", "+42", "config.toml"));
+        assertThat(program.command()).containsExactly("/opt/homebrew/bin/nvim", "+42", "config.toml");
+        assertThat(program.environment()).isEqualTo(settings.environment());
+        assertThat(program.profile()).isEqualTo(settings.profile());
+        assertThat(program.columns()).isEqualTo(150);
+        assertThat(program.label()).isEqualTo("nvim");
+        assertThat(LaunchSettings.programName("/usr/bin/vim")).isEqualTo("vim");
+        assertThat(LaunchSettings.programName("")).isEqualTo("shell");
+        assertThatIllegalArgumentException().isThrownBy(() -> settings.withCommand(List.of()));
+    }
 }

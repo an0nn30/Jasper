@@ -131,6 +131,17 @@ public final class Editors {
         return new Factory<>((setting, context) -> new FontField(setting.label(), () -> Fonts.families(monospaced)), List.of());
     }
 
+    /** What a font family editor says when no installed family matches the text typed. */
+    public static final String NO_FONT_MATCHES = "No installed font matches";
+
+    /**
+     * The families a font family editor offers, read once; plugin pages' standard rows offer the same.
+     *
+     * @param monospaced only the families that draw 'i' and 'W' at the same width
+     * @return the installed and bundled families
+     */
+    public static List<String> fontFamilies(boolean monospaced) { return Fonts.families(monospaced); }
+
     /** Interface font with a readable platform-default choice, retaining arbitrary typed families. */
     public static Factory<String> interfaceFont() {
         return new Factory<>((setting,context)->new FontField(setting.label(),()->Fonts.families(false),true),List.of("System"));
@@ -325,7 +336,7 @@ public final class Editors {
         List<String> suggestions() { return offered; }
         @Override public Nodes.Node node(String id, ControlState state) {
             return new Nodes.Choice(id, state, Nodes.ChoiceKind.SEARCHABLE, options(offered), "", label, "", "",
-                Optional.of(new Nodes.ChoiceSearch(0, "No installed font matches", Optional.of(system && text.equalsIgnoreCase("system") ? "System" : text))));
+                Optional.of(new Nodes.ChoiceSearch(0, NO_FONT_MATCHES, Optional.of(system && text.equalsIgnoreCase("system") ? "System" : text))));
         }
         @Override public String value() { return text; }
         @Override public void show(String value) { text = value; }
@@ -389,7 +400,7 @@ public final class Editors {
             String submit = pending.isBlank() ? "" : id + ":add";
             Nodes.Node entry = suggestions.isPresent()
                 ? new Nodes.Choice(id + ":new", plain(state), Nodes.ChoiceKind.SEARCHABLE, options(suggestions.get().get()), "", "Add to " + label, id + ":add", "",
-                    Optional.of(new Nodes.ChoiceSearch(0, "No installed font matches", Optional.of(pending))))
+                    Optional.of(new Nodes.ChoiceSearch(0, NO_FONT_MATCHES, Optional.of(pending))))
                 : new Nodes.Field(id + ":new", plain(state), Nodes.FieldKind.TEXT, pending, "Add…", "Add to " + label, submit);
             var addState = new ControlState(state.visible(), state.enabled() && !pending.isBlank(), state.busy(), "");
             var add = new Nodes.Button(id + ":add", addState, "Add", "add", Nodes.ButtonKind.SECONDARY, id + ":add", "");

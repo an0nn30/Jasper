@@ -47,7 +47,8 @@ import static dev.jasper.app.plugins.AppContractTest.onEdtValue;
  * follow the production {@link DialogFit} rule. No document, file or terminal is touched. Call from the test thread.
  */
 final class StagedEditorHost implements AutoCloseable {
-    static final PluginInfo EDITOR = new PluginInfo("dev.jasper.editor", "Editor", "0.8.0", Set.of(Capabilities.PALETTE_CONTRIBUTE));
+    static final PluginInfo EDITOR = new PluginInfo("dev.jasper.editor", "Editor", "0.9.0", Set.of(Capabilities.PALETTE_CONTRIBUTE,
+        Capabilities.TERMINAL_ENVIRONMENT, Capabilities.EDITOR_PROVIDE, Capabilities.TERMINAL_OPEN));
 
     final Contributions contributions;
     final AuxiliaryWindows auxiliary;

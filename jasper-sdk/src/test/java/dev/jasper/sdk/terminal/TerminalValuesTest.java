@@ -86,6 +86,42 @@ class TerminalValuesTest {
         assertThat(failure.pluginId()).isEqualTo("dev.example.tool");
         assertThat(failure.capability()).isEqualTo("terminal.inject");
         assertThat(failure).hasMessageContaining("dev.example.tool").hasMessageContaining("terminal.inject");
-        assertThat(Capabilities.ALL).containsExactly("terminal.observe", "terminal.selection", "terminal.inject", "terminal.open", "session.provide", "palette.contribute", "files.source", "network.listen", "clipboard.read");
+        assertThat(Capabilities.ALL).containsExactly("terminal.observe", "terminal.selection", "terminal.inject", "terminal.open", "session.provide", "palette.contribute", "files.source", "network.listen", "clipboard.read", "terminal.environment", "editor.provide");
+    }
+
+    @Test void aLocalSpecMayRunACommandInsteadOfTheShell() {
+        Path home = Path.of(System.getProperty("user.home"));
+        var words = new ArrayList<>(List.of("nvim", "+3", "notes.txt"));
+        LocalSpec spec = LocalSpec.running(words, Optional.of(home));
+        words.add("later");
+        assertThat(spec.command()).as("copied").contains(List.of("nvim", "+3", "notes.txt"));
+        assertThat(spec.workingDirectory()).contains(home);
+        assertThat(spec.profile()).isEmpty();
+        assertThat(spec).isEqualTo(new LocalSpec(Optional.of(home), Optional.empty(), Optional.of(List.of("nvim", "+3", "notes.txt"))));
+        assertThat(OpenRequest.local(spec)).isEqualTo(new OpenRequest.Local(spec));
+        assertThat(new LocalSpec(Optional.empty()).command()).as("the old constructors run the shell").isEmpty();
+        assertThat(new LocalSpec(Optional.empty(), Optional.of("pwsh")).command()).isEmpty();
+        assertThat(LocalSpec.ofProfile("pwsh").command()).isEmpty();
+        assertThatIllegalArgumentException().as("no program").isThrownBy(() -> LocalSpec.running(List.of(), Optional.empty()));
+        assertThatIllegalArgumentException().as("a blank program").isThrownBy(() -> LocalSpec.running(List.of(" ", "x"), Optional.empty()));
+        assertThatNullPointerException().as("a null word").isThrownBy(() -> LocalSpec.running(java.util.Arrays.asList("nvim", null), Optional.empty()));
+        assertThatNullPointerException().isThrownBy(() -> new LocalSpec(Optional.empty(), Optional.empty(), null));
+        assertThatIllegalArgumentException().as("a profile or a command, not both")
+            .isThrownBy(() -> new LocalSpec(Optional.empty(), Optional.of("pwsh"), Optional.of(List.of("nvim"))));
+        assertThatIllegalArgumentException().as("the directory rule still applies")
+            .isThrownBy(() -> LocalSpec.running(List.of("nvim"), Optional.of(Path.of("relative"))));
+    }
+
+    @Test void theEnvironmentHookIsADefaultThatAnOlderHostIgnores() throws Exception {
+        assertThat(Terminals.class.getMethod("environment", java.util.function.Function.class).isDefault()).isTrue();
+        Terminals older = (Terminals) java.lang.reflect.Proxy.newProxyInstance(Terminals.class.getClassLoader(), new Class<?>[]{Terminals.class},
+            (proxy, method, args) -> method.isDefault() ? java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args) : null);
+        var asked = new java.util.concurrent.atomic.AtomicInteger();
+        older.environment(environment -> {
+            asked.incrementAndGet();
+            return java.util.Map.of("EDITOR", "vim");
+        }).close();
+        assertThat(asked).as("an older host never asks").hasValue(0);
+        assertThatNullPointerException().isThrownBy(() -> older.environment(null));
     }
 }

@@ -114,6 +114,14 @@ class ThemeMenuTest {
         assertThatThrownBy(() -> node(page, "section-imported-themes")).as("no Imported themes group").hasMessage("No node section-imported-themes");
     }
 
+    @Test void noGearRemovesABuiltInCatppuccinTheme() {
+        page("[ui.theme]\ndark = \"catppuccin-mocha\"\nlight = \"catppuccin-latte\"\n[terminal]\nscheme = \"catppuccin-frappe/dark\"\n");
+        for (var id : List.of(DARK, LIGHT, TERMINAL)) {
+            assertThat(item(id, "remove").label()).as(id).isEqualTo("Remove Theme");
+            assertThat(item(id, "remove").enabled()).as(id).isFalse();
+        }
+    }
+
     @Test void cancellingTheChooserDoesNothing() {
         page("");
         choose(DARK, "import");

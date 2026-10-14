@@ -117,5 +117,11 @@ class ShellProfilePaneTest {
         assertThat(new OpenSpec.Local(Optional.empty()).profile()).isEmpty();
         assertThat(new OpenSpec.Local(Optional.empty(), Optional.of("wsl:Ubuntu")).profile()).contains("wsl:Ubuntu");
         assertThatNullPointerException().isThrownBy(() -> new OpenSpec.Local(Optional.empty(), null));
+        assertThat(new OpenSpec.Local(Optional.empty(), Optional.of("wsl:Ubuntu")).program()).as("the old constructors run the shell").isEmpty();
+        var words = new ArrayList<>(List.of("nvim", "+3"));
+        var local = new OpenSpec.Local(Optional.empty(), Optional.empty(), Optional.of(words));
+        words.add("later");
+        assertThat(local.program()).as("copied").contains(List.of("nvim", "+3"));
+        assertThatNullPointerException().isThrownBy(() -> new OpenSpec.Local(Optional.empty(), Optional.empty(), null));
     }
 }
