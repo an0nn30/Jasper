@@ -142,6 +142,14 @@ modified=1760400000
 options=
 actual 1000000000000000000 1760400000 - /opt/jasper/lib/app/jasper.aot
 = match
+## sizes above the signed 64-bit range compare as unsigned numbers
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size=9999999999999999999
+modified=1760400000
+options=
+actual 9999999999999999999 1760400000 - /opt/jasper/lib/app/jasper.aot
+= match
 ## a missing key
 record
 cache=/opt/jasper/lib/app/jasper.aot
