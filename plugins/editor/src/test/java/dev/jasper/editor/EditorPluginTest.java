@@ -10,6 +10,8 @@ import dev.jasper.editor.session.Question;
 import dev.jasper.editor.testsupport.StubDocument;
 import dev.jasper.editor.ui.EditorEnvironment;
 import dev.jasper.editor.ui.EditorWindow;
+import dev.jasper.editor.external.Detection;
+import dev.jasper.editor.external.EditorCommands;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.Variant;
@@ -28,7 +30,9 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -41,7 +45,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @org.junit.jupiter.api.extension.ExtendWith(dev.jasper.editor.testsupport.EdtTests.class)
 class EditorPluginTest {
     @TempDir Path home;
-    private static final PluginInfo INFO = new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of("palette.contribute"));
+    private static final PluginInfo INFO = new PluginInfo("dev.jasper.editor", "Editor", "0.1.0",
+        Set.of("palette.contribute", "terminal.environment", "editor.provide", "terminal.open"));
 
     private static EditorPlugin plugin() {
         return new EditorPlugin(Runnable::run, (context, settings) -> new EditorEnvironment(context, Runnable::run,
@@ -296,6 +301,117 @@ class EditorPluginTest {
             host.queueFileChoice(List.of());
             assertThat(host.invoke("dev.jasper.editor.open", terminal, null)).isTrue();
             assertThat(host.fileChoices().getLast().sources()).isEmpty();
+        }
+    }
+
+    private final Set<Path> programs = new HashSet<>();
+    private final List<List<String>> launched = new ArrayList<>();
+
+    /** The Editor over a machine whose programs are {@link #programs}; app editors and detached commands go to {@link #launched}. */
+    private EditorPlugin detecting() {
+        return new EditorPlugin(Runnable::run, (context, settings) -> new EditorEnvironment(context, Runnable::run,
+                owner -> Question::dismissed, owner -> (message, saves) -> saves.getNow(false), settings::current, settings::saveVim, false),
+            () -> new Detection.Probe("Mac OS X", List.of(home.resolve("bin")), home, Map.of(), programs::contains),
+            log -> command -> { launched.add(command); return true; });
+    }
+
+    /** A program detection finds in {@code home/bin}. */
+    private Path install(String name) throws Exception {
+        Path program = Files.createDirectories(home.resolve("bin")).resolve(name).toAbsolutePath().normalize();
+        programs.add(program);
+        return program;
+    }
+
+    @Test void theEditorIsJaspersFileEditorAndNamesItselfInEditorAndVisual() throws Exception {
+        try (var host = host()) {
+            Path client = home.resolve("Jasper Beta.app").resolve("bin").resolve("jasper");
+            host.setCommandClient(client);
+            host.start(INFO, Set.of(), Set.of(), detecting());
+            drain(host);
+            assertThat(host.editorPlugin()).contains("dev.jasper.editor");
+            Path config = Files.writeString(home.resolve("config.toml"), "[window]\n");
+            assertThat(host.edit(config, OptionalInt.of(1), Optional.empty())).isTrue();
+            drain(host);
+            assertThat(host.contentTabs()).hasSize(1);
+            String value = EditorCommands.quote(client.toString(), System.getProperty("os.name", "")) + " editor --wait";
+            assertThat(host.shellEnvironment(Map.of())).isEqualTo(Map.of("EDITOR", value, "VISUAL", value));
+            assertThat(host.failures()).isEmpty();
+            host.stopAll();
+            assertThat(host.editorPlugin()).as("stopped").isEmpty();
+            assertThat(host.shellEnvironment(Map.of())).isEmpty();
+        }
+    }
+
+    @Test void anotherPluginsOpenInEditorOpensTheFileHere() throws Exception {
+        try (var host = host()) {
+            host.start(INFO, Set.of(), Set.of(), detecting());
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of(), Set.of(), consumer::set);
+            consumer.get().platform().openInEditor(Files.writeString(home.resolve("snippets.toml"), "x = 1\n"));
+            drain(host);
+            assertThat(host.contentTabs()).hasSize(1);
+            assertThat(host.openedInEditor()).as("the desktop was not needed").isEmpty();
+        }
+    }
+
+    /** Review Focus 2, end to end: Jasper started from a terminal with EDITOR=vim keeps it until keep_environment_editor is off. */
+    @Test void anEditorInJaspersOwnEnvironmentStaysUntilTheSettingIsOff() {
+        try (var host = host()) {
+            host.setCommandClient(home.resolve("jasper"));
+            host.start(INFO, Set.of(), Set.of(), detecting());
+            drain(host);
+            assertThat(host.shellEnvironment(Map.of("EDITOR", "vim"))).as("git keeps vim").isEmpty();
+            assertThat(host.shellEnvironment(Map.of("VISUAL", "nvim"))).isEmpty();
+            host.setSetting("dev.jasper.editor", "keep_environment_editor", false);
+            assertThat(host.shellEnvironment(Map.of("EDITOR", "vim"))).containsOnlyKeys("EDITOR", "VISUAL");
+        }
+    }
+
+    @Test void anInstalledAppEditorStartsAtTheLineAndATerminalEditorGetsATab() throws Exception {
+        try (var host = host()) {
+            Path code = install("code"), nvim = install("nvim");
+            host.setSetting("dev.jasper.editor", "default_editor", "code");
+            host.start(INFO, Set.of(), Set.of(), detecting());
+            drain(host);
+            Path file = Files.writeString(home.resolve("notes.txt"), "a\nb\n");
+            String os = System.getProperty("os.name", "");
+            assertThat(host.shellEnvironment(Map.of())).containsEntry("EDITOR", EditorCommands.quote(code.toString(), os) + " --wait");
+            assertThat(host.edit(file, OptionalInt.of(2), Optional.empty())).isTrue();
+            assertThat(launched).containsExactly(List.of(code.toString(), "-g", file + ":2"));
+            host.setSetting("dev.jasper.editor", "default_editor", "nvim");
+            UUID window = host.addTerminalWindow();
+            assertThat(host.edit(file, OptionalInt.of(2), Optional.of(window))).isTrue();
+            assertThat(host.openRequests()).contains("tab|" + window + "|" + file.getParent() + "|run:" + nvim + " +2 " + file);
+            assertThat(host.contentTabs()).as("the Jasper Editor opened nothing").isEmpty();
+        }
+    }
+
+    /** Plugins start and the first window opens in one UI turn, so the first shell asks before any background task has run. */
+    @Test void theFirstShellOfALaunchGetsTheSavedInstalledEditorBeforeDetectionHasRun() throws Exception {
+        try (var host = host()) {
+            Path nvim = install("nvim");
+            install("vim");
+            host.setSetting("dev.jasper.editor", "default_editor", "nvim");
+            host.start(INFO, Set.of(), Set.of(), detecting());
+            String os = System.getProperty("os.name", "");
+            assertThat(host.shellEnvironment(Map.of())).as("no background task has run yet")
+                .isEqualTo(Map.of("EDITOR", EditorCommands.quote(nvim.toString(), os), "VISUAL", EditorCommands.quote(nvim.toString(), os)));
+            drain(host);
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Review Focus 5, end to end: the saved editor was uninstalled. */
+    @Test void anUninstalledSavedEditorGivesShellsNothingAndFilesToTheDesktop() throws Exception {
+        try (var host = host()) {
+            host.setSetting("dev.jasper.editor", "default_editor", "zed");
+            host.start(INFO, Set.of(), Set.of(), detecting());
+            drain(host);
+            assertThat(host.settingsReports("dev.jasper.editor")).as("a known id stays a valid value").isEmpty();
+            assertThat(host.shellEnvironment(Map.of())).isEmpty();
+            assertThat(host.edit(Files.writeString(home.resolve("a.txt"), "a\n"), OptionalInt.empty(), Optional.empty())).isFalse();
+            assertThat(launched).isEmpty();
+            assertThat(host.contentTabs()).isEmpty();
         }
     }
 }

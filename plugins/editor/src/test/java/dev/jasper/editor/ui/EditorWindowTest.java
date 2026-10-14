@@ -6,6 +6,7 @@ import dev.jasper.editor.api.LocationResolver;
 import dev.jasper.editor.api.Revision;
 import dev.jasper.editor.open.Locations;
 import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.files.FileChoice;
 import java.util.concurrent.CompletableFuture;
 import dev.jasper.editor.local.LocalDocument;
@@ -22,6 +23,8 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.UUID;
 import dev.jasper.sdk.files.FileLocation;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -744,5 +747,31 @@ class EditorWindowTest {
         host.contentTabs().getFirst().close();
         assertThat(closed).isCompleted();
         assertThat(window.closed(session)).as("it has no tab any more").isCompleted();
+    }
+
+    @Test void editOpensAnExistingFileAtTheLineAndAMissingOneAsATabItsFirstSaveCreates() throws Exception {
+        Path file = file("lines.txt", "one\ntwo\nthree\n");
+        assertThat(window.edit(file, OptionalInt.of(3), Optional.empty())).isTrue();
+        drain();
+        assertThat(window.selected().orElseThrow().area().getCaretPosition()).as("the start of line 3").isEqualTo(8);
+        Path missing = home.resolve("new.txt");
+        assertThat(window.edit(missing, OptionalInt.empty(), Optional.empty())).isTrue();
+        assertThat(host.contentTabs()).hasSize(2);
+        assertThat(missing).doesNotExist();
+    }
+
+    @Test void editLeavesAFolderAndAFileInAMissingFolderToTheDesktop() {
+        assertThat(window.edit(home, OptionalInt.empty(), Optional.empty())).isFalse();
+        assertThat(window.edit(home.resolve("nowhere").resolve("x.txt"), OptionalInt.of(1), Optional.empty())).isFalse();
+        assertThat(host.contentTabs()).isEmpty();
+    }
+
+    @Test void editOpensInTheTerminalWindowItWasGivenAndOtherwiseInTheLastMainWindow() throws Exception {
+        UUID terminal = host.addTerminalWindow();
+        WindowHandle handle = context.terminals().window(terminal).orElseThrow();
+        assertThat(window.edit(file("a.txt", "a\n"), OptionalInt.empty(), Optional.of(handle))).isTrue();
+        assertThat(host.contentOwner(host.contentTabs().getFirst())).isEqualTo(handle);
+        assertThat(window.edit(file("b.txt", "b\n"), OptionalInt.empty(), Optional.of(new WindowOwner() { }))).as("not a terminal window").isTrue();
+        assertThat(host.contentTabs()).hasSize(2);
     }
 }
