@@ -118,4 +118,24 @@ class ShellLauncherTest {
         assertThat(errors.get(2)).hasMessageContaining("Directory is unavailable");
         assertThat(errors.get(3)).hasMessage("start failed");
     }
+
+    @Test @DisabledOnOs(OS.WINDOWS)
+    void aPanesShellNamesThePaneLastOverTheConfiguredEnvironment() throws Exception {
+        var configured = snapshot("/bin/sh", List.of(), Map.of("JASPER_PANE", "configured"), 12, 150, 45);
+        Queue<Runnable> pending = new ArrayDeque<>();
+        var received = new ArrayList<LaunchSettings>();
+        ShellLauncher launcher = new ShellLauncher(pending::add, requested -> LaunchSettings.resolve(configured, "Linux", Map.of(), 150, 45),
+            (requested, captured) -> captured, null, (path, settings) -> { received.add(settings); return shell(path); },
+            pane -> Map.of("JASPER_PANE", pane.toString(), "JASPER_COMMAND_SOCKET", "/tmp/commands"));
+        TerminalPane[] pane = new TerminalPane[1];
+        try {
+            edt(() -> { pane[0] = new TerminalPane(directory, launcher); pane[0].start(); });
+            while (!pending.isEmpty()) pending.remove().run();
+            edt(() -> { });
+            assertThat(received).singleElement().satisfies(settings -> assertThat(settings.environment())
+                .containsEntry("JASPER_PANE", pane[0].id().toString()).containsEntry("JASPER_COMMAND_SOCKET", "/tmp/commands"));
+        } finally {
+            edt(() -> { if (pane[0] != null) pane[0].close(); });
+        }
+    }
 }

@@ -231,7 +231,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     void start() {
         if (request != null) { connect(); return; }
         ShellLauncher.Launch launched = launcher.launch(defaultDirectory ? Optional.empty() : Optional.of(launchDirectory),
-                requestedProfile, replaced -> {
+                requestedProfile, Optional.of(id), replaced -> {
             // Detection showed the profile resolved before it completed is missing: the default starts instead.
             if (closed) return;
             shellLabel = replaced.label();

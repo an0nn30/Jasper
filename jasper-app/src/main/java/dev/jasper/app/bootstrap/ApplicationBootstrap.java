@@ -2,6 +2,7 @@ package dev.jasper.app.bootstrap;
 
 import dev.jasper.app.application.DockControl;
 import dev.jasper.app.application.JasperApplication;
+import dev.jasper.app.commandline.CommandListener;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.ShellIntegrationScripts;
@@ -23,6 +24,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -52,8 +54,12 @@ public final class ApplicationBootstrap {
             AppLog log = acquired.own(AppLog.open(dirs.logs()));
             UnexpectedExceptions exceptions = acquired.own(installUnexpectedExceptionHandler());
             var endpoint = new AtomicReference<HandoffSocket>();
+            var commands = new AtomicReference<CommandListener>();
             Thread shutdown = Thread.ofPlatform().name("jasper-log-shutdown").unstarted(() -> {
-                try { if (endpoint.get() != null) endpoint.get().close(); }
+                try {
+                    if (endpoint.get() != null) endpoint.get().close();
+                    if (commands.get() != null) commands.get().close();
+                }
                 finally { exceptions.close(); log.close(); }
             });
             Runtime.getRuntime().addShutdownHook(shutdown);
@@ -66,7 +72,7 @@ public final class ApplicationBootstrap {
             // Before any plugin is discovered, and here rather than on the EDT: it may wait for the state lock.
             dev.jasper.ui.icons.IconRegistry.prepareBuiltIns();
             JasperApplication.preparePlugins(dirs);
-            SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint));
+            SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint, commands));
             // The posted EDT composition owns service; the process hook owns logging and the endpoint.
             acquired.transfer();
         } catch (RuntimeException | Error failure) {
@@ -94,7 +100,8 @@ public final class ApplicationBootstrap {
     }
 
     private static void startDesktop(Startup startup, AppDirs dirs, AppLog log,
-                                     UnexpectedExceptions exceptions, Thread shutdown, AtomicReference<HandoffSocket> endpoint) {
+                                     UnexpectedExceptions exceptions, Thread shutdown, AtomicReference<HandoffSocket> endpoint,
+                                     AtomicReference<CommandListener> commands) {
         ConfigService service = startup.service(); AppArguments options = startup.options();
         try {
             StartupTrace.current().mark(StartupTrace.Milestone.TOOLKIT_READY);
@@ -110,7 +117,7 @@ public final class ApplicationBootstrap {
             }
             compose(service, () -> new CommandHistory(dirs.commandHistory()),
                 history -> {
-                    JasperApplication application = createApplication(service, history, dirs, options);
+                    JasperApplication application = createApplication(service, history, dirs, options, commands);
                     exceptions.forwardTo(application::unexpected);
                     return application;
                 }, application -> {
@@ -123,6 +130,10 @@ public final class ApplicationBootstrap {
                     endpoint.set(bound);
                     return bound;
                 }, application -> {
+                    if (options.noWindow()) {
+                        serveWithoutWindow(application, commands.get());
+                        return;
+                    }
                     if (!options.background()) {
                         long window = System.nanoTime();
                         application.newWindow();
@@ -147,7 +158,7 @@ public final class ApplicationBootstrap {
     }
 
     private static JasperApplication createApplication(ConfigService service, CommandHistory history, AppDirs dirs,
-                                                       AppArguments options) {
+                                                       AppArguments options, AtomicReference<CommandListener> commands) {
         long began = System.nanoTime();
         var acquired = new StartupResources();
         try {
@@ -187,7 +198,16 @@ public final class ApplicationBootstrap {
             // A packaged macOS Jasper keeps running on Quit and leaves the Dock while it has no window.
             if (MacDock.available())
                 application.backgroundOnQuit(new DockControl(MacDock::show, MacDock::prepare, MacDock::poweringOff), !options.background());
+            if (!options.privateCommands()) application.subcommandList(dirs.subcommandList());
             application.startPlugins(HandoffSocket.codeSource(), options.pluginDir(), options.safeMode(), dirs);
+            // After the plugins started, so a call that arrives first finds its handler.
+            CommandListener listener = CommandListener.bind(commandSocket(options, dirs), application.commands());
+            if (listener != null) {
+                acquired.own(listener);
+                application.onShutdown(listener::close);
+                application.commandSocket(listener.socket());
+                commands.set(listener);
+            }
             StartupTrace.current().phase("application", began);
             acquired.transfer();
             return application;
@@ -296,6 +316,10 @@ public final class ApplicationBootstrap {
             LOG.log(System.Logger.Level.INFO, "Started with --background while a resident Jasper is running; exiting");
             return 0;
         }
+        if (alreadyServing(options, dirs)) {
+            LOG.log(System.Logger.Level.INFO, "Started with --no-window while a Jasper serves the jasper command; exiting");
+            return 0;
+        }
         Path file = options.configOverride() == null ? dirs.configFile() : options.configOverride();
         var acquired = new StartupResources();
         long read = System.nanoTime();
@@ -316,7 +340,7 @@ public final class ApplicationBootstrap {
      * process a recovery launch is escaping; neither does a resident process starting up.
      */
     static boolean handsOff(AppArguments options, AppDirs dirs) {
-        if (options.background() || options.standaloneLaunch()) return false;
+        if (options.background() || options.noWindow() || options.standaloneLaunch()) return false;
         // Windows lets only this freshly launched process bring a window forward; the resident needs that right by the
         // time it shows its window. Grant before sending, including when an existing window can be raised immediately.
         WindowsForeground.allow(System.getProperty("os.name"), HandoffSocket.ownerPid(dirs.daemonToken()));
@@ -339,6 +363,41 @@ public final class ApplicationBootstrap {
      *  handed a window built from that configuration or plugin set. */
     static boolean residentRole(AppArguments options, boolean enabled) {
         return enabled && !options.standaloneLaunch();
+    }
+
+    /** How long a --no-window Jasper that is not resident waits for its first call. */
+    static final int NO_CALL_GRACE_MILLIS = 30_000;
+
+    /** The command socket a launch serves: its own for a private launch, otherwise its home's shared one. */
+    static Path commandSocket(AppArguments options, AppDirs dirs) {
+        return options.privateCommands() ? dirs.commandSocket(ProcessHandle.current().pid()) : dirs.commandSocket();
+    }
+
+    /** True for a {@code --no-window} launch while another Jasper already serves the command: it would only lose the bind. */
+    static boolean alreadyServing(AppArguments options, AppDirs dirs) {
+        return options.noWindow() && !options.privateCommands() && CommandListener.live(dirs.commandSocket());
+    }
+
+    /**
+     * A {@code --no-window} launch, which the {@code jasper} command makes to serve a call: no window. A Jasper that is
+     * not resident quits once it has served its calls and has no window, or when no call arrives within
+     * {@link #NO_CALL_GRACE_MILLIS}, so a client killed before it connected leaves nothing hidden behind. EDT.
+     */
+    static void serveWithoutWindow(JasperApplication application, CommandListener commands) {
+        if (commands == null) {
+            LOG.log(System.Logger.Level.WARNING, "Started with --no-window but the jasper command is unavailable; exiting");
+            application.quitNow();
+            return;
+        }
+        if (application.resident()) {
+            application.warmUp(() -> StartupTrace.current().mark(StartupTrace.Milestone.WARMED_UP));
+            return;
+        }
+        BooleanSupplier busy = () -> commands.activeCalls() > 0;
+        commands.onIdle(() -> SwingUtilities.invokeLater(() -> application.quitIfUnused(busy)));
+        var grace = new javax.swing.Timer(NO_CALL_GRACE_MILLIS, event -> application.quitIfUnused(busy));
+        grace.setRepeats(false);
+        grace.start();
     }
 
     /**

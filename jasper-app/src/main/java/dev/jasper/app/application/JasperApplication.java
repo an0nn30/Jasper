@@ -1,6 +1,7 @@
 package dev.jasper.app.application;
 
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.commandline.CommandDispatcher;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -136,6 +137,10 @@ public final class JasperApplication {
     private final SystemNotices systemNotices;
     private final CommandNotifier notifications;
     private PluginRuntime plugins;
+    /** The command socket this Jasper serves; new local shells name it in JASPER_COMMAND_SOCKET. */
+    private volatile Path commandSocket;
+    /** Where {@code jasper --help} reads the subcommands, or null for a private launch. */
+    private Path subcommandList;
     private ActionEntry migrateAction;
     private dev.jasper.app.settingsui.SettingsDialog settings;
     private boolean preferencesHandlerInstalled;
@@ -359,7 +364,7 @@ public final class JasperApplication {
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
             (path, settings) -> track(watchOutput(startSession(path, settings))), shellIntegrationDir, shellProfiles::resolve,
-            () -> shellProfiles.awaitDetection(DETECTION_WAIT), this::shellProfileProblem);
+            () -> shellProfiles.awaitDetection(DETECTION_WAIT), this::shellProfileProblem, this::paneVariables);
         // Back in the Dock before the window exists: macOS gives a window of a hidden application neither Jasper's menu
         // bar nor focus. If composing fails nothing opened, so the presence is worked out again.
         windowOpening();
@@ -462,6 +467,45 @@ public final class JasperApplication {
     }
 
     public boolean resident() { return resident; }
+
+    /** Where {@code jasper --help} reads the subcommands; before {@link #startPlugins}. Never set for a private launch. */
+    public void subcommandList(Path file) { subcommandList = file; }
+
+    /** The command socket this Jasper serves, named in each new local shell's {@code JASPER_COMMAND_SOCKET}. */
+    public void commandSocket(Path socket) { commandSocket = socket; }
+
+    /** What a new local shell in {@code pane} gets last, over everything else. Any thread. */
+    Map<String, String> paneVariables(UUID pane) {
+        Path socket = commandSocket;
+        return socket == null ? Map.of("JASPER_PANE", pane.toString())
+            : Map.of("JASPER_PANE", pane.toString(), "JASPER_COMMAND_SOCKET", socket.toString());
+    }
+
+    /**
+     * What the command socket runs: no arguments opens a window or raises one, as a launch would; anything else is a
+     * plugin's subcommand. Called on listener threads.
+     */
+    public CommandDispatcher commands() {
+        return invocation -> {
+            if (invocation.arguments().isEmpty()) {
+                SwingUtilities.invokeLater(() -> openOrRaise(HANDOFF));
+                return CompletableFuture.completedFuture(0);
+            }
+            PluginRuntime runtime = plugins;
+            if (runtime == null) {
+                invocation.err("jasper: Jasper's plugins are not running\n");
+                return CompletableFuture.completedFuture(1);
+            }
+            return runtime.commands().dispatch(invocation);
+        };
+    }
+
+    /** Quits a Jasper that is not resident once nothing keeps it: no terminal or plugin window, and {@code busy} false. EDT. */
+    public void quitIfUnused(BooleanSupplier busy) {
+        if (resident || quitting || stopped) return;
+        boolean pluginWindowsOpen = auxiliary != null && !auxiliary.open().isEmpty();
+        if (windows.isEmpty() && !pluginWindowsOpen && !busy.getAsBoolean()) requestShutdown();
+    }
 
     /**
      * Who shows that this process is resident (the macOS menu bar item, the Windows notification-area icon), given its
@@ -765,6 +809,7 @@ public final class JasperApplication {
             if (created == null) throw new IllegalStateException("Application is closing");
             return created.content().id();
         });
+        if (subcommandList != null) plugins.subcommandList(subcommandList);
         plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
         new PluginProblemNotices(notificationCenter, incidentNotices,
             () -> openSettings(null, dev.jasper.app.pluginmanager.PluginsPage.ID)).announce(plugins.problems());
@@ -1000,6 +1045,13 @@ public final class JasperApplication {
             () -> false, message -> LOG.log(System.Logger.Level.WARNING, message));
     }
 
+    static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
+                                        BiFunction<Path, LaunchSettings, TerminalSession> start, Path integrationDir,
+                                        BiFunction<Optional<String>, TerminalConfig.Shell, ShellProfiles.Resolution> profiles,
+                                        BooleanSupplier awaitDetection, Consumer<String> problems) {
+        return windowLauncher(executor, snapshots, start, integrationDir, profiles, awaitDetection, problems, pane -> Map.of());
+    }
+
     /**
      * Each request's profile is resolved on the EDT by {@code profiles}, from the requested id (empty: the configured
      * default) and the saved shell settings; {@code problems} hears, on the EDT, why a profile was replaced.
@@ -1014,7 +1066,8 @@ public final class JasperApplication {
     static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
                                         BiFunction<Path, LaunchSettings, TerminalSession> start, Path integrationDir,
                                         BiFunction<Optional<String>, TerminalConfig.Shell, ShellProfiles.Resolution> profiles,
-                                        BooleanSupplier awaitDetection, Consumer<String> problems) {
+                                        BooleanSupplier awaitDetection, Consumer<String> problems,
+                                        Function<UUID, Map<String, String>> paneVariables) {
         ConfigSnapshot initial = snapshots.get();
         String os = System.getProperty("os.name");
         Map<String, String> environment = System.getenv();
@@ -1042,7 +1095,7 @@ public final class JasperApplication {
         return new ShellLauncher(executor, settings, confirm, () -> {
             ConfigSnapshot snapshot = snapshots.get();
             return new ShellLauncher.SessionDefaults(initial.columns(), initial.lines(), snapshot.terminal().scrollback());
-        }, start);
+        }, start, paneVariables);
     }
 
     /**
