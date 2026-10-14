@@ -4,6 +4,7 @@ import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.notifications.NotificationCenter;
 import dev.jasper.app.settingsui.SchemaPage;
 import dev.jasper.app.settingsui.VmOptionsHooks;
+import dev.jasper.app.vmoptions.AotCacheRecord;
 import dev.jasper.app.vmoptions.LauncherImage;
 import dev.jasper.app.vmoptions.VmOptionsCheck;
 import dev.jasper.app.vmoptions.VmOptionsFile;
@@ -33,13 +34,15 @@ import java.util.function.Supplier;
 
 /**
  * Custom VM options in the running app (spec sections 4.3, 5.1 and 5.2): the System Settings section's hooks, the
- * Help and palette actions' handlers, and the notices after start-up. File I/O and the check run on {@code worker};
+ * Help and palette actions' handlers, and the notices after start-up, including a start without the start-up cache
+ * (start-up recovery spec 6.4). File I/O and the check run on {@code worker};
  * state lives on the EDT, where {@code ui} delivers results. Nothing here runs on the start-up path until
  * {@link #startupSettled()} or the section asks.
  */
 final class VmOptionsFeature {
     private static final System.Logger LOG = System.getLogger(VmOptionsFeature.class.getName());
     private static final List<String> KEYWORDS = List.of("memory", "heap", "xmx", "jvm", "java", "vm options");
+    private static final String LAUNCH_FAILED = "launch-failed";
 
     private final VmOptionsLaunch launch;
     private final Supplier<Optional<LauncherImage>> images;
@@ -115,28 +118,83 @@ final class VmOptionsFeature {
         });
     }
 
-    /** Once, after start-up settles: reads the file and announces a fallback start or a corrupted file. EDT. */
+    /**
+     * Once, after start-up settles: reads the file and announces a fallback start or a corrupted file; after a start
+     * without the start-up cache (start-up recovery spec 6.4) checks the cache, remembers it when it fails and says so.
+     * When the launcher skipped both after failed launches, each notice appears only when its own check fails. EDT.
+     */
     void startupSettled() {
         if (started) return;
         started = true;
-        if (!launch.launcherManaged()) return;
-        Path file = launch.file().orElseThrow();
-        boolean fallback = launch.skipped().filter("launch-failed"::equals).isPresent();
+        boolean managed = launch.launcherManaged();
+        Optional<String> cacheSkipped = launch.aotCacheSkipped();
+        if (!managed && cacheSkipped.isEmpty()) return;
+        Optional<Path> file = launch.file();
+        boolean fallback = launch.skipped().filter(LAUNCH_FAILED::equals).isPresent();
+        boolean cacheFailed = cacheSkipped.filter(LAUNCH_FAILED::equals).isPresent();
         boolean corrupted = launch.corrupted();
         worker.execute(() -> {
-            VmOptionsFile.Contents read = read(file);
+            VmOptionsFile.Contents read = file.map(VmOptionsFeature::read).orElse(VmOptionsFile.Contents.ABSENT);
             Optional<LauncherImage> located = images.get();
-            Optional<String> message = fallback ? check(located, read).fatal().map(VmOptionsCheck.Fatal::message) : Optional.empty();
+            VmOptionsCheck.Findings found = fallback || cacheFailed ? check(located, read, cacheFailed) : VmOptionsCheck.Findings.NONE;
+            Optional<String> message = found.fatal().map(VmOptionsCheck.Fatal::message);
+            boolean announceFallback = fallback && (!cacheFailed || message.isPresent());
+            if (fallback && !announceFallback) {
+                LOG.log(System.Logger.Level.INFO, "Jasper started without the custom VM options after failed launches, but their check finds no failure now");
+            }
+            Optional<String> cacheMessage = cacheFailed ? remember(located, read.parsed(), found) : Optional.empty();
+            if (!cacheFailed) cacheSkipped.ifPresent(VmOptionsFeature::logSkippedCache);
             ui.accept(() -> {
-                if (atStart == null) {
+                if (managed && atStart == null) {
                     atStart = read;
                     contents = read;
                     located.ifPresent(image -> bundledMiB = image.bundledMaxHeapMiB());
                 }
-                if (fallback) notices.fallbackStart(message);
-                if (corrupted) notices.corrupted(file);
+                if (announceFallback) notices.fallbackStart(message);
+                cacheMessage.ifPresent(notices::cacheSkipped);
+                if (corrupted) file.ifPresent(notices::corrupted);
             });
         });
+    }
+
+    /**
+     * After a start that skipped the cache because it made Java fail at launch (start-up recovery spec 6.4). A failing
+     * cache check writes the record the launcher matches, with the options' digest when the check ran with them, and
+     * returns Java's message to announce; a record already holding the same values was announced before, so it is not
+     * written or announced again. A passing check writes nothing, so the next start tries the cache. Worker.
+     */
+    private Optional<String> remember(Optional<LauncherImage> located, VmOptionsSyntax.Parsed parsed, VmOptionsCheck.Findings found) {
+        if (found.cache().isEmpty() || located.isEmpty()) {
+            LOG.log(System.Logger.Level.INFO, "The start-up cache made Java fail at launch, but its check finds no failure now; the next start tries it again");
+            return Optional.empty();
+        }
+        String message = found.cache().get().message();
+        Optional<Path> target = launch.aotCacheRecord();
+        if (target.isEmpty()) {
+            LOG.log(System.Logger.Level.WARNING, "The start-up cache made Java fail at launch, and the launcher named no file to remember it in");
+            return Optional.of(message);
+        }
+        List<String> options = found.cacheUsedOptions() ? VmOptionsSyntax.merge(located.get().javaOptions(), parsed.lines()) : located.get().javaOptions();
+        Optional<String> digest = found.cacheUsedOptions() ? VmOptionsLaunch.appliedDigest(parsed) : Optional.empty();
+        try {
+            AotCacheRecord record = AotCacheRecord.capture(options, digest);
+            if (AotCacheRecord.read(target.get()).filter(record::equals).isPresent()) {
+                LOG.log(System.Logger.Level.INFO, "The start-up cache made Java fail at launch again; it is already remembered, so Jasper does not say so again");
+                return Optional.empty();
+            }
+            record.write(target.get());
+            LOG.log(System.Logger.Level.WARNING, "The start-up cache made Java fail at launch; Jasper skips it until a new build replaces it");
+        } catch (IOException | RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "Could not remember the start-up cache that made Java fail at launch; the next start tries it again", failure);
+        }
+        return Optional.of(message);
+    }
+
+    /** One line for a start without the cache that needs no check: remembered, or skipped by hand. */
+    private static void logSkippedCache(String reason) {
+        LOG.log(System.Logger.Level.INFO, "remembered".equals(reason)
+            ? "Jasper started without its start-up cache, which made Java fail at an earlier launch"
+            : "Jasper started without its start-up cache because JASPER_AOT_CACHE_SKIP is set");
     }
 
     /** The Settings dialog closed: repeats a pending restart as a notification. EDT. */
@@ -165,7 +223,7 @@ final class VmOptionsFeature {
                 located.ifPresent(image -> bundledMiB = image.bundledMaxHeapMiB());
                 notifyListeners();
             });
-            VmOptionsCheck.Findings found = check(located, read);
+            VmOptionsCheck.Findings found = check(located, read, false);
             ui.accept(() -> {
                 if (ticket != generation) return;
                 findings = found;
@@ -333,11 +391,15 @@ final class VmOptionsFeature {
         return restartNeeded() ? Optional.of(new SchemaPage.Notice("Restart required", "Restart Jasper to apply your changes.")) : Optional.empty();
     }
 
-    /** The check's findings; a check that cannot run finds nothing, never blocks saving, and is logged (spec section 7). */
-    private VmOptionsCheck.Findings check(Optional<LauncherImage> located, VmOptionsFile.Contents read) {
+    /**
+     * The check's findings, with the cache checked even without custom options when {@code withCache}; a check that cannot
+     * run finds nothing, never blocks saving, and is logged (spec section 7).
+     */
+    private VmOptionsCheck.Findings check(Optional<LauncherImage> located, VmOptionsFile.Contents read, boolean withCache) {
         if (located.isEmpty()) return VmOptionsCheck.Findings.NONE;
         try {
-            return checks.apply(located.get()).check(read.parsed());
+            VmOptionsCheck check = checks.apply(located.get());
+            return withCache ? check.checkWithCache(read.parsed()) : check.check(read.parsed());
         } catch (IOException | RuntimeException unavailable) {
             LOG.log(System.Logger.Level.WARNING, "Could not check the custom VM options", unavailable);
             return VmOptionsCheck.Findings.NONE;
