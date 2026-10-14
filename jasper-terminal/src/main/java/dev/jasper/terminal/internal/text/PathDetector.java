@@ -7,8 +7,9 @@ import java.util.Optional;
  * {@code PATH:LINE}, {@code PATH:LINE:COLUMN}, {@code PATH(LINE)} or {@code PATH(LINE,COLUMN)}. A path is absolute,
  * starts with {@code ./}, {@code ../} or {@code ~/}, or is relative and has a separator or an extension; {@code C:\}
  * and backslash paths count only on Windows. It ends at whitespace, at {@code <>"'} and the backtick, and before
- * trailing punctuation, and it never contains {@code ://}, so a URL is no path. It starts after the last {@code =} in
- * its word ({@code --config=./x.toml}) and any opener after it, and, when a position follows, after the last
+ * trailing punctuation, and it never contains {@code ://}, so a URL is no path. It starts after each {@code =} in
+ * its word that ends an option or variable name, with no {@code /} or {@code \} before it ({@code --config=./x.toml},
+ * but {@code /tmp/x=1.txt} stays whole), and any opener after it, and, when a position follows, after the last
  * {@code (} that nothing closes in the path ({@code at Bar.baz(Bar.java:42)}). Pure text work: no buffer, lock or file
  * system.
  */
@@ -51,9 +52,11 @@ public final class PathDetector {
         if (text.substring(tokenStart, tokenEnd).contains("://")) return Optional.empty();
         int start = skipOpeners(text, tokenStart, tokenEnd);
         Scan scan = scan(text, start, tokenEnd, windows);
-        for (int equals = lastEquals(text, start, scan.pathEnd()); equals >= 0; equals = lastEquals(text, start, scan.pathEnd())) {
+        for (int equals = equalsEndingName(text, start, scan.pathEnd()); equals >= 0;
+            equals = equalsEndingName(text, start, scan.pathEnd())) {
             start = skipOpeners(text, equals + 1, tokenEnd);
-            scan = scan(text, start, tokenEnd, windows);
+            // The old scan still holds unless the path now starts past its end or at a drive.
+            if (start > scan.pathEnd() || windows && drive(text, start, tokenEnd)) scan = scan(text, start, tokenEnd, windows);
         }
         int pathEnd = scan.pathEnd();
         int[] position = scan.position();
@@ -87,10 +90,16 @@ public final class PathDetector {
         return new Scan(pathEnd, position);
     }
 
-    /** The index of the last {@code =} in {@code [from, to)}, or -1. */
-    private static int lastEquals(String text, int from, int to) {
-        for (int i = to - 1; i >= from; i--) {
-            if (text.charAt(i) == '=') return i;
+    /**
+     * The index of the first {@code =} in {@code [from, to)} when no {@code /} or {@code \} comes before it, so it ends
+     * an option or variable name ({@code --config=}), or -1. An {@code =} after a separator is part of a directory or
+     * file name ({@code /data/dt=2024-01-01/part-0.parquet}).
+     */
+    private static int equalsEndingName(String text, int from, int to) {
+        for (int i = from; i < to; i++) {
+            char c = text.charAt(i);
+            if (c == '=') return i;
+            if (c == '/' || c == '\\') return -1;
         }
         return -1;
     }

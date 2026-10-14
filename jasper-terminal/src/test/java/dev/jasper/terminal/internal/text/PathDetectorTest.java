@@ -203,6 +203,24 @@ class PathDetectorTest {
         assertThat(at("k=[", 2)).as("nothing after the opener").isEmpty();
     }
 
+    /** Ruling 11: an equals sign splits only where it ends an option or variable name, not a directory name. */
+    @Test
+    void anEqualsSignAfterASeparatorIsPartOfThePath() {
+        String hive = "/data/dt=2024-01-01/part-0.parquet";
+        assertThat(at(hive, 7)).contains(new PathDetector.Match(hive, 0, 0, 0, hive.length()));
+        assertThat(at(hive, 25)).contains(new PathDetector.Match(hive, 0, 0, 0, hive.length()));
+        assertThat(at("/tmp/x=1.txt", 6)).contains(new PathDetector.Match("/tmp/x=1.txt", 0, 0, 0, 12));
+        assertThat(at("/tmp/x=1.txt", 10)).contains(new PathDetector.Match("/tmp/x=1.txt", 0, 0, 0, 12));
+        assertThat(at("./a=b/c.txt:3", 8)).contains(new PathDetector.Match("./a=b/c.txt", 3, 0, 0, 13));
+        assertThat(at("--config=./a=b/c.txt", 14)).as("the option still splits, the directory does not")
+            .contains(new PathDetector.Match("./a=b/c.txt", 0, 0, 9, 20));
+        assertThat(at("a=b=c/d=e.txt", 10)).as("each name's equals sign splits, none after a separator")
+            .contains(new PathDetector.Match("c/d=e.txt", 0, 0, 4, 13));
+        assertThat(PathDetector.pathAt(row("C:\\a=b\\x.txt"), 6, true)).contains(new PathDetector.Match("C:\\a=b\\x.txt", 0, 0, 0, 12));
+        assertThat(PathDetector.pathAt(row("C:\\dir\\x=1.txt"), 10, true)).contains(new PathDetector.Match("C:\\dir\\x=1.txt", 0, 0, 0, 14));
+        assertThat(PathDetector.pathAt(row("C:\\a=b\\x.txt"), 6, false)).as("no backslash paths off Windows").isEmpty();
+    }
+
     @Test
     void anEqualsSignAfterThePathIsNotWhereItStarts() {
         assertThat(at("src/Foo.java:42:x=5;", 2)).as("grep's matched text").contains(new PathDetector.Match("src/Foo.java", 42, 0, 0, 15));
@@ -282,6 +300,8 @@ class PathDetectorTest {
             assertThat(PathDetector.pathAt(plainRow(groups), 50_000, false)).map(PathDetector.Match::line).contains(3);
             assertThat(PathDetector.pathAt(plainRow("Foo.java:" + "1".repeat(100_000)), 2, false))
                 .contains(new PathDetector.Match("Foo.java", 0, 0, 0, 8));
+            assertThat(PathDetector.pathAt(plainRow("a=".repeat(50_000) + "b/c.txt"), 100_003, false))
+                .contains(new PathDetector.Match("b/c.txt", 0, 0, 100_000, 100_007));
         });
     }
 
