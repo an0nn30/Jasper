@@ -362,10 +362,10 @@ def testWatcher = tasks.register('testWatcher') {
             // The watcher acts after the launcher has gone: wait for what it should do, then a little longer for anything else.
             boolean reports = scenario.report != null
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
-            while (System.nanoTime() < deadline && !(reports ? report.isFile() : scenario.retried && record.isFile())) {
+            while ((reports || scenario.retried) && System.nanoTime() < deadline && !(reports ? report.isFile() : record.isFile())) {
                 Thread.sleep(100)
             }
-            Thread.sleep(reports || scenario.retried ? 1000 : 2000)
+            Thread.sleep(reports || scenario.retried ? 1000 : 3000)
             String received = ([name] + arguments).join('|')
             List<String> lines = record.isFile() ? record.readLines('UTF-8') : []
             List<String> expected = reports ? ["diagnose skip=- kept=kept value diagnose=1 args=${received}".toString()]
