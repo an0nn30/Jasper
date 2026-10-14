@@ -208,10 +208,13 @@ modified=<seconds since the epoch>
 options=<digest, or empty>
 ```
 
-It **matches** when `cache` equals the cache option's path as the launcher expands it, the file there has that size
-and modification time, and `options` is empty or equals this start's `-Djasper.vmOptionsDigest`. A missing,
-unreadable or malformed record matches nothing. The app writes it atomically (temporary file and move) and never
-deletes it; a new build makes it stale. `packaging/launcher/test/aot-record-vectors.txt` holds matching cases that the
+The launcher adds `-Djasper.aotCacheRecord=<path of this file>` whenever the merged options name an AOT cache,
+decided before section 4 removes it, and the app writes the record to exactly that path. It **matches** when the cache
+option's path, as the launcher expands it, names a regular file with that size and modification time, and `options` is
+empty or equals this start's `-Djasper.vmOptionsDigest`. `cache` records which file failed but is not compared, so a
+launch that spells the path differently (`./Jasper.app/…`) or a moved app still matches. A missing, unreadable or
+malformed record matches nothing. The app writes it atomically (temporary file and move) and never deletes it; a new
+build makes it stale. `packaging/launcher/test/aot-record-vectors.txt` holds matching cases that the
 launcher's native tests and the app's tests both read, as `digest-vectors.txt` does.
 
 ### 6.3 Attribution
@@ -229,7 +232,8 @@ On `StartupTrace.Milestone.OUTPUT_PAINTED`, on the existing worker:
 - `jasper.aotCacheSkipped=launch-failed`: run the check. When the cache check fails, write the record (`options` set
   when the check used the custom options) and post one notification in "Memory & VM options", Warning:
   "Jasper started without its start-up cache", text "The start-up cache made Java fail at launch, so Jasper starts more
-  slowly until a new Jasper build replaces it." and Java's message. When it passes, log at INFO that the cache failed at
+  slowly until a new Jasper build replaces it." and Java's message (the JVM's `[error][aot]` line that names an
+  exception or error when there is one, else its fatal message). When it passes, log at INFO that the cache failed at
   launch and passes now, and write nothing; the next start tries it.
 - `remembered` or any other value: one INFO log line.
 - `jasper.vmOptionsSkipped=launch-failed`: unchanged ("Jasper started without your custom VM options"), now also
