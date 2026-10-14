@@ -43,6 +43,13 @@ int jc_parent(jc_os os, const char *path, char *out, size_t size);
 /* Whether a pane id has a UUID's shape; anything else is sent as no pane. */
 int jc_valid_pane(const char *pane);
 
+/*
+ * Whether a NAME=value environment entry is passed to a Jasper started because nothing listens: every entry but those
+ * whose name starts with GIT_ (git sets them for the editor it runs), JASPER_PANE and JASPER_COMMAND_SOCKET. An entry
+ * without "=" is kept.
+ */
+int jc_cold_start_keeps(const char *entry);
+
 /* The request line, newline included, in a malloc'd string; NULL when memory runs out. An invalid pane is sent empty. */
 char *jc_request(const char *token, const char *cwd, const char *pane, int count, const char *const *arguments);
 

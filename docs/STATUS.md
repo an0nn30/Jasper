@@ -25,8 +25,9 @@ No GUI launched. GUI checks for the user: in a dev run's
 shell, `jasper-app/build/cli/bin/jasper editor --wait notes.txt` and Ctrl-C; on the packaged macOS app, Install (the
 administrator prompt), then from iTerm `jasper editor --wait notes.txt`, `git config --global core.editor "jasper editor
 --wait"` and `git commit`, with Jasper resident, not resident and not running, `jasper` alone, and `jasper --help`; on
-Windows, Install, a new terminal, and `jasper editor --wait` bringing Jasper to the front. Not merged or pushed. Plans 2
-(default editor) and 3 (Cmd-click file paths) are next.
+Windows, Install, a new terminal, and `jasper editor --wait` bringing Jasper to the front; on Windows and Linux,
+`git commit` from another terminal with Jasper not running, then `env | grep GIT_` and `pwd` in a new Jasper tab. Not
+merged or pushed. Plans 2 (default editor) and 3 (Cmd-click file paths) are next.
 
 **Tool windows in Zen, and more plugin commands — 2026-10-13** (`claude/zen-panels-actions`, worktree
 `.claude/worktrees/zen-panels-actions`; design agreed in chat, no spec). Zen now hides the showing tool windows through

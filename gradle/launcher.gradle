@@ -666,7 +666,8 @@ def buildCommandClient = tasks.register('buildCommandClient') {
         delete(work)
         List<File> sources = [new File(cliCore, 'jasper_cli.c'), new File(cliCore, 'jasper_cli_core.c')]
         File client = nativeBuild(kind: 'executable', sources: sources, strict: sources, includes: [cliCore],
-            libraries: host.os == 'windows' ? ['ws2_32.lib', 'user32.lib'] : [],
+            // userenv and advapi32: a cold start's default environment (CreateEnvironmentBlock, OpenProcessToken).
+            libraries: host.os == 'windows' ? ['ws2_32.lib', 'user32.lib', 'userenv.lib', 'advapi32.lib'] : [],
             subsystem: host.os == 'windows' ? 'CONSOLE' : null,
             output: commandClientFile.get().asFile, work: work)
         // Apple silicon runs only signed code; packaging signs the copy in the bundle again.

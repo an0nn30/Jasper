@@ -14,6 +14,7 @@
 #include <winsock2.h>
 #include <afunix.h>
 #include <windows.h>
+#include <userenv.h>
 #include <direct.h>
 #include <fcntl.h>
 #include <io.h>
@@ -267,14 +268,95 @@ static int append_argument(wchar_t *line, size_t size, const wchar_t *argument) 
     return put(line, size, &used, L'"');
 }
 
-/* Starts a program detached, passing it the right to come to the front. 0 when it started. */
-static int start_process(const char *program, int count, const char *const *arguments) {
+/*
+ * Orders an environment entry against a variable's name as Windows sorts a block: by name, ordinal, ignoring case.
+ * Below 0 when the entry comes first, 0 when it is that variable.
+ */
+static int compare_name(const wchar_t *entry, const wchar_t *name) {
+    /* A name may start with "=" (=C:=C:\x): it ends at the first "=" after that. */
+    const wchar_t *equals = entry[0] == L'\0' ? NULL : wcschr(entry + 1, L'=');
+    size_t length = equals == NULL ? wcslen(entry) : (size_t) (equals - entry);
+    return CompareStringOrdinal(entry, (int) length, name, -1, TRUE) - CSTR_EQUAL;
+}
+
+/* Writes name, "=", value and a terminator at out; returns where the next entry goes. */
+static wchar_t *put_variable(wchar_t *out, const wchar_t *name, const wchar_t *value) {
+    size_t name_length = wcslen(name), value_length = wcslen(value);
+    memcpy(out, name, name_length * sizeof(wchar_t));
+    out[name_length] = L'=';
+    memcpy(out + name_length + 1, value, (value_length + 1) * sizeof(wchar_t));
+    return out + name_length + 1 + value_length + 1;
+}
+
+/*
+ * The environment of a Jasper started because nothing listens: the user's default environment, as Explorer gives it,
+ * so nothing of this caller's (git's variables for its editor, a virtualenv's) outlives the call in Jasper's shells.
+ * JASPER_HOME is this caller's, so that Jasper serves the socket this client waits on. A malloc'd block sorted as
+ * Windows wants it, or NULL when there is none; *profile is its USERPROFILE value, or NULL.
+ */
+static wchar_t *default_environment(const wchar_t **profile) {
+    static const wchar_t home_name[] = L"JASPER_HOME", profile_name[] = L"USERPROFILE";
+    /* Where USERPROFILE's value starts in its entry. */
+    const size_t profile_value = wcslen(profile_name) + 1;
+    HANDLE token;
+    void *defaults = NULL;
+    const wchar_t *home = _wgetenv(home_name);
+    const wchar_t *entry;
+    wchar_t *block, *out;
+    size_t size = 2;
+    int placed;
+    *profile = NULL;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, &token)) return NULL;
+    if (!CreateEnvironmentBlock(&defaults, token, FALSE)) defaults = NULL;
+    CloseHandle(token);
+    if (defaults == NULL) return NULL;
+    if (home != NULL && home[0] == L'\0') home = NULL;
+    for (entry = defaults; *entry != L'\0'; entry += wcslen(entry) + 1) size += wcslen(entry) + 1;
+    if (home != NULL) size += wcslen(home_name) + 1 + wcslen(home) + 1;
+    block = malloc(size * sizeof(wchar_t));
+    if (block == NULL) {
+        DestroyEnvironmentBlock(defaults);
+        return NULL;
+    }
+    out = block;
+    placed = home == NULL;
+    for (entry = defaults; *entry != L'\0'; entry += wcslen(entry) + 1) {
+        size_t length = wcslen(entry);
+        int order = compare_name(entry, home_name);
+        if (!placed && order >= 0) {
+            out = put_variable(out, home_name, home);
+            placed = 1;
+        }
+        /* The default environment's own JASPER_HOME, if any, gives way to the caller's. */
+        if (order == 0) continue;
+        memcpy(out, entry, (length + 1) * sizeof(wchar_t));
+        if (compare_name(out, profile_name) == 0 && out[profile_value] != L'\0') *profile = out + profile_value;
+        out += length + 1;
+    }
+    if (!placed) out = put_variable(out, home_name, home);
+    /* The block ends with an empty entry; an empty block is two terminators. */
+    out[0] = L'\0';
+    out[1] = L'\0';
+    DestroyEnvironmentBlock(defaults);
+    return block;
+}
+
+/*
+ * Starts a program detached, passing it the right to come to the front. A cold start runs it with the user's default
+ * environment from their profile folder (default_environment); when that cannot be had, or the start fails, it starts
+ * as an option launch does, with this program's environment and folder. 0 when it started.
+ */
+static int start_process(const char *program, int count, const char *const *arguments, int cold) {
     size_t size = 32768;
     wchar_t *line = calloc(size, sizeof(wchar_t));
     wchar_t *wide_program = wide_of(program);
+    wchar_t *environment = NULL;
+    const wchar_t *folder = NULL;
     STARTUPINFOW startup;
     PROCESS_INFORMATION process;
     int ok = line != NULL && wide_program != NULL && append_argument(line, size, wide_program) == 0;
+    int started = 0;
+    memset(&process, 0, sizeof process);
     for (int i = 0; ok && i < count; i++) {
         wchar_t *wide = wide_of(arguments[i]);
         ok = wide != NULL && append_argument(line, size, wide) == 0;
@@ -282,10 +364,27 @@ static int start_process(const char *program, int count, const char *const *argu
     }
     memset(&startup, 0, sizeof startup);
     startup.cb = sizeof startup;
-    if (ok) {
-        ok = CreateProcessW(wide_program, line, NULL, NULL, FALSE, DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP, NULL, NULL,
-            &startup, &process) != 0;
+    if (ok && cold) environment = default_environment(&folder);
+    if (environment != NULL) {
+        /* CreateProcessW may write to its command line, and the start below needs it as it was. */
+        wchar_t *copy = _wcsdup(line);
+        if (folder == NULL) {
+            const wchar_t *own = _wgetenv(L"USERPROFILE");
+            if (own != NULL && own[0] != L'\0') folder = own;
+        }
+        if (copy != NULL) {
+            started = CreateProcessW(wide_program, copy, NULL, NULL, FALSE,
+                DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_UNICODE_ENVIRONMENT, environment, folder, &startup,
+                &process) != 0;
+            free(copy);
+        }
+        free(environment);
     }
+    if (ok && !started) {
+        started = CreateProcessW(wide_program, line, NULL, NULL, FALSE, DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP, NULL,
+            NULL, &startup, &process) != 0;
+    }
+    ok = ok && started;
     if (ok) {
         /* Only this process may pass on the right to come to the front; Jasper shows its window later. */
         AllowSetForegroundWindow(process.dwProcessId);
@@ -297,14 +396,33 @@ static int start_process(const char *program, int count, const char *const *argu
     return ok ? 0 : -1;
 }
 #else
-/* Starts a program away from this terminal: its own session, standard streams on /dev/null; the working directory and
- * the environment are this program's. 0 when it started. */
-static int spawn_detached(char *const arguments[]) {
+#ifndef __APPLE__
+/* This program's environment as a Jasper started because nothing listens gets it (jc_cold_start_keeps); NULL when
+ * memory runs out. The array is malloc'd; its strings are environ's. */
+static char **cold_environment(void) {
+    size_t count = 0, kept = 0;
+    char **filtered;
+    while (environ != NULL && environ[count] != NULL) count++;
+    filtered = malloc((count + 1) * sizeof *filtered);
+    if (filtered == NULL) return NULL;
+    for (size_t i = 0; i < count; i++) if (jc_cold_start_keeps(environ[i])) filtered[kept++] = environ[i];
+    filtered[kept] = NULL;
+    return filtered;
+}
+#endif
+
+/*
+ * Starts a program away from this terminal: its own session, standard streams on /dev/null, SIGPIPE back to its
+ * default. It runs in folder ("/" when that fails) with environment; a NULL folder or environment is this program's.
+ * 0 when it started.
+ */
+static int spawn_detached(char *const arguments[], char *const environment[], const char *folder) {
     pid_t child = fork();
     if (child < 0) return -1;
     if (child == 0) {
         int nothing;
         setsid();
+        signal(SIGPIPE, SIG_DFL);
         nothing = open("/dev/null", O_RDWR);
         if (nothing >= 0) {
             dup2(nothing, 0);
@@ -312,7 +430,11 @@ static int spawn_detached(char *const arguments[]) {
             dup2(nothing, 2);
             if (nothing > 2) close(nothing);
         }
-        execv(arguments[0], arguments);
+        if (folder != NULL && chdir(folder) != 0 && chdir("/") != 0) {
+            /* Nowhere to go: it stays in this program's folder. */
+        }
+        if (environment != NULL) execve(arguments[0], arguments, environment);
+        else execv(arguments[0], arguments);
         _exit(127);
     }
     return 0;
@@ -336,23 +458,41 @@ static int locate_app(char *bundle, char *launcher) {
     return -1;
 }
 
-/* Starts Jasper's launcher with these options, detached, from this working directory and environment, as running it
- * from this shell would. 0 when it started. */
-static int start_jasper(int count, const char *const *options) {
+/*
+ * Starts Jasper's launcher with these options, detached. An option launch runs it from this working directory and
+ * environment, as running it from this shell would. A cold start (cold: nothing listens) runs it as the desktop would,
+ * so nothing of this caller's outlives the call in Jasper's shells: from the home folder, on Linux without the
+ * variables jc_cold_start_keeps drops, on Windows with the user's default environment. 0 when it started.
+ */
+static int start_jasper(int count, const char *const *options, int cold) {
     char bundle[JC_MAX_PATH], launcher[JC_MAX_PATH];
     int started;
     if (count > MAX_OPTIONS) return -1;
     if (locate_app(bundle, launcher) != 0) return -1;
 #if defined(_WIN32)
-    started = start_process(launcher, count, options);
+    started = start_process(launcher, count, options, cold);
 #else
     {
         char *arguments[MAX_OPTIONS + 2];
+        char **environment = NULL;
+        const char *folder = NULL;
         int n = 0;
         arguments[n++] = launcher;
         for (int i = 0; i < count; i++) arguments[n++] = (char *) options[i];
         arguments[n] = NULL;
-        started = spawn_detached(arguments);
+#ifdef __APPLE__
+        /* macOS cold-starts through LaunchServices (start_without_window). */
+        (void) cold;
+#else
+        /* Without the environment, nothing changes: the launch is an option launch's. */
+        if (cold) environment = cold_environment();
+        if (environment != NULL) {
+            folder = getenv("HOME");
+            if (folder == NULL || folder[0] == '\0') folder = "/";
+        }
+#endif
+        started = spawn_detached(arguments, environment, folder);
+        free(environment);
     }
 #endif
     if (started != 0) fputs("jasper: could not start Jasper\n", stderr);
@@ -386,7 +526,7 @@ static int start_without_window(void) {
     return -1;
 #else
     static const char *const options[] = { "--no-window" };
-    return start_jasper(1, options);
+    return start_jasper(1, options, 1);
 #endif
 }
 
@@ -624,7 +764,7 @@ static int run(int count, const char *const *arguments) {
         return 1;
     }
     if (count > 0 && strcmp(arguments[0], "--help") == 0) return help(socket_path);
-    if (count > 0 && strncmp(arguments[0], "--", 2) == 0) return start_jasper(count, arguments) == 0 ? 0 : 1;
+    if (count > 0 && strncmp(arguments[0], "--", 2) == 0) return start_jasper(count, arguments, 0) == 0 ? 0 : 1;
     return call(socket_path, count, arguments);
 }
 

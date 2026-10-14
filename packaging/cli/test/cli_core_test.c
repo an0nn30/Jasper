@@ -118,6 +118,19 @@ static void frames(void) {
     check(jc_parse_frame("bogus").kind == JC_FRAME_UNKNOWN, "an unknown frame");
 }
 
+static void cold_start(void) {
+    check(!jc_cold_start_keeps("GIT_AUTHOR_DATE=@1700000000 +0000"), "a GIT_ variable is dropped");
+    check(!jc_cold_start_keeps("GIT_INDEX_FILE=.git/index"), "another GIT_ variable is dropped");
+    check(jc_cold_start_keeps("GITHUB_TOKEN=secret"), "GITHUB_TOKEN's name does not start with GIT_");
+    check(jc_cold_start_keeps("JASPER_HOME=/srv/jasper"), "JASPER_HOME is kept");
+    check(!jc_cold_start_keeps("JASPER_PANE=123e4567-e89b-12d3-a456-426614174000"), "JASPER_PANE is dropped");
+    check(!jc_cold_start_keeps("JASPER_COMMAND_SOCKET=/tmp/commands"), "JASPER_COMMAND_SOCKET is dropped");
+    check(jc_cold_start_keeps("JASPER_PANES=x"), "only JASPER_PANE itself is dropped");
+    check(jc_cold_start_keeps("HOME=/home/ann"), "anything else is kept");
+    check(jc_cold_start_keeps("GIT_EDITOR"), "an entry without = is kept");
+    check(jc_cold_start_keeps(""), "an empty entry is kept");
+}
+
 static const char *pairs(const char *name, void *context) {
     const char *const *pair = context;
     for (; pair[0] != NULL; pair += 2) if (strcmp(pair[0], name) == 0) return pair[1];
@@ -271,6 +284,7 @@ int main(int argc, char **argv) {
     parent();
     panes();
     frames();
+    cold_start();
     home_rules();
     home_vectors(argv[1]);
     protocol_vectors(argv[2]);

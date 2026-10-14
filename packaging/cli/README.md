@@ -29,7 +29,9 @@ line installs it on `PATH`.
    `exit <code>`, and the client exits with that code. `stale` (another protocol version) and `refused` (another
    token) end the call with exit code 1.
 4. When nothing listens, the client starts the app with `--no-window` (`open -g -a` on macOS, so Jasper is not a
-   child of the shell; a detached process elsewhere) and polls for the socket for up to 20 seconds.
+   child of the shell; elsewhere a detached process in the home folder, on Linux without the caller's `GIT_*`
+   variables, `JASPER_PANE` and `JASPER_COMMAND_SOCKET`, on Windows with the user's default environment and the
+   caller's `JASPER_HOME`) and polls for the socket for up to 20 seconds.
 5. The client sends nothing after its request. When it goes away, for example on Ctrl-C, Jasper cancels the call.
 
 `jasper --help` prints the usage and the subcommands Jasper last wrote to `<home>/daemon/subcommands`, without

@@ -193,6 +193,18 @@ int jc_valid_pane(const char *pane) {
     return 1;
 }
 
+/* Whether entry is NAME=... for exactly this name. */
+static int named(const char *entry, const char *name) {
+    size_t length = strlen(name);
+    return strncmp(entry, name, length) == 0 && entry[length] == '=';
+}
+
+int jc_cold_start_keeps(const char *entry) {
+    if (entry == NULL) return 0;
+    if (strchr(entry, '=') == NULL) return 1;
+    return strncmp(entry, "GIT_", 4) != 0 && !named(entry, "JASPER_PANE") && !named(entry, "JASPER_COMMAND_SOCKET");
+}
+
 typedef struct {
     char *data;
     size_t used;

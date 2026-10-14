@@ -209,20 +209,68 @@ class CommandClientTest {
         // The record appears whole, by rename, so the wait below never reads half of it.
         Files.writeString(launcher, """
             #!/bin/sh
-            { pwd -P; for argument in "$@"; do printf '%s\\n' "$argument"; done; } > "$RECORD.part" && mv "$RECORD.part" "$RECORD"
+            { pwd -P; for argument in "$@"; do printf '%s\\n' "$argument"; done; printf '%s\\n' "$GIT_AUTHOR_DATE"; } > "$RECORD.part" && mv "$RECORD.part" "$RECORD"
             """);
         assertThat(launcher.toFile().setExecutable(true)).isTrue();
         Path folder = Files.createDirectories(dir.resolve("project"));
         Path record = dir.resolve("record");
 
-        Result result = run(client.toString(), folder,
-            Map.of("RECORD", record.toString(), "JASPER_HOME", dir.toString()), List.of("--config", "jasper.toml", "--safe-mode"));
+        Result result = run(client.toString(), folder, Map.of("RECORD", record.toString(), "JASPER_HOME", dir.toString(),
+            "GIT_AUTHOR_DATE", "@1700000000 +0000"), List.of("--config", "jasper.toml", "--safe-mode"));
 
         assertThat(result).isEqualTo(new Result(0, "", ""));
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (!Files.exists(record) && System.nanoTime() < deadline) Thread.sleep(10);
-        assertThat(Files.readAllLines(record))
-            .containsExactly(folder.toRealPath().toString(), "--config", "jasper.toml", "--safe-mode");
+        assertThat(Files.readAllLines(record)).as("an option launch keeps the caller's environment")
+            .containsExactly(folder.toRealPath().toString(), "--config", "jasper.toml", "--safe-mode", "@1700000000 +0000");
+    }
+
+    /**
+     * A cold start (nothing listens) on Linux: the fake launcher records its folder, arguments and environment, and the
+     * test then serves the call the client waits to send, as the started Jasper would. macOS cold-starts through
+     * {@code open}; Windows gives the launcher the user's default environment, which a test cannot arrange.
+     */
+    @Test void aColdStartRunsTheLauncherFromHomeWithoutTheCallersGitVariables() throws Exception {
+        assumeTrue(System.getProperty("os.name").startsWith("Linux"), "only Linux starts the launcher itself for a cold start");
+        Path image = dir.resolve("image");
+        Path client = image.resolve("lib/bin/jasper");
+        Path launcher = image.resolve("bin/Jasper");
+        Files.createDirectories(client.getParent());
+        Files.createDirectories(launcher.getParent());
+        Files.copy(Path.of(CLIENT), client, StandardCopyOption.REPLACE_EXISTING);
+        assertThat(client.toFile().setExecutable(true)).isTrue();
+        // The record goes beside the image, not where a variable says: the environment is what is checked.
+        Files.writeString(launcher, """
+            #!/bin/sh
+            record="$(dirname "$0")/../record"
+            { pwd -P; for argument in "$@"; do printf '%s\\n' "$argument"; done; echo --; env; } > "$record.part" && mv "$record.part" "$record"
+            """);
+        assertThat(launcher.toFile().setExecutable(true)).isTrue();
+        Path home = Files.createDirectories(dir.resolve("home"));
+        Path folder = Files.createDirectories(dir.resolve("project"));
+        Path record = image.resolve("record");
+        UUID pane = UUID.randomUUID();
+        var seen = new AtomicReference<Invocation>();
+
+        Process process = start(client.toString(), folder, Map.of("JASPER_HOME", dir.toString(), "HOME", home.toString(),
+            "JASPER_COMMAND_SOCKET", socket().toString(), "JASPER_PANE", pane.toString(),
+            "GIT_AUTHOR_DATE", "@1700000000 +0000", "GITHUB_TOKEN", "kept"), List.of("editor", "notes.txt"));
+        var out = CompletableFuture.supplyAsync(() -> read(process.getInputStream()));
+        var err = CompletableFuture.supplyAsync(() -> read(process.getErrorStream()));
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+        while (!Files.exists(record) && System.nanoTime() < deadline) Thread.sleep(10);
+        bind(invocation -> { seen.set(invocation); return CompletableFuture.completedFuture(0); });
+        assertThat(process.waitFor(30, TimeUnit.SECONDS)).as("the client exits").isTrue();
+
+        assertThat(new Result(process.exitValue(), out.get(), err.get())).isEqualTo(new Result(0, "", ""));
+        List<String> lines = Files.readAllLines(record);
+        int end = lines.indexOf("--");
+        assertThat(lines.subList(0, end)).containsExactly(home.toRealPath().toString(), "--no-window");
+        assertThat(lines.subList(end + 1, lines.size()))
+            .noneMatch(line -> line.startsWith("GIT_") || line.startsWith("JASPER_PANE=") || line.startsWith("JASPER_COMMAND_SOCKET="))
+            .contains("JASPER_HOME=" + dir, "HOME=" + home, "GITHUB_TOKEN=kept");
+        assertThat(seen.get().workingDirectory().toRealPath()).as("the call keeps the caller's folder").isEqualTo(folder.toRealPath());
+        assertThat(seen.get().pane()).contains(pane);
     }
 
     @Test void helpListsTheSubcommandsJasperLastRecorded() throws Exception {
