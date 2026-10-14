@@ -795,10 +795,10 @@ public final class JasperApplication {
 
     /**
      * Starts plugins once, before the first window, so their contributions are in place when windows
-     * appear. {@code codeSource} locates bundled plugins beside the application jar and may be null;
+     * appear. {@code codeLocation} locates bundled plugins beside the application jar and may be null;
      * {@code developmentDirectory} is the {@code --plugin-dir} value or null.
      */
-    public void startPlugins(Path codeSource, Path developmentDirectory, boolean safeMode, AppDirs dirs) {
+    public void startPlugins(Path codeLocation, Path developmentDirectory, boolean safeMode, AppDirs dirs) {
         if (plugins != null || quitting || stopped) return;
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
         uiState = UiState.load(dirs.uiState());
@@ -818,7 +818,7 @@ public final class JasperApplication {
         aboutWindows = new AboutWindows(contributions, auxiliary, () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),
             new AboutWindows.Hooks(dev.jasper.app.platform.BuildInfo.current(), IncidentReport.Environment.current(),
                 notificationCenter.clock().getZone(), this::copyBuildInformation, this::browse, JasperApplication::afterDelay));
-        plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
+        plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeLocation), dirs.plugins(),
             developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock()), activityNotifier,
             new PluginRuntime.SettingsReports(
                 diagnostic -> { if (configuration != null) configuration.report(diagnostic); },

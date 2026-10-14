@@ -471,14 +471,14 @@ public final class PluginRuntime {
      * The bundled plugin directory: the {@code jasper.plugins.bundled} system property when set (Gradle
      * run and tests), otherwise {@code plugins} beside the application jar. A classes directory has none.
      *
-     * @param codeSource the application's code source, or null
+     * @param codeLocation the application's code location ({@code HandoffSocket.codeLocation()}), or null
      * @return the directory, which need not exist, or null
      */
-    public static Path bundledDirectory(Path codeSource) {
+    public static Path bundledDirectory(Path codeLocation) {
         String override = System.getProperty("jasper.plugins.bundled");
         if (override != null && !override.isBlank()) return Path.of(override);
-        if (codeSource == null || !Files.isRegularFile(codeSource)) return null;
-        return codeSource.toAbsolutePath().getParent().resolve("plugins");
+        if (codeLocation == null || !Files.isRegularFile(codeLocation)) return null;
+        return codeLocation.toAbsolutePath().getParent().resolve("plugins");
     }
 
     /**

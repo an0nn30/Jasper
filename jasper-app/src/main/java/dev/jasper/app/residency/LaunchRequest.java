@@ -12,14 +12,14 @@ import java.util.Objects;
  * cold launch would, so that {@code jasper} from a shell does not behave differently depending on
  * whether a daemon happened to be running.
  */
-public record LaunchRequest(String token, Path codeSource, long codeSourceModified, Kind kind) {
+public record LaunchRequest(String token, Path codeLocation, long codeLocationModified, Kind kind) {
     private static final String MAGIC = "jasper";
     private static final int PROTOCOL = 1;
     private static final int FIELDS = 5;
 
     public LaunchRequest {
         Objects.requireNonNull(token, "token");
-        Objects.requireNonNull(codeSource, "codeSource");
+        Objects.requireNonNull(codeLocation, "codeLocation");
         Objects.requireNonNull(kind, "kind");
     }
 
@@ -32,8 +32,8 @@ public record LaunchRequest(String token, Path codeSource, long codeSourceModifi
     }
 
     /** An ordinary launch. */
-    public LaunchRequest(String token, Path codeSource, long codeSourceModified) {
-        this(token, codeSource, codeSourceModified, Kind.OPEN);
+    public LaunchRequest(String token, Path codeLocation, long codeLocationModified) {
+        this(token, codeLocation, codeLocationModified, Kind.OPEN);
     }
 
     /**
@@ -43,7 +43,7 @@ public record LaunchRequest(String token, Path codeSource, long codeSourceModifi
      */
     String encode() {
         String line = String.join("\t", MAGIC, Integer.toString(PROTOCOL), token,
-            encode(codeSource), Long.toString(codeSourceModified));
+            encode(codeLocation), Long.toString(codeLocationModified));
         return line + (kind == Kind.RETIRE ? "\tretire" : "") + "\n";
     }
 
