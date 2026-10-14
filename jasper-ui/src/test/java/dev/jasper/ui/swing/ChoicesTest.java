@@ -78,6 +78,27 @@ class ChoicesTest {
             } finally { release(context); }
         });
     }
+    @Test void aDropdownMenuIsAsTallAsTheRowsItShows() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var many = new ArrayList<Option>();
+            for (int i = 0; i < 10; i++) many.add(new Option("o" + i, "Option " + i, Optional.empty()));
+            var settings = new Nodes.Stack("page", ControlState.READY, LayoutRole.SETTINGS_PAGE, List.of(
+                new Choice("few", ControlState.READY, ChoiceKind.DROPDOWN, List.of(new Option("a", "Alpha", Optional.empty()),
+                    new Option("b", "Beta", Optional.empty())), "a", "Few", ""),
+                new Choice("many", ControlState.READY, ChoiceKind.DROPDOWN, many, "o0", "Many", "")));
+            try (var form = new KitView(context, stack(choice(ChoiceKind.DROPDOWN, "a", ControlState.READY)), e -> {});
+                 var page = new KitView(context, new ViewSpec(settings), e -> {})) {
+                for (var combo : List.of(find(form, "choice.input", JComboBox.class), find(page, "few.input", JComboBox.class),
+                        find(page, "many.input", JComboBox.class))) {
+                    var popup = (Choices.KitComboPopup) combo.getUI().getAccessibleChild(combo, 0);
+                    int row = popup.getList().getFixedCellHeight(), rows = Math.min(combo.getItemCount(), combo.getMaximumRowCount());
+                    assertThat(row).isPositive();
+                    assertThat(popup.menuHeight(combo.getMaximumRowCount())).as("%d rows of %d px", rows, row).isEqualTo(rows * row);
+                }
+            } finally { release(context); }
+        });
+    }
     @Test void existingDropdownPopupTracksSemanticMenuColorsAndRows() {
         Edt.run(() -> {
             var context=KitFixtures.context();
