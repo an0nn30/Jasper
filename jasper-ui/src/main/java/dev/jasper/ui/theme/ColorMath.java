@@ -35,6 +35,12 @@ public final class ColorMath {
         return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
     }
 
+    /** CIE L* of an opaque colour: perceived lightness, 0 (black) to 100 (white), even across dark and light colours. */
+    public static double lightness(Color color) {
+        double y = luminance(color);
+        return 116 * (y > 216.0 / 24389 ? Math.cbrt(y) : (24389.0 / 27 * y + 16) / 116) - 16;
+    }
+
     /** Applies one paint treatment to the base alpha, preserving authored translucency. */
     public static Color opacity(Color color, double amount) {
         if (!(amount >= 0 && amount <= 1)) throw new IllegalArgumentException("opacity must be from 0 to 1");

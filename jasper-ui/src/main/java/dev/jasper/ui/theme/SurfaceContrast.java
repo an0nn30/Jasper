@@ -14,6 +14,8 @@ public final class SurfaceContrast {
     public static final double TEXT = 4.5;
     /** Non-text indicators (badges, dots, icon strokes). */
     public static final double INDICATOR = 3;
+    /** How far apart in CIE L* an inactive tab's surface stays from the active tab's. */
+    public static final double TAB_LIGHTNESS = 9;
     private SurfaceContrast() {}
 
     /** {@code role} as painted on {@code surface}: unchanged when it meets {@code minimum}, else made readable there. */
@@ -26,6 +28,21 @@ public final class SurfaceContrast {
     public static Color readable(Color color, Color fill, double minimum, Color toward) {
         Color adjusted = ColorMath.readable(color, fill, minimum, toward);
         return ColorMath.contrast(adjusted, fill) >= minimum ? adjusted : ColorMath.readable(color, fill, minimum, blackOrWhite(fill));
+    }
+
+    /**
+     * {@code surface} kept at least {@code minimum} CIE L* from {@code from}: unchanged when it already is, on either side;
+     * otherwise moved toward black, in 1% steps, just until it is, or toward white when {@code from} is too dark for that.
+     */
+    public static Color apart(Color surface, Color from, double minimum) {
+        double target = ColorMath.lightness(from);
+        if (Math.abs(target - ColorMath.lightness(surface)) >= minimum) return surface;
+        Color toward = target >= minimum ? Color.BLACK : Color.WHITE;
+        for (int step = 1; step <= 100; step++) {
+            Color candidate = ColorMath.mix(toward, surface, step / 100.0);
+            if (Math.abs(target - ColorMath.lightness(candidate)) >= minimum) return candidate;
+        }
+        return toward;
     }
 
     /** White or black, whichever contrasts more with {@code fill}. */

@@ -126,10 +126,13 @@ public final class NativeChromePainting {
 
     /**
      * An equal-width workspace tab's surface: the selected tab is the terminal's surface and the others the tab strip's,
-     * both at {@code base}'s alpha (the window's opacity while it is translucent).
+     * kept clearly apart from it ({@link SurfaceContrast#TAB_LIGHTNESS}) so the selected tab shows whatever the theme gives
+     * the two, both at {@code base}'s alpha (the window's opacity while it is translucent).
      */
     public static Color tabSurface(GeneratedTheme workspace, Color base, boolean selected) {
-        Color role = workspace.semantic().color(selected ? SemanticColor.SURFACE_TERMINAL : SemanticColor.SURFACE_TABSTRIP);
+        var palette = workspace.semantic();
+        Color terminal = palette.color(SemanticColor.SURFACE_TERMINAL);
+        Color role = selected ? terminal : SurfaceContrast.apart(palette.color(SemanticColor.SURFACE_TABSTRIP), terminal, SurfaceContrast.TAB_LIGHTNESS);
         return new Color(role.getRed(), role.getGreen(), role.getBlue(), base.getAlpha());
     }
 
