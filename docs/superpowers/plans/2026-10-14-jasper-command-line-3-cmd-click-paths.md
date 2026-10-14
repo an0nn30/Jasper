@@ -102,6 +102,9 @@ Recorded here and, when the plan completes, in the spec's status line and `docs/
 4. **Paths with spaces** are found only through OSC 8 `file://` links. In plain text a path ends at whitespace.
 5. **`FileLink` is a top-level supported type** in `dev.jasper.terminal.view`, added to the allowlist like
    `session.RemoteDirectory`.
+6. **A Cmd-click's desktop fallback edits or reveals the file, never opens it** (`ConfigEditor.editOrReveal`): opening an
+   existing `.command`, `.app` or `.exe` reached from printed text or an OSC 8 link would run it. Ruled before execution
+   (security).
 
 ## Decisions the spec left open (ruled while writing the plan)
 
@@ -114,7 +117,8 @@ Recorded here and, when the plan completes, in the spec's status line and `docs/
 4. An extension is a dot after the name's first character followed only by letters and digits, at least one a letter;
    the last name is not empty, `.` or `..`. So `1.2.3`, `.bashrc` and `Makefile` are not paths; `e.g` is, harmlessly
    (the existence check).
-5. A digit run longer than 9 drops the line or column and keeps the path.
+5. In the colon forms a digit run longer than 9 drops the line or column and keeps the path; in the parenthesis
+   form an over-long number is no position, so rule 3 keeps the `(` in the name.
 6. On macOS and Linux a path holding `\` is refused.
 7. An OSC 8 link on the cell decides alone: an `http` link opens the browser even if its text looks like a path; a
    `file://` link (OSC 8 or plain) to another host opens nothing and never falls back to the path in its text.
@@ -123,6 +127,7 @@ Recorded here and, when the plan completes, in the spec's status line and `docs/
    `file://` links go through the WSL mapper.
 10. A failure after the existence check (no desktop action, say) is logged at WARNING and shown to nobody.
 11. AGENTS.md's verified JediTerm 3.76 list gains that `HyperlinkStyle` equality ignores the link (Task 4).
+12. Spec 7's "line 1" for `file://` links is met by opening with no line, which every editor reads as the file's start.
 
 ## Review Focus
 
