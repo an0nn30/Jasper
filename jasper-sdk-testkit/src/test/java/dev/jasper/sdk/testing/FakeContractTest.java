@@ -4,6 +4,7 @@ import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
+import dev.jasper.sdk.testing.contract.ContractCall;
 import dev.jasper.sdk.testing.contract.ContractHarness;
 import dev.jasper.sdk.testing.contract.PluginContractTest;
 import java.util.List;
@@ -104,6 +105,20 @@ class FakeContractTest extends PluginContractTest {
             @Override public void clipboardBusy(boolean busy) { host.clipboard().failWrites(busy); }
             @Override public void expireClipboardSecret() { host.clipboard().expireSecrets(); }
             @Override public void stopAll() { host.stopAll(); }
+            @Override public void declareSubcommand(String pluginId, String name, String summary) { host.declareSubcommand(pluginId, name, summary); }
+            @Override public ContractCall call(String name, List<String> arguments, java.nio.file.Path workingDirectory, java.util.UUID paneOrNull) {
+                FakeCommandCall call = host.call(name, arguments, workingDirectory, paneOrNull);
+                return new ContractCall() {
+                    @Override public int exitCode() {
+                        try { return call.exit().get(5, java.util.concurrent.TimeUnit.SECONDS); }
+                        catch (Exception failure) { throw new AssertionError(failure); }
+                    }
+                    @Override public boolean finished() { return call.exit().isDone(); }
+                    @Override public String out() { return call.out(); }
+                    @Override public String err() { return call.err(); }
+                    @Override public void cancel() { call.cancel(); }
+                };
+            }
             @Override public void close() { host.close(); }
         };
     }

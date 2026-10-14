@@ -526,6 +526,24 @@ public final class PluginRuntime {
         synchronized(artworkLock){if(!artworkStopped && epoch==artworkEpoch)pluginIcons=Map.copyOf(next);}
     }
 
+    private java.nio.file.Path subcommandList;
+
+    /** Where {@code jasper --help} reads the subcommands; before {@link #start}, and never for a private launch. */
+    public void subcommandList(java.nio.file.Path file) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        subcommandList = file;
+    }
+
+    /** Runs {@code jasper <subcommand>} calls in the plugins that answer them. */
+    public dev.jasper.app.commandline.CommandDispatcher commands() {
+        return invocation -> {
+            PluginHost current = host;
+            if (current != null) return current.commands.dispatch(invocation);
+            invocation.err("jasper: Jasper's plugins are not running\n");
+            return java.util.concurrent.CompletableFuture.completedFuture(1);
+        };
+    }
+
     public void start(Map<String, Map<String, Object>> pluginTables, boolean dark) {
         if (host != null) throw new IllegalStateException("Plugins already started");
         this.dark = dark;
@@ -565,6 +583,7 @@ public final class PluginRuntime {
         created.animations = animations;
         created.shortcuts = shortcuts;
         created.clipboard = clipboard;
+        created.commands.declare(Subcommands.choose(resolution.load(), notifications.problem()));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         connectionBridge = created.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, this::forwardConnection);
@@ -604,6 +623,22 @@ public final class PluginRuntime {
         try { adminWorker.submit(() -> { publishIcons(admin.snapshot(), artworkEpoch); return null; }).get(); }
         catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); LOG.log(System.Logger.Level.DEBUG, "Plugin artwork startup interrupted", interrupted); }
         catch (java.util.concurrent.ExecutionException failure) { LOG.log(System.Logger.Level.DEBUG, "Plugin artwork unavailable at startup", failure); }
+        if (subcommandList != null) {
+            Set<String> running = new HashSet<>();
+            for (PluginStatus status : statuses) if (status.state() == PluginStatus.State.ACTIVE) running.add(status.id());
+            List<Subcommands.Owner> owners = created.commands.owners();
+            java.nio.file.Path file = subcommandList;
+            adminWorker.execute(() -> {
+                try {
+                    dev.jasper.app.commandline.SubcommandList.write(file, owners.stream()
+                        .filter(owner -> running.contains(owner.pluginId()))
+                        .map(owner -> new dev.jasper.app.commandline.SubcommandList.Entry(owner.name(), owner.summary(), owner.pluginName()))
+                        .toList());
+                } catch (IOException | RuntimeException failure) {
+                    LOG.log(System.Logger.Level.WARNING, "Could not write the subcommand list " + file, failure);
+                }
+            });
+        }
         problems.forEach(problem -> LOG.log(System.Logger.Level.WARNING, "Plugin discovery: " + problem));
         statusLines().forEach(line -> LOG.log(System.Logger.Level.INFO, "Plugin " + line));
         LOG.log(System.Logger.Level.INFO, "Plugins started in " + (System.nanoTime() - began) / 1_000_000 + " ms");

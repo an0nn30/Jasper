@@ -227,4 +227,12 @@ public interface ContractHarness extends AutoCloseable {
         void clipboardBusy(boolean busy);
         /** Runs the pending secret's clear now, as its 30 seconds would. */
         void expireClipboardSecret();
+
+        /** Declares a subcommand as the plugin's {@code [[subcommands]]} would; before that plugin starts. */
+        void declareSubcommand(String pluginId, String name, String summary);
+        /**
+         * Calls {@code jasper name arguments...} as if run in the pane {@code paneOrNull} (null: outside Jasper); returns
+         * once the handler has run.
+         */
+        ContractCall call(String name, List<String> arguments, java.nio.file.Path workingDirectory, java.util.UUID paneOrNull);
 }

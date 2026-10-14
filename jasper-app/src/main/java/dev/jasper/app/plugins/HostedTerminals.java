@@ -213,6 +213,12 @@ final class HostedTerminals implements Terminals {
     /** A handle for an id an action was given; it finds its tab if the pane is open. */
     PaneHandle paneHandle(UUID id) { return registry.pane(id).<PaneHandle>map(Pane::new).orElseGet(() -> new Pane(id, NOWHERE)); }
 
+    /** The open window holding a pane, for a {@code jasper} call run in it; empty when the pane is not open. UI thread. */
+    Optional<WindowHandle> windowOfPane(UUID pane) {
+        return registry.pane(pane).flatMap(entry -> registry.tab(entry.tabId()))
+            .flatMap(tab -> registry.window(tab.windowId())).<WindowHandle>map(window -> new Window(window.id()));
+    }
+
     /** The focused pane in {@code windowId}'s selected tab, else the active pane. */
     Optional<UUID> focusedPane(UUID windowId) {
         Optional<PaneEntry> pane = windowId == null ? Optional.empty()
