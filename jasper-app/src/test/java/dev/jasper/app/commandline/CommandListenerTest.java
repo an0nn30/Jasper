@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -197,10 +198,19 @@ class CommandListenerTest {
         assertThat(exchange(request(token(), List.of("fail")))).isEqualTo(CommandProtocol.err("jasper: disk full\n") + CommandProtocol.exit(1));
     }
 
-    @Test void aHandlerNeverWaitsForAClientThatHasStoppedReading() throws Exception {
-        // About 2.8 MiB of frames, far more than the socket buffers hold while the client reads nothing.
+    /** About 2.8 MiB of frames once encoded, far more than the socket buffers hold while a client reads nothing. */
+    private static List<String> floodChunks() {
         List<String> chunks = new ArrayList<>();
         for (int i = 0; i < 32; i++) chunks.add("chunk " + i + " " + "x".repeat(64 * 1024) + "\n");
+        return chunks;
+    }
+
+    private static String frames(List<String> chunks, int exitCode) {
+        return String.join("", chunks.stream().map(CommandProtocol::out).toList()) + CommandProtocol.exit(exitCode);
+    }
+
+    @Test void aHandlerNeverWaitsForAClientThatHasStoppedReading() throws Exception {
+        List<String> chunks = floodChunks();
         var returned = new CompletableFuture<Void>();
         bind(invocation -> {
             chunks.forEach(invocation::out);
@@ -210,21 +220,63 @@ class CommandListenerTest {
         try (SocketChannel client = open()) {
             send(client, request(token(), List.of("flood")));
             returned.get(5, TimeUnit.SECONDS);
-            String expected = String.join("", chunks.stream().map(CommandProtocol::out).toList()) + CommandProtocol.exit(3);
             String replies = readAll(client);
             // Not isEqualTo: a failure would print megabytes.
-            assertThat(replies.equals(expected)).as("every output frame in order, then the exit frame last").isTrue();
+            assertThat(replies.equals(frames(chunks, 3))).as("every output frame in order, then the exit frame last").isTrue();
         }
     }
 
-    @Test void closingEndsTheCallsStillRunning() throws Exception {
+    @Test void closingEndsTheCallsStillRunningWithoutWaitingForThem() throws Exception {
         var started = new CompletableFuture<Void>();
         CommandListener listener = bind(invocation -> { started.complete(null); return new CompletableFuture<>(); });
         try (SocketChannel client = open()) {
             send(client, request(token(), List.of("editor", "--wait")));
             started.get(10, TimeUnit.SECONDS);
+            long begun = System.nanoTime();
             listener.close();
+            assertThat(Duration.ofNanos(System.nanoTime() - begun)).as("a running call is not waited for").isLessThan(Duration.ofSeconds(2));
             assertThat(readAll(client)).as("no exit frame, so the client says Jasper quit").isEmpty();
+        }
+    }
+
+    @Test void closingRightAfterACallEndsStillDeliversItsExitFrame() throws Exception {
+        // A non-resident Jasper quits as its last call ends: the exit frame is queued, not yet written, when close() runs.
+        List<String> chunks = floodChunks();
+        var queued = new CompletableFuture<Void>();
+        var pending = new CompletableFuture<Integer>();
+        CommandListener listener = bind(invocation -> {
+            chunks.forEach(invocation::out);
+            queued.complete(null);
+            return pending;
+        });
+        try (SocketChannel client = open()) {
+            send(client, request(token(), List.of("editor", "--wait")));
+            var received = new CompletableFuture<String>();
+            Thread.ofVirtual().start(() -> {
+                try { received.complete(readAll(client)); } catch (IOException | RuntimeException failure) { received.completeExceptionally(failure); }
+            });
+            queued.get(10, TimeUnit.SECONDS);
+            pending.complete(3);
+            listener.close();
+            assertThat(received.get(10, TimeUnit.SECONDS).equals(frames(chunks, 3)))
+                .as("every output frame in order, then the exit frame last, although the listener closed at once").isTrue();
+        }
+    }
+
+    @Test void closingWaitsOnlyAMomentForAClientThatReadsNothing() throws Exception {
+        List<String> chunks = floodChunks();
+        var queued = new CompletableFuture<Void>();
+        CommandListener listener = bind(invocation -> {
+            chunks.forEach(invocation::out);
+            queued.complete(null);
+            return CompletableFuture.completedFuture(0);
+        });
+        try (SocketChannel client = open()) {
+            send(client, request(token(), List.of("flood")));
+            queued.get(10, TimeUnit.SECONDS);
+            long begun = System.nanoTime();
+            listener.close();
+            assertThat(Duration.ofNanos(System.nanoTime() - begun)).as("the grace for finished calls is bounded").isLessThan(Duration.ofSeconds(3));
         }
     }
 

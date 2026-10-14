@@ -39,7 +39,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Each connection is served on its own virtual thread, because a call such as {@code jasper editor --wait} lasts as
  * long as the user edits. Reply frames are queued for a writer virtual thread of their own, so a handler's output and
  * a call's completion, which may happen on the UI thread, never wait for a client that has stopped reading. Closing
- * ends the accept loop and the connections of calls still running.
+ * ends the accept loop, gives the calls that have ended up to a second in total to write their exit frames (a
+ * non-resident Jasper closes as its last call ends), and then ends the connections of calls still running.
  */
 public final class CommandListener implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(CommandListener.class.getName());
@@ -49,6 +50,8 @@ public final class CommandListener implements AutoCloseable {
     private static final long REQUEST_TIMEOUT_MILLIS = 5_000;
     /** Backoff after an accept failure, so a persistent error cannot spin the loop. */
     private static final long ACCEPT_FAILURE_BACKOFF_MILLIS = 50;
+    /** In total, how long close() lets the writers of calls that have ended put their exit frames on the wire. */
+    private static final long WRITER_GRACE_MILLIS = 1_000;
 
     private final ServerSocketChannel channel;
     private final Path socket;
@@ -56,6 +59,7 @@ public final class CommandListener implements AutoCloseable {
     private final CommandDispatcher dispatcher;
     private final Thread acceptor;
     private final Set<SocketChannel> connections = ConcurrentHashMap.newKeySet();
+    private final Set<Delivery> deliveries = ConcurrentHashMap.newKeySet();
     private final AtomicInteger active = new AtomicInteger();
     private final List<Runnable> idle = new CopyOnWriteArrayList<>();
     private volatile boolean closed;
@@ -188,49 +192,64 @@ public final class CommandListener implements AutoCloseable {
         // Output and the exit code are only queued; this call's writer puts them on the wire, in order.
         BlockingQueue<Frame> frames = new LinkedBlockingQueue<>();
         Thread writer = Thread.ofVirtual().name("jasper-command-writer").start(() -> write(client, frames));
-        var invocation = new Invocation(request.arguments(), request.workingDirectory(), request.pane(),
-            text -> frames.add(new Frame(CommandProtocol.out(text), false)),
-            text -> frames.add(new Frame(CommandProtocol.err(text), false)));
-        var ended = new CompletableFuture<Void>();
-        active.incrementAndGet();
-        CompletionStage<Integer> stage;
+        var delivery = new Delivery(writer);
+        deliveries.add(delivery);
         try {
-            stage = Objects.requireNonNull(dispatcher.dispatch(invocation), "the dispatcher's stage");
-        } catch (RuntimeException failure) {
-            stage = CompletableFuture.failedFuture(failure);
-        }
-        stage.whenComplete((code, failure) -> {
-            int exit = failure != null ? failed(invocation, failure) : code == null ? 1 : code;
-            invocation.finish();
-            ended.complete(null);
-            frames.add(new Frame(CommandProtocol.exit(exit), true));
-            if (active.decrementAndGet() == 0) {
-                for (Runnable listener : idle) {
-                    try { listener.run(); }
-                    catch (RuntimeException broken) { LOG.log(System.Logger.Level.WARNING, "An idle listener failed", broken); }
-                }
-            }
-        });
-        // The client sends nothing after its request, so a read returns only once it goes away, the listener closes
-        // or the writer closes the connection after the exit frame.
-        ByteBuffer discard = ByteBuffer.allocate(256);
-        try {
-            while (!ended.isDone() && client.read(discard.clear()) >= 0) { }
-        } catch (IOException closedOrGone) {
-            // Closed by the writer or by close(), or the client vanished.
-        }
-        if (ended.isDone()) {
-            // The exit frame is queued; let the writer deliver it before the connection is closed.
+            var invocation = new Invocation(request.arguments(), request.workingDirectory(), request.pane(),
+                text -> frames.add(new Frame(CommandProtocol.out(text), false)),
+                text -> frames.add(new Frame(CommandProtocol.err(text), false)));
+            var ended = new CompletableFuture<Void>();
+            active.incrementAndGet();
+            CompletionStage<Integer> stage;
             try {
-                writer.join();
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
+                stage = Objects.requireNonNull(dispatcher.dispatch(invocation), "the dispatcher's stage");
+            } catch (RuntimeException failure) {
+                stage = CompletableFuture.failedFuture(failure);
             }
-        } else {
-            invocation.cancel();
-            closeQuietly(client);
-            frames.add(Frame.STOP);
+            stage.whenComplete((code, failure) -> {
+                int exit = failure != null ? failed(invocation, failure) : code == null ? 1 : code;
+                invocation.finish();
+                ended.complete(null);
+                frames.add(new Frame(CommandProtocol.exit(exit), true));
+                delivery.exitQueued = true;
+                if (active.decrementAndGet() == 0) {
+                    for (Runnable listener : idle) {
+                        try { listener.run(); }
+                        catch (RuntimeException broken) { LOG.log(System.Logger.Level.WARNING, "An idle listener failed", broken); }
+                    }
+                }
+            });
+            // The client sends nothing after its request, so a read returns only once it goes away, the listener
+            // closes or the writer closes the connection after the exit frame.
+            ByteBuffer discard = ByteBuffer.allocate(256);
+            try {
+                while (!ended.isDone() && client.read(discard.clear()) >= 0) { }
+            } catch (IOException closedOrGone) {
+                // Closed by the writer or by close(), or the client vanished.
+            }
+            if (ended.isDone()) {
+                // The exit frame is queued; let the writer deliver it before the connection is closed.
+                try {
+                    writer.join();
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            } else {
+                invocation.cancel();
+                closeQuietly(client);
+                frames.add(Frame.STOP);
+            }
+        } finally {
+            deliveries.remove(delivery);
         }
+    }
+
+    /** A call's writer, and whether the call's exit frame is queued for it: close() waits for those writers only. */
+    private static final class Delivery {
+        final Thread writer;
+        volatile boolean exitQueued;
+
+        Delivery(Thread writer) { this.writer = writer; }
     }
 
     private static int failed(Invocation invocation, Throwable failure) {
@@ -313,6 +332,7 @@ public final class CommandListener implements AutoCloseable {
                 Thread.currentThread().interrupt();
             }
         }
+        awaitExitFrames();
         for (SocketChannel connection : List.copyOf(connections)) closeQuietly(connection);
         try (FileChannel lockChannel = FileChannel.open(lockFile(socket), StandardOpenOption.CREATE,
                 StandardOpenOption.READ, StandardOpenOption.WRITE);
@@ -328,6 +348,25 @@ public final class CommandListener implements AutoCloseable {
         // A private launch's socket is named for its process, so nothing else ever takes its lock.
         if (socket.getFileName().toString().startsWith("commands-")) {
             try { Files.deleteIfExists(lockFile(socket)); } catch (IOException ignored) { }
+        }
+    }
+
+    /**
+     * A call that has ended has only queued its exit frame, and a non-resident Jasper quits the moment its last call
+     * ends, so its writers get a moment to put the frame on the wire. Calls still running are closed at once.
+     */
+    private void awaitExitFrames() {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(WRITER_GRACE_MILLIS);
+        for (Delivery delivery : List.copyOf(deliveries)) {
+            if (!delivery.exitQueued) continue;
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) return;
+            try {
+                delivery.writer.join(Duration.ofNanos(remaining));
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 }
