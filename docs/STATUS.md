@@ -1,5 +1,16 @@
 # Jasper — Status and Handoff
 
+**Inactive tabs stay clearly darker than the active tab — 2026-10-14** (`claude/inactive-tabs`, worktree
+`.claude/worktrees/inactive-tabs`; bug fix, design and the ΔL* 9 strength chosen by the user). The active tab is
+`surface.terminal` and inactive tabs `surface.tabstrip`, but themes set the two close or equal (Slate Steel Dark 1.9 L*
+apart, Light 5.4; converted IntelliJ themes identical, since IntelliJ marks its tab with an underline), so the active tab
+could not be told apart. `NativeChromePainting.tabSurface` now paints inactive tabs, and the strip behind them, with
+`SurfaceContrast.apart(tabstrip, terminal, TAB_LIGHTNESS = 9)`: the theme's colour when it is at least 9 CIE L* from the
+terminal surface, otherwise darkened just until it is (lightened when the terminal surface is near black); no format
+change, so every installed theme is covered. Catppuccin Frappé `#1F212D` under `#303446`, Slate Steel Dark `#121317`
+under `#23262C`, Light `#DDE0E3` under `#FBFBFC`. `./gradlew check --continue`: **10,113 tests, 0 failures, 0 errors,
+12 skipped**. No GUI launched. GUI check for the user: the tab strip in each theme. Not merged or pushed.
+
 **The jasper command (command line plan 1) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
 [plan](superpowers/plans/2026-10-13-jasper-command-line-1-jasper-command.md)). A native `jasper` command
