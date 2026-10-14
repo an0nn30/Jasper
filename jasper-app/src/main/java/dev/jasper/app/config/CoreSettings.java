@@ -52,7 +52,7 @@ public final class CoreSettings {
         .description("Status bar height in logical pixels, 20-48; never shorter than its text. Updates live.").build();
     public static final Setting<Boolean> WINDOW_MEMORY_INDICATOR = Setting.of("window.memory_indicator", SettingKind.bool(), false)
         .label("Show memory indicator").keywords("memory", "heap", "indicator", "status bar", "garbage collection")
-        .description("Show the heap in use and its limit in the status bar; click it to run garbage collection. Updates live.").build();
+        .description("Show the heap in use and its limit in the status bar, while the status bar is shown; click it to run garbage collection. Updates live.").build();
     public static final Setting<Integer> WINDOW_COLUMNS = Setting.of("window.columns", SettingKind.integer(5, 500, DEFAULT), 100)
         .label("Initial columns").keywords("grid", "width", "size", "columns").applies(Applies.NEW_WINDOWS)
         .description("Initial terminal grid for new windows only; existing windows keep their size.\n"

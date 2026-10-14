@@ -10,6 +10,11 @@ supports both usage and collection-usage thresholds), because a large young gene
 `MemoryIndicator.collectNow()` refreshes only while the indicator is shown, and `close()` also closes the `app.memory.gc`
 action and makes later calls do nothing.
 
+Final review: the indicator reads no heap before start-up settles (`MemoryIndicator.ready()`, hidden until a reading
+succeeds, a failed read logged once); shutdown closes `MemoryWarnings` and the indicator; Adjust Memory Settings…
+stages a heap only above the saved one (`VmOptionsFeature.savedHeapMiB()`); the status entry changes only when its
+values change; `HeapThreshold` sets the threshold before listening and logs a throwing signal.
+
 **Goal:** Jasper can show its heap use in the status bar (`312 of 2048M`, click to collect garbage), warns when the heap
 stays nearly full or runs out, and the warning's **Adjust Memory Settings…** opens the heap limit with 512 MiB more
 filled in.

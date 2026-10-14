@@ -6,12 +6,14 @@ bar, refreshed every 3 s by one shared timer while shown with a window open, wit
 runs garbage collection (the `app.memory.gc` action, also in the palette). A collection-usage threshold at 95% of the
 old generation feeds `LowMemoryWatch` (one signal per 20 s, more than five in 15 minutes warn, once until the heap is
 saved again); an `OutOfMemoryError` warns at once. The warning, "Jasper is running low on memory", is in the Memory &
-VM options group; **Adjust Memory Settings…** opens the heap limit with the running maximum plus 512 MiB staged.
-Deviations: the eight planned ones and two review changes, listed in the plan. The branch starts from `main` at
-`7c0a0938`; `main` has moved since, so it needs `main` merged in before it merges. Full `./gradlew check`: 9,996 tests,
+VM options group; **Adjust Memory Settings…** opens the heap limit with the running maximum plus 512 MiB staged (only the
+field when a higher heap is already saved).
+Deviations: the eight planned ones and the review and final-review changes, listed in the plan. The branch starts from `main` at
+`7c0a0938`; `main` has moved since, so it needs `main` merged in before it merges. Full `./gradlew check` after the final review: 10,009 tests,
 0 failures, 8 skips. Manual checks pending (the user): turn the indicator on and watch it update; click it; in the
 packaged app with a small heap (`-Xmx600m` in `jasper.vmoptions`), open many large scrollbacks until the warning shows,
-and use Adjust Memory Settings….
+and use Adjust Memory Settings…; with the indicator on, cold-launch timing; Adjust Memory Settings… after saving a larger
+heap without restarting.
 
 **Custom VM options plan 2 (settings and actions) complete — 2026-10-13.** On `claude/custom-vm-options-settings`, merged to
 local `main` (not pushed): System Settings has a Java Virtual Machine section (heap limit in `jasper.vmoptions`, Edit Custom VM Options…,

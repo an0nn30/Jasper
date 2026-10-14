@@ -79,6 +79,16 @@ class VmOptionsFeatureTest {
         assertThat(heap.saved().getAsInt()).isEqualTo(4096);
     }
 
+    @Test void theSavedHeapIsTheFilesMaximumElseTheBundledDefault() throws IOException {
+        var feature = feature(managed(), true);
+        feature.reload();
+        assertThat(feature.savedHeapMiB()).as("no file: the bundled maximum").isEqualTo(2048);
+        Files.writeString(file(), "-Xmx4g\n");
+        feature.reload();
+        assertThat(feature.savedHeapMiB()).isEqualTo(4096);
+        assertThat(feature.savedHeapMiB()).as("the row's saved value is the same number").isEqualTo(feature.hooks().heap().saved().getAsInt());
+    }
+
     @Test void savingTheHeapWritesTheFileAndAsksForARestart() throws IOException {
         var feature = feature(managed(), true);
         feature.startupSettled();

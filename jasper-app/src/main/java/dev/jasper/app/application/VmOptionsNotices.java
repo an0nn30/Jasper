@@ -11,7 +11,8 @@ import java.util.Optional;
 
 /**
  * Custom VM options notifications (spec sections 4.3, 5.1, 5.4 and 5.5) in their own group: a fallback start, a corrupted
- * file, a pending restart, failures and low memory. EDT only.
+ * file, a pending restart, failures and low memory. The instance methods run on the EDT only; {@link #lowMemory} builds a
+ * request on any thread.
  */
 final class VmOptionsNotices {
     static final NotificationGroup GROUP = new NotificationGroup("jasper.vmoptions", "Memory & VM options", NotificationRequest.JASPER, DisplayMode.CARD);

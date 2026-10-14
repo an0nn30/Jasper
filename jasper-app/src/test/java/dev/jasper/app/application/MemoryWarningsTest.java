@@ -25,10 +25,12 @@ class MemoryWarningsTest {
     private final List<String> opened = new ArrayList<>();
     private int stops;
 
-    private MemoryWarnings warnings() {
+    private MemoryWarnings warnings() { return warnings(2048, 2048); }
+
+    private MemoryWarnings warnings(long running, long saved) {
         center.register(VmOptionsNotices.GROUP);
         return new MemoryWarnings(new LowMemoryWatch(clock), signal -> { watching.add(signal); return () -> stops++; }, center,
-            () -> 2048, opened::add);
+            () -> running, () -> saved, opened::add);
     }
 
     @Test void startWatchesTheHeapOnce() {
@@ -36,6 +38,30 @@ class MemoryWarningsTest {
         warnings.start();
         warnings.start();
         assertThat(watching).hasSize(1);
+    }
+
+    @Test void closeStopsWatchingOnce() {
+        var warnings = warnings();
+        warnings.start();
+        warnings.close();
+        assertThat(stops).isEqualTo(1);
+        warnings.close();
+        assertThat(stops).as("closing twice stops once").isEqualTo(1);
+    }
+
+    @Test void aWarningClosedBeforeItStartedOrAfterNeverWatches() {
+        var unstarted = warnings();
+        unstarted.close();
+        unstarted.start();
+        assertThat(watching).as("start after close installs nothing").isEmpty();
+        assertThat(stops).isZero();
+
+        var started = warnings();
+        started.start();
+        started.close();
+        started.start();
+        assertThat(watching).as("start after a close does not watch again").hasSize(1);
+        assertThat(stops).isEqualTo(1);
     }
 
     @Test void sixSignalsTwentySecondsApartWarnOnce() {
@@ -57,6 +83,24 @@ class MemoryWarningsTest {
     @Test void adjustOpensTheHeapFieldWithFiveHundredTwelveMiBMore() {
         var warnings = warnings();
         warnings.outOfMemory();
+        center.history().getFirst().request().actions().getFirst().run().run();
+        assertThat(opened).containsExactly("system#vm.heap=2560");
+    }
+
+    @Test void adjustOnlyRevealsTheRowWhenAHigherHeapIsAlreadySaved() {
+        warnings(2048, 4096).outOfMemory();
+        center.history().getFirst().request().actions().getFirst().run().run();
+        assertThat(opened).as("the saved 4096 is already more than 2560").containsExactly("system#vm.heap");
+    }
+
+    @Test void adjustOnlyRevealsTheRowWhenTheSavedHeapEqualsTheProposal() {
+        warnings(2048, 2560).outOfMemory();
+        center.history().getFirst().request().actions().getFirst().run().run();
+        assertThat(opened).as("equal is not higher").containsExactly("system#vm.heap");
+    }
+
+    @Test void adjustProposesMoreThanTheRunningHeapWhenTheSavedOneIsNotHigher() {
+        warnings(2048, 1024).outOfMemory();
         center.history().getFirst().request().actions().getFirst().run().run();
         assertThat(opened).containsExactly("system#vm.heap=2560");
     }

@@ -825,12 +825,14 @@ public final class JasperApplication {
         memoryWarnings = new MemoryWarnings(new dev.jasper.app.vmoptions.LowMemoryWatch(java.time.Clock.systemUTC()),
             signal -> dev.jasper.app.vmoptions.HeapThreshold.install(dev.jasper.app.vmoptions.LowMemoryWatch.FRACTION, signal)
                 .<Runnable>map(threshold -> threshold::close).orElse(() -> { }),
-            notificationCenter, dev.jasper.app.vmoptions.VmOptionsLaunch::runningMaxHeapMiB, page -> openSettings(null, page));
+            notificationCenter, dev.jasper.app.vmoptions.VmOptionsLaunch::runningMaxHeapMiB, vmOptions::savedHeapMiB,
+            page -> openSettings(null, page));
         vmOptions.onHeapSaved(memoryWarnings::heapChanged);
-        // Never on the start-up path: the options file is read and the heap watched once the first output shows, the warm-up ends, or 5 s after the first paint.
+        // Never on the start-up path: the options file is read and the heap watched and shown once the first output shows, the warm-up ends, or 5 s after the first paint.
         Runnable settled = () -> {
             vmOptions.startupSettled();
             memoryWarnings.start();
+            memoryIndicator.ready();
         };
         trace.when(StartupTrace.Milestone.OUTPUT_PAINTED, SwingUtilities::invokeLater, settled);
         trace.when(StartupTrace.Milestone.WARMED_UP, SwingUtilities::invokeLater, settled);
@@ -1570,6 +1572,11 @@ public final class JasperApplication {
         shellProfiles.close();
         // Application-owned state first, so none of it depends on plugins behaving.
         history.close();
+        release("the heap watch", () -> {
+            MemoryWarnings warnings = memoryWarnings;
+            if (warnings != null) warnings.close();
+        });
+        release("the memory indicator", memoryIndicator::close);
         List<CompletableFuture<?>> pluginWork = plugins == null ? List.of() : plugins.stop();
         // Plugins cleared their own secrets as they stopped; this clears anything still pending.
         clipboard.quit();
@@ -1603,6 +1610,15 @@ public final class JasperApplication {
         // Nothing else ends the JVM: without an explicit exit, AWT waits a full quiet second before it lets go.
         pending.add(history.closedFuture());
         shutdown.await(pending);
+    }
+
+    /** Closes one child whose failure must not hold up the rest of the shutdown. */
+    private static void release(String what, Runnable close) {
+        try {
+            close.run();
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "Could not close " + what, failure);
+        }
     }
 
     private static CompletableFuture<Void> processCleanup(Runnable action) {

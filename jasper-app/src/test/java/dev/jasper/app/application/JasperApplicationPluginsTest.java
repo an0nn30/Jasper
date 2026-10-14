@@ -3,7 +3,11 @@ package dev.jasper.app.application;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.platform.AppDirs;
+import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.testsupport.PluginJars;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryPoolMXBean;
+import java.lang.management.MemoryType;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.List;
@@ -182,6 +186,30 @@ class JasperApplicationPluginsTest {
         });
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test void quitReleasesTheHeapWatchAndTheMemoryIndicatorsAction() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        // The old generation: the heap pool that supports both usage thresholds, with the largest maximum.
+        MemoryPoolMXBean oldGeneration = ManagementFactory.getMemoryPoolMXBeans().stream()
+            .filter(pool -> pool.getType() == MemoryType.HEAP && pool.isUsageThresholdSupported() && pool.isCollectionUsageThresholdSupported())
+            .max(java.util.Comparator.comparingLong(pool -> pool.getUsage().getMax())).orElseThrow();
+        var trace = StartupTrace.detached();
+        trace.mark(StartupTrace.Milestone.OUTPUT_PAINTED);
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].trace(trace);
+            application[0].startPlugins(null, null, false, dirs);
+        });
+        edt(() -> { });
+        assertThat(application[0].contributions().action(MemoryIndicator.COLLECT)).as("the indicator's click action").isPresent();
+        assertThat(oldGeneration.getCollectionUsageThreshold()).as("the low-memory watch, installed when start-up settled").isPositive();
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(application[0].contributions().action(MemoryIndicator.COLLECT)).as("closed with the application").isEmpty();
+        assertThat(oldGeneration.getCollectionUsageThreshold()).as("the threshold is released").isZero();
     }
 
     @Test void restartQuitsThenStartsTheReplacementAfterProcessCleanup() throws Exception {

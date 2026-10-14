@@ -13,10 +13,13 @@ import java.util.function.Supplier;
 
 /**
  * The status bar's memory indicator (spec section 5.3): a contributed entry, {@code 312 of 2048M}, rendered the same in
- * every window, refreshed by one shared timer while it is shown and a window is open; a click (the
- * {@link #COLLECT} action) runs garbage collection and refreshes. Updates are instant. EDT only.
+ * every window, refreshed by one shared timer while it is shown, a window is open and start-up has settled
+ * ({@link #ready()}); a click (the {@link #COLLECT} action) runs garbage collection and refreshes. The entry stays
+ * hidden until a reading succeeds, and changes only when its text, tooltip or visibility changes. Updates are instant.
+ * EDT only.
  */
 final class MemoryIndicator implements AutoCloseable {
+    private static final System.Logger LOG = System.getLogger(MemoryIndicator.class.getName());
     static final String STATUS_ID = "app.memory.indicator";
     static final String COLLECT = "app.memory.gc";
     static final Duration INTERVAL = Duration.ofSeconds(3);
@@ -27,6 +30,9 @@ final class MemoryIndicator implements AutoCloseable {
     private final Runnable collect;
     private final BiFunction<Duration, Runnable, Runnable> every;
     private boolean shown;
+    private boolean ready;
+    private boolean hasReading;
+    private boolean failureLogged;
     private int windows;
     private Runnable stop;
     private boolean closed;
@@ -63,11 +69,18 @@ final class MemoryIndicator implements AutoCloseable {
         update();
     }
 
-    /** Runs garbage collection; the heap is read again only while the indicator is shown. */
+    /** Start-up has settled (spec section 6.5): from now on the indicator may read the heap. Idempotent. */
+    void ready() {
+        if (closed || ready) return;
+        ready = true;
+        update();
+    }
+
+    /** Runs garbage collection; the heap is read again only while the indicator runs. */
     void collectNow() {
         if (closed) return;
         collect.run();
-        if (shown) refresh();
+        if (active()) refresh();
     }
 
     /** Stops the timer and removes the entry and the click action; later calls do nothing. */
@@ -87,9 +100,10 @@ final class MemoryIndicator implements AutoCloseable {
         return timer::stop;
     }
 
+    private boolean active() { return shown && windows > 0 && ready; }
+
     private void update() {
-        entry.setVisible(shown);
-        if (shown && windows > 0) {
+        if (active()) {
             if (stop == null) {
                 refresh();
                 stop = every.apply(INTERVAL, this::refresh);
@@ -97,6 +111,13 @@ final class MemoryIndicator implements AutoCloseable {
         } else {
             stopTimer();
         }
+        showEntry();
+    }
+
+    /** Visible only while it runs and has a reading to show. */
+    private void showEntry() {
+        boolean visible = active() && hasReading;
+        if (entry.visible() != visible) entry.setVisible(visible);
     }
 
     private void stopTimer() {
@@ -105,10 +126,22 @@ final class MemoryIndicator implements AutoCloseable {
         stop = null;
     }
 
+    /** Reads the heap; a failed read is logged once and leaves the entry as it was. */
     private void refresh() {
         if (closed) return;
-        HeapReading reading = readings.get();
-        entry.setText(reading.label());
-        entry.setTooltip(reading.tooltip());
+        try {
+            HeapReading reading = readings.get();
+            String label = reading.label();
+            String tooltip = reading.tooltip();
+            if (!label.equals(entry.text())) entry.setText(label);
+            if (!tooltip.equals(entry.tooltip())) entry.setTooltip(tooltip);
+            hasReading = true;
+        } catch (RuntimeException failure) {
+            if (!failureLogged) {
+                failureLogged = true;
+                LOG.log(System.Logger.Level.WARNING, "Could not read the heap for the memory indicator", failure);
+            }
+        }
+        showEntry();
     }
 }

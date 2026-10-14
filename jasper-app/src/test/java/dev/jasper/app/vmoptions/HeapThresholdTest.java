@@ -9,6 +9,7 @@ import java.lang.management.MemoryUsage;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
@@ -66,6 +67,38 @@ class HeapThresholdTest {
         }
         assertThat(pool.getCollectionUsageThreshold()).isZero();
         threshold.close();
+    }
+
+    @Test void aSignalThatThrowsIsLoggedAndNeverEscapesTheListener() throws InterruptedException {
+        // The JDK turns an exception out of a listener into an AssertionError that skips the later listeners.
+        var logger = java.util.logging.Logger.getLogger(HeapThreshold.class.getName());
+        var previousLevel = logger.getLevel();
+        boolean previousParents = logger.getUseParentHandlers();
+        var records = new ConcurrentLinkedQueue<java.util.logging.LogRecord>();
+        var logged = new CountDownLatch(1);
+        var handler = new java.util.logging.Handler() {
+            @Override public void publish(java.util.logging.LogRecord record) { records.add(record); logged.countDown(); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        handler.setLevel(java.util.logging.Level.ALL);
+        logger.addHandler(handler);
+        logger.setLevel(java.util.logging.Level.ALL);
+        logger.setUseParentHandlers(false);
+        var threshold = HeapThreshold.install(0, () -> { throw new IllegalStateException("the signal failed"); }).orElseThrow();
+        try {
+            System.gc();
+            assertThat(logged.await(10, TimeUnit.SECONDS)).as("the failure is logged on the notification thread").isTrue();
+            assertThat(records).first().satisfies(record -> {
+                assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
+                assertThat(record.getThrown()).isInstanceOf(IllegalStateException.class).hasMessage("the signal failed");
+            });
+        } finally {
+            threshold.close();
+            logger.removeHandler(handler);
+            logger.setLevel(previousLevel);
+            logger.setUseParentHandlers(previousParents);
+        }
     }
 
     @Test void aCollectionAboveTheThresholdSignals() throws InterruptedException {

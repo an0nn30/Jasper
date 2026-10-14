@@ -45,9 +45,10 @@ Settings…** and **Edit Custom VM Options…** lead to the same places. The sec
 `java` and says which lines it ignores, which options the JVM does not know, whether Jasper would start with them, and
 when a restart is needed (**Restart Now**). When Jasper had to start without your options, or ignored the file, it says
 so in a notification in the **Memory & VM options** group. Settings › Window › **Show memory indicator**
-(`window.memory_indicator`) adds the heap in use and its limit, such as `312 of 2048M`, to the status bar; click it to
-run garbage collection. When the heap stays nearly full, or Jasper runs out of memory, a notification in the same group
-offers **Adjust Memory Settings…**, which opens the heap limit with 512 MiB more filled in.
+(`window.memory_indicator`) adds the heap in use and its limit, such as `312 of 2048M`, to the status bar while the
+status bar is shown; click it to run garbage collection. When the heap stays nearly full, or Jasper runs out of memory, a notification in the same group
+offers **Adjust Memory Settings…**, which opens the heap limit with 512 MiB more filled in (left as saved when a larger
+limit is already saved).
 
 ## Settings dialog
 
