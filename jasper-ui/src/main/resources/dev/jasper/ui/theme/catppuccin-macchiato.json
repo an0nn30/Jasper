@@ -4,7 +4,7 @@
   "author": "Catppuccin Org <releases@catppuccin.com>",
   "ui": {
     "dark": {
-      "surface.app": "#1E2030",
+      "surface.app": "#181926",
       "surface.panel": "#1E2030",
       "surface.panel.raised": "#252738",
       "surface.dialog": "#1E2030",

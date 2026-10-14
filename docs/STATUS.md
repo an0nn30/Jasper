@@ -9,8 +9,12 @@ lists them; the library, Import, Remove and the converter refuse every built-in 
 built-in files; a converter test fails when the bundled files differ from a fresh conversion. The Licenses window lists
 "Catppuccin for JetBrains 3.6.1" (MIT, its LICENSE shipped in jasper-ui). The user's earlier imports
 `catppuccin-frappe.json` and `catppuccin-latte.json` in `~/.config/jasper/themes/` are now reported as built in and
-ignored (they are identical to the built-in files). Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
-(the colour patterns are now precompiled). `./gradlew check --continue`: **10,165 tests, 0 failures, 0 errors, 12
+ignored (they are identical to the built-in files). After the user's first look: a disabled kit button now fades as
+one layer (`ThemePainting.faded`; design-system-source.md's "whole control at 40-45% opacity"), so Catppuccin's dark
+label on its light accent stays readable instead of fading again over the faded fill; and a classic IntelliJ theme takes
+its window chrome (`surface.app`) from its plugin's Islands variant, so Catppuccin's tool windows (mantle) stand on crust
+as in Islands Catppuccin (the user chose both). Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
+(the colour patterns are now precompiled). `./gradlew check --continue`: **10,166 tests, 0 failures, 0 errors, 12
 skipped**. No GUI launched. GUI check for the user: each flavour in Settings › Appearance and the Licenses window (About Jasper › Licenses). Not merged.
 
 **Right rail splits again: two dock fixes — 2026-10-14** (`claude/right-rail-split`, worktree

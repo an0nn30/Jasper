@@ -868,22 +868,23 @@ MAPPING = [
 OPACITY_ROLES = {"surface.scrim", "border.subtle", "text.onAccent.secondary", "text.onSelection.secondary"}
 
 
-def ui_roles(lookup: Lookup, dark: bool, terminal: dict) -> tuple[dict, dict, list[str]]:
+def ui_roles(lookup: Lookup, dark: bool, terminal: dict, given: dict | None = None) -> tuple[dict, dict, list[str]]:
     """The UI roles in the format's order, each role's source ("theme", a parent's name, or "derived"), and one
-    provenance line per role."""
+    provenance line per role; ``given`` maps a role to the (colour, provenance, source) it takes instead."""
     ansi = {name: parse_hex(terminal[name]) for name in ANSI}
     ansi["bg"] = parse_hex(terminal["bg"])
     values: dict = {}
     sources: dict[str, str] = {}
     provenance: list[str] = []
     for role, keys, rule in MAPPING:
-        found = None
-        for key in keys:
-            found = lookup.key(key)
-            if found is not None:
-                colour, source = found
-                found = (colour, f"{key} ({source})", source)
-                break
+        found = (given or {}).get(role)
+        if found is None:
+            for key in keys:
+                found = lookup.key(key)
+                if found is not None:
+                    colour, source = found
+                    found = (colour, f"{key} ({source})", source)
+                    break
         if found is None and rule is not None:
             found = (rule(values, dark, ansi), "derived", "derived")
         if found is None:
@@ -900,6 +901,32 @@ def ui_roles(lookup: Lookup, dark: bool, terminal: dict) -> tuple[dict, dict, li
     return {role: hex_of(values[role]) for role in ROLES}, sources, provenance
 
 
+def is_islands(effective: Effective) -> bool:
+    """Whether a theme is drawn for IntelliJ's Islands UI, which marks it with "Islands": 1 (inherited from a parent)."""
+    return any(ui.get("Islands") == 1 for _, ui in effective.levels)
+
+
+def islands_variant(theme: ThemeFile, siblings: list[ThemeFile], dark: bool, loose_dir: pathlib.Path | None):
+    """The plugin's Islands variant of a classic theme, (name, effective theme): an Islands theme of the same variant
+    whose name without the word "Islands" is the theme's; None when there is none."""
+    def plain(item: ThemeFile) -> str:
+        return " ".join(word for word in str(item.data.get("name", item.id)).split() if word.casefold() != "islands").casefold()
+    for sibling in siblings:
+        if sibling is theme or plain(sibling) != plain(theme) or not isinstance(sibling.data.get("name"), str):
+            continue
+        try:
+            effective = resolve(sibling, siblings, [], None, loose_dir)
+        except ConversionError:
+            continue  # its own conversion reports it
+        if is_islands(effective) and effective.dark == dark:
+            return sibling.data["name"], effective
+    return None
+
+
+# The roles a classic theme takes from its plugin's Islands variant: the chrome Jasper's tool-window islands stand on.
+ISLANDS_CHROME = ["surface.app"]
+
+
 def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: str | None,
                            scheme_file: pathlib.Path | None = None, loose_dir: pathlib.Path | None = None) -> Result:
     warnings: list[str] = []
@@ -910,7 +937,18 @@ def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: st
     variant = "dark" if effective.dark else "light"
     scheme = Scheme(effective.scheme, warnings, theme.path)
     terminal = terminal_scheme(scheme, display)
-    roles, sources, provenance = ui_roles(Lookup(effective), effective.dark, terminal)
+    islands = None if is_islands(effective) else islands_variant(theme, siblings, effective.dark, loose_dir)
+    given = {}
+    if islands is not None:
+        island_name, island = islands[0], Lookup(islands[1])
+        for role in ISLANDS_CHROME:
+            for key in next(keys for mapped, keys, _ in MAPPING if mapped == role):
+                found = island.key(key)
+                if found is not None:
+                    colour, source = found
+                    given[role] = (colour, f"{key} ({island_name if source == 'theme' else source})", source)
+                    break
+    roles, sources, provenance = ui_roles(Lookup(effective), effective.dark, terminal, given)
     editor, from_scheme = editor_scheme(scheme)
     doc = {"jasper-theme": FORMAT, "name": display}
     if isinstance(theme.data.get("author"), str) and theme.data["author"]:
@@ -924,7 +962,8 @@ def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: st
     inherited = len(ROLES) - own - derived
     parent = effective.chain[1] if len(effective.chain) > 1 else "its base"
     summary = (f"{display} ({variant}): {own} roles from the theme, {inherited} from {parent}, {derived} derived; "
-               f"editor {from_scheme} of {len(EDITOR_SURFACES) + len(SYNTAX_ROLES)} from the scheme")
+               f"editor {from_scheme} of {len(EDITOR_SURFACES) + len(SYNTAX_ROLES)} from the scheme"
+               + (f"; chrome from {islands[0]}" if islands is not None else ""))
     return Result(doc, summary, warnings, provenance)
 
 

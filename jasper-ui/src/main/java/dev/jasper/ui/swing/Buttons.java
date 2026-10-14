@@ -291,72 +291,75 @@ final class Buttons {
         }
         @Override protected void paintComponent(Graphics graphics) {
             if (kind == null || !contextualVisible()) return;
+            // Disabled is the whole button at disabledOpacity, faded as one layer.
+            if (!isEnabled()) { ThemePainting.faded(graphics, this, disabledOpacity, this::paintFace); return; }
             var g = (Graphics2D)graphics.create();
-            try {
-                if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(disabledOpacity));
-                boolean hover = isEnabled() && getModel().isRollover();
-                // A selected toggle shows the segmented control's selected fill, embedded or not.
-                Color fill = toggle && isSelected() ? ThemePainting.color(context, SemanticColor.SEGMENT_SELECTED_BG) : embedded ? null : fill(hover);
-                if (isEnabled() && getModel().isPressed() && fill != null) {
-                    Color darkened = ColorMath.mix(ThemePainting.color(context, SemanticColor.SURFACE_APP), fill, .08);
-                    fill = new Color(darkened.getRed(), darkened.getGreen(), darkened.getBlue(), fill.getAlpha());
-                }
-                Color border = toggle && isSelected() ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : embedded ? null : border();
-                boolean focused = !embedded && focus != null && focus.visible();
-                // The outlined circle fills its bounds; like other buttons its focus halo lies outside them.
+            try { paintFace(g); } finally { g.dispose(); }
+        }
+        /** The button's face, text and glyph at full opacity. */
+        private void paintFace(Graphics2D g) {
+            boolean hover = isEnabled() && getModel().isRollover();
+            // A selected toggle shows the segmented control's selected fill, embedded or not.
+            Color fill = toggle && isSelected() ? ThemePainting.color(context, SemanticColor.SEGMENT_SELECTED_BG) : embedded ? null : fill(hover);
+            if (isEnabled() && getModel().isPressed() && fill != null) {
+                Color darkened = ColorMath.mix(ThemePainting.color(context, SemanticColor.SURFACE_APP), fill, .08);
+                fill = new Color(darkened.getRed(), darkened.getGreen(), darkened.getBlue(), fill.getAlpha());
+            }
+            Color border = toggle && isSelected() ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : embedded ? null : border();
+            boolean focused = !embedded && focus != null && focus.visible();
+            // The outlined circle fills its bounds; like other buttons its focus halo lies outside them.
 if(circular)ThemePainting.rounded(g,this,context,fill,ThemePainting.color(context,SemanticColor.BORDER_CONTROL),focused,false,Math.min(getWidth(),getHeight())/2.0,0,0);
-                else if (panelDetail) ThemePainting.rounded(g, this, context, fill, border, focused, false,
-                    UIScale.scale((float)context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_ARC)) / 2.0,
-                    ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING),
-                    UIScale.scale((float)context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_BOTTOM_TRIM)));
-                else ThemePainting.rounded(g, this, context, fill, border, focused, false);
-                primaryShadows(g, fill);
-                g.setFont(getFont()); g.setColor(textColor(hover));
-                Insets insets = getInsets();
-                if (recorder()) {
-                    int x=insets.left;
-                    if (armed()) {
-                        int halo=recorderHalo(),ring=ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_RECORDER_HALO),top=(getHeight()-halo)/2;
-                        Color danger=ThemePainting.color(context,SemanticColor.STATUS_DANGER);
-                        g.setColor(new Color(danger.getRed(),danger.getGreen(),danger.getBlue(),context.metrics().value(DesignMetrics.Role.KEYCAP_RECORDER_HALO_ALPHA)));
-                        g.fill(new java.awt.geom.Ellipse2D.Double(x,top,halo,halo));
-                        g.setColor(danger);g.fill(new java.awt.geom.Ellipse2D.Double(x+ring,top+ring,halo-2*ring,halo-2*ring));
-                        x+=recorderIndicator();
-                    }
-                    int available=Math.max(0,getWidth()-x-insets.right);
-                    if(getIcon() instanceof Keycaps caps) caps.paintWithin(this,g,x,Math.max(insets.top,(getHeight()-caps.heightAt(available))/2),available);
-                    else {
-                        recorderText.text=getText();recorderText.setFont(getFont());recorderText.setForeground(textColor(hover));
-                        int height=recorderText.height(available);recorderText.setSize(available,height);
-                        g.translate(x,Math.max(insets.top,(getHeight()-height)/2));recorderText.paintComponent(g);
-                    }
-                    return;
+            else if (panelDetail) ThemePainting.rounded(g, this, context, fill, border, focused, false,
+                UIScale.scale((float)context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_ARC)) / 2.0,
+                ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING),
+                UIScale.scale((float)context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_BOTTOM_TRIM)));
+            else ThemePainting.rounded(g, this, context, fill, border, focused, false);
+            primaryShadows(g, fill);
+            g.setFont(getFont()); g.setColor(textColor(hover));
+            Insets insets = getInsets();
+            if (recorder()) {
+                int x=insets.left;
+                if (armed()) {
+                    int halo=recorderHalo(),ring=ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_RECORDER_HALO),top=(getHeight()-halo)/2;
+                    Color danger=ThemePainting.color(context,SemanticColor.STATUS_DANGER);
+                    g.setColor(new Color(danger.getRed(),danger.getGreen(),danger.getBlue(),context.metrics().value(DesignMetrics.Role.KEYCAP_RECORDER_HALO_ALPHA)));
+                    g.fill(new java.awt.geom.Ellipse2D.Double(x,top,halo,halo));
+                    g.setColor(danger);g.fill(new java.awt.geom.Ellipse2D.Double(x+ring,top+ring,halo-2*ring,halo-2*ring));
+                    x+=recorderIndicator();
                 }
-                Rectangle icon = new Rectangle(), text = new Rectangle();
-                String clipped = SwingUtilities.layoutCompoundLabel(this, g.getFontMetrics(), getText(), getIcon(), CENTER, getHorizontalAlignment(), CENTER, RIGHT,
-                    new Rectangle(insets.left, insets.top, getWidth() - insets.left - insets.right, getHeight() - insets.top - insets.bottom), icon, text, getIconTextGap());
-                if (getIcon() != null) {
-                    // Re-tint the same named icon for hover without altering component identity.
-                    String name = null;
-                    if (getClientProperty("Jasper.button.icon") instanceof String value) name = value;
-                    // On a selected row the glyph takes the fill's ink whatever its artwork (the palette overload recolours built-ins).
-                    javax.swing.Icon artwork = name != null && onSelection ? context.icons().icon(name, context.theme().semantic(), ink.text, getIcon().getIconWidth())
-                        : name == null || context.icons().authored(name,panel || panelDetail || panelRow) ? getIcon() : panel || panelDetail || panelRow
-                        ? context.icons().panel(name, context.theme().semantic(), iconRole(hover), panelRow ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_ACTION_GLYPH) : getIcon().getIconWidth())
-                        : context.icons().icon(name, context.theme(), iconRole(hover), getIcon().getIconWidth());
-                    int opticalOffset=panelDetail ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_DETAIL_ACTION_OPTICAL_OFFSET) : panelRow ? -ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_OPTICAL_OFFSET) : 0;
-                    artwork.paintIcon(this, g, icon.x-opticalOffset+(getIcon().getIconWidth()-artwork.getIconWidth())/2, icon.y-opticalOffset+(getIcon().getIconHeight()-artwork.getIconHeight())/2);
+                int available=Math.max(0,getWidth()-x-insets.right);
+                if(getIcon() instanceof Keycaps caps) caps.paintWithin(this,g,x,Math.max(insets.top,(getHeight()-caps.heightAt(available))/2),available);
+                else {
+                    recorderText.text=getText();recorderText.setFont(getFont());recorderText.setForeground(textColor(hover));
+                    int height=recorderText.height(available);recorderText.setSize(available,height);
+                    g.translate(x,Math.max(insets.top,(getHeight()-height)/2));recorderText.paintComponent(g);
                 }
-                if (clipped != null) g.drawString(clipped, text.x, text.y + g.getFontMetrics().getAscent() - (panelDetail ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_DETAIL_TEXT_BASELINE) : 0));
-                if (embedded && isEnabled() && focus != null && focus.visible()) {
-                    // An embedded button has no outer ring room: its keyboard focus cue is a hairline inside its bounds.
-                    int radius = ThemePainting.metric(context, DesignMetrics.Role.CONTROL_RADIUS);
-                    g.setComposite(AlphaComposite.SrcOver);
-                    g.setColor(ThemePainting.color(context, SemanticColor.BORDER_FOCUS));
-                    g.setStroke(new BasicStroke(ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE)));
-                    g.draw(new java.awt.geom.RoundRectangle2D.Double(.5, .5, getWidth() - 1, getHeight() - 1, radius * 2.0, radius * 2.0));
-                }
-            } finally { g.dispose(); }
+                return;
+            }
+            Rectangle icon = new Rectangle(), text = new Rectangle();
+            String clipped = SwingUtilities.layoutCompoundLabel(this, g.getFontMetrics(), getText(), getIcon(), CENTER, getHorizontalAlignment(), CENTER, RIGHT,
+                new Rectangle(insets.left, insets.top, getWidth() - insets.left - insets.right, getHeight() - insets.top - insets.bottom), icon, text, getIconTextGap());
+            if (getIcon() != null) {
+                // Re-tint the same named icon for hover without altering component identity.
+                String name = null;
+                if (getClientProperty("Jasper.button.icon") instanceof String value) name = value;
+                // On a selected row the glyph takes the fill's ink whatever its artwork (the palette overload recolours built-ins).
+                javax.swing.Icon artwork = name != null && onSelection ? context.icons().icon(name, context.theme().semantic(), ink.text, getIcon().getIconWidth())
+                    : name == null || context.icons().authored(name,panel || panelDetail || panelRow) ? getIcon() : panel || panelDetail || panelRow
+                    ? context.icons().panel(name, context.theme().semantic(), iconRole(hover), panelRow ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_ACTION_GLYPH) : getIcon().getIconWidth())
+                    : context.icons().icon(name, context.theme(), iconRole(hover), getIcon().getIconWidth());
+                int opticalOffset=panelDetail ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_DETAIL_ACTION_OPTICAL_OFFSET) : panelRow ? -ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_OPTICAL_OFFSET) : 0;
+                artwork.paintIcon(this, g, icon.x-opticalOffset+(getIcon().getIconWidth()-artwork.getIconWidth())/2, icon.y-opticalOffset+(getIcon().getIconHeight()-artwork.getIconHeight())/2);
+            }
+            if (clipped != null) g.drawString(clipped, text.x, text.y + g.getFontMetrics().getAscent() - (panelDetail ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_DETAIL_TEXT_BASELINE) : 0));
+            if (embedded && isEnabled() && focus != null && focus.visible()) {
+                // An embedded button has no outer ring room: its keyboard focus cue is a hairline inside its bounds.
+                int radius = ThemePainting.metric(context, DesignMetrics.Role.CONTROL_RADIUS);
+                g.setComposite(AlphaComposite.SrcOver);
+                g.setColor(ThemePainting.color(context, SemanticColor.BORDER_FOCUS));
+                g.setStroke(new BasicStroke(ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE)));
+                g.draw(new java.awt.geom.RoundRectangle2D.Double(.5, .5, getWidth() - 1, getHeight() - 1, radius * 2.0, radius * 2.0));
+            }
         }
     }
 }

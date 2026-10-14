@@ -470,6 +470,26 @@ class Plugins(unittest.TestCase):
         self.assertEqual(list(doc["ui"]), ["dark"], "dark, as its parent is")
         self.assertEqual(doc["ui"]["dark"]["surface.panel"], "#102030", "the parent's colour")
 
+    def test_a_classic_theme_takes_its_chrome_from_the_plugins_islands_variant_of_it(self):
+        """Jasper's tool windows are islands: a plugin's Islands variant says which chrome they stand on."""
+        night = {"name": "Night", "dark": True, "ui": {"ToolWindow.background": "#333333", "StatusBar.background": "#333333"}}
+        islands = {"name": "Islands Night", "dark": True, "parentTheme": "Islands Dark",
+                   "ui": {"ToolWindow.background": "#333333", "StatusBar.background": "#111111"}}
+        other = {"name": "Islands Day", "dark": True, "parentTheme": "Islands Dark", "ui": {"StatusBar.background": "#222222"}}
+        with tempfile.TemporaryDirectory() as scratch:
+            jar = theme_jar(pathlib.Path(scratch) / "night.jar", {"night": night, "islands": islands, "day": other})
+            themes = tool.plugin_themes(tool.Files.archive(jar))
+            classic = tool.convert_intellij_theme(themes[0], themes, None)
+            own = tool.convert_intellij_theme(themes[1], themes, None)
+            alone = tool.convert_intellij_theme(themes[0], themes[:1], None)
+        self.assertEqual(classic.doc["ui"]["dark"]["surface.app"], "#111111", "the Islands variant's chrome")
+        self.assertEqual(classic.doc["ui"]["dark"]["surface.panel"], "#333333", "the classic theme's own tool windows")
+        self.assertIn("surface.app: #111111 from StatusBar.background (Islands Night)", classic.sources)
+        self.assertTrue(classic.summary.endswith("; chrome from Islands Night"), classic.summary)
+        self.assertEqual(own.doc["ui"]["dark"]["surface.app"], "#111111")
+        self.assertNotIn("chrome from", own.summary, "an Islands theme keeps its own chrome")
+        self.assertEqual(alone.doc["ui"]["dark"]["surface.app"], "#333333", "without an Islands variant")
+
     def test_list_resolves_dark_and_light_through_the_parent_chain(self):
         themes = {"base": BASE, "child": CHILD, "night": {"name": "Night", "parentTheme": "Darcula"},
                   "plain": {"name": "Plain"}}
