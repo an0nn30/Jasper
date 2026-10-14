@@ -23,7 +23,8 @@ corrected; the empty Imported themes group now says Alacritty and IntelliJ theme
 converter in Jasper's source repository (`tools/themes`). Spec 4.3 shows a failed delete under the theme's row; the
 group shows every message under Import… (recorded in Plan 2's banner). Left for later: the controller adopts a new
 library only when installation succeeds, so an installation failure still hides a newly imported theme from Settings.
-`./gradlew check --continue`: **9,833 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched. Not merged or pushed.
+`./gradlew check --continue`: **9,833 tests, 0 failures, 0 errors, 8 skipped**; after merging `main`: **9,903 tests, 0 failures,
+0 errors, 8 skipped**. No GUI launched. Merged to `main`.
 
 **Theme import Plan 3: the theme converter — 2026-10-13** (`claude/theme-import`;
 [spec](superpowers/specs/2026-10-13-jasper-theme-import-design.md),
@@ -35,7 +36,7 @@ from `c1e968ee^`). `checkThemeTool` runs its tests under `:jasper-ui:check` and 
 installs it); `ConvertedThemesTest` loads its golden files with the Java loader. The mapping departs from the spec's
 section 5.4 starting table in four recorded ways (the plan's header). `./gradlew check --continue`:
 **9,817 tests, 0 failures, 0 errors, 8 skipped**. Review fixes beyond the plan's text are in its status banner. No GUI launched. For the user: convert a favourite theme and import it (Plan 2) or copy it into
-the themes folder. Not merged or pushed.
+the themes folder. Merged to `main`.
 
 **Theme import Plan 2: Import… and Remove — 2026-10-13** (`claude/theme-import`;
 [spec](superpowers/specs/2026-10-13-jasper-theme-import-design.md),
@@ -46,7 +47,7 @@ failures show under the button. Remove asks, deletes the file, and returns the t
 and staged ones to their defaults. `appearance.ThemeFolder` does the file work; `SchemaPage.Part` is a new, generic
 page section; the application asks with `pluginmanager.ConfirmView`. `./gradlew check --continue`: **9,815 tests,
 0 failures, 0 errors, 8 skipped**. Review fixes beyond the plan's text are in its status banner. No GUI launched. GUI checks for the user: Import… with the real chooser, the Replace
-and Remove sheets over Settings, and the dropdowns after each. Not merged or pushed.
+and Remove sheets over Settings, and the dropdowns after each. Merged to `main`.
 
 **Theme import Plan 1: the format and the runtime — 2026-10-13** (`claude/theme-import`;
 [spec](superpowers/specs/2026-10-13-jasper-theme-import-design.md),
@@ -59,7 +60,7 @@ configuration warnings. Settings › Appearance has Dark theme and Light theme d
 over the installed schemes; the palette's "Terminal: …" commands follow them. Deviation: the spec's section 8 put the
 dropdowns in Plan 2; they are here (Plan 2 is Import… and Remove). `./gradlew check --continue`: **9,801 tests, 0 failures,
 0 errors, 8 skipped**. Review fixes beyond the plan's text are in its status banner. No GUI launched. For the user: copy a theme file into the themes folder, Reload config, pick it.
-Not merged or pushed.
+Merged to `main`.
 
 **About screen, build information and licenses — 2026-10-13** (`claude/about-screen`, worktree
 `.claude/worktrees/about-screen`; [spec](superpowers/specs/2026-10-13-about-screen-design.md),
