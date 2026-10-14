@@ -716,6 +716,15 @@ class EditorWindowTest {
         assertThat(tab.area().getCaretPosition()).as("no column: the line's start").isZero();
     }
 
+    @Test void openAtSettlesWhenTheTabClosesBeforeTheTextHasLoaded() throws Exception {
+        Path file = file("lines.txt", "one\ntwo\n");
+        var settled = window.openAt(file, 2, 1, null);
+        assertThat(settled).isNotDone();
+        host.contentTabs().getFirst().close();
+        assertThat(settled).as("closing cancels the read, which never reports").isCompleted();
+        assertThat(window.sessions()).isEmpty();
+    }
+
     @Test void openNewMakesOneTabPerPathThatItsFirstSaveCreates() {
         Path file = home.resolve("new.txt");
         DocumentSession first = window.openNew(file, null);

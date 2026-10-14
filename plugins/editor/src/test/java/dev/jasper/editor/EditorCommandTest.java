@@ -120,6 +120,36 @@ class EditorCommandTest {
         assertThat(host.contentTabs()).hasSize(1);
     }
 
+    @Test void closingTheTabWhileItLoadsEndsTheWait() throws IOException {
+        file("a.txt", "a\n");
+        FakeCommandCall call = editor("--wait", "a.txt");
+        assertThat(call.exit()).as("the text has not loaded yet").isNotDone();
+        host.contentTabs().getFirst().close();
+        assertThat(call.exit()).isCompletedWithValue(0);
+        load();
+        assertThat(host.contentTabs()).isEmpty();
+    }
+
+    @Test void closingTheTabWhileItLoadsEndsAPlainOpenToo() throws IOException {
+        file("a.txt", "a\n");
+        FakeCommandCall call = editor("a.txt");
+        assertThat(call.exit()).as("the text has not loaded yet").isNotDone();
+        host.contentTabs().getFirst().close();
+        assertThat(call.exit()).isCompletedWithValue(0);
+        assertThat(call.err()).isEmpty();
+    }
+
+    @Test void stoppingTheEditorWhileAFileLoadsEndsTheCall() throws IOException {
+        file("a.txt", "a\n");
+        FakeCommandCall waiting = editor("--wait", "a.txt");
+        FakeCommandCall plain = editor("a.txt");
+        assertThat(waiting.exit()).isNotDone();
+        assertThat(plain.exit()).isNotDone();
+        host.stopAll();
+        assertThat(waiting.exit()).isCompletedWithValue(0);
+        assertThat(plain.exit()).isCompletedWithValue(0);
+    }
+
     @Test void stoppingTheEditorEndsTheWait() throws IOException {
         file("a.txt", "a\n");
         FakeCommandCall call = editor("--wait", "a.txt");

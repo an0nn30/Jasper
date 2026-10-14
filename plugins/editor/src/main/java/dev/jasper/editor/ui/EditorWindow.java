@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -215,10 +216,10 @@ public final class EditorWindow {
      *
      * @return completes with the tab's session once it is ready or has failed
      */
-    public java.util.concurrent.CompletableFuture<DocumentSession> openAt(Path file, int line, int column, WindowOwner owner) {
+    public CompletableFuture<DocumentSession> openAt(Path file, int line, int column, WindowOwner owner) {
         open(new LocalDocument(file, context.background()), owner);
         DocumentSession session = model.find(LocalDocument.key(file)).orElseThrow();
-        var settled = new java.util.concurrent.CompletableFuture<DocumentSession>();
+        var settled = new CompletableFuture<DocumentSession>();
         // The session replaces the text before it reports READY, so the caret set here is not reset by the load.
         Runnable check = () -> {
             if (settled.isDone()) return;
@@ -229,8 +230,12 @@ public final class EditorWindow {
                 settled.complete(session);
             }
         };
-        session.addListener(check);
         check.run();
+        if (!settled.isDone()) {
+            session.addListener(check);
+            // Closing the tab cancels the read, which leaves the session loading for good: its closing settles the call too.
+            closed(session).thenRun(() -> settled.complete(session));
+        }
         return settled;
     }
 
@@ -240,10 +245,10 @@ public final class EditorWindow {
      */
     public DocumentSession openNew(Path file, WindowOwner owner) {
         Path target = file.toAbsolutePath().normalize();
-        java.util.Optional<DocumentSession> open = model.find(LocalDocument.key(target));
+        Optional<DocumentSession> open = model.find(LocalDocument.key(target));
         if (open.isEmpty()) {
             open = newFiles.entrySet().stream().filter(entry -> entry.getValue().equals(target))
-                .map(java.util.Map.Entry::getKey).findFirst();
+                .map(Map.Entry::getKey).findFirst();
         }
         if (open.isPresent()) {
             select(open.get());
@@ -253,10 +258,10 @@ public final class EditorWindow {
     }
 
     /** Completes once the session's tab has closed: when the user closes it, its window closes or the Editor stops. */
-    public java.util.concurrent.CompletableFuture<Void> closed(DocumentSession session) {
-        var done = new java.util.concurrent.CompletableFuture<Void>();
+    public CompletableFuture<Void> closed(DocumentSession session) {
+        var done = new CompletableFuture<Void>();
         var handle = hosted.entrySet().stream().filter(entry -> entry.getKey().session() == session)
-            .map(java.util.Map.Entry::getValue).findFirst();
+            .map(Map.Entry::getValue).findFirst();
         if (handle.isEmpty() || handle.get().isClosed()) done.complete(null);
         else handle.get().onClosed(() -> done.complete(null));
         return done;
@@ -273,7 +278,7 @@ public final class EditorWindow {
                 int length = Math.max(0, area.getLineEndOffset(index) - start - 1);
                 int offset = start + Math.min(Math.max(column, 1) - 1, length);
                 area.setCaretPosition(Math.min(offset, area.getDocument().getLength()));
-            } catch (javax.swing.text.BadLocationException impossible) {
+            } catch (BadLocationException impossible) {
                 // The line came from getLineCount, so it exists.
             }
         });
@@ -292,7 +297,7 @@ public final class EditorWindow {
     public void dispose() {
         if (disposed) return; disposed = true;
         for (var handle : List.copyOf(hosted.values())) handle.close();
-        closeRegistration.close(); closed();
+        closeRegistration.close(); shutDown();
     }
 
     /** Settings or the theme changed: applies them to every tab. */
@@ -567,7 +572,7 @@ public final class EditorWindow {
         }
     }
 
-    private void closed() {
+    private void shutDown() {
         ticker.stop();
         noticeTimer.stop();
         for (DocumentSession session : model.sessions()) session.cancelLoad();
