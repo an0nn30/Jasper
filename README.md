@@ -22,7 +22,7 @@ concrete lifecycle owners support the current features. Plugins are written agai
 
 ## Requirements
 
-Install the **JetBrains Runtime SDK 25 (JBR SDK)**, including `jpackage`; a JRE or a JDK from another vendor is insufficient. Gradle requires vendor JetBrains and discovers the SDK automatically on the development Mac. If discovery fails, set `JAVA_HOME` to the SDK and add its `bin` directory to `PATH`, or set `org.gradle.java.installations.paths` in Gradle properties. Use the checked-in Gradle wrapper, not a system Gradle installation. The first build downloads Gradle and dependencies.
+Install the **JetBrains Runtime SDK 25 (JBR SDK)**, including `jpackage`; a JRE or a JDK from another vendor is insufficient. Gradle requires vendor JetBrains and discovers the SDK automatically on the development Mac. If discovery fails, set `JAVA_HOME` to the SDK and add its `bin` directory to `PATH`, or set `org.gradle.java.installations.paths` in Gradle properties. Use the checked-in Gradle wrapper, not a system Gradle installation. The first build downloads Gradle and dependencies. `./gradlew build` and `check` also run the theme converter's tests, which need Python 3.11 or later on the `PATH` as `python3` or `python` (the `python3` in Xcode's command line tools is 3.9).
 
 ## Build and run
 

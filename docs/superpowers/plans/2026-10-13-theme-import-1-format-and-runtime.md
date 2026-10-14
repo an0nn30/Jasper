@@ -7,7 +7,8 @@
 > `ThemeLibrary` says why a file could not be read and survives a failed folder listing; a Settings row with
 > companion settings stages only the settings an edit changed (`SchemaPage.edited`), so picking a theme no longer
 > writes `appearance`; README.md, docs/README.md, docs/ui-architecture.md, docs/sdk-architecture.md and
-> docs/plugin-ui.md describe installed themes.
+> docs/plugin-ui.md no longer name Slate Steel as the only theme. The final whole-branch review's fixes are in
+> docs/STATUS.md.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

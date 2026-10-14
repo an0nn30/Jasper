@@ -6,7 +6,8 @@
 > `ImportedThemesSection` words install, Remove and save failures ("permission denied.", "the file is no longer
 > there.") instead of showing a path; `AppearancePageTest` passes the sixth `AppearanceChoices` argument;
 > docs/app-maintenance.md names the palette's `view.terminal_scheme.match` and `view.terminal_scheme.<theme>.<key>`
-> commands.
+> commands. Spec 4.3 shows a failed delete under the theme's row; the group shows every message under Import….
+> The final whole-branch review's fixes are in docs/STATUS.md.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

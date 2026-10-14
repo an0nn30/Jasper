@@ -1,5 +1,30 @@
 # Jasper — Status and Handoff
 
+**Theme import final review — 2026-10-13** (`claude/theme-import`). The final whole-branch review's fixes. A Remove whose
+settings cannot be saved now has the application read the themes folder itself, so the removed theme leaves the group,
+the dropdowns and the screen at once (it used to stay listed and shown). A foreign JSON file, such as an IntelliJ
+`.theme.json` or a VS Code theme, is refused as "Not a Jasper theme" rather than with a parser error, because the loader
+now reads every valid JSON value (booleans, null, arrays and any other number as opaque values, with the depth limit
+counting arrays) and refuses a value of the wrong kind by its entry name. The converter prints a name the console cannot
+encode escaped instead of ending in a traceback, so later inputs are still written. One malformed theme of a plugin no
+longer stops its plugin's others: it is reported as `error: <input>!<theme path>: <message>` and the rest are written.
+An unexpected failure while preparing an import is reported like any import failure and no longer leaves the group
+busy, and an unexpected failure parsing one theme file becomes a library problem for that file instead of stopping
+start-up. A pick of an installed theme that lacks the variant reads "Dawn (no Dark variant)" (or Light) in the dropdown
+and tile; "(not installed)" stays for an id nothing installed has. The loader refuses a style on
+`editor.<variant>.background` and a reference with an empty style (a trailing comma). The converter lays an alpha
+`Label.foreground` over the panel colour, as spec 5.3 step 4 says, rather than over black or white; the golden files
+are unchanged. Four test gaps are closed: a replaced theme in use is installed again after a reload, a failed install
+keeps the old file and leaves no temporary file, the loader refuses `ui` without `editor` and an `editor` missing a
+variant, and a literal editor colour with a share and a theme without an author load as written. README names Python
+3.11 or later for `build` and `check`; docs/themes.md (the converter's keying, `--theme`, `--name` and summary, the
+Settings path and the diagnostic example), docs/configuration.md, docs/app-maintenance.md and the Plan 1 banner are
+corrected; the empty Imported themes group now says Alacritty and IntelliJ themes can be converted with the theme
+converter in Jasper's source repository (`tools/themes`). Spec 4.3 shows a failed delete under the theme's row; the
+group shows every message under Import… (recorded in Plan 2's banner). Left for later: the controller adopts a new
+library only when installation succeeds, so an installation failure still hides a newly imported theme from Settings.
+`./gradlew check --continue`: **9,833 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched. Not merged or pushed.
+
 **Theme import Plan 3: the theme converter — 2026-10-13** (`claude/theme-import`;
 [spec](superpowers/specs/2026-10-13-jasper-theme-import-design.md),
 [plan](superpowers/plans/2026-10-13-theme-import-3-converter.md)). `tools/themes/jasper_theme.py` (Python 3.11+,

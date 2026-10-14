@@ -9,7 +9,7 @@
 > counts nested jars together, and the `--scheme` file and a loose `.theme.json` are capped at 4 MiB; `--verbose`
 > is described as printing where each UI role came from. The suite has 55 tests; the golden files are unchanged.
 > Task 2's review added the golden files to `:jasper-ui:test`'s inputs, so a regenerated golden file reruns
-> `ConvertedThemesTest`.
+> `ConvertedThemesTest`. The final whole-branch review's fixes are in docs/STATUS.md.
 
 > **Deviations from the spec's section 5.4 (recorded here and in `docs/STATUS.md`), found while checking the table
 > against IntelliJ's own themes, as 5.4 asks:** (1) IntelliJ themes set most colours through `*.` wildcards, and a

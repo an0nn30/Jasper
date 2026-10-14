@@ -54,8 +54,9 @@ editor scheme.
 
 ## Importing and removing themes
 
-Settings › Appearance › **Imported themes** lists every imported theme with what it offers ("UI theme · Dark",
-"Terminal scheme", …) and a **Remove** button, under an **Import…** button. Both act at once, outside Apply.
+Settings › Appearance & Behavior › Appearance › **Imported themes** lists every imported theme with what it offers
+("UI theme · Dark", "Terminal scheme", …) and a **Remove** button, under an **Import…** button. Both act at once,
+outside Apply.
 
 - **Import…** opens Jasper's file chooser for a `.json` file, checks it and copies it into the themes folder as
   `<id>.json`, the id coming from the theme's name ("Gruvbox Dark" is `gruvbox-dark`). Its variants and schemes then
@@ -76,17 +77,20 @@ python3 tools/themes/jasper_theme.py Dracula.jar gruvbox_dark.toml -o ~/Desktop/
 ```
 
 - An **Alacritty** theme (`.toml`) becomes a terminal-only theme: one scheme, named after the file
-  (`gruvbox_dark.toml` is "Gruvbox Dark") and keyed `dark` or `light` by its background.
+  (`gruvbox_dark.toml` is "Gruvbox Dark") and keyed `dark` when its background is darker than its foreground, `light`
+  otherwise.
 - An **IntelliJ** theme (a `.theme.json`, a plugin `.jar`, or a `.zip` downloaded from the JetBrains Marketplace)
   becomes a UI theme with its one variant, Dark or Light: its colours resolved through its parent themes (IntelliJ's
   own, in `tools/themes/intellij/`), its console colours as its terminal scheme and its editor scheme's colours for the
-  Editor. Every theme in a plugin is written; `--list` shows them and `--theme NAME` converts one.
-- `--name` sets the display name, `--scheme FILE` gives a loose `.theme.json` its editor scheme, `--force` overwrites
-  existing files and `--verbose` prints where each UI role came from (IntelliJ themes).
+  Editor. Every theme in a plugin is written; `--list` shows them and `--theme NAME` (a name or id that `--list`
+  shows; it can be repeated) converts only those.
+- `--name` sets the display name (it needs exactly one converted theme), `--scheme FILE` gives a loose `.theme.json`
+  its editor scheme, `--force` overwrites existing files and `--verbose` prints where each UI role came from (IntelliJ
+  themes).
 
 Each theme is written as `<id>.json`, its name lower-cased with dashes, so the file can go straight into the themes
-folder. A conversion prints a summary such as `Dracula (dark): 41 roles from the theme, 12 from Darcula, 4 derived;
-editor 22 of 23 from the scheme`; "derived" roles had no IntelliJ key and follow a rule instead.
+folder. A conversion prints a summary such as `ocean.json: Ocean (dark): 24 roles from the theme, 8 from Darcula, 24
+derived; editor 20 of 23 from the scheme`; "derived" roles had no IntelliJ key and follow a rule instead.
 
 ## The Jasper theme format
 
@@ -141,7 +145,8 @@ same roles through the SDK. Installed themes live in the themes folder, outside 
 - A value that is not a valid `ui.appearance`, theme id or scheme id is reported ("Use …; using the default.") and
   the default is used (`system`, `slate-steel`, `match`).
 - A theme file that cannot be used is skipped and reported with the configuration's warnings, naming the file, the
-  line when known and the entry, for example `dracula.json: warning: ui.dark: Missing colour "accent"`.
+  line when known and the entry, for example
+  `/Users/you/.config/jasper/themes/dracula.json: warning: ui.dark: Missing colour "accent"`.
 - A theme pick that names a theme that is not installed, or one without that variant, and a scheme that is not
   installed, are reported on their setting and replaced by the default until the theme is installed again.
 - A removed setting (`terminal.colors`, `[colors]`) is reported as an unknown setting and ignored.

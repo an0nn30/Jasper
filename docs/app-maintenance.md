@@ -661,8 +661,9 @@ and Dark is used. Terminal › Font & Colors links to the section.
 The command palette's `view.terminal_scheme.match` and `view.terminal_scheme.<theme>.<key>` commands save `terminal.scheme` for every window
 (`WindowContent.selectTerminalScheme`); "Themes…" opens Appearance.
 
-Headless checks: AppearancePageTest, AppearanceSelectionTest, SettingsDialogTest, TerminalSchemeCommandsTest,
-TerminalSchemeSurfaceTest and JasperApplicationThemesTest. Do not launch the GUI from an unattended agent.
+Headless checks: AppearancePageTest, AppearanceSelectionTest, ImportedThemesSectionTest, SettingsAppearanceTest,
+SettingsDialogTest, TerminalSchemeCommandsTest, TerminalSchemeSurfaceTest, ThemeFolderTest, ThemeLibraryTest,
+ThemeSelectionTest and JasperApplicationThemesTest. Do not launch the GUI from an unattended agent.
 
 ## Consumer migration completion
 

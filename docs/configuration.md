@@ -46,7 +46,7 @@ sections holding them, are blue. Click one, press the new keys and click Set; Ap
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
 Appearance holds View mode (Normal or Compact, applied after restart), the Dark, Light and Match System tiles,
-the Dark theme and Light theme dropdowns and the Terminal scheme dropdown; Terminal › Font & Colors links there. See
+the Dark theme and Light theme dropdowns, the Terminal scheme dropdown and the Imported themes group; Terminal › Font & Colors links there. See
 [Themes](themes.md).
 
 Tools holds a page for each running plugin that has settings, built from what the plugin declares or by the plugin
