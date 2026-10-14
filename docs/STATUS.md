@@ -44,8 +44,8 @@ follow, and it is dark when the title bar is); `ThemeZone.titleBar` marks the ma
 MacTitleBar.setHeader) so its painters and glyphs use it, and the macOS controls follow its darkness. The converter
 writes them from IntelliJ's `MainToolbar.background`/`foreground` when that stands 5 L* or more apart from the chrome
 (New UI Light's dark header); the built-ins are unchanged. SDK 0.17.1 mirrors them. Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
-(the colour patterns are now precompiled). `./gradlew check --continue`: **10,177 tests, 0 failures, 0 errors, 12
-skipped**. No GUI launched. GUI check for the user: each flavour in Settings › Appearance and the Licenses window (About Jasper › Licenses). Not merged.
+(the colour patterns are now precompiled). `./gradlew check --continue` after merging main (SDK 0.17.1 now also carries main's default-editor
+additions): **10,301 tests, 0 failures, 0 errors, 12 skipped**. No GUI launched. GUI check for the user: each flavour in Settings › Appearance and the Licenses window (About Jasper › Licenses). Merged to main (fast-forward), not pushed.
 
 **The default editor (command line plan 2) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
