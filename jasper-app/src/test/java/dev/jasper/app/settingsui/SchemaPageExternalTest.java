@@ -152,6 +152,47 @@ class SchemaPageExternalTest {
         assertThat(body.getHierarchyListeners()).as("a disposed page waits for nothing").hasSize(listeners);
     }
 
+    @Test void aRevealWithAValueStagesItAsTheRowsEdit() {
+        var page = page();
+        page.component();
+        page.reveal("vm.heap=4096");
+        page.selected();
+        assertThat(page.externals().getFirst().pending()).isEqualTo(4096);
+        assertThat(kit(page, "vm.heap.input", JTextField.class).getText()).isEqualTo("4096");
+        assertThat(page.modified()).isTrue();
+        assertThat(saves).as("staged, not saved").isEmpty();
+        assertThat(page.revealed()).as("the row still waits to be focused").isEqualTo("vm.heap");
+        kit(page, "vm.heap.input", JTextField.class).setText("3072");
+        page.selected();
+        assertThat(page.externals().getFirst().pending()).as("staged once").isEqualTo(3072);
+    }
+
+    @Test void aRevealedValueIsCheckedLikeTypedOne() {
+        var page = page();
+        page.component();
+        page.reveal("vm.heap=256");
+        page.selected();
+        assertThat(page.externals().getFirst().error()).isEqualTo("Use 512 MiB or more.");
+        assertThat(page.valid()).isFalse();
+    }
+
+    @Test void aDisabledRowOrAMalformedValueStagesNothing() {
+        enabled = false;
+        var disabled = page();
+        disabled.component();
+        disabled.reveal("vm.heap=4096");
+        disabled.selected();
+        assertThat(disabled.externals().getFirst().pending()).isNull();
+        assertThat(disabled.modified()).isFalse();
+        enabled = true;
+        var garbled = page();
+        garbled.component();
+        garbled.reveal("vm.heap=lots");
+        garbled.selected();
+        assertThat(garbled.externals().getFirst().pending()).isNull();
+        assertThat(garbled.revealed()).isEqualTo("vm.heap");
+    }
+
     @Test void searchFindsTheExternalRow() {
         var page = page();
         page.component();

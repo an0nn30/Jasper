@@ -63,7 +63,11 @@ the bundled 2048 MiB removes it) and opens the file with **Edit Custom VM Option
 Settings…** and **Edit Custom VM Options…** lead to the same places. The section checks the options with the bundled
 `java` and says which lines it ignores, which options the JVM does not know, whether Jasper would start with them, and
 when a restart is needed (**Restart Now**). When Jasper had to start without your options, or ignored the file, it says
-so in a notification in the **Memory & VM options** group.
+so in a notification in the **Memory & VM options** group. Settings › Window › **Show memory indicator**
+(`window.memory_indicator`) adds the heap in use and its limit, such as `312 of 2048M`, to the status bar while the
+status bar is shown; click it to run garbage collection. When the heap stays nearly full, or Jasper runs out of memory, a notification in the same group
+offers **Adjust Memory Settings…**, which opens the heap limit with 512 MiB more filled in (left as saved when a larger
+limit is already saved).
 
 ## Settings dialog
 
@@ -184,6 +188,7 @@ family = "system"
 | `window.toolbar_height` | `30` | Integer 28–64 logical pixels; also sets the unified macOS title-bar height; buttons are the height minus 6 and icon-only buttons stay square; out-of-range values use the nearest limit with a warning | Live |
 | `window.status_bar` | `true` | Boolean | Live |
 | `window.status_bar_height` | `24` | Integer 20–48 logical pixels; the bar grows past it only when a large UI font needs the room; out-of-range values use the nearest limit with a warning | Live |
+| `window.memory_indicator` | `false` | Boolean | Live |
 | `window.columns` | `100` | Integer 5–500 | New windows |
 | `window.lines` | `35` | Integer 2–200 | New windows |
 | `window.view_mode` | `"normal"` | `"normal"` or `"compact"`; Compact uses the native title bar, hides the workspace header and floats the command palette | After restart |
@@ -735,7 +740,7 @@ over a plugin's suggestion. A binding for an action that no installed plugin pro
 reported as a configuration warning. Every panel also has a `<panel id>.toggle` action you can
 bind the same way. `"plugins.manage"` opens Settings at Plugins, `"app.shortcuts"` at Keymap and `"app.about"` the About
 window; `"app.memory"` opens the heap limit in System Settings and `"app.vmoptions"` opens `jasper.vmoptions` in your
-editor; none has a default shortcut.
+editor and `"app.memory.gc"` runs garbage collection; none has a default shortcut.
 
 ## Command palette shortcuts
 

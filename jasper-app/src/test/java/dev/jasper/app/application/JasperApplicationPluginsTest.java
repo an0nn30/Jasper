@@ -3,7 +3,11 @@ package dev.jasper.app.application;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.platform.AppDirs;
+import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.testsupport.PluginJars;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryPoolMXBean;
+import java.lang.management.MemoryType;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.List;
@@ -151,6 +155,12 @@ class JasperApplicationPluginsTest {
                 assertThat(action.title()).isEqualTo("Edit Custom VM Options…");
                 assertThat(action.keywords()).contains("memory", "heap", "xmx", "jvm", "java", "vm options");
             });
+            assertThat(application[0].contributions().action(MemoryIndicator.COLLECT)).get()
+                .satisfies(action -> assertThat(action.title()).isEqualTo("Run Garbage Collection"));
+            assertThat(application[0].contributions().status()).anySatisfy(entry -> {
+                assertThat(entry.id()).isEqualTo(MemoryIndicator.STATUS_ID);
+                assertThat(entry.visible()).as("off by default").isFalse();
+            });
             assertThat(application[0].contributions().action(AboutWindows.ABOUT)).get()
                 .satisfies(action -> assertThat(action.title()).isEqualTo("About Jasper"));
             assertThat(application[0].contributions().menus()).anySatisfy(section -> {
@@ -161,6 +171,45 @@ class JasperApplicationPluginsTest {
         });
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test void anOutOfMemoryErrorWarnsThatJasperIsLowOnMemory() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].startPlugins(null, null, false, dirs);
+            application[0].unexpected(Thread.currentThread(), new RuntimeException("wrapped", new OutOfMemoryError("Java heap space")));
+            assertThat(application[0].notificationCenter().history())
+                .anySatisfy(entry -> assertThat(entry.request().title()).isEqualTo("Jasper is running low on memory"));
+        });
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test void quitReleasesTheHeapWatchAndTheMemoryIndicatorsAction() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        // The old generation: the heap pool that supports both usage thresholds, with the largest maximum.
+        MemoryPoolMXBean oldGeneration = ManagementFactory.getMemoryPoolMXBeans().stream()
+            .filter(pool -> pool.getType() == MemoryType.HEAP && pool.isUsageThresholdSupported() && pool.isCollectionUsageThresholdSupported())
+            .max(java.util.Comparator.comparingLong(pool -> pool.getUsage().getMax())).orElseThrow();
+        var trace = StartupTrace.detached();
+        trace.mark(StartupTrace.Milestone.OUTPUT_PAINTED);
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].trace(trace);
+            application[0].startPlugins(null, null, false, dirs);
+        });
+        edt(() -> { });
+        assertThat(application[0].contributions().action(MemoryIndicator.COLLECT)).as("the indicator's click action").isPresent();
+        assertThat(oldGeneration.getCollectionUsageThreshold()).as("the low-memory watch, installed when start-up settled").isPositive();
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(application[0].contributions().action(MemoryIndicator.COLLECT)).as("closed with the application").isEmpty();
+        assertThat(oldGeneration.getCollectionUsageThreshold()).as("the threshold is released").isZero();
     }
 
     @Test void restartQuitsThenStartsTheReplacementAfterProcessCleanup() throws Exception {

@@ -36,7 +36,7 @@ The complete color reference for Jasper. It covers:
 | `surface.control.selected` | `#3A3F4A` | `#D3D8DE` | Active activity-rail item, active pill tab |
 | `surface.menu` | `#30343C` | `#FFFFFF` | Menus, combobox popover, command palette |
 | `surface.terminal` | `#23262C` | `#FBFBFC` | Terminal area, active attached tab |
-| `surface.tabstrip` | `#1F2228` | `#E9ECEF` | Tab strip behind inactive tabs |
+| `surface.tabstrip` | `#1F2228` | `#E9ECEF` | Tab strip behind inactive tabs, painted at least 9 L* darker than `surface.terminal` |
 | `surface.emptyTile` | `#343841` | `#E3E6EA` | Empty-state icon tile |
 | `surface.scrim` | `#0A0C10 @ 55%` | `#1C2027 @ 25%` | Backdrop behind sheets and the command palette |
 

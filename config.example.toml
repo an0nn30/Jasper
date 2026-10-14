@@ -17,6 +17,8 @@ toolbar_height = 30
 status_bar = true
 # Live across open windows. Range: 20-48 logical pixels; out-of-range values use the nearest limit.
 status_bar_height = 24
+# Live across open windows.
+memory_indicator = false
 # Initial grid for new windows only. Columns: 5-500; lines: 2-200.
 columns = 100
 lines = 35

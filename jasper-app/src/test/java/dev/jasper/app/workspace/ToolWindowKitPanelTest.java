@@ -80,6 +80,39 @@ class ToolWindowKitPanelTest {
         }
     }
 
+    /** The old frame lets go of the shared header before the new one borrows it, whichever slot comes first. */
+    @Test void aShowingKitPanelKeepsItsHeaderWhenItMovesToAnEarlierSlot() {
+        ThemeTestSupport.install(true);
+        var theme = ThemeTestSupport.generated(true);
+        try (var bindings = new AppearanceBindings(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }, () -> false);
+             var view = new KitView(bindings.context(ThemeRoute.CHROME), spec(), event -> { throw new AssertionError("Host action leaked"); })) {
+            var state = new DockState();
+            var area = new ToolWindowArea(new JPanel(), state);
+            var sources = new java.util.IdentityHashMap<JComponent, String>();
+            area.dragSource = (component, id) -> sources.put(component, id);
+            area.releaseDragSource = sources::remove;
+            var hidden = new ArrayList<String>();
+            area.onHide = hidden::add;
+            area.setContent("tunnels", "Tunnels", view);
+            area.setHeader("tunnels", metadata("2 open", true, new ArrayList<>()));
+            state.add("tunnels", Slot.RIGHT_BOTTOM);
+            state.show("tunnels");
+            area.sync();
+            var header = view.panelHeader("panel");
+            for (Slot earlier : List.of(Slot.RIGHT_TOP, Slot.LEFT_BOTTOM)) {
+                state.move("tunnels", earlier, 0);
+                area.sync();
+                assertThat(view.getParent()).as("shown in " + earlier).isNotNull();
+                assertThat(sources).as("the header still starts a drag after the move to " + earlier).containsEntry(header, "tunnels");
+                assertThat(buttons(header)).extracting(AbstractButton::getToolTipText).as("in " + earlier).containsExactly("Options", "Hide");
+                assertThat(texts(header, "2 open")).as("the header metadata stays in " + earlier).hasSize(1);
+            }
+            button(header, "Hide").doClick();
+            assertThat(hidden).containsExactly("tunnels");
+            area.close();
+        }
+    }
+
     @Test void contentOnlyUpdatesKeepTheBorrowedHeaderWithoutRelayingOutTheDock() {
         ThemeTestSupport.install(true);
         var theme = ThemeTestSupport.generated(true);

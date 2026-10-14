@@ -43,7 +43,8 @@ import javax.swing.SwingUtilities;
  * Until the cursor first leaves a stripe button's old place, its square grown by the drag threshold and one more
  * pixel on every side, that place is its own target, so pressing, moving a few pixels and releasing on the spot
  * changes nothing even near the button's edge, where the drag layout shifts the stripe; after that the resolver
- * decides from what the stripes show. Releasing the left button over a target hands the drop to
+ * decides from what the stripes show. Another stripe group's drop space wins even there: an empty top group's drop
+ * space covers the old place of the first button under it. Releasing the left button over a target hands the drop to
  * {@link #onDrop}; releasing it anywhere else, Esc in its window, {@link #cancel} or another press (a right or middle
  * click, or a left press after a lost release) ends the drag without one. A window resize while dragging forgets the
  * old place and resolves the target again. EDT only.
@@ -224,8 +225,9 @@ final class DockDrag {
             for (DockDropResolver.Group group : stripe.dropGroups()) groups.add(inRoot(stripe, group));
         Rectangle workspace = SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), root);
         if (home != null && !nearHome(at)) forgetHome();
-        target = home != null ? Optional.of(DockDropResolver.Target.stripe(homeSlot, homeIndex))
-            : DockDropResolver.resolve(at, groups, workspace, sideSplit(workspace));
+        Optional<DockDropResolver.Target> resolved = DockDropResolver.resolve(at, groups, workspace, sideSplit(workspace));
+        boolean otherGroup = resolved.filter(where -> where.onStripe() && where.slot() != homeSlot).isPresent();
+        target = home != null && !otherGroup ? Optional.of(DockDropResolver.Target.stripe(homeSlot, homeIndex)) : resolved;
         for (ToolStripe stripe : stripes)
             stripe.showGap(target.filter(DockDropResolver.Target::onStripe).map(DockDropResolver.Target::slot).orElse(null),
                 target.map(where -> where.index().orElse(0)).orElse(0));

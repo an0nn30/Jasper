@@ -17,10 +17,24 @@ class NativeChromePaintingTest {
         var glass = new Color(0x22, 0x26, 0x29, 200);
         var idle = NativeChromePainting.tabSurface(theme, glass, false);
         var chosen = NativeChromePainting.tabSurface(theme, glass, true);
-        assertThat(idle.getRGB() & 0xFFFFFF).isEqualTo(KitFixtures.marker(SemanticColor.SURFACE_TABSTRIP).getRGB() & 0xFFFFFF);
+        assertThat(idle.getRGB() & 0xFFFFFF).isEqualTo(SurfaceContrast.apart(KitFixtures.marker(SemanticColor.SURFACE_TABSTRIP),
+            KitFixtures.marker(SemanticColor.SURFACE_TERMINAL), SurfaceContrast.TAB_LIGHTNESS).getRGB() & 0xFFFFFF);
         assertThat(chosen.getRGB() & 0xFFFFFF).isEqualTo(KitFixtures.marker(SemanticColor.SURFACE_TERMINAL).getRGB() & 0xFFFFFF);
         assertThat(idle.getAlpha()).isEqualTo(200);
         assertThat(chosen.getAlpha()).isEqualTo(200);
+    }
+
+    @Test void anInactiveTabStaysClearlyDarkerThanTheActiveOneWhenTheThemeGivesThemOneSurface() {
+        var base = KitFixtures.dark();
+        var colors = new java.util.EnumMap<SemanticColor, Color>(SemanticColor.class);
+        for (var role : SemanticColor.values()) colors.put(role, base.semantic().color(role));
+        colors.put(SemanticColor.SURFACE_TERMINAL, new Color(0x303446));
+        colors.put(SemanticColor.SURFACE_TABSTRIP, new Color(0x303446));
+        var theme = KitFixtures.withSemantic(base, new SemanticPalette(colors));
+        var opaque = new Color(0x30, 0x34, 0x46);
+        Color idle = NativeChromePainting.tabSurface(theme, opaque, false), chosen = NativeChromePainting.tabSurface(theme, opaque, true);
+        assertThat(chosen).isEqualTo(new Color(0x303446));
+        assertThat(ColorMath.lightness(chosen) - ColorMath.lightness(idle)).isGreaterThanOrEqualTo(SurfaceContrast.TAB_LIGHTNESS);
     }
 
     @Test void tabStripPaintsSlotsAHoveredSlotDividersAndTheLowerRule() {
@@ -32,10 +46,11 @@ class NativeChromePaintingTest {
         try { NativeChromePainting.tabStrip(strip, g, theme, base, List.of(new Rectangle(0, 0, 100, 28), new Rectangle(100, 0, 100, 28), new Rectangle(200, 0, 100, 28)), 1, 2); }
         finally { g.dispose(); }
         int border = KitFixtures.marker(SemanticColor.BORDER_WINDOW).getRGB();
-        assertThat(image.getRGB(50, 10)).isEqualTo(KitFixtures.marker(SemanticColor.SURFACE_TABSTRIP).getRGB());
+        int idle = NativeChromePainting.tabSurface(theme, base, false).getRGB();
+        assertThat(image.getRGB(50, 10)).isEqualTo(idle);
         assertThat(image.getRGB(150, 10)).isEqualTo(KitFixtures.marker(SemanticColor.SURFACE_TERMINAL).getRGB());
         assertThat(image.getRGB(250, 10)).as("a hovered inactive tab takes the hover overlay")
-            .isNotEqualTo(KitFixtures.marker(SemanticColor.SURFACE_TABSTRIP).getRGB());
+            .isNotEqualTo(idle);
         assertThat(image.getRGB(99, 10)).as("divider between slots").isEqualTo(border);
         assertThat(image.getRGB(150, 27)).as("lower rule").isEqualTo(border);
     }

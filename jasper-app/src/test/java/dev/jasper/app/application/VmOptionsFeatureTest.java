@@ -79,6 +79,16 @@ class VmOptionsFeatureTest {
         assertThat(heap.saved().getAsInt()).isEqualTo(4096);
     }
 
+    @Test void theSavedHeapIsTheFilesMaximumElseTheBundledDefault() throws IOException {
+        var feature = feature(managed(), true);
+        feature.reload();
+        assertThat(feature.savedHeapMiB()).as("no file: the bundled maximum").isEqualTo(2048);
+        Files.writeString(file(), "-Xmx4g\n");
+        feature.reload();
+        assertThat(feature.savedHeapMiB()).isEqualTo(4096);
+        assertThat(feature.savedHeapMiB()).as("the row's saved value is the same number").isEqualTo(feature.hooks().heap().saved().getAsInt());
+    }
+
     @Test void savingTheHeapWritesTheFileAndAsksForARestart() throws IOException {
         var feature = feature(managed(), true);
         feature.startupSettled();
@@ -275,5 +285,16 @@ class VmOptionsFeatureTest {
         });
         feature.settingsClosed();
         assertThat(center.history()).isEmpty();
+    }
+
+    @Test void aSavedHeapIsReportedSoTheLowMemoryWarningCanShowAgain() throws IOException {
+        var feature = feature(managed(), true);
+        int[] saved = {0};
+        feature.onHeapSaved(() -> saved[0]++);
+        feature.hooks().heap().save().apply(4096).join();
+        assertThat(saved[0]).isEqualTo(1);
+        Files.write(file(), new byte[] {'-', 'X', 'm', 'x', '1', 'g', '\n', 0});
+        assertThat(feature.hooks().heap().save().apply(3072)).isCompletedExceptionally();
+        assertThat(saved[0]).as("a refused save changes nothing").isEqualTo(1);
     }
 }

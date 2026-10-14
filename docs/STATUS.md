@@ -26,6 +26,44 @@ a custom `subl -w` with `custom_in_terminal` off, Jasper started from the Dock, 
 from Open in Editor, checking whether its `:!` commands find Homebrew's tools (a known limit: terminal editors keep
 Jasper's own `PATH`). Not merged or pushed. Plan 3 (Cmd-click file paths) is next.
 
+**Right rail splits again: two dock fixes — 2026-10-14** (`claude/right-rail-split`, worktree
+`.claude/worktrees/right-rail-split`; bug fix, the drag rule chosen by the user). The user's right rail could show
+only one window: Sessions and Tunnels were both in Right Bottom, and dragging the first icon under the empty top group
+straight up into it dropped it back where it was, because the drag layout puts that group's drop space over the icon's
+old place, which stayed its own target. `DockDrag` now lets another stripe group's drop space win over the old place
+(a click that drifts past 5 px on that icon can move it up). Second, `ToolWindowArea.sync` released and mounted frames
+slot by slot, so a showing kit panel moved to an earlier slot (Right Bottom to Right Top) lost its borrowed header's
+drag, Options, Hide and metadata to the old frame's release; it now releases every stale frame first. New tests
+`theFirstIconUnderAnEmptyTopGroupDragsStraightUpIntoIt` and `aShowingKitPanelKeepsItsHeaderWhenItMovesToAnEarlierSlot`.
+`./gradlew check --continue`: **10,159 tests, 0 failures, 0 errors, 12 skipped**. No GUI launched. GUI check for the
+user: drag Sessions up into the right rail's top group; move a showing plugin panel up and drag its header. Merged to
+main (fast-forward), not pushed.
+
+**Inactive tabs stay clearly darker than the active tab — 2026-10-14** (`claude/inactive-tabs`, worktree
+`.claude/worktrees/inactive-tabs`; bug fix, design and the ΔL* 9 strength chosen by the user). The active tab is
+`surface.terminal` and inactive tabs `surface.tabstrip`, but themes set the two close or equal (Slate Steel Dark 1.9 L*
+apart, Light 5.4; converted IntelliJ themes identical, since IntelliJ marks its tab with an underline), so the active tab
+could not be told apart. `NativeChromePainting.tabSurface` now paints inactive tabs, and the strip behind them, with
+`SurfaceContrast.apart(tabstrip, terminal, TAB_LIGHTNESS = 9)`: the theme's colour when it is at least 9 CIE L* from the
+terminal surface, otherwise darkened just until it is (lightened when the terminal surface is near black); no format
+change, so every installed theme is covered. Catppuccin Frappé `#1F212D` under `#303446`, Slate Steel Dark `#121317`
+under `#23262C`, Light `#DDE0E3` under `#FBFBFC`. `./gradlew check --continue` after merging `main`: **10,157 tests,
+0 failures, 0 errors, 12 skipped**. No GUI launched. GUI check for the user: the tab strip in each theme. Merged to `main`.
+
+**Custom VM options plan 3 (memory) complete — 2026-10-14.** On `claude/custom-vm-options-memory`, merged to local `main` (not pushed):
+Settings › Window › Show memory indicator (`window.memory_indicator`, off by default) adds `312 of 2048M` to the status
+bar, refreshed every 3 s by one shared timer while shown with a window open, with a heap and non-heap tooltip; a click
+runs garbage collection (the `app.memory.gc` action, also in the palette). A collection-usage threshold at 95% of the
+old generation feeds `LowMemoryWatch` (one signal per 20 s, more than five in 15 minutes warn, once until the heap is
+saved again); an `OutOfMemoryError` warns at once. The warning, "Jasper is running low on memory", is in the Memory &
+VM options group; **Adjust Memory Settings…** opens the heap limit with the running maximum plus 512 MiB staged (only the
+field when a higher heap is already saved).
+Deviations: the eight planned ones and the review and final-review changes, listed in the plan. Full `./gradlew check` after merging main: 10,152 tests,
+0 failures, 12 skips. Manual checks pending (the user): turn the indicator on and watch it update; click it; in the
+packaged app with a small heap (`-Xmx600m` in `jasper.vmoptions`), open many large scrollbacks until the warning shows,
+and use Adjust Memory Settings…; with the indicator on, cold-launch timing; Adjust Memory Settings… after saving a larger
+heap without restarting.
+
 **The jasper command (command line plan 1) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
 [plan](superpowers/plans/2026-10-13-jasper-command-line-1-jasper-command.md)). A native `jasper` command

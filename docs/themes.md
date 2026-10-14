@@ -49,7 +49,9 @@ themes with the same name show their ids.
 A scheme colours only the terminal text area: background, text, bold text, cursor, selection and the 16 ANSI colours.
 Tabs, the tab strip, the area around panes, the editor, panels and dialogs stay on the shown theme. With `match` the
 text area and the active tab meet seamlessly; with High Contrast the text area is black and the tab keeps the theme's
-terminal surface. Workspace opacity and blur apply to the terminal area. The editor always follows the shown theme's
+terminal surface. Inactive tabs take the theme's `surface.tabstrip`, darkened when it is too close to `surface.terminal`
+to tell the active tab apart (lightened when the terminal surface is near black). Workspace opacity and blur apply to the
+terminal area. The editor always follows the shown theme's
 editor scheme.
 
 ## Importing and removing themes
