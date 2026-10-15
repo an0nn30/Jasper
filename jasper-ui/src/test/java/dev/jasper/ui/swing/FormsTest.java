@@ -159,10 +159,12 @@ class FormsTest {
                 var owner=(SettingRows.RowControl)view.control("row");var secret=find(view,"secret",JComponent.class);
                 assertThat(owner.component.getHeight()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.DETAIL_ROW_HEIGHT));
                 assertThat(secret.getX()).isEqualTo(owner.title.getX());
-                // Centred in the detail row, with the 2-logical caption/value gap (11 at the compact row height).
-                assertThat(owner.title.getY()).isEqualTo(s(11));
                 var reveal=find(view,"secret.reveal",JButton.class);
                 var value=find(view,"secret.value",JComponent.class);
+                // Centred below the row's top stroke, with the 2-logical caption/value gap (11 at the compact row height with the macOS faces).
+                int block=owner.title.getHeight()+s(2)+value.getHeight();
+                assertThat(owner.title.getY()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE)+(owner.component.getHeight()-m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE)-block+1)/2);
+                if(com.formdev.flatlaf.util.SystemInfo.isMacOS)assertThat(owner.title.getY()).isEqualTo(s(11));
                 var revealBounds=SwingUtilities.convertRectangle(reveal.getParent(),reveal.getBounds(),owner.component);
                 var valueBounds=SwingUtilities.convertRectangle(value.getParent(),value.getBounds(),owner.component);
                 assertThat(revealBounds.y+revealBounds.height/2).isEqualTo(owner.component.getHeight()/2);

@@ -38,7 +38,10 @@ class HeroCompositionTest {
                             assertThat(icon.getY()).isEqualTo(Math.max(0,(label.getFontMetrics(label.getFont()).getHeight()-icon.getHeight())/2));
                             assertThat(label.wraps()).isTrue();
                             var lines = label.wrapped.lines(label.getWidth());
-                            assertThat(String.join(" ",lines)).isEqualTo(text);
+                            // Lines break between words; only a word wider than the line breaks inside it (DejaVu Serif at 32 pt in 180).
+                            if (Arrays.stream(text.split(" ")).allMatch(word -> label.wrapped.advance(word) <= label.getWidth())) assertThat(String.join(" ",lines)).isEqualTo(text);
+                            else assertThat(String.join("",lines).replace(" ","")).isEqualTo(text.replace(" ",""));
+                            for (String line : lines) assertThat(label.wrapped.advance(line)).as("line %s at font %s width %s",line,size,width).isLessThanOrEqualTo(label.getWidth());
                             assertThat(lines).hasSizeGreaterThan(1);
                             assertThat(label.getHeight()).isEqualTo(lines.size()*label.getFontMetrics(label.getFont()).getHeight());
                             int lineHeight = label.getFontMetrics(label.getFont()).getHeight();

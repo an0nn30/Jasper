@@ -23,7 +23,10 @@ class GroupedFormGeometryTest {
             try(var view=new KitView(context,new ViewSpec(FormsTest.form(FormKind.FULL,sections)),e->{})) {
                 KitFixtures.render(view,540,690,2);
                 var name=find(view,"name",javax.swing.JComponent.class);var bounds=javax.swing.SwingUtilities.convertRectangle(name.getParent(),name.getBounds(),view);
-                assertThat(bounds).isEqualTo(new Rectangle((m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SIDES)+m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING)+m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE))+m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH)+m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP),45,540-2*(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SIDES)+m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING)+m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE))-m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH)-m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP),m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT)));
+                // The field sits below the section label's line (45 with the macOS faces), its gap and the card's padded stroke.
+                int top=m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_TOP)+find(view,"general.title",javax.swing.JComponent.class).getHeight()+m(dev.jasper.ui.metrics.DesignMetrics.Role.SECTION_LABEL_GAP)+m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING)+m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE);
+                if(com.formdev.flatlaf.util.SystemInfo.isMacOS)assertThat(top).isEqualTo(45);
+                assertThat(bounds).isEqualTo(new Rectangle((m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SIDES)+m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING)+m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE))+m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH)+m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP),top,540-2*(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SIDES)+m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING)+m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE))-m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH)-m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP),m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT)));
                 var normal=find(view,"plain.title",javax.swing.JComponent.class);var child=find(view,"dependent.title",javax.swing.JComponent.class);
                 assertThat(child.getX()-normal.getX()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_DEPENDENT_INDENT));
                 assertThat(find(view,"dependent",javax.swing.JComponent.class).getHeight()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT)+1);
@@ -246,11 +249,16 @@ class GroupedFormGeometryTest {
             var context=KitFixtures.context();
             var setting=new SettingRow("setting",ControlState.READY,"Option","Short helper",new Toggle("toggle",ControlState.READY,"Enabled",false,"toggle",false),false);
             try(var view=new KitView(context,new ViewSpec(FormsTest.form(FormKind.FULL,List.of(setting))),e->{})) {
-                // FULL and HERO rows keep their description heights; a SETTINGS row grows to its two lines and padding (44).
-                int[] expected={m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT)+1,44,m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_SETTING_HEIGHT),m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT)+1};int at=0;
+                // FULL and HERO rows keep their description heights; a SETTINGS row grows to its two lines and padding (44 with the macOS faces).
+                int[] expected={m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT)+1,0,m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_SETTING_HEIGHT),m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT)+1};int at=0;
                 for(var kind:List.of(FormKind.FULL,FormKind.SETTINGS,FormKind.HERO,FormKind.FULL)) {
                     view.update(new ViewSpec(FormsTest.form(kind,List.of(setting))));KitFixtures.render(view,540,400,1);
                     assertThat(find(view,"setting",javax.swing.JComponent.class).getInsets().left).isEqualTo(kind==FormKind.FULL?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_SIDE_PADDING):m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_SIDE_PADDING));
+                    if(kind==FormKind.SETTINGS) {
+                        int lines=find(view,"setting.title",javax.swing.JComponent.class).getHeight()+m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_DESCRIPTION_GAP)+find(view,"setting.description",javax.swing.JComponent.class).getHeight();
+                        expected[at]=Math.max(m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_DESCRIPTION_HEIGHT),2*m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_VERTICAL_PADDING)+lines);
+                        if(com.formdev.flatlaf.util.SystemInfo.isMacOS)assertThat(expected[at]).isEqualTo(44);
+                    }
                     assertThat(find(view,"setting",javax.swing.JComponent.class).getHeight()).as("%s current context",kind).isEqualTo(expected[at++]);
                 }
             }finally{release(context);}
