@@ -51,11 +51,12 @@ class HttpEngineReadTest {
     @AfterEach void stop() { if (engine != null) engine.stop(); }
 
     HttpEngine start(ResolvedLogin login) throws Exception {
-        var definition = ServerDefinition.create("docs", Protocol.HTTP, shared);
-        definition = new ServerDefinition(definition.id(), definition.name(), definition.protocol(), definition.folder(), definition.bind(),
-            Ports.free(), definition.passiveRange(), false, definition.login(), List.of(), false, false, false);
-        engine = new HttpEngine(definition, new ShareRoot(shared, true), login, new ServerEvents(Clock.systemUTC(), events::add), throttle, List::of);
-        engine.start();
+        engine = Ports.start(port -> {
+            var definition = ServerDefinition.create("docs", Protocol.HTTP, shared);
+            definition = new ServerDefinition(definition.id(), definition.name(), definition.protocol(), definition.folder(), definition.bind(),
+                port, definition.passiveRange(), false, definition.login(), List.of(), false, false, false);
+            return new HttpEngine(definition, new ShareRoot(shared, true), login, new ServerEvents(Clock.systemUTC(), events::add), throttle, List::of);
+        });
         return engine;
     }
 
