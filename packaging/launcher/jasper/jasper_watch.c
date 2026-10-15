@@ -476,7 +476,8 @@ static int runDiagnostic(char** launch) {
         if (ready > 0) {
             char buffer[4096];
             const ssize_t count = read(fds[0], buffer, sizeof(buffer));
-            if (count > 0) {
+            /* read never returns more than it was asked for; the upper bound tells gcc's fortified memcpy so. */
+            if (count > 0 && (size_t) count <= sizeof(buffer)) {
                 keep(buffer, (size_t) count);
                 continue;
             }
