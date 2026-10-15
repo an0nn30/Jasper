@@ -10,7 +10,7 @@ import dev.jasper.ui.model.UiEvent;
 import dev.jasper.ui.model.ViewSpec;
 import dev.jasper.ui.swing.KitContext;
 import dev.jasper.ui.swing.KitView;
-import dev.jasper.ui.swing.NativeControlStyles;
+import dev.jasper.ui.swing.NativeStyles;
 import dev.jasper.ui.theme.SemanticColor;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -101,14 +101,14 @@ public final class AboutView extends JPanel {
         view.registerContent(ICON_SLOT, new IconCanvas(), () -> { });
         view.registerContent(LOCATION_SLOT, location, () -> { });
         theme = kit.binding().subscribe(pair -> restyle());
-        typography = NativeControlStyles.observeTypography(this::restyle);
+        typography = NativeStyles.installed().observeTypography(this::restyle);
         restyle();
     }
 
     /** The location text takes the module's small mono role and the theme's secondary text and selection colours. */
     private void restyle() {
         if (closed) return;
-        location.setFont(NativeControlStyles.font(kit, Typography.Role.MONO_SMALL));
+        location.setFont(NativeStyles.installed().font(kit, Typography.Role.MONO_SMALL));
         location.setForeground(kit.theme().semantic().color(SemanticColor.TEXT_SECONDARY));
         location.setCaretColor(location.getForeground());
         location.setSelectionColor(kit.theme().semantic().color(SemanticColor.SELECTION_BG));

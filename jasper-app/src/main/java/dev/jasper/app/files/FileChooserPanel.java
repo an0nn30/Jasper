@@ -202,7 +202,7 @@ public final class FileChooserPanel extends JPanel {
         applySurfaces();
         model.addListener(this::sync);
         sync();
-        typography=dev.jasper.ui.swing.NativeControlStyles.observeTypography(this::applySurfaces);
+        typography=dev.jasper.ui.swing.NativeStyles.installed().observeTypography(this::applySurfaces);
     }
 
     private KitView view(ViewSpec spec) {
@@ -400,7 +400,7 @@ public final class FileChooserPanel extends JPanel {
         setBackground(color(SemanticColor.SURFACE_DIALOG));
         if (split != null) split.setBackground(getBackground());
         for (var pane : panes) pane.setBackground(getBackground());
-        previewText.setFont(dev.jasper.ui.swing.NativeControlStyles.font(kit,Typography.Role.MONO_SMALL));
+        previewText.setFont(dev.jasper.ui.swing.NativeStyles.installed().font(kit,Typography.Role.MONO_SMALL));
         previewText.setForeground(color(SemanticColor.TEXT_PRIMARY));
         previewText.setCaretColor(previewText.getForeground());
         previewText.setSelectionColor(color(SemanticColor.SELECTION_BG));

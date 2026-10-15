@@ -31,7 +31,7 @@ class TablesTest {
                             int width=owner.component.getMinimumSize().width;view.setSize(width,300);InteractiveRowsTest.layout(view);
                             var cell=(javax.swing.JLabel)owner.mounted.get("a").title.getComponent(0);
                             int textWidth=cell.getWidth()-(cell.getIcon()==null?0:cell.getIcon().getIconWidth()+cell.getIconTextGap());
-                            assertThat(textWidth).isGreaterThanOrEqualTo(NativeChromePainting.measureText(cell.getFont(),"MMMM"));
+                            assertThat(textWidth).isGreaterThanOrEqualTo(ThemePainting.measureText(cell.getFont(),"MMMM"));
                             assertThat(cell.getFont().getSize2D()).isEqualTo(32f);
                             if(prior>0)assertThat(width).isGreaterThan(prior);prior=width;
                         }
@@ -67,7 +67,7 @@ class TablesTest {
                         for(int width:new int[]{minimum,minimum+1,Math.max(minimum,boundary-1),Math.max(minimum,boundary),Math.max(minimum,boundary+1),minimum+boundary,minimum+500}) {
                             view.setSize(width,300);InteractiveRowsTest.layout(view);
                             int adornment=name.getIcon()==null?0:name.getIcon().getIconWidth()+name.getIconTextGap();
-                            assertThat(name.getWidth()-adornment).as("useful name at width %s, minimum %s, boundary %s",width,minimum,boundary).isGreaterThanOrEqualTo(NativeChromePainting.measureText(name.getFont(),"MMMM"));
+                            assertThat(name.getWidth()-adornment).as("useful name at width %s, minimum %s, boundary %s",width,minimum,boundary).isGreaterThanOrEqualTo(ThemePainting.measureText(name.getFont(),"MMMM"));
                             assertThat(number.getWidth()).as("numeric minimum at width %s, minimum %s, boundary %s",width,minimum,boundary).isGreaterThanOrEqualTo(number.getPreferredSize().width);
                             assertThat(owner.mounted.get("a")).isSameAs(retained);
                         }

@@ -31,7 +31,7 @@ final class RichOptions extends JPanel {
     private Font font(){return ThemePainting.font(context,settings?Typography.Role.LABEL:Typography.Role.BODY);}
     private Font secondary(){return ThemePainting.font(context,settings?Typography.Role.SETTING_DESCRIPTION:Typography.Role.CAPTION);}
     /** A width in the antialiased, fractional context paint draws in, rounded up; paint's own rounded widths never exceed it. */
-    static int measure(Font font,String text){return NativeChromePainting.measureText(font,text);}
+    static int measure(Font font,String text){return ThemePainting.measureText(font,text);}
     /** The Settings face width that shows the widest of {@code options}' labels whole beside their widest annotation. */
     static int settingsFaceWidth(KitContext context,List<Option> options){
         var face=new RichOptions(context,options.getFirst(),false,false,false,0,true);

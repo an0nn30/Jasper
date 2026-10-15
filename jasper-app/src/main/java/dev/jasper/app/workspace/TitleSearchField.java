@@ -2,7 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.ui.metrics.DesignMetrics;
-import dev.jasper.ui.swing.NativeChromePainting;
+import dev.jasper.ui.swing.ChromePainter;
 
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.platform.AppIcons;
@@ -98,12 +98,12 @@ final class TitleSearchField extends JComponent {
     }
 
     @Override protected void paintComponent(Graphics graphics) {
-        NativeChromePainting.search(this, graphics, ThemeZone.theme(this), hover || pressed, collapsed,
+        ChromePainter.installed().search(this, graphics, ThemeZone.theme(this), hover || pressed, collapsed,
             context, shortcutText(), AppIcons.icon("search"), contextIcon);
     }
 
     /** {@code text}, cut at a code point boundary with an ellipsis when it is wider than {@code width}. */
     static String clip(String text, FontMetrics metrics, int width) {
-        return NativeChromePainting.clip(text, metrics, width);
+        return ChromePainter.installed().clip(text, metrics, width);
     }
 }

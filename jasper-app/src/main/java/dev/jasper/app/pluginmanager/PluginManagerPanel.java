@@ -74,7 +74,7 @@ final class PluginManagerPanel extends JPanel {
         listLane.setOpaque(false);listLane.add(bar,BorderLayout.NORTH);listLane.add(list.view(),BorderLayout.CENTER);
         split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listLane, details.component()) {
             @Override public void updateUI() {
-                setUI(dev.jasper.ui.swing.NativeControlStyles.splitPaneUI(kit::theme));
+                setUI(dev.jasper.ui.swing.NativeStyles.installed().splitPaneUI(kit::theme));
                 setOpaque(false);
             }
         };

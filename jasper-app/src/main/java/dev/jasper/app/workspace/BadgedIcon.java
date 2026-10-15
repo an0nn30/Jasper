@@ -30,6 +30,6 @@ final class BadgedIcon implements Icon {
     @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
         base.paintIcon(component, graphics, x, y);
         // Badges sit on the rail (surface.app); the kit holds them to the indicator floor there.
-        dev.jasper.ui.swing.NativeChromePainting.badge(graphics, x, y, getIconWidth(), ThemeZone.theme(null), tone == PanelBadge.Tone.ERROR);
+        dev.jasper.ui.swing.ChromePainter.installed().badge(graphics, x, y, getIconWidth(), ThemeZone.theme(null), tone == PanelBadge.Tone.ERROR);
     }
 }

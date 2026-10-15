@@ -15,6 +15,10 @@ final class ThemePainting {
     private ThemePainting() {}
     static int metric(KitContext context, DesignMetrics.Role role) { return UIScale.scale(context.metrics().value(role)); }
     static Font font(KitContext context, Typography.Role role) { return SwingTypography.effective(context.typography().font(role)); }
+    /** The fractional antialiased context engine labels and native text measure in. */
+    private static final FontRenderContext TEXT_CONTEXT = new FontRenderContext(null, true, true);
+    /** Literal advance measured with the same fractional context used by engine labels and native text. */
+    static int measureText(Font font, String text) { return (int) Math.ceil(font.getStringBounds(text, TEXT_CONTEXT).getWidth()); }
     static int height(KitContext context, DesignMetrics.Role role, Typography.Role text) {
         DesignMetrics.Role padding = context.metrics().contentPadding(role);
         int line = (int)Math.ceil(font(context, text).getLineMetrics("Ag", new FontRenderContext(null, true, true)).getHeight());

@@ -59,7 +59,7 @@ class ShippedControlReadabilityTest {
                 var component = new JPanel(); component.setSize(300, 32);
                 var image = new BufferedImage(300, 32, BufferedImage.TYPE_INT_ARGB);
                 var graphics = image.createGraphics();
-                try { NativeChromePainting.search(component, graphics, theme, hover, false, "", "MMMM", blank, null); }
+                try { new ChromePainter(dev.jasper.ui.kit.Kit.DEFAULT).search(component, graphics, theme, hover, false, "", "MMMM", blank, null); }
                 finally { graphics.dispose(); }
                 // The command field is a raised field whose hover changes only its edge.
                 var surface = SemanticColor.SURFACE_FIELD_RAISED;

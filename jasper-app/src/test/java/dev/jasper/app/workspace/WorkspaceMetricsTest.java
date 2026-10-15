@@ -52,19 +52,19 @@ class WorkspaceMetricsTest {
             workspace.resolve("StatusProgressView.java"), workspace.resolve("ToolWindowHeader.java"), workspace.resolve("FindBar.java"),
             workspace.resolve("TerminalPane.java"), workspace.resolve("BadgedIcon.java"), workspace.resolve("PathBreadcrumbs.java"),
             workspace.resolve("ToolStripe.java"), workspace.resolve("WindowChrome.java"), workspace.resolve("WindowToolbar.java"),
-            workspace.resolve("WindowHeader.java"), swing.resolve("NativeChromePainting.java"), swing.resolve("NativeControlStyles.java"));
+            workspace.resolve("WindowHeader.java"), swing.resolve("ChromePainter.java"), swing.resolve("NativeStyles.java"));
         for (Path file : files) {
             String text = Files.readString(file);
             for (String role : generic)
                 assertThat(text).as(root.relativize(file) + " borrows " + role).doesNotContain("DesignMetrics.Role." + role + ")");
         }
         // Plan 3 Task 10: the running dot, tab strip and toolbar painting live in the kit's native chrome painters.
-        assertThat(Files.readString(swing.resolve("NativeChromePainting.java"))).contains("STATUS_RUNNING_DOT", "TAB_DIVIDER",
+        assertThat(Files.readString(swing.resolve("ChromePainter.java"))).contains("STATUS_RUNNING_DOT", "TAB_DIVIDER",
             "SURFACE_TABSTRIP", "SURFACE_TERMINAL", "TOOLBAR_ACTION_ICON", "NATIVE_HOVER_OVERLAY_PERCENT", "POPOVER_SHADOW_BLUR");
-        var required = Map.of("WindowStatusBar.java", List.of("NativeChromePainting.statusDot"),
+        var required = Map.of("WindowStatusBar.java", List.of("ChromePainter.installed().statusDot"),
             "StatusProgressView.java", List.of("STATUS_PROGRESS_BAR_HEIGHT", "STATUS_PROGRESS_MIN_HEIGHT"),
             "WindowTabs.java", List.of("TAB_REVEAL_INSET", "TAB_CLOSE_FIT_WIDTH", "TAB_CLOSE_GUTTER", "TAB_COMPACT_GUTTER",
-                "TAB_CLOSE_WIDTH", "TAB_CLOSE_TRAILING", "NativeChromePainting.tabStrip", "TAB_REORDER_THRESHOLD"),
+                "TAB_CLOSE_WIDTH", "TAB_CLOSE_TRAILING", "ChromePainter.installed().tabStrip", "TAB_REORDER_THRESHOLD"),
             "ToolWindowHeader.java", List.of("TOOL_HEADER_LEADING_PADDING", "TOOL_HEADER_TRAILING_PADDING",
                 "TOOL_HEADER_DETAIL_GAP", "TOOL_HEADER_ACTIVE_DOT"));
         for (var entry : required.entrySet())

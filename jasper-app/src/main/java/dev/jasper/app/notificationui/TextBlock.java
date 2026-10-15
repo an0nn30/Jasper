@@ -95,7 +95,7 @@ final class TextBlock extends JComponent {
     }
 
     private int measure(String value) {
-        return dev.jasper.ui.swing.NativeChromePainting.measureText(getFont(), value);
+        return dev.jasper.ui.swing.ChromePainter.installed().measureText(getFont(), value);
     }
 
     private void relayout() {
@@ -110,7 +110,7 @@ final class TextBlock extends JComponent {
     @Override protected void paintComponent(Graphics graphics) {
         var g = (Graphics2D) graphics.create();
         try {
-            dev.jasper.ui.swing.NativeChromePainting.prepareText(g);
+            dev.jasper.ui.swing.ChromePainter.installed().prepareText(g);
             g.setFont(getFont());
             g.setColor(getForeground());
             FontMetrics metrics = g.getFontMetrics();

@@ -1,12 +1,12 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.ui.metrics.DesignMetrics;
-import dev.jasper.ui.swing.NativeControlStyles;
+import dev.jasper.ui.swing.NativeStyles;
 
 import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.metrics.Typography;
-import dev.jasper.ui.swing.NativeChromePainting;
+import dev.jasper.ui.swing.ChromePainter;
 
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.Command;
@@ -152,8 +152,8 @@ final class WindowChrome {
         button.putClientProperty("label", label);
         button.setIcon(icon != null ? icon : AppIcons.icon("command"));
         button.setFocusable(false);
-        NativeControlStyles.unframed(button);
-        button.setIconTextGap(NativeControlStyles.metric(DesignMetrics.Role.NATIVE_ACTION_PADDING));
+        NativeStyles.installed().unframed(button);
+        button.setIconTextGap(NativeStyles.installed().metric(DesignMetrics.Role.NATIVE_ACTION_PADDING));
         button.getAccessibleContext().setAccessibleName(label);
         button.setToolTipText(label);
         button.setFont(button.chromeFont());
@@ -218,7 +218,7 @@ final class WindowChrome {
                     if (children.stream().noneMatch(child -> child instanceof JMenuItem)) break;
                     JMenu menu = new JMenu(submenu.title());
                     children.forEach(menu::add);
-                    NativeControlStyles.menu(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+                    NativeStyles.installed().menu(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
                     built.add(menu);
                 }
             }
@@ -290,7 +290,7 @@ final class WindowChrome {
     }
 
     private JMenu observe(JMenu menu) {
-        NativeControlStyles.menu(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+        NativeStyles.installed().menu(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
         menu.addMenuListener(new MenuListener() {
             @Override public void menuSelected(MenuEvent event) { owner.updateActions(); }
             @Override public void menuDeselected(MenuEvent event) {}
@@ -308,8 +308,8 @@ final class WindowChrome {
         ReferenceButton button = new ReferenceButton(owner.action(id), id);
         button.setText(label); button.putClientProperty("label", label);
         button.setIcon(AppIcons.icon(icon)); button.setFocusable(false);
-        NativeControlStyles.unframed(button);
-        button.setIconTextGap(NativeControlStyles.metric(DesignMetrics.Role.NATIVE_ACTION_PADDING));
+        NativeStyles.installed().unframed(button);
+        button.setIconTextGap(NativeStyles.installed().metric(DesignMetrics.Role.NATIVE_ACTION_PADDING));
         button.getAccessibleContext().setAccessibleName(id.label());
         button.setToolTipText(id.label());
         boolean labelled = id == ActionId.SPLIT_RIGHT;
@@ -371,17 +371,17 @@ final class WindowChrome {
         @Override public Dimension getPreferredSize() {
             int side = side();
             // A labelled button keeps its padding however tall the toolbar is; icon-only buttons are square.
-            return new Dimension(NativeChromePainting.actionWidth(this, side, labels(), menu()), side);
+            return new Dimension(ChromePainter.installed().actionWidth(this, side, labels(), menu()), side);
         }
 
         @Override protected void paintComponent(Graphics graphics) {
-            NativeChromePainting.action(this, graphics, ThemeZone.theme(this), labels(), menu() ? AppIcons.dropdown() : null);
+            ChromePainter.installed().action(this, graphics, ThemeZone.theme(this), labels(), menu() ? AppIcons.dropdown() : null);
         }
     }
 
     private static final class ToolbarSeparator extends JSeparator {
         ToolbarSeparator() { super(SwingConstants.VERTICAL); }
-        @Override protected void paintComponent(Graphics g) { NativeChromePainting.rule(this, g, ThemeZone.theme(null)); }
+        @Override protected void paintComponent(Graphics g) { ChromePainter.installed().rule(this, g, ThemeZone.theme(null)); }
     }
 
     JPopupMenu contextMenu() {
@@ -398,7 +398,7 @@ final class WindowChrome {
                 built.forEach(menu::add);
             }
         }
-        NativeControlStyles.menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+        NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
         return menu;
     }
 

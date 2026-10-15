@@ -2,8 +2,8 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.ui.metrics.DesignMetrics;
-import dev.jasper.ui.swing.NativeChromePainting;
-import dev.jasper.ui.swing.NativeControlStyles;
+import dev.jasper.ui.swing.ChromePainter;
+import dev.jasper.ui.swing.NativeStyles;
 
 import dev.jasper.app.config.AnimationSettings;
 import dev.jasper.app.config.ViewMode;
@@ -341,7 +341,7 @@ final class WindowCommandPalette implements AutoCloseable {
     }
 
     /** The card's inset from the window's edges. */
-    private static int margin() { return NativeControlStyles.metric(DesignMetrics.Role.PALETTE_WINDOW_MARGIN); }
+    private static int margin() { return NativeStyles.installed().metric(DesignMetrics.Role.PALETTE_WINDOW_MARGIN); }
 
     private static int guideX(Rectangle window) { return window.x + (int) Math.round(window.width * GUIDE_CENTER); }
     private static int guideY(Rectangle window) { return window.y + (int) Math.round(window.height * GUIDE_TOP); }
@@ -410,7 +410,7 @@ final class WindowCommandPalette implements AutoCloseable {
             Rectangle card = palette.getBounds();
             card.height = palette.revealedHeight();
             if (card.height <= 0) return;
-            NativeChromePainting.popupShadow(graphics, card, ThemeZone.theme(null), owner.theme().chrome().dark());
+            ChromePainter.installed().popupShadow(graphics, card, ThemeZone.theme(null), owner.theme().chrome().dark());
         }
     }
 }

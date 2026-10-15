@@ -3,7 +3,7 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
-import dev.jasper.ui.swing.NativeControlStyles;
+import dev.jasper.ui.swing.NativeStyles;
 import dev.jasper.ui.theme.SemanticColor;
 
 import com.formdev.flatlaf.ui.FlatEmptyBorder;
@@ -82,7 +82,7 @@ final class ToolWindowHeader extends JPanel {
                 int titleWidth = Math.min(title.getPreferredSize().width, getWidth());
                 int height = getHeight();
                 title.setBounds(0, 0, titleWidth, height);
-                int x = titleWidth + NativeControlStyles.metric(DesignMetrics.Role.TOOL_HEADER_DETAIL_GAP);
+                int x = titleWidth + NativeStyles.installed().metric(DesignMetrics.Role.TOOL_HEADER_DETAIL_GAP);
                 detail.setBounds(x, 0, Math.max(0, getWidth() - x), height);
             }
             @Override public Dimension getMinimumSize() { return new Dimension(0, 0); }
@@ -98,7 +98,7 @@ final class ToolWindowHeader extends JPanel {
 
     private static JButton button(String icon, String name) {
         var button = new JButton(AppIcons.semantic(icon));
-        NativeControlStyles.button(button, () -> ThemeZone.theme(button));
+        NativeStyles.installed().button(button, () -> ThemeZone.theme(button));
         button.setFocusable(false);
         button.setToolTipText(name);
         button.getAccessibleContext().setAccessibleName(name);
@@ -110,11 +110,11 @@ final class ToolWindowHeader extends JPanel {
         detail.setText(state.detail());
         detail.setToolTipText(state.detail().isEmpty() ? null : state.detail());
         detail.setIcon(state.active() ? new javax.swing.Icon() {
-            @Override public int getIconWidth() { return NativeControlStyles.metric(DesignMetrics.Role.TOOL_HEADER_ACTIVE_DOT); }
+            @Override public int getIconWidth() { return NativeStyles.installed().metric(DesignMetrics.Role.TOOL_HEADER_ACTIVE_DOT); }
             @Override public int getIconHeight() { return getIconWidth(); }
             @Override public void paintIcon(java.awt.Component c, java.awt.Graphics graphics, int x, int y) {
                 // The connected dot is the success status, held readable on the tool window surface it sits on.
-                dev.jasper.ui.swing.NativeChromePainting.connectedDot(graphics, x, y, getIconWidth(), ThemeZone.theme(ToolWindowHeader.this));
+                dev.jasper.ui.swing.ChromePainter.installed().connectedDot(graphics, x, y, getIconWidth(), ThemeZone.theme(ToolWindowHeader.this));
             }
         } : null);
         while (actionButtons.size() > state.actions().size()) {
@@ -125,7 +125,7 @@ final class ToolWindowHeader extends JPanel {
             if (i == actionButtons.size()) {
                 int index = i;
                 var button = new JButton();
-                NativeControlStyles.button(button, () -> ThemeZone.theme(button));
+                NativeStyles.installed().button(button, () -> ThemeZone.theme(button));
                 button.addActionListener(event -> {
                     if (index < presentation.actions().size()) presentation.actions().get(index).invoke().run();
                 });

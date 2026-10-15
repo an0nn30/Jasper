@@ -622,14 +622,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 ? (state.present() ? "Configuration loaded successfully." : "Using built-in defaults. Open Settings to create this file.")
                 : String.join("\n", state.diagnostics().stream().map(ConfigDiagnostic::formatted).toList()));
             JTextArea text = new JTextArea(details, 12, 64);
-            dev.jasper.ui.swing.NativeControlStyles.textArea(text, () -> ThemeZone.theme(text));
+            dev.jasper.ui.swing.NativeStyles.installed().textArea(text, () -> ThemeZone.theme(text));
             text.setEditable(false); text.setLineWrap(true); text.setWrapStyleWord(true); text.setCaretPosition(0);
             text.getAccessibleContext().setAccessibleName("Configuration details");
             JScrollPane scroll = new JScrollPane(text);
             Runnable migrate = migrateConfiguration;
             if (!state.migratable() || migrate == null) { showConfigDiagnostics.accept(scroll); return; }
             var button = new JButton("Migrate Config\u2026");
-            dev.jasper.ui.swing.NativeControlStyles.framedButton(button, () -> ThemeZone.theme(button));
+            dev.jasper.ui.swing.NativeStyles.installed().framedButton(button, () -> ThemeZone.theme(button));
             button.setName("configuration.migrate");
             button.setToolTipText("Rewrite old keys in this file to the current layout; the original is backed up first.");
             button.addActionListener(event -> {
@@ -838,7 +838,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             for (var command : entry.commands()) { var item = new JMenuItem(command.title()); item.putClientProperty("html.disable", true);
                 item.setEnabled(command.enabled()); item.setAccelerator(command.shortcut()); item.addActionListener(event -> command.run().run()); menu.add(item); }
         }
-        var close = new JMenuItem("Close Tab"); close.setAccelerator(bindings().strokeFor(ActionId.CLOSE_TAB).orElse(null)); close.addActionListener(event -> closeTab(component)); menu.add(close); dev.jasper.ui.swing.NativeControlStyles.menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
+        var close = new JMenuItem("Close Tab"); close.setAccelerator(bindings().strokeFor(ActionId.CLOSE_TAB).orElse(null)); close.addActionListener(event -> closeTab(component)); menu.add(close); dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
     }
     public void focusSelected() { var entry = selectedContent(); if (entry != null) entry.focus(); else if (currentTab() != null) currentTab().focusTerminal(); }
     public boolean mayClose() { return contentRegistry == null || contentRegistry.mayClose(() -> contentRegistry.inWindow(id)); }

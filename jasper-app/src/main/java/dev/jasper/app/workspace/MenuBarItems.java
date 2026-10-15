@@ -18,7 +18,7 @@ final class MenuBarItems {
     private MenuBarItems() {}
 
     private static void style(JMenuItem item) {
-        dev.jasper.ui.swing.NativeControlStyles.menu(item, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+        dev.jasper.ui.swing.NativeStyles.installed().menu(item, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
     }
 
     /** Swing offers a declined window key to the menu bar's items under {@code WHEN_IN_FOCUSED_WINDOW}; they refuse it. */

@@ -78,11 +78,11 @@ final class DockDropOverlay extends JComponent {
     /** Events pass through to whatever is underneath. */
     @Override public boolean contains(int x, int y) { return false; }
 
-    static Color fill() { return dev.jasper.ui.swing.NativeChromePainting.dropGuide(ThemeZone.theme(null), false); }
-    static Color border() { return dev.jasper.ui.swing.NativeChromePainting.dropGuide(ThemeZone.theme(null), true); }
+    static Color fill() { return dev.jasper.ui.swing.ChromePainter.installed().dropGuide(ThemeZone.theme(null), false); }
+    static Color border() { return dev.jasper.ui.swing.ChromePainter.installed().dropGuide(ThemeZone.theme(null), true); }
 
     @Override protected void paintComponent(Graphics graphics) {
-        dev.jasper.ui.swing.NativeChromePainting.dropGuides(graphics, highlight, placeholder, fill(), border());
+        dev.jasper.ui.swing.ChromePainter.installed().dropGuides(graphics, highlight, placeholder, fill(), border());
         Rectangle ghostBounds = ghostBounds();
         if (ghostBounds == null) return;
         var g = (Graphics2D) graphics.create();

@@ -126,7 +126,7 @@ public final class ErrorsView extends JPanel {
         restyle();
         listening = incidents.onChange(change -> refresh());
         refresh();
-        typography = dev.jasper.ui.swing.NativeControlStyles.observeTypography(this::restyle);
+        typography = dev.jasper.ui.swing.NativeStyles.installed().observeTypography(this::restyle);
     }
 
     /** The read-only texts take the module's body and mono roles and the theme's text and selection colours. */

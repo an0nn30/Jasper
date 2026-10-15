@@ -2,7 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.ui.metrics.DesignMetrics;
-import dev.jasper.ui.swing.NativeControlStyles;
+import dev.jasper.ui.swing.NativeStyles;
 
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -30,7 +30,7 @@ final class WindowToolbar extends JToolBar {
         overflow.setName("toolbarOverflow");
         overflow.setText(null);
         overflow.putClientProperty("label", "More actions");
-        NativeControlStyles.button(overflow, () -> ThemeZone.theme(overflow));
+        NativeStyles.installed().button(overflow, () -> ThemeZone.theme(overflow));
         overflow.setToolTipText("More actions");
         overflow.getAccessibleContext().setAccessibleName("More actions");
         overflow.setFocusable(false);
@@ -80,7 +80,7 @@ final class WindowToolbar extends JToolBar {
 
     /** The width that shows every control; the header never gives the toolbar more. */
     int fullWidth() {
-        int padding = NativeControlStyles.metric(DesignMetrics.Role.TOOLBAR_PADDING), gap = NativeControlStyles.metric(DesignMetrics.Role.NATIVE_ACTION_PADDING), width = 0;
+        int padding = NativeStyles.installed().metric(DesignMetrics.Role.TOOLBAR_PADDING), gap = NativeStyles.installed().metric(DesignMetrics.Role.NATIVE_ACTION_PADDING), width = 0;
         for (Component child : getComponents())
             if (child instanceof JButton button && button != overflow) width += button.getPreferredSize().width + gap;
         return width == 0 ? 0 : 2 * padding + width - gap;
@@ -88,7 +88,7 @@ final class WindowToolbar extends JToolBar {
 
     /** The width with every hideable control in the overflow menu. */
     int minimumWidth() {
-        int padding = NativeControlStyles.metric(DesignMetrics.Role.TOOLBAR_PADDING), gap = NativeControlStyles.metric(DesignMetrics.Role.NATIVE_ACTION_PADDING), width = buttonSide();
+        int padding = NativeStyles.installed().metric(DesignMetrics.Role.TOOLBAR_PADDING), gap = NativeStyles.installed().metric(DesignMetrics.Role.NATIVE_ACTION_PADDING), width = buttonSide();
         for (Component child : getComponents())
             if (child instanceof JButton button && button != overflow && !(button.getClientProperty(MENU) instanceof Supplier<?>))
                 width += button.getPreferredSize().width + gap;
@@ -114,14 +114,14 @@ final class WindowToolbar extends JToolBar {
             if (!(child instanceof JButton button) || button == overflow || button.isVisible()) continue;
             if (button.getClientProperty(MENU) instanceof Supplier<?> factory) menu.add((JMenuItem) factory.get());
         }
-        dev.jasper.ui.swing.NativeControlStyles.menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
+        dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
     }
 
     @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(barHeight)); }
     @Override public Dimension getPreferredSize() { return new Dimension(fullWidth(), UIScale.scale(barHeight)); }
 
     @Override public void doLayout() {
-        int padding = NativeControlStyles.metric(DesignMetrics.Role.TOOLBAR_PADDING), gap = NativeControlStyles.metric(DesignMetrics.Role.NATIVE_ACTION_PADDING), side = buttonSide();
+        int padding = NativeStyles.installed().metric(DesignMetrics.Role.TOOLBAR_PADDING), gap = NativeStyles.installed().metric(DesignMetrics.Role.NATIVE_ACTION_PADDING), side = buttonSide();
         int available = Math.max(0, getWidth() - 2 * padding);
         // Labels give way before any control moves into the overflow menu.
         applyLabels(labelsWanted);
@@ -159,8 +159,8 @@ final class WindowToolbar extends JToolBar {
                 button.setBounds(x, y, width, side);
                 x += width + gap; previousVisible = true;
             } else if (child instanceof JSeparator) {
-                child.setBounds(Math.max(0, x - gap / 2), NativeControlStyles.metric(DesignMetrics.Role.TOOLBAR_SEPARATOR_INSET), NativeControlStyles.metric(DesignMetrics.Role.HAIRLINE),
-                    Math.max(0, getHeight() - NativeControlStyles.metric(DesignMetrics.Role.TOOLBAR_SEPARATOR_INSETS)));
+                child.setBounds(Math.max(0, x - gap / 2), NativeStyles.installed().metric(DesignMetrics.Role.TOOLBAR_SEPARATOR_INSET), NativeStyles.installed().metric(DesignMetrics.Role.HAIRLINE),
+                    Math.max(0, getHeight() - NativeStyles.installed().metric(DesignMetrics.Role.TOOLBAR_SEPARATOR_INSETS)));
                 // Empty groups paint no rule; a hidden rule (the empty plugin group's) leaves the
                 // previous group open, so the rule before Find still shows.
                 boolean shownRule = previousVisible && hasFollowingVisibleButton(child);

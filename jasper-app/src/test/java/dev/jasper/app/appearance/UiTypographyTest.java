@@ -38,15 +38,15 @@ class UiTypographyTest {
                             var description = dev.jasper.app.testsupport.KitTestSupport.require(view,"description",JLabel.class);
                             int expectedLineHeight = Math.max(Math.round(18*expected/13),description.getFontMetrics(description.getFont()).getHeight());
                             assertThat(description.getPreferredSize().height).as("two description lines sized once").isEqualTo(2*expectedLineHeight);
-                            assertThat(dev.jasper.ui.swing.NativeControlStyles.font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(expected);
-                            assertThat(dev.jasper.ui.swing.NativeControlStyles.font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getSize2D()).isCloseTo(expected * 15 / 13, within(.001f));
+                            assertThat(new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(expected);
+                            assertThat(new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getSize2D()).isCloseTo(expected * 15 / 13, within(.001f));
                             // Defaults leave native forms on the look and feel's own font, which FlatLaf scales from its platform divider
                             // (13 on macOS, 15 on Linux); a configured size is exact everywhere.
                             float nativeSize = config.size() == 0 ? UIManager.getLookAndFeelDefaults().getFont("Label.font").getSize2D() : expected;
                             assertThat(new JLabel().getFont().getSize2D()).as("native form policy").isEqualTo(nativeSize);
                             if (com.formdev.flatlaf.util.SystemInfo.isMacOS) assertThat(nativeSize).isEqualTo(expected);
                             if (config.family().equals("Serif")) assertThat(body.getFont().getFamily()).isEqualTo(Font.SERIF);
-                            assertThat(dev.jasper.ui.swing.NativeControlStyles.metric(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT))
+                            assertThat(new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).metric(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT))
                                 .isEqualTo(com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT)));
                             var image = new java.awt.image.BufferedImage(200, 80, java.awt.image.BufferedImage.TYPE_INT_ARGB);
                             var graphics = image.createGraphics();
@@ -82,8 +82,8 @@ class UiTypographyTest {
                     var heading = dev.jasper.app.testsupport.KitTestSupport.require(view, "heading", JLabel.class);
                     assertThat(body.getFont().getFontName()).as("system size-only body %s", config).isEqualTo(bodyFace);
                     assertThat(heading.getFont().getFontName()).as("system size-only heading %s", config).isEqualTo(headingFace);
-                    assertThat(dev.jasper.ui.swing.NativeControlStyles.font(dev.jasper.ui.metrics.Typography.Role.BODY).getFontName()).isEqualTo(bodyFace);
-                    assertThat(dev.jasper.ui.swing.NativeControlStyles.font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getFontName()).isEqualTo(headingFace);
+                    assertThat(new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(dev.jasper.ui.metrics.Typography.Role.BODY).getFontName()).isEqualTo(bodyFace);
+                    assertThat(new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getFontName()).isEqualTo(headingFace);
                     if (config.size() != 0) {
                         assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(config.size());
                         assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getSize2D()).isCloseTo(15 * config.size() / 13f, within(.001f));

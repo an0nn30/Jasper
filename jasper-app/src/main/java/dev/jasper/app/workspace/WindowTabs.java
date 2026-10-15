@@ -6,8 +6,8 @@ import dev.jasper.app.config.AnimationSettings;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.swing.FlatLafInstaller;
-import dev.jasper.ui.swing.NativeChromePainting;
-import dev.jasper.ui.swing.NativeControlStyles;
+import dev.jasper.ui.swing.ChromePainter;
+import dev.jasper.ui.swing.NativeStyles;
 import dev.jasper.ui.theme.SemanticColor;
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.*;
@@ -82,7 +82,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             if (reveal) {
                 // The reference first exposes the full-height rail, then expands a compact group at 100 logical px.
                 for (Slot slot : slots) slot.width.set(0);
-                inset.set(Math.min(NativeControlStyles.metric(DesignMetrics.Role.TAB_REVEAL_INSET), Math.max(0, getWidth()) / 2.0));
+                inset.set(Math.min(NativeStyles.installed().metric(DesignMetrics.Role.TAB_REVEAL_INSET), Math.max(0, getWidth()) / 2.0));
             }
             inset.target(0, now, millis, curve);
             for (Slot slot : slots) slot.width.target(slot.entry == null ? 0 : 1.0 / order.size(), now, millis, curve);
@@ -106,7 +106,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             item.addActionListener(event -> { if (!disposed) owner.selectTab(tab); });
             menu.add(item);
         }
-        NativeControlStyles.menuTree(menu, FlatLafInstaller::installedTheme);
+        NativeStyles.installed().menuTree(menu, FlatLafInstaller::installedTheme);
         return menu;
     }
 
@@ -145,11 +145,11 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             if (slot.entry != null && slot.entry.hovered) hovered = bounds.size();
             bounds.add(slot.bounds);
         }
-        NativeChromePainting.tabStrip(this, graphics, owner.theme().workspace(), owner.workspaceSurface(), bounds, chosen, hovered, active);
+        ChromePainter.installed().tabStrip(this, graphics, owner.theme().workspace(), owner.workspaceSurface(), bounds, chosen, hovered, active);
     }
 
     private Color surface(boolean selected) {
-        return NativeChromePainting.tabSurface(owner.theme().workspace(), owner.workspaceSurface(), selected);
+        return ChromePainter.installed().tabSurface(owner.theme().workspace(), owner.workspaceSurface(), selected);
     }
 
     private static String capped(String title) {
@@ -239,7 +239,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
 
     private static void flat(JButton button) {
         button.putClientProperty("html.disable", true);
-        NativeControlStyles.unframed(button);
+        NativeStyles.installed().unframed(button);
         button.setContentAreaFilled(false); button.setFocusable(false);
     }
     private final class Entry extends JPanel {
@@ -282,7 +282,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
                     Point start = origin; origin = null;
                     if (disposed || start == null || !SwingUtilities.isLeftMouseButton(event)) return;
                     Point end = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), WindowTabs.this);
-                    if (start.distance(end) <= NativeControlStyles.metric(DesignMetrics.Role.TAB_REORDER_THRESHOLD)
+                    if (start.distance(end) <= NativeStyles.installed().metric(DesignMetrics.Role.TAB_REORDER_THRESHOLD)
                         || !viewport.getBounds().contains(end)) return;
                     settle(); doLayout();
                     for (int i = 0; i < order.size(); i++) {
@@ -315,13 +315,13 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             doLayout();
         }
         @Override public void doLayout() {
-            boolean closeFits = getWidth() >= NativeControlStyles.metric(DesignMetrics.Role.TAB_CLOSE_FIT_WIDTH);
-            int edge = Math.min(NativeControlStyles.metric(closeFits ? DesignMetrics.Role.TAB_CLOSE_GUTTER
+            boolean closeFits = getWidth() >= NativeStyles.installed().metric(DesignMetrics.Role.TAB_CLOSE_FIT_WIDTH);
+            int edge = Math.min(NativeStyles.installed().metric(closeFits ? DesignMetrics.Role.TAB_CLOSE_GUTTER
                 : DesignMetrics.Role.TAB_COMPACT_GUTTER), getWidth() / 2);
             // Reserve symmetric close gutters only when text and the affordance can fit together.
             select.setBounds(edge, 0, Math.max(0, getWidth() - 2 * edge), getHeight());
-            int closeWidth = NativeControlStyles.metric(DesignMetrics.Role.TAB_CLOSE_WIDTH);
-            close.setBounds(Math.max(0, getWidth() - NativeControlStyles.metric(DesignMetrics.Role.TAB_CLOSE_TRAILING) - closeWidth),
+            int closeWidth = NativeStyles.installed().metric(DesignMetrics.Role.TAB_CLOSE_WIDTH);
+            close.setBounds(Math.max(0, getWidth() - NativeStyles.installed().metric(DesignMetrics.Role.TAB_CLOSE_TRAILING) - closeWidth),
                 0, closeWidth, getHeight());
             close.setVisible(hovered && closeFits);
         }

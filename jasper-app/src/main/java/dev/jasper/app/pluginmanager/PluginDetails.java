@@ -78,7 +78,7 @@ final class PluginDetails {
         theme = kit.binding().subscribe(pair -> restyle());
         restyle();
         show(null, false);
-        typography=dev.jasper.ui.swing.NativeControlStyles.observeTypography(this::restyle);
+        typography=dev.jasper.ui.swing.NativeStyles.installed().observeTypography(this::restyle);
     }
 
     JComponent component() { return component; }
@@ -95,7 +95,7 @@ final class PluginDetails {
         ((BorderLayout) component.getLayout()).setVgap(metric(DesignMetrics.Role.PLUGIN_DETAILS_GAP));
         int vertical = metric(DesignMetrics.Role.PLUGIN_TEXT_VERTICAL_PADDING), side = metric(DesignMetrics.Role.PLUGIN_TEXT_SIDE_PADDING);
         text.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
-        text.setFont(dev.jasper.ui.swing.NativeControlStyles.font(kit,Typography.Role.BODY));
+        text.setFont(dev.jasper.ui.swing.NativeStyles.installed().font(kit,Typography.Role.BODY));
         spacing();
         var palette = kit.theme().semantic();
         text.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));

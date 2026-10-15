@@ -109,7 +109,7 @@ public final class HistoryPanel extends JPanel {
         visible = site.visible();
         rebuild();
         readIfLooking();
-        typography=dev.jasper.ui.swing.NativeControlStyles.observeTypography(this::restyle);
+        typography=dev.jasper.ui.swing.NativeStyles.installed().observeTypography(this::restyle);
     }
 
     private KitView heading(String name) {

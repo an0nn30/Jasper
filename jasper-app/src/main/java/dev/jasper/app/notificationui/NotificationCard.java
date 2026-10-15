@@ -93,7 +93,7 @@ final class NotificationCard extends dev.jasper.ui.swing.SurfacePanel implements
         add(icon); add(title); add(count); add(content); links.forEach(this::add); add(more); add(close);
         theme = kit.binding().subscribe(pair -> restyle());
         update(notification);
-        typography=dev.jasper.ui.swing.NativeControlStyles.observeTypography(this::restyle);
+        typography=dev.jasper.ui.swing.NativeStyles.installed().observeTypography(this::restyle);
     }
 
     Notification notification() { return notification; }

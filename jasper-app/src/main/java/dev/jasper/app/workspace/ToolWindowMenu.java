@@ -36,6 +36,6 @@ final class ToolWindowMenu {
         hideItem.setEnabled(visible);
         hideItem.addActionListener(event -> hide.run());
         menu.add(hideItem);
-        dev.jasper.ui.swing.NativeControlStyles.menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
+        dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
     }
 }

@@ -13,7 +13,7 @@ public final class SplitDividerBorder extends AbstractBorder implements UIResour
     @Override public void paintBorder(Component component, Graphics graphics, int x, int y, int width, int height) {
         if (!(component instanceof BasicSplitPaneDivider divider)) return;
         boolean vertical = divider.getBasicSplitPaneUI().getSplitPane().getOrientation() == JSplitPane.HORIZONTAL_SPLIT;
-        dev.jasper.ui.swing.NativeChromePainting.splitDivider(graphics, x, y, width, height, vertical,
+        dev.jasper.ui.swing.ChromePainter.installed().splitDivider(graphics, x, y, width, height, vertical,
             dev.jasper.app.platform.ThemeZone.theme(component));
     }
 }

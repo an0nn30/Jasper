@@ -9,7 +9,7 @@ import dev.jasper.ui.model.UiEvent;
 import dev.jasper.ui.model.ViewSpec;
 import dev.jasper.ui.swing.KitContext;
 import dev.jasper.ui.swing.KitView;
-import dev.jasper.ui.swing.NativeControlStyles;
+import dev.jasper.ui.swing.NativeStyles;
 import dev.jasper.ui.theme.SemanticColor;
 import java.awt.BorderLayout;
 import java.net.URI;
@@ -87,7 +87,7 @@ public final class LicensesView extends JPanel {
         view.getAccessibleContext().setAccessibleName("Licenses");
         add(view, BorderLayout.CENTER);
         theme = kit.binding().subscribe(pair -> restyle());
-        typography = NativeControlStyles.observeTypography(this::restyle);
+        typography = NativeStyles.installed().observeTypography(this::restyle);
         restyle();
         render();
     }
@@ -95,8 +95,8 @@ public final class LicensesView extends JPanel {
     /** The texts take the module's mono roles and the theme's text and selection colours. */
     private void restyle() {
         if (closed) return;
-        notice.setFont(NativeControlStyles.font(kit, Typography.Role.MONO_SMALL));
-        text.setFont(NativeControlStyles.font(kit, Typography.Role.MONO_SMALL));
+        notice.setFont(NativeStyles.installed().font(kit, Typography.Role.MONO_SMALL));
+        text.setFont(NativeStyles.installed().font(kit, Typography.Role.MONO_SMALL));
         for (var area : List.of(notice, text)) {
             area.setForeground(kit.theme().semantic().color(SemanticColor.TEXT_PRIMARY));
             area.setCaretColor(area.getForeground());

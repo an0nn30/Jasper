@@ -1,5 +1,6 @@
 package dev.jasper.ui.swing;
 
+import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.testsupport.*;
 import dev.jasper.ui.theme.*;
@@ -11,7 +12,9 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Native adapter recipes consume module colors without changing the host's existing geometry or button kind. */
-class NativeControlStylesTest {
+class NativeStylesTest {
+    private static final NativeStyles STYLES = new NativeStyles(Kit.DEFAULT);
+    private static final ChromePainter PAINTER = new ChromePainter(Kit.DEFAULT);
     @Test void typographySubscriptionIsOwnedAndSuppressesQueuedDeliveryAfterClose() throws Exception {
         var calls=new java.util.concurrent.atomic.AtomicInteger();var handle=new java.util.concurrent.atomic.AtomicReference<AutoCloseable>();
         Object previous=UIManager.get("defaultFont");
@@ -19,7 +22,7 @@ class NativeControlStylesTest {
         int listeners=UIManager.getDefaults().getPropertyChangeListeners().length;
         try {
             Edt.run(()->{
-                handle.set(NativeControlStyles.observeTypography(()->{assertThat(EventQueue.isDispatchThread()).isTrue();calls.incrementAndGet();}));
+                handle.set(STYLES.observeTypography(()->{assertThat(EventQueue.isDispatchThread()).isTrue();calls.incrementAndGet();}));
                 assertThat(calls.get()).as("registration never calls a partly constructed owner").isZero();
                 UIManager.put("defaultFont",new Font(Font.DIALOG,Font.PLAIN,20));
                 assertThat(calls.get()).isPositive();calls.set(0);
@@ -38,8 +41,8 @@ class NativeControlStylesTest {
                 for(float size:new float[]{20,32}) {
                     UIManager.put("defaultFont",new Font(Font.DIALOG,Font.PLAIN,1).deriveFont(size));
                     for(var role:dev.jasper.ui.metrics.Typography.Role.values())
-                        assertThat(NativeControlStyles.font(context,role)).isEqualTo(ThemePainting.font(context,role));
-                    assertThat(NativeControlStyles.font(context,dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(size);
+                        assertThat(STYLES.font(context,role)).isEqualTo(ThemePainting.font(context,role));
+                    assertThat(STYLES.font(context,dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(size);
                 }
             }finally{UIManager.put("defaultFont",previous);KitViewTest.release(context);}
         });
@@ -51,7 +54,7 @@ class NativeControlStylesTest {
             var palette = theme.semantic();
             var button = new JButton();
             Insets margin = button.getMargin();
-            NativeControlStyles.button(button, () -> theme);
+            STYLES.button(button, () -> theme);
             assertThat(button.getClientProperty("JButton.buttonType")).isEqualTo("toolBarButton");
             assertThat(button.getMargin()).as("toolbar margins stay the look and feel's").isEqualTo(margin).isInstanceOf(javax.swing.plaf.UIResource.class);
             assertThat(button.getClientProperty("FlatLaf.style")).isEqualTo(Map.of(
@@ -59,7 +62,7 @@ class NativeControlStylesTest {
                 "toolbar.pressedBackground", palette.color(SemanticColor.SURFACE_CONTROL_HOVER),
                 "toolbar.selectedBackground", palette.color(SemanticColor.SURFACE_CONTROL_SELECTED)));
             var rail = new JButton();
-            NativeControlStyles.button(rail, () -> theme, DesignMetrics.Role.RAIL_BUTTON_ARC);
+            STYLES.button(rail, () -> theme, DesignMetrics.Role.RAIL_BUTTON_ARC);
             assertThat(((Map<?, ?>) rail.getClientProperty("FlatLaf.style")).get("arc")).isEqualTo(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RAIL_BUTTON_ARC));
         });
     }
@@ -69,7 +72,7 @@ class NativeControlStylesTest {
             var theme = KitFixtures.light();
             var palette = theme.semantic();
             var field = new JTextField("query");
-            NativeControlStyles.borderlessField(field, () -> theme);
+            STYLES.borderlessField(field, () -> theme);
             SwingUtilities.updateComponentTreeUI(field);
             assertThat(field.getClientProperty("FlatLaf.style")).isEqualTo("borderWidth: 0; focusWidth: 0; innerFocusWidth: 0");
             assertThat(field.getBackground()).isEqualTo(palette.color(SemanticColor.SURFACE_INPUT));
@@ -84,7 +87,7 @@ class NativeControlStylesTest {
             var palette = theme.semantic();
             var button = new JButton("Reconnect");
             Font font = button.getFont(); Insets margin = button.getMargin();
-            NativeControlStyles.framedButton(button, () -> theme);
+            STYLES.framedButton(button, () -> theme);
             assertThat(button.getClientProperty("JButton.buttonType")).as("framed, not a toolbar ghost").isNull();
             assertThat(button.isContentAreaFilled()).isTrue();
             assertThat(button.isBorderPainted()).isTrue();
@@ -104,7 +107,7 @@ class NativeControlStylesTest {
             var theme = KitFixtures.dark();
             var item = new JMenuItem("Hide");
             Insets margin = item.getMargin();
-            NativeControlStyles.menu(item, () -> theme);
+            STYLES.menu(item, () -> theme);
             assertThat(item.getMargin()).isEqualTo(margin).isInstanceOf(javax.swing.plaf.UIResource.class);
             assertThat(item.getForeground()).isEqualTo(theme.semantic().color(SemanticColor.TEXT_PRIMARY));
         });
@@ -146,7 +149,49 @@ class NativeControlStylesTest {
     private static BufferedImage paint(AbstractButton button, GeneratedTheme theme) {
         var image = new BufferedImage(button.getWidth(), button.getHeight(), BufferedImage.TYPE_INT_ARGB);
         var g = image.createGraphics();
-        try { NativeChromePainting.action(button, g, theme, false, null); } finally { g.dispose(); }
+        try { PAINTER.action(button, g, theme, false, null); } finally { g.dispose(); }
         return image;
+    }
+
+    /** The seam: styles read only their own kit's metrics, scaled once, and the ghost arc unscaled for FlatLaf. */
+    @Test void stylesReadOnlyTheirOwnKit() {
+        Edt.run(() -> {
+            var theme = KitFixtures.dark();
+            var styles = new NativeStyles(KitFixtures.kit(Kit.DEFAULT.metrics().with(DesignMetrics.Role.HAIRLINE, 3)
+                .with(DesignMetrics.Role.RAIL_BUTTON_ARC, 13)));
+            assertThat(styles.metric(DesignMetrics.Role.HAIRLINE)).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(3));
+            assertThat(STYLES.metric(DesignMetrics.Role.HAIRLINE)).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(1));
+            var rail = new JButton();
+            styles.button(rail, () -> theme, DesignMetrics.Role.RAIL_BUTTON_ARC);
+            assertThat(((Map<?, ?>) rail.getClientProperty("FlatLaf.style")).get("arc")).as("logical; FlatLaf scales style values").isEqualTo(13);
+            assertThat(styles.padding(DesignMetrics.Role.HAIRLINE, DesignMetrics.Role.HAIRLINE).getBorderInsets(rail).top)
+                .isEqualTo(com.formdev.flatlaf.util.UIScale.scale(3));
+            assertThat(styles.font(dev.jasper.ui.metrics.Typography.Role.BODY)).as("the same type and faces")
+                .isEqualTo(STYLES.font(dev.jasper.ui.metrics.Typography.Role.BODY));
+        });
+    }
+
+    /** Review Focus 5: the installed styles and painter follow the installed kit at once, one instance per kit. */
+    @Test void installedFollowsTheInstalledKitWithOneInstancePerKit() {
+        Edt.run(() -> {
+            var prior = UIManager.getLookAndFeel();
+            var theme = KitFixtures.dark();
+            var derived = KitFixtures.kit(Kit.DEFAULT.metrics().with(DesignMetrics.Role.HAIRLINE, 3));
+            try {
+                FlatLafInstaller.install(theme, Kit.DEFAULT);
+                assertThat(NativeStyles.installed().kit()).isSameAs(Kit.DEFAULT);
+                assertThat(NativeStyles.installed()).isSameAs(NativeStyles.installed());
+                assertThat(ChromePainter.installed()).isSameAs(ChromePainter.installed());
+                FlatLafInstaller.install(theme, derived);
+                assertThat(NativeStyles.installed().kit()).isSameAs(derived);
+                assertThat(ChromePainter.installed().kit()).isSameAs(derived);
+                assertThat(NativeStyles.installed().metric(DesignMetrics.Role.HAIRLINE)).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(3));
+                FlatLafInstaller.install(theme, Kit.DEFAULT);
+                assertThat(ChromePainter.installed().kit()).as("back to the default kit at once").isSameAs(Kit.DEFAULT);
+                assertThat(NativeStyles.installed().kit()).isSameAs(Kit.DEFAULT);
+            } finally {
+                try { UIManager.setLookAndFeel(prior); } catch (UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
+            }
+        });
     }
 }

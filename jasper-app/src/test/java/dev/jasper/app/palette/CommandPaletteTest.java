@@ -720,9 +720,9 @@ class CommandPaletteTest {
                 palette.setEntries(List.of(new PaletteEntry.Header("Recently used"),
                     new PaletteEntry.Item(HISTORY,new PaletteRow("ls","ls -la","in ~/src",null,null,true,null))),null,null);
                 palette.setSize(palette.getPreferredSize());layoutTree(palette);
-                var hint=dev.jasper.ui.swing.NativeControlStyles.font(palette.kit(),dev.jasper.ui.metrics.Typography.Role.PALETTE_HINT);
+                var hint=new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(palette.kit(),dev.jasper.ui.metrics.Typography.Role.PALETTE_HINT);
                 assertThat(label(PaletteTestSupport.entryComponent(palette,0),"Recently used").getFont())
-                    .isEqualTo(dev.jasper.ui.swing.NativeControlStyles.font(palette.kit(),dev.jasper.ui.metrics.Typography.Role.RESULTS_HEADING));
+                    .isEqualTo(new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(palette.kit(),dev.jasper.ui.metrics.Typography.Role.RESULTS_HEADING));
                 assertThat(label(palette.hintView(),"in ~/src").getFont()).as("footer detail").isEqualTo(hint);
                 for(int verb=1;verb<3;verb++)
                     assertThat(KitTestSupport.require(palette.hintView(),CommandPalette.VERB+verb,AbstractButton.class).getFont()).as("footer verb").isEqualTo(hint);
@@ -749,7 +749,7 @@ class CommandPaletteTest {
                     palette.setEntries(List.of(new PaletteEntry.Item(scope,new PaletteRow("one","Title","Detail",null,null,true,null))),null,null);
                     palette.setSize(palette.getPreferredSize());layoutTree(palette);
                     var detail=label(row(palette,0),"Detail");
-                    var expected=dev.jasper.ui.swing.NativeControlStyles.font(palette.kit(),dev.jasper.ui.metrics.Typography.Role.BODY);
+                    var expected=new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(palette.kit(),dev.jasper.ui.metrics.Typography.Role.BODY);
                     assertThat(detail.getFont()).isEqualTo(expected);
                     if(scope.monospaceRows())assertThat(label(row(palette,0),"Title").getFont().getFamily()).isEqualTo(java.awt.Font.MONOSPACED);
                 }

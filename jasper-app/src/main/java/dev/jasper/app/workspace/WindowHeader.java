@@ -1,7 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.ui.metrics.DesignMetrics;
-import dev.jasper.ui.swing.NativeControlStyles;
+import dev.jasper.ui.swing.NativeStyles;
 
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.Dimension;
@@ -63,7 +63,7 @@ final class WindowHeader extends JPanel {
     WindowToolbar toolbar() { return toolbar; }
 
     private int height() { return toolbar.getPreferredSize().height; }
-    private int fieldHeight(int height) { return Math.max(0, height - NativeControlStyles.metric(DesignMetrics.Role.TITLE_SEARCH_VERTICAL_SPACE)); }
+    private int fieldHeight(int height) { return Math.max(0, height - NativeStyles.installed().metric(DesignMetrics.Role.TITLE_SEARCH_VERTICAL_SPACE)); }
 
     /** The header adapts to the window's width, so it never asks for more than its minimum; the terminal sizes new windows. */
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }

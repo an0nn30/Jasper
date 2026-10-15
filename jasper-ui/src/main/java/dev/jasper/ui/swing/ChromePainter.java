@@ -1,21 +1,51 @@
 package dev.jasper.ui.swing;
 
+import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.metrics.*;
 import dev.jasper.ui.theme.*;
 import java.awt.*;
+import java.util.Objects;
 import javax.swing.*;
 import com.formdev.flatlaf.util.UIScale;
 
-/** Kit-owned painters for temporary native chrome control adapters; native input/layout remain host-owned. */
-public final class NativeChromePainting {
-    private NativeChromePainting() {}
-    private static final java.awt.font.FontRenderContext TEXT_CONTEXT = new java.awt.font.FontRenderContext(null,true,true);
-    /** Applies the engine's text coverage to a caller-owned graphics clone. */
-    public static void prepareText(Graphics2D graphics) { ThemePainting.antialias(graphics); }
-    /** Literal advance measured with the same fractional context used by engine labels and native text. */
-    public static int measureText(Font font, String text) { return (int)Math.ceil(font.getStringBounds(text,TEXT_CONTEXT).getWidth()); }
+/**
+ * Kit-owned painters for temporary native chrome control adapters, over one kit's metrics and type; native input and
+ * layout remain host-owned. Application chrome paints with {@link #installed()}; a test builds one for the kit it checks.
+ */
+public final class ChromePainter {
+    /** The painter of the installed kit last asked for; replaced when the installed kit changes identity. */
+    private static volatile ChromePainter current;
+    private final Kit kit;
+    private final NativeStyles styles;
 
-    public static void action(AbstractButton button, Graphics graphics, GeneratedTheme theme, boolean labels, Icon arrow) {
+    /** A painter over {@code kit}'s metrics and type. */
+    public ChromePainter(Kit kit) {
+        this.kit = Objects.requireNonNull(kit, "kit");
+        this.styles = new NativeStyles(kit);
+    }
+
+    /** The painter of {@link FlatLafInstaller#installedKit()}: one instance until the installed kit changes. */
+    public static ChromePainter installed() {
+        Kit kit = FlatLafInstaller.installedKit();
+        ChromePainter painter = current;
+        if (painter == null || painter.kit != kit) current = painter = new ChromePainter(kit);
+        return painter;
+    }
+
+    /** The kit whose metrics and type this painter reads. */
+    public Kit kit() { return kit; }
+
+    // metric() is scaled for the display; value() is the logical role (an alpha, a percentage or a span the caller scales).
+    private int metric(DesignMetrics.Role role) { return styles.metric(role); }
+    private int value(DesignMetrics.Role role) { return kit.metrics().value(role); }
+    private Font font(Typography.Role role) { return styles.font(role); }
+
+    /** Applies the engine's text coverage to a caller-owned graphics clone. */
+    public void prepareText(Graphics2D graphics) { ThemePainting.antialias(graphics); }
+    /** Literal advance measured with the same fractional context used by engine labels and native text. */
+    public int measureText(Font font, String text) { return ThemePainting.measureText(font, text); }
+
+    public void action(AbstractButton button, Graphics graphics, GeneratedTheme theme, boolean labels, Icon arrow) {
         var g = (Graphics2D) graphics.create();
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -25,45 +55,45 @@ public final class NativeChromePainting {
             if (button.isEnabled() && (model.isRollover() || model.isPressed() || model.isSelected())) {
                 g.setColor(model.isPressed() || model.isSelected() ? palette.color(SemanticColor.SURFACE_CONTROL_SELECTED)
                     : hoverOverlay(theme));
-                int arc = NativeControlStyles.metric(DesignMetrics.Role.NATIVE_TOOLBAR_HOVER_ARC);
+                int arc = metric(DesignMetrics.Role.NATIVE_TOOLBAR_HOVER_ARC);
                 g.fillRoundRect(0, 0, button.getWidth(), button.getHeight(), arc, arc);
             }
             if (!button.isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(
-                DesignMetrics.DEFAULT.value(DesignMetrics.Role.NATIVE_TOOLBAR_DISABLED_PERCENT) / 100f));
+                value(DesignMetrics.Role.NATIVE_TOOLBAR_DISABLED_PERCENT) / 100f));
             Icon icon = button.getIcon();
-            int pad = NativeControlStyles.metric(DesignMetrics.Role.NATIVE_ACTION_PADDING);
-            int arrowSpace = NativeControlStyles.metric(DesignMetrics.Role.NATIVE_MENU_SPACE);
+            int pad = metric(DesignMetrics.Role.NATIVE_ACTION_PADDING);
+            int arrowSpace = metric(DesignMetrics.Role.NATIVE_MENU_SPACE);
             int x = labels ? pad : arrow != null ? Math.max(pad, (button.getWidth() - arrowSpace - icon.getIconWidth()) / 2)
                 : (button.getWidth() - icon.getIconWidth()) / 2;
             icon.paintIcon(button, g, x, (button.getHeight() - icon.getIconHeight()) / 2);
             x += icon.getIconWidth();
             if (labels) {
-                x += pad; g.setFont(NativeControlStyles.font(Typography.Role.TOOLBAR_LABEL)); g.setColor(palette.color(SemanticColor.TEXT_PRIMARY));
+                x += pad; g.setFont(font(Typography.Role.TOOLBAR_LABEL)); g.setColor(palette.color(SemanticColor.TEXT_PRIMARY));
                 var metrics = g.getFontMetrics();
                 g.drawString(button.getText(), x, (button.getHeight() - metrics.getHeight()) / 2 + metrics.getAscent());
                 x += metrics.stringWidth(button.getText());
             }
-            if (arrow != null) { x += NativeControlStyles.metric(DesignMetrics.Role.NATIVE_MENU_ARROW_GAP); arrow.paintIcon(button, g, x, (button.getHeight() - arrow.getIconHeight()) / 2); }
+            if (arrow != null) { x += metric(DesignMetrics.Role.NATIVE_MENU_ARROW_GAP); arrow.paintIcon(button, g, x, (button.getHeight() - arrow.getIconHeight()) / 2); }
         } finally { g.dispose(); }
     }
 
-    public static void search(JComponent component, Graphics graphics, GeneratedTheme theme, boolean hover, boolean collapsed,
-                              String context, String hint, Icon search, Icon contextIcon) {
+    public void search(JComponent component, Graphics graphics, GeneratedTheme theme, boolean hover, boolean collapsed,
+                       String context, String hint, Icon search, Icon contextIcon) {
         var g = (Graphics2D) graphics.create();
         try {
             var palette = theme.semantic();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-            int arc = NativeControlStyles.metric(DesignMetrics.Role.TITLE_SEARCH_ARC), width = component.getWidth(), height = component.getHeight();
+            int arc = metric(DesignMetrics.Role.TITLE_SEARCH_ARC), width = component.getWidth(), height = component.getHeight();
             g.setColor(palette.color(SemanticColor.SURFACE_FIELD_RAISED));
             g.fillRoundRect(0, 0, width - 1, height - 1, arc, arc);
             g.setColor(palette.color(hover ? SemanticColor.BORDER_FIELD_RAISED_HOVER : SemanticColor.BORDER_FIELD_RAISED));
             g.drawRoundRect(0, 0, width - 1, height - 1, arc, arc);
             if (collapsed) { search.paintIcon(component, g, (width - search.getIconWidth()) / 2, (height - search.getIconHeight()) / 2); return; }
-            int pad = NativeControlStyles.metric(DesignMetrics.Role.TITLE_SEARCH_PADDING), gap = NativeControlStyles.metric(DesignMetrics.Role.TITLE_SEARCH_GAP), x = pad;
+            int pad = metric(DesignMetrics.Role.TITLE_SEARCH_PADDING), gap = metric(DesignMetrics.Role.TITLE_SEARCH_GAP), x = pad;
             search.paintIcon(component, g, x, (height - search.getIconHeight()) / 2);
             x += search.getIconWidth() + gap;
-            g.setFont(NativeControlStyles.font(Typography.Role.TITLE_CONTEXT));
+            g.setFont(font(Typography.Role.TITLE_CONTEXT));
             var metrics = g.getFontMetrics();
             int hintWidth = hint.isEmpty() ? 0 : metrics.stringWidth(hint);
             int end = width - pad - (hintWidth == 0 ? 0 : hintWidth + gap);
@@ -80,32 +110,32 @@ public final class NativeChromePainting {
         } finally { g.dispose(); }
     }
     /** The native chrome's resting hover tint: the hover overlay at its named share. */
-    public static Color hoverOverlay(GeneratedTheme theme) {
+    public Color hoverOverlay(GeneratedTheme theme) {
         return ColorMath.opacity(theme.semantic().color(SemanticColor.HOVER_OVERLAY),
-            DesignMetrics.DEFAULT.value(DesignMetrics.Role.NATIVE_HOVER_OVERLAY_PERCENT) / 100.0);
+            value(DesignMetrics.Role.NATIVE_HOVER_OVERLAY_PERCENT) / 100.0);
     }
 
     /**
      * A toolbar action's preferred width: square at {@code side} for an icon-only action; otherwise padding, icon,
      * padding, the label in the toolbar role and trailing padding; a menu action adds the arrow's space.
      */
-    public static int actionWidth(AbstractButton button, int side, boolean labels, boolean menu) {
-        int pad = DesignMetrics.DEFAULT.value(DesignMetrics.Role.NATIVE_ACTION_PADDING);
+    public int actionWidth(AbstractButton button, int side, boolean labels, boolean menu) {
+        int pad = value(DesignMetrics.Role.NATIVE_ACTION_PADDING);
         // The leading padding, the toolbar icon and the gap scale as one span, as the label's trailing padding does.
-        int width = labels ? UIScale.scale(2 * pad + DesignMetrics.DEFAULT.value(DesignMetrics.Role.TOOLBAR_ACTION_ICON)) + UIScale.scale(pad)
-            + button.getFontMetrics(NativeControlStyles.font(Typography.Role.TOOLBAR_LABEL)).stringWidth(button.getText()) : side;
-        return menu ? width + NativeControlStyles.metric(DesignMetrics.Role.NATIVE_MENU_SPACE) : width;
+        int width = labels ? UIScale.scale(2 * pad + value(DesignMetrics.Role.TOOLBAR_ACTION_ICON)) + UIScale.scale(pad)
+            + button.getFontMetrics(font(Typography.Role.TOOLBAR_LABEL)).stringWidth(button.getText()) : side;
+        return menu ? width + metric(DesignMetrics.Role.NATIVE_MENU_SPACE) : width;
     }
 
     /** A toolbar's vertical rule between action groups: its whole bounds in the subtle border role. */
-    public static void rule(JComponent component, Graphics graphics, GeneratedTheme theme) {
+    public void rule(JComponent component, Graphics graphics, GeneratedTheme theme) {
         graphics.setColor(theme.semantic().color(SemanticColor.BORDER_SUBTLE));
         graphics.fillRect(0, 0, component.getWidth(), component.getHeight());
     }
 
     /** The hairline closing a native row (the find bar) along its lower edge. */
-    public static void bottomHairline(JComponent component, Graphics graphics, GeneratedTheme theme) {
-        int line = NativeControlStyles.metric(DesignMetrics.Role.HAIRLINE);
+    public void bottomHairline(JComponent component, Graphics graphics, GeneratedTheme theme) {
+        int line = metric(DesignMetrics.Role.HAIRLINE);
         graphics.setColor(theme.semantic().color(SemanticColor.BORDER_SUBTLE));
         graphics.fillRect(0, component.getHeight() - line, component.getWidth(), line);
     }
@@ -115,8 +145,8 @@ public final class NativeChromePainting {
      * top; a window's title row gets a subtle hairline along its bottom; a dialog's title band, which continues into
      * the dialog surface, gets neither.
      */
-    public static void titleBarEdges(JComponent bar, Graphics graphics, GeneratedTheme theme, boolean header, boolean rule) {
-        int line = NativeControlStyles.metric(DesignMetrics.Role.HAIRLINE);
+    public void titleBarEdges(JComponent bar, Graphics graphics, GeneratedTheme theme, boolean header, boolean rule) {
+        int line = metric(DesignMetrics.Role.HAIRLINE);
         if (header) { graphics.setColor(hoverOverlay(theme)); graphics.fillRect(0, 0, bar.getWidth(), line); }
         if (!header && rule) {
             graphics.setColor(theme.semantic().color(SemanticColor.BORDER_SUBTLE));
@@ -129,7 +159,7 @@ public final class NativeChromePainting {
      * kept clearly apart from it ({@link SurfaceContrast#TAB_LIGHTNESS}) so the selected tab shows whatever the theme gives
      * the two, both at {@code base}'s alpha (the window's opacity while it is translucent).
      */
-    public static Color tabSurface(GeneratedTheme workspace, Color base, boolean selected) {
+    public Color tabSurface(GeneratedTheme workspace, Color base, boolean selected) {
         var palette = workspace.semantic();
         Color terminal = palette.color(SemanticColor.SURFACE_TERMINAL);
         Color role = selected ? terminal : SurfaceContrast.apart(palette.color(SemanticColor.SURFACE_TABSTRIP), terminal, SurfaceContrast.TAB_LIGHTNESS);
@@ -143,8 +173,8 @@ public final class NativeChromePainting {
      * window-border dividers between slots and the rule along the bottom. Slot bounds are the host's retained motion
      * geometry; {@code selected} and {@code hovered} are -1 when no slot is.
      */
-    public static void tabStrip(JComponent strip, Graphics graphics, GeneratedTheme workspace, Color base,
-                                java.util.List<Rectangle> slots, int selected, int hovered, boolean active) {
+    public void tabStrip(JComponent strip, Graphics graphics, GeneratedTheme workspace, Color base,
+                         java.util.List<Rectangle> slots, int selected, int hovered, boolean active) {
         var g = (Graphics2D) graphics.create();
         try {
             g.setComposite(AlphaComposite.Src);
@@ -155,10 +185,10 @@ public final class NativeChromePainting {
             if (selected >= 0 && selected < slots.size()) {
                 Rectangle tab = slots.get(selected);
                 g.setColor(workspace.semantic().color(active ? SemanticColor.TAB_INDICATOR : SemanticColor.TAB_INDICATOR_INACTIVE));
-                g.fillRect(tab.x, tab.y, tab.width, NativeControlStyles.metric(DesignMetrics.Role.TAB_INDICATOR));
+                g.fillRect(tab.x, tab.y, tab.width, metric(DesignMetrics.Role.TAB_INDICATOR));
             }
             g.setColor(workspace.semantic().color(SemanticColor.BORDER_WINDOW));
-            int line = NativeControlStyles.metric(DesignMetrics.Role.TAB_DIVIDER);
+            int line = metric(DesignMetrics.Role.TAB_DIVIDER);
             for (int i = 0; i < slots.size() - 1; i++) {
                 Rectangle bounds = slots.get(i);
                 if (bounds.width > 0) g.fillRect(bounds.x + bounds.width - line, 0, line, strip.getHeight());
@@ -168,15 +198,15 @@ public final class NativeChromePainting {
     }
 
     /** The status bar's running dot at its leading gap: success while a shell runs, the idle status otherwise. */
-    public static void statusDot(JComponent bar, Graphics graphics, GeneratedTheme theme, boolean running) {
+    public void statusDot(JComponent bar, Graphics graphics, GeneratedTheme theme, boolean running) {
         var g = (Graphics2D) graphics.create();
         try {
             var palette = theme.semantic();
             g.setColor(running ? SurfaceContrast.on(palette, SemanticColor.STATUS_SUCCESS, SemanticColor.SURFACE_STATUS, SurfaceContrast.TEXT)
                 : palette.color(SemanticColor.STATUS_IDLE));
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            int size = NativeControlStyles.metric(DesignMetrics.Role.STATUS_RUNNING_DOT);
-            g.fillOval(NativeControlStyles.metric(DesignMetrics.Role.STATUS_GAP), (bar.getHeight() - size) / 2, size, size);
+            int size = metric(DesignMetrics.Role.STATUS_RUNNING_DOT);
+            g.fillOval(metric(DesignMetrics.Role.STATUS_GAP), (bar.getHeight() - size) / 2, size, size);
         } finally { g.dispose(); }
     }
 
@@ -184,11 +214,11 @@ public final class NativeChromePainting {
      * An unread badge at an icon's top-right corner on the rail: a rail-coloured ring, then the accent (or danger) dot
      * held to the indicator floor on the rail surface.
      */
-    public static void badge(Graphics graphics, int x, int y, int iconWidth, GeneratedTheme theme, boolean error) {
+    public void badge(Graphics graphics, int x, int y, int iconWidth, GeneratedTheme theme, boolean error) {
         var g = (Graphics2D) graphics.create();
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            int dot = NativeControlStyles.metric(DesignMetrics.Role.RAIL_BADGE_DOT), ring = NativeControlStyles.metric(DesignMetrics.Role.HAIRLINE);
+            int dot = metric(DesignMetrics.Role.RAIL_BADGE_DOT), ring = metric(DesignMetrics.Role.HAIRLINE);
             int left = x + iconWidth - dot;
             var palette = theme.semantic();
             Color rail = palette.color(SemanticColor.SURFACE_APP);
@@ -200,7 +230,7 @@ public final class NativeChromePainting {
     }
 
     /** A tool window header's connected dot: the success status held to the indicator floor on the panel surface. */
-    public static void connectedDot(Graphics graphics, int x, int y, int size, GeneratedTheme theme) {
+    public void connectedDot(Graphics graphics, int x, int y, int size, GeneratedTheme theme) {
         var g = (Graphics2D) graphics.create();
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -210,8 +240,8 @@ public final class NativeChromePainting {
     }
 
     /** The thin rule centred in a native split divider's wider drag area, in the divider token. */
-    public static void splitDivider(Graphics graphics, int x, int y, int width, int height, boolean vertical, GeneratedTheme theme) {
-        int thickness = NativeControlStyles.metric(DesignMetrics.Role.SPLIT_STROKE);
+    public void splitDivider(Graphics graphics, int x, int y, int width, int height, boolean vertical, GeneratedTheme theme) {
+        int thickness = metric(DesignMetrics.Role.SPLIT_STROKE);
         Graphics g = graphics.create();
         try {
             g.setColor(theme.semantic().color(SemanticColor.BORDER_WINDOW));
@@ -221,10 +251,10 @@ public final class NativeChromePainting {
     }
 
     /** A dock drop guide colour: the accent at the named fill or border alpha. */
-    public static Color dropGuide(GeneratedTheme theme, boolean border) {
+    public Color dropGuide(GeneratedTheme theme, boolean border) {
         Color accent = theme.semantic().color(SemanticColor.ACCENT);
         return new Color(accent.getRed(), accent.getGreen(), accent.getBlue(),
-            DesignMetrics.DEFAULT.value(border ? DesignMetrics.Role.DOCK_DROP_BORDER_ALPHA : DesignMetrics.Role.DOCK_DROP_FILL_ALPHA));
+            value(border ? DesignMetrics.Role.DOCK_DROP_BORDER_ALPHA : DesignMetrics.Role.DOCK_DROP_FILL_ALPHA));
     }
 
     /**
@@ -232,7 +262,7 @@ public final class NativeChromePainting {
      * sits inside its border so the two translucent colours never stack; the placeholder border is stroked half a pixel
      * in, so its inner edge and the fill share one corner diameter.
      */
-    public static void dropGuides(Graphics graphics, Rectangle highlight, Rectangle placeholder, Color fill, Color border) {
+    public void dropGuides(Graphics graphics, Rectangle highlight, Rectangle placeholder, Color fill, Color border) {
         var g = (Graphics2D) graphics.create();
         try {
             if (highlight != null) {
@@ -243,7 +273,7 @@ public final class NativeChromePainting {
             }
             if (placeholder != null) {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                double arc = NativeControlStyles.metric(DesignMetrics.Role.DOCK_DROP_ARC);
+                double arc = metric(DesignMetrics.Role.DOCK_DROP_ARC);
                 double inner = Math.max(0, arc - 1);
                 g.setColor(fill);
                 g.fill(new java.awt.geom.RoundRectangle2D.Double(placeholder.x + 1, placeholder.y + 1, placeholder.width - 2, placeholder.height - 2, inner, inner));
@@ -257,14 +287,14 @@ public final class NativeChromePainting {
      * The command palette's soft shadow around its card, theme.md's popover shadow: black, 12 px down, 32 px blur, 50% in
      * Dark and 18% in Light (as {@code dark} says).
      */
-    public static void popupShadow(Graphics graphics, Rectangle card, GeneratedTheme theme, boolean dark) {
+    public void popupShadow(Graphics graphics, Rectangle card, GeneratedTheme theme, boolean dark) {
         ThemePainting.softShadow((Graphics2D) graphics, new java.awt.geom.Rectangle2D.Double(card.x, card.y, card.width, card.height),
-            NativeControlStyles.metric(DesignMetrics.Role.PALETTE_CORNER_ARC) / 2.0, NativeControlStyles.metric(DesignMetrics.Role.POPOVER_SHADOW_OFFSET),
-            NativeControlStyles.metric(DesignMetrics.Role.POPOVER_SHADOW_BLUR),
-            DesignMetrics.DEFAULT.value(dark ? DesignMetrics.Role.POPOVER_SHADOW_PERCENT_DARK : DesignMetrics.Role.POPOVER_SHADOW_PERCENT_LIGHT) / 100.0);
+            metric(DesignMetrics.Role.PALETTE_CORNER_ARC) / 2.0, metric(DesignMetrics.Role.POPOVER_SHADOW_OFFSET),
+            metric(DesignMetrics.Role.POPOVER_SHADOW_BLUR),
+            value(dark ? DesignMetrics.Role.POPOVER_SHADOW_PERCENT_DARK : DesignMetrics.Role.POPOVER_SHADOW_PERCENT_LIGHT) / 100.0);
     }
 
-    public static String clip(String text, FontMetrics metrics, int width) {
+    public String clip(String text, FontMetrics metrics, int width) {
         if (width <= 0) return "";
         if (metrics.stringWidth(text) <= width) return text;
         for (int end = text.offsetByCodePoints(text.length(), -1); end > 0; end = text.offsetByCodePoints(end, -1)) {

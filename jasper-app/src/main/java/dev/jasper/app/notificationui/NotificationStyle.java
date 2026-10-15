@@ -50,7 +50,7 @@ final class NotificationStyle {
     static Color color(KitContext kit, SemanticColor role) { return kit.theme().semantic().color(role); }
 
     static Font font(KitContext kit, Typography.Role role) {
-        return dev.jasper.ui.swing.NativeControlStyles.font(kit,role);
+        return dev.jasper.ui.swing.NativeStyles.installed().font(kit,role);
     }
 
     static int metric(KitContext kit, DesignMetrics.Role role) { return UIScale.scale(kit.metrics().value(role)); }

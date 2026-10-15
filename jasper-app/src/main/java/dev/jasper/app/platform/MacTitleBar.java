@@ -304,7 +304,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     @Override protected void paintChildren(Graphics g) {
         super.paintChildren(g);
         // A header row's top highlight follows its own zone; a window title's lower rule follows the chrome.
-        dev.jasper.ui.swing.NativeChromePainting.titleBarEdges(this, g, ThemeZone.theme(header != null ? this : null), header != null, style == Style.WINDOW);
+        dev.jasper.ui.swing.ChromePainter.installed().titleBarEdges(this, g, ThemeZone.theme(header != null ? this : null), header != null, style == Style.WINDOW);
     }
 
     @Override public void close() {

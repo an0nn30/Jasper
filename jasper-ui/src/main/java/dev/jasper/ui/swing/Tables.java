@@ -50,7 +50,7 @@ final class Tables {
             if(value().columns().isEmpty())return padding;
             var first=value().columns().getFirst();
             var font=ThemePainting.font(context(),Typography.Role.valueOf(first.role().name()));
-            int target=NativeChromePainting.measureText(font,"M".repeat(DesignMetrics.TABLE_MIN_VISIBLE_GLYPHS));
+            int target=ThemePainting.measureText(font,"M".repeat(DesignMetrics.TABLE_MIN_VISIBLE_GLYPHS));
             var icon=value().rows().stream().flatMap(row->row.icon().stream()).findFirst();
             if(icon.isPresent())target+=context().icons().icon(icon.get(),context().theme().semantic(),Nodes.Hue.NONE,
                 com.formdev.flatlaf.util.UIScale.scale(14)).getIconWidth()+new JLabel().getIconTextGap();

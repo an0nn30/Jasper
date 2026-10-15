@@ -2,7 +2,7 @@ package dev.jasper.app.platform;
 
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.metrics.Typography;
-import dev.jasper.ui.swing.NativeControlStyles;
+import dev.jasper.ui.swing.NativeStyles;
 
 import java.awt.Color;
 import java.awt.Component;
@@ -39,7 +39,7 @@ public final class ThemeZone {
     }
 
     public static java.awt.Font font(Typography.Role role) {
-        return NativeControlStyles.font(role);
+        return NativeStyles.installed().font(role);
     }
 
     public static boolean workspace(Component component) {

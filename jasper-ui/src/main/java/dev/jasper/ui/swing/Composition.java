@@ -132,7 +132,7 @@ final class Composition {
          * metrics can differ (Linux hints integer advances wider) and would break lines that fit as painted.
          */
         int advance(String line) {
-            return NativeChromePainting.measureText(getFont(), line);
+            return ThemePainting.measureText(getFont(), line);
         }
 
         List<String> lines(int width) {
