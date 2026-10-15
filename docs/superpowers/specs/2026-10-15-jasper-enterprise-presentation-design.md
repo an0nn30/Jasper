@@ -1,6 +1,6 @@
 # Jasper Enterprise presentation
 
-Status: **Draft for the user's review, 2026-10-15.**
+Status: **Approved on 2026-10-15** (the user: "The spec is approved; left-aligned colon labels and keeping Form.hero are fine.").
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
