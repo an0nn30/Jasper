@@ -7,9 +7,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
-/** Platform family and user size resolved once, then applied consistently to named text roles. */
+/**
+ * A type scale's roles drawn in a face set with the user's font settings, applied consistently to named text roles: the
+ * platform family (resolved once per process) unless the user names one, at the scale's body size unless the user sets
+ * one.
+ */
 public final class Typography {
     public enum Role {
         HERO_TITLE(15, 600), DETAIL_TITLE(16, 600), WINDOW_TITLE(13, 600), PANEL_TITLE(13, 600), PANEL_DETAIL_TITLE(12.5f, 600), PANEL_DETAIL_LABEL(12, 400), PANEL_HEADER_TITLE(12.5f, 600), PANEL_HEADER_COUNT(11.5f, 400), PANEL_SEARCH(12,400), PANEL_ROW_SELECTED(12,500), PANEL_ROW_SECONDARY(13.25f,400), PANEL_DETAIL_MONO(11.65f,400),
@@ -20,22 +25,44 @@ public final class Typography {
         SETTINGS_BODY(13, 400), SETTINGS_PREVIEW(12, 400),
         SUPPORTING(11.5f, 400), CAPTION(11.5f, 400), SETTING_DESCRIPTION(11, 400), SECTION_LABEL(11, 600), COUNT(11, 400), CHIP(9.5f, 400), MONO(12, 400), MONO_SMALL(11.5f, 400), MONO_CAPTION(11, 400),
         ORDERED_ACTION(12, 400);
-        private final float size;
-        private final int weight;
-        Role(float size, int weight) { this.size = size; this.weight = weight; }
+        /** The role's size and weight in {@link TypeScale#DEFAULT}; every reading goes through a scale. */
+        final float declaredSize;
+        final int declaredWeight;
+        Role(float size, int weight) { declaredSize = size; declaredWeight = weight; }
     }
+
+    /**
+     * The user's font settings as the host applied them.
+     *
+     * @param family a named UI family, or empty for the faces' own
+     * @param size a body size in points, or empty for the scale's
+     */
+    public record UserFont(Optional<String> family, Optional<Float> size) {
+        /** Neither setting. */
+        public static final UserFont NONE = new UserFont(Optional.empty(), Optional.empty());
+        /** Both values are required; an empty one means the setting is unset. */
+        public UserFont { Objects.requireNonNull(family, "family"); Objects.requireNonNull(size, "size"); }
+    }
+
+    private final TypeScale scale;
+    private final FaceSet faces;
     private final String family;
     private final float bodySize;
     private final boolean platformDefault;
-    public Typography() { this(13); }
-    /** A size-only setting retains the platform role-family policy. */
-    public Typography(float bodySize) { this(PlatformFamily.NAME, bodySize, true); }
-    public Typography(String family, float bodySize) { this(family, bodySize, false); }
-    private Typography(String family, float bodySize, boolean platformDefault) {
+
+    /** {@code scale}'s roles in {@code faces}, with {@code user}'s family and size where set. */
+    public static Typography of(TypeScale scale, FaceSet faces, UserFont user) {
+        Objects.requireNonNull(scale, "scale"); Objects.requireNonNull(faces, "faces"); Objects.requireNonNull(user, "user");
+        // A named family never runs the installed-family lookup (platformLookups counts it).
+        return new Typography(scale, faces, user.family().orElseGet(() -> PlatformFamily.NAME), user.size().orElse(scale.body()),
+            user.family().isEmpty());
+    }
+
+    private Typography(TypeScale scale, FaceSet faces, String family, float bodySize, boolean platformDefault) {
         Objects.requireNonNull(family);
         if (family.isBlank() || !Float.isFinite(bodySize) || bodySize < 6 || bodySize > 96)
             throw new IllegalArgumentException("Invalid font family or body size");
-        this.family = family; this.bodySize = bodySize; this.platformDefault = platformDefault;
+        this.scale = scale; this.faces = faces; this.family = family; this.bodySize = bodySize; this.platformDefault = platformDefault;
     }
     public String family() { return family; }
     public float bodySize() { return bodySize; }
@@ -43,18 +70,20 @@ public final class Typography {
     /** Selected labels use medium weight. Size settings enlarge every role proportionally. */
     public Font font(Role role, boolean selected) {
         Objects.requireNonNull(role);
-        String resolved = role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION || role == Role.PANEL_DETAIL_MONO ? Font.MONOSPACED : family;
-        int weight = selected && role == Role.LABEL ? 500 : role.weight;
+        int weight = selected && role == Role.LABEL ? 500 : scale.weight(role);
+        String resolved = role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION || role == Role.PANEL_DETAIL_MONO
+            ? weight >= 500 ? faces.dataMedium() : faces.dataRegular() : family;
         // The native macOS text face best matches regular desktop roles. Explicit user families bypass this policy.
         if (platformDefault && role != Role.BODY && weight < 600 && resolved.equals("Helvetica Neue") && AppleText.AVAILABLE)
             resolved = ".AppleSystemUIFont";
+        float size = scale.size(role) * bodySize / scale.base();
         // JBR maps Helvetica Neue's numeric semibold to regular. Use its installed medium face;
         // the small family-wide tracking adjustment is calibrated from original desktop title ink.
         if (weight == 600 && resolved.equals("Helvetica Neue") && HelveticaMedium.AVAILABLE)
-            return HelveticaMedium.FONT.deriveFont(Map.of(TextAttribute.SIZE, role.size * bodySize / 13f,
+            return HelveticaMedium.FONT.deriveFont(Map.of(TextAttribute.SIZE, size,
                 TextAttribute.TRACKING, platformDefault && role == Role.SECTION_LABEL ? .060f : .018f));
         return new Font(resolved, Font.PLAIN, 1).deriveFont(Map.of(
-            TextAttribute.SIZE, role.size * bodySize / 13f,
+            TextAttribute.SIZE, size,
             TextAttribute.WEIGHT, weight == 600 ? TextAttribute.WEIGHT_SEMIBOLD
                 : weight == 500 ? TextAttribute.WEIGHT_MEDIUM : TextAttribute.WEIGHT_REGULAR));
     }

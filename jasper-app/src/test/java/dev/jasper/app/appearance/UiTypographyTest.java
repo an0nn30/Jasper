@@ -68,7 +68,7 @@ class UiTypographyTest {
         SwingUtilities.invokeAndWait(() -> {
             var themes = ThemeTestSupport.controller(true);
             var context = themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME);
-            var defaults = new dev.jasper.ui.metrics.Typography();
+            var defaults = dev.jasper.ui.metrics.Typography.of(dev.jasper.ui.metrics.TypeScale.DEFAULT, dev.jasper.ui.metrics.FaceSet.PLATFORM, dev.jasper.ui.metrics.Typography.UserFont.NONE);
             String bodyFace = defaults.font(dev.jasper.ui.metrics.Typography.Role.BODY).getFontName();
             String headingFace = defaults.font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getFontName();
             var spec = new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Stack("root", dev.jasper.ui.model.ControlState.READY,

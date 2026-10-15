@@ -9,6 +9,11 @@ import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class DesignMetricsTest {
+    private static Typography named(String family, float size) {
+        return Typography.of(TypeScale.DEFAULT, FaceSet.PLATFORM,
+            new Typography.UserFont(java.util.Optional.of(family), java.util.Optional.of(size)));
+    }
+
     @Test void fixedLogicalGeometryIsIndependentOfDisplayScale() {
         var m = DesignMetrics.DEFAULT;
         assertThat(m.value(DesignMetrics.Role.FIELD_HEIGHT)).isEqualTo(24);
@@ -40,7 +45,7 @@ class DesignMetricsTest {
 
     @Test void aThirteenPointLineMakesTheCompactHeights() {
         var frc = new FontRenderContext(null, true, true);
-        var body = new Typography("SansSerif", 13).font(Typography.Role.BODY);
+        var body = named("SansSerif", 13).font(Typography.Role.BODY);
         int line = (int) Math.ceil(body.getLineMetrics("Ag", frc).getHeight());
         assumeTrue(line <= 16, "a 13-pt line of at most 16 px");
         var m = DesignMetrics.DEFAULT;
@@ -54,8 +59,8 @@ class DesignMetricsTest {
 
     @Test void enlargedUserFontGetsEnoughContentBoundsWithoutChangingCatalog() {
         var frc = new FontRenderContext(null, true, true);
-        var normal = new Typography("SansSerif", 13);
-        var large = new Typography("SansSerif", 18);
+        var normal = named("SansSerif", 13);
+        var large = named("SansSerif", 18);
         var font = large.font(Typography.Role.BODY);
         int line = (int) Math.ceil(font.getLineMetrics("Ag", frc).getHeight());
         var m = DesignMetrics.DEFAULT;
@@ -73,8 +78,8 @@ class DesignMetricsTest {
         assertThat(large.font(Typography.Role.MONO).getFamily()).isEqualTo("Monospaced");
     }
     @Test void invalidFontSettingsAreRejected() {
-        assertThatThrownBy(() -> new Typography("", 13)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new Typography("SansSerif", Float.NaN)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> named("", 13)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> named("SansSerif", Float.NaN)).isInstanceOf(IllegalArgumentException.class);
     }
 
     /** A catalog is a value with no public constructor: every catalog derives from DEFAULT. */

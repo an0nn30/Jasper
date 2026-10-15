@@ -15,6 +15,12 @@ public final class KitFixtures {
 
     public static GeneratedTheme light() { return JasperTheme.bundled().generated(false); }
 
+    /** The platform UI family the default kit draws in when the user names none (resolved once per process). */
+    public static String platformFamily() {
+        return dev.jasper.ui.metrics.Typography.of(dev.jasper.ui.metrics.TypeScale.DEFAULT, dev.jasper.ui.metrics.FaceSet.PLATFORM,
+            dev.jasper.ui.metrics.Typography.UserFont.NONE).family();
+    }
+
     /** A third appearance: Slate Cobalt Dark with every role 20% plum (alpha kept), so a hard-coded variant colour shows. */
     public static GeneratedTheme custom() {
         var plum = new java.awt.Color(0x7a3fa0);

@@ -19,7 +19,7 @@ class KitCalibrationTest {
 
     @Test void kitIsTheOnlyPlaceholderPainterUnderRealFlatLaf() {
         Edt.run(() -> {
-            var old = UIManager.getLookAndFeel(); Object font = UIManager.get("defaultFont"); UIManager.put("defaultFont", new Font(new dev.jasper.ui.metrics.Typography().family(), Font.PLAIN, 13)); var context = KitFixtures.context();
+            var old = UIManager.getLookAndFeel(); Object font = UIManager.get("defaultFont"); UIManager.put("defaultFont", new Font(dev.jasper.ui.testsupport.KitFixtures.platformFamily(), Font.PLAIN, 13)); var context = KitFixtures.context();
             try {
                 FlatLafInstaller.install(context.theme());
                 try (var view = new KitView(context, new ViewSpec(new Field("field", ControlState.READY, FieldKind.TEXT, "", "Placeholder calibration", "Label", "")), e -> {})) {
@@ -34,7 +34,7 @@ class KitCalibrationTest {
     }
     @Test void nominalButtonHeightIsTheVisibleFillAndRadiusIsTheControlRadius() {
         Edt.run(() -> {
-            var old = UIManager.getLookAndFeel(); Object font = UIManager.get("defaultFont"); UIManager.put("defaultFont", new Font(new dev.jasper.ui.metrics.Typography().family(), Font.PLAIN, 13)); var context = KitFixtures.context();
+            var old = UIManager.getLookAndFeel(); Object font = UIManager.get("defaultFont"); UIManager.put("defaultFont", new Font(dev.jasper.ui.testsupport.KitFixtures.platformFamily(), Font.PLAIN, 13)); var context = KitFixtures.context();
             try {
                 FlatLafInstaller.install(context.theme());
                 try (var view = new KitView(context, new ViewSpec(new Nodes.Button("button", ControlState.READY, "Continue", "", ButtonKind.PRIMARY, "continue", "")), e -> {})) {
@@ -54,7 +54,7 @@ class KitCalibrationTest {
     @Test void realFormFocusHaloIsExternalVisibleAndDoesNotChangeControlBounds() {
         Edt.run(() -> {
             var old = UIManager.getLookAndFeel(); var priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager();
-            Object font = UIManager.get("defaultFont"); UIManager.put("defaultFont", new Font(new dev.jasper.ui.metrics.Typography().family(), Font.PLAIN, 13)); var manager = new FocusManager(); var context = KitFixtures.context();
+            Object font = UIManager.get("defaultFont"); UIManager.put("defaultFont", new Font(dev.jasper.ui.testsupport.KitFixtures.platformFamily(), Font.PLAIN, 13)); var manager = new FocusManager(); var context = KitFixtures.context();
             try {
                 FlatLafInstaller.install(context.theme()); KeyboardFocusManager.setCurrentKeyboardFocusManager(manager);
                 var field = new Field("field", ControlState.READY, FieldKind.TEXT, "", "Value", "Label", "");

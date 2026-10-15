@@ -1,8 +1,11 @@
 package dev.jasper.ui.swing;
 
 import com.formdev.flatlaf.util.UIScale;
+import dev.jasper.ui.metrics.FaceSet;
+import dev.jasper.ui.metrics.TypeScale;
 import dev.jasper.ui.metrics.Typography;
 import java.awt.Font;
+import java.util.Optional;
 import javax.swing.UIManager;
 
 /** Shared bridge from host font provenance to logical roles and effective Swing point sizes. */
@@ -21,11 +24,18 @@ final class SwingTypography {
         return result;
     }
     static Typography typography() {
+        return Typography.of(TypeScale.DEFAULT, FaceSet.PLATFORM, user());
+    }
+    /**
+     * The user's font settings as the host applied them: none without a developer {@code defaultFont}; otherwise its size
+     * ({@code Label.font}'s when that is set too) and, unless {@code Jasper.uiFontFamilyOverride} is false, its family.
+     */
+    static Typography.UserFont user() {
         Font[] fonts = overrides();
-        if (fonts[0] == null) return new Typography();
-        float size = (fonts[1] == null ? fonts[0] : fonts[1]).getSize2D();
+        if (fonts[0] == null) return Typography.UserFont.NONE;
+        Optional<Float> size = Optional.of((fonts[1] == null ? fonts[0] : fonts[1]).getSize2D());
         return Boolean.FALSE.equals(UIManager.get("Jasper.uiFontFamilyOverride"))
-            ? new Typography(size) : new Typography(fonts[0].getFamily(), size);
+            ? new Typography.UserFont(Optional.empty(), size) : new Typography.UserFont(Optional.of(fonts[0].getFamily()), size);
     }
     static Font effective(Font role) {
         // A host override is an exact effective form-font size, including fractions. UIScale may

@@ -110,7 +110,7 @@ class HeroCompositionTest {
             var context=KitFixtures.context();
             try {
                 for(int size:List.of(13,20)) {
-                    var font=new Font(new dev.jasper.ui.metrics.Typography().family(),Font.PLAIN,size);
+                    var font=new Font(KitFixtures.platformFamily(),Font.PLAIN,size);
                     UIManager.put("defaultFont",font); UIManager.put("Label.font",font);
                     var row=new SettingRow("setting",ControlState.READY,"Bind to this device","Device description",new Toggle("toggle",ControlState.READY,"Bind",true,"bind",false),false,false,"Recommended");
                     try(var view=new KitView(context,new ViewSpec(row), e -> {})) {

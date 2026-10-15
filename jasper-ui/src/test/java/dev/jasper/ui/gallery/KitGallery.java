@@ -98,7 +98,7 @@ public final class KitGallery {
             var priorLaf = UIManager.getLookAndFeel();
             Object priorFont = UIManager.get("defaultFont");
             Object priorCaps = UIManager.get("PasswordField.showCapsLock");
-            String family = new dev.jasper.ui.metrics.Typography().family();
+            String family = KitFixtures.platformFamily();
             var priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager();
             var focus = new GalleryFocus();
             try {
