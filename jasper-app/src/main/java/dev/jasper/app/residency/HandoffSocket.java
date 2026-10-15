@@ -1,9 +1,9 @@
 package dev.jasper.app.residency;
 
+import dev.jasper.app.platform.CodeLocation;
 import dev.jasper.app.platform.OwnerOnlyFiles;
 import java.io.IOException;
 import java.net.StandardProtocolFamily;
-import java.net.URISyntaxException;
 import java.net.UnixDomainSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -115,27 +115,27 @@ public final class HandoffSocket implements AutoCloseable {
      * a stale build, a bad token or a wedged process all return false and leave the caller to start
      * normally.
      */
-    public static boolean handOff(Path socketPath, Path tokenPath, Path codeSource, long modified) {
-        return exchange(socketPath, tokenPath, codeSource, modified, LaunchRequest.Kind.OPEN) == LaunchRequest.Response.OK;
+    public static boolean handOff(Path socketPath, Path tokenPath, Path codeLocation, long modified) {
+        return exchange(socketPath, tokenPath, codeLocation, modified, LaunchRequest.Kind.OPEN) == LaunchRequest.Response.OK;
     }
 
     /**
      * Asks a resident process to quit through its normal quit path. True only when it accepted; it then
      * releases the endpoint as part of its shutdown, which {@link #live} observes. Blocks, bounded.
      */
-    public static boolean retire(Path socketPath, Path tokenPath, Path codeSource, long modified) {
-        return exchange(socketPath, tokenPath, codeSource, modified, LaunchRequest.Kind.RETIRE) == LaunchRequest.Response.OK;
+    public static boolean retire(Path socketPath, Path tokenPath, Path codeLocation, long modified) {
+        return exchange(socketPath, tokenPath, codeLocation, modified, LaunchRequest.Kind.RETIRE) == LaunchRequest.Response.OK;
     }
 
     /** True while some process accepts connections on the endpoint: a plain launch would hand off to it. */
     public static boolean live(Path socketPath) { return owned(socketPath); }
 
-    private static LaunchRequest.Response exchange(Path socketPath, Path tokenPath, Path codeSource, long modified,
+    private static LaunchRequest.Response exchange(Path socketPath, Path tokenPath, Path codeLocation, long modified,
                                                    LaunchRequest.Kind kind) {
         String token = readToken(tokenPath);
         if (token == null) return LaunchRequest.Response.PROTOCOL;
-        // codeSource() is nullable; an unresolvable source compares equal to itself and to nothing else.
-        var request = new LaunchRequest(token, codeSource == null ? Path.of("") : codeSource, modified, kind);
+        // codeLocation() is nullable; an unknown location compares equal to itself and to nothing else.
+        var request = new LaunchRequest(token, codeLocation == null ? Path.of("") : codeLocation, modified, kind);
         var answer = new CompletableFuture<LaunchRequest.Response>();
         // A wedged owner must not hang the caller, so the exchange is bounded from outside it.
         Thread worker = Thread.ofPlatform().daemon().name("jasper-handoff").start(() -> {
@@ -180,14 +180,8 @@ public final class HandoffSocket implements AutoCloseable {
     }
 
     /** The jar or classes directory this build was loaded from; null when it cannot be determined. */
-    public static Path codeSource() {
-        try {
-            var source = HandoffSocket.class.getProtectionDomain().getCodeSource();
-            if (source == null || source.getLocation() == null) return null;
-            return Path.of(source.getLocation().toURI()).toAbsolutePath().normalize();
-        } catch (URISyntaxException | RuntimeException unavailable) {
-            return null;
-        }
+    public static Path codeLocation() {
+        return CodeLocation.of(HandoffSocket.class);
     }
 
     /** Epoch milliseconds, or zero when the file cannot be read; zero never equals a real stamp. */

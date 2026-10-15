@@ -126,7 +126,7 @@ public final class ApplicationBootstrap {
                     if (!standalone)
                         application.loginItems(loginItemReconciler(enabled -> reconcileLoginItem(enabled, appPath, home)));
                     if (!residentRole(options, resident)) return null;
-                    Path source = HandoffSocket.codeSource();
+                    Path source = HandoffSocket.codeLocation();
                     var bound = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(), dirs.daemonLock(),
                         handoffHandler(application, source, HandoffSocket.lastModified(source)));
                     endpoint.set(bound);
@@ -173,7 +173,7 @@ public final class ApplicationBootstrap {
             }
             var application = new JasperApplication(service, null, history, dirs.buddyState(),
                 () -> System.exit(0), integrationDir, dirs.themes());
-            Path source = HandoffSocket.codeSource();
+            Path source = HandoffSocket.codeLocation();
             application.residentControl(new ResidentControl(() -> HandoffSocket.live(dirs.daemonSocket()),
                 () -> HandoffSocket.retire(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source))),
                 replacementHandsOff(options), standaloneNotice(options));
@@ -201,7 +201,7 @@ public final class ApplicationBootstrap {
             if (MacDock.available())
                 application.backgroundOnQuit(new DockControl(MacDock::show, MacDock::prepare, MacDock::poweringOff), !options.background());
             if (!options.privateCommands()) application.subcommandList(dirs.subcommandList());
-            application.startPlugins(HandoffSocket.codeSource(), options.pluginDir(), options.safeMode(), dirs);
+            application.startPlugins(HandoffSocket.codeLocation(), options.pluginDir(), options.safeMode(), dirs);
             // After the plugins started, so a call that arrives first finds its handler.
             CommandListener listener = serveCommands(application, options, dirs, acquired);
             if (listener != null) commands.set(listener);
@@ -342,7 +342,7 @@ public final class ApplicationBootstrap {
         // Windows lets only this freshly launched process bring a window forward; the resident needs that right by the
         // time it shows its window. Grant before sending, including when an existing window can be raised immediately.
         WindowsForeground.allow(System.getProperty("os.name"), HandoffSocket.ownerPid(dirs.daemonToken()));
-        Path source = HandoffSocket.codeSource();
+        Path source = HandoffSocket.codeLocation();
         boolean handed = HandoffSocket.handOff(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source));
         return handed;
     }
@@ -444,13 +444,13 @@ public final class ApplicationBootstrap {
     /** True when a request comes from a different build than this one. A resident process must not
      *  serve windows built from code it is not running. */
     static boolean stale(LaunchRequest request, Path source, long modified) {
-        return !request.codeSource().equals(source == null ? Path.of("") : source)
-            || request.codeSourceModified() != modified;
+        return !request.codeLocation().equals(source == null ? Path.of("") : source)
+            || request.codeLocationModified() != modified;
     }
 
     /**
      * True once the application jar this process was loaded from has changed on disk (a new build was installed under
-     * it) or gone. An unknown code source never counts. Any thread; one file stat per call.
+     * it) or gone. An unknown code location never counts. Any thread; one file stat per call.
      */
     static java.util.function.BooleanSupplier replacedOnDisk(Path source, long modified) {
         return () -> source != null && HandoffSocket.lastModified(source) != modified;

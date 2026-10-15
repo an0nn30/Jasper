@@ -90,7 +90,7 @@ public final class VmOptionsFile {
         }
         Path directory = target.toAbsolutePath().getParent();
         Files.createDirectories(directory);
-        Path temporary = Files.createTempFile(directory, ".jasper.vmoptions", ".tmp");
+        Path temporary = Files.createTempFile(directory, "." + target.getFileName(), ".tmp");
         try {
             Files.writeString(temporary, text, StandardCharsets.UTF_8);
             try {

@@ -1,5 +1,7 @@
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -233,23 +235,28 @@ def testLauncherCore = tasks.register('testLauncherCore') {
     doLast {
         File work = launcherBuild.get().dir('core-test').asFile
         delete(work)
-        List<File> sources = [new File(launcherTestSource, 'vmoptions_core_test.cpp'), new File(jasperNative, 'JasperVmOptionsCore.cpp')]
+        List<File> sources = [new File(launcherTestSource, 'vmoptions_core_test.cpp'), new File(jasperNative, 'JasperVmOptionsCore.cpp'),
+            new File(jasperNative, 'jasper_launch_rules.c')]
         File test = nativeBuild(kind: 'executable', exportAll: true, sources: sources, strict: sources, includes: [jasperNative],
             output: new File(work, launcherHost().os == 'windows' ? 'vmoptions-core-test.exe' : 'vmoptions-core-test'),
             work: new File(work, 'objects'))
-        String output = runLauncherTool([test.absolutePath, new File(launcherTestSource, 'digest-vectors.txt').absolutePath],
-            null, null, "the launcher's options tests")
+        String output = runLauncherTool([test.absolutePath, new File(launcherTestSource, 'digest-vectors.txt').absolutePath,
+            new File(launcherTestSource, 'aot-record-vectors.txt').absolutePath], null, null, "the launcher's options tests")
         logger.lifecycle(output.trim())
         // The JDK's defines are macros in every source (-DLINUX, /DWINDOWS). Check the core and its test once more with
         // the other hosts' defines, so a name that collides with one fails here, not only on that host's CI.
         def host = launcherHost()
         if (host.os != 'windows') {
-            List<String> compiler = host.os == 'macos' ? ['/usr/bin/xcrun', 'clang++'] : ['g++']
+            Map<String, List<String>> compilers = host.os == 'macos'
+                ? [cpp: ['/usr/bin/xcrun', 'clang++', '-std=c++14'], c: ['/usr/bin/xcrun', 'clang', '-std=c11']]
+                : [cpp: ['g++', '-std=c++14'], c: ['gcc', '-std=c11']]
             ['macos', 'linux', 'windows'].findAll { it != host.os }.each { String other ->
-                runLauncherTool(compiler + ['-std=c++14', '-fsyntax-only', '-Wall', '-Wextra', '-Werror'] +
-                    launcherDefines(other).collect { "-D${it}".toString() } + ["-I${jasperNative.absolutePath}".toString()] +
-                    sources.collect { it.absolutePath }, null, null, "checking the options logic with ${other}'s defines",
-                    launcherToolchainHint(host.os))
+                compilers.each { String extension, List<String> compiler ->
+                    runLauncherTool(compiler + ['-fsyntax-only', '-Wall', '-Wextra', '-Werror'] +
+                        launcherDefines(other).collect { "-D${it}".toString() } + ["-I${jasperNative.absolutePath}".toString()] +
+                        sources.findAll { it.name.endsWith('.' + extension) }.collect { it.absolutePath }, null, null,
+                        "checking the options logic with ${other}'s defines", launcherToolchainHint(host.os))
+                }
             }
         }
         new File(work, 'passed').text = output
@@ -257,11 +264,160 @@ def testLauncherCore = tasks.register('testLauncherCore') {
 }
 tasks.named('check') { dependsOn(testLauncherCore) }
 
-// ---- The exit guard, against the toolchain JDK's real libjli ----
+// ---- jasper-watch, and the watch module's start of it (packaging/launcher/README.md) ----
+
+def watcherName = { -> launcherHost().os == 'windows' ? 'jasper-watch.exe' : 'jasper-watch' }
+def watcherFile = launcherBuild.map { it.file("watch/${watcherName()}") }
+// The literal packaging verification looks for in jasper-watch: its dialog's title, which it always uses.
+String watcherMarker = 'Jasper could not start'
+
+def buildWatcher = tasks.register('buildWatcher') {
+    group = 'build'
+    description = 'Builds jasper-watch, which starts Jasper once more when its JVM dies before it exists, for this host.'
+    inputs.dir(jasperNative).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.property('sdk', launcherSdk.map { it.absolutePath })
+    inputs.property('host', providers.provider { launcherHost().toString() })
+    outputs.file(watcherFile)
+    doLast {
+        def host = launcherHost()
+        File work = launcherBuild.get().dir('watch-objects').asFile
+        delete(work)
+        File source = new File(jasperNative, 'jasper_watch.c')
+        File watcher = nativeBuild(kind: 'executable', sources: [source], strict: [source], includes: [jasperNative],
+            libraries: host.os == 'macos' ? ['-framework', 'CoreFoundation'] : (host.os == 'windows' ? ['user32.lib'] : []),
+            subsystem: host.os == 'windows' ? 'CONSOLE' : null, output: watcherFile.get().asFile, work: work)
+        // Apple silicon runs only signed code, and strip -S removed the linker's signature; packaging signs its copy again.
+        if (host.os == 'macos') {
+            runLauncherTool(['/usr/bin/codesign', '--force', '--sign', '-', watcher.absolutePath], null, null, 'signing jasper-watch')
+        }
+        if (!new String(Files.readAllBytes(watcher.toPath()), StandardCharsets.ISO_8859_1).contains(watcherMarker)) {
+            throw new GradleException("buildWatcher: ${watcher.name} lacks '${watcherMarker}'")
+        }
+    }
+}
+ext.watcherBinary = watcherFile.map { it.asFile }
+
+// Copies jasper-watch into directory, where the watch module of a program there finds it. Returns the copy.
+def watcherBeside = { File directory ->
+    directory.mkdirs()
+    File copy = new File(directory, watcherName())
+    Files.copy(watcherFile.get().asFile.toPath(), copy.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    copy.setExecutable(true, false)
+    copy
+}
+
+def testWatcher = tasks.register('testWatcher') {
+    group = 'verification'
+    description = 'Checks jasper-watch with a test launcher that ends before, or after, sending its byte.'
+    dependsOn(buildWatcher)
+    inputs.dir(jasperNative).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(launcherTestSource).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(buildWatcher).withPropertyName('watcher').withPathSensitivity(PathSensitivity.NONE)
+    outputs.file(launcherBuild.map { it.file('watcher-test/passed') })
+    doLast {
+        def host = launcherHost()
+        File work = launcherBuild.get().dir('watcher-test').asFile
+        delete(work)
+        File bin = new File(work, 'bin')
+        File watcher = watcherBeside(bin)
+        List<File> sources = [new File(launcherTestSource, 'watch_fake_launcher.c'), new File(jasperNative, 'jasper_watch_launch.c'),
+            new File(jasperNative, 'jasper_launch_rules.c')]
+        File launcher = nativeBuild(kind: 'executable', exportAll: true, sources: sources, strict: sources, includes: [jasperNative],
+            libraries: host.os == 'linux' ? ['-ldl', '-lpthread'] : [],
+            output: new File(bin, host.os == 'windows' ? 'watch-fake-launcher.exe' : 'watch-fake-launcher'),
+            work: new File(work, 'objects'))
+        String intro = 'Jasper could not start, even without its start-up cache and your custom VM options. Reinstalling Jasper may help.'
+        String noError = 'Java reported no error when checked again. Try opening Jasper again.'
+        String noOutput = 'Java exited with an error and printed nothing.'
+        // POSIX passes arguments in the build's file-name encoding, so a non-ASCII one only when that is UTF-8.
+        List<String> arguments = ['alpha', 'with space'] +
+            (host.os != 'windows' && System.getProperty('sun.jnu.encoding', '').equalsIgnoreCase('UTF-8') ? ['J\u00fcrgen'] : [])
+        String javaReported = 'Java reported:\nError: fake JVM failure: Invalid maximum heap size: -Xmx3q'
+        // jpackage's Linux launcher puts _JPACKAGE_LAUNCHER in its own environment, which jasper-watch inherits; a launch
+        // that inherits it ignores Jasper.cfg, so neither the retry nor the diagnostic launch may see it.
+        Map<String, String> jpackage = [_JPACKAGE_LAUNCHER: '12345']
+        // retried: the watcher starts the launcher once more; report: the text after the introduction. name (default:
+        // the ending) names the scenario's files; environment is added to the test launcher's.
+        List<Map> scenarios = [
+            [ending: 'byte', retried: false],
+            [ending: 'exit', retried: true],
+            [ending: '_exit', retried: true],
+            [name: 'exit-jpackage', ending: 'exit', environment: jpackage, retried: true],
+            host.os == 'windows' ? [ending: 'ctrl-c', retried: false] : [ending: 'kill', retried: true],
+            [ending: 'report', report: javaReported],
+            [name: 'report-jpackage', ending: 'report', environment: jpackage, report: javaReported],
+            [ending: 'report-pass', report: noError],
+            [ending: 'report-hang', report: noError],
+            [ending: 'report-silent', report: noOutput],
+            [ending: 'report-long', report: 'Java reported:\n' + 'x' * 1492 + 'TAIL-END'],
+        ] + (host.os == 'windows' ? [] : [[ending: 'report-utf8', report: 'Java reported:\n' + '\u00e9' * 1500],
+            // The launcher execs itself and lives on for 2 s, beyond the watcher's 1 s wait for it to end: no retry.
+            [ending: 'exec', retried: false]])
+        List<String> failures = []
+        scenarios.each { Map scenario ->
+            String name = scenario.name ?: scenario.ending
+            File record = new File(work, "${name}.record")
+            File report = new File(work, "${name}.report")
+            File log = new File(work, "${name}.log")
+            def builder = new ProcessBuilder([launcher.absolutePath, scenario.ending] + arguments).redirectErrorStream(true)
+                .redirectOutput(log)
+            ['JASPER_VM_OPTIONS_SKIP', 'JASPER_AOT_CACHE_SKIP', 'JASPER_LAUNCH_DIAGNOSE', '_JPACKAGE_LAUNCHER'].each {
+                builder.environment().remove(it)
+            }
+            builder.environment().putAll([WATCH_FAKE_RECORD: record.absolutePath, WATCH_FAKE_KEPT: 'kept value',
+                JASPER_WATCH_REPORT: report.absolutePath] + (scenario.environment ?: [:]))
+            Process process = builder.start()
+            if (!process.waitFor(30, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                failures << "${name}: the test launcher did not exit within 30 s".toString()
+                return
+            }
+            // The watcher acts after the launcher has gone: wait for what it should do, then a little longer for anything else.
+            boolean reports = scenario.report != null
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+            while ((reports || scenario.retried) && System.nanoTime() < deadline && !(reports ? report.isFile() : record.isFile())) {
+                Thread.sleep(100)
+            }
+            Thread.sleep(reports || scenario.retried ? 1000 : 3000)
+            String received = ([scenario.ending] + arguments).join('|')
+            List<String> lines = record.isFile() ? record.readLines('UTF-8') : []
+            // Every start after it sees WATCH_FAKE_KEPT, and none sees _JPACKAGE_LAUNCHER.
+            String passed = 'kept=kept value jpackage=-'
+            List<String> expected = reports ? ["diagnose skip=- ${passed} diagnose=1 args=${received}".toString()]
+                : (scenario.retried ? ["retried skip=launch-failed ${passed} diagnose=- args=${received}".toString()] : [])
+            if (lines != expected) {
+                failures << "${name}: the watcher started ${lines}, expected ${expected}\n${log.getText('UTF-8')}".toString()
+            }
+            String text = report.isFile() ? report.getText('UTF-8') : null
+            String wanted = reports ? intro + '\n\n' + scenario.report : null
+            if (text != wanted) failures << "${name}: the report was\n${text}\nexpected\n${wanted}".toString()
+        }
+        Process usage = new ProcessBuilder([watcher.absolutePath]).redirectErrorStream(true).start()
+        String usageText = new String(usage.inputStream.readAllBytes(), StandardCharsets.UTF_8)
+        if (!usage.waitFor(10, TimeUnit.SECONDS) || usage.exitValue() != 64 || !usageText.contains('usage: jasper-watch')) {
+            failures << "without arguments: jasper-watch printed ${usageText}".toString()
+        }
+        // As testCommandClientCore: on macOS the POSIX code is compiled once more as Linux's, against this host's headers.
+        if (host.os == 'macos') {
+            File include = new File(launcherSdk.get(), 'include')
+            runLauncherTool(['/usr/bin/xcrun', 'clang', '-std=c11', '-fsyntax-only', '-Wall', '-Wextra', '-Werror', '-U__APPLE__'] +
+                launcherDefines('linux').collect { "-D${it}".toString() } +
+                [jasperNative, include, new File(include, 'darwin')].collect { "-I${it.absolutePath}".toString() } +
+                [new File(jasperNative, 'jasper_watch.c'), new File(jasperNative, 'jasper_watch_launch.c'),
+                 new File(launcherTestSource, 'watch_fake_launcher.c')].collect { it.absolutePath }, null, null,
+                "checking jasper-watch and the watch module with Linux's defines", launcherToolchainHint(host.os))
+        }
+        if (failures) throw new GradleException('testWatcher:\n' + failures.join('\n'))
+        new File(work, 'passed').text = "${scenarios.size()} scenarios\n"
+    }
+}
+tasks.named('check') { dependsOn(testWatcher) }
+
+// ---- The watch module, against the toolchain JDK's real libjli and the real jasper-watch ----
 
 def compileLauncherProbes = tasks.register('compileLauncherProbes', JavaCompile) {
     description = "Compiles the Java probes the launcher's tests run."
-    source = fileTree(launcherTestSource) { include '*.java' }
+    source = fileTree(launcherTestSource) { include '**/*.java' }
     classpath = files()
     destinationDirectory.set(launcherBuild.map { it.dir('probes') })
     javaCompiler.set(launcherToolchains.compilerFor(launcherJava.toolchain))
@@ -269,65 +425,122 @@ def compileLauncherProbes = tasks.register('compileLauncherProbes', JavaCompile)
     options.encoding = 'UTF-8'
 }
 
-def testLauncherGuard = tasks.register('testLauncherGuard') {
+def testLauncherWatch = tasks.register('testLauncherWatch') {
     group = 'verification'
-    description = "Checks the launcher's exit guard with the toolchain JDK's libjli: re-spawn only when no JVM was created."
-    dependsOn(compileLauncherProbes)
+    description = "Checks the launcher's watch module with the toolchain JDK's libjli: one more start only when no JVM was created."
+    dependsOn(compileLauncherProbes, buildWatcher)
     inputs.dir(jasperNative).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(launcherTestSource).withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.file(launcherBuild.map { it.file('guard-test/passed') })
+    inputs.files(buildWatcher).withPropertyName('watcher').withPathSensitivity(PathSensitivity.NONE)
+    outputs.file(launcherBuild.map { it.file('watch-test/passed') })
     doLast {
         def host = launcherHost()
-        File work = launcherBuild.get().dir('guard-test').asFile
+        File work = launcherBuild.get().dir('watch-test').asFile
         delete(work)
-        List<File> sources = [new File(launcherTestSource, 'guard_harness.c'), new File(jasperNative, 'jasper_launch_guard.c')]
+        String harnessName = host.os == 'windows' ? 'watch-harness.exe' : 'watch-harness'
+        File bin = new File(work, 'bin')
+        watcherBeside(bin)
+        List<File> sources = [new File(launcherTestSource, 'watch_harness.c'), new File(jasperNative, 'jasper_watch_launch.c'),
+            new File(jasperNative, 'jasper_launch_rules.c')]
         File harness = nativeBuild(kind: 'executable', exportAll: true, sources: sources, strict: sources, includes: [jasperNative],
-            libraries: host.os == 'linux' ? ['-ldl'] : [],
-            output: new File(work, host.os == 'windows' ? 'guard-harness.exe' : 'guard-harness'), work: new File(work, 'objects'))
+            libraries: host.os == 'linux' ? ['-ldl', '-lpthread'] : [],
+            output: new File(bin, harnessName), work: new File(work, 'objects'))
+        // The same harness with no jasper-watch beside it, and (POSIX) with one that is not executable.
+        Map<String, File> directories = [bin: bin, bare: new File(work, 'without-watcher'), unusable: new File(work, 'unusable-watcher')]
+        [directories.bare, directories.unusable].each { File directory ->
+            directory.mkdirs()
+            Files.copy(harness.toPath(), new File(directory, harnessName).toPath(), StandardCopyOption.COPY_ATTRIBUTES)
+        }
+        watcherBeside(directories.unusable).setExecutable(false, false)
         File sdk = launcherSdk.get()
         File jli = host.os == 'windows' ? new File(sdk, 'bin/jli.dll') : new File(sdk, host.os == 'macos' ? 'lib/libjli.dylib' : 'lib/libjli.so')
         String probes = compileLauncherProbes.get().destinationDirectory.get().asFile.absolutePath
-        String armed = '-Djasper.vmOptionsDigest=0123456789abcdef'
-        def scenarios = [
-            [name: 'malformed heap value', arguments: ['-Xmx3q', armed, '-cp', probes, 'GuardProbe'], respawn: true, exit: null],
-            [name: 'conflicting collectors', arguments: ['-XX:+UseSerialGC', '-XX:+UseParallelGC', armed, '-cp', probes, 'GuardProbe'],
-                respawn: true, exit: null],
-            [name: 'System.exit', arguments: [armed, '-cp', probes, 'GuardProbe', 'exit'], respawn: false, exit: 3],
-            [name: 'normal return', arguments: [armed, '-cp', probes, 'GuardProbe'], respawn: false, exit: 0],
-            [name: 'main throws', arguments: [armed, '-cp', probes, 'GuardProbe', 'throw'], respawn: false, exit: 1],
-            [name: 'unarmed malformed heap value', arguments: ['-Xmx3q', '-cp', probes, 'GuardProbe'], respawn: false, exit: null],
-            [name: 'no libjvm loaded', arguments: ['-XXaltjvm=/nonexistent/jvm', armed, '-cp', probes, 'GuardProbe'], respawn: false, exit: null],
-            [name: 'fallback start never arms', arguments: ['-Xmx3q', armed, '-cp', probes, 'GuardProbe'], skip: true, respawn: false, exit: null],
-        ]
+        String digest = '-Djasper.vmOptionsDigest=0123456789abcdef'
+        String cache = '-XX:AOTCache=' + new File(work, 'missing.aot').absolutePath
+        List<String> probe = ['-cp', probes, 'WatchProbe']
+        String inherited = 'inherited JASPER_AOT_CACHE_SKIP=null JASPER_VM_OPTIONS_SKIP=null JASPER_LAUNCH_DIAGNOSE=null'
+        Map<String, String> noPolling = [WATCH_HARNESS_NO_POLLING: '1']
+        // retried: the skip variables of the watcher's one more start; report: what its report quotes from Java;
+        // exit: a JVM existed, so nothing starts after it; diagnostic: a diagnostic launch, which no watcher follows.
+        List<Map> scenarios = [
+            [name: 'malformed heap value', arguments: ['-Xmx3q', digest] + probe, retried: 'aot=- vm=launch-failed'],
+            [name: 'conflicting collectors', arguments: ['-XX:+UseSerialGC', '-XX:+UseParallelGC', digest] + probe,
+                retried: 'aot=- vm=launch-failed'],
+            [name: '-Xms above -Xmx', arguments: ['-Xms1g', '-Xmx256m', digest] + probe, retried: 'aot=- vm=launch-failed'],
+            [name: 'cache in use', arguments: [cache, '-Xmx3q', digest] + probe, retried: 'aot=launch-failed vm=-'],
+            [name: 'cache turned off', arguments: [cache, '-XX:AOTMode=off', '-Xmx3q', digest] + probe, retried: 'aot=- vm=launch-failed'],
+            [name: 'skip variables kept', environment: [JASPER_AOT_CACHE_SKIP: 'launch-failed'], arguments: ['-Xmx3q', digest] + probe,
+                retried: 'aot=launch-failed vm=launch-failed'],
+            [name: 'no libjvm loaded', arguments: ['-XXaltjvm=' + new File(work, 'no-jvm').absolutePath, digest] + probe,
+                retried: 'aot=- vm=launch-failed'],
+            [name: 'nothing left to skip', arguments: ['-Xmx3q'] + probe, report: 'Invalid maximum heap size: -Xmx3q'],
+            [name: 'System.exit', arguments: [digest] + probe + ['exit'], exit: 3],
+            [name: 'normal return', arguments: [digest] + probe, exit: 0],
+            [name: 'main throws', arguments: [digest] + probe + ['throw'], exit: 1],
+            [name: 'System.exit without polling', environment: noPolling, arguments: [digest] + probe + ['exit'], exit: 3],
+            [name: 'normal return without polling', environment: noPolling, arguments: [digest] + probe, exit: 0],
+            [name: 'main throws without polling', environment: noPolling, arguments: [digest] + probe + ['throw'], exit: 1],
+            [name: 'skip variables removed', environment: [JASPER_AOT_CACHE_SKIP: 'manual', JASPER_VM_OPTIONS_SKIP: 'manual'],
+                arguments: [digest] + probe + ['env'], exit: 0, output: inherited],
+            [name: 'diagnostic launch', environment: [JASPER_LAUNCH_DIAGNOSE: '1'], arguments: [digest] + probe + ['env'], exit: 0,
+                output: inherited, diagnostic: true],
+            [name: 'diagnostic launch of a failing JVM', environment: [JASPER_LAUNCH_DIAGNOSE: '1'],
+                arguments: ['-Xmx3q', digest] + probe, diagnostic: true],
+            [name: 'no watcher', directory: directories.bare, arguments: ['-Xmx3q', digest] + probe, exit: 1,
+                output: 'Invalid maximum heap size: -Xmx3q'],
+        ] + (host.os == 'windows' ? [] : [[name: 'watcher not executable', directory: directories.unusable,
+            arguments: ['-Xmx3q', digest] + probe, exit: 1, output: 'Invalid maximum heap size: -Xmx3q']])
         List<String> failures = []
         scenarios.eachWithIndex { Map scenario, int index ->
-            File marker = new File(work, "respawn-${index}")
+            File record = new File(work, "record-${index}.txt")
+            File report = new File(work, "report-${index}.txt")
             File log = new File(work, "output-${index}.txt")
-            def builder = new ProcessBuilder([harness.absolutePath] + scenario.arguments).redirectErrorStream(true).redirectOutput(log)
-            ['JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS', 'CLASSPATH'].each { builder.environment().remove(it) }
-            builder.environment().put('GUARD_HARNESS_JLI', jli.absolutePath)
-            builder.environment().put('GUARD_HARNESS_MARKER', marker.absolutePath)
-            if (scenario.skip) builder.environment().put('JASPER_VM_OPTIONS_SKIP', 'launch-failed')
+            File directory = scenario.directory ?: bin
+            def builder = new ProcessBuilder([new File(directory, harnessName).absolutePath] + scenario.arguments)
+                .redirectErrorStream(true).redirectOutput(log)
+            ['JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS', 'CLASSPATH', 'JASPER_AOT_CACHE_SKIP', 'JASPER_VM_OPTIONS_SKIP',
+                'JASPER_LAUNCH_DIAGNOSE', 'WATCH_HARNESS_STARTED', 'WATCH_HARNESS_NO_POLLING'].each { builder.environment().remove(it) }
+            builder.environment().putAll([WATCH_HARNESS_JLI: jli.absolutePath, WATCH_HARNESS_RECORD: record.absolutePath,
+                JASPER_WATCH_REPORT: report.absolutePath] + (scenario.environment ?: [:]))
             Process process = builder.start()
-            boolean exited = process.waitFor(60, TimeUnit.SECONDS)
-            if (!exited) process.destroyForcibly()
-            String output = log.getText('UTF-8')
-            if (!exited) {
-                failures << "${scenario.name}: the harness did not exit within 60 s\n${output}".toString()
+            if (!process.waitFor(60, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                failures << "${scenario.name}: the harness did not exit within 60 s".toString()
                 return
             }
             int exit = process.exitValue()
-            if (marker.isFile() != scenario.respawn) {
-                failures << "${scenario.name}: re-spawn ${marker.isFile() ? 'happened' : 'did not happen'} (exit ${exit})\n${output}".toString()
+            boolean retries = scenario.retried != null
+            boolean reports = scenario.report != null
+            // The watcher acts after the harness has gone: wait for what it should do, then a little longer for anything else.
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+            while ((retries || reports) && System.nanoTime() < deadline && !(retries ? record.isFile() : report.isFile())) {
+                Thread.sleep(100)
             }
-            if (scenario.exit != null && exit != scenario.exit) failures << "${scenario.name}: exit ${exit}, expected ${scenario.exit}\n${output}".toString()
-            if (scenario.exit == null && exit == 0) failures << "${scenario.name}: the JVM started\n${output}".toString()
+            Thread.sleep(retries || reports ? 1000 : 2000)
+            String received = scenario.arguments.join('|')
+            List<String> lines = record.isFile() ? record.readLines('UTF-8') : []
+            List<String> expected = retries ? ["retried ${scenario.retried} diagnose=- args=${received}".toString()]
+                : (reports || scenario.diagnostic ? ["diagnose aot=- vm=- diagnose=1 args=${received}".toString()] : [])
+            String output = log.getText('UTF-8')
+            if (lines != expected) {
+                failures << "${scenario.name}: the starts after it were ${lines}, expected ${expected} (exit ${exit})\n${output}".toString()
+            }
+            String text = report.isFile() ? report.getText('UTF-8') : null
+            if (reports ? !(text != null && text.contains(scenario.report)) : text != null) {
+                failures << "${scenario.name}: the watcher's report was ${text}".toString()
+            }
+            if (scenario.exit != null && exit != scenario.exit) {
+                failures << "${scenario.name}: exit ${exit}, expected ${scenario.exit}\n${output}".toString()
+            }
+            if (scenario.output != null && !output.contains(scenario.output)) {
+                failures << "${scenario.name}: the JVM printed\n${output}".toString()
+            }
         }
-        if (failures) throw new GradleException('testLauncherGuard:\n' + failures.join('\n'))
+        if (failures) throw new GradleException('testLauncherWatch:\n' + failures.join('\n'))
         new File(work, 'passed').text = "${scenarios.size()} scenarios\n"
     }
 }
-tasks.named('check') { dependsOn(testLauncherGuard) }
+tasks.named('check') { dependsOn(testLauncherWatch) }
 
 // ---- Jasper's launcher for this host ----
 
@@ -380,9 +593,10 @@ def buildLauncher = tasks.register('buildLauncher') {
         File work = launcherBuild.get().dir('objects').asFile
         delete(work)
         File core = new File(jasperNative, 'JasperVmOptionsCore.cpp')
-        File guard = new File(jasperNative, 'jasper_launch_guard.c')
-        List<File> jasperSources = [new File(jasperNative, 'JasperVmOptions.cpp'), core, guard]
-        List<File> strict = [core, guard]
+        File rules = new File(jasperNative, 'jasper_launch_rules.c')
+        File watch = new File(jasperNative, 'jasper_watch_launch.c')
+        List<File> jasperSources = [new File(jasperNative, 'JasperVmOptions.cpp'), core, rules, watch]
+        List<File> strict = [core, rules, watch]
         switch (host.os) {
             case 'macos':
                 List<File> directories = [nativeDirectory('macosx', 'applauncher'), nativeDirectory('share', 'applauncher'),
@@ -395,7 +609,7 @@ def buildLauncher = tasks.register('buildLauncher') {
                 List<File> launcherDirectories = [nativeDirectory('linux', 'applauncher'), nativeDirectory('share', 'applauncher'),
                     nativeDirectory('linux', 'common'), nativeDirectory('unix', 'common'), nativeDirectory('share', 'common')]
                 nativeBuild(kind: 'executable', output: new File(output, 'jpackageapplauncher'), work: new File(work, 'linux-launcher'),
-                    sources: sourcesIn(launcherDirectories).findAll { it.name.endsWith('.c') } + [guard], strict: [guard],
+                    sources: sourcesIn(launcherDirectories).findAll { it.name.endsWith('.c') } + [rules, watch], strict: [rules, watch],
                     includes: launcherDirectories + [jasperNative], libraries: ['-ldl', '-lpthread'])
                 List<File> libraryDirectories = [nativeDirectory('linux', 'libapplauncher')] + launcherDirectories
                 nativeBuild(kind: 'shared', output: new File(output, 'libjpackageapplauncheraux.so'), work: new File(work, 'linux-library'),
@@ -426,7 +640,7 @@ def buildLauncher = tasks.register('buildLauncher') {
     }
 }
 
-// ---- End to end: a probe app packaged with Jasper's launcher ----
+// ---- End to end: a probe app packaged with Jasper's launcher and jasper-watch ----
 
 def launcherProbeJar = tasks.register('launcherProbeJar', Jar) {
     description = "Packs the launcher image test's probe application."
@@ -436,12 +650,31 @@ def launcherProbeJar = tasks.register('launcherProbeJar', Jar) {
     destinationDirectory.set(launcherBuild.map { it.dir('probe-input') })
 }
 
+// The sealed package of the image test's cache that kills the JVM (startup recovery spec section 2).
+def launcherSealedProbeJar = tasks.register('launcherSealedProbeJar', Jar) {
+    description = "Packs the launcher image test's sealed package."
+    from(compileLauncherProbes)
+    include('sealedprobe/**')
+    manifest { attributes('Sealed': 'true') }
+    archiveFileName.set('sealed-probe.jar')
+    destinationDirectory.set(launcherBuild.map { it.dir('probe-sealed') })
+}
+
+def launcherAotProbeInput = tasks.register('launcherAotProbeInput', Sync) {
+    description = "Collects the jars of the launcher image test's cache-training probe."
+    from(launcherProbeJar)
+    from(launcherSealedProbeJar)
+    into(launcherBuild.map { it.dir('probe-aot-input') })
+}
+
 def verifyLauncherImage = tasks.register('verifyLauncherImage') {
     group = 'verification'
-    description = "Packages a probe app with Jasper's launcher and checks jasper.vmoptions end to end, headlessly."
-    dependsOn(buildLauncher, launcherProbeJar)
+    description = "Packages a probe app with Jasper's launcher and jasper-watch and checks both end to end, headlessly."
+    dependsOn(buildLauncher, launcherProbeJar, buildWatcher, launcherAotProbeInput)
     inputs.dir(launcherResources).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(launcherProbeJar.flatMap { it.archiveFile })
+    inputs.files(launcherAotProbeInput).withPropertyName('aotProbeInput').withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(buildWatcher).withPropertyName('watcher').withPathSensitivity(PathSensitivity.NONE)
     outputs.file(launcherBuild.map { it.file('image-test/passed') })
     doLast {
         def host = launcherHost()
@@ -451,36 +684,69 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
         File images = new File(work, 'images')
         File probeInput = launcherProbeJar.get().archiveFile.get().asFile.parentFile
         String jpackage = new File(launcherSdk.get(), host.os == 'windows' ? 'bin/jpackage.exe' : 'bin/jpackage').absolutePath
+        // An image's root, launcher and configuration under dest, where jpackage puts them on this host.
+        def imageRoot = { File dest, String name -> new File(dest, host.os == 'macos' ? "${name}.app" : name) }
+        def launcherIn = { File dest, String name ->
+            File root = imageRoot(dest, name)
+            host.os == 'macos' ? new File(root, "Contents/MacOS/${name}")
+                : (host.os == 'windows' ? new File(root, "${name}.exe") : new File(root, "bin/${name}"))
+        }
+        def configIn = { File dest, String name ->
+            new File(imageRoot(dest, name), host.os == 'macos' ? "Contents/app/${name}.cfg"
+                : (host.os == 'windows' ? "app/${name}.cfg" : "lib/app/${name}.cfg"))
+        }
         // Bundled options the user's lines can replace: -Xmx256m and -XX:+UseSerialGC, plus IntelliJ's ignore flag.
-        def image = { String name, boolean console ->
+        def image = { String name, boolean console, File dest = images, File input = probeInput, List<String> extra = [] ->
             List<String> command = [jpackage, jpackageLauncherOption(), '--type', 'app-image', '--name', name,
-                '--dest', images.absolutePath, '--input', probeInput.absolutePath, '--main-jar', 'launcher-probe.jar',
+                '--dest', dest.absolutePath, '--input', input.absolutePath, '--main-jar', 'launcher-probe.jar',
                 '--main-class', 'LauncherProbe', '--add-modules', 'java.base,java.management',
-                '--java-options', '-Xmx256m', '--java-options', '-XX:+UseSerialGC', '--java-options', '-XX:+IgnoreUnrecognizedVMOptions']
+                '--java-options', '-Xmx256m', '--java-options', '-XX:+UseSerialGC', '--java-options', '-XX:+IgnoreUnrecognizedVMOptions'] +
+                extra
             if (host.os == 'macos') command += ['--mac-package-identifier', "dev.jasper.${name.toLowerCase(Locale.ROOT)}".toString()]
             if (host.os == 'windows' && console) command += ['--win-console']
             runLauncherTool(command, null, null, "jpackage ${name}")
-            host.os == 'macos' ? new File(images, "${name}.app/Contents/MacOS/${name}")
-                : (host.os == 'windows' ? new File(images, "${name}/${name}.exe") : new File(images, "${name}/bin/${name}"))
+            launcherIn(dest, name)
+        }
+        // jasper-watch beside an image's launcher, where the launcher looks for it.
+        def installWatcher = { File launcher -> watcherBeside(launcher.parentFile) }
+        // A copy that keeps modification times (the JVM checks them on an AOT cache's class path), permissions and links.
+        def copyTree = { File from, File to ->
+            def source = from.toPath()
+            def target = to.toPath()
+            Files.walk(source).withCloseable { paths ->
+                paths.forEach { path ->
+                    def copy = target.resolve(source.relativize(path).toString())
+                    if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+                        Files.createDirectories(copy)
+                    } else {
+                        Files.copy(path, copy, StandardCopyOption.COPY_ATTRIBUTES, LinkOption.NOFOLLOW_LINKS)
+                    }
+                }
+            }
         }
         File console = image('LauncherProbe', true)
 
-        // The build's environment without anything that steers the launcher or the JVM, plus the scenario's variables.
+        // The build's environment without anything that steers the launcher, the watcher or the JVM, plus the scenario's.
         def environment = { Map<String, String> extra ->
             Map<String, String> result = new LinkedHashMap<String, String>(System.getenv())
-            ['JASPER_HOME', 'JASPER_VM_OPTIONS', 'JASPER_VM_OPTIONS_SKIP', 'JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS',
-                'JDK_JAVA_OPTIONS', 'XDG_CONFIG_HOME'].each { result.remove(it) }
+            ['JASPER_HOME', 'JASPER_VM_OPTIONS', 'JASPER_VM_OPTIONS_SKIP', 'JASPER_AOT_CACHE_SKIP', 'JASPER_LAUNCH_DIAGNOSE',
+                'JASPER_WATCH_REPORT', 'JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS', 'XDG_CONFIG_HOME'].each { result.remove(it) }
             result.putAll(extra)
             result
         }
-        // Runs the launcher; returns the single report the probe appended (key -> values). Waits for a re-spawned start.
-        def launch = { String scenario, File launcher, Map<String, String> env, List<String> arguments = [] ->
+        // Runs the launcher; returns the single report the probe appended (key -> values). Waits for a watcher's start. Every
+        // launch names a file for the watcher's report, so no watcher here ever shows its dialog. A launcher given with a
+        // directory is started through its path relative to that directory.
+        def launch = { String scenario, File launcher, Map<String, String> env, List<String> arguments = [], File directory = null ->
             File report = new File(work, "${scenario}.report")
             File log = new File(work, "${scenario}.log")
-            def builder = new ProcessBuilder([launcher.absolutePath] + arguments).redirectErrorStream(true).redirectOutput(log)
+            def builder = new ProcessBuilder([directory == null ? launcher.absolutePath : launcher.path] + arguments)
+                .redirectErrorStream(true).redirectOutput(log)
+            if (directory != null) builder.directory(directory)
             builder.environment().clear()
             builder.environment().putAll(env)
             builder.environment().put('PROBE_OUTPUT', report.absolutePath)
+            builder.environment().put('JASPER_WATCH_REPORT', new File(work, "${scenario}.watch").absolutePath)
             Process process = builder.start()
             if (!process.waitFor(60, TimeUnit.SECONDS)) {
                 process.destroyForcibly()
@@ -504,6 +770,29 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
             }
             values
         }
+        // Runs a launcher that should run no probe. Waits up to 60 s for the watcher's report when one is expected, else 3 s
+        // for anything that should not happen; returns the launch's log, the watcher's report and the probe's (null: none).
+        def launchWithoutProbe = { String scenario, File launcher, Map<String, String> env, boolean watcherReports ->
+            File report = new File(work, "${scenario}.report")
+            File watch = new File(work, "${scenario}.watch")
+            File log = new File(work, "${scenario}.log")
+            def builder = new ProcessBuilder([launcher.absolutePath]).redirectErrorStream(true).redirectOutput(log)
+            builder.environment().clear()
+            builder.environment().putAll(env)
+            builder.environment().put('PROBE_OUTPUT', report.absolutePath)
+            builder.environment().put('JASPER_WATCH_REPORT', watch.absolutePath)
+            Process process = builder.start()
+            if (!process.waitFor(60, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                throw new GradleException("verifyLauncherImage: ${scenario}: the launcher did not exit\n${log.text}")
+            }
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(watcherReports ? 60 : 3)
+            while (System.nanoTime() < deadline && !(watcherReports && watch.isFile())) {
+                Thread.sleep(100)
+            }
+            [log: log.getText('UTF-8'), watch: watch.isFile() ? watch.getText('UTF-8') : null,
+             probe: report.isFile() ? report.getText('UTF-8') : null]
+        }
         def one = { Map<String, List<String>> report, String key -> report[key] ? report[key][0] : null }
         List<String> failures = []
         def expect = { String scenario, boolean condition, String message, Map report ->
@@ -516,12 +805,22 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
             directory
         }
         def file = { File directory -> new File(directory, 'jasper.vmoptions').absolutePath }
+        String intro = 'Jasper could not start, even without its start-up cache and your custom VM options. Reinstalling Jasper may help.'
+
+        // Without jasper-watch beside it the launcher goes on unwatched: a JVM that cannot start just ends.
+        File unwatched = home('unwatched', '-Xmx3q\n')
+        Map bare = launchWithoutProbe('unwatched', console, environment([JASPER_HOME: unwatched.absolutePath]), false)
+        expect('without the watcher', bare.probe == null && bare.watch == null && bare.log.contains('Invalid maximum heap size: -Xmx3q'),
+            'the launch just ends', bare)
+        installWatcher(console)
 
         File none = home('no-file', null)
         def report = launch('no-file', console, environment([JASPER_HOME: none.absolutePath]))
         expect('no file', one(report, 'vmOptionsFile') == file(none), 'reports the Jasper home file', report)
         expect('no file', one(report, 'digest') == 'null' && one(report, 'corrupted') == 'null' && report.input.contains('-Xmx256m'),
             'only the bundled options', report)
+        expect('no file', one(report, 'aotCacheRecord') == 'null' && one(report, 'aotCacheSkipped') == 'null' &&
+            one(report, 'diagnoseVariable') == 'null', 'no cache option, so no record and nothing skipped', report)
 
         File ordered = home('ordered', '# heap\r\n\r\n  -Xmx300m  \r\n-Dprobe.marker=a b\r\n')
         report = launch('ordered', console, environment([JASPER_HOME: ordered.absolutePath]))
@@ -577,11 +876,36 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
         expect('JASPER_VM_OPTIONS_SKIP', one(report, 'skipped') == 'manual' && one(report, 'skipVariable') == 'null' &&
             !report.input.contains('-Xmx300m'), 'skips the file and keeps the variable from the JVM', report)
 
+        // A diagnostic launch ends its options with -version, so the JVM stops before the probe, and starts no watcher.
+        Map diagnostic = launchWithoutProbe('diagnostic', console, environment([JASPER_HOME: none.absolutePath,
+            JASPER_LAUNCH_DIAGNOSE: '1']), false)
+        expect('diagnostic launch', diagnostic.probe == null && diagnostic.watch == null && diagnostic.log.contains('version "'),
+            'the JVM prints its version and stops', diagnostic)
+        File diagnosedOptions = home('diagnosed-options', '-Xmx3q\n')
+        diagnostic = launchWithoutProbe('diagnostic-rejected', console, environment([JASPER_HOME: diagnosedOptions.absolutePath,
+            JASPER_LAUNCH_DIAGNOSE: '1']), false)
+        expect('diagnostic launch of rejected options', diagnostic.probe == null && diagnostic.watch == null &&
+            diagnostic.log.contains('Invalid maximum heap size: -Xmx3q'), 'Java reports the options and no watcher starts again',
+            diagnostic)
+
         File rejected = home('rejected', '-Xmx3q\n')
         report = launch('rejected', console, environment([JASPER_HOME: rejected.absolutePath]), ['alpha', 'with space'])
         expect('rejected options', one(report, 'skipped') == 'launch-failed' && one(report, 'skipVariable') == 'null' &&
             !report.input.contains('-Xmx3q'), 'one more start without the options', report)
         expect('rejected options', report.argument == ['alpha', 'with space'], 'the arguments survive the second start', report)
+
+        // HotSpot ends this failure with _exit, which runs no exit handler; the watcher still sees the launcher end.
+        File initFailure = home('init-failure', '-Xms1g\n')
+        report = launch('init-failure', console, environment([JASPER_HOME: initFailure.absolutePath]))
+        expect('-Xms above -Xmx', one(report, 'skipped') == 'launch-failed' && !report.input.contains('-Xms1g'),
+            'one more start without the options', report)
+
+        // Started through a relative path, as from a terminal: the watcher is given the launcher's absolute path.
+        if (host.os != 'windows') {
+            File relative = new File(images.toPath().relativize(console.toPath()).toString())
+            report = launch('relative', relative, environment([JASPER_HOME: rejected.absolutePath]), [], images)
+            expect('relative launcher path', one(report, 'skipped') == 'launch-failed', 'one more start without the options', report)
+        }
 
         File directory = home('directory', null)
         new File(directory, 'jasper.vmoptions').mkdirs()
@@ -607,9 +931,107 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
 
         if (host.os == 'windows') {
             File windowed = image('LauncherProbeGui', false)
+            installWatcher(windowed)
             report = launch('windowed-rejected', windowed, environment([JASPER_HOME: rejected.absolutePath]), ['alpha', 'with space'])
             expect('windowed launcher', one(report, 'skipped') == 'launch-failed' && report.argument == ['alpha', 'with space'],
                 'the windowed launcher starts once more without the options', report)
+        }
+
+        // The start-up cache as the cfg hook decides it, in a copy whose cfg names a cache file the JVM cannot use (it
+        // ignores such a file): the cache option names the record; a matching record or JASPER_AOT_CACHE_SKIP skips it.
+        File cachedImages = new File(work, 'cached')
+        copyTree(imageRoot(images, 'LauncherProbe'), imageRoot(cachedImages, 'LauncherProbe'))
+        File cachedConfig = configIn(cachedImages, 'LauncherProbe')
+        cachedConfig.setText(withJavaOption(cachedConfig.getText('UTF-8'), '-XX:AOTCache=$APPDIR/probe.aot'), 'UTF-8')
+        new File(cachedConfig.parentFile, 'probe.aot').setText('not a cache\n', 'UTF-8')
+        File cached = launcherIn(cachedImages, 'LauncherProbe')
+        def usesCache = { Map<String, List<String>> values -> values.input.any { it.startsWith('-XX:AOTCache=') } }
+        File cachedHome = home('cached-home', null)
+        report = launch('cache-used', cached, environment([JASPER_HOME: cachedHome.absolutePath]))
+        String cachePath = report.input.find { it.startsWith('-XX:AOTCache=') }?.substring('-XX:AOTCache='.length())
+        expect('cache in use', cachePath != null && one(report, 'aotCacheSkipped') == 'null' &&
+            one(report, 'aotCacheRecord') == new File(cachedHome, 'jasper-aot.failed').absolutePath,
+            'the cache option stays and names the record in the Jasper home', report)
+        File cacheFile = new File(cachePath ?: new File(cachedConfig.parentFile, 'probe.aot').absolutePath)
+        long cacheModified = Files.getLastModifiedTime(cacheFile.toPath()).to(TimeUnit.SECONDS)
+        def remember = { File jasperHome, Long size, String options ->
+            new File(jasperHome, 'jasper-aot.failed').setText('# Jasper skips its start-up cache while this file matches it. ' +
+                "Delete this file to try the cache again.\ncache=${cachePath}\nsize=${size}\nmodified=${cacheModified}\n" +
+                "options=${options}\n", 'UTF-8')
+        }
+        File remembered = home('remembered', null)
+        remember(remembered, cacheFile.length(), '')
+        report = launch('remembered', cached, environment([JASPER_HOME: remembered.absolutePath]))
+        expect('remembered failure', one(report, 'aotCacheSkipped') == 'remembered' && !usesCache(report) &&
+            one(report, 'aotCacheRecord') == new File(remembered, 'jasper-aot.failed').absolutePath,
+            'a matching record skips the cache, and the record is still named', report)
+        File stale = home('stale', null)
+        remember(stale, cacheFile.length() + 1, '')
+        report = launch('stale', cached, environment([JASPER_HOME: stale.absolutePath]))
+        expect('stale record', one(report, 'aotCacheSkipped') == 'null' && usesCache(report), 'a record of another cache is ignored',
+            report)
+        File recordDirectory = home('record-directory', null)
+        new File(recordDirectory, 'jasper-aot.failed').mkdirs()
+        report = launch('record-directory', cached, environment([JASPER_HOME: recordDirectory.absolutePath]))
+        expect('record directory', one(report, 'aotCacheSkipped') == 'null' && usesCache(report),
+            'a directory in place of the record matches nothing', report)
+        File withOptions = home('record-options', '-Dprobe.marker=cached\n')
+        report = launch('record-options-digest', cached, environment([JASPER_HOME: withOptions.absolutePath]))
+        remember(withOptions, cacheFile.length(), one(report, 'digest'))
+        report = launch('record-options', cached, environment([JASPER_HOME: withOptions.absolutePath]))
+        expect('record of these options', one(report, 'aotCacheSkipped') == 'remembered' && one(report, 'marker') == 'cached',
+            'a record written with these custom options skips the cache', report)
+        File otherOptions = home('record-other-options', '-Dprobe.marker=other\n')
+        Files.copy(new File(withOptions, 'jasper-aot.failed').toPath(), new File(otherOptions, 'jasper-aot.failed').toPath())
+        report = launch('record-other-options', cached, environment([JASPER_HOME: otherOptions.absolutePath]))
+        expect('record of other options', one(report, 'aotCacheSkipped') == 'null' && one(report, 'marker') == 'other' &&
+            usesCache(report), 'a record written with other custom options is ignored', report)
+        report = launch('cache-skipped', cached, environment([JASPER_HOME: cachedHome.absolutePath, JASPER_AOT_CACHE_SKIP: 'manual']))
+        expect('JASPER_AOT_CACHE_SKIP', one(report, 'aotCacheSkipped') == 'manual' && one(report, 'aotSkipVariable') == 'null' &&
+            !usesCache(report), 'the variable skips the cache and never reaches the JVM', report)
+
+        // A cache that kills the JVM (startup recovery spec section 2, JDK-8376576): trained with a sealed package in one
+        // directory and run from a copy once that directory is gone. The watcher starts the probe once more without it.
+        File trainingImages = new File(work, 'aot-training')
+        File training = image('LauncherProbeAot', true, trainingImages, launcherAotProbeInput.get().destinationDir,
+            ['--jlink-options', '--strip-debug --no-man-pages --no-header-files']) // keeps bin/java, which writes the cache
+        installWatcher(training)
+        File trainedCache = new File(work, 'probe.aot')
+        report = launch('aot-training', training, environment([JASPER_HOME: home('aot-training-home', null).absolutePath,
+            JAVA_TOOL_OPTIONS: javaToolOptions(["-XX:AOTCacheOutput=${trainedCache.absolutePath}".toString()])]))
+        if (!trainedCache.isFile() || trainedCache.length() == 0) {
+            throw new GradleException("verifyLauncherImage: AOT training wrote no cache\n${new File(work, 'aot-training.log').text}")
+        }
+        expect('AOT training', one(report, 'sealed') == 'First+Second', 'the probe loaded both classes of the sealed package', report)
+        File installedImages = new File(work, 'aot-installed')
+        copyTree(imageRoot(trainingImages, 'LauncherProbeAot'), imageRoot(installedImages, 'LauncherProbeAot'))
+        File installedConfig = configIn(installedImages, 'LauncherProbeAot')
+        Files.copy(trainedCache.toPath(), new File(installedConfig.parentFile, 'probe.aot').toPath(), StandardCopyOption.COPY_ATTRIBUTES)
+        installedConfig.setText(withJavaOption(installedConfig.getText('UTF-8'), '-XX:AOTCache=$APPDIR/probe.aot'), 'UTF-8')
+        File installed = launcherIn(installedImages, 'LauncherProbeAot')
+        File aotHome = home('aot-home', null)
+        report = launch('aot-used', installed, environment([JASPER_HOME: aotHome.absolutePath]))
+        expect('trained cache', one(report, 'aotCacheSkipped') == 'null' && one(report, 'sealed') == 'First+Second' && usesCache(report),
+            'the copy starts with the cache while the training directory exists', report)
+        delete(trainingImages)
+        report = launch('aot-killing', installed, environment([JASPER_HOME: aotHome.absolutePath]))
+        expect('a cache that kills the JVM', one(report, 'aotCacheSkipped') == 'launch-failed' &&
+            one(report, 'aotSkipVariable') == 'null' && one(report, 'sealed') == 'First+Second' && !usesCache(report),
+            'the watcher starts the probe once more without the cache. If this start kept the cache, JBR no longer has ' +
+            'JDK-8376576: give this case another cache that kills the JVM (packaging/launcher/README.md)', report)
+
+        // An image whose bundled options kill the JVM: nothing is left to skip, so the watcher reports what Java said.
+        // On Windows the windowed launcher too, which Jasper.exe is: its output reaches the watcher as well.
+        (host.os == 'windows' ? ['LauncherProbe', 'LauncherProbeGui'] : ['LauncherProbe']).each { String name ->
+            File brokenImages = new File(work, "broken-${name}")
+            copyTree(imageRoot(images, name), imageRoot(brokenImages, name))
+            File brokenConfig = configIn(brokenImages, name)
+            brokenConfig.setText(withJavaOption(brokenConfig.getText('UTF-8'), '-Xmx3q'), 'UTF-8')
+            Map broken = launchWithoutProbe("broken-${name}", launcherIn(brokenImages, name),
+                environment([JASPER_HOME: home("broken-${name}-home", null).absolutePath]), true)
+            expect("${name} that cannot start".toString(), broken.probe == null && broken.watch != null &&
+                broken.watch.startsWith(intro + '\n\nJava reported:\n') && broken.watch.contains('Invalid maximum heap size: -Xmx3q'),
+                "the watcher's report quotes Java", broken)
         }
 
         if (failures) throw new GradleException('verifyLauncherImage:\n' + failures.join('\n'))

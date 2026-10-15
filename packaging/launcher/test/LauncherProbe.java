@@ -6,7 +6,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
-/** The launcher image test's application: appends what the launcher handed the JVM to $PROBE_OUTPUT, then "end". */
+/**
+ * The launcher image test's application: appends what the launcher handed the JVM to $PROBE_OUTPUT, then "end". It
+ * loads the two classes of the sealed package sealedprobe when their jar is on the class path, so an AOT cache trained
+ * with it holds both.
+ */
 public final class LauncherProbe {
     private LauncherProbe() {
     }
@@ -18,6 +22,11 @@ public final class LauncherProbe {
         line(report, "corrupted", System.getProperty("jasper.vmOptionsFile.corrupted"));
         line(report, "skipped", System.getProperty("jasper.vmOptionsSkipped"));
         line(report, "skipVariable", System.getenv("JASPER_VM_OPTIONS_SKIP"));
+        line(report, "aotCacheSkipped", System.getProperty("jasper.aotCacheSkipped"));
+        line(report, "aotCacheRecord", System.getProperty("jasper.aotCacheRecord"));
+        line(report, "aotSkipVariable", System.getenv("JASPER_AOT_CACHE_SKIP"));
+        line(report, "diagnoseVariable", System.getenv("JASPER_LAUNCH_DIAGNOSE"));
+        line(report, "sealed", sealedClasses());
         line(report, "marker", System.getProperty("probe.marker"));
         for (String input : ManagementFactory.getRuntimeMXBean().getInputArguments()) {
             line(report, "input", input);
@@ -31,6 +40,15 @@ public final class LauncherProbe {
         report.append("end\n");
         Files.writeString(Path.of(System.getenv("PROBE_OUTPUT")), report, StandardCharsets.UTF_8,
             StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+    }
+
+    private static String sealedClasses() {
+        try {
+            return Class.forName("sealedprobe.First").getSimpleName() + "+"
+                + Class.forName("sealedprobe.Second").getSimpleName();
+        } catch (ClassNotFoundException absent) {
+            return "absent";
+        }
     }
 
     private static void line(StringBuilder report, String key, String value) {

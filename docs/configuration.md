@@ -53,18 +53,20 @@ skipped; a line that does not start with `-`, or that names one of the `java` la
 `-version` or `-cp`), is ignored. `JASPER_VM_OPTIONS=<file>` reads another file instead. Changes take effect at the next
 launch.
 
-If the JVM rejects the options (a malformed value such as `-Xmx3q`, or conflicting garbage collectors), Jasper starts
-once more without them. Failures inside the JVM's own start-up (`-Xms` above `-Xmx`, a missing agent, a module that
-cannot be resolved) stop it instead; setting `JASPER_VM_OPTIONS_SKIP=1` in the environment starts Jasper without the
-file so you can fix it. `./gradlew :jasper-app:run` does not read the file.
+If the JVM cannot start with the options (a malformed value such as `-Xmx3q`, conflicting garbage collectors, `-Xms`
+above `-Xmx`), Jasper starts once more without them, and when it cannot start at all, a dialog (standard error on
+Linux) shows what Java reported. Setting `JASPER_VM_OPTIONS_SKIP=1` in the environment starts Jasper without the file
+so you can fix it, and `JASPER_AOT_CACHE_SKIP=1` without its
+[start-up cache](diagnostics.md#start-up-cache-packaged-macos-app). `./gradlew :jasper-app:run` does not read the file.
 
 In the installed app, System Settings → Java Virtual Machine sets the maximum heap size (it edits the file's `-Xmx` line;
 the bundled 2048 MiB removes it) and opens the file with **Edit Custom VM Options…**; Help → **Change Memory
 Settings…** and **Edit Custom VM Options…** lead to the same places. The section checks the options with the bundled
 `java` and says which lines it ignores, which options the JVM does not know, whether Jasper would start with them, and
-when a restart is needed (**Restart Now**). When Jasper had to start without your options, or ignored the file, it says
-so in a notification in the **Memory & VM options** group. Settings › Window › **Show memory indicator**
-(`window.memory_indicator`) adds the heap in use and its limit, such as `312 of 2048M`, to the status bar while the
+when a restart is needed (**Restart Now**). When Jasper had to start without your options or its start-up cache, or
+ignored the file, it says so in a notification in the **Memory & VM options** group. Settings › Window ›
+**Show memory indicator** (`window.memory_indicator`) adds the heap in use and its limit, such as `312 of 2048M`, to the
+status bar while the
 status bar is shown; click it to run garbage collection. When the heap stays nearly full, or Jasper runs out of memory, a notification in the same group
 offers **Adjust Memory Settings…**, which opens the heap limit with 512 MiB more filled in (left as saved when a larger
 limit is already saved).

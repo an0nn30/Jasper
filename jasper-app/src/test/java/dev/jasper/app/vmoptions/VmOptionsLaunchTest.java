@@ -26,6 +26,7 @@ class VmOptionsLaunchTest {
         assertThat(launch.skipped()).contains("launch-failed");
         assertThat(launch.corrupted()).isFalse();
         assertThat(launch.launcherManaged()).isTrue();
+        assertThat(launch.aotCacheSkipped()).isEmpty();
         assertThat(VmOptionsLaunch.of(properties("jasper.vmOptionsFile.corrupted", "true")).corrupted()).isTrue();
         var development = VmOptionsLaunch.of(properties());
         assertThat(development.launcherManaged()).isFalse();
@@ -39,22 +40,38 @@ class VmOptionsLaunchTest {
         assertThat(launch.digest()).contains("c758526d21c369d0");
     }
 
+    @Test void theStartUpCachesPropertiesAreRead() {
+        var launch = VmOptionsLaunch.of(properties("jasper.vmOptionsFile", "/h/jasper.vmoptions", "jasper.aotCacheSkipped", "launch-failed",
+            "jasper.aotCacheRecord", "/h/jasper-aot.failed"));
+        assertThat(launch.aotCacheSkipped()).contains("launch-failed");
+        assertThat(launch.aotCacheRecord()).contains(Path.of("/h/jasper-aot.failed"));
+        var development = VmOptionsLaunch.of(properties());
+        assertThat(development.aotCacheSkipped()).isEmpty();
+        assertThat(development.aotCacheRecord()).as(":jasper-app:run remembers nothing").isEmpty();
+        var unparsable = VmOptionsLaunch.of(properties("jasper.aotCacheRecord", "bad\u0000path", "jasper.aotCacheSkipped", "remembered"));
+        assertThat(unparsable.aotCacheRecord()).as("a path the platform cannot parse").isEmpty();
+        assertThat(unparsable.aotCacheSkipped()).contains("remembered");
+    }
+
     @Test void aRestartIsNeededWhenTheAppliedLinesDiffer() {
         var applied = new VmOptionsLaunch(Optional.of(Path.of("/h/jasper.vmoptions")), Optional.of(VmOptionsSyntax.digest(List.of("-Xmx2048m"))),
-            false, Optional.empty());
+            false, Optional.empty(), Optional.empty(), Optional.empty());
         assertThat(applied.restartNeeded(parsed("# heap\n-Xmx2048m\n"), VmOptionsSyntax.Parsed.EMPTY)).as("comments do not count").isFalse();
         assertThat(applied.restartNeeded(parsed("-Xmx4g\n"), VmOptionsSyntax.Parsed.EMPTY)).isTrue();
-        var none = new VmOptionsLaunch(Optional.of(Path.of("/h/jasper.vmoptions")), Optional.empty(), false, Optional.empty());
+        var none = new VmOptionsLaunch(Optional.of(Path.of("/h/jasper.vmoptions")), Optional.empty(), false, Optional.empty(), Optional.empty(),
+            Optional.empty());
         assertThat(none.restartNeeded(VmOptionsSyntax.Parsed.EMPTY, VmOptionsSyntax.Parsed.EMPTY)).isFalse();
         assertThat(none.restartNeeded(parsed("Xmx300m\n"), VmOptionsSyntax.Parsed.EMPTY)).as("ignored lines apply nothing").isFalse();
         assertThat(none.restartNeeded(parsed("-Xmx4g\n"), VmOptionsSyntax.Parsed.EMPTY)).isTrue();
     }
 
     @Test void aSkippedOrCorruptedLaunchComparesWithTheFileAtStart() {
-        var skipped = new VmOptionsLaunch(Optional.of(Path.of("/h/jasper.vmoptions")), Optional.empty(), false, Optional.of("launch-failed"));
+        var skipped = new VmOptionsLaunch(Optional.of(Path.of("/h/jasper.vmoptions")), Optional.empty(), false, Optional.of("launch-failed"),
+            Optional.empty(), Optional.empty());
         assertThat(skipped.restartNeeded(parsed("-Xmx3q\n"), parsed("-Xmx3q\n"))).as("restarting would fail the same way").isFalse();
         assertThat(skipped.restartNeeded(parsed("-Xmx3g\n"), parsed("-Xmx3q\n"))).isTrue();
-        var corrupted = new VmOptionsLaunch(Optional.of(Path.of("/h/jasper.vmoptions")), Optional.empty(), true, Optional.empty());
+        var corrupted = new VmOptionsLaunch(Optional.of(Path.of("/h/jasper.vmoptions")), Optional.empty(), true, Optional.empty(),
+            Optional.empty(), Optional.empty());
         assertThat(corrupted.restartNeeded(parsed("-Xmx3g\n"), VmOptionsSyntax.parse(new byte[] {'-', 0}))).isTrue();
     }
 

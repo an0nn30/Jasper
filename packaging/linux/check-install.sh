@@ -38,6 +38,7 @@ case "$package" in
 esac
 
 test -x "$root/bin/Jasper"
+test -x "$root/bin/jasper-watch"
 test -x "$root/lib/bin/jasper"
 "$root/lib/bin/jasper" --help | grep -q '^Usage: jasper'
 "$root/lib/runtime/bin/java" -version

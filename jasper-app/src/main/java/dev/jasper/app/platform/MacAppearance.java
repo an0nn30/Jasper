@@ -16,10 +16,8 @@ final class MacAppearance {
     @SuppressWarnings("restricted")
     private static synchronized void load() {
         if (loaded) return;
-        Path jar = null;
-        try { jar = Path.of(MacAppearance.class.getProtectionDomain().getCodeSource().getLocation().toURI()); }
-        catch (java.net.URISyntaxException | RuntimeException ignored) { }
-        Path path = library(System.getProperty("jasper.appearanceLibrary"), System.getProperty("jpackage.app-path"), jar);
+        Path path = library(System.getProperty("jasper.appearanceLibrary"), System.getProperty("jpackage.app-path"),
+            CodeLocation.of(MacAppearance.class));
         if (path == null) throw new IllegalStateException("No development or packaged appearance bridge");
         System.load(path.toString()); loaded = true;
     }

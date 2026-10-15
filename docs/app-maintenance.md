@@ -289,18 +289,24 @@ checks a built image ([start-up performance](packaging.md#start-up-performance))
   re-signs it in `packageApp` (so the staged bytes and their ad-hoc signature survive), and listed in `verifyPackage`'s
   bridge check with the JNI symbols it must export. A new bridge needs all three.
 - **The AOT cache.** It is trained per build, so it follows class-path changes automatically; never edit a jar inside a
-  trained image, rebuild it. Training opens a window: agents ask the user before `packageDist`, `trainAotCache` or
-  `-Pjasper.aot=true`.
+  trained image, rebuild it. `trainAotCache` trains in a `ditto` copy of the image that it deletes before
+  `verifyAotCache`, because JBR 25 gives cached classes the code source of the path they were trained at
+  (JDK-8376576): the build machine then runs the trained image as every user's Mac does. For the same reason
+  `stagePackage` removes package sealing from class-path jars (`verifyPackage` rejects a sealed one) and Jasper finds
+  its own files with `CodeLocation`, never a code source. Training opens a window: agents ask the user before
+  `packageDist`, `trainAotCache` or `-Pjasper.aot=true`.
 - **Jasper's launcher.** `packageApp` builds the image with Jasper's own build of jpackage's launcher
   (`gradle/launcher.gradle`, [packaging/launcher](../packaging/launcher/README.md)), which merges the user's
   `jasper.vmoptions` over these options. A JBR update means re-vendoring its launcher sources and re-applying the
-  hook lines; `verifyLauncherSources`, `testLauncherCore`, `testLauncherGuard` and `verifyLauncherImage` (all in
-  `check`) show what changed.
+  hook lines; `verifyLauncherSources`, `testLauncherCore`, `testWatcher`, `testLauncherWatch` and `verifyLauncherImage`
+  (all in `check`) show what changed.
 - **Bundled JVM defaults.** `-Xmx2048m` and `-XX:+IgnoreUnrecognizedVMOptions` are in `applicationDefaultJvmArgs`; a
   user's `jasper.vmoptions` overrides them. AOT training and the start-up benchmark's isolated home give the launcher
   an empty options file, so a developer's own flags never shape the cache or the numbers.
   `dev.jasper.app.vmoptions.VmOptionsSyntax` mirrors `packaging/launcher/jasper/JasperVmOptionsCore.cpp`: change both
   together and add a vector to `packaging/launcher/test/digest-vectors.txt`, which both test suites read.
+  `AotCacheRecord` reads the record of a failed start-up cache (`jasper-aot.failed`) with the launcher's rules: change
+  both together and add a vector to `packaging/launcher/test/aot-record-vectors.txt`.
   `LauncherImage.DEFAULT_MAX_HEAP_MIB` follows the bundled `-Xmx` in `jasper-app/build.gradle.kts`.
 
 ## Session lifecycle change
@@ -337,7 +343,8 @@ Every external jar Jasper or a bundled plugin ships needs its exact `group:artif
 `jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml`, with its license text (and its NOTICE, when
 the project publishes one) beside it; `verifyThirdPartyNotices` (part of `check`) names any jar without one and any
 entry that no longer ships. Read the new version's license before updating the entry, and look inside the jar for bundled
-native binaries (DLLs, executables, shared libraries): their own licenses need components too.
+native binaries (DLLs, executables, shared libraries): their own licenses need components too. When `stagePackage`
+logs that it unsealed a jar, record the change in that component's notice, as `jbr-api.NOTICE.txt` does.
 
 ## Review checklist
 

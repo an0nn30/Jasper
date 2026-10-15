@@ -1,6 +1,7 @@
 // See JasperVmOptionsCore.h.
 #include "JasperVmOptionsCore.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 
@@ -62,10 +63,6 @@ std::string join(Os os, const std::string& directory, const std::string& child) 
     return directory + (os == Os::Windows ? "\\" : "/") + child;
 }
 
-std::string inJasperDirectory(Os os, const std::string& configurationRoot) {
-    return join(os, join(os, configurationRoot, "jasper"), FILE_NAME);
-}
-
 // libjli's own launcher options. As JVM options they end option parsing, select a mode or take the next argument, so
 // the JVM would start without running the application (spec 3.2).
 const char* const LAUNCHER_OPTIONS[] = {
@@ -117,7 +114,82 @@ bool isValidUtf8(const std::string& bytes) {
     return true;
 }
 
+// 1 to 19 ASCII digits, which always fit in 64 unsigned bits.
+bool isDecimal(const std::string& text) {
+    if (text.empty() || text.size() > 19) {
+        return false;
+    }
+    for (const char c : text) {
+        if (c < '0' || c > '9') {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::uint64_t decimal(const std::string& digits) {
+    std::uint64_t result = 0;
+    for (const char c : digits) {
+        result = result * 10u + static_cast<std::uint64_t>(c - '0');
+    }
+    return result;
+}
+
+bool isDigest(const std::string& text) {
+    if (text.size() != 16) {
+        return false;
+    }
+    for (const char c : text) {
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// The value of the last option starting with prefix; empty when there is none.
+std::string lastValue(const std::vector<std::string>& options, const char* prefix) {
+    std::string result;
+    for (const std::string& option : options) {
+        if (startsWith(option, prefix)) {
+            result = option.substr(std::string(prefix).size());
+        }
+    }
+    return result;
+}
+
+bool aotCacheInUse(const std::vector<std::string>& options) {
+    std::vector<const char*> pointers;
+    for (const std::string& option : options) {
+        pointers.push_back(option.c_str());
+    }
+    return jasperAotCacheInUse(static_cast<int>(pointers.size()), pointers.data()) != 0;
+}
+
 } // namespace
+
+std::string jasperHome(Os os, const Environment& env, const std::string& workingDirectory) {
+    const std::string home = trim(value(env, HOME_VARIABLE));
+    if (!home.empty()) {
+        return isAbsolute(os, home) ? home : join(os, workingDirectory, home);
+    }
+    if (os == Os::Windows) {
+        const std::string appData = value(env, "APPDATA");
+        if (isAbsolute(os, appData)) {
+            return join(os, appData, "jasper");
+        }
+        const std::string profile = value(env, "USERPROFILE");
+        return profile.empty() ? std::string() : join(os, join(os, join(os, profile, "AppData"), "Roaming"), "jasper");
+    }
+    if (os == Os::Linux) {
+        const std::string xdg = value(env, "XDG_CONFIG_HOME");
+        if (isAbsolute(os, xdg)) {
+            return join(os, xdg, "jasper");
+        }
+    }
+    const std::string userHome = value(env, "HOME");
+    return userHome.empty() ? std::string() : join(os, join(os, userHome, ".config"), "jasper");
+}
 
 std::string userFilePath(Os os, const Environment& env, const std::string& workingDirectory,
                          const std::function<bool(const std::string&)>& isRegularFile) {
@@ -125,27 +197,8 @@ std::string userFilePath(Os os, const Environment& env, const std::string& worki
     if (!trim(chosen).empty() && isRegularFile(chosen)) {
         return chosen;
     }
-    const std::string home = trim(value(env, HOME_VARIABLE));
-    if (!home.empty()) {
-        return join(os, isAbsolute(os, home) ? home : join(os, workingDirectory, home), FILE_NAME);
-    }
-    if (os == Os::Windows) {
-        const std::string appData = value(env, "APPDATA");
-        if (isAbsolute(os, appData)) {
-            return inJasperDirectory(os, appData);
-        }
-        const std::string profile = value(env, "USERPROFILE");
-        return profile.empty() ? std::string()
-                               : inJasperDirectory(os, join(os, join(os, profile, "AppData"), "Roaming"));
-    }
-    if (os == Os::Linux) {
-        const std::string xdg = value(env, "XDG_CONFIG_HOME");
-        if (isAbsolute(os, xdg)) {
-            return inJasperDirectory(os, xdg);
-        }
-    }
-    const std::string userHome = value(env, "HOME");
-    return userHome.empty() ? std::string() : inJasperDirectory(os, join(os, userHome, ".config"));
+    const std::string home = jasperHome(os, env, workingDirectory);
+    return home.empty() ? std::string() : join(os, home, FILE_NAME);
 }
 
 bool isApplicable(const std::string& line) {
@@ -249,13 +302,110 @@ Plan plan(const std::vector<std::string>& bundled, const std::string& path, cons
         result.javaOptions.push_back("-Djasper.vmOptionsFile=" + path);
     }
     if (skipped) {
-        // A blank value is set too: the guard tests presence, so both agree that this launch is a fallback start.
+        // A blank value is set too: the watch module tests presence, so both treat this launch as a fallback start.
         const std::string reason = trim(*skip);
         result.javaOptions.push_back("-Djasper.vmOptionsSkipped=" + (reason.empty() ? std::string("environment") : reason));
     } else if (!path.empty() && file != nullptr && file->corrupted) {
         result.javaOptions.push_back("-Djasper.vmOptionsFile.corrupted=true");
     } else if (applied) {
         result.javaOptions.push_back("-Djasper.vmOptionsDigest=" + digest(file->lines));
+    }
+    return result;
+}
+
+std::string aotRecordPath(Os os, const Environment& env, const std::string& workingDirectory) {
+    const std::string home = jasperHome(os, env, workingDirectory);
+    return home.empty() ? std::string() : join(os, home, AOT_RECORD_FILE_NAME);
+}
+
+AotRecord parseAotRecord(const std::string& bytes) {
+    const AotRecord malformed;
+    std::map<std::string, std::string> values;
+    std::string::size_type start = 0;
+    while (start <= bytes.size()) {
+        std::string::size_type end = bytes.find('\n', start);
+        if (end == std::string::npos) {
+            end = bytes.size();
+        }
+        std::string line = bytes.substr(start, end - start);
+        start = end + 1;
+        if (!line.empty() && line[line.size() - 1] == '\r') {
+            line.erase(line.size() - 1);
+        }
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        const std::string::size_type equals = line.find('=');
+        if (equals == std::string::npos) {
+            return malformed;
+        }
+        const std::string key = line.substr(0, equals);
+        if (key != "cache" && key != "size" && key != "modified" && key != "options") {
+            return malformed;
+        }
+        if (!values.insert(std::make_pair(key, line.substr(equals + 1))).second) {
+            return malformed;
+        }
+    }
+    if (values.size() != 4 || values["cache"].empty() || !isDecimal(values["size"]) || !isDecimal(values["modified"])
+            || !(values["options"].empty() || isDigest(values["options"]))) {
+        return malformed;
+    }
+    AotRecord record;
+    record.valid = true;
+    record.cache = values["cache"];
+    record.size = decimal(values["size"]);
+    record.modified = decimal(values["modified"]);
+    record.options = values["options"];
+    return record;
+}
+
+bool aotRecordMatches(const AotRecord& record, const CacheFile& cache, const std::string& digest) {
+    return record.valid && cache.regular && cache.size == record.size
+        && cache.modified >= 0 && static_cast<std::uint64_t>(cache.modified) == record.modified
+        && (record.options.empty() || record.options == digest);
+}
+
+bool namesAotCache(const std::vector<std::string>& options) {
+    for (const std::string& option : options) {
+        if (startsWith(option, JASPER_AOT_CACHE_OPTION)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::string aotCachePath(const std::vector<std::string>& options) {
+    return lastValue(options, JASPER_AOT_CACHE_OPTION);
+}
+
+std::vector<std::string> applyAotCache(const std::vector<std::string>& options, const Environment& env,
+                                       const std::string& recordPath, const std::string* record,
+                                       const CacheFile& cache) {
+    std::vector<std::string> result = options;
+    if (namesAotCache(options)) {
+        if (!recordPath.empty()) {
+            result.push_back("-Djasper.aotCacheRecord=" + recordPath);
+        }
+        if (aotCacheInUse(options)) {
+            std::string reason;
+            const std::string* skip = variable(env, JASPER_AOT_CACHE_SKIP_VARIABLE);
+            if (skip != nullptr) {
+                reason = trim(*skip).empty() ? std::string("environment") : trim(*skip);
+            } else if (record != nullptr
+                    && aotRecordMatches(parseAotRecord(*record), cache, lastValue(options, JASPER_DIGEST_OPTION))) {
+                reason = "remembered";
+            }
+            if (!reason.empty()) {
+                result.erase(std::remove_if(result.begin(), result.end(), [](const std::string& option) {
+                    return startsWith(option, JASPER_AOT_CACHE_OPTION);
+                }), result.end());
+                result.push_back("-Djasper.aotCacheSkipped=" + reason);
+            }
+        }
+    }
+    if (variable(env, JASPER_LAUNCH_DIAGNOSE_VARIABLE) != nullptr) {
+        result.push_back("-version");
     }
     return result;
 }
