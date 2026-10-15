@@ -1,0 +1,198 @@
+[
+  {
+    "name": "01 Workstation/Workstation - Connected (plugins in use).png",
+    "width": 2884,
+    "height": 1804,
+    "sha256": "5258672b8c23d5cc3770204bbb487fe9f0a85d698e434df48403e63ba08472fd"
+  },
+  {
+    "name": "01 Workstation/Workstation - Disconnected.png",
+    "width": 2884,
+    "height": 1804,
+    "sha256": "5b3b8bdb58cb2b4244658518aa99677f7baee46315777b1abcdb614a48b179b2"
+  },
+  {
+    "name": "02 New File Server/New File Server - FTP.png",
+    "width": 1044,
+    "height": 1272,
+    "sha256": "fb338952db4a9298f3c9216493b39388fff8768bdf3243bbf2ed1ed318e9be6e"
+  },
+  {
+    "name": "02 New File Server/New File Server - HTTP.png",
+    "width": 1044,
+    "height": 1048,
+    "sha256": "25fc8cb1b1e2f498de413fe4968ab76ace33a5b249feea098a9e1a5a5b8c9c88"
+  },
+  {
+    "name": "02 New File Server/New File Server - SFTP.png",
+    "width": 1044,
+    "height": 1234,
+    "sha256": "67aeb274aadf7678b801cd2640b5506bded7dd9b588f19bbf52f24a3fec3b663"
+  },
+  {
+    "name": "02 New File Server/New File Server - TFTP.png",
+    "width": 1044,
+    "height": 924,
+    "sha256": "277798850ac58cb512f0669b0682b1fa7b26d368590bd80cd89a64544bb0c02e"
+  },
+  {
+    "name": "03 Add Host/Add Host - Credential menu open.png",
+    "width": 1044,
+    "height": 1104,
+    "sha256": "791077000d3837b5a89b9c9c889688a0d128f531fc7a06eb456d47ab2c20e592"
+  },
+  {
+    "name": "03 Add Host/Add Host - Default.png",
+    "width": 1044,
+    "height": 1104,
+    "sha256": "14a00c1d36598c2d667ca2b410a8a8c31a9d74e486e2abeb41e5008dcb880aa3"
+  },
+  {
+    "name": "04 New Tunnel/New Tunnel - Dynamic (SOCKS).png",
+    "width": 1044,
+    "height": 884,
+    "sha256": "424a5291a15298634c4dd7d499b93bee2cc57bbede3d57de98d7094637a7770a"
+  },
+  {
+    "name": "04 New Tunnel/New Tunnel - Local.png",
+    "width": 1044,
+    "height": 960,
+    "sha256": "c04f14e40b99b73ca8d2987c884900e4b98418f4544c2d79c556a693a8b00835"
+  },
+  {
+    "name": "04 New Tunnel/New Tunnel - Remote.png",
+    "width": 1044,
+    "height": 988,
+    "sha256": "b922d9e6d1318b1b88de3ed41a6a7f187ccfe22e5de40fe79957f3100835cfb3"
+  },
+  {
+    "name": "05 Settings/Settings 01 - Appearance & Behavior - Appearance.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "01b6ac4c4d6216c592e84968a32e22d984541d47fd057519dfcb8511a81c4e79"
+  },
+  {
+    "name": "05 Settings/Settings 02 - Appearance & Behavior - Window.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "28d324eaa389a6188f7a5974e2d676d0e8f0eefc45c0bd8f24dbdb680d76813c"
+  },
+  {
+    "name": "05 Settings/Settings 03 - Appearance & Behavior - Notifications.png",
+    "width": 2084,
+    "height": 1716,
+    "sha256": "8e329f6bf3993a730ac0a8cec6c227c3de0f8ccc923c124d9d11b0eac2e183c7"
+  },
+  {
+    "name": "05 Settings/Settings 04 - Appearance & Behavior - Command Palette.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "98d2bdd0d8e6ae60c614637c1f53367fb73eb1bcf106fa270812aa64e8045d6d"
+  },
+  {
+    "name": "05 Settings/Settings 05 - Appearance & Behavior - Desk Buddy.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "f1559ed7c2f793273e32980e7d2230d9d1e7479c78b72f20dd6434ae8167017f"
+  },
+  {
+    "name": "05 Settings/Settings 06 - Appearance & Behavior - System Settings.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "9bdc3ed1bcf7bc0fe27b250be5dc446ee98c912c8e28345b36c57fd11e345429"
+  },
+  {
+    "name": "05 Settings/Settings 07 - Keymap.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "8d062fbec3de65fc035f157eeefd5797ecd6003e37ca0c08342632b84374fc8c"
+  },
+  {
+    "name": "05 Settings/Settings 07b - Keymap - Recording shortcut.png",
+    "width": 2084,
+    "height": 1488,
+    "sha256": "69b138849a88175dffb4924e731f9f058e04a73571e4e5d5430cbecfd7ff4c84"
+  },
+  {
+    "name": "05 Settings/Settings 08 - Plugins.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "4b68febc0202376d4e06bba1e3ef5160aff10f92e5edb3b85a25f8468684e096"
+  },
+  {
+    "name": "05 Settings/Settings 09 - Terminal - Font & Colors.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "1d55b2a716f5ab6d937ea8b164e2d78ea17a49ffe248b506d363a82eac271840"
+  },
+  {
+    "name": "05 Settings/Settings 10 - Terminal - Cursor.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "318dd9b2b81014891c838cd0d5748eda0c42ee9384b552574186705496efcdab"
+  },
+  {
+    "name": "05 Settings/Settings 11 - Terminal - Shell.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "5b99b122a5b04f02c5b1fa39291eaa4e7a27ea45ce99823e53f1c9ab26e68d0d"
+  },
+  {
+    "name": "05 Settings/Settings 12 - Tools - Credential Vault.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "af5c87c0729c654708091d7d1d36bfbc6fb1a1217f5f1be801e6024a823ffa31"
+  },
+  {
+    "name": "05 Settings/Settings 13 - Tools - Editor.png",
+    "width": 2084,
+    "height": 1524,
+    "sha256": "d9d96a444c236c10ae44594a8e119d386e91391472c17ef4ac09d7aa7fd41dd8"
+  },
+  {
+    "name": "05 Settings/Settings 14 - Tools - File Server.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "e9036c0db656851519ed92f5b0c08b6bd604d2172a7a5e9383779419f0eac09e"
+  },
+  {
+    "name": "05 Settings/Settings 15 - Tools - Project Index.png",
+    "width": 2084,
+    "height": 1960,
+    "sha256": "22de32b8d890ee0918f6f7d4bee51071c110d7e609d46b032d1b7cbb90fbef1c"
+  },
+  {
+    "name": "05 Settings/Settings 16 - Tools - Remote.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "8e598162c2e4a397f4cf5fcac2751db41da76651d44d2d6f6c95b978183d1a21"
+  },
+  {
+    "name": "05 Settings/Settings 17 - Tools - Sample.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "3d1e4217a8e36bd1d8a24ca43dc9c3397c2f077362e14ca5b98b104170a79d89"
+  },
+  {
+    "name": "05 Settings/Settings 18 - Tools - Shell History.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "4e22ed17a78346d6257a34147be7048dfc341f86480ce41c5943de74383fe040"
+  },
+  {
+    "name": "06 Run Dialog/Run Dialog - Just opened (recent + most used).png",
+    "width": 2884,
+    "height": 1804,
+    "sha256": "ce6937e4f00c900941ec50b5d5150789558e55200bef08f0ac1ea997fcfc6c15"
+  },
+  {
+    "name": "06 Run Dialog/Run Dialog - Typing auth (filtered).png",
+    "width": 2884,
+    "height": 1804,
+    "sha256": "685a7dbdfe37b53347feb101ec682b50bc619486c140a0b98cc8163c7e9857d6"
+  },
+  {
+    "name": "DESIGN_LANGUAGE.md",
+    "sha256": "6fcb0eae77b591ae3f2f471ff4e721355ab6c728916579c3d2e4f197cc46ece8"
+  }
+]
