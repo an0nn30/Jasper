@@ -185,7 +185,7 @@ class SettingsControlsTest {
                     var combo=find(view,"mode.input",JComboBox.class);
                     @SuppressWarnings("unchecked") var face=(RichOptions)((ListCellRenderer<Object>)combo.getRenderer()).getListCellRendererComponent(new JList<>(),combo.getSelectedItem(),-1,false,false);
                     assertThat(face.labelWidth(face.getPreferredSize().width)).as("%s face",preset)
-                        .isGreaterThanOrEqualTo(face.getFontMetrics(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.LABEL)).stringWidth(((Option)combo.getSelectedItem()).label()));
+                        .isGreaterThanOrEqualTo(RichOptions.measure(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.LABEL),((Option)combo.getSelectedItem()).label()));
                 }
             }
         }finally{context.binding().close();context.icons().close();}
