@@ -1,6 +1,7 @@
 # Jasper — Status and Handoff
 
-**Settings' page list without icons — 2026-10-14** (`claude/slate-cobalt`; the user's ask). The Settings navigation
+**Settings' page list without icons — 2026-10-14** (`claude/slate-cobalt`, merged to local main, not pushed; the
+user's ask). The Settings navigation
 shows page titles only, as IntelliJ's settings tree does: `PageTree` gives its items no icon, the page icon and artwork
 methods and the plugin pages' artwork are gone, and the kit drops the navigation tile and its metrics
 (`SETTINGS_NAV_TILE`, `SETTINGS_NAV_GLYPH`, `SETTINGS_NAV_TEXT_GAP`). Plugin identity art still shows on the Plugins
@@ -14,7 +15,8 @@ Its terminal schemes are the file's Dark and Light plus Slate Steel's High Contr
 [`design/theme-engine/slate-cobalt.md`](design/theme-engine/slate-cobalt.md) (its machine-readable block is the bundled
 file). Every contrast target holds; Light cyan now meets 4.9:1, so it is no longer a named exception. Code, tests, the
 converter's built-in list and living docs say Slate Cobalt; plans, specs, acceptance records and the entries below keep
-Slate Steel. GUI check pending.
+Slate Steel. Merged to local main with main's Cmd-click and start-up recovery work, not pushed; `./gradlew check
+--continue` after the merge: **10,420 tests, 0 failures, 0 errors, 17 skipped**. GUI check pending.
 
 **Cmd-click file paths (command line plan 3) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
