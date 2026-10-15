@@ -345,6 +345,20 @@ class FormsTest {
         });
     }
 
+    /** A control's own Enter binding outranks the form's: Enter on a focused picker opens it. */
+    @Test void enterOnAFocusedPickerInAFormOpensThePickerInsteadOfSubmitting() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new java.util.ArrayList<UiEvent>();
+            var picker = new Nodes.Choice("credential", ControlState.READY, ChoiceKind.PICKER, List.of(new Option("a", "Alpha", Optional.empty())), "a", "Credential", "choose-credential");
+            try (var view = new KitView(context, new ViewSpec(form(FormKind.SHEET, List.of(picker))), events::add)) {
+                var button = find(view, "credential.input", JButton.class);
+                for (int type : new int[] {java.awt.event.KeyEvent.KEY_PRESSED, java.awt.event.KeyEvent.KEY_RELEASED})
+                    SwingUtilities.processKeyBindings(new java.awt.event.KeyEvent(button, type, 0, 0, java.awt.event.KeyEvent.VK_ENTER, java.awt.event.KeyEvent.CHAR_UNDEFINED));
+                assertThat(events).containsExactly(new UiEvent.Action("choose-credential"));
+            } finally { release(context); }
+        });
+    }
+
     @Test void visualPrimaryMayOptOutOfEnterWithoutLosingClickOrEscape() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new java.util.ArrayList<UiEvent>();

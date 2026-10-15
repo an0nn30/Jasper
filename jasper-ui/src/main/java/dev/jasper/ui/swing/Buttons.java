@@ -149,11 +149,19 @@ final class Buttons {
         /**
          * A surface that binds Enter, such as a form submitting its PRIMARY, takes it from every control, this button
          * included; Space presses the focused button. FlatLaf binds Enter to a focused button's press off macOS only.
+         * A button's own Enter binding (a picker opening) still wins.
          */
         @Override protected boolean processKeyBinding(KeyStroke stroke, java.awt.event.KeyEvent event, int condition, boolean pressed) {
-            if (condition == WHEN_FOCUSED && event.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER
-                    && ancestorBinds(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, stroke.getModifiers()))) return false;
+            if (condition == WHEN_FOCUSED && event.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER) {
+                var press = KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, stroke.getModifiers());
+                if (!bindsItself(press) && ancestorBinds(press)) return false;
+            }
             return super.processKeyBinding(stroke, event, condition, pressed);
+        }
+        /** Whether this button's own focused map, not the look and feel's parent map, binds {@code stroke}. */
+        private boolean bindsItself(KeyStroke stroke) {
+            KeyStroke[] own = getInputMap(WHEN_FOCUSED).keys();
+            return own != null && java.util.Arrays.asList(own).contains(stroke);
         }
         private boolean ancestorBinds(KeyStroke stroke) {
             for (Container parent = getParent(); parent != null; parent = parent.getParent())
