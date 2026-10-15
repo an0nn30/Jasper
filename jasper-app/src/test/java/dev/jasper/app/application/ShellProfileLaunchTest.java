@@ -26,6 +26,8 @@ import java.util.Optional;
 import java.util.Queue;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 class ShellProfileLaunchTest {
@@ -229,5 +231,25 @@ class ShellProfileLaunchTest {
         assertThat(started.get(1).environment()).as("a WSL shell gets no plugin variables").doesNotContainKey("CONTRIBUTED");
         assertThat(onEdt).as("asked once, for the local shell, on the EDT").containsExactly(true);
         assertThat(inheritedMaps).singleElement().isEqualTo(System.getenv());
+    }
+
+    /**
+     * On Windows the sessions Jasper starts ignore a reported directory on another host, so it never becomes the pane's
+     * directory: plugins check that directory on the file system with no click (the Indexer looks for a project in every
+     * one), and touching {@code \\host\share} makes Windows authenticate to that host over SMB. Any program can report
+     * one. The paths are what the session's mapper gets for {@code file://localhost//attacker.invalid/share/project} and
+     * {@code file://localhost/%5C%5Cattacker.invalid%5Cshare%5Cproject}; the host ends in {@code .invalid}, which never
+     * resolves, should a regression ask.
+     */
+    @Test @EnabledOnOs(OS.WINDOWS) void onWindowsJaspersSessionsIgnoreAReportedDirectoryOnAnotherHost() {
+        var powershell = new ShellProfile("powershell", "PowerShell", ShellProfile.Kind.LOCAL_SHELL, Optional.empty(), List.of("powershell.exe"));
+        var ubuntu = new ShellProfile("wsl:Ubuntu", "Ubuntu", ShellProfile.Kind.WSL, Optional.empty(), List.of("wsl.exe", "-d", "Ubuntu"));
+        var local = JasperApplication.sessionOptions(directory, new LaunchSettings(powershell.command(), Map.of(), 80, 24, 0, powershell));
+        var wsl = JasperApplication.sessionOptions(directory, new LaunchSettings(ubuntu.command(), Map.of(), 80, 24, 0, ubuntu));
+        for (String share : List.of("//attacker.invalid/share/project", "/\\\\attacker.invalid\\share\\project")) {
+            assertThat(local.localPathMapper().apply(share)).as(share).isEmpty();
+        }
+        assertThat(local.localPathMapper().apply(directory.toUri().getPath())).contains(directory);
+        assertThat(wsl.localPathMapper().apply("/home/me")).map(Path::toString).contains("\\\\wsl.localhost\\Ubuntu\\home\\me");
     }
 }

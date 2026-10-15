@@ -191,10 +191,20 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
         return requested.filter(directory -> !windows || !UncHosts.namesForeignHost(directory.toString(), profile.distro().isPresent()));
     }
 
-    /** How the session reads a local working-directory report: a WSL profile's Linux paths become Windows paths. */
-    public Function<String, Optional<Path>> localPaths() {
-        return profile.distro().<Function<String, Optional<Path>>>map(distro -> path -> WslPaths.toWindows(distro, path))
+    /**
+     * How the session reads a local working-directory report: a WSL profile's Linux paths become Windows paths, and on
+     * Windows ({@code windows}) a directory whose text names a UNC host other than, for a WSL profile, this machine's WSL
+     * shares ({@link UncHosts}) is ignored. Any program can report such a directory (OSC 7), and the pane's directory
+     * reaches plugins, which check it on the file system with no click (the Indexer looks for a project in every one), so
+     * Windows would authenticate to that host over SMB. Pure text: nothing is touched.
+     */
+    public Function<String, Optional<Path>> localPaths(boolean windows) {
+        Function<String, Optional<Path>> paths = profile.distro()
+            .<Function<String, Optional<Path>>>map(distro -> path -> WslPaths.toWindows(distro, path))
             .orElse(SessionLaunchOptions.DEFAULT_LOCAL_PATHS);
+        if (!windows) return paths;
+        boolean wsl = profile.distro().isPresent();
+        return path -> paths.apply(path).filter(directory -> !UncHosts.namesForeignHost(directory.toString(), wsl));
     }
 
     /**

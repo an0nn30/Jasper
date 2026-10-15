@@ -1,5 +1,28 @@
 # Jasper — Status and Handoff
 
+**Windows network shares: reported directories — 2026-10-14** (`claude/unc-cwd-reports`, from `claude/windows-unc-hosts`,
+worktree `.claude/worktrees/command-palette-y-axis-a5b3d4`). On Windows the sessions Jasper starts ignore a reported
+directory (OSC 7) on a UNC host other than a WSL pane's own share, so it never becomes the pane's directory and never
+reaches plugins. Before, the Indexer's `CwdWatcher` looked for a project in every reported directory (`Files.exists`,
+`newDirectoryStream`) with no click, and File Server's share-path and serve actions checked it with `Files.isDirectory`.
+`LaunchSettings.localPaths(windows)` applies `UncHosts` to the mapped path, so every spelling of the report counts
+(`file://localhost//host/share`, `file://localhost/%5C%5Chost%5Cshare`), and the new `JasperApplication.sessionOptions`
+passes it to every shell session. Industry check: VS Code keeps the text of such a directory, but its runtime refuses
+file access to UNC hosts missing from `security.allowedUNCHosts` in every process, the pty host and extension hosts
+included (`NODE_UNC_HOST_ALLOWLIST`); Jasper cannot refuse access inside plugins, so it withholds the directory. Windows
+Terminal checks a reported directory with `IsValidDirectory` on Duplicate Tab, which touches the share. Cost: in a
+non-WSL Windows pane whose prompt reports OSC 7 (Jasper ships no PowerShell or cmd integration, so only a prompt the user
+set up, such as oh-my-posh), `cd \\server\share` leaves the status bar, breadcrumbs, History's directory and relative
+Cmd-click paths at the last folder, as for a shell that reports nothing. Docs: `docs/configuration.md`,
+`docs/terminal-architecture.md`. Tests: a `LaunchSettingsTest` case on every OS (`/\\attacker\share` is a UNC path on
+Windows and a file name elsewhere) and an `@EnabledOnOs(WINDOWS)` `ShellProfileLaunchTest` case through
+`sessionOptions`; each was watched failing, then passing, the Windows one on the Mac through the `os.name` init script.
+`./gradlew check --continue`: **10,436 tests, 0 failures, 0 errors, 25 skipped**, after one re-run of File Server's tests:
+the first run lost `TftpReadTest.aFileOfWholeBlocksEndsWithAnEmptyBlock` to a port in use (the `Ports.free` race that
+`claude/fileserver-port-race` fixes). Not merged, not pushed. No GUI launched. GUI check for the user, on Windows:
+in a PowerShell tab, `[Console]::Write("$([char]27)]7;file://localhost//attacker.invalid/share$([char]7)")`, then the
+breadcrumbs keep the previous folder.
+
 **Windows network shares (Cmd-click follow-up) — 2026-10-14** (`claude/windows-unc-hosts`, worktree
 `.claude/worktrees/credentials-manager-status-1e3e7d`). Closes the two Windows credential-leak limits that
 [plan 3](superpowers/plans/2026-10-14-jasper-command-line-3-cmd-click-paths.md) left. The UNC host rule moved from
@@ -20,9 +43,7 @@ failures, 0 errors, 24 skipped**. An earlier run lost seven File Server tests to
 connections; they passed on the re-run. Not merged, not pushed. No GUI launched. GUI checks for the user, on Windows:
 in a PowerShell tab, `[Console]::Write("$([char]27)]7;file://localhost//attacker.invalid/share$([char]7)")`, then a
 split and a new tab both start in the home folder; a `\\wsl.localhost\<distro>\…` path printed in a PowerShell tab
-opens nothing on Ctrl-click, and the same path in a WSL tab opens. Open: the Indexer's `CwdWatcher` runs project
-detection on every directory a shell reports, so on Windows an OSC 7 report naming a share can still reach SMB without
-a click; File Server's "share path" also checks the pane's reported directory with `Files.isDirectory`.
+opens nothing on Ctrl-click, and the same path in a WSL tab opens.
 
 **Cmd-click file paths (command line plan 3) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),

@@ -40,14 +40,14 @@ class LaunchSettingsTest {
             .doesNotContainKey("WSLENV").containsEntry("JASPER_SHELL_INTEGRATION", dir.toString());
         assertThat(settings.label()).isEqualTo("Ubuntu");
         assertThat(settings.profile()).isEqualTo(wsl());
-        assertThat(settings.localPaths().apply("/mnt/c/Users")).map(Path::toString).contains("C:\\Users");
-        assertThat(settings.localPaths().apply("/home/me")).map(Path::toString).contains("\\\\wsl.localhost\\Ubuntu\\home\\me");
+        assertThat(settings.localPaths(true).apply("/mnt/c/Users")).map(Path::toString).contains("C:\\Users");
+        assertThat(settings.localPaths(true).apply("/home/me")).map(Path::toString).contains("\\\\wsl.localhost\\Ubuntu\\home\\me");
         var off = LaunchSettings.resolve(withShell("", List.of(), ShellIntegrationMode.OFF), wsl(), "Windows 11", Map.of(), 80, 24, dir);
         assertThat(off.environment()).containsEntry("WSLENV", "TERM:COLORTERM:TERM_PROGRAM:JASPER_TERMINAL");
         var local = LaunchSettings.resolve(ConfigSnapshot.defaults(), powershell(), "Windows 11", Map.of(), 80, 24, dir);
         assertThat(local.environment()).doesNotContainKey("WSLENV");
         assertThat(local.label()).isEqualTo("PowerShell");
-        assertThat(local.localPaths()).isSameAs(SessionLaunchOptions.DEFAULT_LOCAL_PATHS);
+        assertThat(local.localPaths(false)).isSameAs(SessionLaunchOptions.DEFAULT_LOCAL_PATHS);
     }
 
     @Test void wslenvSpelledTwoWaysBecomesOneMergedEntry() {
@@ -137,6 +137,25 @@ class LaunchSettingsTest {
         assertThat(local.startable(Optional.empty(), true)).isEmpty();
         Optional<Path> named = Optional.of(Path.of("\\\\attacker\\share"));
         assertThat(local.startable(named, false)).as("elsewhere the text is only a name").isEqualTo(named);
+    }
+
+    /**
+     * On Windows the session ignores a reported directory on another host, so it never becomes the pane's directory, which
+     * plugins check on the file system with no click: the Indexer looks for a project in every directory a shell reports.
+     * Any program can report one (OSC 7). A WSL profile's reports stay on its own share. The mapped path's text decides,
+     * and the path of {@code file://localhost/%5C%5Cattacker%5Cshare} is a UNC path on Windows and a file name elsewhere,
+     * so this holds on every OS.
+     */
+    @Test void onWindowsTheSessionIgnoresAReportedDirectoryOnAnotherHost() {
+        var wsl = new LaunchSettings(List.of("wsl.exe", "-d", "Ubuntu"), Map.of(), 80, 24, 0, wsl());
+        var local = new LaunchSettings(List.of("powershell.exe", "-NoLogo"), Map.of(), 80, 24, 0, powershell());
+        String share = "/\\\\attacker\\share";
+        assertThat(local.localPaths(true).apply(share)).isEmpty();
+        assertThat(local.localPaths(false).apply(share)).as("elsewhere the text is only a name").isPresent();
+        assertThat(local.localPaths(true).apply("/C:/Users/me")).isPresent()
+            .isEqualTo(SessionLaunchOptions.DEFAULT_LOCAL_PATHS.apply("/C:/Users/me"));
+        assertThat(wsl.localPaths(true).apply("//attacker/share")).as("on the distribution's share")
+            .map(Path::toString).hasValueSatisfying(path -> assertThat(path).startsWith("\\\\wsl.localhost\\Ubuntu\\"));
     }
 
     @Test void termProgramIsAlwaysJasperAndOnlyAutoInjects() {
