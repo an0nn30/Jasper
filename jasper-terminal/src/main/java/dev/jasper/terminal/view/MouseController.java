@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.IntSupplier;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 
 /** EDT mouse gestures retain press ownership and modifiers through their matching release. */
@@ -21,19 +22,21 @@ final class MouseController {
     private final TerminalAccess terminal;
     private final SelectionController selection;
     private final Viewport viewport;
-    private final boolean macOs;
+    private final boolean macOs, windows;
     private final IntSupplier cellWidth, cellHeight;
     private final BooleanSupplier copyOnSelect;
     private final Runnable requestFocus, copySelection, repaint;
     private final Consumer<String> openLink;
+    /** The application's file link handler, or null while it has none. */
+    private final Supplier<Consumer<FileLink>> openFile;
     private final Consumer<MouseEvent> contextMenu;
-    MouseController(TerminalAccess terminal, SelectionController selection, Viewport viewport, boolean macOs,
+    MouseController(TerminalAccess terminal, SelectionController selection, Viewport viewport, boolean macOs, boolean windows,
                     IntSupplier cellWidth, IntSupplier cellHeight, BooleanSupplier copyOnSelect,
                     Runnable requestFocus, Runnable copySelection, Consumer<String> openLink,
-                    Consumer<MouseEvent> contextMenu, Runnable repaint) {
-        this.terminal = terminal; this.selection = selection; this.viewport = viewport; this.macOs = macOs;
+                    Supplier<Consumer<FileLink>> openFile, Consumer<MouseEvent> contextMenu, Runnable repaint) {
+        this.terminal = terminal; this.selection = selection; this.viewport = viewport; this.macOs = macOs; this.windows = windows;
         this.cellWidth = cellWidth; this.cellHeight = cellHeight; this.copyOnSelect = copyOnSelect;
-        this.requestFocus = requestFocus; this.copySelection = copySelection; this.openLink = openLink;
+        this.requestFocus = requestFocus; this.copySelection = copySelection; this.openLink = openLink; this.openFile = openFile;
         this.contextMenu = contextMenu; this.repaint = repaint;
     }
     void focusLost() { gestures.entrySet().removeIf(entry -> entry.getValue().action == MouseRouting.Action.OPEN_LINK); }
@@ -80,8 +83,15 @@ final class MouseController {
             if (button == MouseInput.Button.LEFT && ((macOs && linkModifier)
                 || action == MouseRouting.Action.OPEN_LINK)) {
                 Optional<String> link = terminal.linkAt(absoluteRow, column);
+                Consumer<FileLink> files = openFile.get();
+                Optional<FileLink> file = link.isPresent() || files == null ? Optional.empty()
+                    : terminal.fileLinkAt(absoluteRow, column, windows)
+                        .map(target -> new FileLink(target.path(), target.line(), target.column()));
                 if (link.isPresent()) {
                     openLink.accept(link.get());
+                    action = MouseRouting.Action.OPEN_LINK;
+                } else if (file.isPresent()) {
+                    files.accept(file.get());
                     action = MouseRouting.Action.OPEN_LINK;
                 } else {
                     action = MouseRouting.Action.START_SELECTION;

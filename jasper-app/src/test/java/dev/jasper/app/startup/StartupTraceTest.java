@@ -18,12 +18,13 @@ class StartupTraceTest {
         final List<String> log = new ArrayList<>();
         final List<Long> delays = new ArrayList<>();
         final List<Runnable> timers = new ArrayList<>();
+        StartupTrace.JvmStatus status = StartupTrace.JvmStatus.of("/Jasper.app/Contents/app/jasper.aot", true, null);
 
         StartupTrace trace() { return trace(null); }
 
         StartupTrace trace(Path file) {
             return new StartupTrace(new StartupTrace.Environment(now::get, 0, 100.0, Instant.parse("2026-10-02T16:35:09.123Z"),
-                42, file, log::add, Runnable::run, () -> StartupTrace.JvmStatus.of("/Jasper.app/Contents/app/jasper.aot", true),
+                42, file, log::add, Runnable::run, () -> status,
                 (delay, task) -> { delays.add(delay); timers.add(task); }));
         }
 
@@ -179,10 +180,42 @@ class StartupTraceTest {
     }
 
     @Test void theJvmStatusNamesAStaleCache() {
-        assertThat(StartupTrace.JvmStatus.of("", true)).isEqualTo(new StartupTrace.JvmStatus("none", "on"));
-        assertThat(StartupTrace.JvmStatus.of("/a.aot", true)).isEqualTo(new StartupTrace.JvmStatus("used", "on"));
-        assertThat(StartupTrace.JvmStatus.of("/a.aot", false)).isEqualTo(new StartupTrace.JvmStatus("stale", "off"));
-        assertThat(StartupTrace.JvmStatus.of(null, false)).isEqualTo(new StartupTrace.JvmStatus("none", "off"));
+        assertThat(StartupTrace.JvmStatus.of("", true, null)).isEqualTo(new StartupTrace.JvmStatus("none", "on"));
+        assertThat(StartupTrace.JvmStatus.of("/a.aot", true, null)).isEqualTo(new StartupTrace.JvmStatus("used", "on"));
+        assertThat(StartupTrace.JvmStatus.of("/a.aot", false, null)).isEqualTo(new StartupTrace.JvmStatus("stale", "off"));
+        assertThat(StartupTrace.JvmStatus.of(null, false, null)).isEqualTo(new StartupTrace.JvmStatus("none", "off"));
+    }
+
+    @Test void theJvmStatusNamesASkippedCacheByItsReason() {
+        assertThat(StartupTrace.JvmStatus.of("", true, "launch-failed")).isEqualTo(new StartupTrace.JvmStatus("skipped: launch-failed", "on"));
+        assertThat(StartupTrace.JvmStatus.of("", true, "remembered")).isEqualTo(new StartupTrace.JvmStatus("skipped: remembered", "on"));
+        assertThat(StartupTrace.JvmStatus.of("", false, "environment")).isEqualTo(new StartupTrace.JvmStatus("skipped: environment", "off"));
+        assertThat(StartupTrace.JvmStatus.of("", true, "/Users/me/notes")).as("a hand-set value stays out of the log")
+            .isEqualTo(new StartupTrace.JvmStatus("skipped: environment", "on"));
+        assertThat(StartupTrace.JvmStatus.of("/a.aot", true, " ")).as("a blank value is no skip")
+            .isEqualTo(new StartupTrace.JvmStatus("used", "on"));
+    }
+
+    @Test void theLaunchersSkipReachesTheObservedStatus() {
+        String previous = System.getProperty("jasper.aotCacheSkipped");
+        System.setProperty("jasper.aotCacheSkipped", "remembered");
+        try {
+            assertThat(StartupTrace.JvmStatus.observe().aotCache()).isEqualTo("skipped: remembered");
+        } finally {
+            if (previous == null) System.clearProperty("jasper.aotCacheSkipped");
+            else System.setProperty("jasper.aotCacheSkipped", previous);
+        }
+    }
+
+    @Test void aStartWithoutTheCacheSaysWhyInTheLineAndTheFile() {
+        var fixture = new Fixture();
+        fixture.status = StartupTrace.JvmStatus.of("", true, "launch-failed");
+        StartupTrace trace = fixture.trace();
+        fixture.at(20);
+        trace.mark(StartupTrace.Milestone.MAIN_ENTERED);
+        trace.settle();
+        assertThat(fixture.log).containsExactly("Startup (cold, AOT cache skipped: launch-failed, CDS on): main entered 120 ms");
+        assertThat(trace.document(trace.status()).get("jvm")).isEqualTo(java.util.Map.of("aotCache", "skipped: launch-failed", "cds", "on"));
     }
 
     @Test void aDetachedTraceNeverLogsOrSchedules() {

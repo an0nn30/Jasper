@@ -16,6 +16,85 @@ file). Every contrast target holds; Light cyan now meets 4.9:1, so it is no long
 converter's built-in list and living docs say Slate Cobalt; plans, specs, acceptance records and the entries below keep
 Slate Steel. GUI check pending.
 
+**Cmd-click file paths (command line plan 3) — 2026-10-14** (`claude/default-editor`, worktree
+`.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
+[plan](superpowers/plans/2026-10-14-jasper-command-line-3-cmd-click-paths.md)). Cmd-click on macOS, Ctrl-click
+elsewhere, on a file path in a local pane's output (`PATH`, `PATH:LINE`, `PATH:LINE:COLUMN`, `PATH(LINE)` and
+`PATH(LINE,COLUMN)`; absolute, `./`, `../`, `~/`, or relative with a `/` or an extension; `C:\…` and backslash paths
+on Windows; across soft wraps), or on an OSC 8 or plain-text `file://` link to this machine, opens the file in the
+default editor at the line. `jasper-terminal` finds the path (`internal.text.PathDetector`, matched outside the buffer
+lock) and reports a new supported value, `view.FileLink`, through `TerminalView.setFileLinkHandler`; a URL still opens
+the browser first, and a click on anything else still starts a selection. A plain-text `file://` URL no longer goes to
+the browser. The app resolves the path against the pane's local directory (`workspace.FileLinks`), checks on a virtual
+thread that it is a regular file, and opens it through `PluginRuntime.open` with the line and the clicked pane's
+window; a provided session, or a shell reporting a remote directory, opens nothing. Fixed on the way: `JediCellReader`
+cached cell styles by colour, and JediTerm's `HyperlinkStyle` equality ignores the link, so every OSC 8 link in the
+same colours opened the first one's target. Deviations: the six in the plan's Planned deviations. Execution rulings: when a position follows, a path restarts after an unclosed mid-word `(`, so a Java stack frame `at com.foo.Bar.baz(Bar.java:42)` gives `Bar.java` at line 42, and a path starts after an `=` only when no `/` or `\` comes before it, so `--config=./x.toml` clicks and `/data/dt=2024-01-01/part.parquet` stays whole (Decision 13); on Windows a path, a `~/` remainder or a pane directory that names a UNC host other than `wsl$` or `wsl.localhost` (compared in ASCII only) resolves to nothing, so a click never makes Windows authenticate to a host named by program output; `LinkDetector` and `PathDetector` share one trailing-punctuation set; the view tests also click a soft-wrapped path and an OSC 8 `file://` link. Final review: a plain-text `file://` URL's trailing `:LINE[:COLUMN]` gives the line, as IntelliJ's console does; the SDK's editor contract names the Cmd-click route; log lines on the editor route carry no path. Known limits: where the desktop supports neither edit nor reveal (often on Linux), a click under System default app only logs; the existence check follows a symbolic link, also to a network share; a click just before quitting can still open its file; the WSL share exemption goes by host name, so on Windows without WSL a printed `\\wsl$\…` path still reaches network name resolution; on Windows an OSC 7 report naming a share still becomes the directory a new tab or split starts in; in a WSL pane `~/` and the start-directory fallback resolve against the Windows home; a plain-text `file://` link to an `.html` file, such as Gradle's test report, opens the HTML in the editor rather than the browser (the user's call).
+`./gradlew check --continue`: **10,367 tests, 0 failures, 0 errors, 17 skipped**. No GUI
+launched. GUI checks for the user, in the packaged app: Cmd-click on compiler output (`javac`'s `src/Foo.java:42:`,
+`dotnet build`'s `Foo.cs(42,5):`) in a local pane opens the Jasper Editor at the line; in a Remote ssh pane a path
+opens nothing; a path soft-wrapped in a narrow window opens from either row; names from `ls --hyperlink` (GNU) or
+`eza --hyperlink` open by Cmd-click; Kotlin output `e: file:///…/Foo.kt:12:5` opens the file at line 12; on Windows
+and Linux, Ctrl-click, and Ctrl+Shift-click inside a program that uses the mouse; with System default app chosen, a
+click on a `.txt` or a `.command` opens it as text in the default text editor (TextEdit unless changed), and the
+`.command` does not run; on Windows, a Ctrl-click on a `\\wsl$\…` path in a WSL pane
+opens it. After merging `main` (the Catppuccin themes, then start-up recovery): **10,421 tests, 0 failures, 0 errors, 17 skipped** (a run lost
+`TftpReadTest.blockNumbersWrapOnALongRead` to a port race in `Ports.free`; the re-run passed). Merged to local `main`, not pushed.
+
+**Start-up recovery plan 3 (the application) complete — 2026-10-14** (`claude/startup-recovery`, worktree
+`.claude/worktrees/startup-recovery`; spec `docs/superpowers/specs/2026-10-14-jasper-startup-recovery-design.md`).
+After the launcher recovers a start without the AOT cache, the start-up line says why (`AOT cache skipped:
+launch-failed`, `remembered` or `environment`); Jasper checks the cache on its VM options worker, and when the check
+fails writes `<home>/jasper-aot.failed` (the path the launcher names in `jasper.aotCacheRecord`) and posts "Jasper
+started without its start-up cache" in Memory & VM options, once per record. `VmOptionsCheck` runs its cache check
+with the custom options only when they start the JVM, so a broken option is never blamed on the cache, and System
+Settings' "These options turn off Jasper's start-up cache" appears only then. New JDK-only `AotCacheRecord`, checked
+against the launcher's `aot-record-vectors.txt`; matching compares the cache file's size and time and the options,
+not its path. The notification quotes the JVM's own AOT error (for the 2026-10-14 failure, the `SecurityException`).
+Deviations: the eleven planned ones in the plan (among them one notification per record, and a hand-set skip reading
+`environment` in the log), Task 0 (plan 2 carry-over, `b05c2585`: the watcher's Windows launches drop
+`_JPACKAGE_LAUNCHER`, and its re-exec handling is recorded), and `AotCacheRecord.matches` also requiring a non-negative
+modification time, as the launcher's matcher does.
+Final-review fixes: after both skips a check that could not run still posts the custom VM options notice; a cache that
+also fails with the bundled options alone is recorded without the options and System Settings does not blame them;
+Settings runs no cache check while the options stop the JVM; and the AOT message keeps a `] ` inside it.
+`./gradlew check --continue`: **10195 tests, 0 failures, 0 errors, 12 skipped** (4 minutes 27 seconds). After merging `main`: **10,337 tests, 0 failures, 0 errors, 12 skipped**. Merged to local `main`, not pushed (the branch is on `origin` for CI). No GUI
+launched. GUI checks for the user are in the plan's hand-off section.
+
+**Start-up recovery plan 2 (the watcher) complete — 2026-10-14.** On `claude/startup-recovery` (not pushed): Jasper's
+launcher starts `jasper-watch` beside itself before the JVM and sends it one byte once the JVM exists. When the JVM dies
+first (`exit`, `_exit` or a signal), the watcher starts Jasper once more without the start-up cache
+(`JASPER_AOT_CACHE_SKIP=launch-failed`), then without the custom VM options, and at last shows "Jasper could not start"
+with Java's message ([plan](superpowers/plans/2026-10-14-jasper-startup-recovery-2-watcher.md),
+[spec](superpowers/specs/2026-10-14-jasper-startup-recovery-design.md) sections 4, 5 and 7). The cfg hook names
+`<home>/jasper-aot.failed` (`-Djasper.aotCacheRecord`), skips the cache for `JASPER_AOT_CACHE_SKIP` or a matching record
+(`-Djasper.aotCacheSkipped`) and appends `-version` for `JASPER_LAUNCH_DIAGNOSE`; the `atexit` guard is gone.
+`packaging/launcher/test/aot-record-vectors.txt` is shared with plan 3. Deviations: the ten in the plan, and three made
+while executing: `testWatcher` and `testLauncherWatch` wait for a retry or report only in scenarios that start one (the
+planned loops ran to the deadline in every negative scenario); the two unwatched `testLauncherWatch` scenarios have the
+JVM reject its options, so they fail unless the launch goes ahead; the image test's `remember` closure takes `Long size`
+(Groovy 4.0.32). The final review's fixes: the watcher's launches drop `_JPACKAGE_LAUNCHER` (POSIX and Windows), on
+POSIX end of file counts only once the launcher is gone (parent identity, 1 s re-exec wait), Windows attribute-list,
+clock and deadline fixes, the `SIGCHLD` reset, `check-install.sh` checks `bin/jasper-watch`, and an unsigned 64-bit
+vector. Full `./gradlew check --continue`: 10,165 tests, 0 failures, 12 skips (4 minutes 25 seconds, most test tasks up
+to date; the launcher's `verifyLauncherSources`, `testLauncherCore` (152 checks), `testWatcher`, `testLauncherWatch` and
+`verifyLauncherImage` re-run with `--rerun`, all passing). Manual checks pending (the user): the
+hand-off checks in the plan. Plan 3 (the application) is next.
+
+**Start-up recovery plan 1 (the shipped cache) complete — 2026-10-14** (`claude/startup-recovery`, worktree
+`.claude/worktrees/startup-recovery`; spec `docs/superpowers/specs/2026-10-14-jasper-startup-recovery-design.md`).
+The installed Jasper.app would not start ("sealing violation: can't seal package com.jetbrains"): JBR 25 gives
+classes from the AOT cache the code source of the path the cache was trained at (JDK-8376576), so the cache only
+worked while the repository's build image existed, and the installed app read its bundled plugins from it.
+`stagePackage` now removes package sealing (only `jbr-api` declared it; the About notices record the change) and
+`verifyPackage` rejects a sealed jar; `CodeLocation` finds Jasper's own jar from its class resource for plugin
+discovery, handoff and the replaced-on-disk check (`CodeSourceScanTest` keeps code sources out of the class-path
+modules); `trainAotCache` trains in a `ditto` copy deleted before `verifyAotCache`. `./gradlew check --continue`:
+**10,164 tests, 0 failures, 0 errors, 12 skipped**. No GUI launched. GUI check for
+the user: `./gradlew :jasper-app:packageDist`, install the DMG, quit Jasper completely, move the repository's
+`jasper-app/build/packaging/image` aside and start Jasper: the start-up line says `AOT cache used` and the bundled
+plugins are `ACTIVE` with no "Plugin discovery: …/build/…" warning. Plans 2 (watcher) and 3 (application) follow.
+
 **Catppuccin built in — 2026-10-14** (`claude/catppuccin-themes`, worktree `.claude/worktrees/catppuccin-themes`; asked
 for by the user, who will name tweaks after seeing the port). Catppuccin Latte (Light), Frappé, Macchiato and Mocha
 (Dark) are built-in themes beside Slate Steel, which stays the default and the fallback. They are the converter's

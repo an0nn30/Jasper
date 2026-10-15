@@ -1,6 +1,6 @@
 # Jasper command line and default editor
 
-Status: **Approved on 2026-10-13** (the user: "spec approved"). Plan 1 (the `jasper` command) complete on 2026-10-14: [`2026-10-13-jasper-command-line-1-jasper-command.md`](../plans/2026-10-13-jasper-command-line-1-jasper-command.md); its deviations are in the plan's banner. Plan 2 (the default editor) complete on 2026-10-14: [`2026-10-14-jasper-command-line-2-default-editor.md`](../plans/2026-10-14-jasper-command-line-2-default-editor.md); its deviations are in that plan's Planned deviations and `docs/STATUS.md`. Branch: `claude/default-editor`, from `main` at `15d97d5d`.
+Status: **Approved on 2026-10-13** (the user: "spec approved"). Plan 1 (the `jasper` command) complete on 2026-10-14: [`2026-10-13-jasper-command-line-1-jasper-command.md`](../plans/2026-10-13-jasper-command-line-1-jasper-command.md); its deviations are in the plan's banner. Plan 2 (the default editor) complete on 2026-10-14: [`2026-10-14-jasper-command-line-2-default-editor.md`](../plans/2026-10-14-jasper-command-line-2-default-editor.md); its deviations are in that plan's Planned deviations and `docs/STATUS.md`. Plan 3 (Cmd-click file paths) complete on 2026-10-14: [`2026-10-14-jasper-command-line-3-cmd-click-paths.md`](../plans/2026-10-14-jasper-command-line-3-cmd-click-paths.md); its deviations are in that plan's Planned deviations and `docs/STATUS.md`. Branch: `claude/default-editor`, from `main` at `15d97d5d`.
 
 ## 1. Intent and decisions
 

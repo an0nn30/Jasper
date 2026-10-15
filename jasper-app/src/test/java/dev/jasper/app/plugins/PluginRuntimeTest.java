@@ -9,6 +9,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
@@ -610,6 +612,54 @@ class PluginRuntimeTest {
         assertThat(root.resolve("absent/dev.example.client/data/client")).hasContent(client.toString());
         onEdt(() -> assertThatIllegalStateException().isThrownBy(() -> runtime.commandClient(java.util.Optional.empty()))
             .withMessage("Plugins have already started"));
+        onEdt(runtime::stop);
+    }
+
+    static final String LINE_EDITOR = """
+        package fix.lines;
+        import java.nio.file.Files;
+        import java.nio.file.StandardOpenOption;
+        public final class Main implements dev.jasper.sdk.plugin.Plugin {
+            @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                context.platform().editor((file, line, window) -> {
+                    String where = window.map(owner -> ((dev.jasper.sdk.terminal.WindowHandle) owner).id().toString()).orElse("-");
+                    try {
+                        Files.writeString(context.dataDirectory().resolve("edited"),
+                            file.getFileName() + "|" + (line.isPresent() ? String.valueOf(line.getAsInt()) : "-") + "|" + where + "\\n",
+                            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                    } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                    return true;
+                });
+            }
+        }
+        """;
+
+    /** A Cmd-click opens the file at its line in the clicked pane's window; Jasper's own opens keep the active window. */
+    @Test void openWithALineAndAWindowReachesTheProvidedEditor() throws Exception {
+        PluginJars.build(root.resolve("bundled").resolve("dev.example.lines"), "lines.jar",
+            PluginJars.descriptor("dev.example.lines", "1.0.0", "fix.lines.Main") + "capabilities = [\"editor.provide\"]\n",
+            Map.of("fix.lines.Main", LINE_EDITOR), List.of());
+        TerminalFixture fixture = AppContractTest.onEdtValue(TerminalFixture::new);
+        UUID active = AppContractTest.onEdtValue(fixture::addWindow);
+        UUID clicked = AppContractTest.onEdtValue(fixture::addWindow);
+        onEdt(() -> fixture.activateWindow(active));
+        var created = new AtomicReference<PluginRuntime>();
+        onEdt(() -> created.set(new PluginRuntime(new PluginRuntime.Options(root.resolve("bundled"), root.resolve("absent"), null, false,
+            root.resolve("plugins.toml"), root.resolve("plugins.lock")),
+            new ActivityNotifier(deck.companion(), () -> { }), new PluginRuntime.SettingsReports(d -> { }, file -> { }),
+            new dev.jasper.app.contributions.Contributions(), AppContractTest.headlessWindows(), fixture.registry)));
+        PluginRuntime runtime = created.get();
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        List<Path> desktop = new CopyOnWriteArrayList<>();
+        runtime.open(root.resolve("Foo.java"), OptionalInt.of(42), Optional.of(clicked), desktop::add);
+        runtime.open(root.resolve("Foo.java"), OptionalInt.empty(), Optional.empty(), desktop::add);
+        runtime.open(root.resolve("config.toml"), desktop::add);
+        assertThat(Files.readAllLines(root.resolve("absent/dev.example.lines/data/edited")))
+            .containsExactly("Foo.java|42|" + clicked, "Foo.java|-|-", "config.toml|-|" + active);
+        assertThat(desktop).isEmpty();
+        onEdt(() -> assertThatIllegalStateException().as("never on the UI thread")
+            .isThrownBy(() -> runtime.open(root.resolve("Foo.java"), OptionalInt.of(1), Optional.of(clicked), desktop::add)));
         onEdt(runtime::stop);
     }
 }

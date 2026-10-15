@@ -10,9 +10,9 @@ import java.nio.file.Path;
 import java.util.Optional;
 
 /**
- * Custom VM options notifications (spec sections 4.3, 5.1, 5.4 and 5.5) in their own group: a fallback start, a corrupted
- * file, a pending restart, failures and low memory. The instance methods run on the EDT only; {@link #lowMemory} builds a
- * request on any thread.
+ * Custom VM options notifications (spec sections 4.3, 5.1, 5.4 and 5.5) in their own group: a fallback start, a start
+ * without the start-up cache (start-up recovery spec 6.4), a corrupted file, a pending restart, failures and low memory.
+ * The instance methods run on the EDT only; {@link #lowMemory} builds a request on any thread.
  */
 final class VmOptionsNotices {
     static final NotificationGroup GROUP = new NotificationGroup("jasper.vmoptions", "Memory & VM options", NotificationRequest.JASPER, DisplayMode.CARD);
@@ -33,6 +33,16 @@ final class VmOptionsNotices {
         center.post(NotificationRequest.of(GROUP.id(), Severity.WARNING, "Jasper started without your custom VM options")
             .withContent(message.map(text -> "The JVM rejected them: " + text).orElse("The JVM rejected them, so Jasper started with the bundled options."))
             .withAction(new NotificationAction("Edit Custom VM Options\u2026", edit, false)));
+    }
+
+    /**
+     * The launcher started Jasper once more without its start-up cache, which made Java fail at launch, and Jasper now
+     * remembers it; {@code message} is Java's own.
+     */
+    void cacheSkipped(String message) {
+        center.post(NotificationRequest.of(GROUP.id(), Severity.WARNING, "Jasper started without its start-up cache")
+            .withContent("The start-up cache made Java fail at launch, so Jasper starts more slowly until a new Jasper build "
+                + "replaces it. Java reported: " + message));
     }
 
     /** The launcher ignored {@code file} because it is not valid text. */

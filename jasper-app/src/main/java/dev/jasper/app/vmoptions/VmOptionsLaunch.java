@@ -16,31 +16,39 @@ import java.util.Properties;
  *             JVM (for example {@code :jasper-app:run})
  * @param digest the digest of the lines it applied; empty when it applied none
  * @param corrupted whether it ignored the file as corrupted
- * @param skipped why it skipped the file ({@code launch-failed} after the guard's fallback start)
+ * @param skipped why it skipped the file ({@code launch-failed} after the launcher's fallback start)
+ * @param aotCacheSkipped why it started this JVM without the AOT cache (start-up recovery spec 6.1): {@code launch-failed},
+ *                        {@code remembered}, or a hand-set {@code JASPER_AOT_CACHE_SKIP}'s value ({@code environment}
+ *                        when blank)
+ * @param aotCacheRecord the file in which the application remembers a cache that failed at launch (spec 6.2); empty when
+ *                       the options named no cache or Jasper's launcher did not start this JVM
  */
-public record VmOptionsLaunch(Optional<Path> file, Optional<String> digest, boolean corrupted, Optional<String> skipped) {
+public record VmOptionsLaunch(Optional<Path> file, Optional<String> digest, boolean corrupted, Optional<String> skipped,
+                              Optional<String> aotCacheSkipped, Optional<Path> aotCacheRecord) {
     /** This JVM's launch. */
     public static VmOptionsLaunch current() { return of(System.getProperties()); }
 
     private static final System.Logger LOG = System.getLogger(VmOptionsLaunch.class.getName());
 
     static VmOptionsLaunch of(Properties properties) {
-        return new VmOptionsLaunch(file(properties), present(properties, "jasper.vmOptionsDigest"),
-            "true".equals(properties.getProperty("jasper.vmOptionsFile.corrupted")), present(properties, "jasper.vmOptionsSkipped"));
+        return new VmOptionsLaunch(path(properties, "jasper.vmOptionsFile", "so the VM options are read-only"),
+            present(properties, "jasper.vmOptionsDigest"), "true".equals(properties.getProperty("jasper.vmOptionsFile.corrupted")),
+            present(properties, "jasper.vmOptionsSkipped"), present(properties, "jasper.aotCacheSkipped"),
+            path(properties, "jasper.aotCacheRecord", "so a start-up cache that fails at launch cannot be remembered"));
     }
 
     /**
-     * The launcher's options file. A value this platform cannot parse (the Windows launcher passes arguments through the
-     * ANSI code page, so unrepresentable characters arrive as {@code ?}) leaves the launch unmanaged instead of stopping
-     * Jasper from starting.
+     * A path the launcher reported. A value this platform cannot parse (the Windows launcher passes arguments through the
+     * ANSI code page, so unrepresentable characters arrive as {@code ?}) reads as absent instead of stopping Jasper from
+     * starting; {@code consequence} says what that costs.
      */
-    private static Optional<Path> file(Properties properties) {
-        Optional<String> value = present(properties, "jasper.vmOptionsFile");
+    private static Optional<Path> path(Properties properties, String name, String consequence) {
+        Optional<String> value = present(properties, name);
         if (value.isEmpty()) return Optional.empty();
         try {
             return Optional.of(Path.of(value.get()));
         } catch (InvalidPathException unparsable) {
-            LOG.log(System.Logger.Level.WARNING, "jasper.vmOptionsFile is not a path this platform can parse, so the VM options are read-only: {0}", value.get());
+            LOG.log(System.Logger.Level.WARNING, name + " is not a path this platform can parse, " + consequence + ": {0}", value.get());
             return Optional.empty();
         }
     }

@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -471,14 +472,14 @@ public final class PluginRuntime {
      * The bundled plugin directory: the {@code jasper.plugins.bundled} system property when set (Gradle
      * run and tests), otherwise {@code plugins} beside the application jar. A classes directory has none.
      *
-     * @param codeSource the application's code source, or null
+     * @param codeLocation the application's code location ({@code HandoffSocket.codeLocation()}), or null
      * @return the directory, which need not exist, or null
      */
-    public static Path bundledDirectory(Path codeSource) {
+    public static Path bundledDirectory(Path codeLocation) {
         String override = System.getProperty("jasper.plugins.bundled");
         if (override != null && !override.isBlank()) return Path.of(override);
-        if (codeSource == null || !Files.isRegularFile(codeSource)) return null;
-        return codeSource.toAbsolutePath().getParent().resolve("plugins");
+        if (codeLocation == null || !Files.isRegularFile(codeLocation)) return null;
+        return codeLocation.toAbsolutePath().getParent().resolve("plugins");
     }
 
     /**
@@ -569,12 +570,33 @@ public final class PluginRuntime {
      * @throws IllegalStateException on the UI thread
      */
     public void open(Path file, Consumer<Path> desktop) {
+        openFromWorker(file, OptionalInt.empty(), () -> terminals.activeWindow().map(dev.jasper.app.terminals.WindowEntry::id), desktop);
+    }
+
+    /**
+     * As {@link #open(Path, Consumer)}, at {@code line} and with {@code window} instead of the active one: what a
+     * Cmd-click on a file in a terminal opens. The desktop opens the file without the line.
+     *
+     * @param file the file
+     * @param line the 1-based line, or empty for the file's start
+     * @param window the terminal window the click came from, or empty for none
+     * @param desktop the desktop's opener, such as {@code ConfigEditor::open}, or {@code ConfigEditor::editOrReveal} for a
+     *        file a program named; its failure propagates
+     * @throws IllegalStateException on the UI thread
+     */
+    public void open(Path file, OptionalInt line, Optional<UUID> window, Consumer<Path> desktop) {
+        Objects.requireNonNull(window, "window");
+        openFromWorker(file, line, () -> window, desktop);
+    }
+
+    private void openFromWorker(Path file, OptionalInt line, Supplier<Optional<UUID>> window, Consumer<Path> desktop) {
         if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor operations require a worker thread");
         Objects.requireNonNull(file, "file");
+        Objects.requireNonNull(line, "line");
         Objects.requireNonNull(desktop, "desktop");
         PluginHost current = host;
         if (current == null) desktop.accept(file);
-        else current.fileEditors.openFromWorker(file, () -> terminals.activeWindow().map(dev.jasper.app.terminals.WindowEntry::id), desktop);
+        else current.fileEditors.openFromWorker(file, line, window, desktop);
     }
 
     private Optional<Path> commandClient = Optional.empty();

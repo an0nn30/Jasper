@@ -1,6 +1,7 @@
 // See JasperVmOptions.h. Environment and file access around JasperVmOptionsCore, with jpackage's own helpers.
 #include "JasperVmOptions.h"
 
+#include <cstdint>
 #include <cstdio>
 #include <new>
 #include <string>
@@ -13,7 +14,9 @@
 #include "SysInfo.h"
 #include "tstrings.h"
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <sys/stat.h>
 #endif
 
@@ -42,7 +45,8 @@ tstring native(const std::string& value) {
 vmoptions::Environment environment() {
     vmoptions::Environment env;
     const char* const names[] = { vmoptions::VM_OPTIONS_VARIABLE, vmoptions::SKIP_VARIABLE, vmoptions::HOME_VARIABLE,
-        "HOME", "XDG_CONFIG_HOME", "APPDATA", "USERPROFILE" };
+        JASPER_AOT_CACHE_SKIP_VARIABLE, JASPER_LAUNCH_DIAGNOSE_VARIABLE, "HOME", "XDG_CONFIG_HOME", "APPDATA",
+        "USERPROFILE" };
     for (const char* name : names) {
         const tstring key = native(name);
         if (SysInfo::isEnvVariableSet(key)) {
@@ -97,6 +101,31 @@ bool readBytes(const std::string& path, std::string& bytes) {
     return !failed;
 }
 
+// What is at the cache's path, as the record compares it: size and modification time in whole seconds since the epoch.
+vmoptions::CacheFile cacheFile(const std::string& path) {
+    vmoptions::CacheFile result;
+#ifdef _WIN32
+    WIN32_FILE_ATTRIBUTE_DATA data;
+    if (GetFileAttributesExW(native(path).c_str(), GetFileExInfoStandard, &data)
+            && (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
+        // FILETIME counts 100 ns intervals since 1601; 11644473600 s lie between 1601 and 1970.
+        const std::uint64_t ticks = (static_cast<std::uint64_t>(data.ftLastWriteTime.dwHighDateTime) << 32)
+            | data.ftLastWriteTime.dwLowDateTime;
+        result.regular = true;
+        result.size = (static_cast<std::uint64_t>(data.nFileSizeHigh) << 32) | data.nFileSizeLow;
+        result.modified = static_cast<std::int64_t>(ticks / 10000000u) - 11644473600LL;
+    }
+#else
+    struct stat info;
+    if (stat(path.c_str(), &info) == 0 && S_ISREG(info.st_mode)) {
+        result.regular = true;
+        result.size = static_cast<std::uint64_t>(info.st_size);
+        result.modified = static_cast<std::int64_t>(info.st_mtime);
+    }
+#endif
+    return result;
+}
+
 } // namespace
 
 void applyUserVmOptions(CfgFile& cfgFile) {
@@ -110,7 +139,8 @@ void applyUserVmOptions(CfgFile& cfgFile) {
             }
         }
         const vmoptions::Environment env = environment();
-        const std::string path = vmoptions::userFilePath(hostOs(), env, workingDirectory(), isRegularFile);
+        const std::string directory = workingDirectory();
+        const std::string path = vmoptions::userFilePath(hostOs(), env, directory, isRegularFile);
         std::string bytes;
         vmoptions::UserFile file;
         const bool exists = !path.empty() && readBytes(path, bytes);
@@ -118,8 +148,15 @@ void applyUserVmOptions(CfgFile& cfgFile) {
             file = vmoptions::parse(bytes);
         }
         const vmoptions::Plan plan = vmoptions::plan(bundled, path, exists ? &file : nullptr, env);
+        const std::string recordPath = vmoptions::aotRecordPath(hostOs(), env, directory);
+        std::string record;
+        const bool remembered = !recordPath.empty() && vmoptions::namesAotCache(plan.javaOptions)
+            && readBytes(recordPath, record);
+        const vmoptions::CacheFile cache = vmoptions::namesAotCache(plan.javaOptions)
+            ? cacheFile(vmoptions::aotCachePath(plan.javaOptions)) : vmoptions::CacheFile();
         tstring_array merged;
-        for (const std::string& option : plan.javaOptions) {
+        for (const std::string& option : vmoptions::applyAotCache(plan.javaOptions, env, recordPath,
+                remembered ? &record : nullptr, cache)) {
             merged.push_back(native(option));
         }
         cfgFile.setPropertyValue(SectionName::JavaOptions, PropertyName::javaOptions, merged);

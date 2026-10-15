@@ -52,4 +52,40 @@ class ConfigEditorTest {
         assertThat(thrown.get()).isInstanceOf(IllegalStateException.class);
         assertThat(calls).isEmpty();
     }
+
+    /** Ruling 6: a file a program printed or linked is edited or revealed, never opened, which would run a script or program. */
+    @Test void editOrRevealEditsWithoutEverOpening() {
+        Path file = Path.of("/tmp/run.command");
+        var calls = new ArrayList<String>();
+        new ConfigEditor(path -> calls.add("edit:" + path), path -> calls.add("open:" + path), path -> calls.add("reveal:" + path))
+            .editOrReveal(file);
+        assertThat(calls).as("the edit action alone").containsExactly("edit:" + file);
+    }
+    @Test void editOrRevealRevealsWhenEditFailsAndStillNeverOpens() {
+        Path file = Path.of("/tmp/run.command");
+        var calls = new ArrayList<String>();
+        new ConfigEditor(path -> { calls.add("edit:" + path); throw new UnsupportedOperationException("edit"); },
+            path -> calls.add("open:" + path), path -> calls.add("reveal:" + path)).editOrReveal(file);
+        assertThat(calls).as("reveal after edit; open is skipped").containsExactly("edit:" + file, "reveal:" + file);
+    }
+    @Test void editOrRevealFailsWithEachAttemptsFailureSuppressedWhenNeitherWorked() {
+        Path file = Path.of("/tmp/run.command");
+        var calls = new ArrayList<String>();
+        var broken = new ConfigEditor(path -> { calls.add("edit"); throw new IllegalStateException("edit"); },
+            path -> calls.add("open"), path -> { calls.add("reveal"); throw new UnsupportedOperationException("reveal"); });
+        assertThatThrownBy(() -> broken.editOrReveal(file)).isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining(file.toString())
+            .satisfies(failure -> assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("edit", "reveal"));
+        assertThat(calls).as("open was never tried").containsExactly("edit", "reveal");
+    }
+    @Test void editOrRevealRefusesTheEdt() throws Exception {
+        var calls = new ArrayList<Path>();
+        var editor = new ConfigEditor(calls::add, calls::add, calls::add);
+        var thrown = new AtomicReference<Throwable>();
+        SwingUtilities.invokeAndWait(() -> {
+            try { editor.editOrReveal(Path.of("/tmp/run.command")); } catch (Throwable failure) { thrown.set(failure); }
+        });
+        assertThat(thrown.get()).isInstanceOf(IllegalStateException.class);
+        assertThat(calls).isEmpty();
+    }
 }

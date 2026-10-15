@@ -299,6 +299,10 @@ them after Jasper's own variables and before `[terminal.env]`; WSL profiles and 
 plugin's replacing a non-bundled plugin's. Every editor open in the application (`ConfigEditor`'s callers, the Plugin
 Manager's settings files, the VM options file and `Platform.openInEditor`) runs on a worker, which asks the file editor
 on the UI thread through `FileEditors.editFromWorker`, waits up to 30 s, and otherwise runs the desktop fallback itself.
+A Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local terminal pane (`JasperApplication.openFileAt`)
+asks the same way, with the line and the clicked window; its path is program output, and an OSC 8 link's target can
+differ from the text shown, so the fallback is the desktop's edit or reveal action, never its open action, and a
+plugin's editor should edit the file and never run it.
 `LocalSpec.command` becomes `terminals.OpenSpec.Local.program`; the workspace launches it through `ShellLauncher` with
 the default profile's environment and pins close-on-success over `terminal.on_exit`. `CommandLine.client()` comes from
 `commandline.CommandInstall.client`: the client inside the installed image, or the build's in a development run. The

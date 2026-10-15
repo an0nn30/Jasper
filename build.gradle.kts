@@ -90,7 +90,7 @@ val verifyTerminalArchitecture = tasks.register("verifyTerminalArchitecture") {
         graph.keys.forEach { visit(it, linkedSetOf(), done) }
         val supported = setOf(
             "session.TerminalSession", "session.SessionLaunchOptions", "session.TerminalSessionListener", "session.AttachedConnection", "session.RemoteDirectory",
-            "view.TerminalView", "view.TerminalAction", "config.TerminalOptions", "config.Palette",
+            "view.TerminalView", "view.TerminalAction", "view.FileLink", "config.TerminalOptions", "config.Palette",
             "config.CursorStyle", "config.BellMode", "config.OptionAsMeta", "config.GridSize",
             "search.SearchQuery", "search.FindResult", "rendering.FontSet"
         ).map { "dev.jasper.terminal.$it" }.toSet()

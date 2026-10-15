@@ -20,8 +20,9 @@ import java.util.function.Function;
  * @param grid initial terminal size in cells
  * @param scrollback history capacity from 0 through 1,000,000 lines
  * @param localHostNames names this machine is known by, for classifying reported working directories; resolve them off the EDT, empty when unknown
- * @param localPathMapper turns the path of a working-directory report classified as local into a directory on this machine;
- *        empty ignores the report. It runs on the session's reader thread and must not block. Record equality compares
+ * @param localPathMapper turns the path of a working-directory report, or of a clicked {@code file:} link, classified as
+ *        local into a path on this machine; empty ignores the report and names no file for the link. It runs on the
+ *        session's reader thread for a report and on the Event Dispatch Thread for a click, and must not block. Record equality compares
  *        the mapper with its own {@code equals}, which for a lambda is identity: options that differ only in two
  *        separately created mappers are not equal
  */

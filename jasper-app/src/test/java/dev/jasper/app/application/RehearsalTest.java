@@ -512,4 +512,15 @@ class RehearsalTest {
         Rehearsal.closeAndDispose(() -> { }, disposed::incrementAndGet);
         assertThat(disposed).as("a close that worked disposed the frame itself").hasValue(2);
     }
+
+    @Test void aSilencedWindowOpensNoFile() throws Exception {
+        var opened = new CopyOnWriteArrayList<String>();
+        edt(() -> {
+            var content = DesktopTestSupport.content(launcher(new ArrayDeque<>()));
+            content.onOpenFile = (file, line) -> opened.add(file + ":" + line);
+            Rehearsal.silence(content);
+            content.onOpenFile.accept(java.nio.file.Path.of("notes.txt"), 3);
+        });
+        assertThat(opened).isEmpty();
+    }
 }

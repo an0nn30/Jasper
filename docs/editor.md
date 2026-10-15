@@ -16,6 +16,18 @@ is the binding reference.
   a file in a folder that does not exist, is reported and the other files still open. With `--wait` (`-w`) the command
   returns once every tab it opened has closed, so `git config --global core.editor "jasper editor --wait"` edits commit
   messages here; Ctrl-C stops waiting and leaves the tabs open.
+- Cmd-click (Ctrl-click on Linux and Windows) a file path in a local terminal pane: `src/Foo.java:42`,
+  `Foo.java:42:5`, `Foo.cs(42,5)`, `./notes.md`, `~/a.txt`, `/tmp/x.log`, on Windows also `C:\…` and backslash
+  paths, or a `file://` link to this machine, as `ls --hyperlink` prints; a plain-text `file://` URL may end in
+  `:LINE[:COLUMN]`, as Kotlin's compiler prints. A relative path is relative to the directory
+  the shell last reported, else the one the pane started in. An existing file opens in the
+  [default editor](#default-editor), at the line when the editor takes one; anything else does nothing. Where a file
+  would open with the system's default app, a clicked file opens in the system's editor for its type (on macOS, the
+  default text editor), else is shown in the file manager; where the desktop supports neither, as on most Linux
+  desktops, the click opens nothing. On Windows, a path on a network share (`\\server\share\…`) other than WSL's opens
+  nothing. A path with spaces opens only from a link. Inside a program that uses the mouse, use Ctrl+Shift-click on
+  Linux and Windows. A pane whose shell reports a directory on another host, and a session a plugin provides, such as
+  Remote's ssh, open nothing.
 
 Opening a file that is already open selects its tab. Files larger than `max_file_mib` and binary
 files (a NUL byte near the start) are refused with a message in the tab.

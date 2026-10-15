@@ -66,11 +66,15 @@ public interface Platform {
 
     /**
      * Makes this plugin the editor Jasper opens files with: {@code config.toml}, the plugin settings files, the custom VM
-     * options file and every {@link #openInEditor} go to {@code editor} first, on the UI thread. One at a time: a bundled
-     * plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and any later one, this
-     * plugin's own included, throws. When the editor returns false or throws, when no plugin provides one, and when
-     * Jasper waited 30 seconds for the UI thread's answer, the desktop opens the file as before. Needs
-     * {@code editor.provide}. UI thread only. The registration ends with the plugin.
+     * options file, every {@link #openInEditor} and a Cmd-click (Ctrl-click on Linux and Windows) on a file path in a
+     * local terminal pane go to {@code editor} first, on the UI thread; a click brings the path's line and the clicked
+     * window. A clicked path comes from program output, and an OSC 8 link's target can differ from the text shown, so
+     * an editor edits the file and never runs it. One at a time: a bundled plugin's registration replaces a plugin's
+     * that is not bundled; otherwise the first stays and any later one, this plugin's own included, throws. When the
+     * editor returns false or throws, when no plugin provides one, and when Jasper waited 30 seconds for the UI
+     * thread's answer, the desktop opens the file as before; for a click it edits the file or shows it in the file
+     * manager instead, and never opens it. Needs {@code editor.provide}. UI thread only. The registration ends with
+     * the plugin.
      *
      * @param editor opens a file
      * @return the registration

@@ -34,8 +34,8 @@ class HandoffSocketTest {
         try (HandoffSocket endpoint = bind(request -> { seen.add(request); return LaunchRequest.Response.OK; })) {
             assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 7L)).isTrue();
             assertThat(seen).hasSize(1);
-            assertThat(seen.get(0).codeSource()).isEqualTo(Path.of("/app.jar"));
-            assertThat(seen.get(0).codeSourceModified()).isEqualTo(7L);
+            assertThat(seen.get(0).codeLocation()).isEqualTo(Path.of("/app.jar"));
+            assertThat(seen.get(0).codeLocationModified()).isEqualTo(7L);
             if (token().getFileSystem().supportedFileAttributeViews().contains("posix")) {
                 assertThat(java.nio.file.attribute.PosixFilePermissions
                     .toString(Files.getPosixFilePermissions(token()))).isEqualTo("rw-------");
@@ -92,12 +92,12 @@ class HandoffSocketTest {
         assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isFalse();
     }
 
-    @Test void anUnresolvableCodeSourceHandsOffInsteadOfCrashingTheLauncher() throws Exception {
+    @Test void anUnknownCodeLocationHandsOffInsteadOfCrashingTheLauncher() throws Exception {
         List<LaunchRequest> seen = new CopyOnWriteArrayList<>();
         try (HandoffSocket endpoint = bind(request -> { seen.add(request); return LaunchRequest.Response.OK; })) {
             assertThat(HandoffSocket.handOff(socket(), token(), null, 0L)).isTrue();
             assertThat(seen).singleElement()
-                .extracting(LaunchRequest::codeSource).isEqualTo(Path.of(""));
+                .extracting(LaunchRequest::codeLocation).isEqualTo(Path.of(""));
         }
     }
 
@@ -196,8 +196,8 @@ class HandoffSocketTest {
             request -> LaunchRequest.Response.OK)).isNull();
     }
 
-    @Test void theCodeSourceOfThisBuildIsResolvableAndItsTimestampIsReadable() {
-        Path source = HandoffSocket.codeSource();
+    @Test void theCodeLocationOfThisBuildIsResolvableAndItsTimestampIsReadable() {
+        Path source = HandoffSocket.codeLocation();
         assertThat(source).as("tests run from a jar or a classes directory").isNotNull();
         assertThat(source.isAbsolute()).isTrue();
         assertThat(HandoffSocket.lastModified(source)).isPositive();
