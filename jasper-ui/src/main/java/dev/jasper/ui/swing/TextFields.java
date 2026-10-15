@@ -285,7 +285,7 @@ final class TextFields {
             if (field.kind() == Nodes.FieldKind.SEARCH || field.kind() == Nodes.FieldKind.PATH) {
                 String name=field.kind() == Nodes.FieldKind.PATH ? "folder.filled" : "search";
                 // The palette's transparent query shows the rail-size glyph its reference depicts.
-                int extent=columnSearch ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_GLYPH) : com.formdev.flatlaf.util.UIScale.scale(context().icons().size(panelSearch || surface.transparent ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
+                int extent=columnSearch ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_GLYPH) : com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), panelSearch || surface.transparent ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
                 leading.setIcon(panelSearch ? context().icons().panel(name, context().theme().semantic(), SemanticColor.HUE_NEUTRAL,extent)
                     : context().icons().icon(name,context().theme(),SemanticColor.TEXT_PLACEHOLDER,extent));
             }

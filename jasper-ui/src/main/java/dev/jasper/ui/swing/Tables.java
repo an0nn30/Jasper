@@ -164,7 +164,7 @@ final class Tables {
                 label.setHorizontalTextPosition(SwingConstants.LEADING);
                 label.setIcon(column.sorted().map(ascending -> context().icons().icon(ascending ? "chevron.up" : "chevron.down",
                         context().theme().semantic(), SemanticColor.TEXT_SECONDARY,
-                        com.formdev.flatlaf.util.UIScale.scale(context().icons().size(Nodes.IconSize.CAPTION)))).orElse(null));
+                        com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), Nodes.IconSize.CAPTION)))).orElse(null));
                 label.getAccessibleContext().setAccessibleName(column.title()
                         + column.sorted().map(ascending -> ascending ? ", sorted ascending" : ", sorted descending").orElse(""));
                 String columnId = column.id();

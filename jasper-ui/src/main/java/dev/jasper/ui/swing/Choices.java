@@ -120,10 +120,10 @@ final class Choices {
                     picker.setText(picker.face==null ? option == null ? "Choose…" : option.label() : picker.empty ? "Choose…" : picker.face.primary());
                     picker.setForeground(ThemePainting.color(context(), picker.textRole(false)));
                     picker.setIcon(choice.icon().isEmpty() ? null : context().icons().icon(choice.icon(), context().theme().semantic(), SemanticColor.TEXT_SECONDARY,
-                        com.formdev.flatlaf.util.UIScale.scale(context().icons().size(Nodes.IconSize.CONTROL))));
+                        com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), Nodes.IconSize.CONTROL))));
                     picker.setDisabledIcon(picker.getIcon()); picker.setHorizontalAlignment(SwingConstants.LEADING);
                     int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING), pad = ThemePainting.metric(context(), DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
-                    picker.setBorder(new EmptyBorder(ring, pad, ring, pad + com.formdev.flatlaf.util.UIScale.scale(context().icons().size(Nodes.IconSize.CAPTION)) + ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP)));
+                    picker.setBorder(new EmptyBorder(ring, pad, ring, pad + com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), Nodes.IconSize.CAPTION)) + ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP)));
                 } else {
                     if (!options.equals(choice.options())) {
                         closeOptions(); input.removeAll(); options = choice.options(); input.setLayout(new SegmentLayout());
@@ -239,7 +239,7 @@ final class Choices {
             try {
                 if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
                 var icon = context.icons().icon("chevron.down", context.theme().semantic(), SemanticColor.TEXT_SECONDARY,
-                    com.formdev.flatlaf.util.UIScale.scale(context.icons().size(Nodes.IconSize.CAPTION)));
+                    com.formdev.flatlaf.util.UIScale.scale(context.icons().size(context.metrics(), Nodes.IconSize.CAPTION)));
                 icon.paintIcon(this, g, getWidth()-ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING)-icon.getIconWidth(), (getHeight()-icon.getIconHeight())/2);
             } finally { g.dispose(); }
         }

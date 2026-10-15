@@ -312,7 +312,7 @@ final class ItemLists {
                 case Nodes.Stack stack -> slotHeight(stack.children());
                 case Nodes.Text text -> fontHeight(Typography.Role.valueOf(text.role().name()));
                 case Nodes.Icon icon ->
-                        com.formdev.flatlaf.util.UIScale.scale(context().icons().size(icon.size()));
+                        com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), icon.size()));
                 case Nodes.Button _, Nodes.MenuButton _ ->
                         inputHeight(DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.LABEL);
                 case Nodes.Toggle toggle ->

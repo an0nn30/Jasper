@@ -42,7 +42,7 @@ class BuiltInArtworkTest {
             assertThat(pixels(registry.icon("settings",light,Nodes.Hue.NONE,16),1)).isNotEqualTo(pixels(registry.icon("settings",dark,Nodes.Hue.NONE,16),1));
             assertThat(pixels(registry.panel("settings",light,SemanticColor.TEXT_PRIMARY,16),1)).isEqualTo(pixels(registry.panel("settings",light.semantic(),SemanticColor.TEXT_PRIMARY,16),1));
             for(String name:registry.names()) {
-                assertThatCode(()->{registry.icon(name,light.semantic(),Nodes.Hue.NONE,16);registry.panel(name,light.semantic(),SemanticColor.TEXT_PRIMARY,16);registry.hero(name,light.semantic(),Nodes.Hue.NONE,24);registry.tile(name,light.semantic(),Nodes.Hue.BLUE,28,false);}).as(name).doesNotThrowAnyException();
+                assertThatCode(()->{registry.icon(name,light.semantic(),Nodes.Hue.NONE,16);registry.panel(name,light.semantic(),SemanticColor.TEXT_PRIMARY,16);registry.hero(name,light.semantic(),Nodes.Hue.NONE,24);registry.tile(dev.jasper.ui.metrics.DesignMetrics.DEFAULT, name,light.semantic(),Nodes.Hue.BLUE,28,false);}).as(name).doesNotThrowAnyException();
             }
         }
     }

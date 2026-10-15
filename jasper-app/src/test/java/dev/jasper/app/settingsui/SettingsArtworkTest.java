@@ -25,7 +25,7 @@ class SettingsArtworkTest {
             view.setSize(600,400);KitTestSupport.layout(view);
             var icon=KitTestSupport.require(view,"groups:owner-0:icon",JLabel.class);assertThat(icon.getIcon()).isNotNull();
             try(var registration=context.icons().register("test:expected",new dev.jasper.ui.icons.IdentityArtwork(art(),Nodes.Hue.PURPLE))) {
-                var expected=context.icons().tile("test:expected",context.theme().semantic(),Nodes.Hue.BLUE,icon.getIcon().getIconWidth(),icon.getIcon().getIconHeight(),context.icons().size(Nodes.IconSize.CONTROL),false);
+                var expected=context.icons().tile(context.metrics(), "test:expected",context.theme().semantic(),Nodes.Hue.BLUE,icon.getIcon().getIconWidth(),icon.getIcon().getIconHeight(),context.icons().size(context.metrics(), Nodes.IconSize.CONTROL),false);
                 assertThat(pixels(icon.getIcon())).isEqualTo(pixels(expected));
             }
             assertThat(context.icons().names().size()).isEqualTo(names.size()+1);

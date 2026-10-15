@@ -337,7 +337,7 @@ final class SearchChoices {
             search.setCaretColor(search.getForeground());
             search.setBorder(new EmptyBorder(0, 0, 0, 0));
             searchIcon.setIcon(context.icons().icon("search", context.theme().semantic(), SemanticColor.TEXT_PLACEHOLDER,
-                com.formdev.flatlaf.util.UIScale.scale(context.icons().size(Nodes.IconSize.CONTROL))));
+                com.formdev.flatlaf.util.UIScale.scale(context.icons().size(context.metrics(), Nodes.IconSize.CONTROL))));
             searchIcon.setBorder(new EmptyBorder(0, 0, 0, ThemePainting.metric(context, DesignMetrics.Role.ICON_GAP)));
             int field = ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
             bar.setBorder(new EmptyBorder(pad, field, pad, field));

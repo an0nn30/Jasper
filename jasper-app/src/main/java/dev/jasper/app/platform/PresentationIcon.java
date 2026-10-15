@@ -14,6 +14,8 @@ import javax.swing.Icon;
 public final class PresentationIcon implements Icon {
     private final String name;
     private final String pathData;
+    /** The installed kit's rail glyph size in logical pixels, read once: the kit is fixed before any window. */
+    private final int rail;
     private final AppIcons.NativePreparation nativeArtwork;
     // This value's registry has no external owner or subscription; it is reclaimed with the presentation value.
     private final IconRegistry artwork = new IconRegistry();
@@ -22,12 +24,13 @@ public final class PresentationIcon implements Icon {
         this.pathData = pathData;
         if (pathData != null) artwork.register(name, pathData);
         else if (!artwork.names().contains(name)) throw new IllegalArgumentException("Unknown icon: " + name);
-        nativeArtwork=pathData==null?AppIcons.prepare(name,artwork.size(Nodes.IconSize.RAIL)):null;
+        rail = artwork.size(dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics(), Nodes.IconSize.RAIL);
+        nativeArtwork=pathData==null?AppIcons.prepare(name,rail):null;
     }
     public String name() { return name; }
     public String pathData() { return pathData; }
-    @Override public int getIconWidth() { return nativeArtwork==null?UIScale.scale(artwork.size(Nodes.IconSize.RAIL)):nativeArtwork.size(); }
-    @Override public int getIconHeight() { return nativeArtwork==null?UIScale.scale(artwork.size(Nodes.IconSize.RAIL)):nativeArtwork.size(); }
+    @Override public int getIconWidth() { return nativeArtwork==null?UIScale.scale(rail):nativeArtwork.size(); }
+    @Override public int getIconHeight() { return nativeArtwork==null?UIScale.scale(rail):nativeArtwork.size(); }
     @Override public void paintIcon(Component c, Graphics g, int x, int y) {
         if(nativeArtwork!=null) nativeArtwork.paint(c,g,x,y,dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY);
         else artwork.icon(name, ThemeZone.theme(c), Nodes.Hue.NONE, getIconWidth()).paintIcon(c,g,x,y);

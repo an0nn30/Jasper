@@ -23,7 +23,7 @@ final class RichOptions extends JPanel {
     private int pad(){return ThemePainting.metric(context,DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);}
     // Settings values use their compact glyph, label and annotation sizes, with the Settings icon-to-text gap.
     private int gap(){return ThemePainting.metric(context,settings?DesignMetrics.Role.SETTINGS_ICON_TEXT_GAP:DesignMetrics.Role.ICON_GAP);}
-    private int glyph(){return com.formdev.flatlaf.util.UIScale.scale(context.icons().size(settings?Nodes.IconSize.CAPTION:Nodes.IconSize.CONTROL));}
+    private int glyph(){return com.formdev.flatlaf.util.UIScale.scale(context.icons().size(context.metrics(), settings?Nodes.IconSize.CAPTION:Nodes.IconSize.CONTROL));}
     // A Settings value runs a little closer to its annotation than to its glyph.
     private int annotationGap(){return settings?ThemePainting.metric(context,DesignMetrics.Role.SETTINGS_ANNOTATION_GAP):gap();}
     // A Settings menu marks its current value with a lighter check than its option glyphs.

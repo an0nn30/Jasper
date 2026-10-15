@@ -222,7 +222,7 @@ final class Menus {
                                             com.formdev.flatlaf.util.UIScale.scale(
                                                     context()
                                                             .icons()
-                                                            .size(Nodes.IconSize.CONTROL))));
+                                                            .size(context().metrics(), Nodes.IconSize.CONTROL))));
             main.setDisabledIcon(main.getIcon());
             main.setToolTipText(menu.tooltip().isBlank() ? null : menu.tooltip());
             main.getAccessibleContext()
@@ -489,7 +489,7 @@ final class Menus {
         }
 
         javax.swing.Icon tile(boolean highlighted) {
-            return context.icons().tile(descriptor.icon(), context.theme().semantic(), descriptor.hue(),
+            return context.icons().tile(context.metrics(), descriptor.icon(), context.theme().semantic(), descriptor.hue(),
                 ThemePainting.metric(context, DesignMetrics.Role.MENU_TILE), highlighted);
         }
 

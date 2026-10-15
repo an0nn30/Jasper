@@ -18,7 +18,7 @@ class HostedKitTest {
   dev.jasper.ui.swing.FlatLafInstaller.install(light, dev.jasper.ui.kit.Kit.DEFAULT);
   var icon=kit.icon("add");var chrome=new JPanel();var workspace=new JPanel();workspace.putClientProperty("Jasper.zone","workspace");workspace.putClientProperty("Jasper.workspaceTheme",dark);
   try(var registry=new dev.jasper.ui.icons.IconRegistry()) {
-   assertThat(icon.getIconWidth()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(registry.size(dev.jasper.ui.model.Nodes.IconSize.RAIL)));
+   assertThat(icon.getIconWidth()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(registry.size(dev.jasper.ui.kit.Kit.DEFAULT.metrics(), dev.jasper.ui.model.Nodes.IconSize.RAIL)));
    assertThat(icon.getIconHeight()).isEqualTo(icon.getIconWidth());
    assertThat(pixels(icon,chrome)).containsExactly(pixels(registry.icon("add",light.semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,16),chrome));
    assertThat(pixels(icon,workspace)).containsExactly(pixels(registry.icon("add",dark.semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,16),workspace));

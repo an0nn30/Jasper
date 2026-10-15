@@ -210,7 +210,7 @@ class KitCalibrationTest {
                         var actual = new java.awt.image.BufferedImage(UIScale.scale(18), UIScale.scale(18), java.awt.image.BufferedImage.TYPE_INT_ARGB);
                         var expected = new java.awt.image.BufferedImage(UIScale.scale(18), UIScale.scale(18), java.awt.image.BufferedImage.TYPE_INT_ARGB);
                         var a = actual.createGraphics(); var b = expected.createGraphics();
-                        try { menu.getIcon().paintIcon(menu, a, 0, 0); context.icons().tile(item.icon(), context.theme().semantic(), item.hue(), UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_TILE)), false).paintIcon(menu, b, 0, 0); }
+                        try { menu.getIcon().paintIcon(menu, a, 0, 0); context.icons().tile(context.metrics(), item.icon(), context.theme().semantic(), item.hue(), UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_TILE)), false).paintIcon(menu, b, 0, 0); }
                         finally { a.dispose(); b.dispose(); }
                         assertThat(actual.getRGB(0,0,actual.getWidth(),actual.getHeight(),null,0,actual.getWidth())).isEqualTo(expected.getRGB(0,0,expected.getWidth(),expected.getHeight(),null,0,expected.getWidth()));
                     }

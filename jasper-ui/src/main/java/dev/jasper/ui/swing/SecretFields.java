@@ -334,7 +334,7 @@ final class SecretFields {
                                     context().theme().semantic(),
                                     SemanticColor.TEXT_SECONDARY,
                                     com.formdev.flatlaf.util.UIScale.scale(
-                                            context().icons().size(Nodes.IconSize.CONTROL))));
+                                            context().icons().size(context().metrics(), Nodes.IconSize.CONTROL))));
             reveal.setDisabledIcon(reveal.getIcon());
             reveal.repaint();
         }
@@ -418,7 +418,7 @@ final class SecretFields {
                                     context().theme().semantic(),
                                     SemanticColor.TEXT_SECONDARY,
                                     com.formdev.flatlaf.util.UIScale.scale(
-                                            context().icons().size(Nodes.IconSize.CONTROL))));
+                                            context().icons().size(context().metrics(), Nodes.IconSize.CONTROL))));
             copy.setDisabledIcon(copy.getIcon());
             input.setFont(ThemePainting.font(context(), Typography.Role.BODY));
             input.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
@@ -453,7 +453,7 @@ final class SecretFields {
                                     context().theme().semantic(),
                                     SemanticColor.TEXT_PLACEHOLDER,
                                     com.formdev.flatlaf.util.UIScale.scale(
-                                            context().icons().size(Nodes.IconSize.CONTROL))));
+                                            context().icons().size(context().metrics(), Nodes.IconSize.CONTROL))));
             lock.setBorder(
                     new EmptyBorder(
                             0, 0, 0, ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP)));

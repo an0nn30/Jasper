@@ -33,7 +33,7 @@ class IconRegistryTest {
                         int baseline = 0;
                         for (float scale : new float[]{1f, 1.5f}) {
                             setter.invoke(null, scale, false);
-                            var icon = registry.tile("user", KitFixtures.dark().semantic(), Nodes.Hue.BLUE, com.formdev.flatlaf.util.UIScale.scale(logical), false);
+                            var icon = registry.tile(dev.jasper.ui.metrics.DesignMetrics.DEFAULT, "user", KitFixtures.dark().semantic(), Nodes.Hue.BLUE, com.formdev.flatlaf.util.UIScale.scale(logical), false);
                             var image = paint(icon); int left=image.getWidth(), right=-1;
                             for(int y=0;y<image.getHeight();y++)for(int x=0;x<image.getWidth();x++)if((image.getRGB(x,y)>>>24)>200){left=Math.min(left,x);right=Math.max(right,x);}
                             int ink=right-left+1;
@@ -48,7 +48,7 @@ class IconRegistryTest {
     @Test void categoryGlyphInkMatchesItsMeasuredInsetWithinTheTile() {
         try(var registry=new IconRegistry()) {
             for(int size:new int[]{18,20,28,32,44}) {
-                var image=paint(registry.tile("user",KitFixtures.dark().semantic(),Nodes.Hue.BLUE,size,false));
+                var image=paint(registry.tile(dev.jasper.ui.metrics.DesignMetrics.DEFAULT, "user",KitFixtures.dark().semantic(),Nodes.Hue.BLUE,size,false));
                 int left=size,right=-1;
                 for(int y=0;y<size;y++)for(int x=0;x<size;x++)if((image.getRGB(x,y)>>>24)>200){left=Math.min(left,x);right=Math.max(right,x);}
                 assertThat(right-left+1).isBetween(size<=20?7:size==28?9:size==32?10:13,size<=20?9:size==28?11:size==32?12:16);
@@ -59,7 +59,7 @@ class IconRegistryTest {
         try(var registry=new IconRegistry()) {
             var colors=new EnumMap<SemanticColor,Color>(SemanticColor.class);for(var role:SemanticColor.values())colors.put(role,KitFixtures.dark().semantic().color(role));
             colors.put(SemanticColor.HUE_BLUE,new Color(127,178,255));colors.put(SemanticColor.HUE_BLUE_SURFACE,new Color(48,124,243));
-            var icon=registry.tile("user",new SemanticPalette(colors),Nodes.Hue.BLUE,44,false);
+            var icon=registry.tile(dev.jasper.ui.metrics.DesignMetrics.DEFAULT, "user",new SemanticPalette(colors),Nodes.Hue.BLUE,44,false);
             var image=new BufferedImage(88,88,BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();g.setColor(new Color(31,35,43));g.fillRect(0,0,88,88);g.scale(2,2);icon.paintIcon(null,g,0,0);g.dispose();
             int left=88,right=-1;for(int y=0;y<88;y++)for(int x=0;x<88;x++){var color=new Color(image.getRGB(x,y));if(color.getGreen()>105&&color.getBlue()>155&&color.getBlue()-color.getRed()>35){left=Math.min(left,x);right=Math.max(right,x);}}
             assertThat(right-left+1).isEqualTo(28);
@@ -114,7 +114,7 @@ class IconRegistryTest {
             for (var name : registry.names()) for (int size : new int[]{12, 14, 16, 20, 24})
                 for (var theme : java.util.List.of(KitFixtures.light(), KitFixtures.dark())) {
                     assertThat(pixels(registry.icon(name, theme.semantic(), Nodes.Hue.NONE, size))).isPositive();
-                    assertThat(pixels(registry.tile(name, theme.semantic(), Nodes.Hue.BLUE, size, true))).isPositive();
+                    assertThat(pixels(registry.tile(dev.jasper.ui.metrics.DesignMetrics.DEFAULT, name, theme.semantic(), Nodes.Hue.BLUE, size, true))).isPositive();
                 }
         }
     }
@@ -124,7 +124,7 @@ class IconRegistryTest {
             BufferedImage icon = paint(registry.icon("add", palette, Nodes.Hue.BLUE, 16));
             assertThat(new Color(icon.getRGB(8, 8), true).getRGB() & 0xffffff)
                 .isEqualTo(palette.color(SemanticColor.HUE_BLUE).getRGB() & 0xffffff);
-            BufferedImage selected = paint(registry.tile("add", palette, Nodes.Hue.BLUE, 24, true));
+            BufferedImage selected = paint(registry.tile(dev.jasper.ui.metrics.DesignMetrics.DEFAULT, "add", palette, Nodes.Hue.BLUE, 24, true));
             Color tile = new Color(selected.getRGB(4, 4), true);
             assertThat(tile.getRGB() & 0xffffff).isEqualTo(palette.color(SemanticColor.TEXT_ONACCENT).getRGB() & 0xffffff);
             assertThat(tile.getAlpha()).isEqualTo(43); // the Dark tile share, 17%, rounded once
@@ -158,7 +158,7 @@ class IconRegistryTest {
         for (var role : SemanticColor.values()) colors.put(role, KitFixtures.dark().semantic().color(role));
         colors.put(SemanticColor.HUE_BLUE_SURFACE, new Color(10, 20, 30, 128));
         try (var registry = new IconRegistry()) {
-            assertThat(new Color(paint(registry.tile("add", new SemanticPalette(colors), Nodes.Hue.BLUE, 24, false)).getRGB(4, 4), true).getAlpha())
+            assertThat(new Color(paint(registry.tile(dev.jasper.ui.metrics.DesignMetrics.DEFAULT, "add", new SemanticPalette(colors), Nodes.Hue.BLUE, 24, false)).getRGB(4, 4), true).getAlpha())
                 .isEqualTo(22); // 128 * 17% (Dark), once
         }
     }
@@ -170,12 +170,27 @@ class IconRegistryTest {
                 var ordinary=paint(registry.icon("owner:line",palette,SemanticColor.HUE_NEUTRAL,16*scale));
                 var panel=paint(registry.panel("owner:line",palette,SemanticColor.HUE_NEUTRAL,16*scale));
                 assertThat(panel.getRGB(0,0,16*scale,16*scale,null,0,16*scale)).containsExactly(ordinary.getRGB(0,0,16*scale,16*scale,null,0,16*scale));
-                var tile=registry.tile("server",palette,Nodes.Hue.NEUTRAL,28*scale,30*scale,14*scale,false);
+                var tile=registry.tile(dev.jasper.ui.metrics.DesignMetrics.DEFAULT, "server",palette,Nodes.Hue.NEUTRAL,28*scale,30*scale,14*scale,false);
                 assertThat(tile.getIconWidth()).isEqualTo(28*scale);assertThat(tile.getIconHeight()).isEqualTo(30*scale);
             }
             assertThat(pixels(registry.panel("add",palette,SemanticColor.HUE_NEUTRAL,18))).isLessThan(pixels(registry.icon("add",palette,SemanticColor.HUE_NEUTRAL,18)));
         }
     }
+    /** Enterprise presentation plan 1: a tile's opacity and an icon's size are the passed catalog's, not a fixed one. */
+    @Test void sizesAndTileOpacityFollowTheCatalogTheCallerPasses() {
+        var colors = new EnumMap<SemanticColor, Color>(SemanticColor.class);
+        for (var role : SemanticColor.values()) colors.put(role, KitFixtures.dark().semantic().color(role));
+        colors.put(SemanticColor.HUE_BLUE_SURFACE, new Color(10, 20, 30, 128));
+        var catalog = dev.jasper.ui.metrics.DesignMetrics.DEFAULT.with(dev.jasper.ui.metrics.DesignMetrics.Role.TILE_PERCENT_DARK, 50)
+            .with(dev.jasper.ui.metrics.DesignMetrics.Role.ICON_CONTROL, 18);
+        try (var icons = new IconRegistry()) {
+            assertThat(new Color(paint(icons.tile(catalog, "add", new SemanticPalette(colors), Nodes.Hue.BLUE, 24, false)).getRGB(4, 4), true).getAlpha())
+                .isEqualTo(64); // 128 * 50%, once
+            assertThat(icons.size(catalog, Nodes.IconSize.CONTROL)).isEqualTo(18);
+            assertThat(icons.size(dev.jasper.ui.metrics.DesignMetrics.DEFAULT, Nodes.IconSize.CONTROL)).isEqualTo(14);
+        }
+    }
+
     private static BufferedImage paint(Icon icon) {
         var image = new BufferedImage(icon.getIconWidth(), icon.getIconHeight(), BufferedImage.TYPE_INT_ARGB);
         var g = image.createGraphics(); try { icon.paintIcon(null, g, 0, 0); } finally { g.dispose(); } return image;

@@ -18,10 +18,10 @@ class TextFieldsTest {
             var spec=new ViewSpec(new Nodes.Field("search",ControlState.READY,Nodes.FieldKind.SEARCH,"","Search","Search",""));
             try(var view=new KitView(context,spec,event->{})) {
                 var field=(TextFields.FieldControl)view.control("search");
-                int extent=com.formdev.flatlaf.util.UIScale.scale(context.icons().size(Nodes.IconSize.CONTROL));
+                int extent=com.formdev.flatlaf.util.UIScale.scale(context.icons().size(context.metrics(), Nodes.IconSize.CONTROL));
                 assertThat(pixels(field.leading.getIcon())).isEqualTo(pixels(context.icons().icon("search",context.theme(),dev.jasper.ui.theme.SemanticColor.TEXT_PLACEHOLDER,extent)));
                 field.panelSearch=true;field.refresh();
-                int rail=com.formdev.flatlaf.util.UIScale.scale(context.icons().size(Nodes.IconSize.RAIL));
+                int rail=com.formdev.flatlaf.util.UIScale.scale(context.icons().size(context.metrics(), Nodes.IconSize.RAIL));
                 assertThat(pixels(field.leading.getIcon())).isEqualTo(pixels(context.icons().panel("search",context.theme().semantic(),dev.jasper.ui.theme.SemanticColor.HUE_NEUTRAL,rail)));
             }finally{release(context);}
         });

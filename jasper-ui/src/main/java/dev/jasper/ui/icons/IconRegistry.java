@@ -165,33 +165,37 @@ public final class IconRegistry implements AutoCloseable {
         return ColorMath.contrast(opaque, surface) >= SurfaceContrast.INDICATOR ? opaque
             : SurfaceContrast.readable(opaque, surface, SurfaceContrast.INDICATOR, SurfaceContrast.blackOrWhite(surface));
     }
-    /** Category tile. Selected treatment is shared across list/menu renderers, applied to base alpha exactly once. */
-    public Icon tile(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize, boolean selected) {
-        return tile(name, palette, hue, logicalSize, logicalSize, selected);
+    /**
+     * Category tile in {@code metrics}' tile opacity. Selected treatment is shared across list/menu renderers, applied to
+     * base alpha exactly once.
+     */
+    public Icon tile(DesignMetrics metrics, String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize, boolean selected) {
+        return tile(metrics, name, palette, hue, logicalSize, logicalSize, selected);
     }
     /** Rectangular category tile; glyph remains optically centered and unstretched. */
-    public Icon tile(String name, SemanticPalette palette, Nodes.Hue hue, int width, int height, boolean selected) {
-        return tile(name, palette, hue, width, height, 0, selected);
+    public Icon tile(DesignMetrics metrics, String name, SemanticPalette palette, Nodes.Hue hue, int width, int height, boolean selected) {
+        return tile(metrics, name, palette, hue, width, height, 0, selected);
     }
     /** Category tile with explicit glyph extent; zero retains the standard optical sizing policy. A selected tile is on the accent fill. */
-    public Icon tile(String name, SemanticPalette palette, Nodes.Hue hue, int width, int height, int glyphSize, boolean selected) {
-        return tile(name,palette,null,hue,width,height,glyphSize,selected?SemanticColor.TEXT_ONACCENT:null);
+    public Icon tile(DesignMetrics metrics, String name, SemanticPalette palette, Nodes.Hue hue, int width, int height, int glyphSize, boolean selected) {
+        return tile(metrics,name,palette,null,hue,width,height,glyphSize,selected?SemanticColor.TEXT_ONACCENT:null);
     }
     /**
      * Identity tiles select the actual receiving-theme sibling; legacy settings/group geometry is preserved. A selected
      * tile is drawn in {@code selectedInk}, the ink of the fill it lies on; null draws it unselected.
      */
-    public Icon tile(String name, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, SemanticColor selectedInk) {
-        return tile(name,theme.semantic(),theme,hue,width,height,glyphSize,selectedInk);
+    public Icon tile(DesignMetrics metrics, String name, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, SemanticColor selectedInk) {
+        return tile(metrics,name,theme.semantic(),theme,hue,width,height,glyphSize,selectedInk);
     }
     /** Receiving identity header: normal authored ink with the shared inward semantic contour. */
-    public Icon identityHeader(String name, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize) {
-        return tile(name,theme.semantic(),theme,hue,width,height,glyphSize,null,theme.semantic().color(SemanticColor.BORDER_IDENTITY));
+    public Icon identityHeader(DesignMetrics metrics, String name, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize) {
+        return tile(metrics,name,theme.semantic(),theme,hue,width,height,glyphSize,null,theme.semantic().color(SemanticColor.BORDER_IDENTITY));
     }
-    private Icon tile(String name, SemanticPalette palette, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, SemanticColor selectedInk) {
-        return tile(name,palette,theme,hue,width,height,glyphSize,selectedInk,null);
+    private Icon tile(DesignMetrics metrics, String name, SemanticPalette palette, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, SemanticColor selectedInk) {
+        return tile(metrics,name,palette,theme,hue,width,height,glyphSize,selectedInk,null);
     }
-    private Icon tile(String name, SemanticPalette palette, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, SemanticColor selectedInk, Color outline) {
+    private Icon tile(DesignMetrics metrics, String name, SemanticPalette palette, GeneratedTheme theme, Nodes.Hue hue, int width, int height, int glyphSize, SemanticColor selectedInk, Color outline) {
+        Objects.requireNonNull(metrics, "metrics");
         boolean selected = selectedInk != null;
         if (glyphSize < 0 || glyphSize > Math.min(width, height)) throw new IllegalArgumentException("Invalid tile glyph size");
         boolean selectedForeground;
@@ -208,7 +212,7 @@ public final class IconRegistry implements AutoCloseable {
         });
         // A palette-only tile has no theme: decide the variant as ordinary(...) does, from the panel surface.
         boolean darkTile = theme != null ? theme.dark() : ColorMath.luminance(palette.color(SemanticColor.SURFACE_PANEL)) < .5;
-        return painted(name, foreground, ColorMath.opacity(fill, DesignMetrics.DEFAULT.value(darkTile ? DesignMetrics.Role.TILE_PERCENT_DARK : DesignMetrics.Role.TILE_PERCENT_LIGHT) / 100.0), width, height, true, false, glyphSize,false,select(name,theme,palette,false),selectedForeground,outline);
+        return painted(name, foreground, ColorMath.opacity(fill, metrics.value(darkTile ? DesignMetrics.Role.TILE_PERCENT_DARK : DesignMetrics.Role.TILE_PERCENT_LIGHT) / 100.0), width, height, true, false, glyphSize,false,select(name,theme,palette,false),selectedForeground,outline);
     }
     /** Compact context preserves calibrated legacy settings/chevron optics. */
     public Icon panel(String name,GeneratedTheme theme,SemanticColor tint,int size) {
@@ -218,8 +222,9 @@ public final class IconRegistry implements AutoCloseable {
     public Icon hero(String name,GeneratedTheme theme,Nodes.Hue hue,int size) {
         return painted(name,tint(theme.semantic(),hue),null,size,size,false,true,0,false,select(name,theme,theme.semantic(),false),false);
     }
-    public int size(Nodes.IconSize size) {
-        return DesignMetrics.DEFAULT.value(switch (size) {
+    /** The logical extent of {@code size} in {@code metrics}. */
+    public int size(DesignMetrics metrics, Nodes.IconSize size) {
+        return metrics.value(switch (size) {
             case CAPTION -> DesignMetrics.Role.ICON_CAPTION;
             case CONTROL -> DesignMetrics.Role.ICON_CONTROL;
             case RAIL -> DesignMetrics.Role.ICON_RAIL;

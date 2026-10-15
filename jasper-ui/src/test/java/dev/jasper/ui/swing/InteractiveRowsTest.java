@@ -646,7 +646,7 @@ class InteractiveRowsTest {
                         var contrasting=KitFixtures.withSemantic(baseTheme, new dev.jasper.ui.theme.SemanticPalette(colors));
                         for(var theme : List.of(baseTheme, contrasting)) {
                         context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme,theme));
-                        var expectedIcon = context.icons().tile("delete", context.theme().semantic(), Hue.PURPLE, com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_TILE)), false);
+                        var expectedIcon = context.icons().tile(context.metrics(), "delete", context.theme().semantic(), Hue.PURPLE, com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_TILE)), false);
                         var actualPixels = new java.awt.image.BufferedImage(expectedIcon.getIconWidth(), expectedIcon.getIconHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
                         var expectedPixels = new java.awt.image.BufferedImage(expectedIcon.getIconWidth(), expectedIcon.getIconHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
                         var ag = actualPixels.createGraphics(); var eg = expectedPixels.createGraphics();
