@@ -17,7 +17,8 @@ and `LaunchSettingsTest` cover the text rule on every OS. Two new `ShellLauncher
 and two `FileLinkClickTest` cases are `@EnabledOnOs(WINDOWS)`; each was watched failing, then passing, on the Mac
 through a Gradle init script that sets `os.name` to `Windows 11`. `./gradlew check --continue`: **10,434 tests, 0
 failures, 0 errors, 24 skipped**. An earlier run lost seven File Server tests to ports in use and refused FTP passive
-connections; they passed on the re-run. Not merged, not pushed. No GUI launched. GUI checks for the user, on Windows:
+connections; they passed on the re-run. After merging `main` (Slate Cobalt): **10,433 tests, 0 failures, 0 errors, 24
+skipped**. Merged to local `main`, not pushed. No GUI launched. GUI checks for the user, on Windows:
 in a PowerShell tab, `[Console]::Write("$([char]27)]7;file://localhost//attacker.invalid/share$([char]7)")`, then a
 split and a new tab both start in the home folder; a `\\wsl.localhost\<distro>\…` path printed in a PowerShell tab
 opens nothing on Ctrl-click, and the same path in a WSL tab opens. Open: the Indexer's `CwdWatcher` runs project
