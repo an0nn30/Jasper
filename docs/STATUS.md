@@ -1,5 +1,20 @@
 # Jasper — Status and Handoff
 
+**File Server test port race — 2026-10-14** (`claude/fileserver-port-race`, worktree
+`.claude/worktrees/practical-shamir-1252c5`). `TftpReadTest.blockNumbersWrapOnALongRead` lost its port once during
+`check`: `Ports.free()` probed TCP while TFTP binds UDP (separate port spaces; on this Mac 9 in 20,000 TCP-free ports
+were already bound for UDP), and any engine could lose its port before binding it. `ServerDefinition` requires ports 1
+to 65535, so the engines cannot bind port 0. `Ports.free()` now checks TCP and UDP; `Ports.start` rebuilds the engine
+on another port when its start fails with a `BindException`, and every engine test starts through it.
+`FtpEngineTest`'s passive range comes from `Ports.freeRange`, below every system's ephemeral range, because on macOS
+Apache FtpServer's passive-port check misses a socket on 127.0.0.1 and the transfer fails with 425. Production code
+unchanged. Under a stress run (2,000 UDP and 2,000 TCP loopback ports held and replaced), `main` lost 3–4 TFTP and 4–5
+FTP tests a run; with the fix none, except that `TftpReadTest.refusalsAreErrorPacketsWithoutHostPaths` timed out in
+about half the runs (one datagram dropped with no socket per failure; commons-net's client never resends its
+request). Unstressed it passed every run. `FileServerPluginTest` starts servers through the registry on `Ports.free()`
+ports and keeps the check-then-use gap. `./gradlew check --continue`: **10,424 tests, 0 failures, 0 errors, 17
+skipped**. Not merged.
+
 **Cmd-click file paths (command line plan 3) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
 [plan](superpowers/plans/2026-10-14-jasper-command-line-3-cmd-click-paths.md)). Cmd-click on macOS, Ctrl-click
