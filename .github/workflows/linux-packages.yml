@@ -10,18 +10,22 @@ on:
       version:
         description: Package version (X.Y.Z); leave empty to take it from the commit's release tag
         required: false
+  # A release tag (vX.Y.Z) always packages; a branch push or pull request only when packaging itself changes.
+  # GitHub does not evaluate path filters for tag pushes.
   push:
+    branches:
+      - '**'
+    tags:
+      - 'v*'
     paths:
       - gradle/packaging.gradle
       - gradle/packaging-support.gradle
-      - gradle/launcher.gradle
       - packaging/**
       - .github/workflows/linux-packages.yml
   pull_request:
     paths:
       - gradle/packaging.gradle
       - gradle/packaging-support.gradle
-      - gradle/launcher.gradle
       - packaging/**
       - .github/workflows/linux-packages.yml
 

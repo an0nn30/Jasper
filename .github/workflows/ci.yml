@@ -1,8 +1,21 @@
 name: ci
 
+# A push or pull request that changes only documentation runs nothing: every run is billed against the account's
+# Actions minutes (macOS ten times, Windows twice), and ./gradlew check, which also checks the docs, runs before
+# every merge. The example external plugin under docs/examples is code and still runs.
 on:
   push:
+    paths:
+      - '**'
+      - '!docs/**'
+      - 'docs/examples/**'
+      - '!**/*.md'
   pull_request:
+    paths:
+      - '**'
+      - '!docs/**'
+      - 'docs/examples/**'
+      - '!**/*.md'
 
 jobs:
   check:
