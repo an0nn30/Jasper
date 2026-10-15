@@ -17,7 +17,7 @@ modification time, as the launcher's matcher does.
 Final-review fixes: after both skips a check that could not run still posts the custom VM options notice; a cache that
 also fails with the bundled options alone is recorded without the options and System Settings does not blame them;
 Settings runs no cache check while the options stop the JVM; and the AOT message keeps a `] ` inside it.
-`./gradlew check --continue`: **10195 tests, 0 failures, 0 errors, 12 skipped** (4 minutes 27 seconds). After merging `main`: **10,337 tests, 0 failures, 0 errors, 12 skipped**. No GUI
+`./gradlew check --continue`: **10195 tests, 0 failures, 0 errors, 12 skipped** (4 minutes 27 seconds). After merging `main`: **10,337 tests, 0 failures, 0 errors, 12 skipped**. Merged to local `main`, not pushed (the branch is on `origin` for CI). No GUI
 launched. GUI checks for the user are in the plan's hand-off section.
 
 **Start-up recovery plan 2 (the watcher) complete — 2026-10-14.** On `claude/startup-recovery` (not pushed): Jasper's
