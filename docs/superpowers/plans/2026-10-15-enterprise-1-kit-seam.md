@@ -1,8 +1,11 @@
 # Enterprise presentation 1: kit seam Implementation Plan
 
-> **Status (2026-10-15): executed on `claude/enterprise-presentation` (`7d9334f4e..92a8a1ce0` and the documentation
-> commit after it).** Deviations from this plan's text beyond its "Planned deviations": the plan's anchors and expected
-> compiler messages were corrected before execution (`d4598cfac`); `AppDocumentationTest` now decodes percent-escapes in
+> **Status (2026-10-15): executed on `claude/enterprise-presentation` (`d4598cfac..96ca2e236`).** Plan-5 entry
+> conditions beyond planned deviation 1: the `ThemeController` constructors without a kit install `Kit.DEFAULT`; a bound
+> `NativeStyles` refresh closure keeps the kit it was made with; `PresentationIcons.context` uses the installed kit, not
+> `source.kit()`; `StaticDefaultTest` does not follow `AppIcons`' lambda cache. Deviations from this plan's text beyond
+> its "Planned deviations": the plan's anchors and expected compiler messages were corrected before execution
+> (`d4598cfac`); `AppDocumentationTest` now decodes percent-escapes in
 > link destinations (`ed5efe0bc`; the spec's reference README links `01%20Workstation`); Task 2's closing `git grep 'new
 > Typography('` prints `Typography.of`'s own call to the private constructor; Task 3's `UiKeySet` compile error names a
 > variable, and Step 6's `DockDropOverlayTest` is not green alone (its ghost test installs no look and feel and passes

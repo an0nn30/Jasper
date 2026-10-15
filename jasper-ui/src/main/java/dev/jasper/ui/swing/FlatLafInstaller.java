@@ -16,7 +16,7 @@ import java.util.Objects;
 import javax.swing.UIManager;
 import javax.swing.plaf.ColorUIResource;
 
-/** Real FlatLaf installation. Authored colors are retained; geometry is owned by the kit. EDT only. */
+/** Real FlatLaf installation. Authored colors are retained; geometry is owned by the kit. Installation is EDT only. */
 public final class FlatLafInstaller {
     private FlatLafInstaller() {}
     /** Installed immutable snapshot; stored with the LAF so appearance rollback restores it atomically. */

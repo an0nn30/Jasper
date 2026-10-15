@@ -1,7 +1,7 @@
 # Jasper — Status and Handoff
 
 **Enterprise presentation, plan 1: the kit seam — 2026-10-15** (`claude/enterprise-presentation`, worktree
-`.claude/worktrees/enterprise-presentation`, `7d9334f4e..92a8a1ce0` and the documentation commit after it;
+`.claude/worktrees/enterprise-presentation`, `d4598cfac..96ca2e236`;
 [plan](superpowers/plans/2026-10-15-enterprise-1-kit-seam.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). jasper-ui gains `dev.jasper.ui.kit`: a
 `Kit` names a metric catalog, a type scale, faces and a FlatLaf key set, and `Kit.DEFAULT` is today's look.
@@ -27,6 +27,9 @@ readers `Kit.DEFAULT`, and cached icons keep their kit); (2) `Kit` has no contro
 installs FlatLaf keys from its own palette, and `ThemeTestSupport.withUiKeys` is gone; (8) `StaticDefaultTest` also
 rejects `TypeScale.DEFAULT` and `FaceSet.PLATFORM` reads and painters built at class load, and pins the `Kit.DEFAULT`
 readers; (9) `TitleSearchField.ARC` is deleted and `PresentationIcon` reads the installed kit's rail size.
+Plan-5 entry conditions beyond (1): the `ThemeController` constructors without a kit install `Kit.DEFAULT`; a bound
+`NativeStyles` refresh closure keeps the kit it was made with; `PresentationIcons.context` uses the installed kit, not
+`source.kit()`; `StaticDefaultTest` does not follow `AppIcons`' lambda cache.
 Deviations from the plan's text beyond those: the plan's anchors and expected compiler messages were corrected before
 execution (`d4598cfac`); `AppDocumentationTest` now decodes percent-escapes in link destinations (`ed5efe0bc`; the
 spec's reference README links `01%20Workstation`); Task 2's closing `git grep 'new Typography('` prints

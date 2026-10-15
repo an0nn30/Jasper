@@ -515,8 +515,9 @@ final class ToolWindowArea extends JPanel {
     }
 
     /**
-     * Exterior gutters are 6px on each edge of the area a frame touches, except where the header, a stripe or the
-     * status bar already supplies the spacing; facing edges have none, because the 6px divider is the gap.
+     * Exterior gutters are the installed kit's gutter (6px by default) on each edge of the area a frame touches,
+     * except where the header, a stripe or the status bar already supplies the spacing; facing edges have none,
+     * because the 6px divider is the gap.
      */
     private void refreshGutters() {
         int gutter = gutter();
