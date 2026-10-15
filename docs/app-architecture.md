@@ -224,15 +224,17 @@ to content with a 3 px selection underline, wheel scrolling and a ▾ list of al
 foreground (see [SDK architecture](sdk-architecture.md)).
 The header, both stripes and the status bar are the native chrome's receiving contexts (`AppIcons.chromeReceiver`):
 named glyphs painted inside them use the kit's original chrome artwork (`IconRegistry.chromeIcon`) without changing
-icon values or identities, and their painting and text sizes come from `NativeChromePainting` and named kit roles.
+icon values or identities, and their painting and text sizes come from `ChromePainter.installed()` and named kit roles.
 
 ## Themes
 
 The built-in themes are Slate Cobalt and Catppuccin's four flavours; installed themes are Jasper theme files in
 `<home>/themes/` ([themes](themes.md)).
-`ThemeManager.install` installs a variant through jasper-ui's `FlatLafInstaller` (FlatLaf's IntelliJ-format input from
-the theme's UI keys, which `UiColorKeys` derives from the semantic roles, then the `Jasper.semantic.*` role keys and
-the popup shadow) and adds the app's native defaults: the split divider border by class name and the centred title.
+`ThemeManager.install(theme, kit)` installs a variant under the start-up kit through jasper-ui's `FlatLafInstaller`
+(FlatLaf's IntelliJ-format input from the UI keys `UiColorKeys` derives from the theme's semantic roles, then the
+`Jasper.semantic.*` role keys and the popup shadow, with the kit's geometry) and adds the app's native defaults: the
+split divider border by class name and the centred title. The kit is published with the theme; app chrome reads it
+through `FlatLafInstaller.installedKit()`, `ChromePainter.installed()` and `NativeStyles.installed()`.
 Tool windows paint `surface.panel` (theme.md's tool-window body) through `ToolWindowSurface`, their headers included; the stripes stay chrome.
 
 `JasperTheme` (jasper-ui) reads a theme file into one `GeneratedTheme` per variant and its terminal schemes;
@@ -261,7 +263,7 @@ there are no recursive styles, combo popup bridges or descendant observers. Tool
 the native shell; ToolWindowHeader reads its own module surface. Platform ThemeZone routes native paint and
 PresentationIcon; immutable artwork snapshots and receiving registries retain the Task11a lifetime rules.
 
-ThemeManager installs the module snapshot and only three app-native delegate settings: the named module
+ThemeManager installs the module snapshot and only three app-native delegate settings: the kit's
 NATIVE_SPLIT_DIVIDER metric, app SplitDividerBorder and centered native titles. SnapshotLaf republishes
 module explicit/canonical colors when defaults are recreated, including reinstall and rollback. There is no
 app palette fallback publisher, copied generator or AppListUI. Default raw-native text now follows the

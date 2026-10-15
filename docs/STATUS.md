@@ -1,5 +1,46 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 1: the kit seam — 2026-10-15** (`claude/enterprise-presentation`, worktree
+`.claude/worktrees/enterprise-presentation`, `7d9334f4e..92a8a1ce0` and the documentation commit after it;
+[plan](superpowers/plans/2026-10-15-enterprise-1-kit-seam.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). jasper-ui gains `dev.jasper.ui.kit`: a
+`Kit` names a metric catalog, a type scale, faces and a FlatLaf key set, and `Kit.DEFAULT` is today's look.
+`DesignMetrics` and the new `TypeScale` are values (`with`, `withBody`), `FaceSet.PLATFORM` names today's faces,
+`Typography.of(scale, faces, user)` replaces its constructors, every `KitContext` is made with `KitContext.of(kit, …)`,
+`IconRegistry.size` and tiles take the caller's metrics, and `ChromePainter(kit)` and `NativeStyles(kit)` replace the
+static native painters. `FlatLafInstaller.install(theme, kit)` derives FlatLaf's colour keys from the theme at install
+time (`GeneratedTheme` no longer carries them) and publishes the kit beside the theme as `Jasper.installedKit`;
+`ThemeManager.install(theme, kit)` and `ThemeController.startup(…, kit, …)` carry it, and start-up uses `Kit.DEFAULT`.
+Zero pixel change, proven by tests: the frozen catalog (`compact-roles.tsv`) and the new `default-type.tsv`, an oracle of
+the former `Typography` over every role and user-font mode, every built-in variant's install-time keys against
+`ui-color-keys.tsv` and the keys it carried, the default kit's FlatLaf extras frozen whole, and the ported painter tests;
+seam tests show one altered metric moving a context, a FlatLaf extra and a painter. `StaticDefaultTest` (a
+`java.lang.classfile` scan of the jasper-ui and jasper-app jars) allows `DesignMetrics.DEFAULT` only in the catalog's
+packages and `AnimationSettings`, and no static metric final, following each static initializer's calls. Planned
+deviations (plan, "Planned deviations"): (1) the app reaches the kit through the installed appearance
+(`FlatLafInstaller.installedKit()`, `ChromePainter.installed()`, `NativeStyles.installed()`) until plan 5's
+`Presentation` plumbing, which must replace it before a non-default kit is installed (a rollback can show off-EDT
+readers `Kit.DEFAULT`, and cached icons keep their kit); (2) `Kit` has no control variants or colour slots yet; (3)
+`DesignMetrics.with(Role, int)` and `TypeScale.withBody` only, with the `CLASSIC` values and tables in plan 4; (4)
+`FaceSet` carries only the data faces, the UI faces in plan 5; (5) the user's font comes from the UIManager keys
+`ThemeController` writes; (6) the start-up kit is captured in the controller's installer; (7) a recoloured test theme
+installs FlatLaf keys from its own palette, and `ThemeTestSupport.withUiKeys` is gone; (8) `StaticDefaultTest` also
+rejects `TypeScale.DEFAULT` and `FaceSet.PLATFORM` reads and painters built at class load, and pins the `Kit.DEFAULT`
+readers; (9) `TitleSearchField.ARC` is deleted and `PresentationIcon` reads the installed kit's rail size.
+Deviations from the plan's text beyond those: the plan's anchors and expected compiler messages were corrected before
+execution (`d4598cfac`); `AppDocumentationTest` now decodes percent-escapes in link destinations (`ed5efe0bc`; the
+spec's reference README links `01%20Workstation`); Task 2's closing `git grep 'new Typography('` prints
+`Typography.of`'s own call to the private constructor; Task 3's `UiKeySet` compile error names a variable, and Step 6's
+`DockDropOverlayTest` is not green alone (its ghost test installs no look and feel and passes only after an earlier
+class leaves one, also at the base; left for a test-isolation fix); Task 4 renames
+`UiColorKeysTest.everyBuiltInVariantInstallsTheKeysItCarried` to `everyBuiltInVariantGetsTheFrozenKeysOverItsOwnRoles`;
+Task 6 removes the dead public `ThemeController.startup(boolean, TerminalSchemeChoice, Consumer)` overload, builds
+`FlatLafInstallerKitTest`'s binding with a rethrowing failure handler and adds `verifyApplicationArchitecture` to Step
+7; Task 7 drops two `DesignMetrics` imports its conversion left unused; Task 8's RED compile message reads "incompatible
+types"; Task 10 adds a guard grep for an unqualified `HEIGHT`.
+`./gradlew check --continue`: **10,473 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: none new (nothing
+visible changed). Not merged, not pushed.
+
 **CI fixes — 2026-10-14** (`claude/ci-fixes`, worktree `.claude/worktrees/ci-fixes`; Windows part merged from
 `claude/ci-windows`). No CI job has started since 2026-10-04 (a failed payment, then the account's Actions budget), and
 the failures that accumulated behind that are fixed. Product fixes:

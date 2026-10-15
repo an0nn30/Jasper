@@ -1,5 +1,19 @@
 # Enterprise presentation 1: kit seam Implementation Plan
 
+> **Status (2026-10-15): executed on `claude/enterprise-presentation` (`7d9334f4e..92a8a1ce0` and the documentation
+> commit after it).** Deviations from this plan's text beyond its "Planned deviations": the plan's anchors and expected
+> compiler messages were corrected before execution (`d4598cfac`); `AppDocumentationTest` now decodes percent-escapes in
+> link destinations (`ed5efe0bc`; the spec's reference README links `01%20Workstation`); Task 2's closing `git grep 'new
+> Typography('` prints `Typography.of`'s own call to the private constructor; Task 3's `UiKeySet` compile error names a
+> variable, and Step 6's `DockDropOverlayTest` is not green alone (its ghost test installs no look and feel and passes
+> only after an earlier class leaves one, also at the base; left for a test-isolation fix); Task 4 renames
+> `UiColorKeysTest.everyBuiltInVariantInstallsTheKeysItCarried` to
+> `everyBuiltInVariantGetsTheFrozenKeysOverItsOwnRoles`; Task 6 removes the dead public
+> `ThemeController.startup(boolean, TerminalSchemeChoice, Consumer)` overload, builds `FlatLafInstallerKitTest`'s
+> binding with a rethrowing failure handler and adds `verifyApplicationArchitecture` to Step 7; Task 7 drops two
+> `DesignMetrics` imports its conversion left unused; Task 8's RED compile message reads "incompatible types"; Task 10
+> adds a guard grep for an unqualified `HEIGHT`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** jasper-ui gains the kit seam: a `dev.jasper.ui.kit.Kit` value (`Kit.DEFAULT`) that every `KitContext`, every

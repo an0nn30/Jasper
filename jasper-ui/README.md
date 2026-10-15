@@ -5,8 +5,8 @@ application, terminal, Buddy, SDK or plugins. The app adapts its configuration
 and library APIs into these values; plugins use SDK contracts and host adapters.
 
 The engine is `dev.jasper.ui.theme`: `JasperTheme` reads a Jasper theme file (the bundled Slate Cobalt is `slate-cobalt.json`) and gives
-each variant's semantic palette, terminal and editor schemes, syntax styles, glass levels and FlatLaf UI keys
-(`UiColorKeys`, from the roles) as an immutable `GeneratedTheme`; the app reads installed theme files with the same
+each variant's semantic palette, terminal and editor schemes, syntax styles and glass levels as an immutable
+`GeneratedTheme` (`UiColorKeys` derives FlatLaf's UI keys from its roles when it is installed); the app reads installed theme files with the same
 loader. The app and plugins use this authority; [completion evidence](../docs/design/theme-engine/completion.md)
 separates source migration from Plan 3 composition.
 
@@ -27,15 +27,15 @@ Use Java 25 on JetBrains Runtime and the repository wrapper:
 ```
 
 Checks are headless. The bytecode architecture gate rejects other Jasper modules,
-Swing dependencies in pure packages and package cycles. It requires only UI classes,
+Swing dependencies in pure packages, edges a package's package-info does not list and package cycles. It requires only UI classes,
 so it introduces no circular dependency on application checks.
 
-The kit foundation now provides immutable `Nodes`/`ViewSpec`/`UiEvent` values, fixed logical
-`DesignMetrics`, centrally resolved `Typography`, and monochrome `IconRegistry` artwork.
+The kit foundation now provides immutable `Nodes`/`ViewSpec`/`UiEvent` values, a `Kit` (`Kit.DEFAULT`) of
+logical `DesignMetrics`, a `TypeScale` and a `FaceSet`, centrally resolved `Typography`, and monochrome `IconRegistry` artwork.
 `ThemeBinding` publishes complete chrome/workspace pairs on EDT; subscriptions replay and
 close independently. `AppearanceTransaction` installs real FlatLaf global defaults before
 publication and restores the old LAF, LAF defaults and developer overrides on failure.
-`KitContext` selects each view's theme route and supplies host-owned values. All 26 node renderers and four working panel controllers are implemented. The headless gallery
+`KitContext.of(kit, …)` carries a kit, selects each view's theme route and supplies host-owned values. All 26 node renderers and four working panel controllers are implemented. The headless gallery
 now exercises the eight initial mock compositions, panel transitions and state variants; final
 whole-branch review remains Plan 1 Task 14. Existing consumers migrate in Plans 2/3.
 

@@ -363,8 +363,8 @@ hand-picked roles in its `roles.json` (its `SOURCE.md` says how to regenerate th
 differ. Slate Cobalt's colours live only in jasper-ui's
 `slate-cobalt.json`, the machine-readable block of [the Slate Cobalt record](design/theme-engine/slate-cobalt.md) (a test
 keeps the two identical). `JasperTheme` reads the file once: the semantic palettes, the terminal schemes (`TerminalScheme`),
-the derived editor schemes and syntax styles, and one `GeneratedTheme` per variant whose FlatLaf UI keys
-`UiColorKeys.flatLaf` derives from the roles (text selection from the terminal selection, a search miss from
+the derived editor schemes and syntax styles, and one `GeneratedTheme` per variant; when one is installed,
+`UiColorKeys.flatLaf` derives its FlatLaf UI keys from the roles (text selection from the terminal selection, a search miss from
 `UiColorKeys.errorTint`). To change a colour, edit the record's block and the JSON together; to give a component a
 colour, give it a role, never a value.
 

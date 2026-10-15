@@ -8,12 +8,13 @@ Plan 3 owns final surface composition; the [completion record](design/theme-engi
 | --- | --- | --- |
 | `theme` | none | Jasper theme files (Slate Cobalt is bundled), semantic palettes, terminal and editor schemes, syntax, glass and FlatLaf keys; EDT appearance binding |
 | `model` | none | Immutable descriptors and events; no secret values |
-| `metrics` | `theme` | Fixed logical geometry and central typography/motion roles |
+| `metrics` | `theme` | Logical geometry catalogs (`DesignMetrics`), type scales and faces, central typography/motion roles |
+| `kit` | `metrics`, `theme` | The look: `Kit` names a metric catalog, type scale, faces and FlatLaf key set; `Kit.DEFAULT` is the default look |
 | `icons` | `theme`, `metrics`, `model` | Named artwork and context-scoped tint caches |
-| `swing` | `model`, `theme`, `metrics`, `icons` | EDT views, delegates, owned controls, registrations and FlatLaf installation |
+| `swing` | `model`, `theme`, `metrics`, `icons`, `kit` | EDT views, delegates, owned controls, registrations and FlatLaf installation |
 
-`verifyUiArchitecture` checks the acyclic package graph, independence from other Jasper modules,
-JDK-only theme/model boundaries. FlatLaf remains an implementation dependency. SDK `ui` values mirror the model without exposing Swing or UI types;
+`verifyUiArchitecture` checks each package's edges against the list its package-info names (this table), the acyclic
+package graph, independence from other Jasper modules and JDK-only theme/model/kit boundaries. FlatLaf remains an implementation dependency. SDK `ui` values mirror the model without exposing Swing or UI types;
 `dev.jasper.app.plugins.KitValues` is the translation boundary. Host and testkit implement the same
 SDK facade. Plugins never receive the engine jar on their runtime classpath.
 
@@ -26,13 +27,14 @@ var cardColor = theme.semantic().color(SemanticColor.SURFACE_CARD);
 ```
 
 Slate Cobalt's semantic roles supply colors. Geometry, spacing, artwork and typography roles
-come from `DesignMetrics`, `Typography` and `IconRegistry`.
+come from the context's kit (`KitContext.kit()`: its `DesignMetrics`, `TypeScale` and `FaceSet`), `Typography` and
+`IconRegistry`.
 `TerminalColors` orders background then foreground; the terminal palette orders foreground then
 background. Translate by meaning. ANSI arrays are defensively copied.
 
 Install appearance on EDT before widget creation. `AppearanceTransaction` installs real FlatLaf
 and publishes a complete chrome/workspace `ThemePair`, restoring prior global defaults on failure.
-Each `KitContext` selects a route. Binding subscriptions replay and close independently; views retain
+Each `KitContext`, made with `KitContext.of(kit, …)`, carries its kit and selects a route. Binding subscriptions replay and close independently; views retain
 stable control/document identity on updates. Font-only default changes refresh central typography.
 
 The caller owns binding and registry lifetimes; a view owns listeners, its descriptor controls and
@@ -102,8 +104,8 @@ the bundled `slate-cobalt.json` (the colour reference `docs/design/theme-engine/
 block, kept identical by a test). A theme has the Dark and/or Light semantic palettes (roles the file omits follow
 fixed rules), its terminal schemes (`TerminalScheme`, with an id and a bold foreground) and an editor scheme per
 variant (`EditorColors` and syntax styles, written as colours or as references into the palettes). `generated(dark)` assembles a full `GeneratedTheme`: the
-palette, the matching terminal scheme, the editor scheme and syntax, FlatLaf's UI keys from the roles (`UiColorKeys`)
-and the glass. Components paint theme.md's roles; alpha treatments (focus and error rings, hover, category tiles)
+palette, the matching terminal scheme, the editor scheme and syntax and the glass; `FlatLafInstaller.install(theme, kit)`
+derives FlatLaf's UI keys from the roles when it installs one (`UiColorKeys.flatLaf(theme, kit.uiKeys())`). Components paint theme.md's roles; alpha treatments (focus and error rings, hover, category tiles)
 apply one kit metric to a base role, and a role that carries alpha (the scrim, `border.subtle`) is painted as given.
 `ColourLiteralScanTest` fails on any colour literal in production code or resources outside `slate-cobalt.json`. Shadows are black at the kit's shadow
 metrics: `ThemePainting.softShadow` blurs one mask per treatment and nine-slices it across face sizes (a face too
@@ -220,7 +222,7 @@ Workspace chrome and palette calibration (Plan 3 Task 10): RESULTS headings use 
 for their text and measured height; a TRANSPARENT search field shows the rail-size glyph with `TRANSPARENT_FIELD_ICON_GAP`.
 The host-only `KitView.setHintPresentation(stackId, hint)` gives one stack (the palette footer) the compact hint face:
 its CAPTION text and embedded links use `PALETTE_HINT` (11) and its children `PALETTE_HINT_ACTION_GAP`; same-id updates
-keep it and it is not part of the plugin SDK. `NativeChromePainting` owns the native chrome's painting (tab strip, toolbar
+keep it and it is not part of the plugin SDK. `ChromePainter` (one per kit; app chrome paints with `ChromePainter.installed()`) owns the native chrome's painting (tab strip, toolbar
 rules and action widths, status dot, rail badges, connected dot, split dividers, drop guides, find and title-bar rules,
 palette shadow) over named roles; `TITLE_CONTEXT`, `TOOLBAR_LABEL`, `STATUS_TEXT` and `STATUS_PATH` carry the reference
 chrome text sizes. `IconRegistry.chromeIcon` is the native chrome's receiving context: the meanings the workspace chrome

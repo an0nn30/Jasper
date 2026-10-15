@@ -18,7 +18,7 @@ state, typed descriptor busy/error/visibility state, route, central font and sca
 and secrets. Coverage tests require all 26 nodes, enum variants, nine originals and real panel
 transitions. Test and gallery classes stay out of the production jar.
 
-Install `FlatLafInstaller` before constructing fixtures. Logical sizes go through `UIScale` once;
+Install `FlatLafInstaller.install(theme, kit)` before constructing fixtures. Logical sizes go through `UIScale` once;
 the capture's device transform is 1. Do not scale both component geometry and capture graphics.
 The gallery supplies the semantic host surface behind transparent composition and excludes native
 window chrome. It paints the kit popup directly without opening a native popup; headless captures
@@ -34,7 +34,8 @@ When adding a descriptor, update UI and SDK `Nodes`, `KitValues`, testkit contra
 actual renderer together. Add an actual mounted fixture plus a behavior or rendered regression;
 enumerating a catalog does not prove rendering. Preserve old constructors where the contract requires
 compatibility. Named artwork must express explicit intent, not infer feature semantics from text.
-Keep fixed geometry in named metrics. Preserve central font changes and logical scaling.
+Keep fixed geometry in named metrics read through a kit (`KitContext.metrics()`, `ChromePainter`, `NativeStyles`);
+`StaticDefaultTest` rejects other `DesignMetrics.DEFAULT` reads and static metric finals. Preserve central font changes and logical scaling.
 
 When changing appearance, test contrasting chrome/workspace colors, replay/rollback and disposal.
 When changing layout, test normal and enlarged fonts, narrow/short hosts, real viewport boundaries
