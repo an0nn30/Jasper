@@ -1108,7 +1108,7 @@ final class InteractiveRows {
             width = Math.max(x, width - tw - (tw > 0 ? pad : 0));
             int lw = Math.min(leading.getPreferredSize().width, Math.max(0, width - x));
             leading.setBounds(x, 0, lw, h);
-            x += lw + (lw > 0 ? ordered ? ThemePainting.metric(owner.context(),DesignMetrics.Role.ORDERED_TEXT_GAP) : owner.column == 0 || owner.column == 1 ? ThemePainting.metric(owner.context(),DesignMetrics.Role.COLUMN_TEXT_GAP) : settingsNavigation ? ThemePainting.metric(owner.context(),DesignMetrics.Role.SETTINGS_NAV_TEXT_GAP) : keycapGroup ? ThemePainting.metric(owner.context(),DesignMetrics.Role.KEYCAP_GROUP_TEXT_GAP) : owner.identityRows() ? ThemePainting.metric(owner.context(),DesignMetrics.Role.IDENTITY_ROW_TEXT_GAP) : owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_TEXT_GAP) : pad : 0);
+            x += lw + (lw > 0 ? ordered ? ThemePainting.metric(owner.context(),DesignMetrics.Role.ORDERED_TEXT_GAP) : owner.column == 0 || owner.column == 1 ? ThemePainting.metric(owner.context(),DesignMetrics.Role.COLUMN_TEXT_GAP) : keycapGroup ? ThemePainting.metric(owner.context(),DesignMetrics.Role.KEYCAP_GROUP_TEXT_GAP) : owner.identityRows() ? ThemePainting.metric(owner.context(),DesignMetrics.Role.IDENTITY_ROW_TEXT_GAP) : owner.panelSingle ? ThemePainting.metric(owner.context(),DesignMetrics.Role.PANEL_ROW_TEXT_GAP) : pad : 0);
             int content = Math.max(0, width - x);
             if (!cells.isEmpty()) {
                 title.setBounds(x, 0, content, h);

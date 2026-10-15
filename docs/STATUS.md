@@ -1,5 +1,11 @@
 # Jasper — Status and Handoff
 
+**Settings' page list without icons — 2026-10-14** (`claude/slate-cobalt`; the user's ask). The Settings navigation
+shows page titles only, as IntelliJ's settings tree does: `PageTree` gives its items no icon, the page icon and artwork
+methods and the plugin pages' artwork are gone, and the kit drops the navigation tile and its metrics
+(`SETTINGS_NAV_TILE`, `SETTINGS_NAV_GLYPH`, `SETTINGS_NAV_TEXT_GAP`). Plugin identity art still shows on the Plugins
+page and notification headers. GUI check pending.
+
 **Slate Cobalt replaces Slate Steel — 2026-10-14** (`claude/slate-cobalt`, worktree `.claude/worktrees/slate-cobalt`;
 the user's `slate-cobalt (3).json`). Slate Cobalt, in Dark and Light, is the default and fallback theme (`slate-cobalt`,
 author Jasper); Slate Steel is removed with no migration, so a saved `slate-steel` pick is reported and the default used.
