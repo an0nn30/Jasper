@@ -46,35 +46,35 @@ public final class ThemeController implements AutoCloseable {
         "PasswordField.font", "FormattedTextField.font", "TextArea.font", "ComboBox.font", "Button.font");
 
     /**
-     * Start-up selection: {@code selection} in {@code dark}, or Slate Steel Dark when that cannot be installed. A failed
+     * Start-up selection: {@code selection} in {@code dark}, or Slate Cobalt Dark when that cannot be installed. A failed
      * attempt is rolled back completely, and the fallback is installed before this returns, so nothing can read the
      * installed snapshot (ThemeZone, named icons, native chrome) before one exists. The fallback's own failure propagates.
      */
     public static ThemeController startup(boolean dark, ThemeSelection selection, java.util.function.Consumer<InstallationFailure> fallingBack) {
         return startup(dark, selection, ThemeManager::install, fallingBack);
     }
-    /** As {@link #startup(boolean, ThemeSelection, java.util.function.Consumer)} for Slate Steel with {@code scheme}. */
+    /** As {@link #startup(boolean, ThemeSelection, java.util.function.Consumer)} for Slate Cobalt with {@code scheme}. */
     public static ThemeController startup(boolean dark, TerminalSchemeChoice scheme, java.util.function.Consumer<InstallationFailure> fallingBack) {
-        return startup(dark, ThemeSelection.slateSteel(scheme), fallingBack);
+        return startup(dark, ThemeSelection.slateCobalt(scheme), fallingBack);
     }
     static ThemeController startup(boolean dark, TerminalSchemeChoice scheme, Predicate<GeneratedTheme> installer,
                                    java.util.function.Consumer<InstallationFailure> fallingBack) {
-        return startup(dark, ThemeSelection.slateSteel(scheme), installer, fallingBack);
+        return startup(dark, ThemeSelection.slateCobalt(scheme), installer, fallingBack);
     }
     static ThemeController startup(boolean dark, ThemeSelection selection, Predicate<GeneratedTheme> installer,
                                    java.util.function.Consumer<InstallationFailure> fallingBack) {
         try { return new ThemeController(new Shown(dark, selection), installer); }
         catch (InstallationFailure failure) {
             fallingBack.accept(failure);
-            var steel = JasperTheme.bundled();
-            return new ThemeController(new Shown(true, new ThemeSelection(selection.library(), steel, steel, selection.scheme())), installer);
+            var cobalt = JasperTheme.bundled();
+            return new ThemeController(new Shown(true, new ThemeSelection(selection.library(), cobalt, cobalt, selection.scheme())), installer);
         }
     }
 
-    /** Slate Steel in {@code dark} with {@code scheme}. */
+    /** Slate Cobalt in {@code dark} with {@code scheme}. */
     public ThemeController(boolean dark, TerminalSchemeChoice scheme) { this(dark, scheme, ThemeManager::install); }
     ThemeController(boolean dark, TerminalSchemeChoice scheme, Predicate<GeneratedTheme> installer) {
-        this(new Shown(dark, ThemeSelection.slateSteel(Objects.requireNonNull(scheme))), installer);
+        this(new Shown(dark, ThemeSelection.slateCobalt(Objects.requireNonNull(scheme))), installer);
     }
     /** {@code selection} in {@code dark}. */
     public ThemeController(boolean dark, ThemeSelection selection) { this(new Shown(dark, Objects.requireNonNull(selection)), ThemeManager::install); }

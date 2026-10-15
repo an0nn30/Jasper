@@ -15,6 +15,24 @@ request). Unstressed it passed every run. `FileServerPluginTest` starts servers 
 ports and keeps the check-then-use gap. `./gradlew check --continue`: **10,424 tests, 0 failures, 0 errors, 17
 skipped**. Not merged.
 
+**Settings' page list without icons — 2026-10-14** (`claude/slate-cobalt`, merged to local main, not pushed; the
+user's ask). The Settings navigation
+shows page titles only, as IntelliJ's settings tree does: `PageTree` gives its items no icon, the page icon and artwork
+methods and the plugin pages' artwork are gone, and the kit drops the navigation tile and its metrics
+(`SETTINGS_NAV_TILE`, `SETTINGS_NAV_GLYPH`, `SETTINGS_NAV_TEXT_GAP`). Plugin identity art still shows on the Plugins
+page and notification headers. GUI check pending.
+
+**Slate Cobalt replaces Slate Steel — 2026-10-14** (`claude/slate-cobalt`, worktree `.claude/worktrees/slate-cobalt`;
+the user's `slate-cobalt (3).json`). Slate Cobalt, in Dark and Light, is the default and fallback theme (`slate-cobalt`,
+author Jasper); Slate Steel is removed with no migration, so a saved `slate-steel` pick is reported and the default used.
+Its terminal schemes are the file's Dark and Light plus Slate Steel's High Contrast, carried over as
+`slate-cobalt/high-contrast`. The colour record is
+[`design/theme-engine/slate-cobalt.md`](design/theme-engine/slate-cobalt.md) (its machine-readable block is the bundled
+file). Every contrast target holds; Light cyan now meets 4.9:1, so it is no longer a named exception. Code, tests, the
+converter's built-in list and living docs say Slate Cobalt; plans, specs, acceptance records and the entries below keep
+Slate Steel. Merged to local main with main's Cmd-click and start-up recovery work, not pushed; `./gradlew check
+--continue` after the merge: **10,420 tests, 0 failures, 0 errors, 17 skipped**. GUI check pending.
+
 **Cmd-click file paths (command line plan 3) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
 [plan](superpowers/plans/2026-10-14-jasper-command-line-3-cmd-click-paths.md)). Cmd-click on macOS, Ctrl-click
@@ -509,7 +527,7 @@ more… recovers from a failed Errors window. See the follow-up round in the
 [acceptance record](design/theme-engine/acceptance.md).
 
 **Slate Steel Plan 1 (engine and kit) complete — 2026-10-12.** On `claude/slate-steel` (not pushed, not merged): the
-user's `theme.md` became [`design/theme-engine/slate-steel.md`](design/theme-engine/slate-steel.md) with derived editor
+user's `theme.md` became [`design/theme-engine/slate-steel.md`](design/theme-engine/slate-cobalt.md) with derived editor
 schemes, bundled as `slate-steel.json` and read by `SlateSteel` into the Dark/Light palettes, the Slate Steel Dark/Light
 and High Contrast terminal schemes (bold foreground included) and complete `GeneratedTheme`s that install into FlatLaf.
 Ten roles were added (SDK 0.15.5; every bundled manifest requires it). Opacity is applied once, and kit components moved

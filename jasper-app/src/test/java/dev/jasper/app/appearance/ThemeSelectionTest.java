@@ -20,7 +20,7 @@ import org.junit.jupiter.api.io.TempDir;
 class ThemeSelectionTest {
     @TempDir Path home;
 
-    /** Slate Steel's file as {@code ocean} (both variants) and a terminal-only {@code zenburn}. */
+    /** Slate Cobalt's file as {@code ocean} (both variants) and a terminal-only {@code zenburn}. */
     ThemeLibrary library() throws Exception {
         var themes = Files.createDirectories(home.resolve("themes"));
         Files.writeString(themes.resolve("ocean.json"), ThemeLibraryTest.uiTheme("Ocean"));
@@ -32,7 +32,7 @@ class ThemeSelectionTest {
         var library = library();
         var problems = new LinkedHashMap<String, String>();
         var zenburn = TerminalSchemeChoice.parse("zenburn/dark").orElseThrow();
-        var selection = ThemeSelection.of(library, "ocean", "slate-steel", zenburn, problems::put);
+        var selection = ThemeSelection.of(library, "ocean", "slate-cobalt", zenburn, problems::put);
         assertThat(problems).isEmpty();
         assertThat(selection.theme(true)).isSameAs(library.theme("ocean").orElseThrow());
         assertThat(selection.theme(false)).isSameAs(JasperTheme.bundled());
@@ -51,12 +51,12 @@ class ThemeSelectionTest {
         assertThat(selection.theme(false)).isSameAs(JasperTheme.bundled());
         assertThat(selection.scheme()).isEqualTo(TerminalSchemeChoice.MATCH);
         assertThat(problems).containsExactly(
-            Map.entry("ui.theme.dark", "\"zenburn\" has no Dark variant. Use one of \"slate-steel\", \"catppuccin-frappe\", "
+            Map.entry("ui.theme.dark", "\"zenburn\" has no Dark variant. Use one of \"slate-cobalt\", \"catppuccin-frappe\", "
                 + "\"catppuccin-macchiato\", \"catppuccin-mocha\", \"ocean\"; using the default."),
-            Map.entry("ui.theme.light", "\"nord\" is not an installed theme. Use one of \"slate-steel\", \"catppuccin-latte\", \"ocean\"; "
+            Map.entry("ui.theme.light", "\"nord\" is not an installed theme. Use one of \"slate-cobalt\", \"catppuccin-latte\", \"ocean\"; "
                 + "using the default."),
-            Map.entry("terminal.scheme", "\"nord/dark\" is not an installed scheme. Use \"match\" or one of \"slate-steel/dark\", "
-                + "\"slate-steel/light\", \"slate-steel/high-contrast\", \"catppuccin-latte/light\", \"catppuccin-frappe/dark\", "
+            Map.entry("terminal.scheme", "\"nord/dark\" is not an installed scheme. Use \"match\" or one of \"slate-cobalt/dark\", "
+                + "\"slate-cobalt/light\", \"slate-cobalt/high-contrast\", \"catppuccin-latte/light\", \"catppuccin-frappe/dark\", "
                 + "\"catppuccin-macchiato/dark\", \"catppuccin-mocha/dark\", \"ocean/dark\", \"ocean/light\", \"ocean/high-contrast\", "
                 + "\"zenburn/dark\"; using the default."));
         assertThat(selection.withScheme(TerminalSchemeChoice.parse("nord/dark").orElseThrow()).scheme()).isEqualTo(TerminalSchemeChoice.MATCH);
@@ -65,7 +65,7 @@ class ThemeSelectionTest {
     @Test void theControllerShowsEachAppearancesThemeAndSwitchesBetweenThem() throws Exception {
         var library = library();
         var ocean = library.theme("ocean").orElseThrow();
-        var selection = ThemeSelection.of(library, "ocean", "slate-steel", TerminalSchemeChoice.MATCH, (key, message) -> { });
+        var selection = ThemeSelection.of(library, "ocean", "slate-cobalt", TerminalSchemeChoice.MATCH, (key, message) -> { });
         var installs = new ArrayList<GeneratedTheme>();
         var controller = new ThemeController(true, selection, installs::add);
         assertThat(controller.current().chrome()).isSameAs(ocean.generated(true)).isSameAs(controller.current().workspace());
@@ -78,7 +78,7 @@ class ThemeSelectionTest {
 
     @Test void aRefreshedLibraryNotifiesSubscribersWithoutReinstallingAnUnchangedTheme() throws Exception {
         var library = library();
-        var selection = ThemeSelection.of(library, "ocean", "slate-steel", TerminalSchemeChoice.MATCH, (key, message) -> { });
+        var selection = ThemeSelection.of(library, "ocean", "slate-cobalt", TerminalSchemeChoice.MATCH, (key, message) -> { });
         var installs = new ArrayList<GeneratedTheme>();
         var controller = new ThemeController(true, selection, installs::add);
         var chromeChanges = new ArrayList<Boolean>();
@@ -86,7 +86,7 @@ class ThemeSelectionTest {
         chromeChanges.clear();
         Files.writeString(home.resolve("themes/nord.json"), ThemeLibraryTest.terminalTheme("Nord"));
         var refreshed = ThemeLibrary.read(home.resolve("themes"), library);
-        controller.configure(true, ThemeSelection.of(refreshed, "ocean", "slate-steel", TerminalSchemeChoice.MATCH, (key, message) -> { }),
+        controller.configure(true, ThemeSelection.of(refreshed, "ocean", "slate-cobalt", TerminalSchemeChoice.MATCH, (key, message) -> { }),
             dev.jasper.app.config.UiFontConfig.defaults());
         assertThat(chromeChanges).containsExactly(false);
         assertThat(installs).hasSize(1);
@@ -95,18 +95,18 @@ class ThemeSelectionTest {
 
     @Test void aReplacedThemeInUseIsInstalledAgainAfterTheReload() throws Exception {
         var library = library();
-        var selection = ThemeSelection.of(library, "ocean", "slate-steel", TerminalSchemeChoice.MATCH, (key, message) -> { });
+        var selection = ThemeSelection.of(library, "ocean", "slate-cobalt", TerminalSchemeChoice.MATCH, (key, message) -> { });
         var installs = new ArrayList<GeneratedTheme>();
         var controller = new ThemeController(true, selection, installs::add);
         var chromeChanges = new ArrayList<Boolean>();
         controller.subscribe((theme, chrome) -> chromeChanges.add(chrome));
         chromeChanges.clear();
         Files.writeString(home.resolve("themes/ocean.json"),
-            ThemeLibraryTest.uiTheme("Ocean").replaceFirst("\"surface.app\": \"#1E2127\"", "\"surface.app\": \"#101820\""));
+            ThemeLibraryTest.uiTheme("Ocean").replaceFirst("\"surface.app\": \"#23262C\"", "\"surface.app\": \"#101820\""));
         var refreshed = ThemeLibrary.read(home.resolve("themes"), library);
         var replaced = refreshed.theme("ocean").orElseThrow();
         assertThat(replaced).as("a changed file is parsed again").isNotSameAs(library.theme("ocean").orElseThrow());
-        controller.configure(true, ThemeSelection.of(refreshed, "ocean", "slate-steel", TerminalSchemeChoice.MATCH, (key, message) -> { }),
+        controller.configure(true, ThemeSelection.of(refreshed, "ocean", "slate-cobalt", TerminalSchemeChoice.MATCH, (key, message) -> { }),
             dev.jasper.app.config.UiFontConfig.defaults());
         assertThat(installs).hasSize(2);
         assertThat(installs.get(1)).isSameAs(replaced.generated(true));

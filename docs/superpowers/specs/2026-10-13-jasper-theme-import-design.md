@@ -117,7 +117,7 @@ dropdown and it offers no UI variant. Alacritty conversions produce these.
 `slate-steel.json` moves onto this format: `"jasper-theme": 1`, `"name": "Slate Steel"`, `"author": "Jasper"`; the
 `ui` and `editor` keys become `dark` and `light`; the terminal keys become `dark` ("Slate Steel Dark"), `light`
 ("Slate Steel Light") and `high-contrast` ("High Contrast"). Every colour value is unchanged. The machine-readable
-block in [the colour reference](../../design/theme-engine/slate-steel.md) changes the same way.
+block in [the colour reference](../../design/theme-engine/slate-cobalt.md) changes the same way.
 
 The token rule is unchanged: hex colours live only in `slate-steel.json` among the app's code and resources.
 Imported files live in `<home>/themes/`, outside the scan.

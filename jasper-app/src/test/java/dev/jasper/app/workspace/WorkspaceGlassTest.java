@@ -346,7 +346,7 @@ class WorkspaceGlassTest {
             owner.setGlassRequests((levels, isDark) -> { requests.add(levels); dark.add(isDark); });
             assertThat(requests.getLast()).isEqualTo(GlassLevels.OPAQUE);
 
-            assertThat(dark.getLast()).as("Slate Steel Dark is a dark workspace").isTrue();
+            assertThat(dark.getLast()).as("Slate Cobalt Dark is a dark workspace").isTrue();
 
             owner.applyConfiguration(ConfigSnapshot.defaults().toBuilder()
                 .glass(new GlassSettings(80f, WorkspaceBlur.OFF)).build(), true);
@@ -355,7 +355,7 @@ class WorkspaceGlassTest {
 
             themes.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
             assertThat(requests.getLast()).isEqualTo(new GlassLevels(0.8, false));
-            assertThat(dark.getLast()).as("Slate Steel Light is a light workspace").isFalse();
+            assertThat(dark.getLast()).as("Slate Cobalt Light is a light workspace").isFalse();
         });
     }
 }

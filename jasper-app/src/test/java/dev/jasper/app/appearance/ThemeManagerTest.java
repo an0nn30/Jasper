@@ -88,7 +88,7 @@ class ThemeManagerTest {
             GeneratedTheme theme = ThemeTestSupport.generated(true);
             var roles = theme.semantic();
             assertThat(ThemeManager.install(theme)).isTrue();
-            assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Slate Steel");
+            assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Slate Cobalt");
             assertThat(FlatLaf.isLafDark()).isTrue();
             assertThat(UIManager.getColor("Panel.background")).isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
             assertThat(UIManager.getColor("List.background")).isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.SURFACE_CARD));

@@ -77,7 +77,7 @@ public final class TitleBarPreview {
         var graphics = image.createGraphics();
         try { graphics.scale(2, 2); bar.printAll(graphics); }
         finally { graphics.dispose(); }
-        try { ImageIO.write(image, "png", output.resolve((dark ? "slate-steel-dark" : "slate-steel-light") + "-" + name + ".png").toFile()); }
+        try { ImageIO.write(image, "png", output.resolve((dark ? "slate-cobalt-dark" : "slate-cobalt-light") + "-" + name + ".png").toFile()); }
         catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
         // Tabs are owned below the titlebar. Preserve their actual region separately from the strip.
         var tabs = owner.windowTabs();
@@ -86,7 +86,7 @@ public final class TitleBarPreview {
         var tabGraphics = tabImage.createGraphics();
         try { tabGraphics.scale(2, 2); tabs.printAll(tabGraphics); }
         finally { tabGraphics.dispose(); }
-        try { ImageIO.write(tabImage, "png", output.resolve((dark ? "slate-steel-dark" : "slate-steel-light") + "-" + name + "-window-tabs.png").toFile()); }
+        try { ImageIO.write(tabImage, "png", output.resolve((dark ? "slate-cobalt-dark" : "slate-cobalt-light") + "-" + name + "-window-tabs.png").toFile()); }
         catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
     }
 }

@@ -18,8 +18,8 @@ public record ResolvedTheme(GeneratedTheme chrome, GeneratedTheme workspace, Pal
         return new ResolvedTheme(theme, theme, TerminalPaletteAdapter.toTerminal(selection.terminal(dark)));
     }
 
-    /** Slate Steel: one variant for chrome and workspace, and {@code scheme}'s palette. */
-    public static ResolvedTheme slateSteel(boolean dark, TerminalScheme scheme) {
+    /** Slate Cobalt: one variant for chrome and workspace, and {@code scheme}'s palette. */
+    public static ResolvedTheme slateCobalt(boolean dark, TerminalScheme scheme) {
         var theme = JasperTheme.bundled().generated(dark);
         return new ResolvedTheme(theme, theme, TerminalPaletteAdapter.toTerminal(scheme));
     }

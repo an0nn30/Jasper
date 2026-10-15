@@ -150,8 +150,8 @@ final class ThemeMenu {
     private void askRemove(String theme) {
         String label = label(theme);
         var uses = new ArrayList<String>();
-        if (names(UI_THEME_DARK, context.draft().value(UI_THEME_DARK), theme)) uses.add("It is your Dark theme; Slate Steel will be used instead.");
-        if (names(UI_THEME_LIGHT, context.draft().value(UI_THEME_LIGHT), theme)) uses.add("It is your Light theme; Slate Steel will be used instead.");
+        if (names(UI_THEME_DARK, context.draft().value(UI_THEME_DARK), theme)) uses.add("It is your Dark theme; Slate Cobalt will be used instead.");
+        if (names(UI_THEME_LIGHT, context.draft().value(UI_THEME_LIGHT), theme)) uses.add("It is your Light theme; Slate Cobalt will be used instead.");
         if (names(TERMINAL_SCHEME, context.draft().value(TERMINAL_SCHEME), theme))
             uses.add("Its scheme is your terminal scheme; Same as UI theme will be used instead.");
         String consequence = "Its file, " + theme + ".json, is deleted from the themes folder."

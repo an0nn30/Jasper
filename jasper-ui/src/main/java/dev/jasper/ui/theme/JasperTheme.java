@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 /**
  * A Jasper theme file ({@code docs/themes.md}): a name, an optional author, a Dark and/or Light UI variant, terminal
  * schemes and an editor scheme for each UI variant. The built-in themes are {@code <id>.json} beside this class: Slate
- * Steel, the default, and Catppuccin's flavours, converted from its IntelliJ plugin ({@code tools/themes/catppuccin}). A UI
+ * Cobalt, the default, and Catppuccin's flavours, converted from its IntelliJ plugin ({@code tools/themes/catppuccin}). A UI
  * variant lists every role except those that follow fixed rules, never colour values: {@code border.focus} is
  * {@code accent}, {@code surface.status} is {@code surface.app}, {@code border.identity} is {@code border.control} and
  * each {@code hue.<name>.surface} is its hue (the kit applies the tile alpha). A variant may leave out the title bar's
@@ -31,12 +31,12 @@ import java.util.regex.Pattern;
  * {@link ThemeFileException} naming the file and the entry. Immutable.
  */
 public final class JasperTheme {
-    /** The default theme's id, Slate Steel's. */
-    public static final String BUNDLED_ID = "slate-steel";
+    /** The default theme's id, Slate Cobalt's. */
+    public static final String BUNDLED_ID = "slate-cobalt";
     /** The format this Jasper reads: {@code "jasper-theme": 1}. */
     public static final long FORMAT = 1;
-    static final String RESOURCE = "/dev/jasper/ui/theme/slate-steel.json";
-    /** The built-in themes after Slate Steel, in the order Settings lists them. */
+    static final String RESOURCE = "/dev/jasper/ui/theme/slate-cobalt.json";
+    /** The built-in themes after Slate Cobalt, in the order Settings lists them. */
     static final List<String> CONVERTED = List.of("catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha");
     static final Pattern WORDS = Pattern.compile("[a-z0-9]+(-[a-z0-9]+)*");
     private static final Pattern RGB = Pattern.compile("#[0-9A-Fa-f]{6}"), RGBA = Pattern.compile("#[0-9A-Fa-f]{8}"),
@@ -96,10 +96,10 @@ public final class JasperTheme {
         light = ui.containsKey(LIGHT) ? build(false) : null;
     }
 
-    /** The default theme, Slate Steel, read once. */
+    /** The default theme, Slate Cobalt, read once. */
     public static JasperTheme bundled() { return Bundled.THEME; }
 
-    /** Every built-in theme, Slate Steel first, read once on first use; no installed theme may use their ids. */
+    /** Every built-in theme, Slate Cobalt first, read once on first use; no installed theme may use their ids. */
     public static List<JasperTheme> builtIns() { return BuiltIns.THEMES; }
 
     /** The built-in theme with this id. */

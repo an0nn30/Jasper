@@ -8,9 +8,9 @@ import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.ui.theme.JasperTheme;
 import org.junit.jupiter.api.Test;
 
-/** Review Focus 2: plugins receive Slate Steel's roles and editor scheme, as before the token view went. */
+/** Review Focus 2: plugins receive Slate Cobalt's roles and editor scheme, as before the token view went. */
 class HostedPalettesTest {
-    /** Every role and editor colour distinct, so two palette fields that swap sources are caught even where Slate Steel shares a colour. */
+    /** Every role and editor colour distinct, so two palette fields that swap sources are caught even where Slate Cobalt shares a colour. */
     @Test void eachPaletteFieldTakesItsOwnSource() {
         var roles = new java.util.EnumMap<dev.jasper.ui.theme.SemanticColor, java.awt.Color>(dev.jasper.ui.theme.SemanticColor.class);
         for (var role : dev.jasper.ui.theme.SemanticColor.values()) {

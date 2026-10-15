@@ -419,7 +419,7 @@ class ConfigLoaderTest {
                 assertThat(d.message()).contains("plugins/dev.example.tool/dev.example.tool.toml");
             });
         }
-    /** Review Focus 2: an older install's theme keys start Slate Steel and are reported, never applied or migrated. */
+    /** Review Focus 2: an older install's theme keys start Slate Cobalt and are reported, never applied or migrated. */
     @Test void theRemovedThemeKeysAreUnknownSettings() {
         var result = parse("[ui.theme]\nname = \"Nord\"\nfollow_system = true\nworkspace = \"Nord\"\n[terminal]\ncolors = \"light\"\n");
         assertThat(result.rejected()).isFalse();
@@ -433,10 +433,10 @@ class ConfigLoaderTest {
     }
 
     @Test void appearanceAndTerminalSchemeReadTheirChoicesAndDefault() {
-        var chosen = parse("[ui]\nappearance = \"light\"\n[terminal]\nscheme = \"slate-steel/high-contrast\"\n");
+        var chosen = parse("[ui]\nappearance = \"light\"\n[terminal]\nscheme = \"slate-cobalt/high-contrast\"\n");
         assertThat(chosen.diagnostics()).isEmpty();
         assertThat(chosen.snapshot().appearance()).isEqualTo(AppearanceMode.LIGHT);
-        assertThat(chosen.snapshot().terminalScheme()).isEqualTo(TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow());
+        assertThat(chosen.snapshot().terminalScheme()).isEqualTo(TerminalSchemeChoice.parse("slate-cobalt/high-contrast").orElseThrow());
         var defaults = parse("");
         assertThat(defaults.snapshot().appearance()).isEqualTo(AppearanceMode.SYSTEM);
         assertThat(defaults.snapshot().terminalScheme()).isEqualTo(TerminalSchemeChoice.MATCH);
@@ -450,16 +450,16 @@ class ConfigLoaderTest {
         assertThat(chosen.snapshot().darkTheme()).isEqualTo("ocean");
         assertThat(chosen.snapshot().lightTheme()).isEqualTo("ocean-dawn");
         var bad = parse("[ui.theme]\ndark = \"Ocean Theme\"\n");
-        assertThat(bad.snapshot().darkTheme()).isEqualTo("slate-steel");
+        assertThat(bad.snapshot().darkTheme()).isEqualTo("slate-cobalt");
         assertDiagnostic(bad, "ui.theme.dark", 2, 1, ConfigDiagnostic.Severity.ERROR);
-        assertThat(bad.diagnostics().getFirst().message()).isEqualTo("Use a theme id such as \"slate-steel\"; using the default.");
+        assertThat(bad.diagnostics().getFirst().message()).isEqualTo("Use a theme id such as \"slate-cobalt\"; using the default.");
     }
 
     @Test void anOldSchemeValueIsUnknownNow() {
         var result = parse("[terminal]\nscheme = \"high-contrast\"\n");
         assertThat(result.snapshot().terminalScheme()).isEqualTo(TerminalSchemeChoice.MATCH);
         assertThat(result.diagnostics().getFirst().message())
-            .isEqualTo("Use \"match\" or a scheme id such as \"slate-steel/high-contrast\"; using the default.");
+            .isEqualTo("Use \"match\" or a scheme id such as \"slate-cobalt/high-contrast\"; using the default.");
     }
 
     @Test void anUnknownAppearanceOrSchemeUsesTheDefaultAndSaysSo() {

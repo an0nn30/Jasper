@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * A Slate Steel variant with every value filled in: the semantic palette, the matching terminal palette, the editor
+ * A Slate Cobalt variant with every value filled in: the semantic palette, the matching terminal palette, the editor
  * scheme and its syntax styles, FlatLaf's ordered UI keys and the workspace glass. Immutable and Swing-free.
  */
 public record GeneratedTheme(String name, boolean dark, String author, SemanticPalette semantic, TerminalColors terminal,

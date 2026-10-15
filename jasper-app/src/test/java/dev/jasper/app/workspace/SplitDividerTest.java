@@ -42,7 +42,7 @@ class SplitDividerTest {
                             if (Math.abs(along - length / 2) < UIScale.scale(16)) continue;
                             Color stroke = new Color(image.getRGB(vertical ? across / 2 : along,
                                 vertical ? along : across / 2));
-                            // Slate Steel's border.window as authored: 1.43:1 (Dark) and 1.58:1 (Light) against the terminal.
+                            // Slate Cobalt's border.window as authored: 1.43:1 (Dark) and 1.58:1 (Light) against the terminal.
                             assertThat(stroke).as("%s orientation %s at %s", (themeDark ? "dark" : "light"), orientation, along)
                                 .isEqualTo(ThemeTestSupport.color(themeDark, dev.jasper.ui.theme.SemanticColor.BORDER_WINDOW));
                             assertThat(contrast(stroke, ThemeTestSupport.terminal(themeDark).background()))

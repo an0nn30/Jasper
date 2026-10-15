@@ -13,8 +13,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** spec 3.2: the built-in themes plus every valid {@code <home>/themes/*.json}; bad files are skipped and reported. */
 class ThemeLibraryTest {
-    static final List<String> BUILT_IN = List.of("slate-steel", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha");
-    static final List<String> BUILT_IN_SCHEMES = List.of("slate-steel/dark", "slate-steel/light", "slate-steel/high-contrast",
+    static final List<String> BUILT_IN = List.of("slate-cobalt", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha");
+    static final List<String> BUILT_IN_SCHEMES = List.of("slate-cobalt/dark", "slate-cobalt/light", "slate-cobalt/high-contrast",
         "catppuccin-latte/light", "catppuccin-frappe/dark", "catppuccin-macchiato/dark", "catppuccin-mocha/dark");
     @TempDir Path home;
 
@@ -35,8 +35,8 @@ class ThemeLibraryTest {
         assertThat(library.themes()).containsExactlyElementsOf(JasperTheme.builtIns());
         assertThat(library.themes().getFirst()).isSameAs(JasperTheme.bundled());
         assertThat(library.themes(true)).extracting(JasperTheme::id)
-            .containsExactly("slate-steel", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha");
-        assertThat(library.themes(false)).extracting(JasperTheme::id).containsExactly("slate-steel", "catppuccin-latte");
+            .containsExactly("slate-cobalt", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha");
+        assertThat(library.themes(false)).extracting(JasperTheme::id).containsExactly("slate-cobalt", "catppuccin-latte");
         assertThat(library.imported()).isEmpty();
         assertThat(library.problems()).isEmpty();
         assertThat(library.schemes()).extracting(scheme -> scheme.id().toString()).containsExactlyElementsOf(BUILT_IN_SCHEMES);
@@ -53,8 +53,8 @@ class ThemeLibraryTest {
         assertThat(library.problems()).isEmpty();
         assertThat(library.themes()).extracting(JasperTheme::id).containsExactlyElementsOf(builtInAnd("abyss", "ocean", "zenburn"));
         assertThat(library.themes(true)).extracting(JasperTheme::id)
-            .containsExactly("slate-steel", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "abyss", "ocean");
-        assertThat(library.themes(false)).extracting(JasperTheme::id).containsExactly("slate-steel", "catppuccin-latte", "abyss", "ocean");
+            .containsExactly("slate-cobalt", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "abyss", "ocean");
+        assertThat(library.themes(false)).extracting(JasperTheme::id).containsExactly("slate-cobalt", "catppuccin-latte", "abyss", "ocean");
         assertThat(library.theme("zenburn")).get().extracting(JasperTheme::name).isEqualTo("Zenburn");
         assertThat(library.theme("nord")).isEmpty();
         var schemes = new java.util.ArrayList<>(BUILT_IN_SCHEMES);
@@ -73,7 +73,7 @@ class ThemeLibraryTest {
         Files.writeString(themes().resolve("broken.json"), "{ \"jasper-theme\": 1,\n  \"name\": \"Broken\" ");
         Files.writeString(themes().resolve("half.json"), terminalTheme("Half").replace("\"fg.bold\": \"#FBF1C7\",", ""));
         Files.writeString(themes().resolve("My Theme.json"), terminalTheme("Mine"));
-        Files.writeString(themes().resolve("slate-steel.json"), terminalTheme("Impostor"));
+        Files.writeString(themes().resolve("slate-cobalt.json"), terminalTheme("Impostor"));
         Files.writeString(themes().resolve("catppuccin-mocha.json"), uiTheme("Catppuccin Mocha"));
         Files.write(themes().resolve("huge.json"), new byte[ThemeLibrary.MAX_BYTES + 1]);
         Files.write(themes().resolve("latin.json"), new byte[] {'{', (byte) 0xE9, '}'});
@@ -82,7 +82,7 @@ class ThemeLibraryTest {
         var library = ThemeLibrary.read(themes(), ThemeLibrary.bundledOnly());
         assertThat(library.imported()).as("a byte-order mark is not part of the text").extracting(JasperTheme::id).containsExactly("good", "marked");
         assertThat(library.problems()).extracting(problem -> problem.file().getFileName().toString())
-            .containsExactly("My Theme.json", "broken.json", "catppuccin-mocha.json", "half.json", "huge.json", "latin.json", "slate-steel.json");
+            .containsExactly("My Theme.json", "broken.json", "catppuccin-mocha.json", "half.json", "huge.json", "latin.json", "slate-cobalt.json");
         assertThat(library.problems().get(0).message()).startsWith("A theme file is named after its id");
         assertThat(library.problems().get(1).line()).isEqualTo(2);
         assertThat(library.problems().get(1).message()).isEqualTo("Unexpected end");
@@ -90,7 +90,7 @@ class ThemeLibraryTest {
         assertThat(library.problems().get(3).message()).isEqualTo("terminal.dark: Missing colour \"fg.bold\"");
         assertThat(library.problems().get(4).message()).isEqualTo("Theme files are at most 1 MiB.");
         assertThat(library.problems().get(5).message()).isEqualTo("A theme file is UTF-8 text.");
-        assertThat(library.problems().get(6).message()).isEqualTo("Slate Steel is built in; this file is ignored.");
+        assertThat(library.problems().get(6).message()).isEqualTo("Slate Cobalt is built in; this file is ignored.");
     }
 
     @Test void aRescanKeepsUnchangedThemesAndAnUnchangedFolderKeepsTheLibrary() throws Exception {

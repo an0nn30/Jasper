@@ -947,8 +947,8 @@ face (a saved host's name, address and glyph) while its options stay ordinary. N
 ### Declared identity tile hue (SDK 0.15.1)
 
 `icon_hue = "neutral"` is optional. Its exact tokens are `neutral`, `blue`, `green`, `amber`, and `purple`;
-omission uses neutral. It chooses the receiving theme's identity tile backdrop in Plugins rows/headers,
-Settings Tools and notification owner headers. It never recolors SVG/PNG pixels or changes their opacity or size.
+omission uses neutral. It chooses the receiving theme's identity tile backdrop in Plugins rows/headers
+and notification owner headers. It never recolors SVG/PNG pixels or changes their opacity or size.
 An opaque authored background can cover that tile. Missing or invalid artwork keeps the generic fallback.
 Invalid decorative strings warn and fall back to neutral; nonstring values and unrelated unknown keys are rejected.
 
