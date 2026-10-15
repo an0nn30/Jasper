@@ -1,5 +1,24 @@
 # Jasper — Status and Handoff
 
+**CI fixes — 2026-10-14** (`claude/ci-fixes`, worktree `.claude/worktrees/ci-fixes`; Windows part merged from
+`claude/ci-windows`). No CI job has started since 2026-10-04 (a failed payment, then the account's Actions budget), and
+the failures that accumulated behind that are fixed. Product fixes:
+- On Linux and Windows, Enter on a focused kit button pressed it. A form now takes Enter for its PRIMARY from every
+  control, so Enter on a destructive question's focused Overwrite picks Cancel; a button's own Enter (a picker) still wins.
+- Wrapped text and rich Settings dropdowns measure in the antialiased, fractional context they paint in (on Linux, words
+  broke apart and values were cut).
+- A stopped tunnel's port is closed when stop returns, so a restart on the same port no longer fails as in use.
+- `jasper_watch.c` builds with gcc 13's fortify checks.
+
+Font-dependent tests keep their macOS values on macOS and check layout invariants elsewhere; Windows-only test
+assumptions (drive-less paths, `/` separators, names Windows forbids, jars still open at `@TempDir` deletion, `/bin/sh`)
+are made portable. CI skips pushes and pull requests that change only documentation, and `linux-packages` runs for
+release tags and packaging changes. `./gradlew check --continue` at `86d8be6c`: macOS **10,424 tests, 0 failures, 0
+errors, 17 skipped**; Linux (Ubuntu 24.04 container, DejaVu fonts; Liberation Sans checked with metric-compatible Arial)
+**10,424, 0 failures, 0 errors, 51 skipped**. Windows is unverified until a CI run. Open: with `flatlaf.uiScale` set,
+FlatLaf's native default font on Linux and Windows differs from the kit's (FlatLaf divides by 15 and 12, the kit by 13).
+Not pushed or merged.
+
 **Cmd-click file paths (command line plan 3) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
 [plan](superpowers/plans/2026-10-14-jasper-command-line-3-cmd-click-paths.md)). Cmd-click on macOS, Ctrl-click
