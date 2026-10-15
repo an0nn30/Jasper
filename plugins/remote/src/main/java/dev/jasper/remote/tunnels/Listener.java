@@ -7,6 +7,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -18,7 +19,11 @@ import java.util.function.Consumer;
  * socket accepts, and each connection gets its own virtual thread.
  */
 final class Listener implements AutoCloseable {
+    /** The longest {@link #close} waits for an accepting thread to let go of its socket. */
+    private static final Duration LET_GO = Duration.ofSeconds(1);
+
     private final List<ServerSocket> sockets;
+    private final List<Thread> accepting = new ArrayList<>();
 
     private Listener(List<ServerSocket> sockets) { this.sockets = List.copyOf(sockets); }
 
@@ -42,14 +47,26 @@ final class Listener implements AutoCloseable {
             throw failure;
         }
         var listener = new Listener(sockets);
-        for (ServerSocket socket : listener.sockets) Thread.ofVirtual().name("jasper-tunnel-accept").start(() -> accept(socket, accepted));
+        for (ServerSocket socket : listener.sockets)
+            listener.accepting.add(Thread.ofVirtual().name("jasper-tunnel-accept").start(() -> accept(socket, accepted)));
         return listener;
     }
 
     /** The port every socket listens on. */
     int port() { return sockets.getFirst().getLocalPort(); }
 
-    @Override public void close() { sockets.forEach(Listener::quietly); }
+    /**
+     * Closes the sockets and waits, up to a second each, for the threads accepting on them: the JDK keeps a socket that
+     * a virtual thread is accepting on open until that thread runs again, and until then the port still takes
+     * connections and cannot be bound again.
+     */
+    @Override public void close() {
+        sockets.forEach(Listener::quietly);
+        for (Thread thread : accepting) {
+            try { thread.join(LET_GO); }
+            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return; }
+        }
+    }
 
     /** The addresses a bind address stands for; never asks DNS. */
     static List<InetAddress> addresses(String bindAddress) {
