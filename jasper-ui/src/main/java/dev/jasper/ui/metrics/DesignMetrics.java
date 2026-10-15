@@ -2,9 +2,13 @@ package dev.jasper.ui.metrics;
 
 import java.awt.Font;
 import java.awt.font.FontRenderContext;
+import java.util.Arrays;
 import java.util.Objects;
 
-/** Fixed logical geometry. Display transforms belong to the host; font growth belongs to content bounds. */
+/**
+ * Logical geometry: one value per {@link Role}. {@link #DEFAULT} is the default catalog; other catalogs derive from it
+ * with {@link #with(Role, int)}. Display transforms belong to the host; font growth belongs to content bounds.
+ */
 public final class DesignMetrics {
     /** Native short-window overflow keeps at least two rows or text lines in its inner body. */
     public static final int NATIVE_BODY_VISIBLE_UNITS = 2;
@@ -14,7 +18,8 @@ public final class DesignMetrics {
     public static final int TABLE_MIN_VISIBLE_GLYPHS = 4;
     /** Transparent query focus is one inward stroke, measured in logical pixels before user scaling. */
     public static final float TRANSPARENT_FIELD_FOCUS_WIDTH = 1.5f;
-    public static final DesignMetrics DEFAULT = new DesignMetrics();
+    /** The default catalog: each role's declared value, frozen by compact-roles.tsv. */
+    public static final DesignMetrics DEFAULT = new DesignMetrics(declared());
     public enum Role {
         // One-line rows (menus, pickers, navigation, keycap and identity rows) pad their line by ROW_VERTICAL_PADDING; a native
         // menu row's margin is MENU_ITEM_VERTICAL_PADDING; main's Button.margin top and bottom are BUTTON_LABEL_MARGIN.
@@ -118,11 +123,28 @@ public final class DesignMetrics {
         HISTORY_HEADER_VERTICAL_PADDING(5), HISTORY_HEADER_LEADING_PADDING(8), HISTORY_HEADER_TRAILING_PADDING(5),
         HISTORY_SIDE_PADDING(8), HISTORY_HEADING_TOP_PADDING(6), HISTORY_HEADING_BOTTOM_PADDING(3),
         HISTORY_ROW_VERTICAL_PADDING(6), HISTORY_ROW_TRAILING_PADDING(5), HISTORY_ROW_GAP(6), HISTORY_TITLE_GAP(5), HISTORY_CONTENT_GAP(2);
-        private final int value;
-        Role(int value) { this.value = value; }
+        /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
+        private final int declared;
+        Role(int value) { declared = value; }
     }
-    public DesignMetrics() {}
-    public int value(Role role) { return Objects.requireNonNull(role).value; }
+    private final int[] values;
+    private DesignMetrics(int[] values) { this.values = values; }
+    private static int[] declared() {
+        var roles = Role.values();
+        var values = new int[roles.length];
+        for (var role : roles) values[role.ordinal()] = role.declared;
+        return values;
+    }
+    /** {@code role}'s logical value in this catalog. */
+    public int value(Role role) { return values[Objects.requireNonNull(role).ordinal()]; }
+    /** A copy of this catalog with {@code role} set to {@code value}, which must not be negative. */
+    public DesignMetrics with(Role role, int value) {
+        Objects.requireNonNull(role);
+        if (value < 0) throw new IllegalArgumentException("Negative " + role + ": " + value);
+        int[] copy = values.clone();
+        copy[role.ordinal()] = value;
+        return new DesignMetrics(copy);
+    }
     /** The vertical padding a content height adds to its font's line. */
     public Role contentPadding(Role height) {
         return switch (Objects.requireNonNull(height)) {
@@ -144,4 +166,6 @@ public final class DesignMetrics {
         Objects.requireNonNull(font); Objects.requireNonNull(context);
         return Math.max(value(height), (int) Math.ceil(font.getLineMetrics("Ag", context).getHeight()) + value(contentPadding(height)));
     }
+    @Override public boolean equals(Object other) { return other instanceof DesignMetrics metrics && Arrays.equals(values, metrics.values); }
+    @Override public int hashCode() { return Arrays.hashCode(values); }
 }

@@ -76,4 +76,38 @@ class DesignMetricsTest {
         assertThatThrownBy(() -> new Typography("", 13)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new Typography("SansSerif", Float.NaN)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    /** A catalog is a value with no public constructor: every catalog derives from DEFAULT. */
+    @Test void catalogsComeOnlyFromTheDefaultCatalog() {
+        assertThat(DesignMetrics.class.getConstructors()).isEmpty();
+    }
+
+    /** {@code with} copies one role and leaves its source and every other role alone; equal catalogs are equal values. */
+    @Test void withCopiesOneRole() {
+        var tall = DesignMetrics.DEFAULT.with(DesignMetrics.Role.BUTTON_HEIGHT, 30);
+        assertThat(tall.value(DesignMetrics.Role.BUTTON_HEIGHT)).isEqualTo(30);
+        assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.BUTTON_HEIGHT)).isEqualTo(24);
+        for (var role : DesignMetrics.Role.values())
+            if (role != DesignMetrics.Role.BUTTON_HEIGHT)
+                assertThat(tall.value(role)).as(role.name()).isEqualTo(DesignMetrics.DEFAULT.value(role));
+        assertThat(tall).isNotEqualTo(DesignMetrics.DEFAULT);
+        var same = DesignMetrics.DEFAULT.with(DesignMetrics.Role.BUTTON_HEIGHT, 24);
+        assertThat(same).isEqualTo(DesignMetrics.DEFAULT).hasSameHashCodeAs(DesignMetrics.DEFAULT).isNotSameAs(DesignMetrics.DEFAULT);
+        assertThat(DesignMetrics.DEFAULT.with(DesignMetrics.Role.TAB_SWITCH_MILLIS, 0).value(DesignMetrics.Role.TAB_SWITCH_MILLIS)).isZero();
+        assertThatThrownBy(() -> DesignMetrics.DEFAULT.with(DesignMetrics.Role.BUTTON_HEIGHT, -1))
+            .isInstanceOf(IllegalArgumentException.class).hasMessage("Negative BUTTON_HEIGHT: -1");
+        assertThatThrownBy(() -> DesignMetrics.DEFAULT.with(null, 1)).isInstanceOf(NullPointerException.class);
+    }
+
+    /** Content heights read the catalog they are asked of: a derived floor or padding moves them. */
+    @Test void contentHeightFollowsTheCatalog() {
+        var frc = new FontRenderContext(null, true, true);
+        var body = new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 13);
+        int line = (int) Math.ceil(body.getLineMetrics("Ag", frc).getHeight());
+        int padding = DesignMetrics.DEFAULT.value(DesignMetrics.Role.FIELD_VERTICAL_PADDING);
+        assertThat(DesignMetrics.DEFAULT.with(DesignMetrics.Role.FIELD_HEIGHT, 40).contentHeight(DesignMetrics.Role.FIELD_HEIGHT, body, frc))
+            .isEqualTo(Math.max(40, line + padding));
+        assertThat(DesignMetrics.DEFAULT.with(DesignMetrics.Role.FIELD_VERTICAL_PADDING, 20).contentHeight(DesignMetrics.Role.FIELD_HEIGHT, body, frc))
+            .isEqualTo(Math.max(24, line + 20));
+    }
 }
