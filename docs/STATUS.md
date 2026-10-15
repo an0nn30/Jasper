@@ -1,5 +1,29 @@
 # Jasper — Status and Handoff
 
+**Windows network shares (Cmd-click follow-up) — 2026-10-14** (`claude/windows-unc-hosts`, worktree
+`.claude/worktrees/credentials-manager-status-1e3e7d`). Closes the two Windows credential-leak limits that
+[plan 3](superpowers/plans/2026-10-14-jasper-command-line-3-cmd-click-paths.md) left. The UNC host rule moved from
+`workspace.FileLinks` to the new JDK-only `launch.UncHosts` (`launch` cannot depend on `workspace`), and `FileLinks`,
+`LaunchSettings`, `ShellLauncher` and `TerminalPane` all call that one copy. The WSL shares (`wsl.localhost`, `wsl$`)
+are exempt only in a WSL profile's pane (`TerminalPane.wsl()`, from the profile id the launch resolved to); in every
+other pane they are refused like any host. This follows VS Code: its UNC allowlist (`security.allowedUNCHosts`) starts
+empty and has no WSL exception, and a host is allowed only after the user opens a folder on it or lists it, so the WSL
+pane is Jasper's form of that choice. Exempting the shares whenever WSL is installed was rejected because VS Code does
+not do it. On Windows a pane passes on no directory on such a host (`inheritableDirectory()` returns null), and
+`ShellLauncher` treats a requested one as no request (`LaunchSettings.startable`) for shells, programs and launchers
+without settings. The launch then starts where the profile's new shell starts (home, or `--cd ~` for WSL), and nothing
+touches the share. User docs: `docs/editor.md` and `docs/configuration.md`. Tests: `UncHostsTest`, `FileLinksTest`
+and `LaunchSettingsTest` cover the text rule on every OS. Two new `ShellLauncherTest` cases, `NetworkShareDirectoryTest`
+and two `FileLinkClickTest` cases are `@EnabledOnOs(WINDOWS)`; each was watched failing, then passing, on the Mac
+through a Gradle init script that sets `os.name` to `Windows 11`. `./gradlew check --continue`: **10,434 tests, 0
+failures, 0 errors, 24 skipped**. An earlier run lost seven File Server tests to ports in use and refused FTP passive
+connections; they passed on the re-run. Not merged, not pushed. No GUI launched. GUI checks for the user, on Windows:
+in a PowerShell tab, `[Console]::Write("$([char]27)]7;file://localhost//attacker.invalid/share$([char]7)")`, then a
+split and a new tab both start in the home folder; a `\\wsl.localhost\<distro>\…` path printed in a PowerShell tab
+opens nothing on Ctrl-click, and the same path in a WSL tab opens. Open: the Indexer's `CwdWatcher` runs project
+detection on every directory a shell reports, so on Windows an OSC 7 report naming a share can still reach SMB without
+a click; File Server's "share path" also checks the pane's reported directory with `Files.isDirectory`.
+
 **Cmd-click file paths (command line plan 3) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
 [plan](superpowers/plans/2026-10-14-jasper-command-line-3-cmd-click-paths.md)). Cmd-click on macOS, Ctrl-click
@@ -13,7 +37,7 @@ the browser. The app resolves the path against the pane's local directory (`work
 thread that it is a regular file, and opens it through `PluginRuntime.open` with the line and the clicked pane's
 window; a provided session, or a shell reporting a remote directory, opens nothing. Fixed on the way: `JediCellReader`
 cached cell styles by colour, and JediTerm's `HyperlinkStyle` equality ignores the link, so every OSC 8 link in the
-same colours opened the first one's target. Deviations: the six in the plan's Planned deviations. Execution rulings: when a position follows, a path restarts after an unclosed mid-word `(`, so a Java stack frame `at com.foo.Bar.baz(Bar.java:42)` gives `Bar.java` at line 42, and a path starts after an `=` only when no `/` or `\` comes before it, so `--config=./x.toml` clicks and `/data/dt=2024-01-01/part.parquet` stays whole (Decision 13); on Windows a path, a `~/` remainder or a pane directory that names a UNC host other than `wsl$` or `wsl.localhost` (compared in ASCII only) resolves to nothing, so a click never makes Windows authenticate to a host named by program output; `LinkDetector` and `PathDetector` share one trailing-punctuation set; the view tests also click a soft-wrapped path and an OSC 8 `file://` link. Final review: a plain-text `file://` URL's trailing `:LINE[:COLUMN]` gives the line, as IntelliJ's console does; the SDK's editor contract names the Cmd-click route; log lines on the editor route carry no path. Known limits: where the desktop supports neither edit nor reveal (often on Linux), a click under System default app only logs; the existence check follows a symbolic link, also to a network share; a click just before quitting can still open its file; the WSL share exemption goes by host name, so on Windows without WSL a printed `\\wsl$\…` path still reaches network name resolution; on Windows an OSC 7 report naming a share still becomes the directory a new tab or split starts in; in a WSL pane `~/` and the start-directory fallback resolve against the Windows home; a plain-text `file://` link to an `.html` file, such as Gradle's test report, opens the HTML in the editor rather than the browser (the user's call).
+same colours opened the first one's target. Deviations: the six in the plan's Planned deviations. Execution rulings: when a position follows, a path restarts after an unclosed mid-word `(`, so a Java stack frame `at com.foo.Bar.baz(Bar.java:42)` gives `Bar.java` at line 42, and a path starts after an `=` only when no `/` or `\` comes before it, so `--config=./x.toml` clicks and `/data/dt=2024-01-01/part.parquet` stays whole (Decision 13); on Windows a path, a `~/` remainder or a pane directory that names a UNC host other than `wsl$` or `wsl.localhost` (compared in ASCII only) resolves to nothing, so a click never makes Windows authenticate to a host named by program output; `LinkDetector` and `PathDetector` share one trailing-punctuation set; the view tests also click a soft-wrapped path and an OSC 8 `file://` link. Final review: a plain-text `file://` URL's trailing `:LINE[:COLUMN]` gives the line, as IntelliJ's console does; the SDK's editor contract names the Cmd-click route; log lines on the editor route carry no path. Known limits: where the desktop supports neither edit nor reveal (often on Linux), a click under System default app only logs; the existence check follows a symbolic link, also to a network share; a click just before quitting can still open its file; in a WSL pane `~/` and the start-directory fallback resolve against the Windows home; a plain-text `file://` link to an `.html` file, such as Gradle's test report, opens the HTML in the editor rather than the browser (the user's call).
 `./gradlew check --continue`: **10,367 tests, 0 failures, 0 errors, 17 skipped**. No GUI
 launched. GUI checks for the user, in the packaged app: Cmd-click on compiler output (`javac`'s `src/Foo.java:42:`,
 `dotnet build`'s `Foo.cs(42,5):`) in a local pane opens the Jasper Editor at the line; in a Remote ssh pane a path

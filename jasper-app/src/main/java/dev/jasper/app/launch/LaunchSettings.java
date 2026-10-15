@@ -180,6 +180,17 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
         return new Start(directory, this);
     }
 
+    /**
+     * The directory a launch asked for {@code requested} may start in: {@code requested}, or empty, so that it starts where
+     * this profile's new shell starts, when on Windows ({@code windows}) its text names a UNC host other than, for a WSL
+     * profile, this machine's WSL shares ({@link UncHosts}). Any program can report such a directory (OSC 7) for a split
+     * or new tab to inherit, and starting there, or only checking that it exists, would make Windows authenticate to that
+     * host over SMB. Pure text: nothing is touched.
+     */
+    public Optional<Path> startable(Optional<Path> requested, boolean windows) {
+        return requested.filter(directory -> !windows || !UncHosts.namesForeignHost(directory.toString(), profile.distro().isPresent()));
+    }
+
     /** How the session reads a local working-directory report: a WSL profile's Linux paths become Windows paths. */
     public Function<String, Optional<Path>> localPaths() {
         return profile.distro().<Function<String, Optional<Path>>>map(distro -> path -> WslPaths.toWindows(distro, path))

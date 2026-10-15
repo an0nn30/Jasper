@@ -540,7 +540,8 @@ script folder into its `/mnt/c/...` path. A working directory the WSL shell repo
 `/mnt/c/Users/me` is `C:\Users\me`, anything else `\\wsl.localhost\<name>\...`, so the status bar, breadcrumbs and
 "new tab here" all get a real path. A PowerShell or Command Prompt tab asked to start on a `\\wsl.localhost` share
 starts in your home folder instead, because those shells misbehave in UNC folders and touching the share can start
-the WSL 2 VM. Limits: a distribution whose hostname is not the Windows computer name reports its directory as
+the WSL 2 VM. A tab asked to start on any other network share (`\\server\share`) starts where a new shell starts,
+because any program can report such a folder and starting there would make Windows sign in to that server. Limits: a distribution whose hostname is not the Windows computer name reports its directory as
 remote, and an automount root other than `/mnt` is not recognised.
 
 For example, this starts zsh with exactly the two arguments `-l` and `-i`:

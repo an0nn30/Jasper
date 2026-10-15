@@ -4,6 +4,7 @@ import dev.jasper.app.application.ApplicationTestSupport;
 import dev.jasper.app.testsupport.ConfigTestSupport;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.launch.LaunchSettings;
+import dev.jasper.app.launch.ShellProfile;
 import dev.jasper.app.application.JasperApplication;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.workspace.TerminalPane;
@@ -16,6 +17,7 @@ import java.util.function.BiConsumer;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
@@ -23,6 +25,10 @@ import static dev.jasper.app.testsupport.ConfigTestSupport.snapshot;
 import static org.assertj.core.api.Assertions.*;
 
 class ShellLauncherTest {
+    private static final ShellProfile POWERSHELL =
+        new ShellProfile("powershell", "PowerShell", ShellProfile.Kind.LOCAL_SHELL, Optional.empty(), List.of("powershell.exe"));
+    private static final ShellProfile UBUNTU =
+        new ShellProfile("wsl:Ubuntu", "Ubuntu", ShellProfile.Kind.WSL, Optional.empty(), List.of("wsl.exe", "-d", "Ubuntu"));
     @TempDir Path directory;
 
     @Test @DisabledOnOs(OS.WINDOWS)
@@ -209,5 +215,53 @@ class ShellLauncherTest {
         while (!pending.isEmpty()) pending.remove().run();
         edt(() -> { });
         assertThat(errors.getLast()).hasMessageContaining("Directory is unavailable");
+    }
+
+    /**
+     * On Windows a launch asked to start on another host starts where a new shell starts: any program can report such a
+     * directory (OSC 7) for a split or new tab to inherit, and starting there, or only checking that it exists, makes Windows
+     * authenticate to that host over SMB. Windows only, like the rule ({@code LaunchSettingsTest} and {@code UncHostsTest}
+     * test its text everywhere). The host ends in {@code .invalid}, which never resolves, should a regression ask for it.
+     */
+    @Test @EnabledOnOs(OS.WINDOWS) void onWindowsALaunchAskedToStartOnAnotherHostStartsWhereANewShellStarts() throws Exception {
+        Path share = Path.of("\\\\attacker.invalid\\share\\project");
+        Path home = Path.of(System.getProperty("user.home"));
+        assertThat(startOf(POWERSHELL, share, Optional.empty())).isEqualTo(Map.entry(home, List.of("powershell.exe")));
+        assertThat(startOf(UBUNTU, share, Optional.empty())).as("the WSL profile's own start")
+            .isEqualTo(Map.entry(home, List.of("wsl.exe", "-d", "Ubuntu", "--cd", "~")));
+        assertThat(startOf(POWERSHELL, share, Optional.of(List.of("vim")))).isEqualTo(Map.entry(home, List.of("vim")));
+        assertThat(startOf(UBUNTU, share, Optional.of(List.of("vim")))).isEqualTo(Map.entry(home, List.of("vim")));
+
+        Queue<Runnable> pending = new ArrayDeque<>();
+        var started = new ArrayList<Path>();
+        var bare = new ShellLauncher(pending::add, path -> { started.add(path); throw new IllegalStateException("controlled launch boundary"); }, "sh");
+        edt(() -> bare.launch(Optional.of(share), Optional.empty(), replaced -> { }, (session, failure) -> { }));
+        while (!pending.isEmpty()) pending.remove().run();
+        edt(() -> { });
+        assertThat(started).as("a launcher without settings").containsExactly(home);
+    }
+
+    /** Only a WSL profile's launch has the WSL shares: elsewhere {@code wsl$} may be a name the network answers. */
+    @Test @EnabledOnOs(OS.WINDOWS) void onWindowsOnlyAWslProfileStartsOnAWslShare() throws Exception {
+        Path home = Path.of(System.getProperty("user.home"));
+        assertThat(startOf(UBUNTU, Path.of("\\\\wsl.localhost\\Ubuntu\\home\\me"), Optional.empty()))
+            .isEqualTo(Map.entry(home, List.of("wsl.exe", "-d", "Ubuntu", "--cd", "/home/me")));
+        assertThat(startOf(POWERSHELL, Path.of("\\\\wsl$\\Ubuntu\\home\\me"), Optional.of(List.of("vim"))))
+            .isEqualTo(Map.entry(home, List.of("vim")));
+    }
+
+    /** Where {@code profile}'s launch asked for {@code requested} starts, and what it runs; null when it starts nothing. */
+    private static Map.Entry<Path, List<String>> startOf(ShellProfile profile, Path requested, Optional<List<String>> program) throws Exception {
+        var settings = new LaunchSettings(profile.command(), Map.of(), 80, 24, 0, profile);
+        Queue<Runnable> pending = new ArrayDeque<>();
+        var started = new ArrayList<Map.Entry<Path, List<String>>>();
+        ShellLauncher launcher = new ShellLauncher(pending::add, () -> settings, (path, captured) -> {
+            started.add(Map.entry(path, captured.command()));
+            throw new IllegalStateException("controlled launch boundary");
+        });
+        edt(() -> launcher.launch(Optional.of(requested), Optional.empty(), program, Optional.empty(), replaced -> { }, (session, failure) -> { }));
+        while (!pending.isEmpty()) pending.remove().run();
+        edt(() -> { });
+        return started.isEmpty() ? null : started.getFirst();
     }
 }

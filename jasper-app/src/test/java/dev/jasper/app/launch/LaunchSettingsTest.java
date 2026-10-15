@@ -109,6 +109,36 @@ class LaunchSettingsTest {
         assertThat(localHome.settings()).isSameAs(local);
     }
 
+    /**
+     * On Windows a requested directory on another host counts as no request, so the launch starts where the profile's new
+     * shell starts and nothing touches the share: any program can report such a directory (OSC 7) for a split or new tab to
+     * inherit, and starting there, or only checking that it exists, makes Windows authenticate to that host over SMB. A WSL
+     * profile keeps its WSL shares; any other launch has none. Textual, so it holds on every OS.
+     */
+    @Test void onWindowsADirectoryOnAnotherHostIsNoRequest() {
+        Path home = Path.of("home-directory");
+        var wsl = new LaunchSettings(List.of("wsl.exe", "-d", "Ubuntu"), Map.of(), 80, 24, 0, wsl());
+        var local = new LaunchSettings(List.of("powershell.exe", "-NoLogo"), Map.of(), 80, 24, 0, powershell());
+        java.util.function.Predicate<Path> untouchable = path -> { throw new AssertionError("the share is never touched: " + path); };
+        for (String share : List.of("\\\\attacker\\share\\project", "\\/attacker/share", "\\\\wsl.localhost.attacker\\x\\y",
+            "\\\\w\u017fl$\\Ubuntu\\x", "\\\\wsl.localhost\\..\\attacker")) {
+            Optional<Path> requested = Optional.of(Path.of(share));
+            assertThat(local.startable(requested, true)).as(share).isEmpty();
+            assertThat(wsl.startable(requested, true)).as(share + " for a WSL profile").isEmpty();
+            assertThat(wsl.at(wsl.startable(requested, true), home, untouchable).settings().command()).as("the WSL profile's own start")
+                .endsWith("--cd", "~");
+            assertThat(local.at(local.startable(requested, true), home, path -> path.equals(home)).directory()).isEqualTo(home);
+        }
+        Optional<Path> wslShare = Optional.of(Path.of("\\\\wsl.localhost\\Ubuntu\\home\\me"));
+        assertThat(wsl.startable(wslShare, true)).as("a WSL profile's share").isEqualTo(wslShare);
+        assertThat(local.startable(wslShare, true)).as("no WSL share outside a WSL profile").isEmpty();
+        Optional<Path> folder = Optional.of(Path.of("C:\\Users\\me"));
+        assertThat(local.startable(folder, true)).isEqualTo(folder);
+        assertThat(local.startable(Optional.empty(), true)).isEmpty();
+        Optional<Path> named = Optional.of(Path.of("\\\\attacker\\share"));
+        assertThat(local.startable(named, false)).as("elsewhere the text is only a name").isEqualTo(named);
+    }
+
     @Test void termProgramIsAlwaysJasperAndOnlyAutoInjects() {
         Path dir = Path.of("/opt/jasper/shell-integration");
         var off = LaunchSettings.resolve(withShell("/bin/zsh", List.of("-l"), ShellIntegrationMode.OFF), "Mac OS X", Map.of(), 150, 45, dir);

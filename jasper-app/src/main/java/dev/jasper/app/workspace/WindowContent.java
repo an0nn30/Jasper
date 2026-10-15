@@ -1009,7 +1009,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         Optional<Path> local = pane.localDirectory();
         if (local.isEmpty()) return;
         FileLinks.resolve(link.path(), local, Path.of(System.getProperty("user.home")),
-                System.getProperty("os.name", "").startsWith("Windows"))
+                System.getProperty("os.name", "").startsWith("Windows"), pane.wsl())
             .ifPresent(file -> onOpenFile.accept(file, link.line()));
     }
 
