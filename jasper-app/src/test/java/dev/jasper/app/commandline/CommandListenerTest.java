@@ -283,6 +283,9 @@ class CommandListenerTest {
             queued.complete(null);
             return pending;
         });
+        // Jasper closes the listener once it reports its last call over, as these tests do.
+        var over = new CompletableFuture<Void>();
+        listener.onIdle(() -> over.complete(null));
         try (SocketChannel client = open()) {
             send(client, request(token(), List.of("editor", "--wait")));
             var received = new CompletableFuture<String>();
@@ -291,6 +294,7 @@ class CommandListenerTest {
             });
             queued.get(10, TimeUnit.SECONDS);
             pending.complete(3);
+            over.get(10, TimeUnit.SECONDS);
             listener.close();
             assertThat(received.get(10, TimeUnit.SECONDS).equals(frames(chunks, 3)))
                 .as("every output frame in order, then the exit frame last, although the listener closed at once").isTrue();
@@ -305,9 +309,12 @@ class CommandListenerTest {
             queued.complete(null);
             return CompletableFuture.completedFuture(0);
         });
+        var over = new CompletableFuture<Void>();
+        listener.onIdle(() -> over.complete(null));
         try (SocketChannel client = open()) {
             send(client, request(token(), List.of("flood")));
             queued.get(10, TimeUnit.SECONDS);
+            over.get(10, TimeUnit.SECONDS);
             long begun = System.nanoTime();
             listener.close();
             assertThat(Duration.ofNanos(System.nanoTime() - begun)).as("the grace for finished calls is bounded").isLessThan(Duration.ofSeconds(3));
