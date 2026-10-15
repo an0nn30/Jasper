@@ -127,16 +127,23 @@ final class Composition {
             return accessibleContext;
         }
 
+        /**
+         * A line's advance in the fractional antialiased context {@link #paintComponent} draws with. The component's own
+         * metrics can differ (Linux hints integer advances wider) and would break lines that fit as painted.
+         */
+        int advance(String line) {
+            return NativeChromePainting.measureText(getFont(), line);
+        }
+
         List<String> lines(int width) {
             var lines = new ArrayList<String>();
             if (text.isEmpty()) return lines;
-            var metrics = getFontMetrics(getFont());
             if (single) {
                 String line = text.replace('\n', ' ');
-                if (metrics.stringWidth(line) > width) {
+                if (advance(line) > width) {
                     String ellipsis = "\u2026";
                     int end = line.length();
-                    while (end > 0 && metrics.stringWidth(line.substring(0, end) + ellipsis) > width) end = line.offsetByCodePoints(end, -1);
+                    while (end > 0 && advance(line.substring(0, end) + ellipsis) > width) end = line.offsetByCodePoints(end, -1);
                     line = end == 0 ? "" : line.substring(0, end).stripTrailing() + ellipsis;
                 }
                 lines.add(line);
@@ -146,14 +153,14 @@ final class Composition {
             for (String paragraph : text.split("\n", -1)) {
                 for (String word : paragraph.split(" ", -1)) {
                     String next = line.isEmpty() ? word : line + " " + word;
-                    if (!line.isEmpty() && metrics.stringWidth(next) > width) {
+                    if (!line.isEmpty() && advance(next) > width) {
                         lines.add(line);
                         line = word;
                     } else line = next;
-                    while (metrics.stringWidth(line) > width && line.length() > 1 && width > 0) {
+                    while (advance(line) > width && line.length() > 1 && width > 0) {
                         int end = 1;
                         while (end < line.length()
-                                && metrics.stringWidth(line.substring(0, end + 1)) <= width) end++;
+                                && advance(line.substring(0, end + 1)) <= width) end++;
                         lines.add(line.substring(0, end));
                         line = line.substring(end);
                     }
@@ -170,8 +177,7 @@ final class Composition {
 
         @Override
         public Dimension getPreferredSize() {
-            var fm = getFontMetrics(getFont());
-            int width = Math.min(300, fm.stringWidth(text));
+            int width = Math.min(300, advance(text));
             return new Dimension(width, height(getWidth() > 0 ? getWidth() : Math.max(1, width)));
         }
 

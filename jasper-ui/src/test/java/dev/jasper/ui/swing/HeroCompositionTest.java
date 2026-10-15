@@ -116,7 +116,10 @@ class HeroCompositionTest {
                         assertThat(image).isNotNull();
                         assertThat(control.title.noteStart).isEqualTo(row.title().length());
                         assertThat(control.title.noteColor).isEqualTo(context.theme().semantic().color(SemanticColor.TEXT_TERTIARY));
-                        assertThat(control.title.lines(control.title.getWidth())).hasSizeGreaterThan(1);
+                        // The title and its annotation wrap once wider than their line: at 13 pt with the macOS faces, at 20 with any.
+                        var titleLines=control.title.lines(control.title.getWidth());
+                        assertThat(titleLines.size()>1).isEqualTo(control.title.advance(control.title.text)>control.title.getWidth());
+                        if(size>13||com.formdev.flatlaf.util.SystemInfo.isMacOS)assertThat(titleLines).hasSizeGreaterThan(1);
                         assertThat(control.title.getHeight()).isEqualTo(control.title.height(control.title.getWidth()));
                         assertThat(control.description.getY()).isGreaterThanOrEqualTo(control.title.getY()+control.title.getHeight());
                         var toggle = (Switches.SwitchButton)view.control("toggle").component;

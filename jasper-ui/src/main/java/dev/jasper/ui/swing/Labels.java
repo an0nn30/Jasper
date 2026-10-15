@@ -47,7 +47,8 @@ final class Labels {
             }
             var metrics = getFontMetrics(getFont()); Insets insets = getInsets();
             int widest = 0;
-            for (String line : (getText() == null ? "" : getText()).split("\n", -1)) widest = Math.max(widest, metrics.stringWidth(line));
+            wrapped.setFont(getFont());
+            for (String line : (getText() == null ? "" : getText()).split("\n", -1)) widest = Math.max(widest, wrapped.advance(line));
             int width = Math.min(widest, flowColumns * metrics.charWidth('m'));
             return new Dimension(width + insets.left + insets.right, wrappedHeight(Math.max(1, width)) + insets.top + insets.bottom);
         }
