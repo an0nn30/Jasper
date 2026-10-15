@@ -231,7 +231,10 @@ class ShortcutEditingTest {
                 try {
                     panel.setRows(ShortcutCatalog.rows(KeyBindings.withOverrides(true,Map.of("copy","none")),List.of(),Map.of(),true));
                     search(panel).setText("Copy");clickShortcut(panel);
-                    var options=KitTestSupport.require(panel,"editor.options",javax.swing.JComponent.class).getComponentPopupMenu();
+                    var optionsButton=KitTestSupport.require(panel,"editor.options",javax.swing.JComponent.class);
+                    var options=optionsButton.getComponentPopupMenu();
+                    // A shown popup has its invoker; FlatLaf's Linux popup canceller looks up the invoker's window.
+                    options.setInvoker(optionsButton);
                     javax.swing.MenuSelectionManager.defaultManager().setSelectedPath(new javax.swing.MenuElement[]{options});
                     assertThat(panel.dispatch(key(panel,KeyEvent.KEY_PRESSED,key,0))).isFalse();assertThat(panel.editor.isVisible()).isTrue();
                     javax.swing.MenuSelectionManager.defaultManager().clearSelectedPath();

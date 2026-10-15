@@ -107,7 +107,10 @@ class SettingsDialogTest {
         try {
             edt(() -> {
                 dialog.open(null, "appearance");
-                for (var entry : java.util.Map.of("opacity", "row:ui.workspace.opacity", "platform font size", "row:ui.font.size", "theme", "row:ui.appearance").entrySet()) {
+                var targets = new java.util.HashMap<>(java.util.Map.of("platform font size", "row:ui.font.size", "theme", "row:ui.appearance"));
+                // Workspace glass, and with it the Opacity row, exists only on macOS.
+                if (com.formdev.flatlaf.util.SystemInfo.isMacOS) targets.put("opacity", "row:ui.workspace.opacity");
+                for (var entry : targets.entrySet()) {
                     var row = KitTestSupport.require(page(dialog), entry.getValue(), javax.swing.JComponent.class);
                     dialog.search(entry.getKey());
                     assertThat(KitTestSupport.require(page(dialog), entry.getValue(), javax.swing.JComponent.class)).isSameAs(row);
@@ -126,11 +129,11 @@ class SettingsDialogTest {
                 dialog.open(null, "appearance"); dialog.view().setSize(980, 330); KitTestSupport.layout(dialog.view());
                 dialog.view().body.getViewport().setViewPosition(new java.awt.Point(0, 0));
                 dialog.select("window"); KitTestSupport.layout(dialog.view());
-                dialog.search("opacity"); KitTestSupport.layout(dialog.view());
+                dialog.search("animations"); KitTestSupport.layout(dialog.view());
             });
             edt(() -> {});
             edt(() -> {
-                var row = KitTestSupport.require(page(dialog), "row:ui.workspace.opacity", javax.swing.JComponent.class);
+                var row = KitTestSupport.require(page(dialog), "row:ui.animations.enabled", javax.swing.JComponent.class);
                 var bounds = javax.swing.SwingUtilities.convertRectangle(row.getParent(), row.getBounds(), page(dialog));
                 assertThat(dialog.view().body.getViewport().getViewRect().intersects(bounds)).as("search target remains visible after pending page restoration").isTrue();
                 assertThat(dialog.view().body.getViewport().getViewPosition().y).isGreaterThan(0);
@@ -299,7 +302,8 @@ class SettingsDialogTest {
         });
     }
 
-    @Test void turningBlurOnAndChangingOpacityEnableApply() throws Exception {
+    @Test @org.junit.jupiter.api.condition.EnabledOnOs(value = org.junit.jupiter.api.condition.OS.MAC, disabledReason = "workspace glass exists only on macOS")
+    void turningBlurOnAndChangingOpacityEnableApply() throws Exception {
         var dialog = dialog();
         edt(() -> {
             dialog.open(null, "appearance");
