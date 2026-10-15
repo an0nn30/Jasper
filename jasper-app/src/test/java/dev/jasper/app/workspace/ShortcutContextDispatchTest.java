@@ -113,7 +113,7 @@ class ShortcutContextDispatchTest {
         Queue<Runnable> pending = new ArrayDeque<>();
         WindowContent[] owner = new WindowContent[1];
         TerminalTab[] tab = new TerminalTab[1];
-        edt(() -> { owner[0] = content(launcher(pending), true); owner[0].newTab(HOME); });
+        edt(() -> { owner[0] = content(idleLauncher(pending), true); owner[0].newTab(HOME); });
         while (!pending.isEmpty()) pending.remove().run();
         edt(() -> { tab[0] = owner[0].currentTab(); tab[0].split(SplitTree.Axis.RIGHT); });
         while (!pending.isEmpty()) pending.remove().run();
@@ -132,7 +132,7 @@ class ShortcutContextDispatchTest {
             // Clear Scrollback and Paste are enabled only with a running shell, so the launcher's queued start runs first.
             Queue<Runnable> pending = new ArrayDeque<>();
             WindowContent[] holder = new WindowContent[1];
-            edt(() -> holder[0] = content(launcher(pending), mac));
+            edt(() -> holder[0] = content(idleLauncher(pending), mac));
             while (!pending.isEmpty()) pending.remove().run();
             until(() -> holder[0].currentPane().running());
             edt(() -> {

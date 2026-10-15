@@ -225,7 +225,7 @@ class ExFilesTest {
             type(editor, ":e!<CR>");
             assertThat(tabs.calls).containsExactly("reload 1", "reload 1");
             type(editor, ":e sub/other.txt<CR>");
-            assertThat(tabs.calls).as("relative to the current file's folder").last().isEqualTo("open sub/other.txt");
+            assertThat(tabs.calls).as("relative to the current file's folder").last().isEqualTo("open " + Path.of("sub", "other.txt"));
             type(editor, ":e one.txt<CR>");
             assertThat(editor.message()).as("the current file: read again, which needs !").isEqualTo("E37: No write since last change (add ! to override)");
             type(editor, ":ene<CR>:tabnew<CR>:tabe x.txt<CR>:tabnew y.txt<CR>");

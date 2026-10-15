@@ -142,7 +142,7 @@ class EditorsTest {
         assertThat(env.value()).doesNotContainKey("A");
         var shell = (Editors.Browse) build(Editors.executable(), CoreSettings.TERMINAL_SHELL_PROGRAM, context);
         assertThat(shell.event("terminal.shell.program", new UiEvent.Action("terminal.shell.program:browse"))).isTrue();
-        assertThat(shell.value()).isEqualTo("/bin/zsh");
+        assertThat(shell.value()).isEqualTo(Path.of("/bin/zsh").toString());
     }
 
     @Test void theOptionalSizeUsesThePlatformUntilTurnedOff() {
@@ -237,6 +237,6 @@ class EditorsTest {
         var editor = (Editors.Browse) build(Editors.path("Choose a file"), tool, context);
         assertThat(((Nodes.Field) editor.node("tool", ControlState.READY)).trailingAction()).isEqualTo("tool:browse");
         editor.browse();
-        assertThat(editor.value()).isEqualTo("/bin/zsh");
+        assertThat(editor.value()).isEqualTo(Path.of("/bin/zsh").toString());
     }
 }

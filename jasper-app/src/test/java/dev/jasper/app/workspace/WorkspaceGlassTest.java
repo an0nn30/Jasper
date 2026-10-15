@@ -126,7 +126,7 @@ class WorkspaceGlassTest {
     @Test void splitsKeepASolidDividerBetweenTranslucentPanes() throws Exception {
         var pending = new ArrayDeque<Runnable>();
         TerminalTab[] created = new TerminalTab[1];
-        edt(() -> created[0] = new TerminalTab(DesktopTestSupport.HOME, DesktopTestSupport.launcher(pending)));
+        edt(() -> created[0] = new TerminalTab(DesktopTestSupport.HOME, DesktopTestSupport.idleLauncher(pending)));
         TerminalTab tab = created[0];
         edt(tab::start);
         try {

@@ -58,9 +58,11 @@ class ShareRootTest {
 
     @Test void namesThePlatformCannotRepresentAreRefusedNotThrown() throws IOException {
         var share = new ShareRoot(shared, false);
-        assertThatThrownBy(() -> share.resolve("x\uD800")).isInstanceOf(PathRefusedException.class);
-        assertThatThrownBy(() -> share.resolve("docs/x\uD800")).isInstanceOf(PathRefusedException.class);
-        assertThatThrownBy(() -> share.openWrite("x\uD800", false)).isInstanceOf(PathRefusedException.class);
+        // Unix encodes names in UTF-8, which has no unpaired surrogate; Windows forbids a question mark.
+        String name = "x\uD800?";
+        assertThatThrownBy(() -> share.resolve(name)).isInstanceOf(PathRefusedException.class);
+        assertThatThrownBy(() -> share.resolve("docs/" + name)).isInstanceOf(PathRefusedException.class);
+        assertThatThrownBy(() -> share.openWrite(name, false)).isInstanceOf(PathRefusedException.class);
     }
 
     @Test void refusesNamesNoPlatformCanShareSafely() throws IOException {

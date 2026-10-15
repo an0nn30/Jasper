@@ -454,8 +454,8 @@ class ConnectionsTest {
         RemoteHost target = host("waiting", 22, "u", new Auth.Vault(UUID.randomUUID()), Optional.empty());
         var future = onUi(() -> connections.shell(target.id(), 80, 24, status -> {}));
         onUi(() -> future.cancel(true));
-        onUi(() -> {});
-        assertThat(pending).isCancelled();
+        // The withdrawal takes several UI hops after the cancel.
+        awaitOnUi(pending::isCancelled, "the Vault request to be withdrawn");
     }
 
     @Test void cancellingSecondKeyRequestClosesFirstCopy(@TempDir Path dir) throws Exception {
@@ -471,8 +471,8 @@ class ConnectionsTest {
         var target = host("waiting", 22, "u", new Auth.VaultKeys(List.of(firstId, secondId)), Optional.empty());
         var future = onUi(() -> connections.shell(target.id(), 80, 24, status -> {}));
         requested.get(5, TimeUnit.SECONDS);
-        onUi(() -> future.cancel(true)); onUi(() -> {}); onUi(() -> {});
-        assertThat(second).isCancelled();
+        onUi(() -> future.cancel(true));
+        awaitOnUi(second::isCancelled, "the second key request to be withdrawn");
         assertThatThrownBy(first::keyBytes).isInstanceOf(IllegalStateException.class);
     }
 

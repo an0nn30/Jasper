@@ -102,6 +102,14 @@ class PluginRuntimeTest {
 
     private static void settle() { for (int i = 0; i < 3; i++) onEdt(() -> { }); }
 
+    /** Waits for what {@link PluginRuntime#stop} left running, which ends with closing the plugins' classloaders. */
+    private static void await(List<CompletableFuture<?>> pending) throws Exception {
+        CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+    }
+
+    /** Stops the plugins and waits until their jars are closed: Windows cannot delete a jar a classloader holds open. */
+    private static void stopAndWait(PluginRuntime runtime) throws Exception { await(AppContractTest.onEdtValue(runtime::stop)); }
+
     private Path probe(Path parent, String id) throws Exception {
         Path directory = parent.resolve(id);
         PluginJars.build(directory, "probe.jar", PluginJars.descriptor(id, "1.0.0", "fix.probe.Main"),
@@ -151,9 +159,11 @@ class PluginRuntimeTest {
             byte[] changed=runtime.pluginIcons().get("dev.example.art").data();changed[0]=0;
             assertThat(runtime.pluginIcons().get("dev.example.art").data()[0]).isEqualTo((byte)'<');
             var late=new CompletableFuture<PluginRuntime.Outcome>();
-            onEdt(()->{runtime.snapshot(late::complete);runtime.stop();});
+            var stopping=new AtomicReference<List<CompletableFuture<?>>>();
+            onEdt(()->{runtime.snapshot(late::complete);stopping.set(runtime.stop());});
             assertThat(late.get(5,TimeUnit.SECONDS).ok()).isTrue();
-        } finally {onEdt(runtime::stop);}
+            await(stopping.get());
+        } finally {stopAndWait(runtime);}
         assertThat(runtime.pluginIcons()).isEmpty();
     }
 
@@ -171,7 +181,7 @@ class PluginRuntimeTest {
             assertThat(failure.cause()).isInstanceOf(IllegalStateException.class).hasMessage("boom at start");
         });
         assertThat(runtime.pluginVersions()).containsEntry("dev.example.boom", "1.2.3");
-        onEdt(runtime::stop);
+        stopAndWait(runtime);
     }
 
     @Test void runsADevelopmentPluginBridgesItsActivityAndStopsIt() throws Exception {
@@ -259,7 +269,7 @@ class PluginRuntimeTest {
         PluginRuntime consented = runtime(null, user, null, false, new ArrayList<>());
         onEdt(() -> consented.start(Map.of(), true));
         assertThat(consented.statusLines()).singleElement().asString().contains("ACTIVE");
-        onEdt(consented::stop);
+        stopAndWait(consented);
 
         PluginRuntime safe = runtime(null, user, null, true, new ArrayList<>());
         onEdt(() -> safe.start(Map.of(), true));
@@ -299,7 +309,7 @@ class PluginRuntimeTest {
         while (!Files.exists(list) && System.nanoTime() < deadline) Thread.sleep(10);
         assertThat(dev.jasper.app.commandline.SubcommandList.read(list)).as("--help lists only what runs").containsExactly(
             new dev.jasper.app.commandline.SubcommandList.Entry("alpha", "Runs", "dev.example.alpha"));
-        onEdt(runtime::stop);
+        stopAndWait(runtime);
     }
 
     @Test void aSafeModeRunKeepsEverySubcommandNameOwnedAndNoneListed() throws Exception {
@@ -316,7 +326,7 @@ class PluginRuntimeTest {
         while (!Files.exists(list) && System.nanoTime() < deadline) Thread.sleep(10);
         assertThat(list).exists();
         assertThat(dev.jasper.app.commandline.SubcommandList.read(list)).isEmpty();
-        onEdt(safe::stop);
+        stopAndWait(safe);
     }
 
     @Test void aPluginThatCannotLoadIsReportedAndTheRestStillStart() throws Exception {
@@ -329,7 +339,7 @@ class PluginRuntimeTest {
         assertThat(runtime.statusLines()).hasSize(2)
             .anySatisfy(line -> assertThat(line).contains("dev.example.broken", "FAILED", "fix.broken.Missing"))
             .anySatisfy(line -> assertThat(line).contains("dev.example.probe", "ACTIVE"));
-        onEdt(runtime::stop);
+        stopAndWait(runtime);
     }
 
     @Test void theBundledDirectorySitsBesideTheApplicationJarUnlessOverridden() throws Exception {
@@ -427,7 +437,7 @@ class PluginRuntimeTest {
                 assertThat(problem.cause()).as("no exception lies behind it").isEmpty();
             });
         assertThat(runtime.statusLines()).anySatisfy(line -> assertThat(line).contains("dev.example.probe", "ACTIVE"));
-        onEdt(runtime::stop);
+        stopAndWait(runtime);
     }
 
     @Test void aPluginWhoseNameShowsNothingIsAProblemAndJasperStillStarts() throws Exception {
@@ -444,7 +454,7 @@ class PluginRuntimeTest {
             assertThat(problem.detail()).contains("dev.example.ghost", "name");
         });
         assertThat(runtime.statusLines()).anySatisfy(line -> assertThat(line).contains("dev.example.probe", "ACTIVE"));
-        onEdt(runtime::stop);
+        stopAndWait(runtime);
     }
 
     static final String ENVIRONMENT = """
@@ -548,7 +558,7 @@ class PluginRuntimeTest {
             Thread.interrupted();
         }
         assertThat(desktop).as("the desktop does not open it").isEmpty();
-        onEdt(runtime::stop);
+        stopAndWait(runtime);
     }
 
     /** Review Focus 3: Open in Editor creates a missing config.toml from its template, then the provided editor opens it. */
@@ -568,7 +578,7 @@ class PluginRuntimeTest {
         assertThat(Files.readString(config)).isEqualTo(dev.jasper.app.config.ConfigTemplate.text(false));
         assertThat(Files.readAllLines(root.resolve("absent/dev.example.editor/data/edited"))).containsExactly("config.toml");
         assertThat(desktop).isEmpty();
-        onEdt(runtime::stop);
+        stopAndWait(runtime);
     }
 
     @Test void aBundledPluginsEditorReplacesADevelopmentPluginsEditor() throws Exception {
@@ -584,7 +594,7 @@ class PluginRuntimeTest {
         runtime.open(root.resolve("notes.txt"), path -> { throw new AssertionError("the bundled editor opens it"); });
         assertThat(Files.readAllLines(root.resolve("absent/dev.example.zeditor/data/edited"))).containsExactly("notes.txt");
         assertThat(root.resolve("absent/dev.example.aeditor/data/edited")).doesNotExist();
-        onEdt(runtime::stop);
+        stopAndWait(runtime);
     }
 
     static final String CLIENT = """
@@ -612,7 +622,7 @@ class PluginRuntimeTest {
         assertThat(root.resolve("absent/dev.example.client/data/client")).hasContent(client.toString());
         onEdt(() -> assertThatIllegalStateException().isThrownBy(() -> runtime.commandClient(java.util.Optional.empty()))
             .withMessage("Plugins have already started"));
-        onEdt(runtime::stop);
+        stopAndWait(runtime);
     }
 
     static final String LINE_EDITOR = """
@@ -660,6 +670,6 @@ class PluginRuntimeTest {
         assertThat(desktop).isEmpty();
         onEdt(() -> assertThatIllegalStateException().as("never on the UI thread")
             .isThrownBy(() -> runtime.open(root.resolve("Foo.java"), OptionalInt.of(1), Optional.of(clicked), desktop::add)));
-        onEdt(runtime::stop);
+        stopAndWait(runtime);
     }
 }
