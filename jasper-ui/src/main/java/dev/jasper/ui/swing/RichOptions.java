@@ -30,6 +30,13 @@ final class RichOptions extends JPanel {
     private int check(){return settings?ThemePainting.metric(context,DesignMetrics.Role.SETTINGS_POPUP_CHECK):glyph();}
     private Font font(){return ThemePainting.font(context,settings?Typography.Role.LABEL:Typography.Role.BODY);}
     private Font secondary(){return ThemePainting.font(context,settings?Typography.Role.SETTING_DESCRIPTION:Typography.Role.CAPTION);}
+    /** The Settings face width that shows the widest of {@code options}' labels whole beside their widest annotation. */
+    static int settingsFaceWidth(KitContext context,List<Option> options){
+        var face=new RichOptions(context,options.getFirst(),false,false,false,0,true);var labels=face.getFontMetrics(face.font());var annotations=face.getFontMetrics(face.secondary());
+        int label=0,annotation=0;boolean icon=false;
+        for(var option:options){label=Math.max(label,labels.stringWidth(option.label()));if(!option.description().isBlank())annotation=Math.max(annotation,annotations.stringWidth(option.description())+face.annotationGap());icon|=!option.icon().isBlank();}
+        return face.pad()+ThemePainting.metric(context,DesignMetrics.Role.CHOICE_VALUE_END_PADDING)+(icon?face.glyph()+face.gap():0)+label+annotation;
+    }
     int labelWidth(int width){return Math.max(0,width-pad()-(popup?pad():ThemePainting.metric(context,DesignMetrics.Role.CHOICE_VALUE_END_PADDING))-(option.icon().isBlank()?0:glyph()+gap())-(option.description().isBlank()?0:getFontMetrics(secondary()).stringWidth(option.description())+annotationGap())-(popup?check()+gap():0));}
     private List<String> lines(int width){
         if(!popup)return List.of(option.label());

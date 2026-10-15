@@ -172,7 +172,22 @@ class SettingsControlsTest {
         try{
             var option=new Option("sticky","Sticky card","notification.sticky","Default");
             var renderer=new RichOptions(context,option,false,false,true,148);
-            assertThat(renderer.labelWidth(148)).isGreaterThanOrEqualTo(renderer.getFontMetrics(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.BODY)).stringWidth(option.label()));
+            // The mock's 148 face holds the label beside its annotation with the macOS faces.
+            if(com.formdev.flatlaf.util.SystemInfo.isMacOS)assertThat(renderer.labelWidth(148)).isGreaterThanOrEqualTo(renderer.getFontMetrics(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.BODY)).stringWidth(option.label()));
+            // With any face a Settings dropdown widens until its widest value shows whole beside the Default annotation.
+            for(String preset:List.of("sticky","history")) {
+                var modes=new ArrayList<Option>();
+                for(var mode:List.of(List.of("card","Card"),List.of("sticky","Sticky card"),List.of("history","History only"),List.of("off","Off")))
+                    modes.add(new Option(mode.get(0),mode.get(1),"notification."+mode.get(0),mode.get(0).equals(preset)?"Default":""));
+                var row=new Nodes.SettingRow("row",ControlState.READY,"Group","",new Nodes.Choice("mode",ControlState.READY,Nodes.ChoiceKind.DROPDOWN,modes,preset,"Mode",""),false);
+                try(var view=new KitView(context,new ViewSpec(new Nodes.Stack("page",ControlState.READY,Nodes.LayoutRole.SETTINGS_PAGE,List.of(new Nodes.Card("card",ControlState.READY,Nodes.CardKind.SETTINGS,List.of(row))))),e->{})) {
+                    dev.jasper.ui.testsupport.KitFixtures.render(view,620,200,1);
+                    var combo=find(view,"mode.input",JComboBox.class);
+                    @SuppressWarnings("unchecked") var face=(RichOptions)((ListCellRenderer<Object>)combo.getRenderer()).getListCellRendererComponent(new JList<>(),combo.getSelectedItem(),-1,false,false);
+                    assertThat(face.labelWidth(face.getPreferredSize().width)).as("%s face",preset)
+                        .isGreaterThanOrEqualTo(face.getFontMetrics(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.LABEL)).stringWidth(((Option)combo.getSelectedItem()).label()));
+                }
+            }
         }finally{context.binding().close();context.icons().close();}
     }); }
     @Test void segmentedChoicesReflowWithoutReplacingButtonsOrLosingKeyboardSelection() { Edt.run(() -> {

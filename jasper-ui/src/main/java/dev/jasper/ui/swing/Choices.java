@@ -99,7 +99,13 @@ final class Choices {
                 if (input instanceof JComboBox<?> raw) {
                     var combo = (JComboBox<Option>)raw;
                     ((ChoiceCombo)combo).compactHeight=fullSetting;
-                    ((ChoiceCombo)combo).settingsWidth=settings?ThemePainting.metric(context(),choice.options().stream().anyMatch(option->!option.icon().isBlank()||!option.description().isBlank())?DesignMetrics.Role.SETTINGS_RICH_CHOICE_WIDTH:DesignMetrics.Role.SETTINGS_CHOICE_WIDTH):0;
+                    boolean rich=choice.options().stream().anyMatch(option->!option.icon().isBlank()||!option.description().isBlank());
+                    int settingsWidth=settings?ThemePainting.metric(context(),rich?DesignMetrics.Role.SETTINGS_RICH_CHOICE_WIDTH:DesignMetrics.Role.SETTINGS_CHOICE_WIDTH):0;
+                    // A wider face than the mock's (DejaVu Sans on Linux) widens a rich dropdown until its widest value fits beside
+                    // its widest annotation, so every row of a table of such choices keeps one width.
+                    if(settings&&rich)settingsWidth=Math.max(settingsWidth,RichOptions.settingsFaceWidth(context(),choice.options())
+                        +ThemePainting.metric(context(),DesignMetrics.Role.SETTINGS_CHOICE_ARROW)+combo.getInsets().left+combo.getInsets().right);
+                    ((ChoiceCombo)combo).settingsWidth=settingsWidth;
                     if (combo instanceof SearchChoices.Combo searchable) choice.search().ifPresent(searchable::configure);
                     if (!options.equals(choice.options())) {
                         combo.setModel(new DefaultComboBoxModel<>(choice.options().toArray(Option[]::new))); options = choice.options();
