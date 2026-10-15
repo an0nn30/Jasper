@@ -13,7 +13,8 @@ FTP tests a run; with the fix none, except that `TftpReadTest.refusalsAreErrorPa
 about half the runs (one datagram dropped with no socket per failure; commons-net's client never resends its
 request). Unstressed it passed every run. `FileServerPluginTest` starts servers through the registry on `Ports.free()`
 ports and keeps the check-then-use gap. `./gradlew check --continue`: **10,424 tests, 0 failures, 0 errors, 17
-skipped**. Not merged.
+skipped**. After merging `main` (Slate Cobalt): **10,423 tests, 0 failures, 0 errors, 17 skipped**. Merged to local
+`main`, not pushed.
 
 **Settings' page list without icons — 2026-10-14** (`claude/slate-cobalt`, merged to local main, not pushed; the
 user's ask). The Settings navigation
