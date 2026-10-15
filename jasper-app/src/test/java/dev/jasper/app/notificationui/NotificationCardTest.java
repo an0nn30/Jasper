@@ -87,11 +87,15 @@ class NotificationCardTest {
                     count.setSize(count.getPreferredSize());
                     var image = new BufferedImage(count.getWidth(), count.getHeight(), BufferedImage.TYPE_INT_ARGB);
                     var graphics = image.createGraphics(); try { count.paint(graphics); } finally { graphics.dispose(); }
-                    // Fractional glyph positions may cover no pixel fully (Liberation Sans at 11 px); partly covered ink keeps the colour.
-                    boolean painted = false;
-                    for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++)
-                        painted |= image.getRGB(x, y) >>> 24 != 0 && (image.getRGB(x, y) & 0xFFFFFF) == (count.getForeground().getRGB() & 0xFFFFFF);
-                    assertThat(painted).as(name + " actual count text").isTrue();
+                    // The most opaque ink is the foreground at full strength. Fractional glyph positions may cover no pixel
+                    // fully off macOS (Liberation Sans at 11 px peaks at alpha 251), so there it may fall a little short.
+                    int strongest = 0; boolean foreground = false;
+                    for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) {
+                        int argb = image.getRGB(x, y);
+                        if (argb >>> 24 > strongest) { strongest = argb >>> 24; foreground = (argb & 0xFFFFFF) == (count.getForeground().getRGB() & 0xFFFFFF); }
+                    }
+                    assertThat(foreground).as(name + " actual count text").isTrue();
+                    assertThat(strongest).as(name + " actual count text opacity").isGreaterThanOrEqualTo(com.formdev.flatlaf.util.SystemInfo.isMacOS ? 255 : 224);
                 }
             }
         }
