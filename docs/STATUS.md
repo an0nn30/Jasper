@@ -22,7 +22,8 @@ opens nothing; a path soft-wrapped in a narrow window opens from either row; nam
 and Linux, Ctrl-click, and Ctrl+Shift-click inside a program that uses the mouse; with System default app chosen, a
 click on a `.txt` or a `.command` opens it as text in the default text editor (TextEdit unless changed), and the
 `.command` does not run; on Windows, a Ctrl-click on a `\\wsl$\…` path in a WSL pane
-opens it. Not merged or pushed.
+opens it. After merging `main`: **10,385 tests, 0 failures, 0 errors, 17 skipped** (the first run lost
+`TftpReadTest.blockNumbersWrapOnALongRead` to a port race in `Ports.free`; the re-run passed). Merged to local `main`, not pushed.
 
 **Catppuccin built in — 2026-10-14** (`claude/catppuccin-themes`, worktree `.claude/worktrees/catppuccin-themes`; asked
 for by the user, who will name tweaks after seeing the port). Catppuccin Latte (Light), Frappé, Macchiato and Mocha
