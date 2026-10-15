@@ -11,7 +11,7 @@ import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 import org.junit.jupiter.api.Test;
 
-class SlateSteelInstallTest {
+class SlateCobaltInstallTest {
     @Test void thePopupShadowComesFromTheMetricsNotTheThemeKeys() {
         Edt.run(() -> {
             var prior = UIManager.getLookAndFeel();

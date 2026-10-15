@@ -5,7 +5,7 @@ import java.util.Optional;
 
 /**
  * The saved workspace glass. {@link #UNSET_OPACITY} and {@link WorkspaceBlur#THEME} mean "use the theme's value" (Slate
- * Steel's is opaque, without blur); the unset opacity lies outside the setting's range, so it never collides with a saved value.
+ * Cobalt's is opaque, without blur); the unset opacity lies outside the setting's range, so it never collides with a saved value.
  *
  * @param opacityPercent 10–100, or {@link #UNSET_OPACITY}
  * @param blurChoice the saved blur choice

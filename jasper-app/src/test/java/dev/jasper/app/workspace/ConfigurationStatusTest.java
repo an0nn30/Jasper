@@ -107,14 +107,14 @@ class ConfigurationStatusTest {
                 assertStatusReadable(status);
                 for (var role : List.of(dev.jasper.ui.theme.SemanticColor.STATUS_SUCCESS, dev.jasper.ui.theme.SemanticColor.STATUS_WARNING,
                         dev.jasper.ui.theme.SemanticColor.STATUS_DANGER))
-                    // Unfloored: panels show Slate Steel's authored status colours (Light status.success is 3.32:1 on surface.panel).
+                    // Unfloored: panels show Slate Cobalt's authored status colours (Light status.success is 3.32:1 on surface.panel).
                     assertThat(semantic.color(role)).as(role.key() + " keeps its authored colour on panels")
                         .isEqualTo(ThemeTestSupport.color(false, role));
             } finally { ThemeTestSupport.controller(true); }
         });
     }
 
-    /** Slate Steel Light with {@code roles} recoloured, installed as the look and feel. */
+    /** Slate Cobalt Light with {@code roles} recoloured, installed as the look and feel. */
     private static dev.jasper.ui.theme.GeneratedTheme install(Map<dev.jasper.ui.theme.SemanticColor, Color> roles) {
         ThemeTestSupport.install(ThemeTestSupport.recolored(ThemeTestSupport.generated(false), roles));
         return dev.jasper.ui.swing.FlatLafInstaller.installedTheme();

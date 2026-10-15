@@ -18,7 +18,7 @@ public final class KitTestSupport {
 
     private KitTestSupport() { }
 
-    /** A chrome context over Slate Steel Dark, shared by the test JVM; EDT only. */
+    /** A chrome context over Slate Cobalt Dark, shared by the test JVM; EDT only. */
     public static KitContext context() {
         if (!EventQueue.isDispatchThread()) throw new IllegalStateException("Kit contexts are EDT confined");
         if (shared == null) shared = bindings(true);

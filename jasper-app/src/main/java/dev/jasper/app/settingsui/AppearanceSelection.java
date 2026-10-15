@@ -94,7 +94,7 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
         return options;
     }
 
-    /** The picked theme's preview; one that is not installed, or lacks the variant, previews the first, Slate Steel, which is shown instead. */
+    /** The picked theme's preview; one that is not installed, or lacks the variant, previews the first, Slate Cobalt, which is shown instead. */
     private static Option.Palette preview(List<InstalledThemes.ThemeOption> installed, String picked) {
         return installed.stream().filter(theme -> theme.id().equals(picked)).findFirst().orElse(installed.getFirst()).preview();
     }

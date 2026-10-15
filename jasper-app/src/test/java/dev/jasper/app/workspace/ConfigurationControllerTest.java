@@ -66,7 +66,7 @@ class ConfigurationControllerTest {
         var folder = directory.resolve("themes");
         edt(() -> {
             var library = dev.jasper.app.appearance.ThemeLibrary.read(folder, dev.jasper.app.appearance.ThemeLibrary.bundledOnly());
-            themes = new ThemeController(true, dev.jasper.app.appearance.ThemeSelection.of(library, "slate-steel", "slate-steel",
+            themes = new ThemeController(true, dev.jasper.app.appearance.ThemeSelection.of(library, "slate-cobalt", "slate-cobalt",
                 TerminalSchemeChoice.MATCH, (key, message) -> { }));
             controller = new ConfigurationTestSupport(themes, service, folder);
         });
@@ -263,9 +263,9 @@ class ConfigurationControllerTest {
             assertThat(owners.getFirst().status().getText()).contains("Config warnings");
             assertThat(controller.shown().diagnostics()).anySatisfy(diagnostic -> {
                 assertThat(diagnostic.key()).isEqualTo("ui.appearance");
-                assertThat(diagnostic.message()).contains("Could not apply Slate Steel Light").contains("keeping the current appearance");
+                assertThat(diagnostic.message()).contains("Could not apply Slate Cobalt Light").contains("keeping the current appearance");
             });
-            assertThat(errors).singleElement().asString().contains("Slate Steel Light");
+            assertThat(errors).singleElement().asString().contains("Slate Cobalt Light");
         });
     }
 
@@ -380,7 +380,7 @@ class ConfigurationControllerTest {
             assertThat(pane.view().fontSize()).isEqualTo(27);
             assertThat(pane.view().options().fontFamily()).isEqualTo("Monospaced");
             assertThat(pane.view().options().lineHeight()).isEqualTo(1.5f);
-            assertThat(pane.view().palette()).as("a reload applies the configured appearance").isEqualTo(slateSteelDarkPalette());
+            assertThat(pane.view().palette()).as("a reload applies the configured appearance").isEqualTo(slateCobaltDarkPalette());
             owner.newTab(HOME);
         }); launchAll();
         edt(() -> {
@@ -393,7 +393,7 @@ class ConfigurationControllerTest {
         reload(liveSettings(20));
         edt(() -> {
             assertThat(pane.view().fontSize()).isEqualTo(20);
-            assertThat(pane.view().palette()).as("a reload applies the configured appearance").isEqualTo(slateSteelDarkPalette());
+            assertThat(pane.view().palette()).as("a reload applies the configured appearance").isEqualTo(slateCobaltDarkPalette());
         });
     }
 
@@ -575,7 +575,7 @@ class ConfigurationControllerTest {
         edt(() -> {
             assertThat(themes.current().chrome()).isSameAs(light);
             assertThat(owners.getFirst().theme()).isEqualTo(themes.current());
-            assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateSteel(false, JasperTheme.bundled().matching(false)));
+            assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateCobalt(false, JasperTheme.bundled().matching(false)));
             assertThat(attempts).containsExactly(dark, light, light);
             assertThat(errors).hasSize(1);
             owners.getFirst().selectVariant(true);
@@ -591,7 +591,7 @@ class ConfigurationControllerTest {
         });
     }
 
-    private static Palette slateSteelDarkPalette() {
+    private static Palette slateCobaltDarkPalette() {
         return dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(JasperTheme.bundled().matching(true));
     }
 
@@ -668,11 +668,11 @@ class ConfigurationControllerTest {
     }
 
     @Test void savedTerminalSchemeAppliesLiveOnStartAndReloadWithoutARestartNotice() throws Exception {
-        start("[ui]\nappearance='light'\n[terminal]\nscheme='slate-steel/dark'\n");
-        edt(() -> assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateSteel(false, JasperTheme.bundled().matching(true))));
+        start("[ui]\nappearance='light'\n[terminal]\nscheme='slate-cobalt/dark'\n");
+        edt(() -> assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateCobalt(false, JasperTheme.bundled().matching(true))));
         reload("[ui]\nappearance='light'\n[terminal]\nscheme='match'\n");
         edt(() -> {
-            assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateSteel(false, JasperTheme.bundled().matching(false)));
+            assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateCobalt(false, JasperTheme.bundled().matching(false)));
             assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().startsWith("ui.") || d.key().startsWith("terminal."));
         });
     }
@@ -800,13 +800,13 @@ class ConfigurationControllerTest {
         until(() -> !seen.isEmpty() && seen.getLast().values().get(dev.jasper.app.config.CoreSettings.WINDOW_TOOLBAR) == ToolbarMode.HIDDEN);
         edt(() -> first.windowCommands().view("view.status_bar").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
         until(() -> Boolean.FALSE.equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.WINDOW_STATUS_BAR)));
-        edt(() -> first.windowCommands().view("view.terminal_scheme.slate-steel.dark").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
-        until(() -> "slate-steel/dark".equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.TERMINAL_SCHEME)));
+        edt(() -> first.windowCommands().view("view.terminal_scheme.slate-cobalt.dark").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
+        until(() -> "slate-cobalt/dark".equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.TERMINAL_SCHEME)));
         edt(() -> {
             for (var owner : List.of(first, second)) {
                 assertThat(owner.toolbar().isVisible()).isFalse();
                 assertThat(owner.status().isVisible()).isFalse();
-                assertThat(owner.terminalSchemeSelected(dev.jasper.app.config.TerminalSchemeChoice.parse("slate-steel/dark").orElseThrow())).isTrue();
+                assertThat(owner.terminalSchemeSelected(dev.jasper.app.config.TerminalSchemeChoice.parse("slate-cobalt/dark").orElseThrow())).isTrue();
             }
         });
         assertThat(Files.readString(directory.resolve("config.toml"))).contains("tab_height = 44");

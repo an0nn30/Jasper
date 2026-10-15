@@ -7,10 +7,10 @@ import org.junit.jupiter.api.Test;
 
 /** A variant may give the window's title bar its own colours; the header then paints with a theme derived from them. */
 class TitleBarThemeTest {
-    /** Slate Steel Light with IntelliJ New UI Light's dark header: Gray2 under Gray12. */
+    /** Slate Cobalt Light with IntelliJ New UI Light's dark header: Gray2 under Gray12. */
     static JasperTheme darkHeader() throws Exception {
-        return JasperTheme.parse(JasperThemeTest.bundledJson().replace("\"accent\": \"#3F6FA8\"",
-            "\"surface.titlebar\": \"#27282E\", \"text.titlebar\": \"#DFE1E5\", \"accent\": \"#3F6FA8\""), "header");
+        return JasperTheme.parse(JasperThemeTest.bundledJson().replace("\"accent\": \"#2563C9\"",
+            "\"surface.titlebar\": \"#27282E\", \"text.titlebar\": \"#DFE1E5\", \"accent\": \"#2563C9\""), "header");
     }
 
     @Test void leftOutTheTitleBarIsTheChromeAndTheHeaderPaintsWithTheThemeItself() {

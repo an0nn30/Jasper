@@ -7,18 +7,18 @@ import dev.jasper.ui.theme.JasperTheme;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-/** Test pages' appearance choices: Slate Steel's previews, an opaque workspace and, unless given, no system appearance. */
+/** Test pages' appearance choices: Slate Cobalt's previews, an opaque workspace and, unless given, no system appearance. */
 public final class AppearanceFixtures {
     private AppearanceFixtures() { }
 
     public static final AppearanceChoices CHOICES = choices(Optional::empty);
 
     public static AppearanceChoices choices(Supplier<Optional<Boolean>> systemDark) {
-        var themes = InstalledThemes.slateSteel(preview(true), preview(false));
+        var themes = InstalledThemes.slateCobalt(preview(true), preview(false));
         return new AppearanceChoices(100f, false, systemDark, ignored -> new Subscription(() -> { }), () -> themes, Optional.empty());
     }
 
-    /** A Slate Steel variant's preview, as the application builds it. */
+    /** A Slate Cobalt variant's preview, as the application builds it. */
     public static Option.Palette preview(boolean dark) {
         var palette = JasperTheme.bundled().palette(dark);
         return new Option.Palette(palette.color(SemanticColor.SURFACE_INPUT).getRGB(), palette.color(SemanticColor.SURFACE_SIDEBAR).getRGB(),

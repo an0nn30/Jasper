@@ -6,7 +6,7 @@ Plan 3 owns final surface composition; the [completion record](design/theme-engi
 
 | Package | Allowed outgoing UI packages | Ownership |
 | --- | --- | --- |
-| `theme` | none | Jasper theme files (Slate Steel is bundled), semantic palettes, terminal and editor schemes, syntax, glass and FlatLaf keys; EDT appearance binding |
+| `theme` | none | Jasper theme files (Slate Cobalt is bundled), semantic palettes, terminal and editor schemes, syntax, glass and FlatLaf keys; EDT appearance binding |
 | `model` | none | Immutable descriptors and events; no secret values |
 | `metrics` | `theme` | Fixed logical geometry and central typography/motion roles |
 | `icons` | `theme`, `metrics`, `model` | Named artwork and context-scoped tint caches |
@@ -17,7 +17,7 @@ JDK-only theme/model boundaries. FlatLaf remains an implementation dependency. S
 `dev.jasper.app.plugins.KitValues` is the translation boundary. Host and testkit implement the same
 SDK facade. Plugins never receive the engine jar on their runtime classpath.
 
-Read a Slate Steel role without constructing Swing controls:
+Read a Slate Cobalt role without constructing Swing controls:
 
 <!-- example:palette -->
 ```java
@@ -25,7 +25,7 @@ var theme = JasperTheme.bundled().generated(true);
 var cardColor = theme.semantic().color(SemanticColor.SURFACE_CARD);
 ```
 
-Slate Steel's semantic roles supply colors. Geometry, spacing, artwork and typography roles
+Slate Cobalt's semantic roles supply colors. Geometry, spacing, artwork and typography roles
 come from `DesignMetrics`, `Typography` and `IconRegistry`.
 `TerminalColors` orders background then foreground; the terminal palette orders foreground then
 background. Translate by meaning. ANSI arrays are defensively copied.
@@ -97,15 +97,15 @@ mid-way. While it moves the card paints one snapshot of its content, so it fades
 paints its own disabled alpha ahead of the rest); at rest the content paints live. The host adds the overlay to a
 layered pane and owns keyboard routing and focus; the app's `WindowOverlay` stacks them per window.
 
-`JasperTheme` reads a Jasper theme file with the JDK-only `ThemeJson` reader; `JasperTheme.bundled()` is Slate Steel,
-the bundled `slate-steel.json` (the colour reference `docs/design/theme-engine/slate-steel.md`'s machine-readable
+`JasperTheme` reads a Jasper theme file with the JDK-only `ThemeJson` reader; `JasperTheme.bundled()` is Slate Cobalt,
+the bundled `slate-cobalt.json` (the colour reference `docs/design/theme-engine/slate-cobalt.md`'s machine-readable
 block, kept identical by a test). A theme has the Dark and/or Light semantic palettes (roles the file omits follow
 fixed rules), its terminal schemes (`TerminalScheme`, with an id and a bold foreground) and an editor scheme per
 variant (`EditorColors` and syntax styles, written as colours or as references into the palettes). `generated(dark)` assembles a full `GeneratedTheme`: the
 palette, the matching terminal scheme, the editor scheme and syntax, FlatLaf's UI keys from the roles (`UiColorKeys`)
 and the glass. Components paint theme.md's roles; alpha treatments (focus and error rings, hover, category tiles)
 apply one kit metric to a base role, and a role that carries alpha (the scrim, `border.subtle`) is painted as given.
-`ColourLiteralScanTest` fails on any colour literal in production code or resources outside `slate-steel.json`. Shadows are black at the kit's shadow
+`ColourLiteralScanTest` fails on any colour literal in production code or resources outside `slate-cobalt.json`. Shadows are black at the kit's shadow
 metrics: `ThemePainting.softShadow` blurs one mask per treatment and nine-slices it across face sizes (a face too
 small to slice gets its own cached mask), and a hollow mask has the face cut out so nothing of the shadow lies under a
 translucent face. It serves the modal overlay's card (hollow, so a fading card does not darken) and the command
@@ -262,4 +262,4 @@ own enabled behavior and text paints at full opacity. Field.listId keys fall bac
 Data-row height counting is separate from selection capability. Inline-row reveal waits for first viewport sizing
 through pendingReveal and does not change logical row focus or keyboard focus.
 
-Task4b shared composition: `FormKind.WINDOW` requires one content section and no hero; it fills the owner above the shared scrollable footer. `PLAIN_PATH` retains PATH/Browse without a leading icon; `DISCREET_INPUT` retains secret behavior with a stable, focus-aware reveal slot. All are mirrored in SDK/host/fake. Category fill bases `hue.{blue,green,amber,purple,neutral}.surface` are Slate Steel's roles (following their glyph hue). Tile paint applies the kit's tile metric (17% Dark, 13% Light) to the base once; selected tiles use onAccent independently. See the Task4b native-composition amendment for measured source calibration and compatibility costs.
+Task4b shared composition: `FormKind.WINDOW` requires one content section and no hero; it fills the owner above the shared scrollable footer. `PLAIN_PATH` retains PATH/Browse without a leading icon; `DISCREET_INPUT` retains secret behavior with a stable, focus-aware reveal slot. All are mirrored in SDK/host/fake. Category fill bases `hue.{blue,green,amber,purple,neutral}.surface` are Slate Cobalt's roles (following their glyph hue). Tile paint applies the kit's tile metric (17% Dark, 13% Light) to the base once; selected tiles use onAccent independently. See the Task4b native-composition amendment for measured source calibration and compatibility costs.

@@ -40,10 +40,45 @@ and `LaunchSettingsTest` cover the text rule on every OS. Two new `ShellLauncher
 and two `FileLinkClickTest` cases are `@EnabledOnOs(WINDOWS)`; each was watched failing, then passing, on the Mac
 through a Gradle init script that sets `os.name` to `Windows 11`. `./gradlew check --continue`: **10,434 tests, 0
 failures, 0 errors, 24 skipped**. An earlier run lost seven File Server tests to ports in use and refused FTP passive
-connections; they passed on the re-run. Not merged, not pushed. No GUI launched. GUI checks for the user, on Windows:
+connections; they passed on the re-run. After merging `main` (Slate Cobalt, then the File Server port-race fix): **10,436
+tests, 0 failures, 0 errors, 24 skipped**. Merged to local `main`, not pushed. No GUI launched. GUI checks for the user, on Windows:
 in a PowerShell tab, `[Console]::Write("$([char]27)]7;file://localhost//attacker.invalid/share$([char]7)")`, then a
 split and a new tab both start in the home folder; a `\\wsl.localhost\<distro>\…` path printed in a PowerShell tab
 opens nothing on Ctrl-click, and the same path in a WSL tab opens.
+
+**File Server test port race — 2026-10-14** (`claude/fileserver-port-race`, worktree
+`.claude/worktrees/practical-shamir-1252c5`). `TftpReadTest.blockNumbersWrapOnALongRead` lost its port once during
+`check`: `Ports.free()` probed TCP while TFTP binds UDP (separate port spaces; on this Mac 9 in 20,000 TCP-free ports
+were already bound for UDP), and any engine could lose its port before binding it. `ServerDefinition` requires ports 1
+to 65535, so the engines cannot bind port 0. `Ports.free()` now checks TCP and UDP; `Ports.start` rebuilds the engine
+on another port when its start fails with a `BindException`, and every engine test starts through it.
+`FtpEngineTest`'s passive range comes from `Ports.freeRange`, below every system's ephemeral range, because on macOS
+Apache FtpServer's passive-port check misses a socket on 127.0.0.1 and the transfer fails with 425. Production code
+unchanged. Under a stress run (2,000 UDP and 2,000 TCP loopback ports held and replaced), `main` lost 3–4 TFTP and 4–5
+FTP tests a run; with the fix none, except that `TftpReadTest.refusalsAreErrorPacketsWithoutHostPaths` timed out in
+about half the runs (one datagram dropped with no socket per failure; commons-net's client never resends its
+request). Unstressed it passed every run. `FileServerPluginTest` starts servers through the registry on `Ports.free()`
+ports and keeps the check-then-use gap. `./gradlew check --continue`: **10,424 tests, 0 failures, 0 errors, 17
+skipped**. After merging `main` (Slate Cobalt): **10,423 tests, 0 failures, 0 errors, 17 skipped**. Merged to local
+`main`, not pushed.
+
+**Settings' page list without icons — 2026-10-14** (`claude/slate-cobalt`, merged to local main, not pushed; the
+user's ask). The Settings navigation
+shows page titles only, as IntelliJ's settings tree does: `PageTree` gives its items no icon, the page icon and artwork
+methods and the plugin pages' artwork are gone, and the kit drops the navigation tile and its metrics
+(`SETTINGS_NAV_TILE`, `SETTINGS_NAV_GLYPH`, `SETTINGS_NAV_TEXT_GAP`). Plugin identity art still shows on the Plugins
+page and notification headers. GUI check pending.
+
+**Slate Cobalt replaces Slate Steel — 2026-10-14** (`claude/slate-cobalt`, worktree `.claude/worktrees/slate-cobalt`;
+the user's `slate-cobalt (3).json`). Slate Cobalt, in Dark and Light, is the default and fallback theme (`slate-cobalt`,
+author Jasper); Slate Steel is removed with no migration, so a saved `slate-steel` pick is reported and the default used.
+Its terminal schemes are the file's Dark and Light plus Slate Steel's High Contrast, carried over as
+`slate-cobalt/high-contrast`. The colour record is
+[`design/theme-engine/slate-cobalt.md`](design/theme-engine/slate-cobalt.md) (its machine-readable block is the bundled
+file). Every contrast target holds; Light cyan now meets 4.9:1, so it is no longer a named exception. Code, tests, the
+converter's built-in list and living docs say Slate Cobalt; plans, specs, acceptance records and the entries below keep
+Slate Steel. Merged to local main with main's Cmd-click and start-up recovery work, not pushed; `./gradlew check
+--continue` after the merge: **10,420 tests, 0 failures, 0 errors, 17 skipped**. GUI check pending.
 
 **Cmd-click file paths (command line plan 3) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
@@ -539,7 +574,7 @@ more… recovers from a failed Errors window. See the follow-up round in the
 [acceptance record](design/theme-engine/acceptance.md).
 
 **Slate Steel Plan 1 (engine and kit) complete — 2026-10-12.** On `claude/slate-steel` (not pushed, not merged): the
-user's `theme.md` became [`design/theme-engine/slate-steel.md`](design/theme-engine/slate-steel.md) with derived editor
+user's `theme.md` became [`design/theme-engine/slate-steel.md`](design/theme-engine/slate-cobalt.md) with derived editor
 schemes, bundled as `slate-steel.json` and read by `SlateSteel` into the Dark/Light palettes, the Slate Steel Dark/Light
 and High Contrast terminal schemes (bold foreground included) and complete `GeneratedTheme`s that install into FlatLaf.
 Ten roles were added (SDK 0.15.5; every bundled manifest requires it). Opacity is applied once, and kit components moved

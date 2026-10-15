@@ -818,18 +818,18 @@ class Writes(unittest.TestCase):
     def test_the_built_in_theme_name_is_refused(self):
         with tempfile.TemporaryDirectory() as scratch:
             out = pathlib.Path(scratch) / "out"
-            theme = loose_file(scratch, "Steel.theme.json", '{ "name": "Slate Steel", "dark": true }')
-            alacritty = pathlib.Path(scratch) / "slate_steel.toml"
+            theme = loose_file(scratch, "Cobalt.theme.json", '{ "name": "Slate Cobalt", "dark": true }')
+            alacritty = pathlib.Path(scratch) / "slate_cobalt.toml"
             alacritty.write_bytes((DATA / "alacritty" / "gruvbox_dark.toml").read_bytes())
             for source in (theme, alacritty):
                 with self.subTest(source.name):
                     status, _, stderr = run(source, "-o", out)
                     self.assertEqual(status, 1)
-                    self.assertIn(f'error: {source.name}: "slate-steel" is a built-in Jasper theme; choose another name '
+                    self.assertIn(f'error: {source.name}: "slate-cobalt" is a built-in Jasper theme; choose another name '
                                   "with --name", stderr)
                     self.assertEqual(listing(out), [])
-            self.assertEqual(run(theme, "--name", "Slate Steel Two", "-o", out)[0], 0)
-            self.assertEqual(listing(out), ["slate-steel-two.json"])
+            self.assertEqual(run(theme, "--name", "Slate Cobalt Two", "-o", out)[0], 0)
+            self.assertEqual(listing(out), ["slate-cobalt-two.json"])
 
 
 class Format(unittest.TestCase):
@@ -861,16 +861,16 @@ class Format(unittest.TestCase):
                 self.assertEqual(hashlib.sha256((tool.INTELLIJ / resource).read_bytes()).hexdigest(), sha256)
 
     def test_the_roles_are_the_bundled_themes(self):
-        bundled = pathlib.Path(__file__).resolve().parents[2] / "jasper-ui/src/main/resources/dev/jasper/ui/theme/slate-steel.json"
+        bundled = pathlib.Path(__file__).resolve().parents[2] / "jasper-ui/src/main/resources/dev/jasper/ui/theme/slate-cobalt.json"
         if not bundled.is_file():
             self.skipTest("not in the repository")
         doc = json.loads(bundled.read_text(encoding="utf-8"))
-        tool.validate(doc, "slate-steel.json")
+        tool.validate(doc, "slate-cobalt.json")
         self.assertEqual(list(doc["editor"]["dark"]), tool.EDITOR_SURFACES + tool.SYNTAX_ROLES)
 
 
 class BuiltIn(unittest.TestCase):
-    """The built-in themes besides Slate Steel are the converter's output for the vendored Catppuccin plugin."""
+    """The built-in themes besides Slate Cobalt are the converter's output for the vendored Catppuccin plugin."""
 
     FLAVOURS = ["latte", "frappe", "macchiato", "mocha"]  # the classic themes; the Islands variants are not built in
 

@@ -9,9 +9,9 @@ import java.util.Objects;
  * What the Appearance page offers, read again whenever the page refreshes: the themes for each appearance and every
  * terminal scheme, in order.
  *
- * @param dark the themes with a Dark variant, Slate Steel first
- * @param light the themes with a Light variant, Slate Steel first
- * @param schemes every installed terminal scheme, Slate Steel's first
+ * @param dark the themes with a Dark variant, Slate Cobalt first
+ * @param light the themes with a Light variant, Slate Cobalt first
+ * @param schemes every installed terminal scheme, Slate Cobalt's first
  * @param names the label of every installed theme by its id, including a theme that has neither a Dark nor a Light variant
  */
 public record InstalledThemes(List<ThemeOption> dark, List<ThemeOption> light, List<SchemeOption> schemes, Map<String, String> names) {
@@ -27,11 +27,11 @@ public record InstalledThemes(List<ThemeOption> dark, List<ThemeOption> light, L
         public SchemeOption { Objects.requireNonNull(key, "key"); Objects.requireNonNull(label, "label"); }
     }
 
-    /** Slate Steel alone, for pages built without an application: these previews and its three schemes. */
-    public static InstalledThemes slateSteel(Option.Palette dark, Option.Palette light) {
-        return new InstalledThemes(List.of(new ThemeOption("slate-steel", "Slate Steel", dark)),
-            List.of(new ThemeOption("slate-steel", "Slate Steel", light)),
-            List.of(new SchemeOption("slate-steel/dark", "Slate Steel Dark"), new SchemeOption("slate-steel/light", "Slate Steel Light"),
-                new SchemeOption("slate-steel/high-contrast", "High Contrast")), Map.of("slate-steel", "Slate Steel"));
+    /** Slate Cobalt alone, for pages built without an application: these previews and its three schemes. */
+    public static InstalledThemes slateCobalt(Option.Palette dark, Option.Palette light) {
+        return new InstalledThemes(List.of(new ThemeOption("slate-cobalt", "Slate Cobalt", dark)),
+            List.of(new ThemeOption("slate-cobalt", "Slate Cobalt", light)),
+            List.of(new SchemeOption("slate-cobalt/dark", "Slate Cobalt Dark"), new SchemeOption("slate-cobalt/light", "Slate Cobalt Light"),
+                new SchemeOption("slate-cobalt/high-contrast", "High Contrast")), Map.of("slate-cobalt", "Slate Cobalt"));
     }
 }

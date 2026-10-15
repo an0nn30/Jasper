@@ -55,7 +55,7 @@ class HostedUiTest {
     { ui.kit(kit); }
     private dev.jasper.sdk.ui.UiView view(){return kit.create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body",dev.jasper.sdk.ui.ControlState.READY,"Content",dev.jasper.sdk.ui.Nodes.TextRole.BODY)),e -> {});}
 
-    /** Slate Steel Dark with a plum accent and panel: another workspace of the same darkness, for hosting code that takes any pair (Decision 5). */
+    /** Slate Cobalt Dark with a plum accent and panel: another workspace of the same darkness, for hosting code that takes any pair (Decision 5). */
     private static dev.jasper.ui.theme.GeneratedTheme recolouredDark() {
         var plum = new java.awt.Color(0x7a3fa0);
         return ThemeTestSupport.recolored(ThemeTestSupport.generated(true), java.util.Map.of(

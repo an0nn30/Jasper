@@ -15,14 +15,14 @@ import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-/** The window's header row paints with its theme's title bar: a dark header on Slate Steel Light here. */
+/** The window's header row paints with its theme's title bar: a dark header on Slate Cobalt Light here. */
 @ExtendWith(EdtTestExtension.class)
 class TitleBarZoneTest {
     @Test void theHeaderAndWhatItHoldsPaintWithTheTitleBarsThemeAndTheRestWithTheChromes() throws Exception {
         String json;
-        try (var in = JasperTheme.class.getResourceAsStream("/dev/jasper/ui/theme/slate-steel.json")) { json = new String(in.readAllBytes(), StandardCharsets.UTF_8); }
-        var light = JasperTheme.parse(json.replace("\"accent\": \"#3F6FA8\"",
-            "\"surface.titlebar\": \"#27282E\", \"text.titlebar\": \"#DFE1E5\", \"accent\": \"#3F6FA8\""), "header").generated(false);
+        try (var in = JasperTheme.class.getResourceAsStream("/dev/jasper/ui/theme/slate-cobalt.json")) { json = new String(in.readAllBytes(), StandardCharsets.UTF_8); }
+        var light = JasperTheme.parse(json.replace("\"accent\": \"#2563C9\"",
+            "\"surface.titlebar\": \"#27282E\", \"text.titlebar\": \"#DFE1E5\", \"accent\": \"#2563C9\""), "header").generated(false);
         var original = UIManager.getLookAndFeel();
         try {
             FlatLafInstaller.install(light);

@@ -239,7 +239,7 @@ class CardLayerTest {
     }
 
     /**
-     * Plan 1 finding 5: card shadows are black (theme.md), not the scrim's colour. Slate Steel's scrims are near black, and
+     * Plan 1 finding 5: card shadows are black (theme.md), not the scrim's colour. Slate Cobalt's scrims are near black, and
      * at a ring's alpha their tint rounds away, so the variants here carry a red scrim the old shadow would show.
      */
     @Test void cardShadowsAreBlackInBothVariants() {

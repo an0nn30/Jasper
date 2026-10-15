@@ -28,7 +28,7 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 
 /**
- * The installed themes: the built-in themes, Slate Steel first, and every valid {@code <home>/themes/<id>.json}.
+ * The installed themes: the built-in themes, Slate Cobalt first, and every valid {@code <home>/themes/<id>.json}.
  * Imported themes are ordered by display name (ignoring case), then id. A file that cannot be used is skipped and kept as a problem.
  * Immutable and thread-safe; {@link #read} builds a new library, reusing the parsed themes of unchanged files.
  */
@@ -163,7 +163,7 @@ public final class ThemeLibrary {
     public List<JasperTheme> themes() { return themes; }
     /** The imported themes, in order. */
     public List<JasperTheme> imported() { return imported; }
-    /** The themes that have the Dark or the Light variant, Slate Steel first. */
+    /** The themes that have the Dark or the Light variant, Slate Cobalt first. */
     public List<JasperTheme> themes(boolean dark) { return themes.stream().filter(theme -> theme.has(dark)).toList(); }
     /** The theme with this id. */
     public Optional<JasperTheme> theme(String id) { return themes.stream().filter(theme -> theme.id().equals(id)).findFirst(); }

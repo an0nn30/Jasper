@@ -36,7 +36,7 @@ class IconPreview {
                 graphics.setColor(UIManager.getColor("Jasper.semantic.surface.app")); graphics.fillRect(left, 0, width / 2, height);
                 graphics.setColor(UIManager.getColor("Jasper.semantic.text.primary"));
                 graphics.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
-                graphics.drawString(panel == 0 ? "Slate Steel Dark" : "Slate Steel Light", left + 28, 40);
+                graphics.drawString(panel == 0 ? "Slate Cobalt Dark" : "Slate Cobalt Light", left + 28, 40);
                 graphics.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
                 graphics.drawString("Same 16 px icons. Layout unchanged.", left + 28, 65);
                 graphics.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
