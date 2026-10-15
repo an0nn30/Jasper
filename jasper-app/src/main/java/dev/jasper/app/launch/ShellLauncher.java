@@ -18,6 +18,7 @@ import javax.swing.SwingUtilities;
 
 /** Captures request settings before dispatch; every completion is delivered on the EDT. */
 public final class ShellLauncher {
+    private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
     private final Executor executor;
     private final Function<Optional<String>, LaunchSettings> settings;
     private final BiFunction<Optional<String>, LaunchSettings, LaunchSettings> confirm;
@@ -131,7 +132,8 @@ public final class ShellLauncher {
      * As above; a present {@code program} runs instead of the shell, with the profile's environment and the pane's
      * variables, in {@code directory} (empty: the user's home), which must exist; a WSL profile's {@code --cd} is not
      * added. The launch's label is the program's file name. A launcher without settings cannot run a program:
-     * {@code completion} gets an {@link IllegalStateException}.
+     * {@code completion} gets an {@link IllegalStateException}. On Windows a {@code directory} on another host counts as
+     * empty, as {@link LaunchSettings#startable} describes, so nothing touches it.
      */
     public Launch launch(Optional<Path> directory, Optional<String> profile, Optional<List<String>> program, Optional<UUID> pane,
                          Consumer<Launch> replaced, BiConsumer<TerminalSession, Throwable> completion) {
@@ -157,7 +159,7 @@ public final class ShellLauncher {
                 Throwable failure = null;
                 try {
                     if (captured == null) {
-                        Path target = directory.orElse(home);
+                        Path target = directory.filter(path -> !WINDOWS || !UncHosts.namesForeignHost(path.toString(), false)).orElse(home);
                         if (!Files.isDirectory(target)) {
                             throw new IllegalArgumentException("Directory is unavailable: " + target);
                         }
@@ -166,15 +168,16 @@ public final class ShellLauncher {
                         LaunchSettings chosen = Objects.requireNonNull(confirm.apply(profile, captured));
                         Launch now = launchOf(chosen, program);
                         if (!now.equals(launched)) SwingUtilities.invokeLater(() -> replaced.accept(now));
+                        Optional<Path> requested = chosen.startable(directory, WINDOWS);
                         Path where;
                         LaunchSettings resolved;
                         if (program.isPresent()) {
                             // Never at(): a WSL profile's --cd belongs to wsl.exe, not to the program.
-                            where = directory.orElse(home);
+                            where = requested.orElse(home);
                             if (!Files.isDirectory(where)) throw new IllegalArgumentException("Directory is unavailable: " + where);
                             resolved = chosen.withCommand(program.get());
                         } else {
-                            LaunchSettings.Start target = chosen.at(directory, home, Files::isDirectory);
+                            LaunchSettings.Start target = chosen.at(requested, home, Files::isDirectory);
                             where = target.directory();
                             resolved = target.settings();
                         }

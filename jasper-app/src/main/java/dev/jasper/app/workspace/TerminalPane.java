@@ -9,6 +9,8 @@ import dev.jasper.app.config.ShellExitBehavior;
 import dev.jasper.app.config.FontConfig;
 import dev.jasper.app.platform.BundledFonts;
 import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.launch.ShellProfiles;
+import dev.jasper.app.launch.UncHosts;
 import dev.jasper.terminal.config.Palette;
 import dev.jasper.terminal.config.TerminalOptions;
 import dev.jasper.terminal.session.TerminalSession;
@@ -38,6 +40,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(TerminalPane.class.getName());
     static final float DEFAULT_FONT_SIZE = FontConfig.defaults().size();
     static final int PADDING = 4;
+    private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
     private final UUID id = UUID.randomUUID();
     private final Path launchDirectory;
     /**
@@ -503,12 +506,18 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     /**
      * Where a split of this pane, or a tab or window opened from it, starts: the directory the shell reported, else
      * the one it was asked to start in; null when it started where a new shell starts and has reported nothing, so
-     * the new pane does too (a WSL profile then opens its Linux home, not {@code /mnt/c/Users/NAME}).
+     * the new pane does too (a WSL profile then opens its Linux home, not {@code /mnt/c/Users/NAME}). Null too on
+     * Windows for a directory on a UNC host other than a WSL pane's WSL share ({@link UncHosts}): any program can report
+     * one, and a shell started there would make Windows authenticate to that host.
      */
     Path inheritableDirectory() {
         Optional<Path> reported = session == null ? Optional.empty() : session.workingDirectory();
-        return reported.orElse(defaultDirectory ? null : launchDirectory);
+        Path directory = reported.orElse(defaultDirectory ? null : launchDirectory);
+        return directory != null && WINDOWS && UncHosts.namesForeignHost(directory.toString(), wsl()) ? null : directory;
     }
+
+    /** Whether this pane's launch started a WSL profile, so that this machine's WSL shares are real here. */
+    boolean wsl() { return launchedProfile.filter(id -> id.startsWith(ShellProfiles.WSL_PREFIX)).isPresent(); }
     String title() {
         return TerminalTitle.singleLine(!reportedTitle.isBlank() ? reportedTitle : runningCommand.strip());
     }

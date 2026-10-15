@@ -16,11 +16,11 @@ import java.util.function.Predicate;
 
 /** Package-local test access, excluded from production artifacts. */
 public final class ThemeTestSupport {
-    /** "Same as UI theme" and Slate Steel's three schemes, in the dropdown's order. */
+    /** "Same as UI theme" and Slate Cobalt's three schemes, in the dropdown's order. */
     public static final java.util.List<TerminalSchemeChoice> SCHEME_CHOICES = java.util.List.of(TerminalSchemeChoice.MATCH,
-        TerminalSchemeChoice.parse("slate-steel/dark").orElseThrow(), TerminalSchemeChoice.parse("slate-steel/light").orElseThrow(),
-        TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow());
-    /** Slate Steel's variant on both routes. */
+        TerminalSchemeChoice.parse("slate-cobalt/dark").orElseThrow(), TerminalSchemeChoice.parse("slate-cobalt/light").orElseThrow(),
+        TerminalSchemeChoice.parse("slate-cobalt/high-contrast").orElseThrow());
+    /** Slate Cobalt's variant on both routes. */
     public static dev.jasper.ui.theme.ThemePair pair(boolean dark) {
         var theme = generated(dark);
         return new dev.jasper.ui.theme.ThemePair(theme, theme);
@@ -36,22 +36,22 @@ public final class ThemeTestSupport {
                 "bright.blue": "#83A598", "bright.magenta": "#D3869B", "bright.cyan": "#8EC07C", "bright.white": "#EBDBB2" } } }
             """.formatted(name, name);
     }
-    /** Slate Steel's file renamed {@code name}: a UI theme with both variants and three schemes. */
+    /** Slate Cobalt's file renamed {@code name}: a UI theme with both variants and three schemes. */
     public static String uiThemeJson(String name) {
-        try (var in = ThemeTestSupport.class.getResourceAsStream("/dev/jasper/ui/theme/slate-steel.json")) {
+        try (var in = ThemeTestSupport.class.getResourceAsStream("/dev/jasper/ui/theme/slate-cobalt.json")) {
             return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
-                .replace("\"name\": \"Slate Steel\"", "\"name\": \"" + name + "\"");
+                .replace("\"name\": \"Slate Cobalt\"", "\"name\": \"" + name + "\"");
         } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
     }
     /** Installs a generated theme, as ThemeController's installer does. */
     public static boolean install(GeneratedTheme theme) { return ThemeManager.install(theme); }
 
-    /** Slate Steel's Dark or Light variant. */
+    /** Slate Cobalt's Dark or Light variant. */
     public static GeneratedTheme generated(boolean dark) { return JasperTheme.bundled().generated(dark); }
     /** The variant with its matching terminal scheme, as a window shows it. */
     public static ResolvedTheme resolved(boolean dark) { return resolved(dark, JasperTheme.bundled().matching(dark)); }
     /** The variant with {@code scheme} in its terminal panes. */
-    public static ResolvedTheme resolved(boolean dark, TerminalScheme scheme) { return ResolvedTheme.slateSteel(dark, scheme); }
+    public static ResolvedTheme resolved(boolean dark, TerminalScheme scheme) { return ResolvedTheme.slateCobalt(dark, scheme); }
     /** Chrome and workspace that differ, for hosting code that accepts any pair; panes take the workspace's terminal colours. */
     public static ResolvedTheme mixed(GeneratedTheme chrome, GeneratedTheme workspace) {
         return new ResolvedTheme(chrome, workspace,

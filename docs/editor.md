@@ -24,8 +24,8 @@ is the binding reference.
   [default editor](#default-editor), at the line when the editor takes one; anything else does nothing. Where a file
   would open with the system's default app, a clicked file opens in the system's editor for its type (on macOS, the
   default text editor), else is shown in the file manager; where the desktop supports neither, as on most Linux
-  desktops, the click opens nothing. On Windows, a path on a network share (`\\server\share\…`) other than WSL's opens
-  nothing. A path with spaces opens only from a link. Inside a program that uses the mouse, use Ctrl+Shift-click on
+  desktops, the click opens nothing. On Windows, a path on a network share (`\\server\share\…`) opens nothing, except
+  a WSL share in a WSL tab. A path with spaces opens only from a link. Inside a program that uses the mouse, use Ctrl+Shift-click on
   Linux and Windows. A pane whose shell reports a directory on another host, and a session a plugin provides, such as
   Remote's ssh, open nothing.
 

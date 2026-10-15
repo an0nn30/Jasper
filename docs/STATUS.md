@@ -19,6 +19,87 @@ errors, 17 skipped**; Linux (Ubuntu 24.04 container, DejaVu fonts; Liberation Sa
 FlatLaf's native default font on Linux and Windows differs from the kit's (FlatLaf divides by 15 and 12, the kit by 13).
 Not pushed or merged.
 
+**Windows network shares: reported directories — 2026-10-14** (`claude/unc-cwd-reports`, from `claude/windows-unc-hosts`,
+worktree `.claude/worktrees/command-palette-y-axis-a5b3d4`). On Windows the sessions Jasper starts ignore a reported
+directory (OSC 7) on a UNC host other than a WSL pane's own share, so it never becomes the pane's directory and never
+reaches plugins. Before, the Indexer's `CwdWatcher` looked for a project in every reported directory (`Files.exists`,
+`newDirectoryStream`) with no click, and File Server's share-path and serve actions checked it with `Files.isDirectory`.
+`LaunchSettings.localPaths(windows)` applies `UncHosts` to the mapped path, so every spelling of the report counts
+(`file://localhost//host/share`, `file://localhost/%5C%5Chost%5Cshare`), and the new `JasperApplication.sessionOptions`
+passes it to every shell session. Industry check: VS Code keeps the text of such a directory, but its runtime refuses
+file access to UNC hosts missing from `security.allowedUNCHosts` in every process, the pty host and extension hosts
+included (`NODE_UNC_HOST_ALLOWLIST`); Jasper cannot refuse access inside plugins, so it withholds the directory. Windows
+Terminal checks a reported directory with `IsValidDirectory` on Duplicate Tab, which touches the share. Cost: in a
+non-WSL Windows pane whose prompt reports OSC 7 (Jasper ships no PowerShell or cmd integration, so only a prompt the user
+set up, such as oh-my-posh), `cd \\server\share` leaves the status bar, breadcrumbs, History's directory and relative
+Cmd-click paths at the last folder, as for a shell that reports nothing. Docs: `docs/configuration.md`,
+`docs/terminal-architecture.md`. Tests: a `LaunchSettingsTest` case on every OS (`/\\attacker\share` is a UNC path on
+Windows and a file name elsewhere) and an `@EnabledOnOs(WINDOWS)` `ShellProfileLaunchTest` case through
+`sessionOptions`; each was watched failing, then passing, the Windows one on the Mac through the `os.name` init script.
+`./gradlew check --continue`: **10,436 tests, 0 failures, 0 errors, 25 skipped**, after one re-run of File Server's tests:
+the first run lost `TftpReadTest.aFileOfWholeBlocksEndsWithAnEmptyBlock` to a port in use (the `Ports.free` race that
+`claude/fileserver-port-race` fixes). After merging `main` (Slate Cobalt and that fix): **10,438 tests, 0 failures, 0
+errors, 25 skipped**. Merged to local `main`, not pushed. No GUI launched. GUI check for the user, on Windows:
+in a PowerShell tab, `[Console]::Write("$([char]27)]7;file://localhost//attacker.invalid/share$([char]7)")`, then the
+breadcrumbs keep the previous folder.
+
+**Windows network shares (Cmd-click follow-up) — 2026-10-14** (`claude/windows-unc-hosts`, worktree
+`.claude/worktrees/credentials-manager-status-1e3e7d`). Closes the two Windows credential-leak limits that
+[plan 3](superpowers/plans/2026-10-14-jasper-command-line-3-cmd-click-paths.md) left. The UNC host rule moved from
+`workspace.FileLinks` to the new JDK-only `launch.UncHosts` (`launch` cannot depend on `workspace`), and `FileLinks`,
+`LaunchSettings`, `ShellLauncher` and `TerminalPane` all call that one copy. The WSL shares (`wsl.localhost`, `wsl$`)
+are exempt only in a WSL profile's pane (`TerminalPane.wsl()`, from the profile id the launch resolved to); in every
+other pane they are refused like any host. This follows VS Code: its UNC allowlist (`security.allowedUNCHosts`) starts
+empty and has no WSL exception, and a host is allowed only after the user opens a folder on it or lists it, so the WSL
+pane is Jasper's form of that choice. Exempting the shares whenever WSL is installed was rejected because VS Code does
+not do it. On Windows a pane passes on no directory on such a host (`inheritableDirectory()` returns null), and
+`ShellLauncher` treats a requested one as no request (`LaunchSettings.startable`) for shells, programs and launchers
+without settings. The launch then starts where the profile's new shell starts (home, or `--cd ~` for WSL), and nothing
+touches the share. User docs: `docs/editor.md` and `docs/configuration.md`. Tests: `UncHostsTest`, `FileLinksTest`
+and `LaunchSettingsTest` cover the text rule on every OS. Two new `ShellLauncherTest` cases, `NetworkShareDirectoryTest`
+and two `FileLinkClickTest` cases are `@EnabledOnOs(WINDOWS)`; each was watched failing, then passing, on the Mac
+through a Gradle init script that sets `os.name` to `Windows 11`. `./gradlew check --continue`: **10,434 tests, 0
+failures, 0 errors, 24 skipped**. An earlier run lost seven File Server tests to ports in use and refused FTP passive
+connections; they passed on the re-run. After merging `main` (Slate Cobalt, then the File Server port-race fix): **10,436
+tests, 0 failures, 0 errors, 24 skipped**. Merged to local `main`, not pushed. No GUI launched. GUI checks for the user, on Windows:
+in a PowerShell tab, `[Console]::Write("$([char]27)]7;file://localhost//attacker.invalid/share$([char]7)")`, then a
+split and a new tab both start in the home folder; a `\\wsl.localhost\<distro>\…` path printed in a PowerShell tab
+opens nothing on Ctrl-click, and the same path in a WSL tab opens.
+
+**File Server test port race — 2026-10-14** (`claude/fileserver-port-race`, worktree
+`.claude/worktrees/practical-shamir-1252c5`). `TftpReadTest.blockNumbersWrapOnALongRead` lost its port once during
+`check`: `Ports.free()` probed TCP while TFTP binds UDP (separate port spaces; on this Mac 9 in 20,000 TCP-free ports
+were already bound for UDP), and any engine could lose its port before binding it. `ServerDefinition` requires ports 1
+to 65535, so the engines cannot bind port 0. `Ports.free()` now checks TCP and UDP; `Ports.start` rebuilds the engine
+on another port when its start fails with a `BindException`, and every engine test starts through it.
+`FtpEngineTest`'s passive range comes from `Ports.freeRange`, below every system's ephemeral range, because on macOS
+Apache FtpServer's passive-port check misses a socket on 127.0.0.1 and the transfer fails with 425. Production code
+unchanged. Under a stress run (2,000 UDP and 2,000 TCP loopback ports held and replaced), `main` lost 3–4 TFTP and 4–5
+FTP tests a run; with the fix none, except that `TftpReadTest.refusalsAreErrorPacketsWithoutHostPaths` timed out in
+about half the runs (one datagram dropped with no socket per failure; commons-net's client never resends its
+request). Unstressed it passed every run. `FileServerPluginTest` starts servers through the registry on `Ports.free()`
+ports and keeps the check-then-use gap. `./gradlew check --continue`: **10,424 tests, 0 failures, 0 errors, 17
+skipped**. After merging `main` (Slate Cobalt): **10,423 tests, 0 failures, 0 errors, 17 skipped**. Merged to local
+`main`, not pushed.
+
+**Settings' page list without icons — 2026-10-14** (`claude/slate-cobalt`, merged to local main, not pushed; the
+user's ask). The Settings navigation
+shows page titles only, as IntelliJ's settings tree does: `PageTree` gives its items no icon, the page icon and artwork
+methods and the plugin pages' artwork are gone, and the kit drops the navigation tile and its metrics
+(`SETTINGS_NAV_TILE`, `SETTINGS_NAV_GLYPH`, `SETTINGS_NAV_TEXT_GAP`). Plugin identity art still shows on the Plugins
+page and notification headers. GUI check pending.
+
+**Slate Cobalt replaces Slate Steel — 2026-10-14** (`claude/slate-cobalt`, worktree `.claude/worktrees/slate-cobalt`;
+the user's `slate-cobalt (3).json`). Slate Cobalt, in Dark and Light, is the default and fallback theme (`slate-cobalt`,
+author Jasper); Slate Steel is removed with no migration, so a saved `slate-steel` pick is reported and the default used.
+Its terminal schemes are the file's Dark and Light plus Slate Steel's High Contrast, carried over as
+`slate-cobalt/high-contrast`. The colour record is
+[`design/theme-engine/slate-cobalt.md`](design/theme-engine/slate-cobalt.md) (its machine-readable block is the bundled
+file). Every contrast target holds; Light cyan now meets 4.9:1, so it is no longer a named exception. Code, tests, the
+converter's built-in list and living docs say Slate Cobalt; plans, specs, acceptance records and the entries below keep
+Slate Steel. Merged to local main with main's Cmd-click and start-up recovery work, not pushed; `./gradlew check
+--continue` after the merge: **10,420 tests, 0 failures, 0 errors, 17 skipped**. GUI check pending.
+
 **Cmd-click file paths (command line plan 3) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
 [plan](superpowers/plans/2026-10-14-jasper-command-line-3-cmd-click-paths.md)). Cmd-click on macOS, Ctrl-click
@@ -32,7 +113,7 @@ the browser. The app resolves the path against the pane's local directory (`work
 thread that it is a regular file, and opens it through `PluginRuntime.open` with the line and the clicked pane's
 window; a provided session, or a shell reporting a remote directory, opens nothing. Fixed on the way: `JediCellReader`
 cached cell styles by colour, and JediTerm's `HyperlinkStyle` equality ignores the link, so every OSC 8 link in the
-same colours opened the first one's target. Deviations: the six in the plan's Planned deviations. Execution rulings: when a position follows, a path restarts after an unclosed mid-word `(`, so a Java stack frame `at com.foo.Bar.baz(Bar.java:42)` gives `Bar.java` at line 42, and a path starts after an `=` only when no `/` or `\` comes before it, so `--config=./x.toml` clicks and `/data/dt=2024-01-01/part.parquet` stays whole (Decision 13); on Windows a path, a `~/` remainder or a pane directory that names a UNC host other than `wsl$` or `wsl.localhost` (compared in ASCII only) resolves to nothing, so a click never makes Windows authenticate to a host named by program output; `LinkDetector` and `PathDetector` share one trailing-punctuation set; the view tests also click a soft-wrapped path and an OSC 8 `file://` link. Final review: a plain-text `file://` URL's trailing `:LINE[:COLUMN]` gives the line, as IntelliJ's console does; the SDK's editor contract names the Cmd-click route; log lines on the editor route carry no path. Known limits: where the desktop supports neither edit nor reveal (often on Linux), a click under System default app only logs; the existence check follows a symbolic link, also to a network share; a click just before quitting can still open its file; the WSL share exemption goes by host name, so on Windows without WSL a printed `\\wsl$\…` path still reaches network name resolution; on Windows an OSC 7 report naming a share still becomes the directory a new tab or split starts in; in a WSL pane `~/` and the start-directory fallback resolve against the Windows home; a plain-text `file://` link to an `.html` file, such as Gradle's test report, opens the HTML in the editor rather than the browser (the user's call).
+same colours opened the first one's target. Deviations: the six in the plan's Planned deviations. Execution rulings: when a position follows, a path restarts after an unclosed mid-word `(`, so a Java stack frame `at com.foo.Bar.baz(Bar.java:42)` gives `Bar.java` at line 42, and a path starts after an `=` only when no `/` or `\` comes before it, so `--config=./x.toml` clicks and `/data/dt=2024-01-01/part.parquet` stays whole (Decision 13); on Windows a path, a `~/` remainder or a pane directory that names a UNC host other than `wsl$` or `wsl.localhost` (compared in ASCII only) resolves to nothing, so a click never makes Windows authenticate to a host named by program output; `LinkDetector` and `PathDetector` share one trailing-punctuation set; the view tests also click a soft-wrapped path and an OSC 8 `file://` link. Final review: a plain-text `file://` URL's trailing `:LINE[:COLUMN]` gives the line, as IntelliJ's console does; the SDK's editor contract names the Cmd-click route; log lines on the editor route carry no path. Known limits: where the desktop supports neither edit nor reveal (often on Linux), a click under System default app only logs; the existence check follows a symbolic link, also to a network share; a click just before quitting can still open its file; in a WSL pane `~/` and the start-directory fallback resolve against the Windows home; a plain-text `file://` link to an `.html` file, such as Gradle's test report, opens the HTML in the editor rather than the browser (the user's call).
 `./gradlew check --continue`: **10,367 tests, 0 failures, 0 errors, 17 skipped**. No GUI
 launched. GUI checks for the user, in the packaged app: Cmd-click on compiler output (`javac`'s `src/Foo.java:42:`,
 `dotnet build`'s `Foo.cs(42,5):`) in a local pane opens the Jasper Editor at the line; in a Remote ssh pane a path
@@ -513,7 +594,7 @@ more… recovers from a failed Errors window. See the follow-up round in the
 [acceptance record](design/theme-engine/acceptance.md).
 
 **Slate Steel Plan 1 (engine and kit) complete — 2026-10-12.** On `claude/slate-steel` (not pushed, not merged): the
-user's `theme.md` became [`design/theme-engine/slate-steel.md`](design/theme-engine/slate-steel.md) with derived editor
+user's `theme.md` became [`design/theme-engine/slate-steel.md`](design/theme-engine/slate-cobalt.md) with derived editor
 schemes, bundled as `slate-steel.json` and read by `SlateSteel` into the Dark/Light palettes, the Slate Steel Dark/Light
 and High Contrast terminal schemes (bold foreground included) and complete `GeneratedTheme`s that install into FlatLaf.
 Ten roles were added (SDK 0.15.5; every bundled manifest requires it). Opacity is applied once, and kit components moved

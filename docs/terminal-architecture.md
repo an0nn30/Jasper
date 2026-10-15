@@ -229,7 +229,8 @@ A mapper that throws or returns null counts as empty; it runs on the reader thre
 the EDT for a click, and must not block. Remote reports never reach it. The
 default, `SessionLaunchOptions.DEFAULT_LOCAL_PATHS`, reads the path as a `file` URI path on this
 machine, as before. Jasper's WSL panes map `/mnt/c/...` to `C:\...` and any other path to the
-distribution's `\\wsl.localhost` share, so a Linux path never reaches the local surface as `\home\x`.
+distribution's `\\wsl.localhost` share, so a Linux path never reaches the local surface as `\home\x`. On Windows,
+Jasper's mappers also ignore a directory on a UNC host other than a WSL pane's own share.
 
 ## Threads and failures
 

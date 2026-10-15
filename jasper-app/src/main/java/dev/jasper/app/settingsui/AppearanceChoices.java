@@ -27,9 +27,9 @@ public record AppearanceChoices(float opacity, boolean blur, Supplier<Optional<B
         Objects.requireNonNull(themes, "themes"); Objects.requireNonNull(imports, "imports");
     }
 
-    /** Fixed previews, Slate Steel alone, an opaque workspace and no system appearance, for pages built without an application. */
+    /** Fixed previews, Slate Cobalt alone, an opaque workspace and no system appearance, for pages built without an application. */
     public static AppearanceChoices of(Option.Palette dark, Option.Palette light) {
-        var themes = InstalledThemes.slateSteel(dark, light);
+        var themes = InstalledThemes.slateCobalt(dark, light);
         return new AppearanceChoices(100f, false, Optional::empty, ignored -> new Subscription(() -> { }), () -> themes, Optional.empty());
     }
 }

@@ -16,7 +16,7 @@ class UiColorKeysTest {
     /**
      * Each key takes the source frozen in {@code ui-color-keys.tsv} (captured when the keys matched the former template),
      * in order. Every role and both derived sources get a colour of their own, so a key moved to another role is caught
-     * even where Slate Steel gives the two roles one colour.
+     * even where Slate Cobalt gives the two roles one colour.
      */
     @Test void eachKeyTakesItsFrozenSourceInOrder() throws IOException {
         var colors = new EnumMap<SemanticColor, Color>(SemanticColor.class);

@@ -147,7 +147,7 @@ with `FakePluginHost.setShellProfiles`.
 `Appearance.variant()` and `onChanged` describe application chrome. Document and workspace widgets use
 `workspaceVariant()`, `workspacePalette()`, `editorPalette()` and `syntaxPalette()`. Both variant getters are safe
 from any thread; read palettes and register listeners on the UI thread. `onWorkspaceChanged` runs after new values
-are available, including a change between Slate Steel Dark and Light. Close the subscription when the widget
+are available, including a change between Slate Cobalt Dark and Light. Close the subscription when the widget
 is disposed; the host also removes registrations when the plugin stops.
 
 Syntax palettes contain all 16 `SyntaxRole` values with color, bold and italic emphasis; plugins classify their

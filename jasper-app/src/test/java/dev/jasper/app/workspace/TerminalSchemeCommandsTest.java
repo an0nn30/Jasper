@@ -40,7 +40,7 @@ class TerminalSchemeCommandsTest {
             var owner = owners[0];
             hidden[0] = owner.currentPane();
             owner.newTab(HOME);
-            owner.selectTerminalScheme(TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow());
+            owner.selectTerminalScheme(TerminalSchemeChoice.parse("slate-cobalt/high-contrast").orElseThrow());
             assertThat(com.formdev.flatlaf.FlatLaf.isLafDark()).as("the UI stays light").isFalse();
             assertThat(hidden[0].view().palette()).as("a background tab").isEqualTo(palette(JasperTheme.bundled().scheme("high-contrast").orElseThrow()));
             assertThat(owners[1].currentPane().view().palette()).as("another window").isEqualTo(palette(JasperTheme.bundled().scheme("high-contrast").orElseThrow()));
@@ -66,18 +66,18 @@ class TerminalSchemeCommandsTest {
             var owner = content(launcher(new ArrayDeque<>()), themes); owner.setActive(true);
             assertThat(owner.windowCommands().view("view.terminal_scheme.zenburn.dark")).isNull();
             var library = dev.jasper.app.appearance.ThemeLibrary.read(folder, themes.library());
-            themes.configure(true, dev.jasper.app.appearance.ThemeSelection.of(library, "slate-steel", "slate-steel",
+            themes.configure(true, dev.jasper.app.appearance.ThemeSelection.of(library, "slate-cobalt", "slate-cobalt",
                 TerminalSchemeChoice.MATCH, (key, message) -> { }), dev.jasper.app.config.UiFontConfig.defaults());
             var zenburn = owner.windowCommands().view("view.terminal_scheme.zenburn.dark");
             assertThat(zenburn.getValue(javax.swing.Action.NAME)).isEqualTo("Terminal: Zenburn");
             assertThat(zenburn.getValue(dev.jasper.app.commands.Command.TITLE)).isEqualTo("Terminal Scheme: Zenburn");
             zenburn.actionPerformed(new java.awt.event.ActionEvent(owner, 0, ""));
             assertThat(themes.schemeChoice()).isEqualTo(TerminalSchemeChoice.parse("zenburn/dark").orElseThrow());
-            themes.configure(true, dev.jasper.app.appearance.ThemeSelection.slateSteel(TerminalSchemeChoice.MATCH),
+            themes.configure(true, dev.jasper.app.appearance.ThemeSelection.slateCobalt(TerminalSchemeChoice.MATCH),
                 dev.jasper.app.config.UiFontConfig.defaults());
             assertThat(owner.windowCommands().view("view.terminal_scheme.zenburn.dark")).isNull();
             assertThat(owner.commands().find("view.terminal_scheme.zenburn.dark")).isEmpty();
-            assertThat(owner.commands().find("view.terminal_scheme.slate-steel.high-contrast")).isPresent();
+            assertThat(owner.commands().find("view.terminal_scheme.slate-cobalt.high-contrast")).isPresent();
         });
     }
 
@@ -91,7 +91,7 @@ class TerminalSchemeCommandsTest {
                 assertThat(themes.schemeChoice()).isEqualTo(scheme);
                 assertThat(owner.terminalSchemeSelected(scheme)).isTrue();
             }
-            assertThat(owner.windowCommands().view("view.terminal_scheme.slate-steel.high-contrast").getValue(dev.jasper.app.commands.Command.TITLE))
+            assertThat(owner.windowCommands().view("view.terminal_scheme.slate-cobalt.high-contrast").getValue(dev.jasper.app.commands.Command.TITLE))
                 .isEqualTo("Terminal Scheme: High Contrast");
         });
     }

@@ -92,7 +92,7 @@ class PackagedResourcesTest {
         try (var jar = new JarFile(dev.jasper.ui.theme.GeneratedTheme.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath())) {
             assertThat(jar.stream().map(java.util.jar.JarEntry::getName)
                     .filter(name -> name.startsWith("dev/jasper/ui/theme/") && !name.endsWith("/") && !name.endsWith(".class")).toList())
-                .containsExactlyInAnyOrder("dev/jasper/ui/theme/slate-steel.json", "dev/jasper/ui/theme/catppuccin-latte.json",
+                .containsExactlyInAnyOrder("dev/jasper/ui/theme/slate-cobalt.json", "dev/jasper/ui/theme/catppuccin-latte.json",
                     "dev/jasper/ui/theme/catppuccin-frappe.json", "dev/jasper/ui/theme/catppuccin-macchiato.json",
                     "dev/jasper/ui/theme/catppuccin-mocha.json", "dev/jasper/ui/theme/catppuccin.LICENSE.txt");
             assertThat(jar.stream().map(java.util.jar.JarEntry::getName).toList())

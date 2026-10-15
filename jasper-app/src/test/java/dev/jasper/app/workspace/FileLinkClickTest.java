@@ -1,6 +1,8 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.launch.LaunchSettings;
 import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.launch.ShellProfile;
 import dev.jasper.app.terminals.SessionAttempt;
 import dev.jasper.app.terminals.SessionRequest;
 import dev.jasper.terminal.config.GridSize;
@@ -22,17 +24,22 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static dev.jasper.app.workspace.DesktopTestSupport.launcher;
 import static dev.jasper.app.workspace.DesktopTestSupport.until;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 
 /** A Cmd-click (Ctrl-click elsewhere) on a file in a pane, through the real view, to the window's {@code onOpenFile}. */
 class FileLinkClickTest {
@@ -153,6 +160,32 @@ class FileLinkClickTest {
         assertThat(opened).containsExactly(reported.resolve("src").resolve("Foo.java") + ":9", reported.resolve("b.txt") + ":0");
     }
 
+    /** A WSL profile's pane has this machine's WSL shares, so a path on one opens. */
+    @Test @EnabledOnOs(OS.WINDOWS) void aWslSharePathOpensInAWslPane() throws Exception {
+        var ubuntu = new ShellProfile("wsl:Ubuntu", "Ubuntu", ShellProfile.Kind.WSL, Optional.empty(), List.of("wsl.exe", "-d", "Ubuntu"));
+        TerminalPane pane = localPane(ubuntu, attached());
+        write(pane, "\\\\wsl.localhost\\Ubuntu\\notes.txt\r\n");
+
+        click(pane, 2, 0);
+
+        assertThat(opened).singleElement(STRING).endsWith("wsl.localhost\\Ubuntu\\notes.txt:0");
+    }
+
+    /**
+     * Any other pane has no WSL share: without WSL, {@code wsl.localhost} is a name the network may answer, so a path on it
+     * opens nothing, as any other host's. The control on the next row opens.
+     */
+    @Test @EnabledOnOs(OS.WINDOWS) void aWslSharePathOpensNothingInAnotherProfilesPane() throws Exception {
+        var powershell = new ShellProfile("powershell", "PowerShell", ShellProfile.Kind.LOCAL_SHELL, Optional.empty(), List.of("powershell.exe"));
+        TerminalPane pane = localPane(powershell, attached());
+        write(pane, "\\\\wsl.localhost\\Ubuntu\\notes.txt\r\n" + directory.resolve("notes.txt") + "\r\n");
+
+        click(pane, 2, 0);
+        click(pane, 2, 1);
+
+        assertThat(opened).containsExactly(directory.resolve("notes.txt") + ":0");
+    }
+
     private WindowContent window(ShellLauncher launcher) {
         WindowContent owner = new WindowContent(launcher, directory, path -> { }, () -> { }, () -> { });
         owner.onOpenFile = (file, line) -> opened.add(file + ":" + line);
@@ -162,9 +195,19 @@ class FileLinkClickTest {
 
     /** A local pane (no provider) over an attached session this test writes to: it never reports a local directory. */
     private TerminalPane localPane(TerminalSession session) throws Exception {
+        return localPane(pending -> new ShellLauncher(pending::add, path -> session, "sh"));
+    }
+
+    /** As above, started with {@code profile}'s launch settings, so the pane knows which profile it runs. */
+    private TerminalPane localPane(ShellProfile profile, TerminalSession session) throws Exception {
+        var settings = new LaunchSettings(profile.command(), Map.of(), 200, 24, 100, profile);
+        return localPane(pending -> new ShellLauncher(pending::add, () -> settings, (where, started) -> session));
+    }
+
+    private TerminalPane localPane(Function<Queue<Runnable>, ShellLauncher> launcher) throws Exception {
         Queue<Runnable> pending = new ArrayDeque<>();
         WindowContent[] owner = new WindowContent[1];
-        edt(() -> owner[0] = window(new ShellLauncher(pending::add, path -> session, "sh")));
+        edt(() -> owner[0] = window(launcher.apply(pending)));
         pending.remove().run();
         until(() -> owner[0].currentPane().view() != null);
         TerminalPane[] pane = new TerminalPane[1];

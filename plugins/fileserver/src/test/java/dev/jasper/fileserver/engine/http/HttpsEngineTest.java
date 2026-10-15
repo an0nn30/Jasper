@@ -62,10 +62,9 @@ class HttpsEngineTest {
         Path shared = Files.createDirectories(temp.resolve("shared"));
         Files.writeString(shared.resolve("a.txt"), "secret-free");
         var tls = new TlsMaterial(temp.resolve("tls"), Clock.systemUTC(), () -> "test-host");
-        int port = Ports.free();
-        engine = new HttpEngine(definition(shared, port, true), new ShareRoot(shared, true), ResolvedLogin.anonymous(),
-            new ServerEvents(Clock.systemUTC(), e -> { }), new LoginThrottle(new TestClock()), List::of, tls);
-        engine.start();
+        engine = Ports.start(free -> new HttpEngine(definition(shared, free, true), new ShareRoot(shared, true), ResolvedLogin.anonymous(),
+            new ServerEvents(Clock.systemUTC(), e -> { }), new LoginThrottle(new TestClock()), List::of, tls));
+        int port = engine.port();
         assertThat(engine.addresses()).containsExactly(URI.create("https://127.0.0.1:" + port + "/"));
         var response = trusting(tls).send(HttpRequest.newBuilder(URI.create("https://127.0.0.1:" + port + "/a.txt")).build(),
             HttpResponse.BodyHandlers.ofString());

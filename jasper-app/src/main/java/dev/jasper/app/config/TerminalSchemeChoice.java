@@ -14,7 +14,7 @@ public record TerminalSchemeChoice(Optional<SchemeId> scheme) {
     /** One scheme, whichever theme is shown. */
     public static TerminalSchemeChoice of(SchemeId id) { return new TerminalSchemeChoice(Optional.of(id)); }
 
-    /** {@code match} or a scheme id such as {@code slate-steel/high-contrast}; empty for anything else. */
+    /** {@code match} or a scheme id such as {@code slate-cobalt/high-contrast}; empty for anything else. */
     public static Optional<TerminalSchemeChoice> parse(String text) {
         if ("match".equals(text)) return Optional.of(MATCH);
         return SchemeId.parse(text).map(TerminalSchemeChoice::of);

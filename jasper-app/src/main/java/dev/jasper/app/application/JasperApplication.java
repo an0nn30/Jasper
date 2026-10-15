@@ -85,6 +85,7 @@ public final class JasperApplication {
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
     /** Workspace glass exists only on macOS; elsewhere plugins see {@code GlassSource.NONE} and windows make no glass requests. */
     private static final boolean WORKSPACE_GLASS = com.formdev.flatlaf.util.SystemInfo.isMacOS;
+    private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
     /** The trigger of a window another launch asked for through the handoff endpoint. */
     public static final String HANDOFF = "handoff";
     private final List<Runnable> glassListeners = new ArrayList<>();
@@ -248,7 +249,7 @@ public final class JasperApplication {
         var selection = dev.jasper.app.appearance.ThemeSelection.of(library, startup.darkTheme(), startup.lightTheme(),
             startup.terminalScheme(), (key, message) -> { });
         themes = ThemeController.startup(dark, selection,
-            failure -> LOG.log(System.Logger.Level.WARNING, "Starting in Slate Steel Dark: " + failure.getMessage(), failure));
+            failure -> LOG.log(System.Logger.Level.WARNING, "Starting in Slate Cobalt Dark: " + failure.getMessage(), failure));
         // App-native menus show each item's action binding from the live keymap.
         themes.appearance().shortcuts(this::shortcutLabel);
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
@@ -1353,12 +1354,17 @@ public final class JasperApplication {
 
     private static TerminalSession startSession(Path directory, LaunchSettings settings) {
         try {
-            return TerminalSession.start(SessionLaunchOptions.builder().command(settings.command()).environment(settings.environment()).workingDirectory(directory).grid(new GridSize(settings.columns(), settings.lines())).scrollback(settings.scrollback())
-                .localHostNames(dev.jasper.app.launch.LocalHostNames.cached()).localPathMapper(settings.localPaths()).build());
+            return TerminalSession.start(sessionOptions(directory, settings));
         } catch (IOException failure) {
             LOG.log(System.Logger.Level.ERROR, "Shell launch failed", failure);
             throw new UncheckedIOException(failure);
         }
+    }
+
+    /** The session a shell starts as; on Windows it ignores a reported directory on another host ({@link LaunchSettings#localPaths}). */
+    static SessionLaunchOptions sessionOptions(Path directory, LaunchSettings settings) {
+        return SessionLaunchOptions.builder().command(settings.command()).environment(settings.environment()).workingDirectory(directory).grid(new GridSize(settings.columns(), settings.lines())).scrollback(settings.scrollback())
+            .localHostNames(dev.jasper.app.launch.LocalHostNames.cached()).localPathMapper(settings.localPaths(WINDOWS)).build();
     }
 
     /** Marks the first spawn and watches the session's first output from right after its start. Any thread. */

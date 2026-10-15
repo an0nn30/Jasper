@@ -24,7 +24,7 @@ class StagedAnchoredPickerTest {
  @TempDir Path root;
  @Test void sixCompactStatesAndRealCreationRenderFromTheMountedImportRoute()throws Exception{
   var theme=onEdtValue(() -> ThemeTestSupport.controller(true));
-  // Slate Steel Dark; the menu switches to Light and back while it keeps its query and selection.
+  // Slate Cobalt Dark; the menu switches to Light and back while it keeps its query and selection.
   var pair=ThemeTestSupport.resolved(true);
   var appearance=onEdtValue(()->new WorkspaceAppearanceFixture(pair));
   try(var vault=new StagedVaultHost(root.resolve("home"),true,appearance)){
