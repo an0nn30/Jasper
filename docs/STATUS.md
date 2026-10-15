@@ -19,7 +19,8 @@ Windows and a file name elsewhere) and an `@EnabledOnOs(WINDOWS)` `ShellProfileL
 `sessionOptions`; each was watched failing, then passing, the Windows one on the Mac through the `os.name` init script.
 `./gradlew check --continue`: **10,436 tests, 0 failures, 0 errors, 25 skipped**, after one re-run of File Server's tests:
 the first run lost `TftpReadTest.aFileOfWholeBlocksEndsWithAnEmptyBlock` to a port in use (the `Ports.free` race that
-`claude/fileserver-port-race` fixes). Not merged, not pushed. No GUI launched. GUI check for the user, on Windows:
+`claude/fileserver-port-race` fixes). After merging `main` (Slate Cobalt and that fix): **10,438 tests, 0 failures, 0
+errors, 25 skipped**. Merged to local `main`, not pushed. No GUI launched. GUI check for the user, on Windows:
 in a PowerShell tab, `[Console]::Write("$([char]27)]7;file://localhost//attacker.invalid/share$([char]7)")`, then the
 breadcrumbs keep the previous folder.
 
