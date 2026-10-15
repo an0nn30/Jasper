@@ -29,11 +29,12 @@ import javax.swing.UIManager;
  * focusable; the keyboard route is the shortcut. Collapsed, it is only the magnifier.
  */
 final class TitleSearchField extends JComponent {
-    static final int PREFERRED_WIDTH = metric(DesignMetrics.Role.TITLE_SEARCH_WIDTH),
-        MINIMUM_WIDTH = metric(DesignMetrics.Role.TITLE_SEARCH_MIN_WIDTH),
-        MAXIMUM_WIDTH = metric(DesignMetrics.Role.TITLE_SEARCH_MAX_WIDTH),
-        ARC = metric(DesignMetrics.Role.TITLE_SEARCH_ARC);
-    private static int metric(DesignMetrics.Role role) { return DesignMetrics.DEFAULT.value(role); }
+    /** {@code role}'s logical value in the installed kit. */
+    private static int metric(DesignMetrics.Role role) { return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(role); }
+    /** The field's preferred width, in logical pixels. */
+    static int preferredWidth() { return metric(DesignMetrics.Role.TITLE_SEARCH_WIDTH); }
+    /** The width below which the field collapses to its magnifier, in logical pixels. */
+    static int minimumWidth() { return metric(DesignMetrics.Role.TITLE_SEARCH_MIN_WIDTH); }
     private final Runnable open;
     private final Supplier<String> shortcut;
     private String context = "Search";
@@ -78,9 +79,9 @@ final class TitleSearchField extends JComponent {
     boolean collapsed() { return collapsed; }
     void setCollapsed(boolean value) { if (collapsed != value) { collapsed = value; repaint(); } }
 
-    @Override public Dimension getPreferredSize() { return new Dimension(UIScale.scale(PREFERRED_WIDTH), UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_HEIGHT))); }
-    @Override public Dimension getMinimumSize() { return new Dimension(UIScale.scale(MINIMUM_WIDTH), UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_HEIGHT))); }
-    @Override public Dimension getMaximumSize() { return new Dimension(UIScale.scale(MAXIMUM_WIDTH), UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_HEIGHT))); }
+    @Override public Dimension getPreferredSize() { return new Dimension(UIScale.scale(preferredWidth()), UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_HEIGHT))); }
+    @Override public Dimension getMinimumSize() { return new Dimension(UIScale.scale(minimumWidth()), UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_HEIGHT))); }
+    @Override public Dimension getMaximumSize() { return new Dimension(UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_MAX_WIDTH)), UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_HEIGHT))); }
 
     @Override public JToolTip createToolTip() {
         var tip = new JToolTip();

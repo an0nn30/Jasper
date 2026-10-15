@@ -178,7 +178,7 @@ class DockDragTest {
     }
 
     /** The first drag event is at least the threshold and one more pixel from the press. */
-    private static int firstDragEvent() { return UIScale.scale(DockDrag.THRESHOLD) + 1; }
+    private static int firstDragEvent() { return UIScale.scale(DockDrag.threshold()) + 1; }
 
     @Test void aWobbleOutOfTheLastRowAndBackStaysHome() {
         var w = window();

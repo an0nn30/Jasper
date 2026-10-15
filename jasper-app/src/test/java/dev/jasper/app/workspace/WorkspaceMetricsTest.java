@@ -70,4 +70,35 @@ class WorkspaceMetricsTest {
         for (var entry : required.entrySet())
             assertThat(Files.readString(workspace.resolve(entry.getKey()))).as(entry.getKey()).contains(entry.getValue());
     }
+
+    /** Enterprise presentation plan 1: geometry that static finals fixed at class load follows the installed kit. */
+    @Test void formerStaticMetricsFollowTheInstalledKit() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            var base = dev.jasper.ui.kit.Kit.DEFAULT;
+            var kit = new dev.jasper.ui.kit.Kit("statics", base.metrics().with(DesignMetrics.Role.NATIVE_TOOL_HEADER_HEIGHT, 40)
+                .with(DesignMetrics.Role.DOCK_DRAG_THRESHOLD, 9).with(DesignMetrics.Role.WORKSPACE_SURFACE_ARC, 0)
+                .with(DesignMetrics.Role.TITLE_SEARCH_WIDTH, 300).with(DesignMetrics.Role.TOOLBAR_BUTTON_TRIM, 10),
+                base.type(), base.faces(), base.uiKeys());
+            var original = javax.swing.UIManager.getLookAndFeel();
+            try {
+                dev.jasper.ui.swing.FlatLafInstaller.install(dev.jasper.app.appearance.ThemeTestSupport.generated(true), kit);
+                assertThat(ToolWindowHeader.logicalHeight()).isEqualTo(40);
+                assertThat(new ToolWindowHeader("Sessions", javax.swing.JPopupMenu::new, () -> { }).getPreferredSize().height)
+                    .isEqualTo(com.formdev.flatlaf.util.UIScale.scale(40));
+                assertThat(DockDrag.threshold()).isEqualTo(9);
+                assertThat(ToolWindowArea.surfaceArc()).isZero();
+                assertThat(TitleSearchField.preferredWidth()).isEqualTo(300);
+                assertThat(WindowToolbar.buttonSide(34)).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(24));
+                dev.jasper.ui.swing.FlatLafInstaller.install(dev.jasper.app.appearance.ThemeTestSupport.generated(true), base);
+                assertThat(ToolWindowHeader.logicalHeight()).isEqualTo(32);
+                assertThat(DockDrag.threshold()).isEqualTo(5);
+                assertThat(ToolWindowArea.surfaceArc()).isEqualTo(16);
+                assertThat(TitleSearchField.preferredWidth()).isEqualTo(400);
+                assertThat(WindowToolbar.buttonSide(34)).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(28));
+            } finally {
+                try { javax.swing.UIManager.setLookAndFeel(original); }
+                catch (javax.swing.UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
+            }
+        });
+    }
 }

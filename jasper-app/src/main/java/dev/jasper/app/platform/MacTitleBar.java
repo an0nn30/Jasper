@@ -214,7 +214,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     }
 
     private static int metric(dev.jasper.ui.metrics.DesignMetrics.Role role) {
-        return UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role));
+        return dev.jasper.ui.swing.NativeStyles.installed().metric(role);
     }
 
     private int accessoryHeight() { return accessory != null && accessory.isVisible() ? accessory.getPreferredSize().height : 0; }

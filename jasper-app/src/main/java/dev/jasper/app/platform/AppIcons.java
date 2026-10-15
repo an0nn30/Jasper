@@ -39,15 +39,18 @@ public final class AppIcons {
 
     /** Host-owned semantic artwork, independent of any plugin's resource loader. */
     public static Icon named(String name) {
-        return CACHE.computeIfAbsent("named:" + name, ignored -> new SemanticIcon(NamedIcons.kitName(name),
-            DesignMetrics.DEFAULT.value(DesignMetrics.Role.ICON_RAIL), false));
+        return CACHE.computeIfAbsent("named:" + name, ignored -> new SemanticIcon(NamedIcons.kitName(name), railSize(), false));
     }
 
     /** A module glyph for an app-native affordance outside the SDK named-icon vocabulary. */
     public static Icon semantic(String name) {
         if (!NAMED.names().contains(name)) throw new IllegalArgumentException("Unknown module icon: " + name);
-        return CACHE.computeIfAbsent("semantic:" + name, ignored -> new SemanticIcon(name,
-            DesignMetrics.DEFAULT.value(DesignMetrics.Role.ICON_RAIL), false));
+        return CACHE.computeIfAbsent("semantic:" + name, ignored -> new SemanticIcon(name, railSize(), false));
+    }
+
+    /** The installed kit's rail glyph size; a cached icon keeps it, since the kit is fixed before any window. */
+    private static int railSize() {
+        return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.ICON_RAIL);
     }
 
     /**

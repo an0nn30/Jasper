@@ -27,8 +27,10 @@ import javax.swing.JPopupMenu;
  * tool window background and its non-control area is a drag handle. EDT only.
  */
 final class ToolWindowHeader extends JPanel {
-    /** Height in logical pixels. */
-    static final int HEIGHT = DesignMetrics.DEFAULT.value(DesignMetrics.Role.NATIVE_TOOL_HEADER_HEIGHT);
+    /** The installed kit's header height, in logical pixels. */
+    static int logicalHeight() {
+        return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.NATIVE_TOOL_HEADER_HEIGHT);
+    }
 
     private final JLabel title = new JLabel() {
         @Override public void updateUI() {
@@ -75,7 +77,8 @@ final class ToolWindowHeader extends JPanel {
         buttons.add(Box.createHorizontalStrut(2));
         buttons.add(hide);
         // An app-owned compound border keeps the padding through look-and-feel switches: the same pattern ToolWindowArea.Host.gutters uses.
-        setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(0, DesignMetrics.DEFAULT.value(DesignMetrics.Role.TOOL_HEADER_LEADING_PADDING), 0, DesignMetrics.DEFAULT.value(DesignMetrics.Role.TOOL_HEADER_TRAILING_PADDING)), null));
+        var metrics = dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics();
+        setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(0, metrics.value(DesignMetrics.Role.TOOL_HEADER_LEADING_PADDING), 0, metrics.value(DesignMetrics.Role.TOOL_HEADER_TRAILING_PADDING)), null));
         detail.putClientProperty("html.disable", Boolean.TRUE);
         labels = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 0)) {
             @Override public void doLayout() {
@@ -151,7 +154,7 @@ final class ToolWindowHeader extends JPanel {
     /** The options menu as it would open now. */
     JPopupMenu menu() { return menu.get(); }
 
-    @Override public Dimension getPreferredSize() { return new Dimension(super.getPreferredSize().width, UIScale.scale(HEIGHT)); }
+    @Override public Dimension getPreferredSize() { return new Dimension(super.getPreferredSize().width, UIScale.scale(logicalHeight())); }
 
-    @Override public Dimension getMinimumSize() { return new Dimension(super.getMinimumSize().width, UIScale.scale(HEIGHT)); }
+    @Override public Dimension getMinimumSize() { return new Dimension(super.getMinimumSize().width, UIScale.scale(logicalHeight())); }
 }

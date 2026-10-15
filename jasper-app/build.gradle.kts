@@ -90,10 +90,11 @@ tasks.test {
     // The installable zips, so a test can stage them through the real installer.
     inputs.files(rootProject.tasks.named("pluginZips")).withPropertyName("pluginZips").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("jasper.pluginZips", rootProject.layout.projectDirectory.dir("plugins/build/zips").asFile.absolutePath)
-    dependsOn(tasks.jar, ":jasper-buddy:jar", ":jasper-terminal:jar")
+    dependsOn(tasks.jar, ":jasper-buddy:jar", ":jasper-terminal:jar", ":jasper-ui:jar")
     systemProperty("jasper.appJar", tasks.jar.get().archiveFile.get().asFile.absolutePath)
     systemProperty("jasper.buddyJar", project(":jasper-buddy").layout.buildDirectory.file("libs/jasper-buddy.jar").get().asFile.absolutePath)
     systemProperty("jasper.terminalJar", project(":jasper-terminal").layout.buildDirectory.file("libs/jasper-terminal.jar").get().asFile.absolutePath)
+    systemProperty("jasper.uiJar", project(":jasper-ui").layout.buildDirectory.file("libs/jasper-ui.jar").get().asFile.absolutePath)
     val configExample = rootProject.layout.projectDirectory.file("config.example.toml")
     inputs.file(configExample).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(rootProject.file("docs/design/theme-engine/migration.csv")).withPathSensitivity(PathSensitivity.RELATIVE)

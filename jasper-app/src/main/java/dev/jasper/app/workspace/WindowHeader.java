@@ -21,7 +21,8 @@ import javax.swing.SwingUtilities;
  * Space the field and toolbar do not use drags the window.
  */
 final class WindowHeader extends JPanel {
-    private static final int GAP = DesignMetrics.DEFAULT.value(DesignMetrics.Role.NATIVE_HEADER_GAP);
+    /** The installed kit's gap between the field and each side, in logical pixels. */
+    private static int headerGap() { return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.NATIVE_HEADER_GAP); }
     private final TitleSearchField field;
     private final WindowToolbar toolbar;
 
@@ -71,15 +72,15 @@ final class WindowHeader extends JPanel {
     @Override public Dimension getMinimumSize() {
         Insets insets = getInsets();
         int side = Math.max(insets.left + leadingMinimum.getAsInt(), insets.right + (toolbar.isVisible() ? toolbar.minimumWidth() : 0));
-        return new Dimension(2 * (side + UIScale.scale(GAP)) + fieldHeight(height()), height());
+        return new Dimension(2 * (side + UIScale.scale(headerGap())) + fieldHeight(height()), height());
     }
 
     @Override public void doLayout() {
         Insets insets = getInsets();
-        int width = getWidth(), height = getHeight(), gap = UIScale.scale(GAP);
+        int width = getWidth(), height = getHeight(), gap = UIScale.scale(headerGap());
         int left = Math.min(insets.left, width), right = Math.max(left, width - insets.right);
         int centre = centre();
-        int preferred = UIScale.scale(TitleSearchField.PREFERRED_WIDTH), minimum = UIScale.scale(TitleSearchField.MINIMUM_WIDTH);
+        int preferred = UIScale.scale(TitleSearchField.preferredWidth()), minimum = UIScale.scale(TitleSearchField.minimumWidth());
         int toolbarMinimum = toolbar.isVisible() ? toolbar.minimumWidth() : 0;
         // Each side gives way before the field does; the field keeps its centre.
         int half = Math.min(centre - left - leadingMinimum.getAsInt() - gap, right - centre - gap - toolbarMinimum);

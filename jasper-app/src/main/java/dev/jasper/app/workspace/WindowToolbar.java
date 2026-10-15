@@ -45,7 +45,9 @@ final class WindowToolbar extends JToolBar {
         firePropertyChange("barHeight", old, height);
         revalidate(); repaint();
     }
-    static int buttonSide(int height) { return UIScale.scale(height - DesignMetrics.DEFAULT.value(DesignMetrics.Role.TOOLBAR_BUTTON_TRIM)); }
+    static int buttonSide(int height) {
+        return UIScale.scale(height - dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.TOOLBAR_BUTTON_TRIM));
+    }
     int buttonSide() { return buttonSide(barHeight); }
     JButton overflowButton() { return overflow; }
 

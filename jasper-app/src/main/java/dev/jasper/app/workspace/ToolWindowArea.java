@@ -50,9 +50,10 @@ import javax.swing.UIManager;
  * calls {@link #sync} afterwards. EDT only.
  */
 final class ToolWindowArea extends JPanel {
-    private static final int GUTTER = DesignMetrics.DEFAULT.value(DesignMetrics.Role.WORKSPACE_GUTTER);
-    /** Shared with the folder tabs so their upper corners meet the workspace frame exactly. */
-    static final int SURFACE_ARC = DesignMetrics.DEFAULT.value(DesignMetrics.Role.WORKSPACE_SURFACE_ARC);
+    /** The installed kit's exterior gutter, in logical pixels. */
+    private static int gutter() { return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.WORKSPACE_GUTTER); }
+    /** The installed kit's workspace frame arc, in logical pixels. */
+    static int surfaceArc() { return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.WORKSPACE_SURFACE_ARC); }
 
     /** A shared frame around plugin-owned content; gutters belong to the workspace chrome. */
     private static final class Host extends JPanel {
@@ -72,7 +73,8 @@ final class ToolWindowArea extends JPanel {
         Host(boolean toolWindow) {
             super(new BorderLayout());
             if (toolWindow) putClientProperty("Jasper.zone", "chrome");
-            gutters(GUTTER, GUTTER, GUTTER, GUTTER);
+            int gutter = gutter();
+            gutters(gutter, gutter, gutter, gutter);
         }
 
         void gutters(int top, int left, int bottom, int right) {
@@ -94,7 +96,7 @@ final class ToolWindowArea extends JPanel {
         private java.awt.Shape surface() {
             var insets = getInsets();
             int width = Math.max(0, getWidth() - insets.left - insets.right);
-            int height = Math.max(0, getHeight() - insets.top - insets.bottom), arc = rounded() ? UIScale.scale(SURFACE_ARC) : 0;
+            int height = Math.max(0, getHeight() - insets.top - insets.bottom), arc = rounded() ? UIScale.scale(surfaceArc()) : 0;
             var round = new RoundRectangle2D.Double(insets.left, insets.top, width, height, arc, arc);
             if (roundLeft == roundRight) return round;
             // One side meets the window edge directly: its half is square.
@@ -227,7 +229,7 @@ final class ToolWindowArea extends JPanel {
     private final DockState state;
     private final Host center = new Host(false);
     private final JPanel lowerInset = new JPanel() {
-        @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(SURFACE_ARC / 2)); }
+        @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(surfaceArc() / 2)); }
         @Override public Dimension getMinimumSize() { return getPreferredSize(); }
     };
     private final EnumMap<Slot, Host> hosts = new EnumMap<>(Slot.class);
@@ -517,8 +519,9 @@ final class ToolWindowArea extends JPanel {
      * status bar already supplies the spacing; facing edges have none, because the 6px divider is the gap.
      */
     private void refreshGutters() {
-        int top = headerVisible ? 0 : GUTTER, bottom = statusVisible ? 0 : GUTTER;
-        int left = leftStripeVisible ? 0 : GUTTER, right = rightStripeVisible ? 0 : GUTTER;
+        int gutter = gutter();
+        int top = headerVisible ? 0 : gutter, bottom = statusVisible ? 0 : gutter;
+        int left = leftStripeVisible ? 0 : gutter, right = rightStripeVisible ? 0 : gutter;
         boolean framed = leftStripeVisible || rightStripeVisible;
         boolean bottomShown = layoutState().showing(Side.BOTTOM);
         center.rounded(leftStripeVisible, rightStripeVisible);
