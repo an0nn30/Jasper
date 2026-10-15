@@ -32,7 +32,10 @@ class ThemeButtonsTest {
                 SwingUtilities.updateComponentTreeUI(dialog);
                 assertThat(button.getUI()).isInstanceOf(FlatButtonUI.class);
                 assertThat(button.getFont().getSize2D()).as("form font").isEqualTo(13f);
-                assertThat(button.getPreferredSize().height).isBetween(20, 28);
+                // FlatLaf sizes the text button to its line inside margin and border (20 to 28 with the macOS faces).
+                var insets = button.getInsets();
+                assertThat(button.getPreferredSize().height).isEqualTo(button.getFontMetrics(button.getFont()).getHeight() + insets.top + insets.bottom);
+                if (com.formdev.flatlaf.util.SystemInfo.isMacOS) assertThat(button.getPreferredSize().height).isBetween(20, 28);
                 assertThat(fill(button)).as((themeDark ? "dark" : "light")).isEqualTo(UIManager.getColor("Button.background"));
                 // IntelliJ Light's default button is a slight gradient; sample within a small tolerance.
                 assertThat(distance(fill(confirm), UIManager.getColor("Button.default.background"))).as((themeDark ? "dark" : "light")).isLessThanOrEqualTo(8);

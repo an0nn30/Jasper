@@ -87,9 +87,10 @@ class NotificationCardTest {
                     count.setSize(count.getPreferredSize());
                     var image = new BufferedImage(count.getWidth(), count.getHeight(), BufferedImage.TYPE_INT_ARGB);
                     var graphics = image.createGraphics(); try { count.paint(graphics); } finally { graphics.dispose(); }
+                    // Fractional glyph positions may cover no pixel fully (Liberation Sans at 11 px); partly covered ink keeps the colour.
                     boolean painted = false;
                     for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++)
-                        painted |= image.getRGB(x, y) == count.getForeground().getRGB();
+                        painted |= image.getRGB(x, y) >>> 24 != 0 && (image.getRGB(x, y) & 0xFFFFFF) == (count.getForeground().getRGB() & 0xFFFFFF);
                     assertThat(painted).as(name + " actual count text").isTrue();
                 }
             }

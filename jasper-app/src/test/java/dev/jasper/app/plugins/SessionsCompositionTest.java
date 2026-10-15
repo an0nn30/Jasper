@@ -32,10 +32,14 @@ class SessionsCompositionTest {
                 assertThat(labels(fixture.view())).contains("Vault locked","amp","ubuntu@100.110.65.45:22");
                 assertThat(bounds(fixture.component("card.identity"),fixture.view()).x).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_PADDING));
                 var before=bounds(fixture.component("sessions.footer-surface"),fixture.view());
-                // The footer keeps its packed height (82 at the compact scale) at the panel's bottom.
-                assertThat(before).isEqualTo(new Rectangle(0,395-82,260,82));
-                // The detail action keeps its 28 px envelope (22 face + focus reservation), right-aligned in the compact detail inset.
-                assertThat(bounds(fixture.component("card.connect"),fixture.view())).isEqualTo(new Rectangle(180,360,70,28));
+                // The footer keeps its packed height (82 at the compact scale with the macOS faces) at the panel's bottom.
+                int packed=fixture.component("sessions.footer-surface").getPreferredSize().height;
+                assertThat(before).isEqualTo(new Rectangle(0,395-packed,260,packed));
+                if(com.formdev.flatlaf.util.SystemInfo.isMacOS)assertThat(packed).isEqualTo(82);
+                // The detail action keeps its 28 px envelope (22 face + focus reservation), right-aligned in the compact detail inset; its label sets its width.
+                int connect=fixture.component("card.connect").getPreferredSize().width;
+                assertThat(bounds(fixture.component("card.connect"),fixture.view())).isEqualTo(new Rectangle(260-m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_PADDING)-connect,360,connect,28));
+                if(com.formdev.flatlaf.util.SystemInfo.isMacOS)assertThat(connect).isEqualTo(70);
                 var shot=fixture.capture(2);
                 int accent=calibration.workspace().semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT).getRGB();
                 // theme.md's white inset line tints the face's top logical row; it is still the face.
@@ -43,10 +47,10 @@ class SessionsCompositionTest {
                 try{tg.setColor(new java.awt.Color(accent,true));tg.fillRect(0,0,1,1);tg.setColor(dev.jasper.ui.theme.ColorMath.opacity(java.awt.Color.WHITE,
                     dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_INSET_PERCENT)/100.0));tg.fillRect(0,0,1,1);}finally{tg.dispose();}
                 int inset=tint.getRGB(0,0);
-                int left=500,right=0,top=772,bottom=0;
-                for(int y=720;y<772;y++)for(int x=350;x<500;x++)if(shot.getRGB(x,y)==accent||shot.getRGB(x,y)==inset){left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);}
-                // At 2x the face is the action's bounds inside its 3 px focus reservation, its bottom row trimmed by 1.
                 var c=bounds(fixture.component("card.connect"),fixture.view());
+                int left=500,right=0,top=2*(c.y+c.height-2),bottom=0;
+                for(int y=2*c.y;y<2*(c.y+c.height-2);y++)for(int x=2*c.x-10;x<500;x++)if(shot.getRGB(x,y)==accent||shot.getRGB(x,y)==inset){left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);}
+                // At 2x the face is the action's bounds inside its 3 px focus reservation, its bottom row trimmed by 1.
                 var face=new Rectangle(2*(c.x+3),2*(c.y+3),2*(c.width-6),2*(c.height-6-1));
                 assertThat(new Rectangle(left,top,right-left+1,bottom-top+1)).as("the Connect face at 2x; hit/text allocation remains unchanged").isEqualTo(face);
                 assertThat(shot.getRGB(face.x+face.width/2,face.y+face.height-1)).isEqualTo(accent);

@@ -51,8 +51,14 @@ class PluginManagerPanelTest {
             actual.setSize(744,582);for(int i=0;i<4;i++)KitTestSupport.layout(actual);
             var area=actual.detailsPane().textArea();
             var first=area.modelToView2D(0);var last=area.modelToView2D(copy.length()-1);
-            assertThat(last.getY()-first.getY()).as("same literal source description occupies two lines at744logical content allocation")
-                .isLessThan(2 * first.getHeight());
+            int lines=(int)Math.round((last.getY()-first.getY())/first.getHeight())+1;
+            // Two lines with the macOS faces; on any face, as few as greedy wrapping at the allocation allows:
+            // at least the text's width over the line's, at most that over the line less its widest word.
+            if(com.formdev.flatlaf.util.SystemInfo.isMacOS)assertThat(lines).as("same literal source description occupies two lines at744logical content allocation").isEqualTo(2);
+            var context=new java.awt.font.FontRenderContext(null,true,true);
+            double text=area.getFont().getStringBounds(copy,context).getWidth(),word=0,line=area.getWidth()-area.getInsets().left-area.getInsets().right;
+            for(String each:copy.split(" "))word=Math.max(word,area.getFont().getStringBounds(each+" ",context).getWidth());
+            assertThat(lines).as("the source description wraps to its allocation").isBetween((int)Math.ceil(text/line),(int)(text/(line-word))+1);
             assertThat(area.getText()).isEqualTo(copy);
         }finally{actual.close();themes.close();}
     }
