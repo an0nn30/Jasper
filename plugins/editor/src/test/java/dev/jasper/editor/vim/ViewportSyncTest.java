@@ -1,6 +1,5 @@
 package dev.jasper.editor.vim;
 
-import java.awt.Font;
 import java.awt.Point;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
@@ -15,10 +14,13 @@ class ViewportSyncTest {
 
     private record Setup(VimTextArea area, JScrollPane scroll, VimEditor editor) { }
 
-    /** A text area of 60 lines in a scroll pane about 10 lines high and 30 characters wide. */
+    /**
+     * A text area of 60 lines in a scroll pane about 10 lines high and 30 characters wide. It keeps the font it was
+     * made with (Menlo 12 on macOS, Cascadia Code or Consolas 13 on Windows): until it is first displayed, which it
+     * never is headless, RSyntaxTextArea measures wrapped lines with that font's metrics whatever font it is given.
+     */
     private static Setup setup() {
         var area = new VimTextArea();
-        area.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
         StringBuilder text = new StringBuilder();
         for (int i = 1; i <= 60; i++) text.append("line ").append(i).append('\n');
         area.setText(text.toString());
