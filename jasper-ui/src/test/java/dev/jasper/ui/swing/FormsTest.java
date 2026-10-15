@@ -324,6 +324,25 @@ class FormsTest {
         });
     }
 
+    /** Off macOS the look and feel binds Enter to a focused button's press; this button carries that binding on every platform. */
+    @Test void enterOnAFocusedSecondaryButtonSubmitsThePrimaryAndSpacePressesTheFocusedButton() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new java.util.ArrayList<UiEvent>();
+            try (var view = new KitView(context, new ViewSpec(form(FormKind.SHEET, List.of(field("input", FieldKind.TEXT, "")))), events::add)) {
+                var cancel = find(view, "cancel", JButton.class);
+                var pressesOnEnter = new javax.swing.plaf.InputMapUIResource();
+                pressesOnEnter.put(KeyStroke.getKeyStroke("pressed ENTER"), "pressed");
+                pressesOnEnter.put(KeyStroke.getKeyStroke("released ENTER"), "released");
+                pressesOnEnter.setParent(SwingUtilities.getUIInputMap(cancel, JComponent.WHEN_FOCUSED));
+                SwingUtilities.replaceUIInputMap(cancel, JComponent.WHEN_FOCUSED, pressesOnEnter);
+                for (int key : new int[] {java.awt.event.KeyEvent.VK_ENTER, java.awt.event.KeyEvent.VK_SPACE})
+                    for (int type : new int[] {java.awt.event.KeyEvent.KEY_PRESSED, java.awt.event.KeyEvent.KEY_RELEASED})
+                        SwingUtilities.processKeyBindings(new java.awt.event.KeyEvent(cancel, type, 0, 0, key, java.awt.event.KeyEvent.CHAR_UNDEFINED));
+                assertThat(events).containsExactly(new UiEvent.Action("save"), new UiEvent.Action("cancel"));
+            } finally { release(context); }
+        });
+    }
+
     @Test void visualPrimaryMayOptOutOfEnterWithoutLosingClickOrEscape() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new java.util.ArrayList<UiEvent>();

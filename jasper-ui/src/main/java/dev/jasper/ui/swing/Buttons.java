@@ -146,6 +146,21 @@ final class Buttons {
                 repaintDrop();
             });
         }
+        /**
+         * A surface that binds Enter, such as a form submitting its PRIMARY, takes it from every control, this button
+         * included; Space presses the focused button. FlatLaf binds Enter to a focused button's press off macOS only.
+         */
+        @Override protected boolean processKeyBinding(KeyStroke stroke, java.awt.event.KeyEvent event, int condition, boolean pressed) {
+            if (condition == WHEN_FOCUSED && event.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER
+                    && ancestorBinds(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, stroke.getModifiers()))) return false;
+            return super.processKeyBinding(stroke, event, condition, pressed);
+        }
+        private boolean ancestorBinds(KeyStroke stroke) {
+            for (Container parent = getParent(); parent != null; parent = parent.getParent())
+                if (parent instanceof JComponent component && component.getConditionForKeyStroke(stroke) == WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
+                    return true;
+            return false;
+        }
         // A push-button model never flips its selection on a click: the owner confirms a toggle's state in its next update.
         @Override public javax.accessibility.AccessibleContext getAccessibleContext() {
             if (accessibleContext == null) accessibleContext = new AccessibleJButton() {
