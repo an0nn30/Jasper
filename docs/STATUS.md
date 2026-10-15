@@ -13,11 +13,12 @@ the failures that accumulated behind that are fixed. Product fixes:
 Font-dependent tests keep their macOS values on macOS and check layout invariants elsewhere; Windows-only test
 assumptions (drive-less paths, `/` separators, names Windows forbids, jars still open at `@TempDir` deletion, `/bin/sh`)
 are made portable. CI skips pushes and pull requests that change only documentation, and `linux-packages` runs for
-release tags and packaging changes. `./gradlew check --continue` at `86d8be6c`: macOS **10,424 tests, 0 failures, 0
+release tags and packaging changes; Ubuntu jobs run on `ubuntu-24.04`. `./gradlew check --continue` at `86d8be6c`: macOS **10,424 tests, 0 failures, 0
 errors, 17 skipped**; Linux (Ubuntu 24.04 container, DejaVu fonts; Liberation Sans checked with metric-compatible Arial)
 **10,424, 0 failures, 0 errors, 51 skipped**. Windows is unverified until a CI run. Open: with `flatlaf.uiScale` set,
 FlatLaf's native default font on Linux and Windows differs from the kit's (FlatLaf divides by 15 and 12, the kit by 13).
-Not pushed or merged.
+After merging `main` (Slate Cobalt, Windows network shares): macOS **10,441 tests, 0 failures, 0 errors, 25 skipped**,
+Linux **10,441, 0 failures, 0 errors, 59 skipped**. Merged to local `main`, not pushed.
 
 **Windows network shares: reported directories — 2026-10-14** (`claude/unc-cwd-reports`, from `claude/windows-unc-hosts`,
 worktree `.claude/worktrees/command-palette-y-axis-a5b3d4`). On Windows the sessions Jasper starts ignore a reported
