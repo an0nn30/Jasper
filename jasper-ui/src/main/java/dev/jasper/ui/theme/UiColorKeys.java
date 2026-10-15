@@ -6,11 +6,13 @@ import java.awt.Color;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
- * FlatLaf's colour defaults for a Slate Cobalt variant, each from a semantic role; text selection in text components
- * takes the variant's terminal selection and a search field's no-match background the {@linkplain #errorTint error
- * tint}. Order matters: a {@code *.suffix} key recolours the keys before it that end in the suffix.
+ * FlatLaf's colour defaults for a theme variant in a {@link UiKeySet}, each from a semantic role; text selection in text
+ * components takes the variant's terminal selection and a search field's no-match background the
+ * {@linkplain #errorTint error tint}. Order matters: a {@code *.suffix} key recolours the keys before it that end in the
+ * suffix.
  */
 public final class UiColorKeys {
     private UiColorKeys() {}
@@ -22,10 +24,25 @@ public final class UiColorKeys {
     private static final Source SELECTED_TEXT = new TextSelection(), ERROR = new ErrorTint();
     private static final Map<String, Source> KEYS = keys();
 
-    /** The keys in FlatLaf's order, each as {@code #rrggbb} or {@code #rrggbbaa}. */
+    /**
+     * {@code set}'s keys for {@code theme} in FlatLaf's order, each as {@code #rrggbb} or {@code #rrggbbaa}: the roles from
+     * the theme's palette, text selection from its terminal colours.
+     */
+    public static Map<String, Object> flatLaf(GeneratedTheme theme, UiKeySet set) {
+        Map<String, Source> sources = switch (Objects.requireNonNull(set)) {
+            case DEFAULT -> KEYS;
+        };
+        return values(sources, theme.semantic(), theme.terminal().selection());
+    }
+
+    /** The default keys in FlatLaf's order, each as {@code #rrggbb} or {@code #rrggbbaa}. */
     public static Map<String, Object> flatLaf(SemanticPalette palette, Color textSelection) {
+        return values(KEYS, palette, textSelection);
+    }
+
+    private static Map<String, Object> values(Map<String, Source> sources, SemanticPalette palette, Color textSelection) {
         var keys = new LinkedHashMap<String, Object>();
-        KEYS.forEach((key, source) -> keys.put(key, ColorMath.hex(switch (source) {
+        sources.forEach((key, source) -> keys.put(key, ColorMath.hex(switch (source) {
             case Role role -> palette.color(role.role());
             case TextSelection ignored -> textSelection;
             case ErrorTint ignored -> errorTint(palette);

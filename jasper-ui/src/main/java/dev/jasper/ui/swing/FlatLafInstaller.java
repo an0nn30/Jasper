@@ -25,18 +25,24 @@ public final class FlatLafInstaller {
     }
     private static final class SnapshotLaf extends IntelliJTheme.ThemeLaf {
         private final GeneratedTheme snapshot;
-        SnapshotLaf(IntelliJTheme source, GeneratedTheme snapshot) { super(source); this.snapshot = snapshot; }
+        private final Map<String, Object> ui;
+        SnapshotLaf(IntelliJTheme source, GeneratedTheme snapshot, Map<String, Object> ui) {
+            super(source); this.snapshot = snapshot; this.ui = ui;
+        }
         @Override public javax.swing.UIDefaults getDefaults() {
             var defaults = super.getDefaults();
-            publish(defaults, snapshot);
+            publish(defaults, snapshot, ui);
             return defaults;
         }
     }
+    /** Installs {@code theme}: FlatLaf's colour keys computed from its roles now, then the catalog's geometry. */
     public static void install(GeneratedTheme theme) {
         if (!EventQueue.isDispatchThread()) throw new IllegalStateException("Appearance requires EDT");
-        String json = FlatLafThemeData.json(theme.name(), theme.dark(), theme.author(), theme.uiKeys());
+        // One map, computed from the theme's roles, feeds FlatLaf's input and every republish of the explicit colours.
+        var ui = UiColorKeys.flatLaf(theme, UiKeySet.DEFAULT);
+        String json = FlatLafThemeData.json(theme.name(), theme.dark(), theme.author(), ui);
         FlatLaf laf;
-        try { laf = new SnapshotLaf(new IntelliJTheme(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8))), theme); }
+        try { laf = new SnapshotLaf(new IntelliJTheme(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8))), theme, ui); }
         catch (IOException failure) { throw new UncheckedIOException(failure); }
         var fixed = new LinkedHashMap<String, String>();
         var metrics = DesignMetrics.DEFAULT;
@@ -72,9 +78,9 @@ public final class FlatLafInstaller {
     private static String insets(int top, int left, int bottom, int right) { return top + "," + left + "," + bottom + "," + right; }
 
     // A LAF reinstall (including rollback) obtains fresh defaults; publish the same immutable snapshot every time.
-    private static void publish(javax.swing.UIDefaults defaults, GeneratedTheme theme) {
+    private static void publish(javax.swing.UIDefaults defaults, GeneratedTheme theme, Map<String, Object> ui) {
         defaults.put("Jasper.installedTheme", theme);
-        FlatLafThemeData.explicitColors(theme.uiKeys()).forEach((key, color) -> defaults.put(key, new ColorUIResource(color)));
+        FlatLafThemeData.explicitColors(ui).forEach((key, color) -> defaults.put(key, new ColorUIResource(color)));
         for (var role : SemanticColor.values()) defaults.put("Jasper.semantic." + role.key(), new ColorUIResource(theme.semantic().color(role)));
         // Popovers and menus: FlatLaf's painted popup shadow (macOS keeps its native one), black at theme.md's strength.
         defaults.put("Popup.dropShadowColor", new ColorUIResource(java.awt.Color.BLACK));

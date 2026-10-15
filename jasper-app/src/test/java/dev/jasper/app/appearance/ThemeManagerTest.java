@@ -17,15 +17,18 @@ class ThemeManagerTest {
     @Test void keysFlatLafSkipsAreRestoredWithoutReplacingItsOwn() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            var theme = ThemeTestSupport.withUiKeys(ThemeTestSupport.generated(true), Map.of("SearchEverywhere.Header.background", "#123456",
-                "EditorTabs.hoverBackground", "#00000019", "ComboBox.background", "#010101"));
+            // The theme's own roles behind keys FlatLaf skips or derives itself, and an alpha-carrying role (border.subtle).
+            var theme = ThemeTestSupport.recolored(ThemeTestSupport.generated(true), Map.of(
+                dev.jasper.ui.theme.SemanticColor.SURFACE_APP, new Color(0x12, 0x34, 0x56),
+                dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT, new Color(0x01, 0x01, 0x01)));
             assertThat(ThemeManager.install(theme)).isTrue();
-            assertColours(Map.of("SearchEverywhere.Header.background", "#123456", "EditorTabs.hoverBackground", "#00000019",
-                "ComboBox.background", "#010101"));
+            var expected = Map.of("SearchEverywhere.Header.background", "#123456", "ComboBox.background", "#010101",
+                "Separator.foreground", hex(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE)));
+            assertThat(expected.get("Separator.foreground")).as("Slate Cobalt Dark's border.subtle carries alpha").hasSize(9);
+            assertColours(expected);
             // A theme's own raw colours win consistently, including alpha and same-instance reinstall.
             UIManager.setLookAndFeel(UIManager.getLookAndFeel());
-            assertColours(Map.of("SearchEverywhere.Header.background", "#123456", "EditorTabs.hoverBackground", "#00000019",
-                "ComboBox.background", "#010101"));
+            assertColours(expected);
         } finally { UIManager.setLookAndFeel(original); }
     }
 
@@ -47,12 +50,15 @@ class ThemeManagerTest {
     @Test void switchingThemesLeavesNothingOfThePreviousOneBehind() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            ThemeManager.install(ThemeTestSupport.withUiKeys(ThemeTestSupport.generated(false), Map.of("Plugins.hoverBackground", "#123456")));
+            ThemeManager.install(ThemeTestSupport.generated(false));
+            // A key only the previous look and feel's defaults hold.
+            UIManager.getLookAndFeelDefaults().put("Plugins.hoverBackground", new javax.swing.plaf.ColorUIResource(new Color(0x12, 0x34, 0x56)));
             assertThat(UIManager.getColor("Plugins.hoverBackground")).isNotNull();
             var dark = ThemeTestSupport.generated(true);
             ThemeManager.install(dark);
             assertThat(UIManager.getColor("Plugins.hoverBackground")).isNull();
-            assertColours(Map.of("ToolWindow.background", (String) dark.uiKeys().get("ToolWindow.background"),
+            assertColours(Map.of("ToolWindow.background",
+                (String) dev.jasper.ui.theme.UiColorKeys.flatLaf(dark, dev.jasper.ui.theme.UiKeySet.DEFAULT).get("ToolWindow.background"),
                 "Jasper.semantic.surface.app", hex(dark.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP))));
         } finally { UIManager.setLookAndFeel(original); }
     }

@@ -10,7 +10,6 @@ import dev.jasper.ui.theme.JasperTheme;
 import dev.jasper.ui.theme.TerminalScheme;
 import java.awt.Color;
 import java.util.EnumMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Predicate;
 
@@ -77,12 +76,6 @@ public final class ThemeTestSupport {
         for (var role : SemanticColor.values()) colors.put(role, roles.getOrDefault(role, base.semantic().color(role)));
         return new GeneratedTheme(base.name(), base.dark(), base.author(), new SemanticPalette(colors), base.terminal(), base.editor(),
             base.syntax(), base.uiKeys(), base.glass());
-    }
-    /** {@code base} with these FlatLaf UI keys added or replaced (values {@code #rrggbb} or FlatLaf values). */
-    public static GeneratedTheme withUiKeys(GeneratedTheme base, Map<String, Object> keys) {
-        var merged = new LinkedHashMap<>(base.uiKeys()); merged.putAll(keys);
-        return new GeneratedTheme(base.name(), base.dark(), base.author(), base.semantic(), base.terminal(), base.editor(),
-            base.syntax(), merged, base.glass());
     }
     /** {@code base} with these syntax styles replaced. */
     public static GeneratedTheme withSyntax(GeneratedTheme base, Map<dev.jasper.ui.theme.SyntaxRole, dev.jasper.ui.theme.SyntaxStyle> styles) {
