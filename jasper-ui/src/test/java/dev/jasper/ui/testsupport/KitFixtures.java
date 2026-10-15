@@ -3,6 +3,7 @@ package dev.jasper.ui.testsupport;
 import dev.jasper.ui.theme.JasperTheme;
 
 import dev.jasper.ui.icons.IconRegistry;
+import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.swing.KitContext;
 import dev.jasper.ui.theme.*;
@@ -19,6 +20,11 @@ public final class KitFixtures {
     public static String platformFamily() {
         return dev.jasper.ui.metrics.Typography.of(dev.jasper.ui.metrics.TypeScale.DEFAULT, dev.jasper.ui.metrics.FaceSet.PLATFORM,
             dev.jasper.ui.metrics.Typography.UserFont.NONE).family();
+    }
+
+    /** The default kit with {@code metrics}: a kit that differs from the default in geometry alone. */
+    public static Kit kit(DesignMetrics metrics) {
+        return new Kit("test", metrics, Kit.DEFAULT.type(), Kit.DEFAULT.faces(), Kit.DEFAULT.uiKeys());
     }
 
     /** A third appearance: Slate Cobalt Dark with every role 20% plum (alpha kept), so a hard-coded variant colour shows. */

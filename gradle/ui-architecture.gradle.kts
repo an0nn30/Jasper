@@ -21,7 +21,16 @@ val verifyUiArchitecture = tasks.register("verifyUiArchitecture") {
         val output = process.inputStream.bufferedReader().readText()
         check(process.waitFor() == 0) { output }
         val edge = Regex("^\\s*(dev\\.jasper\\.ui\\.\\S+)\\s+->\\s+(\\S+).*$")
-        val pure = setOf("dev.jasper.ui.theme", "dev.jasper.ui.model")
+        val pure = setOf("dev.jasper.ui.theme", "dev.jasper.ui.model", "dev.jasper.ui.kit")
+        // Each package's allowed outgoing UI packages: the ones its package-info's "Allowed outgoing Jasper
+        // dependencies:" line names; a package-info without that line (theme, model) allows none.
+        val sources = uiProject.layout.projectDirectory.dir("src/main/java/dev/jasper/ui").asFile
+        val listed = Regex("Allowed outgoing Jasper dependenc(?:y|ies): (.*)")
+        val named = Regex("dev\\.jasper\\.ui\\.[a-z]+")
+        val allowed = sources.listFiles().orEmpty().filter { it.resolve("package-info.java").isFile }.associate { dir ->
+            val names = listed.find(dir.resolve("package-info.java").readText())?.groupValues?.get(1).orEmpty()
+            "dev.jasper.ui.${dir.name}" to named.findAll(names).map { it.value }.toSet()
+        }
         val graph = mutableMapOf<String, MutableSet<String>>()
         output.lineSequence().forEach { line ->
             val match = edge.matchEntire(line) ?: return@forEach
@@ -33,15 +42,18 @@ val verifyUiArchitecture = tasks.register("verifyUiArchitecture") {
             check(pure.none { from == it || from.startsWith("$it.") } || !toClass.startsWith("javax.swing.")) {
                 "Swing dependency in pure UI package: $line"
             }
-            val jdkOnly = from == "dev.jasper.ui.theme" || from.startsWith("dev.jasper.ui.theme.")
-                || from == "dev.jasper.ui.model" || from.startsWith("dev.jasper.ui.model.")
+            val jdkOnly = pure.any { from == it || from.startsWith("$it.") }
             check(!jdkOnly || toClass.startsWith("dev.jasper.ui.") || toClass.startsWith("java.")
                 || toClass.startsWith("javax.") || toClass.startsWith("jdk.")) {
                 "Vendor dependency in JDK-only UI package: $line"
             }
             if (toClass.startsWith("dev.jasper.ui.")) {
                 val to = toClass.substringBeforeLast('.')
-                if (from != to) graph.getOrPut(from) { linkedSetOf() }.add(to)
+                if (from != to) {
+                    val permitted = allowed[from] ?: error("UI package without a package-info: $from")
+                    check(to in permitted) { "UI package edge outside its package-info: $line" }
+                    graph.getOrPut(from) { linkedSetOf() }.add(to)
+                }
             }
         }
         val active = linkedSetOf<String>()
