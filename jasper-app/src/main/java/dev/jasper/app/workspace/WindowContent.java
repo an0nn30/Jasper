@@ -319,8 +319,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             content.chrome.search().setContext(context.label(), context.tooltip(), dev.jasper.app.platform.AppIcons.named(context.icon()));
         };
         if (bar != null) {
-            content.onThemeChanged = theme -> bar.setLight(!theme.chrome().dark());
-            bar.setLight(!content.theme().chrome().dark());
+            // The native controls sit on the title bar, which a theme may make dark on a light theme or light on a dark one.
+            content.onThemeChanged = theme -> bar.setLight(!dev.jasper.ui.theme.TitleBarTheme.of(theme.chrome()).dark());
+            bar.setLight(!dev.jasper.ui.theme.TitleBarTheme.of(content.theme().chrome()).dark());
         }
         if (content.viewMode == ViewMode.COMPACT && content.macOs) {
             content.onThemeChanged = theme -> root.putClientProperty("apple.awt.windowAppearance",

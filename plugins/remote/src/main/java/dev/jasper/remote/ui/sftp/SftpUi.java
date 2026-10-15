@@ -43,6 +43,8 @@ public final class SftpUi implements AutoCloseable {
     private final Set<PluginDialog> dialogs=new HashSet<>();
     private final Map<UUID,CompletableFuture<ConnectionIdentity>> browsing=new HashMap<>();
     private Consumer<UUID> followRequested=pane->{};
+    private volatile boolean showHidden;
+    private Consumer<Boolean> rememberHidden=shown->{};
     private RemoteEditing editing;
     private volatile boolean closed;
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
@@ -62,6 +64,12 @@ public final class SftpUi implements AutoCloseable {
         context.actions().register(ActionSpec.of(id,title).withKeywords(List.of("sftp","files","folder","history")).withDefaultBinding(binding)
             .withContext(ShortcutContext.panel(PANEL)),invoked-> { var view=closed?null:views.get(invoked.window().id());if(view!=null) command.accept(view.panel()); });
     }
+    /**
+     * Whether the SFTP browsers show hidden items, and where a change is remembered; each browser takes the choice as it
+     * opens, and a toggle in any of them changes it.
+     */
+    public void hiddenItems(boolean shown,Consumer<Boolean> remember) { showHidden=shown;rememberHidden=remember; }
+    private void hiddenChanged(boolean shown) { showHidden=shown;rememberHidden.accept(shown); }
     /** The window's explorer while its panel is open. */
     SftpPanel panel(UUID window) { var view=views.get(window);return view==null?null:view.panel(); }
     private UiView create(PanelHost host) {
@@ -73,6 +81,7 @@ public final class SftpUi implements AutoCloseable {
         Function<ConnectionIdentity,CompletableFuture<FileEndpoint>> open=identity->endpoints.open(Optional.of(identity),window,status->{});
         var controller=new SftpController(context.dataDirectory().resolve("browser-cache"),background,ui,open,panel);
         controller.onFollowRequested(pane->followRequested.accept(pane));
+        controller.showHidden(showHidden);controller.onShowHiddenChanged(this::hiddenChanged);
         var operations=new FileOperationController(context.dataDirectory().resolve("browser-cache"),background,ui,open,transfers.get().reservations(),panel::operationStatus,controller::refresh);
         var view=new View(host,panel,controller,operations);views.put(window.id(),view);
         controller.operations(new SftpController.Operations(()->upload(view,false),()->upload(view,true),()->download(view),()->newFolder(view),()->delete(view),()->copyPaths(view),()->copyHost(view),operations::cancel));
@@ -191,6 +200,7 @@ public final class SftpUi implements AutoCloseable {
         var picker=new DestinationPanel(context.kit(),source.selection().size()+" items from "+source.identity().host().name()+":"+source.directory(),hosts.get(),context.dataDirectory().resolve("browser-cache"),background,ui,
             id->connections.resolveIdentity(id,owner),identity->endpoints.open(Optional.of(identity),owner,status->{}),destination->{dialog.close();background(()->new Queued(new TransferRequest(EndpointRef.remote(source.identity()),paths(source),EndpointRef.remote(destination.identity()),destination.directory()),source.selection().stream().map(FileEntry::name).toList()),owner);},
             destination->nameDialog(owner,destination,operations::mkdir),operations::cancel,dialog::close);
+        picker.hiddenItems(showHidden,this::hiddenChanged);
         pickerReference.set(picker);dialog.onClosed(()-> { picker.close();operations.close(); });dialog.setContent(picker.view());dialog.show();
     }
     /** Whether {@code view} is still {@code owner}'s open view, showing the same identity and directory {@code capture} was taken from: a late result from the per-identity {@link RemoteEditing} queue must not act on a view that moved on in the meantime. */

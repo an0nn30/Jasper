@@ -116,6 +116,75 @@ class FileChooserPanelTest {
         } finally {panel.close();themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());themes.close();}
     }
 
+    /**
+     * A short path's box still fills the lane up to the search field, and each navigation button's focus ring has room in
+     * its view, which clipped it to brackets before; the buttons and the box keep their places.
+     */
+    @Test void aShortPathFillsItsLaneAndTheNavigationRingsHaveRoom() {
+        var root = Location.local(dir.getRoot());
+        var request = new ChooserRequest("Choose", OPEN, false, root, Optional.of(root), Optional.empty(), Optional.empty(), Optional.empty());
+        var model = new ChooserModel(request, List.of(new LocalSource(new LocalBrowser(dir))), Runnable::run, Runnable::run, prefs.showHidden());
+        var panel = new FileChooserPanel(KitTestSupport.context(), model, prefs, dir, finished::add, file -> false, Optional::empty);
+        model.start();
+        try {
+            panel.setSize(920, 520);
+            for (int i = 0; i < 5; i++) KitTestSupport.layout(panel);
+            int ring = m(dev.jasper.ui.metrics.DesignMetrics.Role.FOCUS_RING), gap = m(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_GAP);
+            var back = KitTestSupport.require(panel, "back", JComponent.class);
+            var refresh = KitTestSupport.require(panel, "refresh", JComponent.class);
+            var path = KitTestSupport.require(panel, "path", JComponent.class);
+            var search = KitTestSupport.require(panel, "search.input", JTextField.class);
+            var backBounds = javax.swing.SwingUtilities.convertRectangle(back.getParent(), back.getBounds(), panel);
+            var refreshBounds = javax.swing.SwingUtilities.convertRectangle(refresh.getParent(), refresh.getBounds(), panel);
+            var pathBounds = javax.swing.SwingUtilities.convertRectangle(path.getParent(), path.getBounds(), panel);
+            var tools = javax.swing.SwingUtilities.getAncestorOfClass(dev.jasper.ui.swing.KitView.class, search);
+            var toolsBounds = javax.swing.SwingUtilities.convertRectangle(tools.getParent(), tools.getBounds(), panel);
+            assertThat(backBounds.getLocation()).isEqualTo(new java.awt.Point(m(dev.jasper.ui.metrics.DesignMetrics.Role.CHOOSER_TOOLBAR_SIDE_PADDING),
+                m(dev.jasper.ui.metrics.DesignMetrics.Role.CHOOSER_TOOLBAR_VERTICAL_PADDING)));
+            assertThat(pathBounds.x).as("the box keeps its gap after Refresh").isEqualTo(refreshBounds.x + refreshBounds.width + gap);
+            assertThat(pathBounds.y).isEqualTo(backBounds.y);
+            assertThat(pathBounds.height).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT));
+            assertThat(pathBounds.x + pathBounds.width).as("the box reaches the trailing tools").isEqualTo(toolsBounds.x - gap);
+            for (String id : List.of("back", "forward", "up", "refresh")) {
+                var button = KitTestSupport.require(panel, id, JComponent.class);
+                var view = javax.swing.SwingUtilities.getAncestorOfClass(dev.jasper.ui.swing.KitView.class, button);
+                var halo = javax.swing.SwingUtilities.convertRectangle(button.getParent(), button.getBounds(), view);
+                halo.grow(ring, ring);
+                assertThat(new java.awt.Rectangle(0, 0, view.getWidth(), view.getHeight()).contains(halo)).as("%s's ring fits its view", id).isTrue();
+            }
+        } finally { panel.close(); }
+    }
+
+    /**
+     * app-unmocked.md: the column titles sit as the Places heading does, on the dialog surface above their pane (no strip
+     * of their own over the pane's rounded top) and on the first glyph's inset, a multiple-selection listing included:
+     * its rows show no checkboxes, so the titles leave no room for one.
+     */
+    @Test void theColumnTitlesSitOnTheDialogSurfaceAboveTheFirstGlyph() {
+        var request = new ChooserRequest("Choose", OPEN, true, Location.local(dir), Optional.of(Location.local(dir)), Optional.empty(),
+            Optional.empty(), Optional.empty());
+        var model = new ChooserModel(request, List.of(new LocalSource(new LocalBrowser(dir))), Runnable::run, Runnable::run, prefs.showHidden());
+        var panel = new FileChooserPanel(KitTestSupport.context(), model, prefs, dir, finished::add, file -> false, Optional::empty);
+        model.start();
+        try {
+            panel.setSize(820, 400);
+            for (int i = 0; i < 5; i++) KitTestSupport.layout(panel);
+            var files = KitTestSupport.require(panel, "files", javax.swing.JScrollPane.class);
+            var header = files.getColumnHeader();
+            assertThat(header.isOpaque()).isFalse();
+            var image = new java.awt.image.BufferedImage(panel.getWidth(), panel.getHeight(), java.awt.image.BufferedImage.TYPE_INT_RGB);
+            var g = image.createGraphics();
+            try { panel.paint(g); } finally { g.dispose(); }
+            var edge = javax.swing.SwingUtilities.convertPoint(header, 2, header.getHeight() / 2, panel);
+            assertThat(new java.awt.Color(image.getRGB(edge.x, edge.y))).as("the dialog surface shows behind the titles")
+                .isEqualTo(KitTestSupport.context().theme().semantic().color(SemanticColor.SURFACE_DIALOG));
+            var title = KitTestSupport.require(panel, "@table/files/header/name", JLabel.class);
+            var cell = KitTestSupport.require(panel, "@table/files/" + dir.resolve("docs") + "/name", JLabel.class);
+            assertThat(javax.swing.SwingUtilities.convertPoint(title, title.getInsets().left, 0, panel).x).as("Name over the first glyph")
+                .isEqualTo(javax.swing.SwingUtilities.convertPoint(cell, cell.getInsets().left, 0, panel).x);
+        } finally { panel.close(); }
+    }
+
     /** Scrolls every scrolling ancestor of {@code target} until its top is in view, as a user scrolling there would. */
     private static void reveal(java.awt.Component target) {
         for (var parent = target.getParent(); parent != null; parent = parent.getParent())
@@ -374,6 +443,21 @@ class FileChooserPanelTest {
         assertThat(prefs.showHidden()).isFalse();
         type(panel, 't');
         assertThat(panel.nameText()).isEqualTo("todo.md");
+    }
+
+    @Test void theHiddenItemsButtonTogglesThemAndIsPressedWhileTheyShow() throws IOException {
+        Files.writeString(dir.resolve(".env"), "");
+        var panel = panel(OPEN, Optional.empty());
+        var button = kit(panel, FileChooserPanel.HIDDEN, JButton.class);
+        assertThat(button.getToolTipText()).isEqualTo("Show hidden items");
+        assertThat(button.isSelected()).as("pressed: hidden items show").isTrue();
+        button.doClick(0);
+        assertThat(rows(panel)).doesNotContain(".env");
+        assertThat(prefs.showHidden()).as("the same saved choice as Cmd+Shift+.").isFalse();
+        assertThat(kit(panel, FileChooserPanel.HIDDEN, JButton.class).isSelected()).isFalse();
+        kit(panel, FileChooserPanel.HIDDEN, JButton.class).doClick(0);
+        assertThat(rows(panel)).contains(".env");
+        assertThat(prefs.showHidden()).isTrue();
     }
 
     @Test void thePreviewPaneShowsTheStartOfTheSelectedFile() {

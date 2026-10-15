@@ -85,8 +85,8 @@ CheckBoxMenuItem.selectionBackground	ACCENT
 RadioButtonMenuItem.selectionBackground	ACCENT
 PopupMenu.background	SURFACE_MENU
 PopupMenu.borderColor	BORDER_MENU
-TitlePane.background	SURFACE_APP
-TitlePane.inactiveBackground	SURFACE_APP
+TitlePane.background	SURFACE_TITLEBAR
+TitlePane.inactiveBackground	SURFACE_TITLEBAR
 TitlePane.foreground	TEXT_SECONDARY
 TitlePane.inactiveForeground	TEXT_SECONDARY
 TitlePane.infoForeground	TEXT_SECONDARY
@@ -97,7 +97,7 @@ TabbedPane.selectedForeground	TEXT_PRIMARY
 TabbedPane.hoverColor	SURFACE_CONTROL_HOVER
 TabbedPane.focusColor	SURFACE_CONTROL_HOVER
 TabbedPane.contentAreaColor	BORDER_WINDOW
-TabbedPane.underlineColor	ACCENT
+TabbedPane.underlineColor	TAB_INDICATOR
 SplitPaneDivider.gripColor	TEXT_PRIMARY
 SplitPaneDivider.hoverColor	SURFACE_CONTROL_HOVER
 SplitPaneDivider.pressedColor	SURFACE_CONTROL_SELECTED
@@ -108,13 +108,13 @@ ToolTip.background	SURFACE_PANEL_RAISED
 ToolTip.foreground	TEXT_PRIMARY
 Tree.background	SURFACE_CARD
 Table.background	SURFACE_CARD
-MainToolbar.background	SURFACE_APP
-MainToolbar.foreground	TEXT_PRIMARY
+MainToolbar.background	SURFACE_TITLEBAR
+MainToolbar.foreground	TEXT_TITLEBAR
 EditorTabs.underlinedTabBackground	SURFACE_CARD
 EditorTabs.underlinedTabForeground	TEXT_PRIMARY
 EditorTabs.hoverBackground	SURFACE_CONTROL_HOVER
-EditorTabs.underlineColor	ACCENT
-EditorTabs.inactiveUnderlineColor	TEXT_TERTIARY
+EditorTabs.underlineColor	TAB_INDICATOR
+EditorTabs.inactiveUnderlineColor	TAB_INDICATOR_INACTIVE
 ToolWindow.background	SURFACE_SIDEBAR
 ToolWindow.Header.background	SURFACE_APP
 StatusBar.background	SURFACE_STATUS

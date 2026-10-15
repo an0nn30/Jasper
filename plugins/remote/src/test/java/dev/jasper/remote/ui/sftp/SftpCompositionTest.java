@@ -31,7 +31,7 @@ class SftpCompositionTest {
 
     SftpPanel.Actions actions() {
         return new SftpPanel.Actions(path -> commands.add("navigate " + path), () -> { }, () -> commands.add("refresh"), followed::add,
-            () -> { }, () -> { }, () -> { }, () -> { }, () -> { }, () -> { }, () -> { }, () -> commands.add("cancel"), page -> { });
+            () -> { }, () -> { }, () -> { }, () -> { }, () -> { }, () -> { }, () -> { }, () -> commands.add("cancel"), page -> { }, shown -> { });
     }
 
     static Nodes.Panel root(SftpPanel panel) { return (Nodes.Panel) panel.view().spec().root(); }

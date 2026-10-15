@@ -138,12 +138,13 @@ public final class NativeChromePainting {
 
     /**
      * The equal-width tab strip: the strip's surface behind everything, each slot's surface (only {@code selected} the
-     * terminal's), the hover overlay over a hovered inactive slot, the window-border dividers between slots and the rule
-     * along the bottom. Slot bounds are the host's retained motion geometry; {@code selected} and {@code hovered} are -1
-     * when no slot is.
+     * terminal's), the hover overlay over a hovered inactive slot, the selected slot's indicator along its top
+     * ({@code tab.indicator}, or {@code tab.indicator.inactive} while the window is not {@code active}), the
+     * window-border dividers between slots and the rule along the bottom. Slot bounds are the host's retained motion
+     * geometry; {@code selected} and {@code hovered} are -1 when no slot is.
      */
     public static void tabStrip(JComponent strip, Graphics graphics, GeneratedTheme workspace, Color base,
-                                java.util.List<Rectangle> slots, int selected, int hovered) {
+                                java.util.List<Rectangle> slots, int selected, int hovered, boolean active) {
         var g = (Graphics2D) graphics.create();
         try {
             g.setComposite(AlphaComposite.Src);
@@ -151,6 +152,11 @@ public final class NativeChromePainting {
             for (int i = 0; i < slots.size(); i++) { g.setColor(tabSurface(workspace, base, i == selected)); g.fill(slots.get(i)); }
             g.setComposite(AlphaComposite.SrcOver);
             if (hovered >= 0 && hovered < slots.size() && hovered != selected) { g.setColor(hoverOverlay(workspace)); g.fill(slots.get(hovered)); }
+            if (selected >= 0 && selected < slots.size()) {
+                Rectangle tab = slots.get(selected);
+                g.setColor(workspace.semantic().color(active ? SemanticColor.TAB_INDICATOR : SemanticColor.TAB_INDICATOR_INACTIVE));
+                g.fillRect(tab.x, tab.y, tab.width, NativeControlStyles.metric(DesignMetrics.Role.TAB_INDICATOR));
+            }
             g.setColor(workspace.semantic().color(SemanticColor.BORDER_WINDOW));
             int line = NativeControlStyles.metric(DesignMetrics.Role.TAB_DIVIDER);
             for (int i = 0; i < slots.size() - 1; i++) {

@@ -22,7 +22,7 @@ public record ThemeSelection(ThemeLibrary library, JasperTheme dark, JasperTheme
             throw new IllegalArgumentException("Not an installed scheme: " + scheme.key());
     }
 
-    /** Slate Steel for both appearances, from the built-in library; a scheme Slate Steel lacks becomes match. */
+    /** Slate Steel for both appearances, from the built-in library; a scheme the built-in themes lack becomes match. */
     public static ThemeSelection slateSteel(TerminalSchemeChoice scheme) {
         return of(ThemeLibrary.bundledOnly(), JasperTheme.BUNDLED_ID, JasperTheme.BUNDLED_ID, scheme, (key, message) -> { });
     }

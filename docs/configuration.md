@@ -817,7 +817,8 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 ## Theme
 
-Jasper's built-in theme is Slate Steel, in Dark and Light; imported themes live in the themes folder ([Themes](themes.md)).
+Jasper's built-in themes are Slate Steel, in Dark and Light, and Catppuccin Latte, Frappé, Macchiato and Mocha; imported
+themes live in the themes folder ([Themes](themes.md)).
 
 `ui.appearance` chooses the UI appearance: `"dark"`, `"light"`, or `"system"` (the default) to follow the operating
 system's light or dark setting live. When the operating system's appearance is unavailable, `"system"` uses Dark. An

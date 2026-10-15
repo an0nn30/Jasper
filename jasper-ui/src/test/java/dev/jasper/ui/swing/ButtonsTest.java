@@ -179,6 +179,44 @@ class ButtonsTest {
         return image.getRGB(0, 0);
     }
 
+    /**
+     * design-system-source.md: a disabled control is the whole control at 40-45% opacity, as CSS opacity draws it. Over
+     * any background, every pixel is the enabled button's at 42% over that background, so text keeps its contrast with
+     * its own fill (a dark label on a light accent included) instead of fading again over the faded fill.
+     */
+    @Test void aDisabledButtonFadesAsOneLayerOverWhateverIsBeneathIt() {
+        Edt.run(() -> {
+            var ctx = KitFixtures.context();
+            var action = new Nodes.Button("create", ControlState.READY, "Create Vault", "", ButtonKind.PRIMARY, "create", "Create Vault");
+            var detail = new Nodes.Stack("detail", ControlState.READY, LayoutRole.DETAIL, List.of(action));
+            var panel = new Nodes.Panel("panel", ControlState.READY, new Header("header", ControlState.READY, "Panel", java.util.OptionalInt.empty(), java.util.Optional.empty(), java.util.Optional.empty(), List.of()),
+                java.util.Optional.empty(), new Text("body", ControlState.READY, "Body", TextRole.BODY), java.util.Optional.of(detail));
+            try (var view = new KitView(ctx, new ViewSpec(panel), e -> {})) {
+                view.setSize(260, 160); InteractiveRowsTest.layout(view);
+                var button = find(view, "create", JButton.class); button.setSize(120, 28);
+                var beneath = new Color(0x181825);
+                var enabled = paintOver(button, beneath);
+                button.setEnabled(false);
+                var disabled = paintOver(button, beneath);
+                int worst = 0;
+                for (int y = 0; y < enabled.getHeight(); y++) for (int x = 0; x < enabled.getWidth(); x++) {
+                    var expected = ColorMath.mix(new Color(enabled.getRGB(x, y)), beneath, .42);
+                    var actual = new Color(disabled.getRGB(x, y));
+                    worst = Math.max(worst, Math.max(Math.abs(expected.getRed() - actual.getRed()),
+                        Math.max(Math.abs(expected.getGreen() - actual.getGreen()), Math.abs(expected.getBlue() - actual.getBlue()))));
+                }
+                assertThat(worst).as("largest channel difference from the enabled face at 42%").isLessThanOrEqualTo(2);
+            }
+        });
+    }
+
+    /** {@code c} painted at 2x over an opaque {@code beneath}. */
+    static BufferedImage paintOver(JComponent c, Color beneath) {
+        var image = new BufferedImage(c.getWidth() * 2, c.getHeight() * 2, BufferedImage.TYPE_INT_RGB); var g = image.createGraphics();
+        try { g.setColor(beneath); g.fillRect(0, 0, image.getWidth(), image.getHeight()); g.scale(2, 2); c.paint(g); } finally { g.dispose(); }
+        return image;
+    }
+
     static BufferedImage paint(JComponent c) {
         var image = new BufferedImage(c.getWidth(), c.getHeight(), BufferedImage.TYPE_INT_ARGB); var g = image.createGraphics();
         try { c.paint(g); } finally { g.dispose(); } return image;

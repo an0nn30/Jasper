@@ -6,11 +6,14 @@ import java.nio.file.*;
 import java.sql.*;
 import java.util.*;
 
-/** Disposable worker-owned directory spool, independent of the durable transfer database. */
+/**
+ * Disposable worker-owned directory spool, independent of the durable transfer database. Pages and counts can leave out
+ * hidden items, the names starting with a dot.
+ */
 public final class DirectoryCache implements AutoCloseable {
     private final Path path;
     private Connection db;
-    private long count,directories;
+    private long count,directories,hidden,hiddenDirectories;
     public DirectoryCache(Path directory) throws IOException {
         Files.createDirectories(directory);path=Files.createTempFile(directory,"browser-",".sqlite");
         try {
@@ -34,16 +37,28 @@ public final class DirectoryCache implements AutoCloseable {
                 for(var entry:entries) {
                     statement.setString(1,entry.name());statement.setInt(2,entry.kind()==FileEntry.Kind.DIRECTORY?0:1);statement.setString(3,entry.kind().name());statement.setLong(4,entry.size());statement.setLong(5,entry.modifiedMillis());statement.setInt(6,entry.permissions());statement.setString(7,entry.linkTarget());statement.setString(8,entry.fileKey());statement.addBatch();
                 }
-                statement.executeBatch();db.commit();count+=entries.size();directories+=entries.stream().filter(e->e.kind()==FileEntry.Kind.DIRECTORY || e.kind()==FileEntry.Kind.LINK).count();
+                statement.executeBatch();db.commit();count+=entries.size();directories+=entries.stream().filter(DirectoryCache::folder).count();
+                hidden+=entries.stream().filter(DirectoryCache::hidden).count();hiddenDirectories+=entries.stream().filter(e->folder(e) && hidden(e)).count();
             } catch(SQLException failure) { db.rollback();throw failure; }
             finally { db.setAutoCommit(true); }
         } catch(SQLException failure) { throw new IOException("Cannot cache directory listing",failure); }
     }
-    public long count(boolean foldersOnly) { return foldersOnly?directories:count; }
+    private static boolean folder(FileEntry entry) { return entry.kind()==FileEntry.Kind.DIRECTORY || entry.kind()==FileEntry.Kind.LINK; }
+    private static boolean hidden(FileEntry entry) { return entry.name().startsWith("."); }
+    public long count(boolean foldersOnly) { return count(foldersOnly,true); }
+    /** The entries a page can show: folders (and links) only or every entry, with or without the hidden ones. */
+    public long count(boolean foldersOnly,boolean showHidden) {
+        return foldersOnly?directories-(showHidden?0:hiddenDirectories):count-(showHidden?0:hidden);
+    }
     public List<FileEntry> page(long offset,int limit) throws IOException { return page(offset,limit,false); }
-    public List<FileEntry> page(long offset,int limit,boolean foldersOnly) throws IOException {
+    public List<FileEntry> page(long offset,int limit,boolean foldersOnly) throws IOException { return page(offset,limit,foldersOnly,true); }
+    public List<FileEntry> page(long offset,int limit,boolean foldersOnly,boolean showHidden) throws IOException {
         if(offset<0 || limit<1 || limit>200) throw new IllegalArgumentException("Directory page must contain 1..200 rows");
-        try(var statement=db.prepareStatement("SELECT * FROM files "+(foldersOnly?"WHERE kind IN ('DIRECTORY','LINK') ":"")+"ORDER BY rank,name COLLATE NOCASE,name LIMIT ? OFFSET ?")) {
+        var where=new ArrayList<String>();
+        if(foldersOnly) where.add("kind IN ('DIRECTORY','LINK')");
+        if(!showHidden) where.add("substr(name,1,1)<>'.'");
+        try(var statement=db.prepareStatement("SELECT * FROM files "+(where.isEmpty()?"":"WHERE "+String.join(" AND ",where)+" ")
+                +"ORDER BY rank,name COLLATE NOCASE,name LIMIT ? OFFSET ?")) {
             statement.setInt(1,limit);statement.setLong(2,offset);var result=new ArrayList<FileEntry>();
             try(var rows=statement.executeQuery()) { while(rows.next()) result.add(new FileEntry(rows.getString("name"),FileEntry.Kind.valueOf(rows.getString("kind")),rows.getLong("size"),rows.getLong("modified"),rows.getInt("permissions"),rows.getString("target"),rows.getString("file_key"))); }
             return List.copyOf(result);

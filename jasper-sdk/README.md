@@ -42,7 +42,7 @@ monochrome paths with `UiKit.registerIcon`; see [icons](../docs/sdk-icons.md).
 Panels and settings factories return `UiView`; window surfaces and tabs mount only `UiView`.
 Settings hosts supply `Nodes.Node` rows. The host owns ordinary controls and their presentation.
 Specialized content retains explicit Appearance palettes and workspace opacity.
-Bundled manifests require `sdk = ">=0.17.0, <0.18"`, the Editor `>=0.17.1` (0.17.1 adds `Terminals.environment`, `Platform.editor` with `FileEditor`, `LocalSpec.command` and `CommandLine.client()`; 0.17.0 adds `PluginContext.commandLine()` and `[[subcommands]]`; 0.16.2 adds the `TEXT_ONSELECTION` colours; 0.16.1 adds `Platform.copy`, `copySecret`, `clipboardText`, `clipboard.read` and `StandardMenu.TOOLS`; 0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
+Bundled manifests require `sdk = ">=0.17.0, <0.18"`, the Editor `>=0.17.1` (0.17.1 adds `Terminals.environment`, `Platform.editor` with `FileEditor`, `LocalSpec.command`, `CommandLine.client()`, the `hidden` icon and the `TAB_INDICATOR` and `TITLEBAR` colours; 0.17.0 adds `PluginContext.commandLine()` and `[[subcommands]]`; 0.16.2 adds the `TEXT_ONSELECTION` colours; 0.16.1 adds `Platform.copy`, `copySecret`, `clipboardText`, `clipboard.read` and `StandardMenu.TOOLS`; 0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
 `DialogSpec.Presentation.OVERLAY`; 0.15.0 was the breaking boundary: raw factories,
 Appearance icon loaders, arbitrary Icon arguments and palette fallback readers were removed).
 

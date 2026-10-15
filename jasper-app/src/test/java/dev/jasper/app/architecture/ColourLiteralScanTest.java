@@ -9,10 +9,11 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
-/** Spec 3.1 and 11: no colour value lives in production code or resources outside slate-steel.json. */
+/** Spec 3.1 and 11: no colour value lives in production code or resources outside the built-in theme files. */
 class ColourLiteralScanTest {
     static final Path ROOT = Path.of(System.getProperty("jasper.repoRoot"));
-    static final Path THEME = ROOT.resolve("jasper-ui/src/main/resources/dev/jasper/ui/theme/slate-steel.json");
+    static final Set<Path> THEMES = dev.jasper.ui.theme.JasperTheme.builtIns().stream()
+        .map(theme -> ROOT.resolve("jasper-ui/src/main/resources/dev/jasper/ui/theme/" + theme.id() + ".json")).collect(java.util.stream.Collectors.toSet());
     static final Pattern STRING_HEX = Pattern.compile("\"[^\"\\n]*#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?(?![0-9A-Za-z])[^\"\\n]*\"");
     // A constructor or decode call, simple or fully qualified (new java.awt.Color(0x…)), given a hex literal.
     static final Pattern CONSTRUCTED = Pattern.compile("(?:\\bColor(?:UIResource)?|\\bColor\\.decode)\\(\\s*\"?(?:0x|#)[0-9A-Fa-f]{6}");
@@ -29,7 +30,7 @@ class ColourLiteralScanTest {
             assertThat(CONSTRUCTED.matcher(line).find()).as(line).isFalse();
     }
 
-    @Test void noProductionColourLiteralOutsideTheThemeFile() throws IOException {
+    @Test void noProductionColourLiteralOutsideTheThemeFiles() throws IOException {
         var offenders = new ArrayList<String>();
         var roots = new ArrayList<>(List.of(ROOT.resolve("jasper-ui/src/main"), ROOT.resolve("jasper-app/src/main")));
         try (var plugins = Files.list(ROOT.resolve("plugins"))) {
@@ -38,7 +39,7 @@ class ColourLiteralScanTest {
         for (Path root : roots) try (Stream<Path> files = Files.walk(root)) {
             for (Path file : files.filter(Files::isRegularFile).toList()) {
                 String name = file.getFileName().toString(), extension = name.substring(name.lastIndexOf('.') + 1);
-                if (file.equals(THEME)) continue;
+                if (THEMES.contains(file)) continue;
                 String text;
                 if (extension.equals("java")) text = Files.readString(file);
                 else if (TEXT_RESOURCES.contains(extension)) text = Files.readString(file);
@@ -53,6 +54,7 @@ class ColourLiteralScanTest {
                 }
             }
         }
-        assertThat(offenders).as("colour literals outside slate-steel.json").isEmpty();
+        assertThat(THEMES).allMatch(Files::isRegularFile);
+        assertThat(offenders).as("colour literals outside the built-in theme files").isEmpty();
     }
 }

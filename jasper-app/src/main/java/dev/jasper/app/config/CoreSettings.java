@@ -238,13 +238,15 @@ public final class CoreSettings {
     public static final Setting<String> UI_THEME_DARK = Setting.of("ui.theme.dark",
             SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.BUNDLED_ID)
         .label("Dark theme").keywords("theme", "dark", "appearance", "slate steel", "imported")
-        .description("The theme the Dark appearance shows: \"slate-steel\" (the default) or an imported theme's id, its file name\n"
-            + "in the themes folder without .json. A theme without a Dark variant is reported and Slate Steel is used. Switches live.").build();
+        .description("The theme the Dark appearance shows: \"slate-steel\" (the default), a built-in Catppuccin flavour such as\n"
+            + "\"catppuccin-mocha\", or an imported theme's id, its file name in the themes folder without .json. A theme without a\n"
+            + "Dark variant is reported and Slate Steel is used. Switches live.").build();
     public static final Setting<String> UI_THEME_LIGHT = Setting.of("ui.theme.light",
             SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.BUNDLED_ID)
         .label("Light theme").keywords("theme", "light", "appearance", "slate steel", "imported")
-        .description("The theme the Light appearance shows: \"slate-steel\" (the default) or an imported theme's id, its file name\n"
-            + "in the themes folder without .json. A theme without a Light variant is reported and Slate Steel is used. Switches live.").build();
+        .description("The theme the Light appearance shows: \"slate-steel\" (the default), the built-in \"catppuccin-latte\", or an\n"
+            + "imported theme's id, its file name in the themes folder without .json. A theme without a Light variant is reported\n"
+            + "and Slate Steel is used. Switches live.").build();
     static final String SCHEME_ID = "Use \"match\" or a scheme id such as \"slate-steel/high-contrast\"; using the default.";
     public static final Setting<String> TERMINAL_SCHEME = Setting.of("terminal.scheme",
             SettingKind.string(text -> TerminalSchemeChoice.parse(text).isPresent(), SCHEME_ID), TerminalSchemeChoice.MATCH.key())
@@ -284,7 +286,7 @@ public final class CoreSettings {
             Map.entry(List.of("terminal", "shell"), "The shell new panes start."),
             Map.entry(List.of("terminal", "cursor"), "The cursor a program sees until it chooses its own."),
             Map.entry(List.of("ui"), "The interface: its appearance, fonts, workspace glass and animations."),
-            Map.entry(List.of("ui", "theme"), "The theme each appearance shows: slate-steel or an imported theme's id."),
+            Map.entry(List.of("ui", "theme"), "The theme each appearance shows: a built-in theme's id or an imported theme's id."),
             Map.entry(List.of("ui", "font"), "Interface typography, independent of the terminal font."),
             Map.entry(List.of("ui", "workspace"), "Translucent terminal and editor backgrounds on macOS; omitted values keep the terminal area opaque."),
             Map.entry(List.of("ui", "animations"), "App-wide animation policy. Changes apply live.")));

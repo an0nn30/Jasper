@@ -24,6 +24,53 @@ click on a `.txt` or a `.command` opens it as text in the default text editor (T
 `.command` does not run; on Windows, a Ctrl-click on a `\\wsl$\…` path in a WSL pane
 opens it. Not merged or pushed.
 
+**Catppuccin built in — 2026-10-14** (`claude/catppuccin-themes`, worktree `.claude/worktrees/catppuccin-themes`; asked
+for by the user, who will name tweaks after seeing the port). Catppuccin Latte (Light), Frappé, Macchiato and Mocha
+(Dark) are built-in themes beside Slate Steel, which stays the default and the fallback. They are the converter's
+output, unedited, for the plugin jar vendored in `tools/themes/catppuccin/` (3.6.1, byte-identical to the Marketplace
+zip and to the copy removed in `c1e968ee9`); the Islands variants are left out, as before. `JasperTheme.builtIns()`
+lists them; the library, Import, Remove and the converter refuse every built-in id; the colour-literal scan exempts the
+built-in files; a converter test fails when the bundled files differ from a fresh conversion. The Licenses window lists
+"Catppuccin for JetBrains 3.6.1" (MIT, its LICENSE shipped in jasper-ui). The user's earlier imports
+`catppuccin-frappe.json` and `catppuccin-latte.json` in `~/.config/jasper/themes/` are now reported as built in and
+ignored (they are identical to the built-in files). After the user's first look: a disabled kit button now fades as
+one layer (`ThemePainting.faded`; design-system-source.md's "whole control at 40-45% opacity"), so Catppuccin's dark
+label on its light accent stays readable instead of fading again over the faded fill; and a classic IntelliJ theme takes
+its window chrome (`surface.app`) from its plugin's Islands variant, so Catppuccin's tool windows (mantle) stand on crust
+as in Islands Catppuccin (the user chose both). The file chooser's toolbar, after the user's next look (not theme
+related): its navigation view reserves the buttons' focus rings (`SurfacePanel.toolbar`; the room comes out of the
+padding and gap, so nothing moves), so Refresh's ring is no longer clipped to brackets; the path box fills its lane up
+to the search field; and the chooser's first focus is the name field (Save, Directory) or the file list, as
+JFileChooser and the macOS open panel do, not the first enabled toolbar button. Then, the user's pick (option A of
+three rendered): `tools/themes/catppuccin/roles.json` gives the built-ins Slate Steel's dialog/card/sidebar layering in
+Catppuccin's palette (dark: base body, mantle cards, crust sidebar; Latte: mantle, base, crust), so the chooser's Places
+and file list, Settings and the Vault manager have edges; the converter's `roles` parameter applies it. Next, kit
+tables (every theme): the column titles' header viewport is transparent, so they sit on the dialog surface as the Places
+heading does instead of a strip of `surface.card` over the pane's rounded top, and a multiple-selection table no longer
+indents them by a checkbox its rows never show ("Name" now over the first glyph, like "Places"). The first-focus fix
+first failed in the app: the folder loads off the EDT, so the list was hidden when the dialog gained focus and AWT
+focused Refresh (ring shown, cause ACTIVATION). The dialog's traversal policy now has no initial component, and the
+chooser focuses the list when it appears (the search field for an empty or unreadable folder) unless the user
+focused something meanwhile; GUI check pending. Hidden items (user's ask, both browsers): the chooser's tools row
+has a **Show hidden items** toggle (the saved choice Cmd/Ctrl+Shift+. already toggled); the SFTP browser (and the Copy
+to host picker) gains the choice, off by default, remembered as `sftp_show_hidden` in Remote's `panel-state.toml`,
+filtered in `DirectoryCache` so pages and counts stay right. New kit glyph `hidden`; SDK 0.17.1 (the testkit mirrors
+it). Then the active-tab line (user's ask): new format roles `tab.indicator` (focused window) and
+`tab.indicator.inactive` (unfocused; the user chose "dim it"), painted 2 px (`TAB_INDICATOR`) along the top of the active
+tab by `NativeChromePainting.tabStrip`; Slate Steel uses its accent and the accent half over the tab; the converter reads
+IntelliJ's `EditorTabs.underlineColor` / `inactiveUnderlineColor` (fallback: the accent, then that mixed half with the
+terminal surface), so Catppuccin's are its mauve (Latte's unfocused line is IntelliJ Light's `#9CA7B8`); also in SDK
+0.17.1. Imported theme files without the roles are refused until reconverted. Then the title bar (user's ask; the user
+chose background + ink, header row only, no built-in values): optional format roles `surface.titlebar` and
+`text.titlebar` (left out: `surface.app`, `text.primary`); `TitleBarTheme.of` derives the header's theme (the same object
+unless the variant sets its own: the header's surface, text levels, hover, pressed and search-field fill and borders
+follow, and it is dark when the title bar is); `ThemeZone.titleBar` marks the main window's header (WindowChrome,
+MacTitleBar.setHeader) so its painters and glyphs use it, and the macOS controls follow its darkness. The converter
+writes them from IntelliJ's `MainToolbar.background`/`foreground` when that stands 5 L* or more apart from the chrome
+(New UI Light's dark header); the built-ins are unchanged. SDK 0.17.1 mirrors them. Parsing the four at start-up measured 4.6-6.8 ms in a fresh JVM
+(the colour patterns are now precompiled). `./gradlew check --continue` after merging main (SDK 0.17.1 now also carries main's default-editor
+additions): **10,301 tests, 0 failures, 0 errors, 12 skipped**. No GUI launched. GUI check for the user: each flavour in Settings › Appearance and the Licenses window (About Jasper › Licenses). Merged to main (fast-forward), not pushed.
+
 **The default editor (command line plan 2) — 2026-10-14** (`claude/default-editor`, worktree
 `.claude/worktrees/default-editor`; [spec](superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md),
 [plan](superpowers/plans/2026-10-14-jasper-command-line-2-default-editor.md)). Settings › Tools › Editor › Default editor

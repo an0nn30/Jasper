@@ -123,8 +123,8 @@ public final class UiColorKeys {
         role(keys, "RadioButtonMenuItem.selectionBackground", ACCENT);
         role(keys, "PopupMenu.background", SURFACE_MENU);
         role(keys, "PopupMenu.borderColor", BORDER_MENU);
-        role(keys, "TitlePane.background", SURFACE_APP);
-        role(keys, "TitlePane.inactiveBackground", SURFACE_APP);
+        role(keys, "TitlePane.background", SURFACE_TITLEBAR);
+        role(keys, "TitlePane.inactiveBackground", SURFACE_TITLEBAR);
         role(keys, "TitlePane.foreground", TEXT_SECONDARY);
         role(keys, "TitlePane.inactiveForeground", TEXT_SECONDARY);
         role(keys, "TitlePane.infoForeground", TEXT_SECONDARY);
@@ -135,7 +135,7 @@ public final class UiColorKeys {
         role(keys, "TabbedPane.hoverColor", SURFACE_CONTROL_HOVER);
         role(keys, "TabbedPane.focusColor", SURFACE_CONTROL_HOVER);
         role(keys, "TabbedPane.contentAreaColor", BORDER_WINDOW);
-        role(keys, "TabbedPane.underlineColor", ACCENT);
+        role(keys, "TabbedPane.underlineColor", TAB_INDICATOR);
         role(keys, "SplitPaneDivider.gripColor", TEXT_PRIMARY);
         role(keys, "SplitPaneDivider.hoverColor", SURFACE_CONTROL_HOVER);
         role(keys, "SplitPaneDivider.pressedColor", SURFACE_CONTROL_SELECTED);
@@ -146,13 +146,13 @@ public final class UiColorKeys {
         role(keys, "ToolTip.foreground", TEXT_PRIMARY);
         role(keys, "Tree.background", SURFACE_CARD);
         role(keys, "Table.background", SURFACE_CARD);
-        role(keys, "MainToolbar.background", SURFACE_APP);
-        role(keys, "MainToolbar.foreground", TEXT_PRIMARY);
+        role(keys, "MainToolbar.background", SURFACE_TITLEBAR);
+        role(keys, "MainToolbar.foreground", TEXT_TITLEBAR);
         role(keys, "EditorTabs.underlinedTabBackground", SURFACE_CARD);
         role(keys, "EditorTabs.underlinedTabForeground", TEXT_PRIMARY);
         role(keys, "EditorTabs.hoverBackground", SURFACE_CONTROL_HOVER);
-        role(keys, "EditorTabs.underlineColor", ACCENT);
-        role(keys, "EditorTabs.inactiveUnderlineColor", TEXT_TERTIARY);
+        role(keys, "EditorTabs.underlineColor", TAB_INDICATOR);
+        role(keys, "EditorTabs.inactiveUnderlineColor", TAB_INDICATOR_INACTIVE);
         role(keys, "ToolWindow.background", SURFACE_SIDEBAR);
         role(keys, "ToolWindow.Header.background", SURFACE_APP);
         role(keys, "StatusBar.background", SURFACE_STATUS);

@@ -63,7 +63,8 @@ public final class ThemeFolder {
         }
         String id = id(theme.name());
         if (id.isEmpty()) throw new ImportFailure("The theme's name has no letters or digits Jasper can use for a file name");
-        if (id.equals(JasperTheme.BUNDLED_ID)) throw new ImportFailure("Slate Steel is built in and can't be replaced");
+        var builtIn = JasperTheme.builtIn(id);
+        if (builtIn.isPresent()) throw new ImportFailure(builtIn.get().name() + " is built in and can't be replaced");
         return new Candidate(id, theme.name(), Files.exists(file(id)), bytes);
     }
 
@@ -85,9 +86,12 @@ public final class ThemeFolder {
 
     /** Deletes the imported theme {@code id}'s file. */
     public void remove(String id) throws IOException {
-        if (!JasperTheme.validId(id) || id.equals(JasperTheme.BUNDLED_ID)) throw new IllegalArgumentException("Not an imported theme: " + id);
+        if (!JasperTheme.validId(id) || builtIn(id)) throw new IllegalArgumentException("Not an imported theme: " + id);
         Files.delete(file(id));
     }
+
+    /** Whether {@code id} is a built-in theme's, which no file in the folder replaces or removes. */
+    public static boolean builtIn(String id) { return JasperTheme.builtIn(id).isPresent(); }
 
     private Path file(String id) { return folder.resolve(id + ".json"); }
 }

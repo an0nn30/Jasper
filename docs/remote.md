@@ -172,7 +172,8 @@ Remote 0.4 includes SFTP in the same plugin as SSH. Choose **SSH > SFTP**, **Vie
 **Open SFTP here** in a terminal's context menu, or **Browse files** on a saved host.
 Connecting a shell does not automatically open the browser. There is one remote browser in
 each window, with an editable path, compact file list, Up, Upload, Download, Refresh,
-New folder, Delete and Copy path controls. Select multiple rows for file operations.
+New folder, Delete and Copy path controls. Select multiple rows for file operations. Hidden items (names starting with
+a dot) stay out of the list until the **Show hidden items** toggle beside Refresh is pressed; the choice is remembered.
 The context menu also offers **Upload folder** and **Copy to host**.
 Opening a directory link deliberately resolves its path; recursive copy/delete still treat it as a link.
 
