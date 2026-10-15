@@ -48,7 +48,7 @@ final class WorkspaceAppearanceFixture {
         var base = ThemeTestSupport.withSyntax(ThemeTestSupport.recolored(ThemeTestSupport.generated(dark), roles), styles);
         var workspace = new GeneratedTheme("Contract", dark, "", base.semantic(), base.terminal(), new EditorColors(editor.background(),
             editor.foreground(), editor.caret(), editor.selection(), editor.currentLine(), editor.gutter(), editor.lineNumbers()),
-            base.syntax(), base.uiKeys(), base.glass());
+            base.syntax(), base.glass());
         current = ThemeTestSupport.mixed(current.chrome(), workspace);
         for (var listener : List.copyOf(listeners)) listener.accept(current);
     }

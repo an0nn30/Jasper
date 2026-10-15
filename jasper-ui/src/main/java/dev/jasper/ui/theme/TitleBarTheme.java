@@ -50,6 +50,6 @@ public final class TitleBarTheme {
         colors.put(SemanticColor.BORDER_SUBTLE, ColorMath.opacity(ink, .06));
         boolean dark = ColorMath.lightness(surface) < 50;
         return new GeneratedTheme(theme.name(), dark, theme.author(), new SemanticPalette(colors), theme.terminal(), theme.editor(),
-            theme.syntax(), theme.uiKeys(), theme.glass());
+            theme.syntax(), theme.glass());
     }
 }

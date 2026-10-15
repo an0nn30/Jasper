@@ -35,11 +35,6 @@ public final class UiColorKeys {
         return values(sources, theme.semantic(), theme.terminal().selection());
     }
 
-    /** The default keys in FlatLaf's order, each as {@code #rrggbb} or {@code #rrggbbaa}. */
-    public static Map<String, Object> flatLaf(SemanticPalette palette, Color textSelection) {
-        return values(KEYS, palette, textSelection);
-    }
-
     private static Map<String, Object> values(Map<String, Source> sources, SemanticPalette palette, Color textSelection) {
         var keys = new LinkedHashMap<String, Object>();
         sources.forEach((key, source) -> keys.put(key, ColorMath.hex(switch (source) {

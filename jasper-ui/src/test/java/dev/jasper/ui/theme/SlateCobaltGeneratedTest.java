@@ -18,9 +18,12 @@ class SlateCobaltGeneratedTest {
             assertThat(theme.syntax()).isEqualTo(cobalt.syntax(dark));
             assertThat(theme.glass()).isEqualTo(GlassLevels.OPAQUE);
             assertThat(theme.editor()).isEqualTo(cobalt.editor(dark));
-            assertThat(theme.uiKeys()).containsKeys("*.background", "Panel.background");
-            assertThat(theme.uiKeys().keySet()).as("no Jasper.* aliases: chrome reads Jasper.semantic.*").noneMatch(key -> key.startsWith("Jasper."));
-            assertThat(theme.uiKeys().get("Panel.background")).isEqualTo(ColorMath.hex(theme.semantic().color(SemanticColor.SURFACE_PANEL)));
+            var keys = UiColorKeys.flatLaf(theme, UiKeySet.DEFAULT);
+            assertThat(keys).containsKeys("*.background", "Panel.background");
+            assertThat(keys.keySet()).as("no Jasper.* aliases: chrome reads Jasper.semantic.*").noneMatch(key -> key.startsWith("Jasper."));
+            assertThat(keys.get("Panel.background")).isEqualTo(ColorMath.hex(theme.semantic().color(SemanticColor.SURFACE_PANEL)));
+            assertThat(java.util.Arrays.stream(GeneratedTheme.class.getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                .as("FlatLaf's keys are derived when a theme is installed").doesNotContain("uiKeys");
         }
     }
 }

@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.*;
 import dev.jasper.ui.testsupport.Edt;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.JasperTheme;
+import dev.jasper.ui.theme.UiColorKeys;
+import dev.jasper.ui.theme.UiKeySet;
 import java.awt.Insets;
 import java.util.List;
 import javax.swing.UIManager;
@@ -18,7 +20,7 @@ class SlateCobaltInstallTest {
             try {
                 for (boolean dark : new boolean[] {true, false}) {
                     var theme = JasperTheme.bundled().generated(dark);
-                    assertThat(theme.uiKeys()).doesNotContainKeys("Popup.dropShadowColor", "Popup.dropShadowOpacity");
+                    assertThat(UiColorKeys.flatLaf(theme, UiKeySet.DEFAULT)).doesNotContainKeys("Popup.dropShadowColor", "Popup.dropShadowOpacity");
                     FlatLafInstaller.install(theme);
                     assertThat(UIManager.getColor("Popup.dropShadowColor")).isEqualTo(java.awt.Color.BLACK);
                     assertThat(((Number) UIManager.get("Popup.dropShadowOpacity")).doubleValue()).isCloseTo(dark ? .5 : .18,

@@ -58,14 +58,14 @@ class UiColorKeysTest {
         sources.add(ColorMath.hex(selection));
         sources.add(ColorMath.hex(UiColorKeys.errorTint(palette)));
         assertThat(sources).as("every source has its own colour").hasSize(SemanticColor.values().length + 2);
-        assertThat(UiColorKeys.flatLaf(palette, selection)).containsExactlyEntriesOf(expected(palette, selection));
+        assertThat(UiColorKeys.flatLaf(theme(palette, selection), UiKeySet.DEFAULT)).containsExactlyEntriesOf(expected(palette, selection));
     }
 
     /**
      * Enterprise presentation plan 1: computed at install time, every built-in variant's keys are the frozen keys over its
-     * own roles and matching terminal selection, and the keys it carried before the seam.
+     * own roles and matching terminal selection, as the keys it carried before the seam were.
      */
-    @Test void everyBuiltInVariantInstallsTheKeysItCarried() throws IOException {
+    @Test void everyBuiltInVariantGetsTheFrozenKeysOverItsOwnRoles() throws IOException {
         int variants = 0;
         for (var theme : JasperTheme.builtIns())
             for (boolean dark : new boolean[] {true, false}) {
@@ -74,7 +74,6 @@ class UiColorKeysTest {
                 var keys = UiColorKeys.flatLaf(generated, UiKeySet.DEFAULT);
                 String name = theme.id() + (dark ? " dark" : " light");
                 assertThat(keys).as(name).containsExactlyEntriesOf(expected(generated.semantic(), theme.matching(dark).colors().selection()));
-                assertThat(keys).as(name + ", as carried").containsExactlyEntriesOf(generated.uiKeys());
                 variants++;
             }
         assertThat(variants).as("Slate Cobalt's two variants and the four Catppuccin flavours").isEqualTo(6);
@@ -92,6 +91,14 @@ class UiColorKeysTest {
             .isEqualTo(ColorMath.hex(base.semantic().color(SemanticColor.SURFACE_APP)));
     }
 
+    /** Slate Cobalt Dark with {@code palette} and {@code selection} as its terminal selection. */
+    private static GeneratedTheme theme(SemanticPalette palette, Color selection) {
+        var base = JasperTheme.bundled().generated(true);
+        var t = base.terminal();
+        return new GeneratedTheme(base.name(), base.dark(), base.author(), palette,
+            new TerminalColors(t.background(), t.foreground(), t.cursor(), selection, t.ansi()), base.editor(), base.syntax(), base.glass());
+    }
+
     @Test void everyKeyIsARolesColour() {
         for (boolean dark : new boolean[]{true, false}) {
             var p = JasperTheme.bundled().palette(dark);
@@ -99,7 +106,7 @@ class UiColorKeysTest {
             var allowed = new HashSet<Object>();
             for (var role : SemanticColor.values()) allowed.add(ColorMath.hex(p.color(role)));
             allowed.add(ColorMath.hex(selection)); allowed.add(ColorMath.hex(UiColorKeys.errorTint(p)));
-            for (var entry : UiColorKeys.flatLaf(p, selection).entrySet())
+            for (var entry : UiColorKeys.flatLaf(JasperTheme.bundled().generated(dark), UiKeySet.DEFAULT).entrySet())
                 assertThat(entry.getValue()).as("%s in %s", entry.getKey(), dark ? "dark" : "light").isIn(allowed);
         }
     }
@@ -108,7 +115,7 @@ class UiColorKeysTest {
         for (boolean dark : new boolean[]{true, false}) {
             var p = JasperTheme.bundled().palette(dark);
             var selection = JasperTheme.bundled().matching(dark).colors().selection();
-            Map<String, Object> keys = UiColorKeys.flatLaf(p, selection);
+            Map<String, Object> keys = UiColorKeys.flatLaf(JasperTheme.bundled().generated(dark), UiKeySet.DEFAULT);
             assertThat(keys.get("*.selectionBackground")).isEqualTo(ColorMath.hex(selection));
             assertThat(keys.get("SearchField.errorBackground")).isEqualTo(ColorMath.hex(UiColorKeys.errorTint(p)));
             assertThat(keys.get("Panel.background")).isEqualTo(ColorMath.hex(p.color(SemanticColor.SURFACE_PANEL)));

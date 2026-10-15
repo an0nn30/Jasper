@@ -141,7 +141,7 @@ class HostedKitTest {
   var recoloured=ThemeTestSupport.withSyntax(ThemeTestSupport.recolored(previous,java.util.Map.of(dev.jasper.ui.theme.SemanticColor.ACCENT,java.awt.Color.MAGENTA)),
    java.util.Map.of(dev.jasper.ui.theme.SyntaxRole.COMMENT,new dev.jasper.ui.theme.SyntaxStyle(java.awt.Color.GREEN,false,true)));
   var e=recoloured.editor();var changed=new dev.jasper.ui.theme.GeneratedTheme(recoloured.name(),recoloured.dark(),recoloured.author(),recoloured.semantic(),recoloured.terminal(),
-   new dev.jasper.ui.theme.EditorColors(e.background(),e.foreground(),java.awt.Color.ORANGE,e.selection(),e.currentLine(),e.gutter(),e.lineNumbers()),recoloured.syntax(),recoloured.uiKeys(),recoloured.glass());
+   new dev.jasper.ui.theme.EditorColors(e.background(),e.foreground(),java.awt.Color.ORANGE,e.selection(),e.currentLine(),e.gutter(),e.lineNumbers()),recoloured.syntax(),recoloured.glass());
   current.set(dev.jasper.app.appearance.ThemeTestSupport.mixed(changed,changed));
   var variants=new java.util.ArrayList<dev.jasper.sdk.Variant>();appearance.onChanged(variants::add);for(var update:java.util.List.copyOf(updates))update.accept(current.get());
   assertThat(variants).containsExactly(appearance.variant());assertThat(appearance.color(SemanticColor.ACCENT)).isNotEqualTo(before).isEqualTo(java.awt.Color.MAGENTA);

@@ -172,8 +172,7 @@ public final class JasperTheme {
         var colors = editor(dark, palette, styles);
         var syntax = Map.copyOf(styles);
         var scheme = schemes.get(dark ? DARK : LIGHT);
-        var generated = new GeneratedTheme(name, dark, author, palette, scheme.colors(), colors, syntax,
-            UiColorKeys.flatLaf(palette, scheme.colors().selection()), GlassLevels.OPAQUE);
+        var generated = new GeneratedTheme(name, dark, author, palette, scheme.colors(), colors, syntax, GlassLevels.OPAQUE);
         return new Variant(palette, colors, syntax, generated);
     }
 
