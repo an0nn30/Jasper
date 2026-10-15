@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Plan 3 Task 8: the actual Settings pages of the Editor, Sample, Project Index and Shell History plugins, through the
  * real SettingsDialog and plugin runtime with the application's appearance wiring (as JasperApplication passes it), at
- * device scale 2 in Slate Steel Dark and Light and with an enlarged font. The plugins' own pages (Sample,
+ * device scale 2 in Slate Cobalt Dark and Light and with an enlarged font. The plugins' own pages (Sample,
  * Project Index) and the generated ones (Editor, Shell History) read as one design system: the same section labels,
  * settings cards and card colour, at the same card position, in every theme. Output goes to
  * build/theme-migration-evidence/editor-hosted-2x/settings/&lt;family&gt;/.

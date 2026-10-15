@@ -58,7 +58,7 @@ TERMINAL_KEYS = ["bg", "fg", "fg.bold", "cursor", "selection"] + ANSI + ["bright
 EDITOR_SURFACES = ["background", "foreground", "caret", "selection", "currentLine", "gutter", "lineNumbers"]
 SYNTAX_ROLES = ["keyword", "type", "function", "variable", "constant", "number", "string", "comment", "doc_comment",
                 "annotation", "operator", "punctuation", "tag", "attribute", "regex", "error"]
-# Slate Steel's editor references (slate-steel.json, editor.dark): used for an entry the editor scheme leaves out.
+# Slate Cobalt's editor references (slate-cobalt.json, editor.dark): used for an entry the editor scheme leaves out.
 EDITOR_REFERENCES = {
     "background": "terminal.bg", "foreground": "terminal.fg", "caret": "terminal.cursor",
     "selection": "terminal.selection", "currentLine": "hover.overlay @ 5%", "gutter": "terminal.bg",
@@ -70,7 +70,7 @@ EDITOR_REFERENCES = {
     "attribute": "terminal.ansi.yellow", "regex": "terminal.ansi.cyan", "error": "terminal.ansi.red",
 }
 # Import refuses a theme file with a built-in theme's id
-BUILT_IN = ("slate-steel", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha")
+BUILT_IN = ("slate-cobalt", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha")
 KEY = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 HEX = re.compile(r"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?")
 EDITOR_VALUE = re.compile(r"(#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9.]*)( @ \d{1,3}%)?(, italic)?(, bold)?")

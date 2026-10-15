@@ -4,13 +4,13 @@ import static org.assertj.core.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
-/** The built-in themes: Slate Steel, then Catppuccin's four flavours converted from its IntelliJ plugin (tools/themes/catppuccin). */
+/** The built-in themes: Slate Cobalt, then Catppuccin's four flavours converted from its IntelliJ plugin (tools/themes/catppuccin). */
 class BuiltInThemesTest {
-    @Test void slateSteelComesFirstThenCatppuccinsFlavours() {
+    @Test void slateCobaltComesFirstThenCatppuccinsFlavours() {
         assertThat(JasperTheme.builtIns()).extracting(JasperTheme::id)
-            .containsExactly("slate-steel", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha");
+            .containsExactly("slate-cobalt", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha");
         assertThat(JasperTheme.builtIns()).extracting(JasperTheme::name)
-            .containsExactly("Slate Steel", "Catppuccin Latte", "Catppuccin Frappé", "Catppuccin Macchiato", "Catppuccin Mocha");
+            .containsExactly("Slate Cobalt", "Catppuccin Latte", "Catppuccin Frappé", "Catppuccin Macchiato", "Catppuccin Mocha");
         assertThat(JasperTheme.builtIns().getFirst()).isSameAs(JasperTheme.bundled());
     }
 

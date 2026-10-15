@@ -19,12 +19,12 @@ class SettingsAppearanceTest {
         var themes = Files.createDirectories(home.resolve("themes"));
         Files.writeString(themes.resolve("ocean.json"), ThemeTestSupport.uiThemeJson("Ocean"));
         Files.writeString(themes.resolve("zenburn.json"), ThemeTestSupport.terminalThemeJson("Zenburn"));
-        Files.writeString(themes.resolve("steel-ii.json"), ThemeTestSupport.terminalThemeJson("Slate Steel"));
+        Files.writeString(themes.resolve("cobalt-ii.json"), ThemeTestSupport.terminalThemeJson("Slate Cobalt"));
         var choices = SettingsAppearance.themeChoices(ThemeLibrary.read(themes, ThemeLibrary.bundledOnly()));
         assertThat(choices.dark()).extracting(InstalledThemes.ThemeOption::id)
-            .containsExactly("slate-steel", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ocean");
-        assertThat(choices.light()).extracting(InstalledThemes.ThemeOption::id).containsExactly("slate-steel", "catppuccin-latte", "ocean");
-        assertThat(choices.names()).containsOnly(Map.entry("slate-steel", "Slate Steel (slate-steel)"), Map.entry("steel-ii", "Slate Steel (steel-ii)"),
+            .containsExactly("slate-cobalt", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ocean");
+        assertThat(choices.light()).extracting(InstalledThemes.ThemeOption::id).containsExactly("slate-cobalt", "catppuccin-latte", "ocean");
+        assertThat(choices.names()).containsOnly(Map.entry("slate-cobalt", "Slate Cobalt (slate-cobalt)"), Map.entry("cobalt-ii", "Slate Cobalt (cobalt-ii)"),
             Map.entry("catppuccin-latte", "Catppuccin Latte"), Map.entry("catppuccin-frappe", "Catppuccin Frapp\u00e9"),
             Map.entry("catppuccin-macchiato", "Catppuccin Macchiato"), Map.entry("catppuccin-mocha", "Catppuccin Mocha"),
             Map.entry("ocean", "Ocean"), Map.entry("zenburn", "Zenburn"));

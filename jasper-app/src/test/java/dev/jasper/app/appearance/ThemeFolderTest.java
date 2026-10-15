@@ -45,8 +45,8 @@ class ThemeFolderTest {
             .isInstanceOf(ThemeFolder.ImportFailure.class).hasMessage("terminal.dark: Missing colour \"fg.bold\"");
         assertThatThrownBy(() -> folder.prepare(source("broken.json", "{ \"jasper-theme\": 1,\n  \"name\": ")))
             .hasMessageStartingWith("line 2: ");
-        assertThatThrownBy(() -> folder.prepare(source("steel.json", ThemeTestSupport.uiThemeJson("Slate Steel"))))
-            .hasMessage("Slate Steel is built in and can't be replaced");
+        assertThatThrownBy(() -> folder.prepare(source("cobalt.json", ThemeTestSupport.uiThemeJson("Slate Cobalt"))))
+            .hasMessage("Slate Cobalt is built in and can't be replaced");
         assertThatThrownBy(() -> folder.prepare(source("mocha.json", ThemeTestSupport.uiThemeJson("Catppuccin Mocha"))))
             .hasMessage("Catppuccin Mocha is built in and can't be replaced");
         assertThatThrownBy(() -> folder.prepare(source("night.json", ThemeTestSupport.terminalThemeJson("Ночь"))))
@@ -88,13 +88,13 @@ class ThemeFolderTest {
         }
     }
 
-    @Test void removingDeletesTheFileAndNeverTouchesSlateSteel() throws Exception {
+    @Test void removingDeletesTheFileAndNeverTouchesSlateCobalt() throws Exception {
         var folder = new ThemeFolder(home.resolve("themes"));
         folder.install(folder.prepare(source("z.json", ThemeTestSupport.terminalThemeJson("Zenburn"))));
         folder.remove("zenburn");
         assertThat(home.resolve("themes/zenburn.json")).doesNotExist();
         assertThatThrownBy(() -> folder.remove("zenburn")).isInstanceOf(java.nio.file.NoSuchFileException.class);
-        assertThatThrownBy(() -> folder.remove("slate-steel")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> folder.remove("slate-cobalt")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> folder.remove("catppuccin-latte")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> folder.remove("../config")).isInstanceOf(IllegalArgumentException.class);
     }

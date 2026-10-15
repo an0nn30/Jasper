@@ -8,7 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * FlatLaf's colour defaults for a Slate Steel variant, each from a semantic role; text selection in text components
+ * FlatLaf's colour defaults for a Slate Cobalt variant, each from a semantic role; text selection in text components
  * takes the variant's terminal selection and a search field's no-match background the {@linkplain #errorTint error
  * tint}. Order matters: a {@code *.suffix} key recolours the keys before it that end in the suffix.
  */

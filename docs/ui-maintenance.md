@@ -13,7 +13,7 @@ Use Java 25 JetBrains Runtime and the wrapper. All commands here stay headless:
 
 The gallery is a test-runtime entry point. It writes individual PNG/JSON captures, six full-resolution
 contact sheets and a manifest under `jasper-ui/build/gallery/<theme>-<scale>x`. `galleryScale` accepts
-1/2; `galleryTheme` accepts dark/light (Slate Steel's variants). JSON records bounds, actual enabled/focus
+1/2; `galleryTheme` accepts dark/light (Slate Cobalt's variants). JSON records bounds, actual enabled/focus
 state, typed descriptor busy/error/visibility state, route, central font and scale. It excludes values
 and secrets. Coverage tests require all 26 nodes, enum variants, nine originals and real panel
 transitions. Test and gallery classes stay out of the production jar.
@@ -26,7 +26,7 @@ suppress the native caps-lock query and supply deterministic focus. Every view/c
 registry and focus/caret lifetime closes in `finally`; the process exits normally.
 
 Compare original crops using [calibration](design/theme-engine/calibration.md). Correct components
-or fixtures when measurements differ; do not loosen thresholds. Captures use Slate Steel Dark or Light (the
+or fixtures when measurements differ; do not loosen thresholds. Captures use Slate Cobalt Dark or Light (the
 calibration themes are retired); renderers never fall back to fixed colours. Font rasterization and
 native focus/window acceptance remain separate from deterministic geometry tests.
 

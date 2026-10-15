@@ -315,7 +315,7 @@ acceptance remain unexecuted on macOS.
 - [ ] Copy the installed app with `cp -R` to another folder and launch the copy: it starts, and its start-up line reports the cache as stale.
 - [ ] Confirm the Ember Jasper icon in Finder, Dock and Cmd+Tab at normal and Retina sizes; compare its apparent size with neighboring app icons.
 - [ ] With a minimal launcher environment, confirm the shell starts and UTF-8 text renders correctly.
-- [ ] Confirm native title controls and switching between Slate Steel Dark and Light.
+- [ ] Confirm native title controls and switching between Slate Cobalt Dark and Light.
 - [ ] Confirm the window controls are the macOS 26 style (larger, glass) in the packaged app, unlike `./gradlew :jasper-app:run`.
 - [ ] Confirm multiple windows and shell-exit cleanup.
 - [ ] Confirm tmux mouse input including right-click and pane drag resizing.
@@ -351,7 +351,7 @@ acceptance remain unexecuted on macOS.
 - [ ] Confirm PowerShell/PTY input and resize behavior, including Unicode text.
 - [ ] Confirm clipboard operations and tab shortcuts.
 - [ ] Confirm the Settings location and live reload.
-- [ ] Confirm switching between Slate Steel Dark and Light, multiple windows, and shell-exit cleanup.
+- [ ] Confirm switching between Slate Cobalt Dark and Light, multiple windows, and shell-exit cleanup.
 - [ ] Confirm tmux mouse input including right-click and pane drag resizing.
 - [ ] Confirm vim and htop behavior.
 - [ ] Confirm ligatures, Nerd Font icons, emoji, CJK, and truecolor rendering.
@@ -370,7 +370,7 @@ acceptance remain unexecuted on macOS.
 - [ ] Install the `.deb` on Debian/Ubuntu and the `.rpm` on Fedora (or openSUSE), on x64 and on aarch64, with no external Java installed.
 - [ ] Launch Jasper from the desktop menu; confirm the Ember icon in the menu, the dock/taskbar and the window switcher, and that the running window groups with its launcher (not a generic icon) on GNOME and KDE, under X11 and Wayland.
 - [ ] Confirm the shell starts, UTF-8 text renders, and Settings lives under `~/.config/jasper` (or `$XDG_CONFIG_HOME/jasper`).
-- [ ] Confirm switching between Slate Steel Dark and Light, multiple windows, and shell-exit cleanup.
+- [ ] Confirm switching between Slate Cobalt Dark and Light, multiple windows, and shell-exit cleanup.
 - [ ] Confirm tmux mouse input including right-click and pane drag resizing.
 - [ ] Confirm vim and htop behavior.
 - [ ] Confirm ligatures, Nerd Font icons, emoji, CJK, and truecolor rendering.

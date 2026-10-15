@@ -217,15 +217,15 @@ family = "system"
 | `terminal.dim_inactive_panes` | `0.3` | Finite number 0–1; 0 disables dimming, 1 fully dims | Live |
 | `terminal.copy_on_select` | `false` | Boolean | Live |
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
-| `terminal.scheme` | `"match"` | `"match"` or a scheme id such as `"slate-steel/high-contrast"`: the terminal panes' colors ([Themes](themes.md)) | Live |
+| `terminal.scheme` | `"match"` | `"match"` or a scheme id such as `"slate-cobalt/high-contrast"`: the terminal panes' colors ([Themes](themes.md)) | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately | Live |
 | `ui.appearance` | `"system"` | `"system"` (the operating system's light or dark), `"dark"`, `"light"` | Live |
-| `ui.theme.dark` | `"slate-steel"` | A theme id: the theme the Dark appearance shows ([Themes](themes.md)) | Live |
-| `ui.theme.light` | `"slate-steel"` | A theme id: the theme the Light appearance shows ([Themes](themes.md)) | Live |
+| `ui.theme.dark` | `"slate-cobalt"` | A theme id: the theme the Dark appearance shows ([Themes](themes.md)) | Live |
+| `ui.theme.light` | `"slate-cobalt"` | A theme id: the theme the Light appearance shows ([Themes](themes.md)) | Live |
 | `ui.workspace.opacity` | Opaque (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
-| `ui.workspace.blur` | `"theme"` | `"theme"` (Slate Steel's: no blur), `"on"`, `"off"`; macOS only, ignored elsewhere | Live |
+| `ui.workspace.blur` | `"theme"` | `"theme"` (Slate Cobalt's: no blur), `"on"`, `"off"`; macOS only, ignored elsewhere | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Desk buddy
@@ -817,16 +817,16 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 ## Theme
 
-Jasper's built-in themes are Slate Steel, in Dark and Light, and Catppuccin Latte, Frappé, Macchiato and Mocha; imported
+Jasper's built-in themes are Slate Cobalt, in Dark and Light, and Catppuccin Latte, Frappé, Macchiato and Mocha; imported
 themes live in the themes folder ([Themes](themes.md)).
 
 `ui.appearance` chooses the UI appearance: `"dark"`, `"light"`, or `"system"` (the default) to follow the operating
 system's light or dark setting live. When the operating system's appearance is unavailable, `"system"` uses Dark. An
 operating-system change never writes `config.toml`. `ui.theme.dark` and `ui.theme.light` name the theme each
-appearance shows, `"slate-steel"` by default.
+appearance shows, `"slate-cobalt"` by default.
 
 `terminal.scheme` chooses the terminal panes' colours: `"match"` (the default) uses the shown theme's own scheme; a
-scheme id such as `"slate-steel/high-contrast"` chooses one. Only the terminal text area changes: tabs, the tab strip,
+scheme id such as `"slate-cobalt/high-contrast"` chooses one. Only the terminal text area changes: tabs, the tab strip,
 the editor and panels stay on the UI appearance.
 
 Appearance and scheme changes keep shells, scrollback, split ratios and font choices. A failed installation keeps the

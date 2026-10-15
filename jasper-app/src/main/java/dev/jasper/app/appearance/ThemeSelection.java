@@ -22,8 +22,8 @@ public record ThemeSelection(ThemeLibrary library, JasperTheme dark, JasperTheme
             throw new IllegalArgumentException("Not an installed scheme: " + scheme.key());
     }
 
-    /** Slate Steel for both appearances, from the built-in library; a scheme the built-in themes lack becomes match. */
-    public static ThemeSelection slateSteel(TerminalSchemeChoice scheme) {
+    /** Slate Cobalt for both appearances, from the built-in library; a scheme the built-in themes lack becomes match. */
+    public static ThemeSelection slateCobalt(TerminalSchemeChoice scheme) {
         return of(ThemeLibrary.bundledOnly(), JasperTheme.BUNDLED_ID, JasperTheme.BUNDLED_ID, scheme, (key, message) -> { });
     }
 

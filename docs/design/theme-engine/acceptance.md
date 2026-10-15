@@ -128,7 +128,7 @@ The user's checks after the first native pass found the dialog title rows standa
 
 Plan [`2026-10-12-slate-steel-1-engine-and-kit.md`](../../superpowers/plans/2026-10-12-slate-steel-1-engine-and-kit.md)
 of the [Slate Steel specification](../../superpowers/specs/2026-10-12-jasper-slate-steel-themes-design.md). The theme is
-built into the engine from [`slate-steel.md`](slate-steel.md) (the user's `theme.md` plus derived editor schemes) but not
+built into the engine from [`slate-steel.md`](slate-cobalt.md) (the user's `theme.md` plus derived editor schemes) but not
 yet installed: Plan 2 switches the app to it, Plan 3 removes the old themes. Until then the legacy themes give the ten new
 roles the colour their component painted before, so the app looks as it did except where a component moved roles (the
 legacy tab strip is the terminal background sunk 30% toward black in a dark theme and 6% in a light one, as the strip

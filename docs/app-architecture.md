@@ -228,7 +228,7 @@ icon values or identities, and their painting and text sizes come from `NativeCh
 
 ## Themes
 
-The built-in themes are Slate Steel and Catppuccin's four flavours; installed themes are Jasper theme files in
+The built-in themes are Slate Cobalt and Catppuccin's four flavours; installed themes are Jasper theme files in
 `<home>/themes/` ([themes](themes.md)).
 `ThemeManager.install` installs a variant through jasper-ui's `FlatLafInstaller` (FlatLaf's IntelliJ-format input from
 the theme's UI keys, which `UiColorKeys` derives from the semantic roles, then the `Jasper.semantic.*` role keys and
@@ -236,7 +236,7 @@ the popup shadow) and adds the app's native defaults: the split divider border b
 Tool windows paint `surface.panel` (theme.md's tool-window body) through `ToolWindowSurface`, their headers included; the stripes stay chrome.
 
 `JasperTheme` (jasper-ui) reads a theme file into one `GeneratedTheme` per variant and its terminal schemes;
-`JasperTheme.bundled()` is Slate Steel, `builtIns()` every built-in theme. `appearance.ThemeLibrary` holds the built-in themes and every valid
+`JasperTheme.bundled()` is Slate Cobalt, `builtIns()` every built-in theme. `appearance.ThemeLibrary` holds the built-in themes and every valid
 `<home>/themes/*.json`, reusing the parsed theme of an unchanged file, and keeps a problem for each file it skips.
 `appearance.ThemeSelection` is the Dark and Light theme picks and the scheme choice from one library; its `of` replaces
 a pick the library cannot honour by its default and reports it. `ThemeController.configure(dark, selection, font)`

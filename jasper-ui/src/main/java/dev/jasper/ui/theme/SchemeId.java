@@ -4,7 +4,7 @@ import java.util.Optional;
 
 /**
  * A terminal scheme's id: its theme's id and its key in that theme's file, written {@code theme/key}, such as
- * {@code slate-steel/high-contrast}.
+ * {@code slate-cobalt/high-contrast}.
  */
 public record SchemeId(String theme, String key) {
     public SchemeId {

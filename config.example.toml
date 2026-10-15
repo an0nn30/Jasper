@@ -94,7 +94,7 @@ on_exit = "keep_open"
 # "manual" only exports JASPER_SHELL_INTEGRATION for you to source; "off" does neither.
 shell_integration = "auto"
 # Colors for terminal panes, live: "match" uses the shown theme's own scheme; or a scheme id, <theme id>/<scheme key>,
-# such as "slate-steel/dark", "slate-steel/light" or "slate-steel/high-contrast".
+# such as "slate-cobalt/dark", "slate-cobalt/light" or "slate-cobalt/high-contrast".
 scheme = "match"
 
 [terminal.shell]
@@ -131,10 +131,10 @@ blink = true
 appearance = "system"
 
 [ui.theme]
-# The themes the Dark and Light appearances show, live: "slate-steel", a built-in Catppuccin flavour such as
-# "catppuccin-mocha", or an imported theme's id (its file name in the themes folder without .json). A theme without that variant is reported and Slate Steel is used.
-dark = "slate-steel"
-light = "slate-steel"
+# The themes the Dark and Light appearances show, live: "slate-cobalt", a built-in Catppuccin flavour such as
+# "catppuccin-mocha", or an imported theme's id (its file name in the themes folder without .json). A theme without that variant is reported and Slate Cobalt is used.
+dark = "slate-cobalt"
+light = "slate-cobalt"
 
 [ui.font]
 # Live UI font for app chrome and plugin controls, independent of [terminal.font].
@@ -148,7 +148,7 @@ family = "system"
 # macOS only (ignored on other platforms), live: translucent terminal and editor backgrounds. Omit opacity to keep the terminal area opaque.
 # Opacity: 10-100 percent.
 # opacity = 95
-# Blur behind a translucent workspace: "theme" (Slate Steel does not blur), "on" or "off".
+# Blur behind a translucent workspace: "theme" (Slate Cobalt does not blur), "on" or "off".
 blur = "theme"
 
 [ui.animations]

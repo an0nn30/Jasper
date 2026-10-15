@@ -15,7 +15,7 @@ public final class KitFixtures {
 
     public static GeneratedTheme light() { return JasperTheme.bundled().generated(false); }
 
-    /** A third appearance: Slate Steel Dark with every role 20% plum (alpha kept), so a hard-coded variant colour shows. */
+    /** A third appearance: Slate Cobalt Dark with every role 20% plum (alpha kept), so a hard-coded variant colour shows. */
     public static GeneratedTheme custom() {
         var plum = new java.awt.Color(0x7a3fa0);
         var values = new java.util.EnumMap<SemanticColor, java.awt.Color>(SemanticColor.class);

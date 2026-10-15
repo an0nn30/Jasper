@@ -18,7 +18,7 @@ class WindowCommandsTest {
                 assertThat(CommandSearch.find(entries, "paste", java.util.List.of(), 5).stream().map(Command::id)).doesNotContain("paste");
                 assertThat(owner.action(ActionId.SPLIT_RIGHT).getValue(Action.NAME)).isEqualTo(ActionId.SPLIT_RIGHT.label());
                 assertThat(owner.action(ActionId.SPLIT_RIGHT).getValue(Command.TITLE)).isEqualTo("Split Right \u00b7 Vertical");
-                assertThat(entries.stream().map(e -> e.command().id())).contains("select_tab_1", "view.terminal_scheme.slate-steel.dark", "view.window_settings")
+                assertThat(entries.stream().map(e -> e.command().id())).contains("select_tab_1", "view.terminal_scheme.slate-cobalt.dark", "view.window_settings")
                     .doesNotContain("view.tab_height", "view.rail_width", "view.toolbar_height", "view.status_bar_height");
                 var windowSettings = entries.stream().map(CommandSearch.Entry::command)
                     .filter(c -> c.id().equals("view.window_settings")).findFirst().orElseThrow();

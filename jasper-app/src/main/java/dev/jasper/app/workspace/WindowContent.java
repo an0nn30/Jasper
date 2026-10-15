@@ -1130,7 +1130,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     ResolvedTheme theme() { return themes.current(); }
 
     /**
-     * Slate Steel's Dark ({@code dark}) or Light variant in every window sharing this window's themes, as
+     * Slate Cobalt's Dark ({@code dark}) or Light variant in every window sharing this window's themes, as
      * {@code ui.appearance} applies it; the terminal scheme stays. Tests and previews switch variants this way.
      */
     void selectVariant(boolean dark) {

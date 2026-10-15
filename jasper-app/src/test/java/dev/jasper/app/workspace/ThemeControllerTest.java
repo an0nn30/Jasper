@@ -59,7 +59,7 @@ class ThemeControllerTest {
                 "Button.foreground", UIManager.getColor("Button.foreground"));
             var changes = new ArrayList<ResolvedTheme>();
             controller.subscribe((value, refresh) -> changes.add(value)); changes.clear();
-            assertThatThrownBy(() -> controller.configure(false, dev.jasper.app.config.TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow(),
+            assertThatThrownBy(() -> controller.configure(false, dev.jasper.app.config.TerminalSchemeChoice.parse("slate-cobalt/high-contrast").orElseThrow(),
                 new dev.jasper.app.config.UiFontConfig("Monospaced", 19)))
                 .isInstanceOf(ThemeController.InstallationFailure.class);
             assertThat(controller.current()).isSameAs(old);
@@ -314,9 +314,9 @@ class ThemeControllerTest {
             assertThat(UIManager.getLookAndFeel()).isSameAs(before);
             assertThat(errors).singleElement().asString().contains("Could not apply theme");
             // The selection rolled back too: a later scheme change keeps Dark instead of retrying Light.
-            themes.configureScheme(dev.jasper.app.config.TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow());
+            themes.configureScheme(dev.jasper.app.config.TerminalSchemeChoice.parse("slate-cobalt/high-contrast").orElseThrow());
             assertThat(themes.current().chrome()).isSameAs(dev.jasper.app.appearance.ThemeTestSupport.generated(true));
-            assertThat(themes.schemeChoice()).isEqualTo(dev.jasper.app.config.TerminalSchemeChoice.parse("slate-steel/high-contrast").orElseThrow());
+            assertThat(themes.schemeChoice()).isEqualTo(dev.jasper.app.config.TerminalSchemeChoice.parse("slate-cobalt/high-contrast").orElseThrow());
         });
     }
 

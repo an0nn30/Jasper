@@ -1,5 +1,15 @@
 # Jasper — Status and Handoff
 
+**Slate Cobalt replaces Slate Steel — 2026-10-14** (`claude/slate-cobalt`, worktree `.claude/worktrees/slate-cobalt`;
+the user's `slate-cobalt (3).json`). Slate Cobalt, in Dark and Light, is the default and fallback theme (`slate-cobalt`,
+author Jasper); Slate Steel is removed with no migration, so a saved `slate-steel` pick is reported and the default used.
+Its terminal schemes are the file's Dark and Light plus Slate Steel's High Contrast, carried over as
+`slate-cobalt/high-contrast`. The colour record is
+[`design/theme-engine/slate-cobalt.md`](design/theme-engine/slate-cobalt.md) (its machine-readable block is the bundled
+file). Every contrast target holds; Light cyan now meets 4.9:1, so it is no longer a named exception. Code, tests, the
+converter's built-in list and living docs say Slate Cobalt; plans, specs, acceptance records and the entries below keep
+Slate Steel. GUI check pending.
+
 **Catppuccin built in — 2026-10-14** (`claude/catppuccin-themes`, worktree `.claude/worktrees/catppuccin-themes`; asked
 for by the user, who will name tweaks after seeing the port). Catppuccin Latte (Light), Frappé, Macchiato and Mocha
 (Dark) are built-in themes beside Slate Steel, which stays the default and the fallback. They are the converter's
@@ -415,7 +425,7 @@ more… recovers from a failed Errors window. See the follow-up round in the
 [acceptance record](design/theme-engine/acceptance.md).
 
 **Slate Steel Plan 1 (engine and kit) complete — 2026-10-12.** On `claude/slate-steel` (not pushed, not merged): the
-user's `theme.md` became [`design/theme-engine/slate-steel.md`](design/theme-engine/slate-steel.md) with derived editor
+user's `theme.md` became [`design/theme-engine/slate-steel.md`](design/theme-engine/slate-cobalt.md) with derived editor
 schemes, bundled as `slate-steel.json` and read by `SlateSteel` into the Dark/Light palettes, the Slate Steel Dark/Light
 and High Contrast terminal schemes (bold foreground included) and complete `GeneratedTheme`s that install into FlatLaf.
 Ten roles were added (SDK 0.15.5; every bundled manifest requires it). Opacity is applied once, and kit components moved
