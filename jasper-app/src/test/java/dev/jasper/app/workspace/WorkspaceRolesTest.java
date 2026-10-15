@@ -45,7 +45,7 @@ class WorkspaceRolesTest {
             var beforeLaf = raw(UIManager.getLookAndFeelDefaults());
             var beforeOverrides = raw(UIManager.getDefaults());
             var transaction = new dev.jasper.ui.swing.AppearanceTransaction(binding, next -> {
-                dev.jasper.ui.swing.FlatLafInstaller.install(next); throw new IllegalStateException("after install");
+                dev.jasper.ui.swing.FlatLafInstaller.install(next, dev.jasper.ui.kit.Kit.DEFAULT); throw new IllegalStateException("after install");
             }, previous -> {});
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> transaction.apply(new ThemePair(light, light)))
                 .hasMessage("after install").satisfies(failure -> assertThat(failure.getSuppressed()).isEmpty());
@@ -62,7 +62,7 @@ class WorkspaceRolesTest {
                 UIManager.put("Label.font", beforeOverrides.get("Label.font"));
                 UIManager.put("defaultFont", beforeOverrides.get("defaultFont"));
             }
-            new dev.jasper.ui.swing.AppearanceTransaction(binding, dev.jasper.ui.swing.FlatLafInstaller::install, previous -> {})
+            new dev.jasper.ui.swing.AppearanceTransaction(binding, next -> dev.jasper.ui.swing.FlatLafInstaller.install(next, dev.jasper.ui.kit.Kit.DEFAULT), previous -> {})
                 .apply(new ThemePair(light, light));
             assertThat(view.getComponent(0)).isSameAs(label);
             assertThat(label.getForeground()).isEqualTo(light.semantic().color(SemanticColor.TEXT_PRIMARY));

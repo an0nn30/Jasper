@@ -101,7 +101,7 @@ class GalleryCoverageTest {
             var workspace = dev.jasper.ui.testsupport.KitFixtures.custom();
             var prior = javax.swing.UIManager.getLookAndFeel();
             try {
-                dev.jasper.ui.swing.FlatLafInstaller.install(workspace);
+                dev.jasper.ui.swing.FlatLafInstaller.install(workspace, dev.jasper.ui.kit.Kit.DEFAULT);
                 try (var binding = new dev.jasper.ui.theme.ThemeBinding(new dev.jasper.ui.theme.ThemePair(chrome, workspace), failure -> { throw new AssertionError(failure); });
                      var icons = KitGallery.icons()) {
                     for (var route : dev.jasper.ui.theme.ThemeRoute.values()) {

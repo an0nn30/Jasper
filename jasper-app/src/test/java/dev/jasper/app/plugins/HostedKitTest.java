@@ -15,7 +15,7 @@ class HostedKitTest {
    dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY,new java.awt.Color(0xa77fc4)));
   var themes=new java.util.concurrent.atomic.AtomicReference<>(new dev.jasper.ui.theme.ThemePair(light,dark));
   var kit=new HostedKit("owner",() -> true,themes::get,null,new Containment(java.awt.EventQueue::isDispatchThread));
-  dev.jasper.ui.swing.FlatLafInstaller.install(light);
+  dev.jasper.ui.swing.FlatLafInstaller.install(light, dev.jasper.ui.kit.Kit.DEFAULT);
   var icon=kit.icon("add");var chrome=new JPanel();var workspace=new JPanel();workspace.putClientProperty("Jasper.zone","workspace");workspace.putClientProperty("Jasper.workspaceTheme",dark);
   try(var registry=new dev.jasper.ui.icons.IconRegistry()) {
    assertThat(icon.getIconWidth()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(registry.size(dev.jasper.ui.model.Nodes.IconSize.RAIL)));

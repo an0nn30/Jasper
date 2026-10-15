@@ -25,7 +25,7 @@ class TitleBarZoneTest {
             "\"surface.titlebar\": \"#27282E\", \"text.titlebar\": \"#DFE1E5\", \"accent\": \"#2563C9\""), "header").generated(false);
         var original = UIManager.getLookAndFeel();
         try {
-            FlatLafInstaller.install(light);
+            FlatLafInstaller.install(light, dev.jasper.ui.kit.Kit.DEFAULT);
             var header = new JPanel();
             ThemeZone.titleBar(header);
             var label = new JLabel();

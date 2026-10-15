@@ -2,6 +2,7 @@ package dev.jasper.ui.swing;
 
 import com.formdev.flatlaf.FlatLaf;
 import com.formdev.flatlaf.IntelliJTheme;
+import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.theme.*;
 import dev.jasper.ui.metrics.DesignMetrics;
 import java.awt.EventQueue;
@@ -11,6 +12,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import javax.swing.UIManager;
 import javax.swing.plaf.ColorUIResource;
 
@@ -23,29 +25,38 @@ public final class FlatLafInstaller {
         if (value instanceof GeneratedTheme theme) return theme;
         throw new IllegalStateException("No Jasper theme installed");
     }
+    /**
+     * The kit the installed appearance was installed under, stored with the LAF beside the theme so rollback restores
+     * both; {@link Kit#DEFAULT} when no Jasper look and feel is installed. Safe on any thread.
+     */
+    public static Kit installedKit() {
+        return UIManager.getLookAndFeelDefaults().get("Jasper.installedKit") instanceof Kit kit ? kit : Kit.DEFAULT;
+    }
     private static final class SnapshotLaf extends IntelliJTheme.ThemeLaf {
         private final GeneratedTheme snapshot;
+        private final Kit kit;
         private final Map<String, Object> ui;
-        SnapshotLaf(IntelliJTheme source, GeneratedTheme snapshot, Map<String, Object> ui) {
-            super(source); this.snapshot = snapshot; this.ui = ui;
+        SnapshotLaf(IntelliJTheme source, GeneratedTheme snapshot, Kit kit, Map<String, Object> ui) {
+            super(source); this.snapshot = snapshot; this.kit = kit; this.ui = ui;
         }
         @Override public javax.swing.UIDefaults getDefaults() {
             var defaults = super.getDefaults();
-            publish(defaults, snapshot, ui);
+            publish(defaults, snapshot, kit, ui);
             return defaults;
         }
     }
-    /** Installs {@code theme}: FlatLaf's colour keys computed from its roles now, then the catalog's geometry. */
-    public static void install(GeneratedTheme theme) {
+    /** Installs {@code theme} under {@code kit}: FlatLaf's colour keys in the kit's key set, its geometry from the kit's metrics. */
+    public static void install(GeneratedTheme theme, Kit kit) {
         if (!EventQueue.isDispatchThread()) throw new IllegalStateException("Appearance requires EDT");
+        Objects.requireNonNull(theme); Objects.requireNonNull(kit);
         // One map, computed from the theme's roles, feeds FlatLaf's input and every republish of the explicit colours.
-        var ui = UiColorKeys.flatLaf(theme, UiKeySet.DEFAULT);
+        var ui = UiColorKeys.flatLaf(theme, kit.uiKeys());
         String json = FlatLafThemeData.json(theme.name(), theme.dark(), theme.author(), ui);
         FlatLaf laf;
-        try { laf = new SnapshotLaf(new IntelliJTheme(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8))), theme, ui); }
+        try { laf = new SnapshotLaf(new IntelliJTheme(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8))), theme, kit, ui); }
         catch (IOException failure) { throw new UncheckedIOException(failure); }
         var fixed = new LinkedHashMap<String, String>();
-        var metrics = DesignMetrics.DEFAULT;
+        var metrics = kit.metrics();
         String control = Integer.toString(metrics.value(DesignMetrics.Role.CONTROL_RADIUS) * 2);
         fixed.put("Component.arc", control);
         fixed.put("TextComponent.arc", control);
@@ -77,14 +88,15 @@ public final class FlatLafInstaller {
 
     private static String insets(int top, int left, int bottom, int right) { return top + "," + left + "," + bottom + "," + right; }
 
-    // A LAF reinstall (including rollback) obtains fresh defaults; publish the same immutable snapshot every time.
-    private static void publish(javax.swing.UIDefaults defaults, GeneratedTheme theme, Map<String, Object> ui) {
+    // A LAF reinstall (including rollback) obtains fresh defaults; publish the same immutable snapshot and kit every time.
+    private static void publish(javax.swing.UIDefaults defaults, GeneratedTheme theme, Kit kit, Map<String, Object> ui) {
         defaults.put("Jasper.installedTheme", theme);
+        defaults.put("Jasper.installedKit", kit);
         FlatLafThemeData.explicitColors(ui).forEach((key, color) -> defaults.put(key, new ColorUIResource(color)));
         for (var role : SemanticColor.values()) defaults.put("Jasper.semantic." + role.key(), new ColorUIResource(theme.semantic().color(role)));
         // Popovers and menus: FlatLaf's painted popup shadow (macOS keeps its native one), black at theme.md's strength.
         defaults.put("Popup.dropShadowColor", new ColorUIResource(java.awt.Color.BLACK));
-        defaults.put("Popup.dropShadowOpacity", DesignMetrics.DEFAULT.value(theme.dark()
+        defaults.put("Popup.dropShadowOpacity", kit.metrics().value(theme.dark()
             ? DesignMetrics.Role.POPOVER_SHADOW_PERCENT_DARK : DesignMetrics.Role.POPOVER_SHADOW_PERCENT_LIGHT) / 100f);
         var palette = theme.semantic();
         // FlatLaf primitives also inherit the canonical roles; kit paints use the palette directly.

@@ -248,7 +248,7 @@ public final class JasperApplication {
         // The configuration reports unusable picks; start-up only replaces them.
         var selection = dev.jasper.app.appearance.ThemeSelection.of(library, startup.darkTheme(), startup.lightTheme(),
             startup.terminalScheme(), (key, message) -> { });
-        themes = ThemeController.startup(dark, selection,
+        themes = ThemeController.startup(dark, selection, dev.jasper.ui.kit.Kit.DEFAULT,
             failure -> LOG.log(System.Logger.Level.WARNING, "Starting in Slate Cobalt Dark: " + failure.getMessage(), failure));
         // App-native menus show each item's action binding from the live keymap.
         themes.appearance().shortcuts(this::shortcutLabel);

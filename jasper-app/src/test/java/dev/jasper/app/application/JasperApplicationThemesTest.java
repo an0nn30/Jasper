@@ -31,9 +31,13 @@ class JasperApplicationThemesTest {
                 try { UIManager.setLookAndFeel(new javax.swing.plaf.metal.MetalLookAndFeel()); }
                 catch (javax.swing.UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
                 org.assertj.core.api.Assertions.assertThatIllegalStateException().isThrownBy(dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+                assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedKit()).as("no Jasper look and feel yet: the default kit")
+                    .isSameAs(dev.jasper.ui.kit.Kit.DEFAULT);
                 application[0] = new JasperApplication(service, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
                 var expected = JasperTheme.bundled().generated(dark);
                 assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(expected);
+                assertThat(UIManager.getLookAndFeelDefaults().get("Jasper.installedKit")).as("start-up publishes its kit with the theme")
+                    .isSameAs(dev.jasper.ui.kit.Kit.DEFAULT);
                 assertThat(dev.jasper.app.platform.ThemeZone.theme(null)).isSameAs(expected);
                 // Plan 2 finding 8: the configured scheme reaches the terminal palette.
                 assertThat(application[0].themes().current().palette())

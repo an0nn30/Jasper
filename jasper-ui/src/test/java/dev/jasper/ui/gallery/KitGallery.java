@@ -103,7 +103,7 @@ public final class KitGallery {
             var focus = new GalleryFocus();
             try {
                 // Install before creating any gallery widget, including transition controllers.
-                FlatLafInstaller.install(theme);
+                FlatLafInstaller.install(theme, dev.jasper.ui.kit.Kit.DEFAULT);
                 UIManager.put("PasswordField.showCapsLock", false); // native keyboard-lock queries are unavailable headlessly
                 UIManager.put("defaultFont", new Font(family, Font.PLAIN, 13));
                 if (!(UIManager.getLookAndFeel() instanceof FlatLaf)) throw new AssertionError("Gallery must use real FlatLaf");

@@ -21,7 +21,7 @@ class KitCalibrationTest {
         Edt.run(() -> {
             var old = UIManager.getLookAndFeel(); Object font = UIManager.get("defaultFont"); UIManager.put("defaultFont", new Font(dev.jasper.ui.testsupport.KitFixtures.platformFamily(), Font.PLAIN, 13)); var context = KitFixtures.context();
             try {
-                FlatLafInstaller.install(context.theme());
+                FlatLafInstaller.install(context.theme(), dev.jasper.ui.kit.Kit.DEFAULT);
                 try (var view = new KitView(context, new ViewSpec(new Field("field", ControlState.READY, FieldKind.TEXT, "", "Placeholder calibration", "Label", "")), e -> {})) {
                     var control = (TextFields.FieldControl)view.control("field");
                     var before = KitFixtures.render(view, UIScale.scale(400), UIScale.scale(70), 1);
@@ -36,7 +36,7 @@ class KitCalibrationTest {
         Edt.run(() -> {
             var old = UIManager.getLookAndFeel(); Object font = UIManager.get("defaultFont"); UIManager.put("defaultFont", new Font(dev.jasper.ui.testsupport.KitFixtures.platformFamily(), Font.PLAIN, 13)); var context = KitFixtures.context();
             try {
-                FlatLafInstaller.install(context.theme());
+                FlatLafInstaller.install(context.theme(), dev.jasper.ui.kit.Kit.DEFAULT);
                 try (var view = new KitView(context, new ViewSpec(new Nodes.Button("button", ControlState.READY, "Continue", "", ButtonKind.PRIMARY, "continue", "")), e -> {})) {
                     var button = view.control("button").component;
                     int width = UIScale.scale(120), height = UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT));
@@ -56,7 +56,7 @@ class KitCalibrationTest {
             var old = UIManager.getLookAndFeel(); var priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager();
             Object font = UIManager.get("defaultFont"); UIManager.put("defaultFont", new Font(dev.jasper.ui.testsupport.KitFixtures.platformFamily(), Font.PLAIN, 13)); var manager = new FocusManager(); var context = KitFixtures.context();
             try {
-                FlatLafInstaller.install(context.theme()); KeyboardFocusManager.setCurrentKeyboardFocusManager(manager);
+                FlatLafInstaller.install(context.theme(), dev.jasper.ui.kit.Kit.DEFAULT); KeyboardFocusManager.setCurrentKeyboardFocusManager(manager);
                 var field = new Field("field", ControlState.READY, FieldKind.TEXT, "", "Value", "Label", "");
                 var form = new Form("form", ControlState.READY, FormKind.FULL, "Form", Optional.empty(), List.of(new FormRow("row", ControlState.READY, "Label", "", field, Optional.empty())), Optional.empty(), List.of(), "cancel");
                 try (var view = new KitView(context, new ViewSpec(form), e -> {})) {
@@ -225,7 +225,7 @@ class KitCalibrationTest {
             var oldRepaint = RepaintManager.currentManager(null); var repaint = new DirtyRegions();
             var manager = new FocusManager(); var context = KitFixtures.context();
             try {
-                FlatLafInstaller.install(context.theme()); KeyboardFocusManager.setCurrentKeyboardFocusManager(manager);
+                FlatLafInstaller.install(context.theme(), dev.jasper.ui.kit.Kit.DEFAULT); KeyboardFocusManager.setCurrentKeyboardFocusManager(manager);
                 RepaintManager.setCurrentManager(repaint);
                 var field = new Field("field", ControlState.READY, FieldKind.TEXT, "", "Value", "Label", "");
                 var form = new Form("form", ControlState.READY, FormKind.FULL, "Form", Optional.empty(), List.of(new FormRow("row", ControlState.READY, "Label", "", field, Optional.empty())), Optional.empty(), List.of(), "cancel");

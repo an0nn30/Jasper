@@ -29,7 +29,7 @@ class ShippedControlReadabilityTest {
                     var button = KitTestSupport.require(view, "toggle", JButton.class);
                     for (boolean dark : new boolean[]{false, true, false}) {
                         var theme = ThemeTestSupport.generated(dark);
-                        FlatLafInstaller.install(theme); binding.publish(new ThemePair(theme, theme)); SwingUtilities.updateComponentTreeUI(view);
+                        FlatLafInstaller.install(theme, dev.jasper.ui.kit.Kit.DEFAULT); binding.publish(new ThemePair(theme, theme)); SwingUtilities.updateComponentTreeUI(view);
                         button.setSize(button.getPreferredSize()); var image = paint(button);
                         // Centers of the left knob and right track avoid antialiasing and the shadow.
                         Color knob = new Color(image.getRGB(button.getWidth() / 4, button.getHeight() / 2), true);

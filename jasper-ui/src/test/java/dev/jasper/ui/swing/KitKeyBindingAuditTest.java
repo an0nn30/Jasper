@@ -34,7 +34,7 @@ class KitKeyBindingAuditTest {
         Edt.run(() -> {
             var prior = UIManager.getLookAndFeel();
             try {
-                FlatLafInstaller.install(KitFixtures.dark());
+                FlatLafInstaller.install(KitFixtures.dark(), dev.jasper.ui.kit.Kit.DEFAULT);
                 body.run();
             } finally {
                 try { UIManager.setLookAndFeel(prior); } catch (UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }

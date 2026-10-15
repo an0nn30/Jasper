@@ -51,7 +51,7 @@ class PickerMenusTest {
   }catch(ReflectiveOperationException failure){throw new AssertionError(failure);}finally{release(context);}
  });}
  @Test void installedPopupWrapperFitsExactMenuWithoutScrollbar(){Edt.run(()->{
-  var context=KitFixtures.context();var priorLaf=javax.swing.UIManager.getLookAndFeel();FlatLafInstaller.install(context.theme());
+  var context=KitFixtures.context();var priorLaf=javax.swing.UIManager.getLookAndFeel();FlatLafInstaller.install(context.theme(), dev.jasper.ui.kit.Kit.DEFAULT);
   var menu=new Nodes.PickerMenu("menu",ControlState.READY,"staging","Search credentials",List.of(),"","create","No credentials match “staging”","New Credential…","create","cancel");
   try(var view=new KitView(context,new ViewSpec(menu),e->{})){
    var popup=new JPopupMenu();popup.setLayout(new java.awt.BorderLayout());popup.setBorder(new javax.swing.border.EmptyBorder(0,0,0,0));popup.setOpaque(false);popup.add(view);popup.setPopupSize(222,107);popup.setSize(222,107);SwingUtilities.updateComponentTreeUI(popup);layout(popup);

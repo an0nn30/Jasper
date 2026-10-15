@@ -2,6 +2,7 @@ package dev.jasper.app.appearance;
 
 import dev.jasper.app.config.TerminalSchemeChoice;
 import dev.jasper.app.config.UiFontConfig;
+import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.theme.GeneratedTheme;
 import dev.jasper.ui.theme.JasperTheme;
 import java.awt.Font;
@@ -46,16 +47,16 @@ public final class ThemeController implements AutoCloseable {
         "PasswordField.font", "FormattedTextField.font", "TextArea.font", "ComboBox.font", "Button.font");
 
     /**
-     * Start-up selection: {@code selection} in {@code dark}, or Slate Cobalt Dark when that cannot be installed. A failed
-     * attempt is rolled back completely, and the fallback is installed before this returns, so nothing can read the
-     * installed snapshot (ThemeZone, named icons, native chrome) before one exists. The fallback's own failure propagates.
+     * Start-up selection under {@code kit}: {@code selection} in {@code dark}, or Slate Cobalt Dark when that cannot be
+     * installed. Every install of the controller (the fallback's and every later configuration's) uses {@code kit}. A
+     * failed attempt is rolled back completely, and the fallback is installed before this returns, so nothing can read
+     * the installed snapshot (ThemeZone, named icons, native chrome) before one exists. The fallback's own failure
+     * propagates.
      */
-    public static ThemeController startup(boolean dark, ThemeSelection selection, java.util.function.Consumer<InstallationFailure> fallingBack) {
-        return startup(dark, selection, ThemeManager::install, fallingBack);
-    }
-    /** As {@link #startup(boolean, ThemeSelection, java.util.function.Consumer)} for Slate Cobalt with {@code scheme}. */
-    public static ThemeController startup(boolean dark, TerminalSchemeChoice scheme, java.util.function.Consumer<InstallationFailure> fallingBack) {
-        return startup(dark, ThemeSelection.slateCobalt(scheme), fallingBack);
+    public static ThemeController startup(boolean dark, ThemeSelection selection, Kit kit,
+                                          java.util.function.Consumer<InstallationFailure> fallingBack) {
+        Objects.requireNonNull(kit);
+        return startup(dark, selection, theme -> ThemeManager.install(theme, kit), fallingBack);
     }
     static ThemeController startup(boolean dark, TerminalSchemeChoice scheme, Predicate<GeneratedTheme> installer,
                                    java.util.function.Consumer<InstallationFailure> fallingBack) {
@@ -71,16 +72,20 @@ public final class ThemeController implements AutoCloseable {
         }
     }
 
-    /** Slate Cobalt in {@code dark} with {@code scheme}. */
-    public ThemeController(boolean dark, TerminalSchemeChoice scheme) { this(dark, scheme, ThemeManager::install); }
+    /** Slate Cobalt in {@code dark} with {@code scheme}, under the default kit. */
+    public ThemeController(boolean dark, TerminalSchemeChoice scheme) { this(dark, scheme, ThemeController::installDefault); }
     ThemeController(boolean dark, TerminalSchemeChoice scheme, Predicate<GeneratedTheme> installer) {
         this(new Shown(dark, ThemeSelection.slateCobalt(Objects.requireNonNull(scheme))), installer);
     }
-    /** {@code selection} in {@code dark}. */
-    public ThemeController(boolean dark, ThemeSelection selection) { this(new Shown(dark, Objects.requireNonNull(selection)), ThemeManager::install); }
+    /** {@code selection} in {@code dark}, under the default kit. */
+    public ThemeController(boolean dark, ThemeSelection selection) {
+        this(new Shown(dark, Objects.requireNonNull(selection)), ThemeController::installDefault);
+    }
     ThemeController(boolean dark, ThemeSelection selection, Predicate<GeneratedTheme> installer) {
         this(new Shown(dark, Objects.requireNonNull(selection)), installer);
     }
+    /** The installer of the controllers made without a kit. */
+    private static boolean installDefault(GeneratedTheme theme) { return ThemeManager.install(theme, Kit.DEFAULT); }
     private ThemeController(Shown shown, Predicate<GeneratedTheme> installer) {
         requireEdt();
         this.installer = Objects.requireNonNull(installer);

@@ -326,7 +326,7 @@ class NoticeKitTest {
         Edt.run(() -> {
             // FlatLaf's menu item delegate parses markup as soon as text is set (the order dependence the app suite hit).
             var prior = UIManager.getLookAndFeel();
-            FlatLafInstaller.install(KitFixtures.dark());
+            FlatLafInstaller.install(KitFixtures.dark(), dev.jasper.ui.kit.Kit.DEFAULT);
             var context = KitFixtures.context();
             var menu = List.of(new MenuItem("evil", "<html><b>Evil</b>", "", "evil", true, false));
             var spec = new ViewSpec(new Stack("root", READY, LayoutRole.VERTICAL, List.of(

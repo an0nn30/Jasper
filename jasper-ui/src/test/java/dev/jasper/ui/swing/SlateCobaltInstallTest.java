@@ -21,7 +21,7 @@ class SlateCobaltInstallTest {
                 for (boolean dark : new boolean[] {true, false}) {
                     var theme = JasperTheme.bundled().generated(dark);
                     assertThat(UiColorKeys.flatLaf(theme, UiKeySet.DEFAULT)).doesNotContainKeys("Popup.dropShadowColor", "Popup.dropShadowOpacity");
-                    FlatLafInstaller.install(theme);
+                    FlatLafInstaller.install(theme, dev.jasper.ui.kit.Kit.DEFAULT);
                     assertThat(UIManager.getColor("Popup.dropShadowColor")).isEqualTo(java.awt.Color.BLACK);
                     assertThat(((Number) UIManager.get("Popup.dropShadowOpacity")).doubleValue()).isCloseTo(dark ? .5 : .18,
                         org.assertj.core.data.Offset.offset(1e-6));
@@ -36,7 +36,7 @@ class SlateCobaltInstallTest {
         Edt.run(() -> {
             var prior = UIManager.getLookAndFeel();
             try {
-                FlatLafInstaller.install(JasperTheme.bundled().generated(true));
+                FlatLafInstaller.install(JasperTheme.bundled().generated(true), dev.jasper.ui.kit.Kit.DEFAULT);
                 for (var key : List.of("Button.arc", "Component.arc", "TextComponent.arc")) assertThat(UIManager.getInt(key)).as(key).isEqualTo(8);
                 assertThat(UIManager.getInsets("Button.margin")).isEqualTo(new Insets(2, 14, 2, 14));
                 assertThat(UIManager.getInt("Button.minimumWidth")).isEqualTo(72);
@@ -57,13 +57,42 @@ class SlateCobaltInstallTest {
         });
     }
 
+    /** Enterprise presentation plan 1: the default kit's FlatLaf extras, frozen whole; the seam changed no key or value. */
+    @Test void theDefaultKitsExtrasAreTheFormerOnes() {
+        Edt.run(() -> {
+            var prior = UIManager.getLookAndFeel();
+            try {
+                FlatLafInstaller.install(JasperTheme.bundled().generated(true), dev.jasper.ui.kit.Kit.DEFAULT);
+                var expected = new java.util.LinkedHashMap<String, String>();
+                for (var key : List.of("Component.arc", "TextComponent.arc", "Button.arc")) expected.put(key, "8");
+                expected.put("Component.focusWidth", "3");
+                expected.put("Button.minimumHeight", "24");
+                expected.put("Component.minimumHeight", "24");
+                expected.put("Button.margin", "2,14,2,14");
+                expected.put("Button.minimumWidth", "72");
+                for (var key : List.of("List", "Tree", "Table", "ComboBox", "MenuItem")) {
+                    expected.put(key + ".selectionArc", "0");
+                    expected.put(key + ".selectionInsets", "0,0,0,0");
+                }
+                for (var key : List.of("MenuItem", "Menu", "CheckBoxMenuItem", "RadioButtonMenuItem")) expected.put(key + ".margin", "3,8,3,8");
+                expected.put("PopupMenu.borderInsets", "4,1,4,1");
+                expected.put("Popup.borderCornerRadius", "6");
+                expected.put("PopupMenu.borderCornerRadius", "6");
+                assertThat(((com.formdev.flatlaf.FlatLaf) UIManager.getLookAndFeel()).getExtraDefaults()).isEqualTo(expected);
+                assertThat(UIManager.getLookAndFeelDefaults().get("Jasper.installedKit")).isSameAs(dev.jasper.ui.kit.Kit.DEFAULT);
+            } finally {
+                try { UIManager.setLookAndFeel(prior); } catch (UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
+            }
+        });
+    }
+
     @Test void nativeMenusTakeTheKitMenusRoles() {
         Edt.run(() -> {
             var prior = UIManager.getLookAndFeel();
             try {
                 for (boolean dark : new boolean[] {true, false}) {
                     var theme = JasperTheme.bundled().generated(dark); var p = theme.semantic();
-                    FlatLafInstaller.install(theme);
+                    FlatLafInstaller.install(theme, dev.jasper.ui.kit.Kit.DEFAULT);
                     for (var key : List.of("PopupMenu.background", "MenuItem.background", "Menu.background")) assertThat(UIManager.getColor(key)).as(key).isEqualTo(p.color(SemanticColor.SURFACE_MENU));
                     for (var key : List.of("MenuItem.selectionBackground", "Menu.selectionBackground", "CheckBoxMenuItem.selectionBackground", "RadioButtonMenuItem.selectionBackground"))
                         assertThat(UIManager.getColor(key)).as(key).isEqualTo(p.color(SemanticColor.ACCENT));
@@ -83,7 +112,7 @@ class SlateCobaltInstallTest {
             try {
                 for (boolean dark : new boolean[] {true, false}) {
                     var theme = JasperTheme.bundled().generated(dark);
-                    FlatLafInstaller.install(theme);
+                    FlatLafInstaller.install(theme, dev.jasper.ui.kit.Kit.DEFAULT);
                     assertThat(UIManager.get("Jasper.installedTheme")).isSameAs(theme);
                     assertThat(UIManager.getColor("Panel.background")).isEqualTo(theme.semantic().color(SemanticColor.SURFACE_PANEL));
                     assertThat(UIManager.getColor("Jasper.semantic.surface.tabstrip")).isEqualTo(theme.semantic().color(SemanticColor.SURFACE_TABSTRIP));

@@ -13,7 +13,7 @@ class SearchChoiceRefreshTest {
     @Test void editableChoiceRecoversItsKitDelegateWhenAnotherUiWasInstalled() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>(); var oldLaf = UIManager.getLookAndFeel();
-            FlatLafInstaller.install(context.theme());
+            FlatLafInstaller.install(context.theme(), dev.jasper.ui.kit.Kit.DEFAULT);
             try (var view = new KitView(context, entry("Monospaced"), events::add)) {
                 var combo = (SearchChoices.Combo)((Choices.ChoiceControl)view.control("font")).input;
                 var editor = combo.editorField(); editor.select(2, 6);
@@ -36,7 +36,7 @@ class SearchChoiceRefreshTest {
             var context = KitFixtures.context(); var oldLaf = UIManager.getLookAndFeel();
             var oldFocus = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager();
             var focus = new SettingsKitTest.Focus();
-            FlatLafInstaller.install(context.theme());
+            FlatLafInstaller.install(context.theme(), dev.jasper.ui.kit.Kit.DEFAULT);
             var other = new JTextField("Search settings");
             try (var view = new KitView(context, entry("Monospaced"), event -> {})) {
                 var combo = (SearchChoices.Combo)((Choices.ChoiceControl)view.control("font")).input;
@@ -52,7 +52,7 @@ class SearchChoiceRefreshTest {
                     focus.focus(target); editor.select(2, 6);
                     for (var theme : List.of(KitFixtures.light(), KitFixtures.dark())) {
                         assertThat(editor.getSelectedText()).as("before install").isEqualTo("nosp");
-                        FlatLafInstaller.install(theme);
+                        FlatLafInstaller.install(theme, dev.jasper.ui.kit.Kit.DEFAULT);
                         assertThat(editor.getSelectedText()).as("after install").isEqualTo("nosp");
                         context.binding().publish(new ThemePair(theme, theme));
                         assertThat(editor.getSelectedText()).as("after binding publication").isEqualTo("nosp");
@@ -108,7 +108,7 @@ class SearchChoiceRefreshTest {
             var context = KitFixtures.context(); var original = UIManager.getLookAndFeel();
             var events = new ArrayList<UiEvent>();
             try {
-                FlatLafInstaller.install(context.theme());
+                FlatLafInstaller.install(context.theme(), dev.jasper.ui.kit.Kit.DEFAULT);
                 var node = new Nodes.Choice("font", ControlState.READY, Nodes.ChoiceKind.SEARCHABLE,
                     List.of(new Option("mono", "Monospaced", Optional.empty())), "", "Font", "add", "",
                     Optional.of(new Nodes.ChoiceSearch(0, "None", Optional.of("Monospaced"))));
@@ -120,7 +120,7 @@ class SearchChoiceRefreshTest {
                     editor.setText("Pending font"); editor.getCaret().setDot(9); editor.getCaret().moveDot(2);
                     events.clear();
                     for (var theme : List.of(KitFixtures.light(), KitFixtures.dark(), KitFixtures.light())) {
-                        FlatLafInstaller.install(theme); context.binding().publish(new ThemePair(theme, theme));
+                        FlatLafInstaller.install(theme, dev.jasper.ui.kit.Kit.DEFAULT); context.binding().publish(new ThemePair(theme, theme));
                         SwingUtilities.updateComponentTreeUI(view);
                         assertThat(combo.editorField()).isSameAs(editor);
                         assertThat(editor.getDocument()).isSameAs(document);

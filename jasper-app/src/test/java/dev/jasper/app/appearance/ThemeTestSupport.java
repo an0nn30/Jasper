@@ -43,7 +43,7 @@ public final class ThemeTestSupport {
         } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
     }
     /** Installs a generated theme, as ThemeController's installer does. */
-    public static boolean install(GeneratedTheme theme) { return ThemeManager.install(theme); }
+    public static boolean install(GeneratedTheme theme) { return ThemeManager.install(theme, dev.jasper.ui.kit.Kit.DEFAULT); }
 
     /** Slate Cobalt's Dark or Light variant. */
     public static GeneratedTheme generated(boolean dark) { return JasperTheme.bundled().generated(dark); }
@@ -69,7 +69,7 @@ public final class ThemeTestSupport {
         return new ThemeController(dark, TerminalSchemeChoice.MATCH, installer);
     }
     /** Installs the variant's look and feel. */
-    public static boolean install(boolean dark) { return ThemeManager.install(generated(dark)); }
+    public static boolean install(boolean dark) { return ThemeManager.install(generated(dark), dev.jasper.ui.kit.Kit.DEFAULT); }
     /** {@code base} with {@code roles} replaced: a theme unlike either variant for tests that need another one. */
     public static GeneratedTheme recolored(GeneratedTheme base, Map<SemanticColor, Color> roles) {
         var colors = new EnumMap<SemanticColor, Color>(SemanticColor.class);

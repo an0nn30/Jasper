@@ -81,7 +81,7 @@ public final class DesktopTestSupport {
     public static void captureIconOwners(WindowContent owner,String theme,int width,int height) {
         owner.selectVariant(theme.equals("dark"));
         // Standalone owners may already hold this theme while another fixture changed the installed chrome.
-        dev.jasper.ui.swing.FlatLafInstaller.install(owner.theme().chrome());
+        dev.jasper.ui.swing.FlatLafInstaller.install(owner.theme().chrome(), dev.jasper.ui.kit.Kit.DEFAULT);
         owner.connectConfiguration(() -> {}, () -> {}, () -> {});
         var root=new javax.swing.JRootPane();
         try(var title=WindowContent.installTitleBar(root,owner,true,ignored->{})) {

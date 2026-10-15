@@ -51,12 +51,12 @@ class AppearanceTransactionTest {
                 binding.subscribe(notifications::add);
                 var pair = binding.current();
                 var tx = new AppearanceTransaction(binding, theme -> {
-                    FlatLafInstaller.install(theme);
+                    FlatLafInstaller.install(theme, dev.jasper.ui.kit.Kit.DEFAULT);
                     UIManager.put("defaultFont", new Font("Dialog", Font.BOLD, 25));
                     UIManager.put("Jasper.semantic.accent", Color.RED);
                     UIManager.put("task.failure.only", Color.RED);
                     throw new IllegalStateException("injected installation failure");
-                }, FlatLafInstaller::install);
+                }, restored -> FlatLafInstaller.install(restored, dev.jasper.ui.kit.Kit.DEFAULT));
                 assertThatThrownBy(() -> tx.apply(new ThemePair(KitFixtures.light(), KitFixtures.dark())))
                     .isInstanceOf(IllegalStateException.class);
                 assertThat(UIManager.getLookAndFeel()).isSameAs(oldLaf);
@@ -67,7 +67,8 @@ class AppearanceTransactionTest {
                 assertThat(binding.current()).isSameAs(pair);
                 assertThat(notifications).containsExactly(pair);
                 // A later successful switch must not retain the restored LAF's values as global overrides.
-                new AppearanceTransaction(binding, FlatLafInstaller::install, FlatLafInstaller::install)
+                new AppearanceTransaction(binding, next -> FlatLafInstaller.install(next, dev.jasper.ui.kit.Kit.DEFAULT),
+                    previous -> FlatLafInstaller.install(previous, dev.jasper.ui.kit.Kit.DEFAULT))
                     .apply(new ThemePair(KitFixtures.light(), KitFixtures.dark()));
                 assertThat(UIManager.getLookAndFeelDefaults().get("Jasper.semantic.surface.app"))
                     .isEqualTo(KitFixtures.light().semantic().color(SemanticColor.SURFACE_APP));
@@ -89,7 +90,7 @@ class AppearanceTransactionTest {
             var restoreFailure = new IllegalStateException("restore");
             try {
                 var tx = new AppearanceTransaction(binding, theme -> {
-                    FlatLafInstaller.install(theme); UIManager.put("defaultFont", new Font("Dialog", Font.BOLD, 25)); throw failure;
+                    FlatLafInstaller.install(theme, dev.jasper.ui.kit.Kit.DEFAULT); UIManager.put("defaultFont", new Font("Dialog", Font.BOLD, 25)); throw failure;
                 }, theme -> { throw restoreFailure; });
                 assertThatThrownBy(() -> tx.apply(new ThemePair(KitFixtures.light(), KitFixtures.light())))
                     .isSameAs(failure).hasSuppressedException(restoreFailure);
@@ -106,7 +107,7 @@ class AppearanceTransactionTest {
             var oldLaf = UIManager.getLookAndFeel(); var oldFont = UIManager.get("defaultFont");
             var context = KitFixtures.context();
             try {
-                UIManager.put("defaultFont", null); FlatLafInstaller.install(KitFixtures.dark());
+                UIManager.put("defaultFont", null); FlatLafInstaller.install(KitFixtures.dark(), dev.jasper.ui.kit.Kit.DEFAULT);
                 assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(13);
                 UIManager.put("defaultFont", new Font("Dialog", Font.PLAIN, 18));
                 assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(18);
@@ -122,7 +123,7 @@ class AppearanceTransactionTest {
             var oldLaf = UIManager.getLookAndFeel();
             var binding = new ThemeBinding(new ThemePair(KitFixtures.dark(), KitFixtures.dark()), t -> {});
             try {
-                var tx = new AppearanceTransaction(binding, theme -> { FlatLafInstaller.install(theme); binding.close(); }, theme -> {});
+                var tx = new AppearanceTransaction(binding, theme -> { FlatLafInstaller.install(theme, dev.jasper.ui.kit.Kit.DEFAULT); binding.close(); }, theme -> {});
                 assertThatThrownBy(() -> tx.apply(new ThemePair(KitFixtures.light(), KitFixtures.light())))
                     .isInstanceOf(IllegalStateException.class);
                 assertThat(UIManager.getLookAndFeel()).isSameAs(oldLaf);
