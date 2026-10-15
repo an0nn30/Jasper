@@ -1,5 +1,7 @@
 package dev.jasper.app.documentation;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -42,7 +44,7 @@ class AppDocumentationTest {
                 String link = links.group(1);
                 if (link.matches("[a-zA-Z][a-zA-Z0-9+.-]*:.*")) continue;
                 String[] parts = link.split("#", 2);
-                Path target = parts[0].isEmpty() ? guide : guide.getParent().resolve(parts[0]).normalize();
+                Path target = parts[0].isEmpty() ? guide : guide.getParent().resolve(linkPath(parts[0])).normalize();
                 assertThat(target).as("%s: %s", guide, link).exists();
                 if (parts.length == 2 && target.toString().endsWith(".md")) {
                     List<String> anchors = Files.readAllLines(target).stream().filter(l -> l.startsWith("#"))
@@ -76,6 +78,21 @@ class AppDocumentationTest {
             "  ```",
             "After.");
         assertThat(withoutCode(text)).contains("[kept](a.md)", "[kept too](b.md)", "After.").doesNotContain("nowhere.md");
+    }
+
+    @Test void linkDestinationsAreDecodedBeforeTheyAreResolvedAsPaths() {
+        assertThat(linkPath("01%20Workstation")).isEqualTo("01 Workstation");
+        assertThat(linkPath("a+b/caf%C3%A9.md")).isEqualTo("a+b/café.md");
+        assertThat(linkPath("100%")).as("a malformed escape is kept so the missing-file message shows it").isEqualTo("100%");
+    }
+
+    /** The file path a Markdown link destination names: percent-escapes decoded, a literal plus kept. */
+    static String linkPath(String destination) {
+        try {
+            return URLDecoder.decode(destination.replace("+", "%2B"), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException malformedEscape) {
+            return destination;
+        }
     }
 
     /**
