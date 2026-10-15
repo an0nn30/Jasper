@@ -181,7 +181,7 @@ confirms (set `pending` while a start or stop is in flight).
 Icons are semantic names (`"add"`, `"lock"`, `"server"`, `"folder.filled"`, `"key"`, `"laptop"`, `"target"`, ...);
 the host draws the kit's artwork at the role's size and tints it from the theme. A glyph the kit lacks can be
 registered as monochrome path artwork with `UiKit.registerIcon` (see [icons](sdk-icons.md)). Your plugin's own
-identity art (Plugins page, Settings Tools, notification headers) comes from the manifest's `icon`, `icon_hue` and
+identity art (Plugins page, notification headers) comes from the manifest's `icon`, `icon_hue` and
 `icon_selected_ink` keys described in the authoring guide. Category hues (`Hue.BLUE`, `GREEN`, `AMBER`, `PURPLE`,
 `NEUTRAL`) map to the theme's hue roles, never to fixed colors.
 

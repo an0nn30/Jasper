@@ -43,7 +43,6 @@ final class SettingsView extends JPanel implements AutoCloseable {
     SettingsView(KitContext context, Consumer<UiEvent> events, Runnable cancelled) {
         super(new BorderLayout());
         setOpaque(false);
-        tree.artwork(context.icons());
         search = new KitView(context, searchSpec(), events::accept);
         navigation = new KitView(context, new ViewSpec(new Nodes.Stack("settings-navigation", ControlState.READY, Nodes.LayoutRole.SETTINGS_NAVIGATION, List.of(tree.node()))), events::accept);
         header = new KitView(context, headerSpec(), events::accept);
@@ -142,7 +141,7 @@ final class SettingsView extends JPanel implements AutoCloseable {
     /** The search text the user typed; kept in the field's descriptor so a re-render never resets it. */
     void query(String value) { query = value; if (!search.isClosed()) search.update(searchSpec()); }
 
-    void tree() { if (!navigation.isClosed()) tree.publish(() -> navigation.update(new ViewSpec(new Nodes.Stack("settings-navigation", ControlState.READY, Nodes.LayoutRole.SETTINGS_NAVIGATION, List.of(tree.node()))))); }
+    void tree() { if (!navigation.isClosed()) navigation.update(new ViewSpec(new Nodes.Stack("settings-navigation", ControlState.READY, Nodes.LayoutRole.SETTINGS_NAVIGATION, List.of(tree.node())))); }
 
     void breadcrumb(String value) { breadcrumb = value; header(); }
 
@@ -227,7 +226,7 @@ final class SettingsView extends JPanel implements AutoCloseable {
     @Override public void close() {
         ++pageGeneration; ++revealGeneration; scrollPositions.clear();
         RuntimeException failure=null;
-        for(AutoCloseable owned:List.<AutoCloseable>of(shell,search,navigation,header,banner,footer,tree::close)) {
+        for(AutoCloseable owned:List.<AutoCloseable>of(shell,search,navigation,header,banner,footer)) {
             try {owned.close();} catch(Exception problem) {
                 var error=problem instanceof RuntimeException runtime?runtime:new IllegalStateException(problem);
                 if(failure==null)failure=error;else failure.addSuppressed(error);

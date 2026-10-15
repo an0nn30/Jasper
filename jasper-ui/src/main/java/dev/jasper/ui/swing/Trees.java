@@ -326,14 +326,14 @@ final class Trees {
                                                             + "/icon",
                                                     ControlState.READY,
                                                     icon,
-                                                    settingsNavigation || !presentation.isEmpty() ? settingsHue(icon) : Nodes.Hue.NONE,
+                                                    !presentation.isEmpty() ? settingsHue(icon) : Nodes.Hue.NONE,
                                                     Nodes.IconSize.CONTROL,
                                                     item.title())));
             item.status().ifPresent(status -> leading.add(new Nodes.StatusDot(
                     "@tree/" + node.id() + "/" + item.id() + "/status", ControlState.READY, status)));
             row.slot(row.leading, leading);
-            for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon") && !settingsNavigation && presentation.isEmpty())icon.tile(0,false);
-            if(settingsNavigation || !presentation.isEmpty())for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon")){int tile=context().metrics().value(settingsNavigation?dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_TILE:dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE);icon.tile(tile,tile,settingsNavigation?context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_GLYPH):context().icons().size(Nodes.IconSize.CONTROL),selected.contains(item.id()));}
+            for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon") && presentation.isEmpty())icon.tile(0,false);
+            if(!presentation.isEmpty())for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon")){int tile=context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE);icon.tile(tile,tile,context().icons().size(Nodes.IconSize.CONTROL),selected.contains(item.id()));}
             String titleId = "@tree/" + node.id() + "/" + item.id() + "/title";
             row.slot(
                     row.title,

@@ -1,8 +1,8 @@
 # Themes
 
-Jasper's default theme is **Slate Steel**, in Dark and Light, with three terminal colour schemes: **Slate Steel
-Dark**, **Slate Steel Light** and **High Contrast**. Its colours are defined once, in
-[the Slate Steel colour reference](design/theme-engine/slate-steel.md), and bundled as `slate-steel.json`. Catppuccin's
+Jasper's default theme is **Slate Cobalt**, in Dark and Light, with three terminal colour schemes: **Slate Cobalt
+Dark**, **Slate Cobalt Light** and **High Contrast**. Its colours are defined once, in
+[the Slate Cobalt colour reference](design/theme-engine/slate-cobalt.md), and bundled as `slate-cobalt.json`. Catppuccin's
 four flavours are built in too, converted from [its IntelliJ plugin](https://github.com/catppuccin/jetbrains) 3.6.1:
 **Catppuccin Latte** (Light), **Catppuccin Frappé**, **Catppuccin Macchiato** and **Catppuccin Mocha** (Dark), each with
 its own terminal scheme. Other themes are Jasper theme files in the themes folder: a UI theme recolours the whole application and brings its own terminal and
@@ -15,23 +15,23 @@ editor schemes; a terminal-only theme adds terminal schemes.
 appearance = "system" # or "dark", "light"
 
 [ui.theme]
-dark = "slate-steel"  # the theme the Dark appearance shows
-light = "slate-steel" # the theme the Light appearance shows
+dark = "slate-cobalt"  # the theme the Dark appearance shows
+light = "slate-cobalt" # the theme the Light appearance shows
 
 [terminal]
-scheme = "match" # or a scheme id such as "slate-steel/high-contrast"
+scheme = "match" # or a scheme id such as "slate-cobalt/high-contrast"
 ```
 
 `ui.appearance` (`system`, `dark`, `light`) chooses Dark or Light, or follows the operating system's light or dark
 setting live; with `system`, Jasper uses Dark when it cannot read the operating system's setting, and an
 operating-system change never writes `config.toml`. `ui.theme.dark` and `ui.theme.light` name, by id, the theme each
-appearance shows: `slate-steel`, another built-in theme's id (`catppuccin-latte`, `catppuccin-frappe`,
+appearance shows: `slate-cobalt`, another built-in theme's id (`catppuccin-latte`, `catppuccin-frappe`,
 `catppuccin-macchiato`, `catppuccin-mocha`), or an installed theme's id. A theme has a Dark variant, a Light variant or both; with
 `system`, Jasper switches between the two picks as the operating system does.
 
 `terminal.scheme` colours the terminal panes: `match` uses the shown theme's own scheme, and a scheme id,
-`<theme id>/<scheme key>`, chooses one whatever theme is shown: `slate-steel/dark`, `slate-steel/light`,
-`slate-steel/high-contrast`, a Catppuccin flavour's scheme such as `catppuccin-mocha/dark`, or any installed theme's
+`<theme id>/<scheme key>`, chooses one whatever theme is shown: `slate-cobalt/dark`, `slate-cobalt/light`,
+`slate-cobalt/high-contrast`, a Catppuccin flavour's scheme such as `catppuccin-mocha/dark`, or any installed theme's
 scheme, such as `gruvbox-dark/dark`.
 
 Settings › Appearance & Behavior › Appearance has the Dark, Light and Match System tiles, each previewing the theme
@@ -45,7 +45,7 @@ The themes folder is `themes/` in Jasper's home, next to `config.toml`; Settings
 be copied in by hand. It holds one Jasper theme file per theme, named after the theme's id: lowercase letters and digits in dash-separated words, at most 64 characters, so
 `dracula.json` is the theme `dracula`. Jasper reads the folder at start-up, on Reload config, when Settings saves and
 when `config.toml` changes; a theme changed on disk is shown again then. A file named after a built-in theme's id,
-such as `slate-steel.json` or `catppuccin-mocha.json`, is ignored. Dropdowns list the built-in themes first, Slate Steel
+such as `slate-cobalt.json` or `catppuccin-mocha.json`, is ignored. Dropdowns list the built-in themes first, Slate Cobalt
 then the Catppuccin flavours, then the installed themes by name; two themes with the same name show their ids.
 
 ## What the terminal scheme colours
@@ -73,7 +73,7 @@ Apply; a failure is shown in a sheet.
   imported theme already has asks before replacing it; a built-in theme cannot be replaced.
 - **Remove** removes the theme the dropdown shows; for the Terminal scheme gear, the theme the scheme belongs to. It is
   unavailable for a built-in theme and Same as UI theme. It asks first and says what will change. The file is deleted, and
-  every setting that names the theme or one of its schemes, saved or staged, returns to its default (`slate-steel` or
+  every setting that names the theme or one of its schemes, saved or staged, returns to its default (`slate-cobalt` or
   `match`): saved ones are written at once, and other staged changes stay staged. If the file cannot be deleted,
   nothing changes and the sheet says why.
 
@@ -106,7 +106,7 @@ derived; editor 20 of 23 from the scheme`; "derived" roles had no IntelliJ key a
 
 ## The Jasper theme format
 
-A Jasper theme is one UTF-8 JSON file; `slate-steel.json` is the complete example.
+A Jasper theme is one UTF-8 JSON file; `slate-cobalt.json` is the complete example.
 
 ```json
 {
@@ -122,7 +122,7 @@ A Jasper theme is one UTF-8 JSON file; `slate-steel.json` is the complete exampl
 (Each object is shortened here; a real file lists every entry.)
 
 - `jasper-theme` is `1`. `name` is required; `author` is optional.
-- `ui` holds `dark`, `light` or both. Each lists every role `slate-steel.json` lists, as `#RRGGBB` or `#RRGGBBAA`.
+- `ui` holds `dark`, `light` or both. Each lists every role `slate-cobalt.json` lists, as `#RRGGBB` or `#RRGGBBAA`.
   `border.focus`, `surface.status`, `border.identity` and the `hue.*.surface` roles are not listed: they are `accent`,
   `surface.app`, `border.control` and each hue. `surface.titlebar` and `text.titlebar` may be listed to give the
   window's header row (the title bar) its own background and its own text and icon colour, such as a dark title bar on
@@ -131,7 +131,7 @@ A Jasper theme is one UTF-8 JSON file; `slate-steel.json` is the complete exampl
   `name` and exactly 21 colours: `bg`, `fg`, `fg.bold`, `cursor`, `selection`, `black`, `red`, `green`, `yellow`,
   `blue`, `magenta`, `cyan`, `white` and their `bright.` forms. A scheme's id is `<theme id>/<key>`.
 - A UI variant's own scheme, the one `match` uses, is the scheme with its key: `ui.dark` needs `terminal.dark` and
-  `ui.light` needs `terminal.light`. Other keys are extra schemes, such as Slate Steel's `high-contrast`.
+  `ui.light` needs `terminal.light`. Other keys are extra schemes, such as Slate Cobalt's `high-contrast`.
 - `editor` has one entry per UI variant: `background`, `foreground`, `caret`, `selection`, `currentLine`, `gutter`,
   `lineNumbers` and every syntax role (`keyword`, `type`, `function`, `variable`, `constant`, `number`, `string`,
   `comment`, `doc_comment`, `annotation`, `operator`, `punctuation`, `tag`, `attribute`, `regex`, `error`). A value is a
@@ -157,14 +157,14 @@ same roles through the SDK. Installed themes live in the themes folder, outside 
 ## When something is wrong
 
 - A value that is not a valid `ui.appearance`, theme id or scheme id is reported ("Use …; using the default.") and
-  the default is used (`system`, `slate-steel`, `match`).
+  the default is used (`system`, `slate-cobalt`, `match`).
 - A theme file that cannot be used is skipped and reported with the configuration's warnings, naming the file, the
   line when known and the entry, for example
   `/Users/you/.config/jasper/themes/dracula.json: warning: ui.dark: Missing colour "accent"`.
 - A theme pick that names a theme that is not installed, or one without that variant, and a scheme that is not
   installed, are reported on their setting and replaced by the default until the theme is installed again.
 - A removed setting (`terminal.colors`, `[colors]`) is reported as an unknown setting and ignored.
-- If a theme cannot be installed, start-up uses Slate Steel Dark and a reload keeps the current appearance; Reload
+- If a theme cannot be installed, start-up uses Slate Cobalt Dark and a reload keeps the current appearance; Reload
   config retries.
 
 ## Native acceptance for this upgrade (user-run)
@@ -172,4 +172,4 @@ same roles through the SDK. Installed themes live in the themes folder, outside 
 On a Mac, check Dark, Light and Match System (switch the operating system's appearance with Settings and a sheet
 open), each terminal scheme including High Contrast, and compare the mocked pages at 100%; the
 [acceptance record](design/theme-engine/acceptance.md) lists every check. With an installed theme, also check a Dark
-theme pick other than Slate Steel under Match System, and an installed terminal scheme on Slate Steel.
+theme pick other than Slate Cobalt under Match System, and an installed terminal scheme on Slate Cobalt.

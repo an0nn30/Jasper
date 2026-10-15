@@ -17,7 +17,7 @@ import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static dev.jasper.app.workspace.DesktopTestSupport.launcher;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** spec 5.4: start-up parses the bundled theme once and installs the configured Slate Steel variant. */
+/** spec 5.4: start-up parses the bundled theme once and installs the configured Slate Cobalt variant. */
 class JasperApplicationThemesTest {
     @TempDir Path home;
 
@@ -48,7 +48,7 @@ class JasperApplicationThemesTest {
 
     /** From a fresh look and feel (no Jasper snapshot), start-up installs its variant before any chrome reads the snapshot. */
     @Test void aFreshProcessInstallsTheConfiguredVariantBeforeAnyChromeReadsTheSnapshot() throws Exception {
-        start("[ui]\nappearance = 'light'\n[terminal]\nscheme = 'slate-steel/high-contrast'\n", false, dev.jasper.ui.theme.JasperTheme.bundled().scheme("high-contrast").orElseThrow());
+        start("[ui]\nappearance = 'light'\n[terminal]\nscheme = 'slate-cobalt/high-contrast'\n", false, dev.jasper.ui.theme.JasperTheme.bundled().scheme("high-contrast").orElseThrow());
     }
 
     /** The default follows the operating system; a headless run has none, so it starts Dark. */

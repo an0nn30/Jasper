@@ -35,7 +35,7 @@ class ShippedControlReadabilityTest {
                         Color knob = new Color(image.getRGB(button.getWidth() / 4, button.getHeight() / 2), true);
                         Color track = new Color(image.getRGB(button.getWidth() * 3 / 4, button.getHeight() / 2), true);
                         // Painted as theme.md authors them: Dark separates knob and track by more than 3:1; Light's white knob on its
-                        // #C3C8D0 track is 1.68:1, and the knob's shadow carries the separation.
+                        // #C3CAD3 track is 1.65:1, and the knob's shadow carries the separation.
                         var authored = ColorMath.contrast(theme.semantic().color(SemanticColor.TOGGLE_KNOB), theme.semantic().color(SemanticColor.TOGGLE_TRACK_OFF));
                         assertThat(ColorMath.contrast(knob, track)).as((dark ? "dark" : "light") + " compact=" + compact).isCloseTo(authored, org.assertj.core.data.Offset.offset(.01));
                         if (dark) assertThat(ColorMath.contrast(knob, track)).isGreaterThanOrEqualTo(3);

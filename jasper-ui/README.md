@@ -4,7 +4,7 @@ Standalone theme engine and Swing UI kit. `jasper-ui` has no dependency on the
 application, terminal, Buddy, SDK or plugins. The app adapts its configuration
 and library APIs into these values; plugins use SDK contracts and host adapters.
 
-The engine is `dev.jasper.ui.theme`: `JasperTheme` reads a Jasper theme file (the bundled Slate Steel is `slate-steel.json`) and gives
+The engine is `dev.jasper.ui.theme`: `JasperTheme` reads a Jasper theme file (the bundled Slate Cobalt is `slate-cobalt.json`) and gives
 each variant's semantic palette, terminal and editor schemes, syntax styles, glass levels and FlatLaf UI keys
 (`UiColorKeys`, from the roles) as an immutable `GeneratedTheme`; the app reads installed theme files with the same
 loader. The app and plugins use this authority; [completion evidence](../docs/design/theme-engine/completion.md)
@@ -22,7 +22,7 @@ the kit. Views and bindings are EDT-confined and their owner closes them.
 Use Java 25 on JetBrains Runtime and the repository wrapper:
 
 ```sh
-./gradlew :jasper-ui:test --tests '*SlateSteel*' --tests '*JasperTheme*'
+./gradlew :jasper-ui:test --tests '*SlateCobalt*' --tests '*JasperTheme*'
 ./gradlew :jasper-ui:check verifyUiArchitecture
 ```
 
@@ -43,7 +43,7 @@ Public usage, package/lifetime boundaries and compiled examples are in
 [UI architecture](../docs/ui-architecture.md). [Maintenance](../docs/ui-maintenance.md)
 documents gallery/distribution checks; [calibration](../docs/design/theme-engine/calibration.md)
 records original crop/scale anchors and the inspected capture matrix (its calibration themes are retired; the gallery
-renders Slate Steel Dark or Light).
+renders Slate Cobalt Dark or Light).
 
 ```sh
 ./gradlew :jasper-ui:gallery -Pjasper.galleryScale=2 -Pjasper.galleryTheme=dark

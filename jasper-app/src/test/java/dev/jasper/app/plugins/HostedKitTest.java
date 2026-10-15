@@ -10,7 +10,7 @@ class HostedKitTest {
  @Test void presentationIconsFollowTheirPaintRouteAndSameVariantThemeChanges() throws Exception {SwingUtilities.invokeAndWait(() -> {
   var light=dev.jasper.app.appearance.ThemeTestSupport.generated(false);
   var dark=dev.jasper.app.appearance.ThemeTestSupport.generated(true);
-  // Another Dark theme: Slate Steel Dark with plum text, so the same-variant change repaints the glyph.
+  // Another Dark theme: Slate Cobalt Dark with plum text, so the same-variant change repaints the glyph.
   var other=ThemeTestSupport.recolored(dark,java.util.Map.of(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY,new java.awt.Color(0xc9a0e8),
    dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY,new java.awt.Color(0xa77fc4)));
   var themes=new java.util.concurrent.atomic.AtomicReference<>(new dev.jasper.ui.theme.ThemePair(light,dark));

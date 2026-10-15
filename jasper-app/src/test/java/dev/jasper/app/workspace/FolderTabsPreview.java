@@ -62,7 +62,7 @@ public final class FolderTabsPreview {
                     owner.selectTab(owner.terminalTabs().get(1)); render(root, owner, output, name + "-middle", 1040);
                     owner.selectTab(owner.terminalTabs().get(3)); render(root, owner, output, name + "-overflow", 350);
                 }
-                owner.selectVariant(false); owner.selectTerminalScheme(dev.jasper.app.config.TerminalSchemeChoice.parse("slate-steel/dark").orElseThrow());
+                owner.selectVariant(false); owner.selectTerminalScheme(dev.jasper.app.config.TerminalSchemeChoice.parse("slate-cobalt/dark").orElseThrow());
                 owner.selectTab(owner.terminalTabs().get(1)); render(root, owner, output, "light-chrome-dark-workspace", 1040);
                 owner.applyBackgroundOpacity(.5); render(root, owner, output, "glass", 1040);
             });

@@ -52,7 +52,7 @@ public final class SurfaceFixtures {
         } catch (Exception | Error failure) { if (owner != null) owner.close(); delete(home); throw failure; }
     }
 
-    /** Slate Steel's {@code "dark"} or {@code "light"} variant with its matching terminal scheme. */
+    /** Slate Cobalt's {@code "dark"} or {@code "light"} variant with its matching terminal scheme. */
     public static ResolvedTheme theme(String name) {
         return switch (name) {
             case "dark" -> ThemeTestSupport.resolved(true);

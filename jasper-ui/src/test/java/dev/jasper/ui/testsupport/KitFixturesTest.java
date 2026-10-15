@@ -7,7 +7,7 @@ import dev.jasper.ui.theme.JasperTheme;
 import org.junit.jupiter.api.Test;
 
 class KitFixturesTest {
-    @Test void theFixturesAreSlateSteelAndCustomDiffersInEveryOpaqueRole() {
+    @Test void theFixturesAreSlateCobaltAndCustomDiffersInEveryOpaqueRole() {
         assertThat(KitFixtures.dark()).isSameAs(JasperTheme.bundled().generated(true));
         assertThat(KitFixtures.light()).isSameAs(JasperTheme.bundled().generated(false));
         var custom = KitFixtures.custom();

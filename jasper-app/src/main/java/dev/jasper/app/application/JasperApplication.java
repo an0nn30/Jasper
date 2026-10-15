@@ -248,7 +248,7 @@ public final class JasperApplication {
         var selection = dev.jasper.app.appearance.ThemeSelection.of(library, startup.darkTheme(), startup.lightTheme(),
             startup.terminalScheme(), (key, message) -> { });
         themes = ThemeController.startup(dark, selection,
-            failure -> LOG.log(System.Logger.Level.WARNING, "Starting in Slate Steel Dark: " + failure.getMessage(), failure));
+            failure -> LOG.log(System.Logger.Level.WARNING, "Starting in Slate Cobalt Dark: " + failure.getMessage(), failure));
         // App-native menus show each item's action binding from the live keymap.
         themes.appearance().shortcuts(this::shortcutLabel);
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);

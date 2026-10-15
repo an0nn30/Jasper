@@ -89,8 +89,8 @@ class ThemeJsonTest {
     }
 
     @Test void readsTheBundledFile() throws Exception {
-        try (var in = ThemeJsonTest.class.getResourceAsStream("/dev/jasper/ui/theme/slate-steel.json")) {
-            var root = ThemeJson.parse(new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8), "slate-steel.json");
+        try (var in = ThemeJsonTest.class.getResourceAsStream("/dev/jasper/ui/theme/slate-cobalt.json")) {
+            var root = ThemeJson.parse(new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8), "slate-cobalt.json");
             assertThat(root.keySet()).containsExactly("jasper-theme", "name", "author", "ui", "terminal", "editor");
         }
     }

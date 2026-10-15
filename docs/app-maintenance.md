@@ -220,7 +220,7 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 
 ### Workspace glass
 
-A translucent, blurred terminal workspace on macOS. Slate Steel's glass (opaque, no blur) and
+A translucent, blurred terminal workspace on macOS. Slate Cobalt's glass (opaque, no blur) and
 `ui.workspace.opacity`/`ui.workspace.blur` combine in `GlassLevels.resolve`; `WindowContent.requestGlass` sends the
 result to the window's `WindowGlass` after every theme or configuration change. `WindowGlass` decides, and reports the
 opacity actually in effect to `WindowContent.applyBackgroundOpacity`; painting never reads the raw settings, so any
@@ -356,12 +356,12 @@ boundaries; this refactor promises no plugin loading, binary compatibility or pe
 
 ## Themes
 
-Jasper's built-in themes are Slate Steel, in Dark and Light, and Catppuccin's four flavours; installed themes are theme
+Jasper's built-in themes are Slate Cobalt, in Dark and Light, and Catppuccin's four flavours; installed themes are theme
 files in `<home>/themes/` ([themes](themes.md)). `JasperTheme.builtIns()` lists the built-in files. The Catppuccin
 files are the theme converter's output for the plugin jar vendored in `tools/themes/catppuccin/`, with the
 hand-picked roles in its `roles.json` (its `SOURCE.md` says how to regenerate them); a converter test fails when they
-differ. Slate Steel's colours live only in jasper-ui's
-`slate-steel.json`, the machine-readable block of [the Slate Steel record](design/theme-engine/slate-steel.md) (a test
+differ. Slate Cobalt's colours live only in jasper-ui's
+`slate-cobalt.json`, the machine-readable block of [the Slate Cobalt record](design/theme-engine/slate-cobalt.md) (a test
 keeps the two identical). `JasperTheme` reads the file once: the semantic palettes, the terminal schemes (`TerminalScheme`),
 the derived editor schemes and syntax styles, and one `GeneratedTheme` per variant whose FlatLaf UI keys
 `UiColorKeys.flatLaf` derives from the roles (text selection from the terminal selection, a search miss from
@@ -369,11 +369,11 @@ the derived editor schemes and syntax styles, and one `GeneratedTheme` per varia
 colour, give it a role, never a value.
 
 `ColourLiteralScanTest` fails on any colour literal in production code or resources (jasper-ui, the app and the
-plugins) outside the built-in theme files; `UiColorKeysTest`, `SlateSteelGeneratedTest` and `HostedPalettesTest` pin the
+plugins) outside the built-in theme files; `UiColorKeysTest`, `SlateCobaltGeneratedTest` and `HostedPalettesTest` pin the
 keys, the variants and the plugins' palettes. `RemovedThemeLayerTest` pins that the former theme layer is gone.
 
 ```sh
-./gradlew :jasper-ui:test --tests "*SlateSteel*" --tests "*JasperTheme*" --tests "*UiColorKeysTest"
+./gradlew :jasper-ui:test --tests "*SlateCobalt*" --tests "*JasperTheme*" --tests "*UiColorKeysTest"
 ./gradlew :jasper-app:test --tests "*ColourLiteralScanTest" --tests "*HostedPalettesTest" --tests "*RemovedThemeLayerTest"
 ```
 

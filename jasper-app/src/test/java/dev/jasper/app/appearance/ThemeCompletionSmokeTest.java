@@ -16,7 +16,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Completion smoke over both Slate Steel variants, with real live app publication. */
+/** Completion smoke over both Slate Cobalt variants, with real live app publication. */
 class ThemeCompletionSmokeTest {
     /** The loop leaves a 24-point interface font installed; a fresh controller restores the platform's. */
     @AfterEach void resetInterfaceFont() throws Exception { SwingUtilities.invokeAndWait(() -> ThemeTestSupport.controller(true)); }
@@ -42,7 +42,7 @@ class ThemeCompletionSmokeTest {
                             for (var role:SemanticColor.values()) assertThat(view==chrome
                                 ? controller.appearance().context(ThemeRoute.CHROME).theme().semantic().color(role)
                                 : controller.appearance().context(ThemeRoute.WORKSPACE).theme().semantic().color(role)).isNotNull();
-                            ThemeMigrationCapture.save("completion-controls",(dark ? "slate-steel-dark" : "slate-steel-light")+"-font"+size,
+                            ThemeMigrationCapture.save("completion-controls",(dark ? "slate-cobalt-dark" : "slate-cobalt-light")+"-font"+size,
                                 view==chrome ? "chrome" : "workspace",view,560,440);
                         }
                         assertThat(find(workspace,"name.input",JTextField.class)).isSameAs(field);

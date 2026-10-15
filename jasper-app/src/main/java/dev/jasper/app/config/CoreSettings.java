@@ -231,28 +231,28 @@ public final class CoreSettings {
     public static final Setting<AppearanceMode> UI_APPEARANCE = Setting.of("ui.appearance", SettingKind.choice(List.of(
             Map.entry("system", AppearanceMode.SYSTEM), Map.entry("dark", AppearanceMode.DARK), Map.entry("light", AppearanceMode.LIGHT))),
             AppearanceMode.SYSTEM)
-        .label("Appearance").keywords("appearance", "theme", "dark", "light", "system", "slate steel", "look")
+        .label("Appearance").keywords("appearance", "theme", "dark", "light", "system", "slate cobalt", "look")
         .description("The UI appearance: \"system\" (the default) follows the operating system's light or dark setting;\n"
             + "\"dark\" or \"light\" chooses one. [ui.theme] names the theme each shows. Switches live across windows.").build();
-    static final String THEME_ID = "Use a theme id such as \"slate-steel\"; using the default.";
+    static final String THEME_ID = "Use a theme id such as \"slate-cobalt\"; using the default.";
     public static final Setting<String> UI_THEME_DARK = Setting.of("ui.theme.dark",
             SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.BUNDLED_ID)
-        .label("Dark theme").keywords("theme", "dark", "appearance", "slate steel", "imported")
-        .description("The theme the Dark appearance shows: \"slate-steel\" (the default), a built-in Catppuccin flavour such as\n"
+        .label("Dark theme").keywords("theme", "dark", "appearance", "slate cobalt", "imported")
+        .description("The theme the Dark appearance shows: \"slate-cobalt\" (the default), a built-in Catppuccin flavour such as\n"
             + "\"catppuccin-mocha\", or an imported theme's id, its file name in the themes folder without .json. A theme without a\n"
-            + "Dark variant is reported and Slate Steel is used. Switches live.").build();
+            + "Dark variant is reported and Slate Cobalt is used. Switches live.").build();
     public static final Setting<String> UI_THEME_LIGHT = Setting.of("ui.theme.light",
             SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.BUNDLED_ID)
-        .label("Light theme").keywords("theme", "light", "appearance", "slate steel", "imported")
-        .description("The theme the Light appearance shows: \"slate-steel\" (the default), the built-in \"catppuccin-latte\", or an\n"
+        .label("Light theme").keywords("theme", "light", "appearance", "slate cobalt", "imported")
+        .description("The theme the Light appearance shows: \"slate-cobalt\" (the default), the built-in \"catppuccin-latte\", or an\n"
             + "imported theme's id, its file name in the themes folder without .json. A theme without a Light variant is reported\n"
-            + "and Slate Steel is used. Switches live.").build();
-    static final String SCHEME_ID = "Use \"match\" or a scheme id such as \"slate-steel/high-contrast\"; using the default.";
+            + "and Slate Cobalt is used. Switches live.").build();
+    static final String SCHEME_ID = "Use \"match\" or a scheme id such as \"slate-cobalt/high-contrast\"; using the default.";
     public static final Setting<String> TERMINAL_SCHEME = Setting.of("terminal.scheme",
             SettingKind.string(text -> TerminalSchemeChoice.parse(text).isPresent(), SCHEME_ID), TerminalSchemeChoice.MATCH.key())
-        .label("Terminal scheme").keywords("terminal", "scheme", "colors", "colours", "palette", "high contrast", "slate steel")
+        .label("Terminal scheme").keywords("terminal", "scheme", "colors", "colours", "palette", "high contrast", "slate cobalt")
         .description("Colors for terminal panes: \"match\" (the default) uses the shown theme's own scheme; a scheme id,\n"
-            + "<theme id>/<scheme key> such as \"slate-steel/high-contrast\", chooses one. Only the terminal text area changes; updates live.").build();
+            + "<theme id>/<scheme key> such as \"slate-cobalt/high-contrast\", chooses one. Only the terminal text area changes; updates live.").build();
     public static final Setting<Boolean> UI_ANIMATIONS_ENABLED = Setting.of("ui.animations.enabled", SettingKind.bool(), true)
         .label("Enable animations").keywords("animations", "motion", "transitions", "reduce motion")
         .description("Enable animations throughout the app. Disabling finishes running transitions immediately. Updates live in every window.").build();
@@ -265,7 +265,7 @@ public final class CoreSettings {
             Map.entry("theme", WorkspaceBlur.THEME), Map.entry("on", WorkspaceBlur.ON), Map.entry("off", WorkspaceBlur.OFF))),
             WorkspaceBlur.THEME)
         .label("Blur").keywords("blur", "frosted", "glass", "workspace", "background")
-        .description("macOS only (ignored on other platforms), live: blur the desktop behind a translucent workspace. \"theme\" follows Slate Steel, which does not blur.").build();
+        .description("macOS only (ignored on other platforms), live: blur the desktop behind a translucent workspace. \"theme\" follows Slate Cobalt, which does not blur.").build();
     public static final SettingsSchema SCHEMA = SettingsSchema.of(List.<Setting<?>>of(
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT, WINDOW_MEMORY_INDICATOR,
             WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, WINDOW_VIEW_MODE, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, NOTIFICATIONS_GROUPS, SYSTEM_RUN_IN_BACKGROUND,

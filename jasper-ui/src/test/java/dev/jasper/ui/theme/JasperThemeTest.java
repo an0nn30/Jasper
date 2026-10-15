@@ -63,7 +63,7 @@ class JasperThemeTest {
         assertThat(theme.has(false)).isTrue();
         assertThat(theme.schemes()).extracting(scheme -> scheme.id().key()).containsExactly("light");
         assertThat(theme.generated(false).terminal()).isEqualTo(theme.matching(false).colors());
-        assertThat(theme.generated(false).name()).isEqualTo("Slate Steel");
+        assertThat(theme.generated(false).name()).isEqualTo("Slate Cobalt");
     }
 
     @Test void anEditorEntryMayBeALiteralColourWithStyles() throws Exception {
@@ -85,8 +85,8 @@ class JasperThemeTest {
         assertThat(failure(json.replace("\"jasper-theme\": 1,", "\"jasper-theme\": 2,")))
             .hasMessageContaining("jasper-theme: Format 2 is not one this Jasper reads; expected 1");
         assertThat(failure(json.replace("\"jasper-theme\": 1,", "\"jasper-theme\": \"1\","))).hasMessageContaining("jasper-theme: Expected the number 1");
-        assertThat(failure(json.replace("\"name\": \"Slate Steel\", ", ""))).hasMessageContaining("Missing entry \"name\"");
-        assertThat(failure(json.replace("\"name\": \"Slate Steel\"", "\"name\": \" \""))).hasMessageContaining("name: Expected a non-empty string");
+        assertThat(failure(json.replace("\"name\": \"Slate Cobalt\", ", ""))).hasMessageContaining("Missing entry \"name\"");
+        assertThat(failure(json.replace("\"name\": \"Slate Cobalt\"", "\"name\": \" \""))).hasMessageContaining("name: Expected a non-empty string");
         assertThat(failure(json.replace("\"author\": \"Jasper\"", "\"author\": {}"))).hasMessageContaining("author: Expected a string");
         assertThat(failure(json.replace("\"author\": \"Jasper\",", "\"author\": \"Jasper\", \"extra\": \"x\","))).hasMessageContaining("Unknown entry \"extra\"");
         assertThat(failure("{ \"name\": \"X\", \"editorScheme\": \"x.xml\" }")).as("not a Jasper theme, whatever else it holds").hasMessage("t.json: Not a Jasper theme: \"jasper-theme\": 1 is missing");
@@ -96,7 +96,7 @@ class JasperThemeTest {
         String json = bundledJson();
         assertThat(failure(json.replace("\"light\": {\n      \"surface.app\"", "\"pale\": {\n      \"surface.app\"")))
             .hasMessageContaining("ui: Unknown variant \"pale\"");
-        assertThat(failure(json.replace("\"light\": {\n      \"name\": \"Slate Steel Light\"", "\"pale\": {\n      \"name\": \"Slate Steel Light\"")))
+        assertThat(failure(json.replace("\"light\": {\n      \"name\": \"Slate Cobalt Light\"", "\"pale\": {\n      \"name\": \"Slate Cobalt Light\"")))
             .hasMessageContaining("ui.light: Missing its matching scheme \"terminal.light\"");
         assertThat(failure(json.replaceFirst("(?s),\\s*\"editor\": \\{.*}\\s*}\\s*$", "\n}"))).as("ui without editor")
             .hasMessage("t.json: Missing object \"editor\"");
@@ -124,10 +124,10 @@ class JasperThemeTest {
 
     @Test void aFileTheEngineCannotUseFailsNamingTheKey() throws Exception {
         String json = bundledJson();
-        assertThat(failure(json.replace("\"surface.app\": \"#1E2127\",", "\"surface.app\": \"#1E2127\", \"surface.nope\": \"#000000\",")))
+        assertThat(failure(json.replace("\"surface.app\": \"#23262C\",", "\"surface.app\": \"#23262C\", \"surface.nope\": \"#000000\",")))
             .hasMessageContaining("ui.dark: Unknown colour \"surface.nope\"");
-        assertThat(failure(json.replace("\"surface.panel\": \"#272A31\", ", ""))).hasMessageContaining("ui.dark: Missing colour \"surface.panel\"");
-        assertThat(failure(json.replace("\"#1E2127\"", "\"#1E21\""))).hasMessageContaining("surface.app").hasMessageContaining("#RRGGBB");
+        assertThat(failure(json.replace("\"surface.panel\": \"#2E323A\", ", ""))).hasMessageContaining("ui.dark: Missing colour \"surface.panel\"");
+        assertThat(failure(json.replaceFirst("\"surface.app\": \"#23262C\"", "\"surface.app\": \"#2326\""))).hasMessageContaining("surface.app").hasMessageContaining("#RRGGBB");
         assertThat(failure(json.replaceFirst("\"caret\": \"[^\"]+\",\\s*", ""))).hasMessageContaining("editor.dark: Missing entry \"caret\"");
         assertThat(failure(json.replaceFirst("\"keyword\": \"terminal.ansi.magenta\"", "\"keyword\": \"terminal.ansi.pink\"")))
             .hasMessageContaining("editor.dark.keyword").hasMessageContaining("terminal.ansi.pink");
@@ -184,11 +184,11 @@ class JasperThemeTest {
 
     @Test void anEntryOfTheWrongKindIsRefusedByNameWhateverItsJsonType() throws Exception {
         String json = bundledJson();
-        assertThat(failure(json.replaceFirst("\"surface.app\": \"#1E2127\"", "\"surface.app\": true")))
+        assertThat(failure(json.replaceFirst("\"surface.app\": \"#23262C\"", "\"surface.app\": true")))
             .hasMessage("t.json: ui.dark.surface.app: Expected a colour");
-        assertThat(failure(json.replaceFirst("\"surface.app\": \"#1E2127\"", "\"surface.app\": null")))
+        assertThat(failure(json.replaceFirst("\"surface.app\": \"#23262C\"", "\"surface.app\": null")))
             .hasMessage("t.json: ui.dark.surface.app: Expected a colour");
-        assertThat(failure(json.replaceFirst("\"surface.app\": \"#1E2127\"", "\"surface.app\": [\"#1E2127\"]")))
+        assertThat(failure(json.replaceFirst("\"surface.app\": \"#23262C\"", "\"surface.app\": [\"#23262C\"]")))
             .hasMessage("t.json: ui.dark.surface.app: Expected a colour");
         assertThat(failure(json.replaceFirst("\"keyword\": \"terminal.ansi.magenta\"", "\"keyword\": 1.5")))
             .hasMessage("t.json: editor.dark.keyword: Expected a reference");
@@ -206,7 +206,7 @@ class JasperThemeTest {
     }
 
     @Test void theDetailOmitsTheFileForCallersThatShowItSeparately() throws Exception {
-        var failure = failure(bundledJson().replace("\"surface.panel\": \"#272A31\", ", ""));
+        var failure = failure(bundledJson().replace("\"surface.panel\": \"#2E323A\", ", ""));
         assertThat(failure.origin()).isEqualTo("t.json");
         assertThat(failure.detail()).isEqualTo("ui.dark: Missing colour \"surface.panel\"");
         assertThat(failure.getMessage()).isEqualTo("t.json: " + failure.detail());

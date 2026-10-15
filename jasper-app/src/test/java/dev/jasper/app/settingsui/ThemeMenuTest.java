@@ -108,7 +108,7 @@ class ThemeMenuTest {
             assertThat(gear.kind()).isEqualTo(Nodes.ButtonKind.GHOST);
             assertThat(gear.items()).extracting(MenuItem::label).containsExactly("Import Theme…", "", "Remove Theme");
             assertThat(item(id, "import").enabled()).isTrue();
-            assertThat(item(id, "remove").enabled()).as("Slate Steel and Same as UI theme cannot be removed").isFalse();
+            assertThat(item(id, "remove").enabled()).as("Slate Cobalt and Same as UI theme cannot be removed").isFalse();
         }
         assertThat(page.searchTerms()).contains("Import theme", "Remove theme");
         assertThatThrownBy(() -> node(page, "section-imported-themes")).as("no Imported themes group").hasMessage("No node section-imported-themes");
@@ -182,9 +182,9 @@ class ThemeMenuTest {
         assertThat(told).containsExactly(new ThemeImports.Notice("Could not import half.json", "terminal.dark: Missing colour \"fg.bold\""));
         assertThat(folder()).doesNotExist();
         assertThat(reloads[0]).isZero();
-        chosen.add(download("steel.json", ThemeTestSupport.uiThemeJson("Slate Steel")));
+        chosen.add(download("cobalt.json", ThemeTestSupport.uiThemeJson("Slate Cobalt")));
         choose(LIGHT, "import");
-        assertThat(told).last().isEqualTo(new ThemeImports.Notice("Could not import steel.json", "Slate Steel is built in and can't be replaced"));
+        assertThat(told).last().isEqualTo(new ThemeImports.Notice("Could not import cobalt.json", "Slate Cobalt is built in and can't be replaced"));
         assertThat(item(LIGHT, "import").enabled()).as("the gear is not left busy").isTrue();
     }
 
@@ -247,7 +247,7 @@ class ThemeMenuTest {
         assertThat(asked).singleElement().satisfies(question -> {
             assertThat(question.question()).isEqualTo("Remove Ocean?");
             assertThat(question.consequence()).isEqualTo("Its file, ocean.json, is deleted from the themes folder. "
-                + "It is your Dark theme; Slate Steel will be used instead. It is your Light theme; Slate Steel will be used instead. "
+                + "It is your Dark theme; Slate Cobalt will be used instead. It is your Light theme; Slate Cobalt will be used instead. "
                 + "Its scheme is your terminal scheme; Same as UI theme will be used instead.");
         });
         assertThat(folder().resolve("ocean.json")).doesNotExist();
@@ -257,7 +257,7 @@ class ThemeMenuTest {
             assertThat(edit.expected()).containsOnly(Map.entry(CoreSettings.UI_THEME_DARK, Optional.of("ocean")),
                 Map.entry(CoreSettings.TERMINAL_SCHEME, Optional.of("ocean/high-contrast")));
         });
-        assertThat(draft.value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("slate-steel");
+        assertThat(draft.value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("slate-cobalt");
         assertThat(draft.modified(CoreSettings.UI_THEME_LIGHT)).as("the staged pick is gone, not replaced").isFalse();
         assertThat(draft.value(CoreSettings.UI_FONT_SIZE)).as("other staged changes stay").isEqualTo(15f);
         assertThat(told).isEmpty();
