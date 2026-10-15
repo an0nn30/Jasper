@@ -1489,7 +1489,7 @@ Nothing reads the carried keys any more, so the record component goes (spec 6.5)
 **Files:**
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/theme/GeneratedTheme.java` (whole file), `jasper-ui/src/main/java/dev/jasper/ui/theme/JasperTheme.java:175-176`, `jasper-ui/src/main/java/dev/jasper/ui/theme/TitleBarTheme.java:52-53`, `jasper-ui/src/main/java/dev/jasper/ui/theme/UiColorKeys.java` (the palette overload from Task 3)
 - Test: `jasper-ui/src/test/java/dev/jasper/ui/theme/SlateCobaltGeneratedTest.java:21-23`
-- Modify tests: `jasper-ui/src/test/java/dev/jasper/ui/theme/UiColorKeysTest.java` (Task 3's file), `jasper-ui/src/test/java/dev/jasper/ui/swing/SlateCobaltInstallTest.java:6,21`, `jasper-ui/src/test/java/dev/jasper/ui/testsupport/KitFixtures.java:32-33,46-47` (lines as of Task 3: 38-39 and 52-53 after Task 2's insertion), `jasper-app/src/test/java/dev/jasper/app/appearance/ThemeTestSupport.java` (recolored, withSyntax, withGlass, withDark), `jasper-app/src/test/java/dev/jasper/app/plugins/HostedPalettesTest.java:23-24`, `jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitTest.java:143-144`, `jasper-app/src/test/java/dev/jasper/app/plugins/WorkspaceAppearanceFixture.java:49-51`
+- Modify tests: `jasper-ui/src/test/java/dev/jasper/ui/theme/UiColorKeysTest.java` (Task 3's file), `jasper-ui/src/test/java/dev/jasper/ui/swing/SlateCobaltInstallTest.java:7,21`, `jasper-ui/src/test/java/dev/jasper/ui/testsupport/KitFixtures.java:32-33,46-47` (lines as of Task 3: 38-39 and 52-53 after Task 2's insertion), `jasper-app/src/test/java/dev/jasper/app/appearance/ThemeTestSupport.java` (recolored, withSyntax, withGlass, withDark), `jasper-app/src/test/java/dev/jasper/app/plugins/HostedPalettesTest.java:23-24`, `jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitTest.java:143-144`, `jasper-app/src/test/java/dev/jasper/app/plugins/WorkspaceAppearanceFixture.java:49-51`
 
 **Interfaces:**
 - Consumes: `UiColorKeys.flatLaf(GeneratedTheme, UiKeySet)`, `UiKeySet.DEFAULT` (Task 3).
@@ -2241,7 +2241,7 @@ once the first insertion is in) insert:
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.FlatLafInstallerKitTest'`
 Expected: FAIL in `:jasper-ui:compileTestJava` with `error: cannot find symbol` / `symbol: method installedKit()` and
-`method install(GeneratedTheme,Kit)`.
+`error: method install in class FlatLafInstaller cannot be applied to given types`.
 
 - [ ] **Step 3: Install under a kit and publish it**
 
@@ -2702,10 +2702,10 @@ The three app construction sites read the installed kit (a test installs another
 contexts name theirs.
 
 **Files:**
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitContext.java` (whole file), `jasper-ui/src/main/java/dev/jasper/ui/swing/SwingTypography.java:3-6,23-25` (Task 2's version), `jasper-ui/src/main/java/dev/jasper/ui/swing/NativeControlStyles.java:40`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitContext.java` (whole file), `jasper-ui/src/main/java/dev/jasper/ui/swing/SwingTypography.java:4-6,26-28` (Task 2's version), `jasper-ui/src/main/java/dev/jasper/ui/swing/NativeControlStyles.java:40`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/appearance/AppearanceBindings.java` (whole file), `jasper-app/src/main/java/dev/jasper/app/plugins/HostedKit.java:6,57`, `jasper-app/src/main/java/dev/jasper/app/platform/PresentationIcons.java:24`
 - Modify: `docs/ui-architecture.md:46-47` and `jasper-ui/src/test/java/dev/jasper/ui/gallery/UiExamplesTest.java:6,32-33` (the compiled example, together)
-- Test: `jasper-ui/src/test/java/dev/jasper/ui/swing/KitContextTest.java` (new); `jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitTest.java` (one new test before line 56, and line 40)
+- Test: `jasper-ui/src/test/java/dev/jasper/ui/swing/KitContextTest.java` (new); `jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitTest.java` (one new test before line 55, and line 40)
 - Modify test support: `jasper-ui/src/test/java/dev/jasper/ui/testsupport/KitFixtures.java` (`context(GeneratedTheme)` and `context()`)
 - Modify tests (Step 5's script, 26 constructions in 16 files): `ShippedControlReadabilityTest`, `Task9cChooserEvidenceTest`, `NotificationCardTest`, `HostedKitTest`, `NativeShellsChromeTest`, `SheetOwnershipTest` (4), `WorkspaceRolesTest`, `GalleryCoverageTest` (2), `KitGallery`, `EditorKitTest`, `KitCalibrationTest` (5), `KitKeyBindingAuditTest`, `MenusTest`, `ModalOverlayTest`, `RemoteKitTest` (3), `SwitchesTest`
 
@@ -2824,7 +2824,7 @@ class KitContextTest {
 }
 ```
 
-In `jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitTest.java`, insert before line 56
+In `jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitTest.java`, insert before line 55
 (`@Test void failedPresentationReconciliationRetainsBothGenerationsUntilRecovery() throws Exception {…`):
 
 ```java
@@ -2867,7 +2867,7 @@ assertThat(context.kit()).isSameAs(dev.jasper.ui.swing.FlatLafInstaller.installe
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.KitContextTest'`
 Expected: FAIL in `:jasper-ui:compileTestJava` with `error: cannot find symbol` for `method kit()` and
-`method context(GeneratedTheme,Kit)`.
+`error: no suitable method found for context(GeneratedTheme,Kit)`.
 
 Run: `./gradlew :jasper-app:compileTestJava`
 Expected: FAIL in `HostedKitTest` with `error: cannot find symbol` for `method kit()`.
@@ -3188,7 +3188,7 @@ git grep -nE 'new (dev\.jasper\.ui\.swing\.)?KitContext[[:space:]]*\(' -- '*.jav
 ```
 
 Expected: the final `git grep` prints only `jasper-ui/src/main/java/dev/jasper/ui/swing/KitView.java:45` (the
-package-private copy `new KitContext(Objects.requireNonNull(context))`). For example `KitCalibrationTest.java:99`
+package-private copy `new KitContext(Objects.requireNonNull(context))`) and `jasper-ui/src/main/java/dev/jasper/ui/swing/KitContext.java:41` (the factory's own construction). For example `KitCalibrationTest.java:99`
 becomes `KitContext.of(base.kit(), base.binding(), base.route(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false, action -> "")`,
 `MenusTest.java:275` keeps its `id -> bindings.getOrDefault(id, "")`, and `NativeShellsChromeTest.java:38-39` joins into
 one line.
@@ -3279,7 +3279,7 @@ In `jasper-ui/src/test/java/dev/jasper/ui/icons/IconRegistryTest.java`, insert b
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.icons.IconRegistryTest'`
-Expected: FAIL in `:jasper-ui:compileTestJava` with `error: method size in class IconRegistry cannot be applied to given types`.
+Expected: FAIL in `:jasper-ui:compileTestJava` with `error: method size in class IconRegistry cannot be applied to given types` and `error: no suitable method found for tile(DesignMetrics,String,SemanticPalette,Hue,int,boolean)`.
 
 - [ ] **Step 3: Pass the catalog through the registry**
 
@@ -3669,7 +3669,7 @@ In `NativeStylesTest.java`, insert before the file's last line:
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.ChromePainterTest' --tests 'dev.jasper.ui.swing.NativeStylesTest'`
 Expected: FAIL in `:jasper-ui:compileTestJava` with `error: cannot find symbol` / `symbol: class ChromePainter` and
-`class NativeStyles`.
+`class NativeStyles`, and (`TablesTest`, edited in Step 2) `cannot find symbol` / `method measureText(Font,String)` / `location: class ThemePainting`.
 
 - [ ] **Step 5: Make the two classes kit instances**
 
