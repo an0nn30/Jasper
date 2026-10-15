@@ -5,6 +5,7 @@ import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.testsupport.IdleTerminalSession;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.session.SessionLaunchOptions;
 
@@ -44,6 +45,10 @@ public final class DesktopTestSupport {
     }
     public static ShellLauncher launcher(Queue<Runnable> pending) {
         return new ShellLauncher(pending::add, DesktopTestSupport::shell, "sh");
+    }
+    /** A launcher whose shells are idle in-process sessions, so they run on every platform, Windows included. */
+    public static ShellLauncher idleLauncher(Queue<Runnable> pending) {
+        return new ShellLauncher(pending::add, directory -> IdleTerminalSession.start(), "idle-test-session");
     }
     public static WindowContent content(ShellLauncher launcher) {
         WindowContent owner = new WindowContent(launcher, HOME, path -> {}, () -> {}, () -> {});
