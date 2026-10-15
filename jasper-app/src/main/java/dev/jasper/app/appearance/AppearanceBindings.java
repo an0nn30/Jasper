@@ -1,8 +1,8 @@
 package dev.jasper.app.appearance;
 
 import dev.jasper.ui.theme.*;
+import dev.jasper.ui.swing.FlatLafInstaller;
 import dev.jasper.ui.swing.KitContext;
-import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.icons.IconRegistry;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -20,8 +20,9 @@ public final class AppearanceBindings implements AutoCloseable {
     public ThemeBinding binding() { return binding; }
     /** The keymap text app-native menus show beside an item's action; contexts made earlier follow it. */
     public void shortcuts(java.util.function.Function<String, String> labels) { shortcuts = java.util.Objects.requireNonNull(labels); }
+    /** A context for {@code route} over the installed kit, read now: contexts are made after the start-up install. */
     public KitContext context(ThemeRoute route) {
-        return new KitContext(binding, route, DesignMetrics.DEFAULT, icons, animations, action -> shortcuts.apply(action));
+        return KitContext.of(FlatLafInstaller.installedKit(), binding, route, icons, animations, action -> shortcuts.apply(action));
     }
     @Override public void close() { binding.close(); icons.close(); }
 }

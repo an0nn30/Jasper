@@ -3,7 +3,6 @@ package dev.jasper.ui.gallery;
 import com.formdev.flatlaf.FlatLaf;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.ui.icons.IconRegistry;
-import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.model.*;
 import dev.jasper.ui.model.Nodes.*;
 import dev.jasper.ui.swing.*;
@@ -110,7 +109,7 @@ public final class KitGallery {
                 KeyboardFocusManager.setCurrentKeyboardFocusManager(focus);
                 var binding = new ThemeBinding(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); });
                 try (var icons = icons(); var ownedBinding = contextBinding(binding)) {
-                    var context = new KitContext(ownedBinding, ThemeRoute.WORKSPACE, DesignMetrics.DEFAULT, icons, () -> false);
+                    var context = KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, ownedBinding, ThemeRoute.WORKSPACE, icons, () -> false, action -> "");
                     float scale = UIScale.getUserScaleFactor();
                     Path directory = output.resolve(name + "-" + (int)scale + "x");
                     Files.createDirectories(directory);

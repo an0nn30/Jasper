@@ -57,7 +57,7 @@ class SwitchesTest {
     @Test void disablingMotionSettlesRunningSwitchAndProgressAndCloseStopsOwnedTimers() {
         Edt.run(() -> {
             var enabled = new java.util.concurrent.atomic.AtomicBoolean(true); var base = KitFixtures.context();
-            var context = new KitContext(base.binding(), base.route(), base.metrics(), base.icons(), enabled::get);
+            var context = KitContext.of(base.kit(), base.binding(), base.route(), base.icons(), enabled::get, action -> "");
             try (var view = new KitView(context, stack(toggle(false, ControlState.READY, false), new Progress("progress", ControlState.READY, -1, "Loading")), e -> {})) {
                 var button = find(view, "run", Switches.SwitchButton.class);
                 view.update(stack(toggle(true, ControlState.READY, false), new Progress("progress", ControlState.READY, -1, "Loading")));

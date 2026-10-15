@@ -30,7 +30,7 @@ class ModalOverlayTest {
         final AtomicBoolean motion = new AtomicBoolean(true);
         final AtomicLong now = new AtomicLong(1_000 * MS);
         final KitContext base = KitFixtures.context();
-        final KitContext context = new KitContext(base.binding(), base.route(), base.metrics(), base.icons(), motion::get);
+        final KitContext context = KitContext.of(base.kit(), base.binding(), base.route(), base.icons(), motion::get, action -> "");
         final JPanel content = new JPanel();
         final JLayeredPane pane = new JLayeredPane();
         final ModalOverlay overlay;

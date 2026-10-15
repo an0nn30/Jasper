@@ -1,8 +1,7 @@
 package dev.jasper.ui.swing;
 
 import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.ui.metrics.FaceSet;
-import dev.jasper.ui.metrics.TypeScale;
+import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.metrics.Typography;
 import java.awt.Font;
 import java.util.Optional;
@@ -23,8 +22,8 @@ final class SwingTypography {
         });
         return result;
     }
-    static Typography typography() {
-        return Typography.of(TypeScale.DEFAULT, FaceSet.PLATFORM, user());
+    static Typography typography(Kit kit) {
+        return Typography.of(kit.type(), kit.faces(), user());
     }
     /**
      * The user's font settings as the host applied them: none without a developer {@code defaultFont}; otherwise its size

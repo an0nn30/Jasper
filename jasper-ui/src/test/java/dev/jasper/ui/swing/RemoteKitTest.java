@@ -235,8 +235,8 @@ class RemoteKitTest {
 
     /** A context on one theme for both routes, as {@link KitFixtures#context()} does for dark. */
     static KitContext context(dev.jasper.ui.theme.GeneratedTheme theme) {
-        return new KitContext(new dev.jasper.ui.theme.ThemeBinding(new dev.jasper.ui.theme.ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }),
-            dev.jasper.ui.theme.ThemeRoute.WORKSPACE, dev.jasper.ui.metrics.DesignMetrics.DEFAULT, new dev.jasper.ui.icons.IconRegistry(), () -> false);
+        return KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, new dev.jasper.ui.theme.ThemeBinding(new dev.jasper.ui.theme.ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }),
+            dev.jasper.ui.theme.ThemeRoute.WORKSPACE, new dev.jasper.ui.icons.IconRegistry(), () -> false, action -> "");
     }
 
     /** Opaque glyph pixels within a small distance of {@code colour}. */
@@ -570,7 +570,7 @@ class RemoteKitTest {
     @Test void anIndeterminateProgressAnimatesOnlyWhileShowingAndStopsWhenHiddenDeterminateRemovedOrClosed() {
         Edt.run(() -> {
             var enabled = new java.util.concurrent.atomic.AtomicBoolean(true); var base = KitFixtures.context();
-            var context = new KitContext(base.binding(), base.route(), base.metrics(), base.icons(), enabled::get);
+            var context = KitContext.of(base.kit(), base.binding(), base.route(), base.icons(), enabled::get, action -> "");
             java.util.function.Function<ControlState, ViewSpec> working = state -> stack(new Progress("progress", state, -1, "Connecting"),
                 new Text("status", READY, "Opening shell…", TextRole.BODY));
             var host = new javax.swing.JPanel(new java.awt.BorderLayout());
@@ -616,7 +616,7 @@ class RemoteKitTest {
                 } finally { host.removeNotify(); }
             } finally { release(context); }
             var fresh = KitFixtures.context();
-            var off = new KitContext(fresh.binding(), fresh.route(), fresh.metrics(), fresh.icons(), () -> false);
+            var off = KitContext.of(fresh.kit(), fresh.binding(), fresh.route(), fresh.icons(), () -> false, action -> "");
             var shown = new javax.swing.JPanel(new java.awt.BorderLayout());
             try (var view = new KitView(off, working.apply(READY), e -> {})) {
                 shown.add(view); shown.addNotify();

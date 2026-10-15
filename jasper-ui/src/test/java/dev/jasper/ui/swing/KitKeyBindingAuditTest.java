@@ -271,7 +271,7 @@ class KitKeyBindingAuditTest {
             var base = KitFixtures.context();
             var findings = new java.util.TreeSet<String>();
             try (var icons = dev.jasper.ui.gallery.KitGallery.icons()) {
-                var context = new KitContext(base.binding(), dev.jasper.ui.theme.ThemeRoute.WORKSPACE, dev.jasper.ui.metrics.DesignMetrics.DEFAULT, icons, () -> false);
+                var context = KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, base.binding(), dev.jasper.ui.theme.ThemeRoute.WORKSPACE, icons, () -> false, action -> "");
                 for (var fixture : dev.jasper.ui.gallery.KitGallery.fixtures()) {
                     try (var view = new KitView(context, fixture.spec(), e -> { })) {
                         view.setSize(fixture.width(), fixture.height()); InteractiveRowsTest.layout(view);

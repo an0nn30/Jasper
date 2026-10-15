@@ -3,7 +3,7 @@ package dev.jasper.ui.gallery;
 import dev.jasper.ui.theme.JasperTheme;
 
 import dev.jasper.ui.icons.IconRegistry;
-import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.model.*;
 import dev.jasper.ui.model.Nodes.*;
 import dev.jasper.ui.swing.*;
@@ -29,8 +29,8 @@ class UiExamplesTest {
             // example:view:start
             try (var binding = new ThemeBinding(new ThemePair(generated, generated), failure -> {});
                  var icons = new IconRegistry()) {
-                var context = new KitContext(binding, ThemeRoute.WORKSPACE,
-                        DesignMetrics.DEFAULT, icons, () -> false);
+                var context = KitContext.of(Kit.DEFAULT, binding, ThemeRoute.WORKSPACE,
+                        icons, () -> false, action -> "");
                 var root = new Nodes.Stack("editor", ControlState.READY, LayoutRole.VERTICAL,
                         List.of(new Field("name", ControlState.READY, FieldKind.TEXT,
                                 "", "Name", "Name", ""),

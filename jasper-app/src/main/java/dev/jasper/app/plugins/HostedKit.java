@@ -3,7 +3,6 @@ package dev.jasper.app.plugins;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.*;
 import dev.jasper.ui.icons.IconRegistry;
-import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.swing.*;
 import dev.jasper.ui.theme.*;
 import java.awt.EventQueue;
@@ -54,7 +53,7 @@ final class HostedKit implements UiKit,AutoCloseable {
     void refresh(){guard();if(binding!=null){binding.publish(themes.get());for(var view:List.copyOf(views))view.updated.run();}}
     void failed(){KitDiagnostics.failure(containment,owner);}
     void removed(HostedKitView view){views.remove(view);}
-    @Override public HostedKitView create(ViewSpec spec,Consumer<UiEvent> events){initialize();validateIcons(spec);var view=new HostedKitView(this,new KitContext(binding,ThemeRoute.CHROME,DesignMetrics.DEFAULT,icons,animations,shortcuts),spec,events);views.add(view);return view;}
+    @Override public HostedKitView create(ViewSpec spec,Consumer<UiEvent> events){initialize();validateIcons(spec);var view=new HostedKitView(this,KitContext.of(FlatLafInstaller.installedKit(),binding,ThemeRoute.CHROME,icons,animations,shortcuts),spec,events);views.add(view);return view;}
     @Override public Subscription registerIcon(IconAsset asset) {
         initialize(); Objects.requireNonNull(asset);
         if(!asset.name().startsWith(owner+":"))throw new IllegalArgumentException("Foreign icon namespace");

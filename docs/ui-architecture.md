@@ -43,8 +43,8 @@ registered specialized content. Close the view first. This compiled example runs
 ```java
 try (var binding = new ThemeBinding(new ThemePair(generated, generated), failure -> {});
      var icons = new IconRegistry()) {
-    var context = new KitContext(binding, ThemeRoute.WORKSPACE,
-            DesignMetrics.DEFAULT, icons, () -> false);
+    var context = KitContext.of(Kit.DEFAULT, binding, ThemeRoute.WORKSPACE,
+            icons, () -> false, action -> "");
     var root = new Nodes.Stack("editor", ControlState.READY, LayoutRole.VERTICAL,
             List.of(new Field("name", ControlState.READY, FieldKind.TEXT,
                     "", "Name", "Name", ""),

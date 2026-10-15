@@ -669,8 +669,8 @@ class EditorKitTest {
 
     /** Light chrome and a dark workspace, so a re-route is visible. */
     static KitContext mixed() {
-        return new KitContext(new ThemeBinding(new ThemePair(KitFixtures.light(), KitFixtures.dark()), failure -> { throw new AssertionError(failure); }),
-            ThemeRoute.CHROME, DesignMetrics.DEFAULT, new IconRegistry(), () -> false);
+        return KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, new ThemeBinding(new ThemePair(KitFixtures.light(), KitFixtures.dark()), failure -> { throw new AssertionError(failure); }),
+            ThemeRoute.CHROME, new IconRegistry(), () -> false, action -> "");
     }
 
     @Test void reRoutingAViewRepaintsItsControlsFromTheWorkspaceSlotInPlaceAndLeavesOtherViewsAlone() {

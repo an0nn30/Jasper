@@ -34,8 +34,7 @@ class WorkspaceRolesTest {
         assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(dark);
         try (var binding = new ThemeBinding(new ThemePair(dark, dark), failure -> { throw new AssertionError(failure); });
              var icons = new dev.jasper.ui.icons.IconRegistry();
-             var view = new dev.jasper.ui.swing.KitView(new dev.jasper.ui.swing.KitContext(binding, ThemeRoute.CHROME,
-                 dev.jasper.ui.metrics.DesignMetrics.DEFAULT, icons, () -> false),
+             var view = new dev.jasper.ui.swing.KitView(dev.jasper.ui.swing.KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, binding, ThemeRoute.CHROME, icons, () -> false, action -> ""),
                  new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Text("label", dev.jasper.ui.model.ControlState.READY,
                      "Existing view", dev.jasper.ui.model.Nodes.TextRole.BODY)), event -> {})) {
             var label = (JLabel) view.getComponent(0);

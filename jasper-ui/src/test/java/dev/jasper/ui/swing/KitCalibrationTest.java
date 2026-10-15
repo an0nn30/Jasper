@@ -96,7 +96,7 @@ class KitCalibrationTest {
     @Test void referenceCategoryTilesOrderedSurfaceAndPickerAlignmentAreRealRenderedOwners() {
         Edt.run(() -> {
             var base = KitFixtures.context();
-            var context = new KitContext(base.binding(), base.route(), base.metrics(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false);
+            var context = KitContext.of(base.kit(), base.binding(), base.route(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false, action -> "");
             try (var view = new KitView(context, dev.jasper.ui.gallery.FormFixtures.create("add-host"), e -> {})) {
                 var image = KitFixtures.render(view, UIScale.scale(540), UIScale.scale(760), 1);
                 var keys = (ItemLists.ListControl)view.control("keys");
@@ -109,7 +109,7 @@ class KitCalibrationTest {
                 assertThat(changed).as("picker glyph actually paints at leading edge").isTrue();
             } finally { context.icons().close(); base.icons().close(); base.binding().close(); }
             var b = KitFixtures.context();
-            var c = new KitContext(b.binding(), b.route(), b.metrics(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false);
+            var c = KitContext.of(b.kit(), b.binding(), b.route(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false, action -> "");
             try (var sheet = new KitView(c, dev.jasper.ui.gallery.FormFixtures.create("add-login-sheet"), e -> {});
                  var vault = new KitView(c, dev.jasper.ui.gallery.FormFixtures.create("credential-vault"), e -> {})) {
                 KitFixtures.render(sheet, UIScale.scale(480), UIScale.scale(365), 1);
@@ -123,7 +123,7 @@ class KitCalibrationTest {
     @Test void managerUsesThreeSemanticColumnsHiddenChromeAndPinnedTrailingAction() {
         Edt.run(() -> {
             var base = KitFixtures.context();
-            var context = new KitContext(base.binding(), base.route(), base.metrics(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false);
+            var context = KitContext.of(base.kit(), base.binding(), base.route(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false, action -> "");
             try (var view = new KitView(context, dev.jasper.ui.gallery.FormFixtures.create("credential-vault"), e -> {})) {
                 KitFixtures.render(view, UIScale.scale(900), UIScale.scale(555), 1);
                 assertThat(view.control("manager-header").component.getHeight()).as("hidden native-chrome replacement").isZero();
@@ -179,7 +179,7 @@ class KitCalibrationTest {
     @Test void formRowHelperWrapsAndDetailHasSourceInsets() {
         Edt.run(() -> {
             var base = KitFixtures.context();
-            var context = new KitContext(base.binding(), base.route(), base.metrics(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false);
+            var context = KitContext.of(base.kit(), base.binding(), base.route(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false, action -> "");
             try (var server = new KitView(context, dev.jasper.ui.gallery.FormFixtures.create("new-file-server"), e -> {});
                  var vault = new KitView(context, dev.jasper.ui.gallery.FormFixtures.create("credential-vault"), e -> {})) {
                 KitFixtures.render(server, UIScale.scale(540), UIScale.scale(730), 1);
@@ -198,7 +198,7 @@ class KitCalibrationTest {
     @Test void menuCategoryHuesAreExplicitAndLegacyDefaultsRemainNeutral() {
         Edt.run(() -> {
             var base = KitFixtures.context();
-            var context = new KitContext(base.binding(), base.route(), base.metrics(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false);
+            var context = KitContext.of(base.kit(), base.binding(), base.route(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false, action -> "");
             try (var view = new KitView(context, dev.jasper.ui.gallery.FormFixtures.create("vault-add-menu"), e -> {})) {
                 var descriptors = ((Nodes.MenuButton)view.control("add-menu").node).items();
                 assertThat(descriptors.stream().filter(i -> !i.separator()).map(dev.jasper.ui.model.MenuItem::hue)).containsExactly(Nodes.Hue.BLUE, Nodes.Hue.GREEN, Nodes.Hue.AMBER, Nodes.Hue.PURPLE);

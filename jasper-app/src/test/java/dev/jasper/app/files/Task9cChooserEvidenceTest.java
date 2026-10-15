@@ -27,7 +27,7 @@ class Task9cChooserEvidenceTest {
                 for (boolean themeDark : new boolean[]{true, false})for(float font:List.of(13f,20f,32f)) {
                     themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system",font));
                     var sourceKit=themes.appearance().context(ThemeRoute.CHROME);
-                    var kit=new dev.jasper.ui.swing.KitContext(sourceKit.binding(),sourceKit.route(),sourceKit.metrics(),sourceKit.icons(),()->false);
+                    var kit=dev.jasper.ui.swing.KitContext.of(sourceKit.kit(), sourceKit.binding(), sourceKit.route(), sourceKit.icons(), ()->false, action -> "");
                     String family=(themeDark?"dark":"light")+"-"+font;
                     for(var mode:ChooserRequest.Mode.values()) {
                         var request=new ChooserRequest("Synthetic chooser",mode,mode==ChooserRequest.Mode.OPEN,Location.local(home),Optional.empty(),Optional.of("example.txt"),Optional.empty(),Optional.empty());

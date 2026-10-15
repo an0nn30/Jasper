@@ -3,7 +3,6 @@ package dev.jasper.app.appearance;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.KitTestSupport;
 import dev.jasper.ui.icons.IconRegistry;
-import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.model.*;
 import dev.jasper.ui.swing.*;
 import dev.jasper.ui.theme.*;
@@ -22,7 +21,7 @@ class ShippedControlReadabilityTest {
         var original = UIManager.getLookAndFeel();
         try (var binding = new ThemeBinding(new ThemePair(initial, initial), failure -> { throw new AssertionError(failure); });
              var icons = new IconRegistry()) {
-            var kit = new KitContext(binding, ThemeRoute.CHROME, DesignMetrics.DEFAULT, icons, () -> false);
+            var kit = KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, binding, ThemeRoute.CHROME, icons, () -> false, action -> "");
             for (boolean compact : List.of(false, true)) {
                 var events = new java.util.ArrayList<UiEvent>();
                 try (var view = new KitView(kit, new ViewSpec(new Nodes.Toggle("toggle", ControlState.READY, "Enabled", false, "toggle", compact)), events::add)) {

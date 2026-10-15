@@ -105,7 +105,7 @@ class GalleryCoverageTest {
                 try (var binding = new dev.jasper.ui.theme.ThemeBinding(new dev.jasper.ui.theme.ThemePair(chrome, workspace), failure -> { throw new AssertionError(failure); });
                      var icons = KitGallery.icons()) {
                     for (var route : dev.jasper.ui.theme.ThemeRoute.values()) {
-                        var context = new dev.jasper.ui.swing.KitContext(binding, route, dev.jasper.ui.metrics.DesignMetrics.DEFAULT, icons, () -> false);
+                        var context = dev.jasper.ui.swing.KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, binding, route, icons, () -> false, action -> "");
                         var spec = new dev.jasper.ui.model.ViewSpec(new Nodes.Button("route-button", dev.jasper.ui.model.ControlState.READY, "Continue", "", Nodes.ButtonKind.PRIMARY, "continue", ""));
                         try (var view = new dev.jasper.ui.swing.KitView(context, spec, event -> {})) {
                             int w = com.formdev.flatlaf.util.UIScale.scale(200), h = com.formdev.flatlaf.util.UIScale.scale(28);
@@ -125,7 +125,7 @@ class GalleryCoverageTest {
     @Test void popupMetadataDescribesTheActualPaintedRootIncludingUnnamedSeparator() {
         dev.jasper.ui.testsupport.Edt.run(() -> {
             var base = dev.jasper.ui.testsupport.KitFixtures.context();
-            var context = new dev.jasper.ui.swing.KitContext(base.binding(), base.route(), base.metrics(), KitGallery.icons(), () -> false);
+            var context = dev.jasper.ui.swing.KitContext.of(base.kit(), base.binding(), base.route(), KitGallery.icons(), () -> false, action -> "");
             try (var view = new dev.jasper.ui.swing.KitView(context, FormFixtures.create("vault-add-menu"), e -> {})) {
                 var popup = KitGallery.find(view, "add-menu").getComponentPopupMenu();
                 var image = new java.awt.image.BufferedImage(200, 140, java.awt.image.BufferedImage.TYPE_INT_ARGB);

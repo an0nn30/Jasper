@@ -21,7 +21,8 @@ public final class PresentationIcons implements AutoCloseable {
     private Set<Snapshot> requested;
     private long nextAlias;
     public KitContext context(KitContext source) {
-        return new KitContext(source.binding(), source.route(), source.metrics(), registry, source.animationsEnabled(), source.shortcuts());
+        return KitContext.of(dev.jasper.ui.swing.FlatLafInstaller.installedKit(), source.binding(), source.route(), registry,
+            source.animationsEnabled(), source.shortcuts());
     }
     public Optional<String> name(Icon icon) {
         if (!(icon instanceof PresentationIcon named)) return AppIcons.kitName(icon);

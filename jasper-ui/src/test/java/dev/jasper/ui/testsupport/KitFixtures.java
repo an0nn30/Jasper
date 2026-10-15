@@ -153,23 +153,15 @@ public final class KitFixtures {
         return new java.awt.Color(16 + 3 * role.ordinal(), 64 + role.ordinal(), 200 - role.ordinal());
     }
 
-    /** A context over {@code theme} for both routes; caller owns and closes the binding and icon registry; EDT. */
-    public static KitContext context(GeneratedTheme theme) {
-        return new KitContext(new ThemeBinding(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }),
-            ThemeRoute.WORKSPACE, DesignMetrics.DEFAULT, new IconRegistry(), () -> false);
+    /** A context over {@code theme} and {@code kit} for both routes; caller owns and closes the binding and icon registry; EDT. */
+    public static KitContext context(GeneratedTheme theme, Kit kit) {
+        return KitContext.of(kit, new ThemeBinding(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }),
+            ThemeRoute.WORKSPACE, new IconRegistry(), () -> false, action -> "");
     }
 
+    /** A context over {@code theme} for both routes; caller owns and closes the binding and icon registry; EDT. */
+    public static KitContext context(GeneratedTheme theme) { return context(theme, Kit.DEFAULT); }
+
     /** Caller owns and closes the binding and icon registry; creation requires EDT. */
-    public static KitContext context() {
-        return new KitContext(
-                new ThemeBinding(
-                        new ThemePair(dark(), dark()),
-                        failure -> {
-                            throw new AssertionError(failure);
-                        }),
-                ThemeRoute.WORKSPACE,
-                DesignMetrics.DEFAULT,
-                new IconRegistry(),
-                () -> false);
-    }
+    public static KitContext context() { return context(dark()); }
 }

@@ -34,10 +34,10 @@ class HostedKitTest {
   var registration=kit.registerIcon(new IconAsset("owner:custom","M 2 2 L 14 14"));
   var icon=kit.icon("owner:custom");
   try(var receiver=new dev.jasper.app.platform.PresentationIcons();var binding=new dev.jasper.ui.theme.ThemeBinding(pair,e -> {throw new AssertionError(e);});var original=new dev.jasper.ui.icons.IconRegistry()) {
-   var source=new dev.jasper.ui.swing.KitContext(binding,dev.jasper.ui.theme.ThemeRoute.WORKSPACE,dev.jasper.ui.metrics.DesignMetrics.DEFAULT,original,() -> false);
+   var source=dev.jasper.ui.swing.KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, binding, dev.jasper.ui.theme.ThemeRoute.WORKSPACE, original, () -> false, action -> "");
    var context=receiver.context(source);
    assertThat(context.binding()).isSameAs(binding);assertThat(context.route()).isEqualTo(source.route());
-   assertThat(context.metrics()).isSameAs(source.metrics());assertThat(context.animationsEnabled()).isSameAs(source.animationsEnabled());
+   assertThat(context.metrics()).isSameAs(source.metrics());assertThat(context.animationsEnabled()).isSameAs(source.animationsEnabled());assertThat(context.kit()).isSameAs(dev.jasper.ui.swing.FlatLafInstaller.installedKit());
    assertThat(receiver.name(icon)).contains("owner:custom");
    assertThat(original.names()).doesNotContain("owner:custom");
    registration.close();assertThatIllegalArgumentException().isThrownBy(() -> kit.icon("owner:custom"));kit.close();
@@ -50,6 +50,30 @@ class HostedKitTest {
    var next=pixels(context.icons().icon("owner:custom",context.theme().semantic(),dev.jasper.ui.model.Nodes.Hue.NONE,16),new JPanel());
    assertThat(next).isNotEqualTo(first);
    receiver.close();assertThatIllegalStateException().isThrownBy(() -> context.icons().names());
+  }
+ });}
+ /** Enterprise presentation plan 1: the app's three context sites take the kit installed when they make a context. */
+ @Test void appContextsAreMadeOverTheInstalledKit() throws Exception {SwingUtilities.invokeAndWait(() -> {
+  var base=dev.jasper.ui.kit.Kit.DEFAULT;
+  var tall=new dev.jasper.ui.kit.Kit("tall-buttons",base.metrics().with(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT,40),base.type(),base.faces(),base.uiKeys());
+  var pair=ThemeTestSupport.pair(true);
+  var spec=new ViewSpec(new Nodes.Button("go",ControlState.READY,"Go","",Nodes.ButtonKind.SECONDARY,"go",""));
+  var original=UIManager.getLookAndFeel();
+  var kit=new HostedKit("owner",() -> true,() -> pair,null,new Containment(java.awt.EventQueue::isDispatchThread));
+  try(var bindings=new dev.jasper.app.appearance.AppearanceBindings(pair,e -> {throw new AssertionError(e);},() -> false);var receiver=new dev.jasper.app.platform.PresentationIcons()) {
+   dev.jasper.ui.swing.FlatLafInstaller.install(pair.chrome(),base);
+   var source=bindings.context(dev.jasper.ui.theme.ThemeRoute.WORKSPACE);
+   var view=kit.create(spec,e -> {});
+   dev.jasper.ui.swing.FlatLafInstaller.install(pair.chrome(),tall);
+   assertThat(source.kit()).as("read when the context was made").isSameAs(base);
+   assertThat(bindings.context(dev.jasper.ui.theme.ThemeRoute.CHROME).kit()).isSameAs(tall);
+   assertThat(receiver.context(source).kit()).as("the installed kit, not the source's").isSameAs(tall);
+   var tallView=kit.create(spec,e -> {});
+   assertThat(tallView.component().getPreferredSize().height).as("a hosted view measures with the kit installed when it was made")
+    .isGreaterThan(view.component().getPreferredSize().height);
+  } finally {
+   kit.close();
+   try{UIManager.setLookAndFeel(original);}catch(UnsupportedLookAndFeelException failure){throw new AssertionError(failure);}
   }
  });}
  @Test void failedPresentationReconciliationRetainsBothGenerationsUntilRecovery() throws Exception {SwingUtilities.invokeAndWait(() -> {

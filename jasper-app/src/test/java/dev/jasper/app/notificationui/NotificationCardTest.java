@@ -71,7 +71,7 @@ class NotificationCardTest {
         var initial = ThemeTestSupport.pair(true);
         try (var binding = new dev.jasper.ui.theme.ThemeBinding(initial, failure -> { throw new AssertionError(failure); });
              var icons = new dev.jasper.ui.icons.IconRegistry()) {
-            var kit = new KitContext(binding, ThemeRoute.CHROME, DesignMetrics.DEFAULT, icons, () -> false);
+            var kit = KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, binding, ThemeRoute.CHROME, icons, () -> false, action -> "");
             var notification = posted(titled("Repeated"));
             notification = posted(titled("Repeated"));
             try (var card = card(kit, notification, false)) {

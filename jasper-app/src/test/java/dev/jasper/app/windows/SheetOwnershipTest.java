@@ -48,7 +48,7 @@ class SheetOwnershipTest {
     @Test void realFormRewrapsAtConstrainedWidthAndKeepsFooterInsideTheSheet() {
         var controller = ThemeTestSupport.controller(true);
         var theme = controller.current();var binding = new dev.jasper.ui.theme.ThemeBinding(theme.pair(), failure -> {throw new AssertionError(failure);});
-        var icons = new dev.jasper.ui.icons.IconRegistry();var context = new dev.jasper.ui.swing.KitContext(binding, dev.jasper.ui.theme.ThemeRoute.CHROME,dev.jasper.ui.metrics.DesignMetrics.DEFAULT,icons,()->false);
+        var icons = new dev.jasper.ui.icons.IconRegistry();var context = dev.jasper.ui.swing.KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, binding, dev.jasper.ui.theme.ThemeRoute.CHROME, icons, ()->false, action -> "");
         var node = new dev.jasper.ui.model.Nodes.Form("sheet",dev.jasper.ui.model.ControlState.READY,dev.jasper.ui.model.Nodes.FormKind.SHEET,"Add item",Optional.empty(),java.util.List.of(
             new dev.jasper.ui.model.Nodes.Text("explanation",dev.jasper.ui.model.ControlState.READY,"A long explanation that must wrap when its native owner is made narrower. ".repeat(8),dev.jasper.ui.model.Nodes.TextRole.DESCRIPTION)),Optional.empty(),java.util.List.of(
             new dev.jasper.ui.model.Nodes.Button("cancel",dev.jasper.ui.model.ControlState.READY,"Cancel","",dev.jasper.ui.model.Nodes.ButtonKind.SECONDARY,"cancel",""),
@@ -73,7 +73,7 @@ class SheetOwnershipTest {
         var controller = ThemeTestSupport.controller(true);
         var binding = new dev.jasper.ui.theme.ThemeBinding(controller.current().pair(), failure -> { throw new AssertionError(failure); });
         var icons = new dev.jasper.ui.icons.IconRegistry();
-        var context = new dev.jasper.ui.swing.KitContext(binding, dev.jasper.ui.theme.ThemeRoute.CHROME, dev.jasper.ui.metrics.DesignMetrics.DEFAULT, icons, () -> false);
+        var context = dev.jasper.ui.swing.KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, binding, dev.jasper.ui.theme.ThemeRoute.CHROME, icons, () -> false, action -> "");
         var node = new dev.jasper.ui.model.Nodes.Form("sheet", dev.jasper.ui.model.ControlState.READY, dev.jasper.ui.model.Nodes.FormKind.SHEET,
             "Tall form", Optional.empty(), java.util.List.of(new dev.jasper.ui.model.Nodes.Text("text", dev.jasper.ui.model.ControlState.READY,
             "A paragraph that requires substantial vertical space. ".repeat(200), dev.jasper.ui.model.Nodes.TextRole.DESCRIPTION)), Optional.empty(), java.util.List.of());
@@ -98,7 +98,7 @@ class SheetOwnershipTest {
         controller.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system", 32f));
         var binding = new dev.jasper.ui.theme.ThemeBinding(controller.current().pair(), failure -> {throw new AssertionError(failure);});
         var icons = new dev.jasper.ui.icons.IconRegistry();
-        var context = new dev.jasper.ui.swing.KitContext(binding, dev.jasper.ui.theme.ThemeRoute.CHROME,dev.jasper.ui.metrics.DesignMetrics.DEFAULT,icons,()->false);
+        var context = dev.jasper.ui.swing.KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, binding, dev.jasper.ui.theme.ThemeRoute.CHROME, icons, ()->false, action -> "");
         var node = new dev.jasper.ui.model.Nodes.Form("sheet",dev.jasper.ui.model.ControlState.READY,dev.jasper.ui.model.Nodes.FormKind.SHEET,"Add item",Optional.empty(),java.util.List.of(
             new dev.jasper.ui.model.Nodes.Field("draft",dev.jasper.ui.model.ControlState.READY,dev.jasper.ui.model.Nodes.FieldKind.TEXT,"preserved draft","","Name","")),Optional.empty(),java.util.List.of(
             new dev.jasper.ui.model.Nodes.Button("cancel",dev.jasper.ui.model.ControlState.READY,"Cancel","",dev.jasper.ui.model.Nodes.ButtonKind.SECONDARY,"cancel",""),
@@ -133,8 +133,7 @@ class SheetOwnershipTest {
         var controller = ThemeTestSupport.controller(true);
         var binding = new dev.jasper.ui.theme.ThemeBinding(controller.current().pair(), failure -> { throw new AssertionError(failure); });
         var icons = new dev.jasper.ui.icons.IconRegistry();
-        var context = new dev.jasper.ui.swing.KitContext(binding, dev.jasper.ui.theme.ThemeRoute.CHROME,
-            dev.jasper.ui.metrics.DesignMetrics.DEFAULT, icons, () -> false);
+        var context = dev.jasper.ui.swing.KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, binding, dev.jasper.ui.theme.ThemeRoute.CHROME, icons, () -> false, action -> "");
         var node = new dev.jasper.ui.model.Nodes.Form("sheet", dev.jasper.ui.model.ControlState.READY,
             dev.jasper.ui.model.Nodes.FormKind.SHEET, "Edit item", Optional.empty(), java.util.List.of(
                 new dev.jasper.ui.model.Nodes.Field("draft", dev.jasper.ui.model.ControlState.READY,

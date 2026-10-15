@@ -37,7 +37,7 @@ public final class NativeControlStyles {
     }
     /** Exact host point-size overrides, or catalog roles with user scaling applied once. */
     public static Font font(Typography.Role role) {
-        return SwingTypography.effective(SwingTypography.typography().font(role));
+        return SwingTypography.effective(SwingTypography.typography(FlatLafInstaller.installedKit()).font(role));
     }
     /** Context role font with the same exactly-once host/user scaling policy as descriptor controls. */
     public static Font font(KitContext context,Typography.Role role) { return ThemePainting.font(context,role); }
