@@ -25,6 +25,22 @@ opens nothing on Ctrl-click, and the same path in a WSL tab opens. Open: the Ind
 detection on every directory a shell reports, so on Windows an OSC 7 report naming a share can still reach SMB without
 a click; File Server's "share path" also checks the pane's reported directory with `Files.isDirectory`.
 
+**File Server test port race — 2026-10-14** (`claude/fileserver-port-race`, worktree
+`.claude/worktrees/practical-shamir-1252c5`). `TftpReadTest.blockNumbersWrapOnALongRead` lost its port once during
+`check`: `Ports.free()` probed TCP while TFTP binds UDP (separate port spaces; on this Mac 9 in 20,000 TCP-free ports
+were already bound for UDP), and any engine could lose its port before binding it. `ServerDefinition` requires ports 1
+to 65535, so the engines cannot bind port 0. `Ports.free()` now checks TCP and UDP; `Ports.start` rebuilds the engine
+on another port when its start fails with a `BindException`, and every engine test starts through it.
+`FtpEngineTest`'s passive range comes from `Ports.freeRange`, below every system's ephemeral range, because on macOS
+Apache FtpServer's passive-port check misses a socket on 127.0.0.1 and the transfer fails with 425. Production code
+unchanged. Under a stress run (2,000 UDP and 2,000 TCP loopback ports held and replaced), `main` lost 3–4 TFTP and 4–5
+FTP tests a run; with the fix none, except that `TftpReadTest.refusalsAreErrorPacketsWithoutHostPaths` timed out in
+about half the runs (one datagram dropped with no socket per failure; commons-net's client never resends its
+request). Unstressed it passed every run. `FileServerPluginTest` starts servers through the registry on `Ports.free()`
+ports and keeps the check-then-use gap. `./gradlew check --continue`: **10,424 tests, 0 failures, 0 errors, 17
+skipped**. After merging `main` (Slate Cobalt): **10,423 tests, 0 failures, 0 errors, 17 skipped**. Merged to local
+`main`, not pushed.
+
 **Settings' page list without icons — 2026-10-14** (`claude/slate-cobalt`, merged to local main, not pushed; the
 user's ask). The Settings navigation
 shows page titles only, as IntelliJ's settings tree does: `PageTree` gives its items no icon, the page icon and artwork

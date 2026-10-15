@@ -47,13 +47,14 @@ class TftpWriteTest {
     void start(boolean writable, Duration timeout) throws Exception { start(writable, timeout, 5); }
 
     void start(boolean writable, Duration timeout, int retries) throws Exception {
-        port = Ports.free();
-        var base = ServerDefinition.create("tftp", Protocol.TFTP, shared);
-        var definition = new ServerDefinition(base.id(), "tftp", Protocol.TFTP, shared, base.bind(), port, Optional.empty(), writable,
-            base.login(), List.of(), false, false, false);
-        engine = new TftpEngine(definition, new ShareRoot(shared, !writable), new ServerEvents(Clock.systemUTC(), events::add), List::of,
-            timeout, retries, 16);
-        engine.start();
+        engine = Ports.start(free -> {
+            port = free;
+            var base = ServerDefinition.create("tftp", Protocol.TFTP, shared);
+            var definition = new ServerDefinition(base.id(), "tftp", Protocol.TFTP, shared, base.bind(), port, Optional.empty(), writable,
+                base.login(), List.of(), false, false, false);
+            return new TftpEngine(definition, new ShareRoot(shared, !writable), new ServerEvents(Clock.systemUTC(), events::add), List::of,
+                timeout, retries, 16);
+        });
     }
 
     void put(String name, int mode, byte[] content) throws IOException {

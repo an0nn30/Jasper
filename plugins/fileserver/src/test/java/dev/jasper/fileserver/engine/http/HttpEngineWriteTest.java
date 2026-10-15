@@ -46,12 +46,13 @@ class HttpEngineWriteTest {
     @AfterEach void stop() { if (engine != null) engine.stop(); }
 
     void start(boolean writable) throws Exception {
-        var base = ServerDefinition.create("drop", Protocol.HTTP, shared);
-        var definition = new ServerDefinition(base.id(), base.name(), base.protocol(), base.folder(), base.bind(), Ports.free(),
-            base.passiveRange(), writable, base.login(), List.of(), false, false, false);
-        engine = new HttpEngine(definition, new ShareRoot(shared, !writable), ResolvedLogin.anonymous(),
-            new ServerEvents(Clock.systemUTC(), events::add), new LoginThrottle(new TestClock()), List::of);
-        engine.start();
+        engine = Ports.start(port -> {
+            var base = ServerDefinition.create("drop", Protocol.HTTP, shared);
+            var definition = new ServerDefinition(base.id(), base.name(), base.protocol(), base.folder(), base.bind(), port,
+                base.passiveRange(), writable, base.login(), List.of(), false, false, false);
+            return new HttpEngine(definition, new ShareRoot(shared, !writable), ResolvedLogin.anonymous(),
+                new ServerEvents(Clock.systemUTC(), events::add), new LoginThrottle(new TestClock()), List::of);
+        });
     }
 
     HttpResponse<String> send(String method, String path, HttpRequest.BodyPublisher body, String... headers) throws Exception {

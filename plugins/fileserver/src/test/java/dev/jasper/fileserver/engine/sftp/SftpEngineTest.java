@@ -81,8 +81,8 @@ class SftpEngineTest {
         clients.close();
     }
 
-    SftpEngine engine(ResolvedLogin login, boolean writable, List<String> keys) throws IOException {
-        port = Ports.free();
+    SftpEngine engine(int port, ResolvedLogin login, boolean writable, List<String> keys) throws IOException {
+        this.port = port;
         var base = ServerDefinition.create("sftp", Protocol.SFTP, shared);
         var definition = new ServerDefinition(base.id(), "sftp", Protocol.SFTP, shared, base.bind(), port, Optional.empty(), writable,
             login.isAnonymous() ? Login.ANONYMOUS : Login.SESSION, keys, false, false, false);
@@ -91,8 +91,12 @@ class SftpEngineTest {
         return engine;
     }
 
+    SftpEngine start(ResolvedLogin login, boolean writable, List<String> keys) throws Exception {
+        return Ports.start(free -> engine(free, login, writable, keys));
+    }
+
     SftpClient start(boolean writable) throws Exception {
-        engine(DUSTIN, writable, List.of()).start();
+        start(DUSTIN, writable, List.of());
         return Clients.sftp(clients.password(port, "dustin", "pw"));
     }
 
@@ -179,7 +183,7 @@ class SftpEngineTest {
     }
 
     @Test void aVersion3RealPathNamesNoHostFolder() throws Exception {
-        engine(DUSTIN, false, List.of()).start();
+        start(DUSTIN, false, List.of());
         var sftp = SftpClientFactory.instance().createSftpClient(clients.password(port, "dustin", "pw"),
             SftpVersionSelector.fixedVersionSelector(SftpConstants.SFTP_V3));
         assertThat(sftp.getVersion()).isEqualTo(SftpConstants.SFTP_V3);
@@ -299,7 +303,7 @@ class SftpEngineTest {
     }
 
     @Test void aDroppedConnectionAbandonsTheUpload() throws Exception {
-        engine(DUSTIN, true, List.of()).start();
+        start(DUSTIN, true, List.of());
         ClientSession session = clients.password(port, "dustin", "pw");
         var sftp = Clients.sftp(session);
         var handle = sftp.open("/docs/a.txt", OpenMode.Write, OpenMode.Create, OpenMode.Truncate);
@@ -378,18 +382,18 @@ class SftpEngineTest {
     @Test void keysWorkForTheirUserAndKeysOnlyServersForAnyUser() throws Exception {
         KeyPair key = Clients.newKey(), stranger = Clients.newKey();
         String line = PublicKeyEntry.toString(key.getPublic());
-        engine(DUSTIN, false, List.of(line)).start();
+        start(DUSTIN, false, List.of(line));
         assertThat(read(Clients.sftp(clients.key(port, "dustin", key)), "/docs/a.txt")).isEqualTo("hello");
         assertThatThrownBy(() -> clients.key(port, "mallory", key)).as("a password server's keys are for its user").isInstanceOf(SshException.class);
         assertThatThrownBy(() -> clients.key(port, "dustin", stranger)).isInstanceOf(SshException.class);
         engine.stop();
-        engine(ResolvedLogin.anonymous(), false, List.of(line)).start();
+        start(ResolvedLogin.anonymous(), false, List.of(line));
         assertThat(read(Clients.sftp(clients.key(port, "anyone", key)), "/docs/a.txt")).isEqualTo("hello");
         assertThatThrownBy(() -> clients.password(port, "anyone", "pw")).as("keys only").isInstanceOf(SshException.class);
     }
 
     @Test void aWrongPasswordIsThrottled() throws Exception {
-        engine(DUSTIN, false, List.of()).start();
+        start(DUSTIN, false, List.of());
         assertThatThrownBy(() -> clients.password(port, "dustin", "bad")).isInstanceOf(SshException.class);
         assertThatThrownBy(() -> clients.password(port, "dustin", "pw")).as("too soon after a failure").isInstanceOf(SshException.class);
         clock.advance(Duration.ofSeconds(2));
@@ -398,7 +402,7 @@ class SftpEngineTest {
     }
 
     @Test void onlyTheSftpSubsystemIsServed() throws Exception {
-        engine(DUSTIN, false, List.of()).start();
+        start(DUSTIN, false, List.of());
         ClientSession session = clients.password(port, "dustin", "pw");
         try (ChannelExec exec = session.createExecChannel("echo hi")) {
             exec.open().verify(Duration.ofSeconds(5));
@@ -416,7 +420,7 @@ class SftpEngineTest {
     }
 
     @Test void aBusyPortFailsWithAClearMessageAndStopFreesThePort() throws Exception {
-        engine(DUSTIN, false, List.of());
+        engine(Ports.free(), DUSTIN, false, List.of());
         try (var taken = new ServerSocket()) {
             taken.setReuseAddress(false);
             taken.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), port));
@@ -432,7 +436,7 @@ class SftpEngineTest {
     }
 
     @Test void anUnusableAuthorizedKeyFailsTheStart() throws Exception {
-        engine(DUSTIN, false, List.of("ssh-ed25519 AAAAnotakey"));
+        engine(Ports.free(), DUSTIN, false, List.of("ssh-ed25519 AAAAnotakey"));
         assertThatThrownBy(engine::start).isInstanceOf(EngineFailure.class).hasMessageStartingWith("Authorized key 1 can't be used");
     }
 
@@ -457,7 +461,7 @@ class SftpEngineTest {
     }
 
     @Test void aPartialReadOrADroppedUploadIsIncomplete() throws Exception {
-        engine(DUSTIN, true, List.of()).start();
+        start(DUSTIN, true, List.of());
         ClientSession session = clients.password(port, "dustin", "pw");
         var sftp = Clients.sftp(session);
         try (var handle = sftp.open("/docs/a.txt", OpenMode.Read)) { sftp.read(handle, 0, new byte[2]); }

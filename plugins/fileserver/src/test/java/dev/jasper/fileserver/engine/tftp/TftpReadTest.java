@@ -65,12 +65,8 @@ class TftpReadTest {
 
     @AfterEach void stop() { if (engine != null) engine.stop(); }
 
-    TftpEngine engine(Duration timeout, int retries, int maxTransfers) throws IOException {
-        return engine(timeout, retries, maxTransfers, events::add);
-    }
-
-    TftpEngine engine(Duration timeout, int retries, int maxTransfers, Consumer<ServerEvent> sink) throws IOException {
-        port = Ports.free();
+    TftpEngine engine(int port, Duration timeout, int retries, int maxTransfers, Consumer<ServerEvent> sink) throws IOException {
+        this.port = port;
         var base = ServerDefinition.create("tftp", Protocol.TFTP, shared);
         var definition = new ServerDefinition(base.id(), "tftp", Protocol.TFTP, shared, base.bind(), port, Optional.empty(), false,
             base.login(), List.of(), false, false, false);
@@ -79,7 +75,13 @@ class TftpReadTest {
         return engine;
     }
 
-    void start() throws Exception { engine(Duration.ofMillis(300), 5, 16).start(); }
+    void start() throws Exception { start(Duration.ofMillis(300), 5, 16); }
+
+    void start(Duration timeout, int retries, int maxTransfers) throws Exception { start(timeout, retries, maxTransfers, events::add); }
+
+    void start(Duration timeout, int retries, int maxTransfers, Consumer<ServerEvent> sink) throws Exception {
+        Ports.start(free -> engine(free, timeout, retries, maxTransfers, sink));
+    }
 
     byte[] fetch(String name, int mode) throws IOException {
         var client = new TFTPClient();
@@ -182,7 +184,7 @@ class TftpReadTest {
     }
 
     @Test void aLostPacketIsResentThenTheTransferGivesUp() throws Exception {
-        engine(Duration.ofMillis(400), 2, 16).start();
+        start(Duration.ofMillis(400), 2, 16);
         try (var client = new RawClient()) {
             client.send(port, RawClient.read("docs/a.txt", "octet"));
             var first = client.next();
@@ -202,7 +204,7 @@ class TftpReadTest {
     }
 
     @Test void theSeventeenthTransferIsBusyAndStrangersAreTurnedAway() throws Exception {
-        engine(Duration.ofSeconds(2), 5, 1).start();
+        start(Duration.ofSeconds(2), 5, 1);
         try (var holder = new RawClient(); var other = new RawClient()) {
             holder.send(port, RawClient.read("docs/a.txt", "octet"));
             var held = holder.next();
@@ -223,7 +225,7 @@ class TftpReadTest {
     }
 
     @Test void aBusyPortFailsClearlyAndStopReleasesEverything() throws Exception {
-        engine(Duration.ofSeconds(2), 5, 16);
+        engine(Ports.free(), Duration.ofSeconds(2), 5, 16, events::add);
         try (var taken = new DatagramSocket(null)) {
             taken.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), port));
             assertThatThrownBy(engine::start).isInstanceOf(EngineFailure.class).hasMessage("Port " + port + " is already in use on 127.0.0.1");
@@ -288,7 +290,7 @@ class TftpReadTest {
     }
 
     @Test void aStrangersGarbageOnATransferPortIsNotAnswered() throws Exception {
-        engine(Duration.ofSeconds(2), 5, 16).start();
+        start(Duration.ofSeconds(2), 5, 16);
         try (var holder = new RawClient(); var stranger = new RawClient()) {
             holder.send(port, RawClient.read("docs/a.txt", "octet"));
             var held = holder.next();
@@ -309,7 +311,7 @@ class TftpReadTest {
     }
 
     @Test void aStrangersErrorOnATransferPortIsNotAnswered() throws Exception {
-        engine(Duration.ofSeconds(2), 5, 16).start();
+        start(Duration.ofSeconds(2), 5, 16);
         try (var holder = new RawClient(); var stranger = new RawClient()) {
             holder.send(port, RawClient.read("docs/a.txt", "octet"));
             var held = holder.next();
@@ -325,7 +327,7 @@ class TftpReadTest {
     }
 
     @Test void aDuplicateAckIsNotAnsweredWithAResend() throws Exception {
-        engine(Duration.ofSeconds(2), 5, 16).start();
+        start(Duration.ofSeconds(2), 5, 16);
         try (var client = new RawClient()) {
             client.send(port, RawClient.read("big.bin", "octet", "blksize", "1024"));
             var oack = client.next();
@@ -371,7 +373,7 @@ class TftpReadTest {
         byte[] content = new byte[8 * 65536 + 8 * 3 + 5];
         new java.util.Random(1).nextBytes(content);
         Files.write(shared.resolve("wrap.bin"), content);
-        engine(Duration.ofSeconds(2), 5, 16).start();
+        start(Duration.ofSeconds(2), 5, 16);
         try (var client = new RawClient()) {
             client.send(port, RawClient.read("wrap.bin", "octet", "blksize", "8"));
             var oack = client.next();
@@ -403,7 +405,7 @@ class TftpReadTest {
     @Test void aTransferUnwindingAfterStopNeverFreesASlotOfTheNextStart() throws Exception {
         var gate = new CountDownLatch(1);
         var held = new AtomicReference<Thread>();
-        engine(Duration.ofSeconds(2), 5, 1, event -> {
+        start(Duration.ofSeconds(2), 5, 1, event -> {
             events.add(event);
             if (event instanceof ServerEvent.Transferred && held.compareAndSet(null, Thread.currentThread())) {
                 while (true) {
@@ -411,7 +413,7 @@ class TftpReadTest {
                     catch (InterruptedException stopping) { /* stop() interrupts the pool; keep holding */ }
                 }
             }
-        }).start();
+        });
         try (var holder = new RawClient()) {
             holder.send(port, RawClient.read("docs/a.txt", "octet"));
             holder.next();
