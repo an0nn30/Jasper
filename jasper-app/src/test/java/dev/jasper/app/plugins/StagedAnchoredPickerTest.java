@@ -76,7 +76,9 @@ class StagedAnchoredPickerTest {
     }
     settle();onEdt(()->click(form,"import.import"));
     var review=vault.awaitSurface("Import SSH keys");onEdt(()->{capture("disabled-review",kitView(form));
-     var defaults=new HashMap<Object,Object>();UIManager.getDefaults().forEach(defaults::put);try{UIManager.put("defaultFont",new Font("Dialog",0,1).deriveFont(32.5f));assertThat(com.formdev.flatlaf.util.UIScale.getUserScaleFactor()).isEqualTo(2.5f);capture("disabled-review-250",kitView(form));}finally{UIManager.put("defaultFont",defaults.get("defaultFont"));}
+     // FlatLaf reads the user scale off the default font over its platform divider: 13 on macOS (32.5 pt), 15 on Linux, 12 on Windows.
+     float divider=100/com.formdev.flatlaf.util.UIScale.computeFontScaleFactor(new Font("Dialog",0,100));
+     var defaults=new HashMap<Object,Object>();UIManager.getDefaults().forEach(defaults::put);try{UIManager.put("defaultFont",new Font("Dialog",0,1).deriveFont(2.5f*divider));assertThat(com.formdev.flatlaf.util.UIScale.getUserScaleFactor()).isEqualTo(2.5f);capture("disabled-review-250",kitView(form));}finally{UIManager.put("defaultFont",defaults.get("defaultFont"));}
      click(review,"commit");});
     await(()->!node(form,"import.import").state().enabled()&&((dev.jasper.ui.model.Nodes.Text)node(form,"import.status")).text().contains("saved"),"import completion");
     onEdt(()->{capture("disabled",kitView(form));assertThat(vault.problems).isEmpty();teardownProbe(form);click(form,"import.cancel");assertThat(form.closed()).isTrue();assertThat(vault.problems).isEmpty();});

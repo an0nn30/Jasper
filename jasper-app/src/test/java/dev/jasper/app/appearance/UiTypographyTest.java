@@ -40,7 +40,11 @@ class UiTypographyTest {
                             assertThat(description.getPreferredSize().height).as("two description lines sized once").isEqualTo(2*expectedLineHeight);
                             assertThat(dev.jasper.ui.swing.NativeControlStyles.font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(expected);
                             assertThat(dev.jasper.ui.swing.NativeControlStyles.font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getSize2D()).isCloseTo(expected * 15 / 13, within(.001f));
-                            assertThat(new JLabel().getFont().getSize2D()).as("native form policy").isEqualTo(expected);
+                            // Defaults leave native forms on the look and feel's own font, which FlatLaf scales from its platform divider
+                            // (13 on macOS, 15 on Linux); a configured size is exact everywhere.
+                            float nativeSize = config.size() == 0 ? UIManager.getLookAndFeelDefaults().getFont("Label.font").getSize2D() : expected;
+                            assertThat(new JLabel().getFont().getSize2D()).as("native form policy").isEqualTo(nativeSize);
+                            if (com.formdev.flatlaf.util.SystemInfo.isMacOS) assertThat(nativeSize).isEqualTo(expected);
                             if (config.family().equals("Serif")) assertThat(body.getFont().getFamily()).isEqualTo(Font.SERIF);
                             assertThat(dev.jasper.ui.swing.NativeControlStyles.metric(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT))
                                 .isEqualTo(com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT)));
@@ -85,8 +89,10 @@ class UiTypographyTest {
                         assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getSize2D()).isCloseTo(15 * config.size() / 13f, within(.001f));
                     }
                 }
-                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("Helvetica Neue", 20));
-                assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getFamily()).isEqualTo(new Font("Helvetica Neue", Font.PLAIN, 20).getFamily());
+                // Choosing the platform's own family explicitly keeps that family (Helvetica Neue on macOS).
+                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig(defaults.family(), 20));
+                assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getFamily()).isEqualTo(new Font(defaults.family(), Font.PLAIN, 20).getFamily());
+                if (com.formdev.flatlaf.util.SystemInfo.isMacOS) assertThat(defaults.family()).isEqualTo("Helvetica Neue");
                 themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("Serif", 20));
                 assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getFamily()).isEqualTo(Font.SERIF);
             } finally { themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults()); themes.close(); }
