@@ -87,7 +87,8 @@ public final class FilesScope implements PaletteScope {
     @Override public ScopeSpec spec() {
         return ScopeSpec.of(ID, "Files", "Search files", List.of(OPEN, COPY, TERMINAL))
             .withDescription("Open a file from an indexed project").withIcon(icon)
-            .withShortcutActionId(shortcutActionId).withInAll(true).withInRecents(true);
+            .withShortcutActionId(shortcutActionId).withInAll(true).withInRecents(true)
+            .withHue(dev.jasper.sdk.ui.Nodes.Hue.AMBER).withItemNoun("file");
     }
 
     @Override public PaletteResults search(String query, PaletteQuery context) {

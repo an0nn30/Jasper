@@ -440,7 +440,7 @@ private static void installPaletteDemo(PluginContext context) {
         @Override public ScopeSpec spec() {
             return ScopeSpec.of(GREETINGS, "Greetings", "Search greetings",
                     List.of(new PaletteVerb("paste", "Paste"), new PaletteVerb("paste_run", "Paste and run")))
-                .withShortcutActionId(GREETINGS_OPEN);
+                .withShortcutActionId(GREETINGS_OPEN).withItemNoun("greeting");
         }
         // Search runs on the UI thread for every keystroke: rank what is already in memory, never read files here.
         @Override public PaletteResults search(String query, PaletteQuery palette) {

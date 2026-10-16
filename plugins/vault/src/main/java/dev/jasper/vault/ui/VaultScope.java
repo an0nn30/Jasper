@@ -51,7 +51,8 @@ public final class VaultScope implements PaletteScope {
 
     @Override public ScopeSpec spec() {
         return ScopeSpec.of(ID, "Vault", "Search logins", List.of(COPY_PASSWORD, COPY_USERNAME, OPEN))
-            .withDescription("Copy a password or username from the vault").withShortcutActionId(SEARCH_ACTION).withInAll(false);
+            .withDescription("Copy a password or username from the vault").withShortcutActionId(SEARCH_ACTION).withInAll(false)
+            .withItemNoun("login");
     }
 
     @Override public PaletteResults search(String query, PaletteQuery context) {

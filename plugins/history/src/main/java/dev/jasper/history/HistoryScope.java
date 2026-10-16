@@ -46,6 +46,7 @@ final class HistoryScope implements PaletteScope {
                 snippets.isPresent() ? List.of(PASTE, PASTE_RUN, SAVE) : List.of(PASTE, PASTE_RUN))
             .withDescription("Search shell history and paste or run a command")
             .withMonospaceRows(true).withShortcutActionId(openActionId)
+            .withHue(dev.jasper.sdk.ui.Nodes.Hue.PURPLE).withItemNoun("command")
             // Searchable, but never offered before the user types: shell commands can hold anything.
             .withInRecents(false);
     }

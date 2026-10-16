@@ -44,6 +44,7 @@ class HistoryScopeTest {
             host.start(INFO, Set.of(), Set.of(), new HistoryPlugin(context -> index));
             UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "t"), pane = host.addTerminalPane(tab, pane(Path.of("/a")));
             assertThat(host.scopes()).containsExactly(SCOPE + "|History|paste,paste_run");
+            assertThat(host.scopePresentation(SCOPE)).as("spec 14.6").isEqualTo("PURPLE|command|STANDARD,STANDARD");
             assertThat(host.scopesInAll()).contains(SCOPE);
             assertThat(host.scopesInRecents()).as("searchable, never offered unprompted").doesNotContain(SCOPE);
             List<String> recent = host.searchScope(SCOPE, "", window, pane);

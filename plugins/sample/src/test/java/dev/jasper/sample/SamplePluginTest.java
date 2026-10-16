@@ -271,6 +271,7 @@ class SamplePluginTest {
                     Set.of(), Set.of(), new SamplePlugin());
                 assertThat(host.failures()).isEmpty();
                 assertThat(host.scopes()).containsExactly("dev.jasper.sample.greetings|Greetings|paste,paste_run");
+                assertThat(host.scopePresentation("dev.jasper.sample.greetings")).as("spec 14.6").isEqualTo("NEUTRAL|greeting|STANDARD,STANDARD");
                 assertThat(host.searchScope("dev.jasper.sample.greetings", "", window, pane)).hasSize(3);
                 assertThat(host.searchScope("dev.jasper.sample.greetings", "morn", window, pane)).containsExactly("greeting.0|good morning|true");
                 assertThat(host.availableInScope("dev.jasper.sample.greetings", "greeting.0", "paste", window, null)).as("needs an origin pane").isFalse();

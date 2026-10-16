@@ -83,6 +83,7 @@ class TunnelsPluginTest {
                 TunnelsUi.PICK + "|Start or Stop a Tunnel...|true", TunnelsUi.NEW + "|New Tunnel...|true", TunnelsUi.FORWARD + "|Forward a Port...|true", TunnelsUi.STOP_ALL + "|Stop All Tunnels|false");
             assertThat(host.panels()).contains(TunnelsUi.PANEL + "|Tunnels|LEFT|" + TunnelsUi.TOGGLE);
             assertThat(host.scopes()).contains(TunnelsScope.ID + "|Tunnels|toggle,browse,edit");
+            assertThat(host.scopePresentation(TunnelsScope.ID)).as("spec 14.6").isEqualTo("NEUTRAL|tunnel|STANDARD,STANDARD,STANDARD");
             assertThat(host.menu("top:" + RemotePlugin.MENU)).containsSubsequence("item:" + TunnelsUi.TOGGLE, "item:" + TunnelsUi.PICK, "item:" + TunnelsUi.NEW,
                 "item:" + TunnelsUi.FORWARD, "item:" + TunnelsUi.STOP_ALL);
             assertThat(host.menu("context")).contains("item:" + TunnelsUi.FORWARD);
