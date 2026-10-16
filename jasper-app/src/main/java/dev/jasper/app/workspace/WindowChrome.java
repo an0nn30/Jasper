@@ -179,7 +179,9 @@ final class WindowChrome {
 
     /**
      * Rebuilds the plugin section after the built-in controls. A contributed view is built once, after this window
-     * opened, and closed here when its entry goes or the window lets go of its contributions. A view's factory and its
+     * opened, and closed here when its entry goes or the window lets go of its contributions. Until then it stays in the
+     * toolbar across passes, moved into place without a remove, so that a control inside it keeps its focus and an open
+     * dropdown stays open while other contributions change. A view's factory and its
      * close are contributor code that may change the contributions (register an action, enable one, add a toolbar
      * item), which renders the toolbar again from inside this pass: that nested call only marks the toolbar dirty, and
      * this pass then runs again with the latest model, as {@code renderContributedMenus} does.
@@ -199,7 +201,10 @@ final class WindowChrome {
     }
 
     private void rebuildContributedToolbar() {
-        contributedToolbar.forEach(toolbar::remove);
+        // A built view stays a child of the toolbar: Container.remove would call its removeNotify.
+        var kept = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Component, Boolean>());
+        for (ToolbarEntry.Mounted mounted : views.values()) if (mounted != null) kept.add(mounted.component());
+        for (Component control : contributedToolbar) if (!kept.contains(control)) toolbar.remove(control);
         contributedToolbar.clear();
         List<ToolbarEntry> entries = contributions == null ? List.of() : contributions.model().toolbar();
         // Not "live": the Dropdown case below declares its own local of that name.
@@ -208,8 +213,10 @@ final class WindowChrome {
         for (var built = views.entrySet().iterator(); built.hasNext(); ) {
             var next = built.next();
             if (liveViews.contains(next.getKey())) continue;
-            if (next.getValue() != null) next.getValue().close();
+            // Read before the remove: an IdentityHashMap entry is invalid once removed.
+            ToolbarEntry.Mounted gone = next.getValue();
             built.remove();
+            if (gone != null) { toolbar.remove(gone.component()); gone.close(); }
         }
         if (contributions != null) {
             for (ToolbarEntry entry : entries) {
@@ -250,14 +257,21 @@ final class WindowChrome {
                         }
                         ToolbarEntry.Mounted mounted = views.get(view);
                         if (mounted == null) break;
-                        if (mounted.component() instanceof dev.jasper.ui.swing.KitView kit && !kit.isClosed()) kit.toolbarStrip(true);
+                        // The header is a title bar zone: a kit view paints from the title bar's theme, as the header's own controls do.
+                        if (mounted.component() instanceof dev.jasper.ui.swing.KitView kit && !kit.isClosed()) {
+                            kit.toolbarStrip(true); kit.route(dev.jasper.ui.theme.ThemeRoute.TITLE_BAR);
+                        }
                         WindowToolbar.view(mounted.component(), VIEW_PRIORITY);
                         contributedToolbar.add(mounted.component());
                     }
                 }
             }
             int index = toolbar.getComponentIndex(pluginSeparator) + 1;
-            for (Component control : contributedToolbar) toolbar.add(control, index++);
+            // setComponentZOrder moves a kept view without removeNotify; everything else is new to the toolbar.
+            for (Component control : contributedToolbar) {
+                if (control.getParent() == toolbar) toolbar.setComponentZOrder(control, index++);
+                else toolbar.add(control, index++);
+            }
         }
         pluginSeparator.setVisible(!contributedToolbar.isEmpty());
         toolbar.revalidate(); toolbar.repaint();

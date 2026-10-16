@@ -1,8 +1,10 @@
 # Enterprise presentation 3d: SDK 0.18 chrome Implementation Plan
 
-> **Status (2026-10-16): executed on `claude/enterprise-sdk-0-18-chrome` (`d6210499e..9f7a43ae8`).** Deviation from the spec,
-> awaiting the user's approval: ruling 1 (toolbar view admission at mount and on update, not at registration; spec
-> 10.3 and 15). Deviations from this plan's text: none beyond its "Rulings" and its "Execution notes (2026-10-16)".
+> **Status (2026-10-16): executed on `claude/enterprise-sdk-0-18-chrome` (`d6210499e..9f7a43ae8`), then the documentation
+> commit and the final review's fixes.** Deviations from the spec, awaiting the user's approval: ruling 1 (toolbar view
+> admission at mount and on update, not at registration; spec 10.3 and 15) and ruling 6 (no dialog swatch in the
+> Windows and Linux FlatLaf title pane; spec 8.2). Deviations from this plan's text: none beyond its "Rulings", its
+> "Execution notes (2026-10-16)" and the review fixes' toolbar-view title bar route (`ThemeRoute.TITLE_BAR`).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -211,7 +213,8 @@ and the STATUS entry record it as a deviation awaiting that approval.
 5. **`KitView.toolbarStrip` in the default look** presents icon-only menus as a title strip does, and keeps the kit's
    control height, which equals the default toolbar's button side (24 px); the toolbar centres the view at its
    preferred height. A classic toolbar density, if one is needed, is plan 4's or 6's.
-6. **The default look draws a swatch only in `MacTitleBar`'s window or dialog title**, the one dialog title it draws
+6. **Deviation (spec 8.2; awaiting the user's approval): the default look draws a swatch only in `MacTitleBar`'s window
+   or dialog title**, the one dialog title it draws
    itself; overlays draw no title, attached sheets have no title bar, and Windows and Linux dialogs carry the system's
    or FlatLaf's title bar, which count as native title bars ("a native title bar draws none").
 7. **`itemNoun` validation:** null or blank becomes `""`; any other value must equal its own `strip()` and its

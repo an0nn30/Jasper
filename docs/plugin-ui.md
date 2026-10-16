@@ -180,8 +180,9 @@ confirms (set `pending` while a start or stop is in flight).
   None and the creation footer.
 - **Empty states.** `Empty(icon, title, description, actions)`; actions may be buttons, a `MenuButton` (Choose
   Session) or none.
-- **Toolbar views.** An INLINE `Stack` of LABEL `Text`, choices, one PRIMARY `Button` and `MenuButton`s, placed in
-  the main toolbar with `ToolbarItem.view` (see [actions](plugin-authoring.md#actions-and-where-they-appear)).
+- **Toolbar views.** An INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER choices, at most one PRIMARY
+  `Button` and `MenuButton`s, placed in the main toolbar with `ToolbarItem.view` (see
+  [actions](plugin-authoring.md#actions-and-where-they-appear)).
 - **Dialog swatch.** `DialogSpec.swatch` puts a small square of a hue before the dialog's title where Jasper draws the
   title (the macOS window title row); `Hue.NONE`, the default, draws none.
 - **Settings pages.** Declared settings render as the standard Settings page; a custom settings panel is a

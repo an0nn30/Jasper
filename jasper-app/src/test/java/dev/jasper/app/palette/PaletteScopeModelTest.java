@@ -71,7 +71,7 @@ class PaletteScopeModelTest {
         });
     }
 
-    /** Plan 3d: the registry keeps a split verb after the first and alone; an app scope is NEUTRAL and named by its label. */
+    /** Plan 3d: the registry keeps a split verb after the first and alone and refuses a NONE hue; an app scope is NEUTRAL and named by its label. */
     @Test void theRegistryRefusesASplitVerbFirstOrTwiceAndScopesDefaultToNeutralAndTheirLabel() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try (var registry = new ScopeRegistry()) {
@@ -85,6 +85,18 @@ class PaletteScopeModelTest {
                 assertThatIllegalArgumentException().isThrownBy(() -> registry.register(scope("a.twice",
                     List.of(run, split, new PaletteVerb("down", "Split down", PaletteVerb.Role.SPLIT)))));
                 registry.register(scope("a.ok", List.of(run, split))).close();
+                var colourless = new PaletteScope() {
+                    @Override public String id() { return "a.none"; }
+                    @Override public String label() { return "None"; }
+                    @Override public String placeholder() { return "Search"; }
+                    @Override public List<PaletteVerb> verbs() { return List.of(run); }
+                    @Override public dev.jasper.ui.model.Nodes.Hue hue() { return dev.jasper.ui.model.Nodes.Hue.NONE; }
+                    @Override public PaletteResults search(String query, PaletteContext context) { return PaletteResults.none(); }
+                    @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) {}
+                    @Override public Subscription onChanged(Runnable listener) { return new Subscription(() -> {}); }
+                };
+                assertThatIllegalArgumentException().as("an app scope's hue is never NONE")
+                    .isThrownBy(() -> registry.register(colourless)).withMessageContaining("a.none");
             }
         });
     }

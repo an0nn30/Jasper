@@ -552,12 +552,14 @@ public final class FakePluginHost implements AutoCloseable {
      * UI thread: the toolbar views a terminal window shows, in toolbar order. The window builds each registered
      * {@code ToolbarItem.View} once, the first time this is asked for it, as a window builds its views when it opens; a
      * view whose factory threw or whose tree the toolbar does not admit is left out and recorded in {@link #failures()}.
+     * A window that is not open, or whose views {@link #closeToolbarViews closed}, shows none and asks no factory.
      *
      * @param windowId a terminal window
      * @return the live views
      * @since 0.18.0
      */
     public List<FakeKitView> toolbarViews(UUID windowId) {
+        if (closedToolbarWindows.contains(windowId) || workspace.window(windowId).isEmpty()) return List.of();
         List<FakeKitView> views = new ArrayList<>();
         for (FakePluginContext context : contexts.values()) views.addAll(context.ui.toolbarViews(windowId));
         return views;
@@ -571,8 +573,12 @@ public final class FakePluginHost implements AutoCloseable {
      * @since 0.18.0
      */
     public void closeToolbarViews(UUID windowId) {
+        closedToolbarWindows.add(windowId);
         for (FakePluginContext context : contexts.values()) context.ui.closeToolbarViews(windowId);
     }
+
+    /** The windows whose toolbar views closed, which build none again. */
+    private final java.util.Set<UUID> closedToolbarWindows = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     /**
      * One menu target's contributed entries.

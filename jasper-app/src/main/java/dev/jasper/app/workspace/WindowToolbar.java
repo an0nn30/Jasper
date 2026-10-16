@@ -88,6 +88,14 @@ final class WindowToolbar extends JToolBar {
         return count == 0 ? 0 : width - gap;
     }
 
+    /** The width of the controls the row shows now, with the gaps between them. */
+    private int visibleWidth(int gap) {
+        int width = 0, count = 0;
+        for (Component child : getComponents())
+            if (placed(child) && child.isVisible()) { width += child.getPreferredSize().width + gap; count++; }
+        return count == 0 ? 0 : width - gap;
+    }
+
     /** The width that shows every control; the header never gives the toolbar more. */
     int fullWidth() {
         int padding = NativeStyles.installed().metric(DesignMetrics.Role.TOOLBAR_PADDING), gap = NativeStyles.installed().metric(DesignMetrics.Role.NATIVE_ACTION_PADDING), width = 0;
@@ -144,7 +152,8 @@ final class WindowToolbar extends JToolBar {
         int available = Math.max(0, getWidth() - 2 * padding);
         // Labels give way before any control moves into the overflow menu.
         applyLabels(labelsWanted);
-        if (labelsWanted && groupWidth(gap) > available) applyLabels(false);
+        boolean labelsGaveWay = labelsWanted && groupWidth(gap) > available;
+        if (labelsGaveWay) applyLabels(false);
         List<Component> controls = new ArrayList<>();
         for (Component child : getComponents()) {
             if (placed(child)) {
@@ -157,14 +166,33 @@ final class WindowToolbar extends JToolBar {
         java.util.Collections.reverse(removable);
         removable.sort(Comparator.comparingInt(control -> ((JComponent) control).getClientProperty(PRIORITY) instanceof Integer p ? p : 50));
         int group = controls.stream().mapToInt(control -> control.getPreferredSize().width + gap).sum() - (controls.isEmpty() ? 0 : gap);
-        boolean hidden = false;
+        boolean hidden = false, viewHid = false;
+        List<Component> overflowed = new ArrayList<>();
         for (Component control : removable) {
             if (group + (hidden ? gap + side : 0) <= available) break;
             boolean view = isView(control);
             if (!view && !(((JComponent) control).getClientProperty(MENU) instanceof Supplier<?>)) continue;
             control.setVisible(false); control.setBounds(0, 0, 0, 0);
             group -= control.getPreferredSize().width + gap;
-            if (!view) hidden = true;
+            if (view) viewHid = true; else { hidden = true; overflowed.add(control); }
+        }
+        if (viewHid) {
+            // A wide view that hid can leave room for buttons that gave way before it: they come back, the most recently
+            // overflowed first, while they fit beside the overflow button any others still need.
+            for (int i = overflowed.size() - 1; i >= 0; i--) {
+                Component control = overflowed.get(i);
+                int width = control.getPreferredSize().width + gap;
+                if (group + width + (i > 0 ? gap + side : 0) > available) break;
+                control.setVisible(true); group += width; overflowed.remove(i);
+            }
+            hidden = !overflowed.isEmpty();
+            // Labels that gave way for the view come back too when the row still fits with them.
+            if (labelsGaveWay) {
+                applyLabels(true);
+                int width = visibleWidth(gap);
+                if (width + (hidden ? gap + side : 0) > available) applyLabels(false);
+                else group = width;
+            }
         }
         overflow.setVisible(hidden);
         int shown = Math.max(0, group);

@@ -34,11 +34,13 @@ public sealed interface ToolbarItem permits ToolbarItem.Button, ToolbarItem.Drop
 
     /**
      * A small group of the plugin's own controls, one per window, such as a session choice with a Connect button. The
-     * factory runs when a window opens, never for a window nobody sees, and the view closes with its window or with this
-     * registration. Its root is an INLINE {@link Nodes.Stack} of LABEL {@link Nodes.Text}s, DROPDOWN, SEARCHABLE or
-     * PICKER {@link Nodes.Choice}s, at most one PRIMARY {@link Nodes.Button} and {@link Nodes.MenuButton}s: the host
-     * refuses any other tree, naming the node, when it mounts the view and on every {@link UiView#update}. A view never
-     * moves into the overflow menu: it hides while the toolbar is too narrow for it.
+     * factory runs when a window opens, and for each window already open from inside {@code add}, never for a window
+     * nobody sees, and the view closes with its window or with this registration. Its root is an INLINE
+     * {@link Nodes.Stack} of LABEL {@link Nodes.Text}s, DROPDOWN, SEARCHABLE or PICKER {@link Nodes.Choice}s, at most one
+     * PRIMARY {@link Nodes.Button} and {@link Nodes.MenuButton}s. When it mounts the view the host refuses any other tree
+     * without an exception to the plugin: it records the refusal, naming the node, closes the view and that window shows
+     * none. {@link UiView#update} throws {@link IllegalArgumentException} naming the node and keeps the tree. A view
+     * never moves into the overflow menu: it hides while the toolbar is too narrow for it.
      *
      * @param factory builds one window's view
      * @since 0.18.0

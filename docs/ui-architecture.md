@@ -174,7 +174,8 @@ arrow and page keys (`listId`) while keeping the focus; a stack's `cancelAction`
 technology, confirmed by the owner); `Text.severity` tints text and `Text.caret` draws a command line's insertion bar.
 Host-only: `KitView.route(ThemeRoute)` re-routes one view in place (each view owns a copy of its context) and
 `KitView.paintsSurface(true)` paints its slot's `surface.panel` opaque; the app mounts plugin content tabs on the
-workspace slot over that surface, and their registered specialized content follows the view's slot.
+workspace slot over that surface, and their registered specialized content follows the view's slot. Toolbar views
+take `ThemeRoute.TITLE_BAR`, the chrome's `TitleBarTheme`, as the window header's own controls do.
 
 Document bars (Plan 3 Task 8): a `SplitKind.DOCUMENT` split presents its non-document children as compact bars,
 by structure and with no SDK shape change. An INLINE stack among them, directly or as a row of a VERTICAL group child,

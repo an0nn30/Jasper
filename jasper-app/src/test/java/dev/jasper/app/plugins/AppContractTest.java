@@ -308,20 +308,30 @@ class AppContractTest extends PluginContractTest {
             /** Each toolbar view's instance per window, built once as a window builds it when it opens; empty when it failed. */
             final java.util.Map<dev.jasper.app.contributions.ToolbarEntry.View, java.util.Map<UUID, Optional<dev.jasper.app.contributions.ToolbarEntry.Mounted>>> toolbarViews =
                 new java.util.IdentityHashMap<>();
+            /** Windows whose toolbar views closed: like a closed window, they build none again. */
+            final java.util.Set<UUID> closedToolbarWindows = new java.util.HashSet<>();
             @Override public List<String> openToolbarViews(UUID windowId) {
                 return onEdtValue(() -> {
                     List<String> roots = new java.util.ArrayList<>();
+                    if (closedToolbarWindows.contains(windowId) || terminalFixture.registry.window(windowId).isEmpty()) return roots;
                     for (var entry : contributions.toolbar()) {
                         if (!(entry instanceof dev.jasper.app.contributions.ToolbarEntry.View view)) continue;
-                        var mounted = toolbarViews.computeIfAbsent(view, key -> new java.util.HashMap<>())
-                            .computeIfAbsent(windowId, id -> view.factory().apply(id));
-                        mounted.ifPresent(built -> roots.add(((dev.jasper.ui.swing.KitView) built.component()).spec().root().id()));
+                        var built = toolbarViews.computeIfAbsent(view, key -> new java.util.HashMap<>());
+                        var mounted = built.get(windowId);
+                        if (mounted == null) built.put(windowId, mounted = view.factory().apply(windowId));
+                        else if (mounted.isPresent()) {
+                            // Asks the host again, as a second pass of a window's toolbar could: it keeps the window's view.
+                            var again = view.factory().apply(windowId);
+                            if (again.isPresent()) throw new AssertionError("The host built a second toolbar view for " + windowId);
+                        }
+                        mounted.ifPresent(shown -> roots.add(((dev.jasper.ui.swing.KitView) shown.component()).spec().root().id()));
                     }
                     return roots;
                 });
             }
             @Override public void closeToolbarViews(UUID windowId) {
                 onEdt(() -> {
+                    closedToolbarWindows.add(windowId);
                     for (var built : toolbarViews.values()) {
                         var mounted = built.remove(windowId);
                         if (mounted != null) mounted.ifPresent(dev.jasper.app.contributions.ToolbarEntry.Mounted::close);

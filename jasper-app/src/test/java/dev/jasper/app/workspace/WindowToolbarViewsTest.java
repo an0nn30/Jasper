@@ -123,6 +123,75 @@ class WindowToolbarViewsTest {
         });
     }
 
+    /**
+     * Review fix (plan 3d): a pass re-renders on every ACTIONS or TOOLBAR change, and a view stays a child of the toolbar
+     * across it. A remove would call its removeNotify, ending a focused control's focus and closing an open dropdown.
+     */
+    @Test void aViewStaysInTheToolbarWhileOtherContributionsChange() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var recorder = new Recorder();
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            owner.connectContributions(model);
+            owner.connectTerminals(new TerminalRegistry(), () -> { });
+            var action = model.addAction("dev.x.run", "Run", null, List.of(), Optional.empty(), invocation -> { });
+            model.addToolbar(new ToolbarEntry.Button("dev.x.run"));
+            model.addToolbar(recorder.entry);
+            JComponent view = recorder.components.getFirst();
+            var parent = view.getParent();
+            List<java.awt.event.HierarchyEvent> moves = new ArrayList<>();
+            view.addHierarchyListener(event -> {
+                if ((event.getChangeFlags() & java.awt.event.HierarchyEvent.PARENT_CHANGED) != 0) moves.add(event);
+            });
+            var before = owner.toolbar().getComponentIndex(view);
+            model.addAction("dev.x.stop", "Stop", null, List.of(), Optional.empty(), invocation -> { });
+            action.setEnabled(false);
+            var placed = model.addToolbar(new ToolbarEntry.Button("dev.x.stop"));
+            assertThat(owner.toolbar().getComponentIndex(view)).as("a button placed before it moves it along").isEqualTo(before);
+            placed.close();
+            owner.chrome().renderContributedToolbar();
+            assertThat(moves).as("never removed from its parent").isEmpty();
+            assertThat(view.getParent()).isSameAs(parent);
+            assertThat(owner.toolbar().getComponentIndex(view)).isEqualTo(before);
+            assertThat(recorder.built).containsExactly(owner.id());
+        });
+    }
+
+    /** Review fix (plan 3d): the header is a title bar zone, so a kit view takes the title bar's theme, as its neighbours do. */
+    @Test void aKitViewPaintsWithTheTitleBarsThemeOnAThemeThatOwnsItsTitleBar() throws Exception {
+        edt(() -> {
+            String json;
+            try (var in = dev.jasper.ui.theme.JasperTheme.class.getResourceAsStream("/dev/jasper/ui/theme/slate-cobalt.json")) {
+                json = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            } catch (java.io.IOException failure) { throw new AssertionError(failure); }
+            var light = dev.jasper.ui.theme.JasperTheme.parse(json.replace("\"accent\": \"#2563C9\"",
+                "\"surface.titlebar\": \"#27282E\", \"text.titlebar\": \"#DFE1E5\", \"accent\": \"#2563C9\""), "header").generated(false);
+            var header = dev.jasper.ui.theme.TitleBarTheme.of(light);
+            assertThat(header).as("the variant owns its title bar").isNotSameAs(light);
+            var binding = new dev.jasper.ui.theme.ThemeBinding(new dev.jasper.ui.theme.ThemePair(light, light), failure -> { throw new AssertionError(failure); });
+            var icons = new dev.jasper.ui.icons.IconRegistry();
+            var context = dev.jasper.ui.swing.KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, binding, dev.jasper.ui.theme.ThemeRoute.CHROME,
+                icons, () -> false, action -> "");
+            var view = new dev.jasper.ui.swing.KitView(context, new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Text("label",
+                dev.jasper.ui.model.ControlState.READY, "Session", dev.jasper.ui.model.Nodes.TextRole.LABEL)), event -> { });
+            try {
+                var model = new Contributions();
+                WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+                owner.connectContributions(model);
+                owner.connectTerminals(new TerminalRegistry(), () -> { });
+                model.addToolbar(new ToolbarEntry.View(window -> Optional.of(new ToolbarEntry.Mounted(view, view::close))));
+                assertThat(view.route()).isEqualTo(dev.jasper.ui.theme.ThemeRoute.TITLE_BAR);
+                var label = WindowTabsTest.named(view, "label");
+                assertThat(label).isNotNull();
+                // A LABEL Text paints in the secondary text level, which the title bar's theme derives from its own ink.
+                assertThat(label.getForeground()).as("the header's ink, not the chrome's")
+                    .isEqualTo(header.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY))
+                    .isNotEqualTo(light.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
+                owner.close();
+            } finally { if (!view.isClosed()) view.close(); binding.close(); icons.close(); }
+        });
+    }
+
     @Test void aKitViewIsPresentedAsAToolbarStrip() throws Exception {
         edt(() -> {
             var controller = ThemeTestSupport.controller(true);

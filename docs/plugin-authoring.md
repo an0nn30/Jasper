@@ -126,9 +126,12 @@ private static void installUi(PluginContext context, long stepMillis) {
   `StandardMenu.SESSION` and `TRANSFER`. Like Tools, each shows only while some plugin has entries in it, after Tab.
 - **Toolbar views** (SDK 0.18): `ToolbarItem.view(window -> context.kit().create(spec, events))` places a small group
   of your own controls in the main toolbar, one per window, built when the window opens and closed with it or your
-  registration. Its root is an INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER `Choice`s, at most one
-  PRIMARY `Button` and `MenuButton`s; the host refuses any other tree, naming the node, when it mounts the view and
-  on every `update`. A view never moves into the overflow menu: it hides while the toolbar is too narrow.
+  registration. The factory also runs inside `toolbar().add(...)` for every window already open, so finish
+  initialising what it reads before you add the view; a factory that throws is not asked again for that window. Its
+  root is an INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER `Choice`s, at most one PRIMARY `Button`
+  and `MenuButton`s. When a window mounts the view the host refuses any other tree by logging it, naming the node, and
+  closing the view, and that window shows none; `update` throws `IllegalArgumentException` naming the node. A view
+  never moves into the overflow menu: it hides while the toolbar is too narrow.
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** Pass semantic names such as `"lock"`, `"server"` and `"file"` to presentation records.
   Register a plugin-owned monochrome path with `context.kit().registerIcon(new IconAsset("your.plugin:icon", path))`.
